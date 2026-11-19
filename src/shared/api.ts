@@ -300,6 +300,8 @@ export interface CombworkRequests {
   /** Always on Top for this window, remembered for its workspace (pin.ts). Returns the window's state now. */
   'window:setAlwaysOnTop': (on: boolean) => boolean
   'window:getAlwaysOnTop': () => boolean
+  /** This window's state now, as a `window-state` event gives it: asked as the page starts, since a window opened without the focus gets no event until it is first focused or blurred (HI-3404). */
+  'window:state': () => { maximized: boolean; focused: boolean; alwaysOnTop: boolean }
   /** The project this window's page shows (null: none), for banners shown for "This project". */
   'window:showing': (projectPath: string | null) => void
   /** A banner was clicked: brings up the window showing its project, and the project (as a Windows notification's click). */

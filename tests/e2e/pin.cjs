@@ -58,7 +58,7 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   const invW = invOn(pw)
   await lib.openWorkspace(invW, pw, wsB)
   await invW('workspace:refresh')
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that the other window's workspace events do NOT unpin it.
+  await lib.sleep(lib.timing('quiet.pinKeptMs')) // A quiet window on purpose: this checks that the other window's workspace events do NOT unpin it.
   check("another window opening and refreshing a workspace leaves the pinned welcome window on top, its pin lit", await both(p1, true))
   check('…and that window starts off', await both(pw, false))
   await pw.evaluate(() => window.combwork.invoke('window:close')).catch(() => undefined)
@@ -178,7 +178,7 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   check('opening it again: on', !!(await lib.until(() => both(p1, true), lib.timing('hang.ui'))))
 
   // --- Quit and start again: each window comes back with its own pin.
-  const exited = app.waitForEvent('close', { timeout: 20000 }).then(() => true).catch(() => false)
+  const exited = app.waitForEvent('close', { timeout: lib.timing('app.closeMs') }).then(() => true).catch(() => false)
   await inv1('app:quit').catch(() => undefined)
   check('Combwork quits', await exited)
   app = await start()

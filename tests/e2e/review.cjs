@@ -69,12 +69,7 @@ function mcp(config, msgs) {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  const until = lib.until
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
   const calls = () => {
     const f = path.join(claudeHome, 'fake-calls.jsonl')

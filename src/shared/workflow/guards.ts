@@ -29,6 +29,8 @@ export interface GuardInputs {
   /** The acting agent, if an agent acts. */
   agent: string | null
   revision?: string | null
+  /** A submit taken as a follow-up in Review (HI-1832): its builder's, unstale, never a drag. */
+  followUp?: boolean
   /** Cards it waits for that aren't Done by facts. */
   waitingFor?: Ans<string[]>
   slotFree?: Ans<boolean>
@@ -132,9 +134,13 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
   'submit.notDuplicate': (i) => {
     const s = i.state
     const waiting = s.latest && (s.stage === 'review' || s.stage === 'merging' || ((s.stage === 'approved' || awaitsAgentMerge(i.ruleset, s)) && !s.stale))
-    if (i.card.kind === 'no-code') return waiting ? { rule: 'submit.notDuplicate', values: { card: i.card.key, revision: '—' } } : null
-    if (waiting && s.latest!.revision === i.revision) return { rule: 'submit.notDuplicate', values: { card: i.card.key, revision: short(i.revision) } }
-    return null
+    if (!waiting) return null
+    // The refusal names the waiting submission's recorded revision, or none (a no-code submission): HI-3409.
+    const refusal = { rule: 'submit.notDuplicate' as const, values: { card: i.card.key, revision: s.latest!.revision ? short(s.latest!.revision) : 'none' } }
+    // A no-code card has no revision to repeat: a follow-up in Review is new evidence, a new submission (HI-3409: a card
+    // the user made no-code in Review, its code submission waiting); any other submit while one waits is a second copy.
+    if (i.card.kind === 'no-code') return i.followUp ? null : refusal
+    return s.latest!.revision === i.revision ? refusal : null
   },
   'requeue.allowed': (i): GuardRefusal | null => {
     const s = i.state

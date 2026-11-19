@@ -127,12 +127,12 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     let k = 0
     const heldTurn = (a) => {
       const n = ++k
+      const go = (f) => fs.writeFileSync(path.join(homeOf(a), f), '')
       if (a.provider === 'codex') {
-        // "hold" waits for a "g" typed into it; its turn ends once its tool has (a second hold could miss its key while
-        // the checkpoint reads the inbox).
-        return { start: () => say(a.id, 'hold then checkpoint'), tool: () => inv('pty:write', lib.ptyKey(alpha, a.id), 'g'), end: async () => undefined, holdsEnd: false }
+        // Its tool waits for a file, never a key typed into its pane (HI-3403: a key is the user typing, whose pause holds
+        // the idle wake 15 s); its turn ends once its tool has.
+        return { start: () => say(a.id, `waitfile carry-tool${n} then checkpoint`), tool: () => go(`carry-tool${n}`), end: async () => undefined, holdsEnd: false }
       }
-      const go = (f) => fs.writeFileSync(path.join(claudeHome, f), '')
       return { start: () => say(a.id, `waitfile carry-tool${n} then checkpoint then holduntil carry-end${n}`), tool: () => go(`carry-tool${n}`), end: () => go(`carry-end${n}`), holdsEnd: true }
     }
 

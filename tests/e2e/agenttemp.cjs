@@ -118,14 +118,22 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
 
     // --- The workspace closes while a launch waits on its folder (HR1, round 1): held once Dora's folder is made, the
     // window opens another workspace, then the hold ends. Dora's CLI never starts, and nothing of the launch is left:
-    // back in the workspace, Dora starts as usual.
+    // back in the workspace, Dora starts as usual. HI-3402: the switch waits for a start still under way to be cancelled
+    // (HI-3376), so the hold ends once the window says it is waiting for it, and the switch finishes after.
     const dora = await lib.addAgent(inv, proj, { name: 'Dora' })
     const doraDir = path.join(host, dora.id)
     fs.rmSync(holdGo)
     const doraStart = inv('session:start', proj, { agentId: dora.id }).then(() => null, (e) => String(e?.message ?? e))
     check("Dora's launch is held with its folder made", !!(await lib.until(async () => fs.existsSync(doraDir), HUNG_MS)))
-    await lib.openWorkspace(inv, page, wsOther)
+    const switching = lib.openWorkspace(inv, page, wsOther).then(() => null, (e) => String(e?.message ?? e))
+    const waitingFor = await lib.until(async () => {
+      const s = await inv('closingAgents:state')
+      return s?.starting >= 1 ? s : null
+    }, HUNG_MS)
+    check('…the window switches workspace: it waits for the start under way, saying so', !!waitingFor, JSON.stringify(waitingFor))
     fs.writeFileSync(holdGo, '')
+    const switchSaid = await switching
+    check('…the hold ends: the switch finishes', switchSaid === null, String(switchSaid))
     const doraSaid = await doraStart
     const doraLaunched = () => claudeLaunches(proj).filter((l) => l.env?.CW_AGENT === 'Dora').length
     check("…the workspace closed meanwhile: its launch ends, and Dora's CLI never starts", doraLaunched() === 0 && !(await inv('session:live')).some((s) => same(s.projectPath, proj) && s.agentId === dora.id), String(doraSaid))

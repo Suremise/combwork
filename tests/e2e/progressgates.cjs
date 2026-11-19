@@ -266,7 +266,8 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
       })
       check("de: the offer to resume the lane's agents answered Don't Resume, and gone", !!answered && !!closed, String(fs.existsSync(restartRecord)))
     }
-    if (!(await until(async () => (await page.locator('.progress-panel').count()) === 1, 5000))) await page.locator('.progress-rail').click()
+    // A try's pace, not a bound: not restored open within it, the panel is opened by its rail.
+    if (!(await until(async () => (await page.locator('.progress-panel').count()) === 1, lib.timing('pace.panelRestoredMs')))) await page.locator('.progress-rail').click()
     const seg = page.locator('.progress-lane .lane-seg.todo').first()
     const label = async () => (await seg.getAttribute('aria-label').catch(() => null)) ?? ''
     check('in German, the refused mark is there, said in German', !!(await until(async () => (await seg.locator('.lane-seg-mark.refused').count()) === 1 && /kann noch nicht starten/.test(await label()) && !(await label()).includes("can't start yet"), HUNG_MS)), await label())

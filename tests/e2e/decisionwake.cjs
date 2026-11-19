@@ -51,12 +51,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  const until = lib.until
   const wakes = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).map((w) => w.text)
@@ -85,10 +80,11 @@ const check = (name, ok, extra = '') => {
 
   // Two decisions within the settle: one line.
   await inv('tasks:update', n, { decision: 'Shot 1: wide, from the door.' })
-  await lib.sleep(800)
+  // The gap between the two is the point (inside the wake's settle, they make one line), not a wait for a state.
+  await lib.sleep(lib.timing('pace.decisionGapMs'))
   await inv('tasks:update', n, { decision: 'Shot 2: close on the counter.' })
   check('one line for the two decisions', !!(await until(async () => wakes().length >= 1, HUNG_MS)), JSON.stringify(wakes()))
-  await lib.sleep(4000) // A fixed wait on purpose: this checks that a second line does NOT come.
+  await lib.sleep(lib.timing('quiet.secondWakeMs')) // A quiet window on purpose: this checks that a second line does NOT come.
   check('…exactly one, naming the card and both', wakes().length === 1 && wakes()[0] === `[CW] ${named} has 2 new decisions from the user: read them (cw_read_task) and carry on from where you asked.`, JSON.stringify(wakes()))
   check('it reads them', !!(await until(async () => reads(n).length >= 1, HUNG_MS)))
   check("the card's history says whom Combwork told", !!(await until(async () => (await card(n))?.history.some((h) => h.by === 'Combwork' && h.what === 'Told Asker (alpha) of 2 new decisions'), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
@@ -99,7 +95,7 @@ const check = (name, ok, extra = '') => {
   await prompts.type('holduntil decisionwake-busy')
   check('it works', !!(await until(async () => (await live(agent.id))?.status === 'working', HUNG_MS)))
   await inv('tasks:update', n, { decision: 'Shot 3: the van outside.' })
-  await lib.sleep(4500) // A fixed wait on purpose: this checks that nothing is typed while it works.
+  await lib.sleep(lib.timing('quiet.decisionWakeHeldMs')) // A quiet window on purpose: this checks that nothing is typed while it works.
   check('nothing typed while it works', wakes().length === 1 && (await live(agent.id))?.status === 'working', JSON.stringify({ wakes: wakes().length, status: (await live(agent.id))?.status }))
   fs.writeFileSync(path.join(claudeHome, 'decisionwake-busy'), '')
   check('…then one line once its turn ends', !!(await until(async () => wakes().length === 2, HUNG_MS)) && wakes()[1].startsWith(`[CW] ${named} has 1 new decision from the user: read it`), JSON.stringify(wakes().slice(1)))
@@ -113,12 +109,12 @@ const check = (name, ok, extra = '') => {
   const keepTyping = (async () => {
     // A key every half second, well inside the 4 s pause: typing, not a wait for a check.
     while (typing.on) {
-      await lib.sleep(500)
+      await lib.sleep(lib.timing('pace.keystrokeMs'))
       if (typing.on) await inv('pty:write', key, '.')
     }
   })()
   await inv('tasks:update', n, { decision: 'Shot 4: the sign.' })
-  await lib.sleep(3500) // A fixed wait on purpose: this checks that nothing is typed over the user's typing.
+  await lib.sleep(lib.timing('quiet.typingHoldMs')) // A quiet window on purpose: this checks that nothing is typed over the user's typing.
   check('nothing typed while the user types there', wakes().length === 2, JSON.stringify(wakes().slice(2)))
   typing.on = false
   await keepTyping

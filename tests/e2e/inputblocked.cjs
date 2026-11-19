@@ -7,7 +7,10 @@
 // dialog shows types one letter and says it still takes no keys; the user's Esc in its pane, which leaves the box empty
 // and sends no hook, frees nothing by itself; Try again then sees the box take its key: what waited is typed, and the
 // lane's slot places card 2 with B1 once, never made and called off while B1 is busy with that (HB3's re-give every
-// second, HI-2191). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// second, HI-2191). Then (HI-3411) the same dialog drawn in its input box's place: card 2's event and card 3's hand-off
+// are refused until Advanced's Input box hidden: wait passes, then B1 waits for the user (the lane watch told once more),
+// and the user's Esc, which draws its box again, frees it by itself. Dev build, throwaway profile, workspace and
+// CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -113,7 +116,11 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const c1 = (await inv('tasks:create', { title: 'Done by hand', project: 'alpha' })).number
     const c2 = (await inv('tasks:create', { title: 'Blocked input', project: 'alpha' })).number
     const c2Key = (await inv('tasks:list')).find((c) => c.number === c2).key
-    const started = await inv('lanes:start', alpha, { builder: b1.id, reviewer: r1.id, cards: [c1, c2] })
+    const c3 = (await inv('tasks:create', { title: 'Box hidden', project: 'alpha' })).number
+    const c3Key = (await inv('tasks:list')).find((c) => c.number === c3).key
+    // Input box hidden: wait (HI-3411), its least, so the second part needn't wait two minutes.
+    await inv('advanced:set', 'cw.input.hiddenSeconds', 10)
+    const started = await inv('lanes:start', alpha, { builder: b1.id, reviewer: r1.id, cards: [c1, c2, c3] })
     check('the lane is lent slot-a, and its agents start', started.slot === 'slot-a' && started.started.every((s) => s.how !== 'failed'), JSON.stringify(started))
     check('B1 runs in slot-a', !!(await until(async () => same((await live(b1.id))?.cwd, slotA) && (await idle(alpha, b1.id)))), JSON.stringify(await live(b1.id)))
     tb1 = await tokenOf(b1.id)
@@ -192,6 +199,39 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check("the lane watch was told once that B1 waits for the user", waitLine().length === 1, JSON.stringify(waitLine()))
     check('Combwork never answered the dialog', JSON.stringify(jsonl('fake-envsetup.jsonl').filter((r) => r.agent === 'B1').map((r) => r.answer)) === '["later"]', JSON.stringify(jsonl('fake-envsetup.jsonl')))
     check('the log says when it was blocked and freed', /took no key in 3 clears in a row/.test(combworkLog()) && /its input takes keys again \(Try again: its input took the key\)/.test(combworkLog()))
+
+    // ---- HI-3411: B1's turn ends on that dialog drawn in its input box's place (the box off the screen). Card 2 moved to
+    // Done by the user: its event, and the lane's hand-off of card 3, are refused for that until Advanced's Input box
+    // hidden: wait (10 s here) has passed; then B1 waits for the user, the lane watch told once more, and nothing is typed
+    // or handed off. The user's Esc draws its box again, which frees it by itself: what waited is typed, card 3 placed once.
+    await until(async () => (await idle(alpha, b1.id)) && b1Reads(freeAt).some((r) => r.data.includes(`(${c2Key})`)))
+    // Its lane watch ended with its wake: the Assistant watches the lanes again, as its wake tells it to.
+    await until(() => idle(aHome, 'assistant'))
+    await lib.typeLine(inv, lib.ptyKey(aHome, 'assistant'), home, null, 'cw cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}', { live: () => liveIn(aHome, 'assistant') })
+    check('the Assistant watches the lanes again', !!(await until(async () => (await liveIn(aHome, 'assistant'))?.status === 'watching')))
+    await lib.typeLine(inv, b1Key, home, 'B1', 'swallowhide', { ready: async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tb1), strict: true, live: () => live(b1.id), hungMs: HUNG_MS })
+    check("B1 ends its turn with the dialog in its input box's place", !!(await until(async () => (await idle(alpha, b1.id)) && (await inv('pty:buffer', b1Key)).slice(-800).includes(SWALLOW))))
+    const placed3 = placements(c3)
+    await inv('tasks:move', c2, 'done', { confirm: true, reason: 'Done by hand' })
+    const hidden = await until(async () => {
+      const s = await live(b1.id)
+      return s?.status === 'waiting' && s.inputBlocked && s
+    })
+    const blockedAt = new Date().toISOString()
+    check('past the wait, B1 waits for the user: something on its screen takes its keys', !!hidden && /taking its keys/.test(String(hidden.statusMessage)), JSON.stringify(hidden && { status: hidden.status, message: hidden.statusMessage }))
+    check("…the log says its box was off the screen, naming its screen's last rows", /its input box hasn't been on the screen for \d+ s \(its screen's last rows: "[^"]*Don't show again \| Enter to select/.test(combworkLog()))
+    check("the Assistant's lane watch is told once more", !!(await until(() => waitLine().length >= 2)) && waitLine().length === 2, JSON.stringify(waitLine()))
+    const cancelledHidden = await cancelled()
+    // Hand-offs tried before the block (each refused, the report's loop) are bounded by the wait; none since.
+    const placedBlocked = placements(c3)
+    const escHidden = new Date().toISOString()
+    await inv('pty:write', b1Key, '\x1b')
+    check('the user puts the dialog off: B1 takes keys again by itself, its box drawn again', !!(await until(async () => !(await live(b1.id))?.inputBlocked)), JSON.stringify(await live(b1.id)))
+    check('…nothing was typed into it while it was blocked', b1Reads(blockedAt).filter((r) => r.at < escHidden).length === 0, JSON.stringify(b1Reads(blockedAt)))
+    check('…what waited is typed into it', !!(await until(() => b1Reads(escHidden).some((r) => /\[CW\] New in your inbox/.test(r.data)))), JSON.stringify(b1Reads(escHidden).map((r) => r.data.slice(0, 60))))
+    check('…and the lane places card 3 with it, once', !!(await until(() => b1Reads(escHidden).some((r) => r.data.includes(`(${c3Key})`)))) && placements(c3) === placedBlocked + 1 && b1Reads(escHidden).filter((r) => r.data.includes(`(${c3Key})`)).length === 1, JSON.stringify({ placed3, placedBlocked, placements: placements(c3), reads: b1Reads(escHidden).map((r) => r.data.slice(0, 60)) }))
+    check('no delivery was called off while it was blocked', (await cancelled()) === cancelledHidden, JSON.stringify([cancelledHidden, await cancelled()]))
+    check('the log says its box is back', /its input takes keys again \(its input box is on the screen again\)/.test(combworkLog()))
   } catch (e) {
     check('the suite ran to the end', false, e?.stack ?? String(e))
   } finally {

@@ -71,8 +71,8 @@ const check = (name, ok, extra = '') => {
   for (const [zoom, theme] of [[1, 'dark'], [1.25, 'light']]) {
     const at = `${zoom * 100}% ${theme}`
     await inv('settings:update', { appearance: { theme } })
-    await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
-    await lib.sleep(300)
+    await lib.themeShown(page, theme)
+    await lib.zoomTo(app, page, zoom)
 
     // The Notifications panel's ✕ and Clear all, the report's case.
     if ((await page.locator('.notif-panel').count()) === 0) await page.locator('.activity-btn[aria-label="Notifications"]').click()

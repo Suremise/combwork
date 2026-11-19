@@ -520,8 +520,8 @@
     "description": "A line in a card's history: the card's description was edited."
   },
   "tasks.history.followUpSubmitted": {
-    "defaultMessage": "Follow-up submitted for review at {revision}",
-    "description": "A line in a card's history (HI-1832): while the card was in Review, its builder submitted a change its reviewer asked for (a follow-up), which its reviewer reviews now, with no new round. {revision} is a commit's short hash (keep it as it is)."
+    "defaultMessage": "Follow-up submitted for review{revision, select, none {} other { at {revision}}}",
+    "description": "A line in a card's history (HI-1832): while the card was in Review, its builder submitted a change its reviewer asked for (a follow-up), which its reviewer reviews now, with no new round. {revision} is a commit's short hash (keep it as it is), or none for a no-code card's follow-up, which records no revision and leaves out \"at …\" (HI-3409)."
   },
   "tasks.history.forwardResolving": {
     "defaultMessage": "Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.",

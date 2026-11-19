@@ -83,6 +83,17 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')).includes(name), lib.timing('hang.ui'))
   }
 
+  // --- Opened without the focus (HI-3404): the window knows it from the start, before any focus or blur event, so a pop-up
+  // sent to it (as main sends one, "waits in its window") holds its clock rather than closing unseen after its seconds.
+  check('a test copy opens without the focus', !(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isFocused())))
+  const early = { id: 'unfocused-1', kind: 'finished', level: 'success', title: 'Opened unfocused', message: 'Done.', target: { kind: 'project', projectPath: alpha, project: 'alpha' }, timestamp: new Date().toISOString() }
+  await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'toast', toast: early })
+  await lib.until(async () => (await banners().count()) === 1, lib.timing('hang.ui'))
+  await lib.sleep(lib.timing('quiet.bannerStaysMs')) // The window is the point: past a banner's 2 s, it doesn't close while the window is unfocused.
+  check('…and a pop-up in it stays past its seconds while unfocused', (await banners().count()) === 1, JSON.stringify(await bannerTitles()))
+  await setFocus(true)
+  check('…then closes after its seconds once the window is focused', !!(await lib.until(async () => (await banners().count()) === 0, lib.timing('hang.ui'))))
+
   // --- Focused: a finished agent is a pop-up at the bottom right, not a Windows notification.
   await setFocus(true)
   await showProject('beta')
@@ -261,6 +272,36 @@ const check = (name, ok, extra = '') => {
   await turnEnds(alpha, one)
   check('in the background: a Windows notification, no pop-up', !!(await lib.until(() => osNotes().length > before, lib.timing('hang.ui'))) && (await banners().count()) === 0, JSON.stringify(osNotes()))
   await inv('settings:update', { notifications: { bannerScope: 'all' } })
+
+  // --- Before the window knows its focus (HI-3404, HR1's round 1): reloaded unfocused with its answer to window:state held
+  // in main (CW_TEST_HOLD_IPC), the page has its workspace and live agents but counts as unfocused, so an unseen agent on
+  // screen stays unseen and a pop-up holds its clock; once the answer comes (unfocused) nothing changes, and once the
+  // window is focused both go on as ever.
+  await showProject('alpha')
+  await send(alpha, one, 'go work 1')
+  await turnEnds(alpha, one)
+  check('in the background, an agent finishing on screen is unseen', !!(await lib.until(async () => (await live(alpha, one))?.unseen === true, lib.timing('hang.ui'))), JSON.stringify(await live(alpha, one)))
+  const answered = () => app.evaluate(() => globalThis.__cwSettledIpc?.['window:state'] ?? 0)
+  const answeredBefore = await answered()
+  await app.evaluate(() => { process.env.CW_TEST_HOLD_IPC = 'window:state' })
+  await page.reload()
+  await lib.appReady(page)
+  check('reloaded, its window:state answer is held', !!(await lib.until(() => app.evaluate(() => (globalThis.__cwHeldIpc?.['window:state'] ?? 0) === 1), lib.timing('hang.ui'))))
+  await showProject('alpha')
+  await lib.until(async () => (await lib.paneHeader(page, 'One').count()) === 1, lib.timing('hang.ui'))
+  const pending = { ...early, id: 'unfocused-2', title: 'Before the answer', timestamp: new Date().toISOString() }
+  await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'toast', toast: pending })
+  await lib.until(async () => (await banners().count()) === 1, lib.timing('hang.ui'))
+  await lib.sleep(lib.timing('quiet.bannerStaysMs')) // The window is the point: past a banner's 2 s, with the page's workspace loaded, nothing is marked seen or closed.
+  check('…while held: the agent on screen stays unseen', (await live(alpha, one))?.unseen === true, JSON.stringify(await live(alpha, one)))
+  check('…and the pop-up stays past its seconds', (await banners().count()) === 1, JSON.stringify(await bannerTitles()))
+  await app.evaluate(() => { delete process.env.CW_TEST_HOLD_IPC })
+  check('the answer comes (unfocused)', !!(await lib.until(async () => (await answered()) > answeredBefore, lib.timing('hang.ui'))))
+  await lib.sleep(lib.timing('quiet.bannerStaysMs')) // The window is the point: past a banner's 2 s, an unfocused answer changes nothing.
+  check('…and changes nothing: still unseen, the pop-up still there', (await live(alpha, one))?.unseen === true && (await banners().count()) === 1)
+  await setFocus(true)
+  check('focused: the agent on screen is seen', !!(await lib.until(async () => (await live(alpha, one))?.unseen !== true, lib.timing('hang.ui'))), JSON.stringify(await live(alpha, one)))
+  check('…and the pop-up closes after its seconds', !!(await lib.until(async () => (await banners().count()) === 0, lib.timing('hang.ui'))))
 
   for (const [p, a] of [[alpha, one], [beta, two]]) await inv('session:stop', p, a.id).catch(() => undefined)
   await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))

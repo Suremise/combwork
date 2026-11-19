@@ -44,7 +44,7 @@ const post = (url, token, body) =>
   await inv('project:updateConfig', proj, { layout: 'columns2' })
   await lib.setOwnOptions(inv, proj, { fileLocks: 'ask' })
   await page.getByText('demo', { exact: true }).first().click()
-  await sleep(500)
+  await lib.projectShown(page)
   const agents = () => inv('workspace:get').then((w) => w.projects.find((p) => p.name === 'demo').agents)
   for (const name of ['Codex', 'Codex 2']) await lib.addAgent(inv, proj, { name, provider: 'codex', model: 'gpt-6-luna', effort: 'low' })
   const codex = (await agents()).filter((a) => a.provider === 'codex')
@@ -57,7 +57,7 @@ const post = (url, token, body) =>
       const l = await live(id)
       if (test(l)) return l
       if (Date.now() - t > ms) return l
-      await sleep(700)
+      await sleep(lib.timing('poll.intervalMs'))
     }
   }
   const text = async (id) => (await inv('pty:buffer', `session:${proj.toLowerCase()}#${id}`).catch(() => '')).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, ' ').replace(/\s+/g, ' ')
@@ -98,7 +98,7 @@ const post = (url, token, body) =>
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText: async () => '', writeText: async () => undefined } }))
   // The first Codex agent's pane is the left-hand column.
   await page.mouse.click(600, 650)
-  await sleep(300)
+  await lib.until(async () => page.evaluate(() => !!document.activeElement?.closest('.terminal-host')), lib.timing('hang.ui'))
   await page.keyboard.press('Control+V')
   await lib.until(async () => { const d = path.join(proj, '.combwork', 'attachments', l.sessionId); return fs.existsSync(d) && fs.readdirSync(d).length > 0 && /\[Image|image #|\.png/i.test((await text(a1.id)).slice(-600)) }, lib.timing('hang.ui')) // the pasted image saved, and shown by Codex
   const t1 = await text(a1.id)
@@ -108,7 +108,8 @@ const post = (url, token, body) =>
   check('Codex shows the pasted image', /\[Image|image #|\.png/i.test(t1.slice(-600)), t1.slice(-300))
   await page.screenshot({ path: path.join(scratch, 'cxe-2-image.png') })
   await inv('pty:write', key1, '\x15')
-  await sleep(500)
+  // Ctrl+U taken: the pasted image gone from the prompt (the screen's end) before the next part.
+  await lib.until(async () => !/\[Image|image #/i.test((await text(a1.id)).slice(-300)), lib.timing('hang.ui'))
 
   // --- "Ask me" lock: agent 2 holds notes.txt (a claim made through the hook server), agent 1 edits it.
   await inv('session:start', proj, { agentId: a2.id })
@@ -125,7 +126,7 @@ const post = (url, token, body) =>
     tool_input: { command: '*** Begin Patch\n*** Update File: notes.txt\n@@\n+claimed\n*** End Patch' }
   })
   check('agent 2 claims notes.txt', claim.status === 200, `${claim.status} ${claim.body}`)
-  await sleep(800)
+  await lib.until(async () => ((await live(a2.id))?.lockedFiles ?? []).some((f) => /notes\.txt$/i.test(f)), lib.timing('hang.ui'))
   const held = (await live(a2.id))?.lockedFiles ?? []
   check('lock shows on agent 2', held.some((f) => /notes\.txt$/i.test(f)), JSON.stringify(held))
   const asking = page.locator('.toast', { hasText: 'wants to edit notes.txt' })

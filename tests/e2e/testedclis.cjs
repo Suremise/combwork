@@ -43,7 +43,7 @@ const testedWith = (version) => fs.writeFileSync(manifest, JSON.stringify(versio
   check('the installed CLI and the tested one are the same', JSON.stringify(info.tested) === JSON.stringify({ version: '2.1.999', testedAt: '2026-10-07', installed: 'same' }), JSON.stringify(info.tested))
   const theme = async (t) => {
     await inv('settings:update', { appearance: { theme: t } })
-    await lib.sleep(300)
+    await lib.themeShown(page, t)
   }
   const shot = async (name) => {
     await page.screenshot({ path: path.join(lib.WORK, `testedclis-${name}-dark.png`) })
@@ -54,9 +54,10 @@ const testedWith = (version) => fs.writeFileSync(manifest, JSON.stringify(versio
 
   // --- Provider Setup, through the command palette.
   await page.keyboard.press('Control+Shift+P')
-  await lib.sleep(300)
+  await lib.until(async () => (await page.locator('.palette input').count()) === 1, lib.timing('hang.ui'))
   await page.keyboard.type('Provider Setup')
-  await lib.sleep(300)
+  // The list filtered to it: its first entry is the command.
+  await lib.until(async () => (await page.locator('.palette-item').first().innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')).includes('Provider Setup'), lib.timing('hang.ui'))
   await page.keyboard.press('Enter')
   const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
   check('Provider Setup opens', !!(await lib.until(async () => (await setup.count()) === 1, lib.timing('hang.ui'))))

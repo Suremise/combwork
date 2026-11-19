@@ -96,7 +96,7 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
   const asked = await page.locator('.dialog').allInnerTexts()
   check('Restart session relaunches while the stopped session is still being saved, asking nothing', again && !asked.length, JSON.stringify({ launches: launches().length, dialogs: asked }))
   check('…with the newer effort, the same conversation', launches()[2]?.opts['--effort'] === 'high' && launches()[2]?.opts['--resume'] === st.sessionId, JSON.stringify(launches()[2]?.opts))
-  await Promise.race([released, lib.sleep(10000)])
+  await Promise.race([released, lib.sleep(lib.timing('hang.ui'))])
 
   await inv('session:stop', proj)
   await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))

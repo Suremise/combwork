@@ -193,7 +193,7 @@ function jjRepo(dir, o = {}) {
     fs.mkdirSync(path.join(kept, 'ws'), { recursive: true })
     fs.writeFileSync(path.join(kept, 'ws', 'notes.txt'), 'a note of the user\'s\n')
     const C = (c) => c.repeat(40)
-    const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
     try {
       const seen = JSON.stringify({ remote: 'origin', url: 'https://example.invalid/shop.git', pushed: C('1'), head: C('1'), op: 'a'.repeat(128), print: 'p', at: Date.now() - 3600e3 })
       const flag = db.prepare(`INSERT INTO jj_obligations (project, card, cycle, bundle, target, result, since, state, pushed, at, seq, seen, "check") VALUES (?, ?, 1, ?, 'main', ?, 1, 'checkThis', ?, 5, 1, ?, ?)`)

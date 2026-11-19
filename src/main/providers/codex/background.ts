@@ -16,6 +16,8 @@ export interface CodexBackgroundMemo {
   unnamed: Map<string, string>
   /** Subagents seen to end (by thread id), so one started again (resume_agent) counts again (#1584). */
   subagentsEnded: Set<string>
+  /** When each recent call (by call_id) was made (HI-3406): a command's start says when its call was (`began`). */
+  called?: Map<string, number>
 }
 
 const MAX_KEPT = 50
@@ -84,17 +86,20 @@ function sessionId(text: string): string | undefined {
  */
 export function codexBackgroundTasks(appended: string, memo: CodexBackgroundMemo = codexBackgroundMemo()): BackgroundTaskEvent[] {
   const out: BackgroundTaskEvent[] = []
+  const called = (memo.called ??= new Map())
+  // When the call a command came from was made (HI-3406): exec_command returns a session only after its wait.
+  let began: number | undefined
   const start = (id: string, at: number): void => {
     memo.known.add(id)
     bound(memo.known)
-    out.push({ kind: 'start', id, at })
+    out.push({ kind: 'start', id, at, ...(began !== undefined && began <= at ? { began } : {}) })
   }
   const activity = advanced.get<string>('codex.subagent.item')
   const startedKind = advanced.get<string>('codex.subagent.started')
   const threadField = advanced.get<string>('codex.subagent.threadField')
   const taskField = advanced.get<string>('codex.subagent.taskField')
   for (const line of appended.split('\n')) {
-    if (!/session_id|session ID|process_id|custom_tool_call/.test(line) && !line.includes(activity)) continue
+    if (!/session_id|session ID|process_id|custom_tool_call|"function_call"/.test(line) && !line.includes(activity)) continue
     let o: Record<string, any>
     try {
       o = JSON.parse(line)
@@ -139,6 +144,10 @@ export function codexBackgroundTasks(appended: string, memo: CodexBackgroundMemo
       for (const c of calls) c.unclear = true
       continue
     }
+    if (o.type === 'response_item' && (p.type === 'function_call' || p.type === 'custom_tool_call') && p.call_id != null) {
+      called.set(String(p.call_id), at)
+      bound(called)
+    }
     if (o.type === 'response_item' && p.type === 'custom_tool_call' && p.name === 'exec' && typeof p.input === 'string' && p.call_id) {
       const code = codeOf(p.input)
       if (callSites(code)) {
@@ -150,6 +159,8 @@ export function codexBackgroundTasks(appended: string, memo: CodexBackgroundMemo
     if (p.type !== 'custom_tool_call_output' && p.type !== 'function_call_output') continue
     const call = p.call_id != null ? memo.open.get(String(p.call_id)) : undefined
     if (call) memo.open.delete(String(p.call_id))
+    began = p.call_id != null ? called.get(String(p.call_id)) : undefined
+    if (p.call_id != null) called.delete(String(p.call_id))
     const parts: string[] = typeof p.output === 'string' ? [p.output] : Array.isArray(p.output) ? p.output.map((x: any) => (typeof x?.text === 'string' ? x.text : '')) : []
     // A script whose one command ran once and ended within it started nothing, whatever it printed (a file it read).
     const allEnded = !!call && runsOnce(call.code) && call.ended.length > 0
@@ -179,7 +190,7 @@ export function codexBackgroundTasks(appended: string, memo: CodexBackgroundMemo
       const id = `${p.call_id}#0`
       memo.unnamed.set(id, call.input)
       bound(memo.unnamed)
-      out.push({ kind: 'start', id, at })
+      out.push({ kind: 'start', id, at, ...(began !== undefined && began <= at ? { began } : {}) })
     }
   }
   return out

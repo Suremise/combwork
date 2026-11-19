@@ -11,7 +11,7 @@ const HUNG_MS = lib.timing('hang.slow')
 const COMMITS = 2000
 const FILLER = 300
 /** Main's longest stall allowed while it takes them in (18 s before HI-2379; about 100 ms after). */
-const STALL_MS = 1000
+const STALL_MS = lib.timing('budget.mainStallMs')
 
 const userData = path.join(lib.WORK, 'mergeburst-profile')
 const ws = path.join(lib.WORK, 'mergeburst-ws')

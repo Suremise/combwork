@@ -2009,6 +2009,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork: when an agent is about to end its turn with items in its inbox it hasn't read, Combwork makes it carry on and read them.",
     "audience": "both"
   },
+  "settings.advanced.cw.input.hiddenSeconds.desc": {
+    "text": "How long an agent's input box may stay off its screen, from the first time Combwork couldn't type into it for that, before Combwork stops trying and shows the agent as waiting for you (HI-3411): something its CLI drew in the box's place, such as a question Combwork doesn't recognise, takes the keys. Once the box shows again, what waited is typed.",
+    "note": "What the advanced setting \"Input box hidden: wait\" is for (Settings → Advanced). HI-3411 is a card key: keep it as it is.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.input.hiddenSeconds.title": {
+    "text": "Input box hidden: wait",
+    "note": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"120 s\"). The input box: where a coding agent's terminal takes what is typed to it.",
+    "audience": "both"
+  },
   "settings.advanced.cw.jj.commandSeconds.desc": {
     "text": "How long one jj command Combwork runs may take, a snapshot of a large working copy included, before Combwork ends it: a read then counts as unknown, and a change made during a merge is left for you to settle. Raise it for a very large repository or a slow disk.",
     "note": "What the advanced setting \"jj: longest a command takes\" does, and when to change it (Settings → Advanced, HI-3372). jj is the Jujutsu version control tool.",
@@ -4018,7 +4028,7 @@
     "audience": "both"
   },
   "settings.agents.backgroundTaskMinutes.tip": {
-    "text": "An agent that ends its turn while a task it started is still running shows as waiting on background tasks, not finished: Claude Code carries on by itself when the task ends. Combwork can't tell a test run from something that never ends, such as a dev server, so it stops counting a task after this long (a Monitor also when it expires). Codex isn't told when its background terminals end, so they are only counted and shown. {min, number} to {max, plural, one {# minute} other {# minutes}}.",
+    "text": "An agent that ends its turn while a task it started is still running shows as waiting on background tasks, not finished: Claude Code carries on by itself when the task ends. Combwork can't tell a test run from something that never ends, such as a dev server, so it stops counting a task after this long (a Monitor also when it expires). A run under cw-progress that still reports keeps its task counted, and this time then counts from its last report. Codex isn't told when its background terminals end, so they are only counted and shown. {min, number} to {max, plural, one {# minute} other {# minutes}}.",
     "note": "The info tip of the setting \"Count background tasks for up to\" (Settings → Agents): more on what it does and when it applies. {min} and {max} are the fewest and most minutes it can be set to.",
     "audience": "both"
   },

@@ -209,7 +209,8 @@ const check = (name, ok, extra = '') => {
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
       await lib.fitWindow(app, page, { width, height: 800 })
-      await lib.sleep(400)
+      await lib.themeShown(page, theme)
+      await lib.viewportIs(page, width)
       check(`${theme}, ${width} px: the tab's template actions are inside the window and clickable`, await reachable('.split-main'))
       await shot(`tab-${width}-${theme}`)
     }
@@ -218,7 +219,7 @@ const check = (name, ok, extra = '') => {
   await userRow(sidebar, 'Solo').click()
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(400)
+    await lib.themeShown(page, theme)
     check(`${theme}, 900 px: the view's template actions are inside the window and clickable`, await reachable('.main-area > .tab-body'))
     await shot(`view-900-${theme}`)
   }
@@ -259,7 +260,7 @@ const check = (name, ok, extra = '') => {
   check('…added, moved and removed in the editor', JSON.stringify(editedRows) === '["Tester","Reviewer"]', JSON.stringify(editedRows))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await lib.themeShown(page, theme)
     await shot(`editor-${theme}`)
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -294,7 +295,7 @@ const check = (name, ok, extra = '') => {
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Shift+P')
   await page.locator('.palette input').fill('Save Agents as Template')
-  await lib.sleep(300)
+  await lib.until(async () => (await page.locator('.palette-item').first().innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')).includes('Save Agents as Template'), lib.timing('hang.ui'))
   await page.keyboard.press('Enter')
   await dialog.locator('input.input').waitFor({ timeout: lib.timing('hang.ui') })
   await dialog.locator('input.input').fill('Bump')
@@ -328,7 +329,7 @@ const check = (name, ok, extra = '') => {
   // (The file is written a moment before the editor has the reply.)
   check('…the editor stays open, with nothing left unsaved', !!(await lib.until(async () => (await editor.count()) === 1 && (await editor.locator('.template-unsaved-note').count()) === 0 && (await editor.getByRole('button', { name: 'Save Template' }).isDisabled()), lib.timing('hang.ui'))))
   // Nothing should come: 1.5 s in which the stale note must not show (a quiet period, the point of the check).
-  check('…and never says it was saved again meanwhile (its own save)', !(await lib.until(async () => (await editor.locator('.template-stale').count()) > 0, 1500)))
+  check('…and never says it was saved again meanwhile (its own save)', !(await lib.until(async () => (await editor.locator('.template-stale').count()) > 0, lib.timing('quiet.staleNoteMs'))))
   await editor.getByRole('button', { name: 'Close' }).click()
   await detail.getByRole('button', { name: 'Edit…' }).click()
   await editor.waitFor({ timeout: lib.timing('hang.ui') })
@@ -341,14 +342,14 @@ const check = (name, ok, extra = '') => {
   check('…another template: the list marks this one "Not saved"', !!(await lib.until(async () => (await teamRow.locator('.template-unsaved').count()) === 1, lib.timing('hang.ui'))))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await lib.themeShown(page, theme)
     await shot(`unsaved-row-${theme}`)
   }
   await teamRow.click()
   check('…back: the editor opens again with the change', !!(await lib.until(async () => (await editor.count()) === 1 && (await editor.locator('#template-name').inputValue()) === 'Team pending', lib.timing('hang.ui'))))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await lib.themeShown(page, theme)
     await shot(`unsaved-editor-${theme}`)
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -403,7 +404,7 @@ const check = (name, ok, extra = '') => {
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Shift+P')
   await page.locator('.palette input').fill('Reload Window')
-  await lib.sleep(300)
+  await lib.until(async () => (await page.locator('.palette-item').first().innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')).includes('Reload Window'), lib.timing('hang.ui'))
   await page.keyboard.press('Enter')
   const askSave = page.locator('.dialog', { hasText: 'Save your changes?' })
   check('Reload Window with a template draft asks to save it first', !!(await lib.until(async () => (await askSave.count()) === 1 && /Template "Team slow"/.test(await askSave.innerText()), lib.timing('hang.ui'))), await askSave.innerText().catch(() => ''))
@@ -416,7 +417,7 @@ const check = (name, ok, extra = '') => {
   check('quitting with a template draft asks about it', !!(await lib.until(async () => (await quitDialog.count()) === 1 && /pair\.json/.test(await quitDialog.innerText()), lib.timing('hang.ui'))), await quitDialog.innerText().catch(() => ''))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await lib.themeShown(page, theme)
     await shot(`quit-asks-${theme}`)
   }
   await quitDialog.getByRole('button', { name: 'Save and quit' }).click()

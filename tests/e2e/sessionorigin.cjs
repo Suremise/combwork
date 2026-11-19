@@ -48,7 +48,7 @@ const check = (name, ok, extra = '') => {
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   /** Starts an agent and has it answer one prompt, so Combwork keeps its session. */
@@ -58,7 +58,7 @@ const check = (name, ok, extra = '') => {
     if ((await live(id))?.status === 'waiting') await inv('pty:write', lib.ptyKey(alpha, id), '\r')
     await until(async () => (await live(id))?.status === 'ready', HUNG_MS)
     await inv('pty:write', lib.ptyKey(alpha, id), 'hello')
-    await lib.sleep(300)
+    await lib.sleep(lib.timing('pace.keysThenEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
     await inv('pty:write', lib.ptyKey(alpha, id), '\r')
     return !!(await until(async () => (await live(id))?.status === 'finished', HUNG_MS))
   }

@@ -1471,7 +1471,15 @@ export async function recordEndedLaunches(): Promise<void> {
       if (l.restored || outcomes.has(l.runId) || host.instance !== helper) continue
       const list = await listJob(l.runId).catch(() => null)
       if (host.instance !== helper || !left.has(l.runId) || outcomes.has(l.runId)) continue
-      if (list && (await nothingHolds(list.processes, list.more, l.agentName))) ended.push(l.runId)
+      if (list && (await nothingHolds(list.processes, list.more, l.agentName))) {
+        // HI-3402: settled here as the leftovers' own look settles it (refresh), so its writer is released before the
+        // workspaces close: the quit waits for the writers of this Combwork's runs (HI-3376), and this one's release
+        // would otherwise never come, holding the quit until Don't wait.
+        left.delete(l.runId)
+        void host.request('forget', l.runId)
+        settleRun(l.runId, 'ended')
+        ended.push(l.runId)
+      }
     }
     scan: while (pending.size) {
       for (const run of [...pending]) {

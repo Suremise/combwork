@@ -208,7 +208,7 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
     for (const p of [shop]) await inv('session:stop', p).catch(() => undefined)
     await lib.until(async () => (await inv('session:live')).length === 0, HUNG_MS)
     await app.close()
-    const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
     const seq = (db.prepare('SELECT MAX(seq) AS m FROM card_facts WHERE card = ?').get(c.n).m ?? 0) + 1
     db.prepare('INSERT INTO card_facts (card, seq, kind, at, actor, source, ruleset, dedupe, data) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?)').run(c.n, seq, 'AdvanceAttempted', new Date().toISOString(), 'combwork', 'recorded', JSON.stringify({ plan: 'p', attempt: 'ghost' }))
     db.close()

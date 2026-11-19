@@ -37,7 +37,7 @@ const check = (name, ok, extra = '') => {
   )
   check('the workspace closed', close.ok && close.value === true, JSON.stringify(close))
   check('the start was cancelled', !start.ok && /stopped before it had started/.test(start.error), JSON.stringify(start).slice(0, 200))
-  await lib.sleep(4000) // A fixed wait on purpose: this checks that the cancelled start does NOT start an agent later.
+  await lib.sleep(lib.timing('quiet.cancelledStartMs')) // A quiet window on purpose: this checks that the cancelled start does NOT start an agent later.
   const live = await inv('session:live')
   check('no agent is running afterwards', live.length === 0, JSON.stringify(live).slice(0, 200))
 

@@ -40,12 +40,7 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-    return v
-  }
+  const until = lib.until
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
   const saved = () => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8')).agents.map((a) => a.name).join(',')
   const paneNames = async () => (await page.locator('.pane-header-bar .agent-name').allInnerTexts()).join(',')
@@ -60,9 +55,7 @@ const check = (name, ok, extra = '') => {
   await inv('session:start', alpha, { agentId: one.id })
   // before any turn (HI-2688): its start, restart or resume
   await until(async () => (await live(one.id))?.status === 'ready', lib.timing('hang.step'))
-  await inv('pty:write', lib.ptyKey(alpha, one.id), 'hello')
-  await lib.sleep(300)
-  await inv('pty:write', lib.ptyKey(alpha, one.id), '\r')
+  await lib.typeThenEnter(inv, lib.ptyKey(alpha, one.id), 'hello')
   await until(async () => (await live(one.id))?.status === 'finished', lib.timing('hang.step'))
   const session = (await live(one.id)).sessionId
   check('starts in the order added', saved() === 'One,Two,Three' && (await paneNames()) === 'One,Two,Three', await paneNames())
@@ -87,7 +80,7 @@ const check = (name, ok, extra = '') => {
   check('dragging a pane shows where it can go', !!(await until(async () => (await page.locator('.pane-drop').count()) === 2, HUNG_MS)))
   const b = await target.boundingBox()
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 8 })
-  await lib.sleep(200)
+  await lib.framesDrawn(page)
   await page.screenshot({ path: path.join(lib.WORK, 'reorder-2-pane-drag.png') })
   await page.mouse.up()
   check("dropping a pane on another puts it in that agent's place", !!(await until(async () => (await paneNames()) === 'Three,Two,One', HUNG_MS)), await paneNames())

@@ -106,6 +106,8 @@ export function startProgress(): void {
   if (started) return
   started = true
   setInterval(() => progress.sweep(), 15_000).unref()
+  // An agent's runs still reporting keep its background tasks counted (HI-3406).
+  sessions.followProgress((projectPath, agentId) => progress.runsOf(projectPath, agentId))
   // A workspace that closes (or whose window opens another) takes its runs with it: reopened, it starts empty.
   WorkspaceService.closingListeners.add((path) => progress.clear(path))
   config.onSettingsChanged((s, prev) => {

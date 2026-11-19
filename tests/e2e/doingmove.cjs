@@ -17,12 +17,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+const until = lib.until
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
@@ -98,7 +93,7 @@ const until = async (fn, ms) => {
   check('with nobody as the default for a card with no agent', await mode(dialog(a), 'Nobody yet').locator('input').isChecked())
   check('the card is not moved while it asks', (await card(a)).column === 'todo' && (await column('Todo').locator(`.task-card[data-task="${a}"]`).count()) === 1)
   await dialog(a).getByRole('button', { name: 'Cancel' }).click()
-  await lib.sleep(500)
+  await until(async () => (await dialog(a).count()) === 0, lib.timing('hang.ui'))
   const ac = await card(a)
   check('Cancel leaves the card where it was', ac.column === 'todo' && ac.agent === null && (await dialog(a).count()) === 0, JSON.stringify({ column: ac.column, agent: ac.agent }))
 
@@ -138,7 +133,7 @@ const until = async (fn, ms) => {
     const x = await card(c)
     return x.column === 'doing' && x.agent === busy.id
   }, lib.timing('hang.ui'))))
-  await lib.sleep(1000) // A fixed wait on purpose: this checks that nothing starts.
+  await lib.sleep(lib.timing('quiet.noStartMs')) // A quiet window on purpose: this checks that nothing starts.
   const cName = await named(c)
   check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(cName), cName)
   check('and starts nothing', !transcripts().includes(`task ${cName} `) && (await live(busy))?.status === 'working' && !(await live(sleepy)))
@@ -148,9 +143,10 @@ const until = async (fn, ms) => {
   const doingBefore = await order('Active')
   const last = doingBefore.at(-1)
   await tile(last).dragTo(tile(doingBefore[0]), { targetPosition: { x: 20, y: 4 } })
-  await lib.sleep(800)
+  // The drop done (a move into Active asks at once, at the drop; a reorder is the drop's whole effect), then no question.
+  const reordered = (await until(async () => (await order('Active'))[0] === last, lib.timing('hang.ui'))) === true
   check('reordering within Active does not ask', (await page.locator('.dialog', { hasText: 'to Active' }).count()) === 0)
-  check('and reorders', (await until(async () => (await order('Active'))[0] === last, lib.timing('hang.ui'))) === true, JSON.stringify(await order('Active')))
+  check('and reorders', reordered, JSON.stringify(await order('Active')))
 
   // --- A drop position is kept: F dropped above the top Active card.
   const top = (await order('Active'))[0]
@@ -168,7 +164,7 @@ const until = async (fn, ms) => {
   await edit.getByRole('button', { name: 'Save', exact: true }).click()
   await dialog(d).waitFor({ timeout: lib.timing('hang.ui') })
   await dialog(d).getByRole('button', { name: 'Cancel' }).click()
-  await lib.sleep(500)
+  await until(async () => (await dialog(d).count()) === 0, lib.timing('hang.ui'))
   const dc = await card(d)
   check('Cancel from the card dialog saves nothing and keeps it open', dc.column === 'todo' && dc.title === 'Card D' && (await edit.count()) === 1, JSON.stringify({ column: dc.column, title: dc.title }))
 
@@ -202,9 +198,7 @@ const until = async (fn, ms) => {
   await eRow('Idle').click()
   check('Start is on for the idle agent', !(await confirm(dialog(e)).isDisabled()))
   const key = lib.ptyKey(alpha, idle.id)
-  await inv('pty:write', key, 'work 30')
-  await lib.sleep(100)
-  await inv('pty:write', key, '\r')
+  await lib.typeThenEnter(inv, key, 'work 30')
   check('once it gets busy, it is greyed out', !!(await until(async () => await disabled(eRow('Idle')), lib.timing('hang.ui'))))
   check('and Start is off', await confirm(dialog(e)).isDisabled())
   await dialog(e).getByRole('button', { name: 'Cancel' }).click()

@@ -61,12 +61,7 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-cw-api
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-    return v
-  }
+  const until = (fn, ms) => lib.until(fn, ms)
   await lib.waitForProvider(inv, 'codex')
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()

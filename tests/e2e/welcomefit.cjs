@@ -54,9 +54,10 @@ const check = (name, ok, extra = '') => {
 
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
+    await lib.themeShown(page, theme)
     for (const zoom of [1, 1.25]) {
-      await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
-      await lib.sleep(300) // Layout after a zoom change.
+      // Drawn at the zoom and settled (its layout after the change).
+      await lib.zoomTo(app, page, zoom)
       const label = `${theme}, ${zoom * 100}%`
       const m = await measure()
       check(`${label}: the page is no wider than its area`, m.scrollWidth <= m.clientWidth, JSON.stringify({ scrollWidth: m.scrollWidth, clientWidth: m.clientWidth }))

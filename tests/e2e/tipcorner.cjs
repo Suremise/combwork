@@ -41,16 +41,13 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
+  // A tip waits for a focused window, and a test copy never has the focus (HI-3404).
+  await lib.stubFocus(app)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-    return v
-  }
+  const until = (fn, ms) => lib.until(fn, ms)
   const card = page.locator('.tip-card')
   const panel = page.locator('.assistant-panel')
   const header = panel.locator('.assistant-header')
@@ -73,8 +70,8 @@ const check = (name, ok, extra = '') => {
   const runAndStop = async (p, id) => {
     await inv('session:start', p, { agentId: id })
     await until(async () => (await live(p, id))?.status === 'ready', HUNG_MS)
+    // The fake reads its keys in order, the line then its Enter (fake-claude.cjs: a paste only after a slow spell it isn't in).
     await inv('pty:write', lib.ptyKey(p, id), 'hello')
-    await lib.sleep(300)
     await inv('pty:write', lib.ptyKey(p, id), '\r')
     await until(async () => (await live(p, id))?.status === 'finished', HUNG_MS)
     const sid = (await live(p, id)).sessionId
@@ -91,7 +88,8 @@ const check = (name, ok, extra = '') => {
   const first = await runAndStop(home, 'assistant')
   const ended = panel.locator('.assistant-ended')
   await until(async () => (await ended.getByRole('button', { name: 'Resume' }).count()) === 1, lib.timing('hang.step'))
-  await lib.sleep(300)
+  await lib.animationsDone(panel)
+  await lib.animationsDone(card)
   const p1 = await box(panel)
   const c1 = await box(card)
   check('with the Assistant open, the card sits left of its panel', c1 && p1 && c1.x + c1.width <= p1.x, JSON.stringify({ card: c1, panelLeft: p1?.x }))
@@ -120,7 +118,9 @@ const check = (name, ok, extra = '') => {
   const done = await runAndStop(alpha, coder.id)
   const bar = page.locator('.agent-pane-body .session-ended')
   await until(async () => (await bar.count()) === 1, lib.timing('hang.ui'))
-  await lib.sleep(300)
+  // On purpose: a notice of the ended session that closed the tip would have come within this.
+  await lib.sleep(lib.timing('quiet.briefMs'))
+  await lib.animationsDone(card)
   check('the tip still shows (no notification closed it)', (await card.count()) === 1, JSON.stringify(await page.evaluate(() => window.__cwBell?.())))
   const b2 = await box(bar)
   const c2 = await box(card)
@@ -144,7 +144,7 @@ const check = (name, ok, extra = '') => {
   await card.getByRole('button', { name: "Don't show tips" }).click()
   const toast = page.locator('.toast', { hasText: 'Tips are off' })
   await until(async () => (await toast.count()) === 1, lib.timing('hang.ui'))
-  await lib.sleep(300)
+  await lib.animationsDone(toast)
   const t3 = await box(toast)
   const b3 = await box(bar)
   check("a toast keeps clear of the pane's ended bar", t3 && b3 && !overlaps(t3, b3), JSON.stringify({ toast: t3, bar: b3 }))

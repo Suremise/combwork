@@ -75,7 +75,7 @@ function board09() {
 
 /** The board's rows for a query, read on a connection of the suite's own. */
 function rows(sql, ...args) {
-  const db = new DatabaseSync(dbFile, { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(dbFile, { readOnly: true, timeout: lib.timing('db.busyMs') })
   try {
     return db.prepare(sql).all(...args)
   } finally {
@@ -189,7 +189,7 @@ const log = () => {
     const unchosen = async (crash) => {
       await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { commitMessage: undefined }) })
       await h.app.close().catch(() => {})
-      const db = new DatabaseSync(dbFile, { timeout: 5000 })
+      const db = new DatabaseSync(dbFile, { timeout: lib.timing('db.busyMs') })
       try {
         db.prepare("DELETE FROM board_meta WHERE key = 'workflow:alpha:mergeChoice'").run()
       } finally {

@@ -3,6 +3,7 @@
 // locale-independent means only: IPC, command ids and structural hooks, never English text. Windows draws the native
 // dialogs' titles, so they can't be photographed here.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 
@@ -40,7 +41,7 @@ async function excludeRefused(ctx) {
 /** The notice closed, the project off again (cases after this one count the projects that are on), and alpha shown. */
 async function closeRefused(ctx) {
   const { page, lib, inv } = ctx
-  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.toasts .toast').count()) === 0 || (await dismiss()), ctx.hungMs))) throw new Error("the refusal didn't close")
   await ctx.command('project.focus', ctx.project)
   await inv('project:setActive', projectOf(ctx), false)

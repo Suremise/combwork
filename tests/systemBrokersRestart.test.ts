@@ -96,6 +96,13 @@ describe("an idle broker from before a restart, or at a quit, holds nothing (HI-
     expect(await m.endedEarlier('q-broker')).toBe(true)
     expect(await m.endedEarlier('q-writer')).toBe(false)
     expect(await m.endedEarlier('q-sandbox')).toBe(false)
+    // HI-3402: the broker's run settled now, as the leftovers' own look would: its writer's release (which the quit waits
+    // for, HI-3376) comes before Combwork exits, and it is no longer listed. The others stay as they were.
+    expect(m.runOutcome('q-broker')).toBe('ended')
+    expect(m.leftoversOf(join(dir, 'p'), 'q-broker').processes).toEqual([])
+    expect(m.runOutcome('q-writer')).toBeNull()
+    expect(m.runOutcome('q-sandbox')).toBeNull()
+    expect(m.leftoversOf(join(dir, 'p'), 'q-writer').processes.length).toBe(2)
     expect(host.ended).toEqual([])
     expect(host.killed).toEqual([])
   })

@@ -18,7 +18,7 @@ const { jjDir, portableJj } = require('../jjPortable.cjs')
 const HUNG_MS = lib.timing('hang.step')
 // The repository watch's own re-arm and rescan run each minute: an observation written well before it came from the
 // operation (or the reopen), not from that timer.
-const PROMPT_MS = 20000
+const PROMPT_MS = lib.timing('budget.jjObservedMs')
 const exe = portableJj()
 if (!exe) {
   console.log("SKIP jjreopen: the pinned jj isn't fetched (npm run jj:fetch)")
@@ -52,7 +52,7 @@ const toolEnv = () => ({ ...lib.gitEnv({ GIT_CONFIG_GLOBAL: gitConfig, GIT_ATTR_
 const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 const dbFile = path.join(ws, '.combwork', 'combwork.db')
 const onDb = (fn) => {
-  const db = new DatabaseSync(dbFile, { timeout: 5000 })
+  const db = new DatabaseSync(dbFile, { timeout: lib.timing('db.busyMs') })
   try {
     return fn(db)
   } finally {

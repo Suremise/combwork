@@ -26,12 +26,8 @@ const check = (name, ok, extra = '') => {
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 950 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-    return v
-  }
+  // HI-3396: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
   const pageSel = '.performance-page:visible'
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `perfcompare-${name}.png`) })
   // The open dialog answered in main: the next import picks `file`.
@@ -41,8 +37,11 @@ const check = (name, ok, extra = '') => {
     }, file)
   const importFile = async (file) => {
     await picks(file)
+    const before = await lib.ipcSettled(app, 'benchmarks:import')
     await page.locator(`${pageSel} button`, { hasText: 'Import' }).click()
-    await lib.sleep(600)
+    // HI-3396: its import answered and drawn.
+    await lib.ipcAnswered(app, 'benchmarks:import', before + 1, HUNG_MS)
+    await lib.answersDrawn(inv, page)
   }
   const statusOf = async (id) => (await page.locator(`${pageSel} .perf-scenarios tbody tr`, { hasText: id }).first().locator('.badge').innerText().catch(() => '')).trim()
 
@@ -97,16 +96,20 @@ const check = (name, ok, extra = '') => {
   await shot('better-dark')
 
   // A pair switched while a slow read is out: the new pair is what shows.
+  const reads = await lib.ipcSettled(app, 'benchmarks:read')
   await app.evaluate(() => {
     process.env.CW_TEST_SLOW_IPC = 'benchmarks:read=2000*2'
   })
   await page.locator(`${pageSel} select[aria-label="Run"]`).selectOption({ label: 'fake, fixtures v5 (smaller but wrong)' })
-  await lib.sleep(200)
+  // HI-3396: its (slowed) reads asked for, by the change drawn, before the slowing is taken off.
+  await lib.framesDrawn(page)
   await app.evaluate(() => {
     process.env.CW_TEST_SLOW_IPC = ''
   })
   await page.locator(`${pageSel} select[aria-label="Run"]`).selectOption({ label: 'fake, fixtures v5 (smaller replies)' })
-  await lib.sleep(3000) // A fixed wait on purpose: the slowed answer for the old choice arrives later, and this checks it doesn't replace the new one.
+  // HI-3396: the old pair's slowed reads answered and drawn (main's count), then checked.
+  await lib.ipcAnswered(app, 'benchmarks:read', reads + 4, HUNG_MS)
+  await lib.answersDrawn(inv, page)
   check("a pair switched during a slow read shows the new pair, not the old one's late answer", (await statusOf('card-detail')) === 'Smaller, still correct', await statusOf('card-detail'))
   check('the choice is remembered for the scope', (await inv('benchmarks:list', { kind: 'workspace' })).run !== null)
   check('the table shows the checks themselves: passed and skipped, baseline → run', /4✓ 1– → 4✓ 1–/.test(await page.locator(`${pageSel} .perf-scenarios tbody tr`, { hasText: 'card-detail' }).first().innerText()), await page.locator(`${pageSel} .perf-scenarios tbody tr`, { hasText: 'card-detail' }).first().innerText())
@@ -170,7 +173,7 @@ const check = (name, ok, extra = '') => {
   await page.locator(`${pageSel} button`, { hasText: 'Keep current view' }).click()
   await page.locator('.dialog input.input').first().fill('Today, whole workspace')
   await page.locator('.dialog .btn.primary').click()
-  await lib.sleep(800)
+  await lib.readyWithin('its dialog closed', async () => (await page.locator('.dialog').count()) === 0, HUNG_MS)
   await page.locator(`${pageSel} select[aria-label="Run"]`).selectOption({ label: 'Today, whole workspace' })
   check('an export against a benchmark is not comparable, and says why', !!(await until(async () => /measure different things/.test(await page.locator(`${pageSel} .banner.warn`).innerText().catch(() => '')), HUNG_MS)))
 
@@ -186,7 +189,7 @@ const check = (name, ok, extra = '') => {
     await page.locator(`${pageSel} button`, { hasText: 'Keep current view' }).click()
     await page.locator('.dialog input.input').first().fill(label)
     await page.locator('.dialog .btn.primary').click()
-    await lib.sleep(800)
+    await lib.readyWithin('its dialog closed', async () => (await page.locator('.dialog').count()) === 0, HUNG_MS)
   }
   check("…its own kept views compare, per hour recorded", !!(await until(async () => (await page.locator(`${pageSel} .perf-comparison table`).count()) === 1, HUNG_MS)))
   const alphaList = await inv('benchmarks:list', { kind: 'project', project: 'alpha' })
@@ -207,10 +210,10 @@ const check = (name, ok, extra = '') => {
   check('…and back to worst first', (await page.locator(`${pageSel} .perf-scenarios th[aria-sort="ascending"]`, { hasText: 'Result' }).count()) === 1, (await scenarioIds()).join())
   check('the kept list is a table too', (await page.locator(`${pageSel} .perf-kept th`, { hasText: 'When' }).count()) === 1)
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.sleep(800)
+  await lib.themeSettled(page, 'light')
   await shot('failing-light')
   await lib.fitWindow(app, page, { width: 720, height: 900 })
-  await lib.sleep(800)
+  await lib.viewportIs(page, 720)
   const overflow = await page.locator(pageSel).evaluate((el) => el.scrollWidth - el.clientWidth)
   check('narrow: the page itself has no sideways scroll', overflow <= 1, String(overflow))
   await shot('narrow-light')

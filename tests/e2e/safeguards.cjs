@@ -61,12 +61,7 @@ const check = (name, ok, extra = '') => {
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const live = async (p, agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === agentId)
-    const until = async (fn, ms) => {
-      const t = Date.now()
-      let v
-      while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-      return v
-    }
+    const until = lib.until
     const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification')
     const hooksLog = path.join(userData, 'logs', 'hooks.log')
     const notifications = () => (fs.existsSync(hooksLog) ? fs.readFileSync(hooksLog, 'utf8').split('\n').filter((l) => / Notification /.test(l)).length : 0)
@@ -104,11 +99,15 @@ const check = (name, ok, extra = '') => {
       return /4\.8/.test(t) && t
     }, HUNG_MS)
     check('its pane shows the model it runs on now', !!mark, String(mark))
+    // Seen once Combwork is focused with its pane on screen (stubbed: a test copy never has the focus, and its page knows
+    // that, HI-3404); then in the background again, where Combwork's notices are Windows notifications (the log read here).
+    await lib.stubFocus(app)
     const seen = await until(async () => {
       const s = await live(alpha, id)
       return s?.safeguard && !s.safeguard.unseen && s
     }, HUNG_MS)
     check('its pane on screen counts as seen (out of the attention inbox)', !!seen, JSON.stringify(seen?.safeguard))
+    await lib.stubFocus(app, false)
     const told = await until(() => notices().find((n) => /now runs on/.test(n.title ?? '')), HUNG_MS)
     check("Combwork's notice says so", !!told && /safety classifier stopped a response/.test(told.body ?? ''), JSON.stringify(notices()))
     const comment = await until(async () => {

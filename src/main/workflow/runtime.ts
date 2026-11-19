@@ -467,7 +467,7 @@ const W = {
   staleChange: agentMsg({ id: 'runtime.wake.stalePaths', text: 'stale: your paths changed since the pass, submit again', note: "The builder's wake when its declared paths changed after its pass." }),
   approvedMerge: agentMsg({ id: 'runtime.wake.approvedMerge', text: 'approved: merge it and report the merge', note: "The builder's wake when its card passed and the builder merges it." }),
   movedAhead: agentMsg({ id: 'runtime.submit.movedAhead', text: 'moved ahead of {cards} (not started); its reviewer is told', note: "A submit's lane field: the card was moved before its lane's cards nobody has started. {cards}: their keys." }),
-  followUp: agentMsg({ id: 'runtime.wake.followUp', text: '{card}: follow-up submitted for review at {revision} (submission {submission}). Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused', note: "HI-1832: the reviewer's wake for a follow-up (the card stays in Review, so no arrival wakes it). {revision}: short. {submission}: its number." }),
+  followUp: agentMsg({ id: 'runtime.wake.followUp', text: '{card}: follow-up submitted for review{revision, select, none {} other { at {revision}}} (submission {submission}). Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused', note: "HI-1832: the reviewer's wake for a follow-up (the card stays in Review, so no arrival wakes it). {revision}: short, or none for a no-code card's follow-up, which records no revision (HI-3409). {submission}: its number." }),
   aheadInLane: agentMsg({ id: 'runtime.wake.aheadInLane', text: '{card} is in Review ahead of {cards}, earlier in its lane, which nobody has started: Combwork moved it before them in the lane. Review {card} now; the lane goes on to {next} after it', note: "The reviewer's wake for a card submitted ahead of its lane's unstarted cards. {cards}: their keys. {next}: the first of them." }),
   inReview: agentMsg({ id: 'runtime.wake.inReview', text: '{card} is in Review', note: "The reviewer's wake for a card's arrival in Review." }),
   failedReview: agentMsg({ id: 'runtime.wake.failedReview', text: '{card} failed review', note: "The builder's wake for a failing verdict." }),
@@ -1943,6 +1943,18 @@ export class Workflow {
     w.action('enqueue', { target })
   }
 
+  /**
+   * HI-3410: a no-code card finishes with nothing merged, so it doesn't while its own line holds commits its target lacks
+   * (`FinishInputs.unmerged`, MC-1559's four): refused naming them, for the user to say whether they merge (the card made
+   * code again) or are dropped (the user moves it to Done). Refused too when the line can't be read, never taken for none.
+   */
+  private unmergedRefusal(card: CardRecord, fin: FinishInputs | Record<string, never>): GuardRefusal | null {
+    const u = (fin as FinishInputs).unmerged
+    if (!u) return null
+    if (isUnknown(u)) return { rule: 'platform.unknown', values: { card: card.key, what: u.whatText ?? u.what, rule: 'done.noCodeUnmerged' } }
+    return { rule: 'done.noCodeUnmerged', values: { card: card.key, line: u.line, target: u.target, count: u.count, commits: u.commits.join('; '), more: u.count - u.commits.length } }
+  }
+
   /** Finish (§16.7.2): after review, or straight after submit with no review. */
   finish(w: Write, fin: FinishInputs): void {
     const r = w.ruleset!
@@ -2114,7 +2126,8 @@ export class Workflow {
         const owner = this.store.cardAgent(card.id) ?? now.started?.builder ?? null
         if (agent && agent !== owner) return { rule: 'submit.followUpNotBuilder', values: { card: card.key } } as GuardRefusal
       }
-      const ins = this.submitInputs(g)
+      // A follow-up isn't a no-code card's second copy (HI-3409): submit.notDuplicate reads it.
+      const ins = { ...this.submitInputs(g), ...(followUp ? { followUp: true } : {}) }
       const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : (this.check(w, 'submit', ins, g.only) ?? this.agentHasSeen(w, ins, g.only))
       if (bad) return bad
       // Ahead of earlier cards of its lane nobody has started (#1410): it goes before them, so its reviewer takes it next.
@@ -2221,7 +2234,10 @@ export class Workflow {
       inputs.focused = await this.pickFor(o, this.folderOf(s), revision, base, args.tests, focusedOp)
     }
     const earlier = card.kind === 'code' && s.submissions.some((x) => x.revision === revision)
-    const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
+    // HI-3410: a no-code card's own line is read at its submission too, so its builder hears of unmerged commits first.
+    const fin = o.review === 'none' || card.kind === 'no-code' ? await this.finishInputs(card, s, r, revision) : {}
+    const unmerged = card.kind === 'no-code' ? this.unmergedRefusal(card, fin) : null
+    if (unmerged) return unmerged
     const only = card.kind === 'no-code' ? (id: GuardId) => NO_CODE_GUARDS.includes(id) : undefined
     return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), ...(platform ? { platform } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}), ...(focusedOp ? { focusedOp } : {}) }
   }
@@ -2291,7 +2307,7 @@ export class Workflow {
       w.action('assignReviewer', { submission: sub.seq })
     }
     // A follow-up (HI-1832): the card stays in Review, so no arrival wakes its reviewer; told what to do, its words kept.
-    else if (reviewerAgent(g.o.review) && args.followUp) this.wake(w, this.reviewerOf(g.card), stored(W.followUp, { card: g.card.key, revision: (g.revision ?? '').slice(0, 7), submission: sub.seq }), 'review')
+    else if (reviewerAgent(g.o.review) && args.followUp) this.wake(w, this.reviewerOf(g.card), stored(W.followUp, { card: g.card.key, revision: g.revision ? g.revision.slice(0, 7) : 'none', submission: sub.seq }), 'review')
     else if (reviewerAgent(g.o.review) && ahead) {
       const keys = ahead.map((c) => c.key).join(', ')
       this.wake(w, this.reviewerOf(g.card), stored(W.aheadInLane, { card: g.card.key, cards: keys, next: ahead[0].key }), 'review')
@@ -2369,6 +2385,8 @@ export class Workflow {
     // builder submits the new revision, which runs its checks, the user's gates and a review copy as any submission does.
     if (args.pass && moved && !moved.same) return this.refuse(card, actor, 'verdict', { rule: 'review.headMoved', values: { card: card.key, submitted: (sub?.revision ?? '').slice(0, 7), head: moved.to.slice(0, 7) } } as GuardRefusal)
     const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
+    const unmerged = args.pass && card.kind === 'no-code' ? this.unmergedRefusal(card, fin) : null
+    if (unmerged) return this.refuse(card, actor, 'verdict', unmerged)
     // HI-1734: a code card passing with nothing to merge (its change already in its target: HI-1449's checks only, which
     // others' merges had superseded) is proposed no code. Read before the write; unknown is no proposal.
     const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? asCardCounts(s, await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key })) : null
@@ -2567,6 +2585,9 @@ export class Workflow {
     // What the answer may be follows its request (HR3's #1269 round 1 finding 2): checked before anything is written.
     if (!answerFits(req, { outcome: answer, reply: !!note, decision: !!opts.decided, choice, rounds: opts.rounds, action }, LANE_MAX_ROUNDS)) throw new Error(`an answer (${answer}${choice ? `, ${choice}` : ''}) that doesn't fit request ${request} (${req.kind}, ${req.gate})`) // i18n-ignore: a programming error (tasks.ts checks first, in the user's words)
     const rounds = choice === 'carryOn' ? opts.rounds : undefined
+    // HI-3410: the user's approval of a no-code card's review finishes it: not while its own line holds unmerged commits.
+    const unmerged = req.gate === 'review' && answer === 'approved' && card.kind === 'no-code' ? this.unmergedRefusal(card, fin) : null
+    if (unmerged) return this.refuse(card, by, 'answer', unmerged)
     await this.cfg.hooks?.beforeWrite?.('answer')
     // HI-3391: as a verdict's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant,
     // as often as its platform allows. jj's head moves with any jj operation in the repository (another lane's commit, a

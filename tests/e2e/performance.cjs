@@ -80,12 +80,8 @@ const check = (name, ok, extra = '') => {
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 950 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-    return v
-  }
+  // HI-3396: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
   const card = (title) => page.locator('.performance-page:visible .card', { hasText: title }).first().locator('.value')
   const requests = () => card('API requests').innerText().catch(() => '')
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `performance-${name}.png`) })
@@ -187,8 +183,11 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await requests()) === '47', HUNG_MS)
 
   // Reading it adds nothing: Refresh shows the same.
+  const refreshed = await lib.ipcSettled(app, 'metrics:query')
   await page.locator('.performance-page:visible button[aria-label="Refresh"]').click()
-  await lib.sleep(800)
+  // HI-3396: its read answered and drawn, then checked.
+  await lib.ipcAnswered(app, 'metrics:query', refreshed + 1, HUNG_MS)
+  await lib.answersDrawn(inv, page)
   check('reading the page adds nothing to it', (await requests()) === '47', await requests())
 
   await page.locator('.sidebar .row', { hasText: 'alpha' }).click()
@@ -244,14 +243,19 @@ const check = (name, ok, extra = '') => {
   await page.locator('select[aria-label="Provider"]').selectOption('')
 
   // A scope switched while the last query is slow: the late answer for the old scope is never shown.
+  const queried = await lib.ipcSettled(app, 'metrics:query')
   await app.evaluate(() => {
     process.env.CW_TEST_SLOW_IPC = 'metrics:query=2500*1'
   })
   await page.locator('.sidebar .row', { hasText: 'alpha' }).click()
-  await lib.sleep(300)
+  // HI-3396: alpha's (slowed) query asked for, by its pick drawn, before beta is picked.
+  await lib.readyWithin('its project shown', async () => (await page.locator('.sidebar .row.selected', { hasText: 'alpha' }).count()) === 1, HUNG_MS)
+  await lib.framesDrawn(page)
   await page.locator('.sidebar .row', { hasText: 'beta' }).click()
   check('a scope switched during a slow query shows the new scope', !!(await until(async () => (await requests()) === '12', HUNG_MS)), await requests())
-  await lib.sleep(3000) // A fixed wait on purpose: the slowed answer for the old choice arrives later, and this checks it doesn't replace the new one.
+  // HI-3396: alpha's slowed reply answered and drawn (main's count), then checked.
+  await lib.ipcAnswered(app, 'metrics:query', queried + 2, HUNG_MS)
+  await lib.answersDrawn(inv, page)
   check("…and the old scope's late reply doesn't replace it", (await requests()) === '12', await requests())
   await app.evaluate(() => {
     process.env.CW_TEST_SLOW_IPC = ''
@@ -303,10 +307,10 @@ const check = (name, ok, extra = '') => {
   // Light theme, and a narrow window.
   await page.locator('.activitybar button[aria-label="Performance"]').click()
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.sleep(800)
+  await lib.themeSettled(page, 'light')
   await shot('wide-light')
   await lib.fitWindow(app, page, { width: 720, height: 900 })
-  await lib.sleep(800)
+  await lib.viewportIs(page, 720)
   const overflow = await page.locator('.performance-page:visible').evaluate((el) => el.scrollWidth - el.clientWidth)
   check('narrow: the page itself has no sideways scroll', overflow <= 1, String(overflow))
   // A route stays on one line (HI-2534): its table scrolls sideways rather than breaking "/v1/tasks/:n" into fragments.
@@ -327,7 +331,7 @@ const check = (name, ok, extra = '') => {
   check('narrow: each route is on one line', !!(await until(routesOnOneLine, HUNG_MS)), JSON.stringify(routeLines))
   await shot('narrow-light')
   await inv('settings:update', { appearance: { theme: 'dark' } })
-  await lib.sleep(800)
+  await lib.themeSettled(page, 'dark')
   await shot('narrow-dark')
 
   await app.close()

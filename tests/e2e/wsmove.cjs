@@ -52,7 +52,7 @@ const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8'))
  */
 const sessionsWritable = (host, writable) => {
   const { ws, scope } = deliveriesPlace(host)
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
   try {
     for (const op of ['INSERT', 'UPDATE', 'DELETE']) {
       const name = `test_sessions_readonly_${op.toLowerCase()}`

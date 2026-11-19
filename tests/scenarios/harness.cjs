@@ -585,6 +585,10 @@ async function runScenario(sc, providerKey, opts = {}) {
   placeDialect(opts.dialect, ws)
   // The fake trusts these folders; the real Claude Code asks (answered below); Codex reads its test home's trust list.
   fs.writeFileSync(path.join(fakeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
+  // HI-3407: the fake's home trusts the workspace's worktrees folder too, as Set Up leaves it, so a reviewer is granted its
+  // review copies (HI-3337: withheld from a Claude Code whose home doesn't trust it). lib.openWorkspace does this for the
+  // e2e suites (HI-3342); this harness opens its workspace itself, so it records it here.
+  lib.trustWorktrees(fakeHome, ws)
   // A fake that acts out an expired sign-in: each prompt's turn ends with "Login expired · Please run /login".
   if (opts.exitsAtLaunch && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-launch-exit.json'), JSON.stringify({ code: 1 }))
   if (opts.signedOut && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-signin.json'), JSON.stringify({ expired: true, ...(opts.signedOut === 'launch' ? { atLaunch: true } : opts.signedOut === 'late' ? { late: true } : {}) }))

@@ -115,7 +115,7 @@ const check = (name, ok, extra = '') => {
   check(`Tab from beta's entry reaches its ✕`, await entry2('recent-beta').locator('.recent-remove').evaluate((b) => b === document.activeElement))
   await page2.keyboard.press('Enter')
   check('Enter on an entry’s ✕ removes it', !!(await lib.until(async () => !(await recent()).includes('recent-beta'), lib.timing('hang.ui'))), JSON.stringify(await recent()))
-  await lib.sleep(500)
+  await lib.sleep(lib.timing('quiet.removeOpensNothingMs')) // A quiet window on purpose: this checks that the ✕ opens nothing.
   check('…and opens nothing: the window still shows the welcome page, beta stays forgotten', (await welcome2()) && !(await recent()).includes('recent-beta'), JSON.stringify(await recent()))
   check('…leaving its folder alone', fs.existsSync(wsB))
   // As from the keyboard: the entry, then Tab to its ✕ (shown once the entry has the focus).
