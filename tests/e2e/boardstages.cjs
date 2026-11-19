@@ -371,9 +371,7 @@ const nothingToArchive = (dialog) => {
     q.steer(fx, 'wait')
     const second = await q.approve(fx, h, reviewer, 'Queued again', { 'again.txt': 'again\n' })
     const base = (await inv('app:info')).language
-    const dir = path.join(lib.ROOT, 'locales', 'pl')
-    const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: { ...base, code: 'pl', locale: 'pl', messages } })
+    await lib.speakLanguage(h.app, base, 'pl')
     await showBoard('Wszystkie projekty', 'Tablica zadań')
     check('Polish: Merging reads Scalanie under Zatwierdzone', !!(await until(async () => (await labelText('merging')) === 'Scalanie' && (await inColumn(second.n, 'merging')), HUNG_MS)), await labelText('merging'))
     // Seven columns at this width: every name readable, wrapped rather than cut (the Assistant's OK on round 3).
@@ -399,7 +397,7 @@ const nothingToArchive = (dialog) => {
     check('a 24-letter name with no space stays inside its column', !!(await until(async () => (await labelText('doing')) === 'W'.repeat(24) && (await outside()).length === 0, HUNG_MS)), JSON.stringify(await outside()))
     await shoot('longname-pl')
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
-    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: base })
+    await lib.speakLanguage(h.app, base)
     fs.writeFileSync(fx.go, 'go')
     await until(async () => (await h.card(second.n))?.column === 'done', HUNG_MS)
 

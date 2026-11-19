@@ -219,11 +219,9 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   // German in a narrow window: the tabs' longer names and counts wrap onto another line, every tab whole, none scrolled
   // out of sight (HR5's design check).
   const base = (await inv('app:info')).language
-  const deDir = path.join(lib.ROOT, 'locales', 'de')
-  const deMessages = Object.assign({}, ...fs.readdirSync(deDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(deDir, f), 'utf8'))))
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
   await lib.fitWindow(app, page, { width: 1000, height: 900 })
-  await speak({ ...base, code: 'de', locale: 'de', messages: deMessages })
+  // German's catalogue is read by main, not sent through app.evaluate (HI-3434).
+  await lib.speakLanguage(app, base, 'de')
   const tabsFit = () => page.locator('.kb-tabs').evaluate((list) => {
     const l = list.getBoundingClientRect()
     const tabs = [...list.querySelectorAll('[role="tab"]')].map((t) => t.getBoundingClientRect())
@@ -282,7 +280,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
   await page.screenshot({ path: path.join(scratch, 'keys-tabs-narrow-de-light.png') })
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
-  await speak(base)
+  await lib.speakLanguage(app, base)
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.until(async () => (await tabsFit()).first === 'All', HUNG_MS)
   // A DataTable (#250): sorting by a header in All, with the edit controls kept.

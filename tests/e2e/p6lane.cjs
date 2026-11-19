@@ -84,7 +84,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'de')
     const german = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+    // The window is told German by code; main reads its catalogue, not sent through app.evaluate (HI-3434).
+    const speak = (code) => lib.speakLanguage(app, base, code)
     const english = async () => (await page.getByRole('button', { name: 'Task Board', exact: true }).count()) > 0
     /**
      * Screenshots of `loc` (the window by default) in both themes, in English and then German; `show` brings back what
@@ -94,7 +95,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const shoot = async (name, { loc = page, show, open, close } = {}) => {
       for (const lang of ['en', 'de']) {
         if (lang === 'de') {
-          await speak({ ...base, code: 'de', locale: 'de', messages: german })
+          await speak('de')
           await waitHung(async () => !(await english()))
         }
         const target = open ? await open() : loc
@@ -107,7 +108,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
         }
         if (close) await close(target, lang)
       }
-      await speak(base)
+      await speak()
       await waitHung(english)
       await inv('settings:update', { appearance: { theme: 'dark' } })
       await page.mouse.move(5, 5)

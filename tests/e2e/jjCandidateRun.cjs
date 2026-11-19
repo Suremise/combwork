@@ -163,17 +163,15 @@ const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log'
     check('…in place of the copy-and-set commands', (await waiting.locator('[data-jj-command=""]').count()) === 0, await text(waiting))
     await shoot(repo.locator('[data-jj-integrate]'), 'candidate')
     // In each language, both themes.
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     const english = (await inv('app:info')).language
-    const catalogue = (code) => Object.assign({}, ...fs.readdirSync(path.join(lib.ROOT, 'locales', code)).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', code, f), 'utf8'))))
     for (const language of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
-      const cat = catalogue(language)
-      await speak({ ...english, code: language, locale: language, messages: cat })
+      // The language's catalogue is read by main, not sent through app.evaluate (HI-3434).
+      const cat = await lib.speakLanguage(app, english, language)
       const want = cat['jj.integrate.candidateHow'].replace('{target}', 'main')
       check(`${language}: the candidate in the language`, !!(await until(async () => (await text(waiting)).includes(want), HUNG_MS)), await text(waiting))
       await shoot(repo.locator('[data-jj-integrate]'), `candidate-${language}`)
     }
-    await speak(english)
+    await lib.speakLanguage(app, english)
 
     // --- The user integrates it with the command shown: Done, from a prepared candidate.
     jj(shop, 'bookmark', 'set', 'main', '-r', result)

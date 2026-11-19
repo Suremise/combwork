@@ -151,17 +151,16 @@ function board(sql, ...args) {
 
     // --- German: the header and the sections as they wrap.
     const base = (await inv('app:info')).language
-    const dir = path.join(lib.ROOT, 'locales', 'de')
-    const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
-    await speak({ ...base, code: 'de', locale: 'de', messages })
+    // Main reads German's catalogue, not sent through app.evaluate (HI-3434).
+    const speak = (code) => lib.speakLanguage(app, base, code)
+    await speak('de')
     check('the tab and the fact line in German', !!(await lib.until(async () => (await page.locator('.tabs .tab', { hasText: 'Versionsverwaltung' }).count()) === 1 && (await text(fact)) === 'Dieser Ordner hat keine Versionsverwaltung.', HUNG_MS)), await text(fact))
     await shots('none-de', page.locator('.vc-view'))
     await page.getByText('alpha', { exact: true }).first().click()
     await page.locator('.git-sections [data-section="changes"]').click()
     check('the Git header in German', !!(await lib.until(async () => (await text(link)).trim() === 'Workflow: Git · Benutzerdefiniert (aus Solo)', HUNG_MS)), await text(link))
     await shots('git-de', page.locator('.vc-view'))
-    await speak(base)
+    await speak()
     check('back in English', !!(await lib.until(async () => (await vcTab.count()) === 1, HUNG_MS)))
 
     // --- The presets notice (after an upgrade from 0.9): Choose… opens the first named project's tab at Workflow.
@@ -367,12 +366,12 @@ function board(sql, ...args) {
     check("a folded section's tooltip names it", histTip === 'History', histTip)
     await page.locator('.git-sections [data-section="branches"]').click()
     await shots('sections-narrow', page.locator('.vc-view'))
-    await speak({ ...base, code: 'de', locale: 'de', messages })
+    await speak('de')
     check('the sections in German', !!(await lib.until(async () => (await page.locator('.tabs .tab', { hasText: 'Versionsverwaltung' }).count()) === 1, HUNG_MS)))
     await everySection('de')
     await page.locator('.git-sections [data-section="branches"]').click()
     await shots('sections-narrow-de', page.locator('.vc-view'))
-    await speak(base)
+    await speak()
   } finally {
     await app.close()
   }

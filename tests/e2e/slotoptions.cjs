@@ -264,12 +264,8 @@ function board(sql, ...args) {
 
     // --- German.
     const lang = (await inv('app:info')).language
-    const speak = async (code) => {
-      const dir = path.join(lib.ROOT, 'locales', code)
-      const messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: messages ? { ...lang, code, locale: code, messages } : lang })
-      return messages
-    }
+    // Main reads the language's catalogue, not sent through app.evaluate (HI-3434); English: the window's own.
+    const speak = (code) => lib.speakLanguage(app, lang, code === 'en' ? undefined : code)
     await openWorkflow(fx.alpha)
     const de = await speak('de')
     check('the section shows in German', !!(await until(async () => (await section.innerText()).includes(de['workflow.slots.heading']), HUNG_MS)))

@@ -535,23 +535,22 @@ const commit = (dir, file, text, message) => {
 
   // --- The same in German: no English inside its sentences.
   const base0 = (await inv('app:info')).language
-  const deDir = path.join(lib.ROOT, 'locales', 'de')
-  const deMessages = Object.assign({}, ...fs.readdirSync(deDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(deDir, f), 'utf8'))))
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
-  await speak({ ...base0, code: 'de', locale: 'de', messages: deMessages })
+  // German's catalogue is read by main, not sent through app.evaluate (HI-3434).
+  const speak = (code) => lib.speakLanguage(app, base0, code)
+  await speak('de')
   const english = /not read|latest commit|no base|no target|Its next submission/
   check('German: nothing read before the change, said in German', !!(await lib.until(async () => { const t = await nText(); return t.includes('Keine Revision aufgezeichnet: Combwork hat keine gelesen, als die Karte nach Review kam.') && t.includes('Dateien nicht gelesen') && !english.test(t) }, HUNG_MS)), await nText())
   await shots(nSection, 'notread-de')
   // The board's button has its English name again before the next card opens; then German with its dialog open.
-  await speak(base0)
+  await speak()
   await lib.until(async () => (await page.getByRole('button', { name: 'Task Board' }).count()) > 0, HUNG_MS)
   const uDe = (await openCard(u)).locator('.card-work[data-work="recorded"]')
-  await speak({ ...base0, code: 'de', locale: 'de', messages: deMessages })
+  await speak('de')
   const uDeText = async () => (await uDe.innerText().catch(() => '')).replace(/\s+/g, ' ')
   check('German: what couldn’t be read, in German too', !!(await lib.until(async () => { const t = await uDeText(); return t.includes('Revision beim Einreichen nicht gelesen: Combwork konnte den neuesten Commit in ') && !english.test(t) }, HUNG_MS)), await uDeText())
   await uDe.scrollIntoViewIfNeeded()
   await shots(uDe, 'unread-de')
-  await speak(base0)
+  await speak()
   await lib.until(async () => (await page.getByRole('button', { name: 'Task Board' }).count()) > 0, HUNG_MS)
   await closeDialogs()
 

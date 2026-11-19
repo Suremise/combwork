@@ -656,10 +656,9 @@ async function theForm(page, app, inv) {
     await reopen()
     const base = (await inv('app:info')).language
     let messages = null
+    // Main reads the language's catalogue, not sent through app.evaluate (HI-3434); English: the window's own.
     const speak = async (code) => {
-      const dir = path.join(lib.ROOT, 'locales', code)
-      messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: messages ? { ...base, code, locale: code, messages } : base })
+      messages = await lib.speakLanguage(app, base, code === 'en' ? undefined : code)
     }
     /**
      * The save's dialog opened in the window's language (#1489): its title, message, what changes (Merge style, its

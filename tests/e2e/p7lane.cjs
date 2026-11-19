@@ -712,13 +712,14 @@ async function gallery(h, kept) {
   const base = (await inv('app:info')).language
   const dir = path.join(lib.ROOT, 'locales', 'de')
   const german = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+  // The window is told German by code; main reads its catalogue, not sent through app.evaluate (HI-3434).
+  const speak = (code) => lib.speakLanguage(app, base, code)
   const english = async () => (await page.getByRole('button', { name: 'Task Board', exact: true }).count()) > 0
   /** `loc` (or what `open(lang)` opens in each language) shot in both themes, English then German; `close` after. */
   const shoot = async (name, { loc = page, open, close } = {}) => {
     for (const lang of ['en', 'de']) {
       if (lang === 'de') {
-        await speak({ ...base, code: 'de', locale: 'de', messages: german })
+        await speak('de')
         await until(async () => !(await english()), HUNG_MS)
       }
       const target = open ? await open(lang) : loc
@@ -730,7 +731,7 @@ async function gallery(h, kept) {
       }
       if (close) await close(lang)
     }
-    await speak(base)
+    await speak()
     await until(english, HUNG_MS)
     await inv('settings:update', { appearance: { theme: 'dark' } })
   }

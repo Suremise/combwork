@@ -72,19 +72,18 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     }
     const base = (await inv('app:info')).language
-    const dir = path.join(lib.ROOT, 'locales', 'fr')
-    const french = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+    // The window is told French by code; main reads its catalogue, not sent through app.evaluate (HI-3434).
+    const speak = (code) => lib.speakLanguage(app, base, code)
 
     // --- A Git folder found in the workspace: the notice, then the step.
     await lib.openWorkspace(inv, page, ws)
     check('the notice names the project found', !!(await lib.until(async () => (await text(notice())).startsWith('alpha was added: how do you work?'), HUNG_MS)), await text(notice()))
     check('…and no options were applied to it', projectJson(alpha).workflow === undefined)
     await shoot(notice(), 'notice')
-    await speak({ ...base, code: 'fr', locale: 'fr', messages: french })
+    await speak('fr')
     await lib.until(async () => !(await text(notice())).startsWith('alpha was added'), HUNG_MS)
     await shoot(notice(), 'notice-fr')
-    await speak(base)
+    await speak()
     await lib.until(async () => (await text(notice())).startsWith('alpha was added'), HUNG_MS)
     // --- Notice banners in a narrow pane (HI-1717: at 900 px and 150% Not Now was cut at the edge, the text a word a line,
     // and the providers banner's "Choose providers" squeezed its text the same way, cut to "Ch" beside the Assistant):
@@ -177,7 +176,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     check('900 px at 150%: each banner\'s buttons under its text, whole, inside it and apart; the text has its row (HI-1717)', !!(await fits(below)), JSON.stringify(await layouts()))
     await capture('notice-narrow-150')
     // French's longer labels (Choisir… / Pas maintenant, Choisir les fournisseurs).
-    await speak({ ...base, code: 'fr', locale: 'fr', messages: french })
+    await speak('fr')
     await lib.until(async () => !(await text(notice())).startsWith('alpha was added'), HUNG_MS)
     check('…and in French', !!(await fits(below)), JSON.stringify(await layouts()))
     await capture('notice-narrow-150-fr')
@@ -199,7 +198,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     await lib.until(async () => (await page.locator('.assistant-panel').count()) === 1, HUNG_MS)
     check("French, 900 px beside the Assistant's panel: each banner whole, inside it and apart", !!(await fits()), JSON.stringify(await layouts()))
     await capture('notice-narrow-assistant-fr')
-    await speak(base)
+    await speak()
     await lib.until(async () => (await text(notice())).startsWith('alpha was added'), HUNG_MS)
     check('…and in English', !!(await fits()), JSON.stringify(await layouts()))
     await capture('notice-narrow-assistant')
@@ -222,10 +221,10 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     await shoot(stepEl(), 'step-git-details')
     await stepEl().locator('[data-action="step-details"]').click()
     await lib.until(async () => (await stepEl().locator('.workflow-preview').count()) === 0, HUNG_MS)
-    await speak({ ...base, code: 'fr', locale: 'fr', messages: french })
+    await speak('fr')
     await lib.until(async () => (await text(stepEl().locator('h3'))) !== 'How do you work?', HUNG_MS)
     await shoot(stepEl(), 'step-git-fr')
-    await speak(base)
+    await speak()
     await lib.until(async () => (await text(stepEl().locator('h3'))) === 'How do you work?', HUNG_MS)
     await stepEl().locator('[data-action="step-choose"]').click()
     check('Choose asks once: nothing is in flight', !!(await lib.until(async () => /Nothing is in flight yet/.test(await text(dialog())), HUNG_MS)), await text(dialog()))

@@ -2513,10 +2513,12 @@ async function agentMenu(page, name, ms = 10000) {
  * with its translations from locales/<code>, or `base` itself when no code is given. Main reads the catalogue itself
  * and only the code crosses Playwright's channel (HI-3428): a whole catalogue (about 1.4 MB) sent through app.evaluate
  * goes by Node's inspector, whose I/O thread crashed the test app's main process under a full run's load (an access
- * violation on InspectorIo, rc.15's jjwindow). Returns the catalogue, for the text a step expects.
+ * violation on InspectorIo, rc.15's jjwindow). With a code, `base`'s own translations aren't sent either (HI-3434: a test
+ * app started in Japanese has its catalogue in app:info's language). Returns the catalogue, for the text a step expects.
  */
 async function speakLanguage(app, base, code) {
   const dir = code ? path.join(ROOT, 'locales', code) : null
+  if (dir) base = { ...base, messages: {} }
   await app.evaluate(
     ({ BrowserWindow }, said) => {
       let language = said.base
