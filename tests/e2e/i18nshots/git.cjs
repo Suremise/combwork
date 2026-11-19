@@ -120,9 +120,13 @@ async function history(ctx) {
 /** The pseudo-locale (shared/i18n/languages.ts): every message shows changed from its English. */
 const PSEUDO = 'en-XA'
 
-/** Tells the window its language changed, as Settings → General → Language does (the language-changed event). */
-const sendLanguage = (ctx, language) =>
-  ctx.app.evaluate(({ BrowserWindow }, l) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'language-changed', language: l }), language)
+/**
+ * Tells the window its language changed, as Settings → General → Language does (the language-changed event). A language
+ * with translations (the run's, from app:info) goes by its code, main reading its catalogue: a whole catalogue sent
+ * through app.evaluate can crash the test app's main process (lib.speakLanguage, HI-3434). English and the
+ * pseudo-locale have none to send.
+ */
+const sendLanguage = (ctx, language) => ctx.lib.speakLanguage(ctx.app, language)
 
 /**
  * The notices closed. Putting .git back (closeInit) raises "Version control changed in alpha" at the window's bottom

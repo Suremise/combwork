@@ -2513,10 +2513,12 @@ async function agentMenu(page, name, ms = 10000) {
  * with its translations from locales/<code>, or `base` itself when no code is given. Main reads the catalogue itself
  * and only the code crosses Playwright's channel (HI-3428): a whole catalogue (about 1.4 MB) sent through app.evaluate
  * goes by Node's inspector, whose I/O thread crashed the test app's main process under a full run's load (an access
- * violation on InspectorIo, rc.15's jjwindow). With a code, `base`'s own translations aren't sent either (HI-3434: a test
- * app started in Japanese has its catalogue in app:info's language). Returns the catalogue, for the text a step expects.
+ * violation on InspectorIo, rc.15's jjwindow). `base`'s own translations are never sent either (HI-3434: a test app
+ * started in Japanese has its catalogue in app:info's language): with no code, a `base` that has some is told by its own
+ * code, main reading them again, and keeps its locale. Returns the catalogue, for the text a step expects.
  */
 async function speakLanguage(app, base, code) {
+  if (!code && Object.keys(base?.messages ?? {}).length) code = base.code
   const dir = code ? path.join(ROOT, 'locales', code) : null
   if (dir) base = { ...base, messages: {} }
   await app.evaluate(
@@ -2526,7 +2528,7 @@ async function speakLanguage(app, base, code) {
         const files = process.getBuiltinModule('fs')
         const p = process.getBuiltinModule('path')
         const messages = Object.assign({}, ...files.readdirSync(said.dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(files.readFileSync(p.join(said.dir, f), 'utf8'))))
-        language = { ...said.base, code: said.code, locale: said.code, messages }
+        language = { ...said.base, code: said.code, locale: said.code === said.base.code ? said.base.locale : said.code, messages }
       }
       BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'language-changed', language })
     },
