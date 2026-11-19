@@ -106,8 +106,13 @@ const hooksOff = (agent, off) => {
 
     // The lane: Builder on a card in Doing, Reviewer reviewing.
     const c = await inv('tasks:create', { title: 'Hooks health', project: 'alpha', column: 'doing', agent: builder.id })
+    const builderBefore = (await live(builder))?.sessionId
     const lane = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', reviewer: 'Reviewer', cards: [c.number] })
     check('the lane starts', lane.status === 200, JSON.stringify(lane))
+    // The lane gives its idle builder a new conversation whose first turn is its brief (HI-2232): done with it before
+    // anything is typed (HI-3416). Typed while the brief was starting, a prompt ran beside it, and the brief's reply,
+    // written after the next prompt, was taken as that prompt's turn, answered by no hook.
+    check("the lane's brief is done in Builder's new conversation", !!(await until(async () => lib.laneBriefDone(PORT, 'alpha', await live(builder), builderBefore, apiToken), HUNG_MS)), JSON.stringify(await live(builder)))
     const laneNow = async () => (await inv('lanes:list')).find((l) => l.builder.id === builder.id)
 
     // --- Healthy: a long silent think (its prompt's hook came, then nothing for 10 s: over three bounds), and idle.
