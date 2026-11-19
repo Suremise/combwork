@@ -352,10 +352,8 @@ const beta = path.join(fx.ws, 'beta')
     await shootJa('5-ja-old-rules', () => hover(tagJa, (t) => t.includes('旧ルール')))
 
     // --- pt-BR (#1496): its Todo column is "A\u00a0fazer", its stage "A fazer"; the legend names it once, no stage under it.
-    const ptDir = path.join(lib.ROOT, 'locales', 'pt-BR')
-    const pt = Object.assign({}, ...fs.readdirSync(ptDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(ptDir, f), 'utf8'))))
-    const base = (await h.inv('app:info')).language
-    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: { ...base, code: 'pt-BR', locale: 'pt-BR', messages: pt } })
+    // Main reads pt-BR's catalogue; Japanese's, which app:info's language has here, isn't sent (lib.speakLanguage, HI-3434).
+    const pt = await lib.speakLanguage(h.app, (await h.inv('app:info')).language, 'pt-BR')
     const ptTitle = pt['board.lanes.legendTitle']
     check('pt-BR: the legend in Portuguese', !!(await hover(barJa, (t) => t.includes(ptTitle))), await tipText())
     const todoRow = page.locator('.tip .lanes-legend-row[data-category="todo"]')

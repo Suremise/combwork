@@ -233,12 +233,9 @@ const check = (name, ok, extra = '') => {
     await drag(c, 'Done')
     check('all off: a drag to Done just moves, nothing asked or overridden', !!(await lib.until(async () => (await card(c))?.column === 'done', HUNG_MS)) && (await dialog.count()) === 0 && !(await facts(c)).includes('Override'), JSON.stringify(await facts(c)))
 
-    // --- The question in Polish (as main sends a change of language, with Polish's own catalogue).
+    // --- The question in Polish (as main sends a change of language, with Polish's own catalogue, which main reads: HI-3434).
     const base = (await inv('app:info')).language
-    const dir = path.join(lib.ROOT, 'locales', 'pl')
-    const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
-    await speak({ ...base, code: 'pl', locale: 'pl', messages })
+    await lib.speakLanguage(app, base, 'pl')
     const plDialog = page.locator('.dialog', { hasText: 'mimo to?' })
     const plDone = page.locator('.board-column', { has: page.locator('.board-column-label', { hasText: 'Gotowe' }) })
     await lib.until(async () => (await plDone.count()) === 1, HUNG_MS)
@@ -246,7 +243,7 @@ const check = (name, ok, extra = '') => {
     check('the question in Polish', !!(await lib.until(async () => (await plDialog.count()) === 1, HUNG_MS)), await page.locator('.dialog').innerText().catch(() => ''))
     await plDialog.screenshot({ path: path.join(lib.WORK, 'boardgates-ask-pl.png') })
     await plDialog.getByRole('button', { name: 'Anuluj' }).click().catch(() => page.keyboard.press('Escape'))
-    await speak(base)
+    await lib.speakLanguage(app, base)
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
     await app

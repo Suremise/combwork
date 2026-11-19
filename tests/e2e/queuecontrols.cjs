@@ -241,15 +241,14 @@ const TARGET = 'integration'
     check('…its Work section says why in words', !!english && !/: resolution\b/.test(english), await resText())
     await q.folderHelpers(fx).themes(h.page, cardDialog.locator('.card-work'), 'queuecontrols-resolution-returned')
     const base = (await h.inv('app:info')).language
-    const speak = (language) => h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
-    const deDir = path.join(lib.ROOT, 'locales', 'de')
-    await speak({ ...base, code: 'de', locale: 'de', messages: Object.assign({}, ...fs.readdirSync(deDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(deDir, f), 'utf8')))) })
+    // German's catalogue is read by main, not sent through app.evaluate (HI-3434).
+    await lib.speakLanguage(h.app, base, 'de')
     try {
       const german = await until(async () => ((await resText()).includes('der aufgelöste Commit wurde kopiert, nicht gemergt') ? resText() : null), HUNG_MS)
       check('…and in German', !!german && !/: resolution\b/.test(german), await resText())
       await cardDialog.locator('.card-work').screenshot({ path: path.join(fx.shots, 'queuecontrols-resolution-returned-de-dark.png') })
     } finally {
-      await speak(base)
+      await lib.speakLanguage(h.app, base)
     }
     await h.page.keyboard.press('Escape')
     // --- HI-2893: main taken out of Other branches, its queue holding nothing, is a past branch's: left out of
