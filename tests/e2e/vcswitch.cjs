@@ -213,8 +213,10 @@ function writeProject(dir, cfg) {
     const c3Start = await q.intent(h, g1, c3, 'start')
     check("a new card starts under None's rules", c3Start.status === 200 && (await startedUnder(c3)) === 'none', JSON.stringify({ c3Start, data: await started(c3) }))
     // Initialise repository… from Git's page (HI-1905): with a lane and a card in flight keeping None's rules, the switch
-    // that follows warns first; cancelled, the project stays None, and Git is offered without a restart.
-    await head.locator('[data-platform="git"]').click()
+    // that follows warns first; cancelled, the project stays None, and Git is offered without a restart. Git's choice opens
+    // its page only once the tab has read the folder's git (`data-vc-preview`, HI-3436): before that the click is the switch.
+    check("gamma: Git's page offered (the tab read its git)", !!(await until(async () => (await head.locator('[data-platform="git"][data-vc-preview]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
+    await head.locator('[data-platform="git"][data-vc-preview]').click()
     const preview = page.locator('[data-vc-git-preview]')
     check("gamma: Git's page offers Initialise repository…", !!(await until(async () => (await preview.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
     await preview.locator('[data-git-init]').click()
