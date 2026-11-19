@@ -2518,13 +2518,13 @@ async function agentMenu(page, name, ms = 10000) {
 async function speakLanguage(app, base, code) {
   const dir = code ? path.join(ROOT, 'locales', code) : null
   await app.evaluate(
-    ({ BrowserWindow }, { base, code, dir }) => {
-      let language = base
-      if (dir) {
-        const fs = process.getBuiltinModule('fs')
+    ({ BrowserWindow }, said) => {
+      let language = said.base
+      if (said.dir) {
+        const files = process.getBuiltinModule('fs')
         const p = process.getBuiltinModule('path')
-        const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(p.join(dir, f), 'utf8'))))
-        language = { ...base, code, locale: code, messages }
+        const messages = Object.assign({}, ...files.readdirSync(said.dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(files.readFileSync(p.join(said.dir, f), 'utf8'))))
+        language = { ...said.base, code: said.code, locale: said.code, messages }
       }
       BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'language-changed', language })
     },
