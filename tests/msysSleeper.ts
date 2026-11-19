@@ -66,7 +66,7 @@ export const winpidsIn = (file: string): number[] => (existsSync(file) ? readFil
 export async function markedNow(mark: string, bin: string): Promise<ListedProcess[] | { error: string }> {
   const found = await findMsysMarked({ mark, bin }, (file, args, o) => boundedOutput(file, args.map((a) => (a === MSYS_FIND_SCRIPT ? SLEEPER_FIND_SCRIPT : a)), o))
   if ('error' in found) return { error: found.error }
-  // The tests' own listing (processTree's listProcesses gives no answer while Windows lists pid 0: HI-3433).
+  // The tests' own listing (written while processTree's listProcesses gave no answer on Windows, HI-3433).
   let list: ListedProcess[]
   try {
     list = processes().map((p) => ({ pid: p.pid, parent: p.parent, started: p.started }))
