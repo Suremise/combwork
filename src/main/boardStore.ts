@@ -23,7 +23,7 @@ import { QUEUE_REVS_STEP } from './schema/queueRevsStep'
 import { PROJECT_REVS_DROP_STEP } from './schema/projectRevsDropStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
 import { backupsOf, beginTransaction, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
-import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
+import { checkpointsLetGo, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { beginWrite, countedWrite } from './dbWrites'
 import { timedStep } from './stallWork'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
@@ -2232,9 +2232,9 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     const pending = boardOf(path).db.pending
     if (!pending) return { backup: null }
     const from09 = pending.from < FIRST_10
-    // The group runs with the file locked to one connection: the checkpoints' worker lets go of it first (HI-1691),
-    // awaited before the close, so nothing opens it again between the close and the upgrade's open.
-    await checkpointsReleased(join(path, CW_DIR, DB_FILE))
+    // The group runs with the file locked to one connection: the checkpoints' worker lets go of it first (HI-1691, its
+    // kept connection too: HI-3414), awaited before the close, so nothing opens it again between the close and the upgrade's open.
+    await checkpointsLetGo(join(path, CW_DIR, DB_FILE))
     // Opened for keeps: only while a window holds it (#1395), checked after that wait, nothing awaited since.
     assertAdmitted(join(path, CW_DIR, DB_FILE))
     closeBoard(path)
@@ -2290,9 +2290,9 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
     // The board put back takes no writes here: an agent running on would go unrecorded. Starts are refused from then on.
     if (agentsRunning() > 0) throw combworkError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
     if (othersPresent(combwork, presenceId()).length) throw combworkError(M.inUse, undefined, { kind: 'conflict' })
-    // Copied as its only connection, then replaced: the checkpoints' worker lets go of it first (HI-1691), awaited
-    // before the close, so nothing opens it again between the close and the copy.
-    await checkpointsReleased(file)
+    // Copied as its only connection, then replaced: the checkpoints' worker lets go of it first (HI-1691, its kept
+    // connection too: HI-3414), awaited before the close, so nothing opens it again between the close and the copy.
+    await checkpointsLetGo(file)
     // As they are after that wait: still a window's (#1395, HR6's round 3: closed meanwhile, nothing is changed), and no
     // agent or other Combwork on it.
     assertAdmitted(file)

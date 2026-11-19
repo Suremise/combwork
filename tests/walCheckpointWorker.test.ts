@@ -153,6 +153,40 @@ describe("the WAL checkpoints' worker (HI-1691)", () => {
     }
   })
 
+  it("HI-3414: the worker's connection, kept after its checkpoint and restart, is closed once the database closes: checkpointsReleased waits for that, and the file can be moved", async () => {
+    const db = open()
+    write(db.writer, 20)
+    const restarts = wal.checkpointStats.restarts
+    due()
+    await vi.waitFor(() => expect(wal.checkpointStats.restarts).toBe(restarts + 1), { timeout: HUNG_MS })
+    await wal.walWritable(db.writer)
+    // Nothing in flight now, but the worker still holds the file on its kept connection.
+    expect(() => renameSync(db.file, `${db.file}.held`)).toThrow()
+    db.close()
+    await wal.checkpointsReleased(db.file)
+    expect(() => renameSync(db.file, `${db.file}.moved`)).not.toThrow()
+  })
+
+  it('HI-3414: checkpointsLetGo, awaited just before the close (as restoring the 0.9 board does), has the worker close its kept connection: closed with no await between, the file can be moved', async () => {
+    const db = open()
+    try {
+      write(db.writer, 20)
+      const restarts = wal.checkpointStats.restarts
+      due()
+      await vi.waitFor(() => expect(wal.checkpointStats.restarts).toBe(restarts + 1), { timeout: HUNG_MS })
+      await wal.walWritable(db.writer)
+      await wal.checkpointsLetGo(db.file)
+      // The close's own release kept from the worker: only the one awaited has let go of the file.
+      wal.checkpointThreadHooks.beforePost = (kind) => {
+        if (kind === 'release') throw new Error('not sent (test)')
+      }
+      db.close()
+      expect(() => renameSync(db.file, `${db.file}.moved`)).not.toThrow()
+    } finally {
+      wal.checkpointThreadHooks.beforePost = undefined
+    }
+  })
+
   it('a checkpoint holding the file: the close returns at once, main runs on while what needs the file waits, and it goes on once the worker lets go', async () => {
     wal.useCheckpointWorker(standIn('holding-worker.cjs', false))
     const db = open()
