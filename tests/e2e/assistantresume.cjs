@@ -123,9 +123,12 @@ const mode = ({ name, word: w }) =>
   // Its answer is the first codeword in the reply (HI-1669: Haiku may go on to name its earlier one, "My earlier reply,
   // ALPHA-…, was wrong."): a wrong first answer, or a codeword from an earlier run, still fails.
   const answers = (reply, m) => /\b(?:ALPHA|BRAVO|CHARLIE)-[0-9A-F]{6}\b/.exec(reply)?.[0] === m.word
-  // The mode menu in the Assistant panel's header.
+  // The mode menu in the Assistant panel's header. The panel loads the workspace's modes as it opens (modes:list), and its menu
+  // lists those it has when clicked (HI-3418, as HI-3417 in assistant.cjs), so it is clicked once the header shows its mode's
+  // icon (every mode here has one): the list loaded. "Manage Modes…" alone would satisfy a wait for any item.
   const panel = page.locator('.assistant-panel')
   const menu = async (label) => {
+    await lib.until(async () => (await panel.locator('.assistant-mode .assistant-mode-icon').count()) === 1, HUNG_MS)
     await panel.locator('.assistant-mode').click()
     await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, HUNG_MS)
     await page.locator('.menu .menu-item', { hasText: label }).first().click()
