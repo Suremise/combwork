@@ -82,8 +82,10 @@ function holders(ctx) {
     const list = processes()
     const pid = ctx.app.process().pid
     const tree = new Set(descendantsIn(list, pid).map((p) => p.pid))
-    const named = list.filter((p) => tree.has(p.pid) || (p.pid !== process.pid && namesFolder(p.commandLine, ctx.project)))
-    return named.length ? named.map((p) => `${p.pid}${tree.has(p.pid) ? ' (Combwork\'s)' : ''}: ${p.commandLine}`).join('; ') : `none running beside Combwork's main process (${pid})`
+    // Electron's own helpers (GPU, renderer, crash handler: `--type=`) and consoles open nothing in a project.
+    const helper = (p) => /\s--type=/.test(p.commandLine) || /\\conhost\.exe/i.test(p.commandLine)
+    const named = list.filter((p) => !helper(p) && (tree.has(p.pid) || (p.pid !== process.pid && namesFolder(p.commandLine, ctx.project))))
+    return named.length ? named.map((p) => `${p.pid}${tree.has(p.pid) ? ' (Combwork\'s)' : ''}: ${p.commandLine.slice(0, 200)}`).join('; ') : `nothing running beside Combwork's main process (${pid}): it or a scan`
   } catch (e) {
     return `the processes couldn't be listed (${e.message})`
   }
