@@ -215,6 +215,8 @@
   "settings.advanced.claude-code.memory.realPath.title": "接続では自動メモリを実際のパスで渡す",
   "settings.advanced.claude-code.memory.setting.desc": "Claude Codeの自動メモリフォルダーを指定する設定です。Combworkは接続上でこれを設定し（接続では自動メモリを実際のパスで渡す）、自分で設定している場合はそのままにします。誤っていると、Claude Codeはこれを無視し、接続上でメモリごとに確認します。",
   "settings.advanced.claude-code.memory.setting.title": "自動メモリフォルダーの設定",
+  "settings.advanced.claude-code.monitor.expired.desc": "Monitorの制限時間で終了したときに、その最後の通知が示す内容（正規表現）です。それ以外の通知は、実行中に起きたイベントを伝えます。誤っていると、Monitorが期限切れになったエージェントは、期限切れで起こされる時に通知とともに完了と表示されます。",
+  "settings.advanced.claude-code.monitor.expired.title": "トランスクリプト：Monitorの期限切れ",
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": "Claude Codeのペインでの右クリックは、他のすべてのペインと同じくCombworkが処理します。ターミナルの選択範囲があればコピーし、なければ貼り付けます。オンにすると、Combworkは右クリックをClaude Codeに渡します。Claude Codeは入力欄でマウスを使わないため、そこでは右クリックしても何も起きません。コピーと貼り付けはCtrl+CとCtrl+Vで行ってください。",
   "settings.advanced.claude-code.mouse.rightClickToCli.title": "右クリックをClaude Codeに渡す",
   "settings.advanced.claude-code.outage.connectionError.desc": "Claude Codeが再試行後もAPIに接続できなかったときに、StopFailureフックのメッセージが示す内容です。「接続が切れた後にエージェントを再開」がオンなら、Combworkは接続を待ってエージェントを再開します。誤っていると、そのようなエージェントは停止したままになります。",

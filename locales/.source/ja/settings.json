@@ -219,6 +219,8 @@
   "settings.advanced.claude-code.memory.realPath.title": "Auto memory by its real path on connections",
   "settings.advanced.claude-code.memory.setting.desc": "The Claude Code setting that names its auto memory folder, which Combwork sets on a connection (Auto memory by its real path on connections) and leaves alone where you set it yourself. Wrong, Claude Code ignores it and asks before each memory on a connection.",
   "settings.advanced.claude-code.memory.setting.title": "Auto memory folder setting",
+  "settings.advanced.claude-code.monitor.expired.desc": "What a Monitor's last notification says when its time limit ends it, as a regular expression; its other notifications report events while it runs on. Wrong, an agent whose Monitor expires shows finished, with a notification, as its expiry wakes it.",
+  "settings.advanced.claude-code.monitor.expired.title": "Transcript: Monitor expired",
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": "Right-click in a Claude Code pane is Combwork's, as in every pane: it copies the terminal's selection, or pastes. Turned on, Combwork passes right-clicks to Claude Code instead. Claude Code doesn't use the mouse at its prompt, so there a right-click then does nothing: copy and paste with Ctrl+C and Ctrl+V.",
   "settings.advanced.claude-code.mouse.rightClickToCli.title": "Pass right-click to Claude Code",
   "settings.advanced.claude-code.outage.connectionError.desc": "What a StopFailure hook's message says when Claude Code couldn't reach its API after its retries: with Resume agents after a connection drops on, Combwork waits for the connection and resumes the agent. Wrong, such agents stay stopped.",
