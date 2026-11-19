@@ -8,7 +8,7 @@
 // Combwork's wait (CW_TEST_DETECT_WAIT_MS): a new conversation of the Assistant, switched back to Claude Code, and an
 // agent added with no connection are refused, not guessed.
 // 5. A Claude Code agent switched to Codex resumes its Claude Code conversation in Claude Code; a new one runs Codex.
-// 6. Claude Code held beyond the wait again: a launch of a known provider waits only for its own CLI, so the Assistant
+// 6. Claude Code held beyond the wait again (until the suite lets it go, CW_TEST_HOLD_DETECT): a launch of a known provider waits only for its own CLI, so the Assistant
 // switched to Codex starts a conversation, and the agent resumes its Codex one. 7. The Claude Code conversation with
 // its Combwork record gone (one started outside Combwork) still resumes in Claude Code, found by its transcript.
 // Throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME; quiet. No real CLI runs.
@@ -173,7 +173,11 @@ const check = (name, ok, extra = '') => {
   check('the Claude Code conversation has a Combwork record, to remove', saved.sessions.some((s) => s.id === asid))
   saved.sessions = saved.sessions.filter((s) => s.id !== asid)
   putSessions(alpha, saved)
-  ;({ app, page, inv } = await launchHeld({ CW_TEST_SLOW_DETECT: 'claude-code=9000', CW_TEST_DETECT_WAIT_MS: '1500' }))
+  // Claude Code is held while this file exists (HI-3442: a fixed hold ran out under load before the second check), and
+  // let go once both checks have run.
+  const holdFile = path.join(lib.WORK, 'provdetect-hold-claude-code')
+  fs.writeFileSync(holdFile, '')
+  ;({ app, page, inv } = await launchHeld({ CW_TEST_HOLD_DETECT: `claude-code=${holdFile}`, CW_TEST_DETECT_WAIT_MS: '1500' }))
   await lib.openWorkspace(inv, page, ws)
   home = (await inv('workspace:refresh')).assistant.path
   await lib.waitForProvider(inv, 'codex')
@@ -194,6 +198,7 @@ const check = (name, ok, extra = '') => {
   check('…and the agent resumes its Codex conversation', codexBack === `codex ${csid}` && (await held()), `${codexBack}; Claude Code checking: ${await held()}`)
   await lib.until(agentReady, lib.timing('hang.ui'))
   await stopAgent()
+  fs.rmSync(holdFile, { force: true })
 
   // 7. A conversation Combwork has no record of resumes in the provider whose CLI has its transcript.
   await lib.waitForProvider(inv, 'claude-code', 20000)
