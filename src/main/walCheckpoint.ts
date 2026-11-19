@@ -6,7 +6,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import { beginGuards } from './db'
 import { createLogger } from './logger'
 import { timedStep } from './stallWork'
-import { CLOSING, runCheckpoint, runRestart, type CheckpointDone, type CheckpointReply, type CheckpointRequest, type RestartDone } from './walCheckpointWorker'
+import { CLOSING, releaseConnection, runCheckpoint, runRestart, type CheckpointDone, type CheckpointKind, type CheckpointReply, type CheckpointRequest, type CheckUnchanged, type RestartDone } from './walCheckpointWorker'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 
 /**
@@ -20,7 +20,10 @@ import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
  * for readers or writers) on main once it has been idle: nothing written for `idleMs` (its WAL file's size and time
  * unchanged), something written since its last checkpoint, and at least `everyMs` since that one. A WAL growing past
  * `walBytes` is checkpointed at once, idle or not, as is one written to without a pause for `maxGapMs`. The WAL starts
- * again from its beginning at the writer's next write after a whole checkpoint, as before.
+ * again from its beginning at the writer's next write after a whole checkpoint, as before. HI-3414: the WAL's time moves
+ * only at the clock's tick (about 15.6 ms on Windows by default), so a commit in the same tick that doesn't grow the file
+ * leaves its size and time as they were; so every `everyMs` while the stat says idle, the worker is asked to `check`, and
+ * checkpoints only if its kept connection's data_version says another connection committed (walCheckpointWorker.ts).
  *
  * Bounded: `incomplete` checkpoints in a row that couldn't copy the whole WAL (a reader on an old snapshot, another
  * process's checkpoint) or threw (a statement of the writer's still running, an I/O error) give the writer SQLite's own
@@ -43,7 +46,8 @@ import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
  * refused, never waited for (`beginGuards`). Another connection's commit still moves the board's `data_version`, and so
  * does this write: the board takes it for another process's change (one refresh), never missing a real one. The write
  * itself isn't a change to checkpoint again (HI-3362): the worker reads the WAL as its commit left it, and main starts
- * its next tick from there (restart's answer, RestartDone's `wal`).
+ * its next tick from there (restart's answer, RestartDone's `wal`); and made on the worker's kept connection, it never
+ * moves that connection's data_version, so a check after it finds nothing (HI-3414).
  */
 
 const log = createLogger('db')
@@ -128,17 +132,19 @@ const walStat = (file: string): { size: number; mtime: number } => {
 }
 
 /**
- * Checkpoints `r` (PASSIVE, on a connection of the worker's): its answer is taken when it comes. One that couldn't copy
+ * Checkpoints `r` (PASSIVE, on the worker's kept connection): its answer is taken when it comes. One that couldn't copy
  * the whole WAL, or threw (SQLite refused it, an I/O error), counts towards the fallback alike, and the database stays due
- * from this attempt on: tried again at the triggers' pace, not at every tick.
+ * from this attempt on: tried again at the triggers' pace, not at every tick. A `check` (HI-3414) checkpoints only if
+ * another connection committed since the worker's connection last looked; nothing committed, it is `unchanged`, and the
+ * next check is `everyMs` on.
  */
-function checkpoint(r: Registered, now: number, why: string): void {
+function checkpoint(r: Registered, now: number, why: string, kind: 'checkpoint' | 'check' = 'checkpoint'): void {
   r.last = now
   r.inFlight = true
-  thread.run(r.file, 'checkpoint', (res, where) => {
+  thread.run(r.file, kind, (res, where) => {
     r.inFlight = false
     // Closed meanwhile: nothing more of it.
-    if (dbs.get(r.writer) !== r || res === null || 'restart' in res) return
+    if (dbs.get(r.writer) !== r || res === null || 'restart' in res || 'unchanged' in res) return
     if ('error' in res) {
       checkpointStats.failed++
       log.warn(`checkpointing ${basename(r.file)}'s WAL${where}: ${res.error}`)
@@ -248,7 +254,12 @@ export function checkpointTick(now = performance.now()): void {
       r.changed = now
       r.dirty = true
     }
-    if (!r.dirty) continue
+    if (!r.dirty) {
+      // HI-3414: idle by the stat, which misses a commit in the same clock tick that doesn't grow the WAL: the worker's
+      // connection says whether another one committed, and checkpoints if so.
+      if (now - r.changed >= checkpointLimits.idleMs && now - r.last >= checkpointLimits.everyMs) checkpoint(r, now, "idle, a commit its WAL's size and time missed", 'check') // i18n-ignore: for the log
+      continue
+    }
     if (grew && s.size > checkpointLimits.walBytes) checkpoint(r, now, `its WAL grew past ${Math.round(checkpointLimits.walBytes / 1048576)} MB`) // i18n-ignore: for the log
     else if (now - r.changed >= checkpointLimits.idleMs && now - r.last >= checkpointLimits.everyMs) checkpoint(r, now, 'idle') // i18n-ignore: for the log
     else if (now - r.last >= checkpointLimits.maxGapMs) checkpoint(r, now, 'written to without a pause') // i18n-ignore: for the log
@@ -291,8 +302,10 @@ export function checkpointWhenIdle(file: string, writer: DatabaseSync, opts: { h
   return () => {
     dbs.delete(writer)
     beginGuards.delete(writer)
-    // A checkpoint asked for before now is skipped; one under way finishes on its own connection (checkpointsReleased).
+    // A checkpoint asked for before now is skipped; one under way finishes, and the worker's kept connection is closed
+    // after it (HI-3414; checkpointsReleased).
     thread.closing()
+    thread.release(file)
     if (!dbs.size && timer) {
       clearInterval(timer)
       timer = null
@@ -302,7 +315,7 @@ export function checkpointWhenIdle(file: string, writer: DatabaseSync, opts: { h
 }
 
 /** A checkpoint's answer: done, refused (its error), or skipped (null); `where` says where it ran, for the log. */
-type Answer = (res: CheckpointDone | RestartDone | { error: string } | null, where: string) => void
+type Answer = (res: CheckpointDone | CheckUnchanged | RestartDone | { error: string } | null, where: string) => void
 
 /**
  * The checkpoints' worker (HI-1691), started with the first checkpoint, as the repository lock's is (HI-1680). Without its
@@ -318,13 +331,17 @@ class CheckpointThread {
   /** Checkpoints in flight, and what waits for them to end, by file (lower case). */
   private flying = new Map<string, number>()
   private waiting = new Map<string, (() => void)[]>()
+  /** HI-3414 (HR1's round 4): files being let go of (letGo), by key: nothing more is asked of the worker for them meanwhile. */
+  private lettingGo = new Map<string, number>()
 
   /**
    * Runs a checkpoint or a restart of `file`, answered once. Never throws: a worker that can't be started, or a request
    * that can't be sent, is answered at once with its error, nothing of it left in flight (HI-3289: a restart's gate
    * opens only with its answer).
    */
-  run(file: string, kind: 'checkpoint' | 'restart', answer: Answer): void {
+  run(file: string, kind: CheckpointKind, answer: Answer): void {
+    // Being let go of: skipped (as one asked for before a close), so nothing opens the worker's connection again.
+    if (kind !== 'release' && this.lettingGo.has(file.toLowerCase())) return answer(null, '')
     let w: Worker | null
     try {
       checkpointThreadHooks.beforeDispatch?.(kind)
@@ -333,10 +350,10 @@ class CheckpointThread {
       return answer({ error: `its worker couldn't be started: ${e instanceof Error ? e.message : String(e)}` }, '') // i18n-ignore: for the log
     }
     if (!w) {
-      let res: CheckpointDone | RestartDone | { error: string } | null
+      let res: CheckpointDone | CheckUnchanged | RestartDone | { error: string } | null
       try {
         const m: CheckpointRequest = { id: 0, file, closing: 0, kind }
-        res = kind === 'restart' ? runRestart(m, null) : runCheckpoint(m, null)
+        res = kind === 'release' ? (releaseConnection(file), null) : kind === 'restart' ? runRestart(m, null) : runCheckpoint(m, null)
       } catch (e) {
         res = { error: e instanceof Error ? e.message : String(e) }
       }
@@ -361,6 +378,34 @@ class CheckpointThread {
   /** A database is closing: checkpoints asked for before now are skipped (never waited for). */
   closing(): void {
     Atomics.add(this.state, CLOSING, 1)
+  }
+
+  /**
+   * HI-3414: the worker's kept connection to `file` is closed, after what it has under way: in flight until then, so
+   * checkpointsReleased waits for it. Here, at once, without the worker (unit tests, or none started: then it holds
+   * nothing). Never starts a worker; a worker that ends has let go of it.
+   */
+  release(file: string): void {
+    releaseConnection(file)
+    if (this.worker) this.run(file, 'release', () => undefined)
+  }
+
+  /**
+   * HI-3414: the worker lets go of `file`, its kept connection included, while the database is still open: no request for
+   * it is made from now until the release and whatever was in flight before it have ended (HR1's round 4: a checkpoint's
+   * answer would otherwise ask for a restart, made after the release, on a connection opened again), then resolves.
+   */
+  async letGo(file: string): Promise<void> {
+    const key = file.toLowerCase()
+    this.lettingGo.set(key, (this.lettingGo.get(key) ?? 0) + 1)
+    try {
+      this.release(file)
+      await this.released(file)
+    } finally {
+      const left = (this.lettingGo.get(key) ?? 1) - 1
+      if (left > 0) this.lettingGo.set(key, left)
+      else this.lettingGo.delete(key)
+    }
   }
 
   /** Resolves once no checkpoint of `file` is in flight: the worker has let go of it, or ended. */
@@ -423,16 +468,24 @@ class CheckpointThread {
 }
 
 /** Tests: a throw where the worker is started (beforeDispatch) or a request is sent to it (beforePost). */
-export const checkpointThreadHooks: { beforeDispatch?: (kind: 'checkpoint' | 'restart') => void; beforePost?: (kind: 'checkpoint' | 'restart') => void } = {}
+export const checkpointThreadHooks: { beforeDispatch?: (kind: CheckpointKind) => void; beforePost?: (kind: CheckpointKind) => void } = {}
 
 /** How often something waiting for a database's file to be let go of by the worker says so in the log (tests change it). */
 export const closeLimits = { warnMs: 10_000 }
 
 /**
  * Resolves once the checkpoints' worker has let go of `file` (HI-1691): awaited after a database is closed by what renames,
- * replaces or deletes its file. At once when no checkpoint of it is in flight.
+ * replaces or deletes its file (the close sends the release of the worker's kept connection, HI-3414). At once when
+ * nothing of it is in flight.
  */
 export const checkpointsReleased = (file: string): Promise<void> => thread.released(file)
+
+/**
+ * HI-3414: checkpointsReleased for a database still open, to be closed in the same task once this resolves (no await
+ * between, so no request can open the worker's connection again): the worker's kept connection is closed first, and
+ * nothing more is asked of the worker for the file until it is (CheckpointThread's letGo).
+ */
+export const checkpointsLetGo = (file: string): Promise<void> => thread.letGo(file)
 
 /** The worker's script, beside main's (as the repository lock's); a test's build of it (`useCheckpointWorker`). */
 let scriptForTests: string | null = null

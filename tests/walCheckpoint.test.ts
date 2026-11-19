@@ -1,7 +1,7 @@
 // The WAL's checkpoints out of the commits (#1633): a writer given to the idle checkpointer never checkpoints in its
 // commits; it is checkpointed once idle (and due), at once when its WAL grows past the bound, or after writes without a
 // pause; checkpoints that can't copy the whole WAL give SQLite's own back until one can. Time is passed in: no waits.
-import { closeSync, openSync, readSync } from 'fs'
+import { closeSync, openSync, readSync, renameSync, statSync, utimesSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
@@ -13,7 +13,7 @@ const HUNG_MS = timing('wait.hang')
 
 const { openDb, transaction } = await import('../src/main/db')
 const wal = await import('../src/main/walCheckpoint')
-const { checkpointHooks } = await import('../src/main/walCheckpointWorker')
+const { checkpointHooks, releaseConnection } = await import('../src/main/walCheckpointWorker')
 const { checkpointThreadHooks } = wal
 
 const base = tempDir('cw-wal-checkpoint-')
@@ -297,6 +297,159 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
     }
   })
 
+  // HI-3414: Windows stamps a file's modified time from its clock tick (about 15.6 ms unless something raised the timer's
+  // resolution, as GitHub's runner doesn't), so a write in the restart's tick that doesn't grow the WAL (its frames go
+  // over the old ones from the beginning) leaves its size and time as the restart's. The WAL's time is set back to the
+  // restart's here (a whole second, which utimes keeps exactly): the same tick, whatever this machine's clock does.
+  /** A restart whose WAL is stamped `tick` as the worker reads it: its size and time as the checkpointer holds them. */
+  const restartAt = (db: { file: string; writer: DatabaseSync }, tick: number): { size: number; mtimeMs: number } => {
+    write(db.writer, 5)
+    checkpointHooks.beforeWalStat = () => utimesSync(`${db.file}-wal`, tick, tick)
+    const restarts = wal.checkpointStats.restarts
+    due()
+    checkpointHooks.beforeWalStat = null
+    expect(wal.checkpointStats.restarts).toBe(restarts + 1)
+    const s = statSync(`${db.file}-wal`)
+    expect(s.mtimeMs).toBe(tick * 1000)
+    return s
+  }
+  const otherWrite = (file: string): void => {
+    const other = new DatabaseSync(file)
+    try {
+      other.exec('PRAGMA wal_autocheckpoint = 0')
+      other.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(6000, 7))
+    } finally {
+      other.close()
+    }
+  }
+
+  for (const by of ['another connection', 'the writer'] as const) {
+    it(`HI-3414: a write by ${by} in the restart's clock tick, the WAL's size and time unchanged, is still seen and checkpointed`, () => {
+      const db = open(wal.checkpointWhenIdle)
+      const walFile = `${db.file}-wal`
+      const tick = Math.floor(Date.now() / 1000) - 60
+      try {
+        const done = wal.checkpointStats.done
+        const restarts = wal.checkpointStats.restarts
+        const before = restartAt(db, tick)
+        if (by === 'the writer') write(db.writer, 1)
+        else otherWrite(db.file)
+        utimesSync(walFile, tick, tick)
+        // The premise: nothing in the file's size or time says it was written.
+        const after = statSync(walFile)
+        expect([after.size, after.mtimeMs]).toEqual([before.size, before.mtimeMs])
+        const t = performance.now() + 2 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+        wal.checkpointTick(t)
+        wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+        expect(wal.checkpointStats.done).toBe(done + 2)
+        expect(wal.checkpointStats.restarts).toBe(restarts + 2)
+      } finally {
+        checkpointHooks.beforeWalStat = null
+        db.close()
+      }
+    })
+  }
+
+  it("HI-3414: the worker's connection lost (as a worker that ended loses it): the next check checkpoints once, a write the stat missed with it, then idle checks find nothing", () => {
+    const db = open(wal.checkpointWhenIdle)
+    const walFile = `${db.file}-wal`
+    const tick = Math.floor(Date.now() / 1000) - 60
+    try {
+      const before = restartAt(db, tick)
+      const done = wal.checkpointStats.done
+      const restarts = wal.checkpointStats.restarts
+      otherWrite(db.file)
+      utimesSync(walFile, tick, tick)
+      const after = statSync(walFile)
+      expect([after.size, after.mtimeMs]).toEqual([before.size, before.mtimeMs])
+      // No connection, so no data_version to compare: the next check checkpoints.
+      releaseConnection(db.file)
+      const step = wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+      let t = performance.now() + 2 * step
+      wal.checkpointTick(t)
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      expect(wal.checkpointStats.restarts).toBe(restarts + 1)
+      // Its restart made on the new connection: idle, nothing more.
+      for (let i = 0; i < 3; i++) wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      expect(wal.checkpointStats.restarts).toBe(restarts + 1)
+      expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(6)
+    } finally {
+      db.close()
+    }
+  })
+  it("HI-3414 (HR1's round 1): the WAL's size and time still count when its frames say nothing changed", () => {
+    const db = open(wal.checkpointWhenIdle)
+    const tick = Math.floor(Date.now() / 1000) - 60
+    try {
+      restartAt(db, tick)
+      const done = wal.checkpointStats.done
+      // Its time moved, nothing written.
+      utimesSync(`${db.file}-wal`, tick + 5, tick + 5)
+      const t = performance.now() + 2 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      wal.checkpointTick(t)
+      wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      expect(wal.checkpointStats.done).toBe(done + 1)
+    } finally {
+      db.close()
+    }
+  })
+
+  it("HI-3414 (HR1's round 2): a commit over frames spilled and rolled back, the WAL's frame count, size and time all unchanged, is still seen and checkpointed", () => {
+    const db = open(wal.checkpointWhenIdle)
+    const walFile = `${db.file}-wal`
+    const tick = Math.floor(Date.now() / 1000) - 60
+    // Another connection with a cache too small for its transaction: its pages spill into the WAL before its commit.
+    const other = new DatabaseSync(db.file, { timeout: 0 }) // timing-ok: no busy wait: nothing else takes the lock here
+    try {
+      other.exec('PRAGMA wal_autocheckpoint = 0')
+      other.exec('PRAGMA cache_size = 5')
+      restartAt(db, tick)
+      const done = wal.checkpointStats.done
+      const skipped = wal.checkpointStats.restartsSkipped
+      other.exec('BEGIN IMMEDIATE')
+      other.exec('SAVEPOINT s')
+      const ins = other.prepare('INSERT INTO t (doc) VALUES (?)')
+      for (let i = 0; i < 100; i++) ins.run(Buffer.alloc(6000, i % 251))
+      utimesSync(walFile, tick, tick)
+      const spilled = statSync(walFile)
+      const step = wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+      let t = performance.now() + 2 * step
+      // The spill grew the WAL: idle and due, it is checkpointed (what was committed), its restart skipped (the lock held).
+      wal.checkpointTick(t)
+      wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      expect(wal.checkpointStats.restartsSkipped).toBe(skipped + 1)
+      // Rolled back to before the spill, then a commit written over its frames.
+      other.exec('ROLLBACK TO s')
+      ins.run(Buffer.alloc(6000, 7))
+      other.exec('RELEASE s')
+      other.exec('COMMIT')
+      utimesSync(walFile, tick, tick)
+      const after = statSync(walFile)
+      expect([after.size, after.mtimeMs]).toEqual([spilled.size, spilled.mtimeMs])
+      wal.checkpointTick((t += step))
+      wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.done).toBe(done + 2)
+      expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(6)
+    } finally {
+      if (other.isTransaction) other.exec('ROLLBACK')
+      other.close()
+      db.close()
+    }
+  })
+
+  it("HI-3414: closing the database closes the checkpointer's kept connection with it: its file can be moved at once", () => {
+    const db = open(wal.checkpointWhenIdle)
+    write(db.writer, 5)
+    const restarts = wal.checkpointStats.restarts
+    // A checkpoint and its restart: the connection they ran on is kept.
+    due()
+    expect(wal.checkpointStats.restarts).toBe(restarts + 1)
+    db.close()
+    // Windows refuses to move a file a connection holds.
+    expect(() => renameSync(db.file, `${db.file}.moved`)).not.toThrow()
+  })
   it("HI-3362: another connection writing just after the restart's commit (the lock taken before the WAL is read) is still seen and checkpointed", () => {
     const db = open(wal.checkpointWhenIdle)
     const other = new DatabaseSync(db.file, { timeout: 0 }) // timing-ok: no busy wait: a lock refused at once is what the test checks
@@ -384,6 +537,41 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
       }
       expect(wal.checkpointStats.done).toBe(done + 2)
       expect(wal.checkpointStats.restarts).toBe(restarts + 2)
+      expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(6)
+    } finally {
+      checkpointThreadHooks.beforeDispatch = undefined
+      db.close()
+    }
+  })
+
+  it("HI-3414 (HR1's round 4): another connection's commit after the checkpoint, before the restart begins, the WAL's size and time unchanged, is still seen and checkpointed: the restart never takes it for its own", () => {
+    const db = open(wal.checkpointWhenIdle)
+    const walFile = `${db.file}-wal`
+    const tick = Math.floor(Date.now() / 1000) - 60
+    try {
+      write(db.writer, 5)
+      // The WAL in one clock tick from here on, as the stat sees it.
+      utimesSync(walFile, tick, tick)
+      const before = statSync(walFile)
+      checkpointThreadHooks.beforeDispatch = (kind) => {
+        if (kind === 'restart') otherWrite(db.file)
+      }
+      const done = wal.checkpointStats.done
+      due()
+      checkpointThreadHooks.beforeDispatch = undefined
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      // The other connection's commit restarted the WAL over its old frames, and the restart wrote after it: the premise,
+      // nothing in the file's size or time says so.
+      utimesSync(walFile, tick, tick)
+      const after = statSync(walFile)
+      expect([after.size, after.mtimeMs]).toEqual([before.size, before.mtimeMs])
+      const step = wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+      let t = performance.now() + 2 * step
+      wal.checkpointTick(t)
+      expect(wal.checkpointStats.done).toBe(done + 2)
+      // Then idle: nothing more.
+      for (let i = 0; i < 3; i++) wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.done).toBe(done + 2)
       expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(6)
     } finally {
       checkpointThreadHooks.beforeDispatch = undefined

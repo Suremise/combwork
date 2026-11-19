@@ -12,16 +12,16 @@ import { junction } from './pathAliases'
 import { as09 } from './boardDb'
 import { timing } from './timing.cjs'
 
-// The checkpoints' worker letting go of a file (HI-1691), held by a test: `gate` set, checkpointsReleased waits for it,
+// The checkpoints' worker letting go of a file (HI-1691), held by a test: `gate` set, checkpointsLetGo waits for it,
 // telling `reached` as it starts to.
 const held = vi.hoisted(() => ({ gate: null as Promise<void> | null, reached: null as (() => void) | null }))
 vi.mock('../src/main/walCheckpoint', async (original) => {
   const real = await original<typeof import('../src/main/walCheckpoint')>()
   return {
     ...real,
-    checkpointsReleased: (file: string) => {
+    checkpointsLetGo: (file: string) => {
       held.reached?.()
-      return held.gate ?? real.checkpointsReleased(file)
+      return held.gate ?? real.checkpointsLetGo(file)
     }
   }
 })
@@ -56,7 +56,7 @@ afterEach(() => {
   held.reached = null
 })
 
-/** Holds checkpointsReleased (HI-1691): resolves once the code under test waits there; `release` lets it go on. */
+/** Holds checkpointsLetGo (HI-1691, HI-3414): resolves once the code under test waits there; `release` lets it go on. */
 function holdRelease(): { waiting: Promise<void>; release: () => void } {
   let release = (): void => undefined
   held.gate = new Promise<void>((r) => (release = r))
