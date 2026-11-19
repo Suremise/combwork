@@ -748,9 +748,15 @@ interface LiveSession {
    * Its input box taking no keys (HI-2191): INPUT_BLOCKED_AFTER clears in a row refused so, something else on its screen
    * takes them (a dialog Combwork doesn't know). The agent waits for the user with `ask`, and Combwork presses no key there until
    * it is seen to take keys again (inputBlockedDrawn, a hook, Try again), in this run (`runId`). `box`: its box as read
-   * then; `since`: when (ms); `retrying` while Try again's clear runs.
+   * then; `since`: when (ms); `retrying` while Try again's clear runs. `hidden` (HI-3411): blocked because its box stayed
+   * off the screen (boxHidden), so the box drawn again frees it.
    */
-  inputBlocked?: { runId: string; ask: Ask; box: string | null; since: number; retrying?: boolean }
+  inputBlocked?: { runId: string; ask: Ask; box: string | null; since: number; retrying?: boolean; hidden?: boolean }
+  /**
+   * Its input box off the screen since a clear was refused for it (HI-3411: a dialog drawn in its place), in this run: the
+   * box seen again, or a clear that empties it, ends it. Past Advanced's Input box hidden: wait, the input is blocked.
+   */
+  boxHidden?: { runId: string; since: number }
   /** A look at its screen for that question and a lost line is queued (one at a time, however much the CLI draws). */
   idleChecking?: boolean
   /** The user was told this launch runs another model than it was given (HI-2609): once a launch. */
@@ -1380,7 +1386,7 @@ const USER_REPLY_MS = 15_000
  * HI-3373: 120 s (it was 30): a CLI starting several MCP servers can be ready long before it takes its first task, and
  * pending ends at that first prompt anyway.
  */
-const PENDING_MS = 120_000
+export const PENDING_MS = 120_000
 
 /** The longest a Shift+Tab press waits for the footer to show the mode it moved to (HI-3373: 4 s gave up on a busy machine). */
 const MODE_PRESS_MS = 30_000
@@ -1410,6 +1416,8 @@ const CLEAR_PROBE = 'x'
  * counts as blocked (HI-2191): one delivery's tries. A clear answered late but answered resets the count.
  */
 const INPUT_BLOCKED_AFTER = 3
+/** How long its input box may stay off the screen, from a clear refused for it, before its input is blocked (HI-3411): Settings → Advanced. */
+export const INPUT_HIDDEN_SECONDS = 'cw.input.hiddenSeconds'
 
 /**
  * A launch's task on its CLI's command line not taken yet (#712): the CLI is ready at its SessionStart and takes the task
@@ -4765,6 +4773,8 @@ class SessionManager {
     const waitMs = advanced.number(clearKeyWaitId(l.adapter.id)) * 1000
     // Refused because a key went unanswered while the box read empty (HI-2191): something else may take its keys.
     let unanswered = false
+    // Refused while its box wasn't on the screen (HI-3411): something may be drawn in its place.
+    let hidden = false
     /** The box once the key just pressed is answered: drawn differently from `before`, or null while it can't be read and the screen changed. */
     const answered = async (keyName: string, before: string | null, shown: string | null): Promise<string | null> => {
       const t = Date.now()
@@ -4775,6 +4785,7 @@ class SessionManager {
         if (before === null && box === null && shown !== null && screen!.text() !== shown) return null
         if (Date.now() - t > waitMs) {
           unanswered = before === ''
+          hidden = before === null
           throw notCleared(before === null ? "its input box isn't on the screen" : `${keyName} wasn't answered within ${waitMs} ms (the box read "${userText(words(before).slice(0, 60))}")`) // i18n-ignore: why, for the log
         }
       }
@@ -4790,7 +4801,10 @@ class SessionManager {
     let probe = false
     try {
       for (let n = 0; ; n++) {
-        if (n >= CLEAR_KEYS_MOST) throw notCleared(`${CLEAR_KEYS_MOST} keys didn't empty it`) // i18n-ignore: why, for the log
+        if (n >= CLEAR_KEYS_MOST) {
+          hidden = box === null
+          throw notCleared(`${CLEAR_KEYS_MOST} keys didn't empty it`) // i18n-ignore: why, for the log
+        }
         check()
         if (box === '') {
           probe = true
@@ -4806,6 +4820,7 @@ class SessionManager {
           if (box !== '') throw notCleared(`the letter Combwork typed and took back left "${userText(words(box).slice(0, 60))}"`) // i18n-ignore: why, for the log
           check()
           l.unanswered = 0
+          l.boxHidden = undefined
           return
         }
         box = await press('\x15', 'A Ctrl+U', box)
@@ -4814,6 +4829,7 @@ class SessionManager {
       const same = this.live.get(liveId(projectPath, agentId)) === l && l.state.runId === runId
       if (probe && same && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x7f')
       if (unanswered && same) this.inputUnanswered(l)
+      if (hidden && same) this.inputHidden(l)
       throw e
     }
   }
@@ -4859,15 +4875,40 @@ class SessionManager {
   private inputUnanswered(l: LiveSession): void {
     l.unanswered = (l.unanswered ?? 0) + 1
     if (l.unanswered < INPUT_BLOCKED_AFTER || l.inputBlocked) return
+    this.blockInput(l, `its input took no key in ${l.unanswered} clears in a row: something on its screen takes them`) // i18n-ignore: for the log
+  }
+
+  /**
+   * A clear refused because its input box wasn't on the screen (HI-3411: a dialog of its CLI's drawn in its place, which
+   * Combwork doesn't recognise, refused every wake, message and slot hand-off every 2.5 s for days while nobody was told).
+   * The first starts its time hidden (boxHidden); one past Advanced's Input box hidden: wait (minutes: a draft taller than
+   * the screen, cleared meanwhile, or a dialog the user is answering, isn't one) blocks its input as HI-2191 does, logging
+   * its screen's last rows. Its box seen again ends both (inputBlockedDrawn).
+   */
+  private inputHidden(l: LiveSession): void {
+    const st = l.state
+    const now = Date.now()
+    if (l.boxHidden?.runId !== st.runId) l.boxHidden = { runId: st.runId, since: now }
+    const hiddenMs = now - l.boxHidden.since
+    if (l.inputBlocked || hiddenMs < advanced.number(INPUT_HIDDEN_SECONDS) * 1000) return
+    const rows = (l.screen?.text() ?? '').split('\n').map((r) => r.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(-4).join(' | ')
+    this.blockInput(l, `its input box hasn't been on the screen for ${Math.round(hiddenMs / 1000)} s (its screen's last rows: "${userText(rows.slice(-300))}")`, true) // i18n-ignore: for the log
+  }
+
+  /**
+   * Blocks an agent's input (HI-2191, HI-3411): the agent waits for the user with why, unless it already waits on something
+   * else, whose reason stays (nothing is typed meanwhile either way). `why`: for the log.
+   */
+  private blockInput(l: LiveSession, why: string, hidden = false): void {
     const st = l.state
     const id = liveId(st.projectPath, st.agentId)
     const text = msg({ id: 'session.status.inputBlocked', defaultMessage: 'Something on its screen is taking its keys: answer it there, then Try again', description: "An agent's status: Combwork typed into its coding agent's input and nothing reached it (a dialog or question of the coding agent's own, which Combwork doesn't recognise, takes the keys). The user answers it in the agent's terminal. Try again is the button beside this status: keep its name as it is translated there." })
     // agent-stored: agentField says it for each agent where its status is sent (setStatus keeps its text)
     const ask: Ask = { kind: 'question', blocking: true, message: englishText(text), text }
     const at = Date.now()
-    l.inputBlocked = { runId: st.runId, ask, box: this.boxNow(l), since: at }
+    l.inputBlocked = { runId: st.runId, ask, box: this.boxNow(l), since: at, ...(hidden ? { hidden } : {}) }
     st.inputBlocked = { since: new Date(at).toISOString() }
-    log.info(`${userText(this.label(st))}: its input took no key in ${l.unanswered} clears in a row: something on its screen takes them; it waits for the user, and nothing is typed into it until it takes keys again`) // i18n-ignore: for the log
+    log.info(`${userText(this.label(st))}: ${why}; it waits for the user, and nothing is typed into it until it takes keys again`) // i18n-ignore: for the log
     const ev: HookEvent = { kind: 'ask', ask }
     if (AT_PROMPT.has(st.status)) this.carryOut(id, l, hookStep(ev, this.statusInput(l)), 'screen', ev)
     else this.emitState(st)
@@ -4883,6 +4924,7 @@ class SessionManager {
     if (!b || this.live.get(id) !== l || l.state.runId !== b.runId) return
     l.inputBlocked = undefined
     l.unanswered = 0
+    l.boxHidden = undefined
     l.state.inputBlocked = undefined
     log.info(`${userText(this.label(l.state))}: its input takes keys again (${why})`) // i18n-ignore: for the log
     if (l.state.status === 'waiting' && l.waitingOn === b.ask) this.carryOut(id, l, idleQuestionGone(this.statusInput(l)), 'screen')
@@ -4895,7 +4937,17 @@ class SessionManager {
    */
   private inputBlockedDrawn(id: string, l: LiveSession): void {
     const b = l.inputBlocked
-    if (!b || b.retrying || this.userTypedAt(l.state.projectPath, l.state.agentId) < b.since) return
+    // Its box off the screen (HI-3411): drawn again, it is back, whoever answered what hid it (a dialog's own timeout too).
+    if (!b) {
+      if (l.boxHidden && this.boxNow(l) !== null) l.boxHidden = undefined
+      return
+    }
+    if (b.retrying) return
+    if (b.hidden) {
+      if (this.boxNow(l) !== null) this.unblockInput(id, l, 'its input box is on the screen again') // i18n-ignore: for the log
+      return
+    }
+    if (this.userTypedAt(l.state.projectPath, l.state.agentId) < b.since) return
     const box = this.boxNow(l)
     if (box !== null && box !== b.box) this.unblockInput(id, l, "its input box took the user's key") // i18n-ignore: for the log
   }
@@ -8205,6 +8257,7 @@ class SessionManager {
     if (unblocked) {
       l.inputBlocked = undefined
       l.unanswered = 0
+      l.boxHidden = undefined
       st.inputBlocked = undefined
       log.info(`${userText(label)}: its input takes keys again (its CLI sent ${ev!.kind})`) // i18n-ignore: for the log
     }

@@ -6,7 +6,7 @@
 //  - its work is this prompt's: Combwork recorded it working since this prompt (statesFrom), the prompt was answered, or a
 //    look saw it at work (the looks begin once the prompt is sent);
 //  - it ended: idle (ready, finished, watching) with affirmative evidence of that work's end (the prompt answered, an end
-//    status after the work in this prompt's statuses, or a look at an end, its turn over, after one that saw the work)
+//    status after the work in this prompt's statuses, or a look at an end, its turn 'over', after one that saw the work)
 //    and its turn not running; or a person is asked (Combwork's
 //    runtime attention 'waiting': not the relaunch's trust, not a sign-in), which doesn't end the turn in the ledger;
 //  - nothing could still change the outcome: a trust question, a dispatched agent at work, the scenario's keepWaiting,
@@ -14,7 +14,8 @@
 //  - and that has held for the floor (scenario.quietMs; asked: scenario.waitingQuietMs), counted again from any look that
 //    saw work or anything pending.
 // The session gone (no live state) has ended once it has stayed gone for scenario.quietMs: a relaunch comes back sooner.
-// A read that fails or doesn't answer within its bound is unknown, never quiet: nothing ends on it.
+// A read that fails or doesn't answer within its bound is unknown, never quiet: nothing ends on it. A question on the
+// subject's screen is told only from a screen that was read (screenReads).
 'use strict'
 
 /** Statuses of work under way: the floor never runs while one shows (unless a person is asked). */
@@ -38,7 +39,8 @@ function turnStep(state, look, floors) {
   // given at launch can be at work before Combwork's statuses are recorded (card-loop-design-check on the fake Copilot:
   // only 'watching' recorded), so a look's own sight of it counts, as does an idle end with its turn over in a later look.
   const sawWork = !!state.sawWork || WORKING.has(look.status) || look.turn === 'running'
-  const sawEnd = !!state.sawEnd || (!!state.sawWork && IDLE_ENDS.has(look.status) && look.turn !== 'running' && look.turn !== 'unknown')
+  // The end must be affirmative: the turn ledger saying over, never a turn missing or unread (HR1 on HI-3400, 2).
+  const sawEnd = !!state.sawEnd || (!!state.sawWork && IDLE_ENDS.has(look.status) && look.turn === 'over')
   const seen = { sawWork, sawEnd }
   const hold = (phase, why) => ({ state: { phase, quietSince: null, ...seen }, done: false, outcome: null, why })
   if (look.stop) return { state: { ...state, phase: 'done' }, done: true, outcome: 'environment', why: `stopped for the environment: ${look.stop}` }
@@ -84,7 +86,31 @@ async function bounded(fn, deadline, readMs) {
 }
 
 /** The reads a look takes, in order (a later one may use an earlier one's value). */
-const READS = ['live', 'stop', 'workSeen', 'endSeen', 'asks', 'quiet', 'trust', 'dispatchedBusy', 'keepWaiting']
+const READS = ['live', 'stop', 'workSeen', 'endSeen', 'screen', 'asks', 'quiet', 'trust', 'dispatchedBusy', 'keepWaiting']
+
+/**
+ * The reads a look takes from the subject's screen (HR1 on HI-3400, 1): `screen` reads it once a look, only when a
+ * question may be on it (`readScreen` rejects when it can't be read), and `asks` and `trust` decide from that one
+ * snapshot. A screen unread (failed, or no answer within its bound) leaves both unknown: trust pending, and no question
+ * for the user told from it. `isTrust(screen)`: a trust question is on it; `trustKind(live, screen)`: the one the harness
+ * answers (its relaunch's), or nothing.
+ */
+function screenReads({ readScreen, isTrust, trustKind }) {
+  const waiting = (s) => s?.status === 'waiting' || s?.runtime?.attention === 'waiting'
+  const read = (screen) => typeof screen === 'string'
+  return {
+    screen: async ({ live: s }) => (waiting(s) ? String(await readScreen()) : ''),
+    asks: async ({ live: s, screen }) => {
+      if (!(s?.runtime?.attention === 'waiting' && s.runtime.lifecycle === 'running')) return false
+      return read(screen) ? !isTrust(screen) : UNKNOWN
+    },
+    trust: async ({ live: s, screen }) => {
+      if (!waiting(s)) return false
+      if (!read(screen)) return UNKNOWN
+      return !!(await trustKind(s, screen))
+    }
+  }
+}
 
 /**
  * One look: each of `reads` (functions of the values read so far; one left out reads as nothing pending) bounded by
@@ -205,4 +231,4 @@ function lineReads({ live, conversation, quiet }) {
   }
 }
 
-module.exports = { turnStep, start, gatherLook, waitTurnEnd, bounded, UNKNOWN, WORKING, IDLE_ENDS, lineReads, combworkLineAt }
+module.exports = { turnStep, start, gatherLook, waitTurnEnd, screenReads, bounded, UNKNOWN, WORKING, IDLE_ENDS, lineReads, combworkLineAt }

@@ -461,6 +461,8 @@
   "settings.advanced.copilotFooter.title": "Rodapé: {mode}",
   "settings.advanced.cw.db.busySeconds.desc": "Quanto tempo uma gravação no quadro, no diário do Assistente ou no histórico de uso espera enquanto outro programa (outro Combwork neste espaço de trabalho, um script) mantém o bloqueio do banco de dados, antes de a gravação ser recusada. Limita uma espera, não uma velocidade: uma gravação no quadro espera na thread principal do Combwork, então a janela não responde enquanto espera. Vale depois que o Combwork reiniciar.",
   "settings.advanced.cw.db.busySeconds.title": "Bancos de dados: esperar o bloqueio de outro programa",
+  "settings.advanced.cw.input.hiddenSeconds.desc": "Por quanto tempo a caixa de entrada de um agente pode ficar fora da tela, desde a primeira vez que o Combwork não conseguiu digitar nela por isso, antes que o Combwork pare de tentar e mostre o agente esperando por você (HI-3411): algo que a CLI dele desenhou no lugar da caixa, como uma pergunta que o Combwork não reconhece, está pegando as teclas. Assim que a caixa aparece de novo, o que esperava é digitado.",
+  "settings.advanced.cw.input.hiddenSeconds.title": "Caixa de entrada oculta: espera",
   "settings.advanced.data.desc": "O Combwork guarda as configurações em %APPDATA%\\Combwork\\config.json.",
   "settings.advanced.data.tip": "As configurações do projeto ficam na pasta .combwork de cada projeto; as do espaço de trabalho, na pasta .combwork do espaço de trabalho.",
   "settings.advanced.data.title": "Arquivo de configurações",

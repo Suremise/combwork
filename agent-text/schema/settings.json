@@ -1229,6 +1229,12 @@
   "settings.advanced.cw.inbox.stopContinuation.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.input.hiddenSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.input.hiddenSeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.jj.commandSeconds.desc": {
     "placeholders": {}
   },

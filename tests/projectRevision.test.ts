@@ -140,7 +140,11 @@ describe("v33 drops the project revision, unread since HI-3296's queue revision 
     await w2.open(ws)
     opened.push(w2)
     const reader = store.workspaceDb(ws).reader
-    expect((reader.prepare('SELECT max(version) AS v FROM schema_version').get() as { v: number }).v).toBe(33)
+    // Upgraded through v33 and every step after it (HI-3374's v34 quiet claims): at the board's latest version.
+    const latest = Math.max(...store.BOARD_MIGRATIONS.map((m) => m.version))
+    expect(latest).toBeGreaterThanOrEqual(33)
+    expect((reader.prepare('SELECT version FROM schema_version WHERE version = 33').get() as { version: number } | undefined)?.version, 'v33 ran').toBe(33)
+    expect((reader.prepare('SELECT max(version) AS v FROM schema_version').get() as { v: number }).v).toBe(latest)
     expect(names(reader)).toEqual(NEW_EPOCH)
     expect(epoch(ws)).toBe(41)
     expect(JSON.stringify(docOf(w2, c))).toBe(doc)

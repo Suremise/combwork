@@ -744,6 +744,21 @@
       "target": "plain"
     }
   },
+  "workflow.refused.done.noCodeUnmerged.message": {
+    "placeholders": {
+      "card": "plain",
+      "line": "plain",
+      "count": "plural",
+      "target": "plain",
+      "commits": "plain",
+      "more": "plural"
+    }
+  },
+  "workflow.refused.done.noCodeUnmerged.next": {
+    "placeholders": {
+      "reader": "select"
+    }
+  },
   "workflow.refused.evidence.changed.message": {
     "placeholders": {
       "card": "plain"
@@ -1485,7 +1500,7 @@
   "workflow.refused.submit.notDuplicate.message": {
     "placeholders": {
       "card": "plain",
-      "revision": "plain"
+      "revision": "select"
     }
   },
   "workflow.refused.submit.notDuplicate.next": {
@@ -1599,6 +1614,9 @@
     "placeholders": {}
   },
   "workflow.rule.done.contained": {
+    "placeholders": {}
+  },
+  "workflow.rule.done.noCodeUnmerged": {
     "placeholders": {}
   },
   "workflow.rule.forward.resolutionSource": {

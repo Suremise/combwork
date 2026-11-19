@@ -99,7 +99,8 @@
 //   it off (its input back, empty), Enter answers it (recorded in fake-envsetup.jsonl). With fake-input-box.txt in its
 //   home at its start, its input is 2.1.312's box (a rule, `❯` and a no-break space, a rule below). "envsetupunder": the
 //   same offer as 2.1.314 draws it (HI-2191), under its input box and footer, the empty box kept above it; "swallow": a
-//   dialog of its own Combwork doesn't know ("Choose how long replies are kept?"), drawn and answered the same way. The test making
+//   dialog of its own Combwork doesn't know ("Choose how long replies are kept?"), drawn and answered the same way;
+//   "swallowhide" (HI-3411): that dialog on a cleared screen, in its input box's place, as 2.1.312 draws its offer. The test making
 //   fake-clear-line-<agent> clears its input line while idle, as that screen took HB4's wake.
 // - Notices (#650), as Claude Code 2.1.296 takes them: context in a PostToolUse or Stop reply reaches "the model", and a
 //   Stop answered with context (or a block) carries the turn on to another Stop with stop_hook_active. Each notice
@@ -916,6 +917,7 @@ async function runPrompt(text, enter = null) {
   if (/\benvsetup\b/i.test(text)) envSetup()
   if (/\benvsetupunder\b/i.test(text)) envSetup(ENV_SETUP_TITLE)
   if (/\bswallow\b/i.test(text)) envSetup(SWALLOW_TITLE)
+  if (/\bswallowhide\b/i.test(text)) envSetup(null, SWALLOW_TITLE)
   // "statusmodel ID": the status line reports the model it runs as ID, as Claude Code's does (HI-1772: a server's model).
   const statusModel = /\bstatusmodel\s+(\S+)/i.exec(text)
   if (statusModel) await statusLine({ model: { id: statusModel[1], display_name: statusModel[1] } })
@@ -1000,9 +1002,10 @@ const ENV_SETUP_TITLE = 'Teach auto mode about your environment?'
 const SWALLOW_TITLE = 'Choose how long replies are kept?'
 /**
  * `under`: as Claude Code 2.1.314 draws it (HI-2191, recorded), under its input box and footer, the box (empty) kept above
- * it; the dialog titled `under`. Otherwise 2.1.312's, on a cleared screen.
+ * it; the dialog titled `under`. Otherwise 2.1.312's, on a cleared screen, titled `title` ("swallowhide", HI-3411: a dialog
+ * Combwork doesn't know in its input box's place).
  */
-function envSetup(under = null) {
+function envSetup(under = null, title = ENV_SETUP_TITLE) {
   envSetupOpen = true
   envSetupUnder = under
   if (under) {
@@ -1011,7 +1014,7 @@ function envSetup(under = null) {
   }
   // In place of its input box, which the cleared screen takes with it (HI-1979: not drawn back under the question).
   boxShown = false
-  out("\x1b[2J\x1b[H Teach auto mode about your environment?\r\n\r\n Auto mode works better when it knows your environment. Takes about a minute.\r\n\r\n ❯ 1. Yes\r\n   2. Not now\r\n   3. Don't show again\r\n\r\n Enter to select · ↑/↓ to navigate · Esc to cancel\r\n")
+  out(`\x1b[2J\x1b[H ${title}\r\n\r\n Auto mode works better when it knows your environment. Takes about a minute.\r\n\r\n ❯ 1. Yes\r\n   2. Not now\r\n   3. Don't show again\r\n\r\n Enter to select · ↑/↓ to navigate · Esc to cancel\r\n`)
 }
 function envSetupAnswered(answer) {
   envSetupOpen = false

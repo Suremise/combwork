@@ -461,6 +461,8 @@
   "settings.advanced.copilotFooter.title": "底栏：{mode}",
   "settings.advanced.cw.db.busySeconds.desc": "当其他程序（此工作区中的另一个 Combwork、某个脚本）持有数据库锁时，对看板、助手日志或使用历史的写入在被拒绝前等待的时间。这是等待时间的上限，而不是速度：对看板的写入在 Combwork 的主线程上等待，因此等待期间窗口不会响应。重启 Combwork 后生效。",
   "settings.advanced.cw.db.busySeconds.title": "数据库：等待其他程序的锁",
+  "settings.advanced.cw.input.hiddenSeconds.desc": "从 Combwork 首次因代理的输入框不在屏幕上而无法输入时算起，输入框可以一直不显示多久，之后 Combwork 停止尝试，并将该代理显示为等待你处理（HI-3411）：它的 CLI 在输入框位置显示的内容（例如 Combwork 无法识别的问题）正在接收按键。输入框再次显示后，等待中的内容会被输入。",
+  "settings.advanced.cw.input.hiddenSeconds.title": "输入框被遮挡：等待时间",
   "settings.advanced.data.desc": "Combwork 将设置保存在 %APPDATA%\\Combwork\\config.json 中。",
   "settings.advanced.data.tip": "项目设置位于各项目的 .combwork 文件夹中；工作区设置位于工作区的 .combwork 文件夹中。",
   "settings.advanced.data.title": "设置文件",

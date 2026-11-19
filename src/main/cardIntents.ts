@@ -162,7 +162,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'submit': {
         // A follow-up's (HI-1832): no move to say it, so a line of its own, which its reviewer's watch and pendingStep read.
         const sub = w.written.findLast((f) => f.kind === 'Submitted')?.data as { followUp?: boolean; revision?: string | null } | undefined
-        return { opts: { keepAgent, comment: intent.summary, ...(sub?.followUp ? { note: [storedText(HISTORY.followUpSubmitted, { revision: (sub.revision ?? '').slice(0, 7) })] } : {}) } }
+        return { opts: { keepAgent, comment: intent.summary, ...(sub?.followUp ? { note: [storedText(HISTORY.followUpSubmitted, { revision: sub.revision ? sub.revision.slice(0, 7) : 'none' })] } : {}) } }
       }
       case 'startReview':
         // The card marked as this reviewer's (an agent's own review; the Assistant and scripts don't review).

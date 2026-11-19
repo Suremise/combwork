@@ -56,6 +56,19 @@ export interface FinishInputs {
   contained?: Maybe<boolean>
   /** Acceptance: the revision of the card's work now (None: its paths' hash). */
   currentRevision?: Maybe<string>
+  /** HI-3410: a no-code card's own line holding commits its target lacks (Git only); null: none. */
+  unmerged?: Maybe<Unmerged | null>
+}
+
+/**
+ * HI-3410: a no-code card's own line (one a start of it made) with commits its target lacks, which its finish would
+ * leave there unmerged: the line, the target, how many, and the first few as short ids and subjects, oldest first.
+ */
+export interface Unmerged {
+  line: string
+  target: string
+  count: number
+  commits: string[]
 }
 
 /** A later revision of a card's work than the one a pass was for, and whether it is the same change. */
