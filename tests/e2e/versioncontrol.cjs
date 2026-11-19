@@ -135,7 +135,13 @@ function board(sql, ...args) {
     const plainSaved = () => (fs.existsSync(path.join(plain, '.combwork', 'project.json')) ? fs.readFileSync(path.join(plain, '.combwork', 'project.json'), 'utf8') : null)
     const savedBefore = plainSaved()
     const linkBefore = (await text(link)).trim()
-    await head.locator('[data-platform="git"]').click()
+    // Git's choice opens its page only once the tab has read the folder's git (`data-vc-preview`, HI-3436, as gitinit's
+    // HI-3429): before that answer the click is the switch, refused with no repository.
+    const showGitPage = async (name) => {
+      if (!(await lib.until(async () => (await head.locator('[data-platform="git"][data-vc-preview]').count()) === 1, HUNG_MS))) check(`${name}: Git's page offered (the tab read its git)`, false, await text(page.locator('.vc-view')))
+      await head.locator('[data-platform="git"][data-vc-preview]').click()
+    }
+    await showGitPage('plain')
     check("Git: its page says the folder isn't a repository yet, with Initialise repository… and what it does", !!(await lib.until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && (await text(preview)).startsWith("This folder isn't a Git repository yet.") && (await preview.locator('[data-git-init]').count()) === 1 && /on a branch called main/.test(await text(preview)), HUNG_MS)), await text(page.locator('.vc-view')))
     check("…and nothing else of Git's: no sections, no preset step", (await page.locator('.git-sections').count()) === 0 && (await page.locator('[data-preset-step]').count()) === 0 && (await page.locator('.git-body').count()) === 0)
     check('…the workflow link and the fact line still None’s', (await text(link)).trim() === linkBefore && (await text(fact)) === 'This folder has no version control.', await text(link))
@@ -143,7 +149,7 @@ function board(sql, ...args) {
     await shots('none-git-preview', page.locator('.vc-view'))
     await head.locator('[data-platform="none"]').click()
     check('None again: its page', !!(await lib.until(async () => (await preview.count()) === 0 && JSON.stringify(await sections()) === '["workflow"]', HUNG_MS)))
-    await head.locator('[data-platform="git"]').click()
+    await showGitPage('plain again')
     await lib.until(async () => (await preview.count()) === 1, HUNG_MS)
     await page.locator('.tabs .tab', { hasText: 'Tasks' }).first().click()
     await vcTab.click()
