@@ -17,7 +17,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 const { createHash } = require('crypto')
-const { processes, descendantsIn, suspensions } = require('../folderProcesses.cjs')
+const { processes, descendantsIn, suspensions, suspendRunning } = require('../folderProcesses.cjs')
 const { startFakeCopilotApi, copilotTestEnv, copilotInstalled } = require('../fake-copilot-api.cjs')
 const { doorbellIds: doorbellsIn, newDelivery } = require('./doorbells.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -102,13 +102,17 @@ module.exports = async function run(provider) {
     }
     /** Combwork's log lines about lines typed into the agent (its wakes' and doorbells' outcomes). */
     const wakeLines = () => combworkLog().split('\n').filter((l) => l.includes(id) && /\[watches\] (Woke|The wake typed into)/.test(l))
-    /** The CLI's processes in this Combwork's tree (by their command lines), each { pid, started }: what a busy round suspends. */
+    /**
+     * The CLI's processes in this Combwork's tree (by their command lines), each { pid, started }, parents first: what a
+     * busy round suspends. The CLI's own process (`cli: true`) must be there; its children may be short-lived (HI-3432).
+     */
     const cliProcesses = () => {
       const list = processes()
       const mine = descendantsIn(list, app.process().pid).map((d) => list.find((p) => p.pid === d.pid && p.started === d.started)).filter(Boolean)
       const roots = mine.filter((p) => new RegExp(`[\\\\/]${provider}(\\.exe)?"?(\\s|$)`, 'i').test(p.commandLine))
       const ids = new Map()
-      for (const r of roots) for (const t of [{ pid: r.pid, started: r.started }, ...descendantsIn(list, r.pid)]) ids.set(t.pid, t)
+      for (const r of roots) ids.set(r.pid, { pid: r.pid, started: r.started, cli: true })
+      for (const r of roots) for (const t of descendantsIn(list, r.pid)) if (!ids.has(t.pid)) ids.set(t.pid, t)
       return [...ids.values()]
     }
     /** What the agent's pane shows now (its terminal's lines, as drawn). */
@@ -140,11 +144,14 @@ module.exports = async function run(provider) {
         const logLines = combworkLog().split('\n').length - 1
         if (pause) {
           const procs = cliProcesses()
-          check(`${what}: its CLI's processes are found`, procs.length > 0)
-          const s = paused.suspend(procs)
-          check(`${what}: its CLI is suspended (every process of it)`, procs.length > 0 && s.done.length === procs.length, JSON.stringify(s.failed))
+          check(`${what}: its CLI's processes are found`, procs.some((p) => p.cli))
+          // Every process of it still running, listed again until nothing new shows: a child that ended before it was
+          // reached reads no input (HI-3432: Copilot's come and go within a second), the CLI's own process must be there.
+          const listed = [procs]
+          const s = suspendRunning(paused, () => listed.shift() ?? cliProcesses(), (t) => !!t.cli)
+          check(`${what}: its CLI is suspended (every process of it)`, s.done.some((p) => p.cli) && !s.failed.length, JSON.stringify(s.failed))
           // Not all of it suspended, the round wouldn't test what it says: it stops here (cleanup resumes what was).
-          if (!procs.length || s.failed.length) throw new Error(`${what}: its CLI couldn't be suspended: ${JSON.stringify(s.failed)}`)
+          if (!s.done.some((p) => p.cli) || s.failed.length) throw new Error(`${what}: its CLI couldn't be suspended: ${JSON.stringify(s.failed)}`)
         }
         const left = callApi('POST', `/v1/projects/alpha/agents/Tester/message`, { text: `Round ${i + 1}: nothing to do. Read this, ack it, and reply with just: ok` })
         if (pause) {
