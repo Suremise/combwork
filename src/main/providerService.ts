@@ -1,4 +1,5 @@
 import { homedir } from 'os'
+import { existsSync } from 'original-fs'
 import { app } from 'electron'
 import type { AccountModels, AgentInstallInfo, ModelCatalog, ProviderId, ProviderTask } from '../shared/types'
 import { cachedCatalogFor, observedEffortKey } from '../shared/models'
@@ -53,6 +54,18 @@ const blank = (id: ProviderId): AgentInstallInfo => ({
   defaultModel: null,
   readiness: []
 })
+
+/**
+ * Tests only (unpackaged builds, HI-3442): CW_TEST_HOLD_DETECT="claude-code=<file>" holds that provider's detection while
+ * the file exists, so a suite keeps it "still looking" for as long as its checks need it, whatever the machine's load
+ * (CW_TEST_SLOW_DETECT's fixed time ran out under load).
+ */
+async function heldDetection(id: ProviderId): Promise<void> {
+  const file = app.isPackaged ? undefined : (process.env.CW_TEST_HOLD_DETECT ?? '').split(',').find((x) => x.startsWith(`${id}=`))?.slice(id.length + 1)
+  if (!file || !existsSync(file)) return
+  log.info(`${id}: its detection is held while a test's file exists`)
+  while (existsSync(file)) await new Promise((r) => setTimeout(r, 50))
+}
 
 /** Tracks each provider's installed CLI and runs its install, update, sign-in and setup tasks in visible terminals. */
 class ProviderService {
@@ -261,6 +274,7 @@ class ProviderService {
       // Tests only (unpackaged builds): CW_TEST_SLOW_DETECT="claude-code=6000" holds that provider's detection (#506).
       const slow = app.isPackaged ? 0 : Number((process.env.CW_TEST_SLOW_DETECT ?? '').split(',').find((x) => x.startsWith(`${id}=`))?.slice(id.length + 1) ?? 0)
       if (slow > 0) await new Promise((r) => setTimeout(r, slow))
+      await heldDetection(id)
       const found = await adapter.install.locate()
       // Its folder on the PATH of what Combwork starts, so its sessions and terminals find the CLI Provider Setup found (#1103).
       if (this.refreshes.get(id) === run) noteCliFolder(id, found.path)
