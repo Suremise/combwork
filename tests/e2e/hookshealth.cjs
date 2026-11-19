@@ -178,10 +178,11 @@ const hooksOff = (agent, off) => {
     // task is watched from its start, though it is still starting then.
     const cx = await lib.addAgent(inv, alpha, { name: 'Cx', provider: 'codex', permissionMode: 'full-access' })
     fs.writeFileSync(path.join(codexHome, 'fake-nohooks-Cx'), '')
-    // What it does with the card it is started on: work held until the test types "g", its Working line on screen.
-    fs.writeFileSync(path.join(codexHome, 'fake-wakes-Cx.txt'), 'hold\n')
-    // Started on a card (Start on Card, as from the board), whose title is the fake's step: 12 s of work.
-    const cxCard = await inv('tasks:create', { title: 'Hold on', project: 'alpha', column: 'todo' })
+    // Started on a card (Start on Card, as from the board), whose title is the fake's step: the card read from its inbox
+    // is new work, its brief the turn's text (HI-2747), so "work 60" in it is a minute's work, its Working line on screen
+    // for longer than the check waits (HI-3415: a fake-wakes line answers no new work; the turn ended at once, and only
+    // the fake's Working line left up after the turn made it look at work).
+    const cxCard = await inv('tasks:create', { title: 'work 60', project: 'alpha', column: 'todo' })
     const startedCx = await inv('tasks:start', cxCard.number, { kind: 'agent', agentId: cx.id })
     check('the Codex agent starts on its card', startedCx?.agentId === cx.id, JSON.stringify(startedCx))
     const deafCx = await until(async () => (await live(cx))?.hooksMissing, HUNG_MS)

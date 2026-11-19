@@ -139,8 +139,10 @@ const check = (name, ok, extra = '') => {
   check('with what it asks', (await live(asking.id))?.statusMessage === 'Codex asks to run curl.exe https://example.com', (await live(asking.id))?.statusMessage)
   await lib.sleep(lib.timing('quiet.toldAgainMs')) // The window is the point: no second telling within it.
   check('told once, though its title blinks', told('Asking') === 1, String(told('Asking')))
-  // The inbox (finishes the window hasn't shown yet may be listed with it).
-  await page.locator('[data-inbox-toggle]').click()
+  // The inbox (finishes the window hasn't shown yet may be listed with it). Its "needs you" item, not the quieter
+  // "finished" one beside it: the window opens unfocused (HI-3404), so the agents' finishes stay unseen and that shows too.
+  const needsYou = page.locator('[data-inbox-toggle]:not([data-inbox-finished])')
+  await needsYou.click()
   check('the inbox says it needs input', !!(await until(() => page.getByText('Needs input: Codex asks to run curl.exe https://example.com').isVisible().catch(() => false), HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'attention-1-approval.png') })
   await page.keyboard.press('Escape')
@@ -162,8 +164,8 @@ const check = (name, ok, extra = '') => {
   check('told once', told('Reviewed') === 1, String(told('Reviewed')))
   check('never waiting', !states(reviewed).some((s) => s.startsWith('waiting')), states(reviewed).join(' > '))
   check('its pane says so', !!(await until(() => page.locator('.pane-status.asks', { hasText: 'has a question for you' }).isVisible().catch(() => false), HUNG_MS)))
-  check('it needs you in the status bar', await page.locator('[data-inbox-toggle]', { hasText: /needs? you/ }).isVisible().catch(() => false))
-  await page.locator('[data-inbox-toggle]').click()
+  check('it needs you in the status bar', await needsYou.filter({ hasText: /needs? you/ }).isVisible().catch(() => false))
+  await needsYou.click()
   check('the inbox shows the question', !!(await until(() => page.getByText('Asks: Which colour?').isVisible().catch(() => false), HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'attention-2-question.png') })
   await page.keyboard.press('Escape')

@@ -67,6 +67,9 @@ const AGENTS = [
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1500, height: 900 })
+    // Focused, as Combwork sees it: a test copy opens unfocused (HI-3404), where pop-ups wait for you and stack up over the
+    // Progress rail this suite opens (HI-3415). Nothing here is about the focus.
+    await lib.stubFocus(app)
     await lib.appReady(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.waitForProvider(inv)
@@ -139,7 +142,9 @@ const AGENTS = [
     const before = await counts()
     await until(async () => (await counts()).now >= before.now + 3, HUNG_MS)
     const shownCounts = await counts()
-    check('shown: what runs now read in one call a tick for every project (never one per project)', shownCounts.now - before.now >= 3 && shownCounts.lists - before.lists <= 2 * 3, JSON.stringify([before, shownCounts]))
+    // By its ticks, not its now reads: a now read still under way at the next tick isn't started again (HI-3415).
+    const listRounds = (a, b, extra) => (Math.floor((b.ticks - a.ticks) / 5) + extra) * 3
+    check('shown: what runs now read in one call a tick for every project (never one per project)', shownCounts.now - before.now >= 3 && shownCounts.now - before.now <= shownCounts.ticks - before.ticks && shownCounts.lists - before.lists <= listRounds(before, shownCounts, 2), JSON.stringify([before, shownCounts]))
     // The window hidden, as minimised: a quiet test copy's window is never on screen, so minimising it doesn't change
     // the page's visibility; it is said as Chromium says it.
     const visibility = (state) =>
@@ -240,7 +245,7 @@ const AGENTS = [
     await until(async () => ['ready', 'finished'].includes((await liveOf(alpha, 'hr1'))?.status), HUNG_MS)
     await until(async () => (await counts()).now >= c0.now + 2, HUNG_MS)
     const c1 = await counts()
-    check('a status change alone: no card lookup, the session lists at their cadence', c1.cardAgents === c0.cardAgents && c1.lists - c0.lists <= (Math.floor((c1.now - c0.now) / 5) + 1) * 3, JSON.stringify([c0, c1]))
+    check('a status change alone: no card lookup, the session lists at their cadence', c1.cardAgents === c0.cardAgents && c1.lists - c0.lists <= listRounds(c0, c1, 1), JSON.stringify([c0, c1]))
     await inv('session:stop', alpha, 'hr1').catch(() => undefined)
     // Beta's HB1 stops: found again, only alpha's; then alpha's too: nobody, said so.
     await inv('session:stop', beta, 'hb1')
