@@ -13,6 +13,17 @@ import { timing } from './timing.cjs'
 const HUNG_MS = timing('wait.hang')
 let n = 0
 
+/**
+ * HI-3426: whether this process's SQLite refuses such a file (1546), as 3.53's does, Electron 44's included (the SQLite
+ * Combwork ships). 3.54's opens it as it is, the WAL's rows read and written and checkpointed (Node 24.22.3 has 3.54.1, and
+ * CI's runner takes the latest Node 24): the waits these tests are about are then never made, and there is nothing to wait for.
+ * Tests of a wait run only where it is refused; `tests/boardStore.test.ts` checks this against what SQLite does.
+ */
+export const MAPPED_SHM_REFUSED = ((v: string): boolean => {
+  const [major, minor] = v.split('.').map(Number)
+  return major < 3 || (major === 3 && minor < 54)
+})(process.versions.sqlite ?? '0')
+
 /** Leaves `file` as a process that ended without closing it leaves it: written to, its -wal and -shm there. */
 export async function leftByAKill(file: string): Promise<void> {
   const script = "const { DatabaseSync } = require('node:sqlite'); const d = new DatabaseSync(process.argv[1]); d.exec('PRAGMA journal_mode = WAL'); d.exec('PRAGMA wal_autocheckpoint = 0'); d.exec('CREATE TABLE IF NOT EXISTS left (x)'); d.exec('INSERT INTO left VALUES (1)'); console.log('written'); setInterval(() => {}, 1000)"
