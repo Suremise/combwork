@@ -153,6 +153,7 @@ import { clearSavedPauses } from './teamPause'
 import { followMovedLink } from './combworkMove'
 import { allProviders } from './providers'
 import { startClis } from './clis'
+import { LOCK_RELEASE_WAIT_MS, lockOnceReleased, profileLockHeld } from './singleInstance'
 
 const log = createLogger('main')
 let quitting = false
@@ -245,7 +246,22 @@ if (testQuiet()) app.commandLine.appendSwitch('disable-features', 'CalculateNati
 // Chromium takes its language only at start (#767): --lang or CW_LANG, the setting, or Windows' languages.
 chooseStartLanguage(config.savedLanguage())
 
-if (!app.requestSingleInstanceLock()) {
+/**
+ * A refused lock on Windows (HI-3454): a copy still ending (crashed, or ended from outside) may hold the profile's lock
+ * with no window left to tell. Waits for it within LOCK_RELEASE_WAIT_MS, then asks once more: true once this start has it.
+ */
+function lockAfterEndingCopy(): boolean {
+  if (process.platform !== 'win32') return false
+  const profile = app.getPath('userData')
+  log.info(`The single-instance lock was refused: waiting up to ${LOCK_RELEASE_WAIT_MS} ms for the profile's lock to be released, as a copy still ending holds it; a running copy holds it throughout`)
+  const r = lockOnceReleased(() => app.requestSingleInstanceLock(), () => profileLockHeld(profile))
+  if (r.taken) log.info(`The profile's lock was released after ${r.waitedMs} ms: this start carries on`)
+  else if (r.released) log.info(`The profile's lock was released after ${r.waitedMs} ms, and another start took it`)
+  else log.info(`The profile's lock was still held after ${r.waitedMs} ms: a copy is running`)
+  return r.taken
+}
+
+if (!app.requestSingleInstanceLock() && !lockAfterEndingCopy()) {
   exitBy('process.exit', 'Combwork is already running: this start brings it forward', () => {
     app.quit()
     process.exit(0)
