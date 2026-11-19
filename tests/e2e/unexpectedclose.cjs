@@ -74,14 +74,22 @@ async function start(extra = {}) {
   return { app, page, inv }
 }
 
-/** Ends the copy from outside, as a crash or a kill would: its own process (by pid and start time) and what it started. */
+/**
+ * Ends the copy from outside, as a crash or a kill would: its own process (by pid and start time) and what it started,
+ * and waits until each of them is gone. HI-3454: on Windows `app.process()` is the `cmd.exe` Playwright starts
+ * Electron through, and a kill returns before its process has ended. The shell's exit came while Combwork's own process
+ * was still ending, holding its profile's singleton lock, and the next start found the lock held and left as "already
+ * running". So the wait is for every ended process to have left the process list, when Windows has closed its handles.
+ */
 async function endFromOutside(app) {
   const proc = app.process()
-  const gone = new Promise((r) => (proc.exitCode !== null ? r(true) : proc.once('exit', () => r(true))))
   const id = identities.find((i) => i.pid === proc.pid)
+  const tree = id ? [id, ...lib.processTree(id.pid)] : []
   const ended = id ? lib.endTreeExactly(id) : 0
-  const exited = await Promise.race([gone, new Promise((r) => setTimeout(() => r(false), HUNG_MS))])
-  return ended > 0 && exited
+  const at = Date.now()
+  const gone = !!(await lib.until(() => lib.stillSame(tree).length === 0, HUNG_MS))
+  if (gone) console.log(`INFO the ended copy's ${tree.length} processes were gone ${Date.now() - at} ms after the kill`)
+  return ended > 0 && gone
 }
 
 /** The notice's text in the window, once it is shown. */
