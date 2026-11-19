@@ -1694,6 +1694,11 @@ async function main() {
   promptLine()
   setInterval(() => void whileIdle(), 200)
   if (firstPrompt && take('fake-launch-hold')) while (!take('fake-launch-go')) await sleep(100)
-  if (firstPrompt) await runPrompt(firstPrompt)
+  // Never beside a turn already running (a line typed before it began): Claude Code runs one turn at a time (HI-3416: the
+  // two ran at once, sharing its prompt_id, and the task's reply landed after the next prompt, chained to it).
+  if (firstPrompt) {
+    while (isBusy()) await sleep(100)
+    await runPrompt(firstPrompt)
+  }
 }
 void main()
