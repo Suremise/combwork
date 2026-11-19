@@ -2335,7 +2335,12 @@ route('GET', '/v1/lanes/next', async () =>
   laneCall(async () => {
     const a = agentCaller()
     if (!a) throw new HttpError(400, apiSaid(API.lane.nextIsAgents))
-    const r = await lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId)
+    // HI-3420: a lane that just ended or was abandoned is an answer (what it says, `ended`), not an error.
+    const r = await lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId).catch((e: unknown) => {
+      if (e instanceof lanes.LaneEnded) return { lane: null, next: null, waits: null, ended: { lane: e.lane, text: e.message } } as const
+      throw e
+    })
+    if (!r.lane) return r
     // HI-3340: a card it says to start is issued to the calling launch at its attempt now, so the start it tells of is
     // accepted (a binding from an earlier attempt, before a put-back or a lane reorder's restart, would refuse it). A card
     // to carry on issues nothing: the agent's view of it may be from an attempt that has moved on, which the fence is for.

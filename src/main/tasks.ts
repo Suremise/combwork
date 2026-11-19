@@ -3548,21 +3548,26 @@ export async function askAssistantOn(n: number, asked: string, actor: TaskActor,
     const c = await getTask(n, ws)
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
     // HI-3194: an agent's request on a card fenced as any of its writes (its comment, and the waiting mark it may set),
-    // on the card's attempt as this change finds it, its launch again as the change commits.
+    // on the card's attempt as this change finds it, its launch again as the change commits. HI-3420: a request is a
+    // message, so an attempt that moved on since the agent's (the card finished, put back, restarted, given to another)
+    // doesn't refuse it: MR1's answer on MC-1568, sent just after its verdict merged the card, was refused and never
+    // reached the Assistant. Only its launch is fenced then; it sets no waiting mark (the card's attempt isn't the
+    // agent's) and binds the launch to nothing, so the agent's later changes of the card are still refused.
     const g = guardOf(actor)
     const pre = g ? attemptIn(ws, c.project, n) : null
-    if (g) fenceOrThrow(g, n, pre, ws)
+    const moved = !!g && g.check(n, cardRef(n), pre)?.rule === 'attempt.moved'
+    if (g) fenceOrThrow(g, n, moved ? null : pre, ws)
     check(c)
     const by = actorName(actor)
     note(c, by, storedText(HISTORY.assistantAsked, { text: clip(t) }))
     addComment(c, by, t)
-    if (ref && actor.kind === 'agent' && actor.self && c.agent === actor.self.agentId && c.column === 'doing' && !c.waitingFor) {
+    if (ref && !moved && actor.kind === 'agent' && actor.self && c.agent === actor.self.agentId && c.column === 'doing' && !c.waitingFor) {
       const reason = clip(t.replace(/\s+/g, ' ').trim(), 200)
       c.waitingFor = { reason, by, at: new Date().toISOString(), ask: ref }
       note(c, by, storedText(HISTORY.waiting, { reason }))
     }
     await saveCard(ws, n, c)
-    if (g && pre) g.accepted(n, pre, (fn) => afterBoardWrite(ws, fn))
+    if (g && pre && !moved) g.accepted(n, pre, (fn) => afterBoardWrite(ws, fn))
     changed(ws)
     return c
   }))

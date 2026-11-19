@@ -290,7 +290,8 @@ the caller, before anything is awaited, and `taskActor()` gives the actor an `At
 in each write: `runIntent` gives the runtime an `Alongside.before`, which `runtime.write` (and `refuse`, before its
 `Refused`) calls inside the transaction before the write decides anything, with the builder's-move flag for
 `attempt.notAssignee`; `updateTaskAs`, `commentTask`, `askAssistantOn`, `fenceNow` (declaring paths) and `fenceCommit` (a
-kind, review skip or target, through their `commit`) check plain changes. The launch check reads
+kind, review skip or target, through their `commit`) check plain changes. `askAssistantOn` (HI-3420, a message) takes an
+`attempt.moved` as message only: its launch alone is fenced, and it sets no waiting mark and calls no `accepted`. The launch check reads
 `agentTokens.currentAgentRun`; every check (`tasks.ts` `fenceOrThrow`) also registers it with `boardStore.beforeBoardCommit`,
 which `boardWrite` runs synchronously after the change's last await, just before `COMMIT`, so a launch replaced during
 the change's awaits undoes it whole. **Readiness**:
