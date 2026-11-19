@@ -129,7 +129,7 @@ function commits(wt, n) {
     let mark = null
     const first = await read()
     const t = Date.now()
-    check(`${a.name}: the header starts with its state mark, a ring while idle`, !!(await until(async () => ok((mark = await read())))), JSON.stringify(mark))
+    check(`${a.name}: the header starts with its state mark, a ring while idle`, !!(await until(async () => ok((mark = await read())), HUNG_MS)), JSON.stringify(mark))
     if (!ok(first)) console.log(`  (${a.name}'s mark read ${JSON.stringify(first)} at first, idle ${Date.now() - t} ms later)`)
   }
   await header(long).locator('.agent-name').hover()

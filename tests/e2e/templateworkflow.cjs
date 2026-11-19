@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = (fn) => lib.until(fn, HUNG_MS, 150)
+const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
 
 ;(async () => {
   for (const d of [userData, ws, ws + '.worktrees', claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
@@ -73,13 +73,13 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     }
     const select = async (name) => {
       await page.locator('.project-row', { hasText: name }).first().click()
-      if (!(await until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')) === name))) throw new Error(`${name} wasn't selected`)
+      if (!(await until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')) === name, HUNG_MS))) throw new Error(`${name} wasn't selected`)
     }
     const menuItems = async () => (await page.locator('.menu .menu-item').allInnerTexts()).map((t) => t.split('\n')[0].trim())
     const item = (label) => page.locator('.menu .menu-item').filter({ has: page.getByText(label, { exact: true }) }).first()
     const templatesMenu = async (then) => {
       await lib.addMenuRun(page, 'Templates')
-      if (!(await until(async () => (await menuItems()).includes(then)))) throw new Error(`Templates ▸ has no ${then}: ${JSON.stringify(await menuItems())}`)
+      if (!(await until(async () => (await menuItems()).includes(then), HUNG_MS))) throw new Error(`Templates ▸ has no ${then}: ${JSON.stringify(await menuItems())}`)
       await item(then).click()
     }
     const saveAs = async (name, { workspace = true, workflow = true, replace = false } = {}) => {
@@ -235,7 +235,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     const openRounds = async () => {
       await lib.addMenuRun(page, 'Templates')
-      if (!(await until(async () => (await menuItems()).includes('Rounds')))) {
+      if (!(await until(async () => (await menuItems()).includes('Rounds'), HUNG_MS))) {
         // The menu reads the templates when it opens: closed and opened again once the file is listed.
         await page.keyboard.press('Escape')
         await page.keyboard.press('Escape')
@@ -290,7 +290,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     const release = () => app.evaluate((_, m) => void globalThis.__late.held.splice(0).forEach((r) => r(m)), model)
     await hold(true)
     await lib.addMenuRun(page, 'Templates')
-    if (!(await until(async () => (await menuItems()).includes('Late')))) {
+    if (!(await until(async () => (await menuItems()).includes('Late'), HUNG_MS))) {
       await page.keyboard.press('Escape')
       await page.keyboard.press('Escape')
       await lib.addMenuRun(page, 'Templates')

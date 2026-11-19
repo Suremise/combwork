@@ -29,6 +29,7 @@
   "slot.readyMs": { "kind": "hang", "ms": 120000, "note": "a slot being prepared" },
   "git.lockRetryMs": { "kind": "hang", "ms": 60000, "note": "an e2e git command retried while git's index lock is held" },
   "runner.lockStaleMs": { "kind": "lock", "ms": 60000, "note": "the e2e runner's lane claims lock counted stale, when another run may take it: an ownership threshold on a shared machine, never scaled" },
+  "runner.lockRetryMs": { "kind": "interval", "ms": 50, "note": "how often the e2e runner tries the claims lock again while another run holds it, or Windows is still deleting the one just released (lanes.mjs withLock)" },
   "sandbox.otherPollMs": { "kind": "interval", "ms": 30000, "note": "how often the Sandbox checks look again for another run's Sandbox, one at a time on the machine, before theirs" },
   "sandbox.settingsOpenMs": { "kind": "pace", "ms": 6000, "note": "Settings opening inside the Sandbox before its screenshot: nothing there to wait on from the host" },
   "sandbox.stopRetryMs": { "kind": "interval", "ms": 3000, "note": "how long the Sandbox checks wait before trying a Sandbox's stop again, until list no longer holds it" },
