@@ -2324,12 +2324,36 @@ export function laneWaitsForSlot(ws: WorkspaceService, id: string): boolean {
 /** Whether a lane's start is launching this builder now (holdLaneStart). */
 export const laneStartHeld = (ws: WorkspaceService, project: string, builder: string): boolean => launching.has(launchKey(ws, project, builder))
 
+/** Workspaces whose look waits (holdLanesLook), by path: how many holds. */
+const lookHolds = new Map<string, number>()
+/**
+ * Holds a workspace's look (changed()) until the returned release, which looks again then (HI-3425). For tests: a test of
+ * what happens before the look has run holds it, else the look's timer, at SETTLE_MS, can run first under load. A look
+ * already running carries on.
+ */
+export function holdLanesLook(ws: WorkspaceService): () => void {
+  const k = ws.path?.toLowerCase()
+  if (!k) return () => {}
+  lookHolds.set(k, (lookHolds.get(k) ?? 0) + 1)
+  let done = false
+  return () => {
+    if (done) return
+    done = true
+    const n = (lookHolds.get(k) ?? 1) - 1
+    if (n > 0) lookHolds.set(k, n)
+    else lookHolds.delete(k)
+    changed(ws)
+  }
+}
+
 /** A workspace's lanes changed: look again soon. */
 function changed(ws: WorkspaceService): void {
   const k = ws.path?.toLowerCase()
   if (!k || timers.has(k)) return
   const t = setTimeout(() => {
     timers.delete(k)
+    // Held (holdLanesLook): its release looks again.
+    if (lookHolds.has(k)) return
     // One refresh at a time (#1011): a slow one isn't overlapped by the next.
     void coalesced(`lanes:${k}`, () => refresh(ws).catch((e) => log.warn('following the lanes', e)))
   }, SETTLE_MS)
