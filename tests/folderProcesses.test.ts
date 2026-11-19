@@ -10,11 +10,12 @@ import { timing } from './timing.cjs'
 type Proc = { pid: number; parent?: number; commandLine: string; started: number }
 type Tree = { pid: number; started: number }[]
 const req = createRequire(import.meta.url)
-const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs, leftoverIdentities, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree } = req('./e2e/folderProcesses.cjs') as {
+const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs, leftoverIdentities, processes, endExactly, suspendExactly, suspensions, suspendRunning, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree } = req('./e2e/folderProcesses.cjs') as {
   processes: () => Proc[]
   endExactly: (targets: Tree) => number
   suspendExactly: (targets: Tree, resume?: boolean) => { done: Tree; failed: { pid: number; why: string }[] }
   suspensions: (act?: (t: Tree, resume?: boolean) => { done: Tree; failed: { pid: number; why: string }[] }, end?: (t: Tree) => number) => { held: () => Tree; suspend: (t: Tree) => { done: Tree; failed: { pid: number; why: string }[] }; resume: () => { pid: number; why: string }[]; release: () => { failed: { pid: number; why: string }[]; ended: Tree } }
+  suspendRunning: (held: { held: () => Tree; suspend: (t: Tree) => { done: Tree; failed: { pid: number; why: string }[] } }, find: () => Tree, kept?: (t: { pid: number; started: number; cli?: boolean }) => boolean, looks?: number) => { done: Tree; failed: { pid: number; why: string }[]; ended: Tree }
   childrenFirst: (list: Proc[], targets: Tree) => Tree
   namesFolder: (cmd: string, folder: string) => boolean
   namesFile: (list: Proc[], name: string) => boolean
@@ -202,6 +203,37 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     // Nothing held: cleanup does nothing.
     expect(s.release()).toEqual({ failed: [], ended: [] })
     expect(calls).toEqual(['suspend 1,2,3,9', 'resume 1,2,3', 'resume 2'])
+  })
+
+  it("a CLI's tree is suspended while its short-lived children come and go: those ended are no failure, its own process gone is (HI-3432)", () => {
+    // Stubs only. The CLI (pid 1) and its MCP server (2) stay; children 3 and 4 have ended by the time they're reached,
+    // 5's pid names another process by now, and 6 starts between the first listing and the CLI's suspension.
+    type Failed = { pid: number; why: string }[]
+    const gone = new Map([[3, 'gone'], [4, 'gone'], [5, 'another process']])
+    const act = (targets: Tree) => ({ done: targets.filter((t) => !gone.has(t.pid)), failed: targets.filter((t) => gone.has(t.pid)).map((t) => ({ pid: t.pid, why: gone.get(t.pid)! })) })
+    const cli = { pid: 1, started: 10, cli: true }
+    const mcp = { pid: 2, started: 20 }
+    const late = { pid: 6, started: 60 }
+    const lists = [[cli, mcp, { pid: 3, started: 30 }, { pid: 4, started: 40 }, { pid: 5, started: 50 }], [cli, mcp, late], [cli, mcp, late]]
+    let looked = 0
+    const find = () => lists[Math.min(looked++, lists.length - 1)]
+    const kept = (t: { cli?: boolean }) => !!t.cli
+    const s = suspensions(act, () => 0)
+    const r = suspendRunning(s, find, kept)
+    expect(r.failed).toEqual([])
+    expect(r.done.map((t) => t.pid)).toEqual([1, 2, 6])
+    expect(r.ended.map((t) => t.pid)).toEqual([3, 4, 5])
+    expect(s.held().map((t) => t.pid)).toEqual([1, 2, 6])
+    expect(looked).toBe(3)
+    // The CLI's own process gone: the CLI has ended, a failure.
+    gone.set(1, 'gone')
+    expect(suspendRunning(suspensions(act, () => 0), () => [cli], kept).failed).toEqual([{ pid: 1, why: 'gone' }])
+    // A process that couldn't be suspended for another reason is a failure, never retried as new.
+    const denied = (targets: Tree) => ({ done: [] as Tree, failed: targets.map((t) => ({ pid: t.pid, why: '0xC0000022' })) as Failed })
+    expect(suspendRunning(suspensions(denied, () => 0), () => [mcp], kept).failed).toEqual([{ pid: 2, why: '0xC0000022' }])
+    // New ones still showing after the last look: `still starting`.
+    let n = 100
+    expect(suspendRunning(suspensions(act, () => 0), () => [{ pid: n++, started: n }], kept, 2).failed).toEqual([{ pid: 102, why: 'still starting' }])
   })
 
   it.runIf(process.platform === 'win32')('suspends and resumes only the process a pid was when listed, and says what it did (#600)', async () => {
