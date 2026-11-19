@@ -150,11 +150,15 @@ async function notQuiet(c, a) {
   const waiting = (r.body?.deliveries ?? []).filter((d) => d.state === 'queued' || d.state === 'uncertain')
   return waiting.length ? `deliveries waiting: ${waiting.map((d) => `${d.id} ${d.state}`).join(', ')}` : ''
 }
-/** Waits until an alpha agent is quiet (notQuiet), within the step's bound; says why not when it isn't. */
+/**
+ * Waits until an alpha agent is quiet (notQuiet), within the step's bound. Not quiet: a failed check saying why, and the
+ * suite stops (a prompt typed into a busy agent is dropped, and what the next quit records would no longer be the test's).
+ */
 async function whenQuiet(c, a) {
-  if (await lib.until(async () => (await notQuiet(c, a)) === '', HUNG_MS, 250)) return true
-  console.log(`INFO ${a.name} not quiet within the step's bound (${await notQuiet(c, a)}): typed anyway`)
-  return false
+  if (await lib.until(async () => (await notQuiet(c, a)) === '', HUNG_MS, 250)) return
+  const why = await notQuiet(c, a)
+  check(`${a.name} is quiet before its prompt`, false, why)
+  throw new Error(`${a.name} not quiet within the step's bound: ${why}`)
 }
 /**
  * Sets an alpha agent working on a "holduntil" prompt (HI-3452). Typed once it is quiet, and taken only once its
@@ -169,7 +173,11 @@ async function promptWorking(c, a, text) {
     return (t?.items ?? []).some((x) => x.kind === 'user' && (x.text ?? '').includes(text))
   }
   await whenQuiet(c, a)
-  return lib.sendPrompt(c.inv, lib.ptyKey(alpha, a.id), text, { submitted: taken })
+  // sendPrompt returns 0, not throwing, when no attempt was taken: a failed check and the suite stops, or a turn of
+  // something else's would decide what the next quit records.
+  if (await lib.sendPrompt(c.inv, lib.ptyKey(alpha, a.id), text, { submitted: taken })) return
+  check(`${a.name} takes "${text}" and works on it`, false, `its conversation lacks the prompt, or it isn't working: status ${(await c.live(a.id))?.status ?? 'none'}`)
+  throw new Error(`${a.name} never took "${text}"`)
 }
 /** A notice's text in whichever window shows it (a notice goes to one window of several), and that window. */
 async function anyToast(c, re) {
