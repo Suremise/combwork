@@ -364,6 +364,17 @@ export const ADVANCED: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/subagent-resume-claude-2.1.309.jsonl`, version: '2.1.309', fields: ['success', 'message', 'resumedAgentId', 'revivedAgentId', 'pin'] }]
   },
+  {
+    // HI-3423: a Monitor's events and its expiry are both notifications with no status; only the event's text tells them apart.
+    id: 'claude-code.monitor.expired',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.monitor.expired.title', defaultMessage: 'Transcript: Monitor expired', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A Monitor is a Claude Code tool that watches a long-running command in the background." }),
+    desc: msg({ id: 'settings.advanced.claude-code.monitor.expired.desc', defaultMessage: "What a Monitor's last notification says when its time limit ends it, as a regular expression; its other notifications report events while it runs on. Wrong, an agent whose Monitor expires shows finished, with a notification, as its expiry wakes it.", description: 'What the advanced setting "Transcript: Monitor expired" is for, and what goes wrong when it is wrong (Settings → Advanced). A Monitor is a Claude Code tool that watches a long-running command in the background.' }),
+    kind: 'pattern',
+    default: String.raw`^\[Monitor expired\b`,
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/monitor-claude-2.1.326.jsonl`, version: '2.1.326', text: '[Monitor expired after 30m with no events delivered. Re-arm it if you still need the watch — and widen the filter if silence was unexpected.]' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   // Claude Code waiting to retry its model request (HI-1973): its transcript's entry for each try.
   {
     id: 'claude-code.retry.subtype',
