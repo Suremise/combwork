@@ -67,6 +67,14 @@ const check = (name, ok, extra = '') => {
   await page2.waitForLoadState('domcontentloaded')
   await lib.appReady(page2)
   const entry2 = (name) => page2.locator('.welcome .recent-item', { hasText: name })
+  // The other window's welcome list exactly so, in this order (HI-3417): a count or one entry is there before the last open
+  // is shown, and that open then moves the entries below it, which takes the focus from a moved one (Tab then goes
+  // elsewhere, and Enter opens an entry instead of removing it).
+  const names2 = () => page2.locator('.welcome .recent-item .recent-name').allInnerTexts()
+  const shows2 = async (names) => {
+    const ok = await lib.until(async () => JSON.stringify(await names2()) === JSON.stringify(names), lib.timing('hang.ui'))
+    if (!ok) throw new Error(`The other window's recent list didn't come to ${JSON.stringify(names)}: ${JSON.stringify(await names2())}`)
+  }
   await lib.until(async () => (await entry2('recent-alpha').innerText().catch(() => '')).includes('open in another window'), lib.timing('hang.ui'))
   check('another window marks the workspace open here', (await entry2('recent-alpha').innerText()).includes('open in another window'), await entry2('recent-alpha').innerText().catch(() => ''))
 
@@ -107,7 +115,7 @@ const check = (name, ok, extra = '') => {
   // (its folder stays); Enter on the entry itself opens it.
   fs.mkdirSync(path.join(wsC, 'app'), { recursive: true })
   for (const w of [wsC, wsB, wsA]) await lib.openWorkspace(inv, page, w)
-  await lib.until(async () => (await page2.locator('.welcome .recent-item').count()) === 3, lib.timing('hang.ui'))
+  await shows2(['recent-alpha', 'recent-beta', 'recent-gone'])
   const welcome2 = async () => (await page2.locator('.welcome').count()) === 1
   // As from the keyboard: the entry, then Tab to its ✕ (shown once the entry has the focus).
   await entry2('recent-beta').focus()
@@ -126,7 +134,7 @@ const check = (name, ok, extra = '') => {
   check('Space on an entry’s ✕ removes it too, opening nothing', !!(await lib.until(async () => !(await recent()).includes('recent-gone'), lib.timing('hang.ui'))) && (await welcome2()), JSON.stringify(await recent()))
   await lib.openWorkspace(inv, page, wsB)
   await lib.openWorkspace(inv, page, wsA)
-  await lib.until(async () => (await entry2('recent-beta').count()) === 1, lib.timing('hang.ui'))
+  await shows2(['recent-alpha', 'recent-beta'])
   await entry2('recent-beta').focus()
   await page2.keyboard.press('Enter')
   check('Enter on the entry itself opens it', !!(await lib.until(() => page2.evaluate(() => document.title.includes('recent-beta')).catch(() => false), lib.timing('hang.ui'))), await page2.title())
