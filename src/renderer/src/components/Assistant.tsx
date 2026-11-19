@@ -942,12 +942,15 @@ export function AssistantSettingsDialog() {
     // Reset each time the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openFlag])
-  // None chosen yet (a new workspace's): the first usable in the order of accounts, as a new agent's (decision A).
+  // None chosen yet (a new workspace's): the first usable in the order of accounts, as a new agent's (decision A). Never
+  // over the Assistant's own (HI-3443): on a window's first open this ran with the empty value from before the reset
+  // above, so its connection showed as the first usable one, and Save moved it there.
   const providers = useStore((s) => s.providers)
   const first = firstUsableConnection(view, settings, cliReadyOf(providers))
+  const own = agent?.connection
   useEffect(() => {
-    if (openFlag && !connection && first) setConnection(first)
-  }, [openFlag, connection, first])
+    if (openFlag && !own && !connection && first) setConnection(first)
+  }, [openFlag, own, connection, first])
   if (!openFlag || !a || !agent) return null
   const close = (): void => set({ assistantSettingsOpen: false })
   const defaultMode = modes.find((p) => p.id === (settings?.assistant.mode || DEFAULT_MODE))
