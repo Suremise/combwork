@@ -128,7 +128,7 @@ const mode = ({ name, word: w }) =>
   // icon (every mode here has one): the list loaded. "Manage Modes…" alone would satisfy a wait for any item.
   const panel = page.locator('.assistant-panel')
   const menu = async (label) => {
-    await lib.until(async () => (await panel.locator('.assistant-mode .assistant-mode-icon').count()) === 1, HUNG_MS)
+    if (!(await lib.until(async () => (await panel.locator('.assistant-mode .assistant-mode-icon').count()) === 1, HUNG_MS))) throw new Error(`the Assistant's header shows no mode icon (its modes not loaded) within ${HUNG_MS / 1000} s: ${JSON.stringify(await panel.locator('.assistant-mode').innerText().catch(() => '(no header)'))}`)
     await panel.locator('.assistant-mode').click()
     await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, HUNG_MS)
     await page.locator('.menu .menu-item', { hasText: label }).first().click()

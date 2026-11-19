@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
   // HI-3417 in assistant.cjs), so it is clicked once the header shows its mode's icon (every bundled mode has one): the list
   // loaded. "Manage Modes…" alone would satisfy a wait for any item.
   const modeMenu = async () => {
-    await lib.until(async () => (await panel.locator('.assistant-mode .assistant-mode-icon').count()) === 1, HUNG_MS)
+    if (!(await lib.until(async () => (await panel.locator('.assistant-mode .assistant-mode-icon').count()) === 1, HUNG_MS))) throw new Error(`the Assistant's header shows no mode icon (its modes not loaded) within ${HUNG_MS / 1000} s: ${JSON.stringify(await panel.locator('.assistant-mode').innerText().catch(() => '(no header)'))}`)
     await panel.locator('.assistant-mode').click()
     await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, HUNG_MS)
   }
