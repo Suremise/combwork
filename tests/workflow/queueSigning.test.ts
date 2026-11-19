@@ -41,10 +41,25 @@ const sshKeygen = (): string => keygen
 
 /** Windows' own ssh-keygen (OpenSSH for Windows), where it is installed. */
 const SYS_KEYGEN = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'OpenSSH', 'ssh-keygen.exe')
+const SYSTEM32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
+let userSid = ''
+/**
+ * HI-3422: a private key readable by its owner alone, as Windows' own ssh-keygen leaves one it makes. A file made or
+ * copied in the test's folder inherits that folder's entries (on a PC with Codex's sandbox, its CodexSandboxUsers group's),
+ * and Windows' OpenSSH refuses a key anyone else can read ("UNPROTECTED PRIVATE KEY FILE"), whichever ssh-keygen git
+ * finds first on PATH. Only the key file is changed, never the test folder's or the user's entries.
+ */
+function ownerOnly(file: string): void {
+  if (process.platform !== 'win32') return
+  if (!userSid) userSid = execFileSync(join(SYSTEM32, 'whoami.exe'), ['/user', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true }).trim().split(',').pop()!.replace(/"/g, '')
+  execFileSync(join(SYSTEM32, 'icacls.exe'), [file, '/inheritance:r', '/grant:r', `*${userSid}:F`], { stdio: 'pipe', windowsHide: true })
+}
+
 /** An ed25519 key pair in a folder of its own: with a passphrase when given, made by `maker` (Git's unless said). */
 function keyPair(passphrase = '', maker = sshKeygen()): { key: string; pub: string } {
   const key = slash(join(tempDir('key-'), 'id_ed25519'))
   execFileSync(maker, ['-q', '-t', 'ed25519', '-N', passphrase, '-C', 'combwork-test', '-f', key])
+  ownerOnly(key)
   return { key, pub: `${key}.pub` }
 }
 
@@ -58,6 +73,7 @@ function keyPairIn(name: string): { key: string; pub: string } {
   mkdirSync(dir)
   const key = slash(join(dir, 'id_ed25519'))
   copyFileSync(made.key, key)
+  ownerOnly(key) // HI-3422: the copy has its new folder's entries, not the key's own
   copyFileSync(made.pub, `${key}.pub`)
   return { key, pub: `${key}.pub` }
 }
