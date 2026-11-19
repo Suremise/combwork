@@ -23,7 +23,7 @@ import { findSecretWarnings } from '../../mcpSecrets'
 import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, childArgs, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel, WHERE_MS, cliProbeMs } from '../common'
 import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
-import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustReading, TrustTarget, ExternalSession, KeySteps, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
+import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustReading, TrustTarget, ExternalSession, KeyStep, KeySteps, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
 import { codexSafeguards } from './safeguards'
 import { codexTranscriptTurns } from './turns'
@@ -213,6 +213,16 @@ export function inputHolds(screen: string, command: string): boolean {
     .filter((l) => /^\s*›/.test(l))
     .at(-1)
   return input !== undefined && input.replace(/^\s*›\s*/, '') === command
+}
+/**
+ * Enter for a slash command typed into Codex's input: only once its input shows the command (HI-3437), and again while it
+ * still holds it unrun, once Codex is free (#363); never the command a second time. Busy starting up (its spinner just after it loads, as it shows its update notice),
+ * Codex draws what was typed late and drops an Enter that comes first, leaving the command in its input: an Enter checked
+ * against a screen that didn't show the command yet looked taken, and was never sent again.
+ */
+function enterOnceShown(command: string): KeyStep {
+  const holds = (screen: string): boolean => inputHolds(screen, command)
+  return { keys: '\r', waitMs: 200, shown: holds, what: `"${command}" in Codex's input`, heldOn: holds } // i18n-ignore: the CLI's command, quoted in callers' messages (PickNotFound's `what`)
 }
 /**
  * Codex's own terminal title items, set for Combwork's sessions and its sandbox setup so a user's [tui].terminal_title
@@ -932,7 +942,7 @@ export class CodexAdapter implements ProviderAdapter {
     const s = toSpawnable(executable, ['--no-daemon', '-C', dir, '-c', `projects=${toToml({ [dir]: { trust_level: 'trusted' } })}`, '-c', `tui.terminal_title=${toToml(titleItems())}`, ...CODEX_MODE_FLAGS['read-only']])
     const before = this.sandboxKind()
     const keys = before === 'unelevated'
-      ? [{ keys: '/setup-default-sandbox', waitMs: 300 }, { keys: '\r', heldOn: (screen: string) => inputHolds(screen, '/setup-default-sandbox') }]
+      ? [{ keys: '/setup-default-sandbox', waitMs: 300 }, enterOnceShown('/setup-default-sandbox')]
       : this.modeMenuKeys('ask')
     // Codex stays open once the sandbox is set up: the task is done when its config names a new sandbox.
     const done = (): boolean => {
@@ -1310,8 +1320,7 @@ export class CodexAdapter implements ProviderAdapter {
     return [
       { keys: '\x15', waitMs: 150 },
       { keys: '/permissions', waitMs: 200 },
-      // Enter again while Codex's input still holds the command, once it is free (#363); never a second /permissions.
-      { keys: '\r', waitMs: 200, heldOn: (screen) => inputHolds(screen, '/permissions') },
+      enterOnceShown('/permissions'),
       { pick: (screen) => permissionsMenuNumber(screen, target), what: `"${permissionsMenuLabel(target) ?? target}" in Codex's /permissions menu`, waitMs: 300 } // i18n-ignore: the CLI's menu item, quoted in callers' messages (PickNotFound's `what`)
     ]
   }
