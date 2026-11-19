@@ -72,11 +72,14 @@ let gitDoor: { entered: () => void; open: Promise<void> } | null = null
 let refDoor: { entered: () => void; open: Promise<void> } | null = null
 /** While set, a git command it matches fails as git would, without running (HI-1180: a worktree that can't be removed). */
 let gitFails: ((args: string[]) => boolean) | null = null
+/** While set, runs before each git command (HI-3453: a branch moved by a git outside Combwork between two of a read's commands). */
+let gitBefore: ((args: string[]) => void) | null = null
 vi.mock('../src/main/git', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/main/git')>()
   return {
     ...real,
     git: async (...args: Parameters<typeof real.git>) => {
+      gitBefore?.(args[1])
       const door = gitDoor
       if (door && (args[1][0] === 'checkout' || args[1][0] === 'merge')) {
         gitDoor = null
@@ -143,6 +146,7 @@ beforeEach(() => {
   lockDoor = null
   refDoor = null
   gitFails = null
+  gitBefore = null
   asUser.mockClear()
   workTarget = ''
   cardLines = []
@@ -1035,6 +1039,31 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     const left = leftoverBranches(all, busyLines(new Map([['cw/card', [{ stage: 'review' as const }]]])))
     expect(left.merged.map((b) => b.name)).toContain('zz/leftover')
     expect([left.merged.length, left.unmerged.map((b) => b.name)]).toEqual([2 + 205 + 1, ['spike/x']])
+  })
+
+  it('measures each branch at the commit it was read at: one moved meanwhile shows its count there, and deletes there (HI-3453)', async () => {
+    const at = setUp()
+    // A git outside Combwork moves spike/x (one commit of its own) and cw/hb2 (merged) on by a commit each, after the
+    // read's for-each-ref and before their counts: their rows stay as read, each count with its commit.
+    const moved: Record<string, string> = {}
+    gitBefore = (args) => {
+      if (args[0] !== 'for-each-ref' || !args.some((a) => a.startsWith('--merged='))) return
+      gitBefore = null
+      for (const b of ['spike/x', 'cw/hb2']) {
+        moved[b] = git(proj, 'commit-tree', `${b}^{tree}`, '-p', `refs/heads/${b}`, '-m', 'later')
+        git(proj, 'update-ref', `refs/heads/${b}`, moved[b])
+      }
+    }
+    const all = await repo.leftoverInfo(proj, workTarget)
+    expect(Object.keys(moved)).toHaveLength(2)
+    const row = (b: string) => all.branches.find((x) => x.name === b)
+    expect([row('spike/x')?.sha, row('spike/x')?.toTarget]).toEqual([at['spike/x'], 1])
+    expect([row('cw/hb2')?.sha, row('cw/hb2')?.toTarget]).toEqual([at['cw/hb2'], 0])
+    // Read again: at their new commits, counted there.
+    const again = await repo.leftoverInfo(proj, workTarget)
+    expect(['spike/x', 'cw/hb2'].map((b) => again.branches.find((x) => x.name === b)).map((r) => [r?.sha, r?.toTarget])).toEqual([[moved['spike/x'], 2], [moved['cw/hb2'], 1]])
+    // The read's row and its count agree, so deleting at the row's commit goes.
+    expect(await repo.deleteBranches(proj, [{ name: 'spike/x', sha: again.branches.find((x) => x.name === 'spike/x')!.sha! }], true)).toMatch(/Deleted spike\/x\./)
   })
 
   it("never deletes an open card's earlier line: one back from Done that started again elsewhere (HI-1823)", async () => {
