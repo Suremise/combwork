@@ -47,10 +47,6 @@ beforeAll(async () => {
   dir = tempDir('sign-')
   home = join(dir, 'h')
   mkdirSync(home)
-  // By its MSYS path: MSYS converts HOME and PATH from Windows' form, not GNUPGHOME (gpg would take C:\… as relative).
-  const g = spawnSync(join(GB, 'cygpath.exe'), ['-u', tempDir('g')], { encoding: 'utf8', windowsHide: true, timeout: HUNG_MS })
-  expect(g.status, g.stderr).toBe(0)
-  gnupg = g.stdout.trim()
   writeFileSync(join(home, '.gitconfig'), '')
   const launcher = buildSignLauncher(join(dir, 'bin'), () => undefined)
   const script = join(dir, 'cw-sign.js')
@@ -58,7 +54,12 @@ beforeAll(async () => {
   signer = { launcher, exec: process.execPath, script, timeoutMs: HUNG_MS }
   for (const k of ['PATH', 'PATHEXT', 'SystemRoot', 'windir', 'ComSpec', 'TEMP', 'TMP', 'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432', 'SystemDrive', 'ProgramData']) if (process.env[k]) base[k] = process.env[k]!
   // Git's own folders first, as a session started from Git's installation finds gpg (git adds them for its children).
-  base = { ...base, HOME: home, USERPROFILE: home, GNUPGHOME: gnupg, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(home, '.gitconfig') }
+  base = { ...base, HOME: home, USERPROFILE: home, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(home, '.gitconfig') }
+  // By its MSYS path: MSYS converts HOME and PATH from Windows' form, not GNUPGHOME (gpg would take C:\… as relative).
+  const g = spawnSync(join(GB, 'cygpath.exe'), ['-u', tempDir('g')], { env: base, encoding: 'utf8', windowsHide: true, timeout: HUNG_MS })
+  expect(g.status, g.stderr).toBe(0)
+  gnupg = g.stdout.trim()
+  base.GNUPGHOME = gnupg
 }, HUNG_MS)
 
 afterAll(() => {
