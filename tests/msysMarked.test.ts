@@ -13,7 +13,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { msysBinFor } from '../src/main/gitWorker'
 import { boundedOutput, endTreeAsync, findMsysMarked, msysMatches, MSYS_FIND_SCRIPT, RUN_MARK_VAR, treesToEnd, type ListedProcess } from '../src/main/processTree'
-import { markedNow, startSleeper } from './msysSleeper'
+import { markedNow, sleeperEnv, SLEEPER_MARK_VAR, startSleeper } from './msysSleeper'
 import { tempDir } from './tempDir'
 import { timing } from './timing.cjs'
 
@@ -245,15 +245,29 @@ describe.skipIf(!isWin)("Git's own sh finds exactly the marker's entry (HI-3047)
     expect(out2).toMatch(new RegExp(`^a ${msysPid} `, 'm'))
   }, timing('test.hang'))
 
-  // HI-3421: under a full run's load MSYS refused the background sleep, and the shell looked for it in /proc forever,
-  // writing nothing: the test's wait ran out, no reason given, and the shell spun on. Now each try's shell exits, saying
-  // why, and the reasons are the error.
-  it.skipIf(!bin)("a sleeper whose sleep doesn't start: each try's shell exits, and the error says why", async () => {
+  // HI-3421: a sleep that didn't start left the shell looking for it in /proc forever, writing nothing: the test's wait ran
+  // out, no reason given, and the shell spun on. Now the shell exits, saying why, and that is the error.
+  it.skipIf(!bin)("a sleeper whose sleep doesn't start: its shell exits, and the error says why", async () => {
     const err = await startSleeper({ bin: bin!, env: baseEnv(), sleep: 'cw-no-such-sleep' }).catch((e: Error) => e)
     expect(err).toBeInstanceOf(Error)
-    const tries = String((err as Error).message).split('\n').filter((l) => l.startsWith('try '))
-    expect(tries).toHaveLength(3)
-    for (const t of tries) expect(t).toMatch(/exited 1, winpids \[\], stderr: .*cw-no-such-sleep: command not found.*the background sleep \(\d+\) ended before it was seen as sleep/s)
+    expect((err as Error).message).toMatch(/^Git Bash's sleep didn't start: exited 1, winpids \[\], stderr: .*cw-no-such-sleep: command not found.*the background sleep \(\d+\) ended before it was seen as sleep$/s)
+  }, timing('test.hang'))
+
+  // HI-3455: rc.15's failure. A run started from PowerShell has Git's `cmd` folder on its PATH, not `usr\bin`, and MSYS's
+  // /usr/bin went with it: `sleep: command not found`, every time. The sleeper's shell has `bin` first on its PATH, under
+  // whichever spelling the caller's environment has.
+  it.skipIf(!bin)("a caller's PATH without Git's usr\\bin (PowerShell's, under either spelling): the sleep still starts", async () => {
+    const cmdOnly = `${process.env.SystemRoot ?? 'C:\\Windows'}\\System32;${join(bin!, '..', '..', 'cmd')}`
+    const plain = Object.fromEntries(Object.entries(baseEnv()).filter(([k]) => k.toUpperCase() !== 'PATH'))
+    for (const name of ['Path', 'PATH']) {
+      const pid = await startSleeper({ bin: bin!, env: { ...plain, [name]: cmdOnly } })
+      own(pid)
+      expect(pid).toBeGreaterThan(0)
+    }
+    const env = sleeperEnv({ ...plain, Path: cmdOnly }, bin!, 'm')
+    expect(Object.keys(env).filter((k) => k.toUpperCase() === 'PATH')).toEqual(['PATH'])
+    expect(env.PATH).toBe(`${bin};${cmdOnly}`)
+    expect(env[SLEEPER_MARK_VAR]).toBe('m')
   }, timing('test.hang'))
 
   // HI-3421 (HR1's rounds 1 and 2): a shell that doesn't exit within the wait is ended, and whatever carries its try's
