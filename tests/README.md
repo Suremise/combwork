@@ -33,7 +33,8 @@ Vitest's own copies of the modules, Combwork's code under test and the programs 
 and scenario runners do the same for their suites (HI-2102: Playwright's `playwright-artifacts-*`, the test copies of
 Combwork, the CLIs), and remove theirs as they exit (an e2e run with `--record` keeps it). Each run has its own folder
 there, `run-<pid>-<random>` (`runTemp.mts`). Before a run makes it the temp folder, it starts a keeper, Git's `cat.exe`
-with the user's temp folder, which lives as long as the run (`msysTemp.mts`, HI-3447). Git Bash keeps one mount table per
+with the user's temp folder, which lives as long as the run (`msysTemp.mts`, HI-3447). If the keeper doesn't start, the run
+stops before it starts anything. Git Bash keeps one mount table per
 Windows session, and the first MSYS process sets its `/tmp` from its own temp folder. A run's hook or shell started as
 that first process fixed `/tmp` at the run's folder for every Git Bash on the PC until all of them ended, long after the
 run had removed the folder. A run's start also removes the run folders older than a day whose run has ended, as the board's evidence rules allow

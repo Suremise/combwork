@@ -14,7 +14,7 @@ import { gitMsysBin, startMsysKeeper } from './msysTemp.mts'
 const git = gitMsysBin()
 
 /** What the copy needs to run sh, cat, sleep and mount, with Git's fstab (its /tmp is `usertemp`). */
-const RUNTIME = ['msys-2.0.dll', 'msys-iconv-2.dll', 'msys-intl-8.dll', 'msys-ncursesw6.dll', 'msys-readline8.dll', 'sh.exe', 'cat.exe', 'mount.exe', 'sleep.exe']
+const RUNTIME = ['msys-2.0.dll', 'msys-iconv-2.dll', 'msys-intl-8.dll', 'msys-gcc_s-seh-1.dll', 'msys-ncursesw6.dll', 'msys-readline8.dll', 'sh.exe', 'cat.exe', 'mount.exe', 'sleep.exe', 'sort.exe']
 
 /** A copy of Git's MSYS runtime, its own folders for a user's and a run's temp folders. */
 function copied(): { bin: string; userTemp: string; runTemp: string; dir: string } {
@@ -138,4 +138,57 @@ describe.runIf(git)("a test run and Git Bash's /tmp (HI-3447)", () => {
     // Nothing of the copy's runs any more: the run's keeper ended with it.
     expect(tmpOf(c.bin, c.runTemp)).toBe(c.runTemp.toLowerCase())
   })
+
+  // HR1's round 1: a keeper that doesn't start is ended by its own handle, says why, and the run starts nothing.
+  it("a keeper that doesn't start says why, and one still running is ended by its handle: ended first, never answering (ended at its bound), not startable", async () => {
+    const c = copied()
+    // sleep with no operand ends at once; sort answers nothing until its input ends.
+    const as = (exe: string): string => {
+      const bin = join(c.dir, `as-${exe}`)
+      mkdirSync(bin)
+      for (const f of RUNTIME) copyFileSync(join(c.bin, f), join(bin, f))
+      copyFileSync(join(c.bin, exe), join(bin, 'cat.exe'))
+      return bin
+    }
+    const endedFirst = startMsysKeeper(as('sleep.exe'), c.userTemp)
+    expect(await endedFirst.ready).toMatch(/^it ended \(\d+\) before it answered$/)
+    const silent = startMsysKeeper(as('sort.exe'), c.userTemp, timing('msys.keeperReadyShortMs'))
+    const silentGone = new Promise<void>((r) => (silent.child!.exitCode !== null ? r() : silent.child!.once('exit', () => r())))
+    expect(await silent.ready).toBe(`it didn't answer within ${timing('msys.keeperReadyShortMs')} ms`)
+    // Ended by the keeper's own handle, not left running.
+    await silentGone
+    expect(silent.child!.killed).toBe(true)
+    expect(await startMsysKeeper(join(c.dir, 'none'), c.userTemp).ready).toMatch(/^it couldn't be started: spawn .*ENOENT/)
+  })
+
+  // Each runner, as `npm test`, `npm run e2e` and `npm run scenarios` start it, its keeper's Git a folder that isn't there:
+  // it says so and stops, before a worker, a build or a suite starts.
+  // The unit run's control has its keeper's Git a working copy: the same file runs then, so what's missing is the keeper's doing.
+  const RUNNERS: { name: string; args: string[]; started: RegExp; control?: boolean }[] = [
+    { name: 'the unit run', args: [join('node_modules', 'vitest', 'vitest.mjs'), 'run', 'tests/timing.test.ts'], started: /Test Files {2}1 passed/, control: true },
+    { name: 'the e2e runner', args: [join('tests', 'e2e', 'run.mjs'), 'gitdirect'], started: /Suite|Building|build|gitdirect: / },
+    { name: 'the scenario runner', args: [join('tests', 'scenarios', 'run.mjs'), '--only', 'none-such'], started: /Scenario|scenario .* (pass|fail)|unknown/i }
+  ]
+  for (const r of RUNNERS) {
+    it(`${r.name} whose keeper doesn't start starts nothing`, () => {
+      const dir = tempDir('cw-msys-refused-')
+      const run = (msysBin: string): { status: number | null; out: string } => {
+        const local = join(dir, `local-${Date.now()}`)
+        const user = join(dir, `user-temp-${Date.now()}`)
+        mkdirSync(local)
+        mkdirSync(user)
+        const env = { SystemRoot: process.env.SystemRoot, PATH: process.env.PATH, LOCALAPPDATA: local, TMP: user, TEMP: user, CW_TEST_MSYS_BIN: msysBin, CW_TEST_NO_BOARD: '1' }
+        const res = spawnSync(process.execPath, r.args, { cwd: join(import.meta.dirname, '..'), env, encoding: 'utf8', timeout: timing('spawn.hang'), windowsHide: true })
+        return { status: res.status, out: `${res.stdout}\n${res.stderr}`.replace(/\x1b\[[0-9;]*m/g, '') }
+      }
+      const refused = run(join(dir, 'no-git'))
+      expect(refused.status, refused.out).not.toBe(0)
+      expect(refused.out).toMatch(/Git Bash's \/tmp keeper didn't start \(HI-3447\): it couldn't be started: spawn .*ENOENT\. The run starts nothing/)
+      expect(refused.out).not.toMatch(r.started)
+      if (!r.control) return
+      const kept = run(copied().bin)
+      expect(kept.status, kept.out).toBe(0)
+      expect(kept.out).toMatch(r.started)
+    })
+  }
 })

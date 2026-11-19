@@ -2,7 +2,8 @@
 // before the workers started. What Combwork's code under test wrote after a test file's own clean-up (tests/tempCleanup.ts)
 // goes with it. A run inside a test (its parent's folder) leaves it to the parent.
 // HI-3447: first, the Git Bash /tmp keeper startRunTemp started has started, before any worker can start Git Bash
-// (vitest.config.ts can't await: Vitest builds it as CommonJS).
+// (vitest.config.ts can't await: Vitest builds it as CommonJS). One that didn't start throws here, and Vitest starts no
+// worker (HR1's round 1).
 import { endRunTemp, msysTempKept } from './runTemp.mts'
 
 export default async function setup(): Promise<() => void> {

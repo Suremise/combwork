@@ -8,7 +8,8 @@
 // So before it changes the temp folder, a run starts a keeper: Git's own cat.exe, with the user's temp folder. Started
 // first, it makes the table (or joins one already made, which it leaves as it is: a table some other process made isn't a
 // run's to change). It reads its stdin, a pipe the run holds, and ends when that closes, as the run ends however it ends.
-// Off Windows, or without Git for Windows' usr\bin, there is nothing to keep.
+// A keeper that doesn't start stops the run before it starts anything. Off Windows, or without Git for Windows' usr\bin,
+// there is nothing to keep.
 import { spawn, spawnSync, type ChildProcess } from 'child_process'
 import { existsSync } from 'fs'
 import { createRequire } from 'module'
@@ -38,9 +39,11 @@ export interface MsysKeeper {
 /**
  * Starts `bin`'s cat.exe with `temp` as its temp folder (TMP and TEMP: Windows' GetTempPath reads TMP first), so the
  * session's MSYS mount table, if none is made yet, maps /tmp there. It ends when this process does (its stdin closes);
- * nothing of it keeps this process running. `ready`: null once cat has echoed a line back, MSYS started in it.
+ * nothing of it keeps this process running. `ready`: null once cat has echoed a line back, MSYS started in it; else why
+ * not (it couldn't be started, it ended first, or it didn't answer within `readyMs`), and one still running is ended, by
+ * its own handle (HR1's round 1).
  */
-export function startMsysKeeper(bin: string, temp: string): MsysKeeper {
+export function startMsysKeeper(bin: string, temp: string, readyMs = timing('msys.keeperReadyMs')): MsysKeeper {
   let child: ChildProcess
   try {
     child = spawn(join(bin, 'cat.exe'), [], { env: { SystemRoot: process.env.SystemRoot, PATH: bin, TMP: temp, TEMP: temp }, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true })
@@ -48,9 +51,13 @@ export function startMsysKeeper(bin: string, temp: string): MsysKeeper {
     return { child: null, ready: Promise.resolve(`it couldn't be started: ${(e as Error).message}`) }
   }
   const ready = new Promise<string | null>((resolve) => {
-    const bound = setTimeout(() => resolve(`it didn't answer within ${timing('msys.keeperReadyMs')} ms`), timing('msys.keeperReadyMs'))
+    const bound = setTimeout(() => done(`it didn't answer within ${readyMs} ms`), readyMs)
+    let answered = false
     const done = (why: string | null): void => {
+      if (answered) return
+      answered = true
       clearTimeout(bound)
+      if (why && child.exitCode === null && child.signalCode === null) child.kill()
       resolve(why)
     }
     child.once('error', (e) => done(`it couldn't be started: ${e.message}`))
@@ -87,10 +94,11 @@ export function keepMsysTemp(temp: string | undefined): void {
 }
 
 /**
- * Resolves once the run's keeper has started (at once without one): the runners await it before they start anything
- * that may run Git Bash. A keeper that couldn't start is said, and the run goes on.
+ * Resolves once the run's keeper has started (at once where none is needed: off Windows, or without Git for Windows): the
+ * runners await it before they start anything that may run Git Bash. A keeper tried that didn't start rejects, and the
+ * run starts nothing (HR1's round 1): its first Git Bash could otherwise still set /tmp to the run's folder.
  */
 export async function msysTempKept(): Promise<void> {
   const why = await (store[KEPT] ?? null)
-  if (why) console.warn(`Git Bash's /tmp keeper (HI-3447): ${why}. A test run that starts the first Git Bash on this PC may leave /tmp at its temp folder.`)
+  if (why) throw new Error(`Git Bash's /tmp keeper didn't start (HI-3447): ${why}. The run starts nothing: its first Git Bash could set /tmp, for every Git Bash on this PC, to the run's temp folder, which goes with it.`)
 }

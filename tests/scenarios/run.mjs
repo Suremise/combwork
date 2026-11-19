@@ -70,8 +70,11 @@ if (!evidence.ok) {
 // left, as the evidence rules allow. Before lib.cjs loads: Playwright, which the harness runs in this process, takes
 // the temp folder for its playwright-artifacts-* folders as it loads.
 startRunTemp(spare)
-// Git Bash's /tmp kept at the user's temp folder before any scenario can start Git Bash (HI-3447).
-await msysTempKept()
+// Git Bash's /tmp kept at the user's temp folder before any scenario can start Git Bash (HI-3447); without it, nothing runs.
+await msysTempKept().catch((e) => {
+  console.error(e.message)
+  process.exit(2)
+})
 process.on('exit', () => {
   const failed = endRunTemp()
   if (failed) console.warn(`The run's temp folder was left behind (the next run's start removes it after a day): ${failed}`)
