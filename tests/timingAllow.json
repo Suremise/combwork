@@ -4,49 +4,6 @@
     "tests/e2e/lanes.mjs": [
       "sleep await sleep(50)",
       "sleep else await sleep(50)"
-    ],
-    "tests/scenarios/harness.cjs": [
-      "clockLoop for (let t = Date.now(); Date.now() - t < 90000 && !['ready', 'finished', 'working'].includes((await up())?.status); ) {",
-      "sleep await sleep(1000)",
-      "sleep await sleep(500)",
-      "sleep await sleep(500)",
-      "until } else if (!(await lib.until(async () => !!(launchRun = (await live())?.runId ?? null), 90000))) {"
-    ],
-    "tests/scenarios/measure.cjs": [
-      "clockLoop while (Date.now() - t < 30000 && !['ready', 'finished'].includes((await live(host, id))?.status)) await lib.sleep(300)",
-      "sleep while (Date.now() - t < 30000 && !['ready', 'finished'].includes((await live(host, id))?.status)) await lib.sleep(300)"
-    ],
-    "tests/scenarios/scenarios.cjs": [
-      "clockLoop for (const t = Date.now(); Date.now() - t < 120000; await new Promise((r) => setTimeout(r, 500))) {",
-      "clockLoop for (let t = Date.now(); Date.now() - t < 60000 && !['ready', 'finished'].includes((await coderLive(c))?.status); ) await new Promise((r) => setTimeout(r, 500))",
-      "clockLoop for (let t = Date.now(); Date.now() - t < 90000 && !['ready', 'finished'].includes((await coderLive(c, agent))?.status); ) {",
-      "clockLoop if (Date.now() - c.blockedAt < 15000) return",
-      "clockLoop keepWaiting: async (c) => !!c.verdictAt && !c.woke && Date.now() - c.verdictAt < 40000,",
-      "clockLoop return !c.sent2At || (Date.now() - c.sent2At < 240000 && !(second && (second.state === 'acked' || !!second.ended)))",
-      "clockLoop return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))",
-      "clockLoop return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))",
-      "clockLoop return Date.now() - c.answeredAt < 240000 && (await c.api('GET', `/v1/tasks/${c.cards.b}`)).body?.column !== 'done'",
-      "promiseSleep await new Promise((r) => setTimeout(r, 1100))",
-      "promiseSleep await new Promise((r) => setTimeout(r, 1100))",
-      "promiseSleep await new Promise((r) => setTimeout(r, 20))",
-      "promiseSleep await new Promise((r) => setTimeout(r, 200))",
-      "promiseSleep for (const t = Date.now(); Date.now() - t < 120000; await new Promise((r) => setTimeout(r, 500))) {",
-      "promiseSleep for (let t = Date.now(); Date.now() - t < 60000 && !['ready', 'finished'].includes((await coderLive(c))?.status); ) await new Promise((r) => setTimeout(r, 500))",
-      "sleep await sleep(500)",
-      "testTimeout [\"it doesn't sleep and then check\", !!test && timed.length === 0, `${timed.map((w) => `${w.line}: ${w.code}`).join(' | ')} in: ${test.slice(0, 1500)}`],",
-      "testTimeout ['it waits for the line (polls the file, or waits on its change)', /\\bwhile\\s*\\(|\\bif\\s*\\(.*\\b(?:break|return)\\b|until|waitFor|poll|setInterval|watch/.test(test), test.slice(0, 300)],",
-      "until if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(\"setup: Coder didn't stop\")",
-      "until if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(\"setup: Coder didn't stop\")",
-      "until if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(`setup: ${key} didn't stop after Combwork gave it #${n}`)",
-      "until if (!(await lib.until(async () => !(await live()), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)",
-      "until if (!(await lib.until(async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'BuilderPlaced'), 90000))) throw new Error(`setup: Combwork didn't give #${n} to ${key} in its slot`)",
-      "until if (!(await lib.until(async () => (await c.api('GET', `/v1/tasks/${a}`)).body?.column === 'done', 120000))) throw new Error(`setup: #${a} didn't go Done after the user's rebase: ${(await c.api('GET', `/v1/tasks/${a}`)).body?.column}`)",
-      "until if (!(await lib.until(landed, 90000))) throw new Error(`setup: Combwork's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}; its screen ends: ${(await screen()).trim().slice(-400)}`)",
-      "until if (!(await require('../e2e/lib.cjs').until(() => submittedDiff(c, n), 15000))) await assertDiff(c, n)",
-      "until if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', 30000))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)",
-      "until if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', 30000))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)",
-      "until if (!(await require('../e2e/lib.cjs').until(given, 30000))) throw new Error(`setup: Combwork didn't give #${n} to Implementer`)",
-      "until if (!(await require('../e2e/lib.cjs').until(wakeIsRead, 120000))) throw new Error(`setup: Coder's wake for #${c.cards[key]} wasn't read: ${JSON.stringify(await c.deliveries('coder'))}, ${await c.subjectStatus()}`)"
     ]
   }
 }

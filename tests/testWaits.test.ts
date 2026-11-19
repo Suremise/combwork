@@ -20,6 +20,13 @@ describe('test waits (#524)', () => {
     expect(found).toEqual([{ line: 2, code: `await lib.${S}(500)`, commented: false }])
   })
 
+  it('loads with require() from CommonJS, as the scenarios do (no top-level await: ERR_REQUIRE_ASYNC_MODULE failed test-waits-write)', () => {
+    // Its path in the environment: as process.argv[1], the script would take itself for the command and run.
+    const run = spawnSync(process.execPath, ['-e', 'process.stdout.write(typeof require(process.env.CW_TEST_WAITS_SCRIPT).findWaits)'], { encoding: 'utf8', env: { ...ctx.baseEnv(), CW_TEST_WAITS_SCRIPT: join(import.meta.dirname, '..', 'scripts', 'testWaits.mjs') } })
+    expect(run.stderr).not.toMatch(/ERR_REQUIRE|Error/)
+    expect(run.stdout).toBe('function')
+  })
+
   it('finds the other forms: a promise around setTimeout, waitForTimeout, a sleep on the line of the action', () => {
     expect(findWaits(lines(`  await new Promise((r) => ${T}(r, 300))`, '  expect(seen).toHaveLength(1)'))).toHaveLength(1)
     expect(findWaits(lines(`  await page.waitFor${T.slice(3)}(800)`, "  check('open', ok)"))).toHaveLength(1)

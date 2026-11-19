@@ -104,7 +104,7 @@ const tomlString = (v) => (v.startsWith('"') ? JSON.parse(v) : v)
         const runOnce = async (host, id, resumeId) => {
           await inv('session:start', host, { agentId: id, ...(resumeId ? { resumeId } : {}) })
           const t = Date.now()
-          while (Date.now() - t < 30000 && !['ready', 'finished'].includes((await live(host, id))?.status)) await lib.sleep(300)
+          while (Date.now() - t < lib.timing('hang.ui') && !['ready', 'finished'].includes((await live(host, id))?.status)) await lib.sleep(lib.timing('poll.intervalMs'))
           // One exchange, so there is a conversation to resume: sent, then over (the session back at its prompt).
           let worked = false
           await lib.sendPrompt(inv, lib.ptyKey(host, id), 'hello', { submitted: async () => (worked ||= ['working', 'finished'].includes((await live(host, id))?.status)) })

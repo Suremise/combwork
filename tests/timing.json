@@ -154,5 +154,14 @@
   "quiet.linkMs": { "kind": "quiet", "ms": 700, "note": "a terminal path hovered or plainly clicked: no link marked and nothing opened within this (filelinks.cjs)" },
   "budget.copyQuietMs": { "kind": "budget", "ms": 60000, "note": "a returned review copy's quiet minute (Combwork's own): a check made before it ends (copyquiet.cjs)" },
   "seam.deliveryOverdueMs": { "kind": "seam", "ms": 8000, "note": "CW_TEST_DELIVERY_OVERDUE_MS: a delivery counted overdue this long after it was made (instead of 30 minutes; deliveries.cjs)" },
-  "seam.silentMs": { "kind": "seam", "ms": 2000, "note": "CW_TEST_SILENT_MS: how long a running turn may be silent before Combwork says its state is unknown (flightrecorder.cjs, turnledger.cjs)" }
+  "seam.silentMs": { "kind": "seam", "ms": 2000, "note": "CW_TEST_SILENT_MS: how long a running turn may be silent before Combwork says its state is unknown (flightrecorder.cjs, turnledger.cjs)" },
+  "scenario.waitingQuietMs": { "kind": "quiet", "ms": 3000, "note": "a scenario's turn end when its agent asks the user (Combwork's runtime attention): quiet for this long, at least (HI-3400)" },
+  "scenario.lookMs": { "kind": "interval", "ms": 1000, "note": "how often the scenario harness looks at a turn (its state, statuses, inbox, trust, dispatched agents) while it waits for its end" },
+  "scenario.readMs": { "kind": "interval", "ms": 10000, "note": "the longest one read of a turn's look may take (a state, the conversation, the inbox, a scenario's keepWaiting) before it counts as unknown, which holds the turn (HI-3400)" },
+  "scenario.startLookMs": { "kind": "interval", "ms": 500, "note": "how often the harness looks at a starting session (its state and screen: a trust question to answer, a sign-in) until it is ready" },
+  "scenario.messageTakenMs": { "kind": "hang", "ms": 240000, "note": "a scenario's keepWaiting: a message left for its agent acked or ended within this, else the trial ends without it" },
+  "scenario.answerLandsMs": { "kind": "hang", "ms": 240000, "note": "a scenario's keepWaiting: the card the user answered goes Done within this after the answer" },
+  "scenario.wakeComesMs": { "kind": "hang", "ms": 40000, "note": "a scenario's keepWaiting: Combwork's wake after a verdict (a watch's settle) comes within this, within a fake's minute" },
+  "pace.nextSecondMs": { "kind": "pace", "ms": 1100, "note": "so a time recorded to the second (a handover's) is a later second than the one before it" },
+  "pace.userAnswersMs": { "kind": "pace", "ms": 15000, "note": "a scenario's user answering a blocked card's question this long after it was asked (its premise: the reviewer stays watching meanwhile, HI-481)" }
 }
