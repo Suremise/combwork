@@ -10,7 +10,7 @@ import { timing } from './timing.cjs'
 const { runningJobsIn } = await import('../src/main/providers/claude/adapter')
 const { completeProcessList } = await import('../src/main/processTree')
 const { backgroundJobEnded, backgroundTestHooks, jobProcess, BACKGROUND_END_MS } = await import('../src/main/sessions')
-const { completeListing } = await import('../src/main/processTree')
+const { completeListing, listProcesses } = await import('../src/main/processTree')
 const { advanced } = await import('../src/main/advanced')
 const { tempDir } = await import('./tempDir')
 type Adapter = Parameters<typeof backgroundJobEnded>[0]
@@ -110,11 +110,20 @@ describe('a real PowerShell listing that reports an error part way is no answer 
       { pid: 5, parent: 0, started: 1001 }
     ])
   }, timing('test.hang'))
+
+  it("HI-3433: Windows' System Idle Process row (pid 0) is no process, and the listing still complete; the real listing has this process", async () => {
+    expect(await completeListing("'0 0 1794561628732'; '4 0 1000'", 20_000)).toEqual([{ pid: 4, parent: 0, started: 1000 }])
+    const list = await listProcesses()
+    expect(list?.some((p) => p.pid === process.pid)).toBe(true)
+  }, timing('test.hang'))
 })
 
 describe("a process listing is an answer only when complete (HR1's round 1)", () => {
   it('exited by itself with 0, every line a process, ending with its end line: the processes', () => {
     expect(completeProcessList('50124 80380 1794975870720\r\n4 0 1000\r\nend\r\n', true)).toEqual([proc, { pid: 4, parent: 0, started: 1000 }])
+    // HI-3433: led by Windows' System Idle Process (pid 0), not a process: the rest, never no answer.
+    expect(completeProcessList('0 0 1794561628732\r\n50124 80380 1794975870720\r\n4 0 1000\r\nend\r\n', true)).toEqual([proc, { pid: 4, parent: 0, started: 1000 }])
+    expect(completeProcessList('0 0 1794561628732\r\nend\r\n', true)).toBeNull()
   })
 
   it('some valid rows, then cut short (ended at its bound or failing: not ok), or without its end line, or with a line not a process: no answer', () => {

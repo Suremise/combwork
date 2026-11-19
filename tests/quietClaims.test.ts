@@ -277,3 +277,27 @@ describe('putting a folder back is retried for at least a minute (HI-3374)', () 
     }
   }, timing('test.hang'))
 })
+
+describe("an owner's liveness from Windows' real process listing (HI-3433)", () => {
+  it('a running process is alive; its pid with another start is dead, and its standing claim is recovered', async () => {
+    const { listProcesses } = await import('../src/main/processTree')
+    const list = await listProcesses()
+    expect(list).not.toBeNull()
+    const parent = list!.find((p) => p.pid === process.ppid)!
+    expect(await claimDeps.alive({ pid: parent.pid, started: parent.started })).toBe('alive')
+    const ghost = { pid: process.pid, started: claimDeps.self().started - 3_600_000 }
+    expect(await claimDeps.alive(ghost)).toBe('dead')
+    const s = setup()
+    try {
+      const aside = `${s.folder}.cw-quiet-hhhhhh`
+      claimDeps.self = () => ghost
+      const c = await takeClaim(s.a, s.folder, aside)
+      renameSync(s.folder, aside)
+      claimDeps.self = real.self
+      expect(await recoverClaim(s.b, c!)).toEqual({ state: 'released' })
+      expect(existsSync(join(s.folder, 'a.txt'))).toBe(true)
+    } finally {
+      s.close()
+    }
+  }, timing('test.hang'))
+})
