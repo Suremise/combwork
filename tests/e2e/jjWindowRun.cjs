@@ -178,19 +178,17 @@ const onDb = (fn) => {
     }
     const quiet = await page.addStyleTag({ content: '.toasts { display: none !important; }' })
     // The window's language, as a change of it reaches the window (jjview's way). Names change with it: each view is
-    // reached in English, then shown in each language where it is, in both themes.
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+    // reached in English, then shown in each language where it is, in both themes. Main reads each catalogue itself
+    // (lib.speakLanguage, HI-3428).
     const english = (await inv('app:info')).language
-    const catalogue = (code) => Object.assign({}, ...fs.readdirSync(path.join(lib.ROOT, 'locales', code)).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', code, f), 'utf8'))))
     const inEach = async (loc, name, wanted) => {
       for (const language of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
-        const cat = catalogue(language)
-        await speak({ ...english, code: language, locale: language, messages: cat })
+        const cat = await lib.speakLanguage(app, english, language)
         const want = wanted(cat)
         check(`${language}: ${name} in the language`, !!want && !!(await until(async () => (await text(loc)).includes(want), HUNG_MS)), await text(loc))
         await shoot(loc, `${name}-${language}`)
       }
-      await speak(english)
+      await lib.speakLanguage(app, english)
     }
     const repo = await section('jjRepo')
     const refresh = () => repo.locator('[data-action="jj-refresh"]').first().click()
@@ -616,13 +614,12 @@ const onDb = (fn) => {
       await form8.locator('[data-action="save"]').click()
       await save8.waitFor({ timeout: HUNG_MS })
     }
-    const de8 = catalogue('de')
+    const de8 = await lib.speakLanguage(app, english, 'de')
     const deKept8 = (/\bkept \{([^}]*)\{from\}/.exec(de8['workflow.form.retargetKeep'] ?? '') ?? [])[1]?.trim() ?? ''
-    await speak({ ...english, code: 'de', locale: 'de', messages: de8 })
     await reopen8()
     check('de: Save…\'s Retarget, card 2 and its slot staying, in German', !!deKept8 && !!(await until(async () => (await text(keptCard8)).includes(deKept8) && (await text(keptSlot8)).includes(deKept8), HUNG_MS)), await text(retarget8))
     await shoot(retarget8, 'retarget-kept-de')
-    await speak(english)
+    await lib.speakLanguage(app, english)
     await reopen8()
     check('…in English again', !!(await until(async () => /its work is kept on main/.test(await text(keptCard8)), HUNG_MS)), await text(retarget8))
     await save8.getByRole('button', { name: 'Save', exact: true }).click()
