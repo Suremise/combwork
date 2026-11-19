@@ -335,9 +335,9 @@ class ProviderService {
     let sent = !typed
     let finished = false
     // Typed once its screen shows it ready (typeWhenIdle).
-    // A key picked from the screen (a menu entry, #396), or a submission checked against it (#363), needs the screen
-    // after it is ready too.
-    const keepScreen = !!typed?.keys.some((k) => 'pick' in k || ('heldOn' in k && !!k.heldOn))
+    // A key picked from the screen (a menu entry, #396), a submission checked against it (#363), or keys held until it
+    // shows what they act on (HI-3437), needs the screen after it is ready too.
+    const keepScreen = !!typed?.keys.some((k) => 'pick' in k || !!k.heldOn || !!k.shown)
     const gate = typed?.ready
       ? new KeyGate({ ready: typed.ready, busyTitle: typed.busyTitle, busyScreen: typed.busyScreen, ...startSize(key), onReady: () => typeWhenIdle(), keepScreen })
       : null

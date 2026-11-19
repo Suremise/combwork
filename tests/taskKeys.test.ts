@@ -194,6 +194,10 @@ describe('runTask: the setup keys go in once Codex has loaded and is idle', () =
       run('codex', 'setup', { file: 'codex.exe', args: [] }, 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: CODEX_LOADED, busyTitle: BUSY })
       pty.onData!(stream)
       await vi.advanceTimersByTimeAsync(3000)
+      // Enter once its input shows the command (HI-3437).
+      expect(pty.typed.map((t) => t.keys)).toEqual(['\x15', '/permissions'])
+      pty.onData!(draw('codex-0.161-held-idle'))
+      await vi.advanceTimersByTimeAsync(1000)
       // The menu is open; the number isn't typed until it shows.
       expect(pty.typed.map((t) => t.keys)).toEqual(['\x15', '/permissions', '\r'])
       pty.onData!(`\r\n${menu(codexVersion)}`)
@@ -208,9 +212,50 @@ describe('runTask: the setup keys go in once Codex has loaded and is idle', () =
     const run = (providerService as unknown as { runTask: (...a: unknown[]) => string }).runTask.bind(providerService)
     run('codex', 'setup', { file: 'codex.exe', args: [] }, 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: CODEX_LOADED, busyTitle: BUSY })
     pty.onData!(stream)
-    pty.onData!('\r\n  1. Approve for me   Only ask for actions detected as potentially unsafe')
+    await vi.advanceTimersByTimeAsync(3000)
+    pty.onData!(draw('codex-0.161-held-idle'))
+    await vi.advanceTimersByTimeAsync(1000)
+    pty.onData!('\x1b[2J\x1b[H  1. Approve for me   Only ask for actions detected as potentially unsafe')
     await vi.advanceTimersByTimeAsync(10_000)
     expect(pty.typed.map((t) => t.keys)).toEqual(['\x15', '/permissions', '\r'])
+  })
+
+  // HI-3437: busy starting up (its spinner just after it loads) under load, Codex drew /permissions only after Enter would have gone
+  // in, then dropped that Enter and kept the command; the input showed its placeholder when Enter was checked, so it
+  // looked taken and was never sent again. Enter now waits for the input to show the command.
+  it('sends Enter only once its input shows the command, which Codex busy starting up draws late', async () => {
+    vi.useFakeTimers({ now: 0 })
+    const { codex } = await import('../src/main/providers/codex/adapter')
+    const run = (providerService as unknown as { runTask: (...a: unknown[]) => string }).runTask.bind(providerService)
+    run('codex', 'setup', { file: 'codex.exe', args: [] }, 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: CODEX_LOADED, busyTitle: BUSY, busyScreen: codexHoldsInput })
+    pty.onData!(stream)
+    for (let ms = 0; ms < 5000 && pty.typed.length < 2; ms += 10) await vi.advanceTimersByTimeAsync(10)
+    // Nothing drawn of the command yet: no Enter.
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(pty.typed.map((t) => t.keys)).toEqual(['\x15', '/permissions'])
+    // Drawn with Codex busy: still none.
+    pty.onData!(draw('codex-0.161-held-working'))
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(pty.typed.map((t) => t.keys)).toEqual(['\x15', '/permissions'])
+    // Free, holding it: Enter, which Codex runs.
+    pty.onData!(draw('codex-0.161-held-idle'))
+    for (let ms = 0; ms < 5000 && pty.typed.length < 3; ms += 10) await vi.advanceTimersByTimeAsync(10)
+    pty.onData!(draw('codex-0.161-permissions-readonly'))
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(pty.typed.map((t) => t.keys)).toEqual(['\x15', '/permissions', '\r', '1'])
+  })
+
+  it('types no Enter, and says so, when its input never shows the command', async () => {
+    const toasts = vi.spyOn(events, 'toast').mockImplementation(() => undefined as never)
+    vi.useFakeTimers({ now: 0 })
+    const { codex } = await import('../src/main/providers/codex/adapter')
+    const run = (providerService as unknown as { runTask: (...a: unknown[]) => string }).runTask.bind(providerService)
+    run('codex', 'setup', { file: 'codex.exe', args: [] }, 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: CODEX_LOADED, busyTitle: BUSY, busyScreen: codexHoldsInput })
+    pty.onData!(stream)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(pty.typed.map((t) => t.keys)).toEqual(['\x15', '/permissions'])
+    expect(toasts).toHaveBeenCalledWith('warning', 'Codex setup: Combwork couldn\'t find "/permissions" in Codex\'s input. Do it in the terminal, or update Combwork.')
+    toasts.mockRestore()
   })
 
   // #363: under load Codex was busy as the setup's keys came, its title's spinner later than the hint on its screen, and

@@ -236,8 +236,13 @@ export interface CommandSpec {
  * a menu whose order the CLI can change (Codex's /permissions, #396); `what` names what it looks for, for the error
  * when it never shows (main/keySteps.ts). A step that submits (Enter) can say how the screen shows it wasn't taken:
  * `heldOn` is true while the CLI still holds what it submits, unrun (Codex's input still holding the command, #363).
+ * `shown` holds a step's keys until the screen shows what they act on (HI-3437: Enter once Codex's input shows the
+ * command typed, which a CLI busy starting up draws late), failing as a pick does, by `what`, when it never shows.
  */
-export type KeyStep = { keys: string; waitMs?: number; heldOn?: (screen: string) => boolean } | { pick: (screen: string) => string | null; what: string; waitMs?: number }
+export type KeyStep =
+  | { keys: string; waitMs?: number; heldOn?: (screen: string) => boolean; shown?: undefined }
+  | { keys: string; waitMs?: number; heldOn?: (screen: string) => boolean; shown: (screen: string) => boolean; what: string }
+  | { pick: (screen: string) => string | null; what: string; waitMs?: number }
 export type KeySteps = KeyStep[]
 
 /** An adoption under way, as a provider takes it over in its own data (ProviderAdapter.adopting, HI-2774). */
