@@ -81,6 +81,8 @@
   "providers.copilot.host.proxy": "Proxy Copilota w GitHub Enterprise Server to wersja zapoznawcza, której Combwork jeszcze nie obsługuje: wybierz github.com lub swój host GHE.com w Kontrola wersji → GitHub. Do tego czasu jego agenci Copilota się nie uruchomią.",
   "providers.copilot.host.signInRuns": "**Zaloguj się** uruchamia `copilot login --host {host}` w terminalu: otwiera {host} w przeglądarce, aby autoryzować Copilota. Combwork nigdy nie loguje się za Ciebie.",
   "providers.copilot.host.signedOut": "Copilot nie jest zalogowany na {host}.",
+  "providers.copilot.host.unknownCopilot": "Nie udało się sprawdzić logowania Copilota na {host}: Copilot nie odpowiedział na czas. Wybierz Sprawdź ponownie.",
+  "providers.copilot.host.unknownGh": "Nie udało się sprawdzić logowania Copilota na {host}: GitHub CLI nie odpowiedział na czas. Wybierz Sprawdź ponownie.",
   "providers.copilot.parens.message": "Copilot nie może zatwierdzać edycji w folderze, którego ścieżka zawiera nawiasy, więc ten agent pyta przed każdą edycją, jak w trybie Pytaj. Zmień nazwę folderu, aby mógł działać w trybie Akceptuj edycje.",
   "providers.copilot.parens.title": "Copilot będzie pytać przed każdą edycją",
   "providers.copilot.planNote": "Copilot Free używa tylko Auto; wybór modelu wymaga płatnego planu.",

@@ -91,6 +91,8 @@ interface CombworkMessageValues {
   'providers.copilot.host.proxy': undefined
   'providers.copilot.host.signInRuns': { host: string | number }
   'providers.copilot.host.signedOut': { host: string | number }
+  'providers.copilot.host.unknownCopilot': { host: string | number }
+  'providers.copilot.host.unknownGh': { host: string | number }
   'providers.copilot.parens.message': undefined
   'providers.copilot.parens.title': undefined
   'providers.copilot.planNote': undefined

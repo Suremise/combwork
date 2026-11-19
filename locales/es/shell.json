@@ -351,7 +351,7 @@
   "shell.setup.host.proxy": "Proxy de Copilot de GitHub Enterprise Server: aún no compatible",
   "shell.setup.host.repo": "Repositorios en {host}",
   "shell.setup.host.tokens": "Copilot toma primero un token de COPILOT_GITHUB_TOKEN. GH_TOKEN y GITHUB_TOKEN se mantienen fuera de los agentes de Copilot, salvo que Configuración → Avanzado → GitHub Copilot → Mantener GH_TOKEN y GITHUB_TOKEN fuera de Copilot esté desactivado. Combwork nunca lee un token.",
-  "shell.setup.host.unknown": "No se pudo contactar con el host para comprobarlo",
+  "shell.setup.host.unknown": "La comprobación no respondió a tiempo",
   "shell.setup.host.unverified": "No se pudo confirmar el inicio de sesión",
   "shell.setup.host.usedBy": "{projects, select, none {{workspace}} other {{workspace}: {projects}}}",
   "shell.setup.host.verified": "CLI de GitHub con la sesión iniciada como {account} en {host}",

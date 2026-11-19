@@ -81,6 +81,8 @@
   "providers.copilot.host.proxy": "Le proxy Copilot de GitHub Enterprise Server est une préversion que Combwork ne prend pas encore en charge : choisis github.com ou ton hôte GHE.com dans Gestion de versions → GitHub. Ses agents Copilot ne démarrent pas tant que ce n’est pas fait.",
   "providers.copilot.host.signInRuns": "**Se connecter** exécute `copilot login --host {host}` dans un terminal : cela ouvre {host} dans ton navigateur pour autoriser Copilot. Combwork ne se connecte jamais à ta place.",
   "providers.copilot.host.signedOut": "Copilot n’est pas connecté sur {host}.",
+  "providers.copilot.host.unknownCopilot": "Impossible de vérifier la connexion de Copilot sur {host} : Copilot n’a pas répondu à temps. Choisis Vérifier à nouveau.",
+  "providers.copilot.host.unknownGh": "Impossible de vérifier la connexion de Copilot sur {host} : la CLI GitHub n’a pas répondu à temps. Choisis Vérifier à nouveau.",
   "providers.copilot.parens.message": "Copilot ne peut pas approuver de modifications dans un dossier dont le chemin contient des parenthèses, donc cet agent demande avant chaque modification, comme en mode Demander. Renomme le dossier pour lui donner le mode Accepter les modifications.",
   "providers.copilot.parens.title": "Copilot demandera avant chaque modification",
   "providers.copilot.planNote": "Copilot Free n’utilise qu’Auto ; choisir un modèle nécessite un forfait payant.",

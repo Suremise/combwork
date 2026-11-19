@@ -128,6 +128,16 @@
       "host": "plain"
     }
   },
+  "providers.copilot.host.unknownCopilot": {
+    "placeholders": {
+      "host": "plain"
+    }
+  },
+  "providers.copilot.host.unknownGh": {
+    "placeholders": {
+      "host": "plain"
+    }
+  },
   "providers.copilot.planNote": {
     "placeholders": {}
   },

@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { dirname, join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentInstallInfo } from '../src/shared/types'
+import type { AgentInstallInfo, HostCheck } from '../src/shared/types'
 import { redactLog } from '../src/shared/redact'
 import { copilotCheckEnv, copilotReadiness, copilotSignIn, copilotUpdateCommand, copilotUpdateRetry, ignoredTokens, installKind, parseCopilotConfig, parseCopilotVersion, parseGhStatus } from '../src/main/providers/copilot/install'
 import { storedLoginFor } from '../src/main/providers/copilot/hosts'
@@ -146,6 +146,16 @@ describe('Copilot readiness', () => {
     const [other] = copilotReadiness({ ...update, path: 'D:\\tools\\copilot.exe' }, {})
     expect(other.action).toBeUndefined()
     expect(other.detail![0]).toContain('the way you installed it')
+  })
+
+  // HI-3438: a host check with no answer in time (gh's under load, or Copilot's own listing) is never shown as ready.
+  it('says which check gave no answer in time on a host, as info; a host signed in adds nothing', () => {
+    const host = (key: string, state: HostCheck['state'], source: string | null, h = 'github.com'): HostCheck => ({ key, host: h, repoHost: h, origin: 'default', state, source, account: null, usedBy: [] })
+    const checks = [host('a', 'unknown', 'GitHub CLI'), host('b', 'unknown', 'COPILOT_GITHUB_TOKEN', 'acme.ghe.com'), host('c', 'verified', 'GitHub CLI', 'other.ghe.com')]
+    expect(copilotReadiness({ ...base, loggedIn: null, hostChecks: checks }, {})).toEqual([
+      { id: 'copilot-host-unknown:a', level: 'info', message: 'Couldn’t check Copilot’s sign-in on github.com: the GitHub CLI didn’t answer in time. Choose Check again.' },
+      { id: 'copilot-host-unknown:b', level: 'info', message: 'Couldn’t check Copilot’s sign-in on acme.ghe.com: Copilot didn’t answer in time. Choose Check again.' }
+    ])
   })
 })
 

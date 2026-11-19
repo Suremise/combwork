@@ -81,6 +81,8 @@
   "providers.copilot.host.proxy": "GitHub Enterprise Server 的 Copilot 代理是 Combwork 尚不支持的预览功能：请在“版本控制”→“GitHub”中选择 github.com 或你的 GHE.com 主机。在你选择之前，它的 Copilot 智能体不会启动。",
   "providers.copilot.host.signInRuns": "**登录**会在终端中运行 `copilot login --host {host}`：它会在浏览器中打开 {host} 以授权 Copilot。Combwork 绝不会替你登录。",
   "providers.copilot.host.signedOut": "Copilot 未在 {host} 上登录。",
+  "providers.copilot.host.unknownCopilot": "无法检查 Copilot 在 {host} 上的登录：Copilot 未及时响应。请选择“重新检查”。",
+  "providers.copilot.host.unknownGh": "无法检查 Copilot 在 {host} 上的登录：GitHub CLI 未及时响应。请选择“重新检查”。",
   "providers.copilot.parens.message": "Copilot 无法在路径含括号的文件夹中批准编辑，因此此智能体会像“询问”模式一样在每次编辑前询问。重命名该文件夹即可使用“接受编辑”。",
   "providers.copilot.parens.title": "Copilot 将在每次编辑前询问",
   "providers.copilot.planNote": "Copilot Free 只能使用 Auto；选择模型需要付费套餐。",
