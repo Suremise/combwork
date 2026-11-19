@@ -351,7 +351,7 @@
   "shell.setup.host.proxy": "GitHub Enterprise ServerのCopilotプロキシ：まだサポートされていません",
   "shell.setup.host.repo": "リポジトリは{host}",
   "shell.setup.host.tokens": "CopilotはまずCOPILOT_GITHUB_TOKENからトークンを取得します。「設定」→「詳細」→「GitHub Copilot」→「GH_TOKENとGITHUB_TOKENをCopilotに渡さない」がオフでない限り、GH_TOKENとGITHUB_TOKENはCopilotのエージェントに渡されません。Combworkがトークンを読むことはありません。",
-  "shell.setup.host.unknown": "確認のためにホストに接続できませんでした",
+  "shell.setup.host.unknown": "確認が時間内に応答しませんでした",
   "shell.setup.host.unverified": "サインインを確認できませんでした",
   "shell.setup.host.usedBy": "{projects, select, none {{workspace}} other {{workspace}：{projects}}}",
   "shell.setup.host.verified": "GitHub CLIは{host}に{account}としてサインイン済み",

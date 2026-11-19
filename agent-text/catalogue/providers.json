@@ -144,6 +144,16 @@
     "note": "Provider Setup, GitHub Copilot (HI-2779): no sign-in found for a GitHub host Combwork’s projects use. {host} is the host (github.com, yourcompany.ghe.com).",
     "audience": "both"
   },
+  "providers.copilot.host.unknownCopilot": {
+    "text": "Couldn’t check Copilot’s sign-in on {host}: Copilot didn’t answer in time. Choose Check again.",
+    "note": "Provider Setup, GitHub Copilot (HI-3438): credentials are set for the host, and Copilot itself, asked for its models with them, gave no usable answer in time. {host} is the host (github.com, yourcompany.ghe.com). Check again is the dialog’s button.",
+    "audience": "both"
+  },
+  "providers.copilot.host.unknownGh": {
+    "text": "Couldn’t check Copilot’s sign-in on {host}: the GitHub CLI didn’t answer in time. Choose Check again.",
+    "note": "Provider Setup, GitHub Copilot (HI-3438): Copilot signs in through the GitHub CLI there, and its check (`gh auth status`) gave no usable answer in time, as on a busy PC. {host} is the host (github.com, yourcompany.ghe.com). Check again is the dialog’s button.",
+    "audience": "both"
+  },
   "providers.copilot.planNote": {
     "text": "Copilot Free uses Auto only; choosing a model needs a paid plan.",
     "note": "A note in Provider Setup under GitHub Copilot. Copilot Free is the plan's name; Auto is Copilot's model choice: keep both names.",

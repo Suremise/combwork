@@ -1408,8 +1408,8 @@
     "description": "Provider Setup → GitHub Copilot (HI-2779): which token variables Copilot uses, and where the switch keeping two of them out is (its name as Settings shows it). Keep the variable names."
   },
   "shell.setup.host.unknown": {
-    "defaultMessage": "Couldn’t reach the host to check",
-    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): a check timed out or answered nothing readable."
+    "defaultMessage": "The check didn’t answer in time",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779, HI-3438): the check (the GitHub CLI’s, or Copilot’s own) gave no usable answer in time, as on a busy PC; the row names which below. The host itself wasn’t asked."
   },
   "shell.setup.host.unverified": {
     "defaultMessage": "Couldn’t confirm the sign-in",

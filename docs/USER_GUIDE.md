@@ -882,7 +882,7 @@ Copilot signs in on a GitHub host: github.com unless you say otherwise. A compan
   - **GitHub CLI signed in as … on …**: the GitHub CLI (`gh auth status`) checked its login on exactly that host. That is gh's account; it doesn't prove a Copilot seat.
   - **Every model is unavailable to this account**: Copilot listed models there and marked each one unavailable, as an organisation's policy or a plan can. A model marked unavailable on its own is listed apart, never offered.
   - **Couldn't confirm the sign-in**: a check answered with an error, shown as it said it. It may be a token that no longer works or the network; Combwork doesn't guess which.
-  - **Couldn't reach the host to check**: a check timed out.
+  - **The check didn't answer in time**: the GitHub CLI's check, or Copilot's own, gave no usable answer in time, as can happen on a busy PC (the row says which). The host itself wasn't asked. Copilot's status above says so too, with **Check again** to try once more, so it never looks ready.
   - **No GitHub sign-in needed**: Copilot runs a model of its own (`COPILOT_PROVIDER_BASE_URL`, or `COPILOT_OFFLINE`).
 
   A login on one host never counts for another: a GitHub CLI login on github.com doesn't sign Copilot in on `yourcompany.ghe.com`.

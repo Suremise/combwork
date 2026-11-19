@@ -89,6 +89,8 @@
   "providers.copilot.host.proxy": "GitHub Enterprise Server’s Copilot proxy is a preview Combwork doesn’t support yet: choose github.com or your GHE.com host in Version Control → GitHub. Its Copilot agents don’t start until you do.",
   "providers.copilot.host.signInRuns": "**Sign in** runs `copilot login --host {host}` in a terminal: it opens {host} in your browser to authorise Copilot. Combwork never signs in for you.",
   "providers.copilot.host.signedOut": "Copilot isn’t signed in on {host}.",
+  "providers.copilot.host.unknownCopilot": "Couldn’t check Copilot’s sign-in on {host}: Copilot didn’t answer in time. Choose Check again.",
+  "providers.copilot.host.unknownGh": "Couldn’t check Copilot’s sign-in on {host}: the GitHub CLI didn’t answer in time. Choose Check again.",
   "providers.copilot.parens.message": "Copilot can't approve edits in a folder whose path has parentheses, so this agent asks before each edit, as in Ask. Rename the folder to give it Accept edits.",
   "providers.copilot.parens.title": "Copilot will ask before each edit",
   "providers.copilot.planNote": "Copilot Free uses Auto only; choosing a model needs a paid plan.",
