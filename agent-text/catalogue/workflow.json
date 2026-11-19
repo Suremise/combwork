@@ -1040,6 +1040,16 @@
     "note": "The next step after going ahead with a follow-up unchecked (#1467). ok and gaps are the reviewer's answers, as agents name them: keep them as they are. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences.",
     "audience": "both"
   },
+  "workflow.refused.loop.followUpInReview.message": {
+    "text": "{card} is in Review: its reviewer gives a verdict on what was submitted, so a change now is not a follow-up for a check.",
+    "note": "A refused follow-up posted for the reviewer's check (HI-3419) on a card in Review: the review still owes its verdict, which a check (an OK or gaps) doesn't give, so a change made now goes to the reviewer another way (the next sentence). {card} is a card key.",
+    "audience": "both"
+  },
+  "workflow.refused.loop.followUpInReview.next": {
+    "text": "A commit: submit it with cw_submit and followUp: true, which keeps the card in Review with no round counted, and its reviewer reviews it again. No commit: say it to the reviewer in a comment.",
+    "note": "The next step after a follow-up refused on a card in Review (HI-3419): a commit is submitted as a follow-up, which its reviewer reviews again; a change with no commit (a screenshot) is said in a comment. Keep cw_submit and followUp: true as they are.",
+    "audience": "both"
+  },
   "workflow.refused.loop.followUpMerging.message": {
     "text": "{card} is being merged now: a follow-up can no longer take it out of the merge queue.",
     "note": "A refused follow-up (#1623): a follow-up on a queued card takes it out of the merge queue first, but the queue has already begun merging this one. {card} is a card key.",
@@ -1091,13 +1101,13 @@
     "audience": "both"
   },
   "workflow.refused.loop.stepNotHere.message": {
-    "text": "{step, select, followUp {{card} is in {stage}: a follow-up is posted for its check once the work is in review or has passed it.} other {{card} is in {stage}: a design is posted for its check before the work goes to review.}}",
-    "note": "A refused card loop step (#1382, #1467): a design was posted for a card that isn't being worked on (not in Doing), or a follow-up (a change asked of reviewed work, such as a screenshot's) for a card that isn't in Review or Passed. {card} is a card key; {stage} the stage it is in; step (select): followUp, or other for a design. Translate each sentence.",
+    "text": "{step, select, followUp {{card} is in {stage}: a follow-up is posted for its check once the work has passed review.} other {{card} is in {stage}: a design is posted for its check before the work goes to review.}}",
+    "note": "A refused card loop step (#1382, #1467): a design was posted for a card that isn't being worked on (not in Doing), or a follow-up (a change asked of reviewed work, such as a screenshot's) for a card that hasn't passed review (HI-3419: one in Review has a refusal of its own). {card} is a card key; {stage} the stage it is in; step (select): followUp, or other for a design. Translate each sentence.",
     "audience": "both"
   },
   "workflow.refused.loop.stepNotHere.next": {
     "text": "{step, select, followUp {Send the work to review, or say it in a comment.} other {Post it while the card is being worked on, or say it in a comment.}}",
-    "note": "The next step after a design posted for a card that is not being worked on, or a follow-up for a card not in Review or Passed (#1382, #1467). step (select): followUp, or other for a design. Translate each sentence.",
+    "note": "The next step after a design posted for a card that is not being worked on, or a follow-up for a card that has not passed review (#1382, #1467, HI-3419). step (select): followUp, or other for a design. Translate each sentence.",
     "audience": "both"
   },
   "workflow.refused.loop.stepNotYours.message": {

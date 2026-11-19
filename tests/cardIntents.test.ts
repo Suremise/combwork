@@ -871,17 +871,24 @@ describe('a card by intent (#1267)', () => {
     expect(ok.card.column).toBe('passed')
   })
 
-  it('a follow-up in Review wakes the reviewer too; with no reviewer it is refused (#1467)', async () => {
+  it('a follow-up for a check is refused in Review, its verdict still due: a commit there is a follow-up submission (HI-3419)', async () => {
     const { w, wt } = await workspace()
-    const card = await create(w)
-    await act(w, card, builder, { kind: 'start' })
+    const card = await inLane(w)
     commit(wt, 'i.txt')
     await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
-    // No lane, nobody has reviewed it: nobody could be woken.
-    expect(await refused(act(w, card, builder, { kind: 'loopStep', step: 'followUp', text: 'Fixes' }))).toBe('loop.noReviewer')
     await act(w, card, reviewer, { kind: 'startReview' })
-    expect(await refused(act(w, card, builder, { kind: 'loopStep', step: 'followUp', text: 'Fixes' }))).toBeNull()
-    expect(wakesOf(w, card).at(-1)).toBe('a2')
+    const steps = () => facts(w, card).filter((f) => f.kind === 'LoopStep' || f.kind === 'Submitted').length
+    const before = { facts: steps(), wakes: wakesOf(w, card).length }
+    // MC-1568: the reviewer, told of a follow-up to check, answered ok and waited; the verdict never came.
+    const r = await act(w, card, builder, { kind: 'loopStep', step: 'followUp', text: 'Fixes at 1093e21.' }).then(() => null, (e: { refusal?: { rule: string; next: string } }) => e.refusal)
+    expect(r?.rule).toBe('loop.followUpInReview')
+    expect(r?.next).toBe('A commit: submit it with cw_submit and followUp: true, which keeps the card in Review with no round counted, and its reviewer reviews it again. No commit: say it to the reviewer in a comment.')
+    expect({ facts: steps(), wakes: wakesOf(w, card).length }).toEqual(before)
+    // The route it names: submitted as a follow-up, the reviewer is woken to review it again.
+    commit(wt, 'j.txt')
+    await act(w, card, builder, { kind: 'submit', summary: 'Fixes', followUp: true })
+    expect(facts(w, card).filter((f) => f.kind === 'Submitted').at(-1)?.data).toMatchObject({ followUp: true })
+    expect(wakesOf(w, card).slice(before.wakes)).toEqual(['a2'])
   })
 
   it('a no-code card is submitted with a summary and no revision (S25, S38)', async () => {

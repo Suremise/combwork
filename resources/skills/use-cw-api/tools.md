@@ -91,7 +91,7 @@ Texts are clipped: the task to 300 characters, the reply to 500, the last 3 tool
 
 ## Card loop steps (`cw_loop_step`)
 
-- Builder: `design` (posted for the reviewer to check, the card in Doing; the reply gives its id and `until`, when the check is due); `proceed` (no answer by then: building as posted; refused before); `followUp` (a follow-up asked of reviewed work, such as a screenshot change, ready for the reviewer's check, the card in Review or Passed; no proceed).
+- Builder: `design` (posted for the reviewer to check, the card in Doing; the reply gives its id and `until`, when the check is due); `proceed` (no answer by then: building as posted; refused before); `followUp` (a follow-up asked of reviewed work, such as a screenshot change, ready for the reviewer's check, the card in Passed; no proceed).
 - Reviewer: `ok` or `gaps` (what is missing), naming the design.
 - Refused with no reviewer to check it.
 

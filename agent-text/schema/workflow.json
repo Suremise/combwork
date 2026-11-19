@@ -889,6 +889,14 @@
       "reader": "select"
     }
   },
+  "workflow.refused.loop.followUpInReview.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.loop.followUpInReview.next": {
+    "placeholders": {}
+  },
   "workflow.refused.loop.followUpMerging.message": {
     "placeholders": {
       "card": "plain"

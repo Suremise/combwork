@@ -5965,7 +5965,7 @@ The `review` parameter of `cw_update_task` maps onto the intents for one release
 - **A follow-up checked** (#1467, built [#1467]). On 22 Oct #1417 and #1419 stalled the same way in Review and Approved:
   the Assistant's screenshot OK asked for changes for the reviewer to check, the builder posted its fixes as a comment,
   and the reviewer watched for a move into Review that never came. The card loop step has a `followUp`: the builder's,
-  on a card in Review or Approved, queued included (`loop.stepNotHere` elsewhere; on a queued card it first takes its
+  on a card in Approved, queued included (`loop.stepNotHere` elsewhere, and `loop.followUpInReview` in Review, below; on a queued card it first takes its
   entry out of the queue, `IntegrationCancelled` with reason follow-up, so the queue can't merge the approved revision
   while the follow-up changes its line, and the reviewer's `ok` queues it again while its pass holds; refused once the
   queue has begun merging it, `loop.followUpMerging`, #1623). **A follow-up's `ok` is only the reviewer's check of it:
@@ -5991,7 +5991,13 @@ The `review` parameter of `cw_update_task` maps onto the intents for one release
   holds commits its target lacks (MC-1559's 5045b46 among them), the follow-up is refused `done.noCodeUnmerged` first, as
   any no-code submission is (HI-3410, HI-3412): a no-code submission would leave them unmerged, so the user says whether
   they merge (the card made code again) or are dropped.
-  The loop step's `followUp` stays for Approved and for a change with no commit (a screenshot's). On 26 Oct HR4 OK'd HB4's
+  **The loop step's `followUp` is for Approved alone** (HI-3419): in Review it is refused (`loop.followUpInReview`; next:
+  a commit is `cw_submit` with `followUp`, a change with no commit a comment to the reviewer). On 19 Nov MC-1568 stalled
+  15 minutes: its reviewer's pass was refused `review.headMoved`, its builder posted the commit as the loop step, and
+  the reviewer, told of a follow-up to check, answered `ok`, as a check is answered, and waited, its verdict still due
+  (and a pass of the earlier submission refused). Two routes in Review, one a check with no verdict, contradicted each
+  other; one route each (a submission in Review, a check in Approved) needs no reading of which is meant. Moving the
+  review to the new head by itself was the alternative, and would have a pass cover work not reviewed. On 26 Oct HR4 OK'd HB4's
   follow-up commit and passed the submitted one: the pass went stale at once and HI-1737 sat in Approved, nobody told.
   **A pass that goes stale afterwards is never silent:** its builder's wake names what was passed, where the line is and
   what to submit (`staleWake`), the card's merge line and a refused merge or move say so (queue state `stale`,
