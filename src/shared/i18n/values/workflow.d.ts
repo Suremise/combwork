@@ -381,6 +381,8 @@ interface CombworkMessageValues {
   'workflow.refused.loop.churnPending.next': undefined
   'workflow.refused.loop.followUpChecked.message': { card: string | number }
   'workflow.refused.loop.followUpChecked.next': { reader: string }
+  'workflow.refused.loop.followUpInReview.message': { card: string | number }
+  'workflow.refused.loop.followUpInReview.next': undefined
   'workflow.refused.loop.followUpMerging.message': { card: string | number }
   'workflow.refused.loop.followUpMerging.next': undefined
   'workflow.refused.loop.noReviewer.message': { card: string | number }

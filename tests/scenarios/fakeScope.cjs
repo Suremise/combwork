@@ -27,7 +27,7 @@ const FAKE_CLAUDE_ONLY = [
   'merged-to-done', 'tag-cards', 'progress-log', 'card-detail', 'card-read-first', 'card-read-first-broken', 'long-doc-section', 'list-compact', 'list-detail', 'skill-unchanged',
   // The card loop's rules (its delivery: card-loop-lane, card-loop-submit-watch, card-loop-lane-next, card-loop-design-check).
   'card-loop-rounds', 'card-loop-recurring', 'card-loop-recurring-review', 'card-loop-return', 'card-loop-commit', 'card-loop-uncommitted', 'card-loop-lane-defaults', 'card-loop-lane-override', 'card-loop-lane-join',
-  'card-loop-already-in-review', 'card-loop-two-cards', 'card-loop-disputed', 'card-loop-design-first', 'card-loop-follow-up', 'card-loop-follow-up-check', 'card-loop-ask-assistant', 'card-loop-released', 'card-loop-loop-wake', 'card-loop-start-early',
+  'card-loop-already-in-review', 'card-loop-two-cards', 'card-loop-disputed', 'card-loop-design-first', 'card-loop-follow-up', 'card-loop-follow-up-check', 'card-loop-follow-up-review-again', 'card-loop-ask-assistant', 'card-loop-released', 'card-loop-loop-wake', 'card-loop-start-early',
   // Wakes are the fake Claude Code's alone (harness.cjs: fakeWakes): on the others these check only their fixture.
   'card-loop-blocked', 'coordinator-lanes-to-end',
   // HI-3324: a job Combwork can't see; its end is a watch's wake, and the mark, the watch and the job's checks after the server.

@@ -947,7 +947,7 @@ describe('a pass covers only the revision submitted; a stale pass says so (HI-17
   const reviewer = { waitMinutes: 30, reviewer: async () => 'R1' }
   const head = (folder: string): string => sh(folder, 'rev-parse', 'HEAD').trim()
 
-  it("HI-1737's sequence: a follow-up commit in Review, OK'd, then a pass: refused, saying to resubmit the head; resubmitted, it is reviewed and queued there", async () => {
+  it("HI-1737's sequence: a follow-up commit in Review, then a pass: refused, saying to resubmit the head; resubmitted, it is reviewed and queued there", async () => {
     const e = pair()
     const { card, folder } = await started(e)
     moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
@@ -955,9 +955,8 @@ describe('a pass covers only the revision submitted; a stale pass says so (HI-17
     moved(await e.wf.startReview(card.key, R1))
     commit(folder, { 'tests/fix.test.txt': 'one more assertion\n' }, 'follow-up')
     const now = head(folder)
-    const posted = await e.wf.loopStep(card.key, B1, 'followUp', 'One more assertion', reviewer)
-    moved(posted)
-    moved(await e.wf.loopStep(card.key, R1, 'ok', 'Checked', { ...reviewer, design: (posted as { data?: Record<string, unknown> }).data?.design as string }))
+    // HI-3419 (MC-1568): never a follow-up for a check in Review, which its reviewer OK'd as a check and left its verdict due.
+    refusedBy(await e.wf.loopStep(card.key, B1, 'followUp', 'One more assertion', reviewer), 'loop.followUpInReview')
     const r = refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }), 'review.headMoved')
     expect(r.message).toBe(`${card.key}'s line has moved since it was submitted: it was submitted at ${submitted.slice(0, 7)}, and its head is now ${now.slice(0, 7)}, a different change. A pass covers only the revision submitted.`)
     expect(r.next).toBe(`A commit you asked for: ask its builder to submit ${now.slice(0, 7)} as a follow-up (cw_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (cw_verdict, pass: false), and its builder submits it as the next round.`)
