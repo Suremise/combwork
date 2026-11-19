@@ -130,7 +130,7 @@ const check = (name, ok, extra = '') => {
     check(`${width}px ${theme}: the details on hover: the reviewer, and what it asks`, !!hovered && /reviewer is checking/.test(await tip.innerText()), `mark visible: ${await mark.isVisible().catch(() => false)}; tips: ${await page.locator('.tip').allInnerTexts().then((t) => t.join(' | '))}; ${Date.now() - t0} ms; ${states(reviewed).join(' > ')}`)
     await page.screenshot({ path: path.join(lib.WORK, `attention-review-${width}-${theme}.png`) })
     await page.mouse.move(5, 5)
-    check(`${width}px ${theme}: approved, the mark goes`, !!(await finished(reviewed)) && (await mark.count()) === 0)
+    check(`${width}px ${theme}: approved, the mark goes`, !!(await finished(reviewed)) && !!(await until(reviewGone, lib.timing('hang.ui'))), await reviewLeft())
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
