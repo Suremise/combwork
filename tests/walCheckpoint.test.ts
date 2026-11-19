@@ -1,7 +1,7 @@
 // The WAL's checkpoints out of the commits (#1633): a writer given to the idle checkpointer never checkpoints in its
 // commits; it is checkpointed once idle (and due), at once when its WAL grows past the bound, or after writes without a
 // pause; checkpoints that can't copy the whole WAL give SQLite's own back until one can. Time is passed in: no waits.
-import { closeSync, openSync, readSync, statSync, utimesSync } from 'fs'
+import { closeSync, openSync, readSync, statSync, utimesSync, writeSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
@@ -13,7 +13,7 @@ const HUNG_MS = timing('wait.hang')
 
 const { openDb, transaction } = await import('../src/main/db')
 const wal = await import('../src/main/walCheckpoint')
-const { checkpointHooks } = await import('../src/main/walCheckpointWorker')
+const { checkpointHooks, sameCommits, walMark } = await import('../src/main/walCheckpointWorker')
 const { checkpointThreadHooks } = wal
 
 const base = tempDir('cw-wal-checkpoint-')
@@ -392,6 +392,86 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
       wal.checkpointTick(t)
       wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
       expect(wal.checkpointStats.done).toBe(done + 1)
+    } finally {
+      db.close()
+    }
+  })
+
+  it("HI-3414 (HR1's round 2): a commit over frames spilled and rolled back, the WAL's frame count, size and time all unchanged, is still seen and checkpointed", () => {
+    const db = open(wal.checkpointWhenIdle)
+    const walFile = `${db.file}-wal`
+    const tick = Math.floor(Date.now() / 1000) - 60
+    // Another connection with a cache too small for its transaction: its pages spill into the WAL before its commit.
+    const other = new DatabaseSync(db.file, { timeout: 0 }) // timing-ok: no busy wait: nothing else takes the lock here
+    try {
+      other.exec('PRAGMA wal_autocheckpoint = 0')
+      other.exec('PRAGMA cache_size = 5')
+      restartAt(db, tick)
+      const done = wal.checkpointStats.done
+      const skipped = wal.checkpointStats.restartsSkipped
+      other.exec('BEGIN IMMEDIATE')
+      other.exec('SAVEPOINT s')
+      const ins = other.prepare('INSERT INTO t (doc) VALUES (?)')
+      for (let i = 0; i < 100; i++) ins.run(Buffer.alloc(6000, i % 251))
+      utimesSync(walFile, tick, tick)
+      const spilled = statSync(walFile)
+      const step = wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+      let t = performance.now() + 2 * step
+      // The spill grew the WAL: idle and due, it is checkpointed (what was committed), its restart skipped (the lock held).
+      wal.checkpointTick(t)
+      wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      expect(wal.checkpointStats.restartsSkipped).toBe(skipped + 1)
+      // Rolled back to before the spill, then a commit written over its frames.
+      other.exec('ROLLBACK TO s')
+      ins.run(Buffer.alloc(6000, 7))
+      other.exec('RELEASE s')
+      other.exec('COMMIT')
+      utimesSync(walFile, tick, tick)
+      const after = statSync(walFile)
+      expect([after.size, after.mtimeMs]).toEqual([spilled.size, spilled.mtimeMs])
+      wal.checkpointTick((t += step))
+      wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.done).toBe(done + 2)
+      expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(6)
+    } finally {
+      if (other.isTransaction) other.exec('ROLLBACK')
+      other.close()
+      db.close()
+    }
+  })
+
+  it("HI-3414 (HR1's round 2): walMark counts only frames SQLite would: a commit frame whose checksum fails past the end isn't committed", () => {
+    const db = open(wal.checkpointWhenIdle)
+    const walFile = `${db.file}-wal`
+    try {
+      write(db.writer, 3)
+      const before = walMark(db.file)!
+      expect(before.end).toBeGreaterThan(0)
+      expect(before.more).toBe(false)
+      // A frame after the last commit with the header's salts and a commit size, its checksum wrong (as a torn write leaves it).
+      const fd = openSync(walFile, 'r+')
+      try {
+        const head = Buffer.alloc(32)
+        readSync(fd, head, 0, 32, 0)
+        const page = head.readUInt32BE(8)
+        const forged = Buffer.alloc(24 + page)
+        forged.writeUInt32BE(1, 0)
+        forged.writeUInt32BE(5, 4)
+        head.copy(forged, 8, 16, 24)
+        forged.writeUInt32BE(0xdeadbeef, 16)
+        forged.writeUInt32BE(0xfeedface, 20)
+        writeSync(fd, forged, 0, forged.length, 32 + before.end * (24 + page))
+      } finally {
+        closeSync(fd)
+      }
+      const forgedMark = walMark(db.file, before)!
+      expect(sameCommits(forgedMark, before)).toBe(true)
+      expect(sameCommits(walMark(db.file)!, before)).toBe(true)
+      // A real commit over it moves the mark.
+      write(db.writer, 1)
+      expect(sameCommits(walMark(db.file, forgedMark), before)).toBe(false)
+      expect(walMark(db.file, forgedMark)).toEqual(walMark(db.file))
     } finally {
       db.close()
     }

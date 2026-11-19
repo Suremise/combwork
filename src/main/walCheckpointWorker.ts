@@ -1,4 +1,4 @@
-import { closeSync, existsSync, fstatSync, openSync, readSync, statSync } from 'original-fs'
+import { closeSync, existsSync, openSync, readSync, statSync } from 'original-fs'
 import { parentPort, workerData } from 'worker_threads'
 import { DatabaseSync } from 'node:sqlite'
 
@@ -26,14 +26,14 @@ export type CheckpointRequest = { id: number; file: string; closing: number; kin
 /**
  * What the WAL's first write did: written (`busy` false), or skipped because another connection had the write lock; how
  * long it took. `wal` (HI-3362): the WAL file's size and modified time after that write, read while this connection held
- * the write lock again (so no other connection's write is in them), with its WAL-index's mark then (HI-3414: walMark);
+ * the write lock again (so no other connection's write is in them), with what the WAL had committed then (HI-3414: walMark);
  * none when another connection took it first.
  */
 export interface RestartDone {
   restart: true
   busy: boolean
   ms: number
-  wal?: { size: number; mtime: number; mark: string | null }
+  wal?: { size: number; mtime: number; mark: WalMark | null }
 }
 
 /** What SQLite says of a checkpoint (`busy`: it couldn't finish; `checkpointed` of `log` pages), and how long it took. */
@@ -139,52 +139,149 @@ function walSalts(file: string): string | null {
   }
 }
 
-/** A WAL file's magic numbers (its header's first 4 bytes, big-endian): its checksums little- or big-endian. */
+/** A WAL file's magic numbers (its header's first 4 bytes, big-endian): the last bit says its checksums are big-endian. */
 const WAL_MAGIC = [0x377f0682, 0x377f0683]
+/** A frame's header, before its page. */
+const FRAME_HEADER = 24
+/**
+ * walMark reads at most this much of whole frames a call (the size trigger's bound: 8 MB, about 6 ms on main's thread,
+ * once, after a burst of writes; a tick with nothing new reads one frame's header): past it, the reading says so (`more`)
+ * and goes on from there at the next.
+ */
+const MARK_BYTES = 8 * 1024 * 1024
+/** Whole frames read in one go, at most this much (a read for many frames, not two a frame). */
+const MARK_CHUNK_BYTES = 256 * 1024
+/** At most this many uncommitted frames are remembered past the committed end: past it, the reading says so (`more`). */
+const MARK_TAIL = 512
 
 /**
- * HI-3414: what the WAL holds, read from the WAL file itself (sqlite.org/walformat.html): its salts (the header's bytes
- * 16-23) and how many frames from its beginning carry them, as `<salts>:<frames>`. Every commit moves it (frames written
- * with the header's salts, or the WAL started again with new ones) and a checkpoint never does (it writes the database,
- * not the WAL), so it says whether anything was written where the file's size and modified time can't: Windows stamps
- * that time from its clock tick (about 15.6 ms by default), and a write after a restart goes over the old frames without
- * growing the file. Not the WAL-index (`-shm`): that one is SQLite's mapped memory, which an ordinary read isn't sure to
- * see as it stands; WAL frames are written and read with ordinary file I/O, as every other connection and process reads
- * them. A restart writes from frame 0 with new salts, so the frames carrying the header's salts come first: the first
- * that doesn't is found by halves, and given the `last` mark with the same salts, one frame's header says if any came
- * since. A frame being written may count early (a change either way). Null when the WAL can't be read or isn't one.
+ * HI-3414: what a WAL has committed, read from the WAL file as SQLite's own recovery reads it (sqlite.org/walformat.html):
+ * from its header on, frames whose salts are the header's and whose checksum chain holds; its committed content ends at
+ * the last commit frame among them (a commit size in its header). A commit moves it (a commit frame further on, or the WAL
+ * started again with new salts); a checkpoint (it writes the database, not the WAL), frames spilled or rolled back (no
+ * commit frame), and a torn frame (its checksum fails) never do, nor do frames written over in place with the same count.
+ * So it says whether anything was written where the file's size and time can't: Windows stamps that time from its clock
+ * tick (about 15.6 ms by default), and a write after a restart goes over old frames without growing the file. The WAL is
+ * written and read with ordinary file I/O, as every connection and process reads it (unlike the `-shm`, SQLite's mapped
+ * memory, which an ordinary read isn't sure to see as it stands).
  */
-export function walMark(file: string, last: string | null = null): string | null {
+export interface WalMark {
+  /** The header's salts (hex). */
+  salts: string
+  /** Frames committed: up to and with the last valid commit frame. */
+  end: number
+  /** The checksum chain at `end` (the header's own at 0). */
+  sum: [number, number]
+  /** The headers (hex, 24 bytes each) of the valid frames past `end` with no commit after them yet: checked, and while
+   * their headers stay the same (the chain's checksum is in each), not read whole again. */
+  tail: string
+  /** The reading stopped short (its bound per call, or a long uncommitted tail): taken as written. */
+  more: boolean
+}
+
+/** Two marks for the same committed content (the WAL's salts, committed frames and chain). */
+export const sameCommits = (a: WalMark | null, b: WalMark | null): boolean => a !== null && b !== null && !a.more && !b.more && a.salts === b.salts && a.end === b.end && a.sum[0] === b.sum[0] && a.sum[1] === b.sum[1]
+
+const LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1
+
+/** SQLite's WAL checksum (walChecksumBytes) over `b[from, to)`, on from `sum`, its words in the WAL's byte order. */
+function walChecksum(b: Buffer, from: number, to: number, big: boolean, sum: [number, number]): [number, number] {
+  let [s1, s2] = sum
+  // Little-endian words on a little-endian machine (x64, arm64): read as they lie, many times faster.
+  if (!big && LITTLE_ENDIAN && (b.byteOffset + from) % 4 === 0) {
+    const w = new Uint32Array(b.buffer, b.byteOffset + from, (to - from) / 4)
+    for (let i = 0; i < w.length; i += 2) {
+      s1 = (s1 + w[i] + s2) >>> 0
+      s2 = (s2 + w[i + 1] + s1) >>> 0
+    }
+    return [s1, s2]
+  }
+  for (let i = from; i < to; i += 8) {
+    s1 = (s1 + (big ? b.readUInt32BE(i) : b.readUInt32LE(i)) + s2) >>> 0
+    s2 = (s2 + (big ? b.readUInt32BE(i + 4) : b.readUInt32LE(i + 4)) + s1) >>> 0
+  }
+  return [s1, s2]
+}
+
+/**
+ * The WAL's committed content now (WalMark), read on from `last` when its salts are the same: frames past its end only,
+ * and those of its tail by their headers while unchanged. Null when the WAL can't be read, isn't one, or its header's
+ * checksum fails (being written).
+ */
+export function walMark(file: string, last: WalMark | null = null): WalMark | null {
   if (checkpointHooks.markUnreadable?.(file)) return null
   let fd: number | null = null
   try {
     fd = openSync(`${file}-wal`, 'r')
     const head = Buffer.alloc(32)
-    if (readSync(fd, head, 0, 32, 0) !== 32 || !WAL_MAGIC.includes(head.readUInt32BE(0))) return null
+    if (readSync(fd, head, 0, 32, 0) !== 32) return null
+    const magic = head.readUInt32BE(0)
+    if (!WAL_MAGIC.includes(magic)) return null
+    const big = (magic & 1) === 1
     const raw = head.readUInt32BE(8)
     const page = raw === 1 ? 65536 : raw
     if (page < 512 || page > 65536 || (page & (page - 1)) !== 0) return null
+    const headSum = walChecksum(head, 0, 24, big, [0, 0])
+    if (headSum[0] !== head.readUInt32BE(24) || headSum[1] !== head.readUInt32BE(28)) return null
     const salts = head.toString('hex', 16, 24)
-    const frameBytes = page + 24
-    const frames = Math.max(0, Math.floor((fstatSync(fd).size - 32) / frameBytes))
-    const b = Buffer.alloc(8)
-    const handle = fd
-    // A frame's header: its salts at bytes 8-15.
-    const carries = (i: number): boolean => readSync(handle, b, 0, 8, 32 + i * frameBytes + 8) === 8 && b.toString('hex') === salts
-    let lo = 0
-    let hi = frames
-    const [lastSalts, lastFrames] = last?.split(':') ?? []
-    const known = Number(lastFrames)
-    if (lastSalts === salts && Number.isInteger(known) && known <= frames) {
-      if (known === frames || !carries(known)) return last
-      lo = known + 1
+    const same = last !== null && last.salts === salts
+    const from = same ? last.end : 0
+    let end = from
+    let sum: [number, number] = same ? [last.sum[0], last.sum[1]] : headSum
+    const known = same ? last.tail : ''
+    const frameBytes = page + FRAME_HEADER
+    const at = (i: number): number => 32 + i * frameBytes
+    let chain = sum
+    let tail = ''
+    let i = from
+    // The tail checked before, by its headers alone while they're unchanged (each holds its chain's checksum): valid,
+    // uncommitted frames. Up to the first that isn't, so `end` is still `from` here.
+    const hdr = Buffer.alloc(FRAME_HEADER)
+    for (let k = 0; k < known.length; k += 2 * FRAME_HEADER, i++) {
+      if (readSync(fd, hdr, 0, FRAME_HEADER, at(i)) !== FRAME_HEADER) break
+      const hex = hdr.toString('hex')
+      if (known.slice(k, k + 2 * FRAME_HEADER) !== hex) break
+      chain = [hdr.readUInt32BE(16), hdr.readUInt32BE(20)]
+      tail += hex
     }
-    while (lo < hi) {
-      const mid = (lo + hi) >>> 1
-      if (carries(mid)) lo = mid + 1
-      else hi = mid
+    // From there, whole frames, a chunk at a time, until one isn't valid, the file ends or the bound is reached. The next
+    // frame's header first: nothing new (the file ends, or a frame of an older WAL) is the usual tick, one small read.
+    let more = false
+    const next0 = readSync(fd, hdr, 0, FRAME_HEADER, at(i)) === FRAME_HEADER && hdr.toString('hex', 8, 16) === salts
+    if (!next0) return { salts, end, sum, tail, more }
+    const budget = Math.max(1, Math.floor(MARK_BYTES / frameBytes))
+    const chunkFrames = Math.max(1, Math.min(budget, Math.floor(MARK_CHUNK_BYTES / frameBytes)))
+    const chunk = Buffer.alloc(chunkFrames * frameBytes)
+    let read = 0
+    scan: for (;;) {
+      if (read >= budget) {
+        more = true
+        break
+      }
+      const want = Math.min(chunkFrames, budget - read)
+      const n = Math.floor(readSync(fd, chunk, 0, want * frameBytes, at(i)) / frameBytes)
+      if (n === 0) break
+      for (let j = 0; j < n; j++, i++) {
+        const o = j * frameBytes
+        const frame = chunk.subarray(o, o + frameBytes)
+        if (frame.toString('hex', 8, 16) !== salts || frame.readUInt32BE(0) === 0) break scan
+        const next = walChecksum(frame, FRAME_HEADER, frameBytes, big, walChecksum(frame, 0, 8, big, chain))
+        if (next[0] !== frame.readUInt32BE(16) || next[1] !== frame.readUInt32BE(20)) break scan
+        chain = next
+        if (frame.readUInt32BE(4) !== 0) {
+          end = i + 1
+          sum = next
+          tail = ''
+        } else tail += frame.toString('hex', 0, FRAME_HEADER)
+        if (tail.length > MARK_TAIL * 2 * FRAME_HEADER) {
+          more = true
+          break scan
+        }
+      }
+      read += n
+      if (n < want) break
     }
-    return `${salts}:${lo}`
+    return { salts, end, sum, tail, more }
   } catch {
     return null
   } finally {

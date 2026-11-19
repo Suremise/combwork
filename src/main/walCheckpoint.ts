@@ -6,7 +6,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import { beginGuards } from './db'
 import { createLogger } from './logger'
 import { timedStep } from './stallWork'
-import { CLOSING, runCheckpoint, runRestart, walMark, type CheckpointDone, type CheckpointReply, type CheckpointRequest, type RestartDone } from './walCheckpointWorker'
+import { CLOSING, runCheckpoint, runRestart, sameCommits, walMark, type WalMark, type CheckpointDone, type CheckpointReply, type CheckpointRequest, type RestartDone } from './walCheckpointWorker'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 
 /**
@@ -18,8 +18,8 @@ import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
  *
  * So their writers have it off (`wal_autocheckpoint = 0`), and a timer checkpoints each one (PASSIVE: it never waits
  * for readers or writers) on main once it has been idle: nothing written for `idleMs` (its WAL file's size, time and
- * frames unchanged, HI-3414: the time moves only at the clock's tick, so a write in the same tick that doesn't grow the
- * file leaves its size and time as they were, and only its frames say it was written: walMark), something written since its last checkpoint, and at least `everyMs` since that one. A WAL growing past
+ * committed frames unchanged, HI-3414: the time moves only at the clock's tick, so a commit in the same tick that doesn't
+ * grow the file leaves its size and time as they were, and only its committed frames say it was written: walMark), something written since its last checkpoint, and at least `everyMs` since that one. A WAL growing past
  * `walBytes` is checkpointed at once, idle or not, as is one written to without a pause for `maxGapMs`. The WAL starts
  * again from its beginning at the writer's next write after a whole checkpoint, as before.
  *
@@ -78,8 +78,8 @@ interface Registered {
   /** The WAL file's size and modified time as last seen, and when they last changed. */
   size: number
   mtime: number
-  /** HI-3414: its WAL's salts and frames carrying them as last seen (walMark); null: not read. */
-  mark: string | null
+  /** HI-3414: what its WAL had committed as last seen (walMark); null: not read. */
+  mark: WalMark | null
   changed: number
   /** Something was written since the last checkpoint. */
   dirty: boolean
@@ -247,9 +247,11 @@ export function checkpointTick(now = performance.now()): void {
     const s = walStat(r.file)
     const mark = walMark(r.file, r.mark)
     const grew = s.size > r.size
-    // HI-3414: the WAL's frames say what its size and time can miss (a write in the same clock tick that doesn't grow it);
-    // those still count, and a reading that fails, or succeeds again, is never taken for nothing written.
-    const written = s.size !== r.size || s.mtime !== r.mtime || mark !== r.mark
+    // HI-3414: what the WAL has committed says what its size and time can miss (a commit in the same clock tick that
+    // doesn't grow it); those still count, and a reading that fails, succeeds again or stops short is never taken for
+    // nothing written.
+    const committed = mark === null && r.mark === null ? false : !sameCommits(mark, r.mark)
+    const written = s.size !== r.size || s.mtime !== r.mtime || committed
     r.size = s.size
     r.mtime = s.mtime
     r.mark = mark
