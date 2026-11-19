@@ -256,14 +256,14 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
       const answered = await until(async () => {
         if (await dontResume.count()) await dontResume.first().click().catch(() => undefined)
         return !fs.existsSync(restartRecord) && (await dontResume.count()) === 0
-      })
+      }, HUNG_MS)
       // Its outcome then shows for the usual time, counted only while the window is focused (Popups.tsx), and a test
       // window never is: closed with its × as the user would (HI-2370).
       const outcome = page.locator('.toast.resolved .popup-close')
       const closed = await until(async () => {
         if (await outcome.count()) await outcome.first().click().catch(() => undefined)
         return (await outcome.count()) === 0
-      })
+      }, HUNG_MS)
       check("de: the offer to resume the lane's agents answered Don't Resume, and gone", !!answered && !!closed, String(fs.existsSync(restartRecord)))
     }
     // A try's pace, not a bound: not restored open within it, the panel is opened by its rail.

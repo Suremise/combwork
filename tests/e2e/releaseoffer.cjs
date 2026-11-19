@@ -71,7 +71,7 @@ function release(repo, line) {
       await page.mouse.move(2, 2)
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
-        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+        await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
         await target.screenshot({ path: path.join(shots, `${name}-${theme}.png`) })
       }
       await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -87,11 +87,11 @@ function release(repo, line) {
 
     // --- The status bar counts it, and its popover lists it with its buttons.
     const needItem = page.locator('.statusbar .inbox-item:not(.inbox-finished)')
-    check('the status bar counts the offers', !!(await until(async () => /^\d+ needs? you$/.test((await needItem.innerText().catch(() => '')).trim()))), await needItem.innerText().catch(() => ''))
+    check('the status bar counts the offers', !!(await until(async () => /^\d+ needs? you$/.test((await needItem.innerText().catch(() => '')).trim()), HUNG_MS)), await needItem.innerText().catch(() => ''))
     await needItem.click()
     const inboxRow = page.locator(`.inbox-panel [data-release-offer="${a1.id}"]`)
     const words = async (l) => (await l.innerText().catch(() => '')).replace(/\s+/g, ' ')
-    check('…its popover lists the offer in words, with Move…, Not now', !!(await until(async () => (await inboxRow.count()) === 1 && /1\.4\.0 is released \(v1\.4\.0, tagged .+, merged into main\)\. Move Work merges into to 1\.5\.0\?/.test(await words(inboxRow)) && /1\.3\.0 is released and nothing uses it/.test(await words(inboxRow)) && (await inboxRow.getByRole('button', { name: 'Move…' }).count()) === 1 && (await inboxRow.getByRole('button', { name: 'Not now' }).count()) === 1)), await words(inboxRow))
+    check('…its popover lists the offer in words, with Move…, Not now', !!(await until(async () => (await inboxRow.count()) === 1 && /1\.4\.0 is released \(v1\.4\.0, tagged .+, merged into main\)\. Move Work merges into to 1\.5\.0\?/.test(await words(inboxRow)) && /1\.3\.0 is released and nothing uses it/.test(await words(inboxRow)) && (await inboxRow.getByRole('button', { name: 'Move…' }).count()) === 1 && (await inboxRow.getByRole('button', { name: 'Not now' }).count()) === 1, HUNG_MS)), await words(inboxRow))
     await shoot('inbox', page.locator('.inbox-panel'))
     await page.keyboard.press('Escape')
 
@@ -99,20 +99,20 @@ function release(repo, line) {
     await page.getByRole('button', { name: 'Task Board' }).click()
     await page.locator('.board-for-you-filter input').check()
     const boardRow = page.locator(`.board-release-offers [data-release-offer="${a1.id}"]`)
-    check('the board with For you ticked shows it above the cards', !!(await until(async () => (await boardRow.count()) === 1)))
+    check('the board with For you ticked shows it above the cards', !!(await until(async () => (await boardRow.count()) === 1, HUNG_MS)))
     await shoot('board', page.locator('.board-release-offers'))
 
     // --- Move…: Version Control → Workflow's Save…, the change filled in; saved, it applies.
     await boardRow.getByRole('button', { name: 'Move…' }).click()
     const saveDialog = page.locator('.dialog', { hasText: 'Save Workflow Options' })
-    check('Move… opens Workflow’s Save… with the change', !!(await until(async () => (await saveDialog.count()) === 1 && /1\.5\.0/.test(await saveDialog.innerText()))), await saveDialog.innerText().catch(() => ''))
+    check('Move… opens Workflow’s Save… with the change', !!(await until(async () => (await saveDialog.count()) === 1 && /1\.5\.0/.test(await saveDialog.innerText()), HUNG_MS)), await saveDialog.innerText().catch(() => ''))
     await shoot('save', saveDialog)
     await saveDialog.getByRole('button', { name: 'Save', exact: true }).click()
     const form = async () => inv('workflow:form', alpha)
     check('…saved: Work merges into is 1.5.0, 1.4.0 joins the other branches, 1.3.0 is off', !!(await until(async () => {
       const f = await form()
       return f.options.target === '1.5.0' && JSON.stringify([...(f.options.otherTargets ?? [])].sort()) === '["1.4.0"]'
-    })), JSON.stringify((await form()).options))
+    }, HUNG_MS)), JSON.stringify((await form()).options))
     const a2 = await until(async () => {
       const o = await offerOf(alpha)
       return o && !o.move && o.cleanup?.drop[0]?.branch === '1.4.0' ? o : null
@@ -122,10 +122,10 @@ function release(repo, line) {
     // --- Not now: hidden.
     await page.getByRole('button', { name: 'Task Board' }).click()
     const a2Row = page.locator(`.board-release-offers [data-release-offer="${a2?.id}"]`)
-    await until(async () => (await a2Row.count()) === 1)
+    await until(async () => (await a2Row.count()) === 1, HUNG_MS)
     await shoot('cleanup', a2Row)
     await a2Row.getByRole('button', { name: 'Not now' }).click()
-    check('Not now hides it', !!(await until(async () => (await a2Row.count()) === 0 && !(await offerOf(alpha)))))
+    check('Not now hides it', !!(await until(async () => (await a2Row.count()) === 0 && !(await offerOf(alpha)), HUNG_MS)))
 
     // --- beta: Start 1.5.0… opens Start the next version; started, its cleanup-only offer (1.4.0 off, 1.3.0 kept).
     const card = await inv('tasks:create', { title: 'On 1.3.0', project: 'beta', target: '1.3.0' })
@@ -135,12 +135,12 @@ function release(repo, line) {
     }, OFFER_MS)
     check("beta's offer: start 1.5.0, 1.3.0 kept (a card uses it)", !!b1, JSON.stringify(await offerOf(beta)))
     const bRow = page.locator(`.board-release-offers [data-release-offer="${b1?.id}"]`)
-    await until(async () => (await bRow.count()) === 1)
+    await until(async () => (await bRow.count()) === 1, HUNG_MS)
     check('…its Start 1.5.0… button, and the kept branch said', (await bRow.getByRole('button', { name: 'Start 1.5.0…' }).count()) === 1 && /1\.3\.0 \(.+\) is released but still in use, so it stays/.test(await words(bRow)), await words(bRow))
     await shoot('start', bRow)
     await bRow.getByRole('button', { name: 'Start 1.5.0…' }).click()
     const startDialog = page.locator('.dialog', { hasText: 'Start the next version' })
-    check('Start 1.5.0… opens Start the next version', !!(await until(async () => (await startDialog.count()) === 1)))
+    check('Start 1.5.0… opens Start the next version', !!(await until(async () => (await startDialog.count()) === 1, HUNG_MS)))
     await startDialog.getByRole('button', { name: 'Start', exact: true }).click()
     const b2 = await until(async () => {
       const o = await offerOf(beta)
@@ -148,7 +148,7 @@ function release(repo, line) {
     }, OFFER_MS)
     check('…started: the cleanup-only offer, 1.4.0 to come off and 1.3.0 kept', !!b2, JSON.stringify(await offerOf(beta)))
     const b2Row = page.locator(`.board-release-offers [data-release-offer="${b2?.id}"]`)
-    if (await until(async () => (await b2Row.count()) === 1)) await shoot('after-start', b2Row)
+    if (await until(async () => (await b2Row.count()) === 1, HUNG_MS)) await shoot('after-start', b2Row)
     // The card on 1.3.0 is what keeps it: named among its uses.
     check('…1.3.0 kept, named with the card that uses it', !!b2?.cleanup?.kept.find((k) => k.branch === '1.3.0')?.uses.some((u) => u.includes(String(card.number)) || (card.key && u.includes(card.key))), JSON.stringify(b2?.cleanup))
   } finally {

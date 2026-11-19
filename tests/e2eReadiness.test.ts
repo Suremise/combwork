@@ -99,6 +99,7 @@ describe('lib.projectShown', () => {
     let shown = false
     let done = false
     const waiting = lib.projectShown(page(async () => true, async () => (shown ? 1 : 0)), WITHIN * 2).then((v) => ((done = true), v))
+    // A fixed wait on purpose: the view held for a look's bound, and the wait mustn't have ended in it.
     await new Promise((r) => setTimeout(r, BOUND))
     expect(done).toBe(false)
     shown = true
