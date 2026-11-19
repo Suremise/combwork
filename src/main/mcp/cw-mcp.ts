@@ -1100,7 +1100,11 @@ const tools: Tool[] = [
       const me = ASSISTANT ? {} : { project: PROJECT, ...(process.env.CW_AGENT_ID ? { [a.action === 'join' ? 'reviewer' : 'builder']: process.env.CW_AGENT_ID } : {}) }
       if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief', 'applyNow', 'target', 'released']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'join') return named((await api('POST', '/v1/lanes/join', { ...pick(['project', 'builder', 'cards']), ...me })) as LaneChange, laneChangeText)
-      if (a.action === 'next') return named((await api('GET', '/v1/lanes/next')) as Parameters<typeof laneNextText>[0], laneNextText)
+      if (a.action === 'next') {
+        // HI-3420: the agent's lane just ended or was abandoned: what Combwork says of it, as a reply, never an error.
+        const r = (await api('GET', '/v1/lanes/next')) as Parameters<typeof laneNextText>[0] | { lane: null; ended: { lane: string; text: string } }
+        return r.lane === null ? r.ended.text : named(r, laneNextText)
+      }
       if (a.action !== 'end') throw new Error(say(T['lane.error.action']))
       if (typeof a.lane !== 'string' || !a.lane) throw new Error(say(T['lane.error.laneRequired']))
       return named((await api('POST', `/v1/lanes/${enc(a.lane)}/end`, pick(['mergeCommit', 'abandoned']))) as LaneInfo, laneEndText)

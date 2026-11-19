@@ -84,6 +84,19 @@ export class LaneError extends CombworkError {
   }
 }
 
+/**
+ * HI-3420: cw_lane next for an agent whose lane just ended or was abandoned (`lane`: its id): an answer, not a failure, so
+ * the Agent API replies with it (`ended`) rather than an error, and the agent's tool call doesn't count as a failed one.
+ */
+export class LaneEnded extends LaneError {
+  constructor(
+    readonly lane: string,
+    message: string
+  ) {
+    super(404, message)
+  }
+}
+
 /** Refusals the window can meet (ending a lane from Progress → Lanes), in its language. */
 const M = {
   noWorkspace: msg({ id: 'service.lanes.noWorkspace', defaultMessage: 'No workspace is open', description: "An error changing a workspace's lanes (card loops) while no workspace is open in the window." }),
@@ -2105,12 +2118,12 @@ export async function laneNext(ws: WorkspaceService, project: string, agentId: s
           columns = null
         }
       }
-      if (!columns || columns.some((c) => c.column === 'unrecorded')) throw new LaneError(404, say(A.nextEndedUnknown, { lane: gone.id }))
+      if (!columns || columns.some((c) => c.column === 'unrecorded')) throw new LaneEnded(gone.id, say(A.nextEndedUnknown, { lane: gone.id }))
       const open = columns.filter((c) => c.column !== 'done' && c.column !== 'gone')
-      if (open.length) throw new LaneError(404, withCardNames(ws, () => say(A.nextEndedOpen, { lane: gone.id, cards: open.map((c) => cardRef(c.number)).join(', '), n: open.length })))
-      throw new LaneError(404, say(A.nextEnded, { lane: gone.id }))
+      if (open.length) throw new LaneEnded(gone.id, withCardNames(ws, () => say(A.nextEndedOpen, { lane: gone.id, cards: open.map((c) => cardRef(c.number)).join(', '), n: open.length })))
+      throw new LaneEnded(gone.id, say(A.nextEnded, { lane: gone.id }))
     }
-    if (gone) throw new LaneError(404, say(A.nextAbandoned, { lane: gone.id }))
+    if (gone) throw new LaneEnded(gone.id, say(A.nextAbandoned, { lane: gone.id }))
     throw new LaneError(404, say(A.nextNone))
   }
   // Its queued list once the boundary has passed (HI-3118: no card of its own in flight), as the next start reads it.

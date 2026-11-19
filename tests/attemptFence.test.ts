@@ -484,7 +484,9 @@ describe('the fence on an agent write (HI-3194)', () => {
     expect(facts(w, card).some((f) => f.kind === 'Submitted')).toBe(false)
   })
 
-  it("an agent's Assistant request is fenced: a moved attempt and a launch replaced mid-change leave no comment or waiting mark", async () => {
+  // HI-3420: a request is a message, not a change of the card: a moved attempt lets it through (MR1's answer after its own
+  // verdict merged MC-1568 was refused), with no waiting mark and no binding, so the launch's next change is still refused.
+  it("an agent's Assistant request: a moved attempt still delivers it, unmarked and unbound; a launch replaced mid-change leaves nothing", async () => {
     const { w, repo, wt } = await workspace()
     const card = await create(w)
     const l = await launch(repo, 'a1', 'r1')
@@ -497,10 +499,13 @@ describe('the fence on an agent write (HI-3194)', () => {
     }
     // The card restarted on the same agent: the launch's binding is the old attempt's.
     const old = arrive(l)
+    const bound = fence.boundAttempt('r1', card)
     await restart(w, card)
     const before = seen()
-    expect(await refused(ask(old, '#1/aaaa0001'))).toBe('attempt.moved')
-    expect(seen()).toEqual(before)
+    expect(await refused(ask(old, '#1/aaaa0001'))).toBeNull()
+    expect(seen()).toEqual({ comments: before.comments + 1, waiting: null })
+    expect(fence.boundAttempt('r1', card)).toEqual(bound)
+    expect(await refused(comment(w, card, arrive(l)))).toBe('attempt.moved')
     // Read again, then replaced while the request's change awaits.
     await read(w, l, card)
     const r = renewedMidChange(w, () => launch(repo, 'a1', 'r2'))
@@ -510,7 +515,7 @@ describe('the fence on an agent write (HI-3194)', () => {
     } finally {
       r.restore()
     }
-    expect(seen()).toEqual(before)
+    expect(seen()).toEqual({ comments: before.comments + 1, waiting: null })
     // The current launch's request goes through, marking the card waiting.
     const now = { projectPath: repo, agentId: 'a1', runId: 'r2' }
     fence.issueAttempt(now, card, key(w, card))
@@ -665,6 +670,22 @@ describe('reads that clear a stale attempt, through the real handlers (HI-3340)'
     await act(w, card, user, { kind: 'putBack', why: 'Another card first' })
     return { w, card, l }
   }
+
+  // HI-3420: an ended lane's next was an error (404), counted as a failed tool call; it is an answer. No lane at all stays one.
+  it('cw_lane next once the lane has ended or was abandoned: a reply saying so, not an error; with no lane, still an error', async () => {
+    const { w, repo } = await workspace()
+    const card = await create(w)
+    const lanes = await import('../src/main/lanes')
+    const l = await launch(repo, 'a1', 'r1')
+    const ended = (await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], by: 'the Assistant' })).lane
+    await lanes.endLane(w, ended.id, {})
+    expect(await call(w, l, 'GET', '/v1/lanes/next', card)).toEqual({ lane: null, next: null, waits: null, ended: { lane: ended.id, text: `Your lane ${ended.id} was ended with #${card} not Done: nothing more on it. Don't start it again; ask the user before starting another lane with that card.` } })
+    const abandoned = (await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], by: 'the Assistant' })).lane
+    await lanes.endLane(w, abandoned.id, { abandoned: true })
+    expect((await call(w, l, 'GET', '/v1/lanes/next', card)).ended).toEqual({ lane: abandoned.id, text: `Your lane ${abandoned.id} was abandoned: don't start it again; ask the user if there is more to do.` })
+    const other = await launch(repo, 'a3', 'r3')
+    await expect(call(w, other, 'GET', '/v1/lanes/next', card)).rejects.toMatchObject({ status: 404 })
+  })
 
   it("cw_lane next, a latest-comment read and cw_start_card: the start goes through on the first try", async () => {
     const { w, card, l } = await putBackLaneCard()

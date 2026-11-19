@@ -1,6 +1,6 @@
 // An agent's request for the Combwork Assistant on a card (HI-1866, main/assistantAsk.ts, `cw_ask_assistant`): written as
 // the agent's comment with a history line, and given to the Assistant as a delivery from that agent quoting it whole.
-// Refused before anything is written: another project's card, a card archived or in Done, the Assistant unable to act
+// Given on a card in Done too (HI-3420). Refused before anything is written: another project's card, an archived card, the Assistant unable to act
 // (Settings → Assistant → Control below changing cards), an agent-less caller, a text past a comment's limit. One that
 // ends unread (Control turned down before the Assistant takes it) tells the user on the card and in a notice. Its wake
 // of a watching Assistant (a lane watch) is laneWatch.test.ts'; the route, e2e intents.
@@ -89,7 +89,25 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     expect(items).toMatchObject([{ from: 'B1 (alpha)', card, kind: 'rebrief' }])
   })
 
-  it('refused before anything is written: another project, archived, in Done, the Assistant unable to act, no agent, too long', async () => {
+  // HI-3420: MR1's answer to the Assistant, sent just after its verdict merged MC-1568, never arrived. A request is a
+  // message: on a card in Done it is the agent's comment and reaches the Assistant naming the card, and marks nothing.
+  // (A moved attempt letting it through is attemptFence.test.ts'.)
+  it('on a card in Done (an agent answering about a card it just finished): given, naming the card, and the card waits on nothing', async () => {
+    const { w, card } = await open()
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'done' }, user))
+    const text = 'Verdict given: it passed. I waited for the e2e run to finish first.'
+    const r = await ask(w, card, text)
+    expect(r).toMatchObject({ waiting: false })
+    expect(r.id).not.toBe('')
+    const c = await read(w, card)
+    expect(c.column).toBe('done')
+    expect(c.waitingFor).toBeUndefined()
+    expect(c.comments.at(-1)).toMatchObject({ by: 'B1 (alpha)', text })
+    expect(asked(w).map((x) => x.body)).toEqual([askLine({ key: c.key ?? `#${card}`, askerName: 'B1 (alpha)', text, waiting: false })])
+    expect((await deliveries.readInbox(w.assistantHome, 'assistant')).items).toMatchObject([{ from: 'B1 (alpha)', card, kind: 'rebrief' }])
+  })
+
+  it('refused before anything is written: another project, archived, the Assistant unable to act, no agent, too long', async () => {
     const { w, card } = await open()
     const before = await read(w, card)
     const nothingWritten = async () => {
@@ -111,11 +129,7 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     // Past a comment's limit: refused, never cut.
     await expect(ask(w, card, 'x'.repeat(20_001))).rejects.toThrow(/too long/)
     await nothingWritten()
-    // In Done, and archived.
-    await inWorkspace(w, () => tasks.updateTask(card, { column: 'done' }, user))
-    const done = await read(w, card)
-    await expect(ask(w, card, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && /is in Done/.test(e.message) && /More work on it that the user asked for: move it back with cw_update_task \(column: doing\)\. Separate follow-up work goes on a new card/.test(e.message))
-    expect((await read(w, card)).comments).toEqual(done.comments)
+    // Archived.
     const second = (await inWorkspace(w, () => tasks.createTask({ title: 'Old', project: 'alpha' }, user))).number
     await inWorkspace(w, () => tasks.archiveTask(second, true))
     await expect(ask(w, second, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && /is archived/.test(e.message))

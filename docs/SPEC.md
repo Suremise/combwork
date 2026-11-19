@@ -6212,8 +6212,8 @@ Settings → Assistant → Control lets it change cards, checked at each offer a
 ends unread, says so on the card and in a notice ("… couldn't be told of your answer"). **An agent asking the
 Assistant (HI-1866; on 27 Oct HB6 asked it in a comment to park HI-1865 and move HI-1759 to Done on the user's answer,
 and a comment reaches no inbox: it sat an hour unseen):** `cw_ask_assistant` (`POST /v1/tasks/{card}/ask-assistant`,
-`text`), a project agent's only (the Assistant and scripts are refused, 403), on a card of its project not archived or
-in Done (another project's is unknown to it), for what only the Assistant or the user may do on it (park a card On
+`text`), a project agent's only (the Assistant and scripts are refused, 403), on a card of its project not archived
+(another project's is unknown to it; in Done too, HI-3420: an agent answering about a card it just finished), for what only the Assistant or the user may do on it (park a card On
 Hold, move one past its rules on the user's recorded answer, unblock, reassign). It moves nothing and counts no round:
 the text is the agent's comment (at most a comment's 20,000 characters, refused rather than cut) with a history line
 ("Asked the Assistant: …"), and a message (`rebrief`, which the Assistant acks once it has dealt with it; a `control`
@@ -6297,8 +6297,8 @@ moved on.
   it makes (its own accepted write moves what its next write expects): a later read or receipt never lets an older request
   through. The agent passes nothing: no new arguments, no reads.
 - **The check**, in every write of a project agent's own call on a card, in that write's transaction before it decides
-  anything (intents, `cw_update_task` changes and comments, a batch's cards, files attached to it (with a change or alone, HI-3244), an Assistant request on the card and the
-  waiting mark it sets, declaring paths, a kind, review skip or target),
+  anything (intents, `cw_update_task` changes and comments, a batch's cards, files attached to it (with a change or alone, HI-3244), the
+  waiting mark an Assistant request sets, declaring paths, a kind, review skip or target),
   against the card's attempt before the write: the launch replaced → **`attempt.staleLaunch`**; a binding that isn't the
   card's attempt → **`attempt.moved`** (read it again), in every stage, Todo and Done included. The launch is checked
   again as the board change commits, after its last await (the card's save, an attachment's publish): one replaced
@@ -6317,6 +6317,12 @@ moved on.
   Combwork's own Done, which ended the attempt, landed between the report's reads and its write, as it does when that
   Done came first.
   Reordering a column is fenced by nothing more than before (the order is the board's, not an attempt's).
+- **A message isn't a change of the card** (HI-3420; on 19 Nov MR1 gave its verdict on MC-1568, which merged it, then
+  answered the Assistant's question with `cw_ask_assistant`, refused `attempt.moved`, and the answer reached the Assistant
+  only through MR1's transcript): an agent's Assistant request (`cw_ask_assistant`) is given whatever the card's attempt,
+  as the agent's comment and the Assistant's message naming the card. Only its launch is fenced (`attempt.staleLaunch`);
+  with its binding not the card's attempt it marks the card waiting for nothing and binds the launch to nothing, so the
+  agent's next change of the card is still refused `attempt.moved`.
 - **Never fenced**: the user, the Assistant, scripts on the workspace token and Combwork itself, its writes that an
   agent's call set off and that outlive it included (a reconciliation its move scheduled, a candidate's checks: the call's
   fence is checked in its own writes only, HI-3322). A card with no workflow
@@ -9418,7 +9424,9 @@ a returned card gets its own slot and a fresh conversation) is put to the user a
   asked. For an agent that **only reviews** running lanes, `cw_lane next` answers as a reviewer: the first card of its
   lanes waiting in Review, or that none waits; never a card to start. Once its lane has ended, it says "all its cards
   are Done" only when the lane's kept snapshot says so; ended with cards open (the user's End), it names them; with
-  nothing kept, it claims nothing. **A card submitted ahead of its lane** (#1410: started by the user's own drag, or before the lane listed it)
+  nothing kept, it claims nothing. That answer, and an abandoned lane's, is a reply, not an error (HI-3420: it was a `404`,
+  counted as a failed tool call; `GET /v1/lanes/next` gives `{ lane: null, next: null, waits: null, ended: { lane, text } }`);
+  an agent with no lane lately still gets the `404`. **A card submitted ahead of its lane** (#1410: started by the user's own drag, or before the lane listed it)
   goes before the earlier cards of the lane nobody has started (Todo), in the submission's own write (`LaneChanged`):
   its reviewer's wake says so and names the card the lane goes on to, and the submit's reply says it moved. Not while
   an earlier card is in flight unreviewed (Doing or Review: the lane waits on that one as it is), while a list change is
