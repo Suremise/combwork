@@ -247,6 +247,20 @@ export async function checkLanePool(ws: WorkspaceService, projectPath: string, b
   if (!pool.some((a) => a.id !== builderId)) throw combworkError(M.poolEmpty, { project }, { kind: 'invalid' })
 }
 
+/**
+ * HI-3424: a lane the Assistant or a script starts naming neither a reviewer nor `pool`, in a project whose rules review by
+ * a pool (a lane with no reviewer there is never reviewed: nobody joins a pool project's lane): a new one is the pool's,
+ * or refused as `checkLanePool` refuses it (`refusal`). Null where the rules have no pool (or are off): no reviewer, as before.
+ */
+export async function poolUnlessNamed(ws: WorkspaceService, projectPath: string, builderId: string): Promise<{ refusal: Error | null } | null> {
+  const cfg = await ws.projectConfig(projectPath)
+  const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
+  const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
+  if (!poolOf(cfg, options)) return null
+  const refusal = await checkLanePool(ws, projectPath, builderId).then(() => null, (e: unknown) => (e instanceof Error ? e : new Error(String(e))))
+  return { refusal }
+}
+
 /** What Start Lane… offers for a project (#1443): Pool in its reviewer list, with the pool's agents, where the rules have one. */
 export async function laneStartInfo(ws: WorkspaceService, projectPath: string): Promise<LaneStartInfo> {
   const cfg = await ws.projectConfig(projectPath)

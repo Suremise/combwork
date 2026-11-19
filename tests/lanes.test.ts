@@ -581,6 +581,31 @@ describe('the lanes service', () => {
     await lanes.endLane(w, named.lane.id, { abandoned: true })
   })
 
+  it('HI-3424: a new lane naming no reviewer in a pool project is the pool\'s (or refused); a running lane, or one naming a reviewer, keeps what it has', async () => {
+    const [c1, c2, c3] = [await make('D1'), await make('D2'), await make('D3')]
+    const byDefault = { poolUnlessNamed: { refusal: null } }
+    // Refused where nobody but the builder reviews: nothing recorded.
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number], by: 'the Assistant', poolUnlessNamed: { refusal: new Error('the pool has nobody') } })).rejects.toThrow('the pool has nobody')
+    expect((await lanes.rawLanes(w)).filter((l) => l.builder.id === 'b2' && l.state === 'active')).toEqual([])
+    // A new lane, reviewer left out or null: the pool's, its line saying so.
+    const started = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: null, cards: [c1.number, c2.number], by: 'the Assistant', ...byDefault })
+    expect([started.did, started.lane.pool, started.lane.reviewer]).toEqual(['started', true, null])
+    expect(laneLine(started.lane)).toContain('B2 / the reviewer pool (alpha)')
+    // Its running lane's start keeps the pool, the refusal not asked again.
+    const again = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number, c2.number, c3.number], by: 'the Assistant', poolUnlessNamed: { refusal: new Error('not asked') } })
+    expect([again.did, again.lane.id, again.lane.pool]).toEqual(['updated', started.lane.id, true])
+    await lanes.endLane(w, started.lane.id, { abandoned: true })
+    // A running lane with a reviewer of its own isn't moved to the pool.
+    const own = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'the Assistant' })
+    const kept = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number, c2.number], by: 'the Assistant', ...byDefault })
+    expect([kept.did, kept.lane.id, kept.lane.pool, kept.lane.reviewer?.id]).toEqual(['updated', own.lane.id, undefined, 'r1'])
+    await lanes.endLane(w, own.lane.id, { abandoned: true })
+    // A new lane naming a reviewer is that reviewer's.
+    const named = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'the Assistant', ...byDefault })
+    expect([named.did, named.lane.pool, named.lane.reviewer?.id]).toEqual(['started', undefined, 'r1'])
+    await lanes.endLane(w, named.lane.id, { abandoned: true })
+  })
+
   it("a builder's next loop, its last lane's cards passed but not merged: that lane ends (not abandoned), whoever registers first", async () => {
     // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
     await rulesOff()

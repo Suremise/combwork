@@ -194,8 +194,10 @@ const commitIn = (dir, files, message, trailer) => {
     const viaApi = await lanesApi({ project: 'alpha', builder: b2.name, pool: true, cards: [b, e] })
     const l2 = viaApi.body?.lane
     check("…with pool: true, B2's lane is the pool's and B2 alone starts, in its slot (HI-1581)", viaApi.status === 200 && l2?.pool === true && l2?.reviewer === null && new RegExp(`Started ${b2.name} with the lane's brief, in slot-`).test(viaApi.body?.note ?? '') && !!(await until(() => live(alpha, b2.id), HUNG_MS)), JSON.stringify(viaApi))
-    const l3 = (await inv('lanes:start', alpha, { builder: e1.id, reviewer: null, pool: true, cards: [d] })).lane
-    check("B2's and E1's lanes start on the pool", l2.pool === true && l3.pool === true, JSON.stringify([l2, l3]))
+    // E1's through the API naming neither a reviewer nor pool (HI-3424: the Assistant's lane had no reviewer): the pool's.
+    const viaDefault = await lanesApi({ project: 'alpha', builder: e1.name, cards: [d] })
+    const l3 = viaDefault.body?.lane
+    check("B2's and E1's lanes start on the pool, E1's naming neither (HI-3424)", viaDefault.status === 200 && l2.pool === true && l3?.pool === true && l3?.reviewer === null, JSON.stringify([l2, viaDefault]))
     const panel = page.locator('.progress-panel')
     await page.locator('.progress-rail').click().catch(() => undefined)
     const row = panel.locator(`.progress-lane[data-lane="${l1.id}"]`)

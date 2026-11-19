@@ -127,7 +127,7 @@ vi.mock('../src/main/workflow/service', () => ({ workflowEnforced: () => state.e
 vi.mock('../src/main/workflow/cardWork', () => ({ openCardsNoCode: (_ws: unknown, ns: number[]) => ns.length > 0 && ns.every((n) => state.noCode.includes(n)) }))
 vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: state.options }) }))
 
-const { briefAfterFailedPrepare, checkLanePool, launchFresh, launchRecordedLane, laneStartInfo, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
+const { briefAfterFailedPrepare, checkLanePool, launchFresh, launchRecordedLane, laneStartInfo, poolUnlessNamed, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
 const { allOff } = await import('../src/shared/workflow/options')
 
 const ws = {
@@ -223,6 +223,17 @@ describe('Start Lane… with the reviewer pool (#1443)', () => {
     expect(state.calls).toEqual(['start b1'])
     expect(state.briefs[0]).toContain('reviewed by the pool (R1 and R2)')
     expect(recordedLaneNote(l)).toBe("Started B1 with the lane's brief.")
+  })
+
+  it('HI-3424: a lane naming no reviewer takes the pool where the rules review by one, refused as a pool lane is where nobody else reviews; none elsewhere', async () => {
+    expect(await poolUnlessNamed(ws, 'D:\\ws\\alpha', 'b1')).toBeNull()
+    state.enforced = true
+    state.options = { ...allOff('git'), review: 'agent', noSelfReview: true }
+    expect(await poolUnlessNamed(ws, 'D:\\ws\\alpha', 'b1')).toBeNull()
+    pool()
+    expect(await poolUnlessNamed(ws, 'D:\\ws\\alpha', 'b1')).toEqual({ refusal: null })
+    const lonely = { ...(ws as object), projectConfig: async () => ({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'e1', name: 'E1', workflowRole: 'either' }] }) } as never
+    expect((await poolUnlessNamed(lonely, 'D:\\ws\\alpha', 'e1'))?.refusal?.message).toMatch(/pool has nobody/)
   })
 })
 
