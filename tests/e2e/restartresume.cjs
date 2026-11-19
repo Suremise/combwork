@@ -148,8 +148,10 @@ async function promptWorking(c, a, text) {
     const t = await c.inv('transcript:read', alpha, live.sessionId).catch(() => null)
     return (t?.items ?? []).some((x) => x.kind === 'user' && (x.text ?? '').includes(text))
   }
-  // Idle (lib.agentIdle): after its note's turn a fake is `finished`, not `ready`.
-  if (!(await lib.agentIdle(c.inv, a.id, HUNG_MS))) console.log(`INFO ${a.name ?? a.id} not idle within the step's bound: typed anyway`)
+  // Quiet (lib.agentQuiet): idle (after its note's turn a fake is `finished`, not `ready`), and nothing of Combwork's to
+  // type into it next: a just-started Watcher takes an inbox line it had (the install's) as a turn of its own.
+  const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
+  if (!(await lib.until(async () => lib.agentQuiet(PORT, 'alpha', await s(), token), HUNG_MS, 250))) console.log(`INFO ${a.name ?? a.id} not quiet within the step's bound: typed anyway`)
   return lib.sendPrompt(c.inv, lib.ptyKey(alpha, a.id), text, { submitted: taken })
 }
 /** A notice's text in whichever window shows it (a notice goes to one window of several), and that window. */
