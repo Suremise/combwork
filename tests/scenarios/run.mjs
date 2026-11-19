@@ -53,7 +53,7 @@ import { consumerHooks, waitForTestHome } from '../e2e/testHomeLock.mjs'
 import { freshenHome, freshenedLine, HomeNotReady } from '../e2e/testHomes.mjs'
 import { autoClean } from '../e2e/clean.mjs'
 import { scenariosProgress, slotWaitProgress } from '../progressReport.mts'
-import { endRunTemp, startRunTemp } from '../runTemp.mts'
+import { endRunTemp, msysTempKept, startRunTemp } from '../runTemp.mts'
 
 const require = createRequire(import.meta.url)
 // What may be deleted (#253): never what a card that isn't Done cites, nothing earlier while the board can't be read.
@@ -70,6 +70,11 @@ if (!evidence.ok) {
 // left, as the evidence rules allow. Before lib.cjs loads: Playwright, which the harness runs in this process, takes
 // the temp folder for its playwright-artifacts-* folders as it loads.
 startRunTemp(spare)
+// Git Bash's /tmp kept at the user's temp folder before any scenario can start Git Bash (HI-3447); without it, nothing runs.
+await msysTempKept().catch((e) => {
+  console.error(e.message)
+  process.exit(2)
+})
 process.on('exit', () => {
   const failed = endRunTemp()
   if (failed) console.warn(`The run's temp folder was left behind (the next run's start removes it after a day): ${failed}`)

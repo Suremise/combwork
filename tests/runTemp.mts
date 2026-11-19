@@ -14,6 +14,9 @@ import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, statSync } f
 import { createRequire } from 'module'
 import { tmpdir } from 'os'
 import { basename, dirname, join } from 'path'
+import { keepMsysTemp } from './msysTemp.mts'
+
+export { msysTempKept } from './msysTemp.mts'
 
 /** The test area's temp folder, combwork-test\tmp: the runs' folders are in it. */
 export const tempArea = join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'tmp')
@@ -40,6 +43,11 @@ export function startRunTemp(protects?: Protects): string {
     createRequire(import.meta.url)('./testArea.cjs').assertReady()
     mkdirSync(tempArea, { recursive: true })
     if (protects) pruneRunTemps(protects)
+    // HI-3447: Git Bash's /tmp is the session's, made from the first MSYS process's temp folder: kept at the user's
+    // before this run's becomes the temp folder of all it starts (msysTemp.mts; the runners await msysTempKept).
+    // Never a folder of the test area's (one a run would remove).
+    const userTemp = process.env.TMP || process.env.TEMP
+    keepMsysTemp(userTemp && !userTemp.toLowerCase().startsWith(tempArea.toLowerCase()) ? userTemp : undefined)
     process.env.CW_TEST_RUN_TMP = realpathSync.native(mkdtempSync(join(tempArea, `run-${process.pid}-`)))
     process.env.CW_TEST_RUN_TMP_OWNER = String(process.pid)
   }
