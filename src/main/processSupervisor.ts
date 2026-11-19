@@ -287,8 +287,11 @@ public static class CombworkJobs {
       if (!jobs.TryGetValue(id, out job)) return false;
       // PROCESS_TERMINATE | PROCESS_SET_QUOTA | PROCESS_QUERY_LIMITED_INFORMATION
       IntPtr c = OpenProcess(0x0001 | 0x0100 | 0x1000, false, pid);
-      // ERROR_INVALID_PARAMETER: no such process (gone). Anything else (access denied): it may be one, unchecked.
-      if (c == IntPtr.Zero) { if (Marshal.GetLastWin32Error() != 87) uncertain++; return false; }
+      // ERROR_INVALID_PARAMETER: no such process (gone). Anything else (access denied): it may be one, unless the system's
+      // list of processes says it is no child of this parent (HI-3427: Windows reuses a dead parent's id, and csrss,
+      // wininit and winlogon all name a dead smss instance as theirs; a job's process given that id made every sweep
+      // unsure, so its keeper never wrote "live").
+      if (c == IntPtr.Zero) { if (Marshal.GetLastWin32Error() != 87 && !NotItsChild(pid, parent, at)) uncertain++; return false; }
       bool keep = false;
       try {
         bool inJob, inAny; uint code; long cc, pc, x, k, u;
@@ -335,6 +338,45 @@ public static class CombworkJobs {
       if (!GetProcessTimes(p, out created, out x, out k, out u)) { sure = false; return false; }
       return created <= at;
     } finally { CloseHandle(p); }
+  }
+  [DllImport("ntdll.dll")] static extern int NtQuerySystemInformation(int cls, IntPtr info, int len, out int ret);
+  /**
+   * When a process was created, from the system's list of processes (SystemProcessInformation), which needs no handle of
+   * it: a process this user may not open (a system process) still has one. 0 when no process has that id now, -1 when
+   * the list couldn't be read.
+   */
+  static long CreatedFromList(int pid) {
+    // SYSTEM_PROCESS_INFORMATION: CreateTime at 32; UniqueProcessId after ImageName (a UNICODE_STRING at 56) and BasePriority.
+    int idAt = 56 + (IntPtr.Size == 8 ? 16 + 8 : 8 + 4);
+    for (int size = 1 << 20; size <= 1 << 26; size *= 2) {
+      IntPtr buf = Marshal.AllocHGlobal(size);
+      try {
+        int ret;
+        int status = NtQuerySystemInformation(5, buf, size, out ret);
+        // STATUS_INFO_LENGTH_MISMATCH: a bigger buffer.
+        if (status == unchecked((int)0xC0000004)) continue;
+        if (status != 0) return -1;
+        for (int at = 0; ; ) {
+          IntPtr e = buf + at;
+          if ((int)Marshal.ReadIntPtr(e, idAt).ToInt64() == pid) return Marshal.ReadInt64(e, 32);
+          int next = Marshal.ReadInt32(e, 0);
+          if (next == 0) return 0;
+          at += next;
+        }
+      } finally { Marshal.FreeHGlobal(buf); }
+    }
+    return -1;
+  }
+  /**
+   * Whether an escaped child the sweep couldn't open is surely no child of parent's (Take): gone, created after the
+   * snapshot (another process by its id), or created before parent (a dead parent's id that parent was given since).
+   */
+  static bool NotItsChild(int pid, int parent, long at) {
+    long cc = CreatedFromList(pid);
+    if (cc < 0) return false;
+    if (cc == 0 || cc > at) return true;
+    long pc;
+    return Started(parent, at, out pc) && pc > cc;
   }
   /**
    * Holds a process the port says joined job id, if it is in that job: a notification read late may carry an id that

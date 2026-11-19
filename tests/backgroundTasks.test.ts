@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { claudeBackgroundTasks } from '../src/main/providers/claude/background'
 import { codexBackgroundMemo, codexBackgroundTasks } from '../src/main/providers/codex/background'
@@ -64,6 +66,24 @@ describe('Claude Code background tasks', () => {
 
   it("doesn't end a Monitor on one of its events", () => {
     expect(claudeBackgroundTasks(lines({ type: 'user', timestamp: '2026-10-01T04:00:00.000Z', message: { role: 'user', content: notification('bi9giyn5m', 'running') } }))).toEqual([])
+  })
+
+  // HI-3423: HB1's Monitors on HI-3357 (Claude Code 2.1.326), as its transcript wrote them, with a stream that ended and a
+  // script that failed from other sessions. An event has no status, and neither has the expiry: its text tells them apart.
+  it("a Monitor runs on through its events, and ends when it expires, its stream ends or its script fails", () => {
+    const recorded = readFileSync(join(__dirname, 'fixtures', 'advanced', 'monitor-claude-2.1.326.jsonl'), 'utf8')
+    const [armed, expired, rearmed, event, ended, failed] = recorded.split(/\r?\n/).filter(Boolean).map((l) => l + '\n')
+    const memo = {}
+    expect(claudeBackgroundTasks(armed, memo)).toEqual([{ kind: 'start', id: 'bncri2uo6', at: at('2026-11-19T10:06:41.719Z'), type: 'monitor', expiresAt: at('2026-11-19T10:36:41.719Z') }])
+    expect(claudeBackgroundTasks(expired, memo)).toEqual([{ kind: 'end', id: 'bncri2uo6', at: at('2026-11-19T10:36:41.641Z') }])
+    expect(claudeBackgroundTasks(rearmed, memo)).toEqual([{ kind: 'start', id: 'bmrnz1tfk', at: at('2026-11-19T10:37:10.651Z'), type: 'monitor', expiresAt: at('2026-11-19T11:07:10.651Z') }])
+    // Its first event ("unit exit=1"): it still waited for the e2e run, so it isn't an end.
+    expect(claudeBackgroundTasks(event, memo)).toEqual([])
+    // The same event as delivered in the turn it started (a user message's text).
+    const delivered = JSON.parse(event).content as string
+    expect(claudeBackgroundTasks(lines({ type: 'user', timestamp: '2026-11-19T10:59:16.000Z', message: { role: 'user', content: [{ type: 'text', text: delivered }] } }), memo)).toEqual([])
+    expect(claudeBackgroundTasks(ended, memo)).toEqual([{ kind: 'end', id: 'bi9eba166', at: at('2026-11-19T05:39:22.107Z') }])
+    expect(claudeBackgroundTasks(failed, memo)).toEqual([{ kind: 'end', id: 'bvgoqbkk8', at: at('2026-11-11T06:06:19.109Z') }])
   })
 
   it('ignores ordinary lines', () => {

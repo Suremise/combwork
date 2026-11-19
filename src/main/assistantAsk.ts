@@ -29,6 +29,10 @@ import { WorkspaceService, workspaceFor } from './workspace'
  * unread (cancelled when Control is turned down, expired) tells the user on the card and in a notice, as an answer
  * relay's does (answerRelay.ts).
  *
+ * HI-3420: a message, not a change of the card: given whatever the card's attempt (an agent answering the Assistant about
+ * a card it just finished, which its own verdict merged), in Done too; only the asker's launch is fenced then
+ * (tasks.askAssistantOn), and the card isn't marked waiting.
+ *
  * HI-2915: asked by the card's own agent on its card in Doing, the card is marked waiting with that request's ref
  * (`waitingFor.ask`, tasks.askAssistantOn), so a builder waiting for the Assistant's answer isn't reported stalled. The mark
  * goes when the request ends: acked (the Assistant dealt with it), ended unread, or never given (clearAskWait, only while
@@ -86,7 +90,7 @@ export interface Asked {
 
 /**
  * An agent asks the Assistant on a card of its project: refused under the board's lock, before anything is written (an
- * AskRefused: the card archived or in Done, the Assistant unable to act now; another project's card is unknown to it).
+ * AskRefused: the card archived, the Assistant unable to act now; another project's card is unknown to it).
  * Once written, never throws for the delivery: one that can't be made tells the user instead.
  */
 export async function askAssistant(ws: WorkspaceService, n: number, actor: TaskActor & { kind: 'agent' }, text: string): Promise<Asked> {
@@ -105,8 +109,8 @@ export async function askAssistant(ws: WorkspaceService, n: number, actor: TaskA
 /** askAssistant's request written and given, its ref in `making` throughout. */
 async function asked(ws: WorkspaceService, n: number, actor: TaskActor & { kind: 'agent' }, self: { project: string; agentId: string }, text: string, ref: string): Promise<Asked> {
   const card = await askAssistantOn(n, text, actor, (c) => {
+    // HI-3420: a card in Done is asked on (an agent answering the Assistant about a card it just finished); an archived one isn't.
     if (c.archived) throw new AskRefused(409, `${cardName(c)} is archived: nothing more is asked on it.`) // i18n-ignore: agent-facing (a refusal of cw_ask_assistant)
-    if (c.column === 'done') throw new AskRefused(409, `${cardName(c)} is in Done: nothing more is asked on it. More work on it that the user asked for: move it back with cw_update_task (column: doing). Separate follow-up work goes on a new card (cw_create_task).`) // i18n-ignore: agent-facing (a refusal of cw_ask_assistant)
     if (!assistantCanAct(ws)) throw new AskRefused(409, say(REFUSED.cantAct))
   }, ws, ref)
   const waiting = card.waitingFor?.ask === ref

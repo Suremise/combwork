@@ -36,6 +36,8 @@ const run = <T>(fn: () => Promise<T> | T): Promise<T> => inWorkspace(w, async ()
 const screen = (name: string): string => readFileSync(join(__dirname, 'fixtures', `codex-${name}.txt`), 'utf8').replace(/\r\n/g, '\n')
 const HELD_WORKING = screen('0.161-held-working')
 const MENU = screen('0.161-permissions-readonly')
+/** Codex free, its input showing /permissions as typed (HI-3437: Enter waits for it). */
+const HELD_IDLE = screen('0.161-held-idle')
 /** Codex free, its input empty (the held screen with the input cleared). */
 const IDLE = screen('0.161-held-idle').replace('› /permissions\n', '› Ask Codex to do anything\n')
 if (IDLE === screen('0.161-held-idle')) throw new Error("the held-idle fixture's input line has changed")
@@ -83,7 +85,8 @@ describe("switching a running Codex agent's preset through its menu (#363)", () 
   it('switches when Codex is free: Ctrl+U, /permissions, Enter, then the preset picked from its menu', async () => {
     const a = agent(IDLE)
     pty.onWrite = (d) => {
-      if (d === '\r') a.view.text = MENU
+      if (d === '/permissions') a.view.text = HELD_IDLE
+      else if (d === '\r') a.view.text = MENU
     }
     expect(await a.switchTo('ask')).toEqual({ ok: true })
     expect(a.typed()).toEqual(['\x15', '/permissions', '\r', '1'])
@@ -144,7 +147,8 @@ describe("switching a running Codex agent's preset through its menu (#363)", () 
     config.settings.providers.codex.enableDangerousMode = true
     const a = agent(IDLE)
     pty.onWrite = (d) => {
-      if (d === '\r') a.view.text = MENU
+      if (d === '/permissions') a.view.text = HELD_IDLE
+      else if (d === '\r') a.view.text = MENU
       else if (/^\d$/.test(d)) a.view.text = WARNING
     }
     return a
@@ -208,7 +212,8 @@ describe("switching a running Codex agent's preset through its menu (#363)", () 
     const late = () => {
       const a = warned()
       pty.onWrite = (d) => {
-        if (d === '\r') a.view.text = MENU
+        if (d === '/permissions') a.view.text = HELD_IDLE
+        else if (d === '\r') a.view.text = MENU
         else if (/^\d$/.test(d)) setTimeout(() => (a.view.text = WARNING), 3000)
       }
       return a
@@ -262,7 +267,8 @@ describe("switching a running Codex agent's preset through its menu (#363)", () 
       vi.spyOn(sessions, 'effective').mockImplementation((async (_p: string, def?: { id: string }) => ({ permissionMode: want.get(def!.id) })) as never)
       pty.onWrite = (d, key) => {
         const a = list.find((x) => x.key === key)!
-        if (d === '\r') a.view.text = MENU
+        if (d === '/permissions') a.view.text = HELD_IDLE
+        else if (d === '\r') a.view.text = MENU
         else if (/^\d$/.test(d)) a.view.text = want.get(a.agentId) === 'full-access' ? WARNING : IDLE
       }
       return list

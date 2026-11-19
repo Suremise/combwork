@@ -7,19 +7,20 @@
 // Windows only where real processes run; tempDir() only.
 import { spawn, type ChildProcess } from 'child_process'
 import { randomBytes } from 'crypto'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { msysBinFor } from '../src/main/gitWorker'
 import { boundedOutput, endTreeAsync, findMsysMarked, msysMatches, MSYS_FIND_SCRIPT, RUN_MARK_VAR, treesToEnd, type ListedProcess } from '../src/main/processTree'
+import { markedNow, startSleeper } from './msysSleeper'
 import { tempDir } from './tempDir'
 import { timing } from './timing.cjs'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 type Ids = { pid: number; started: number }[]
-const { identify, endExactly } = req('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Ids; endExactly: (targets: Ids) => number }
+const { identify, endExactly, stillSame } = req('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Ids; endExactly: (targets: Ids) => number; stillSame: (ids: Ids) => number[] }
 
 const isWin = process.platform === 'win32'
 const alive = (pid: number): boolean => {
@@ -39,11 +40,6 @@ afterEach(() => {
 
 const p = (pid: number, started: number, parent = 0): ListedProcess => ({ pid, parent, started })
 
-/**
- * Git Bash: `sleep 30` in the background, its winpid written to `$1` once it is sleep (until MSYS's exec, `$!` names the
- * forked sh.exe, another Windows process), then the shell exits, leaving the sleep's Windows parent gone.
- */
-const SLEEPER = 'sleep 30 & while :; do read -r e < /proc/$!/exename; case "$e" in */sleep*) break;; esac; done; read -r w < /proc/$!/winpid; echo "$w" > "$1"; exit 0'
 /** The `t` line for `ms` (Unix ms), as $EPOCHREALTIME prints it. */
 const at = (ms: number): string => `t ${Math.floor(ms / 1000)}.${String(ms % 1000).padStart(3, '0')}000`
 /** A search's output: its time taken before any read (`t`), its lines, `end`. */
@@ -212,25 +208,21 @@ describe.skipIf(!isWin)("Git's own sh finds exactly the marker's entry (HI-3047)
   const bin = isWin ? msysBinFor({ env: process.env }) : null
   it.skipIf(!bin)('exact: found; a longer value either side, the marker inside another variable, none: not; nothing but ids printed', async () => {
     const mark = randomBytes(16).toString('hex')
-    const dir = tempDir('msys-marked-')
     /**
      * A Git Bash shell that starts a background sleep, writes its winpid and exits (the sleep outlives it, its parent
-     * gone). Its winpid once it is sleep: until MSYS's exec, `$!` is the forked sh.exe, another Windows process.
+     * gone): tests/msysSleeper.ts. `vars`: added to its environment.
      */
-    const sleeper = async (name: string, vars: Record<string, string>): Promise<number> => {
-      const file = join(dir, name)
-      spawn(join(bin!, 'sh.exe'), ['-c', SLEEPER, 'sh', file.replace(/\\/g, '/')], { stdio: 'ignore', windowsHide: true, env: { ...baseEnv(), ...vars } })
-      await vi.waitFor(() => expect(existsSync(file) && /\d/.test(readFileSync(file, 'utf8'))).toBe(true), { timeout: timing('wait.hang') })
-      const pid = Number(readFileSync(file, 'utf8').trim())
+    const sleeper = async (vars: Record<string, string>): Promise<number> => {
+      const pid = await startSleeper({ bin: bin!, env: { ...baseEnv(), ...vars } })
       own(pid)
       return pid
     }
-    const exact = await sleeper('exact', { [RUN_MARK_VAR]: mark })
+    const exact = await sleeper({ [RUN_MARK_VAR]: mark })
     const others = [
-      await sleeper('suffix', { [RUN_MARK_VAR]: `${mark}0` }),
-      await sleeper('prefix', { [RUN_MARK_VAR]: `0${mark}` }),
-      await sleeper('embedded', { OTHER: `${RUN_MARK_VAR}=${mark}` }),
-      await sleeper('none', {})
+      await sleeper({ [RUN_MARK_VAR]: `${mark}0` }),
+      await sleeper({ [RUN_MARK_VAR]: `0${mark}` }),
+      await sleeper({ OTHER: `${RUN_MARK_VAR}=${mark}` }),
+      await sleeper({})
     ]
     const r = await findMsysMarked({ mark, bin: bin! })
     expect(r).toHaveProperty('out')
@@ -251,6 +243,72 @@ describe.skipIf(!isWin)("Git's own sh finds exactly the marker's entry (HI-3047)
     expect(out2.trim().split(/\r?\n/).at(-1)).toBe('end')
     expect(out2).not.toMatch(new RegExp(`^(x|m) ${msysPid}( |$)`, 'm'))
     expect(out2).toMatch(new RegExp(`^a ${msysPid} `, 'm'))
+  }, timing('test.hang'))
+
+  // HI-3421: under a full run's load MSYS refused the background sleep, and the shell looked for it in /proc forever,
+  // writing nothing: the test's wait ran out, no reason given, and the shell spun on. Now each try's shell exits, saying
+  // why, and the reasons are the error.
+  it.skipIf(!bin)("a sleeper whose sleep doesn't start: each try's shell exits, and the error says why", async () => {
+    const err = await startSleeper({ bin: bin!, env: baseEnv(), sleep: 'cw-no-such-sleep' }).catch((e: Error) => e)
+    expect(err).toBeInstanceOf(Error)
+    const tries = String((err as Error).message).split('\n').filter((l) => l.startsWith('try '))
+    expect(tries).toHaveLength(3)
+    for (const t of tries) expect(t).toMatch(/exited 1, winpids \[\], stderr: .*cw-no-such-sleep: command not found.*the background sleep \(\d+\) ended before it was seen as sleep/s)
+  }, timing('test.hang'))
+
+  // HI-3421 (HR1's rounds 1 and 2): a shell that doesn't exit within the wait is ended, and whatever carries its try's
+  // marker, before the starter throws: nothing of the try is left for a caller that never got a winpid, and nothing else is
+  // touched. Never by a pid read from the winpid file: one written there by then may name another process.
+  it.skipIf(!bin)("the starter's wait runs out at once: the shell ended, nothing of the try left; pids in its winpid file (another sleeper's, a native process's) left alone", async () => {
+    const control = await startSleeper({ bin: bin!, env: baseEnv() })
+    own(control)
+    const native = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true, env: baseEnv() })
+    const unrelated = native.pid!
+    own(unrelated)
+    let mark = ''
+    const err = await startSleeper({
+      bin: bin!,
+      env: baseEnv(),
+      waitExit: async (_check, t) => {
+        mark = t.mark
+        // As if the file named them: a stale winpid given out again since.
+        writeFileSync(t.file, `${control}
+${unrelated}
+`)
+        throw new Error('the wait ran out')
+      }
+    }).catch((e: Error) => e)
+    expect(err).toBeInstanceOf(Error)
+    const msg = (err as Error).message
+    expect(msg).toMatch(/^the wait ran out; the shell \(pid \d+\) was still running, ended \(exited [^)]+\), .*nothing carries its marker( now)?; stderr: /)
+    expect(alive(Number(/the shell \(pid (\d+)\)/.exec(msg)![1]))).toBe(false)
+    expect(await markedNow(mark, bin!)).toEqual([])
+    expect([alive(control), alive(unrelated)]).toEqual([true, true])
+  }, timing('test.hang'))
+
+  it.skipIf(!bin)("the starter's wait runs out before the winpid is written: everything carrying the try's marker ended, verified by a search that finds none", async () => {
+    let mark = ''
+    let found: Ids = []
+    const err = await startSleeper({
+      bin: bin!,
+      env: baseEnv(),
+      // timeout's exename isn't sleep: the shell looks on, never writing a winpid, while timeout and its sleep run.
+      sleep: 'timeout 60 sleep',
+      waitExit: async (_check, t) => {
+        mark = t.mark
+        await vi.waitFor(async () => {
+          const now = await markedNow(t.mark, bin!)
+          expect(Array.isArray(now) ? now.length : now).toBeGreaterThanOrEqual(2)
+          found = (now as Ids).map((m) => ({ pid: m.pid, started: m.started }))
+        }, { timeout: timing('wait.hang') })
+        throw new Error('the wait ran out')
+      }
+    }).catch((e: Error) => e)
+    expect(err).toBeInstanceOf(Error)
+    const msg = (err as Error).message
+    expect(msg).toMatch(/the shell \(pid \d+\) was still running, ended \(exited [^)]+\), ended what carried its marker: winpids [\d ]+, .*nothing carries its marker now; stderr: /)
+    expect(await markedNow(mark, bin!)).toEqual([])
+    expect(stillSame(found)).toEqual([])
   }, timing('test.hang'))
 })
 

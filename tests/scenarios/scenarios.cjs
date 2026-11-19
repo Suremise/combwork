@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 140
+const FIXTURES_VERSION = 141
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -4346,23 +4346,31 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'card-loop-follow-up-check',
-    title: "A card loop reviewer told of a follow-up to check, on a card in Review (#1467): it answers with cw_loop_step naming it, not a verdict",
-    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
-    // and starts it with its line, as review-card's (HI-2046).
-    startedByCombwork: true,
+    title: "A card loop reviewer told of a follow-up to check, on a card that passed (#1467): it answers with cw_loop_step naming it, not a verdict",
+    // HI-3419: a follow-up for a check is a passed card's alone (in Review it is refused, its verdict still due), so the card
+    // passes before it. Nobody reviews while it does (both builders, so no free reviewer is given it: HI-2664), so Combwork
+    // starts nobody; the harness starts Coder, and the follow-up's wake rings first (read before the prompt, as #1613's).
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
-      await pairInProject(c)
+      // Merges reported by the builder, not checked: a pass waits in Passed (pairInProject's committed finish has no Passed).
+      await pairInProject(c, { finish: 'notChecked' })
+      await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'builder' })
+      await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
-      await swapRoles(c)
-      // Implementer's round 1 sent for review, then its lane (the subject, Coder, reviewing), then its follow-up, with its
-      // own token. The moves come before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
-      // builderLane stops it (HI-2029), racing the move to Doing.
+      // Implementer's round 1, passed (the user's pass: no reviewer session gives one in a setup), then its lane (the
+      // subject, Coder, reviewing), then its follow-up, with its own token. The moves come before the lane (HI-2270): over a
+      // card in Todo, Combwork starts it on Implementer itself once builderLane stops it (HI-2029).
       await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
       c.git('add', '-A')
       c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet says Hi')
       await userMove(c, n, 'review')
+      for (const [route, body] of [['start-review'], ['verdict', { pass: true, comment: 'Round 1: PASSED. greet.js says Hi.' }]]) {
+        const r = await c.api('POST', `/v1/tasks/%23${n}/${route}`, body)
+        if (r.status !== 200) throw new Error(`setup: the user's ${route}: ${JSON.stringify(r.body)}`)
+      }
+      if ((await c.api('GET', `/v1/tasks/${n}`)).body?.column !== 'passed') throw new Error('setup: the passed card is not in Passed')
+      await swapRoles(c)
       await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name.trim()\n")
       c.git('add', '-A')
@@ -4372,22 +4380,65 @@ module.exports.SCENARIOS = [
       if (posted.status !== 200) throw new Error(`follow-up: ${JSON.stringify(posted.body)}`)
       c.followUp = posted.body.data.design
     },
-    // HI-3408: Combwork-started (HI-2664), so it has no prompt of its own to give at launch (HI-2225's promptAtLaunch, which
-    // this had, did nothing since): Combwork's line is its first input, and the follow-up's wake (left above) rings as that
-    // line's turn ends. A model takes both as Combwork types them; a fake is typed its steps once both turns are over and
-    // Combwork is quiet (harness.cjs), so its watch has seen the follow-up already and its answer comes in the same turn.
-    prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). On card #${c.cards.f}, in Review, the user asked for a change for you to check, and Implementer has posted it as a follow-up: check it and answer as your loop says.`,
+    beforePrompt: (c) => wakeRead(c, 'f'),
+    prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). Card #${c.cards.f} passed review; the user then asked for a change for you to check, and Implementer has posted it as a follow-up: check it and answer as your loop says.`,
     fake: (c) =>
       `skill card-loop then cw cw_read_task {"number":${c.cards.f},"latestComment":true} then cw cw_wait_for_tasks {"cards":[${c.cards.f}],"changes":["comment","column"],"wake":true} then cw cw_loop_step ${JSON.stringify({ card: `#${c.cards.f}`, step: 'gaps', text: '1. Add a test for the trimmed name.', design: c.followUp })}`,
     expect: (o, c) => {
       const tools = o.combworkCalls.map((x) => x.tool)
       const answers = ran(o, 'cw_loop_step').filter((x) => ['ok', 'gaps'].includes(argsOf(x).step))
+      // After the follow-up (the setup's pass is the user's, before it).
+      const posted = factsOf(o, 'f', 'LoopStep').find((f) => f.data.design === c.followUp)
+      const mine = (f) => !posted || f.seq > posted.seq
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['answered the follow-up with cw_loop_step (ok or gaps)', answers.length > 0, tools.join(',')],
         ['named the follow-up it was shown', answers.some((x) => argsOf(x).design === c.followUp) && factsOf(o, 'f', 'LoopStep').some((f) => ['ok', 'gaps'].includes(f.data.step) && f.data.design === c.followUp), JSON.stringify(answers.map((x) => argsOf(x)))],
-        ['gave no verdict (a follow-up check is not a review)', !factsOf(o, 'f', 'Verdict').length, (o.facts?.f ?? []).map((f) => f.kind).join(',')],
-        ['the card stays in Review', o.cards.f?.column === 'review', o.cards.f?.column]
+        ['gave no verdict and started no review (a follow-up check is not a review)', !factsOf(o, 'f', 'Verdict').some(mine) && !factsOf(o, 'f', 'ReviewStarted').some(mine), (o.facts?.f ?? []).map((f) => f.kind).join(',')],
+        ['the card stays in Passed', o.cards.f?.column === 'passed', o.cards.f?.column]
+      ]
+    }
+  },
+  {
+    id: 'card-loop-follow-up-review-again',
+    title: "A card loop reviewer whose card's line moved while it reviewed (HI-3419, MC-1568): its builder submits the commit as a follow-up, and the reviewer reviews that and gives its verdict, with no loop step",
+    // HI-2664: Coder reviews, so it is the project's free reviewer: Combwork gives it the card and starts it with its line.
+    // Then the lane, and Implementer's follow-up submission (its own token), whose wake ("follow-up submitted for review …
+    // Start your review again") is what MC-1568's reviewer needed to act on.
+    startedByCombwork: true,
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      await pairInProject(c)
+      const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>", the name trimmed.', agent: 'implementer' })
+      await swapRoles(c)
+      await userMove(c, n, 'doing')
+      c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet says Hi')
+      await userMove(c, n, 'review')
+      await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
+      c.write('greet.js', "module.exports = (name) => 'Hi, ' + name.trim()\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet trims the name')
+      c.commit = c.git('rev-parse', 'HEAD').trim()
+      await c.startAgent('implementer')
+      const sent = await c.as('implementer', 'POST', `/v1/tasks/%23${n}/submit`, { summary: `Follow-up: greet.js trims the name, at ${c.commit.slice(0, 7)}, as the reviewer asked.`, followUp: true })
+      if (sent.status !== 200) throw new Error(`follow-up: ${JSON.stringify(sent.body)}`)
+    },
+    // Combwork-started (HI-3408): its line is a model's first input; a fake is typed these steps once Combwork is quiet.
+    prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). You were reviewing card #${c.cards.f}; its line moved on with a commit you asked for (greet.js trims the name), and Implementer has submitted it as a follow-up. Carry on as your loop says.`,
+    fake: (c) =>
+      `skill card-loop then cw cw_start_review {"card":"#${c.cards.f}"} then cw cw_verdict {"card":"#${c.cards.f}","pass":true,"comment":"Round 1: PASSED. greet.js says Hi and trims the name."}`,
+    expect: (o, c) => {
+      const tools = o.combworkCalls.map((x) => x.tool)
+      const followUp = factsOf(o, 'f', 'Submitted').find((f) => f.data.followUp === true)
+      const mine = (f) => f.data.reviewer !== 'user'
+      const kinds = (o.facts?.f ?? []).map((f) => `${f.kind}${f.data?.submission ? `@${f.data.submission}` : ''}`).join(',')
+      return [
+        ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ['started its review of the follow-up (a ReviewStarted fact for that submission)', !!followUp && factsOf(o, 'f', 'ReviewStarted').some((f) => mine(f) && f.data.submission === followUp.seq), kinds],
+        ['gave its verdict on the follow-up', !!followUp && factsOf(o, 'f', 'Verdict').some((f) => mine(f) && f.data.submission === followUp.seq && f.data.revision === c.commit), kinds],
+        ['answered no follow-up check (no loop step: a follow-up submitted is reviewed)', !factsOf(o, 'f', 'LoopStep').length && !ran(o, 'cw_loop_step').length, tools.join(',')]
       ]
     }
   },

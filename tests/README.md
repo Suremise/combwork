@@ -7,6 +7,13 @@ tests run git with no global config, as CI does), `cliHomes.ts` (each test file 
 Copilot homes, never the user's, whatever the shell sets: HI-1703), `loggerListeners.ts` (takes off the process
 listeners a test's fresh load of the logger added: HI-1728), and `electron-stub.ts` standing in for `electron`.
 
+**Which Node runs them** (HI-3435): CI runs the unit tests on the Node inside the Electron Combwork ships, not the
+latest Node 24, because the tests use `node:sqlite` directly, and the SQLite it bundles changes with Node's version.
+The runner's Node 24.22.3 had SQLite 3.54.1, which opens a WAL database whose -shm another process maps, where Electron
+44.10's 3.53.4 refuses it (HI-3426, the HI-2199/HI-2200 waits): CI then skipped the product's open-and-wait path.
+`scripts/installElectronCi.mjs --node` reads that version from the installed Electron, and CI fails if the Node running
+the tests doesn't match it (`--check-node`, which says on any machine whether the local Node matches).
+
 **The test area** is `%LOCALAPPDATA%\combwork-test` (`testArea.cjs`): the test profiles, the signed-in Claude Code and
 Codex test homes, the scenario baselines and results, the e2e lanes and logs, the Sandbox reports and the runs' temp
 folders. Before 1.1 it had the old name: `npm run test:move-area` (`moveTestArea.mjs`, HI-2590) moves it once, one way,
@@ -25,7 +32,12 @@ scanning setting covers the test area, and thousands of folders made and removed
 Vitest's own copies of the modules, Combwork's code under test and the programs tests start (git) put theirs there. The e2e
 and scenario runners do the same for their suites (HI-2102: Playwright's `playwright-artifacts-*`, the test copies of
 Combwork, the CLIs), and remove theirs as they exit (an e2e run with `--record` keeps it). Each run has its own folder
-there, `run-<pid>-<random>` (`runTemp.mts`), and a run's start removes those older than a day whose run has ended, as the board's evidence rules allow
+there, `run-<pid>-<random>` (`runTemp.mts`). Before a run makes it the temp folder, it starts a keeper, Git's `cat.exe`
+with the user's temp folder, which lives as long as the run (`msysTemp.mts`, HI-3447). If the keeper doesn't start, the run
+stops before it starts anything. Git Bash keeps one mount table per
+Windows session, and the first MSYS process sets its `/tmp` from its own temp folder. A run's hook or shell started as
+that first process fixed `/tmp` at the run's folder for every Git Bash on the PC until all of them ended, long after the
+run had removed the folder. A run's start also removes the run folders older than a day whose run has ended, as the board's evidence rules allow
 (`e2e/evidence.cjs`: nothing an open card cites, nothing while the board can't be read). A
 unit run's is removed once the run has ended (`tempRun.ts`, #995), with whatever Combwork's code wrote
 late; and every folder `tempDir()` makes is removed when its test file ends (`tempCleanup.ts`), after the file's own

@@ -316,6 +316,12 @@
   "settings.advanced.claude-code.memory.setting.title": {
     "placeholders": {}
   },
+  "settings.advanced.claude-code.monitor.expired.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.monitor.expired.title": {
+    "placeholders": {}
+  },
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": {
     "placeholders": {}
   },

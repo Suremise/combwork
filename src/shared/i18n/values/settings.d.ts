@@ -221,6 +221,8 @@ interface CombworkMessageValues {
   'settings.advanced.claude-code.memory.realPath.title': undefined
   'settings.advanced.claude-code.memory.setting.desc': undefined
   'settings.advanced.claude-code.memory.setting.title': undefined
+  'settings.advanced.claude-code.monitor.expired.desc': undefined
+  'settings.advanced.claude-code.monitor.expired.title': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.desc': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.title': undefined
   'settings.advanced.claude-code.outage.connectionError.desc': undefined

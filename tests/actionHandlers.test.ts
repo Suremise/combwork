@@ -34,6 +34,7 @@ const { ENFORCE } = await import('../src/main/workflow/service')
 const { runCardIntent } = await import('../src/main/cardIntents')
 const { allOff } = await import('../src/shared/workflow/options')
 const { readCondition } = await import('../src/shared/watch')
+const { coalescing } = await import('../src/main/coalesce')
 type WatchCondition = import('../src/shared/watch').WatchCondition
 advanced.load(join(base, 'profile'))
 loopWakes.initLoopWakes()
@@ -102,6 +103,16 @@ async function settled(): Promise<void> {
   await deliveries.offerAllForTests()
   await loopWakes.settled()
 }
+/**
+ * The workspace's lanes' look held, none still running (HI-3440): every lane write arms it on a 300 ms timer, so under
+ * load it runs at a moment the load picks (ending a lane, applying a queued list and telling the builder). A test whose
+ * premise is that it hasn't run holds it, and calls lanes.refresh where it wants one. Released by the returned function.
+ */
+async function holdLook(w: WS): Promise<() => void> {
+  const release = lanes.holdLanesLook(w)
+  await vi.waitFor(() => expect(coalescing(`lanes:${w.path!.toLowerCase()}`)).toBe(false), HANG)
+  return release
+}
 const typedUntil = async (st: { typed: unknown[] }, count: number) =>
   vi.waitFor(async () => {
     await deliveries.offerAllForTests()
@@ -135,30 +146,38 @@ describe('loop wakes from the facts (#1266)', () => {
   it('a move into Done by hand wakes its builder (Moved into Done, no verdict); its own move wakes no one', async () => {
     const { w, alpha } = await open()
     const st = fake(alpha)
-    const c = await inReview(w)
-    // A card after it, so the lane runs on once this one is Done (with its lane over, a Done card's step is dropped: HI-1687).
-    const next = await newCard(w)
-    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c, next], by: 'B1 (alpha)' })
-    await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' }))
-    // Its verdict (the reviewer's arrival wake was dropped: it started reviewing first).
-    await typedUntil(st, 1)
-    expect(st.typed.map((t) => t.agent)).toEqual(['b1'])
-    // The user merges it: Done, its builder told, though its watch counts verdicts (no verdict moved it there).
-    st.status.set('b1', 'ready')
-    await watches.registerWatch(w, alpha, 'b1', { cards: [c], changes: ['verdict'] })
-    await inWorkspace(w, () => tasks.updateTask(c, { column: 'done' }, user))
-    await typedUntil(st, 2)
-    expect(st.typed.at(-1)).toMatchObject({ agent: 'b1' })
-    // HI-1990: what comes next in its lane, in place of carrying on with the card (the next one is in Doing already).
-    expect(st.typed.at(-1)!.text).toMatch(new RegExp(`^\\[CW\\] #${c} is in Done.*Your lane's next card, #${next} \\("Work"\\), is under way: carry on with it`))
-    // Moved back by the user (its builder told) and on again by its own builder: its own change wakes it not.
-    st.status.set('b1', 'ready')
-    await inWorkspace(w, () => tasks.updateTask(c, { column: 'passed' }, user))
-    await typedUntil(st, 3)
-    st.status.set('b1', 'ready')
-    await inWorkspace(w, () => tasks.updateTask(c, { column: 'done' }, b1))
-    await settled()
-    expect(st.typed).toHaveLength(3)
+    // The look held (HI-3440): the list change below is queued behind c, and a look applying it once c is Done tells B1 so
+    // ("Your lane's card list changed"), a line of its own when B1 is idle then. When the load lets it run, it isn't the
+    // wakes this tests.
+    const release = await holdLook(w)
+    try {
+      const c = await inReview(w)
+      // A card after it, so the lane runs on once this one is Done (with its lane over, a Done card's step is dropped: HI-1687).
+      const next = await newCard(w)
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c, next], by: 'B1 (alpha)' })
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' }))
+      // Its verdict (the reviewer's arrival wake was dropped: it started reviewing first).
+      await typedUntil(st, 1)
+      expect(st.typed.map((t) => t.agent)).toEqual(['b1'])
+      // The user merges it: Done, its builder told, though its watch counts verdicts (no verdict moved it there).
+      st.status.set('b1', 'ready')
+      await watches.registerWatch(w, alpha, 'b1', { cards: [c], changes: ['verdict'] })
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'done' }, user))
+      await typedUntil(st, 2)
+      expect(st.typed.at(-1)).toMatchObject({ agent: 'b1' })
+      // HI-1990: what comes next in its lane, in place of carrying on with the card (the next one is in Doing already).
+      expect(st.typed.at(-1)!.text).toMatch(new RegExp(`^\\[CW\\] #${c} is in Done.*Your lane's next card, #${next} \\("Work"\\), is under way: carry on with it`))
+      // Moved back by the user (its builder told) and on again by its own builder: its own change wakes it not.
+      st.status.set('b1', 'ready')
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'passed' }, user))
+      await typedUntil(st, 3)
+      st.status.set('b1', 'ready')
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'done' }, b1))
+      await settled()
+      expect(st.typed).toHaveLength(3)
+    } finally {
+      release()
+    }
   })
 
   it('a move into Review is one wake, not two (no other path: tasks.ts tells nothing of its own)', async () => {
@@ -736,6 +755,9 @@ describe('notices (#1266, §16.11.4)', () => {
       const { w, ws, alpha } = await open({ agents })
       const st = fake(alpha, { b1: 'working', r1: 'working', b4: 'working', r4: 'working' })
       const db = () => store.workspaceDb(ws).reader
+      // The look held (HI-3440): the wrong lane has nothing of its own (its card is B1's), so a look ends it, which the
+      // first pass must not see before it abandons it; the second looks where it says. Released as the workspace closes.
+      const release = await holdLook(w)
       await notices.checkLanesNow(w)
       const since = Date.parse((db().prepare("SELECT value FROM board_meta WHERE key = 'lane_notices_since'").get() as { value: string }).value)
       await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(since), HANG)
@@ -775,6 +797,7 @@ describe('notices (#1266, §16.11.4)', () => {
       // Closed with its test (HI-1946): its failed card is back in Doing, its builder's, and a later test's stand-in
       // sessions don't run that builder, so the lane's next look would tell its card stalled in that test.
       await disposeWorkspaceService(w)
+      release()
     }
   })
 

@@ -351,7 +351,7 @@
   "shell.setup.host.proxy": "GitHub Enterprise Server 的 Copilot 代理：尚不支持",
   "shell.setup.host.repo": "仓库位于 {host}",
   "shell.setup.host.tokens": "Copilot 首先从 COPILOT_GITHUB_TOKEN 获取令牌。除非关闭“设置”→“高级”→“GitHub Copilot”→“不向 Copilot 传递 GH_TOKEN 和 GITHUB_TOKEN”，否则不会把 GH_TOKEN 和 GITHUB_TOKEN 传给 Copilot 智能体。Combwork 从不读取令牌。",
-  "shell.setup.host.unknown": "无法连接主机进行检查",
+  "shell.setup.host.unknown": "检查未及时响应",
   "shell.setup.host.unverified": "无法确认登录",
   "shell.setup.host.usedBy": "{projects, select, none {{workspace}} other {{workspace}：{projects}}}",
   "shell.setup.host.verified": "GitHub CLI 已在 {host} 上以 {account} 登录",

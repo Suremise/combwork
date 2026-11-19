@@ -44,10 +44,12 @@ const ALLOWED: Record<string, string[]> = {
   // npm run e2e -- --clear-dir: a folder the user names may be in the temp folder (one nothing here made).
   'e2e/evidence.cjs': ['function clearDir(target, { board = {}, temp = os.tmpdir(), testRoot = runContext.TEST_ROOT, homes = [runContext.CODEX_HOME, runContext.CLAUDE_TEST_HOME] } = {}) {']
 }
-const OWN = ['tempDir.ts', 'runTemp.mts', 'tempDir.test.ts']
+// msysTemp.mts: the run's Git Bash /tmp keeper, given the temp folder the run started with (HI-3447).
+const OWN = ['tempDir.ts', 'runTemp.mts', 'msysTemp.mts', 'tempDir.test.ts']
 // Files whose subject is the temp variables Combwork gives agents (HI-2496: Agents' temp folder): TEMP, TMP and TMPDIR are
 // the data they check, never where they put files (those come from tempDir() and lib.WORK).
-const DATA = ['agentTemp.test.ts', 'e2e/agenttemp.cjs']
+// msysTemp.test.ts: those a run gives MSYS processes, and the one a run is started with (HI-3447).
+const DATA = ['agentTemp.test.ts', 'e2e/agenttemp.cjs', 'msysTemp.test.ts']
 
 /** A file's text with its regular expression literals blanked (same length, lines kept); as it is when it doesn't parse. */
 function withoutRegexes(name: string, text: string): string {
@@ -295,11 +297,15 @@ describe("a stopped run's temp folder goes at a later run's start, and every run
     // The runners make theirs before they start anything, and remove it as they exit; their children get it (ALLOW).
     for (const runner of ['e2e/run.mjs', 'scenarios/run.mjs']) {
       const text = readFileSync(join(here, runner), 'utf8')
-      expect(text, runner).toMatch(/^import \{ endRunTemp, startRunTemp \} from '\.\.\/runTemp\.mts'$/m)
+      expect(text, runner).toMatch(/^import \{ endRunTemp, msysTempKept, startRunTemp \} from '\.\.\/runTemp\.mts'$/m)
       // With the board's rules, once the runner has found the board readable (it doesn't start otherwise).
       const start = text.search(/startRunTemp\((\(p\) => evidence\.protects\(p\)|spare)\)/)
       expect(start, runner).toBeGreaterThan(text.indexOf('if (!evidence.ok)'))
       expect(start, runner).toBeLessThan(text.search(/\bspawn(Sync)?\(|require\('\.\/harness\.cjs'\)/))
+      // HI-3447: Git Bash's /tmp keeper has started right after the run's folder is made, before the runner starts anything.
+      const kept = text.indexOf('await msysTempKept()')
+      expect(kept, runner).toBeGreaterThan(start)
+      expect(kept, runner).toBeLessThan(text.search(/\bspawn(Sync)?\(|require\('\.\/harness\.cjs'\)|require\('\.\.\/e2e\/lib\.cjs'\)/))
       expect(text, runner).toMatch(/process\.on\('exit'[^]*?endRunTemp\(\)/)
     }
     // Playwright takes the temp folder as it loads (its playwright-artifacts-* folders): the scenario harness runs it in

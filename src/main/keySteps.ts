@@ -24,7 +24,8 @@ export const RESENDS = 2
  * Types key steps into a CLI's terminal (#396). A plain step's keys go in as they are. A pick step reads the CLI's
  * screen as rendered, every 100 ms until it finds what it needs or `pickTimeoutMs` passes, and types what it chose
  * (Codex's /permissions menu: the number its menu shows beside a preset's label, which a Codex version can reorder).
- * Throws PickNotFound when it never finds it, after the steps before it have gone in.
+ * Throws PickNotFound when it never finds it, after the steps before it have gone in. A step with `shown` waits the
+ * same way for the screen to show what its keys act on, then types them (HI-3437).
  *
  * `ready` says whether the CLI is safe to type into now, waiting while it may become so (a task waits while the CLI is
  * busy): true, or why not, which stops the typing (KeysStopped, fail closed). It is asked before every write, and
@@ -57,6 +58,16 @@ export async function typeKeySteps(
         if (Date.now() - t0 >= (io.pickTimeoutMs ?? 4000)) throw new PickNotFound(step.what)
       }
       keys = found
+    } else if (step.shown) {
+      // Held until the screen shows what the keys act on (HI-3437), read as a pick is, and safe just before the write.
+      const shown = step.shown
+      for (const t0 = Date.now(); ; await sleep(100)) {
+        await safe()
+        const screen = io.screen()
+        if (screen !== null && shown(screen)) break
+        if (Date.now() - t0 >= (io.pickTimeoutMs ?? 4000)) throw new PickNotFound(step.what)
+      }
+      keys = step.keys
     } else {
       await safe()
       keys = step.keys

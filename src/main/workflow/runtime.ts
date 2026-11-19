@@ -2929,7 +2929,7 @@ export class Workflow {
   /**
    * A card loop's step (#1382, #1467): the builder's design posted for its reviewer's check (in Doing), or its going ahead
    * with it unchecked once the check is due (`proceed`), or a follow-up of its work ready for the reviewer's check (in
-   * Review or Passed: a change asked of it, such as a screenshot's; never gone ahead with unchecked), or the reviewer's
+   * Passed: a change asked of it, such as a screenshot's; never gone ahead with unchecked; in Review, `loop.followUpInReview`), or the reviewer's
    * answer (`ok`, `gaps`). A design or a follow-up is named (`<key>/s<seq>`); a design is due `waitMinutes` after its post
    * (Card loops → Design check wait, the caller's), kept in its fact: an answer or `proceed` names the step it is about,
    * and one for an earlier step is refused, so a late reply never settles a newer one. Moves nothing; wakes the other side: the builder's steps its reviewer (the lane's, else the
@@ -2968,9 +2968,11 @@ export class Workflow {
           // builder, an answer by its reviewer, never its builder.
           if (agent && (side === 'builder' ? agent !== builder : agent !== reviewer || agent === builder)) return { rule: 'loop.stepNotYours', values: { card: card.key, side } } as GuardRefusal
           if (step === 'design' || step === 'followUp') {
-            // A design before the work goes to review; a follow-up of work reviewed or under review.
+            // A design before the work goes to review; a follow-up of work that has passed it. In Review (HI-3419: MC-1568
+            // stalled so) the review still owes its verdict: a change then is a follow-up submission, reviewed again, or a reply.
             // (Queued counts as approved: its entry is taken out below, #1623; one the queue is merging now can't be.)
-            const here = step === 'design' ? now.stage === 'active' : now.stage === 'review' || now.stage === 'approved' || now.stage === 'merging'
+            if (step === 'followUp' && now.stage === 'review') return { rule: 'loop.followUpInReview', values: { card: card.key } } as GuardRefusal
+            const here = step === 'design' ? now.stage === 'active' : now.stage === 'approved' || now.stage === 'merging'
             if (!here) return { rule: 'loop.stepNotHere', values: { card: card.key, stage: now.stage, step } } as GuardRefusal
             if (step === 'followUp' && openEntry(now)?.state === 'started') return { rule: 'loop.followUpMerging', values: { card: card.key } } as GuardRefusal
             // A pool lane's design (HI-2310) needs no reviewer yet: the pool gives it to the next free one.

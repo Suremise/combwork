@@ -81,6 +81,8 @@
   "providers.copilot.host.proxy": "GitHub Enterprise ServerのCopilotプロキシはプレビュー版で、Combworkはまだサポートしていません。「バージョン管理」→「GitHub」でgithub.comまたはGHE.comのホストを選んでください。選ぶまで、そのCopilotエージェントは起動しません。",
   "providers.copilot.host.signInRuns": "**サインイン**はターミナルで`copilot login --host {host}`を実行します。ブラウザーで{host}が開き、Copilotを承認できます。Combworkが代わりにサインインすることはありません。",
   "providers.copilot.host.signedOut": "Copilotは{host}にサインインしていません。",
+  "providers.copilot.host.unknownCopilot": "{host}でのCopilotのサインインを確認できませんでした。Copilotが時間内に応答しませんでした。「再確認」を選んでください。",
+  "providers.copilot.host.unknownGh": "{host}でのCopilotのサインインを確認できませんでした。GitHub CLIが時間内に応答しませんでした。「再確認」を選んでください。",
   "providers.copilot.parens.message": "Copilotはパスに括弧を含むフォルダーでは編集を承認できないため、このエージェントは「確認する」と同じく、編集のたびに確認します。「編集を承認」を使うには、フォルダーの名前を変更してください。",
   "providers.copilot.parens.title": "Copilotは編集のたびに確認します",
   "providers.copilot.planNote": "Copilot FreeはAutoのみ使えます。モデルを選ぶには有料プランが必要です。",

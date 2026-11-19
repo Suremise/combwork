@@ -4,11 +4,12 @@
 // and a deletion; a refusing hook losing nothing; a stash told by its object, kept and named when git fails after making
 // it; the caller's guard, an operation under way, a busy folder; Files' Commit it committing .gitignore alone. Real git
 // in throwaway repositories.
-import { execFileSync, spawn } from 'child_process'
+import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { sleeperScript, startSleeper, winpidsIn } from './msysSleeper'
 import { tempDir } from './tempDir'
 import { timing, waitOptions } from './waits'
 import { commit, gitRepo, sh } from './workflow/harness'
@@ -543,9 +544,9 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const node = `"${fwd(process.execPath)}" -e 'require("fs").appendFileSync(process.argv[1], process.pid + "\\n"); setTimeout(() => {}, 30000)' "${fwd(pids)}"`
     return `#!/bin/sh\n${started ? `: > "${fwd(started)}"\n` : ''}${msys ? `( ${sleeper(pids)} )\n` : ''}${node} &\n${node}\n`
   }
-  /** Git Bash: a background `sleep 30`, its winpid added to `pids` once it is sleep. */
-  const sleeper = (pids: string): string => `sleep 30 & while :; do read -r e < /proc/$!/exename; case "$e" in */sleep*) break;; esac; done; read -r w < /proc/$!/winpid; echo "$w" >> "${fwd(pids)}"`
-  const pidsIn = (file: string): number[] => (existsSync(file) ? readFileSync(file, 'utf8').split(/\s+/).map(Number).filter((pid) => pid > 0) : [])
+  /** Git Bash: a background `sleep 30`, its winpid added to `pids` once it is sleep (tests/msysSleeper.ts). */
+  const sleeper = sleeperScript
+  const pidsIn = winpidsIn
   const lines = (): string[] => status().split('\n').map((l) => l.trim()).filter(Boolean).sort()
   /** Combwork's own git (GIT_PREFIX: no optional locks, no index refresh), as the queue's advance runs it. */
   const realGit = async (cwd: string, args: string[]): Promise<GitResult> => (await import('../src/main/git')).git(cwd, args)
@@ -563,15 +564,12 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     // HI-3047 (Git for Windows): the hook starts a Git Bash sleep too; and an unrelated one, started as the hook's is but
     // outside the commit (no marker), is left running.
     const msys = process.platform === 'win32'
-    const control = join(tempDir('cw-folderchanges-control-'), 'pids')
     let controlId: { pid: number; started: number }[] = []
     if (msys) {
       const bin = msysBinFor({ env: process.env })
       expect(bin).not.toBeNull()
-      spawn(join(bin!, 'sh.exe'), ['-c', sleeper(control)], { stdio: 'ignore', windowsHide: true, env: baseEnv() }).unref()
-      await vi.waitFor(() => expect(pidsIn(control)).toHaveLength(1), { timeout: timing('wait.hang') })
       // Its identity while it is known to be the test's own (#603): ended by it afterwards.
-      controlId = identify(pidsIn(control))
+      controlId = identify([await startSleeper({ bin: bin!, env: baseEnv() })])
       expect(controlId).toHaveLength(1)
     }
     onTestFinished(() => void endExactly(controlId))

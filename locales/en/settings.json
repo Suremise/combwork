@@ -879,6 +879,14 @@
     "defaultMessage": "Auto memory folder setting",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto memory is Claude Code's own notes it keeps per project."
   },
+  "settings.advanced.claude-code.monitor.expired.desc": {
+    "defaultMessage": "What a Monitor's last notification says when its time limit ends it, as a regular expression; its other notifications report events while it runs on. Wrong, an agent whose Monitor expires shows finished, with a notification, as its expiry wakes it.",
+    "description": "What the advanced setting \"Transcript: Monitor expired\" is for, and what goes wrong when it is wrong (Settings → Advanced). A Monitor is a Claude Code tool that watches a long-running command in the background."
+  },
+  "settings.advanced.claude-code.monitor.expired.title": {
+    "defaultMessage": "Transcript: Monitor expired",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A Monitor is a Claude Code tool that watches a long-running command in the background."
+  },
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": {
     "defaultMessage": "Right-click in a Claude Code pane is Combwork's, as in every pane: it copies the terminal's selection, or pastes. Turned on, Combwork passes right-clicks to Claude Code instead. Claude Code doesn't use the mouse at its prompt, so there a right-click then does nothing: copy and paste with Ctrl+C and Ctrl+V.",
     "description": "What the advanced setting \"Pass right-click to Claude Code\" is for (Settings → Advanced, under Claude Code). Ctrl+C and Ctrl+V name keys: use the key names your language uses."

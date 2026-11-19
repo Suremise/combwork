@@ -2508,6 +2508,35 @@ async function agentMenu(page, name, ms = 10000) {
   return (await page.locator('.menu .menu-item').allInnerTexts()).map((t) => t.trim())
 }
 
+/**
+ * Tells the first window its language changed, as main does (language-changed): `base` (app:info's language) in `code`,
+ * with its translations from locales/<code>, or `base` itself when no code is given. Main reads the catalogue itself
+ * and only the code crosses Playwright's channel (HI-3428): a whole catalogue (about 1.4 MB) sent through app.evaluate
+ * goes by Node's inspector, whose I/O thread crashed the test app's main process under a full run's load (an access
+ * violation on InspectorIo, rc.15's jjwindow). `base`'s own translations are never sent either (HI-3434: a test app
+ * started in Japanese has its catalogue in app:info's language): with no code, a `base` that has some is told by its own
+ * code, main reading them again, and keeps its locale. Returns the catalogue, for the text a step expects.
+ */
+async function speakLanguage(app, base, code) {
+  if (!code && Object.keys(base?.messages ?? {}).length) code = base.code
+  const dir = code ? path.join(ROOT, 'locales', code) : null
+  if (dir) base = { ...base, messages: {} }
+  await app.evaluate(
+    ({ BrowserWindow }, said) => {
+      let language = said.base
+      if (said.dir) {
+        const files = process.getBuiltinModule('fs')
+        const p = process.getBuiltinModule('path')
+        const messages = Object.assign({}, ...files.readdirSync(said.dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(files.readFileSync(p.join(said.dir, f), 'utf8'))))
+        language = { ...said.base, code: said.code, locale: said.code === said.base.code ? said.base.locale : said.code, messages }
+      }
+      BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'language-changed', language })
+    },
+    { base, code, dir }
+  )
+  return dir ? Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')))) : null
+}
+
 /** Runs the session toolbar's + Add ▾ entry with this label (#975); `then`: an entry of the menu it opens (Templates ▸ → Save Template…). */
 async function addMenuRun(page, label, then, ms = 10000) {
   await page.locator('.session-toolbar .add-menu').click()
@@ -2518,4 +2547,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, pageFocused, realFocus, openWorkspace, trustWorktrees, hadEstimate, fitWindow, stubFocus, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven, animationsDone, exitWithin }
+module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, speakLanguage, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, pageFocused, realFocus, openWorkspace, trustWorktrees, hadEstimate, fitWindow, stubFocus, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven, animationsDone, exitWithin }

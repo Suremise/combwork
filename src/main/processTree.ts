@@ -9,7 +9,9 @@ import { join } from 'node:path'
 export type ListedProcess = { pid: number; parent: number; started: number }
 
 const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-const LIST_PS = "Get-CimInstance Win32_Process | ForEach-Object { '{0} {1} {2}' -f $_.ProcessId, $_.ParentProcessId, ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() }"
+// HI-3433: without the System Idle Process (pid 0, never a process to end or find), whose start some Windows builds
+// leave empty: its cast would fail the whole listing.
+const LIST_PS = "Get-CimInstance Win32_Process -Filter 'ProcessId != 0' | ForEach-Object { '{0} {1} {2}' -f $_.ProcessId, $_.ParentProcessId, ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() }"
 
 /** HI-3376: how long each of endTree's blocking PowerShell runs (its listing, its end) may take: cw-progress's own process only. */
 export const END_TREE_SYNC_MS = 30_000
@@ -131,7 +133,9 @@ export function completeProcessList(out: string, ok: boolean): ListedProcess[] |
   if (!ok) return null
   const lines = out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   if (lines.at(-1) !== 'end') return null
-  const rows = lines.slice(0, -1)
+  // HI-3433: Windows lists the System Idle Process as pid 0, a row of the listing but never a process (parseProcessList
+  // leaves it out): not counted, so the listing is complete when every other row is a process's.
+  const rows = lines.slice(0, -1).filter((l) => !/^0 0 \d+$/.test(l))
   const list = parseProcessList(rows.join('\n'))
   return rows.length && list.length === rows.length ? list : null
 }

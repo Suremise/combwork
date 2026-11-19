@@ -215,6 +215,8 @@
   "settings.advanced.claude-code.memory.realPath.title": "在连接上按实际路径使用自动记忆",
   "settings.advanced.claude-code.memory.setting.desc": "指定 Claude Code 自动记忆文件夹的设置。Combwork 会在连接上设置它（在连接上按实际路径使用自动记忆），在你自行设置的地方则保持不变。设置错误时，Claude Code 会忽略它，并在连接上每次保存记忆前询问。",
   "settings.advanced.claude-code.memory.setting.title": "自动记忆文件夹设置",
+  "settings.advanced.claude-code.monitor.expired.desc": "Monitor 因时间限制结束时其最后一条通知的内容，使用正则表达式；它的其他通知报告其继续运行期间的事件。若设置有误，Monitor 过期的智能体会在过期唤醒它时显示为已完成，并发出通知。",
+  "settings.advanced.claude-code.monitor.expired.title": "会话记录：Monitor 已过期",
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": "Claude Code 窗格中的右键单击和其他所有窗格一样由 Combwork 处理：复制终端的所选内容，否则粘贴。开启后，Combwork 会把右键单击交给 Claude Code。Claude Code 在输入框中不使用鼠标，因此在那里右键单击不会有任何作用：请用 Ctrl+C 和 Ctrl+V 复制和粘贴。",
   "settings.advanced.claude-code.mouse.rightClickToCli.title": "将右键单击交给 Claude Code",
   "settings.advanced.claude-code.outage.connectionError.desc": "Claude Code 重试后仍无法连接其 API 时，StopFailure 钩子消息中的内容：开启“连接中断后恢复智能体”后，Combwork 会等待连接恢复并让智能体继续。若设置有误，这类智能体会保持停止状态。",

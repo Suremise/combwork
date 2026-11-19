@@ -1,8 +1,18 @@
 import { advanced } from '../../advanced'
 import type { BackgroundTaskEvent } from '../types'
 
-/** Notification statuses that report on a task still running (a Monitor's events); any other status ends it. */
+/** Notification statuses that report on a task still running; any other status ends it. A Monitor's events have none (monitorEvent). */
 const STILL_RUNNING = new Set(['running', 'event', 'progress', 'pending', 'started', 'in_progress'])
+
+/**
+ * A notification with no status that reports one of a Monitor's events while it runs on (HI-3423: HB1's Monitor read as
+ * ended at its first event, so its agent showed finished with nothing counted while it still waited). Its expiry is a
+ * notification of the same shape, told apart only by its text (claude-code.monitor.expired), and ends it.
+ */
+function monitorEvent(body: string): boolean {
+  const event = /<event>([\s\S]*?)<\/event>/.exec(body)?.[1]
+  return event !== undefined && !advanced.pattern('claude-code.monitor.expired').test(event.trim())
+}
 
 /** Subagents' descriptions kept between reads of one launch's transcript, so a resumed one is named too. */
 const MAX_KEPT = 50
@@ -13,7 +23,7 @@ const MAX_KEPT = 50
  * subagent the Agent tool runs in the background (#1584) is `async_launched` with its agentId, a background workflow
  * the same with a taskId; a message to a finished subagent resumes it (resumedAgentId), and it notifies again. A
  * message queued to one still running changes nothing. A task's end arrives as a <task-notification> naming it (which
- * starts a new turn), or a TaskStop result. `memo` keeps the subagents' descriptions for their resumes, and when the
+ * starts a new turn; a Monitor's events, with no status, start one too but leave it running), or a TaskStop result. `memo` keeps the subagents' descriptions for their resumes, and when the
  * latest tool calls were made: a background command's start says when its call was (`began`, HI-3406), since one moved
  * to the background is written only once it is. The subagents' status and fields are advanced settings
  * (claude-code.subagent.*).
@@ -80,7 +90,8 @@ export function claudeBackgroundTasks(appended: string, memo: Record<string, unk
     const text = line.replace(/\\n/g, '\n')
     for (const m of text.matchAll(/<task-notification>\s*<task-id>([\w-]+)<\/task-id>([\s\S]*?)<\/task-notification>/g)) {
       const status = /<status>([\w-]+)<\/status>/.exec(m[2])?.[1]
-      if (!status || !STILL_RUNNING.has(status)) out.push({ kind: 'end', id: m[1], at })
+      if (status ? STILL_RUNNING.has(status) : monitorEvent(m[2])) continue
+      out.push({ kind: 'end', id: m[1], at })
     }
   }
   return out

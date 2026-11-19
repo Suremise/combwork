@@ -438,12 +438,11 @@ function jjRepo(dir, o = {}) {
     await warn.getByRole('button', { name: 'Switch', exact: true }).click()
     await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1, HUNG_MS)
     await section('jjRepo')
-    // The window's language, as a change of it reaches the window (vcswitch's way).
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+    // The window's language (`code`; none: English), as a change of it reaches the window; main reads its catalogue (HI-3434).
     const english = (await inv('app:info')).language
-    const catalogue = (code) => Object.assign({}, ...fs.readdirSync(path.join(lib.ROOT, 'locales', code)).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', code, f), 'utf8'))))
+    const speak = (code) => lib.speakLanguage(app, english, code)
     for (const language of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
-      await speak({ ...english, code: language, locale: language, messages: catalogue(language) })
+      await speak(language)
       const cat = Object.assign({}, ...['jj', 'git'].map((a) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', language, `${a}.json`), 'utf8'))))
       // Repository may be the same word in a language: the unsupported list's heading and Compare's label say it.
       const want = [cat['git.section.jjCompare'], cat['jj.repo.unsupported'], cat['jj.toCheck.head'], cat['jj.leftovers.head']]
@@ -457,14 +456,14 @@ function jjRepo(dir, o = {}) {
       await section('jjRepo')
     }
     // loose's header (not colocated, Git refused) in each language: its fact in the language's words (its tab found in English).
-    await speak(english)
+    await speak()
     await toTab('loose')
     for (const language of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
-      await speak({ ...english, code: language, locale: language, messages: catalogue(language) })
+      await speak(language)
       check(`${language}: loose's fact in the language`, !!(await until(async () => !/not colocated with Git/.test(await text(head)) && (await text(head)).includes(loose), HUNG_MS)), await text(head))
       await head.screenshot({ path: path.join(shots, `jjview-loose-${language}.png`) })
     }
-    await speak(english)
+    await speak()
     // None: the project's own switch, always offered.
     await head.locator('[data-platform="none"]').click()
     const toNone = dialog.filter({ hasText: 'None' })

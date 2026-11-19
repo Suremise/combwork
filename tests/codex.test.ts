@@ -565,12 +565,13 @@ describe('Codex permission menu (#396)', () => {
   it('types the steps, waits for a pick to show, and fails clearly when it never does', async () => {
     const { PickNotFound, typeKeySteps } = await import('../src/main/keySteps')
     const { codex } = await import('../src/main/providers/codex/adapter')
-    // The menu shows a moment after Enter.
+    // The command shows in its input a moment after it is typed, and the menu a moment after Enter.
     let shown = ''
     const typed: string[] = []
     await typeKeySteps(codex.modeMenuKeys('full-access'), {
       write: (k) => {
         typed.push(k)
+        if (k === '/permissions') setTimeout(() => (shown = screen('0.161-held-idle')), 150)
         if (k === '\r') setTimeout(() => (shown = screen('0.161-permissions-readonly')), 150)
       },
       screen: () => shown
@@ -578,10 +579,16 @@ describe('Codex permission menu (#396)', () => {
     expect(typed).toEqual(['\x15', '/permissions', '\r', '3'])
     // Never shown: the keys before it went in, nothing is chosen, and the error says what was missing.
     const before: string[] = []
-    const err = await typeKeySteps(codex.modeMenuKeys('ask'), { write: (k) => before.push(k), screen: () => 'no menu here', pickTimeoutMs: 300 }).catch((e) => e)
+    const err = await typeKeySteps(codex.modeMenuKeys('ask'), { write: (k) => before.push(k), screen: () => (before.includes('\r') ? 'no menu here' : screen('0.161-held-idle')), pickTimeoutMs: 300 }).catch((e) => e)
     expect(err).toBeInstanceOf(PickNotFound)
     expect(err.message).toBe('Couldn\'t find "Ask for approval" in Codex\'s /permissions menu.')
     expect(before).toEqual(['\x15', '/permissions', '\r'])
+    // The command never shown in its input (HI-3437): no Enter, and the error says so.
+    const unshown: string[] = []
+    const none = await typeKeySteps(codex.modeMenuKeys('ask'), { write: (k) => unshown.push(k), screen: () => '› Ask Codex to do anything', pickTimeoutMs: 300 }).catch((e) => e)
+    expect(none).toBeInstanceOf(PickNotFound)
+    expect(none.message).toBe('Couldn\'t find "/permissions" in Codex\'s input.')
+    expect(unshown).toEqual(['\x15', '/permissions'])
   })
 
   // #363: Codex's screens as 0.161 drew them: its input holding /permissions while a turn runs ("tab to queue

@@ -290,7 +290,8 @@ the caller, before anything is awaited, and `taskActor()` gives the actor an `At
 in each write: `runIntent` gives the runtime an `Alongside.before`, which `runtime.write` (and `refuse`, before its
 `Refused`) calls inside the transaction before the write decides anything, with the builder's-move flag for
 `attempt.notAssignee`; `updateTaskAs`, `commentTask`, `askAssistantOn`, `fenceNow` (declaring paths) and `fenceCommit` (a
-kind, review skip or target, through their `commit`) check plain changes. The launch check reads
+kind, review skip or target, through their `commit`) check plain changes. `askAssistantOn` (HI-3420, a message) takes an
+`attempt.moved` as message only: its launch alone is fenced, and it sets no waiting mark and calls no `accepted`. The launch check reads
 `agentTokens.currentAgentRun`; every check (`tasks.ts` `fenceOrThrow`) also registers it with `boardStore.beforeBoardCommit`,
 which `boardWrite` runs synchronously after the change's last await, just before `COMMIT`, so a launch replaced during
 the change's awaits undoes it whole. **Readiness**:
@@ -1081,7 +1082,7 @@ the Progress runs (`ProgressRun` gains `card` and
 - **Unit tests** (`tests/*.test.ts`, Vitest) cover pure logic: migrations, settings resolution, parsers (with CLI transcript fixtures in `tests/fixtures`), prices, kept files and path guards. `electron` resolves to `tests/electron-stub.ts` (vitest alias), so they need no Electron binary.
 - **End-to-end suites** (`tests/e2e`, `npm run e2e`) drive the dev build with Playwright `_electron`; see `tests/e2e/README.md`. They need the CLIs and sign-ins, so they run locally, not in CI.
 - **Lint**: oxlint with `.oxlintrc.json` (typescript-eslint doesn't support TypeScript 7 yet). `npm run lint` fails on warnings and runs in `npm run build`.
-- **CI** (`.github/workflows/ci.yml`): typecheck, lint and unit tests on Windows for every push to `main` and pull request. Electron's binary is installed before them by `scripts/installElectronCi.mjs`, with retries and a cache keyed by the Electron version (HI-2751).
+- **CI** (`.github/workflows/ci.yml`): typecheck, lint and unit tests on Windows for every push to `main` and pull request. Electron's binary is installed before them by `scripts/installElectronCi.mjs`, with retries and a cache keyed by the Electron version (HI-2751). The unit tests then run on that Electron's own Node version, so they test the SQLite Combwork ships (HI-3435, tests/README.md).
 
 ## Renderer structure
 

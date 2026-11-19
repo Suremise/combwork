@@ -92,9 +92,8 @@ function writeProject(dir, cfg) {
       await inv('settings:update', { appearance: { theme: 'dark' } })
     }
     const base = (await inv('app:info')).language
-    const dir = path.join(lib.ROOT, 'locales', 'de')
-    const german = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+    // The window is told German by code; main reads its catalogue, not sent through app.evaluate (HI-3434).
+    const speak = (code) => lib.speakLanguage(app, base, code)
     const confirmSwitch = async () => {
       await dialog.getByRole('button', { name: 'Switch', exact: true }).click()
       return !!(await until(async () => (await dialog.count()) === 0, HUNG_MS))
@@ -186,7 +185,7 @@ function writeProject(dir, cfg) {
     const refused = await q.intent(h, g1, c3, 'start')
     check("a Git card's start is refused: what can't be read, and the switch as its next step", refused.status === 409 && refused.body?.rule === 'platform.unknown' && /switch the project to None in its Version Control tab/.test(refused.body?.next ?? ''), JSON.stringify(refused))
     // German: the offer and the warning.
-    await speak({ ...base, code: 'de', locale: 'de', messages: german })
+    await speak('de')
     check('the offer in German', !!(await until(async () => (await text(offer)) && !(await text(offer)).startsWith('The Git repository'), HUNG_MS)), await text(offer))
     await shoot(page.locator('.vc-view'), 'offer-gone-de')
     await offer.locator('[data-action="vc-offer-switch"]').click()
@@ -194,7 +193,7 @@ function writeProject(dir, cfg) {
     await shoot(dialog, 'warning-gone-de')
     await page.keyboard.press('Escape')
     await until(async () => (await dialog.count()) === 0, HUNG_MS)
-    await speak(base)
+    await speak()
     await until(async () => (await text(offer)).startsWith('The Git repository is gone.'), HUNG_MS)
     await offer.locator('[data-action="vc-offer-switch"]').click()
     const c1Key = (await h.card(c1)).key
@@ -213,8 +212,10 @@ function writeProject(dir, cfg) {
     const c3Start = await q.intent(h, g1, c3, 'start')
     check("a new card starts under None's rules", c3Start.status === 200 && (await startedUnder(c3)) === 'none', JSON.stringify({ c3Start, data: await started(c3) }))
     // Initialise repository… from Git's page (HI-1905): with a lane and a card in flight keeping None's rules, the switch
-    // that follows warns first; cancelled, the project stays None, and Git is offered without a restart.
-    await head.locator('[data-platform="git"]').click()
+    // that follows warns first; cancelled, the project stays None, and Git is offered without a restart. Git's choice opens
+    // its page only once the tab has read the folder's git (`data-vc-preview`, HI-3436): before that the click is the switch.
+    check("gamma: Git's page offered (the tab read its git)", !!(await until(async () => (await head.locator('[data-platform="git"][data-vc-preview]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
+    await head.locator('[data-platform="git"][data-vc-preview]').click()
     const preview = page.locator('[data-vc-git-preview]')
     check("gamma: Git's page offers Initialise repository…", !!(await until(async () => (await preview.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
     await preview.locator('[data-git-init]').click()
@@ -249,10 +250,10 @@ function writeProject(dir, cfg) {
     await toTab('delta')
     check('the offer: Mercurial found, Switch to None…', !!(await until(async () => (await offer.getAttribute('data-vc-offer').catch(() => null)) === 'otherFound', HUNG_MS)) && (await text(offer)).startsWith('Mercurial found: not supported yet'), await text(offer))
     await shoot(page.locator('.vc-view'), 'offer-other')
-    await speak({ ...base, code: 'de', locale: 'de', messages: german })
+    await speak('de')
     await until(async () => !(await text(offer)).startsWith('Mercurial found: not supported'), HUNG_MS)
     await shoot(page.locator('.vc-view'), 'offer-other-de')
-    await speak(base)
+    await speak()
     await until(async () => (await text(offer)).startsWith('Mercurial found'), HUNG_MS)
     // The fact is said once: by the offer while it shows; Not Now hides it and the line beside the choice says it.
     const fact = page.locator('[data-vc-fact]')

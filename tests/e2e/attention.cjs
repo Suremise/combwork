@@ -99,13 +99,16 @@ const check = (name, ok, extra = '') => {
   await turn(reviewed, 'review allow')
   check('under review: its status still says Working…, with the review mark', !!(await until(async () => (await mark.isVisible().catch(() => false)) && (await status()) === 'Working…', HUNG_MS)), await status())
   check('an approved auto-review finishes the turn', !!(await finished(reviewed)))
-  check('and the mark goes', (await mark.count()) === 0)
+  // Main has it finished (its review cleared with it) before the window draws that: wait for the mark to go (HI-3430).
+  const reviewGone = async () => (await live(reviewed.id))?.review === undefined && (await mark.count()) === 0
+  const reviewLeft = async () => `review ${JSON.stringify((await live(reviewed.id))?.review)}, marks ${await mark.count()}`
+  check('and the mark goes', !!(await until(reviewGone, lib.timing('hang.ui'))), await reviewLeft())
   check('it was under review, with what was asked', states(reviewed).some(underReview), states(reviewed).join(' > '))
   check('never as its status message', neverStatus(reviewed), states(reviewed).join(' > '))
   check('and never that it needed you', !states(reviewed).some((s) => s.startsWith('waiting')) && told('Reviewed') === 0, states(reviewed).join(' > '))
   await turn(reviewed, 'review deny')
   check('a denied one too', !!(await finished(reviewed)) && !states(reviewed).some((s) => s.startsWith('waiting')) && told('Reviewed') === 0, states(reviewed).join(' > '))
-  check('its review gone with the next command', (await live(reviewed.id))?.review === undefined && (await mark.count()) === 0)
+  check('its review gone with the next command', !!(await until(reviewGone, lib.timing('hang.ui'))), await reviewLeft())
 
   // --- A long command under review (an environment variable, a path): the header stays short and readable, wide
   // and narrow, dark and light; the command is only in the mark's tooltip.
@@ -127,7 +130,7 @@ const check = (name, ok, extra = '') => {
     check(`${width}px ${theme}: the details on hover: the reviewer, and what it asks`, !!hovered && /reviewer is checking/.test(await tip.innerText()), `mark visible: ${await mark.isVisible().catch(() => false)}; tips: ${await page.locator('.tip').allInnerTexts().then((t) => t.join(' | '))}; ${Date.now() - t0} ms; ${states(reviewed).join(' > ')}`)
     await page.screenshot({ path: path.join(lib.WORK, `attention-review-${width}-${theme}.png`) })
     await page.mouse.move(5, 5)
-    check(`${width}px ${theme}: approved, the mark goes`, !!(await finished(reviewed)) && (await mark.count()) === 0)
+    check(`${width}px ${theme}: approved, the mark goes`, !!(await finished(reviewed)) && !!(await until(reviewGone, lib.timing('hang.ui'))), await reviewLeft())
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await lib.fitWindow(app, page, { width: 1400, height: 850 })

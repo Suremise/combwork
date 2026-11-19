@@ -145,15 +145,15 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const DE = path.join(lib.ROOT, 'locales', 'de')
   const german = Object.assign({}, ...fs.readdirSync(DE).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(DE, f), 'utf8'))))
   const base = (await inv('app:info')).language
-  /** The window shown in a language, as main sends a change of language (i18nlive's way). */
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+  /** The window shown in a language (`code`; none: English), as main sends a change of language; main reads its catalogue (HI-3434). */
+  const speak = (code) => lib.speakLanguage(app, base, code)
   const archivedBox = () => page.locator('.sessions-filters label').innerText().catch(() => '')
   const narrowShots = async (name, el) => {
     const width = await list.evaluate((e) => e.style.width)
     await list.evaluate((e) => (e.style.width = '200px'))
     await lib.until(async () => Math.round((await list.boundingBox()).width) === 200, HUNG_MS)
-    for (const [lang, language, label] of [['en', base, 'Archived'], ['de', { ...base, code: 'de', locale: 'de', messages: german }, german['sessions.filter.archived']]]) {
-      await speak(language)
+    for (const [lang, code, label] of [['en', undefined, 'Archived'], ['de', 'de', german['sessions.filter.archived']]]) {
+      await speak(code)
       await lib.until(async () => (await archivedBox()).trim() === label, HUNG_MS)
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
@@ -167,7 +167,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
         await list.screenshot({ path: path.join(lib.WORK, `sessiontree-narrow-${name}-${lang}-${theme}.png`) })
       }
     }
-    await speak(base)
+    await speak()
     await lib.until(async () => (await archivedBox()).trim() === 'Archived', HUNG_MS)
     await inv('settings:update', { appearance: { theme: 'dark' } })
     await list.evaluate((e, w) => (e.style.width = w), width)

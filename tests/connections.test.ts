@@ -1417,8 +1417,16 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
     const p = join(wsPath, 'cr1')
     mkdirSync(join(p, '.combwork'), { recursive: true })
     writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [{ id: 'u1', name: 'Builder', provider: 'claude-code', connection: c.id }] }))
+    // HI-3448: the new folder's project id is written (the root watch's id check, 250 ms on) while this refresh reads it,
+    // as under load: the refresh then reports what it had before (#999), and the refresh that write schedules reports cr1.
+    const idGiven = () => /"id":\s*"p-/.test(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
+    configTestHooks.afterConfigSeen = async (at) => {
+      if (at.toLowerCase() === p.toLowerCase()) await vi.waitFor(() => expect(idGiven()).toBe(true), { timeout: HUNG_MS })
+    }
     try {
       await w.refresh()
+      delete configTestHooks.afterConfigSeen
+      await w.refreshesSettled()
       expect(accounts.connectionUsers().get(c.id)).toEqual([{ projectPath: expect.any(String), project: 'cr1', agentId: 'u1', agent: 'Builder' }])
       const row = here(() => accounts.accountsView()).connectionRows.find((r) => r.id === c.id)
       expect(row?.users.map((u) => u.agent)).toEqual(['Builder'])
@@ -1428,6 +1436,7 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
       await accounts.removeConnection(c.id)
       expect(accounts.getConnection(c.id)).toBeUndefined()
     } finally {
+      delete configTestHooks.afterConfigSeen
       writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     }
     // One order for every CLI (decision A): a Codex account moved above Claude Code's.

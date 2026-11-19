@@ -21,4 +21,4 @@ For each card, in order:
 
 A finding the builder **disputes**: stop and ask (rounds.md).
 
-**A design or follow-up to check** (woken with "The builder: design HI-12/s40 posted…" or "follow-up HI-12/s41 ready…"): read its latest comment (and what a follow-up names as changed), start your watch again (while a follow-up is due, `changes: ["comment", "column"]`: it doesn't move the card), then answer with `cw_loop_step`, `step: "ok"` or `"gaps"` (what's missing, numbered) and `design`, its id, and end your turn. Not a review: no verdict, no round. Told the builder went ahead unchecked: nothing to answer.
+**A design or follow-up to check** (woken with "The builder: design HI-12/s40 posted…" or "follow-up HI-12/s41 ready…"; a follow-up *submitted*: step 2): read its latest comment (and what a follow-up names as changed), start your watch again (while a follow-up is due, `changes: ["comment", "column"]`: it doesn't move the card), then answer with `cw_loop_step`, `step: "ok"` or `"gaps"` (what's missing, numbered) and `design`, its id, and end your turn. Not a review: no verdict, no round. Told the builder went ahead unchecked: nothing to answer.

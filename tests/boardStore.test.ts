@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
-import { leftByAKill, refusedNow, whileMapped } from './mappedShm'
+import { leftByAKill, MAPPED_SHM_REFUSED, refusedNow, whileMapped } from './mappedShm'
 import { journalSettings } from '../src/shared/journal'
 import type { BoardNotice } from '../src/main/boardStore'
 import { timing } from './timing.cjs'
@@ -194,7 +194,34 @@ async function killedWorkspace(): Promise<{ ws: string; file: string }> {
   return { ws, file }
 }
 
-describe.runIf(process.platform === 'win32')('a board whose -shm another process still maps (HI-2199)', () => {
+describe.runIf(process.platform === 'win32')("whether this SQLite refuses a file whose -shm another process maps (HI-3426)", () => {
+  it('as MAPPED_SHM_REFUSED says, by its version: 1546 before 3.54, opened as it is from then on', async () => {
+    const file = join(base, `layer-${++n}`, 'x.db')
+    mkdirSync(join(file, '..'), { recursive: true })
+    await leftByAKill(file)
+    await whileMapped(base, `${file}-shm`, async () => {
+      expect(refusedNow(file)).toBe(MAPPED_SHM_REFUSED ? 1546 : null)
+    })
+  })
+
+  it.runIf(!MAPPED_SHM_REFUSED)("where it isn't refused, the workspace's open waits for nothing and opens the board with what it kept", async () => {
+    const { ws, file } = await killedWorkspace()
+    const waits: string[] = []
+    store.boardTestHooks.openableWait = (p) => waits.push(p)
+    try {
+      await whileMapped(base, `${file}-shm`, async () => {
+        const w = await open(ws)
+        expect((await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title)).toContain('Kept')
+        expect(waits).toEqual([])
+      })
+    } finally {
+      store.boardTestHooks.openableWait = null
+    }
+  })
+})
+
+// Only where this SQLite refuses it (HI-3426: 3.54's opens it, nothing to wait for; MAPPED_SHM_REFUSED).
+describe.runIf(process.platform === 'win32' && MAPPED_SHM_REFUSED)('a board whose -shm another process still maps (HI-2199)', () => {
   afterEach(() => {
     store.boardTestHooks.openableWait = null
     journal.journalTestHooks.openableWait = null

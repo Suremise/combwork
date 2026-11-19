@@ -84,6 +84,19 @@ export class LaneError extends CombworkError {
   }
 }
 
+/**
+ * HI-3420: cw_lane next for an agent whose lane just ended or was abandoned (`lane`: its id): an answer, not a failure, so
+ * the Agent API replies with it (`ended`) rather than an error, and the agent's tool call doesn't count as a failed one.
+ */
+export class LaneEnded extends LaneError {
+  constructor(
+    readonly lane: string,
+    message: string
+  ) {
+    super(404, message)
+  }
+}
+
 /** Refusals the window can meet (ending a lane from Progress → Lanes), in its language. */
 const M = {
   noWorkspace: msg({ id: 'service.lanes.noWorkspace', defaultMessage: 'No workspace is open', description: "An error changing a workspace's lanes (card loops) while no workspace is open in the window." }),
@@ -1157,6 +1170,12 @@ export interface StartLane {
   unknownReviewer?: string
   /** Reviewed by the project's reviewer pool (#1443), with `reviewer` null; undefined: a running lane keeps what it has. */
   pool?: boolean
+  /**
+   * HI-3424: the Assistant's or a script's start named neither a reviewer nor `pool`, in a project whose rules review by a
+   * pool: a new lane is reviewed by the pool, or refused with `refusal` (as Start Lane… refuses a pool: nobody in it but
+   * the builder); a running lane keeps what it has. Decided under the lanes' lock, where it is known which it is.
+   */
+  poolUnlessNamed?: { refusal: Error | null }
   cards: number[]
   rounds?: number
   waitMinutes?: number
@@ -1835,6 +1854,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const done = cards.filter((n) => board.get(n)?.column === 'done')
     if (done.length && done.length === cards.length) throw new LaneError(409, withCardNames(ws, () => say(A.allDoneNoLane, { cards: done.map(cardRef).join(', '), n: done.length }), scope))
     leftOut = done
+    // HI-3424: a new lane naming no reviewer in a pool project is the pool's, never a lane nobody reviews (or refused).
+    const byPool = pool || (!!s.poolUnlessNamed && !reviewer && s.unknownReviewer === undefined)
+    if (byPool && !pool && s.poolUnlessNamed?.refusal) throw s.poolUnlessNamed.refusal
     const rec: LaneRecord = {
       id: newId(),
       project: s.project,
@@ -1851,7 +1873,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       endedAt: null,
       mergeCommit: null,
       ...(ruleset ? { ruleset } : {}),
-      ...(pool ? { pool: true as const } : {}),
+      ...(byPool ? { pool: true as const } : {}),
       ...(releasedGrant ? { releasedOverride: releasedGrant } : {})
     }
     const brief = nextBrief(undefined, carried?.brief?.text ?? s.brief, s.briefNotIn)
@@ -2105,12 +2127,12 @@ export async function laneNext(ws: WorkspaceService, project: string, agentId: s
           columns = null
         }
       }
-      if (!columns || columns.some((c) => c.column === 'unrecorded')) throw new LaneError(404, say(A.nextEndedUnknown, { lane: gone.id }))
+      if (!columns || columns.some((c) => c.column === 'unrecorded')) throw new LaneEnded(gone.id, say(A.nextEndedUnknown, { lane: gone.id }))
       const open = columns.filter((c) => c.column !== 'done' && c.column !== 'gone')
-      if (open.length) throw new LaneError(404, withCardNames(ws, () => say(A.nextEndedOpen, { lane: gone.id, cards: open.map((c) => cardRef(c.number)).join(', '), n: open.length })))
-      throw new LaneError(404, say(A.nextEnded, { lane: gone.id }))
+      if (open.length) throw new LaneEnded(gone.id, withCardNames(ws, () => say(A.nextEndedOpen, { lane: gone.id, cards: open.map((c) => cardRef(c.number)).join(', '), n: open.length })))
+      throw new LaneEnded(gone.id, say(A.nextEnded, { lane: gone.id }))
     }
-    if (gone) throw new LaneError(404, say(A.nextAbandoned, { lane: gone.id }))
+    if (gone) throw new LaneEnded(gone.id, say(A.nextAbandoned, { lane: gone.id }))
     throw new LaneError(404, say(A.nextNone))
   }
   // Its queued list once the boundary has passed (HI-3118: no card of its own in flight), as the next start reads it.
@@ -2302,12 +2324,36 @@ export function laneWaitsForSlot(ws: WorkspaceService, id: string): boolean {
 /** Whether a lane's start is launching this builder now (holdLaneStart). */
 export const laneStartHeld = (ws: WorkspaceService, project: string, builder: string): boolean => launching.has(launchKey(ws, project, builder))
 
+/** Workspaces whose look waits (holdLanesLook), by path: how many holds. */
+const lookHolds = new Map<string, number>()
+/**
+ * Holds a workspace's look (changed()) until the returned release, which looks again then (HI-3425). For tests: a test of
+ * what happens before the look has run holds it, else the look's timer, at SETTLE_MS, can run first under load. A look
+ * already running carries on.
+ */
+export function holdLanesLook(ws: WorkspaceService): () => void {
+  const k = ws.path?.toLowerCase()
+  if (!k) return () => {}
+  lookHolds.set(k, (lookHolds.get(k) ?? 0) + 1)
+  let done = false
+  return () => {
+    if (done) return
+    done = true
+    const n = (lookHolds.get(k) ?? 1) - 1
+    if (n > 0) lookHolds.set(k, n)
+    else lookHolds.delete(k)
+    changed(ws)
+  }
+}
+
 /** A workspace's lanes changed: look again soon. */
 function changed(ws: WorkspaceService): void {
   const k = ws.path?.toLowerCase()
   if (!k || timers.has(k)) return
   const t = setTimeout(() => {
     timers.delete(k)
+    // Held (holdLanesLook): its release looks again.
+    if (lookHolds.has(k)) return
     // One refresh at a time (#1011): a slow one isn't overlapped by the next.
     void coalesced(`lanes:${k}`, () => refresh(ws).catch((e) => log.warn('following the lanes', e)))
   }, SETTLE_MS)

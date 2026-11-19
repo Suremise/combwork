@@ -62,6 +62,15 @@ jobs:
         with:
           path: ${{ runner.temp }}/electron-cache
           key: ${{ steps.electron-cache.outputs.cache-primary-key }}
+      # HI-3435: the tests run on the Node inside the Electron Combwork ships, not the latest Node 24 set up above for
+      # npm, so they test the SQLite it ships (node:sqlite) and a runner update can't change it. Node 24's modules stay
+      # compatible within the major. The check fails the run if the Node now running isn't Electron's.
+      - id: electron-node
+        run: echo "version=$(node scripts/installElectronCi.mjs --node)" >> $env:GITHUB_OUTPUT
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ steps.electron-node.outputs.version }}
+      - run: node scripts/installElectronCi.mjs --check-node
       - if: matrix.shard == 1
         run: npm run typecheck
       - if: matrix.shard == 1

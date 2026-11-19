@@ -26,7 +26,7 @@ import { laneTargetOf, targetedOf } from '../../shared/workflow/compile'
 import { workflowFor } from './service'
 import { hasOwnWork, projectTargets } from './targets'
 import { keptLineTarget } from './keptLine'
-import { checkCardMove, IN_FLIGHT_STAGES, laneOf, laneStill, type MoveWhy } from './retargetCard'
+import { checkCardMove, IN_FLIGHT_STAGES, laneOf, laneStill, type MoveRefusal, type MoveWhy } from './retargetCard'
 import type { RetargetPreview, RetargetResult } from '../../shared/types'
 import { combworkError } from '../combworkError'
 import { fmt, msg } from '../../shared/i18n'
@@ -40,6 +40,11 @@ type KeepWhy = RetargetPreview['cards']['keep'][number]['why']
 
 /** A move in flight's refusal as a retarget's reason to keep a card (or its lane) where it is (HI-2753). */
 const keepOf = (why: MoveWhy): KeepWhy => (why === 'queued' || why === 'notInTarget' || why === 'reviewed' || why === 'noLine' ? why : why === 'notStarted' || why === 'lane' ? 'started' : 'cantCheck')
+
+/** HI-3439: why a preview keeps a card in flight on `from` (its refusal's code, rule and detail), in the log. */
+function keptLog(c: { key: string }, from: string, r: MoveRefusal): void {
+  log.info(`Retarget's preview keeps ${c.key} on ${userText(from)}: ${r.why}${r.rule ? ` (${r.rule})` : ''}${r.detail ? `: ${userText(r.detail)}` : ''}${r.ref ? ` [${userText(r.ref)}]` : ''}`)
+}
 
 /**
  * What a change of Work merges into from `from` to `to` would move, and what stays with why (HI-2680), read-only. Slots
@@ -91,6 +96,7 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
     }
     const checked = c ? await checkCardMove(wf, projectPath, c, to) : null
     if (checked && !checked.ok) {
+      keptLog(c, from, checked)
       const why = keepOf(checked.why)
       out.lanes.push({ ...lane, why })
       out.cards.keep.push({ ...row(c), why })
@@ -117,7 +123,8 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
       const lane = laneOf(wf, c)
       const checked = lane && (lane.target ?? null) !== to && !onFrom.has(lane.id) ? null : await checkCardMove(wf, projectPath, c, to)
       if (checked?.ok) out.cards.move.push({ ...row(c), started: { head: checked.check.head, own } })
-      else out.cards.keep.push({ ...row(c), why: checked ? keepOf(checked.why) : 'started' }) // i18n-ignore: a reason's code, said in words where it is shown
+      else if (checked) keptLog(c, from, checked)
+      if (!checked?.ok) out.cards.keep.push({ ...row(c), why: checked ? keepOf(checked.why) : 'started' }) // i18n-ignore: a reason's code, said in words where it is shown
       continue
     }
     // HI-3112: put back with its line from `from`, holding history `to` lacks: it keeps merging into `from` (its start
