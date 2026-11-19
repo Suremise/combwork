@@ -1,16 +1,17 @@
 // HI-3421: a Git Bash (MSYS) `sleep 30` started in the background by a shell that then exits, the sleep's winpid written
 // once it is sleep: what HI-3047's tests end by its marker (tests/msysMarked.test.ts, tests/gitFolderChanges.test.ts).
 //
-// Under a full run's load MSYS can refuse the background sleep (a fork or exec that fails, the shell saying why on its
-// stderr). The script used to look for the sleep in /proc forever then, writing nothing and spinning a core, and the test's
-// wait ran out with no reason given (rc.15, HI-3357). Now the script says so and exits once the sleep is gone, and
-// startSleeper starts it again (it's the test's own setup, not what the test checks), saying each try's exit and stderr
-// if none starts.
+// The shell's PATH starts with Git's MSYS folder (HI-3455), as findMsysMarked's own does: a run started from PowerShell or
+// cmd has Git's `cmd` folder on its PATH but not `usr\bin`, so MSYS's PATH had no /usr/bin and `sleep` wasn't found
+// ("sleep: command not found", every time). That, not load, was rc.15's failure: first a script that looked for the gone
+// sleep in /proc forever (HI-3357), then, once it said so and exited (HI-3421), three tries failing alike (HI-3455). The
+// script still says so and exits once the sleep is gone, and startSleeper throws with its exit and stderr: one try, since
+// nothing seen called for another.
 //
-// Until it hands a sleep's winpid to its caller, what a try started is its own to end (HR1's rounds 1 and 2): each try's
+// Until it hands a sleep's winpid to its caller, what the shell started is its own to end (HR1's rounds 1 and 2): the
 // shell gets a marker of its own in its environment, which everything it starts inherits from the moment it is forked
 // (the forked sh before MSYS's exec, the sleep after). A shell that doesn't exit within the wait is ended by its handle,
-// and then whatever carries that try's marker, found as HI-3047 finds a timed command's MSYS programs (processTree's
+// and then whatever carries that marker, found as HI-3047 finds a timed command's MSYS programs (processTree's
 // findMsysMarked and msysMatches: each by its winpid and start time) and ended by that identity, until a search finds none.
 // Never by a pid read from a file: a pid written earlier may name another process by then.
 import { spawn } from 'child_process'
@@ -25,14 +26,18 @@ import { waitUntil } from './waits'
 const req = createRequire(import.meta.url)
 type Ids = { pid: number; started: number }[]
 const { endExactly, processes } = req('./e2e/folderProcesses.cjs') as { endExactly: (targets: Ids) => number; processes: () => ListedProcess[] }
+const { envValue, withPathFirst } = req('./e2e/runContext.cjs') as {
+  envValue: (env: Record<string, string>, name: string) => string | undefined
+  withPathFirst: (env: Record<string, string>, dirs: string | string[], rest?: string) => Record<string, string>
+}
 
 const fwd = (p: string): string => p.replace(/\\/g, '/')
 
 /**
  * Git Bash: a background `sleep 30`, its winpid appended to `file` once it is sleep (until MSYS's exec, `$!` names the
- * forked sh.exe, another Windows process). Should the sleep be gone before that (MSYS refused it), it says so on stderr
+ * forked sh.exe, another Windows process). Should the sleep be gone before that (it didn't start), it says so on stderr
  * and exits 1, rather than looking for it forever. Builtins only after the sleep: it starts nothing else. `sleep`: the
- * command it starts (a test of MSYS refusing it names one that isn't there).
+ * command it starts (a test of one that doesn't start names one that isn't there).
  */
 export const sleeperScript = (file: string, sleep = 'sleep'): string =>
   `${sleep} 30 & s=$!; while :; do kill -0 "$s" 2>/dev/null || { echo "the background sleep ($s) ended before it was seen as sleep" >&2; exit 1; }; e=; { read -r e < /proc/$s/exename; } 2>/dev/null; case "$e" in */sleep*) break;; esac; done; read -r w < /proc/$s/winpid; echo "$w" >> "${fwd(file)}"`
@@ -46,8 +51,6 @@ export const SLEEPER_MARK_VAR = 'CW_TEST_SLEEPER'
 const SLEEPER_FIND_SCRIPT = MSYS_FIND_SCRIPT.replace(`"${RUN_MARK_VAR}=$1"`, `"${SLEEPER_MARK_VAR}=$1"`)
 if (SLEEPER_FIND_SCRIPT === MSYS_FIND_SCRIPT) throw new Error(`MSYS_FIND_SCRIPT no longer matches "${RUN_MARK_VAR}=$1": tests/msysSleeper.ts looks for its own variable through it`)
 
-/** How many times startSleeper starts the shell before it gives up: each failed try is MSYS refusing the sleep. */
-const TRIES = 3
 /**
  * How many searches a try's ending makes for what carries its marker: each ends what it found, and the next looks again
  * (a forked sh exec'ing meanwhile is another Windows process, a process just ended can still be listed). One that finds
@@ -86,40 +89,43 @@ export type SleeperTry = { mark: string; file: string; errFile: string }
 type ExitWait = (check: () => void, t: SleeperTry) => Promise<unknown>
 
 /**
- * Starts sleeperScript with Git's own sh (`bin`, its MSYS folder) and `env`, the shell's exit awaited: replies with the
- * sleep's winpid, the caller's to end from then on. A shell that exits without one (MSYS refused the sleep) is started
- * again, up to TRIES times; then it throws with each try's exit code and stderr. A shell that doesn't exit within the wait
- * is ended, and everything carrying its try's marker (endTry), before it throws with what that found and the stderr.
+ * `env` for the sleeper's shell: `bin` first on its PATH (HI-3455), before env's own (whatever its spelling), and the try's
+ * marker.
+ */
+export const sleeperEnv = (env: Record<string, string>, bin: string, mark: string): Record<string, string> =>
+  withPathFirst({ ...env, [SLEEPER_MARK_VAR]: mark }, bin, envValue(env, 'PATH'))
+
+/**
+ * Starts sleeperScript with Git's own sh (`bin`, its MSYS folder, first on its PATH) and `env`, the shell's exit awaited:
+ * replies with the sleep's winpid, the caller's to end from then on. A shell that exits without one throws with its exit
+ * code and stderr. A shell that doesn't exit within the wait is ended, and everything carrying its marker (endTry), before
+ * it throws with what that found and the stderr.
  */
 export async function startSleeper(o: { bin: string; env: Record<string, string>; sleep?: string; waitExit?: ExitWait }): Promise<number> {
   const dir = tempDir('msys-sleeper-')
   const waitExit: ExitWait = o.waitExit ?? ((check) => waitUntil(check))
   const stderrOf = (errFile: string): string => readFileSync(errFile, 'utf8').trim().replace(/\r?\n/g, ' | ')
-  const tries: string[] = []
-  for (let n = 1; n <= TRIES; n++) {
-    const t: SleeperTry = { mark: randomBytes(16).toString('hex'), file: join(dir, `winpid-${n}`), errFile: join(dir, `stderr-${n}`) }
-    const fd = openSync(t.errFile, 'w')
-    let ended: string | null = null
-    let child: ReturnType<typeof spawn> | undefined
-    try {
-      child = spawn(join(o.bin, 'sh.exe'), ['-c', sleeperScript(t.file, o.sleep)], { stdio: ['ignore', 'ignore', fd], windowsHide: true, env: { ...o.env, [SLEEPER_MARK_VAR]: t.mark } })
-      child.on('error', (e) => void (ended = `didn't start: ${e.message}`))
-      child.on('exit', (code, signal) => void (ended = `exited ${code ?? signal}`))
-    } finally {
-      closeSync(fd)
-    }
-    try {
-      await waitExit(() => {
-        if (ended === null) throw new Error(`try ${n}: Git Bash's sh hasn't exited yet`)
-      }, t)
-    } catch (e) {
-      throw new Error(`${(e as Error).message}; ${await endTry(child, () => ended, t.mark, o.bin)}; stderr: ${stderrOf(t.errFile)}`, { cause: e })
-    }
-    const winpids = winpidsIn(t.file)
-    if (winpids.length === 1) return winpids[0]
-    tries.push(`try ${n}: ${ended}, winpids ${JSON.stringify(winpids)}, stderr: ${stderrOf(t.errFile)}`)
+  const t: SleeperTry = { mark: randomBytes(16).toString('hex'), file: join(dir, 'winpid'), errFile: join(dir, 'stderr') }
+  const fd = openSync(t.errFile, 'w')
+  let ended: string | null = null
+  let child: ReturnType<typeof spawn> | undefined
+  try {
+    child = spawn(join(o.bin, 'sh.exe'), ['-c', sleeperScript(t.file, o.sleep)], { stdio: ['ignore', 'ignore', fd], windowsHide: true, env: sleeperEnv(o.env, o.bin, t.mark) })
+    child.on('error', (e) => void (ended = `didn't start: ${e.message}`))
+    child.on('exit', (code, signal) => void (ended = `exited ${code ?? signal}`))
+  } finally {
+    closeSync(fd)
   }
-  throw new Error(`Git Bash's sleep didn't start in ${TRIES} tries:\n${tries.join('\n')}`)
+  try {
+    await waitExit(() => {
+      if (ended === null) throw new Error("Git Bash's sh hasn't exited yet")
+    }, t)
+  } catch (e) {
+    throw new Error(`${(e as Error).message}; ${await endTry(child, () => ended, t.mark, o.bin)}; stderr: ${stderrOf(t.errFile)}`, { cause: e })
+  }
+  const winpids = winpidsIn(t.file)
+  if (winpids.length === 1) return winpids[0]
+  throw new Error(`Git Bash's sleep didn't start: ${ended}, winpids ${JSON.stringify(winpids)}, stderr: ${stderrOf(t.errFile)}`)
 }
 
 /**

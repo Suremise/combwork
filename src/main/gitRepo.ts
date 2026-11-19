@@ -455,7 +455,7 @@ export async function repoInfo(root: string, workTarget?: string | null): Promis
   for (const r of remoteRows) r.remoteHead = remoteHeads.has(r.name)
   const shown = branches.slice(0, BRANCHES_SHOWN)
   const shownRemote = remoteRows.slice(0, BRANCHES_SHOWN)
-  if (targets.target) await measure(root, targets.target, shown, shownRemote)
+  if (targets.target) await measure(root, targets.target, branches.find((b) => b.name === targets.target)?.sha, shown, shownRemote)
   return { summary, branches: shown, remoteBranches: remoteBranches.slice(0, BRANCHES_SHOWN), remotes: remoteList, worktrees, identity: id, target: targets.target, defaultBranch: targets.defaultBranch, remoteRows: shownRemote }
 }
 
@@ -486,7 +486,7 @@ export async function leftoverInfo(root: string, workTarget: string | null): Pro
     const name = f[0].slice('refs/heads/'.length)
     branches.push({ name, current: name === current, upstream: null, ahead: 0, behind: 0, gone: false, worktree: worktrees.find((w) => w.branch === name)?.path ?? null, commit: f[1], date: Number(f[2]) * 1000, subject: f[3], sha: f[4] })
   }
-  if (targets.target) await measure(root, targets.target, branches, [])
+  if (targets.target) await measure(root, targets.target, branches.find((b) => b.name === targets.target)?.sha, branches, [])
   return { isRepo: true, branches, target: targets.target, defaultBranch: targets.defaultBranch, uncounted: branches.filter((b) => b.toTarget == null).length }
 }
 
@@ -496,29 +496,39 @@ const COUNTED = 60
 /**
  * Each branch's commits not in the target (#1642): 0 for those merged into it (one `for-each-ref --merged`), a count for
  * the first COUNTED others, null past them. Measured against the local target branch.
+ *
+ * Each row is measured at the commit it was read at (its `sha`), against the target's commit in the same read (`targetAt`),
+ * never by their names now (HI-3453): a branch that moves between the read and its count would otherwise show its new
+ * count beside its old commit, and deleting it at that commit is refused as moved.
  */
-async function measure(root: string, target: string, local: GitBranchRow[], remote: GitRemoteBranchRow[]): Promise<void> {
-  const merged = await git(root, ['for-each-ref', `--merged=refs/heads/${target}`, '--format=%(refname)', 'refs/heads', 'refs/remotes'])
+async function measure(root: string, target: string, targetAt: string | undefined, local: GitBranchRow[], remote: GitRemoteBranchRow[]): Promise<void> {
+  const at = targetAt || `refs/heads/${target}`
+  const merged = await git(root, ['for-each-ref', `--merged=${at}`, '--format=%(refname)%00%(objectname)', 'refs/heads', 'refs/remotes'])
   if (!merged.ok) return
-  const inTarget = new Set(merged.out.split(/\r?\n/).filter(Boolean))
-  const rows = [...local.map((b) => ({ ref: `refs/heads/${b.name}`, row: b as { toTarget?: number | null } })), ...remote.map((r) => ({ ref: `refs/remotes/${r.name}`, row: r as { toTarget?: number | null } }))]
+  // Merged as each ref is now: a row read at another commit (moved since) isn't taken for merged, and is counted at its own.
+  const lines = merged.out.split(/\r?\n/).filter(Boolean)
+  const inTarget = new Set(lines)
+  const refsIn = new Set(lines.map((l) => l.split('\0')[0]))
+  const rows = [...local.map((b) => ({ ref: `refs/heads/${b.name}`, sha: b.sha, row: b as { toTarget?: number | null } })), ...remote.map((r) => ({ ref: `refs/remotes/${r.name}`, sha: r.sha as string | undefined, row: r as { toTarget?: number | null } }))]
   let counted = 0
   // Merged branches' counts of what they lack, apart: they never take an unmerged branch's count.
   let behindCounted = 0
-  for (const { ref, row } of rows) {
-    if (inTarget.has(ref)) {
+  for (const { ref, sha, row } of rows) {
+    const pin = sha || ref
+    if (sha ? inTarget.has(`${ref}\0${sha}`) : refsIn.has(ref)) {
       row.toTarget = 0
       // A local branch with nothing of its own may still lack the target's newest (HR4's HI-1180 round 1: a card's new line
       // behind its target): Update from <target> fast-forwards it.
       if (ref.startsWith('refs/heads/') && behindCounted++ < COUNTED) {
-        const n = await git(root, ['rev-list', '--count', `${ref}..refs/heads/${target}`, '--'])
+        const n = await git(root, ['rev-list', '--count', `${pin}..${at}`, '--'])
         ;(row as { fromTarget?: number | null }).fromTarget = n.ok ? Number(n.out.trim()) || 0 : null
       }
     } else if (counted++ < COUNTED) {
       // Both ways in one run: the target's commits it hasn't (HI-1180's Update from <target>), and its own.
-      const n = await git(root, ['rev-list', '--left-right', '--count', `refs/heads/${target}...${ref}`, '--'])
+      const n = await git(root, ['rev-list', '--left-right', '--count', `${at}...${pin}`, '--'])
       const [from, to] = n.ok ? n.out.trim().split(/\s+/).map(Number) : []
-      row.toTarget = n.ok ? to || null : null
+      // 0 for one merged at the commit read (it moved since the merged list): nothing of its own there.
+      row.toTarget = n.ok && Number.isFinite(to) ? to : null
       if (ref.startsWith('refs/heads/')) (row as { fromTarget?: number | null }).fromTarget = n.ok && Number.isFinite(from) ? from : null
     } else row.toTarget = null
   }

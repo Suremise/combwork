@@ -89,10 +89,17 @@ describe("the scenarios' fake providers", () => {
     })
   })
 
-  it('splits them as the ownership matrix does (HI-2663, HI-2915, HI-2913, HI-2944, HI-2854, HI-2938, HI-3155, HI-3323, HI-3324, HI-3360, HI-3361): 103 on the fake Claude Code (HI-2854: solo-ab-card among them), 17 model trials only (solo-ab-plain among them), the rest on every fake', () => {
-    expect(FAKE_CLAUDE_ONLY).toHaveLength(103)
-    expect(MODEL_TRIALS_ONLY).toHaveLength(17)
+  // HI-3450: the split follows fakeScope's own lists, never a count written here: a literal count drifted when HI-3419
+  // added a fake-only scenario, and no merge check runs this file (check:repo is for tests that scan the tree).
+  it('splits them as the ownership matrix does (HI-2663, HI-2854, HI-3450): each scenario on the fake Claude Code only, model trials only, or every fake, once', () => {
+    const fakeOnly = ids.filter((id: string) => fakesFor(id).length === 1)
+    const trialsOnly = ids.filter((id: string) => fakesFor(id).length === 0)
+    const everyFake = ids.filter((id: string) => fakesFor(id).length === FAKES.length)
+    expect([...fakeOnly].sort()).toEqual([...FAKE_CLAUDE_ONLY].sort())
+    expect([...trialsOnly].sort()).toEqual([...MODEL_TRIALS_ONLY].sort())
+    expect(fakeOnly.length + trialsOnly.length + everyFake.length).toBe(ids.length)
+    expect(FAKE_CLAUDE_ONLY).toContain('solo-ab-card')
+    expect(MODEL_TRIALS_ONLY).toContain('solo-ab-plain')
     expect(NOT_A_TRIAL).toEqual(['tool-sweep'])
-    expect(ids.filter((id: string) => fakesFor(id).length === FAKES.length)).toHaveLength(ids.length - 103 - 17)
   })
 })
