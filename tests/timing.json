@@ -10,6 +10,7 @@
   "wait.hangReal": { "kind": "hang", "ms": 180000, "note": "a unit test's wait on real git or a real process" },
   "wait.hangRealJj": { "kind": "hang", "ms": 300000, "note": "a unit test's wait on the real jj" },
   "wait.interval": { "kind": "interval", "ms": 50, "note": "how often a unit test's wait looks" },
+  "msys.keeperReadyMs": { "kind": "hang", "ms": 60000, "note": "a test run's Git Bash /tmp keeper starting (tests/msysTemp.mts, HI-3447): past it, the run goes on without it, said" },
   "spawn.hang": { "kind": "hang", "ms": 120000, "note": "a child process a unit test starts (its timeout: option)" },
   "spawn.hangReal": { "kind": "hang", "ms": 300000, "note": "a child process a unit test starts doing real git or real processes at length" },
   "worker.start": { "kind": "hang", "ms": 60000, "note": "a worker thread a unit test starts, until it answers" },

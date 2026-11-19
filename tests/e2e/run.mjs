@@ -59,7 +59,7 @@ import { freshenHome, freshenedLine, HomeNotReady } from './testHomes.mjs'
 import { autoClean, holdLane } from './clean.mjs'
 import { recycleBinCount, recycleBinLine } from './recycleBin.mjs'
 import { readUnpackedInfo } from '../../scripts/distCopy.mjs'
-import { endRunTemp, startRunTemp } from '../runTemp.mts'
+import { endRunTemp, msysTempKept, startRunTemp } from '../runTemp.mts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..', '..')
@@ -120,6 +120,8 @@ if (!evidence.ok) {
 // exits, unless the run is recorded for review (kept, as its logs are, until a run's start a day later removes it,
 // while no open card cites it). A run's start removes what stopped runs left, by the same evidence rules.
 const runTemp = startRunTemp((p) => evidence.protects(p))
+// Git Bash's /tmp kept at the user's temp folder before any suite can start Git Bash (HI-3447).
+await msysTempKept()
 process.on('exit', () => {
   if (opts.record) return console.log(`\nKept the run's temp folder with its record: ${runTemp}`)
   const failed = endRunTemp()
