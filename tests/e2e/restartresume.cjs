@@ -148,7 +148,9 @@ async function promptWorking(c, a, text) {
     const t = await c.inv('transcript:read', alpha, live.sessionId).catch(() => null)
     return (t?.items ?? []).some((x) => x.kind === 'user' && (x.text ?? '').includes(text))
   }
-  return lib.sendPrompt(c.inv, lib.ptyKey(alpha, a.id), text, { ready: async () => (await s())?.status === 'ready', submitted: taken })
+  // Idle (lib.agentIdle): after its note's turn a fake is `finished`, not `ready`.
+  if (!(await lib.agentIdle(c.inv, a.id, HUNG_MS))) console.log(`INFO ${a.name ?? a.id} not idle within the step's bound: typed anyway`)
+  return lib.sendPrompt(c.inv, lib.ptyKey(alpha, a.id), text, { submitted: taken })
 }
 /** A notice's text in whichever window shows it (a notice goes to one window of several), and that window. */
 async function anyToast(c, re) {
