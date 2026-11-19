@@ -73,8 +73,9 @@ export type CheckpointReply = { id: number; ok: true; value: CheckpointDone | Ch
 export const checkpointHooks = { fail: null as ((file: string) => boolean) | null, inRestart: null as ((file: string) => void) | null, afterRestart: null as ((file: string) => void) | null, beforeWalStat: null as ((file: string) => void) | null }
 
 /**
- * HI-3414: the connection kept for a database (by its file, lower case), and its data_version as it was read last before
- * a checkpoint or inside the WAL's restart (null: none read yet on this connection, so a check checkpoints).
+ * HI-3414: the connection kept for a database (by its file, lower case), and its data_version as it was read before its
+ * last checkpoint (null: none on this connection yet, so a check checkpoints). Never moved by the restart: whatever
+ * another connection committed since that checkpoint is for the next one.
  */
 interface Kept {
   db: DatabaseSync
@@ -154,7 +155,8 @@ export function runCheckpoint(m: CheckpointRequest, state: Int32Array | null): C
  * first pays that sync, on its thread. Made here, it is this thread's: `user_version` written back as it is (a page of
  * the file's header written, nothing in it changed), in a transaction that never waits for the write lock (another
  * connection holding it, it is skipped: `busy`, and that connection's commit restarts the WAL itself). Its commit is this
- * connection's own, so it never moves data_version (HI-3414): the next check sees only other connections' commits.
+ * connection's own, so it never moves data_version (HI-3414): the next check sees only other connections' commits since
+ * the checkpoint, those before this restart included.
  */
 export function runRestart(m: CheckpointRequest, state: Int32Array | null): RestartDone | null {
   if (state && Atomics.load(state, CLOSING) !== m.closing) return null
@@ -186,7 +188,8 @@ export function runRestart(m: CheckpointRequest, state: Int32Array | null): Rest
       if (db.isTransaction) db.exec('ROLLBACK')
       throw e
     }
-    k.seen = seen
+    // Its own commit leaves data_version as it was, so `k.seen` stays the checkpoint's: a commit of another connection's
+    // since (HR1's round 4: one between the checkpoint and this transaction) is still seen by the next check.
     const ms = performance.now() - t
     const wal = walAfter(db, m.file, seen, salts)
     checkpointHooks.afterRestart?.(m.file)

@@ -544,6 +544,41 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
     }
   })
 
+  it("HI-3414 (HR1's round 4): another connection's commit after the checkpoint, before the restart begins, the WAL's size and time unchanged, is still seen and checkpointed: the restart never takes it for its own", () => {
+    const db = open(wal.checkpointWhenIdle)
+    const walFile = `${db.file}-wal`
+    const tick = Math.floor(Date.now() / 1000) - 60
+    try {
+      write(db.writer, 5)
+      // The WAL in one clock tick from here on, as the stat sees it.
+      utimesSync(walFile, tick, tick)
+      const before = statSync(walFile)
+      checkpointThreadHooks.beforeDispatch = (kind) => {
+        if (kind === 'restart') otherWrite(db.file)
+      }
+      const done = wal.checkpointStats.done
+      due()
+      checkpointThreadHooks.beforeDispatch = undefined
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      // The other connection's commit restarted the WAL over its old frames, and the restart wrote after it: the premise,
+      // nothing in the file's size or time says so.
+      utimesSync(walFile, tick, tick)
+      const after = statSync(walFile)
+      expect([after.size, after.mtimeMs]).toEqual([before.size, before.mtimeMs])
+      const step = wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+      let t = performance.now() + 2 * step
+      wal.checkpointTick(t)
+      expect(wal.checkpointStats.done).toBe(done + 2)
+      // Then idle: nothing more.
+      for (let i = 0; i < 3; i++) wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.done).toBe(done + 2)
+      expect((db.reader.prepare('SELECT count(*) AS c FROM t').get() as { c: number }).c).toBe(6)
+    } finally {
+      checkpointThreadHooks.beforeDispatch = undefined
+      db.close()
+    }
+  })
+
   it('a write begun on main since the checkpoint restarts the WAL itself: the checkpointer makes none then', async () => {
     const l = lock()
     const db = open((f, w) => wal.checkpointWhenIdle(f, w, { hold: l.hold }))

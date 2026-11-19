@@ -184,6 +184,31 @@ describe("the WAL checkpoints' worker (HI-1691)", () => {
       expect(() => renameSync(db.file, `${db.file}.moved`)).not.toThrow()
     } finally {
       wal.checkpointThreadHooks.beforePost = undefined
+      if (db.writer.isOpen) db.close()
+    }
+  })
+
+  it("HI-3414 (HR1's round 4): checkpointsLetGo awaited while a checkpoint is in flight: the restart its answer would ask for isn't made, so closed with no await between, the file can be moved", async () => {
+    const db = open()
+    try {
+      write(db.writer, 20)
+      const done = wal.checkpointStats.done
+      const restarts = wal.checkpointStats.restarts
+      // The checkpoint posted to the worker; its answer comes only after this task.
+      due()
+      await wal.checkpointsLetGo(db.file)
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      expect(wal.checkpointStats.restarts).toBe(restarts)
+      // The close's own release kept from the worker: only the one awaited has let go of the file.
+      wal.checkpointThreadHooks.beforePost = (kind) => {
+        if (kind === 'release') throw new Error('not sent (test)')
+      }
+      db.close()
+      expect(() => renameSync(db.file, `${db.file}.moved`)).not.toThrow()
+    } finally {
+      wal.checkpointThreadHooks.beforePost = undefined
+      // Closed once, whichever way it went (a database left registered would be ticked by the tests after).
+      if (db.writer.isOpen) db.close()
     }
   })
 

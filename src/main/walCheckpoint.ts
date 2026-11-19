@@ -331,6 +331,8 @@ class CheckpointThread {
   /** Checkpoints in flight, and what waits for them to end, by file (lower case). */
   private flying = new Map<string, number>()
   private waiting = new Map<string, (() => void)[]>()
+  /** HI-3414 (HR1's round 4): files being let go of (letGo), by key: nothing more is asked of the worker for them meanwhile. */
+  private lettingGo = new Map<string, number>()
 
   /**
    * Runs a checkpoint or a restart of `file`, answered once. Never throws: a worker that can't be started, or a request
@@ -338,6 +340,8 @@ class CheckpointThread {
    * opens only with its answer).
    */
   run(file: string, kind: CheckpointKind, answer: Answer): void {
+    // Being let go of: skipped (as one asked for before a close), so nothing opens the worker's connection again.
+    if (kind !== 'release' && this.lettingGo.has(file.toLowerCase())) return answer(null, '')
     let w: Worker | null
     try {
       checkpointThreadHooks.beforeDispatch?.(kind)
@@ -384,6 +388,24 @@ class CheckpointThread {
   release(file: string): void {
     releaseConnection(file)
     if (this.worker) this.run(file, 'release', () => undefined)
+  }
+
+  /**
+   * HI-3414: the worker lets go of `file`, its kept connection included, while the database is still open: no request for
+   * it is made from now until the release and whatever was in flight before it have ended (HR1's round 4: a checkpoint's
+   * answer would otherwise ask for a restart, made after the release, on a connection opened again), then resolves.
+   */
+  async letGo(file: string): Promise<void> {
+    const key = file.toLowerCase()
+    this.lettingGo.set(key, (this.lettingGo.get(key) ?? 0) + 1)
+    try {
+      this.release(file)
+      await this.released(file)
+    } finally {
+      const left = (this.lettingGo.get(key) ?? 1) - 1
+      if (left > 0) this.lettingGo.set(key, left)
+      else this.lettingGo.delete(key)
+    }
   }
 
   /** Resolves once no checkpoint of `file` is in flight: the worker has let go of it, or ended. */
@@ -460,12 +482,10 @@ export const checkpointsReleased = (file: string): Promise<void> => thread.relea
 
 /**
  * HI-3414: checkpointsReleased for a database still open, to be closed in the same task once this resolves (no await
- * between, so no request can open the worker's connection again): the worker's kept connection is closed first.
+ * between, so no request can open the worker's connection again): the worker's kept connection is closed first, and
+ * nothing more is asked of the worker for the file until it is (CheckpointThread's letGo).
  */
-export const checkpointsLetGo = (file: string): Promise<void> => {
-  thread.release(file)
-  return thread.released(file)
-}
+export const checkpointsLetGo = (file: string): Promise<void> => thread.letGo(file)
 
 /** The worker's script, beside main's (as the repository lock's); a test's build of it (`useCheckpointWorker`). */
 let scriptForTests: string | null = null
