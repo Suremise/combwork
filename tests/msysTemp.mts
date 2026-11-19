@@ -15,7 +15,10 @@ import { existsSync } from 'fs'
 import { createRequire } from 'module'
 import { dirname, join } from 'path'
 
-const { timing } = createRequire(import.meta.url)('./timing.cjs') as { timing: (name: string) => number }
+// Read when called, never at module scope (HI-3451): tests bundle Combwork's code for a child process with esbuild as
+// CommonJS (electron-stub.ts → tempDir.ts → runTemp.mts → here), where import.meta.url is undefined, and a module-scope
+// createRequire(undefined) threw as the bundle loaded: the child ended before it did anything.
+const timing = (name: string): number => (createRequire(import.meta.url)('./timing.cjs') as { timing: (name: string) => number }).timing(name)
 
 /** Git for Windows' MSYS folder (`<root>\usr\bin`, with msys-2.0.dll and cat.exe), from git's exec path; null without one. */
 export function gitMsysBin(): string | null {
