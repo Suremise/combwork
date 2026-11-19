@@ -1,4 +1,4 @@
-import { closeSync, existsSync, openSync, readSync, statSync } from 'original-fs'
+import { closeSync, existsSync, fstatSync, openSync, readSync, statSync } from 'original-fs'
 import { parentPort, workerData } from 'worker_threads'
 import { DatabaseSync } from 'node:sqlite'
 
@@ -50,10 +50,11 @@ export type CheckpointReply = { id: number; ok: true; value: CheckpointDone | Re
 /**
  * Tests: a checkpoint of these files throws, as one refused by SQLite or the disk would; `inRestart` runs inside the
  * WAL's first write, its write lock held, `beforeWalStat` once it is committed, before the WAL is read under the write
- * lock again (HI-3362), and `afterRestart` once its connection is closed, before its answer (in-process only: a worker's
+ * lock again (HI-3362), and `afterRestart` once its connection is closed, before its answer; `markUnreadable` makes
+ * walMark's reading of these files fail (HI-3414) (in-process only: a worker's
  * thread has its own copy of this module).
  */
-export const checkpointHooks = { fail: null as ((file: string) => boolean) | null, inRestart: null as ((file: string) => void) | null, afterRestart: null as ((file: string) => void) | null, beforeWalStat: null as ((file: string) => void) | null }
+export const checkpointHooks = { markUnreadable: null as ((file: string) => boolean) | null, fail: null as ((file: string) => boolean) | null, inRestart: null as ((file: string) => void) | null, afterRestart: null as ((file: string) => void) | null, beforeWalStat: null as ((file: string) => void) | null }
 
 /** Checkpoints `m.file`'s WAL on a connection of its own; `state` is shared with main (null: run on main, in tests). */
 export function runCheckpoint(m: CheckpointRequest, state: Int32Array | null): CheckpointDone | null {
@@ -138,21 +139,52 @@ function walSalts(file: string): string | null {
   }
 }
 
+/** A WAL file's magic numbers (its header's first 4 bytes, big-endian): its checksums little- or big-endian. */
+const WAL_MAGIC = [0x377f0682, 0x377f0683]
+
 /**
- * HI-3414: what the WAL holds, as its WAL-index says (the `-shm` file's first header copy, sqlite.org/walformat.html):
- * the frames in it (`mxFrame`, bytes 16-19) and its salts (bytes 32-39), raw. Every commit moves one of them (frames
- * added, or the WAL started again with new salts) and a checkpoint moves neither, so it says whether anything was written
- * where the file's size and modified time can't: Windows stamps that time from its clock tick (about 15.6 ms by
- * default), and a write after a restart goes over the old frames without growing the file. Bytes past the header are the
- * locks SQLite takes (from 120), never read. Null when it can't be read, or SQLite hasn't initialised it.
+ * HI-3414: what the WAL holds, read from the WAL file itself (sqlite.org/walformat.html): its salts (the header's bytes
+ * 16-23) and how many frames from its beginning carry them, as `<salts>:<frames>`. Every commit moves it (frames written
+ * with the header's salts, or the WAL started again with new ones) and a checkpoint never does (it writes the database,
+ * not the WAL), so it says whether anything was written where the file's size and modified time can't: Windows stamps
+ * that time from its clock tick (about 15.6 ms by default), and a write after a restart goes over the old frames without
+ * growing the file. Not the WAL-index (`-shm`): that one is SQLite's mapped memory, which an ordinary read isn't sure to
+ * see as it stands; WAL frames are written and read with ordinary file I/O, as every other connection and process reads
+ * them. A restart writes from frame 0 with new salts, so the frames carrying the header's salts come first: the first
+ * that doesn't is found by halves, and given the `last` mark with the same salts, one frame's header says if any came
+ * since. A frame being written may count early (a change either way). Null when the WAL can't be read or isn't one.
  */
-export function walMark(file: string): string | null {
+export function walMark(file: string, last: string | null = null): string | null {
+  if (checkpointHooks.markUnreadable?.(file)) return null
   let fd: number | null = null
   try {
-    fd = openSync(`${file}-shm`, 'r')
-    const b = Buffer.alloc(40)
-    if (readSync(fd, b, 0, 40, 0) !== 40 || b[12] !== 1) return null
-    return b.toString('hex', 16, 20) + b.toString('hex', 32, 40)
+    fd = openSync(`${file}-wal`, 'r')
+    const head = Buffer.alloc(32)
+    if (readSync(fd, head, 0, 32, 0) !== 32 || !WAL_MAGIC.includes(head.readUInt32BE(0))) return null
+    const raw = head.readUInt32BE(8)
+    const page = raw === 1 ? 65536 : raw
+    if (page < 512 || page > 65536 || (page & (page - 1)) !== 0) return null
+    const salts = head.toString('hex', 16, 24)
+    const frameBytes = page + 24
+    const frames = Math.max(0, Math.floor((fstatSync(fd).size - 32) / frameBytes))
+    const b = Buffer.alloc(8)
+    const handle = fd
+    // A frame's header: its salts at bytes 8-15.
+    const carries = (i: number): boolean => readSync(handle, b, 0, 8, 32 + i * frameBytes + 8) === 8 && b.toString('hex') === salts
+    let lo = 0
+    let hi = frames
+    const [lastSalts, lastFrames] = last?.split(':') ?? []
+    const known = Number(lastFrames)
+    if (lastSalts === salts && Number.isInteger(known) && known <= frames) {
+      if (known === frames || !carries(known)) return last
+      lo = known + 1
+    }
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1
+      if (carries(mid)) lo = mid + 1
+      else hi = mid
+    }
+    return `${salts}:${lo}`
   } catch {
     return null
   } finally {

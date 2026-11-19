@@ -214,6 +214,7 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
     checkpointHooks.fail = null
     checkpointHooks.beforeWalStat = null
     checkpointHooks.afterRestart = null
+    checkpointHooks.markUnreadable = null
   })
   /** A checkpoint due now (the idle trigger), for every database registered. */
   const due = (): void => {
@@ -300,33 +301,40 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
   // HI-3414: Windows stamps a file's modified time from its clock tick (about 15.6 ms unless something raised the timer's
   // resolution, as GitHub's runner doesn't), so a write in the restart's tick that doesn't grow the WAL (its frames go
   // over the old ones from the beginning) leaves its size and time as the restart's. The WAL's time is set back to the
-  // restart's here: the same tick, whatever this machine's clock does.
+  // restart's here (a whole second, which utimes keeps exactly): the same tick, whatever this machine's clock does.
+  /** A restart whose WAL is stamped `tick` as the worker reads it: its size and time as the checkpointer holds them. */
+  const restartAt = (db: { file: string; writer: DatabaseSync }, tick: number): { size: number; mtimeMs: number } => {
+    write(db.writer, 5)
+    checkpointHooks.beforeWalStat = () => utimesSync(`${db.file}-wal`, tick, tick)
+    const restarts = wal.checkpointStats.restarts
+    due()
+    checkpointHooks.beforeWalStat = null
+    expect(wal.checkpointStats.restarts).toBe(restarts + 1)
+    const s = statSync(`${db.file}-wal`)
+    expect(s.mtimeMs).toBe(tick * 1000)
+    return s
+  }
+  const otherWrite = (file: string): void => {
+    const other = new DatabaseSync(file)
+    try {
+      other.exec('PRAGMA wal_autocheckpoint = 0')
+      other.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(6000, 7))
+    } finally {
+      other.close()
+    }
+  }
+
   for (const by of ['another connection', 'the writer'] as const) {
     it(`HI-3414: a write by ${by} in the restart's clock tick, the WAL's size and time unchanged, is still seen and checkpointed`, () => {
       const db = open(wal.checkpointWhenIdle)
       const walFile = `${db.file}-wal`
-      // A whole second: utimes keeps it exactly, so the worker's reading and the one after the write are equal.
       const tick = Math.floor(Date.now() / 1000) - 60
       try {
-        write(db.writer, 5)
-        checkpointHooks.beforeWalStat = () => utimesSync(walFile, tick, tick)
         const done = wal.checkpointStats.done
         const restarts = wal.checkpointStats.restarts
-        due()
-        checkpointHooks.beforeWalStat = null
-        expect(wal.checkpointStats.restarts).toBe(restarts + 1)
-        const before = statSync(walFile)
-        expect(before.mtimeMs).toBe(tick * 1000)
+        const before = restartAt(db, tick)
         if (by === 'the writer') write(db.writer, 1)
-        else {
-          const other = new DatabaseSync(db.file)
-          try {
-            other.exec('PRAGMA wal_autocheckpoint = 0')
-            other.prepare('INSERT INTO t (doc) VALUES (?)').run(Buffer.alloc(6000, 7))
-          } finally {
-            other.close()
-          }
-        }
+        else otherWrite(db.file)
         utimesSync(walFile, tick, tick)
         // The premise: nothing in the file's size or time says it was written.
         const after = statSync(walFile)
@@ -342,6 +350,52 @@ describe("the WAL's first write after a checkpoint is the checkpointer's (HI-328
       }
     })
   }
+
+  it("HI-3414 (HR1's round 1): a WAL that can't be read is never taken for one unwritten: a write then, its size and time unchanged, is still checkpointed", () => {
+    const db = open(wal.checkpointWhenIdle)
+    const walFile = `${db.file}-wal`
+    const tick = Math.floor(Date.now() / 1000) - 60
+    try {
+      const before = restartAt(db, tick)
+      const done = wal.checkpointStats.done
+      checkpointHooks.markUnreadable = (file) => file === db.file
+      otherWrite(db.file)
+      utimesSync(walFile, tick, tick)
+      const after = statSync(walFile)
+      expect([after.size, after.mtimeMs]).toEqual([before.size, before.mtimeMs])
+      const step = wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs
+      let t = performance.now() + 2 * step
+      wal.checkpointTick(t)
+      // Readable again: a reading after none is a change too, so it waits to be idle once more, then is checkpointed.
+      checkpointHooks.markUnreadable = null
+      wal.checkpointTick((t += step))
+      wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.done).toBe(done + 1)
+      // Then idle: nothing more.
+      for (let i = 0; i < 3; i++) wal.checkpointTick((t += step))
+      expect(wal.checkpointStats.done).toBe(done + 1)
+    } finally {
+      checkpointHooks.markUnreadable = null
+      db.close()
+    }
+  })
+
+  it("HI-3414 (HR1's round 1): the WAL's size and time still count when its frames say nothing changed", () => {
+    const db = open(wal.checkpointWhenIdle)
+    const tick = Math.floor(Date.now() / 1000) - 60
+    try {
+      restartAt(db, tick)
+      const done = wal.checkpointStats.done
+      // Its time moved, nothing written.
+      utimesSync(`${db.file}-wal`, tick + 5, tick + 5)
+      const t = performance.now() + 2 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      wal.checkpointTick(t)
+      wal.checkpointTick(t + wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)
+      expect(wal.checkpointStats.done).toBe(done + 1)
+    } finally {
+      db.close()
+    }
+  })
 
   it("HI-3362: another connection writing just after the restart's commit (the lock taken before the WAL is read) is still seen and checkpointed", () => {
     const db = open(wal.checkpointWhenIdle)
