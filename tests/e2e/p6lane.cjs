@@ -418,6 +418,11 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     await section('branches')
     const later = await send(b2, dep, 'start')
     check('…and starts once One is merged', later.status === 200, JSON.stringify(later.body))
+    // HI-3439: its start answers before its slot is on its line (prepared after it); the Retarget below needs the line.
+    const laterAt = later.body?.data?.folder
+    const laterLine = later.body?.data?.line
+    const laterOn = () => { try { return git(laterAt, 'branch', '--show-current') === laterLine } catch { return false } }
+    check('…on its line in its own slot', !!laterAt && !!laterLine && !!(await waitHung(laterOn)), JSON.stringify(later.body))
     check("Branches & remotes: One's branch says merged, with the merge's revision",!!(await waitHung(async () => (await chip.getAttribute('data-stage').catch(() => null)) === 'done' && (await chip.locator('[data-merged]').getAttribute('data-merged').catch(() => null)) === i1?.data?.result)), await text(chip))
 
     // ===== S19: the options changed mid-lane, in the tab.
