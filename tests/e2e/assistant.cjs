@@ -89,7 +89,10 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await lib.openWorkspace(inv, page, ws)
   check('coming back shows it again', (await page.locator('.assistant-panel').count()) === 1)
 
-  // Switching mode (not running): saved for this workspace.
+  // Switching mode (not running): saved for this workspace. The panel came back with no modes: they load as it opens
+  // (modes:list), and its menu lists those it has when clicked (HI-3417), so it is clicked once the header shows its mode's
+  // icon (every bundled mode has one), the list loaded.
+  check('the header shows its mode once the modes are loaded', !!(await lib.until(async () => (await page.locator('.assistant-mode .assistant-mode-icon').count()) === 1, lib.timing('hang.ui'))))
   await page.locator('.assistant-mode').click()
   await page.locator('.context-menu .menu-item, .menu .menu-item', { hasText: 'Planner' }).first().click()
   check('choosing a mode saves it for the workspace', !!(await lib.until(() => agentFile().mode === 'planner', lib.timing('hang.ui'))), JSON.stringify(agentFile()))
