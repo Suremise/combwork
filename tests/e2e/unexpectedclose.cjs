@@ -10,6 +10,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 const { createHash } = require('crypto')
+const { spawn } = require('child_process')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.ui')
 // An agent's or a copy's start after an unexpected close: a bound for a hung run.
@@ -90,6 +91,43 @@ async function endFromOutside(app) {
   const gone = !!(await lib.until(() => lib.stillSame(tree).length === 0, HUNG_MS))
   if (gone) console.log(`INFO the ended copy's ${tree.length} processes were gone ${Date.now() - at} ms after the kill`)
   return ended > 0 && gone
+}
+
+const children = []
+/**
+ * Starts a copy of Combwork straight from Electron, not through Playwright (HI-3454): its output is read as it comes, so a
+ * check can see it wait for the profile's lock before it has a window. `out()`: its stdout and stderr so far.
+ */
+function startPlain() {
+  const child = spawn(lib.ELECTRON, [lib.ROOT], { cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, ...claudeEnv }), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+  children.push(child)
+  let text = ''
+  for (const s of [child.stdout, child.stderr]) s.on('data', (d) => (text += d))
+  identities.push(...lib.identify([child.pid]))
+  return { child, out: () => text, exited: () => child.exitCode !== null || child.signalCode !== null }
+}
+
+/**
+ * Holds the profile's lock file as a copy of Combwork still ending does (HI-3454): opened for writing and shared for
+ * reading only, as Chromium opens it, by a PowerShell process (Node can't choose a file's sharing), until `release()`.
+ */
+function holdLock() {
+  const file = path.join(userData, 'lockfile').replace(/'/g, "''")
+  const ps = `$f = [IO.File]::Open('${file}', 'OpenOrCreate', 'Write', 'Read'); [Console]::Out.WriteLine('held'); [Console]::Out.Flush(); $null = [Console]::In.ReadLine(); $f.Close()`
+  const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { env: lib.baseEnv(), stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true })
+  children.push(child)
+  let held = false
+  child.stdout.on('data', (d) => (held ||= /held/.test(String(d))))
+  const gone = new Promise((r) => child.once('exit', r))
+  return { held: () => held, release: () => (child.stdin.end(), gone) }
+}
+
+/** Ends a copy startPlain started, by its pid and start time, and waits until each of its processes has gone. */
+async function endPlain(copy) {
+  const id = identities.find((i) => i.pid === copy.child.pid)
+  const tree = id ? [id, ...lib.processTree(id.pid)] : []
+  if (id) lib.endTreeExactly(id)
+  return !!(await lib.until(() => lib.stillSame(tree).length === 0, HUNG_MS))
 }
 
 /** The notice's text in the window, once it is shown. */
@@ -213,12 +251,36 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       check('the test copy quits', await quitting.gone(HUNG_MS))
       current = null
     }
+    // --- 5. HI-3454: a start while another process holds the profile's lock, as a copy still ending (crashed, or ended
+    // from outside) holds it for a moment after its window has gone. It used to leave at once as "already running", with
+    // nothing to bring forward: now it waits for the lock and carries on once it's released.
+    {
+      const holder = holdLock()
+      check("another process holds the profile's lock", !!(await lib.until(holder.held, HUNG_MS)))
+      const copy = startPlain()
+      const waiting = await lib.until(() => /waiting up to \d+ ms for the profile's lock/.test(copy.out()) || copy.exited(), START_MS)
+      check('a start meanwhile waits for the lock, rather than leaving as already running', !!waiting && !copy.exited(), copy.out())
+      await holder.release()
+      check('…and carries on once it is released', !!(await lib.until(() => /this start carries on/.test(copy.out()) || copy.exited(), HUNG_MS)) && !copy.exited(), copy.out())
+      check('…to a running Combwork, which keeps its marker', !!(await lib.until(() => marker()?.pid === copy.child.pid, START_MS)), JSON.stringify(marker()))
+      check('that copy is ended from outside', await endPlain(copy))
+    }
+    // A lock held throughout is a running copy's: the start waits its bound out, then leaves as it did.
+    {
+      const holder = holdLock()
+      check("another process holds the profile's lock again", !!(await lib.until(holder.held, HUNG_MS)))
+      const copy = startPlain()
+      check('a start while it stays held leaves, once its wait has run out', !!(await lib.until(copy.exited, START_MS)), copy.out())
+      check('…saying the lock was still held, and that Combwork is already running', /The profile's lock was still held after \d+ ms/.test(copy.out()) && /Combwork is already running/.test(copy.out()), copy.out())
+      await holder.release()
+    }
   } catch (e) {
     check('no unexpected error', false, e?.stack ?? String(e))
   } finally {
     if (current) await current.app.close().catch(() => undefined)
     // Anything left of a copy this suite started, by its own pid and start time only.
     for (const id of identities) lib.endTreeExactly(id)
+    for (const c of children) lib.endChildTree(c)
   }
   console.log(failed ? `\n${failed} check(s) failed` : '\nAll checks passed')
   process.exit(failed ? 1 : 0)
