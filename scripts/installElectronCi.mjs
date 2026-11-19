@@ -5,8 +5,12 @@
 // electron_config_cache when the zip isn't cached there and unzips it into node_modules/electron/dist.
 //   node scripts/installElectronCi.mjs              install, up to 4 attempts with growing pauses
 //   node scripts/installElectronCi.mjs --version    print the Electron version (CI's cache key)
+//   node scripts/installElectronCi.mjs --node       print the Node version inside the installed Electron (HI-3435)
+//   node scripts/installElectronCi.mjs --check-node fail unless this Node has Electron's Node and SQLite versions
 // It exits 1 with "Electron download failed" (a GitHub error annotation in CI) when every attempt fails.
-import { spawn } from 'node:child_process'
+// HI-3435: CI's unit tests run on the Node inside the Electron Combwork ships, so they test the SQLite it ships
+// (node:sqlite): the latest Node 24 the runner takes had a newer SQLite, which behaves differently (tests/README.md).
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -17,6 +21,30 @@ const { version } = JSON.parse(readFileSync(join(ELECTRON, 'package.json'), 'utf
 if (process.argv.includes('--version')) {
   console.log(version)
   process.exit(0)
+}
+
+/** The installed Electron's Node and SQLite versions, read by running it as Node. */
+function electronVersions() {
+  const exe = join(ELECTRON, 'dist', readFileSync(join(ELECTRON, 'path.txt'), 'utf8'))
+  const out = execFileSync(exe, ['-p', 'JSON.stringify({ node: process.versions.node, sqlite: process.versions.sqlite })'], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, encoding: 'utf8', windowsHide: true })
+  return JSON.parse(out.trim())
+}
+
+if (process.argv.includes('--node')) {
+  console.log(electronVersions().node)
+  process.exit(0)
+}
+
+if (process.argv.includes('--check-node')) {
+  const want = electronVersions()
+  const have = { node: process.versions.node, sqlite: process.versions.sqlite }
+  if (want.node === have.node && want.sqlite === have.sqlite) {
+    console.log(`Node ${have.node} with SQLite ${have.sqlite}, as in Electron ${version}.`)
+    process.exit(0)
+  }
+  const message = `Node ${have.node} with SQLite ${have.sqlite} runs the tests, but Electron ${version} ships Node ${want.node} with SQLite ${want.sqlite}.`
+  console.error(process.env.GITHUB_ACTIONS ? `::error title=Not Electron's Node::${message}` : message)
+  process.exit(1)
 }
 
 /** Pauses before attempts 2, 3 and 4: a release-download hiccup usually clears within a minute. */

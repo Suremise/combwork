@@ -7,6 +7,13 @@ tests run git with no global config, as CI does), `cliHomes.ts` (each test file 
 Copilot homes, never the user's, whatever the shell sets: HI-1703), `loggerListeners.ts` (takes off the process
 listeners a test's fresh load of the logger added: HI-1728), and `electron-stub.ts` standing in for `electron`.
 
+**Which Node runs them** (HI-3435): CI runs the unit tests on the Node inside the Electron Combwork ships, not the
+latest Node 24, because the tests use `node:sqlite` directly, and the SQLite it bundles changes with Node's version.
+The runner's Node 24.22.3 had SQLite 3.54.1, which opens a WAL database whose -shm another process maps, where Electron
+44.10's 3.53.4 refuses it (HI-3426, the HI-2199/HI-2200 waits): CI then skipped the product's open-and-wait path.
+`scripts/installElectronCi.mjs --node` reads that version from the installed Electron, and CI fails if the Node running
+the tests doesn't match it (`--check-node`, which says on any machine whether the local Node matches).
+
 **The test area** is `%LOCALAPPDATA%\combwork-test` (`testArea.cjs`): the test profiles, the signed-in Claude Code and
 Codex test homes, the scenario baselines and results, the e2e lanes and logs, the Sandbox reports and the runs' temp
 folders. Before 1.1 it had the old name: `npm run test:move-area` (`moveTestArea.mjs`, HI-2590) moves it once, one way,
