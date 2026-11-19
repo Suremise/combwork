@@ -16,6 +16,10 @@ const te = createRequire(import.meta.url)('./scenarios/turnEnd.cjs') as {
   waitTurnEnd: (o: { reads: Reads; act?: (l: Look) => unknown; deadline: number; floors: { quietMs: number; waitingQuietMs: number }; readMs: number; lookMs: number; sleep?: (ms: number) => Promise<void> }) => Promise<Step>
 }
 const FLOORS = { quietMs: 6000, waitingQuietMs: 3000 }
+type ScreenReads = { reads: Reads; trustKind: (live: unknown, screen: string) => string | null }
+const harness = createRequire(import.meta.url)('./scenarios/harness.cjs') as {
+  subjectScreenReads: (o: { readScreen: () => Promise<string>; launchRun: string; answered: Set<string>; provider: string }) => ScreenReads
+}
 
 /** Runs looks (each with defaults: this prompt's work seen and ended, quiet, nothing pending) and says when and how it ended. */
 function run(looks: Look[]) {
@@ -81,6 +85,12 @@ describe("evidence: this prompt's work, and its end (HR1 on s8, 2)", () => {
   it('seen at work in a look, but no look at an end with its turn over: never ends', () => {
     const looks = [{ now: 0, status: 'working', turn: 'running', workSeen: false, endSeen: false }, ...every(2000, 60000, { status: 'finished', turn: 'unknown', workSeen: false, endSeen: false })]
     expect(run(looks)).toBeNull()
+  })
+  it('seen at work in a look, then at an end with no turn (missing or null): never ends, a missing turn is no proof (HR1 on HI-3400, 2)', () => {
+    for (const turn of [undefined, null]) {
+      const looks = [{ now: 0, status: 'working', turn: 'running', workSeen: false, endSeen: false }, ...every(1000, 60000, { status: 'finished', turn: turn as unknown as string, workSeen: false, endSeen: false })]
+      expect(run(looks)).toBeNull()
+    }
   })
 })
 
@@ -214,5 +224,59 @@ describe('bounded gathering (HR1 on s8, 3)', () => {
     await new Promise((r) => setTimeout(r, timing('quiet.briefMs')))
     expect(reads).toBe(before)
     expect(afterExpiry).toBe(0)
+  })
+})
+
+describe("the subject's screen, through the harness's own reads (HR1 on HI-3400, 1)", () => {
+  const never = () => new Promise<string>(() => {})
+  const fast = { quietMs: 300, waitingQuietMs: 150 }
+  // A relaunch (a run after the launch's) waiting, Combwork's attention on it: a trust question or one for the user.
+  const relaunched = { status: 'waiting', runId: 'slot-run', turn: { state: 'running' }, runtime: { attention: 'waiting', lifecycle: 'running', composer: 'free' } }
+  const TRUST = 'Accessing workspace: Is this a project you created or one you trust? > 1. Yes, I trust this folder 2. No, exit'
+  const QUESTION = 'Which name should the card have? 1. Short 2. Long'
+  /** The harness's reads of a waiting relaunch, its screen read by `readScreen`; this prompt's work seen, nothing else pending. */
+  const subject = (readScreen: () => Promise<string>) => {
+    const s = harness.subjectScreenReads({ readScreen, launchRun: 'launch-run', answered: new Set(), provider: 'claude-code' })
+    return { ...s, reads: { live: () => relaunched, workSeen: () => true, endSeen: () => false, quiet: () => true, ...s.reads } as Reads }
+  }
+  const look = (reads: Reads) => te.gatherLook(reads, { deadline: Date.now() + 60_000, readMs: 100 })
+
+  it('a screen read that fails or never answers is no question for the user: trust pending, never over', async () => {
+    for (const readScreen of [() => Promise.reject(new Error('renderer busy')), never]) {
+      const l = await look(subject(readScreen).reads)
+      expect([l.asks, l.trust]).toEqual([false, true])
+      expect(te.turnStep(te.start(), l, FLOORS)).toMatchObject({ done: false, outcome: null })
+      expect((await te.waitTurnEnd({ reads: subject(readScreen).reads, deadline: Date.now() + 800, floors: fast, readMs: 100, lookMs: 50 })).outcome).toBe('timed out')
+    }
+  })
+  it('the screen is read once a look, and asks and trust decide from that one snapshot', async () => {
+    let reads = 0
+    const l = await look(subject(async () => (reads++, QUESTION)).reads)
+    expect(reads).toBe(1)
+    expect([l.asks, l.trust]).toEqual([true, false])
+  })
+  it('unread, then read again: its trust question answered from the look that read it, then a question for the user ends it', async () => {
+    // Looks 1-3: the read fails or doesn't answer; then the trust question; once answered, a question for the user.
+    let n = 0
+    let answered = false
+    const readScreen = () => {
+      n++
+      if (n === 1) return Promise.reject(new Error('renderer busy'))
+      if (n <= 3) return never()
+      return Promise.resolve(answered ? QUESTION : TRUST)
+    }
+    const s = subject(readScreen)
+    const kinds: (string | null)[] = []
+    const act = (l: Look & { values?: Record<string, unknown> }) => {
+      const screen = l.values?.screen
+      const kind = typeof screen === 'string' ? s.trustKind(relaunched, screen) : null
+      kinds.push(kind)
+      if (kind) answered = true
+    }
+    const r = await te.waitTurnEnd({ reads: s.reads, act, deadline: Date.now() + 10_000, floors: fast, readMs: 100, lookMs: 50 })
+    expect(r).toMatchObject({ outcome: 'over', why: expect.stringMatching(/asking the user/) })
+    // Nothing answered from the unread looks; the trust question answered once it was read.
+    expect(kinds.slice(0, 3)).toEqual([null, null, null])
+    expect(kinds).toContain('claude')
   })
 })

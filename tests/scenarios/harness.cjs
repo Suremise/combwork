@@ -14,7 +14,7 @@ const { timing } = require('../timing.cjs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const lib = require('../e2e/lib.cjs')
-const { waitTurnEnd, UNKNOWN } = require('./turnEnd.cjs')
+const { waitTurnEnd, screenReads, UNKNOWN } = require('./turnEnd.cjs')
 const { processes, leftoverIdentities } = require('../e2e/folderProcesses.cjs')
 const { measuresOf, metricsTotals } = require('./benchmark.cjs')
 const { readWhole, withScriptCalls } = require('./codexScripts.cjs')
@@ -353,6 +353,18 @@ function relaunchTrust({ status, runId, launchRun, answered, screen = '', provid
   // An added folder's (Claude Code 2.1.326, HI-3335).
   if (lib.CLAUDE_TRUST.test(screen) && provider !== 'codex') return 'claude'
   return null
+}
+
+/**
+ * The session under test's screen reads for its turn end (HI-3400, HR1's finding 1: turnEnd.cjs's screenReads), from
+ * `readScreen`, which rejects when its screen can't be read: a trust question on it is never a question for the user, and
+ * the one answered is its relaunch's (relaunchTrust). An unread screen is unknown, never a screen with no question.
+ * Returns { reads, trustKind(live, screen) } (the answer `act` gives, from the look's screen).
+ */
+function subjectScreenReads({ readScreen, launchRun, answered, provider }) {
+  const trustKind = (s, screen) => (s?.status === 'waiting' ? relaunchTrust({ status: s.status, runId: s.runId, launchRun, answered, screen, provider }) : null)
+  const isTrust = (screen) => /Do you trust the files in this folder|trust this folder/i.test(screen) || lib.CLAUDE_TRUST.test(screen)
+  return { reads: screenReads({ readScreen, isTrust, trustKind }), trustKind }
 }
 
 /**
@@ -1079,9 +1091,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     const trustAnswered = new Set()
     const working = (x) => ['working', 'background'].includes(x.status)
     const thisPrompt = () => ctx.statesSeen(statesFrom)
+    // Another agent's screen, for a trust answer only: unread, it's answered at a later look.
     const screenOf = async (k) => plain(await inv('pty:buffer', k).catch(() => '')).slice(-2000)
-    /** The subject's trust question on its screen, in a run after its launch's (relaunchTrust: 'enter', 'claude'), or null. */
-    const trustKind = async (s) => (s?.status === 'waiting' ? relaunchTrust({ status: s.status, runId: s.runId, launchRun, answered: subjectTrusted, screen: await screenOf(key), provider: p.provider }) : null)
+    // The subject's: a failed read rejects, so the look's screen is unknown (subjectScreenReads).
+    const subjectScreen = subjectScreenReads({ readScreen: async () => plain((await inv('pty:buffer', key)) ?? '').slice(-2000), launchRun, answered: subjectTrusted, provider: p.provider })
     const otherAgents = async () => (await inv('session:live')).filter((x) => x.projectPath.toLowerCase() === alpha.toLowerCase())
     const reads = {
       live: async () => (await live()) ?? null,
@@ -1098,8 +1111,9 @@ async function runScenario(sc, providerKey, opts = {}) {
         const from = states.findIndex(working)
         return (from >= 0 && states.slice(from + 1).some((x) => ['ready', 'finished', 'watching'].includes(x.status))) || (await ctx.answered(text))
       },
-      // A person asked (Combwork's runtime facts): not a trust question on its screen, nor a sign-in.
-      asks: async ({ live: s }) => s?.runtime?.attention === 'waiting' && s.runtime.lifecycle === 'running' && !/Do you trust the files in this folder|trust this folder/i.test(await screenOf(key)) && !lib.CLAUDE_TRUST.test(await screenOf(key)),
+      // Its screen, once a look; a person asked (Combwork's runtime facts: not a trust question on that screen, nor a
+      // sign-in); and its relaunch's trust question on it.
+      ...subjectScreen.reads,
       // Combwork types nothing into it now or next: its composer free and (in a project) nothing queued to be offered.
       quiet: async ({ live: s }) => {
         if (!s || s.runtime?.composer !== 'free') return false
@@ -1107,7 +1121,6 @@ async function runScenario(sc, providerKey, opts = {}) {
         const token = s.runId ? lib.launchToken(userData, s.runId) : null
         return !!token && (await lib.inboxQuiet(port, 'alpha', s.agentName, token))
       },
-      trust: async ({ live: s }) => !!(await trustKind(s)),
       // A dispatched agent's work is part of the outcome: wait while one is still working, or at a question (#498).
       dispatchedBusy: sc.waitForAgents ? async () => (await otherAgents()).some((x) => x.agentId !== agentId && ['working', 'starting', 'background', 'waiting'].includes(x.status)) : undefined,
       // Something Combwork does after the turn has ended (a line it types later, #401) is part of the outcome.
@@ -1117,7 +1130,9 @@ async function runScenario(sc, providerKey, opts = {}) {
     const act = async (look) => {
       const s = look.values.live && typeof look.values.live === 'object' ? look.values.live : null
       const status = s?.status ?? 'stopped'
-      const kind = await trustKind(s)
+      // From the look's own screen: one that couldn't be read answers nothing (its trust stays pending).
+      const screen = look.values.screen
+      const kind = typeof screen === 'string' ? subjectScreen.trustKind(s, screen) : null
       if (kind === 'enter') await inv('pty:write', key, '\r')
       if (kind === 'enter' || (kind === 'claude' && (await lib.acceptClaudeTrust(inv, host, agentId, timing('cli.trustMs'))))) subjectTrusted.add(s.runId)
       if (sc.during) await sc.during(ctx, status)
@@ -1332,4 +1347,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, scenarioFolder, PROVIDER_TAGS, dialectForRun, dialectRecord,forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, terminalEnded, claudeTrustAsked, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, scenarioFolder, PROVIDER_TAGS, dialectForRun, dialectRecord,forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, subjectScreenReads, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, terminalEnded, claudeTrustAsked, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
