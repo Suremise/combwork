@@ -255,6 +255,32 @@ describe.skipIf(!isWin)("Git's own sh finds exactly the marker's entry (HI-3047)
     expect(tries).toHaveLength(3)
     for (const t of tries) expect(t).toMatch(/exited 1, winpids \[\], stderr: .*cw-no-such-sleep: command not found.*the background sleep \(\d+\) ended before it was seen as sleep/s)
   }, timing('test.hang'))
+
+  // HI-3421 (HR1's round 1): a shell that doesn't exit within the wait is ended, with any sleep it started, before the
+  // starter throws: nothing of its is left for a caller that never got a winpid. The wait made to run out at once (the
+  // shell still starting) and once the sleep's winpid is written (the sleep surely running).
+  it.skipIf(!bin)("the starter's wait for the shell runs out: the shell, and the sleep once written, ended before it throws; why said", async () => {
+    const early = await startSleeper({ bin: bin!, env: baseEnv(), waitExit: async () => { throw new Error('the wait ran out') } }).catch((e: Error) => e)
+    expect(early).toBeInstanceOf(Error)
+    const msg = (early as Error).message
+    expect(msg).toMatch(/^the wait ran out; the shell \(pid (\d+)\) was still running, ended \(exited [^)]+\), .*; stderr: /)
+    const shell = Number(/the shell \(pid (\d+)\)/.exec(msg)![1])
+    expect(alive(shell)).toBe(false)
+    let sleepWinpid = 0
+    const late = await startSleeper({
+      bin: bin!,
+      env: baseEnv(),
+      waitExit: async (_check, files) => {
+        await vi.waitFor(() => expect(existsSync(files.file) && /\d/.test(readFileSync(files.file, 'utf8'))).toBe(true), { timeout: timing('wait.hang') })
+        sleepWinpid = Number(readFileSync(files.file, 'utf8').trim())
+        own(sleepWinpid)
+        throw new Error('the wait ran out')
+      }
+    }).catch((e: Error) => e)
+    expect(late).toBeInstanceOf(Error)
+    expect((late as Error).message).toContain(`its sleep (winpid ${sleepWinpid}) ended`)
+    expect(alive(sleepWinpid)).toBe(false)
+  }, timing('test.hang'))
 })
 
 describe('msysBinFor: the MSYS folder of the git started (HI-3047)', () => {
