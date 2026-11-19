@@ -4,6 +4,7 @@
 // touched.
 import { spawn, spawnSync } from 'child_process'
 import { copyFileSync, mkdirSync, writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { describe, expect, it, vi } from 'vitest'
@@ -12,6 +13,7 @@ import { timing } from './timing.cjs'
 import { gitMsysBin, startMsysKeeper } from './msysTemp.mts'
 
 const git = gitMsysBin()
+const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 
 /** What the copy needs to run sh, cat, sleep and mount, with Git's fstab (its /tmp is `usertemp`). */
 const RUNTIME = ['msys-2.0.dll', 'msys-iconv-2.dll', 'msys-intl-8.dll', 'msys-gcc_s-seh-1.dll', 'msys-ncursesw6.dll', 'msys-readline8.dll', 'sh.exe', 'cat.exe', 'mount.exe', 'sleep.exe', 'sort.exe']
@@ -191,4 +193,22 @@ describe.runIf(git)("a test run and Git Bash's /tmp (HI-3447)", () => {
       expect(kept.out).toMatch(r.started)
     })
   }
+})
+
+// HI-3451: tests bundle Combwork's code for a child process with esbuild, as CommonJS, and electron-stub.ts brings in
+// tempDir.ts, runTemp.mts and this keeper: there import.meta.url is undefined, so nothing at their module scope may need
+// it. A module-scope createRequire(import.meta.url) threw as such a bundle loaded, and the children of boardFileMove,
+// combworkMove, copies, slots and queueRunner ended before writing anything.
+describe('the keeper in a CommonJS bundle (HI-3451)', () => {
+  it('a bundle of tempDir.ts loads, the keeper and runTemp with it', async () => {
+    const { build } = await import('esbuild')
+    const dir = tempDir('msys-bundle-')
+    const bundle = join(dir, 'bundle.cjs')
+    const entry = join(dir, 'entry.cjs')
+    writeFileSync(entry, `require(${JSON.stringify(join(import.meta.dirname, 'tempDir.ts'))}); process.stdout.write('loaded')`)
+    await build({ entryPoints: [entry], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent' })
+    const res = spawnSync(process.execPath, [bundle], { env: ctx.baseEnv(), encoding: 'utf8', timeout: timing('spawn.hang'), windowsHide: true })
+    expect(res.status, res.stderr).toBe(0)
+    expect(res.stdout).toBe('loaded')
+  })
 })
