@@ -40,6 +40,27 @@ const alpha = fx.alpha
 const beta = path.join(fx.ws, 'beta')
 const gamma = path.join(fx.ws, 'gamma')
 const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
+/**
+ * A Git project added to the open workspace whole (HI-3444): made beside the workspace, then moved in. Made in place, the
+ * root watcher can read the bare folder before its `git init` (slow under load) and Combwork records None for it, for good
+ * (§16.3.5: detected as it is made, never switched silently), so its notice opens at None. A move refused while something
+ * has a file in it open for a moment (git's, the indexer) is tried again, as accounts' epsilon is.
+ */
+const addGitProject = async (dir, files) => {
+  const made = path.join(lib.WORK, `p6lane-made-${path.basename(dir)}`)
+  fs.rmSync(made, { recursive: true, force: true })
+  lib.gitProject(made, files)
+  const movedIn = await lib.until(async () => {
+    try {
+      fs.renameSync(made, dir)
+      return true
+    } catch (e) {
+      if (!['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e
+      return false
+    }
+  }, HUNG_MS)
+  if (!movedIn) throw new Error(`${path.basename(dir)} wasn't moved into the workspace`)
+}
 
 ;(async () => {
   q.prepare(fx)
@@ -410,6 +431,10 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     await shoot('5-legend', { show: () => hover(bar, () => true).then(() => waitHung(async () => (await page.locator('.tip .lanes-legend').count()) === 1)) })
 
     // --- Merged: Done; the branch's card says merged.
+    // HI-3444: a Done card's merged line is deleted once nothing has it checked out (#1438), seconds after the merge as
+    // the lane moves its slot on, so the chip read below raced that deletion (lost under load). Held off while it is
+    // read, then on again: its next pass deletes it (checked after Two starts).
+    await inv('advanced:set', 'cw.slots.deleteMergedLines', false)
     fs.writeFileSync(fx.go, 'go')
     check('One is merged by the queue: Done', await done(c1), JSON.stringify(await kinds(c1)))
     const i1 = await integrated(c1)
@@ -424,10 +449,12 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const laterOn = () => { try { return git(laterAt, 'branch', '--show-current') === laterLine } catch { return false } }
     check('…on its line in its own slot', !!laterAt && !!laterLine && !!(await waitHung(laterOn)), JSON.stringify(later.body))
     check("Branches & remotes: One's branch says merged, with the merge's revision",!!(await waitHung(async () => (await chip.getAttribute('data-stage').catch(() => null)) === 'done' && (await chip.locator('[data-merged]').getAttribute('data-merged').catch(() => null)) === i1?.data?.result)), await text(chip))
+    await inv('advanced:set', 'cw.slots.deleteMergedLines', true)
 
     // ===== S19: the options changed mid-lane, in the tab.
     const s2 = await intent('b1', c2, 'start')
     check("Two starts once One is Done, on its own line in the lane's slot", s2.status === 200 && s2.body?.data?.line !== line && !!(await onLine(s2)), JSON.stringify(s2.body))
+    check("…One's merged line is deleted by the next pass, the switch on again", !!(await waitHung(async () => (await factsOf(c1, 'LineDeleted')).length > 0 && (await chip.count()) === 0)), JSON.stringify(await kinds(c1)))
     await section('workflow')
     const form = page.locator('.workflow-form')
     const row = (option) => form.locator(`.workflow-option[data-option="${option}"]`)
@@ -520,7 +547,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     await shootSections('git-pair', ['workflow', 'changes', 'history', 'branches', 'queue'])
 
     // ===== beta: added with one agent; Solo; S44 through the tab.
-    lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
+    await addGitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
     await inv('workspace:refresh')
     let s = await q.agent(fx, h, 'S1', { project: beta })
     check('beta: its notice opens the step at Git', await fromNotice('beta'))
@@ -565,7 +592,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     await showTab('pulse')
 
     // ===== gamma: all off in the tab, G16 on, two agents in the project folder (S11, S39).
-    lib.gitProject(gamma, { 'g.txt': 'g\n', '.gitignore': '.combwork/\n' })
+    await addGitProject(gamma, { 'g.txt': 'g\n', '.gitignore': '.combwork/\n' })
     await inv('workspace:refresh')
     const g1 = await q.agent(fx, h, 'G1', { project: gamma })
     const g2 = await q.agent(fx, h, 'G2', { project: gamma })
