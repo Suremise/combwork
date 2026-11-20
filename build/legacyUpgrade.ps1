@@ -33,6 +33,8 @@ param(
   [int]$RunningWaitMs = 30000,
   [int]$UninstallMs = 300000,
   [switch]$SkipAsk,
+  # Where to say what still runs when it stops (exit 5), for the installer's message (Tell-Blocker).
+  [string]$BlockerFile = '',
   # Tests only: the process list to look at instead of Windows' (Candidates).
   [string]$ProcessesFile = ''
 )
@@ -69,11 +71,13 @@ function Candidates([string]$name) {
 # named like it, one whose executable can't be read (no path given: another user's, a protected one) makes it unknown,
 # never "not running"; one positively elsewhere (another installation) is left out; one of this executable counts unless
 # its command line positively says it is a child (--type=: Chromium's helpers), an unreadable command line counting too.
+# The process that made it unknown is kept in $script:unreadable (its id; none when the list itself couldn't be read).
 function Running([string]$exe) {
+  $script:unreadable = $null
   try {
     $ids = @()
     foreach ($p in Candidates (Split-Path -Leaf $exe)) {
-      if (-not $p.ExecutablePath) { return $null }
+      if (-not $p.ExecutablePath) { $script:unreadable = $p.ProcessId; return $null }
       if (-not (Same $p.ExecutablePath $exe)) { continue }
       if ($p.CommandLine -and $p.CommandLine -match '--type=') { continue }
       $ids += $p.ProcessId
@@ -85,19 +89,35 @@ function Running([string]$exe) {
   }
 }
 
-# Waits until no main process of any of `exes` runs: 'none', 'running <exe>', or 'unknown <exe>'.
+# Waits until no main process of any of `exes` runs: $null, or what still runs (HI-3463, for the refusal to name it):
+# { State: 'running' or 'unknown'; Exe: the executable looked for; Id: its process id (none when Windows' list couldn't
+# be read) }. 'unknown' means a process of that name whose location Windows won't show, or no list at all.
 function WaitNone([string[]]$exes, [int]$ms) {
   $clock = [Diagnostics.Stopwatch]::StartNew()
   while ($true) {
     $busy = $null
     foreach ($e in $exes) {
       $r = Running $e
-      if ($null -eq $r) { return "unknown $e" }
-      if ($r.Count) { $busy = $e; break }
+      if ($null -eq $r) { return @{ State = 'unknown'; Exe = $e; Id = $script:unreadable } }
+      if ($r.Count) { $busy = @{ State = 'running'; Exe = $e; Id = $r[0] }; break }
     }
-    if (-not $busy) { return 'none' }
-    if ($clock.ElapsedMilliseconds -ge $ms) { return "running $busy" }
+    if (-not $busy) { return $null }
+    if ($clock.ElapsedMilliseconds -ge $ms) { return $busy }
     Start-Sleep -Milliseconds 250
+  }
+}
+
+# What blocked the upgrade, for the installer's message (HI-3463): -BlockerFile gets three lines, UTF-16LE without a
+# BOM (NSIS's FileReadUTF16LE): the state (running, unknown), the process id (empty when there is none) and the
+# executable (its full path when running; its name only when unknown, as its location isn't known). Best effort: the
+# installer shows its general message without it.
+function Tell-Blocker($b) {
+  if (-not $BlockerFile) { return }
+  $where = if ($b.State -eq 'running') { $b.Exe } else { Split-Path -Leaf $b.Exe }
+  try {
+    [IO.File]::WriteAllText($BlockerFile, "$($b.State)`n$($b.Id)`n$where`n", (New-Object Text.UnicodeEncoding $false, $false))
+  } catch {
+    Say "still running: its details couldn't be written for the installer ($($_.Exception.Message))"
   }
 }
 
@@ -150,9 +170,11 @@ if (-not $SkipAsk) {
   }
 }
 $exes = @($newExe) + $(if ($oldExe) { @($oldExe) } else { @() })
-$state = WaitNone $exes $RunningWaitMs
-if ($state -ne 'none') {
-  Say "still running: ${state}: nothing changed"
+$blocker = WaitNone $exes $RunningWaitMs
+if ($blocker) {
+  $id = if ($null -ne $blocker.Id -and "$($blocker.Id)" -ne '') { "process $($blocker.Id)" } else { 'no process list' }
+  Say "still running: $($blocker.State) $($blocker.Exe) ($id): nothing changed"
+  Tell-Blocker $blocker
   exit 5
 }
 Say 'running: none'
