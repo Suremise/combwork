@@ -13,6 +13,7 @@ import { boardLockKey, editCard, readCard, removeCard, writeCard, writeCardOutsi
 import { boardTestHooks } from '../src/main/boardStore'
 import { follow } from './followDoorbell'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-tasks-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -40,9 +41,9 @@ const assistant = { kind: 'assistant' } as const
  * Deliberate, not a wait for a state: lets the clock reach a later millisecond, so what is recorded next (a decision, a
  * read) is newer than what came before it (they are compared by time).
  */
-const laterMs = (): Promise<void> => new Promise((r) => setTimeout(r, 5))
+const laterMs = (): Promise<void> => new Promise((r) => setTimeout(r, timing('pace.tick')))
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 function project(ws: string, name: string, agents: { id: string; name: string }[] = []): string {
   const p = join(ws, name)
@@ -631,7 +632,7 @@ describe('archiving in batches', () => {
     expect([again.restored, again.failed]).toEqual([[stuck], []])
     expect(await column('done')).toEqual(expect.arrayContaining(['Comes back', 'Stuck']))
     expect((await run(() => tasks.archiveBatches())).map((b) => b.id)).not.toContain(batch!.id)
-  }, 20_000)
+  }, timing('test.hang'))
 
   it('a card whose neighbours are gone comes back at the top; two batches at once each keep their cards', async () => {
     const [p, q, r] = [await make('P'), await make('Q'), await make('R')]
@@ -1162,7 +1163,7 @@ describe('card decisions', () => {
       refusedTyping = 0
       await decisionWakes.tellNow(w, alpha, 'a1')
       // Asked again and again while the user types (the delivery service tries it again in a moment each time, #649).
-      await expect.poll(() => refusedTyping, { timeout: 10000 }).toBeGreaterThan(3)
+      await expect.poll(() => refusedTyping, { timeout: timing('wait.hang') }).toBeGreaterThan(3)
       expect(mine('a1')).toHaveLength(2)
       typing = false
       await expect.poll(() => mine('a1').length, { timeout: HUNG_MS }).toBe(3)
@@ -1475,13 +1476,13 @@ describe("a project agent's board", () => {
 
   it('reads only the latest comment, as far as it may read the card', async () => {
     const l = (await run(() => tasks.createTask({ title: 'Long', description: 'x'.repeat(5000), project: 'alpha' }, user))).number
-    expect(await run(() => tasks.latestComment(l, alphaAgent))).toEqual({ number: l, comment: null, commentId: null, sources: [] })
+    expect(await run(() => tasks.latestComment(l, alphaAgent))).toMatchObject({ number: l, comment: null, commentId: null, sources: [] })
     await run(() => tasks.commentTask(l, 'first', user))
     await run(() => tasks.commentTask(l, 'second', assistant))
     await run(() => tasks.commentTask(l, 'third, '.repeat(400), alphaAgent))
     const got = await run(() => tasks.latestComment(l, alphaAgent))
     // Its id and the card's comments' authors and times (HI-2402: where its attachments came), never their words.
-    expect(Object.keys(got)).toEqual(['number', 'comment', 'commentId', 'sources'])
+    expect(Object.keys(got)).toEqual(['number', 'comment', 'commentId', 'sources', 'attempt'])
     expect(got.sources).toHaveLength(3)
     expect(got.sources.every((x) => Object.keys(x).join() === 'id,by,at' && !!x.id)).toBe(true)
     expect(got.sources.at(-1)?.by).toBe('Agent 1 (alpha)')
@@ -2071,7 +2072,7 @@ describe('removal and board under faults', () => {
 
 describe('task prompt', () => {
   const card = { number: 7, title: 'Fix it', description: 'The details.', blockedBy: [], comments: [] } as unknown as import('../src/shared/types').TaskCard
-  // A card's start in its own words (#1292, #966 row 30, Darren's choice: only the card's start has a raw variant).
+  // A card's start in its own words (#1292, #966 row 30: only the card's start has a raw variant).
   it("in its own words: the card's title, the user's note and its description, nothing of Combwork's", async () => {
     const { rawTaskPrompt } = await import('../src/shared/tasks')
     expect(rawTaskPrompt(card)).toBe('Fix it\n\nThe details.')

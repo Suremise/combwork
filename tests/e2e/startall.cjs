@@ -12,7 +12,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 // Agents ▾ with three agents: each batch action, Start New and Archive and Start New with their one-agent entries after
 // them (HI-2665), Remove All last after a line.
 const AGENTS_MENU = ['Start New (3)', 'Start New for One Agent', 'Start Fresh (Idle Agents)…', 'Archive and Start New (3)', 'Archive and Start New for One Agent', 'Remove All (3)…']
@@ -52,10 +52,10 @@ const check = (name, ok, extra = '') => {
   const menuRows = () => page.locator('.menu').last().evaluate((m) => [...m.children].map((c) => (c.classList.contains('menu-sep') ? '-' : `${c.querySelector('.menu-label, :scope > span:not(.menu-key)')?.textContent.trim() ?? c.textContent.trim()}=${c.querySelector('.menu-key')?.textContent.trim() ?? ''}`)))
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 20000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   const type = async (id, text) => {
@@ -89,13 +89,13 @@ const check = (name, ok, extra = '') => {
   // all three have one to archive), and its state line from the agents' marks.
   const header = page.locator('.project-header .actions')
   const labels = async () => (await header.locator('button').allInnerTexts()).map((t) => t.trim()).filter(Boolean)
-  check('the header shows Resume Agent, Stop (2) and Agents, in that order', !!(await until(async () => JSON.stringify(await labels()) === JSON.stringify(['Resume Agent', 'Stop (2)', 'Agents']), 5000)), JSON.stringify(await labels()))
+  check('the header shows Resume Agent, Stop (2) and Agents, in that order', !!(await until(async () => JSON.stringify(await labels()) === JSON.stringify(['Resume Agent', 'Stop (2)', 'Agents']), lib.timing('hang.step'))), JSON.stringify(await labels()))
   const stateLine = page.locator('.project-header .project-state')
-  check('its state line: 1 working · 1 idle · 1 stopped (the idle ones and the stopped apart, #1035), with the working mark', !!(await until(async () => (await stateLine.innerText().catch(() => '')).trim() === '1 working · 1 idle · 1 stopped' && (await stateLine.locator('.state-mark.working').count()) === 1, 5000)), await stateLine.innerText().catch(() => ''))
+  check('its state line: 1 working · 1 idle · 1 stopped (the idle ones and the stopped apart, #1035), with the working mark', !!(await until(async () => (await stateLine.innerText().catch(() => '')).trim() === '1 working · 1 idle · 1 stopped' && (await stateLine.locator('.state-mark.working').count()) === 1, lib.timing('hang.ui'))), await stateLine.innerText().catch(() => ''))
   const tipOf = async (name) => {
     await header.getByRole('button', { name, exact: true }).hover()
     const tip = page.locator('.tip')
-    await tip.waitFor({ timeout: 3000 }).catch(() => undefined)
+    await lib.until(async () => (await tip.count()) > 0, lib.timing('hang.ui'))
     const t = (await tip.count()) ? (await tip.innerText()).trim() : null
     await page.mouse.move(0, 0)
     await lib.until(async () => (await page.locator('.tip').count()) === 0, HUNG_MS)
@@ -117,7 +117,7 @@ const check = (name, ok, extra = '') => {
   check("…and Stop's red wash shows on hover", !!(await until(async () => {
     const l = await look('button.act-stop')
     return l.bg !== agentsLook.bg && l.border !== agentsLook.border
-  }, 5000)), JSON.stringify(await look('button.act-stop')))
+  }, lib.timing('hang.ui'))), JSON.stringify(await look('button.act-stop')))
   await page.mouse.move(0, 0)
   check('no Explorer or Terminal button in the header', (await header.locator('button', { hasText: /Explorer|Terminal/ }).count()) === 0)
   // Agents ▾: the batch actions with their counts, Start Fresh (Idle Agents)… after Start New (#1437), Remove All last
@@ -128,7 +128,7 @@ const check = (name, ok, extra = '') => {
   check('…with a line before Remove All', !!(await page.locator('.menu > *').evaluateAll((els) => els.at(-2)?.classList.contains('menu-sep'))))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, 5000)
+    await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, lib.timing('hang.ui'))
     await page.screenshot({ path: path.join(lib.WORK, `startall-header-${theme}.png`), clip: { x: 0, y: 0, width: 1500, height: 260 } })
   }
   await page.keyboard.press('Escape')
@@ -178,7 +178,7 @@ const check = (name, ok, extra = '') => {
     )
   const allReachable = (list) => list.length > 0 && list.every((a) => a.inside && a.hit)
   await lib.fitWindow(app, page, { width: 1020, height: 900 })
-  check('narrow (1020 px): every action is in the header and clickable', !!(await lib.until(async () => allReachable(await actionsAt()), 5000)), JSON.stringify(await actionsAt()))
+  check('narrow (1020 px): every action is in the header and clickable', !!(await lib.until(async () => allReachable(await actionsAt()), lib.timing('hang.ui'))), JSON.stringify(await actionsAt()))
   await page.screenshot({ path: path.join(lib.WORK, 'startall-header-narrow.png'), clip: { x: 0, y: 0, width: 1020, height: 120 } })
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
@@ -188,7 +188,7 @@ const check = (name, ok, extra = '') => {
     const at = (await lib.until(async () => {
       const a = await actionsAt()
       return JSON.stringify(a.map((x) => x.name)) === JSON.stringify(names) && allReachable(a) ? a : null
-    }, 5000)) || (await actionsAt())
+    }, lib.timing('hang.ui'))) || (await actionsAt())
     check(`${theme}, 900 px: Active, Resume, Stop (2), Agents ▾ and ⋯ are all in the header and clickable`, JSON.stringify(at.map((a) => a.name)) === JSON.stringify(names) && allReachable(at), JSON.stringify(at))
     check(`${theme}, 900 px: the header keeps one row`, (await page.locator('.project-header').evaluate((el) => el.getBoundingClientRect().height)) < 48)
     await page.screenshot({ path: path.join(lib.WORK, `startall-header-900-${theme}.png`), clip: { x: 0, y: 0, width: 900, height: 120 } })
@@ -197,10 +197,10 @@ const check = (name, ok, extra = '') => {
   // Really clicked at 900 px: Start New asks (Cancel), and ⋯ opens with Explorer and Terminal.
   await lib.agentsMenuRun(page, 'Start New (3)')
   const asked = page.locator('.dialog', { hasText: 'Start new sessions for all agents?' })
-  check('900 px: Start New opens its question', !!(await lib.until(async () => (await asked.count()) === 1, 5000)))
+  check('900 px: Start New opens its question', !!(await lib.until(async () => (await asked.count()) === 1, lib.timing('hang.step'))))
   await asked.getByRole('button', { name: 'Cancel' }).click()
   await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
-  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, 5000)
+  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, lib.timing('hang.ui'))
   const narrowItems = (await menuRows()).map((r) => r.split('=')[0])
   check('900 px: ⋯ opens with Explorer and Terminal first', JSON.stringify(narrowItems.slice(0, 2)) === JSON.stringify(['Explorer', 'Terminal']), JSON.stringify(narrowItems))
   await page.keyboard.press('Escape')
@@ -209,10 +209,10 @@ const check = (name, ok, extra = '') => {
   // away first, in the header's order. Never a second row of controls above the name.
   const menuNames = async () => {
     await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
-    await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, 5000)
+    await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, lib.timing('hang.ui'))
     const names = (await page.locator('.menu .menu-item').allInnerTexts()).map((t) => t.split('\n')[0].trim())
     await page.keyboard.press('Escape')
-    await lib.until(async () => (await page.locator('.menu').count()) === 0, 5000)
+    await lib.until(async () => (await page.locator('.menu').count()) === 0, lib.timing('hang.ui'))
     return names
   }
   const oneRow = () => page.locator('.project-header').evaluate((el) => el.getBoundingClientRect().height < 48)
@@ -227,7 +227,7 @@ const check = (name, ok, extra = '') => {
   const at265 = (await lib.until(async () => {
     const a = await actionsAt()
     return a.at(-1)?.name === 'More actions' && !a.some((x) => x.name === 'Active') && allReachable(a) && (await oneRow()) ? a : null
-  }, 5000)) || (await actionsAt())
+  }, lib.timing('hang.ui'))) || (await actionsAt())
   check('900 px with the Progress panel (~265 px): one row, Active gone from it, the rest and ⋯ reachable', at265.at(-1)?.name === 'More actions' && !at265.some((x) => x.name === 'Active') && allReachable(at265) && (await oneRow()), JSON.stringify(at265))
   check('…the status its most urgent count only, the rest in its tooltip', !(await statusText()).includes('·') && (await statusText()).length > 0, await statusText())
   const items265 = await menuNames()
@@ -241,7 +241,7 @@ const check = (name, ok, extra = '') => {
   const cramped = (await lib.until(async () => {
     const a = await actionsAt()
     return a.length === 1 && a[0].name === 'More actions' && allReachable(a) && (await oneRow()) ? a : null
-  }, 5000)) || (await actionsAt())
+  }, lib.timing('hang.ui'))) || (await actionsAt())
   check('900 px with the Assistant open (a squeezed main area): one row, only ⋯ beside the name, reachable', cramped.length === 1 && cramped[0].name === 'More actions' && allReachable(cramped) && (await oneRow()), JSON.stringify(cramped))
   const crampedItems = await menuNames()
   check("…⋯ starts with Active, Resume and Stop, then Agents ▾'s actions", JSON.stringify(crampedItems.slice(0, 4 + AGENTS_MENU.length)) === JSON.stringify(['Active', "Resume Stopped's last session", 'Stop all 2 running agents', 'Stop One Agent', ...AGENTS_MENU]), JSON.stringify(crampedItems))
@@ -249,31 +249,31 @@ const check = (name, ok, extra = '') => {
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+I')
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
-  await lib.until(async () => (await page.locator('.project-header .agents-menu').count()) === 1, 5000)
+  await lib.until(async () => (await page.locator('.project-header .agents-menu').count()) === 1, lib.timing('hang.ui'))
 
   // --- ⋯: Explorer, Terminal, Remove Project… (Changes is a tab; Project Settings is More ▾'s, HI-2551), each with its
   // command's keys where it has some: Terminal's by default, and a key given to Remove Project shows too.
   await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
-  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, 5000)
+  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, lib.timing('hang.ui'))
   const items = await menuRows()
   check('⋯ has Explorer, Terminal (Ctrl+Shift+`) and Remove Project…, without Changes or Project Settings', JSON.stringify(items) === JSON.stringify(['Explorer=', 'Terminal=Ctrl+Shift+`', '-', 'Remove Project…=']), JSON.stringify(items))
   await page.screenshot({ path: path.join(lib.WORK, 'startall-project-menu.png') })
   await page.keyboard.press('Escape')
-  await lib.until(async () => (await page.locator('.menu').count()) === 0, 5000)
+  await lib.until(async () => (await page.locator('.menu').count()) === 0, lib.timing('hang.ui'))
   await inv('settings:setKeybinding', 'project.remove', 'Ctrl+Alt+Shift+R')
   await lib.until(async () => (await inv('settings:get')).keybindings['project.remove'] === 'Ctrl+Alt+Shift+R', HUNG_MS)
   await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
-  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, 5000)
+  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, lib.timing('hang.ui'))
   const rebound = await menuRows()
   check("…a key given to Remove Project shows on it (the user's overrides apply)", rebound.at(-1) === 'Remove Project…=Ctrl+Alt+Shift+R', JSON.stringify(rebound))
   await page.keyboard.press('Escape')
-  await lib.until(async () => (await page.locator('.menu').count()) === 0, 5000)
+  await lib.until(async () => (await page.locator('.menu').count()) === 0, lib.timing('hang.ui'))
   await inv('settings:setKeybinding', 'project.remove', undefined)
 
   // --- Menus: the Project menu lists every tab in the strip's order; the Session menu has both new actions.
   const menuItems = async (name) => {
     await page.locator('.menubar .menubar-item', { hasText: name }).click()
-    await lib.sleep(250)
+    await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, lib.timing('hang.ui'))
     const t = await page.locator('.menu .menu-item > span:not(.menu-key)').allInnerTexts()
     await page.keyboard.press('Escape')
     return t.map((x) => x.trim())
@@ -288,7 +288,7 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => document.activeElement?.blur())
     await page.keyboard.press('Control+Shift+P')
     await page.locator('.palette input').fill('Start New')
-    await lib.sleep(300)
+    await lib.until(async () => (await page.locator('.palette-item').allInnerTexts()).some((t) => t.includes('Start New (3)…')), lib.timing('hang.ui'))
     const found = await page.locator('.palette-item').allInnerTexts()
     // The palette's first Escape clears what was typed (#433), the next closes it.
     await page.keyboard.press('Escape')
@@ -343,7 +343,7 @@ const check = (name, ok, extra = '') => {
   const axTexts = async () => (await cdp.send('Accessibility.getFullAXTree')).nodes.filter((n) => !n.ignored).map((n) => n.name?.value ?? '')
   const stopDialog = page.locator('.dialog', { hasText: 'Stop all agents?' })
   await header.getByRole('button', { name: 'Stop all 2 running agents', exact: true }).click()
-  await stopDialog.waitFor({ timeout: 5000 })
+  await stopDialog.waitFor({ timeout: lib.timing('hang.ui') })
   const stopTable = await tableOf(stopDialog)
   check('Stop all lists the running agents as a table: Agent, State, Card', JSON.stringify(stopTable.heads) === JSON.stringify(['Agent', 'State', 'Card']) && JSON.stringify(Object.keys(stopTable.rows).sort()) === JSON.stringify(['Idle', 'Worker']), JSON.stringify(stopTable))
   check("…the Worker's card in its row, and the one Idle reviews in its", stopTable.rows.Worker?.[2]?.text === `${cardName} Batch tables` && /Working/.test(stopTable.rows.Worker?.[1]?.text ?? '') && stopTable.rows.Idle?.[2]?.text === `reviewing ${reviewedName} Review table`, JSON.stringify(stopTable.rows))
@@ -360,13 +360,13 @@ const check = (name, ok, extra = '') => {
   check('…the table hidden from screen readers, its plain lines for them instead, and the note under it', stopTable.hidden && /• Worker — Working/.test(await plainLines(stopDialog)) && /conversations are kept/.test(await stopDialog.locator('.agents-detail-note').innerText()))
   await bothThemes('startall-stop-confirm')
   await stopDialog.getByRole('button', { name: 'Cancel' }).click()
-  await stopDialog.waitFor({ state: 'detached', timeout: 5000 })
+  await stopDialog.waitFor({ state: 'detached', timeout: lib.timing('hang.ui') })
   check('…and Cancel stops nobody', (await live(w.id))?.status === 'working' && !!(await live(i.id)))
 
   // --- Start New (All): one question listing every agent, the working one flagged; Cancel changes nothing.
   const dialog = page.locator('.dialog', { hasText: 'Start new sessions for all agents?' })
   await lib.agentsMenuRun(page, 'Start New (3)')
-  await dialog.waitFor({ timeout: 5000 })
+  await dialog.waitFor({ timeout: lib.timing('hang.ui') })
   const text = await dialog.innerText()
   check('it lists every agent, flagging the working one', /Worker — Working.*\(will be interrupted\)/.test(text) && /Idle — /.test(text) && /Stopped — Not running · A new session/.test(text), text)
   const newTable = await tableOf(dialog)
@@ -376,15 +376,15 @@ const check = (name, ok, extra = '') => {
   check('…the working one stopped first, in the warning colour; the stopped one only starts', newTable.rows.Worker?.[3]?.text === 'Stopped (will be interrupted), then a new session' && newTable.rows.Worker[3].warn && newTable.rows.Stopped?.[3]?.text === 'A new session' && !newTable.rows.Stopped[3].warn && newTable.rows.Stopped?.[1]?.text === 'Not running', JSON.stringify(newTable.rows))
   await bothThemes('startall-confirm')
   await dialog.getByRole('button', { name: 'Cancel' }).click()
-  await lib.sleep(1500) // on purpose: nothing may stop or start after Cancel
+  await lib.sleep(lib.timing('quiet.cancelledStartMs')) // on purpose: nothing may stop or start after Cancel
   check('Cancel changes nothing', (await live(w.id))?.sessionId === before.w && (await live(w.id))?.status === 'working' && (await live(i.id))?.sessionId === before.i && !(await live(s.id)))
   await lib.agentsMenuRun(page, 'Start New (3)')
-  await dialog.waitFor({ timeout: 5000 })
+  await dialog.waitFor({ timeout: lib.timing('hang.ui') })
   await dialog.getByRole('button', { name: 'Start new' }).click()
   const fresh = await until(async () => {
     const l = await Promise.all([w, i, s].map((a) => live(a.id)))
     return l.every((x) => x && ['ready', 'waiting'].includes(x.status)) && l[0].sessionId !== before.w && l[1].sessionId !== before.i ? l : null
-  }, 30000)
+  }, lib.timing('hang.ui'))
   check('every agent has a new session', !!fresh, JSON.stringify(await Promise.all([w, i, s].map((a) => live(a.id)))))
   const list = await sessions()
   check('the old sessions are kept, not archived', [before.w, before.i].every((id) => list.some((x) => x.id === id && !x.archived)), JSON.stringify(list.map((x) => [x.id.slice(0, 8), x.archived])))
@@ -403,7 +403,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => /^1 working\b/.test(await chipText()), HUNG_MS)
   const archiveDialog = page.locator('.dialog', { hasText: 'Archive and start new for all agents?' })
   await lib.agentsMenuRun(page, 'Archive and Start New (3)')
-  await archiveDialog.waitFor({ timeout: 5000 })
+  await archiveDialog.waitFor({ timeout: lib.timing('hang.ui') })
   const arcappText = await archiveDialog.innerText()
   const archiveTable = await tableOf(archiveDialog)
   check('Archive lists them as a table too, saying each session is archived', archiveTable.rows.Worker?.[3]?.text === 'Stopped (will be interrupted), then its session archived, then a new one' && Object.keys(archiveTable.rows).length === 3, JSON.stringify(archiveTable.rows))
@@ -412,7 +412,7 @@ const check = (name, ok, extra = '') => {
   const renewed = await until(async () => {
     const l = await Promise.all([w, i, s].map((a) => live(a.id)))
     return l.every((x) => x && x.sessionId !== current[x.agentId] && ['ready', 'waiting'].includes(x.status))
-  }, 30000)
+  }, lib.timing('hang.ui'))
   check('every agent has a fresh session', !!renewed)
   const after = await sessions()
   const archivedIds = Object.values(current).filter((id) => after.some((x) => x.id === id && x.archived))
@@ -430,22 +430,22 @@ const check = (name, ok, extra = '') => {
     await until(async () => !(await live(a.id)), HUNG_MS)
   }
   await inv('workspace:refresh')
-  check('one running, two to resume: Resume (2), Stop Agent, Agents', !!(await until(async () => JSON.stringify(await labels()) === JSON.stringify(['Resume (2)', 'Stop Agent', 'Agents']), 10000)), JSON.stringify(await labels()))
+  check('one running, two to resume: Resume (2), Stop Agent, Agents', !!(await until(async () => JSON.stringify(await labels()) === JSON.stringify(['Resume (2)', 'Stop Agent', 'Agents']), lib.timing('hang.step'))), JSON.stringify(await labels()))
   check('…and Resume says it in full in its tooltip and accessible name', (await tipOf('Resume all 2 stopped agents')) === 'Resume all 2 stopped agents')
   // The count is what the question lists.
   await lib.agentsMenuRun(page, 'Archive and Start New (3)')
-  await archiveDialog.waitFor({ timeout: 5000 })
+  await archiveDialog.waitFor({ timeout: lib.timing('hang.ui') })
   const listed = (await archiveDialog.innerText()).split('\n').filter((l) => l.startsWith('• '))
   check('Archive and Start New (3) lists 3 agents', listed.length === 3, JSON.stringify(listed))
   await archiveDialog.getByRole('button', { name: 'Cancel' }).click()
   // Idle resumes: two running again, one to resume.
-  await header.getByRole('button', { name: 'Resume all 2 stopped agents' }).waitFor({ timeout: 5000 })
+  await header.getByRole('button', { name: 'Resume all 2 stopped agents' }).waitFor({ timeout: lib.timing('hang.ui') })
   const idleSession = (await inv('session:list', alpha)).find((x) => x.agentId === i.id && !x.archived && x.id !== current[i.id])
   await inv('session:start', alpha, { agentId: i.id, resumeId: idleSession?.id })
-  check('Idle resumed: Resume Agent, Stop (2)', !!(await until(async () => JSON.stringify((await labels()).slice(0, 2)) === JSON.stringify(['Resume Agent', 'Stop (2)']), 15000)), JSON.stringify(await labels()))
+  check('Idle resumed: Resume Agent, Stop (2)', !!(await until(async () => JSON.stringify((await labels()).slice(0, 2)) === JSON.stringify(['Resume Agent', 'Stop (2)']), lib.timing('hang.step'))), JSON.stringify(await labels()))
 
   await inv('session:stop', alpha)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

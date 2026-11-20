@@ -11,7 +11,10 @@
 // The session's dialect (HI-2065), loaded before any text below is said: first, on purpose.
 import '../../shared/agentText/processDialect'
 import { AsyncLocalStorage } from 'async_hooks'
-import { appendFileSync, readFileSync } from 'fs'
+import { createHash, randomUUID } from 'crypto'
+import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { dirname } from 'path'
+import { keyedWrite } from '../../shared/requestKeys'
 import { createInterface } from 'readline'
 import { combworkInstructions, withLatestHandover, withPlatformRule } from '../../shared/combworkGuidance'
 import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, assistantTools, controlAllows, hiddenForSide, TOOLS_SERVER, WORKER_ONLY_TOOLS, workflowHiddenOf } from '../../shared/assistantTools'
@@ -30,7 +33,7 @@ import { INBOX_SWITCHES, type InboxSwitch } from '../../shared/inboxSwitches'
 import { ENTRY_LIMITS, JOURNAL_KINDS, LINK_TYPES } from '../../shared/journal'
 import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
 import { toolListSize } from '../../shared/toolListSize'
-import { ALWAYS_LOAD_META, alwaysLoaded, argumentHint } from '../../shared/combworkToolLoad'
+import { ALWAYS_LOAD_META, alwaysLoaded, argumentHint, withAliases } from '../../shared/combworkToolLoad'
 import { agentMsg, say } from '../../shared/agentText'
 import { ACCEPT_MAX } from '../../shared/workflow/focused'
 
@@ -103,7 +106,7 @@ const T = {
   'connection.arg.launch': agentMsg({ id: 'tool.connection.arg.launch', text: 'update: guidance, tools, typing, overrides by key (false: off); preset: "terminal" turns all off; empty object: all on.' }),
   'updateAgent.arg.confirm': agentMsg({ id: 'tool.updateAgent.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make this agent Independent while on a lane or holding a card.' }),
   'connection.arg.confirm': agentMsg({ id: 'tool.connection.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make those agents Independent.' }),
-  'startAgent.description': agentMsg({ id: 'tool.startAgent.description', text: 'Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them.' }),
+  'startAgent.description': agentMsg({ id: 'tool.startAgent.description', text: 'Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. A long-idle conversation is refused with its age and size: resume it only with resumeIdle=true. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them.' }),
   'promptAgent.description': agentMsg({ id: 'tool.promptAgent.description', text: 'Type a task, in full, into an idle running agent. Refused while it is busy or the user just typed there. newConversation=true starts it on the task in a new conversation. For a card, use cw_start_task.' }),
   'messageAgent.description': agentMsg({ id: 'tool.messageAgent.description', text: "Leave a busy or watching agent, or one the user just typed into, a message in its inbox on its current work (a re-brief, the user's answer). Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. (detail: use-cw-api, tools.md)" }),
   'messageAgent.arg.card': agentMsg({ id: 'tool.messageAgent.arg.card', text: "The card it is about (its key): dropped, never given, once that card's round ends." }),
@@ -161,6 +164,9 @@ const T = {
   // HI-2641: a card's oldest comments past the 500 it keeps, its archive, read from an offset (commentsArchived counts them).
   // Within HI-2012's agent total: the description's forYou gloss and summary's "and its length" were cut to pay for it.
   'readTask.arg.archived': agentMsg({ id: 'tool.readTask.arg.archived', text: 'Archived older comments from this offset.' }),
+  'readTask.arg.lineComments': agentMsg({ id: 'tool.readTask.arg.lineComments', text: 'Its line comments as rows.' }),
+  'readTask.arg.offset': agentMsg({ id: 'tool.readTask.arg.offset', text: "With either: the reply's next." }),
+  'readTask.arg.feedback': agentMsg({ id: 'tool.readTask.arg.feedback', text: 'A sent batch, by its id.' }),
   // HI-2561: Codex asked for the history to see why an agent stopped, which forYou already says. Within HI-2012's
   // total (toolLimits.cjs): the description dropped its history clause, and summary's words were cut, to pay for it.
   'readTask.arg.history': agentMsg({ id: 'tool.readTask.arg.history', text: 'Long; rarely needed.' }),
@@ -204,6 +210,10 @@ const T = {
   'readSetting.arg.id': agentMsg({ id: 'tool.readSetting.arg.id', text: 'From cw_list_settings, e.g. sessions.transcriptWarnMB.' }),
   'updateSetting.description': agentMsg({ id: 'tool.updateSetting.description', text: "Change one of Combwork's settings, as Settings would: only when the user asked or agreed. [read-only] ones are refused: tell the user where to change them. Replies with old → new." }),
   'updateSetting.arg.value': agentMsg({ id: 'tool.updateSetting.arg.value', text: 'What cw_read_setting says it takes.' }),
+  'answerSimplify.description': agentMsg({ id: 'tool.answerSimplify.description', text: "Answer a card's simplify check, which Combwork told you of: carryOn (what still comes up is worth handling) or simplify (drop what isn't). Cutting scope, and the hard stop's question, are the user's: leave those. why: your reason, a comment on the card.", note: 'HI-3188: the Assistant-only tool for a simplify check (Workflow → Card loops).' }),
+  'answerSimplify.done': agentMsg({ id: 'tool.answerSimplify.done', text: '{card}: answered {request}, {choice, select, carryOn {carry on} other {simplify}}; its agents are woken.', note: "HI-3188: cw_answer_simplify's reply." }),
+  'call.keyNotKept': agentMsg({ id: 'tool.call.keyNotKept', text: "Not sent: Combwork's tools couldn't keep this write's request key ({message}), so a retry after a restart could apply it twice. Nothing was written; try the call again.", note: "HI-3195 (HR3's round 2): a keyed write's key is kept in the agent's file before it is sent; when that fails, the write isn't sent. {message}: the file system's error." }),
+  'call.appliedEarlier': agentMsg({ id: 'tool.call.appliedEarlier', text: "Done earlier: Combwork had already applied this call ({made, select, other {{made}} none {its card}}), whose reply was lost. Read the card for its state now; don't send it again.", note: 'HI-3195: a retried write Combwork had already applied (its first reply lost). {made}: the card it made or was about (a key or #n), or none.' }),
   'undo.description': agentMsg({ id: 'tool.undo.description', text: 'Undo changes of your own (kept 7 days, grouped by the user\'s message): list, then change or group ("latest": your newest). What someone changed since stays. Only your own: never the user\'s or agents\'. (detail: use-cw-api, tools.md)' }),
   'undo.arg.change': agentMsg({ id: 'tool.undo.arg.change', text: "A change's id, from list with its group." }),
   'undo.arg.group': agentMsg({ id: 'tool.undo.arg.group', text: 'A message\'s id, from list, or "latest".' }),
@@ -226,6 +236,7 @@ const T = {
   'lane.arg.cards': agentMsg({ id: 'tool.lane.arg.cards', text: 'Cards, in the order they are done.' }),
   'createTask.arg.blockedBy': agentMsg({ id: 'tool.createTask.arg.blockedBy', text: 'Cards that have to be done first.' }),
   'createTask.arg.links': agentMsg({ id: 'tool.createTask.arg.links', text: 'Related cards.' }),
+  'createTask.arg.followUpOf': agentMsg({ id: 'tool.createTask.arg.followUpOf', text: 'The card this continues, for a split or accepted follow-ups: it keeps its count. Separate finds: links.', note: 'HI-3188: cw_create_task’s followUpOf.' }),
   'updateTask.arg.blockedBy': agentMsg({ id: 'tool.updateTask.arg.blockedBy', text: 'Cards that have to be done first (replaces the list).' }),
   'updateTask.arg.links': agentMsg({ id: 'tool.updateTask.arg.links', text: 'Related cards (replaces the list).' }),
   'updateTasks.arg.numbers': agentMsg({ id: 'tool.updateTasks.arg.numbers', text: 'The cards to change, up to 100.' }),
@@ -239,7 +250,7 @@ const T = {
   'startReview.description': agentMsg({ id: 'tool.startReview.description', text: 'Start reviewing a card in Review (it stays there). Replies with what to review and the review copy to work in, when there is one.' }),
   'verdict.description': agentMsg({ id: 'tool.verdict.description', text: 'Give your verdict on the card you review, comment written on it: a pass moves it on, a fail sends it back to Doing for its builder (a round counted).' }),
   'focusedSkip.description': agentMsg({ id: 'tool.focusedSkip.description', text: 'As its reviewer, when Combwork asks: merge a card whose focused tests were skipped for their environment (merge true), or return it to its builder (false).' }),
-  'reportMerge.description': agentMsg({ id: 'tool.reportMerge.description', text: "Report a card's work merged, where its agent merges it or merges aren't checked: Combwork checks the merge is in its target (unless the project doesn't check merges) and moves it to Done." }),
+  'reportMerge.description': agentMsg({ id: 'tool.reportMerge.description', text: "Report a card's work merged, where its agent merges it or merges aren't checked: Combwork checks the merge is in its target (if merges are checked) and moves it to Done; one it already saw merged answers OK." }),
   'askUser.description': agentMsg({ id: 'tool.askUser.description', text: 'Ask the user something about a card, under For you; the answer comes to your inbox. When the answer is something only the user can do (Done, no code, unblock, skip review), offer it in actions.' }),
   'cannotWithinRules.description': agentMsg({ id: 'tool.cannotWithinRules.description', text: "Report that a card can't go on within a workflow rule: the user decides, under For you." }),
   'requestBuilder.description': agentMsg({ id: 'tool.requestBuilder.description', text: "Ask a card's builder for something while you review it (a commit, a run); it is woken." }),
@@ -368,19 +379,117 @@ function token(): string {
 const notices = new AsyncLocalStorage<Set<string>>()
 
 /**
+ * HI-3195: a tool call's request key (`X-Combwork-Request`), made once per call: each write it sends (POST, PATCH) is
+ * keyed `<base>-<n>`, n counted in the call, so its writes keep their own keys, and the same key is sent again when api()
+ * retries one whose reply was lost. Combwork applies a keyed write once (requestReceipts.ts). `lost`: a write of the call
+ * got no reply after its retries.
+ */
+const callKey = new AsyncLocalStorage<{ base: string; n: number; lost: boolean; hash: string; kept: boolean }>()
+/**
+ * A lost write's retries, each with the same key: the waits before each (HI-3377: backing off, so a Combwork restarting or
+ * stalled isn't asked three times in a row into the same moment; the intents e2e suite checks the gaps).
+ */
+const LOST_RETRY_MS: readonly number[] = [2000, 10_000]
+/**
+ * HI-3195: tool calls whose write got no reply, by tool and arguments, for 10 minutes and at most 32: the same call again
+ * (the model retrying it) reuses that call's key, so Combwork answers "already applied" rather than writing twice. Cleared
+ * once that call's outcome is recovered (a later call with its key gets an answer). Equal arguments can't tell a new
+ * write from a retry while the first's outcome is unknown: this treats them as the retry.
+ */
+const unresolved = new Map<string, { base: string; at: number }>()
+const UNRESOLVED_MS = 10 * 60_000
+const UNRESOLVED_MAX = 32
+/**
+ * HR3's round 1: kept in the agent's own file (CW_REQUEST_KEYS_FILE, the launch's env: one per agent, not per launch), so
+ * the agent's next launch after a restart (its conversation resumed, the same call made again) reuses the key and Combwork
+ * answers "already applied" (its markers are the agent's). Read at start; written whole on each change.
+ */
+const KEYS_FILE = process.env.CW_REQUEST_KEYS_FILE || ''
+function loadUnresolved(): void {
+  if (!KEYS_FILE) return
+  try {
+    const kept = JSON.parse(readFileSync(KEYS_FILE, 'utf8')) as { entries?: { hash?: unknown; base?: unknown; at?: unknown }[] }
+    for (const e of kept.entries ?? []) if (typeof e.hash === 'string' && typeof e.base === 'string' && typeof e.at === 'number' && Date.now() - e.at <= UNRESOLVED_MS) unresolved.set(e.hash, { base: e.base, at: e.at })
+  } catch {
+    // None kept, or unreadable: nothing to reuse.
+  }
+}
+/** Writes the agent's file whole; the error when it couldn't (null when kept, or there is no file). */
+function saveUnresolved(): Error | null {
+  if (!KEYS_FILE) return null
+  try {
+    mkdirSync(dirname(KEYS_FILE), { recursive: true })
+    const tmp = `${KEYS_FILE}.${process.pid}.tmp`
+    writeFileSync(tmp, JSON.stringify({ entries: [...unresolved].map(([hash, u]) => ({ hash, ...u })) }))
+    renameSync(tmp, KEYS_FILE)
+    return null
+  } catch (e) {
+    return e instanceof Error ? e : new Error(String(e))
+  }
+}
+/**
+ * HR3's round 2: a keyed call's key kept as unresolved, in the agent's file, before its first write is sent, so a launch
+ * that ends while the write is on its way (no reply, no error: nothing more runs) leaves its next launch the key. It is
+ * cleared once the call has an answer. Throws, sending nothing, when the file can't be written.
+ */
+function keepPending(call: { base: string; hash: string }): void {
+  unresolved.delete(call.hash)
+  unresolved.set(call.hash, { base: call.base, at: Date.now() })
+  while (unresolved.size > UNRESOLVED_MAX) unresolved.delete(unresolved.keys().next().value!)
+  const failed = saveUnresolved()
+  if (failed) {
+    unresolved.delete(call.hash)
+    throw new Error(say(T['call.keyNotKept'], { message: failed.message }))
+  }
+}
+loadUnresolved()
+const callHash = (tool: string, args: unknown): string => createHash('sha256').update(JSON.stringify([tool, sortedKeys(args)])).digest('hex')
+const sortedKeys = (v: unknown): unknown => (Array.isArray(v) ? v.map(sortedKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v as object).sort().map((k) => [k, sortedKeys((v as Record<string, unknown>)[k])])) : v)
+/** The key base for a call: an unresolved one's of the same tool and arguments (unexpired), else a new one. */
+function keyBaseFor(hash: string): string {
+  const now = Date.now()
+  for (const [h, u] of unresolved) if (now - u.at > UNRESOLVED_MS) unresolved.delete(h)
+  return unresolved.get(hash)?.base ?? randomUUID()
+}
+
+/** HI-3195: a write Combwork had applied already (a retry of one whose reply was lost): what it produced. */
+class AppliedEarlier extends Error {
+  constructor(readonly produced: Record<string, unknown>) {
+    super('applied earlier') // agent-protocol: an internal tag; the call says T['call.appliedEarlier']
+  }
+}
+
+/**
  * Calls the Agent API. `replyMs` is how long the reply may take: a wait passes its own (waitReplyMs), the rest take the
  * usual limit. Not fetch, whose 300 s limit on a reply's headers cut longer waits short (#371).
  */
 
 async function api(method: string, path: string, body?: unknown, replyMs?: number): Promise<unknown> {
+  // HI-3195: a write carries its call's request key (the same on each retry), so Combwork applies it once.
+  // Only a project agent's writes Combwork applies once by their key (shared/requestKeys.ts): any other is sent once.
+  const call = !ASSISTANT && keyedWrite(method, path) ? callKey.getStore() : undefined
+  const requestKey = call ? `${call.base}-${++call.n}` : undefined
+  if (call && !call.kept) {
+    keepPending(call)
+    call.kept = true
+  }
   // agent-protocol: an HTTP header
-  const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}) }
-  let res: Awaited<ReturnType<typeof agentApiCall>>
-  try {
-    res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
-  } catch (e) {
-    // No reply (no connection, a timeout): a real error, whatever its message (HI-2553).
-    throw Object.assign(e instanceof Error ? e : new Error(String(e)), { noReply: true })
+  const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}), ...(requestKey ? { 'X-Combwork-Request': requestKey } : {}) }
+  let res: Awaited<ReturnType<typeof agentApiCall>> | undefined
+  // A keyed write whose reply was lost is sent again, with the same key, a few times: applied at most once.
+  for (let tries = 0; ; tries++) {
+    try {
+      res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
+      break
+    } catch (e) {
+      if (requestKey && tries < LOST_RETRY_MS.length) {
+        await new Promise((r) => setTimeout(r, LOST_RETRY_MS[tries]))
+        continue
+      }
+      if (call) call.lost = true
+      // No reply (no connection, a timeout): a real error, whatever its message (HI-2553).
+      throw Object.assign(e instanceof Error ? e : new Error(String(e)), { noReply: true })
+    }
   }
   if (res.notice) {
     try {
@@ -396,6 +505,8 @@ async function api(method: string, path: string, body?: unknown, replyMs?: numbe
   } catch {
     // keep text
   }
+  // HI-3195: applied already (this call's key, a retry of a write whose reply was lost): said so, not as its reply.
+  if (res.status === 200 && data && typeof data === 'object' && (data as { replayed?: unknown }).replayed === true) throw new AppliedEarlier(((data as { produced?: Record<string, unknown> }).produced ?? {}) as Record<string, unknown>)
   if (res.status < 200 || res.status >= 300) throw Object.assign(new Error(typeof data === 'object' && data && 'refused' in data ? refusedText(data as Refused) : typeof data === 'object' && data && 'error' in data ? String((data as { error: unknown }).error) : say(T['call.error.http'], { status: res.status })), { status: res.status })
   return data
 }
@@ -836,9 +947,9 @@ const tools: Tool[] = [
   {
     name: 'cw_start_agent',
     description: say(T['startAgent.description']),
-    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, resume: { type: 'boolean' }, prompt: { type: 'string' } }, required: ['project', 'agent'] },
+    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, resume: { type: 'boolean' }, resumeIdle: { type: 'boolean' }, prompt: { type: 'string' } }, required: ['project', 'agent'] },
     run: async (a) => {
-      const st = (await api('POST', `${agentPath(a)}/start`, { resume: a.resume, prompt: a.prompt })) as { agentName?: string; status: string; sessionId?: string }
+      const st = (await api('POST', `${agentPath(a)}/start`, { resume: a.resume, resumeIdle: a.resumeIdle, prompt: a.prompt })) as { agentName?: string; status: string; sessionId?: string }
       return say(T['startAgent.reply.started'], { resumed: a.resume ? 'yes' : 'no', agent: String(st.agentName ?? a.agent), project: String(a.project || PROJECT), status: String(st.status), hasSession: st.sessionId ? 'yes' : 'no', session: st.sessionId ?? '' })
     }
   },
@@ -989,7 +1100,11 @@ const tools: Tool[] = [
       const me = ASSISTANT ? {} : { project: PROJECT, ...(process.env.CW_AGENT_ID ? { [a.action === 'join' ? 'reviewer' : 'builder']: process.env.CW_AGENT_ID } : {}) }
       if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief', 'applyNow', 'target', 'released']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'join') return named((await api('POST', '/v1/lanes/join', { ...pick(['project', 'builder', 'cards']), ...me })) as LaneChange, laneChangeText)
-      if (a.action === 'next') return named((await api('GET', '/v1/lanes/next')) as Parameters<typeof laneNextText>[0], laneNextText)
+      if (a.action === 'next') {
+        // HI-3420: the agent's lane just ended or was abandoned: what Combwork says of it, as a reply, never an error.
+        const r = (await api('GET', '/v1/lanes/next')) as Parameters<typeof laneNextText>[0] | { lane: null; ended: { lane: string; text: string } }
+        return r.lane === null ? r.ended.text : named(r, laneNextText)
+      }
       if (a.action !== 'end') throw new Error(say(T['lane.error.action']))
       if (typeof a.lane !== 'string' || !a.lane) throw new Error(say(T['lane.error.laneRequired']))
       return named((await api('POST', `/v1/lanes/${enc(a.lane)}/end`, pick(['mergeCommit', 'abandoned']))) as LaneInfo, laneEndText)
@@ -1148,13 +1263,20 @@ const tools: Tool[] = [
         summary: { type: 'boolean', description: say(T['readTask.arg.summary']) },
         history: { type: 'boolean', description: say(T['readTask.arg.history']) },
         attachments: { type: 'boolean', description: say(T['readTask.arg.attachments']) },
-        archived: { type: 'number', description: say(T['readTask.arg.archived']) }
+        archived: { type: 'number', description: say(T['readTask.arg.archived']) },
+        lineComments: { type: 'string', enum: ['open', 'all'], description: say(T['readTask.arg.lineComments']) },
+        feedback: { type: 'string', description: say(T['readTask.arg.feedback']) },
+        offset: { type: 'number', description: say(T['readTask.arg.offset']) }
       },
       required: ['number']
     },
     run: (a) => {
       const n = enc(String(a.number))
       if (a.archived !== undefined && a.archived !== null) return api('GET', `/v1/tasks/${n}/comments/archived?offset=${enc(String(a.archived))}`)
+      // HI-3220: a batch of comments sent to its builder, a page of items.
+      if (typeof a.feedback === 'string' && a.feedback) return api('GET', `/v1/tasks/${n}/feedback/${enc(a.feedback)}${typeof a.offset === 'number' ? `?offset=${Math.max(0, Math.floor(a.offset))}` : ''}`)
+      // HI-3219: its line comments, a page of rows.
+      if (a.lineComments === 'open' || a.lineComments === 'all') return api('GET', `/v1/tasks/${n}/line-comments?state=${a.lineComments}${typeof a.offset === 'number' ? `&offset=${Math.max(0, Math.floor(a.offset))}` : ''}`)
       const all = a.attachments === true ? 'attachments=true' : ''
       if (a.latestComment) {
         const lq = [a.summary ? 'summary=true' : '', all].filter(Boolean).join('&')
@@ -1199,6 +1321,7 @@ const tools: Tool[] = [
         blocked: { type: 'string', description: say(T['createTask.arg.blocked']) },
         blockedBy: cardsArg(say(T['createTask.arg.blockedBy'])),
         links: cardsArg(say(T['createTask.arg.links'])),
+        followUpOf: { type: ['number', 'string'], description: say(T['createTask.arg.followUpOf']) },
         context: contextArg,
         kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? say(T['createTask.arg.kind.assistant']) : say(T['createTask.arg.kind']) },
         skipReview: { type: 'string', description: ASSISTANT ? say(T['createTask.arg.skipReview.assistant']) : say(T['createTask.arg.skipReview']) },
@@ -1212,7 +1335,7 @@ const tools: Tool[] = [
       },
       required: ['title']
     },
-    run: async (a) => createdLaneText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.target !== undefined ? { target: a.target } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), ...(a.lane !== undefined ? { lane: a.lane } : {}), reply: 'short' })) as TaskChange & { lane?: LaneChange; laneRefused?: string })
+    run: async (a) => createdLaneText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.followUpOf !== undefined ? { followUpOf: a.followUpOf } : {}), ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.target !== undefined ? { target: a.target } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), ...(a.lane !== undefined ? { lane: a.lane } : {}), reply: 'short' })) as TaskChange & { lane?: LaneChange; laneRefused?: string })
   },
   {
     name: 'cw_update_task',
@@ -1225,7 +1348,8 @@ const tools: Tool[] = [
         column: columnArg,
         position: { type: 'string', enum: ['top', 'bottom'], description: say(T['updateTask.arg.position']) },
         before: { type: ['number', 'string'], description: say(T['updateTask.arg.before']) },
-        blocked: { type: 'string' },
+        // HI-3234: null too, so a client passes a clear as null rather than the text "null" (the API clears on either).
+        blocked: { type: ['string', 'null'] },
         title: { type: 'string', description: say(T['updateTask.arg.title']) },
         description: { type: 'string' },
         ...(ASSISTANT ? { project: { type: 'string' } } : {}),
@@ -1238,7 +1362,7 @@ const tools: Tool[] = [
         context: contextArg,
         decision: { type: 'string', description: say(T['updateTask.arg.decision']) },
         // HI-2618: its own card in Doing waits on purpose, with why ('' clears it); no description: the tools' budget (replysize).
-        waitingFor: { type: 'string' },
+        waitingFor: { type: ['string', 'null'] },
         attachments: attachmentsArg('comment'),
         ...(ASSISTANT
           ? {
@@ -1270,7 +1394,7 @@ const tools: Tool[] = [
         numbers: cardsArg(say(T['updateTasks.arg.numbers'])),
         column: columnArg,
         position: { type: 'string', enum: ['top', 'bottom'], description: say(T['updateTasks.arg.position']) },
-        blocked: { type: 'string', description: say(T['updateTasks.arg.blocked']) },
+        blocked: { type: ['string', 'null'], description: say(T['updateTasks.arg.blocked']) },
         labels: { type: 'array', items: { type: 'string' }, description: say(T['updateTasks.arg.labels']) },
         addLabels: { type: 'array', items: { type: 'string' }, description: say(T['updateTasks.arg.addLabels']) },
         removeLabels: { type: 'array', items: { type: 'string' }, description: say(T['updateTasks.arg.removeLabels']) },
@@ -1358,6 +1482,19 @@ const tools: Tool[] = [
       required: ['id', 'value']
     },
     run: async (a) => settingChangedText((await api('PATCH', `/v1/settings/${enc(a.id)}`, { value: a.value, project: a.project, ...(a.offer !== undefined ? { offer: a.offer } : {}) })) as Parameters<typeof settingChangedText>[0])
+  },
+  {
+    name: 'cw_answer_simplify',
+    description: say(T['answerSimplify.description']),
+    inputSchema: {
+      type: 'object',
+      properties: { card: { type: 'string' }, request: { type: 'string' }, choice: { type: 'string', enum: ['carryOn', 'simplify'] }, why: { type: 'string' } },
+      required: ['card', 'request', 'choice']
+    },
+    run: async (a) => {
+      const r = (await api('POST', `/v1/tasks/${enc(String(a.card))}/answer-simplify`, { request: a.request, choice: a.choice, ...(a.why !== undefined ? { why: a.why } : {}) })) as { card: string; request: string; choice: string }
+      return say(T['answerSimplify.done'], { card: r.card, request: r.request, choice: r.choice })
+    }
   },
   {
     name: 'cw_undo',
@@ -1501,7 +1638,8 @@ async function instructions(): Promise<string> {
   // Without a project (the Combwork Assistant's session) there is no "latest handover for this project".
   if (!PROJECT) return INSTRUCTIONS
   try {
-    const latest = await Promise.race([handovers(PROJECT || undefined), new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 1500))])
+    // HI-3375: 10 s, a bound for a hung read (Combwork's main thread busy), not a budget: past it, no handover pointer.
+    const latest = await Promise.race([handovers(PROJECT || undefined), new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 10_000))])
     if (latest[0]) return withLatestHandover(INSTRUCTIONS, latest[0].relPath)
   } catch {
     // Combwork not reachable yet: the static instructions still apply.
@@ -1692,7 +1830,10 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
     case 'tools/call': {
       const tool = offered.find((t) => t.name === params?.name)
       if (!tool) return replyError(id, -32602, say(T['call.error.unknownTool'], { name: String(params?.name) }))
-      const args = (params?.arguments ?? {}) as Record<string, unknown>
+      // HI-3361: an argument Combwork's own tools name two ways (a card's `number` or `card`…) taken as this tool's name for
+      // it, before its handler and every check (withAliases): its schema stays the one it lists.
+      const props = (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {}
+      const args = withAliases(tool.name, (n) => Object.prototype.hasOwnProperty.call(props, n), (params?.arguments ?? {}) as Record<string, unknown>)
       const started = performance.now()
       calling++
       let text: string
@@ -1700,8 +1841,16 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       let kind: CallReport['kind']
       let testId: string | undefined
       const said = new Set<string>()
+      // HI-3195: this call's request key: an unresolved earlier call's of the same tool and arguments, else a new one.
+      const hash = callHash(tool.name, args)
+      const call = { base: keyBaseFor(hash), n: 0, lost: false, hash, kept: false }
       try {
-        const result = await notices.run(said, () => tool.run(args))
+        const result = await callKey.run(call, () => notices.run(said, () => tool.run(args)).catch((e: unknown) => {
+          // Applied earlier: the call's outcome is recovered, said as such (what it made, to read).
+          if (e instanceof AppliedEarlier) return say(T['call.appliedEarlier'], { made: typeof e.produced.created === 'string' ? e.produced.created : typeof e.produced.card === 'string' ? e.produced.card : 'none' })
+          throw e
+        }))
+        if (unresolved.delete(hash)) saveUnresolved()
         // Compact: indenting JSON makes it about a third bigger for the model, and no easier for it to read.
         text = typeof result === 'string' ? result : JSON.stringify(result)
         // Combwork's flag (a new decision on a card the agent works on) goes after the reply, on its own line.
@@ -1715,6 +1864,9 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         const hint = argumentHint(tool.name, tool.inputSchema, args)
         text = `${say(T['call.error'], { message: (e as Error).message })}${hint ? `\n${hint}` : ''}`
         testId = testLog(tool.name, params?.arguments, (e as Error).message, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
+        // HI-3195: a write that got no reply stays kept (keepPending kept it before it was sent), so the model's retry of the
+        // same call reuses its key; a call Combwork answered is cleared, before the reply goes.
+        if (!call.lost && kind !== 'failed' && unresolved.delete(hash)) saveUnresolved()
         reply(id, { content: [{ type: 'text', text }], isError: true })
       }
       // After the reply: the model's text exactly as sent (characters as UTF-16 code units, and UTF-8 bytes).

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import type { QueuePauseInfo } from '@shared/workflow/queue'
 import { folderChangesOffered, pauseRefOf, settleFolderChanges } from '../folderChanges'
+import { cancelGitRun, cancelLabel } from '../gitRuns'
 import { Icon } from './ui'
 
 const T = {
@@ -16,12 +17,14 @@ const T = {
 
 export function FolderChangeButtons({ projectPath, target, paused }: { projectPath: string; target: string; paused: QueuePauseInfo }) {
   const [busy, setBusy] = useState(false)
+  // HI-3372: the run going now, for the Cancel beside the buttons while it runs.
+  const [op, setOp] = useState<string | null>(null)
   const ref = pauseRefOf(paused)
   if (!ref || !folderChangesOffered()) return null
   const act = async (action: 'commit' | 'setAside'): Promise<void> => {
     setBusy(true)
     try {
-      await settleFolderChanges(projectPath, target, action, paused.files, ref)
+      await settleFolderChanges(projectPath, target, action, paused.files, ref, null, setOp)
     } finally {
       setBusy(false)
     }
@@ -39,6 +42,11 @@ export function FolderChangeButtons({ projectPath, target, paused }: { projectPa
       <button type="button" className="btn small subtle" disabled={busy} data-action="set-aside-changes" title={tr(T.setAsideTip, { files })} onClick={() => void act('setAside')}>
         <Icon name="archive" /> {tr(T.setAside)}
       </button>
+      {busy && op && (
+        <button type="button" className="btn small subtle" data-action="cancel-git-run" onClick={() => cancelGitRun(op)}>
+          <Icon name="close" /> {cancelLabel()}
+        </button>
+      )}
     </span>
   )
 }

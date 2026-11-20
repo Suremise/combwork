@@ -12,7 +12,7 @@ const { createHash } = require('crypto')
 const { execFileSync } = require('child_process')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 // A loaded machine took longer than 15 s for an agent's turn (#724).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 
 const userData = path.join(lib.WORK, 'replysize-profile')
 const ws = path.join(lib.WORK, 'replysize-ws')
@@ -59,12 +59,7 @@ const prose = (seed, n) => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms = 15000) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  const until = lib.until
   const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const api = async (method, p, body, bearer = apiToken) => {
     const res = await fetch(API + p, { method, headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
@@ -99,9 +94,7 @@ const prose = (seed, n) => {
   await inv('session:start', alpha, { agentId: coder.id })
   await until(async () => (await live(alpha, coder.id))?.status === 'ready', HUNG_MS)
   for (let i = 1; i <= 4; i++) {
-    await inv('pty:write', lib.ptyKey(alpha, coder.id), `turn ${i}`)
-    await lib.sleep(200)
-    await inv('pty:write', lib.ptyKey(alpha, coder.id), '\r')
+    await lib.typeThenEnter(inv, lib.ptyKey(alpha, coder.id), `turn ${i}`)
     await until(async () => String(await inv('pty:buffer', lib.ptyKey(alpha, coder.id))).includes(`Done: turn ${i}`), HUNG_MS)
   }
 
@@ -139,7 +132,7 @@ const prose = (seed, n) => {
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
       env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, ...extra }),
-      timeout: 60000
+      timeout: lib.timing('spawn.hang')
     }).toString()
     const r = JSON.parse(out.split('\n')[0]).result
     return { text: r.content[0].text, isError: !!r.isError }
@@ -154,7 +147,7 @@ const prose = (seed, n) => {
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) + '\n',
       env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, ...extra }),
-      timeout: 60000
+      timeout: lib.timing('spawn.hang')
     }).toString()
     return JSON.parse(out.split('\n')[0]).result.tools
   }
@@ -250,7 +243,9 @@ const prose = (seed, n) => {
   check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, either\] idle; Tester \[claude-code, either\] stopped$/m.test(projects), projects)
   // About 3,030 characters: each Claude Code agent's connection fields (HI-1771), there for everyone since HI-1774.
   // Each agent row names its connection (HI-2108: every agent has one, its id and name).
-  measure('cw_project_status', tool('cw_project_status', {}), 3300)
+  // HI-3188: two more preferences in its workflow options (simplifyAt, churnStopAt), about 35 characters; HI-3211's
+  // assistantWakes, about 45 more.
+  measure('cw_project_status', tool('cw_project_status', {}), 3400)
   const usage = measure('cw_session_usage', tool('cw_session_usage', {}), 1500)
   check('usage leaves out its days unless asked', !usage.includes('"days"') && tool('cw_session_usage', { days: true }).text.includes('"days"'))
   const notes = measure('cw_list_shared_notes', tool('cw_list_shared_notes', {}), 1500)
@@ -513,7 +508,7 @@ const prose = (seed, n) => {
     // older comments may have been dropped, and never how many.
     const { DatabaseSync } = require('node:sqlite')
     const meta = (sql, ...a) => {
-      const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+      const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
       try {
         db.prepare(sql).run(...a)
       } finally {
@@ -681,7 +676,11 @@ const prose = (seed, n) => {
   }
   const longReply = prose(8, 7000)
   entry({ type: 'assistant', requestId: 'req_long_end', message: { model: 'claude-fake', content: [{ type: 'text', text: longReply }], usage: { input_tokens: 1, output_tokens: 1 } } })
-  await lib.sleep(500)
+  // Read by Combwork: its activity (the Agent API's, the same reading) has every call and the long reply.
+  await until(async () => {
+    const a = (await api('GET', '/v1/projects/alpha/agents/Coder/activity')).body
+    return a?.toolCalls === 12 && a?.clipped?.latestReply === longReply.length
+  }, HUNG_MS)
   // 1900 (HI-1996): its model and effort added, a slow round told from a throttled one.
   const activity = JSON.parse(measure('cw_agent_activity', tool('cw_agent_activity', { project: 'alpha', agent: 'Coder' }, 'assistant'), 1900))
   check('activity: the model and effort it runs with (the fake reports neither: its CLI’s default)', activity.model === 'default' && activity.effort === 'default' && !('retryWaits' in activity), JSON.stringify({ model: activity.model, effort: activity.effort, retryWaits: activity.retryWaits }))
@@ -701,7 +700,8 @@ const prose = (seed, n) => {
   check('cancel with no watch says so', measure('cw_wait_for_agents (cancel)', tool('cw_wait_for_agents', { cancel: true }, 'assistant'), 100) === 'You had no watch.', texts['cw_wait_for_agents (cancel)'])
   // A lane watch (#531): begun, saying what it counts; cancelled.
   const laneWatch = measure('cw_wait_for_tasks (lanes, wake)', tool('cw_wait_for_tasks', { lanes: ['all'], wake: true }, 'assistant'), 300)
-  check('a lane watch begun (default events, not repeated): to end the turn', laneWatch.startsWith('Waiting on all running lanes. End your turn now: Combwork types a line into this session on a lane event'), laneWatch)
+  // HI-3211: what it counts is each lane's project's Wake the Assistant for, said in brackets after "lanes".
+  check('a lane watch begun (default events, not repeated): to end the turn', laneWatch.startsWith('Waiting on all running lanes') && laneWatch.includes('End your turn now: Combwork types a line into this session on a lane event'), laneWatch)
   check('…cancelled', measure('cw_wait_for_tasks (lanes, cancel)', tool('cw_wait_for_tasks', { cancel: true }, 'assistant'), 100) === 'Cancelled your lane watch.', texts['cw_wait_for_tasks (lanes, cancel)'])
   check('activating a project confirms it', measure('cw_activate_project', tool('cw_activate_project', { project: 'gamma' }, 'assistant'), 300) === 'gamma is on.')
   measure('cw_create_project', tool('cw_create_project', { name: 'epsilon' }, 'assistant'), 300)
@@ -846,7 +846,7 @@ const prose = (seed, n) => {
   const latestToken = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).reverse().find((l) => l.token && l.env?.CW_AGENT === launchAgent && l.cwd.toLowerCase() === alpha.toLowerCase())?.token
   check("metrics: the agent's own token is known", !!latestToken())
   const asCoder = (method, request) =>
-    JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: request }) + '\n', env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(latestToken()), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }), timeout: 60000 }).toString().split('\n')[0]).result
+    JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: request }) + '\n', env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(latestToken()), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }), timeout: lib.timing('spawn.hang') }).toString().split('\n')[0]).result
   const unicode = (await api('POST', '/v1/tasks', { title: 'Ünïcödé 日本語 🐝 "quoted" \\ back', project: 'alpha', description: 'Ελληνικά — ✓ — \n new line' })).body.number
   const expected = {}
   for (const [name, args] of [['cw_list_tasks', {}], ['cw_list_tasks', { details: true }], ['cw_read_task', { number: unicode }], ['cw_read_task', { number: 999999 }]]) {
@@ -861,11 +861,20 @@ const prose = (seed, n) => {
   }
   const list = asCoder('tools/list', {}).tools
   check('metrics: a Unicode reply has more bytes than characters', expected['cw_read_task compact ok'].bytes > expected['cw_read_task compact ok'].chars)
-  await lib.sleep(500)
-  const report = (await api('GET', `/v1/metrics?scope=workspace&from=${encodeURIComponent(since)}`)).body
+  // Recorded: the report counts each of those calls (metrics are written behind the replies), then it is compared whole.
+  const gotOf = (r) => {
+    const g = {}
+    for (const sr of r?.projects?.alpha?.mcp ?? []) g[`${sr.tool} ${sr.mode} ${sr.outcome}`] = { count: sr.count, chars: sr.chars, bytes: sr.bytes }
+    return g
+  }
+  let report = null
+  await until(async () => {
+    report = (await api('GET', `/v1/metrics?scope=workspace&from=${encodeURIComponent(since)}`)).body
+    const g = gotOf(report)
+    return Object.entries(expected).every(([k, e]) => (g[k]?.count ?? 0) >= e.count)
+  }, HUNG_MS)
   const alphaPart = report.projects?.alpha
-  const got = {}
-  for (const sr of alphaPart?.mcp ?? []) got[`${sr.tool} ${sr.mode} ${sr.outcome}`] = { count: sr.count, chars: sr.chars, bytes: sr.bytes }
+  const got = gotOf(report)
   check("metrics: each tool call's reported size is the text the model got, by mode and outcome", JSON.stringify(Object.fromEntries(Object.entries(got).filter(([k]) => k in expected).sort())) === JSON.stringify(Object.fromEntries(Object.entries(expected).sort())), JSON.stringify({ got, expected }))
   // Each launch's side of the workflow its own series (HI-2049): summed here.
   const cats = (alphaPart?.catalog ?? []).filter((c) => c.role === 'agent')
@@ -912,8 +921,12 @@ const prose = (seed, n) => {
       }, 300)
     })
   })
-  await lib.sleep(500)
-  const after = (await api('GET', `/v1/metrics?scope=workspace&from=${encodeURIComponent(since)}`)).body
+  // Recorded: the refused token counted, and the cancelled call (metrics are written behind the replies).
+  const metricsNow = async () => (await api('GET', `/v1/metrics?scope=workspace&from=${encodeURIComponent(since)}`)).body
+  const after = (await until(async () => {
+    const m = await metricsNow()
+    return m?.app?.unauthenticated >= before + 1 && m?.workspace?.api?.some((sr) => sr.route === '/v1/tasks' && sr.method === 'POST' && sr.outcome === 'cancelled' && sr.role === 'api') ? m : null
+  }, HUNG_MS)) ?? (await metricsNow())
   check('metrics: a refused token is counted, not attributed to a workspace', after.app.unauthenticated === before + 1, `${before} → ${after.app.unauthenticated}`)
   const cancelled = after.workspace.api.find((sr) => sr.route === '/v1/tasks' && sr.method === 'POST' && sr.outcome === 'cancelled' && sr.role === 'api')
   check('metrics: a client that goes away mid-request is cancelled, with the body bytes it did send', cancelled?.requestBytes === Buffer.byteLength('{"title":'), JSON.stringify(cancelled))
@@ -1128,6 +1141,44 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   measure('cw_project_status (connections)', tool('cw_project_status', { project: 'beta' }, 'assistant'), 3500)
   await inv('connections:setOn', max.id, false)
 
+  // --- HI-3219: a card's line comments: counts in its read, rows a page at a time within their budget. Coder starts and
+  // submits a card with a 60-line file, and the user leaves 30 comments on it, each with a body at the limit.
+  const lcCard = await inv('tasks:create', { title: 'Line comments', project: 'alpha', agent: coder.id, column: 'todo' })
+  const lcKey = lcCard.key || `#${lcCard.number}`
+  // Started as the user does from the board (an agent can't start a card on itself through the Agent API), under rules with
+  // a review (alpha's have none; a card keeps the rules it started under, HI-3220: its send needs Review), put back after.
+  const lcRules = await inv('workflow:form', alpha)
+  await inv('workflow:setOptions', alpha, { preset: lcRules.preset, options: { ...lcRules.own, review: 'agent', noSelfReview: true } })
+  await toolsSettled()
+  const lcStart = await inv('tasks:start', lcCard.number, { kind: 'agent', agentId: coder.id }).then(() => null, (e) => String(e?.message ?? e))
+  await inv('workflow:setOptions', alpha, { preset: lcRules.preset, options: lcRules.own })
+  await toolsSettled()
+  check('line comments: the card is started on Coder', lcStart === null, String(lcStart))
+  fs.writeFileSync(path.join(alpha, 'lines.txt'), Array.from({ length: 60 }, (_, i) => `line ${i + 1}: ${'w'.repeat(150)}`).join('\n') + '\n')
+  lib.git(alpha, ['add', 'lines.txt'])
+  // Its card's trailer: other cards' agents work in this folder too.
+  lib.git(alpha, ['commit', '-qm', 'Lines to comment on', '-m', `Combwork-Card: ${lcKey}`])
+  const lcSubmit = tool('cw_submit', { card: lcKey, summary: 'Lines to comment on.' })
+  check('line comments: Coder submits it', !lcSubmit.isError, lcSubmit.text)
+  const lcSub = (await inv('tasks:work', lcCard.number))?.revisions.at(-1)?.submission
+  for (let i = 0; i < 30; i++) await inv('tasks:lineCommentAdd', lcCard.number, { submission: lcSub, path: 'lines.txt', side: 'new', from: i + 1, to: i + 3, body: `Comment ${i + 1}. ${prose(400 + i, 3900)}`.slice(0, 4000) })
+  const lcRead = JSON.parse(measure('cw_read_task (line comment counts)', JSON.stringify(JSON.parse(tool('cw_read_task', { number: lcKey }).text).lineComments ?? null), 60))
+  check('line comments: a card’s read counts them', lcRead?.open === 30 && lcRead.resolved === 0 && lcRead.sent === 0, JSON.stringify(lcRead))
+  const lcPage = JSON.parse(measure('cw_read_task (lineComments, a page)', tool('cw_read_task', { number: lcKey, lineComments: 'open' }), 24500))
+  check('line comments: a page of rows, and where the next starts', lcPage.lineComments.length > 0 && lcPage.lineComments.length < 30 && lcPage.next === lcPage.lineComments.length && lcPage.lineComments[0].lines.startsWith('line 1: '), JSON.stringify({ rows: lcPage.lineComments?.length, next: lcPage.next }))
+  const lcNext = JSON.parse(tool('cw_read_task', { number: lcKey, lineComments: 'all', offset: lcPage.next }).text)
+  check('line comments: the next page goes on from there', lcNext.lineComments[0]?.id !== lcPage.lineComments[0].id && lcNext.lineComments[0]?.body.startsWith(`Comment ${lcPage.next + 1}.`), JSON.stringify(lcNext.lineComments?.[0]?.body?.slice(0, 40)))
+  // HI-3220: sent to Coder as one fix round; the verdict's comment lists what fits and names the batch read for the rest.
+  const lcPreview = await inv('tasks:feedbackPreview', lcCard.number)
+  const lcSent = await inv('tasks:feedbackSend', lcCard.number, { batch: lcPreview.batch, items: lcPreview.items.map((x) => ({ id: x.id, version: x.version })), expect: lcPreview.expect, replaces: null }).then(() => null, (e) => String(e?.message ?? e))
+  check('line comments: sent to Coder as one fix round', lcSent === null, String(lcSent))
+  const lcComment = (await inv('tasks:list')).find((x) => x.number === lcCard.number)?.comments.at(-1)?.text ?? ''
+  measure('the comments sent: the verdict’s comment', lcComment, 18600)
+  check('line comments: the comment names the batch read for those that didn’t fit', lcComment.startsWith('30 line comments from the user, each at the commit it names:') && new RegExp(`And \\d+ more: cw_read_task with number ${lcKey}, feedback "${lcPreview.batch}" and offset \\d+\\.$`).test(lcComment), lcComment.slice(-200))
+  const lcBatch = JSON.parse(measure('cw_read_task (feedback, a page)', tool('cw_read_task', { number: lcKey, feedback: lcPreview.batch }), 24500))
+  check('line comments: the batch read gives the comments sent, a page at a time', lcBatch.items?.length > 0 && lcBatch.next === lcBatch.items.length && lcBatch.round === 1, JSON.stringify({ items: lcBatch.items?.length, next: lcBatch.next, round: lcBatch.round }))
+  await inv('tasks:delete', lcCard.number).catch(() => undefined)
+
   // A request that began in this workspace and ends after the window opened another: counted nowhere (not the next).
   const nextWs = path.join(lib.WORK, 'replysize-next-ws')
   fs.rmSync(nextWs, { recursive: true, force: true })
@@ -1141,7 +1192,7 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   await inv('session:stop', alpha, coder.id).catch(() => undefined)
   await lib.openWorkspace(inv, page, nextWs)
   pendingSock.destroy()
-  await lib.sleep(500)
+  await lib.sleep(lib.timing('quiet.crossedSwitchMs')) // A quiet window on purpose: this checks that the ended request records nothing in the next workspace.
   const nextReport = await inv('metrics:query', { scope: { kind: 'workspace' } })
   check('metrics: a request that crossed a workspace switch is not recorded in the next workspace', nextReport.workspacePath.toLowerCase() === nextWs.toLowerCase() && !nextReport.workspace.api.some((sr) => sr.outcome === 'cancelled'), JSON.stringify(nextReport.workspace.api))
 

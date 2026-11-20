@@ -172,7 +172,7 @@ describe("the old name's allowances (HI-2617)", () => {
   })
 })
 
-describe("the names check of a change (Darren's decision on HI-2617)", () => {
+describe("the names check of a change (HI-2617)", () => {
   it('fails only what the change adds: a line, a new path; passes the lines it keeps, a diffFiles file, a marked line', () => {
     const repo = tempDir('cw-oldnames-diff-')
     try {
@@ -250,7 +250,7 @@ describe("the names check of a change (Darren's decision on HI-2617)", () => {
 // old-name: end truth-table
 
 // The whole tree is `npm run check:names` (node tests/oldNames.mjs), the report sweep 3 works from; check:repo runs the
-// change's check, `--diff` (Darren's decision on HI-2617, 6 Nov).
+// change's check, `--diff` (HI-2617).
 describe('the old name in what Combwork generates (HI-2617)', () => {
   it('appears in nothing Combwork generates by default: the files it writes, the default settings and configs', () => {
     const generated: Record<string, string> = {

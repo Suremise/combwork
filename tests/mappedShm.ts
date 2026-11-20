@@ -7,10 +7,22 @@ import { join } from 'path'
 import { expect, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { powershellEnv } from './powershellEnv'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 let n = 0
+
+/**
+ * HI-3426: whether this process's SQLite refuses such a file (1546), as 3.53's does, Electron 44's included (the SQLite
+ * Combwork ships). 3.54's opens it as it is, the WAL's rows read and written and checkpointed (Node 24.22.3 has 3.54.1, and
+ * CI's runner takes the latest Node 24): the waits these tests are about are then never made, and there is nothing to wait for.
+ * Tests of a wait run only where it is refused; `tests/boardStore.test.ts` checks this against what SQLite does.
+ */
+export const MAPPED_SHM_REFUSED = ((v: string): boolean => {
+  const [major, minor] = v.split('.').map(Number)
+  return major < 3 || (major === 3 && minor < 54)
+})(process.versions.sqlite ?? '0')
 
 /** Leaves `file` as a process that ended without closing it leaves it: written to, its -wal and -shm there. */
 export async function leftByAKill(file: string): Promise<void> {

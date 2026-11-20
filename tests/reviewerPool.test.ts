@@ -15,6 +15,7 @@ import { allOff, contradictions, preset, reviewerModeOf, takesOption, type Workf
 import { designReviewer, heldOnUser, openDesign, poolAssignments, preferredReviewer, reviewingNow, reviewsInProgress, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
 import type { LaneRecord } from '../src/shared/lanes'
 import type { AgentDef } from '../src/shared/types'
+import { timing } from './timing.cjs'
 
 /** What the stand-ins do: the switch, the lanes, the agents' sessions, the slots' leases and the deliveries. */
 const state = vi.hoisted(() => ({
@@ -36,6 +37,8 @@ const state = vi.hoisted(() => ({
   hooksMissing: new Set<string>(),
   /** Running with its old side's tools (HI-2664: made a reviewer, not restarted since): sessions.sideAllows false. */
   oldTools: new Set<string>(),
+  /** Running in a slot (HI-3402: an either agent whose lane's lease just ended, its exit still to come). */
+  inSlot: new Set<string>(),
   deliveries: [] as { id: string; agentId: string; source?: string; ref?: string; state: string; body: string }[],
   /** The next deliveries: given, or not (its agent got busy: cancelled). */
   next: [] as ('given' | 'notGiven')[],
@@ -71,7 +74,7 @@ vi.mock('../src/main/sessions', async (orig) => {
   const actual = await orig<typeof import('../src/main/sessions')>()
   const stub = {
     sideAllows: (_p: string, a: string) => !state.oldTools.has(a),
-    liveFor: (_p: string, a: string) => (state.running.has(a) ? { status: state.status.get(a) ?? (state.busy.has(a) ? 'working' : 'ready'), sessionId: `s-${a}`, cwd: '', ...(state.hooksMissing.has(a) ? { hooksMissing: true } : {}) } : null),
+    liveFor: (_p: string, a: string) => (state.running.has(a) ? { status: state.status.get(a) ?? (state.busy.has(a) ? 'working' : 'ready'), sessionId: `s-${a}`, cwd: '', ...(state.hooksMissing.has(a) ? { hooksMissing: true } : {}), ...(state.inSlot.has(a) ? { slot: 'slot-c' } : {}) } : null),
     agentNow: (_p: string, a: string) => (state.running.has(a) ? { status: state.status.get(a) ?? (state.busy.has(a) ? 'working' : 'ready'), pending: false, backgroundTasks: state.background.has(a) ? 1 : 0 } : null),
     // As the real one: its `allowed` just before it spawns, after its own awaits (HI-2046).
     start: async (_p: string, o: { agentId: string; prompt?: string; purpose?: string; allowed?: () => void }) => {
@@ -119,14 +122,14 @@ afterEach(() => {
   lives.clear()
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), oldTools: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null, manualBoard: null })
+  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), oldTools: new Set(), inSlot: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null, manualBoard: null })
   // Nothing armed by this test outlives it (HI-2360).
   expect(poolTestHooks.retriesPending()).toBe(0)
 })
 
 const E1 = agentActor('E1')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 const AGENTS: AgentDef[] = [
   { id: 'B1', name: 'B1', workflowRole: 'builder' },
   { id: 'B2', name: 'B2', workflowRole: 'builder' },
@@ -315,7 +318,7 @@ describe("the pool's choice (#1443)", () => {
   })
 })
 
-describe("the pool's pass (#1443)", { timeout: 60_000 }, () => {
+describe("the pool's pass (#1443)", { timeout: timing('test.hang') }, () => {
   it.each([1, 2] as const)('G1b %i × G17 × G11: every cell valid, each card reviewed by its lane reviewer or the pool', async (reviewers) => {
     for (const reviewerMode of ['lane', 'pool'] as const)
       for (const folder of ['slots', 'project'] as const) {
@@ -548,7 +551,7 @@ describe("the pool's pass (#1443)", { timeout: 60_000 }, () => {
   })
 })
 
-describe('a card in Review outside a lane (HI-2046): given to a free reviewer by the same pass', { timeout: 60_000 }, () => {
+describe('a card in Review outside a lane (HI-2046): given to a free reviewer by the same pass', { timeout: timing('test.hang') }, () => {
   const loose = (reviewers: 1 | 2 = 1, loopWakes = true) => {
     const e = (env = setup({ ...optionsFor(reviewers, 'lane', 'project'), loopWakes, platform: 'git' }, { autoRun: false }))
     state.wf = e.wf
@@ -713,7 +716,7 @@ describe('a card in Review outside a lane (HI-2046): given to a free reviewer by
   })
 })
 
-describe("a pool lane's design step (HI-2310): given out by the pool, its answerer preferred for the review", { timeout: 60_000 }, () => {
+describe("a pool lane's design step (HI-2310): given out by the pool, its answerer preferred for the review", { timeout: timing('test.hang') }, () => {
   const card = (n: number, at: string, o: Partial<PoolCard> = {}): PoolCard => ({ card: n, submission: 1, submittedAt: at, pool: true, builders: ['B1'], seen: [], reviewing: null, quorum: 1, passes: 0, ...o })
   const agent = (id: string, o: Partial<PoolAgent> = {}): PoolAgent => ({ id, role: 'reviewer', leased: false, idle: true, ...o })
   const f = (seq: number, kind: string, data: Record<string, unknown>, actor = 'combwork') => ({ seq, kind, at: `t${seq}`, actor, data })
@@ -851,7 +854,7 @@ describe("a pool lane's design step (HI-2310): given out by the pool, its answer
   })
 })
 
-describe("a reviewer whose card waits on its own question to the user is free for the pool's other cards (HI-2559)", { timeout: 60_000 }, () => {
+describe("a reviewer whose card waits on its own question to the user is free for the pool's other cards (HI-2559)", { timeout: timing('test.hang') }, () => {
   const card = (n: number, at: string, o: Partial<PoolCard> = {}): PoolCard => ({ card: n, submission: 1, submittedAt: at, pool: true, builders: ['B1'], seen: [], reviewing: null, quorum: 1, passes: 0, ...o })
   const agent = (id: string, o: Partial<PoolAgent> = {}): PoolAgent => ({ id, role: 'reviewer', leased: false, idle: true, ...o })
 
@@ -938,7 +941,7 @@ describe("a reviewer whose card waits on its own question to the user is free fo
   })
 })
 
-describe('a reviewer watching a card is free for the pool (HI-2333): only what it reviews, checks or runs holds it', { timeout: 60_000 }, () => {
+describe('a reviewer watching a card is free for the pool (HI-2333): only what it reviews, checks or runs holds it', { timeout: timing('test.hang') }, () => {
   /** One reviewer, R1, as in the cli project's pool that stalled. */
   const ONE = AGENTS.filter((a) => a.id !== 'R2')
   const reviewer = (e: Env, id: number) => async () => designReviewer(e.store.facts(id), () => true)
@@ -1030,7 +1033,9 @@ describe('a reviewer watching a card is free for the pool (HI-2333): only what i
     // The delivery would refuse it a line (readyFor): never given, so no pass tries again at once (HI-2333's e2e loop).
     ['watching, its hooks not arriving', () => (state.status.set('R1', 'watching'), state.hooksMissing.add('R1'))],
     // Made a reviewer while it ran and not restarted since (HI-2664, HR3's round 1: Later): no reviewer's tools yet.
-    ['made a reviewer while running, its builder tools still loaded', () => (state.status.set('R1', 'watching'), state.oldTools.add('R1'))]
+    ['made a reviewer while running, its builder tools still loaded', () => (state.status.set('R1', 'watching'), state.oldTools.add('R1'))],
+    // HI-3402: an either agent's run left in its lane's slot as the lane ends: typed there, it reviewed without its review copy.
+    ['running in a slot, its lane over and its exit still to come', () => state.inSlot.add('R1')]
   ])('a reviewer %s is still not free: given the card once that ends', async (_what, hold) => {
     const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
     state.wf = e.wf
@@ -1041,7 +1046,7 @@ describe('a reviewer watching a card is free for the pool (HI-2333): only what i
     await pass(e, ONE)
     expect(assignedTo(e, a.id)).toEqual([])
     expect(state.calls).toEqual([])
-    Object.assign(state, { status: new Map([['R1', 'watching']]), pending: new Set(), background: new Set(), runs: new Set(), hooksMissing: new Set(), oldTools: new Set() })
+    Object.assign(state, { status: new Map([['R1', 'watching']]), pending: new Set(), background: new Set(), runs: new Set(), hooksMissing: new Set(), oldTools: new Set(), inSlot: new Set() })
     await pass(e, ONE)
     await pass(e, ONE)
     expect(assignedTo(e, a.id)).toEqual(['R1'])
@@ -1121,7 +1126,7 @@ describe('a reviewer watching a card is free for the pool (HI-2333): only what i
  * aborts its lifetime and gives the same service a new one), and fake timers for the retry's deadline and the board's
  * debounce. What it waits for are the pool's own counts (its passes run and going, its retries pending and fired).
  */
-describe("a refused pool line's retry through the pool's events (HI-2343)", { timeout: 60_000 }, () => {
+describe("a refused pool line's retry through the pool's events (HI-2343)", { timeout: timing('test.hang') }, () => {
   const ONE = AGENTS.filter((a) => a.id !== 'R2')
   const RETRY = 5000
   /** Polled on the event loop's check phase, which fake timers leave alone; bounded for a hung run. */

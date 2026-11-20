@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'replytell-profile')
 const ws = path.join(lib.WORK, 'replytell-ws')
@@ -46,12 +46,7 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 30000) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  const until = lib.until
   /** What Combwork typed into the Assistant to wake it (the fake logs each line from Combwork). */
   const wakes = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
@@ -67,7 +62,7 @@ const check = (name, ok, extra = '') => {
     if (p === home && enter) return lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
     await inv('pty:write', lib.ptyKey(p, id), text)
     if (!enter) return
-    await lib.sleep(300)
+    await lib.sleep(lib.timing('pace.keysThenEnterMs'))
     await inv('pty:write', lib.ptyKey(p, id), '\r')
   }
   const idle = async (p, id) => ['ready', 'finished'].includes((await live(p, id))?.status)
@@ -84,41 +79,41 @@ const check = (name, ok, extra = '') => {
   check('both start', !!(await until(async () => (await idle(alpha, builder.id)) && (await idle(home, 'assistant')), HUNG_MS)))
   const watchCard = async () => {
     await type(home, 'assistant', `cw cw_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
-    return until(async () => (await live(home, 'assistant'))?.status === 'watching', 15000)
+    return until(async () => (await live(home, 'assistant'))?.status === 'watching', lib.timing('hang.step'))
   }
 
   // The Assistant watches the card; the user types in Builder's pane without sending: nothing.
   check("the Assistant watches the Builder's card", !!(await watchCard()))
   await type(alpha, builder.id, 'C, the corner', false)
-  await lib.sleep(2500) // A fixed wait on purpose: this checks that keystrokes without Enter tell nothing.
+  await lib.sleep(lib.timing('quiet.noTellMs')) // A quiet window on purpose: this checks that keystrokes without Enter tell nothing.
   check('keystrokes without Enter: no wake', wakes().length === 0, JSON.stringify(wakes()))
   // The user sends the answer: one wake, with its first line, naming the agent and the card.
   await type(alpha, builder.id, ' cell')
-  check('the reply wakes the Assistant', !!(await until(async () => wakes().length >= 1, 20000)))
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that a second line does NOT come.
+  check('the reply wakes the Assistant', !!(await until(async () => wakes().length >= 1, lib.timing('hang.ui'))))
+  await lib.sleep(lib.timing('quiet.noTellMs')) // A quiet window on purpose: this checks that a second line does NOT come.
   const w1 = wakes()
   check('…once, with the reply, the agent and the card', w1.length === 1 && w1[0].startsWith(`[CW] User replied to Builder on ${named}: "C, the corner cell"`), JSON.stringify(w1))
-  await until(async () => (await idle(home, 'assistant')) && (await idle(alpha, builder.id)), 20000)
+  await until(async () => (await idle(home, 'assistant')) && (await idle(alpha, builder.id)), lib.timing('hang.ui'))
 
   // A line Combwork types into Builder (a task the Assistant gives it, then watches its card) isn't the user's.
   await type(home, 'assistant', `cw cw_prompt_agent {"project":"alpha","agent":"Builder","text":"work 2"} then cw cw_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
-  check('the Assistant gives Builder a task, then watches its card', !!(await until(async () => (await live(alpha, builder.id))?.status === 'working', 15000)) && !!(await until(async () => (await live(home, 'assistant'))?.status === 'watching', 15000)))
-  await until(() => idle(alpha, builder.id), 20000)
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that Combwork's own line tells nothing.
+  check('the Assistant gives Builder a task, then watches its card', !!(await until(async () => (await live(alpha, builder.id))?.status === 'working', lib.timing('hang.step'))) && !!(await until(async () => (await live(home, 'assistant'))?.status === 'watching', lib.timing('hang.step'))))
+  await until(() => idle(alpha, builder.id), lib.timing('hang.ui'))
+  await lib.sleep(lib.timing('quiet.noTellMs')) // A quiet window on purpose: this checks that Combwork's own line tells nothing.
   check("Combwork's own typed line: no wake", wakes().length === 1, JSON.stringify(wakes().slice(1)))
 
   // Settings → Assistant → Tell the Assistant when I reply to an agent, off: the user's reply tells nothing.
   await inv('settings:update', { assistant: { tellReplies: false } })
   await type(alpha, builder.id, 'Use the second one')
-  await until(async () => (await live(alpha, builder.id))?.status === 'working', 10000)
-  await until(() => idle(alpha, builder.id), 20000)
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that nothing is told with the setting off.
+  await until(async () => (await live(alpha, builder.id))?.status === 'working', lib.timing('hang.step'))
+  await until(() => idle(alpha, builder.id), lib.timing('hang.ui'))
+  await lib.sleep(lib.timing('quiet.noTellMs')) // A quiet window on purpose: this checks that nothing is told with the setting off.
   check('with the setting off: no wake', wakes().length === 1, JSON.stringify(wakes().slice(1)))
   check('…and the Assistant still watches', (await live(home, 'assistant'))?.status === 'watching')
   // On again: told, naming the user as Settings → General → Your name says (#426).
-  await inv('settings:update', { assistant: { tellReplies: true }, general: { userName: 'Darren' } })
+  await inv('settings:update', { assistant: { tellReplies: true }, general: { userName: 'Sam' } })
   await type(alpha, builder.id, 'Ship it')
-  check('on again: the next reply is told, by the name in Settings', !!(await until(async () => wakes().length === 2 && wakes()[1].startsWith(`[CW] Darren replied to Builder on ${named}: "Ship it"`), 20000)), JSON.stringify(wakes().slice(1)))
+  check('on again: the next reply is told, by the name in Settings', !!(await until(async () => wakes().length === 2 && wakes()[1].startsWith(`[CW] Sam replied to Builder on ${named}: "Ship it"`), lib.timing('hang.ui'))), JSON.stringify(wakes().slice(1)))
 
   // #1099: the Assistant watches Builder while Builder is idle (answered at once: no watch starts) and ends its turn.
   // The user's reply to Builder still reaches it within seconds, as a wake of its own.
@@ -128,22 +123,22 @@ const check = (name, ok, extra = '') => {
   const before = wakes().length
   const t0 = Date.now()
   await type(alpha, builder.id, 'Go ahead and push')
-  const told = await until(() => wakes().slice(before).find((x) => x.startsWith('[CW] Darren replied to Builder (alpha): "Go ahead and push"')), HUNG_MS)
-  check('the reply reaches the Assistant within seconds with no watch of its own (#1099)', !!told && Date.now() - t0 < 15000, JSON.stringify({ wakes: wakes().slice(before), ms: Date.now() - t0 }))
+  const told = await until(() => wakes().slice(before).find((x) => x.startsWith('[CW] Sam replied to Builder (alpha): "Go ahead and push"')), HUNG_MS)
+  check('the reply reaches the Assistant within seconds with no watch of its own (#1099)', !!told && Date.now() - t0 < lib.timing('budget.replyToldMs'), JSON.stringify({ wakes: wakes().slice(before), ms: Date.now() - t0 }))
 
   // HI-2410: a turn Claude Code starts by itself (a background task's end, its prompt hook a <task-notification>) soon
   // after the user pressed Enter in the pane (answering a dialog, say: no prompt of theirs) isn't the user's reply.
   await until(() => idle(alpha, builder.id), HUNG_MS)
   const b0 = wakes().length
   await type(alpha, builder.id, 'background 8')
-  check("the user's prompt that starts a background task is told", !!(await until(() => wakes().slice(b0).find((x) => x.startsWith('[CW] Darren replied to Builder (alpha): "background 8"')), HUNG_MS)), JSON.stringify(wakes().slice(b0)))
+  check("the user's prompt that starts a background task is told", !!(await until(() => wakes().slice(b0).find((x) => x.startsWith('[CW] Sam replied to Builder (alpha): "background 8"')), HUNG_MS)), JSON.stringify(wakes().slice(b0)))
   // Its turn is over, the task runs on: the user's Enter, with nothing typed, before the task ends.
   check('Builder waits on its background task', !!(await until(async () => (await live(alpha, builder.id))?.status === 'background', HUNG_MS)), (await live(alpha, builder.id))?.status)
   await inv('pty:write', lib.ptyKey(alpha, builder.id), '\r')
   // The task ends: its own turn starts and ends.
   check("the task's end starts a turn by itself", !!(await until(async () => (await live(alpha, builder.id))?.status === 'working', HUNG_MS)), (await live(alpha, builder.id))?.status)
   await until(() => idle(alpha, builder.id), HUNG_MS)
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that the task's turn tells nothing.
+  await lib.sleep(lib.timing('quiet.noTellMs')) // A quiet window on purpose: this checks that the task's turn tells nothing.
   check("the task's own turn isn't told as the user's reply", wakes().length === b0 + 1 && !wakes().some((x) => x.includes('task-notification')), JSON.stringify(wakes().slice(b0)))
 
   await app.close()

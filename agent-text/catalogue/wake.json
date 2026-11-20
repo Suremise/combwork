@@ -200,8 +200,8 @@
     "note": "#401: the line after \"[CW] \" given to an agent waiting for the user (or a decision wake, #1266) when the user's decisions were recorded on its cards. cards: each card's decisions (notice.decision.card), joined by \", \"; one: yes for a single decision on one card; reviewer: yes when the agent only reviews those cards (HI-2261: told to carry on, a reviewer that had asked nothing made the decided change itself); n: how many cards."
   },
   "wake.idle.reply": {
-    "text": "Nothing waits on {card}: it is in Doing and not submitted, with no question open for the user and no design step out for the reviewer, so nobody will change it for you. Carry on with its work now rather than end your turn; if you need someone, ask: cw_ask_user for the user, cw_loop_step with a design for the reviewer, or cw_submit once it is ready. Keep this watch only for something you asked for that Combwork doesn't track (a comment you requested): if you only watch it, {card} shows as stalled after {after}.",
-    "note": "HI-2285: cw_wait_for_tasks's warning to a lane's builder watching only its own card while nothing on it waits on anyone (CB1 watched CL-5 for a comment and ended its turn). card: its name (HI-12); after: how long until it shows as stalled (5 min)."
+    "text": "Nothing waits on {card}: it is in Doing and not submitted, with no question open for the user and no design step out for the reviewer, so nobody will change it for you. Carry on with its work now rather than end your turn; if you need someone, ask: cw_ask_user for the user, cw_loop_step with a design for the reviewer, or cw_submit once it is ready. Waiting on a long job Combwork can't see (not run through cw-progress: a VM run, a remote build), mark {card} waiting (cw_update_task's waitingFor) instead. Keep this watch only for something you asked for that Combwork doesn't track (a comment you requested): if you only watch it, {card} shows as stalled after {after}.",
+    "note": "HI-2285: cw_wait_for_tasks's warning to a lane's builder watching only its own card while nothing on it waits on anyone (CB1 watched CL-5 for a comment and ended its turn). HI-3324: it names waitingFor for a job Combwork can't see (CB2 ended its turn on a 40-min VM run and CL-234 showed as stalled). card: its name (HI-12); after: how long until it shows as stalled (5 min)."
   },
   "wake.idle.stalled": {
     "text": "{agent} only watches {card} ({since}), and nothing waits on it: no question for the user, no design step, not submitted.",
@@ -442,6 +442,10 @@
   "wake.loop.tail": {
     "text": ". {who} (cw_read_task with latestComment for the comment in full).",
     "note": "#405: the end of a loop wake: who is what it tells the agent (wake.loop.review…, or its lane's next card)."
+  },
+  "wake.loop.watchOn": {
+    "text": "This is your card loop's handoff (Wake reviewers and builders), not your card watch, which is still on.",
+    "note": "HI-3211: after a loop wake's line, when the agent's own card watch on the card is still on and hasn't fired: the wake came from the loop, so the watch's filter (changes) wasn't broken. Wake reviewers and builders is a workflow option's title: keep it as written."
   },
   "wake.many.count": {
     "text": "{n} watched cards changed{short}",

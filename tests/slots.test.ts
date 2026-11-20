@@ -26,6 +26,7 @@ import { JJ_SAYS } from '../src/main/platform/jjWorkspacePort'
 import { unknown } from '../src/main/platform/types'
 import { UNREADABLE } from '../src/shared/workflow/texts'
 import type { WorkspacePort } from '../src/main/platform/workspacePort'
+import { timing } from './timing.cjs'
 
 /** A read of one folder refused (#1500's guard: a skills folder that can't be listed), set by a test and cleared after. */
 const fault = vi.hoisted(() => ({ readdir: null as string | null }))
@@ -146,7 +147,7 @@ function world(o: { setup?: string; builders?: number; port?: WorkspacePort } = 
         }
         const logPath = join(logs, `${runs.length}.log`)
         const out = new BoundedLog(logPath, FILE_IO)
-        const e = r.signal.aborted ? null : await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: 60_000, env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)
+        const e = r.signal.aborted ? null : await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: timing('spawn.hang'), env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)
         out.close()
         const end: SlotRunEnd = e ? { ok: !e.spawnError && !e.timedOut && e.exitCode === 0 && !r.signal.aborted, exitCode: e.exitCode, logPath, settled: steer.settled } : { ok: false, exitCode: null, error: 'the workspace closed', logPath, settled: true }
         runs.push({ ...r, ...end })
@@ -214,7 +215,7 @@ async function lent(w: World, ask: { agent: string; card?: number; lane?: string
   return r
 }
 
-describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
+describe('lending and releasing (#1429)', { timeout: timing('test.hang') }, () => {
   it("a start's claim of a writer is the pool's tracked work: close waits for it, and a closing pool makes none (#1434)", async () => {
     const w = world()
     const t = w.pool.trackWriter()!
@@ -740,7 +741,7 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
   })
 })
 
-describe('the pool (#1429)', { timeout: 60_000 }, () => {
+describe('the pool (#1429)', { timeout: timing('test.hang') }, () => {
   it("is as large as the project's builders (the count given, else the default), at least one, at most the cap", async () => {
     const w = world({ builders: 1 })
     await lent(w, { agent: 'a1', card: 1 })
@@ -817,7 +818,7 @@ describe('the pool (#1429)', { timeout: 60_000 }, () => {
   })
 })
 
-describe('warming (#1429)', { timeout: 60_000 }, () => {
+describe('warming (#1429)', { timeout: timing('test.hang') }, () => {
   it("a failed setup leaves the slot not ready, with its run's log; lending skips it, and the tidy removes it", async () => {
     const w = world({ setup: 'node -e "console.log(\'broken\'); process.exit(3)"' })
     const r = await w.pool.lend({ agent: 'a1', card: 1 })
@@ -847,7 +848,7 @@ describe('warming (#1429)', { timeout: 60_000 }, () => {
   })
 })
 
-describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
+describe('guarded clean-up (#1429)', { timeout: timing('test.hang') }, () => {
   /** A world with one free, clean slot. */
   async function freeSlot(): Promise<{ w: World; folder: string }> {
     const w = world({ builders: 1 })
@@ -880,7 +881,7 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
     expect(await w.pool.remove('slot-a')).toEqual({ why: 'process' })
     p.kill()
     await new Promise<void>((r) => p.once('exit', () => r()))
-    await vi.waitFor(async () => expect(await quiet(folder)).toBe(true), { timeout: 30_000, interval: 100 })
+    await vi.waitFor(async () => expect(await quiet(folder)).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
     expect(await w.pool.remove('slot-a')).toBeNull()
   })
 
@@ -1029,7 +1030,7 @@ describe('guarded clean-up (#1429)', { timeout: 90_000 }, () => {
   })
 })
 
-describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_000 }, () => {
+describe('operations own a slot while it changes (HR1 round 1)', { timeout: timing('test.hang') }, () => {
   /** A session's claim of a slot's writer (#1434, agentFolders.ts's claimIn) for its lease's agent, as a start makes it. */
   const claimFor = (w: World, run: string) => {
     const lease = w.store.leaseOf({ card: 1 })
@@ -1320,7 +1321,7 @@ describe('operations own a slot while it changes (HR1 round 1)', { timeout: 90_0
   })
 })
 
-describe("an operation is its pool's from before its reservation (HR1 round 2)", { timeout: 90_000 }, () => {
+describe("an operation is its pool's from before its reservation (HR1 round 2)", { timeout: timing('test.hang') }, () => {
   /** Runs `then` (to its end) just after each reservation write commits (a take), before the lend goes on. */
   function afterTake(w: World, then: () => unknown): void {
     const take = w.store.take.bind(w.store)
@@ -1418,7 +1419,7 @@ describe("an operation is its pool's from before its reservation (HR1 round 2)",
   })
 })
 
-describe("HI-3003: a slot's failures in its platform's words", { timeout: 90_000 }, () => {
+describe("HI-3003: a slot's failures in its platform's words", { timeout: timing('test.hang') }, () => {
   // Git's port with its reads or its switch failing: said in the pool's words (Git's, unchanged), or in jj's (JJ_SAYS).
   const failing = (what: 'line' | 'files' | 'lineHead' | 'switch', says?: WorkspacePort['says']): WorkspacePort => ({
     ...gitWorkspacePort,
@@ -1465,7 +1466,7 @@ describe("HI-3003: a slot's failures in its platform's words", { timeout: 90_000
   })
 })
 
-describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () => {
+describe('preparing a lent slot for its card (#1438)', { timeout: timing('test.hang') }, () => {
   const branch = (folder: string): string => sh(folder, 'branch', '--show-current')
 
   it("checks out the card's line from the target's head, or the line it already has; the slot stays lent, no operation left", async () => {
@@ -1724,7 +1725,7 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
   })
 })
 
-describe('moving a free slot onto another target (HI-2680)', { timeout: 90_000 }, () => {
+describe('moving a free slot onto another target (HI-2680)', { timeout: timing('test.hang') }, () => {
   /** A slot lent, released and settled: free, ready, its recorded target and head as the preview would read them. */
   async function free(w: World) {
     const r = await lent(w, { agent: 'a1', card: 1 })

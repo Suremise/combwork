@@ -13,6 +13,7 @@ import { BENCHMARK_LIMITS, EXPORT_MEASURES, SCENARIO_MEASURES, USAGE_MEASURES, a
 import { englishText, shownText } from '../src/shared/advanced'
 import { setLanguage } from '../src/shared/i18n'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require_ = createRequire(import.meta.url)
 const fixture = (name: string): string => readFileSync(join(__dirname, 'fixtures', 'benchmarks', `${name}.json`), 'utf8')
@@ -797,7 +798,7 @@ describe('kept comparisons (main/benchmarks.ts)', async () => {
     const ids: string[] = []
     for (let i = 0; i < BENCHMARK_LIMITS.kept; i++) {
       ids.push(entryOf(await kept.importBenchmark(ctx(), WS, { path: f })).id)
-      await new Promise((res) => setTimeout(res, 2))
+      await new Promise((res) => setTimeout(res, timing('pace.tick')))
     }
     const write = kept.benchIo.write
     for (const failOn of ['artifact', 'index']) {
@@ -1007,7 +1008,7 @@ describe('kept comparisons: damage and closing mid-change (#117 round 2)', async
     const ids: string[] = []
     for (let i = 0; i < BENCHMARK_LIMITS.kept; i++) {
       ids.push(entryOf(await kept.importBenchmark(ctx(), WS, { path: f })).id)
-      await new Promise((res) => setTimeout(res, 2))
+      await new Promise((res) => setTimeout(res, timing('pace.tick')))
     }
     const unlinkFn = kept.benchIo.unlink
     let refuse = true
@@ -1067,7 +1068,7 @@ describe('kept comparisons: damage and closing mid-change (#117 round 2)', async
     const ids: string[] = []
     for (let i = 0; i < BENCHMARK_LIMITS.kept; i++) {
       ids.push(entryOf(await kept.importBenchmark(A.ctx(), WS, { path: f })).id)
-      await new Promise((res) => setTimeout(res, 2))
+      await new Promise((res) => setTimeout(res, timing('pace.tick')))
     }
     const before = readFileSync(join(A.dir, 'index.json'), 'utf8')
     // Hold the index's write until the workspace has switched.
@@ -1316,7 +1317,7 @@ describe('kept comparisons: Windows rename retries stop when the workspace goes 
     expect(readdirSync(dir).some((x) => /staged/.test(x))).toBe(false)
     expect((await kept.listBenchmarks(ctx(), WS)).entries.some((e) => e.id === first.id)).toBe(true)
     await disposeWorkspaceService(w)
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('a quarantine move or a damaged index set aside, refused during a switch, isn’t done late: the files stay where they were', async () => {
     const A = await open()

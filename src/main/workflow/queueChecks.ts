@@ -160,7 +160,7 @@ export const TAIL_LINES = 40
  * spawn error, or the shell's "no such command", 9009 on Windows and 127 elsewhere), was ended by its time limit, was
  * killed from outside (a signal, or Windows' interrupt status), exited 75 (the project's own script saying so, #1362),
  * or has a network error code (`network`: Settings → Advanced, Node's and npm's own) in its last 40 lines (#1362,
- * Darren's decision on #1121): never guessed from anything else. A process another program ends with TerminateProcess
+ * #1121): never guessed from anything else. A process another program ends with TerminateProcess
  * exits with the code that program gave, which can't be told from the check's own: it counts as red.
  */
 export function transientCause(e: CheckEnd, platform: NodeJS.Platform = process.platform, network: RegExp | null = null): TransientFailure | null {

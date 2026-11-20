@@ -7,11 +7,12 @@ import { join } from 'path'
 import { inDialectOf, say, setChainResolver, setProcessChain, type DialectChain } from '../src/shared/agentText'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
 import { linksNotCopied, overBytes, sourceProblem, tooBigToDeliver, ContentTooLarge, CopyFailed, SKILL_COPY_MESSAGES } from '../src/main/fsutil'
-import { CLAUDE_PERMISSION_MODES, claudeModeCaveat } from '../src/shared/claude'
-import { CODEX_PERMISSION_MODES } from '../src/shared/codex'
-import { COPILOT_PERMISSION_MODES } from '../src/shared/copilot'
-import { ANTIGRAVITY_PERMISSION_MODES } from '../src/shared/antigravity'
-import { OPENCODE_PERMISSION_MODES } from '../src/shared/opencode'
+import { CLAUDE_PERMISSION_MODES, claudeModeCaveat } from '../src/shared/providers/claude'
+import { CODEX_PERMISSION_MODES } from '../src/shared/providers/codex'
+import { COPILOT_PERMISSION_MODES } from '../src/shared/providers/copilot'
+import { ANTIGRAVITY_PERMISSION_MODES } from '../src/shared/providers/antigravity'
+import { OPENCODE_PERMISSION_MODES } from '../src/shared/providers/opencode'
+import { MUSE_PERMISSION_MODES } from '../src/shared/providers/muse'
 import { CLI_OWN_OPTION } from '../src/shared/cliOwnMode'
 import { modeBadgeLabel, modeDescription, permissionLabel } from '../src/shared/providers'
 // @ts-expect-error: a plain .mjs module without types
@@ -24,7 +25,7 @@ const ids = new Set(Object.keys(catalogue))
 const chain = (texts: Record<string, string>): DialectChain => ({ texts, files: ['test.json'], hash: 'test' })
 const canary = (): void => setProcessChain(chain(canaryTexts(catalogue)))
 const errno = (code: string): Error => Object.assign(new Error(code), { code })
-const MODES = [...CLAUDE_PERMISSION_MODES, ...CODEX_PERMISSION_MODES, ...COPILOT_PERMISSION_MODES, ...ANTIGRAVITY_PERMISSION_MODES, ...OPENCODE_PERMISSION_MODES, CLI_OWN_OPTION]
+const MODES = [...CLAUDE_PERMISSION_MODES, ...CODEX_PERMISSION_MODES, ...COPILOT_PERMISSION_MODES, ...ANTIGRAVITY_PERMISSION_MODES, ...OPENCODE_PERMISSION_MODES, ...MUSE_PERMISSION_MODES, CLI_OWN_OPTION]
 
 afterEach(() => {
   setProcessChain(null)

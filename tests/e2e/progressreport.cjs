@@ -7,7 +7,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'progressreport-profile')
 const ws = path.join(lib.WORK, 'progressreport-ws')
@@ -48,12 +48,8 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 30000) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  // HI-3385: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
   const shells = () => {
     const f = path.join(claudeHome, 'fake-shell.jsonl')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
@@ -117,7 +113,7 @@ const check = (name, ok, extra = '') => {
     check(`${name} shows the ${theme} theme`, !!ok, `the panel is ${at.bg} in the page, ${shown} in the image`)
   }
   const runs = () => inv('progress:list')
-  const newRun = async (known, match) => until(async () => (await runs()).find((r) => !known.includes(r.id) && match(r)), 60000)
+  const newRun = async (known, match) => until(async () => (await runs()).find((r) => !known.includes(r.id) && match(r)), lib.timing('hang.step'))
 
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
@@ -169,11 +165,11 @@ const check = (name, ok, extra = '') => {
   const live1 = await newRun(known, (r) => r.title === 'Stepped demo')
   const row = panel.locator(`.progress-run[data-run="${live1?.id}"]`)
   const rowText = async () => (await row.textContent().catch(() => '')) ?? ''
-  check('the panel shows the run with the agent, its title and its first step', !!live1 && !!(await until(async () => /Builder/.test(await rowText()) && /Stepped demo/.test(await rowText()) && /1 of 3: alpha/.test(await rowText()), 10000)), await rowText())
-  check('…then its next step', !!(await until(async () => /2 of 3: beta/.test(await rowText()), 10000)), await rowText())
+  check('the panel shows the run with the agent, its title and its first step', !!live1 && !!(await until(async () => /Builder/.test(await rowText()) && /Stepped demo/.test(await rowText()) && /1 of 3: alpha/.test(await rowText()), lib.timing('hang.ui'))), await rowText())
+  check('…then its next step', !!(await until(async () => /2 of 3: beta/.test(await rowText()), lib.timing('hang.ui'))), await rowText())
   await page.screenshot({ path: path.join(lib.WORK, 'progressreport-panel.png') })
   const end1 = await stepped()
-  check('…and it passes', end1?.code === 0 && (await until(async () => (await runs()).find((r) => r.id === live1?.id)?.state === 'passed', 10000)), JSON.stringify(end1))
+  check('…and it passes', end1?.code === 0 && (await until(async () => (await runs()).find((r) => r.id === live1?.id)?.state === 'passed', lib.timing('hang.ui'))), JSON.stringify(end1))
 
   // A total printed late (#145) is the wrapper's and the store's (progressReport.test.ts: a late total sent once, kept
   // within it; progress.test.ts: taken once): checked here until HI-2663, whose row's "n of m" the Stepped demo shows.
@@ -194,16 +190,16 @@ const check = (name, ok, extra = '') => {
   check("a run names the agent's card in Doing and the folder's head by default", live3?.card === card.number && live3?.revision === head && live3?.testedCheckout === head && live3?.folder?.toLowerCase() === alpha.toLowerCase(), JSON.stringify(live3))
   const cardRow = panel.locator(`.progress-run[data-run="${live3?.id}"]`)
   const forText = async () => (await cardRow.locator('.progress-run-for').textContent().catch(() => '')) ?? ''
-  check('…and its row shows "AM-12 · a3f2c1d" under the agent (the card by key, #1221)', !!(await until(async () => (await forText()).replace(/\s+/g, ' ').trim() === `${card.key} · ${head.slice(0, 7)}`, 10000)), await forText())
+  check('…and its row shows "AM-12 · a3f2c1d" under the agent (the card by key, #1221)', !!(await until(async () => (await forText()).replace(/\s+/g, ' ').trim() === `${card.key} · ${head.slice(0, 7)}`, lib.timing('hang.ui'))), await forText())
   await cardRow.locator('.progress-title').click()
   const details = cardRow.locator('.progress-details')
   const detailsText = async () => (await details.textContent().catch(() => '')) ?? ''
-  check('…and its details the card and the whole revision', !!(await until(async () => (await detailsText()).includes(`Card${card.key}`) && (await detailsText()).includes(`Revision${head}`), 10000)), await detailsText())
+  check('…and its details the card and the whole revision', !!(await until(async () => (await detailsText()).includes(`Card${card.key}`) && (await detailsText()).includes(`Revision${head}`), lib.timing('hang.ui'))), await detailsText())
   check("…and no Tested on: it was tested on the card's revision (#1273)", !(await detailsText()).includes('Tested on'), await detailsText())
   for (const theme of ['light', 'dark']) await themedShot(theme, `progressreport-card-${theme}.png`)
   await cardRow.locator('.progress-run-card').click()
   // The dialog has the card's title in its title box.
-  check('…and its card opens the card', !!(await until(() => page.locator('[role="dialog"] input').evaluateAll((els) => els.some((e) => e.value === 'Run for a card')), 10000)))
+  check('…and its card opens the card', !!(await until(() => page.locator('[role="dialog"] input').evaluateAll((els) => els.some((e) => e.value === 'Run for a card')), lib.timing('hang.ui'))))
   await page.keyboard.press('Escape')
   const end3 = await forCard()
   check('…and it passes', end3?.code === 0, JSON.stringify(end3))
@@ -245,23 +241,23 @@ const check = (name, ok, extra = '') => {
   // --- Runs as checks (#1222): the --check run is a check of the card's revision in its facts, counted, and its details
   // say so; a check that edits a tracked file while it runs (undone before it ends) is recorded, not counted.
   const work = () => inv('tasks:work', card.number)
-  const counted = await until(async () => (await work())?.checks.find((c) => c.run === quick?.id), 10000)
+  const counted = await until(async () => (await work())?.checks.find((c) => c.run === quick?.id), lib.timing('hang.ui'))
   check("…and is the card's check of its revision, counted", counted?.counted === true && counted.name === 'quick' && counted.revision === head && counted.tested === head && counted.result === 'passed', JSON.stringify({ counted, status: gitIn('status', '--porcelain') }))
   const quickRow = panel.locator(`.progress-run[data-run="${quick?.id}"]`)
   await quickRow.locator('.progress-title').click()
   const quickDetails = async () => (await quickRow.locator('.progress-details').textContent().catch(() => '')) ?? ''
-  check('…and its details say it counts as the check', !!(await until(async () => (await quickDetails()).includes('CheckCounts as check: quick'), 10000)), await quickDetails())
+  check('…and its details say it counts as the check', !!(await until(async () => (await quickDetails()).includes('CheckCounts as check: quick'), lib.timing('hang.ui'))), await quickDetails())
   commands.edit = `node -e "const fs = require('fs'); const t = fs.readFileSync('b.ts'); fs.writeFileSync('b.ts', 'edited'); fs.writeFileSync('b.ts', t)"`
   await setCommands()
   known = (await runs()).map((r) => r.id)
   const edited = await shell(builder.id, 'cw-progress --check edit')
   const editRun = (await runs()).find((r) => !known.includes(r.id) && r.check === 'edit')
-  const notCounted = await until(async () => (await work())?.checks.find((c) => c.run === editRun?.id), 10000)
+  const notCounted = await until(async () => (await work())?.checks.find((c) => c.run === editRun?.id), lib.timing('hang.ui'))
   check('a check that edits a tracked file while it runs is recorded, not counted (changed)', edited?.code === 0 && notCounted?.counted === false && notCounted.whyNot === 'changed', JSON.stringify({ edited, notCounted }))
   const editRow = panel.locator(`.progress-run[data-run="${editRun?.id}"]`)
   await editRow.locator('.progress-title').click()
   const editDetails = async () => (await editRow.locator('.progress-details').textContent().catch(() => '')) ?? ''
-  check('…and its details say why', !!(await until(async () => (await editDetails()).includes("Doesn't count as check edit: files changed in the folder while it ran"), 10000)), await editDetails())
+  check('…and its details say why', !!(await until(async () => (await editDetails()).includes("Doesn't count as check edit: files changed in the folder while it ran"), lib.timing('hang.ui'))), await editDetails())
   for (const theme of ['light', 'dark']) await themedShot(theme, `progressreport-check-${theme}.png`)
 
   // `--check` with no command for the name runs nothing and says so: progressReport.test.ts's (HI-2663).

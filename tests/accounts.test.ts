@@ -3,12 +3,15 @@
 // while one runs, the watches, and a workspace's choice of accounts. All in this file's temp folders: the CLI is never
 // run (its status is faked), nothing signs in, and no real home or accounts folder is touched.
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
-import { join, resolve } from 'path'
+import { basename, dirname, join, resolve } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { accountState, baseConnection, connectionReadiness, duplicateLogins, movedConnection, switchedOn, topOfOrder, workspaceAccounts } from '../src/shared/accounts'
+import { accountState, baseConnection, connectionReadiness, duplicateLogins, movedConnection, switchedOn, topOfOrder, trustInputsKey, workspaceAccounts } from '../src/shared/accounts'
 import type { Account } from '../src/shared/types'
+import { COPIES_REVIEW } from '../src/shared/advanced'
+import type { TrustTarget } from '../src/main/providers/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /**
  * The terminals (HI-1870): which are open, by key, and what closing one does. `endsOnKill` (the default) ends it as a
@@ -31,6 +34,22 @@ vi.mock('../src/main/ptyHost', async (importOriginal) => {
   }
 })
 
+/** Making a worktrees folder (Set Up's, HI-3395), held while `hold` is set: it waits for that before making it. */
+const treesMkdir = vi.hoisted(() => ({ hold: null as null | Promise<void>, asked: 0 }))
+vi.mock('fs/promises', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('fs/promises')>()
+  return {
+    ...fs,
+    mkdir: (async (p: string, o?: Parameters<typeof fs.mkdir>[1]) => {
+      if (String(p).endsWith('.worktrees')) {
+        treesMkdir.asked++
+        if (treesMkdir.hold) await treesMkdir.hold
+      }
+      return fs.mkdir(p, o)
+    }) as typeof fs.mkdir
+  }
+})
+
 const base = tempDir('cw-accounts-')
 const home = join(base, 'claude-home')
 process.env.CW_USER_DATA = join(base, 'profile')
@@ -46,7 +65,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const { claudeAccountStatus, parseClaudeAuthStatus } = await import('../src/main/providers/claude/adapter')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const FIX = join(__dirname, 'fixtures', 'advanced', 'auth-status-claude-2.1.310.jsonl')
 const FIELDS = { loggedIn: 'loggedIn', email: 'email', orgId: 'orgId', plan: 'subscriptionType' }
 
@@ -84,8 +103,8 @@ beforeAll(async () => {
   // A kill ends the terminal, its exit run, as node-pty's does.
   terminals.onKill = (key) => logins.get(key.split(':').at(-1)!)?.(1)
   // No CLI starts here: an account's models read (HI-2852, at its sign-in) answers nothing.
-  vi.spyOn(provider('claude-code'), 'listModels').mockResolvedValue(null)
-  vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async (_exe, env) => {
+  vi.spyOn(provider('claude-code').models!, 'listModels').mockResolvedValue(null)
+  vi.spyOn(provider('claude-code').accounts!, 'accountStatus').mockImplementation(async (_exe, env) => {
     const dir = env.CLAUDE_CONFIG_DIR!
     asked.push(dir)
     const s = [...status].find(([k]) => k.toLowerCase() === dir.toLowerCase())?.[1]
@@ -200,7 +219,7 @@ describe('removing an account', () => {
     expect(mine()).toEqual([`first ${a.id}`, `first undone ${a.id}`])
     // The late one answers: it is taken back at once, as the removal it answered for was refused.
     answer()
-    for (let i = 0; i < 200 && !mine().includes(`second undone ${a.id}`); i++) await new Promise((r) => setTimeout(r, 5))
+    for (let i = 0; i < 200 && !mine().includes(`second undone ${a.id}`); i++) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     expect(mine()).toEqual([`first ${a.id}`, `first undone ${a.id}`, `second ${a.id}`, `second undone ${a.id}`])
   })
 
@@ -507,7 +526,7 @@ describe("a sign-in connection's Set Up (HI-1826)", () => {
 describe("whether a connection's first-run setup is done (HI-1870: Needs set up)", () => {
   const ONBOARDING = join(__dirname, 'fixtures', 'advanced', 'onboarding-claude-2.1.311.jsonl')
   const [onboarded, fresh] = readFileSync(ONBOARDING, 'utf8').trim().split(/\r?\n/)
-  const setUpOf = (dir: string) => provider('claude-code').connectionSetUp!(dir)
+  const setUpOf = (dir: string) => provider('claude-code').accounts?.connectionSetUp!(dir)
   const folder = (name: string, claudeJson?: string): string => {
     const dir = join(base, 'setup', name)
     mkdirSync(dir, { recursive: true })
@@ -551,7 +570,7 @@ describe("whether a connection's first-run setup is done (HI-1870: Needs set up)
 
 describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
   const TRUST = join(__dirname, 'fixtures', 'advanced', 'trust-entry-claude-2.1.311.json')
-  const trustsOf = (dir: string, targets: { root: string | null; git: boolean; short: boolean }[]) => provider('claude-code').connectionTrusts!(dir, targets)
+  const trustsOf = (dir: string, targets: { root: string | null; git: boolean; short: boolean }[]) => provider('claude-code').accounts?.connectionTrusts!(dir, targets)
   const trustHome = (name: string, claudeJson?: string): string => {
     const dir = join(base, 'trust', name)
     mkdirSync(dir, { recursive: true })
@@ -589,6 +608,39 @@ describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
     } finally {
       await advanced.set('claude-code.accounts.trustField', null)
     }
+  })
+
+  it("Claude Code: an --add-dir folder (HI-3337): review copies under a trusted worktrees folder are trusted, else not; no home, its own (CLAUDE_CONFIG_DIR)", async () => {
+    const claude = provider('claude-code').accounts!
+    const root = join(base, 'trust-added', 'ws.worktrees')
+    const copies = join(root, 'alpha', 'copies')
+    mkdirSync(copies, { recursive: true })
+    const entry = (folder: string) => ({ projects: { [realpathSync.native(folder).replace(/\\/g, '/')]: { hasTrustDialogAccepted: true } } })
+    expect(await claude.addedDirTrusted!(trustHome('added-root', JSON.stringify(entry(root))), copies)).toBe(true)
+    expect(await claude.addedDirTrusted!(trustHome('added-none', JSON.stringify({ projects: {} })), copies)).toBe(false)
+    expect(await claude.addedDirTrusted!(trustHome('added-broken', '{'), copies)).toBeNull()
+    // A folder that isn't there can't be told (never trusted on a guess).
+    expect(await claude.addedDirTrusted!(trustHome('added-gone', JSON.stringify(entry(root))), join(root, 'gone'))).toBeNull()
+    const own = trustHome('added-own', JSON.stringify(entry(root)))
+    vi.stubEnv('CLAUDE_CONFIG_DIR', own)
+    try {
+      expect(await claude.addedDirTrusted!(null, copies)).toBe(true)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('the worktrees folder as a target for review copies (HI-3337): plain, its name the project, read where it would be and never made by the reading (HI-3395)', async () => {
+    const parent = join(base, 'trust-copies')
+    mkdirSync(parent, { recursive: true })
+    const root = join(parent, 'ws.worktrees')
+    const [got] = await accounts.trustTargets([{ name: 'ws.worktrees', path: root, copies: true }])
+    expect(got).toMatchObject({ project: 'ws.worktrees', root: join(realpathSync.native(parent), 'ws.worktrees'), git: false, copies: true })
+    expect(existsSync(root)).toBe(false)
+    // Once it is there, its own real place.
+    mkdirSync(root)
+    const [made] = await accounts.trustTargets([{ name: 'ws.worktrees', path: root, copies: true }])
+    expect(made).toMatchObject({ root: realpathSync.native(root), copies: true })
   })
 
   it("finds each project's folder as the CLIs look it up: a worktree project's main repository root, which covers its slots", async () => {
@@ -660,6 +712,14 @@ describe("where Set Up asks a CLI's trust question (HI-1871)", () => {
     // Mixed: the workspace folder first, for the plain one; once it's trusted, the Git roots left, one at a time.
     expect(accounts.chooseSetUpTarget(true, ws, [cli, alpha, apiary])).toEqual({ folder: ws, workspace: true })
     expect(accounts.chooseSetUpTarget(true, ws, [cli, apiary])).toEqual({ folder: cli.folder, project: 'cli' })
+  })
+
+  it("the worktrees folder for review copies (HI-3337): asked last, at its own folder, said as the copies'", () => {
+    const copies = { project: 'ws.worktrees', folder: 'C:\\work\\ws.worktrees', git: false, copies: true as const }
+    // A plain project still pending: the workspace folder first (the worktrees folder is beside it, not inside).
+    expect(accounts.chooseSetUpTarget(true, ws, [alpha, copies])).toEqual({ folder: ws, workspace: true })
+    expect(accounts.chooseSetUpTarget(true, ws, [cli, copies])).toEqual({ folder: cli.folder, project: 'cli' })
+    expect(accounts.chooseSetUpTarget(true, ws, [copies])).toEqual({ folder: copies.folder, project: 'ws.worktrees', copies: true })
   })
 
   it("a CLI whose trust isn't inherited (Codex): each pending root in turn, Git or not; nothing pending: none", () => {
@@ -929,7 +989,7 @@ describe("a workspace's accounts", () => {
 
     it('turning one on saves it in workspace.json, as its default, and nowhere else (HI-2650)', async () => {
       const a = await accounts.addAccount('claude-code', 'Here')
-      // Added, it is on nowhere: nothing is turned on by itself (Darren, 6 Nov).
+      // Added, it is on nowhere: nothing is turned on by itself.
       expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).connections?.['claude-code']?.on ?? []).not.toContain(a.id)
       await run(() => accounts.setAccountOn(a.id, true))
       expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [a.id] } })
@@ -965,14 +1025,14 @@ describe("a workspace's accounts", () => {
       const names = ['alpha', 'beta', 'gamma']
       const folders = names.map((n) => join(wsPath, n))
       // Each trust read held until the test answers it: how many projects it was asked about, and its answer.
-      let held: { home: string; projects: number; answer: (v: (boolean | null | { at: string })[]) => void }[] = []
+      let held: { home: string; projects: number; targets: readonly TrustTarget[]; answer: (v: (boolean | null | { at: string })[]) => void }[] = []
       let spy: ReturnType<typeof vi.spyOn>
       let a: Account
       const row = () => run(() => accounts.accountsView()).connections.find((c) => c.id === a.id)!
       // A project's config with one agent, and an id of its own: one written without is given its id by Combwork whenever it
       // next reads the ids, in temp files and a .bak beside it, and a folder removed while that lands is found not empty
       // (HI-2060).
-      const writeProject = (i: number, agent: { provider: string; connection?: string }): void => {
+      const writeProject = (i: number, agent: { provider: string; connection?: string; workflowRole?: string }): void => {
         mkdirSync(join(folders[i], '.combwork'), { recursive: true })
         writeFileSync(join(folders[i], '.combwork', 'project.json'), JSON.stringify({ version: 2, id: `p-2060000000${i}`, agents: [{ id: `a-${i}`, name: `Agent ${i}`, ...agent }] }))
       }
@@ -997,7 +1057,7 @@ describe("a workspace's accounts", () => {
       const alphaConnection = (info: Awaited<ReturnType<typeof w.refresh>>) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.connection
       beforeEach(async () => {
         held = []
-        spy = vi.spyOn(provider('claude-code'), 'connectionTrusts').mockImplementation((dir, targets) => new Promise((answer) => held.push({ home: dir, projects: targets.length, answer })))
+        spy = vi.spyOn(provider('claude-code').accounts!, 'connectionTrusts').mockImplementation((dir, targets) => new Promise((answer) => held.push({ home: dir, projects: targets.length, targets, answer })))
         a = await accounts.addAccount('claude-code', 'Trusting')
         writeFileSync(join(folderOf(a), '.claude.json'), JSON.stringify({ hasCompletedOnboarding: true }))
         await projectsNow(1)
@@ -1012,7 +1072,7 @@ describe("a workspace's accounts", () => {
         await projectsNow(0)
       })
 
-      it("counts only the projects it would be used in (HI-1871, Darren): an agent on it, own or the first on in the order; not another CLI's, nor one pinned elsewhere", async () => {
+      it("counts only the projects it would be used in (HI-1871): an agent on it, own or the first on in the order; not another CLI's, nor one pinned elsewhere", async () => {
         const mine = () => held.filter((h) => h.home === folderOf(a))
         // Its first read (beforeEach): alpha, whose Claude Code agent has no connection of its own (the first on: this
         // one), and the Assistant's home (the Assistant on it too).
@@ -1033,6 +1093,162 @@ describe("a workspace's accounts", () => {
         await vi.waitFor(() => expect(held.filter((h) => h.home === folderOf(other)).map((h) => h.projects)).toEqual([1]), { timeout: HUNG_MS })
         for (const h of held.filter((x) => x.home === folderOf(other))) h.answer([true])
         await run(() => accounts.setAccountOn(other.id, false))
+      })
+
+      it('a reviewer on it adds the worktrees folder, for its review copies (HI-3337): named as the copies, Set Up asked there', async () => {
+        const mine = () => held.filter((h) => h.home === folderOf(a))
+        mine()[0].answer([true, true])
+        await vi.waitFor(() => expect(row().trust?.checking).toBeUndefined(), { timeout: HUNG_MS })
+        writeProject(0, { provider: 'claude-code', workflowRole: 'reviewer' })
+        await refreshedTo((info) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.workflowRole === 'reviewer')
+        row()
+        await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(3), { timeout: HUNG_MS })
+        const last = mine().at(-1)!
+        // Read where it would be, and not made by the reading (HI-3395: the check made it beside the workspace).
+        expect(existsSync(w.worktreesRoot)).toBe(false)
+        const trees = join(realpathSync.native(dirname(w.worktreesRoot)), basename(w.worktreesRoot))
+        expect(last.targets[2]).toMatchObject({ root: trees, git: false, copies: true })
+        last.answer([true, true, false])
+        await vi.waitFor(() => expect(row().trust?.pending).toEqual([{ project: basename(w.worktreesRoot), folder: trees, git: false, copies: true }]), { timeout: HUNG_MS })
+        expect(row().trust?.setUpIn).toEqual({ folder: trees, project: basename(w.worktreesRoot), copies: true })
+        expect(existsSync(w.worktreesRoot)).toBe(false)
+        // Set Up opens there, so it makes the folder then.
+        const reads = mine().length
+        const place = run(() => accounts.setUpPlace(a.id))
+        await vi.waitFor(() => expect(mine().length).toBeGreaterThan(reads), { timeout: HUNG_MS })
+        mine().at(-1)!.answer([true, true, false])
+        expect(await place).toEqual({ folder: trees, project: basename(w.worktreesRoot), copies: true })
+        expect(existsSync(w.worktreesRoot)).toBe(true)
+        // Review copies off (Settings → Advanced): no folder to trust for them.
+        await advanced.set(COPIES_REVIEW, false)
+        try {
+          row()
+          await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(2), { timeout: HUNG_MS })
+        } finally {
+          await advanced.set(COPIES_REVIEW, null)
+        }
+        // A Claude Code before 2.1.326 never asks about the folder (HI-3342): none to trust for them either; 2.1.326 does.
+        // Each read answered first, so the next is a read of its own rather than joining it.
+        const cliInfo = providerService.info
+        try {
+          for (const [version, count] of [['2.1.326', 3], ['2.1.325', 2], ['2.1.326', 3]] as const) {
+            mine().at(-1)!.answer(Array(mine().at(-1)!.projects).fill(true))
+            providerService.info = ((id: string) => ({ ...cliInfo(id as never), version })) as never
+            row()
+            await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(count), { timeout: HUNG_MS })
+          }
+        } finally {
+          providerService.info = cliInfo
+        }
+        for (const h of held) h.answer([true, true, true])
+        writeProject(0, { provider: 'claude-code' })
+        await refreshedTo((info) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.workflowRole === undefined)
+        rmSync(w.worktreesRoot, { recursive: true, force: true })
+      })
+
+      describe("Set Up making the worktrees folder (HI-3395, HR1's round 1): checked again after it, never a stale place", () => {
+        const mine = () => held.filter((h) => h.home === folderOf(a))
+        let release: () => void = () => undefined
+        // alpha's agent a reviewer, the worktrees folder untrusted; Set Up asked for, its read answered so, and its
+        // making of the folder held.
+        const heldSetUp = async (): Promise<{ place: Promise<unknown> }> => {
+          mine()[0].answer([true, true])
+          await vi.waitFor(() => expect(row().trust?.checking).toBeUndefined(), { timeout: HUNG_MS })
+          writeProject(0, { provider: 'claude-code', workflowRole: 'reviewer' })
+          await refreshedTo((info) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.workflowRole === 'reviewer')
+          row()
+          await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(3), { timeout: HUNG_MS })
+          mine().at(-1)!.answer([true, true, false])
+          await vi.waitFor(() => expect(row().trust?.pending.map((p) => !!p.copies)).toEqual([true]), { timeout: HUNG_MS })
+          treesMkdir.hold = new Promise<void>((r) => (release = r))
+          treesMkdir.asked = 0
+          const reads = mine().length
+          const place = run(() => accounts.setUpPlace(a.id)).then((v) => ({ v }), (e: Error) => ({ e: e.message }))
+          await vi.waitFor(() => expect(mine().length).toBeGreaterThan(reads), { timeout: HUNG_MS })
+          mine().at(-1)!.answer([true, true, false])
+          await vi.waitFor(() => expect(treesMkdir.asked).toBe(1), { timeout: HUNG_MS })
+          // Wrapped: an async function returning the promise itself would wait for it.
+          return { place }
+        }
+        afterEach(async () => {
+          treesMkdir.hold = null
+          release()
+          for (const h of held) h.answer([true, true, true])
+          writeProject(0, { provider: 'claude-code' })
+          await refreshedTo((info) => info.projects.find((p) => p.name === 'alpha')?.agents[0]?.workflowRole === undefined)
+          rmSync(w.worktreesRoot, { recursive: true, force: true })
+        })
+
+        it('the connection removed meanwhile: cancelled, never the old place', async () => {
+          const { place } = await heldSetUp()
+          await run(() => accounts.setAccountOn(a.id, false))
+          await accounts.removeAccount(a.id)
+          release()
+          expect(await place).toEqual({ e: expect.stringMatching(/Set Up didn't open: the connection was removed or its workspace closed/) })
+        })
+
+        it('its state retired meanwhile (as its workspace closing prunes it): cancelled', async () => {
+          const { place } = await heldSetUp()
+          // Turned off here: the read it would be used in goes, as a closed workspace's does.
+          await run(() => accounts.setAccountOn(a.id, false))
+          release()
+          expect(await place).toEqual({ e: expect.stringMatching(/Set Up didn't open/) })
+        })
+
+        it("its folders changed meanwhile (a new generation): asked afresh, the current answer's place", async () => {
+          const { place } = await heldSetUp()
+          // A terminal of it ended: its trust read again, a new generation, now trusting the worktrees folder.
+          const reads = mine().length
+          accounts.rereadTrust(a.id)
+          release()
+          await vi.waitFor(() => expect(mine().length).toBeGreaterThan(reads), { timeout: HUNG_MS })
+          // That read answered, and the fresh Set Up's own: the folder trusted now, so Set Up opens in its own folder.
+          for (let i = 0; i < 2; i++) {
+            await vi.waitFor(() => expect(mine().length).toBeGreaterThan(reads + i), { timeout: HUNG_MS })
+            mine().at(-1)!.answer([true, true, true])
+          }
+          expect(await place).toEqual({ v: undefined })
+        })
+
+        it('nothing changed meanwhile: the place, its folder made', async () => {
+          const { place } = await heldSetUp()
+          expect(existsSync(w.worktreesRoot)).toBe(false)
+          release()
+          expect(await place).toEqual({ v: expect.objectContaining({ project: basename(w.worktreesRoot), copies: true }) })
+          expect(existsSync(w.worktreesRoot)).toBe(true)
+        })
+
+        it('its workspace closed meanwhile: cancelled, its worktrees folder never offered', async () => {
+          // A second workspace with a reviewer on this connection, its worktrees folder untrusted.
+          const ws2 = join(base, 'ws-trust-copies')
+          mkdirSync(join(ws2, 'delta', '.combwork'), { recursive: true })
+          writeFileSync(join(ws2, 'delta', '.combwork', 'project.json'), JSON.stringify({ version: 2, id: 'p-33950000001', agents: [{ id: 'a-d', name: 'Delta', provider: 'claude-code', workflowRole: 'reviewer' }] }))
+          const w2 = createWorkspaceService()
+          await w2.open(ws2)
+          const in2 = <T>(fn: () => T): T => inWorkspace(w2, fn)
+          const untrusted = (h: (typeof held)[number]): void => h.answer(h.targets.map((t) => !(t as { copies?: true }).copies))
+          const of2 = () => held.filter((h) => h.targets.some((t) => (t as { copies?: true }).copies && (t.root ?? '').toLowerCase().includes('ws-trust-copies')))
+          try {
+            await in2(() => accounts.setAccountOn(a.id, true))
+            in2(() => accounts.accountsView())
+            await vi.waitFor(() => expect(of2()).toHaveLength(1), { timeout: HUNG_MS })
+            untrusted(of2()[0])
+            treesMkdir.hold = new Promise<void>((r) => (release = r))
+            treesMkdir.asked = 0
+            const place = in2(() => accounts.setUpPlace(a.id)).then((v) => ({ v }), (e: Error) => ({ e: e.message }))
+            await vi.waitFor(() => expect(of2()).toHaveLength(2), { timeout: HUNG_MS })
+            untrusted(of2()[1])
+            await vi.waitFor(() => expect(treesMkdir.asked).toBe(1), { timeout: HUNG_MS })
+            await disposeWorkspaceService(w2)
+            // The next list read prunes its state (as the close's own event does in the app).
+            row()
+            release()
+            expect(await place).toEqual({ e: expect.stringMatching(/Set Up didn't open/) })
+          } finally {
+            await disposeWorkspaceService(w2).catch(() => undefined)
+            rmSync(`${ws2}.worktrees`, { recursive: true, force: true })
+          }
+        })
       })
 
       it("follows the connection a project's agent would launch on now: reassigned, the project moves to the other's count; the order changed, the same (HR3, HI-1871)", async () => {
@@ -1250,5 +1466,27 @@ describe("a workspace's accounts", () => {
       expect((await accounts.confirmAccount(a.id)).fresh).toBe(false)
       await run(() => accounts.setAccountOn(a.id, false))
     })
+  })
+})
+
+describe("what the window's trust read keys on (trustInputsKey, HI-3341)", () => {
+  const agent = { id: 'a-one', name: 'Agent', provider: 'claude' as const, connection: 'c1' }
+  const key = (over: Partial<typeof agent> & { workflowRole?: 'builder' | 'reviewer' } = {}, copies = true, version = '2.1.326'): string =>
+    trustInputsKey([{ path: 'D:/ws/alpha', agents: [{ ...agent, ...over }] }], [], null, copies, { claude: { version } })
+
+  it('changes when an agent becomes a reviewer, and back', () => {
+    expect(key({ workflowRole: 'reviewer' })).not.toBe(key({ workflowRole: 'builder' }))
+    expect(key({ workflowRole: 'builder' })).toBe(key())
+  })
+  it('changes with a name or note that makes it a reviewer', () => {
+    expect(key({ name: 'Reviewer' })).not.toBe(key())
+  })
+  it('changes with its connection, review copies turned off, and the CLI version', () => {
+    expect(key({ connection: 'c2' })).not.toBe(key())
+    expect(key({}, false)).not.toBe(key())
+    expect(key({}, true, '2.1.325')).not.toBe(key())
+  })
+  it('stays the same for what the folders do not depend on', () => {
+    expect(key({ name: 'Builder two' })).toBe(key())
   })
 })

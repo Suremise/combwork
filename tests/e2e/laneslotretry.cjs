@@ -27,7 +27,7 @@ const path = require('path')
 const { spawn } = require('child_process')
 const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 90000
+const HUNG_MS = lib.timing('hang.step')
 
 const at = (x) => path.join(lib.WORK, `laneslotretry-${x}`)
 const userData = at('profile')
@@ -71,9 +71,9 @@ const renamable = (dir) => {
   const holdBeat = path.join(tools, 'hold-beat.txt')
   fs.writeFileSync(hold, `const fs = require('fs'); const [file, go, beat, ms] = process.argv.slice(2); const fd = fs.openSync(file, 'w'); const t = Date.now(); const tick = () => { if (fs.existsSync(go) || Date.now() - t > Number(ms)) { fs.closeSync(fd); process.exit(0) } fs.writeFileSync(beat, String(Date.now())); setTimeout(tick, 100) }; tick()\n`)
   /** Whether the holder runs now: alive, its heartbeat fresh. */
-  const holding = (p) => !!p && p.exitCode === null && fs.existsSync(holdBeat) && Date.now() - Number(fs.readFileSync(holdBeat, 'utf8') || 0) < 2000
+  const holding = (p) => !!p && p.exitCode === null && fs.existsSync(holdBeat) && Date.now() - Number(fs.readFileSync(holdBeat, 'utf8') || 0) < lib.timing('lock.beatFreshMs')
   /** Whether a holder with heartbeat `beat` runs now (one started by B1's run: not this suite's child). */
-  const beating = (beat) => fs.existsSync(beat) && Date.now() - Number(fs.readFileSync(beat, 'utf8') || 0) < 2000
+  const beating = (beat) => fs.existsSync(beat) && Date.now() - Number(fs.readFileSync(beat, 'utf8') || 0) < lib.timing('lock.beatFreshMs')
   // Step 4's turn: B1's command starts a holder that outlives it (detached, as a sandbox server is), then runs until
   // turn-go.txt, so B1 is in a turn meanwhile.
   const turn = path.join(tools, 'turn.js')
@@ -159,7 +159,7 @@ const renamable = (dir) => {
           const now = JSON.stringify({ state: l?.state, status: l?.status ? { reason: l.status.reason, why: l.status.why, slot: l.status.slot, held: l.status.held, broker: l.status.broker, idle: l.status.idle } : null, slot: l?.slot ?? null, lease: s?.lease?.lane ?? null, b1: (await live(b1.id).catch(() => null))?.status ?? 'stopped' })
           if (now !== last) seen.push(`${Date.now() - t0} ms ${now}`)
           last = now
-          await new Promise((r) => setTimeout(r, 250))
+          await lib.sleep(lib.timing('poll.watchMs')) // a sample's pace for the watcher's log, not a wait for a state
         }
       }
       const done = look()
@@ -283,7 +283,7 @@ const renamable = (dir) => {
       const ready = () => {
         try {
           const beat = JSON.parse(fs.readFileSync(standBeat, 'utf8'))
-          return c.exitCode === null && beat.pid === c.pid && same(beat.cwd, cwd) && Date.now() - beat.at < 2000 ? beat : null
+          return c.exitCode === null && beat.pid === c.pid && same(beat.cwd, cwd) && Date.now() - beat.at < lib.timing('lock.beatFreshMs') ? beat : null
         } catch {
           return null // The child hasn't written yet, or this read overlapped its next heartbeat.
         }

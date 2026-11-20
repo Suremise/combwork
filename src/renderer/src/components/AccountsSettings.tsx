@@ -3,7 +3,9 @@ import { limitName } from '@shared/planLimits'
 import { connectionCells, currentLimits, planName, resetText, usageLevel, windowOf, type ConnectionCell } from './accountCard'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Account, PlanLimit, ProviderId } from '@shared/types'
-import { accountState, connectionReadiness, duplicateLogins, type AccountView, type ConnectionRow, type ConnectionsView, type ConnectionState } from '@shared/accounts'
+import { COPIES_REVIEW } from '@shared/advanced'
+import { useAdvancedValue } from '../advanced'
+import { accountState, connectionReadiness, duplicateLogins, trustInputsKey, type AccountView, type ConnectionRow, type ConnectionsView, type ConnectionState, type ConnectionTrust } from '@shared/accounts'
 import { pcAccountId, pcWideSignIn } from '@shared/connectionDefaults'
 import { connectionOf } from '@shared/connectionLabel'
 import { isProviderEnabled, providerDescriptor } from '@shared/providers'
@@ -68,12 +70,15 @@ const M = {
   removeFailed: msg({ id: 'settings.accounts.removeFailed', defaultMessage: "Couldn't remove the connection", description: "An error's title: removing a connection failed." }),
   sameLogin: msg({ id: 'settings.accounts.sameLoginAccount', defaultMessage: 'Signed in to the same login as another account: {names}', description: 'A warning on an account (Settings → Accounts & Connections, HI-2107): other accounts are signed in as the same login. {names} is their names, listed.' }),
   leftover: msg({ id: 'settings.accounts.leftover', defaultMessage: "Not all removed: {what}. Remove tries again; nothing outside its folder was touched.", description: "A warning on a connection (Settings → Accounts & Connections) whose removal stopped partway. {what} is what's left, in English." }),
+  cliGone: msg({ id: 'settings.accounts.cliGone', defaultMessage: "{cli}'s description is gone (removed, or its id changed), so this connection can't be used. Remove it, or put the description back and choose Reload.", description: "A warning on a connection (Settings → Accounts & Connections, HI-3270) whose coding agent CLI ran from a description file the user removed or renamed. {cli} is the CLI's id from that file (such as mycli). Reload is the button in Settings that reads the CLIs' descriptions again." }),
   changedTo: msg({ id: 'settings.accounts.changedTo', defaultMessage: 'Now signed in as {now}, was {was}', description: 'A warning on a connection (Settings → Accounts & Connections): its login changed (a /login typed in a pane). {now} and {was} are emails.' }),
   affected: msg({ id: 'settings.accounts.affected', defaultMessage: '{n, plural, one {# running agent runs on another connection than the one chosen for it now.} other {# running agents run on another connection than the one chosen for them now.}}', description: 'Banner in Settings → Accounts & Connections after a connection was turned off or the default changed (HI-1755): how many running agents are on a connection other than the one chosen now.' }),
   switchAffected: msg({ id: 'settings.accounts.switchAffected', defaultMessage: 'Switch Them When Their Turn Is Over', description: 'Button on that banner: each of those agents ends once its turn is over and carries on, on the connection chosen now.' }),
   notTrusted: msg({ id: 'settings.accounts.notTrusted', defaultMessage: 'Not trusted yet in this workspace: {projects}', description: "Under a connection that needs set up (Settings → Accounts & Connections, HI-1870): the projects of the open workspace whose folders its coding agent CLI hasn't been told to trust yet ({projects}: their names, listed). Set Up asks the CLI's trust question for each in turn." }),
   moreProjects: msg({ id: 'settings.accounts.moreProjects', defaultMessage: '{n, plural, one {# more} other {# more}}', description: 'The last item of that list when it names only the first projects: how many more there are.' }),
   setUpIn: msg({ id: 'settings.accounts.setUpIn', defaultMessage: "It opens in {project}'s folder, {folder}: answer {cli}'s question to trust it.", description: "Above a connection's Set Up terminal when it opens in a project's folder its coding agent CLI ({cli}) doesn't trust yet (HI-1870): {project} is the project's name, {folder} the folder." }),
+  setUpInCopies: msg({ id: 'settings.accounts.setUpInCopies', defaultMessage: "It opens in this workspace's worktrees folder, {folder}, where reviewers' review copies are: answer {cli}'s question to trust it. Until then, reviewers on this connection review without a copy, since {cli} would ask about it at every start.", description: "Above a connection's Set Up terminal when it opens in the open workspace's worktrees folder (HI-3337): the coding agent CLI ({cli}) asks about the reviewers' review-copies folder at each start until it trusts this folder once. {folder} is the folder." }),
+  reviewCopies: msg({ id: 'settings.accounts.reviewCopies', defaultMessage: 'review copies', description: "In the list after \"Not trusted yet in this workspace:\" (settings.accounts.notTrusted), beside project names (HI-3337): the workspace's worktrees folder, where reviewers' review copies are, which the coding agent CLI doesn't trust yet. Lower case, a list item." }),
   setUpInWorkspace: msg({ id: 'settings.accounts.setUpInWorkspace', defaultMessage: "It opens in this workspace's folder, {folder}: answer {cli}'s question to trust it, and with it every project in it that isn't a Git repository. A Git repository is asked in its own folder next.", description: "Above a connection's Set Up terminal when it opens in the open workspace's folder (HI-1871): the coding agent CLI ({cli}) asks once whether to trust that folder; trusting it covers the projects inside it that aren't Git repositories, and Set Up then asks in each Git repository's own folder (HI-2520). {folder} is the folder." }),
   setUpChecking: msg({ id: 'settings.accounts.setUpChecking', defaultMessage: 'Checking…', description: "A connection's state (Settings → Accounts & Connections, HI-1870): Combwork is still reading whether its coding agent CLI trusts the open workspace's project folders, so it doesn't say yet whether it is set up." }),
   setUpNeeded: msg({ id: 'settings.accounts.setUpNeeded', defaultMessage: 'Needs set up', description: "A connection's state (Settings → Accounts & Connections, HI-1870): its CLI's one-time first-run setup (Set Up, a button beside it) hasn't been done in its folder yet." }),
@@ -90,7 +95,7 @@ const M = {
   base: msg({ id: 'settings.accounts.connection.base', defaultMessage: 'First', description: "A mark on an account's first connection (HI-2107): the one a new agent on that account gets first. Keep it short." }),
   tagTip: msg({ id: 'settings.accounts.connection.tagTip', defaultMessage: "Its tag: a usage move puts agents on another account's connection with the same tag.", description: "The tooltip of a connection's tag on its row (Settings → Accounts & Connections, HI-2530). The tag is a free-text label of the user's (\"Builders\")." }),
   baseTip: msg({ id: 'settings.accounts.connection.baseTip', defaultMessage: 'The first of its account: what a new agent gets when this account is first in the order and on here.', description: 'The tooltip of "First" on a connection (HI-2107).' }),
-  // The tidied cards (HI-2528, Darren's approved mockup v2).
+  // The tidied cards (HI-2528, approved mockup v2).
   factSignedInAs: msg({ id: 'settings.accounts.fact.signedInAs', defaultMessage: 'Signed in as', description: "A field's label on an account's card (Settings → Accounts & Connections, HI-2528): the email (or, for GitHub Copilot, the user name) it is signed in as. Keep it short." }),
   factPlan: msg({ id: 'settings.accounts.fact.plan', defaultMessage: 'Plan', description: "A field's label on an account's card (HI-2528): its plan as the coding agent CLI names it (\"Max\"). Keep it short." }),
   factState: msg({ id: 'settings.accounts.fact.state', defaultMessage: 'State', description: "A field's label on an account's card (HI-2528): whether it is signed in and set up, and when its sign-in expires. Keep it short." }),
@@ -171,7 +176,7 @@ function Fact({ label, children, data }: { label: string; children: React.ReactN
   )
 }
 
-type Terminal = { id: string; key: string; ended: boolean; provider: ProviderId; setUp?: boolean; in?: { folder: string; project?: string; workspace?: true } }
+type Terminal = { id: string; key: string; ended: boolean; provider: ProviderId; setUp?: boolean; in?: ConnectionTrust['setUpIn'] }
 
 export function AccountsSettings() {
   const changed = useStore((s) => s.connectionsChanged)
@@ -193,7 +198,7 @@ export function AccountsSettings() {
   // An account being dragged to another place in the one order (HI-2107), and the row it would drop on.
   const [dragging, setDragging] = useState<string | null>(null)
   const [dropAt, setDropAt] = useState<string | null>(null)
-  // The account whose Account Settings are open (HI-2528: its usage move, off the card at Darren's word, 21:40).
+  // The account whose Account Settings are open (HI-2528: its usage move, off the card).
   const [accountDialog, setAccountDialog] = useState<string | null>(null)
   const load = useCallback((check: boolean) => {
     call('connections:list', check)
@@ -203,11 +208,13 @@ export function AccountsSettings() {
   // Each account checked again as the section is shown; read again whenever main says they changed.
   useEffect(() => load(true), [load, wsPath])
   useEffect(() => load(false), [load, changed])
-  // The workspace's projects changed (one added, moved), or which agent runs on which connection: the projects each
-  // account would be used in, and so its trust of them, are read again (HI-1870; HI-1871), and who uses each connection.
-  const projectsKey = (projects ?? []).map((p) => `${p.path}:${p.agents.map((a) => `${a.id}=${a.provider ?? ''}/${a.connection ?? ''}`).join(',')}`).join('|')
-  const assistantKey = useStore((s) => (s.workspace?.assistant?.agents ?? []).map((a) => `${a.provider ?? ''}/${a.connection ?? ''}`).join(','))
-  useEffect(() => load(false), [load, projectsKey, assistantKey])
+  // The workspace's projects changed (one added, moved), which agent runs on which connection, or anything else the
+  // folders each connection is used in depend on (an agent made a reviewer: HI-3341): the projects each account would
+  // be used in, and so its trust of them, are read again (HI-1870; HI-1871), and who uses each connection.
+  const assistantAgents = useStore((s) => s.workspace?.assistant?.agents)
+  const copiesReview = useAdvancedValue<boolean>(COPIES_REVIEW) !== false
+  const trustKey = trustInputsKey(projects ?? [], assistantAgents ?? [], settings, copiesReview, providerInfo)
+  useEffect(() => load(false), [load, trustKey])
 
   if (!view) return <div className="faint">{tr(M.loading)}</div>
   // Agents running on a connection other than the one chosen for them now (HI-1755), not yet waiting to switch: by
@@ -217,9 +224,9 @@ export function AccountsSettings() {
   const dups = duplicateLogins(view.connections)
   const nameOf = (id: string): string => view.connections.find((a) => a.id === id)?.name ?? id
   // One list in the one order (decision A): Combwork's accounts of the CLIs turned on, and each PC-wide sign-in (Copilot's,
-  // the Antigravity CLI's: HI-2544) while its CLI is on.
+  // the Antigravity CLI's: HI-2544) while its CLI is on; and those of a CLI whose description is gone (HI-3270), to remove.
   const byId = new Map<string, AccountView | Account>([...view.connections, ...view.homes].map((a) => [a.id, a]))
-  const shown = view.order.map((id) => byId.get(id)).filter((a): a is AccountView | Account => !!a && (a.home ? pcWideSignIn(a.provider) && a.id === pcAccountId(a.provider) && isProviderEnabled(settings, a.provider) : view.providers.includes(a.provider)))
+  const shown = view.order.map((id) => byId.get(id)).filter((a): a is AccountView | Account => !!a && (a.home ? pcWideSignIn(a.provider) && a.id === pcAccountId(a.provider) && isProviderEnabled(settings, a.provider) : view.providers.includes(a.provider) || !!(a as AccountView).gone))
   // Its place in the one order, every account counted (those hidden here too): what a move names.
   const placeOf = (id: string): number => view.order.indexOf(id)
   const move = (id: string, index: number): Promise<void> => act(M.moveFailed, () => call('connections:move', id, Math.max(0, index)))
@@ -289,7 +296,7 @@ export function AccountsSettings() {
   }
 
   /**
-   * An account's connections as a small table inside its card (HI-2528, Darren's 21:40 decision and approved mockup v2):
+   * An account's connections as a small table inside its card (HI-2528, and its approved mockup v2):
    * order, Connection (with First), Tag, Model, Effort, Context, Mode, Extra args, Used by, then Edit, Remove and ⋯
    * (Duplicate). Each value the CLI decides reads "CLI's own"; on a narrow card each row goes to two lines (CSS).
    */
@@ -495,7 +502,7 @@ export function AccountsSettings() {
         <p className="hint">{t.setUp ? setUpHint(t.provider) : tr(M.signingIn)}</p>
         {t.in && (
           <p className="hint" data-set-up-in>
-            {t.in.workspace ? tr(M.setUpInWorkspace, { folder: t.in.folder, cli: providerDescriptor(t.provider).name }) : tr(M.setUpIn, { project: t.in.project ?? '', folder: t.in.folder, cli: providerDescriptor(t.provider).name })}
+            {t.in.workspace ? tr(M.setUpInWorkspace, { folder: t.in.folder, cli: providerDescriptor(t.provider).name }) : t.in.copies ? tr(M.setUpInCopies, { folder: t.in.folder, cli: providerDescriptor(t.provider).name }) : tr(M.setUpIn, { project: t.in.project ?? '', folder: t.in.folder, cli: providerDescriptor(t.provider).name })}
           </p>
         )}
         <div className="task-terminal">
@@ -529,6 +536,25 @@ export function AccountsSettings() {
         {shown.map((x, place) => {
           if (x.home) return pcRow(x)
           const a = x as AccountView
+          // Its CLI's description is gone (HI-3270): nothing can run on it, so Remove is all it offers.
+          if (a.gone)
+            return (
+              <div key={a.id} className="account-block" data-account={a.id} data-cli={a.provider} data-gone data-order={place + 1}>
+                <div className="account-row">
+                  <div className="account-main">
+                    <div className="account-name">{a.name}</div>
+                    <div className="account-warning" data-warning="cli-gone">
+                      <Icon name="warning" /> {tr(M.cliGone, { cli: a.provider })}
+                    </div>
+                  </div>
+                  <div className="account-actions">
+                    <button className="btn danger" data-remove onClick={() => void remove(a.id, a.name, false)}>
+                      {tr(M.remove)}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
           const ws = view.workspace[a.provider]
           const server = a.kind === 'server'
           const state = accountState(a)
@@ -536,7 +562,7 @@ export function AccountsSettings() {
           const o = a.observed
           const email = o?.email ?? a.accepted?.email
           const same = dups.get(a.id)
-          // Its usage move lives in its Account Settings (HI-2528, Darren 21:40): there when it could have one.
+          // Its usage move lives in its Account Settings (HI-2528): there when it could have one.
           const moveTargets = view.connections.filter((other) => other.id !== a.id && other.provider === a.provider && !other.leftover)
           const hasMove = !server && !a.leftover && (!!a.usageMove || moveTargets.length > 0)
           const expiry = !server && state === 'signedIn' ? o?.loginExpiresAt : undefined
@@ -607,7 +633,7 @@ export function AccountsSettings() {
                   )}
                   {/* Said once: above its Set Up terminal while that is open (the Assistant, HI-1871). */}
                   {needsSetUp && !(terminal?.setUp && terminal.id === a.id) && <div className="account-setup-note hint" data-set-up-note>{setUpHint(a.provider)}</div>}
-                  {needsSetUp && pending.length > 0 && <div className="account-setup-note hint" data-not-trusted>{tr(M.notTrusted, { projects: fmt.list([...pending.slice(0, 3).map((p) => p.project), ...(pending.length > 3 ? [tr(M.moreProjects, { n: pending.length - 3 })] : [])]) })}</div>}
+                  {needsSetUp && pending.length > 0 && <div className="account-setup-note hint" data-not-trusted>{tr(M.notTrusted, { projects: fmt.list([...pending.slice(0, 3).map((p) => (p.copies ? tr(M.reviewCopies) : p.project)), ...(pending.length > 3 ? [tr(M.moreProjects, { n: pending.length - 3 })] : [])]) })}</div>}
                   {state === 'changed' && a.accepted && o?.email && <div className="account-warning" data-warning="changed"><Icon name="warning" /> {tr(M.changedTo, { now: o.email, was: a.accepted.email })}</div>}
                   {same && <div className="account-warning" data-warning="duplicate"><Icon name="warning" /> {tr(M.sameLogin, { names: fmt.list(same.map(nameOf)) })}</div>}
                   {a.leftover && <div className="account-warning" data-warning="leftover"><Icon name="warning" /> {tr(M.leftover, { what: a.leftover })}</div>}

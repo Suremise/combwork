@@ -18,13 +18,14 @@
  */
 import type { AppSettings, CommandPoint, CustomCommand, ProjectConfig, ProviderId, WorkflowLevel, WorkspaceConfig } from './types'
 import type { PlatformId } from './platform/descriptors'
-import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from './loopLimits'
+import { CHURN_MAX, LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from './loopLimits'
+import { LANE_EVENTS, WAKE_LEVELS } from './laneEvents'
 import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES, SLOT_COPY_DEFAULT } from './defaults'
 import { SLOT_COPY_TEXT } from './slotDefaults'
 import { GITHUB_HOST_TEXT } from './githubHostText'
 import { parseCopilotChoice, parseGithubHost } from './githubHost'
 import { PRICES_CHECKED } from './prices'
-import { LISTED_ADVANCED, advancedDef, advancedTakesText, advancedText, agentText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
+import { listedAdvanced, advancedDef, advancedTakesText, advancedText, agentText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
 import { agentMsg, say, type AgentMsg } from './agentText'
 import { language, msg } from './i18n'
 import { FORM_GROUPS, takesOption, type OptionKey } from './workflow/options'
@@ -32,7 +33,7 @@ import { OPTION_TEXT, optionDesc, optionTitle, VALUE_TEXT } from './workflow/opt
 import { writeWorkflow } from './workflow/projectWorkflow'
 import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
-import { PROVIDERS, dangerModes, defaultProviderSettings, permissionLabel, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
+import { PROVIDERS, dangerModes, onProvidersChanged, defaultProviderSettings, permissionLabel, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
 import { LEGACY_CONSUMED, ownOrLegacy } from './workflow/preferences'
 import { EMPTY_CW, EMPTY_WORKSPACE, resolvePoint } from './commands'
 
@@ -104,7 +105,7 @@ function modeLabel(m: Pick<ModeOption, 'label' | 'text'>): TextPart {
 /** Advanced's values (#367) as catalog rows, drawn by Settings → Advanced's list: one each, and a workspace's own where it takes one. */
 function advancedRows(): Row[] {
   // One of Combwork's settings (Show developer features) keeps its own entry, under its settings key.
-  return LISTED_ADVANCED.filter((d) => !d.setting).flatMap((d): Row[] => {
+  return listedAdvanced().filter((d) => !d.setting).flatMap((d): Row[] => {
     const title = withValues(msg({ id: 'settings.advancedRow.title', defaultMessage: '{group}: {title}', description: "An advanced setting's title where it is named alone: {group} is Combwork or the CLI it belongs to, {title} the setting's own title." }), { group: groupName(d.group), title: d.text.title })
     const tip = withValues(
       msg({
@@ -198,8 +199,8 @@ export const SETTINGS_TEXT = {
   providerOff: msg({ id: 'settings.provider.off', defaultMessage: '{provider} (off)', description: "A provider in a list of providers (Settings → Providers → Default provider, Settings → Assistant → Provider) while it is turned off. {provider} is its name." })
 }
 
-/** Settings' sections, in order (the view adds their icons). */
-export const SETTINGS_SECTIONS: SettingsSectionInfo<SettingsSection>[] = [
+/** Settings' sections, in order (the view adds their icons), as the providers registered now make them. */
+const settingsSections = (): SettingsSectionInfo<SettingsSection>[] => [
   sectionInfo('general', msg({ id: 'settings.section.general.label', defaultMessage: 'General', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.general.desc', defaultMessage: 'Startup, window and tray behaviour.', description: 'Under the heading of the section "General" of Settings: what it holds.' })),
   sectionInfo('updates', msg({ id: 'settings.section.updates.label', defaultMessage: 'Updates', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.updates.desc', defaultMessage: "Keeping Combwork itself up to date. New versions come from Combwork's GitHub releases and are verified before they install.", description: 'Under the heading of the section "Updates" of Settings: what it holds.' })),
   sectionInfo('appearance', msg({ id: 'settings.section.appearance.label', defaultMessage: 'Appearance', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.appearance.desc', defaultMessage: 'Theme, fonts and terminal look.', description: 'Under the heading of the section "Appearance" of Settings: what it holds.' })),
@@ -227,7 +228,13 @@ export const SETTINGS_SECTIONS: SettingsSectionInfo<SettingsSection>[] = [
   sectionInfo('advanced', msg({ id: 'settings.section.advanced.label', defaultMessage: 'Advanced', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.advanced.desc', defaultMessage: 'Developer features, the details Combwork relies on that a CLI update can break (advanced.json), logs, data and resetting Combwork.', description: 'Under the heading of the section "Advanced" of Settings: what it holds.' }))
 ]
 
-const APP_ROWS: Row[] = [
+/**
+ * Settings' sections, in order: rebuilt in place when the providers change (HI-3196: a user's own CLI registered, changed or
+ * removed has its page), so every reader sees them as they are.
+ */
+export const SETTINGS_SECTIONS: readonly SettingsSectionInfo<SettingsSection>[] = settingsSections()
+
+const appRows = (): Row[] => [
   // General
   { section: 'general', key: 'closeToTray', title: msg({ id: 'settings.general.closeToTray.title', defaultMessage: 'Close to tray', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.closeToTray.desc', defaultMessage: 'Closing the window keeps Combwork running in the system tray so sessions continue.', description: 'What the setting "Close to tray" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.closeToTray.tip', defaultMessage: 'When off, closing the window quits Combwork (asking first if sessions are running). Use File → Exit or the tray menu to quit.', description: 'The info tip of the setting "Close to tray" (Settings → General): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'general', key: 'minimizeToTray', title: msg({ id: 'settings.general.minimizeToTray.title', defaultMessage: 'Minimise to tray', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.minimizeToTray.desc', defaultMessage: 'Minimising hides Combwork to the system tray instead of the taskbar.', description: 'What the setting "Minimise to tray" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.minimizeToTray.tip', defaultMessage: 'Click the tray icon to bring Combwork back.', description: 'The info tip of the setting "Minimise to tray" (Settings → General): more on what it does and when it applies.' }), type: 'boolean' },
@@ -275,7 +282,7 @@ const APP_ROWS: Row[] = [
   { section: 'general', key: 'language', title: LANGUAGE_TEXT.title, desc: LANGUAGE_TEXT.desc, tip: LANGUAGE_TEXT.tip, englishTitle: true, type: 'custom' },
   { section: 'general', key: 'dateFormat', title: msg({ id: 'settings.general.dateFormat.title', defaultMessage: 'Date format', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.dateFormat.desc', defaultMessage: 'How dates show in Combwork: sessions named by when they started, the session lists and their tooltips, exports.', description: 'What the setting "Date format" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.dateFormat.tip', defaultMessage: 'System uses your Windows language\'s short date. Names you give sessions stay as you typed them: only the automatic ones (when a session started) follow this. How long ago something happened ("2 hours ago") stays, with the date on hover.', description: 'The info tip of the setting "Date format" (Settings → General): more on what it does and when it applies.' }), type: 'select', options: [{ value: 'ymd', label: msg({ id: 'settings.general.dateFormat.option.ymd', defaultMessage: 'yyyy-mm-dd (2026-10-04)', description: 'A choice of the setting "Date format" (Settings → General).' }) }, { value: 'dmy', label: msg({ id: 'settings.general.dateFormat.option.dmy', defaultMessage: 'dd/mm/yyyy (04/10/2026)', description: 'A choice of the setting "Date format" (Settings → General).' }) }, { value: 'mdy', label: msg({ id: 'settings.general.dateFormat.option.mdy', defaultMessage: 'mm/dd/yyyy (10/04/2026)', description: 'A choice of the setting "Date format" (Settings → General).' }) }, { value: 'system', label: msg({ id: 'settings.general.dateFormat.option.system', defaultMessage: 'System', description: 'A choice of the setting "Date format" (Settings → General).' }) }] },
   { section: 'general', key: 'timeFormat', title: msg({ id: 'settings.general.timeFormat.title', defaultMessage: 'Time format', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.timeFormat.desc', defaultMessage: 'How times show with the dates.', description: 'What the setting "Time format" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.timeFormat.tip', defaultMessage: 'Applies wherever Combwork shows a time, such as a session that started today or the time a screenshot was pasted.', description: 'The info tip of the setting "Time format" (Settings → General): more on what it does and when it applies.' }), type: 'select', options: [{ value: '24h', label: msg({ id: 'settings.general.timeFormat.option.24h', defaultMessage: '24-hour (14:05)', description: 'A choice of the setting "Time format" (Settings → General).' }) }, { value: '12h', label: msg({ id: 'settings.general.timeFormat.option.12h', defaultMessage: '12-hour (2:05 PM)', description: 'A choice of the setting "Time format" (Settings → General).' }) }] },
-  { section: 'general', key: 'userName', title: msg({ id: 'settings.general.userName.title', defaultMessage: 'Your name', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.userName.desc', defaultMessage: 'How Combwork names you to the Assistant when it tells it you replied to an agent ("Darren replied to B1 on #399").', description: 'What the setting "Your name" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.userName.tip', defaultMessage: 'It goes into the Assistant\'s conversation, so use whatever form you like it to see. Empty uses "User".', description: 'The info tip of the setting "Your name" (Settings → General): more on what it does and when it applies.' }), type: 'text', placeholder: msg({ id: 'settings.general.userName.placeholder', defaultMessage: 'User', description: 'The empty box\'s placeholder of the setting "Your name" (Settings → General).' }) },
+  { section: 'general', key: 'userName', title: msg({ id: 'settings.general.userName.title', defaultMessage: 'Your name', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.userName.desc', defaultMessage: 'How Combwork names you to the Assistant when it tells it you replied to an agent ("Sam replied to B1 on #399").', description: 'What the setting "Your name" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.userName.tip', defaultMessage: 'It goes into the Assistant\'s conversation, so use whatever form you like it to see. Empty uses "User".', description: 'The info tip of the setting "Your name" (Settings → General): more on what it does and when it applies.' }), type: 'text', placeholder: msg({ id: 'settings.general.userName.placeholder', defaultMessage: 'User', description: 'The empty box\'s placeholder of the setting "Your name" (Settings → General).' }) },
   { section: 'general', key: 'showTips', title: msg({ id: 'settings.general.showTips.title', defaultMessage: 'Show a tip when Combwork starts', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.showTips.desc', defaultMessage: 'One tip a day about something Combwork can do, and a tip at the moments one helps.', description: 'What the setting "Show a tip when Combwork starts" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.showTips.tip', defaultMessage: 'Tips show in a small card in the bottom corner and never get in the way. Help → Tips… lists them all, whether this is on or off.', description: 'The info tip of the setting "Show a tip when Combwork starts" (Settings → General): more on what it does and when it applies.' }), type: 'boolean' },
   // Updates
   { section: 'updates', key: 'status', title: msg({ id: 'settings.updates.status.title', defaultMessage: 'Combwork version', description: "A setting's title (Settings → Updates)." }), tip: msg({ id: 'settings.updates.status.tip', defaultMessage: 'The version you are running and the result of the last check.', description: 'The info tip of the setting "Combwork version" (Settings → Updates): more on what it does and when it applies.' }), type: 'custom' },
@@ -402,7 +409,7 @@ const APP_ROWS: Row[] = [
   {
     section: 'workflow',
     key: 'defaults',
-    title: msg({ id: 'settings.workflow.combworkDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
+    title: msg({ id: 'settings.workflow.combworkDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (HI-1768)." }),
     desc: msg({ id: 'settings.workflow.combworkDefaults.desc', defaultMessage: 'For every workspace: what each project starts from unless its workspace or the project sets its own. Pick a preset, or set each option, for None or for Git.', description: 'What the setting "Combwork defaults" is, under its title (Settings → Version Control). None and Git: glossary 2.1.' }),
     tip: msg({ id: 'settings.workflow.combworkDefaults.tip', defaultMessage: 'Until 1.0’s settings tidy, Settings → Workflow defaults: nothing set there changed.', description: 'The info tip of "Combwork defaults" (Settings → Version Control): its old place, so a search for its old name finds it. Workflow defaults was the old section’s name: translate it as that section was.' }),
     type: 'custom',
@@ -421,7 +428,7 @@ const APP_ROWS: Row[] = [
   { section: 'board', key: 'archiveDoneDays', title: msg({ id: 'settings.board.archiveDoneDays.title', defaultMessage: 'Archive Done cards after', description: "A setting's title (Settings → Board)." }), desc: msg({ id: 'settings.board.archiveDoneDays.desc', defaultMessage: 'Days a card stays in Done before Combwork archives it.', description: 'What the setting "Archive Done cards after" does, under its title (Settings → Board).' }), tip: msg({ id: 'settings.board.archiveDoneDays.tip', defaultMessage: "Counted from when the card last went into Done (or was brought back from the archive), not from its last change. An archived card is kept: the board's Archived list shows it, and you can bring it back. Combwork checks when a workspace opens and every hour.", description: 'The info tip of the setting "Archive Done cards after" (Settings → Board): more on what it does and when it applies.' }), type: 'number', min: 1, max: 365, step: 1, off: msg({ id: 'settings.board.archiveDoneDays.off', defaultMessage: 'Never', description: 'The Off box of the number setting "Archive Done cards after" (Settings → Board): ticked, the setting is off (0).' }) },
   { section: 'board', key: 'columnColors', title: msg({ id: 'settings.board.columnColors.title', defaultMessage: 'Colour columns', description: "A setting's title (Settings → Board)." }), desc: msg({ id: 'settings.board.columnColors.desc', defaultMessage: "Give each column's heading its colour and tint its cards with it.", description: 'What the setting "Colour columns" does, under its title (Settings → Board).' }), tip: msg({ id: 'settings.board.columnColors.tip', defaultMessage: 'A card takes the colour of the column it is in. Blocked, stalled and finished cards keep their red, amber and green edge, and their text, over the tint.', description: 'The info tip of the setting "Colour columns" (Settings → Board): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'board', key: 'colors', title: msg({ id: 'settings.board.colors.title', defaultMessage: 'Column colours', description: "A setting's title (Settings → Board)." }), desc: msg({ id: 'settings.board.colors.desc', defaultMessage: 'Pick the colour of each column.', description: 'What the setting "Column colours" does, under its title (Settings → Board).' }), tip: msg({ id: 'settings.board.colors.tip', defaultMessage: 'The tint on cards is a light mix of the colour with the theme, so it works in light and dark themes. Reset puts back the default.', description: 'The info tip of the setting "Column colours" (Settings → Board): more on what it does and when it applies.' }), type: 'custom' },
-  { section: 'agents', key: 'backgroundTaskMinutes', title: msg({ id: 'settings.agents.backgroundTaskMinutes.title', defaultMessage: 'Count background tasks for up to', description: "A setting's title (Settings → Agents)." }), desc: msg({ id: 'settings.agents.backgroundTaskMinutes.desc', defaultMessage: 'Minutes an agent waits on a background task it started (such as a test run) before Combwork counts it as finished anyway.', description: 'What the setting "Count background tasks for up to" does, under its title (Settings → Agents).' }), tip: withValues(msg({ id: 'settings.agents.backgroundTaskMinutes.tip', defaultMessage: "An agent that ends its turn while a task it started is still running shows as waiting on background tasks, not finished: Claude Code carries on by itself when the task ends. Combwork can't tell a test run from something that never ends, such as a dev server, so it stops counting a task after this long (a Monitor also when it expires). Codex isn't told when its background terminals end, so they are only counted and shown. {min, number} to {max, plural, one {# minute} other {# minutes}}.", description: 'The info tip of the setting "Count background tasks for up to" (Settings → Agents): more on what it does and when it applies. {min} and {max} are the fewest and most minutes it can be set to.' }), { min: 10, max: 480 }), type: 'number', min: 10, max: 480, step: 5 },
+  { section: 'agents', key: 'backgroundTaskMinutes', title: msg({ id: 'settings.agents.backgroundTaskMinutes.title', defaultMessage: 'Count background tasks for up to', description: "A setting's title (Settings → Agents)." }), desc: msg({ id: 'settings.agents.backgroundTaskMinutes.desc', defaultMessage: 'Minutes an agent waits on a background task it started (such as a test run) before Combwork counts it as finished anyway.', description: 'What the setting "Count background tasks for up to" does, under its title (Settings → Agents).' }), tip: withValues(msg({ id: 'settings.agents.backgroundTaskMinutes.tip', defaultMessage: "An agent that ends its turn while a task it started is still running shows as waiting on background tasks, not finished: Claude Code carries on by itself when the task ends. Combwork can't tell a test run from something that never ends, such as a dev server, so it stops counting a task after this long (a Monitor also when it expires). A run under cw-progress that still reports keeps its task counted, and this time then counts from its last report. Codex isn't told when its background terminals end, so they are only counted and shown. {min, number} to {max, plural, one {# minute} other {# minutes}}.", description: 'The info tip of the setting "Count background tasks for up to" (Settings → Agents): more on what it does and when it applies. {min} and {max} are the fewest and most minutes it can be set to.' }), { min: 10, max: 480 }), type: 'number', min: 10, max: 480, step: 5 },
   { section: 'agents', key: 'leftoverProcesses', title: msg({ id: 'settings.agents.leftoverProcesses.title', defaultMessage: 'Processes left running', description: "A setting's title (Settings → Agents)." }), desc: msg({ id: 'settings.agents.leftoverProcesses.desc', defaultMessage: 'What Combwork does with processes an agent started that are still running when it stops, such as a preview server or a tail -f.', description: 'What the setting "Processes left running" does, under its title (Settings → Agents).' }), tip: msg({ id: 'settings.agents.leftoverProcesses.tip', defaultMessage: "Combwork follows every process an agent's session starts, however it was started. Ask: a notification lists them and offers to end them; the agent's pane header shows them until they end or you decide. End them: Combwork ends them as the agent stops. Combwork never ends a process the agent didn't start, and asks about the ones still running when you quit.", description: 'The info tip of the setting "Processes left running" (Settings → Agents): more on what it does and when it applies.' }), type: 'select', options: [{ value: 'ask', label: msg({ id: 'settings.agents.leftoverProcesses.option.ask', defaultMessage: 'Ask', description: 'A choice of the setting "Processes left running" (Settings → Agents).' }) }, { value: 'end', label: msg({ id: 'settings.agents.leftoverProcesses.option.end', defaultMessage: 'End them', description: 'A choice of the setting "Processes left running" (Settings → Agents).' }) }] },
   // Accounts (HI-980)
   {
@@ -588,7 +595,7 @@ function providerRows(p: ProviderDescriptor): Row[] {
       }
     })
   }
-  if (p.capabilities.backgroundSessions) {
+  if (p.capabilities.background?.backgroundSessions) {
     defs.push({
       section,
       provider: p.id,
@@ -627,7 +634,7 @@ function providerRows(p: ProviderDescriptor): Row[] {
     wide: true
   })
   // Only a provider that reports its own cost has a choice (#436): for the others the table is the only source.
-  if (p.capabilities.reportsCost)
+  if (p.capabilities.usage?.reportsCost)
     defs.push({
       section,
       provider: p.id,
@@ -654,7 +661,7 @@ function providerRows(p: ProviderDescriptor): Row[] {
     key: 'prices',
     title: msg({ id: 'settings.provider.prices.title', defaultMessage: 'API prices', description: "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)." }),
     desc: withValues(
-      p.capabilities.reportsCost
+      p.capabilities.usage?.reportsCost
         ? msg({ id: 'settings.provider.prices.descReported', defaultMessage: "{provider} reports each session's cost itself; these prices are used for sessions without one, or for all of them with Session costs set to your prices. USD per million tokens.", description: 'What the setting "API prices" is (Settings → a provider page: Claude Code, Codex or GitHub Copilot), for a provider that reports its costs. {provider} is its name; Session costs is the setting above it.' })
         : msg({ id: 'settings.provider.prices.descEstimated', defaultMessage: 'Used to estimate what {provider} sessions would cost at API prices (shown with ≈ on the Overview). USD per million tokens.', description: 'What the setting "API prices" is (Settings → a provider page: Claude Code, Codex or GitHub Copilot), for a provider that reports no costs. {provider} is its name.' }),
       { provider: p.name }
@@ -710,6 +717,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('mergeChecks', 'custom'),
     option('focusedTests', 'boolean'),
     option('mergeInstall', 'select', [['onManifestChange', V.mergeInstall.onManifestChange], ['always', V.mergeInstall.always]]),
+    option('mergeGuards', 'custom'),
     option('strict', 'boolean'),
     option('pushTarget', 'boolean'),
     option('followRemote', 'boolean'),
@@ -728,8 +736,13 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('fileLocks', 'select', FILE_LOCK_MODES.map((m) => [m.value, m.text.label])),
     option('loopWakes', 'boolean'),
     { ...option('loopRounds', 'number'), min: 1, max: LANE_MAX_ROUNDS, step: 1 },
+    // HI-3188: the churn's two levels (0 = off).
+    { ...option('simplifyAt', 'number'), min: 0, max: CHURN_MAX, step: 1 },
+    { ...option('churnStopAt', 'number'), min: 0, max: CHURN_MAX, step: 1 },
     { ...option('loopWaitHours', 'number'), min: 1, max: LOOP_WAIT_MAX_HOURS, step: 1 },
     { ...option('loopStepWaitMinutes', 'number'), min: 1, max: LOOP_STEP_WAIT_MAX_MINUTES, step: 5 },
+    // Wake the Assistant for (HI-3211): a level, or Custom's events.
+    option('assistantWakes', 'custom'),
     // Maximum agents (HI-2001): the user's team size, read-only to the Assistant (SENSITIVE).
     { ...option('maxAgents', 'number'), min: 1, max: AGENT_LIMIT_MAX, step: 1 }
   ]
@@ -874,31 +887,33 @@ const ACTIONS = new Set([
   'project.keybindings',
   'project.agents',
   'project.metadata',
-  'project.reset',
-  ...PROVIDERS.map((p) => `${p.id}.status`)
+  'project.reset'
 ])
+/** A provider's rows that hold no value, for whichever providers are registered when an entry is made. */
+const isAction = (id: string): boolean => ACTIONS.has(id) || PROVIDERS.some((p) => id === `${p.id}.status`)
 
 /** Custom controls whose value the tools can set (checked by checkSettingValue). */
 const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
   'notifications.chimeSound': 'select',
   'general.language': 'select',
   'assistant.mode': 'text',
-  ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames', 'otherTargets'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
-  'board.colors': 'table',
-  ...Object.fromEntries(
-    PROVIDERS.flatMap((p): [string, SettingEntry['value']][] => [
-      [`${p.id}.enabled`, 'boolean'],
-      [`${p.id}.modelFallback`, 'table'],
-      [`${p.id}.effortFallback`, 'table'],
-      [`${p.id}.prices`, 'table'],
-      [`assistant.${p.id}.model`, 'text'],
-      [`assistant.${p.id}.effort`, 'effort'],
-      [`assistant.${p.id}.permissionMode`, 'select'],
-      [`assistant.${p.id}.use200kContext`, 'select'],
-      [`assistant.${p.id}.extraArgs`, 'text']
-    ])
-  )
+  ...Object.fromEntries(['preChecks', 'mergeChecks', 'mergeGuards', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames', 'otherTargets', 'assistantWakes'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
+  'board.colors': 'table'
 }
+/** A provider's custom controls whose value the tools can set (checked by checkSettingValue). */
+const providerCustom = (p: ProviderId): [string, SettingEntry['value']][] => [
+      [`${p}.enabled`, 'boolean'],
+      [`${p}.modelFallback`, 'table'],
+      [`${p}.effortFallback`, 'table'],
+      [`${p}.prices`, 'table'],
+      [`assistant.${p}.model`, 'text'],
+      [`assistant.${p}.effort`, 'effort'],
+      [`assistant.${p}.permissionMode`, 'select'],
+      [`assistant.${p}.use200kContext`, 'select'],
+      [`assistant.${p}.extraArgs`, 'text']
+]
+/** A custom control's value kind: Combwork's, or a provider's registered when the entry is made. */
+const customValue = (id: string): SettingEntry['value'] | undefined => CUSTOM_VALUES[id] ?? PROVIDERS.flatMap((p) => providerCustom(p.id)).find(([k]) => k === id)?.[1]
 
 /** Read-only to the Assistant because they decide what agents or the Assistant may do, or what runs (#186). */
 const SENSITIVE: [RegExp, AgentMsg][] = [
@@ -926,6 +941,9 @@ const RESTART: [RegExp, NonNullable<SettingEntry['restart']>][] = [
 ]
 
 /** When a setting is worth suggesting: the signal to look for (the tune-settings skill reads these). */
+/** When Wake the Assistant for is worth suggesting (HI-3211), at each level. */
+const ASSISTANT_WAKES_HELPS = agentMsg({ id: 'settings.agent.helps.assistantWakes', text: "Many of your lane watch's wakes are ones you only acknowledge (a busy project of small cards: Important only), or the user wants you told more of a few big cards (Everything); quieter during a long unattended run.", note: 'When the workflow option assistantWakes (Wake the Assistant for) is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill). Important only and Everything are its levels as Settings names them.' })
+
 const HELPS: Record<string, AgentMsg> = {
   'general.progressPanel': agentMsg({ id: 'settings.agent.helps.general.progressPanel', text: "Agents run long tests or builds and the user can't see how far along they are.", note: 'When the setting general.progressPanel is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
   'general.progressCommands': agentMsg({ id: 'settings.agent.helps.general.progressCommands', text: "Agents' long commands don't show in the Progress panel, or the user wants them shown only on request.", note: 'When the setting general.progressCommands is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
@@ -953,6 +971,8 @@ const HELPS: Record<string, AgentMsg> = {
   'assistant.compactSuggestTokens': agentMsg({ id: 'settings.agent.helps.assistant.compactSuggestTokens', text: "The Assistant's own conversation gets long and slow: a lower threshold suggests compacting it sooner.", note: 'When the setting assistant.compactSuggestTokens is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
   'assistant.panelSide': agentMsg({ id: 'settings.agent.helps.assistant.panelSide', text: 'Windows notifications or other apps cover the right of the screen.', note: 'When the setting assistant.panelSide is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
   'board.archiveDoneDays': agentMsg({ id: 'settings.agent.helps.board.archiveDoneDays', text: 'The Done column has grown long with finished cards.', note: 'When the setting board.archiveDoneDays is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
+  // HI-3211: the Assistant's own wakes, at each level a project's lanes take theirs from.
+  ...Object.fromEntries(['workflow.git.assistantWakes', 'workflow.none.assistantWakes', 'workspace.workflow.git.assistantWakes', 'workspace.workflow.none.assistantWakes', 'project.workflow.assistantWakes'].map((id): [string, AgentMsg] => [id, ASSISTANT_WAKES_HELPS])),
   'workflow.git.slotCopy': agentMsg({ id: 'settings.agent.helps.workflow.git.slotCopy', text: "New slots and review copies miss git-ignored files such as .env, so agents' builds or tests fail there.", note: 'When the setting workflow.git.slotCopy is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
   'agents.leftoverProcesses': agentMsg({ id: 'settings.agent.helps.agents.leftoverProcesses', text: "A folder can't be renamed or deleted (in use), or a port is taken, after its agents have stopped: processes they started are still running.", note: 'When the setting agents.leftoverProcesses is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
   'agents.backgroundTaskMinutes': agentMsg({ id: 'settings.agent.helps.agents.backgroundTaskMinutes', text: "Agents' background tasks (long test runs) count as finished too soon, or a dev server keeps an agent waiting long after its work is done.", note: 'When the setting agents.backgroundTaskMinutes is worth suggesting: the signal the Assistant looks for (cw_read_setting, the tune-settings skill).' }),
@@ -1015,7 +1035,7 @@ const DOCS_BY_ID: Record<string, string> = {
 
 /** Where a setting is, in English (the tools name it so) or as the user sees it: "Settings → Sessions → Suggest compacting above". */
 function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel' | 'slotLevel' | 'githubLevel'>, scope: SettingScope, format: (t: TextPart) => string): string {
-  const where = (list: SettingsSectionInfo[]): string => {
+  const where = (list: readonly SettingsSectionInfo[]): string => {
     const found = list.find((x) => x.id === e.section)
     return found ? format(found.text.label) : e.section
   }
@@ -1031,7 +1051,7 @@ function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel
 
 /** Settings → Version Control's two parts (HI-1768), as a level default's path names them. */
 const LEVEL_PART = {
-  global: msg({ id: 'settings.workflow.combworkDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
+  global: msg({ id: 'settings.workflow.combworkDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (HI-1768)." }),
   workspace: msg({ id: 'settings.workflow.workspaceDefaults.title', defaultMessage: 'Workspace defaults', description: "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Combwork defaults (HI-1768). The window shows the workspace's name beside it." })
 }
 
@@ -1048,8 +1068,8 @@ const toOption = (o: RowOption): SettingOption => ({ value: o.value, label: engl
 function entry(row: Row, id: string, scope: SettingScope, docs: string): SettingEntry {
   const sensitive = SENSITIVE.find(([re]) => re.test(id))
   const readOnly = READ_ONLY.find(([re]) => re.test(id))
-  const action = ACTIONS.has(id)
-  const value = row.type === 'custom' ? CUSTOM_VALUES[id] : undefined
+  const action = isAction(id)
+  const value = row.type === 'custom' ? customValue(id) : undefined
   const applies = row.advanced ? advancedDef(row.advanced.id)?.applies : undefined
   const restart = row.advanced ? (applies === 'sessions' ? 'sessions' : applies === 'restart' ? 'combwork' : undefined) : RESTART.find(([re]) => re.test(id))?.[1]
   const { title, desc, tip, options, off, confirmOn, englishTitle, ...rest } = row
@@ -1079,22 +1099,22 @@ function entry(row: Row, id: string, scope: SettingScope, docs: string): Setting
  * Where the user finds it, as the tools name it (in English, said in the reader's chain): "Settings → Sessions → Suggest
  * compacting above", "Project Settings → Claude Code → Model". A record kept for later says it in the Default.
  */
-// agent-text: PATHS, LEVEL_PART, SETTINGS_SECTIONS, PROJECT_SETTINGS_SECTIONS
+// agent-text: PATHS, LEVEL_PART, settingsSections, PROJECT_SETTINGS_SECTIONS
 export const settingPath = (e: SettingEntry): string => settingPathOf(e, e.scope, agentText)
 
 /** A setting's text as an agent reads it (dialects, HI-2441): said from its messages in the reader's chain; with none, exactly the entry's English. */
 export function agentSetting(e: SettingEntry): { title: string; desc: string; tip: string; off?: string } {
   const t = e.text
   return {
-    title: agentText(t.title), // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
-    desc: t.desc ? agentText(t.desc) : '', // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
-    tip: t.tip ? agentText(t.tip) : '', // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
-    ...(t.off ? { off: agentText(t.off) } : {}) // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+    title: agentText(t.title), // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+    desc: t.desc ? agentText(t.desc) : '', // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+    tip: t.tip ? agentText(t.tip) : '', // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+    ...(t.off ? { off: agentText(t.off) } : {}) // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
   }
 }
 
 /** A setting's title as an agent reads it (agentSetting's). */
-export const agentTitle = (e: SettingEntry): string => agentText(e.text.title) // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
+export const agentTitle = (e: SettingEntry): string => agentText(e.text.title) // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, slotCopyRow, LANGUAGE_TEXT
 
 /** Why the Assistant can't change it, with where the user does, a level default's level too (undefined: it can; HI-2470). */
 export const settingReadOnly = (e: SettingEntry): string | undefined => (e.readOnly ? say(e.readOnly, { path: settingPath(e) }) : undefined)
@@ -1105,16 +1125,30 @@ export const settingHelps = (e: SettingEntry): string | undefined => (e.helps ? 
 /** Where the user finds it, as the user sees it, in the language Combwork shows: "Ustawienia → Sesje → …". */
 export const shownSettingPath = (e: SettingEntry): string => settingPathOf(e, e.scope, shownText)
 
-/** Settings' entries (Combwork's and the providers' pages), in their order. */
-export const APP_SETTINGS_CATALOG: readonly SettingEntry[] = [...APP_ROWS, ...levelRows()].map((r) =>
+/** Settings' entries (Combwork's and the providers' pages), in their order, as the providers registered now make them. */
+const appCatalog = (): SettingEntry[] => [...appRows(), ...levelRows()].map((r) =>
   r.provider ? entry(r, `${r.provider}.${r.key}`, 'provider', 'coding-agents-claude-code-codex-and-github-copilot') : entry(r, `${r.section}.${r.key}`, r.section === 'workspace' ? 'workspace' : 'app', DOCS[r.section] ?? 'getting-started') // i18n-ignore: a user guide heading's id (#1535)
 )
+
+/** Settings' entries (Combwork's and the providers' pages), in their order: rebuilt in place when the providers change (HI-3196). */
+export const APP_SETTINGS_CATALOG: readonly SettingEntry[] = appCatalog()
 
 /** Project Settings' entries, in their order. */
 export const PROJECT_SETTINGS_CATALOG: readonly SettingEntry[] = PROJECT_ROWS.map((r) => entry(r, r.provider ? `project.${r.provider}.${r.key}` : `project.${r.key}`, 'project', 'project-settings')) // i18n-ignore: a user guide heading's id (#1535)
 
 /** Every setting, Settings' then Project Settings'. */
 export const SETTINGS_CATALOG: readonly SettingEntry[] = [...APP_SETTINGS_CATALOG, ...PROJECT_SETTINGS_CATALOG]
+
+/** An array refilled in place: its readers hold the same array, and see its new contents. */
+const refill = <T>(a: readonly T[], next: readonly T[]): void => void (a as T[]).splice(0, a.length, ...next)
+
+// A user's own CLI registered, changed or removed (HI-3196): its page, its rows and its advanced values' rows, for every
+// reader (the window's Settings, the Assistant's settings tools), from the providers as they are now.
+onProvidersChanged(() => {
+  refill(SETTINGS_SECTIONS, settingsSections())
+  refill(APP_SETTINGS_CATALOG, appCatalog())
+  refill(SETTINGS_CATALOG, [...APP_SETTINGS_CATALOG, ...PROJECT_SETTINGS_CATALOG])
+})
 
 export function settingEntry(id: string): SettingEntry | undefined {
   return SETTINGS_CATALOG.find((e) => e.id === id)
@@ -1228,8 +1262,10 @@ const AGENT = {
   otherTargets: agentMsg({ id: 'settings.agent.takes.otherTargets', text: 'a list of branch names besides project.workflow.target, e.g. ["1.2.0"] (each one a lane or card may take as its target)', note: "What the workflow option otherTargets takes (HI-2556). The JSON and project.workflow.target (a setting's id) are code: keep them." }),
   preChecks: agentMsg({ id: 'settings.agent.takes.preChecks', text: 'a list of check names, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', note: "What the workflow option preChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them." }),
   mergeChecks: agentMsg({ id: 'settings.agent.takes.mergeChecks', text: 'a list of check names the merge queue runs on the merged result when Combwork merges, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', note: "What the workflow option mergeChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them." }),
+  mergeGuards: agentMsg({ id: 'settings.agent.takes.mergeGuards', text: 'a list of guards, each {shape} (pattern: a JavaScript regular expression matched against each line a merge adds; paths and skip: globs such as "docs/**" or "*.md"; at most 50 guards). A guard is not secret scanning: it catches only what it names', note: "What the workflow option mergeGuards takes (HI-3284). {shape} is the object's JSON form; the JSON field names and the globs are code: keep them." }),
   commands: agentMsg({ id: 'settings.agent.takes.commands', text: 'an object of check name → command, e.g. {example}', note: 'What the workflow option commands takes. {example} is JSON: code.' }),
   okBefore: agentMsg({ id: 'settings.agent.takes.okBefore', text: 'an object {shape}', note: "What the workflow option okBefore takes. {shape} is the object's JSON form: code." }),
+  assistantWakes: agentMsg({ id: 'settings.agent.takes.assistantWakes', text: 'an object {shape} (events: Custom\'s, any of {events}; kept, unused, at the other levels)', note: "What the workflow option assistantWakes takes (HI-3211). {shape} is the object's JSON form and {events} the lane events' ids: code." }),
   identity: agentMsg({ id: 'settings.agent.takes.identity', text: 'null (off) or {shape}', note: "What the workflow option identity takes. {shape} is the object's JSON form: code." }),
   excluded: agentMsg({ id: 'settings.agent.takes.excluded', text: 'a list of folders and files left out of the work, e.g. ["node_modules"]', note: 'What the workflow option excluded takes. The JSON is code: keep it.' }),
   stageNames: agentMsg({ id: 'settings.agent.takes.stageNames', text: 'an object of stage id → the name the user gives it, e.g. {example} (ids: hold, todo, active, review, approved, merging, done; names are for the user, agents keep the ids; each at most 24 characters, unique, applies at once)', note: "What the workflow option stageNames takes (#1417). {example} is JSON; the stage ids are code: keep them." }),
@@ -1250,7 +1286,7 @@ const AGENT = {
 /** The values a select setting (or a custom one the tools set as a select) takes. */
 export function settingOptions(e: SettingEntry): { value: string; label: string }[] | null {
   // The tools' choices, in English: the Assistant sets a value by it or by its label as the tools name it.
-  if (e.options) return e.options.map((o) => ({ ...o, label: agentText(o.text) })) // agent-text: APP_ROWS, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, INHERIT, ON_OFF, FILE_LOCK_MODES
+  if (e.options) return e.options.map((o) => ({ ...o, label: agentText(o.text) })) // agent-text: appRows, PROJECT_ROWS, levelRows, advancedRows, providerRows, optionRows, workflowRows, INHERIT, ON_OFF, FILE_LOCK_MODES
   if (e.id === 'notifications.chimeSound') return ['chime', 'bell', 'soft', 'pop'].map((v) => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }))
   // The Assistant's tools name languages in English (Polish, or pl); Settings shows each by its own name.
   if (e.id === 'general.language') return [{ value: 'auto', label: say(AGENT.automatic) }, ...LANGUAGES.map((l) => ({ value: l.code, label: l.english }))]
@@ -1413,8 +1449,10 @@ export function workflowTakes(e: SettingEntry, kind: ReturnType<typeof settingKi
   const shapes: Partial<Record<OptionKey, () => string>> = {
     preChecks: () => say(AGENT.preChecks),
     mergeChecks: () => say(AGENT.mergeChecks),
+    mergeGuards: () => say(AGENT.mergeGuards, { shape: '{"name": ..., "pattern": ..., "ignoreCase": false, "paths": [...], "skip": [...], "message": ...}' }), // agent-protocol: JSON
     commands: () => say(AGENT.commands, { example: '{"lint": "npm run lint"}' }), // agent-protocol: JSON
     okBefore: () => say(AGENT.okBefore, { shape: '{"mode": "never" | "labels" | "every", "labels": [...]}' }), // agent-protocol: JSON
+    assistantWakes: () => say(AGENT.assistantWakes, { shape: `{"level": ${WAKE_LEVELS.map((l) => `"${l}"`).join(' | ')}, "events": [...]}`, events: LANE_EVENTS.join(', ') }), // agent-protocol: JSON
     identity: () => say(AGENT.identity, { shape: '{"name": ..., "email": ...}' }), // agent-protocol: JSON
     excluded: () => say(AGENT.excluded),
     otherTargets: () => say(AGENT.otherTargets),

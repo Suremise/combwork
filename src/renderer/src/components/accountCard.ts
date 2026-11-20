@@ -7,7 +7,7 @@ import { formatDateTime, formatTime, formatWeekdayTime } from '../../../shared/d
 import { msg, tr } from '../../../shared/i18n'
 
 /**
- * What Settings → Accounts & Connections' tidied cards show (HI-2528, Darren's approved mockup v2), worked out apart from
+ * What Settings → Accounts & Connections' tidied cards show (HI-2528, approved mockup v2), worked out apart from
  * the components so it can be tested: an account's current limits, when each resets, its bar's level, its plan's name,
  * and a connection's values as its table's cells.
  */
@@ -28,7 +28,7 @@ export function currentLimits(limits: readonly PlanLimit[] | undefined, now = Da
 
 /** A limit's window for its label: the 5-hour or the weekly one, else the provider's own name for it. */
 /** A limit's window as the usage messages select on (shared/planLimits.ts: a limit of part of a plan is named by limitName). */
-export const windowOf = (l: Pick<PlanLimit, 'windowMinutes' | 'models'>): 'fiveHour' | 'weekly' | 'other' => limitWindow(l)
+export const windowOf = (l: Pick<PlanLimit, 'windowMinutes' | 'models' | 'scope'>): 'fiveHour' | 'weekly' | 'other' => limitWindow(l)
 
 /**
  * When a limit resets, as plan-usage notices say it (main.plan.resetsAt/resetsOn): its time when that's today, its weekday
@@ -63,7 +63,7 @@ export function connectionCells(c: Pick<Connection, 'model' | 'effort' | 'use200
   return {
     model: c.model ? { text: server ? c.model : modelLabel(c.model, cli) } : own,
     effort: server ? none : c.effort ? { text: effortName(cli, c.effort, settings ?? undefined, tr) } : own,
-    context: server || !providerDescriptor(cli).capabilities.contextLimit ? none : c.use200kContext ? { text: tr(M.context200k) } : own,
+    context: server || !providerDescriptor(cli).capabilities.compaction?.contextLimit ? none : c.use200kContext ? { text: tr(M.context200k) } : own,
     mode: c.permissionMode ? { text: permissionLabel(cli, c.permissionMode, tr) } : own,
     args: c.extraArgs ? { text: c.extraArgs } : { text: tr(M.cellNoArgs), own: true }
   }

@@ -1,5 +1,5 @@
 // The Operations section (HI-2800, J7; design HI-2800/s12, s16, s19): jj's operations, each named by what jj called it,
-// and a preview of reverting one. Under Darren's decision A (HI-2794) Combwork runs no jj write: the preview is read, and
+// and a preview of reverting one. Under decision A (HI-2794) Combwork runs no jj write: the preview is read, and
 // the command it offers (`jj op revert <id>`) is the user's to run, only when E1–E8 (jjOpView.ts) all hold.
 //
 // Every read is pinned at the single operation head H through J3's JjReads (`--at-op H --ignore-working-copy`: no

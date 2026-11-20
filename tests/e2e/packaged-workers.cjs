@@ -10,7 +10,7 @@ const fs = require('fs')
 const path = require('path')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 const WORKERS = ['usage history', 'git', 'repository lock', 'WAL checkpoints', 'stall watchdog', 'log writer']
 // Listed too, but started only by a Codex session's first look at its log (HI-1972), or a card's start in a project
 // without version control (HI-2340): none runs here.

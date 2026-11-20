@@ -20,6 +20,14 @@
   "tool.agentActivity.description": {
     "text": "What one agent is doing, as JSON: status, model and effort, its folder, its task and latest reply (clipped), last tool calls, retry waits and its inbox. detail=true clips less. (detail: use-cw-api, tools.md)"
   },
+  "tool.answerSimplify.description": {
+    "text": "Answer a card's simplify check, which Combwork told you of: carryOn (what still comes up is worth handling) or simplify (drop what isn't). Cutting scope, and the hard stop's question, are the user's: leave those. why: your reason, a comment on the card.",
+    "note": "HI-3188: the Assistant-only tool for a simplify check (Workflow → Card loops)."
+  },
+  "tool.answerSimplify.done": {
+    "text": "{card}: answered {request}, {choice, select, carryOn {carry on} other {simplify}}; its agents are woken.",
+    "note": "HI-3188: cw_answer_simplify's reply."
+  },
   "tool.arg.agent": {
     "text": "Its name or id; optional when the project has one agent."
   },
@@ -114,6 +122,10 @@
     "text": "Started {name} from {from} ({commit}); {added, select, yes {{from} added to other branches; } other {}}target {name}.{retarget, select, yes { Can follow {name}: {move}. Stay: {stay}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to.} other {}}",
     "note": "HI-2807: cw_branch nextVersion. {move} and {stay} are lists (\"-\" for none); {preview} an id."
   },
+  "tool.call.appliedEarlier": {
+    "text": "Done earlier: Combwork had already applied this call ({made, select, other {{made}} none {its card}}), whose reply was lost. Read the card for its state now; don't send it again.",
+    "note": "HI-3195: a retried write Combwork had already applied (its first reply lost). {made}: the card it made or was about (a key or #n), or none."
+  },
   "tool.call.error": {
     "text": "Combwork error: {message}",
     "note": "{message}: the call's error (the Agent API's refusal, or one below). What the call takes follows on its own line when it gave the wrong arguments (HI-2229)."
@@ -130,6 +142,10 @@
   },
   "tool.call.error.unknownTool": {
     "text": "Unknown tool: {name}"
+  },
+  "tool.call.keyNotKept": {
+    "text": "Not sent: Combwork's tools couldn't keep this write's request key ({message}), so a retry after a restart could apply it twice. Nothing was written; try the call again.",
+    "note": "HI-3195 (HR3's round 2): a keyed write's key is kept in the agent's file before it is sent; when that fails, the write isn't sent. {message}: the file system's error."
   },
   "tool.cannotWithinRules.arg.rule": {
     "text": "The rule, as a refusal named it."
@@ -213,6 +229,10 @@
   },
   "tool.createTask.arg.description": {
     "text": "What to do and how to tell it is done, in full: whoever starts it reads only the card."
+  },
+  "tool.createTask.arg.followUpOf": {
+    "text": "The card this continues, for a split or accepted follow-ups: it keeps its count. Separate finds: links.",
+    "note": "HI-3188: cw_create_task’s followUpOf."
   },
   "tool.createTask.arg.kind": {
     "text": "no-code proposes work with no commits; the user confirms it. Default code."
@@ -553,11 +573,20 @@
   "tool.readTask.arg.comments": {
     "text": "Only the newest n."
   },
+  "tool.readTask.arg.feedback": {
+    "text": "A sent batch, by its id."
+  },
   "tool.readTask.arg.history": {
     "text": "Long; rarely needed."
   },
   "tool.readTask.arg.latestComment": {
     "text": "Only the newest comment."
+  },
+  "tool.readTask.arg.lineComments": {
+    "text": "Its line comments as rows."
+  },
+  "tool.readTask.arg.offset": {
+    "text": "With either: the reply's next."
   },
   "tool.readTask.arg.summary": {
     "text": "Each comment's first line."
@@ -596,7 +625,7 @@
     "text": "The merge commit."
   },
   "tool.reportMerge.description": {
-    "text": "Report a card's work merged, where its agent merges it or merges aren't checked: Combwork checks the merge is in its target (unless the project doesn't check merges) and moves it to Done."
+    "text": "Report a card's work merged, where its agent merges it or merges aren't checked: Combwork checks the merge is in its target (if merges are checked) and moves it to Done; one it already saw merged answers OK."
   },
   "tool.requestBuilder.description": {
     "text": "Ask a card's builder for something while you review it (a commit, a run); it is woken."
@@ -605,7 +634,7 @@
     "text": "Token usage, cache use and compaction history for a project session (the live one by default), as JSON. days=true adds its usage by day."
   },
   "tool.startAgent.description": {
-    "text": "Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them."
+    "text": "Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. A long-idle conversation is refused with its age and size: resume it only with resumeIdle=true. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them."
   },
   "tool.startAgent.reply.started": {
     "text": "{resumed, select, yes {Resumed} other {Started}} {agent} in {project}: {status}{hasSession, select, yes {, session {session}} other {}}. Follow it with cw_wait_for_agents."

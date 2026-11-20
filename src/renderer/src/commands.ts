@@ -1,5 +1,5 @@
 import { PROJECT_KEYBINDING_CATEGORIES, SESSION_LAYOUTS, projectSessionView, resolveKeybinding } from '@shared/defaults'
-import { PROVIDERS, providerDescriptor } from '@shared/providers'
+import { PROVIDERS, adminSnippetProvider, providerDescriptor } from '@shared/providers'
 import { batchCounts, type BatchCounts } from '@shared/startAll'
 import { appTakesTerminalKey } from '@shared/terminalInput'
 import type { ProjectInfo, ProviderId, SessionLayout, ToastTarget } from '@shared/types'
@@ -22,6 +22,7 @@ import type { VcSection } from '@shared/gitRepo'
 import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, tilesPageSize, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
 import { STRIP_TABS } from '@shared/projectTabs'
 import { commitIgnore, settleFolderChanges, showFolderChanges } from './folderChanges'
+import { cancelGitRun } from './gitRuns'
 import { workspacePaused } from './teamPause'
 import { pauseTheTeam, resumeTheTeam } from './components/TeamPause'
 
@@ -430,6 +431,7 @@ const COMMAND_DEFS: CommandDef[] = [
     id: 'hooks.adminSnippet',
     name: msg({ id: 'shell.command.hooks.adminSnippet', defaultMessage: 'Claude Code Admin Snippet…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the admin snippet, a block of Claude Code settings an organisation's administrator pastes into its managed settings so Combwork's hooks run where policy allows only managed hooks (HI-2777). The … says it opens a dialog first: keep it." }),
     category: 'session',
+    when: () => !!adminSnippetProvider(),
     run: () => set({ adminSnippetOpen: true })
   },
   {
@@ -592,6 +594,13 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'project',
     internal: true,
     run: (projectPath?: unknown) => (typeof projectPath === 'string' ? commitIgnore(projectPath) : undefined)
+  },
+  {
+    id: 'git.cancelRun',
+    name: msg({ id: 'shell.command.git.cancelRun', defaultMessage: 'Cancel Git Action', description: "HI-3372: a command, in the Project category. It isn't in the menus or the palette: a commit's, set aside's, fetch's, pull's or push's notification runs it from its Cancel button while that action runs." }),
+    category: 'project',
+    internal: true,
+    run: (op?: unknown) => cancelGitRun(op)
   },
   {
     id: 'agent.show',

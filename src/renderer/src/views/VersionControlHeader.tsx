@@ -246,7 +246,8 @@ export function presetState(f: WorkflowForm): { state: 'preset' | 'custom' | 'no
 
 /** The project's workflow form, read again when its saved options change (here, or by the Assistant's tool). */
 export function useWorkflowForm(project: ProjectInfo): WorkflowForm | null {
-  const saved = JSON.stringify(project.config.workflow ?? null)
+  // Read again when its options or its version control change (HI-3315: a switch to jj reads jj's options).
+  const saved = JSON.stringify([project.config.workflow ?? null, project.platform?.id ?? null])
   const [form, setForm] = useState<{ for: string; form: WorkflowForm } | null>(null)
   useEffect(() => {
     let live = true
@@ -285,10 +286,11 @@ export function VersionControlHeader({ project, platform, form, preview, onPrevi
                   {tr(PLATFORM_NAME[id])}
                 </button>
               )
-            // Back to None from Git's page, or to Git's page from None: a view, nothing switched or saved.
+            // Back to None from Git's page, or to Git's page from None: a view, nothing switched or saved. Offered once the
+            // tab has read the folder's git (`data-vc-preview`, HI-3429: before that answer the click is the switch).
             if (onPreview && !needsRepository(platform) && PLATFORM_VIEW[id].previewable) {
               const button = (
-                <button key={id} type="button" role="radio" aria-checked={false} aria-disabled={false} data-platform={id} onClick={() => onPreview(needsRepository(id))}>
+                <button key={id} type="button" role="radio" aria-checked={false} aria-disabled={false} data-platform={id} data-vc-preview="" onClick={() => onPreview(needsRepository(id))}>
                   {tr(PLATFORM_NAME[id])}
                 </button>
               )

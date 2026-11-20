@@ -94,7 +94,7 @@ export interface ItemGroup {
 const words = (t: string | Msg): string => (typeof t === 'string' ? t : tr(t))
 
 /**
- * Items as a table (#1317, grown from the agents table, #529, #572: Darren's model for list dialogs): a header row,
+ * Items as a table (#1317, grown from the agents table, #529, #572: the model for list dialogs): a header row,
  * hairline rules, one line an item; the first column any item (`first` its heading), columns after it, and each row's
  * actions at the right edge, aligned down the table, in a column of their own without a heading (a row without them gives
  * its last cell that room). Group headings span it.

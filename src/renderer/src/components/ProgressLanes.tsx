@@ -837,14 +837,17 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
           {oldRules && (
             <Tooltip content={oldRules} focus>
               <span className="progress-lane-state old-rules" data-mark="old-rules" tabIndex={0} role="note" aria-label={oldRules}>
-                {tr(OLD_RULES)}
+                {/* A narrow panel shows its icon instead (HI-3209), the room for the project's link and the card. */}
+                <Icon name="history" className="progress-lane-tag-icon" />
+                <span className="progress-lane-tag-text">{tr(OLD_RULES)}</span>
               </span>
             </Tooltip>
           )}
           {l.target && (
             <Tooltip content={tr(LANE_TARGET_TIP, { branch: l.target })} focus>
               <span className="progress-lane-state lane-target" data-lane-target={l.target} tabIndex={0} role="note" aria-label={tr(LANE_TARGET_TIP, { branch: l.target })}>
-                {tr(LANE_TARGET, { branch: l.target })}
+                <Icon name="git-merge" className="progress-lane-tag-icon" />
+                <span className="progress-lane-tag-text">{tr(LANE_TARGET, { branch: l.target })}</span>
               </span>
             </Tooltip>
           )}
@@ -1238,9 +1241,13 @@ function CardPicker({ lane: l, all, taken, onPick, onClose }: { lane: Lane; all:
                     li?.querySelector<HTMLElement>('button')?.focus()
                   }}
                 >
-                  <span className="progress-lane-queue-key">{cardLabelOf({ tasks }, t.number)}</span>
-                  <span className="progress-lane-queue-title">{t.title}</span>
-                  {other && <span className="faint">{tr(EDIT.onOther, { builder: other.builder.name })}</span>}
+                  {/* Two rows (HI-3217): the key and the title, the title given the row's width; under it, smaller, the
+                      lane that has it. */}
+                  <span className="progress-lane-picker-head" title={t.title}>
+                    <span className="progress-lane-queue-key">{cardLabelOf({ tasks }, t.number)}</span>
+                    <span className="progress-lane-queue-title">{t.title}</span>
+                  </span>
+                  {other && <span className="faint progress-lane-picker-status">{tr(EDIT.onOther, { builder: other.builder.name })}</span>}
                 </button>
               </li>
             )
@@ -1319,7 +1326,7 @@ const ENDED = {
 }
 
 /**
- * Today's ended lanes (HI-2898, Darren's decision: the local calendar day): the lanes that ended since local midnight,
+ * Today's ended lanes (HI-2898: the local calendar day): the lanes that ended since local midnight,
  * read again as the lanes change, at midnight (and on a change of the date, clock or time zone, seen on focus and each
  * minute). Only while the Lanes tab shows (`on`).
  */

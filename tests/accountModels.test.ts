@@ -11,6 +11,7 @@ import * as electron from 'electron'
 import type { Account, AgentInstallInfo, CatalogModel, ModelCatalog } from '../src/shared/types'
 import type { CatalogRead } from '../src/main/providers/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 vi.mock('../src/main/ptyHost', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/main/ptyHost')>()
@@ -56,7 +57,7 @@ function gate<T = void>(): { wait: Promise<T>; open: (v: T) => void } {
 }
 /** Waits for a condition (a microtask turn at a time), bounded for a hung run. */
 async function until(fn: () => boolean, what: string): Promise<void> {
-  for (let i = 0; i < 2000 && !fn(); i++) await new Promise((r) => setTimeout(r, 1))
+  for (let i = 0; i < 2000 && !fn(); i++) await new Promise((r) => setTimeout(r, timing('wait.interval')))
   if (!fn()) throw new Error(`never: ${what}`)
 }
 
@@ -65,8 +66,8 @@ beforeAll(() => {
   advanced.load(join(base, 'profile'))
   mkdirSync(home, { recursive: true })
   config.settings.providers[CLI].enabled = true
-  vi.spyOn(provider(CLI), 'accountStatus').mockResolvedValue({ ok: true, loggedIn: false })
-  vi.spyOn(provider(CLI), 'listModels').mockImplementation(async (_exe, env) => {
+  vi.spyOn(provider(CLI).accounts!, 'accountStatus').mockResolvedValue({ ok: true, loggedIn: false })
+  vi.spyOn(provider(CLI).models!, 'listModels').mockImplementation(async (_exe, env) => {
     const dir = (env.CLAUDE_CONFIG_DIR ?? '').toLowerCase()
     listed.push(dir)
     const f = listing.get(dir)

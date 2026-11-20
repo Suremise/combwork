@@ -56,6 +56,7 @@ interface CombworkMessageValues {
   'actions.duration.hoursMinutes': { h: number; m: string | number }
   'actions.duration.minutes': { m: string | number }
   'actions.duration.seconds': { s: string | number }
+  'actions.idleResume.message': { what: string; unit: string; days: number; duration: string | number; size: string; tokens: string | number; bytes: string | number }
   'actions.keys.ctrl': undefined
   'actions.keys.delete': undefined
   'actions.keys.shift': undefined
@@ -75,7 +76,6 @@ interface CombworkMessageValues {
   'actions.mcp.openFailed': undefined
   'actions.mcp.rename': undefined
   'actions.mcp.replace': undefined
-  'actions.mcp.replaceMessage': { name: string | number }
   'actions.mcp.replaceTitle': { name: string | number }
   'actions.mcp.updateFailedAdded': undefined
   'actions.pane.edge': { agent: string | number; dir: string }
@@ -198,6 +198,7 @@ interface CombworkMessageValues {
   'actions.resumeAll.failed': { all: string; tried: number; failed: string | number }
   'actions.resumeAll.heldLine': { agent: string | number; why: string | number }
   'actions.resumeAll.heldTitle': { n: number }
+  'actions.resumeAll.idleLine': { agent: string | number; unit: string; days: number; duration: string | number; size: string; tokens: string | number; bytes: string | number }
   'actions.resumeAll.message': { who: string; cold: number }
   'actions.resumeAll.nothing': undefined
   'actions.resumeAll.nothingMessage': undefined
@@ -243,6 +244,8 @@ interface CombworkMessageValues {
   'actions.startFresh.why.waiting': undefined
   'actions.startFresh.why.watching': undefined
   'actions.startFresh.why.working': undefined
+  'actions.stillStopping.message': undefined
+  'actions.stillStopping.title': { named: string; agent: string | number; n: number }
   'actions.stop.confirm': undefined
   'actions.stop.detail': undefined
   'actions.stop.failed': undefined

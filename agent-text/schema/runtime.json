@@ -17,6 +17,12 @@
   "runtime.choice.carryOn": {
     "placeholders": {}
   },
+  "runtime.choice.cutScope": {
+    "placeholders": {}
+  },
+  "runtime.choice.simplify": {
+    "placeholders": {}
+  },
   "runtime.choice.split": {
     "placeholders": {}
   },
@@ -40,6 +46,22 @@
   "runtime.repair.boardDone": {
     "placeholders": {
       "stage": "plain"
+    }
+  },
+  "runtime.reportMerge.mergeSeen": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "runtime.reportMerge.mergeSeenMove": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
+    }
+  },
+  "runtime.reportMerge.mergeSeenMoveNext": {
+    "placeholders": {
+      "tool": "plain"
     }
   },
   "runtime.review.everyTest": {
@@ -229,8 +251,14 @@
   "runtime.wake.followUp": {
     "placeholders": {
       "card": "plain",
-      "revision": "plain",
+      "revision": "select",
       "submission": "plain"
+    }
+  },
+  "runtime.wake.followUpsOf": {
+    "placeholders": {
+      "said": "plain",
+      "card": "plain"
     }
   },
   "runtime.wake.inReview": {

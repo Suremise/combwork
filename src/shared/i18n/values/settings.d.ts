@@ -9,6 +9,7 @@ interface CombworkMessageValues {
   'settings.accounts.changeFailed': undefined
   'settings.accounts.changedTo': { now: string | number; was: string | number }
   'settings.accounts.checkedAt': { when: string | number }
+  'settings.accounts.cliGone': { cli: string | number }
   'settings.accounts.closeRunningConfirm': undefined
   'settings.accounts.closeRunningMessage': { cli: string | number }
   'settings.accounts.closeRunningTitle': undefined
@@ -83,10 +84,12 @@ interface CombworkMessageValues {
   'settings.accounts.renameTitle': { name: string | number }
   'settings.accounts.resetsAt': { time: string | number }
   'settings.accounts.resetsOn': { when: string | number }
+  'settings.accounts.reviewCopies': undefined
   'settings.accounts.sameLoginAccount': { names: string | number }
   'settings.accounts.setUpChecking': undefined
   'settings.accounts.setUpDone': undefined
   'settings.accounts.setUpIn': { project: string | number; folder: string | number; cli: string | number }
+  'settings.accounts.setUpInCopies': { folder: string | number; cli: string | number }
   'settings.accounts.setUpInWorkspace': { folder: string | number; cli: string | number }
   'settings.accounts.setUpNeeded': undefined
   'settings.accounts.signIn': undefined
@@ -192,6 +195,10 @@ interface CombworkMessageValues {
   'settings.advanced.claude-code.accounts.trustField.title': undefined
   'settings.advanced.claude-code.autoModeSetup.offer.desc': undefined
   'settings.advanced.claude-code.autoModeSetup.offer.title': undefined
+  'settings.advanced.claude-code.background.idField.desc': undefined
+  'settings.advanced.claude-code.background.idField.title': undefined
+  'settings.advanced.claude-code.background.pidField.desc': undefined
+  'settings.advanced.claude-code.background.pidField.title': undefined
   'settings.advanced.claude-code.connections.remoteModels.desc': undefined
   'settings.advanced.claude-code.connections.remoteModels.title': undefined
   'settings.advanced.claude-code.exit.command.desc': undefined
@@ -214,6 +221,8 @@ interface CombworkMessageValues {
   'settings.advanced.claude-code.memory.realPath.title': undefined
   'settings.advanced.claude-code.memory.setting.desc': undefined
   'settings.advanced.claude-code.memory.setting.title': undefined
+  'settings.advanced.claude-code.monitor.expired.desc': undefined
+  'settings.advanced.claude-code.monitor.expired.title': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.desc': undefined
   'settings.advanced.claude-code.mouse.rightClickToCli.title': undefined
   'settings.advanced.claude-code.outage.connectionError.desc': undefined
@@ -346,8 +355,14 @@ interface CombworkMessageValues {
   'settings.advanced.codex.queue.hint.title': undefined
   'settings.advanced.codex.rateLimitNudge.hide.desc': undefined
   'settings.advanced.codex.rateLimitNudge.hide.title': undefined
+  'settings.advanced.codex.rateLimits.defaultLimitId.desc': undefined
+  'settings.advanced.codex.rateLimits.defaultLimitId.title': undefined
   'settings.advanced.codex.rateLimits.field.desc': undefined
   'settings.advanced.codex.rateLimits.field.title': undefined
+  'settings.advanced.codex.rateLimits.limitId.desc': undefined
+  'settings.advanced.codex.rateLimits.limitId.title': undefined
+  'settings.advanced.codex.rateLimits.limitName.desc': undefined
+  'settings.advanced.codex.rateLimits.limitName.title': undefined
   'settings.advanced.codex.rateLimits.usedPercent.desc': undefined
   'settings.advanced.codex.rateLimits.usedPercent.title': undefined
   'settings.advanced.codex.rateLimits.windowMinutes.desc': undefined
@@ -475,16 +490,24 @@ interface CombworkMessageValues {
   'settings.advanced.cw.cards.attachmentMax.title': undefined
   'settings.advanced.cw.cards.titleNudgeChars.desc': undefined
   'settings.advanced.cw.cards.titleNudgeChars.title': undefined
+  'settings.advanced.cw.cli.probeSeconds.desc': undefined
+  'settings.advanced.cw.cli.probeSeconds.title': undefined
   'settings.advanced.cw.console.showText.desc': undefined
   'settings.advanced.cw.console.showText.title': undefined
   'settings.advanced.cw.copies.quietWaitMinutes.desc': undefined
   'settings.advanced.cw.copies.quietWaitMinutes.title': undefined
   'settings.advanced.cw.copies.review.desc': undefined
   'settings.advanced.cw.copies.review.title': undefined
+  'settings.advanced.cw.db.busySeconds.desc': undefined
+  'settings.advanced.cw.db.busySeconds.title': undefined
   'settings.advanced.cw.disableHardwareAcceleration.desc': undefined
   'settings.advanced.cw.disableHardwareAcceleration.title': undefined
   'settings.advanced.cw.focused.pickSeconds.desc': undefined
   'settings.advanced.cw.focused.pickSeconds.title': undefined
+  'settings.advanced.cw.git.commitMinutes.desc': undefined
+  'settings.advanced.cw.git.commitMinutes.title': undefined
+  'settings.advanced.cw.git.networkMinutes.desc': undefined
+  'settings.advanced.cw.git.networkMinutes.title': undefined
   'settings.advanced.cw.guidance.desc': undefined
   'settings.advanced.cw.guidance.title': undefined
   'settings.advanced.cw.heapSnapshotNearLimit.desc': undefined
@@ -497,6 +520,10 @@ interface CombworkMessageValues {
   'settings.advanced.cw.inbox.idleWakes.title': undefined
   'settings.advanced.cw.inbox.stopContinuation.desc': undefined
   'settings.advanced.cw.inbox.stopContinuation.title': undefined
+  'settings.advanced.cw.input.hiddenSeconds.desc': undefined
+  'settings.advanced.cw.input.hiddenSeconds.title': undefined
+  'settings.advanced.cw.jj.commandSeconds.desc': undefined
+  'settings.advanced.cw.jj.commandSeconds.title': undefined
   'settings.advanced.cw.journal.builds.desc': undefined
   'settings.advanced.cw.journal.builds.title': undefined
   'settings.advanced.cw.lanes.endWaitMinutes.desc': undefined
@@ -525,6 +552,10 @@ interface CombworkMessageValues {
   'settings.advanced.cw.mcpCatalog.probeSeconds.title': undefined
   'settings.advanced.cw.merge.lockWaitSeconds.desc': undefined
   'settings.advanced.cw.merge.lockWaitSeconds.title': undefined
+  'settings.advanced.cw.mergeGuards.maxLines.desc': undefined
+  'settings.advanced.cw.mergeGuards.maxLines.title': undefined
+  'settings.advanced.cw.mergeGuards.seconds.desc': undefined
+  'settings.advanced.cw.mergeGuards.seconds.title': undefined
   'settings.advanced.cw.none.baselineSeconds.desc': undefined
   'settings.advanced.cw.none.baselineSeconds.title': undefined
   'settings.advanced.cw.notes.deliverWorkspaceNotes.desc': undefined
@@ -549,6 +580,10 @@ interface CombworkMessageValues {
   'settings.advanced.cw.outage.resumesPerHour.title': undefined
   'settings.advanced.cw.outage.waitMinutes.desc': undefined
   'settings.advanced.cw.outage.waitMinutes.title': undefined
+  'settings.advanced.cw.processes.knownHosts.desc': undefined
+  'settings.advanced.cw.processes.knownHosts.title': undefined
+  'settings.advanced.cw.processes.orphanMinutes.desc': undefined
+  'settings.advanced.cw.processes.orphanMinutes.title': undefined
   'settings.advanced.cw.processes.orphanNotice.desc': undefined
   'settings.advanced.cw.processes.orphanNotice.title': undefined
   'settings.advanced.cw.progress.lanesShown.desc': undefined
@@ -573,6 +608,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.queue.focusedJobs.title': undefined
   'settings.advanced.cw.queue.networkCodes.desc': undefined
   'settings.advanced.cw.queue.networkCodes.title': undefined
+  'settings.advanced.cw.queue.networkMinutes.desc': undefined
+  'settings.advanced.cw.queue.networkMinutes.title': undefined
   'settings.advanced.cw.queue.signSeconds.desc': undefined
   'settings.advanced.cw.queue.signSeconds.title': undefined
   'settings.advanced.cw.recorder.afterSeconds.desc': undefined
@@ -595,8 +632,14 @@ interface CombworkMessageValues {
   'settings.advanced.cw.restart.resumeAfterUpdate.title': undefined
   'settings.advanced.cw.restart.resumeReadySeconds.desc': undefined
   'settings.advanced.cw.restart.resumeReadySeconds.title': undefined
+  'settings.advanced.cw.resume.idleAsk.desc': undefined
+  'settings.advanced.cw.resume.idleAsk.title': undefined
+  'settings.advanced.cw.resume.idleMinutes.desc': undefined
+  'settings.advanced.cw.resume.idleMinutes.title': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.desc': undefined
   'settings.advanced.cw.retry.tellAssistantAfterSeconds.title': undefined
+  'settings.advanced.cw.server.checkInferSeconds.desc': undefined
+  'settings.advanced.cw.server.checkInferSeconds.title': undefined
   'settings.advanced.cw.sessions.signFailFast.desc': undefined
   'settings.advanced.cw.sessions.signFailFast.title': undefined
   'settings.advanced.cw.sessions.signTimeoutSeconds.desc': undefined
@@ -627,6 +670,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.terminal.osc52.block': undefined
   'settings.advanced.cw.terminal.osc52.desc': undefined
   'settings.advanced.cw.terminal.osc52.title': undefined
+  'settings.advanced.cw.typed.takeSeconds.desc': undefined
+  'settings.advanced.cw.typed.takeSeconds.title': undefined
   'settings.advanced.cw.usage.timelineDetailDays.desc': undefined
   'settings.advanced.cw.usage.timelineDetailDays.title': undefined
   'settings.advanced.cw.wait.agentsMaxSeconds.desc': undefined
@@ -655,6 +700,8 @@ interface CombworkMessageValues {
   'settings.advanced.error.number': { title: string | number; min: string | number; max: string | number }
   'settings.advanced.error.oneLine': { title: string | number; most: string | number }
   'settings.advanced.error.pattern': { title: string | number }
+  'settings.advanced.error.roles': { title: string | number; roles: string | number }
+  'settings.advanced.error.rolesTwice': { title: string | number; name: string | number }
   'settings.advanced.error.text': { title: string | number }
   'settings.advanced.logs.desc': undefined
   'settings.advanced.logs.tip': undefined
@@ -662,6 +709,34 @@ interface CombworkMessageValues {
   'settings.advanced.miss.field': { cli: string | number; version: string | number; field: string | number; fields: string | number }
   'settings.advanced.miss.list': { cli: string | number; version: string | number; missing: string | number; fields: string | number }
   'settings.advanced.miss.text': { cli: string | number; version: string | number; shown: string | number }
+  'settings.advanced.muse.guidance.maxBytes.desc': undefined
+  'settings.advanced.muse.guidance.maxBytes.title': undefined
+  'settings.advanced.muse.hooks.editTools.desc': undefined
+  'settings.advanced.muse.hooks.editTools.title': undefined
+  'settings.advanced.muse.hooks.pathField.desc': undefined
+  'settings.advanced.muse.hooks.pathField.title': undefined
+  'settings.advanced.muse.hooks.timeoutSeconds.desc': undefined
+  'settings.advanced.muse.hooks.timeoutSeconds.title': undefined
+  'settings.advanced.muse.names.configKeys.desc': undefined
+  'settings.advanced.muse.names.configKeys.title': undefined
+  'settings.advanced.muse.names.hookEvents.desc': undefined
+  'settings.advanced.muse.names.hookEvents.title': undefined
+  'settings.advanced.muse.names.hookFields.desc': undefined
+  'settings.advanced.muse.names.hookFields.title': undefined
+  'settings.advanced.muse.names.sessionLog.desc': undefined
+  'settings.advanced.muse.names.sessionLog.title': undefined
+  'settings.advanced.muse.override.keepPersonalOut.desc': undefined
+  'settings.advanced.muse.override.keepPersonalOut.title': undefined
+  'settings.advanced.muse.override.keepProjectConfigOut.desc': undefined
+  'settings.advanced.muse.override.keepProjectConfigOut.title': undefined
+  'settings.advanced.muse.override.stripAccountVars.desc': undefined
+  'settings.advanced.muse.override.stripAccountVars.title': undefined
+  'settings.advanced.muse.ready.input.desc': undefined
+  'settings.advanced.muse.ready.input.title': undefined
+  'settings.advanced.muse.sandbox.setupRequired.desc': undefined
+  'settings.advanced.muse.sandbox.setupRequired.title': undefined
+  'settings.advanced.muse.sandbox.setupScreen.desc': undefined
+  'settings.advanced.muse.sandbox.setupScreen.title': undefined
   'settings.advanced.off': undefined
   'settings.advanced.on': undefined
   'settings.advanced.openLogs': undefined
@@ -710,12 +785,14 @@ interface CombworkMessageValues {
   'settings.advanced.takes.number': { unit: string; min: string | number; max: string | number }
   'settings.advanced.takes.pattern': undefined
   'settings.advanced.takes.patternFlags': { flags: string | number }
+  'settings.advanced.takes.roles': { roles: string | number }
   'settings.advanced.takes.text': undefined
   'settings.advanced.unit.agents': { n: number }
   'settings.advanced.unit.captures': { n: number }
   'settings.advanced.unit.characters': { n: number }
   'settings.advanced.unit.days': { n: number }
   'settings.advanced.unit.lanes': { n: number }
+  'settings.advanced.unit.lines': { n: number }
   'settings.advanced.unit.minutes': { n: number }
   'settings.advanced.unit.seconds': { n: number }
   'settings.advanced.unitLabel.agents': undefined
@@ -724,6 +801,7 @@ interface CombworkMessageValues {
   'settings.advanced.unitLabel.characters': undefined
   'settings.advanced.unitLabel.days': undefined
   'settings.advanced.unitLabel.lanes': undefined
+  'settings.advanced.unitLabel.lines': undefined
   'settings.advanced.unitLabel.minutes': undefined
   'settings.advanced.unitLabel.seconds': undefined
   'settings.advanced.values.desc': undefined
@@ -1058,6 +1136,7 @@ interface CombworkMessageValues {
   'settings.connections.server.keyTitle': { name: string | number }
   'settings.connections.server.label': undefined
   'settings.connections.server.limitsHint': undefined
+  'settings.connections.server.limitsHintGeneric': undefined
   'settings.connections.server.local': { name: string | number }
   'settings.connections.server.modelId': undefined
   'settings.connections.server.models': undefined
@@ -1066,6 +1145,7 @@ interface CombworkMessageValues {
   'settings.connections.server.needUrl': undefined
   'settings.connections.server.needsKey': undefined
   'settings.connections.server.notBelow': undefined
+  'settings.connections.server.notPassed': undefined
   'settings.connections.server.output': undefined
   'settings.connections.server.outputDefault': { n: number }
   'settings.connections.server.pickerHint': undefined

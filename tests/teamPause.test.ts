@@ -10,6 +10,7 @@ import { teamPauseLine } from '../src/shared/teamPause'
 import type { TaskCard } from '../src/shared/types'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const state = vi.hoisted(() => ({
   profile: '',
@@ -117,7 +118,7 @@ describe('one answer, for this running Combwork only (HI-2156)', () => {
     expect(tp.teamPauseOf(ws(w))).toBeNull()
     expect(() => refuseWhileTeamPaused(ws(w))).not.toThrow()
     expect((await scanWorkspace(ws(w))).pause).toBeNull()
-    await vi.waitFor(() => expect([join(dir, 'team-pause.json'), join(dir, 'team-pause-closing.json'), join(w.path, '.combwork', 'team-pause.json')].filter((f) => existsSync(f))).toEqual([]), { timeout: 10_000 })
+    await vi.waitFor(() => expect([join(dir, 'team-pause.json'), join(dir, 'team-pause-closing.json'), join(w.path, '.combwork', 'team-pause.json')].filter((f) => existsSync(f))).toEqual([]), { timeout: timing('wait.hang') })
   })
 
   it("the user's pause: status and lane starts agree; the Assistant's resume lifts it in its workspace, and it ends with the last workspace it held", async () => {

@@ -4,5 +4,12 @@
       "models": "select",
       "window": "select"
     }
+  },
+  "project.limit.scoped": {
+    "placeholders": {
+      "name": "plain",
+      "window": "select",
+      "hours": "plural"
+    }
   }
 }

@@ -24,9 +24,10 @@
 // screenshot to open) and report.json. Read it first and open only the images it flags; it never fails the run.
 const fs = require('fs')
 const path = require('path')
+const { timing } = require('../timing.cjs')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 25000
+const HUNG_MS = timing('hang.ui')
 const CASES = path.join(__dirname, 'i18nshots')
 const THEMES = ['dark', 'light']
 const SCREEN_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/

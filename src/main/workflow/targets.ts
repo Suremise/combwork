@@ -3,7 +3,7 @@
 // as it is made, never at the start: the start takes what the card or its lane recorded (`card.target`, the lane's
 // targeted ruleset, compile.ts `targetedOf`), so a change of the list moves nothing already chosen.
 //
-// A card's target can change only while its branch has no work (Darren, 7 Nov: no rebase of started work): never
+// A card's target can change only while its branch has no work (no rebase of started work): never
 // started, or every line it had holds nothing that isn't in its target already.
 
 import { existsSync } from 'original-fs'
@@ -13,7 +13,7 @@ import { workspacePortOf } from '../platform/workspacePorts'
 import { isUnknown } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
 import type { CardState } from '../../shared/workflow/facts'
-import { projectPlatform } from '../platform/registry'
+import { platformIdOf } from '../platform/registry'
 import { hasCapability, type PlatformId } from '../../shared/platform/descriptors'
 import { resolvedOf } from './rulesets'
 import { combworkError } from '../combworkError'
@@ -32,7 +32,7 @@ export interface ProjectTargets {
 /** The targets a lane or card of this project may name, as the options resolve now; null: not a Git project, or no default readable. */
 export async function projectTargets(ws: WorkspaceService, projectPath: string): Promise<ProjectTargets | null> {
   const cfg = await ws.projectConfig(projectPath)
-  const platform = projectPlatform(projectPath, cfg.platform).id
+  const platform = platformIdOf(projectPath, cfg.platform)
   // Git's default from its history port, as before; a platform without one (jj, HI-3129) from its workspace port.
   const H = historyOf(platform)
   const port = workspacePortOf(platform)
@@ -41,7 +41,7 @@ export async function projectTargets(ws: WorkspaceService, projectPath: string):
   const fallback = o.target ? null : await (H ? H.defaultTarget(projectPath) : port!.defaultLine(projectPath)).catch(() => null)
   const def = o.target || (fallback && !isUnknown(fallback) ? fallback : '')
   if (!def) return null
-  // A platform whose targets are its repository's lines (jj's local bookmarks, Darren's decision on HI-3129): read now;
+  // A platform whose targets are its repository's lines (jj's local bookmarks, HI-3129): read now;
   // unreadable, the default alone, marked (a pick of another is refused, never offered blind). Else G7b's list.
   const fixed = hasCapability(platform, 'retarget') ? {} : { fixedInFlight: true as const }
   if (port?.targetLines) {
@@ -68,7 +68,7 @@ export function pickTarget(t: ProjectTargets | null, raw: unknown): { target: st
 /** HI-3129: whether a branch a card or lane names exists, by the project's own platform (its targets' port). */
 export async function targetExists(ws: WorkspaceService, projectPath: string, branch: string): Promise<boolean | 'unknown'> {
   const cfg = await ws.projectConfig(projectPath)
-  return branchExists(projectPath, branch, projectPlatform(projectPath, cfg.platform).id)
+  return branchExists(projectPath, branch, platformIdOf(projectPath, cfg.platform))
 }
 
 export async function branchExists(projectPath: string, branch: string, platform?: PlatformId): Promise<boolean | 'unknown'> {
@@ -100,7 +100,7 @@ export async function forwardSources(ws: WorkspaceService, projectPath: string, 
  * when git names none or can't say: then nothing counts as main, so it never makes a direction (HI-2892).
  */
 export async function defaultBranch(ws: WorkspaceService, projectPath: string): Promise<string | null> {
-  const H = historyOf(projectPlatform(projectPath, (await ws.projectConfig(projectPath)).platform).id)
+  const H = historyOf(platformIdOf(projectPath, (await ws.projectConfig(projectPath)).platform))
   const d = H ? await H.defaultTarget(projectPath).catch(() => null) : null
   return d && !isUnknown(d) && (await branchExists(projectPath, d)) === true ? d : null
 }

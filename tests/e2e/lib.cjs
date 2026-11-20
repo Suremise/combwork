@@ -11,6 +11,8 @@ const { execFileSync, execSync } = require('child_process')
 const { _electron } = require('playwright-core')
 
 // The run context (runContext.cjs): the environments of everything a suite starts, its folders and the CLI test homes.
+// HI-3378: every wait's bound, by name, from the tests' one timing file (tests/timing.json).
+const { timing } = require('../timing.cjs')
 const { TEST_ROOT, WORK, CODEX_HOME, CLAUDE_TEST_HOME, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, isCombworkEnv, isUserCliHome, trashDir, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv: contextGitEnv, isUserGitConfig } = require('./runContext.cjs')
 
 const ROOT = path.resolve(__dirname, '..', '..')
@@ -20,6 +22,7 @@ require('../testArea.cjs').assertReady()
 const ELECTRON = require('electron')
 const { windowsCodesIn } = require('./windowsExits.cjs')
 const { readDocs, writeDoc } = require('./boardRows.cjs')
+const { renderScreen, drawnCount, inputOf } = require('./drawnScreen.cjs')
 // WORK: where suites keep their profiles, workspaces and screenshots. Stable, so Claude Code trusts its folders once.
 fs.mkdirSync(WORK, { recursive: true })
 
@@ -69,7 +72,7 @@ function trashed(match = '') {
  */
 function readCard(ws, n) {
   const { DatabaseSync } = require('node:sqlite')
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true, timeout: timing('db.busyMs') })
   try {
     const [row] = readDocs(db, [n])
     if (!row) throw new Error(`no card #${n} in ${ws}`)
@@ -82,7 +85,7 @@ function readCard(ws, n) {
 /** Saves a card's document as another program would (a running Combwork sees it within about a second, #1017). */
 function writeCard(ws, n, doc) {
   const { DatabaseSync } = require('node:sqlite')
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: timing('db.busyMs') })
   try {
     writeDoc(db, n, doc)
   } finally {
@@ -104,6 +107,25 @@ function probeDir(name = 'probe', root = TEST_ROOT) {
  * A token in a file of its own, as Combwork gives a session its token (HI-2262: CW_API_TOKEN_FILE, never CW_API_TOKEN):
  * its path, for a child's CW_API_TOKEN_FILE. `dir`: where (a new probe folder by default).
  */
+/**
+ * HI-3195: each agent launch's Agent API token is in that launch's private folder (launches\<runId>\agent-token.json, as
+ * its Combwork tools read it). `launchToken`: a launch's (its live session's runId), or null; `launchTokens`: every
+ * launch's token file in a profile, newest first (a suite with one agent, or wanting its newest launch).
+ */
+function launchToken(userData, runId) {
+  const f = path.join(userData, 'launches', runId, 'agent-token.json')
+  return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).token : null
+}
+function launchTokens(userData) {
+  const dir = path.join(userData, 'launches')
+  if (!fs.existsSync(dir)) return []
+  return fs
+    .readdirSync(dir)
+    .map((run) => path.join(dir, run, 'agent-token.json'))
+    .filter((f) => fs.existsSync(f))
+    .map((f) => ({ file: f, token: JSON.parse(fs.readFileSync(f, 'utf8')).token, at: fs.statSync(f).mtimeMs }))
+    .sort((a, b) => b.at - a.at)
+}
 function tokenFile(token, dir = probeDir('token')) {
   const file = path.join(dir, `token-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`)
   fs.writeFileSync(file, JSON.stringify({ token }))
@@ -116,19 +138,89 @@ function tokenFile(token, dir = probeDir('token')) {
 const port = (fallback) => process.env.CW_E2E_PORT || String(fallback)
 
 /** A wait this long that ran out is worth a line: a check of its result, or a wait for what never comes, costs it whole. */
-const WAIT_NOTED_MS = 10000
+const WAIT_NOTED_MS = 10000 // timing-ok: when a wait that ran out is logged (a report's threshold), never a wait
 
 /**
  * Waits until fn() returns something truthy (checking every interval ms), up to ms; returns its last value. A wait of
  * WAIT_NOTED_MS or more that ran out says so, with its caller ("WAIT ran out after …"), and the runner lists them per
  * suite (HI-2663: three suites spent 420 of their 623 s in waits that ran out and that nothing checked).
+ * HI-3378, HI-3382: a bound is the caller's to name (timing('hang.ui'), …), and it is required: one left out, or one that
+ * isn't a positive number of ms, throws at once (never a silent default); the check:repo guard
+ * (scripts/testWaits.mjs --literals) keeps numbers out of new waits. The interval is the file's poll.intervalMs.
  */
-async function until(fn, ms = 10000, interval = 100) {
+async function until(fn, ms, interval = timing('poll.intervalMs')) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) throw new Error(`until needs its bound, a name from tests/timing.json (timing('hang.ui'), …): got ${ms}`)
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await sleep(interval)
   if (!v && Date.now() - t >= WAIT_NOTED_MS) console.log(`WAIT ran out after ${Date.now() - t} ms at ${waitCaller(new Error().stack)}`)
   return v
+}
+
+/**
+ * Whether `promise` settles within ms (HI-3384): true once it has, false when ms passes first, never taken as done. A
+ * call that can hang outside a polling wait (a page.evaluate for a frame, an IPC round trip: Playwright bounds neither)
+ * is raced against its deadline; a rejection is thrown. The promise left behind is not cancelled, only no longer awaited.
+ */
+async function within(promise, ms) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) throw new Error(`within needs its deadline, a name from tests/timing.json: got ${ms}`)
+  let timer
+  const late = new Promise((done) => {
+    timer = setTimeout(() => done(false), ms)
+  })
+  try {
+    return await Promise.race([Promise.resolve(promise).then(() => true), late])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * HI-3397: a test copy's exit, awaited within ms (`exited`: a promise of its process's exit, made before what quits it).
+ * Exited in time: it returns. Not: that exact process is ended by its handle (`proc`, the copy's own ChildProcess, never a
+ * name), its exit given ms again, and it throws naming `what`, so nothing goes on as if it had quit (HR1's round 1).
+ */
+async function exitWithin(proc, exited, ms, what) {
+  if (await within(exited, ms)) return
+  try {
+    proc.kill()
+  } catch {
+    // Gone meanwhile: nothing to end.
+  }
+  await within(exited, ms)
+  throw new Error(`${what}: the app didn't exit within ${ms / 1000} s (ended by its own handle)`)
+}
+
+/**
+ * Waits until read() gives the same value (JSON) twice a look apart (HI-3384): what it reads has stopped changing (a
+ * layout after a resize, a column after its scrolling). Whether it did within ms; false when it kept changing, or when a
+ * read is still unanswered at the deadline (HR1's round 2: a Playwright read can hang, and the whole wait, each read and
+ * each pause included, has the one deadline). Past it, no further read starts; the one left unanswered is only no longer
+ * awaited. A read's failure is thrown.
+ */
+async function steady(read, ms, interval = timing('poll.intervalMs')) {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) throw new Error(`steady needs its deadline, a name from tests/timing.json: got ${ms}`)
+  const LATE = Symbol('late')
+  let timer
+  const late = new Promise((done) => {
+    timer = setTimeout(() => done(LATE), ms)
+  })
+  const inTime = (p) => Promise.race([p, late])
+  try {
+    let last
+    let looked = false
+    for (;;) {
+      const value = await inTime(Promise.resolve().then(read))
+      if (value === LATE) return false
+      const now = JSON.stringify(value)
+      if (looked && now === last) return true
+      last = now
+      looked = true
+      if ((await inTime(sleep(interval))) === LATE) return false
+    }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** The suite's line a wait was called from: the first frame outside lib.cjs, repo-relative. */
@@ -143,19 +235,141 @@ function waitCaller(stack) {
  * A tooltip shows after its delay (ui.tsx), measured hidden before it is placed, so this waits for it to be visible
  * with the text, never for the delay. The mouse first leaves for the window's corner, so an earlier tip has gone.
  */
-async function hoverTip(page, locator, want, ms = 10000) {
-  const tip = () => page.locator('.tip:visible').last().innerText({ timeout: 1000 }).catch(() => '')
+/**
+ * HI-3385, HI-3399: the window shows `theme` fully, within ms: its root says so and the page has settled (no finite
+ * animation or transition running, a background's fade among them), so a screenshot or a colour read shows the theme's
+ * colours, not a blend. It is themeSettled: each page read bounded (readyWithin), and a throw when not so, never a
+ * false a bare await would ignore.
+ */
+async function themeShown(page, theme, ms = timing('hang.ui')) {
+  return themeSettled(page, theme, ms)
+}
+
+/**
+ * HI-3396: sets the first window's zoom to z, then waits, within ms in all, until its page draws at it (devicePixelRatio
+ * z times its display's scale) and has settled (lib.settled). Each call is bounded (readyWithin's looks); it throws
+ * otherwise, so nothing measured or shot goes on as if it had.
+ */
+async function zoomTo(app, page, z, ms = timing('hang.ui')) {
+  const deadline = Date.now() + ms
+  let scale = null
+  await readyWithin(`zoomed to ${z * 100}% by main`, async () => {
+    scale = await app.evaluate(({ BrowserWindow, screen }, f) => {
+      const w = BrowserWindow.getAllWindows()[0]
+      w.webContents.setZoomFactor(f)
+      return screen.getDisplayMatching(w.getBounds()).scaleFactor
+    }, z)
+    return typeof scale === 'number'
+  }, ms, deadline)
+  await readyWithin(`drawn at ${z * 100}%`, () => page.evaluate((want) => Math.abs(devicePixelRatio - want) < 0.01, z * scale), ms, deadline)
+  return settled(page, ms, deadline)
+}
+
+/** HI-3396: the window's next two frames drawn (what a change just made renders, its effects run), within ms; it throws otherwise. */
+async function framesDrawn(page, ms = timing('hang.ui')) {
+  return readyWithin('two frames drawn', () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))), ms)
+}
+
+/** HI-2971, HI-3396: how many calls on `channel` main has answered (or failed) so far (dev builds' __cwSettledIpc): one read. */
+const ipcSettled = (app, channel) => app.evaluate((_e, c) => globalThis.__cwSettledIpc?.[c] ?? 0, channel)
+
+/**
+ * HI-2971, HI-3396: main has answered at least n calls on `channel` (ipcSettled), within ms (each read bounded); it throws
+ * otherwise. A late answer is then known to have gone to the window, without waiting a time.
+ */
+async function ipcAnswered(app, channel, n, ms = timing('hang.ui')) {
+  return readyWithin(`${n} ${channel} answer(s) from main`, async () => (await ipcSettled(app, channel)) >= n, ms)
+}
+
+/**
+ * HI-2971, HI-3396: every answer main has sent so far has reached the window and been drawn, within ms in all: a call
+ * answered after them (the same pipe, in order), then two frames. It throws otherwise.
+ */
+async function answersDrawn(inv, page, ms = timing('hang.ui')) {
+  const deadline = Date.now() + ms
+  await readyWithin('answered by main after its earlier answers', async () => !!(await inv('app:info')), ms, deadline)
+  return readyWithin('two frames drawn', () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))), ms, deadline)
+}
+
+/** HI-3396: the page's viewport `width` CSS pixels wide (a resize applied) and settled, within ms in all; it throws otherwise. */
+async function viewportIs(page, width, ms = timing('hang.ui')) {
+  const deadline = Date.now() + ms
+  await readyWithin(`${width} px wide`, () => page.evaluate((w) => innerWidth === w, width), ms, deadline)
+  return settled(page, ms, deadline)
+}
+
+async function hoverTip(page, locator, want, ms = timing('hang.ui')) {
+  const tip = () => page.locator('.tip:visible').last().innerText({ timeout: timing('poll.readMs') }).catch(() => '')
   await page.mouse.move(5, 5)
   await until(async () => (await page.locator('.tip:visible').count()) === 0, ms)
   await locator.hover()
   return (await until(async () => { const t = await tip(); return want(t) && t }, ms)) || (await tip())
 }
 
+/**
+ * HI-3388: one look of a readiness wait, bounded: `look()` (a call into the page) raced against what is left of the deadline
+ * and at most poll.readMs, so a renderer that never answers (no frame drawn, an evaluate that never returns) is a look
+ * that came back false, never a wait that outlives its bound. Its pending call is left to the page.
+ */
+async function boundedLook(look, deadline) {
+  const left = Math.min(deadline - Date.now(), timing('poll.readMs'))
+  if (left <= 0) return false
+  let timer
+  const out = await Promise.race([Promise.resolve().then(look).catch(() => false), new Promise((r) => (timer = setTimeout(() => r(false), left)))])
+  clearTimeout(timer)
+  return out
+}
+
+/** A readiness wait: `look` true within ms (each look bounded), or it throws naming `what` (never a pass by timeout). */
+async function readyWithin(what, look, ms, deadline = Date.now() + ms) {
+  const ok = await until(() => boundedLook(look, deadline), Math.max(1, deadline - Date.now()))
+  if (!ok) throw new Error(`not ${what} within ${ms} ms`)
+  return true
+}
+
+/**
+ * HI-3388: the page settled, for a screenshot or a measurement: two frames drawn and no finite CSS animation or transition
+ * still running (a spinner's endless one doesn't count). A condition, never a fixed pause before the shot; it throws
+ * when the page hasn't settled within ms, so nothing goes on as if it had.
+ */
+async function settled(page, ms = timing('hang.ui'), deadline = Date.now() + ms) {
+  const still = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getTiming?.().iterations === Infinity))))))
+  return readyWithin('settled (two frames drawn, no animation running)', still, ms, deadline)
+}
+
+/** HI-3388: a theme applied (the page's data-theme says it) and the page settled, within ms in all; it throws otherwise. */
+async function themeSettled(page, theme, ms = timing('hang.ui')) {
+  const deadline = Date.now() + ms
+  await readyWithin(`in the ${theme} theme`, async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, ms, deadline)
+  return settled(page, ms, deadline)
+}
+
+/** HI-3388: no dialog left open (an Escape or a close taken) within ms; it throws otherwise. */
+async function noDialog(page, ms = timing('hang.ui')) {
+  return readyWithin('without a dialog', async () => (await page.locator('[role="dialog"]:visible').count()) === 0, ms)
+}
+
+/**
+ * HI-3387: waits for `locator`'s element with no CSS animation or transition running on it or inside it (sliding in,
+ * fading), so where it is now is where it stays: read its box after this. Each look finds the element within the bound
+ * too (never Playwright's longer default). Still moving, or not there, within ms, it throws, saying what ran.
+ */
+async function animationsDone(locator, ms = timing('hang.ui')) {
+  const look = Math.min(ms, timing('poll.readMs'))
+  let seen = null
+  const atRest = async () => {
+    seen = await locator.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a.playState === 'running').map((a) => a.animationName || a.transitionProperty || 'an animation'), undefined, { timeout: look }).catch((e) => ({ error: e.message }))
+    return Array.isArray(seen) && seen.length === 0
+  }
+  if (!(await until(atRest, ms))) throw new Error(`${locator} still animating, or not there, after ${ms} ms: ${JSON.stringify(seen)}`)
+  return true
+}
+
 let quitWatches = 0
 /**
  * Watches a test copy of Combwork quit, telling Combwork's part from the process's (#424). Start it before the quit.
  * `untilDecided(ms)`: the time Combwork called app.quit (or app.exit), recorded in main as it calls it: its own quit work is
- * done (sessions stopped, state saved), or null if it hasn't within ms. `gone(ms)`: the process has ended since. What
+ * done (sessions stopped, state saved), or null if it hasn't within ms; `decidedAt()` reads it once. `gone(ms)`: the process has ended since. What
  * comes between (Electron closing windows and processes) is the machine's, and a loaded one stretches it to seconds, so
  * a suite times Combwork's part and only waits for the rest. `timings()` says both, for the suite's log.
  */
@@ -188,6 +402,8 @@ async function quitWatch(app) {
   }
   return {
     untilDecided: (ms) => until(decided, ms),
+    // The time Combwork decided to quit if it has, read once (no wait: until's bound is never 0).
+    decidedAt: decided,
     // Its timer goes once the process has ended, so a suite that has finished isn't kept alive for the rest of ms.
     gone: (ms) =>
       new Promise((resolve) => {
@@ -271,6 +487,21 @@ function fakeClaude(userData, home, trusted = []) {
 }
 
 /**
+ * Makes every Combwork window open now focused (or not), as Combwork sees it: a test copy never takes the OS focus, and
+ * its page knows that from the start (HI-3404). appReady tells each page it is focused (pageFocused, HI-3413), but main
+ * still says unfocused: a suite that needs main to say focused (a tip, a notification's route) stubs it here, and sends
+ * the event Combwork listens for. A window opened later isn't stubbed.
+ */
+async function stubFocus(app, focused = true) {
+  await app.evaluate(({ BrowserWindow }, f) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      w.isFocused = () => f
+      w.emit(f ? 'focus' : 'blur')
+    }
+  }, focused)
+}
+
+/**
  * Sizes the test window's page area to `size` and pins the page to it. Pinning alone (setViewportSize) leaves
  * the rest of a bigger window blank, which looks like a layout bug when you watch a suite run.
  */
@@ -291,7 +522,7 @@ async function fitWindow(app, page, size) {
  * CLIs (it does that in the background after start; starting an agent before then fails with "… is required").
  * Instead of a fixed wait after launch.
  */
-async function appReady(page, ms = 90000) {
+async function appReady(page, ms = timing('app.readyMs')) {
   const ready = () =>
     page
       .evaluate(async () => {
@@ -302,10 +533,102 @@ async function appReady(page, ms = 90000) {
       .catch(() => false)
   const ok = await until(ready, ms)
   if (!ok) throw new Error("Combwork's window wasn't ready (rendered, providers found) within " + ms / 1000 + ' s')
+  await pageFocused(page)
+}
+
+/** Each window's app (HI-3413), by every page an app launched by any suite has: registered as Playwright launches it. */
+const APP_OF_PAGE = new WeakMap()
+/** Apps whose pages keep the focus a test copy has (realFocus). */
+const REAL_FOCUS = new WeakSet()
+{
+  const launchApp = _electron.launch.bind(_electron)
+  _electron.launch = async (...args) => {
+    const app = await launchApp(...args)
+    for (const p of app.windows()) APP_OF_PAGE.set(p, app)
+    app.on('window', (p) => APP_OF_PAGE.set(p, app))
+    return app
+  }
+}
+
+/**
+ * HI-3413: a test copy never has the focus, and since HI-3404 its page knows that from the start, so its pop-ups keep their
+ * clocks and a toast stays at the bottom right over what a suite clicks. Every suite's page is told it is focused once
+ * ready (appReady, after a reload too), as a page was before HI-3404: only the page, never main, so which notifications
+ * Combwork sends (the OS's with no window focused) is unchanged. Sent to each window as its own state, after the page's
+ * own window:state answer (appReady's provider:info is answered after it, on the same channel). A window whose focus a
+ * suite stubbed (stubFocus, its own isFocused) keeps what the stub says; a suite testing the unfocused page itself calls
+ * realFocus first.
+ */
+async function pageFocused(page) {
+  const app = APP_OF_PAGE.get(page)
+  if (!app || REAL_FOCUS.has(app)) return
+  await app
+    .evaluate(({ BrowserWindow }) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (w.isDestroyed()) continue
+        const stubbed = w.isFocused !== BrowserWindow.prototype.isFocused
+        w.webContents.send('cw:event', { type: 'window-state', maximized: w.isMaximized(), focused: stubbed ? w.isFocused() : true, alwaysOnTop: w.isAlwaysOnTop() })
+      }
+    })
+    .catch(() => undefined)
+}
+
+/** Its pages keep the unfocused state a test copy has (HI-3413, pageFocused): for a suite testing an unfocused page. Call it before appReady. */
+function realFocus(app) {
+  REAL_FOCUS.add(app)
+}
+
+/** Each window's Claude Code home, as launch was given it (HI-3342). */
+const CLAUDE_HOMES = new WeakMap()
+
+/**
+ * HI-3342: Claude Code 2.1.326 and later asks about an --add-dir folder outside the folders it trusts at every start, so
+ * Combwork grants a reviewer the copies folder only once its home trusts the workspace's worktrees folder (HI-3337, read
+ * from .claude.json). The fake says a later version (2.1.999), so a fake home the suite gave launch (one with
+ * fake-trusted.json) trusts it as Set Up leaves it: recorded as Claude Code writes it (its real path, forward slashes;
+ * tests/fixtures/advanced/trust-entry-*), beside what the home's .claude.json has. Reviewcopies takes it away to test that.
+ */
+function trustFakeWorktrees(home, ws) {
+  if (home && fs.existsSync(path.join(home, 'fake-trusted.json'))) trustWorktrees(home, ws)
+}
+
+/**
+ * Records in a Claude Code home (its .claude.json) that it trusts the workspace's worktrees folder, as Set Up leaves it
+ * (HI-3337, HI-3342): its real path with forward slashes, the rest of the file kept. A file that isn't JSON throws rather
+ * than be written afresh (a real home's holds its sign-in and onboarding). Returns the folder's key. The folder isn't
+ * made (HI-3395: that gave every such suite a worktrees folder before Combwork made one, which antivirus and repairdefender
+ * check): its key is where it would be, its parent's real path and its name, as its real path is once made.
+ */
+function trustWorktrees(home, ws) {
+  const trees = `${ws}.worktrees`
+  const key = (fs.existsSync(trees) ? fs.realpathSync.native(trees) : path.join(fs.realpathSync.native(path.dirname(trees)), path.basename(trees))).replace(/\\/g, '/')
+  const file = path.join(home, '.claude.json')
+  const json = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}
+  json.projects = { ...json.projects, [key]: { ...json.projects?.[key], hasTrustDialogAccepted: true } }
+  fs.writeFileSync(file, JSON.stringify(json, null, 2))
+  return key
+}
+
+/**
+ * A project's view shown (its session toolbar) after a click on its name, instead of a fixed wait (HI-3386). Each look
+ * is bounded (readyWithin, HI-3388), and it throws naming what isn't so once ms have passed: never a pass by timeout.
+ */
+async function projectShown(page, ms = timing('hang.ui')) {
+  return readyWithin("the project's view shown", async () => (await page.locator('.session-toolbar').count()) > 0, ms)
+}
+
+/**
+ * HI-3386: each terminal's CLI has been given the size its terminal now has. `pairs`: { term, given } per terminal, its
+ * terminal's { cols, rows } (null if not drawn) and the last size its CLI recorded (undefined if none). A resize still on
+ * its way (the CLI's size behind its terminal's) is false: what a window, zoom or layout change leaves once done.
+ */
+function sizesGiven(pairs) {
+  return pairs.length > 0 && pairs.every(({ term, given }) => !!term && !!given && term.cols === given.cols && term.rows === given.rows)
 }
 
 /** Opens a workspace and waits until the window shows it (its name in the title), instead of a fixed wait. */
-async function openWorkspace(inv, page, ws, ms = 20000) {
+async function openWorkspace(inv, page, ws, ms = timing('workspace.openMs')) {
+  trustFakeWorktrees(CLAUDE_HOMES.get(page), ws)
   await inv('workspace:open', ws)
   const name = path.basename(ws)
   const ok = await until(() => page.evaluate((n) => document.title.includes(n), name).catch(() => false), ms)
@@ -317,7 +640,7 @@ async function openWorkspace(inv, page, ws, ms = 20000) {
  * build, #1578). Returns { app, page, inv } (inv calls an
  * IPC channel). readyMs bounds the wait for its window to be ready; one that isn't is closed and the failure thrown.
  */
-async function launch({ userData, env = {}, viewport = { width: 1400, height: 850 }, readyMs = 90000 }) {
+async function launch({ userData, env = {}, viewport = { width: 1400, height: 850 }, readyMs = timing('app.readyMs') }) {
   const exe = process.env.CW_EXE
   if (exe && !launch.said) console.log(`Combwork: ${exe} (CW_EXE), not the dev build`)
   launch.said = !!exe
@@ -331,6 +654,8 @@ async function launch({ userData, env = {}, viewport = { width: 1400, height: 85
   let page
   try {
     page = await app.firstWindow()
+    // HI-3378: Playwright's own waits (a click, waitFor, an expect) bound by hang.ui, not its 30 s nor a literal.
+    page.setDefaultTimeout(timing('hang.ui'))
     await fitWindow(app, page, viewport)
     await appReady(page, readyMs)
   } catch (e) {
@@ -339,6 +664,8 @@ async function launch({ userData, env = {}, viewport = { width: 1400, height: 85
     throw e
   }
   const inv = (ch, ...a) => page.evaluate(([c, args]) => window.combwork.invoke(c, ...args), [ch, a])
+  // Its Claude Code home, for openWorkspace (HI-3342): by its window, as suites wrap inv.
+  if (env.CLAUDE_CONFIG_DIR) CLAUDE_HOMES.set(page, env.CLAUDE_CONFIG_DIR)
   return { app, page, inv }
 }
 
@@ -354,7 +681,7 @@ async function waitForProvider(inv, provider = 'claude-code', timeoutMs = 60000)
       if (!info.found) throw new Error(`${provider} wasn't found on this machine`)
       return info
     }
-    await sleep(250)
+    await sleep(timing('poll.intervalMs')) // its loop's look, bounded by timeoutMs
   }
   throw new Error(`${provider}: still looking for it after ${timeoutMs / 1000} s`)
 }
@@ -442,23 +769,86 @@ const ptyKey = (proj, agentId) => `session:${proj.toLowerCase()}#${agentId}`
 const CLAUDE_AT_PROMPT = /for shortcuts|\? for|shift\+tab to cycle|\bmode on\b/i
 
 /**
- * Answers Claude Code's "trust this folder" question in an agent's terminal, if it asks: true when it answered, false
- * as soon as the session is past it (Claude Code's prompt on screen, or Combwork has the session ready: a trusted folder
- * asks nothing, #188), or at the timeout. Never answers anything else (a sign-in screen least of all).
+ * Claude Code's trust questions: its folder's ("trust this folder"), and from 2.1.326 an added folder's (HI-3335: an
+ * --add-dir nobody trusted, a slot's launch plugin or a reviewer's copy: "Adding a new directory:", "Yes, add it").
  */
-async function acceptClaudeTrust(inv, proj, agentId, timeoutMs = 15000) {
+const CLAUDE_TRUST = /trust this folder|Adding a new directory:/i
+
+/** Where a trust question's text starts: its title, or (an older Claude Code's, without one) its first words. */
+const TRUST_TITLE = /Accessing workspace:|Adding a new directory:/gi
+const TRUST_WORDS = /Quick safety check|Is this a project/gi
+/** Where its choices start. */
+const TRUST_CHOICES = /[>❯›]?\s*(?:\d\.\s*)?(?:No, exit|Yes, )/
+
+/**
+ * A terminal's screen as it shows now (drawnScreen.cjs: pty:buffer drawn at pty:size, a wrapped row joined to the one
+ * before). Never positions in pty:buffer itself: it is a replay, after a resize the screen redrawn, where an earlier
+ * read's length means nothing (HI-3311, HI-3312); and in the output as it came, a question's text stays after it is
+ * erased.
+ */
+async function screenNow(inv, key) {
+  const size = await inv('pty:size', key).catch(() => null)
+  return renderScreen(String((await inv('pty:buffer', key).catch(() => '')) ?? ''), size?.cols, size?.rows, { unwrap: true })
+}
+
+/**
+ * Types `text` into a CLI's terminal (pty key) at its prompt and presses Enter once its input line shows it (HI-3384), as
+ * Combwork waits before its Enter (#600): read in one go with the text, the Enter is taken as part of a paste (the fake
+ * Claude Code drops it, #597). Its input line, never the whole screen (inputOf): the same text sent before shows above.
+ * Whether it was drawn within ms; Enter goes either way, and the caller's wait for the turn is the check.
+ */
+async function typeThenEnter(inv, key, text, ms = timing('hang.ui')) {
+  await inv('pty:write', key, text)
+  // Claude Code's box marks its input with `❯` and a no-break space (2.1.312, as the fake draws it): read as a space.
+  const drawn = !!(await until(async () => drawnCount(inputOf((await screenNow(inv, key)).replace(/ /g, ' ')), text) > 0, ms))
+  if (!drawn) console.log(`INFO typeThenEnter: ${JSON.stringify(text.slice(0, 40))} not drawn on its input line within ${ms / 1000} s: Enter anyway`)
+  await inv('pty:write', key, '\r')
+  return drawn
+}
+
+/**
+ * The trust question a screen shows (screenNow), read from that screen alone (HI-3335): { id, choice }, or null when it
+ * shows none (none drawn, or Claude Code's prompt drawn after it). id is its text up to its choices: which question (its
+ * folder's, or which added folder's), so its screen moving on to another is seen. choice is the one shown selected
+ * ('No, exit', 'Yes, …'), or null while its menu draws no pointer: 2.1.326's added folder's menu draws both choices
+ * dimmed (grey) and no pointer for its first 500 ms, while it takes no keys (its armAfterMs; recorded in
+ * trust-added-raw-claude-2.1.326.json), and draws "❯ No, exit" once it does.
+ */
+function trustQuestion(screen) {
+  const text = plainText(screen)
+  const asked = [...text.matchAll(new RegExp(CLAUDE_TRUST.source, 'gi'))].at(-1)
+  if (!asked || CLAUDE_AT_PROMPT.test(text.slice(asked.index))) return null
+  const before = (re) => [...text.matchAll(re)].filter((m) => m.index <= asked.index).at(-1)?.index
+  const block = text.slice(before(TRUST_TITLE) ?? before(TRUST_WORDS) ?? asked.index)
+  const choices = block.search(TRUST_CHOICES)
+  return { id: (choices > 0 ? block.slice(0, choices) : block.slice(0, 200)).trim(), choice: trustChoice(block) }
+}
+
+/**
+ * Answers Claude Code's trust questions (CLAUDE_TRUST) in an agent's terminal, each it asks (its folder's, then an added
+ * folder's, HI-3335), each read from its screen as it shows now (screenNow): true when it answered one, false as soon as
+ * the session is past them (Claude Code's prompt on screen, or Combwork has the session ready: a trusted folder asks
+ * nothing, #188), or at the timeout. Never answers anything else (a sign-in screen least of all).
+ */
+async function acceptClaudeTrust(inv, proj, agentId, timeoutMs = timing('cli.trustMs')) {
   const key = ptyKey(proj, agentId)
   const t = Date.now()
+  const ready = async () => (await inv('session:live').catch(() => [])).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === agentId)?.status === 'ready'
+  let answered = false
   while (Date.now() - t < timeoutMs) {
-    // Terminal UIs draw spaces as cursor moves: control sequences become spaces before matching.
-    const text = plainText(await inv('pty:buffer', key).catch(() => ''))
-    if (/trust this folder/i.test(text)) return chooseTrust(inv, key, Math.max(3000, timeoutMs - (Date.now() - t)))
-    if (CLAUDE_AT_PROMPT.test(text)) return false
-    const live = (await inv('session:live').catch(() => [])).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === agentId)
-    if (live?.status === 'ready') return false
-    await sleep(500)
+    const screen = await screenNow(inv, key)
+    const q = trustQuestion(screen)
+    if (q) {
+      const r = await chooseTrust(inv, key, q.id, ready, Math.max(3000, timeoutMs - (Date.now() - t)))
+      if (r === null) return answered
+      answered ||= r
+      continue
+    }
+    if (CLAUDE_AT_PROMPT.test(plainText(screen))) return answered
+    if (await ready()) return answered
+    await sleep(timing('poll.intervalMs')) // its loop's look, bounded by timeoutMs
   }
-  return false
+  return answered
 }
 
 /**
@@ -473,30 +863,41 @@ async function acceptRelaunchTrust(inv, proj, agentId, spawned, { spawnMs = 2000
 
 /** The trust question's choice the terminal shows selected last ('No, exit' or 'Yes, …'), or null. */
 function trustChoice(text) {
-  const marks = [...plainText(text).matchAll(/[>❯›]\s*(?:\d\.\s*)?(No, exit|Yes, I trust this folder)/g)]
+  const marks = [...plainText(text).matchAll(/[>❯›]\s*(?:\d\.\s*)?(No, exit|Yes, I trust this folder|Yes, add it)/g)]
   return marks.length ? marks.at(-1)[1] : null
 }
 
 /**
- * Says yes to Claude Code's trust question. Its menu starts on "No, exit", and Enter on that quits Claude Code (exit 1).
- * A key sent while it is still drawing the menu is dropped on a busy machine (#218: Down lost, Enter chose No), so
- * Enter is pressed only once the terminal shows "Yes" selected, Down sent again until it does; never on "No". true when
- * it answered yes.
+ * Says yes to the trust question `id` (trustQuestion) its screen shows. Its menu starts on "No, exit", and Enter on that
+ * quits Claude Code (exit 1). A key sent while it is still drawing the menu is dropped on a busy machine (#218: Down
+ * lost, Enter chose No), so Enter is pressed only while its screen shows "Yes" selected, Down sent (only while it shows
+ * "No") until it does; nothing while it shows no pointer (its menu takes no keys yet). Answered only once its screen
+ * moves on (another question, its prompt, or `ready()`): an Enter it didn't take (dropped) is pressed again, on "Yes"
+ * again. true when it answered; false when the question went without its Enter; null at the timeout.
  */
-async function chooseTrust(inv, key, timeoutMs = 20000) {
+async function chooseTrust(inv, key, id, ready, timeoutMs = timing('cli.trustMs')) {
   const t = Date.now()
-  const choice = async () => trustChoice(await inv('pty:buffer', key).catch(() => ''))
+  const now = async () => trustQuestion(await screenNow(inv, key))
+  const here = (q) => !!q && q.id === id
+  const onYes = (q) => here(q) && !!q.choice?.startsWith('Yes')
+  const gone = async () => !here(await now()) || (await ready())
+  let entered = false
   while (Date.now() - t < timeoutMs) {
-    // Still "Yes" a moment later: a Down still on its way would have moved it back by then.
-    if ((await choice()) === 'Yes, I trust this folder' && (await sleep(400), (await choice()) === 'Yes, I trust this folder')) {
+    const q = await now()
+    if (!here(q) || (await ready())) return entered
+    // Still "Yes" a moment later (pace.trustSettleMs): a Down still on its way would have moved it back by then.
+    if (onYes(q) && (await sleep(timing('pace.trustSettleMs')), onYes(await now()))) {
       await inv('pty:write', key, '\r')
-      return true
+      entered = true
+      // A try's pace, not a bound: its screen not moved on within 3 s, the loop presses Enter again if "Yes" still shows.
+      if (await until(gone, timing('pace.trustEnterMs'), 150)) return true
+      continue
     }
-    await inv('pty:write', key, '\x1b[B')
-    // A try's pace, not a bound: not on "Yes" within 2 s, Down is pressed again (timeoutMs bounds the whole).
-    await until(async () => (await choice()) === 'Yes, I trust this folder', 2000, 150)
+    if (q.choice && !onYes(q)) await inv('pty:write', key, '\x1b[B')
+    // A try's pace, not a bound: not on "Yes" (or no pointer yet) within 2 s, the loop looks again (timeoutMs bounds the whole).
+    await until(async () => { const n = await now(); return !here(n) || onYes(n) || (!q.choice && !!n?.choice) }, timing('pace.trustDownMs'), 150)
   }
-  return false
+  return null
 }
 
 /**
@@ -577,7 +978,7 @@ function trustForCodex(folder, home = CODEX_HOME) {
  * clearly one of these stays a FAIL. Hook errors (127.0.0.1) are Combwork's, never the environment's.
  */
 const ENVIRONMENT = [
-  { why: 'usage or rate limit', re: /(?:usage|5-hour|weekly|session|opus|sonnet) limit reached|hit your (?:usage )?limit|rate_limit_error|rate limit(?:ed| exceeded)|too many requests|API Error: 429/i },
+  { why: 'usage or rate limit', re: /(?:usage|5-hour|weekly|session|opus|sonnet) limit reached|hit your (?:usage |5-hour |weekly |session |opus |sonnet )?limit|rate_limit_error|rate limit(?:ed| exceeded)|too many requests|API Error: 429/i },
   { why: 'the API is overloaded', re: /overloaded_error|API Error: 529/i },
   { why: 'not signed in', re: /select login method|please run \/login|not logged in|invalid api key|oauth token (?:has )?expired|oauth session expired|authentication_error|sign in with chatgpt|run `?codex login/i },
   { why: 'network', re: /API Error: (?:Connection error|Request timed out)|unable to connect to (?:the )?(?:Anthropic )?API|stream disconnected before completion|error sending request for url \(https:\/\/[\w.]*(?:openai|chatgpt)|ENOTFOUND [\w.]*(?:anthropic|openai|chatgpt)/i }
@@ -588,6 +989,21 @@ const plainText = (s) =>
     .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, ' ')
     .replace(/\x1b\][^\x07]*\x07/g, ' ')
     .replace(/\s+/g, ' ')
+
+/**
+ * Records every terminal's output in the window as it arrives, from now on (HI-3312). pty:buffer is what a new view
+ * replays (HI-3252): after a resize it is the screen redrawn, so it keeps neither the sequences a CLI wrote (OSC) nor text
+ * it has since drawn over. A suite that counts what a CLI printed, or reads its sequences, reads this instead (ptyOutput).
+ */
+const recordPtyOutput = (page) =>
+  page.evaluate(() => {
+    if (window.__cwPtyOutput) return
+    const out = (window.__cwPtyOutput = {})
+    window.combwork.onPtyData((key, data) => void (out[key] = (out[key] ?? '') + data))
+  })
+
+/** A terminal's output since recordPtyOutput, as it came. */
+const ptyOutput = (page, key) => page.evaluate((k) => window.__cwPtyOutput?.[k] ?? '', key)
 
 /** Every environment failure in this CLI output, in order: [{ why, at }] ("usage or rate limit: …", with what it said). */
 function environmentProblems(text) {
@@ -1310,7 +1726,7 @@ function checked(ok) {
 }
 
 /** The longest a skipped step waits for its test copies to close before the suite exits: a bound for a hung close. */
-const CLOSE_MS = 10000
+const CLOSE_MS = timing('app.closeMs')
 
 /**
  * Runs a step that depends on the real CLI answering (a turn, a start), in a real-CLI suite. If a check in it failed
@@ -1364,12 +1780,22 @@ const pasteOn = (raw) => raw.lastIndexOf('\x1b[?2004h') > raw.lastIndexOf('\x1b[
  * - Typed: a CLI can take typing read in one go as a paste, and the Enter right after it as a new line in it (#190):
  *   when this attempt's text was drawn, the next attempt is Enter alone (typed again, the prompt would follow that new
  *   line); when it wasn't (dropped while the CLI drew), or on the last attempt, it is typed again.
+ * Enter follows once the CLI has drawn the text on its screen as rendered (drawnScreen.cjs), as Combwork waits (#600,
+ * HI-3210), at most DRAWN_MS.
  * ready(), if given, is waited for (within waitMs) before the first attempt: the CLI able to take a prompt
  * (combworkToolsConnected); not ready by then, it is typed anyway and said. Up to `tries` times; returns the attempt that
  * worked (1 = the first), or 0.
  */
 async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, waitMs = 20000 } = {}) {
   const raw = async () => (await inv('pty:buffer', key).catch(() => '')) ?? ''
+  // The screen as drawn (drawnScreen.cjs), never the raw output's plain text: Codex redraws only the cells that changed,
+  // so that text lacks letters its input has (HI-3210).
+  const screen = async () => {
+    const size = await inv('pty:size', key).catch(() => null)
+    return renderScreen(await raw(), size?.cols, size?.rows)
+  }
+  const shown = async () => drawnCount(await screen(), text)
+  const inInput = async () => drawnCount(inputOf(await screen()), text)
   if (ready && !(await until(ready, waitMs, 250))) console.log(`INFO sendPrompt: not ready within ${waitMs / 1000} s, typed anyway`)
   let echoed = false
   for (let attempt = 1; attempt <= tries; attempt++) {
@@ -1377,28 +1803,41 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
     // A slash command is typed (pasted, it would be sent as a message), as is any prompt to a CLI without it on.
     const paste = pasteOn(await raw()) && !text.startsWith('/')
     const enterOnly = !paste && echoed && attempt < tries
-    const mark = (await raw()).length
+    let before = 0
     if (!enterOnly) {
+      // An attempt not taken left its text in the input: once Ctrl+U has cleared it, the count is the screen's without it.
+      // The input only (inputOf): the same prompt sent before, in the conversation above, stays (HR1's round 1).
+      const left = attempt > 1 ? await inInput() : 0
       await inv('pty:write', key, '\x15')
-      await sleep(150)
+      // HI-3396: what Ctrl+U clears is waited for (an attempt's text left in its input); the count after it is the text shown.
+      if (left > 0) await until(async () => (await inInput()) < left, DRAWN_MS, 250)
+      before = await shown()
       await inv('pty:write', key, paste ? `\x1b[200~${text}\x1b[201~` : text)
     }
     // Deliberate pause, not a wait for a state: a CLI takes an Enter that comes within its paste window as part of the
     // text (a new line, not a submit), and nothing on screen says when that window ends: Copilot shows the line at once
     // and still takes an Enter right after it as part of the paste (tried in #527). submitted() is the check.
-    await sleep(400)
-    // Whether the CLI drew the text after this attempt's write (#981's evidence; for a typed prompt, what the next
-    // attempt does), and whether it is on the screen's last input line ("> …") now: read from the output as drawn, so a
-    // guess at the screen, said for an attempt not taken.
-    echoed = !enterOnly && plainText((await raw()).slice(mark)).includes(text.slice(0, 30))
+    await sleep(timing('pace.pasteWindowMs'))
+    // A paste: Enter once the CLI has drawn it, as Combwork does (enterOnceDrawn, #600): a busy Codex reads the text and an
+    // Enter in one go, takes them as a paste burst and drops the Enter (HI-3210: under load, all three attempts of a
+    // scenario's prompt were lost so). Not drawn within DRAWN_MS: Enter anyway, and said. Typed (a CLI without bracketed
+    // paste, such as the fake Codex, which draws nothing typed): whether it is drawn now, what the next attempt does
+    // (#981's evidence), with no wait.
+    const t = Date.now()
+    echoed = !enterOnly && (paste ? await until(async () => (await shown()) > before, DRAWN_MS, 250) : (await shown()) > before)
+    if (paste) console.log(`INFO sendPrompt attempt ${attempt}: ${echoed ? `drawn ${Date.now() - t + 400} ms after it was written` : `not drawn within ${(DRAWN_MS + 400) / 1000} s: Enter anyway`}`)
     await inv('pty:write', key, '\r')
     if (await until(submitted, waitMs, 500)) return attempt
-    const screen = plainText(await raw())
-    const input = screen.slice(screen.lastIndexOf('> ') + 2)
-    console.log(`INFO sendPrompt attempt ${attempt} not taken: ${enterOnly ? 'Enter only (typed, its text drawn before)' : `${paste ? 'pasted' : 'typed'}, echoed ${echoed ? 'yes' : 'no'}`}, ${input.includes(text.slice(0, 30)) ? 'its text on the last input line' : 'its text not on the last input line'}; screen ends: ${JSON.stringify(screen.slice(-300))}`)
+    const drawn = await screen()
+    const input = inputOf(drawn)
+    const lines = drawn.split('\n').filter((l) => l.trim())
+    console.log(`INFO sendPrompt attempt ${attempt} not taken: ${enterOnly ? 'Enter only (typed, its text drawn before)' : `${paste ? 'pasted' : 'typed'}, drawn ${echoed ? 'yes' : 'no'}`}, ${drawnCount(input, text) > 0 ? 'its end on the last input line' : 'its end not on the last input line'}; screen ends: ${JSON.stringify(lines.slice(-8).join('\n'))}`)
   }
   return 0
 }
+
+/** The longest sendPrompt waits for a CLI to draw what it wrote, or to clear it: a bound for a CLI that never does, not how long it takes. */
+const DRAWN_MS = timing('pace.promptDrawnMs')
 
 /**
  * Whether Combwork's log in a test profile (CW_USER_DATA) says an agent's Combwork tools connected (#865), at or after
@@ -1419,7 +1858,7 @@ const combworkToolsConnected = (userData, agentId, since = 0) => combworkLogLine
  * The longest a fake Claude Code's prompt waits to be taken, or its turn to end: a bound for a hung run, never how long
  * it should take (#570). Under load the fake took a prompt 10 s after it was typed (#672).
  */
-const TURN_HUNG_MS = 60000
+const TURN_HUNG_MS = timing('turn.fakeMs')
 
 /** Whether a fake Claude Code takes a prompt now, by its session:live entry: idle, its turn not running. */
 const FAKE_IDLE = (s) => ['ready', 'finished', 'watching', 'background'].includes(s?.status) && s?.turn?.state !== 'running'
@@ -1639,7 +2078,7 @@ function fakePrompts(inv, key, live, { hungMs = TURN_HUNG_MS, home = null, why =
     if (home && fs.existsSync(path.join(home, 'fake-log-input.txt'))) await typeLine(inv, key, home, null, text, { live, ready: takesPrompts, hungMs })
     else {
       await inv('pty:write', key, text)
-      await sleep(300)
+      await sleep(timing('pace.typedEnterMs')) // on purpose: its Enter after the line, as the comment above says
       await inv('pty:write', key, '\r')
     }
     return { text, before, items }
@@ -1694,7 +2133,7 @@ const GIT_LOCKED = /Unable to create '[^']+\.lock': (File exists|Permission deni
  * machine, #298). That alone is tried again every 100 ms for up to timeoutMs; any other failure throws at once.
  * opts: execSync's (input, env…).
  */
-function git(cwd, cmd, { timeoutMs = 15_000, ...opts } = {}) {
+function git(cwd, cmd, { timeoutMs = timing('git.lockRetryMs'), ...opts } = {}) {
   const start = Date.now()
   let tries = 0
   for (;;) {
@@ -2069,6 +2508,35 @@ async function agentMenu(page, name, ms = 10000) {
   return (await page.locator('.menu .menu-item').allInnerTexts()).map((t) => t.trim())
 }
 
+/**
+ * Tells the first window its language changed, as main does (language-changed): `base` (app:info's language) in `code`,
+ * with its translations from locales/<code>, or `base` itself when no code is given. Main reads the catalogue itself
+ * and only the code crosses Playwright's channel (HI-3428): a whole catalogue (about 1.4 MB) sent through app.evaluate
+ * goes by Node's inspector, whose I/O thread crashed the test app's main process under a full run's load (an access
+ * violation on InspectorIo, rc.15's jjwindow). `base`'s own translations are never sent either (HI-3434: a test app
+ * started in Japanese has its catalogue in app:info's language): with no code, a `base` that has some is told by its own
+ * code, main reading them again, and keeps its locale. Returns the catalogue, for the text a step expects.
+ */
+async function speakLanguage(app, base, code) {
+  if (!code && Object.keys(base?.messages ?? {}).length) code = base.code
+  const dir = code ? path.join(ROOT, 'locales', code) : null
+  if (dir) base = { ...base, messages: {} }
+  await app.evaluate(
+    ({ BrowserWindow }, said) => {
+      let language = said.base
+      if (said.dir) {
+        const files = process.getBuiltinModule('fs')
+        const p = process.getBuiltinModule('path')
+        const messages = Object.assign({}, ...files.readdirSync(said.dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(files.readFileSync(p.join(said.dir, f), 'utf8'))))
+        language = { ...said.base, code: said.code, locale: said.code === said.base.code ? said.base.locale : said.code, messages }
+      }
+      BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'language-changed', language })
+    },
+    { base, code, dir }
+  )
+  return dir ? Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')))) : null
+}
+
 /** Runs the session toolbar's + Add ▾ entry with this label (#975); `then`: an entry of the menu it opens (Templates ▸ → Save Template…). */
 async function addMenuRun(page, label, then, ms = 10000) {
   await page.locator('.session-toolbar .add-menu').click()
@@ -2079,4 +2547,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { timing, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, speakLanguage, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, pageFocused, realFocus, openWorkspace, trustWorktrees, hadEstimate, fitWindow, stubFocus, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven, animationsDone, exitWithin }

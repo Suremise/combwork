@@ -1,9 +1,12 @@
 /**
  * When what the Sandbox driver (drive.cjs) reads is ready: conditions Combwork itself says are met, never a quiet spell
  * (tests/README.md: wait for Combwork to settle, not for a quiet spell). Each wait is bounded and gives null when it expires,
- * which the driver turns into a failed check, never a read of whatever is there. Node built-ins only: it runs inside the
+ * which the driver turns into a failed check, never a read of whatever is there. Node built-ins and the tests' timing.cjs only: it runs inside the
  * Sandbox, and the unit tests (tests/sandboxChecks.test.ts) load it with stand-ins for the window and the Agent API.
  */
+// Its bounds by name from the tests' timing file (HI-3393), a file of Combwork's own beside it: the tests folder is mapped
+// whole into the Sandbox.
+const { timing } = require(require('path').join(__dirname, '..', '..', 'timing.cjs'))
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 /** fn's first truthy value, polled every `every` ms; null once ms have passed. A throw counts as not yet. */
@@ -17,6 +20,15 @@ async function until(fn, ms, every = 250) {
   }
 }
 
+/**
+ * p's value, or null once ms have passed: for a page call that may never settle (HI-3459: a window that draws no frame
+ * never runs its rAF). Its timer is cleared once settled, or the step's process would stay up until it fired.
+ */
+function within(p, ms) {
+  let t
+  return Promise.race([p, new Promise(r => { t = setTimeout(() => r(null), ms) })]).finally(() => clearTimeout(t))
+}
+
 const sameFolder = (a, b) => typeof a === 'string' && typeof b === 'string' && a.replace(/[\\/]+$/, '').toLowerCase() === b.replace(/[\\/]+$/, '').toLowerCase()
 
 /**
@@ -24,7 +36,7 @@ const sameFolder = (a, b) => typeof a === 'string' && typeof b === 'string' && a
  * replies with only once the open has brought the bundled skills and modes up to date (servers.ts combworkSkillsNow, which
  * awaits the workspace's itemsUpToDate: workspace.ts's work after an open). `status` reads /v1/status. Gives the reply.
  */
-function workspaceSetUp(status, folder, ms = 60_000, every = 250) {
+function workspaceSetUp(status, folder, ms = timing('hang.step'), every = 250) {
   return until(async () => {
     const s = await status()
     return s && sameFolder(s.workspace?.path, folder) && Array.isArray(s.guidance?.skills) && s.guidance.skills.length > 0 ? s : null
@@ -52,7 +64,7 @@ const VIEWS = [
   { name: 'Assistant', slug: 'assistant', ready: ['.sessions-list .sessions-tree'], loading: ['.main-area .empty-state .codicon-loading'] }
 ]
 /** The view is shown and loaded: `count(selector)` counts matches in the window. Gives true, or null when ms pass. */
-function viewReady(view, count, ms = 20_000, every = 250) {
+function viewReady(view, count, ms = timing('hang.ui'), every = 250) {
   return until(async () => {
     for (const s of view.ready) if (!((await count(s)) > 0)) return false
     for (const s of view.loading) if ((await count(s)) > 0) return false
@@ -72,4 +84,4 @@ const pickBridge = (wanted, has) => wanted.find((n) => Array.isArray(has) && has
  */
 const releasesStarted = (log, re) => [...new Set([...String(log ?? '').matchAll(re)].map((m) => `${m[1]} ${m[2]}`))]
 
-module.exports = { sleep, until, sameFolder, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted }
+module.exports = { sleep, until, within, sameFolder, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted }

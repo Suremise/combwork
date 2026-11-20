@@ -13,7 +13,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const results = []
 const check = (name, ok) => results.push(`${ok ? 'PASS' : 'FAIL'}  ${name}`)
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
@@ -49,16 +49,16 @@ async function launch(name, config) {
  * Combwork quits: it decides to (its own quit work done, timed from the watch's start) within ms, and its process ends after.
  * The process's part is Electron's on a loaded machine, so it is only waited for, up to GONE_MS (#424).
  */
-const GONE_MS = 30000
+const GONE_MS = lib.timing('app.closeMs')
 const quits = async (q, ms = 10000) => !!(await q.untilDecided(ms)) && (await q.gone(GONE_MS))
 /**
  * Until n sessions are ready (idle), not just past starting: in a folder Claude Code hasn't seen, its trust question
  * shows the session as waiting (Needs your input) until acceptClaudeTrust's answer gets it to its prompt (#177).
  */
-const untilReady = (inv, n) => lib.until(async () => (await inv('session:live')).filter((l) => l.status === 'ready').length >= n, 30000)
+const untilReady = (inv, n) => lib.until(async () => (await inv('session:live')).filter((l) => l.status === 'ready').length >= n, lib.timing('hang.step'))
 /** Closes a copy that didn't quit by itself: app.close() alone waits at its Quit dialog for ever. */
 const forceClose = async (app) => {
-  await Promise.race([app.close().catch(() => undefined), sleep(5000)])
+  await Promise.race([app.close().catch(() => undefined), sleep(lib.timing('pace.closeThenKillMs'))])
   try {
     app.process().kill()
   } catch {
@@ -135,7 +135,7 @@ const forceClose = async (app) => {
     const closed = await quits(q)
     check('idle + default: quits without asking', closed)
     // Combwork's own shutdown (stopping the session, up to 3 s, and saving), not the process's teardown after it.
-    const decided = await q.untilDecided(0)
+    const decided = q.decidedAt()
     check('idle + default: shutdown under 5 s', !!decided && decided - t0 < 5000)
     results.push(`INFO  idle + default: ${q.timings(t0)}`)
     // It asked instead: close it, or it stays open (at the dialog) after the suite, holding the runner's port.

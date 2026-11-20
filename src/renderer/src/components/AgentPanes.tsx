@@ -1713,7 +1713,7 @@ export function PaneFooter({
         </Tooltip>
       )
     })
-  // Free (HI-1772, Darren 27 Oct): its conversation ran only on servers on this PC.
+  // Free (HI-1772): its conversation ran only on servers on this PC.
   if (live?.costFree)
     right.push({
       key: 'cost',
@@ -1814,7 +1814,7 @@ export function PaneFooter({
 const CONNECTION_TEXT = {
   email: msg({ id: 'panes.footer.connectionEmail', defaultMessage: 'Signed in as {email}.', description: "Added to the hover of a pane footer's connection (HI-1756): the login the connection is signed in as ({email}: its email address)." }),
   tip: msg({ id: 'panes.footer.connectionTip', defaultMessage: 'Runs on the connection {name}.', description: "Hover of the connection in a pane's footer (HI-1755): the connection this session launched on ({name})." }),
-  offFallback: msg({ id: 'panes.footer.connectionOffHere', defaultMessage: "The connection chosen for it is on an account that's off in this workspace, so it runs on its CLI's first usable connection.", description: "Added to the hover of a pane footer's connection (HI-2108): the agent's own connection is on an account turned off in this workspace, so its CLI's first usable connection runs it." }),
+  offFallback: msg({ id: 'panes.footer.connectionOffHere', defaultMessage: "The connection chosen for it is on an account that's off in this workspace, so it runs on the first account that's on here: on the connection there with the same tag, else the same name, else that account's first.", description: "Added to the hover of a pane footer's connection (HI-2108, HI-3213): the agent's own connection is on an account turned off in this workspace, so it runs on the first account on here, on the connection matched there: the same tag (a label set on connections, such as Builders), else the same name, else that account's first connection." }),
   missing: msg({ id: 'panes.footer.connectionRemoved', defaultMessage: "The connection chosen for it was removed, so it runs on its CLI's first usable connection. Choose another in its Agent Settings.", description: "Added to the hover of a pane footer's connection (HI-2108): the agent's connection was removed, so its CLI's first usable connection runs it. Agent Settings names a dialog." }),
   unknownLogin: msg({ id: 'panes.footer.connectionUnknown', defaultMessage: "Combwork couldn't check who this connection is signed in as when it started.", description: "Added to the hover of a pane footer's connection: the connection's sign-in couldn't be checked at launch (not the same as signed out)." }),
   loginChanged: msg({ id: 'panes.footer.connectionChanged', defaultMessage: 'Its login changed since it was added: see Settings → Accounts & Connections.', description: "Added to the hover of a pane footer's connection: its account is signed in as another login than the one it was added with. Settings → Accounts & Connections names a section." }),

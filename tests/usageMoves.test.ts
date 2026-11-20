@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Account, AgentDef, Connection, PlanLimit, ProjectConfig, UsageMoveRule } from '../src/shared/types'
 import { tempRoot } from './tempDir'
+import { timing } from './timing.cjs'
 
 /**
  * HI-2195: an account's usage move. The pure rules (shared/usageMoves.ts), how a usage move and HI-1755's own switch share
@@ -125,10 +126,13 @@ const { accountUsageText } = await import('../src/shared/toolReplies')
 
 const HOUR = 3600e3
 // The longest a wait here waits: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const ahead = (h: number): string => new Date(Date.now() + h * HOUR).toISOString()
 const weekly = (used: number, resetsAt = ahead(48)): PlanLimit => ({ id: 'seven_day', label: 'weekly', windowMinutes: 10080, usedPercent: used, resetsAt })
 const fiveHour = (used: number, resetsAt = ahead(2)): PlanLimit => ({ id: 'five_hour', label: '5-hour', windowMinutes: 300, usedPercent: used, resetsAt })
+/** Codex's limit for some models (HI-1125: its own `limit_id`, kept in a 5-hour or weekly window), and Antigravity's per-model weekly quota (HI-2734). */
+const scoped = (used: number, window = 300, resetsAt = ahead(2)): PlanLimit => ({ id: `spark/w${window}`, label: 'GPT-5-Codex-Spark', windowMinutes: window, usedPercent: used, resetsAt, scope: 'GPT-5-Codex-Spark' })
+const modelQuota = (used: number, resetsAt = ahead(48)): PlanLimit => ({ id: 'gemini', label: 'gemini', windowMinutes: 10080, usedPercent: used, resetsAt, models: 'gemini' })
 
 const account = (id: string, name: string, extra: Partial<Account> = {}): Account => ({ id, provider: 'claude-code', name, createdAt: '2026-10-01T00:00:00Z', observed: { at: '2026-10-31T00:00:00Z', loggedIn: true }, ...extra })
 const conn = (id: string, acc: string, name: string, tag?: string): Connection => ({ id, account: acc, name, ...(tag !== undefined ? { tag } : {}) })
@@ -145,6 +149,13 @@ describe('the rules (shared/usageMoves.ts)', () => {
   })
   it('a rule watches its kind of limit, or (any) the weekly and 5-hour ones each on its own', () => {
     const limits = [weekly(10), fiveHour(99), { ...weekly(5), id: 'other', windowMinutes: 60 }]
+    expect(U.ruleLimits({ limit: 'weekly' }, limits).map((l) => l.id)).toEqual(['seven_day'])
+    expect(U.ruleLimits({ limit: 'fiveHour' }, limits).map((l) => l.id)).toEqual(['five_hour'])
+    expect(U.ruleLimits({ limit: 'any' }, limits).map((l) => l.id)).toEqual(['seven_day', 'five_hour'])
+  })
+  it("never watches a limit of part of the plan (HI-3262, option (a)): a Codex model's limit or a per-model quota, whatever its window", () => {
+    const limits = [scoped(99), scoped(99, 10080), modelQuota(99), weekly(10), fiveHour(20)]
+    for (const l of [scoped(99), scoped(99, 10080), modelQuota(99)]) expect(U.limitKind(l)).toBeNull()
     expect(U.ruleLimits({ limit: 'weekly' }, limits).map((l) => l.id)).toEqual(['seven_day'])
     expect(U.ruleLimits({ limit: 'fiveHour' }, limits).map((l) => l.id)).toEqual(['five_hour'])
     expect(U.ruleLimits({ limit: 'any' }, limits).map((l) => l.id)).toEqual(['seven_day', 'five_hour'])
@@ -185,6 +196,8 @@ describe('the rules (shared/usageMoves.ts)', () => {
     expect(U.targetProblem(a1, RULE, [a1, account('a2', 'Two')], [], undefined, now)).toBe('noConnections')
     expect(U.targetProblem(a1, RULE, [a1, account('a2', 'Two')], cs, { limits: [weekly(99)] }, now)).toBe('full')
     expect(U.targetProblem(a1, RULE, [a1, account('a2', 'Two')], cs, { limits: [weekly(50)] }, now)).toBeNull()
+    // A target full only on a model's limit (HI-3262) can take them: its own limits are what count.
+    expect(U.targetProblem(a1, RULE, [a1, account('a2', 'Two')], cs, { limits: [weekly(50), scoped(100, 10080), modelQuota(100)] }, now)).toBeNull()
   })
 })
 
@@ -320,6 +333,19 @@ describe('usageMoves.ts', () => {
     setUsage('a1', [weekly(3, ahead(48 + 168))])
     await settle()
     expect(pc.agents.map((a) => a.connection)).toEqual(['c2b', 'c2b', 'c2', 'c3'])
+  })
+
+  it("moves no one when only a limit of part of the plan reaches the share (HI-3262): a Codex model's limit, a per-model quota", async () => {
+    config.update((c) => (c.accounts = c.accounts!.map((a) => (a.id === 'a1' ? { ...a, usageMove: { ...RULE, limit: 'any' } } : a))))
+    setUsage('a1', [weekly(40), fiveHour(30), scoped(99.5), scoped(99.5, 10080), modelQuota(100)])
+    await settle()
+    expect(pc.agents.map((a) => a.connection)).toEqual(['c1b', 'c1b', undefined, 'c3'])
+    expect(S.quits).toEqual([])
+    expect(H.notices).toEqual([])
+    // The account's own limit reaching it still moves them.
+    setUsage('a1', [weekly(40), fiveHour(98.5), scoped(99.5)])
+    await settle()
+    await vi.waitFor(() => expect(connectionOf('idle')).toBe('c2b'), { timeout: HUNG_MS })
   })
 
   it('moves the Assistant too (HI-2530), only once its turn is over, to the same-tagged connection, and never back', async () => {
@@ -615,6 +641,10 @@ describe('the usage watch and the listing', () => {
     expect(usageWakeLine(hits)).toMatch(/^\[CW\] Usage reached: Anthropic-1: weekly 98%/)
     expect(readSavedUsage(watch)).toEqual(watch)
     expect(readSavedUsage([{ ...watch[0], percent: 0 }])).toBeNull()
+    // A model's limit at the share (HI-3262) never wakes it, nor is it named "the 5-hour limit": the account's own limits only.
+    const any = [{ account: 'a1', name: 'Codex-1', percent: 98, limit: 'any' as const }]
+    expect(usageHits(any, () => [scoped(99.5), scoped(99.5, 10080), modelQuota(100), weekly(10)], Date.now())).toEqual([])
+    expect(usageHits(any, () => [scoped(99.5), fiveHour(98.5, '2026-11-02T09:00:00.000Z')], Date.parse('2026-11-01T00:00:00Z'))).toEqual(['Codex-1: 5-hour 98.5% (resets 2026-11-02T09:00Z)'])
   })
   it("cw_connection list's line gives the limits and the move", () => {
     expect(accountUsageText({ account: 'Anthropic-1', limits: [{ label: 'weekly', usedPercent: 95, resetsAt: '2026-11-02T09:00:00.000Z' }], move: { percent: 98, limit: 'weekly', to: 'Anthropic-2' } })).toBe('Usage of Anthropic-1: weekly 95% (resets 2026-11-02T09:00Z); moves its agents to Anthropic-2 at 98% of the weekly limit')

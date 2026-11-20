@@ -628,6 +628,7 @@ const W = {
   loopReply: agentMsg({ id: 'wake.loop.reply', text: 'You review this card in its loop: carry on with your review', note: "HI-2302: a loop wake telling a reviewer its builder's reply." }),
   loopAnswer: agentMsg({ id: 'wake.loop.answer', text: 'The user answered: carry on from where you asked', note: "#1269: a wake with the user's answer to an agent's question." }),
   loopOwn: agentMsg({ id: 'wake.loop.own', text: 'This is your card in its loop: carry on', note: "#405: what a loop wake tells a card's builder (a verdict, a request, a note)." }),
+  loopWatchOn: agentMsg({ id: 'wake.loop.watchOn', text: "This is your card loop's handoff (Wake reviewers and builders), not your card watch, which is still on.", note: "HI-3211: after a loop wake's line, when the agent's own card watch on the card is still on and hasn't fired: the wake came from the loop, so the watch's filter (changes) wasn't broken. Wake reviewers and builders is a workflow option's title: keep it as written." }),
   loopTail: agentMsg({ id: 'wake.loop.tail', text: '. {who} (cw_read_task with latestComment for the comment in full).', note: "#405: the end of a loop wake: who is what it tells the agent (wake.loop.review…, or its lane's next card)." }),
   loopSaid: agentMsg({ id: 'wake.loop.said', text: '. {whose, select, reviewerAsks {The reviewer asks} builderReplies {The builder replies} builder {The builder} reviewer {The reviewer} other {Combwork}}: "{text}"', note: "#912, #1382: in a loop wake, what a request, step or Combwork's note says (cut with … to fit), and whose it is." }),
   lanePaused: agentMsg({ id: 'wake.lane.paused', text: 'Your lane is paused: cw_lane next says why', note: "HI-1990: a builder's Done wake when its lane is paused." }),
@@ -714,7 +715,10 @@ export const ANSWER_MAX = 4000
  */
 export const isReturnNote = (kind: LoopWakeKind, text?: string): boolean => kind === 'note' && !!text && text.replace(/\s+/g, ' ').includes(` ${CAME_BACK}: `)
 
-export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string, next?: string): string {
+export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string, next?: string, watchOn = false): string {
+  // HI-3211: a loop wake isn't the agent's card watch firing, whose filter may leave this out; said so,
+  // and that the watch is still on, when it is.
+  const still = watchOn ? ` ${say(W.loopWatchOn)}` : ''
   const who =
     kind === 'done' && next ? next : say(kind === 'review' ? W.loopReview : kind === 'step' ? W.loopStep : kind === 'stepNotice' ? W.loopStepNotice : kind === 'reply' ? W.loopReply : kind === 'answer' ? W.loopAnswer : W.loopOwn)
   // A reviewer's request (#912), a card loop's step (#1382) or Combwork's own note (stale, an answer, what came back from the
@@ -725,9 +729,9 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
   const tail = say(W.loopTail, { who })
   // HI-2087: Combwork's note that the merge queue returned the card leads the line, as a watch's does: its column and the
   // review's pass first made HB2 take HI-2046 for merged.
-  if (isReturnNote(kind, text)) return lineOf({ ...change, about: { owner: null, verdict: null, ...change.about, queueReturn: said.slice(0, max).join('') } }, tail)
+  if (isReturnNote(kind, text)) return `${lineOf({ ...change, about: { owner: null, verdict: null, ...change.about, queueReturn: said.slice(0, max).join('') } }, tail)}${still}`
   const what = !said.length ? '' : say(W.loopSaid, { whose, text: said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('') })
-  return lineOf(change, `${what}${tail}`)
+  return `${lineOf(change, `${what}${tail}`)}${still}`
 }
 
 /**

@@ -12,7 +12,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 /** A suite's queue project, its folders under the suite's work folder (`name-…`). */
 function queueProject(name) {
@@ -123,6 +123,16 @@ async function agent(fx, h, name, { worktree = false, project = fx.alpha, workfl
  * comes: { launch, token }, or null if none came.
  */
 async function liveToken(fx, live, where = () => true, stale = null) {
+  return lib.until(async () => {
+    const s = await live()
+    if (!s?.runId || !where(s)) return null
+    const got = runToken(fx, s.runId)
+    return got && got.token !== stale ? got : null
+  }, HUNG_MS, 200)
+}
+
+/** Run `runId`'s launch and its token, read now: { launch, token }, or null while either isn't there (yet, or any more). */
+function runToken(fx, runId) {
   const read = (file) => {
     try {
       return JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -130,14 +140,10 @@ async function liveToken(fx, live, where = () => true, stale = null) {
       return null
     }
   }
-  return lib.until(async () => {
-    const s = await live()
-    if (!s?.runId || !where(s)) return null
-    const launch = launches(fx).find((l) => l.opts['--mcp-config'] && path.basename(path.dirname(l.opts['--mcp-config'])) === s.runId)
-    const server = launch ? read(launch.opts['--mcp-config'])?.mcpServers?.combwork : null
-    const token = server ? read(server.env.CW_API_TOKEN_FILE)?.token : null
-    return token && token !== stale ? { launch, token } : null
-  }, HUNG_MS, 200)
+  const launch = launches(fx).find((l) => l.opts['--mcp-config'] && path.basename(path.dirname(l.opts['--mcp-config'])) === runId)
+  const server = launch ? read(launch.opts['--mcp-config'])?.mcpServers?.combwork : null
+  const token = server ? read(server.env.CW_API_TOKEN_FILE)?.token : null
+  return token ? { launch, token } : null
 }
 
 /**
@@ -201,10 +207,21 @@ async function startCard(fx, h, builder, n) {
   let start = null
   // No slot free yet (the last card's: its builder's session there just ended with its lease, until its processes are
   // known to have ended): as an agent told "Wait for a slot to be free", started again once one is (a few times at most).
-  // A start sent as Combwork stops it (401, its token ended with that session): once it has, started again.
-  for (let tries = 0; tries < 4 && (!start || start.status === 401 || start.body?.rule === 'start.slotAvailable'); tries++) {
-    if (start?.status === 401) await lib.until(async () => !(await live()), HUNG_MS, 200)
-    else if (start) await lib.until(free, HUNG_MS, 200)
+  // A start sent as Combwork stops its run (the last card's Done ends it with its lease) is refused: 401 once its token has
+  // ended, or, its token ending while the start was in flight, 409 attempt.staleLaunch (HI-3344: HI-3194's fence checks the
+  // launch again at the write). Either way that run is over: once it has gone (or a newer one is live, whose token is
+  // taken), started again.
+  const ended = (r) => r?.status === 401 || r?.body?.rule === 'attempt.staleLaunch'
+  for (let tries = 0; tries < 4 && (!start || ended(start) || start.body?.rule === 'start.slotAvailable'); tries++) {
+    if (ended(start)) {
+      const now = await lib.until(async () => {
+        const s = await live()
+        if (!s) return 'gone'
+        const t = s.runId ? runToken(fx, s.runId)?.token : null
+        return t && t !== builder.token ? t : null
+      }, HUNG_MS, 200)
+      if (now && now !== 'gone') builder.token = now
+    } else if (start) await lib.until(free, HUNG_MS, 200)
     // Stopped by Combwork meanwhile (its session ended with its slot's lease, as a card's Done or its recovery after a seam
     // ends it): started again, with its new launch's token.
     if (!(await live())) Object.assign(builder, await rejoin(fx, h, builder))
@@ -253,12 +270,13 @@ async function intent(h, who, n, name, body = {}) {
 
 /**
  * intent() for an agent a workflow change may have restarted (HI-2740): HI-2694 restarts an idle agent whose tool list
- * the change alters, and its new launch has a token of its own, the old one refused (401). Refused so: the new run's
- * token is read (renewed), kept in `who`, and the intent sent again with it. Any other reply is returned as it is.
+ * the change alters, and its new launch has a token of its own, the old one refused (401, or 409 attempt.staleLaunch when
+ * the restart came while the intent was in flight: HI-3344). Refused so: the new run's token is read (renewed), kept in
+ * `who`, and the intent sent again with it. Any other reply is returned as it is.
  */
 async function act(fx, h, who, n, name, body = {}, project = fx.alpha) {
   const first = await intent(h, who, n, name, body)
-  if (first.status !== 401) return first
+  if (first.status !== 401 && first.body?.rule !== 'attempt.staleLaunch') return first
   const got = await renewed(fx, h, who, project)
   if (!got.token) return first
   who.token = got.token

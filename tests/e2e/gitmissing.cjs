@@ -6,7 +6,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'gitmissing-profile')
 const ws = path.join(lib.WORK, 'gitmissing-ws')
@@ -48,23 +48,23 @@ function pathWithoutGit() {
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `gitmissing-${name}.png`) })
   const theme = async (t) => {
     await inv('settings:update', { appearance: { theme: t } })
-    await lib.sleep(300)
+    await lib.themeSettled(page, t)
   }
 
   // --- Git itself.
   const tool = await lib.until(async () => {
     const t = await inv('git:tool', true)
     return t.state === 'missing' ? t : null
-  }, 15000)
+  }, lib.timing('hang.ui'))
   check('Combwork finds git missing', !!tool, JSON.stringify(await inv('git:tool')))
   const item = page.locator('.statusbar .status-item.warn', { hasText: 'Git' })
-  check('the status bar shows it', !!(await lib.until(async () => (await item.count()) === 1, 10000)))
+  check('the status bar shows it', !!(await lib.until(async () => (await item.count()) === 1, lib.timing('hang.ui'))))
 
   // --- Provider Setup: the Git row, both themes.
   await item.click()
   const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
   const row = setup.locator('.setup-git[data-git="missing"]')
-  check("the status bar item opens Provider Setup, with Git's row", !!(await lib.until(async () => (await row.count()) === 1, 10000)))
+  check("the status bar item opens Provider Setup, with Git's row", !!(await lib.until(async () => (await row.count()) === 1, lib.timing('hang.ui'))))
   const rowText = await row.innerText().catch(() => '')
   check('…"Git not found", the fix and Git for Windows', rowText.includes('Git not found') && rowText.includes('Install Git for Windows') && (await row.locator('button', { hasText: 'Git for Windows' }).count()) === 1, rowText)
   await shot('setup-dark')
@@ -80,7 +80,7 @@ function pathWithoutGit() {
   await page.getByText('repo', { exact: true }).first().click()
   await lib.addMenuRun(page, 'Configure Agent and Add…')
   const add = page.locator('.dialog', { hasText: 'Add an agent' })
-  await lib.until(async () => (await add.count()) === 1, 5000)
+  await lib.until(async () => (await add.count()) === 1, lib.timing('hang.ui'))
   check('Add Agent: no worktree choice to turn off (#1442)', (await add.locator('.choice', { hasText: /New worktree|Existing worktree/ }).count()) === 0 && (await add.locator('[data-where-note]').count()) === 1, await add.innerText())
   await shot('addagent')
   await page.keyboard.press('Escape')
@@ -94,7 +94,7 @@ function pathWithoutGit() {
   check('git:status: git missing, not "not a repository"', status.gitProblem === MISSING, JSON.stringify(status))
   await page.locator('.tab', { hasText: 'Version Control' }).click()
   const view = page.locator('.changes-git-missing')
-  check('the Changes tab says git is missing, with the fix', !!(await lib.until(async () => (await view.count()) === 1, 8000)) && (await view.innerText()).includes(MISSING) && (await page.getByText('is not a git repository').count()) === 0, await view.innerText().catch(() => ''))
+  check('the Changes tab says git is missing, with the fix', !!(await lib.until(async () => (await view.count()) === 1, lib.timing('hang.ui'))) && (await view.innerText()).includes(MISSING) && (await page.getByText('is not a git repository').count()) === 0, await view.innerText().catch(() => ''))
   await shot('changes-dark')
   await theme('light')
   await shot('changes-light')
@@ -106,7 +106,7 @@ function pathWithoutGit() {
   await page.locator('.menu-item', { hasText: 'Merge…' }).click()
   const merge = page.locator('.dialog', { hasText: 'Merge' })
   const mergeErr = merge.locator('.banner.warn', { hasText: MISSING })
-  check('the Merge dialog says git is missing', !!(await lib.until(async () => (await mergeErr.count()) === 1, 8000)), await merge.innerText().catch(() => ''))
+  check('the Merge dialog says git is missing', !!(await lib.until(async () => (await mergeErr.count()) === 1, lib.timing('hang.step'))), await merge.innerText().catch(() => ''))
   check('…and nothing can be merged', (await merge.locator('.btn.primary', { hasText: 'Merge' }).isDisabled().catch(() => false)) && (await merge.getByText('There is nothing to merge').count()) === 0)
   await shot('merge')
   await page.keyboard.press('Escape')

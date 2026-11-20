@@ -94,7 +94,7 @@ function mapInputs(entries: readonly MapEntry[], contexts: ReadonlyMap<string, M
       tasks: part ? part.subagents.flatMap((n) => (n.kind === 'task' ? [{ type: n.task.type }] : [])) : [],
       processes: part ? part.processes.flatMap((n) => (n.kind === 'process' && !n.gone ? [n.process.name] : [])) : [],
       blocks: part?.blocks.length ?? 0,
-      ...(provider && providerDescriptor(provider).capabilities.activityStations ? { reported: providerDescriptor(provider).capabilities.activityStations } : {})
+      ...(provider && providerDescriptor(provider).capabilities.session?.activityStations ? { reported: providerDescriptor(provider).capabilities.session?.activityStations } : {})
     }
   })
 }
@@ -261,7 +261,7 @@ export interface ActivityMapProps {
   /** The strip's click: show this agent's map, the others still listed (HI-3180), or all again for the one shown. */
   onPick?: (key: string) => void
   /**
-   * The agents of the selection while one of them is shown alone (HI-3180, Darren's decision): the strip keeps listing
+   * The agents of the selection while one of them is shown alone (HI-3180): the strip keeps listing
    * them, that one marked (`picked`), so a click switches to another. Without it, the strip lists the shared map's.
    */
   strip?: readonly MapStripAgent[]

@@ -99,7 +99,8 @@
 //   it off (its input back, empty), Enter answers it (recorded in fake-envsetup.jsonl). With fake-input-box.txt in its
 //   home at its start, its input is 2.1.312's box (a rule, `❯` and a no-break space, a rule below). "envsetupunder": the
 //   same offer as 2.1.314 draws it (HI-2191), under its input box and footer, the empty box kept above it; "swallow": a
-//   dialog of its own Combwork doesn't know ("Choose how long replies are kept?"), drawn and answered the same way. The test making
+//   dialog of its own Combwork doesn't know ("Choose how long replies are kept?"), drawn and answered the same way;
+//   "swallowhide" (HI-3411): that dialog on a cleared screen, in its input box's place, as 2.1.312 draws its offer. The test making
 //   fake-clear-line-<agent> clears its input line while idle, as that screen took HB4's wake.
 // - Notices (#650), as Claude Code 2.1.296 takes them: context in a PostToolUse or Stop reply reaches "the model", and a
 //   Stop answered with context (or a block) carries the turn on to another Stop with stop_hook_active. Each notice
@@ -129,6 +130,8 @@
 //   it couldn't refresh: "Failed to authenticate: OAuth session expired and could not be refreshed", exit 1 (#577).
 //   With "late": true instead, nothing shows it until a prompt is sent: the prompt isn't taken (no turn, no hook) and
 //   "Not logged in · Run /login" shows under it, as Claude Code's status line did in #1321.
+// - With fake-launch-exit.json in CLAUDE_CONFIG_DIR ({ "code": n }), it exits with n once its session has started
+//   (SessionStart sent), before drawing its prompt (HI-3392).
 // - "/crash" typed in it exits with 1 at once, a CLI crashing by itself (HI-1881's stopped pane says so).
 // - `--model fail-start` makes it refuse to start, printing an error and exiting with 1, as Claude Code does for an
 //   argument it rejects.
@@ -830,6 +833,20 @@ async function runPrompt(text, enter = null) {
   // "pad N": N KB more transcript, as a long conversation has.
   const pad = /\bpad\s+(\d+)/i.exec(text)
   if (pad) write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_pad', content: 'x'.repeat(Number(pad[1]) * 1024) }] } })
+  // "fullscreen N" (HI-3252): as a full-screen renderer draws, once: the alternate screen, mouse reporting (SGR) and
+  // bracketed paste on, and a header; then N frames updating the rows under it only, so a pane made after them has to
+  // be given the screen and the modes, not the latest output alone. Each frame changes whole rows, one write each: the
+  // pseudoconsole sends on what changed, so that is what reaches Combwork (300 frames: about 600 KB).
+  const fullscreen = /\bfullscreen\s+(\d+)/i.exec(text)
+  if (fullscreen) {
+    rawOut('\x1b[?1049h\x1b[?2004h\x1b[?1000h\x1b[?1006h\x1b[2J\x1b[1;1H\x1b[1;33mFULLSCREEN HEADER\x1b[0m')
+    for (let i = 0; i < Number(fullscreen[1]); i++) {
+      let f = `\x1b[2;1H\x1b[32mframe ${i}\x1b[0m\x1b[K`
+      for (let r = 3; r <= 30; r++) f += `\x1b[${r};1H${String(i * 31 + r).repeat(25).slice(0, 100)}`
+      rawOut(f)
+      await sleep(0)
+    }
+  }
   // Steps joined by "then" run in order ("work N" in a step waits N seconds before the next).
   const steps = text.split(/\s+then\s+/i)
   for (const [i, step] of steps.entries()) {
@@ -879,6 +896,8 @@ async function runPrompt(text, enter = null) {
   if (linger) leaveRunning(Number(linger[1]))
   if (/\bhidden-linger\b/i.test(text)) leaveUnnamedRunning()
   if (/\bprogress-linger\b/i.test(text)) await leaveProgressRunning(!/\bnowait\b/i.test(text))
+  const progressOrphan = /\bprogress-orphan\s+(\d+)/i.exec(text)
+  if (progressOrphan) leaveProgressOrphan(Number(progressOrphan[1]))
   if (/\bdevapp\b/i.test(text)) leaveAppRunning()
   const secs = Number(/\bwork\s+(\d+)/i.exec(text)?.[1] ?? 1)
   await sleep(secs * 1000)
@@ -898,6 +917,7 @@ async function runPrompt(text, enter = null) {
   if (/\benvsetup\b/i.test(text)) envSetup()
   if (/\benvsetupunder\b/i.test(text)) envSetup(ENV_SETUP_TITLE)
   if (/\bswallow\b/i.test(text)) envSetup(SWALLOW_TITLE)
+  if (/\bswallowhide\b/i.test(text)) envSetup(null, SWALLOW_TITLE)
   // "statusmodel ID": the status line reports the model it runs as ID, as Claude Code's does (HI-1772: a server's model).
   const statusModel = /\bstatusmodel\s+(\S+)/i.exec(text)
   if (statusModel) await statusLine({ model: { id: statusModel[1], display_name: statusModel[1] } })
@@ -982,9 +1002,10 @@ const ENV_SETUP_TITLE = 'Teach auto mode about your environment?'
 const SWALLOW_TITLE = 'Choose how long replies are kept?'
 /**
  * `under`: as Claude Code 2.1.314 draws it (HI-2191, recorded), under its input box and footer, the box (empty) kept above
- * it; the dialog titled `under`. Otherwise 2.1.312's, on a cleared screen.
+ * it; the dialog titled `under`. Otherwise 2.1.312's, on a cleared screen, titled `title` ("swallowhide", HI-3411: a dialog
+ * Combwork doesn't know in its input box's place).
  */
-function envSetup(under = null) {
+function envSetup(under = null, title = ENV_SETUP_TITLE) {
   envSetupOpen = true
   envSetupUnder = under
   if (under) {
@@ -993,7 +1014,7 @@ function envSetup(under = null) {
   }
   // In place of its input box, which the cleared screen takes with it (HI-1979: not drawn back under the question).
   boxShown = false
-  out("\x1b[2J\x1b[H Teach auto mode about your environment?\r\n\r\n Auto mode works better when it knows your environment. Takes about a minute.\r\n\r\n ❯ 1. Yes\r\n   2. Not now\r\n   3. Don't show again\r\n\r\n Enter to select · ↑/↓ to navigate · Esc to cancel\r\n")
+  out(`\x1b[2J\x1b[H ${title}\r\n\r\n Auto mode works better when it knows your environment. Takes about a minute.\r\n\r\n ❯ 1. Yes\r\n   2. Not now\r\n   3. Don't show again\r\n\r\n Enter to select · ↑/↓ to navigate · Esc to cancel\r\n`)
 }
 function envSetupAnswered(answer) {
   envSetupOpen = false
@@ -1586,6 +1607,16 @@ function leaveAppRunning() {
  * each minute, missed them). fake-progress-delay-ms.txt (N) starts the command N ms late, as a machine under load does.
  * wait false ("progress-linger nowait"): the turn ends at once, the command still to start, as a real agent's may be (#1134).
  */
+/**
+ * "progress-orphan N" (HI-3206): a cw-progress run whose shell is gone while it runs: a short-lived starter starts
+ * cmd → cw-progress --title "Sandbox cycle" → a child that keeps a detached "linger" for N seconds, then exits; so the
+ * run's wrapper has no living parent while the run is live, and once the run ends the linger is what it left behind (its
+ * pid in fake-progress-orphan.jsonl in its home). Not waited for.
+ */
+function leaveProgressOrphan(seconds) {
+  spawn(process.execPath, [path.join(__dirname, 'linger.cjs'), 'progress-starter', path.join(home, 'fake-progress-orphan.jsonl'), process.env.CW_AGENT || 'agent', String(seconds)], { cwd, env: process.env, detached: true, stdio: 'ignore', windowsHide: true }).unref()
+}
+
 async function leaveProgressRunning(wait = true) {
   const q = (x) => `"${x}"`
   const pids = path.join(home, 'fake-progress-linger.jsonl')
@@ -1646,9 +1677,28 @@ async function main() {
     : null
   void connectOwnServer(server, held)
   await sessionStart(opts['--resume'] ? 'resume' : 'startup')
+  // HI-3392: fake-launch-exit.json in CLAUDE_CONFIG_DIR ({ "code": n }): it exits with n once its session has started
+  // (its SessionStart hook sent), before it draws its prompt, as Claude Code 2.1.327's blank starts in model trials did:
+  // Combwork keeps such a session, stopped.
+  const launchExit = (() => {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(process.env.CLAUDE_CONFIG_DIR || '', 'fake-launch-exit.json'), 'utf8'))
+    } catch {
+      return null
+    }
+  })()
+  if (launchExit) {
+    process.exit(Number(launchExit.code ?? 1))
+    return
+  }
   promptLine()
   setInterval(() => void whileIdle(), 200)
   if (firstPrompt && take('fake-launch-hold')) while (!take('fake-launch-go')) await sleep(100)
-  if (firstPrompt) await runPrompt(firstPrompt)
+  // Never beside a turn already running (a line typed before it began): Claude Code runs one turn at a time (HI-3416: the
+  // two ran at once, sharing its prompt_id, and the task's reply landed after the next prompt, chained to it).
+  if (firstPrompt) {
+    while (isBusy()) await sleep(100)
+    await runPrompt(firstPrompt)
+  }
 }
 void main()

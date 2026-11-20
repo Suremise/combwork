@@ -12,7 +12,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'boardgates-profile')
 const ws = path.join(lib.WORK, 'boardgates-ws')
@@ -210,7 +210,7 @@ const check = (name, ok, extra = '') => {
     await startAsk.screenshot({ path: path.join(lib.WORK, 'boardgates-start-ask-dark.png') })
     await startAsk.getByRole('button', { name: 'Cancel' }).click()
     await lib.until(async () => (await startAsk.count()) === 0, HUNG_MS)
-    await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing starts after Cancel.
+    await lib.sleep(lib.timing('quiet.noStartMs')) // A quiet window on purpose: this checks that nothing starts after Cancel.
     check('Cancel: nothing done, no agent started', (await card(s))?.column === 'todo' && !(await facts(s)).includes('Started') && !(await facts(s)).includes('Override') && (await live()) === liveBefore, JSON.stringify({ column: (await card(s))?.column, facts: await facts(s), live: await live(), liveBefore }))
     // The Move to Active dialog may still be open behind it (the start didn't happen): close it.
     if (await doingDialog.count()) await doingDialog.getByRole('button', { name: 'Cancel' }).click()
@@ -227,18 +227,15 @@ const check = (name, ok, extra = '') => {
     // --- Every rule off (S39): nothing asks; a column its rules don't have (Review) takes no drop.
     const c = await create('Read the docs', 'beta')
     await drag(c, 'Review')
-    await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing happens (no drop, no question).
+    await lib.sleep(lib.timing('quiet.refusedDropMs')) // A quiet window on purpose: this checks that nothing happens (no drop, no question).
     check("a column the card's rules don't have takes no drop", (await card(c))?.column === 'todo' && (await dialog.count()) === 0, (await card(c))?.column)
     check('…which tasks:columns says', JSON.stringify(await inv('tasks:columns', c)) === JSON.stringify(['hold', 'todo', 'doing', 'done']), JSON.stringify(await inv('tasks:columns', c)))
     await drag(c, 'Done')
     check('all off: a drag to Done just moves, nothing asked or overridden', !!(await lib.until(async () => (await card(c))?.column === 'done', HUNG_MS)) && (await dialog.count()) === 0 && !(await facts(c)).includes('Override'), JSON.stringify(await facts(c)))
 
-    // --- The question in Polish (as main sends a change of language, with Polish's own catalogue).
+    // --- The question in Polish (as main sends a change of language, with Polish's own catalogue, which main reads: HI-3434).
     const base = (await inv('app:info')).language
-    const dir = path.join(lib.ROOT, 'locales', 'pl')
-    const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
-    await speak({ ...base, code: 'pl', locale: 'pl', messages })
+    await lib.speakLanguage(app, base, 'pl')
     const plDialog = page.locator('.dialog', { hasText: 'mimo to?' })
     const plDone = page.locator('.board-column', { has: page.locator('.board-column-label', { hasText: 'Gotowe' }) })
     await lib.until(async () => (await plDone.count()) === 1, HUNG_MS)
@@ -246,7 +243,7 @@ const check = (name, ok, extra = '') => {
     check('the question in Polish', !!(await lib.until(async () => (await plDialog.count()) === 1, HUNG_MS)), await page.locator('.dialog').innerText().catch(() => ''))
     await plDialog.screenshot({ path: path.join(lib.WORK, 'boardgates-ask-pl.png') })
     await plDialog.getByRole('button', { name: 'Anuluj' }).click().catch(() => page.keyboard.press('Escape'))
-    await speak(base)
+    await lib.speakLanguage(app, base)
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
     await app

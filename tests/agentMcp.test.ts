@@ -172,7 +172,7 @@ describe('a launch', () => {
         expect(Object.keys(e.mcpServers).sort(), r).toEqual(['combwork', 'notes', 'sandbox'])
       }
       expect(sides).toEqual({ builder: 'builder', reviewer: 'reviewer', either: 'both', generalist: 'both' })
-      // Darren's 22:15 decision: "Independent behaves as if connection level switches are off": the terminal preset.
+      // Decided: "Independent behaves as if connection level switches are off": the terminal preset.
       const { launchPolicy, terminalPreset } = await import('../src/shared/launchPolicy')
       const ind = await eff('independent')
       expect(ind.launch).toEqual(launchPolicy({ launch: terminalPreset('claude-code') }, 'claude-code'))
@@ -182,6 +182,13 @@ describe('a launch', () => {
       expect(ind.skillHashes).toEqual({})
       // A role change to or from Independent changes the signature, so a running agent restarts for it.
       expect(sessions.signature(ind)).not.toBe(sessions.signature(await eff('either')))
+      // HI-3314: each launch's own token file (HI-3195) is '' while its settings are read before the token is made, and
+      // that launch's file after: no restart for it. Any other change to combwork's environment still asks for one.
+      const either = await eff('either')
+      const withEnv = (env: Record<string, string>) => ({ ...either, mcpServers: { ...either.mcpServers, combwork: { ...either.mcpServers.combwork!, env: { ...either.mcpServers.combwork!.env, ...env } } } })
+      expect(sessions.signature(withEnv({ CW_API_TOKEN_FILE: '' }))).toBe(sessions.signature(withEnv({ CW_API_TOKEN_FILE: 'C:\\profile\\launches\\r1\\agent-token.json' })))
+      expect(sessions.signature(withEnv({ CW_API_TOKEN_FILE: '' }))).toBe(sessions.signature(either))
+      expect(sessions.signature(withEnv({ CW_API_TOKEN_FILE: '', CW_SIDE: 'reviewer' }))).not.toBe(sessions.signature(withEnv({ CW_API_TOKEN_FILE: '' })))
 
       // HR1's round 1: a running agent whose role changes to or from Independent restarts (its side alone is `both`
       // either way, and an Independent launch has no combwork server), idle at once, busy only when asked, and does no

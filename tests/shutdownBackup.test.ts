@@ -6,6 +6,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir, tempRoot } from './tempDir'
+import { timing } from './timing.cjs'
 
 // A slow disk: each synchronous write takes this long.
 const slow = vi.hoisted(() => ({ ms: 0 }))
@@ -80,7 +81,7 @@ describe('sessions.backupAllNow', () => {
       const t = Date.now()
       expect(sessions.backupAllNow(20)).toEqual({ saved: 0, incomplete: 1, skipped: 1, failed: 0 })
       // One 1 MB step of 60 ms past the budget, not 16 of them.
-      expect(Date.now() - t).toBeLessThan(250)
+      expect(Date.now() - t).toBeLessThan(timing('budget.shutdownBackupMs'))
       // The copy it couldn't finish isn't put in place.
       expect(existsSync(join(profile, 'alpha', '.combwork', 'sessions', `${SID}.jsonl`))).toBe(false)
     })

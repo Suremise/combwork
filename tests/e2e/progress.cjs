@@ -13,7 +13,7 @@ const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47911))
 const userData = path.join(lib.WORK, 'progress-profile')
@@ -28,12 +28,8 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 10000) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+// HI-3385: lib's until (its bound required, the file's interval).
+const until = (fn, ms) => lib.until(fn, ms)
 /**
  * Gives an element the keyboard for a key press. Showing an agent (or its project) focuses its terminal, more than
  * once and late: in the frame its view is shown (TerminalView; a quiet test window off screen draws its frames late),
@@ -43,15 +39,15 @@ const until = async (fn, ms = 10000) => {
  * frame later.
  */
 const focusForKeys = async (page, locator) => {
-  // A frame, or 2 s if the window draws none meanwhile.
-  const frame = () => page.evaluate(() => new Promise((r) => (requestAnimationFrame(() => setTimeout(r, 0)), setTimeout(r, 2000))))
-  if (!(await until(async () => (await page.locator('.agent-pane.flash, .assistant-panel.flash').count()) === 0, 5000))) throw new Error('a pane still flashes')
+  // A frame, or pace.frameMs if the window draws none meanwhile (a quiet window off screen draws its frames late).
+  const frame = () => page.evaluate((ms) => new Promise((r) => (requestAnimationFrame(() => setTimeout(r)), setTimeout(r, ms))), lib.timing('pace.frameMs'))
+  if (!(await until(async () => (await page.locator('.agent-pane.flash, .assistant-panel.flash').count()) === 0, lib.timing('hang.ui')))) throw new Error('a pane still flashes')
   const ok = await until(async () => {
     await frame()
     await locator.focus()
     await frame()
     return locator.evaluate((el) => el === document.activeElement)
-  }, 5000)
+  }, lib.timing('hang.ui'))
   if (!ok) throw new Error('could not give it the keyboard')
 }
 /** The last taskbar call for the workspace. */
@@ -90,7 +86,8 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   await inv('session:start', alpha, { agentId: alfie.id })
   await inv('session:start', beta, { agentId: betty.id })
-  check('both agents start', !!(await until(async () => (await live(alfie.id))?.status === 'ready' && (await live(betty.id))?.status === 'ready', 25000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('both agents start', !!(await until(async () => (await live(alfie.id))?.status === 'ready' && (await live(betty.id))?.status === 'ready', lib.timing('hang.step'))))
 
   // Each agent's own token, from its launch environment.
   const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
@@ -244,7 +241,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('a finish is accepted', r.status === 200)
   check('a passed run shows ✓ and how long it took', !!(await until(async () => (await row.locator('.progress-ok').count()) === 1 && /Passed in/.test(await rowText()), HUNG_MS)), await rowText())
   check('a finished run takes no more updates (409)', (await call(alfieToken, 'PATCH', `/v1/progress/${run1}`, { step: 2 })).status === 409)
-  check('after a few seconds it leaves Pulse', !!(await until(async () => (await row.count()) === 0, 15000)))
+  check('after a few seconds it leaves Pulse', !!(await until(async () => (await row.count()) === 0, lib.timing('hang.ui'))))
   await showTab('runs')
   // A run for no card is in Other (HI-1701), docked under Today (HI-1925): its run a line, its details closed.
   const other = panel.locator('.progress-card-runs[data-card-runs="other"]')
@@ -270,7 +267,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   // Seen (#220): a few seconds later it leaves Pulse, as a passed run does, and Pulse says a run failed (#1309: nothing
   // passed since), a line that opens the Runs tab on the failures.
   const attention = panel.locator('.progress-attention')
-  check('…then leaves Pulse by itself, which says a run failed', !!(await until(async () => (await row2.count()) === 0 && ((await attention.textContent().catch(() => '')) ?? '').includes('1 run failed'), 20000)), await attention.textContent().catch(() => ''))
+  check('…then leaves Pulse by itself, which says a run failed', !!(await until(async () => (await row2.count()) === 0 && ((await attention.textContent().catch(() => '')) ?? '').includes('1 run failed'), lib.timing('hang.ui'))), await attention.textContent().catch(() => ''))
   check('…and the Runs tab has a red badge: one failure nothing has passed since', (await panel.locator('.progress-tab[data-tab="runs"] .progress-tab-badge.failed').textContent()) === '1' && (await panel.locator('.progress-tab[data-tab="runs"]').getAttribute('aria-label')) === 'Runs, 1 failure nothing has passed since')
   await attention.click()
   check('the line opens the Runs tab on the failures', !!(await until(async () => (await panel.locator('.progress-tab-runs').count()) === 1 && (await panel.locator('.progress-runs-failed').getAttribute('aria-pressed')) === 'true', HUNG_MS)) && (await panel.locator(`.progress-recent-item[data-run="${run2}"] .progress-recent.failed`).count()) === 1 && (await panel.locator('.progress-recent.passed').count()) === 0)
@@ -346,7 +343,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   fs.mkdirSync(logDir, { recursive: true })
   const logFile = path.join(logDir, 'run-record.md')
   fs.writeFileSync(logFile, '# e2e run record\n')
-  const toast = async (re) => !!(await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => re.test(t)), 5000))
+  const toast = async (re) => !!(await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => re.test(t)), lib.timing('hang.ui')))
   /** A failed run of Alfie's reporting `log`, dismissed off Pulse, shown in the Runs tab with its details open. */
   const runWithLog = async (title, log) => {
     const id = (await call(alfieToken, 'POST', '/v1/progress', { title, command: 'npm run e2e -- --all --build --record', total: 96 })).body?.id
@@ -371,9 +368,9 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   const logText = (await withLog.locator('.progress-details').innerText()).replace(/\s+/g, ' ')
   check('a run that named its log shows it, with its exit code and steps', logText.includes(`Log ${logFile}`) && /Exit code 1/.test(logText) && /Steps 95 of 96 done · last: taskbar/.test(logText), logText)
   await withLog.locator('button', { hasText: 'Open log' }).click()
-  check("Open log opens that run's log, though it is outside the workspace", !!(await until(async () => (await lastShell()) === JSON.stringify(['open', logFile]), 5000)), JSON.stringify(await shellCalls()))
+  check("Open log opens that run's log, though it is outside the workspace", !!(await until(async () => (await lastShell()) === JSON.stringify(['open', logFile]), lib.timing('hang.ui'))), JSON.stringify(await shellCalls()))
   await withLog.locator('button', { hasText: 'Show in folder' }).click()
-  check('Show in folder shows it in its folder', !!(await until(async () => (await lastShell()) === JSON.stringify(['show', logFile]), 5000)), JSON.stringify(await shellCalls()))
+  check('Show in folder shows it in its folder', !!(await until(async () => (await lastShell()) === JSON.stringify(['show', logFile]), lib.timing('hang.ui'))), JSON.stringify(await shellCalls()))
   check("the window's own Show in folder still refuses a path outside the workspace", (await inv('app:showInFolder', logFile).then(() => 'ok', (e) => String(e))) !== 'ok')
   await withLog.locator('button', { hasText: 'Copy details' }).click()
   const copiedLog = (await page.evaluate(() => window.__copied)).at(-1) ?? ''
@@ -392,7 +389,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check("Open log refuses what isn't a text log or report, saying to use Show in folder", await toast(/opens only text logs and reports.*Show in folder/))
   check('…and opens nothing', (await shellCalls()).length === before)
   await notText.locator('button', { hasText: 'Show in folder' }).click()
-  check('…but Show in folder shows it', !!(await until(async () => (await lastShell()) === JSON.stringify(['show', exe]), 5000)))
+  check('…but Show in folder shows it', !!(await until(async () => (await lastShell()) === JSON.stringify(['show', exe]), lib.timing('hang.ui'))))
 
   // --- The filter (#251): runs from alpha and beta, so the panel offers one project's runs; it applies to running runs
   // and the Runs tab's alike, is remembered for the workspace, and the folded strip follows it.
@@ -448,7 +445,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   const run3 = r.body?.id
   await inv('session:stop', alpha, alfie.id)
   const row3 = panel.locator(`.progress-run[data-run="${run3}"]`)
-  check("a stopped agent's run goes stale (amber in the strip), saying its agent stopped", !!(await until(async () => (await rail.locator(`.progress-mini.stale[data-run="${run3}"]`).count()) === 1, 25000)) && (await inv('progress:list')).find((x) => x.id === run3)?.staleReason === 'agent-stopped')
+  check("a stopped agent's run goes stale (amber in the strip), saying its agent stopped", !!(await until(async () => (await rail.locator(`.progress-mini.stale[data-run="${run3}"]`).count()) === 1, lib.timing('hang.ui'))) && (await inv('progress:list')).find((x) => x.id === run3)?.staleReason === 'agent-stopped')
 
   check("a stale run still shows in its agent's status", (await call(workspaceToken, 'GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.name === 'Alfie')?.progress?.stale === true)
 
@@ -528,8 +525,8 @@ const near = (a, b) => Math.abs(a - b) < 0.001
     await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
     for (const w of [220, 640]) {
       await panel.evaluate((el, px) => (el.style.width = `${px}px`), w)
-      await lib.sleep(250)
-      const bad = await escapes()
+      // HI-3385: its rows laid out at this width (a row's own layout can follow its size a frame later): waited for, then checked.
+      const bad = (await until(async () => ((await escapes()).length ? null : []), lib.timing('hang.ui'))) ?? (await escapes())
       check(`${zoom * 100}%, panel ${w}px: no text escapes the run's box`, !bad.length, bad.slice(0, 4).join('; '))
       const title = longRow.locator('.progress-title')
       check(`${zoom * 100}%, panel ${w}px: the title ends in an ellipsis, its whole text on hover`, await title.evaluate((el) => el.scrollWidth > el.clientWidth && getComputedStyle(el).textOverflow === 'ellipsis'))
@@ -568,8 +565,8 @@ const near = (a, b) => Math.abs(a - b) < 0.001
       await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
       for (const w of [220, 640]) {
         await panel.evaluate((el, px) => (el.style.width = `${px}px`), w)
-        await lib.sleep(200)
-        const low = await lowContrast()
+        // HI-3385: its theme and width applied (a frame later): waited for, then checked.
+        const low = (await until(async () => ((await lowContrast()).length ? null : []), lib.timing('hang.ui'))) ?? (await lowContrast())
         check(`${theme}, ${zoom * 100}%, panel ${w}px: the details' labels and "why" read at 4.5:1 or more`, !low.length, low.slice(0, 4).join('; '))
         if (w === 220 && (theme === 'light' ? zoom === 1.25 : zoom === 1)) await page.screenshot({ path: path.join(shots, `${theme}-${zoom}-220-details.png`) })
       }
@@ -583,7 +580,8 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   // A run whose agent was removed since: its details say so rather than offering to show it.
   const cara = await lib.addAgent(inv, beta, { name: 'Cara Featherstonehaugh' })
   await inv('session:start', beta, { agentId: cara.id })
-  await until(async () => (await live(cara.id))?.status === 'ready', 20000)
+  // before any turn (HI-2688): its start, restart or resume
+  await until(async () => (await live(cara.id))?.status === 'ready', lib.timing('hang.step'))
   const caraSession = (await live(cara.id))?.sessionId
   const caraToken = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.sessionId === caraSession).at(-1)?.token
   r = await call(caraToken, 'POST', '/v1/progress', { title: 'cara builds' })
@@ -621,12 +619,12 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   }
   await call(caraToken, 'POST', `/v1/progress/${caraRun}/finish`, { ok: true })
   await inv('session:stop', beta, cara.id)
-  await until(async () => !(await live(cara.id)), 15000)
+  await until(async () => !(await live(cara.id)), lib.timing('hang.ui'))
   await inv('agents:remove', beta, cara.id, { deleteWorktree: false })
   const caraItem = panel.locator(`.progress-recent-item[data-run="${caraRun}"]`)
-  await until(async () => (await panel.locator(`.progress-run[data-run="${caraRun}"]`).count()) === 0, 20000)
+  await until(async () => (await panel.locator(`.progress-run[data-run="${caraRun}"]`).count()) === 0, lib.timing('hang.ui'))
   await showTab('runs')
-  await until(async () => (await caraItem.count()) === 1, 20000)
+  await until(async () => (await caraItem.count()) === 1, lib.timing('hang.ui'))
   await caraItem.locator('.progress-recent').click()
   check('a removed agent: its run says so, with nothing to show', !!(await until(async () => /Cara Featherstonehaugh has been removed from beta/.test(await caraItem.locator('.progress-details').innerText().catch(() => '')), HUNG_MS)) && (await caraItem.locator('button', { hasText: 'Show the agent' }).count()) === 0)
   await page.keyboard.press('Escape')
@@ -648,7 +646,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('every ended run is in the Runs tab under Today, newest first', !!(await until(async () => {
     const l = await lines()
     return Array.from({ length: 12 }, (_, i) => `Script · history ${i}`).every((x) => l.includes(x)) && l.indexOf('Script · history 11') < l.indexOf('Script · history 0')
-  }, 20000)), JSON.stringify(await lines()))
+  }, lib.timing('hang.ui'))), JSON.stringify(await lines()))
   const retried = panel.locator('.progress-run-group').filter({ hasText: 'retried check' })
   const retriedLine = async () => (await retried.locator('.progress-group-head').evaluate((el) => `${el.querySelector('.progress-recent-who')?.textContent} · ${el.querySelector('.progress-recent-text')?.textContent}`).catch(() => ''))
   check('a run tried three times is one line: ×3 · 2 failed, then passed', (await retriedLine()) === 'Script · retried check ×3 · 2 failed, then passed', await retriedLine())
@@ -687,10 +685,11 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   await inv('settings:update', { appearance: { theme: 'light' } })
   await showTab('pulse')
   // The scripts' runs just ended have left Pulse (a few seconds, seen): the first run is an agent's again.
-  await until(async () => (await panel.locator('.progress-tab-pulse .progress-run').filter({ hasText: 'Script' }).count()) === 0, 30000)
+  await until(async () => (await panel.locator('.progress-tab-pulse .progress-run').filter({ hasText: 'Script' }).count()) === 0, lib.timing('hang.ui'))
   await page.keyboard.press('Control+Alt+I')
-  await lib.sleep(800)
-  const boxes = await page.evaluate(() => ['.progress-panel', '.assistant-panel'].map((s) => document.querySelector(s)?.getBoundingClientRect().left ?? null))
+  // HI-3385: the Assistant's panel shown, and Progress laid out beside it.
+  const placed = () => page.evaluate(() => ['.progress-panel', '.assistant-panel'].map((s) => document.querySelector(s)?.getBoundingClientRect().left ?? null))
+  const boxes = (await until(async () => { const b = await placed(); return b[0] !== null && b[1] !== null && b[0] < b[1] ? b : null }, lib.timing('hang.ui'))) ?? (await placed())
   check("with the Assistant's panel open, Progress sits to its left", boxes[0] !== null && boxes[1] !== null && boxes[0] < boxes[1], JSON.stringify(boxes))
   await page.screenshot({ path: path.join(shots, 'light-with-assistant.png') })
   await panel.locator('button[aria-label^="Fold the Progress panel"]').focus()
@@ -717,7 +716,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('reports are accepted and ignored', r.status === 200 && r.body?.ignored === true && ri.body?.ignored === true && rf.body?.ignored === true, JSON.stringify([r, ri, rf]))
   await inv('settings:update', { general: { progressPanel: true } })
   check('on again, the strip is back, with nothing from before', !!(await until(async () => (await rail.count()) === 1 || (await panel.count()) === 1, HUNG_MS)) && (await page.locator('.progress-run').count()) === 0)
-  check('…Recent included, kept runs too (#352)', (await inv('progress:list')).length === 0 && !!(await until(async () => !fs.existsSync(path.join(userData, 'progress-history')), 5000)))
+  check('…Recent included, kept runs too (#352)', (await inv('progress:list')).length === 0 && !!(await until(async () => !fs.existsSync(path.join(userData, 'progress-history')), lib.timing('hang.ui'))))
 
   // --- Agents show long commands (#167): on by default, in Settings under the Progress panel and greyed out while the
   // panel is off; a session started afterwards gets the matching rule (its combwork MCP server's instructions).
@@ -732,14 +731,15 @@ const near = (a, b) => Math.abs(a - b) < 0.001
       if (line) resolve(JSON.parse(line).result?.instructions ?? '')
     }))
     p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } }) + '\n')
-    const text = await Promise.race([got, lib.sleep(15000).then(() => '(no reply)')])
+    const text = await Promise.race([got, lib.sleep(lib.timing('hang.ui')).then(() => '(no reply)')])
     p.kill()
     return text
   }
   check('on by default', (await inv('settings:get')).general.progressCommands === true)
   // A launch's MCP config is in its private folder only while it runs (#345): the agent stopped above starts again.
   await inv('session:start', alpha, { agentId: alfie.id })
-  await until(async () => (await live(alfie.id))?.status === 'ready', 25000)
+  // before any turn (HI-2688): its start, restart or resume
+  await until(async () => (await live(alfie.id))?.status === 'ready', lib.timing('hang.step'))
   let told = await instructionsOf(alpha)
   check("a session's guidance says to run long commands through cw-progress", /over 30 s.*`cw-progress --title "<what and why, in a few words>" -- <command>`/.test(told), told.slice(-400))
   await page.keyboard.press('Control+Comma')
@@ -756,9 +756,10 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   await page.screenshot({ path: path.join(shots, 'settings-wrap-off.png') })
   await page.keyboard.press('Control+Comma')
   await inv('session:stop', alpha, alfie.id)
-  await until(async () => !(await live(alfie.id)) || (await live(alfie.id))?.status === 'stopped', 15000)
+  await until(async () => !(await live(alfie.id)) || (await live(alfie.id))?.status === 'stopped', lib.timing('hang.ui'))
   await inv('session:start', alpha, { agentId: alfie.id })
-  check('the agent starts again', !!(await until(async () => (await live(alfie.id))?.status === 'ready', 25000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the agent starts again', !!(await until(async () => (await live(alfie.id))?.status === 'ready', lib.timing('hang.step'))))
   told = await instructionsOf(alpha)
   check('a session started afterwards is told: only when the user asks', /cw-progress --title "[^"]+" -- <command>`.*only when the user asks/.test(told) && !/over 30 s/.test(told), told.slice(-400))
   await inv('settings:update', { general: { progressCommands: true } })

@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-retarget-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -450,7 +451,8 @@ describe('a slot counts against a branch in Other branches only while it uses it
       await atWrite
       // Asked from outside the save's change: its own board write, never the save's, waiting for the board's lock.
       const lend = take(w, repo, name).then((r) => (order.push('lend'), r))
-      await vi.waitFor(() => expect(writesAt(dirname(repo), dirname(repo))).toBe(2))
+      // Bounded for a hung run (HI-3349), not Vitest's 1 s, which a loaded runner outlasts.
+      await vi.waitFor(() => expect(writesAt(dirname(repo), dirname(repo))).toBe(2), { timeout: timing('wait.hang') })
       release()
       await save
       expect(await lend).toMatchObject({ ok: true })

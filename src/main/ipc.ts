@@ -41,6 +41,7 @@ import { combworkWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, 
 import { lineCard, lineConfirmed } from './branchMerge'
 import { createLogger, logsDir, userText } from './logger'
 import { closeCommandsRun, closeCommandState, closeWithCommand, controlRun, dismiss, dontWait, runByHand, runOpenCommands } from './closeCommand/closeCommands'
+import { closingAgentsDontWait, closingAgentsState } from './closingAgents'
 import { cleanCombwork, cleanWorkspace } from '../shared/commands'
 import { diagnostics } from './diagnostics'
 import { resumeAfterClose, startupStep, stopLeftAfterClose } from './lastRun'
@@ -50,7 +51,7 @@ import { progress, progressSeq } from './progressService'
 import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
 import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
-import { endLane, laneReleaseCheck, lanesEndedSince, listLanes, stampLaneProjects } from './lanes'
+import { endLane, laneReleaseCheck, laneYieldTo, lanesEndedSince, listLanes, stampLaneProjects } from './lanes'
 import { editLanes, endedSinceOf, laneEditOf } from './laneEdits'
 import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } from './laneStart'
 import { loopChecksOf } from './loopCheck'
@@ -87,7 +88,7 @@ import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agen
 import { CW_DIR, projectAgents as agentsOf } from '../shared/defaults'
 import type { MoveOptions, TaskCard } from '../shared/types'
 import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
-import { apiInfo, claudeSnippetFacts, createViewer, regenerateToken, revokeViewer } from './servers'
+import { adminSnippetFacts, apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
 import * as projectAgents from './projectAgents'
 import * as templates from './templates'
 import * as branchWatch from './branchWatch'
@@ -111,7 +112,7 @@ import { cleanTasks, cleanWhere } from '../shared/windowHealth'
 import { setTitleBarBackdrops, setTitleBarColors } from './titleBar'
 import { showWindow } from './tray'
 import { resetMetrics } from './metrics'
-import { beginWork, recentStalls } from './mainStalls'
+import { beginWork, measured, recentStalls } from './mainStalls'
 import { metricsExport, metricsReport } from './metricsUsage'
 import { cancelWatch, stampWatchProjects } from './watches'
 import { cancelMessages, deliverWaiting } from './agentMessages'
@@ -135,7 +136,7 @@ import { settleCommitMessageDefault } from './workflow/commitMessageStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
-import { checkWorkflowChange, chooseMerge, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
+import { checkWorkflowChange, chooseMerge, guardPreview, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { SwitchRefusedError } from './workflow/storeSwitch'
 import { presetNotNow } from './workflow/presetStep'
@@ -153,16 +154,21 @@ import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
 import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
+import { cancelGitRun, cancellableGit, cancelOwnerOf, withGitCancel, type CancelOwner } from './gitCancel'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer'
 import { branchStartArg } from '../shared/nextVersion'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, purgeQueueHistory, purgeTargetsOf, queueCardChange, queueHistory, queueViews, resolveForward, resumeQueue, settleQueueChanges } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
+import { revisionDiff } from './workflow/revisionDiff'
+import { addLineComment, changeLineComment, feedbackPreview, sendFeedback } from './workflow/lineComments'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
 import { withSkillDelivered } from '../shared/skillDelivery'
 import { pauseApp, resumeApp } from './teamPause'
 import { endParkedProcess, installIfParked, teamPauseState } from './teamParked'
+import { cliSnapshotForWindow, openClisFolder, reloadClis } from './clis'
+import { cancelPreview } from './workflow/mergeGuardsRun'
 
 /**
  * What the window is told when a call is refused (#845): thrown as CombworkErrors, so the window reads them in its language
@@ -233,6 +239,14 @@ const advancedState = (): AdvancedState => advanced.state(workspace.path ? (work
 /** The window an IPC call came from, for calls that keep something per window (the developer console's subscription). */
 const senderStore = new AsyncLocalStorage<WebContents>()
 
+/** HI-3372: who may cancel a run started now: this window, this open of its workspace, the project (gitCancel.ts). */
+const cancelOwner = (projectPath: string): CancelOwner => cancelOwnerOf(senderStore.getStore(), currentWorkspace(), projectPath)
+
+/** A Commit or Set aside, Fetch, Pull or Push the user can cancel (`op`: the window's id for it). */
+const cancellableRun = <T>(p: string, op: unknown, fn: () => T | Promise<T>): Promise<T> => withGitCancel(op, cancelOwner(workspace.assertProject(p)), async (signal) => (signal ? cancellableGit(signal, async () => fn()) : fn()))
+const netRun = cancellableRun
+const actRun = cancellableRun
+
 /**
  * The Combwork window whose IPC request is being served now (HI-2355), or null outside one (a timer, a hook, the Agent API):
  * a result or warning made for that request is told in that window (main/notify.ts), even if another has the focus by
@@ -302,7 +316,7 @@ function assertExtraArgs(args: unknown): void {
 function guardFile(path: string, write = false): string {
   if (insideArchive(path)) throw combworkError(M.insideArchive, undefined, { kind: 'forbidden' })
   // A CLI's own files: its connections' homes on in this workspace (HI-1755), else the CLI's own home.
-  if (workspace.isAllowedPath(path) || allProviders().some((p) => p.fileAllowed(path, write, connectionHomes(p.id, workspace.path ? workspace.config : null)?.map((h) => h.home)))) return path
+  if (workspace.isAllowedPath(path) || allProviders().some((p) => p.projectFiles?.fileAllowed(path, write, connectionHomes(p.id, workspace.path ? workspace.config : null)?.map((h) => h.home)))) return path
   // The skills that ship with Combwork, to view one the workspace doesn't have.
   if (!write && insideReal(path, [skills.bundledSkillsDir()])) return path
   throw combworkError(M.outsideWorkspace, undefined, { kind: 'forbidden' })
@@ -360,6 +374,12 @@ async function openHere(path: string): ReturnType<WorkspaceService['open']> {
 }
 
 const log = createLogger('ipc')
+
+/** Where an MCP server was shown added (a Replace's or an Update's question, HI-3327), as the window sent it. */
+function shownPlaces(p: unknown): { projects: string[]; assistant: boolean } {
+  const o = (p && typeof p === 'object' ? p : {}) as { projects?: unknown; assistant?: unknown }
+  return { projects: Array.isArray(o.projects) ? o.projects.filter((x): x is string => typeof x === 'string') : [], assistant: o.assistant === true }
+}
 
 /** Repair…'s choices as the window sent them, with anything else dropped (#146). */
 function moveOptions(o: unknown): MoveOptions {
@@ -517,6 +537,17 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
   const impl: Impl = {
     // The repository mutations (HI-2788): each through the operations port, gated by its operation.
     ...repoOpHandlers,
+    // HI-3372: the user's network actions and Commit it, each under the window's id for it (`op`), which its Cancel names.
+    'git:fetch': (p, op) => netRun(p, op, () => repoOpHandlers['git:fetch'](p)),
+    'git:pull': (p, op) => netRun(p, op, () => repoOpHandlers['git:pull'](p)),
+    'git:push': (p, remote, op) => netRun(p, op, () => repoOpHandlers['git:push'](p, remote)),
+    'git:pushTo': (p, remote, scope, branch, op) => netRun(p, op, () => repoOpHandlers['git:pushTo'](p, remote, scope, branch)),
+    'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst, op) => netRun(p, op, () => repoOpHandlers['git:setUpstream'](p, branch, remote, remoteBranch, pushFirst)),
+    'git:createTag': (p, name, message, pushTo, op) => netRun(p, op, () => repoOpHandlers['git:createTag'](p, name, message, pushTo)),
+    'git:deleteRemoteBranches': (p, remote, items, op) => netRun(p, op, () => repoOpHandlers['git:deleteRemoteBranches'](p, remote, items)),
+    'files:gitCommitIgnore': (p, op) => actRun(p, op, () => repoOpHandlers['files:gitCommitIgnore'](p)),
+    // The owner's Cancel of its run `op` (the project it recorded with it): another window's, workspace's or project's changes nothing.
+    'git:cancel': (op, p) => cancelGitRun(op, cancelOwner(String(p ?? ''))),
     'app:info': () => getAppInfo(),
     'app:planUsage': () => config.get().planUsage,
     'app:connectionPlanUsage': () => config.get().connectionPlanUsage ?? {},
@@ -525,6 +556,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'app:quitDecision': (choice, dontAskAgain, install) => quitControl.decide(win(), choice, dontAskAgain, typeof install === 'string' ? install : null),
     'app:cancelPendingQuit': () => quitControl.cancelPending(),
     'closeCommand:state': () => closeCommandState(win()),
+    'closingAgents:state': () => closingAgentsState(win()),
+    'closingAgents:dontWait': (id) => closingAgentsDontWait(win(), String(id)),
     'closeCommand:dontWait': (id) => dontWait(win(), String(id)),
     'closeCommand:dismiss': (id) => dismiss(win(), String(id)),
     'closeCommand:control': (id, action, step, attempt) => controlRun(win(), String(id), action, step, attempt),
@@ -613,6 +646,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return now
     },
     'window:getAlwaysOnTop': () => win().isAlwaysOnTop(),
+    'window:state': () => {
+      const w = win()
+      return { maximized: w.isMaximized(), focused: w.isFocused(), alwaysOnTop: w.isAlwaysOnTop() }
+    },
     'window:showing': (projectPath) => {
       const e = combworkWindows().find((x) => x.win === win())
       if (e) e.showing = projectPath
@@ -996,12 +1033,17 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (typeof project === 'string' && project) reconcileCard(ws, n, project)
       return cardWork(ws, n)
     },
+    'tasks:revisionDiff': (n, submission, file) => revisionDiff(currentWorkspace(), Number(n), Number(submission), String(file ?? '')),
+    'tasks:lineCommentAdd': (n, comment) => addLineComment(currentWorkspace(), Number(n), comment),
+    'tasks:lineCommentChange': (n, id, change) => changeLineComment(currentWorkspace(), Number(n), String(id ?? ''), change),
+    'tasks:feedbackPreview': (n) => feedbackPreview(currentWorkspace(), Number(n)),
+    'tasks:feedbackSend': (n, send) => sendFeedback(currentWorkspace(), Number(n), send),
     'tasks:workBadges': async () => {
       const ws = currentWorkspace()
       if (!ws.path) return []
       // Each project's ruleset now, for the old rules marks (#1421): read before the board, then the badges on one snapshot.
       const now = await rulesNow(ws)
-      return ws.path ? workBadges(ws, now.ids, now.at) : []
+      return ws.path ? measured('work badges', () => workBadges(ws, now.ids, now.at)) : [] // i18n-ignore: a stall label for combwork.log, in English
     },
     'project:setActive': async (p, active) => {
       p = workspace.assertProject(p)
@@ -1036,6 +1078,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
+    'workflow:guardPreview': (p, guard, slot) => guardPreview(workspace, workspace.assertProject(p), guard, slot),
+    'workflow:guardPreviewCancel': (slot) => void (typeof slot === 'string' && cancelPreview(slot)),
     'workflow:retarget': (p, preview) => retargetApply(currentWorkspace(), workspace.assertProject(p), retargetArg(preview), { kind: 'user' }),
     'workflow:nextVersionPlan': (p) => nextVersionPlan(workspace, workspace.assertProject(p)),
     'workflow:nextVersionPreview': (p, from, to) => previewFor(workspace, workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
@@ -1108,7 +1152,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
     // HI-2944: the port refuses it first where the project's version control doesn't offer it.
-    'queue:settleChanges': (p, target, action, shown, pause, folder) => settleQueueChanges(workspace, workspace.assertProject(p), queueTarget(target), action === 'setAside' ? 'setAside' : 'commit', shown, pauseRef(pause), typeof folder === 'string' && folder ? folder : null, opsAt('queue:settleChanges')),
+    'queue:settleChanges': (p, target, action, shown, pause, folder, op) => actRun(p, op, () => settleQueueChanges(workspace, workspace.assertProject(p), queueTarget(target), action === 'setAside' ? 'setAside' : 'commit', shown, pauseRef(pause), typeof folder === 'string' && folder ? folder : null, opsAt('queue:settleChanges'))),
     'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
     'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
     // HI-2959: Resolve on a builder, on a forward merge the queue returned: the card made for a builder.
@@ -1561,23 +1605,25 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return r.canceled || !r.filePaths[0] ? null : r.filePaths[0]
     },
     'mcp:previewFile': (file) => mcp.previewMcpFile(file),
-    'mcp:addFromFile': async (file, name, replace) => {
-      const m = await mcp.addMcpFromFile(file, name, replace)
+    'mcp:nameTaken': (name, folder) => mcp.mcpNameTaken(String(name), folder === true),
+    'mcp:addFromFile': async (file, name, replace, places) => {
+      const m = await mcp.addMcpFromFile(file, name, replace, shownPlaces(places))
       emit({ type: 'skills-changed' })
       workspace.scheduleRefresh()
       return m
     },
     'mcp:catalog': (opts) => mcpCatalog.catalogPages(opts && typeof opts === 'object' ? opts : {}),
     'mcp:catalogNoted': (url) => mcpCatalog.noteCatalogSource(String(url)),
-    'mcp:catalogPrepare': (source, name) => mcpCatalog.prepareCatalogServer(String(source), String(name)),
+    'mcp:catalogPrepare': (source, name, op) => mcpCatalog.prepareCatalogServer(String(source), String(name), typeof op === 'string' ? op : undefined),
+    'mcp:catalogCancel': (op) => mcpCatalog.cancelCatalogPrepare(String(op)),
     'mcp:catalogDrop': (id) => mcpCatalog.dropPrepared(String(id)),
-    'mcp:catalogInstall': async (id, name, replace) => {
-      await mcpCatalog.installCatalogServer(String(id), String(name), replace === true)
+    'mcp:catalogInstall': async (id, name, replace, places) => {
+      await mcpCatalog.installCatalogServer(String(id), String(name), replace === true, shownPlaces(places))
       emit({ type: 'skills-changed' })
       workspace.scheduleRefresh()
     },
     'mcp:catalogUpdate': async (id, shown, places) => {
-      const r = await mcpCatalog.updateCatalogServer(String(id), shown, { projects: Array.isArray(places?.projects) ? places.projects.filter((p): p is string => typeof p === 'string') : [], assistant: places?.assistant === true })
+      const r = await mcpCatalog.updateCatalogServer(String(id), shown, shownPlaces(places))
       emit({ type: 'skills-changed' })
       workspace.scheduleRefresh()
       return r
@@ -1648,6 +1694,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}), ...(typeof r.target === 'string' && r.target ? { target: r.target.slice(0, 250) } : {}), ...(r.released && typeof r.released.target === 'string' && r.released.target && typeof r.released.reason === 'string' && r.released.reason.trim() ? { released: { target: r.released.target.slice(0, 250), reason: r.released.reason.trim().slice(0, 4000) } } : {}) })
     },
     'lanes:startInfo': (p) => laneStartInfo(currentWorkspace(), workspace.assertProject(p)),
+    'lanes:yieldTo': (p, builder, cards, behind) => {
+      const list = Array.isArray(cards) ? cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
+      if (typeof builder !== 'string' || !builder || !Number.isInteger(behind)) return null
+      return laneYieldTo(currentWorkspace(), basename(workspace.assertProject(p)), builder, list, behind)
+    },
     'lanes:releaseCheck': (p, builder, target) => laneReleaseCheck(currentWorkspace(), basename(workspace.assertProject(p)), typeof builder === 'string' ? builder : '', typeof target === 'string' && target ? target.slice(0, 250) : null),
     'costs:cards': (q) => {
       if (!workspace.path) return []
@@ -1784,7 +1835,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'memory:list': async (p) => {
       const project = workspace.assertProject(p)
-      return (await Promise.all(allProviders().map((a) => a.memorySources(project, connectionHomes(a.id, workspace.config))))).flat()
+      return (await Promise.all(allProviders().map((a) => a.projectFiles?.memorySources(project, connectionHomes(a.id, workspace.config)) ?? []))).flat()
     },
     'memory:instructionsShared': async (p, ids) => {
       const project = workspace.assertProject(p)
@@ -1941,7 +1992,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'session:restartForTools': (p, agentId, when) => sessions.restartForTools(p, agentId, { when: when === 'atSafePoint' ? 'atSafePoint' : 'ifIdle' }),
 
     'api:info': () => apiInfo(),
-    'api:claudeSnippet': () => claudeSnippetFacts(),
+    'api:adminSnippet': (id: ProviderId) => adminSnippetFacts(id),
+    'clis:snapshot': () => cliSnapshotForWindow(),
+    'clis:reload': () => reloadClis(),
+    'clis:openFolder': () => openClisFolder(),
     'api:regenerateToken': async () => {
       await regenerateToken()
       return apiInfo()
@@ -2013,7 +2067,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       try {
         const block = take(blocking, channel)
         if (block?.ms) for (const until = Date.now() + block.ms; Date.now() < until; );
-        return await senderStore.run(e.sender, () => inWorkspace(w.ws, () => (fn as (...a: unknown[]) => unknown)(...args)))
+        // Its own code up to its first wait, named when it computed long enough to be felt (HI-3293).
+        return await senderStore.run(e.sender, () => inWorkspace(w.ws, () => measured(`ran ipc ${channel}`, () => (fn as (...a: unknown[]) => unknown)(...args)))) // i18n-ignore: a line of combwork.log, in English
       } catch (err) {
         // A failure that isn't one of Combwork's own refusals (a file that couldn't be written, HI-1749): the window shows it, and
         // combwork.log has it too, so every "Could not …" notification has its line.

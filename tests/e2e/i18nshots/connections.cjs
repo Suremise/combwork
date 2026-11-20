@@ -4,6 +4,7 @@
 // hooks (data-section, data-account, data-edit-server, data-save-server, data-model-limits), never English text.
 // A server connection with two models is added over IPC: one with a label and limits that leave little room (its
 // warning shown), one with none (the placeholders shown); it is removed again after.
+const { timing } = require('../../timing.cjs')
 
 /** Waits for a locator to be on the page; throws saying what didn't show. */
 async function shown(ctx, locator, what) {
@@ -38,7 +39,7 @@ async function editServer(ctx) {
 async function closeEditServer(ctx) {
   const { page, lib, inv } = ctx
   // Its footer's Cancel (the model rows above have subtle buttons of their own).
-  const cancel = () => page.locator('.dialog').last().locator('.dialog-footer button.subtle').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const cancel = () => page.locator('.dialog').last().locator('.dialog-footer button.subtle').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.dialog').count()) === 0 || (await cancel()), ctx.hungMs))) throw new Error("Edit Server didn't close")
   if (added) await inv('connections:remove', added, {})
   added = null

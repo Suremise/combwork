@@ -1,4 +1,4 @@
-// Repair renames agents' branches named after where the workspace was (#1305, Darren's decision on #1303: always, never
+// Repair renames agents' branches named after where the workspace was (#1305, decided on #1303: always, never
 // offered, Combwork's records with them). Before: workspace Scratch with project juniper and three worktree agents on
 // cw/Scratch/juniper/<agent>; JB1 has a card started (its work's line is JB1's branch), JB2's branch tracks a remote,
 // and a branch cw/Tools/juniper/jb3 is already there. Combwork is closed; the workspace and its worktrees folder move to
@@ -18,7 +18,7 @@ const fs = require('fs')
 const path = require('path')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 const userData = path.join(lib.WORK, 'repairbranches-profile')
 const home = path.join(lib.WORK, 'repairbranches-claude-home')
 const root = path.join(lib.WORK, 'repairbranches')

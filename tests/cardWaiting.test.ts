@@ -103,8 +103,8 @@ describe('a card waiting on purpose (HI-2618)', () => {
     await run(() => tasks.updateTask(card, { waitingFor: 'Waiting for the Assistant' }, assistant))
     expect((await get(card)).waitingFor?.by).toMatch(/Assistant/)
     await expect(run(() => tasks.updateTask(card, { waitingFor: null }, other))).rejects.toThrow(/Only/)
-    await run(() => tasks.updateTask(card, { waitingFor: 'Waiting for Darren' }, user))
-    expect((await get(card)).waitingFor?.reason).toBe('Waiting for Darren')
+    await run(() => tasks.updateTask(card, { waitingFor: 'Waiting for Sam' }, user))
+    expect((await get(card)).waitingFor?.reason).toBe('Waiting for Sam')
     await run(() => tasks.updateTask(card, { waitingFor: null }, user))
     expect((await get(card)).waitingFor).toBeUndefined()
     // Too long, or a card not in Doing: refused, nothing written.

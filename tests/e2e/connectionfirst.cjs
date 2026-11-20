@@ -12,7 +12,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'connectionfirst-profile')
 const home = path.join(lib.WORK, 'connectionfirst-claude-home')
@@ -181,7 +181,7 @@ async function duringDetection(env) {
     check('…an add with no connection made then waits for detection (Codex still looked for)', (await codex()).checking === true)
 
     // Once Codex is found: Codex first in the order, chosen; Add enabled.
-    check('once Codex is found, Add Agent chooses its connection (first in the order) and Add can go', !!(await lib.until(async () => (await select.inputValue()) === 'c-codex' && !(await addButton.isDisabled()), 45000)), await select.inputValue().catch(() => ''))
+    check('once Codex is found, Add Agent chooses its connection (first in the order) and Add can go', !!(await lib.until(async () => (await select.inputValue()) === 'c-codex' && !(await addButton.isDisabled()), lib.timing('hang.step'))), await select.inputValue().catch(() => ''))
     const made = await viaMain.catch((e) => ({ error: e.message }))
     check("…and main's add went on Codex's connection, its CLI Codex", made?.connection === 'c-codex' && made.provider === 'codex', JSON.stringify(made))
     await add.getByRole('button', { name: 'Cancel', exact: true }).click()

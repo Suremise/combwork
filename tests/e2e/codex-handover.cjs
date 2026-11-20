@@ -9,7 +9,6 @@ const scratch = lib.WORK
 const userData = path.join(scratch, 'cxcont-profile')
 const ws = path.join(scratch, 'cxcont-ws')
 const proj = path.join(ws, 'demo')
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const results = []
 const check = (name, ok, extra = '') => {
   lib.checked(ok)
@@ -40,7 +39,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
-  await sleep(500)
+  await lib.projectShown(page)
   const agents = () => inv('workspace:get').then((w) => w.projects.find((p) => p.name === 'demo').agents)
   // An agent's turn has run (#782): the line Combwork gave it (its inbox's doorbell) is in its transcript, it answered after
   // it, and the turn is over. Ready alone isn't: a CLI that never took the line is ready too.
@@ -56,15 +55,14 @@ const check = (name, ok, extra = '') => {
   const cx = await lib.addAgent(inv, proj, { name: 'Codex', ...small })
   const cx2 = await lib.addAgent(inv, proj, { name: 'Codex 2', ...small })
   check('agents added', (await agents()).length === 3)
-  await sleep(800)
   // The dialog, from the pane header's menu (panes show in a multi-column layout).
   await inv('project:updateConfig', proj, { layout: 'columns2' })
-  await sleep(800)
+  await lib.until(async () => (await page.locator('.pane-header-bar').count()) >= 2, lib.timing('hang.ui'))
   await page.screenshot({ path: path.join(scratch, 'cont-0-before.png') })
   await page.locator('.pane-header-bar').first().click({ button: 'right' })
-  await sleep(300)
+  await lib.until(async () => (await page.getByText('Hand Over to…').count()) > 0, lib.timing('hang.ui'))
   await page.getByText('Hand Over to…').first().click()
-  await sleep(400)
+  await lib.until(async () => (await page.locator('.dialog-header', { hasText: 'Hand over' }).count()) > 0, lib.timing('hang.ui'))
   const dialog = await page.locator('.dialog-header', { hasText: 'Hand over' }).count()
   await page.screenshot({ path: path.join(scratch, 'cont-1-dialog.png') })
   check('dialog opens', dialog > 0)
@@ -74,11 +72,11 @@ const check = (name, ok, extra = '') => {
   const t0 = Date.now()
   await inv('session:handOver', proj, claude.id, cx.id, { handover: false })
   // Started with the handover as its launch's task (#782): the call returns as it launches, before the workspace says so.
-  const codexLive = await lib.until(async () => (await agents()).find((a) => a.id === cx.id).live, 30000)
+  const codexLive = await lib.until(async () => (await agents()).find((a) => a.id === cx.id).live, lib.timing('hang.ui'))
   check('codex started and got the prompt', !!codexLive, `${Math.round((Date.now() - t0) / 1000)}s`)
   // Wait for Codex to finish its turn: the CLI's part (a usage limit or the network there is the environment's).
   await lib.cliStep('codex’s first turn', { session: lib.ptyKey(proj, cx.id) }, async () => {
-    check('codex finished its turn', !!(await lib.until(() => turnRan(cx.id), 120000, 1000)))
+    check('codex finished its turn', !!(await lib.until(() => turnRan(cx.id), lib.timing('hang.step'), 1000)))
   })
   const l1 = (await agents()).find((a) => a.id === cx.id).live
   const sessions = sessionsOf(proj)
@@ -104,7 +102,7 @@ const check = (name, ok, extra = '') => {
   check('and the session it was written in', header.includes(`- **Session:** ${l1.sessionId}`))
   check('and the date, with UTC', /^- \*\*Date:\*\* \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\)$/m.test(header))
   await lib.cliStep('codex 2’s turn', { session: lib.ptyKey(proj, cx2.id) }, async () => {
-    check('codex 2 finished its turn', !!(await lib.until(() => turnRan(cx2.id), 120000, 1000)))
+    check('codex 2 finished its turn', !!(await lib.until(() => turnRan(cx2.id), lib.timing('hang.step'), 1000)))
   })
   const l2 = (await agents()).find((a) => a.id === cx2.id).live
   const s2 = sessionsOf(proj)
@@ -112,11 +110,11 @@ const check = (name, ok, extra = '') => {
   check('second session linked to the first', rec2?.handedOverFrom === l1.sessionId, JSON.stringify(rec2?.handedOverFrom))
   await page.screenshot({ path: path.join(scratch, 'cont-3-codex2.png') })
   await page.locator('.tab', { hasText: 'Sessions' }).first().click().catch(() => undefined)
-  await lib.until(async () => (await page.locator('.tabs .tab.active', { hasText: 'Sessions' }).count()) === 1 && (await page.locator('.session-row').count()) > 0, 10000)
+  await lib.until(async () => (await page.locator('.tabs .tab.active', { hasText: 'Sessions' }).count()) === 1 && (await page.locator('.session-row').count()) > 0, lib.timing('hang.step'))
   await page.screenshot({ path: path.join(scratch, 'cont-4-sessions.png') })
 
   await inv('session:stop', proj)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(`${results.filter(Boolean).length}/${results.length}`)
 })().catch((e) => {

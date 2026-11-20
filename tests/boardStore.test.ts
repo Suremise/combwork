@@ -8,20 +8,21 @@ import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { junction, shortPath } from './pathAliases'
 import { tempDir } from './tempDir'
-import { leftByAKill, refusedNow, whileMapped } from './mappedShm'
+import { leftByAKill, MAPPED_SHM_REFUSED, refusedNow, whileMapped } from './mappedShm'
 import { journalSettings } from '../src/shared/journal'
 import type { BoardNotice } from '../src/main/boardStore'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-board-store-')
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace, WorkspaceService } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const journal = await import('../src/main/journal')
 const store = await import('../src/main/boardStore')
-const { backupTo, OPEN_IO_RETRY_MS, openDb, schemaVersion, untilOpenable } = await import('../src/main/db')
+const { backupTo, dbLimits, OPEN_IO_RETRY_MS, openDb, schemaVersion, untilOpenable } = await import('../src/main/db')
 const { renameRetrying } = await import('../src/main/fsutil')
 const { refusal } = await import('../src/main/openingFence')
 
@@ -65,7 +66,8 @@ describe('the database layer (db.ts)', () => {
     try {
       expect((db.writer.prepare('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode).toBe('wal')
       expect((db.writer.prepare('PRAGMA synchronous').get() as { synchronous: number }).synchronous).toBe(1)
-      expect((db.writer.prepare('PRAGMA busy_timeout').get() as { timeout: number }).timeout).toBe(5000)
+      // HI-3374: cw.db.busySeconds' (dbLimits.busyMs, 15 s by default).
+      expect((db.writer.prepare('PRAGMA busy_timeout').get() as { timeout: number }).timeout).toBe(dbLimits.busyMs)
       expect(db.writer.prepare('SELECT version, name, app_version FROM schema_version').all()).toEqual([{ version: 1, name: 'one', app_version: '9.9.9' }])
       // The reader only reads.
       expect(() => db.reader.exec('INSERT INTO a VALUES (1)')).toThrow()
@@ -192,7 +194,34 @@ async function killedWorkspace(): Promise<{ ws: string; file: string }> {
   return { ws, file }
 }
 
-describe.runIf(process.platform === 'win32')('a board whose -shm another process still maps (HI-2199)', () => {
+describe.runIf(process.platform === 'win32')("whether this SQLite refuses a file whose -shm another process maps (HI-3426)", () => {
+  it('as MAPPED_SHM_REFUSED says, by its version: 1546 before 3.54, opened as it is from then on', async () => {
+    const file = join(base, `layer-${++n}`, 'x.db')
+    mkdirSync(join(file, '..'), { recursive: true })
+    await leftByAKill(file)
+    await whileMapped(base, `${file}-shm`, async () => {
+      expect(refusedNow(file)).toBe(MAPPED_SHM_REFUSED ? 1546 : null)
+    })
+  })
+
+  it.runIf(!MAPPED_SHM_REFUSED)("where it isn't refused, the workspace's open waits for nothing and opens the board with what it kept", async () => {
+    const { ws, file } = await killedWorkspace()
+    const waits: string[] = []
+    store.boardTestHooks.openableWait = (p) => waits.push(p)
+    try {
+      await whileMapped(base, `${file}-shm`, async () => {
+        const w = await open(ws)
+        expect((await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title)).toContain('Kept')
+        expect(waits).toEqual([])
+      })
+    } finally {
+      store.boardTestHooks.openableWait = null
+    }
+  })
+})
+
+// Only where this SQLite refuses it (HI-3426: 3.54's opens it, nothing to wait for; MAPPED_SHM_REFUSED).
+describe.runIf(process.platform === 'win32' && MAPPED_SHM_REFUSED)('a board whose -shm another process still maps (HI-2199)', () => {
   afterEach(() => {
     store.boardTestHooks.openableWait = null
     journal.journalTestHooks.openableWait = null
@@ -218,7 +247,7 @@ describe.runIf(process.platform === 'win32')('a board whose -shm another process
     const first = await open(ws)
     const home = first.assistantHome
     const settings = journalSettings({ enabled: true })
-    journal.writeEntry(home, settings, { kind: 'event', summary: 'Kept in the journal' }, 'combwork')
+    await journal.writeEntry(home, settings, { kind: 'event', summary: 'Kept in the journal' }, 'combwork')
     await disposeWorkspaceService(first)
     const file = journal.journalFile(home)
     await leftByAKill(file)
@@ -387,7 +416,7 @@ function leaveStub(ws: string, next: number): string {
   return stub
 }
 
-describe("cards an older version saved meanwhile (#1017 downgrade, Darren's decision of 17 Oct: none taken back on its own)", () => {
+describe("cards an older version saved meanwhile (#1017 downgrade: none taken back on its own)", () => {
   /** A workspace moved to the board (its board opened once and closed), and the stub 1.0 left, an older version's cards in it. */
   async function moved(files: Record<string, string>): Promise<{ ws: string; stub: string }> {
     const ws = workspaceWith(files)
@@ -472,7 +501,7 @@ describe("cards an older version saved meanwhile (#1017 downgrade, Darren's deci
   })
 })
 
-describe('reviewing the set-aside cards (#1044, Darren\'s decision on #1017: the only way they reach the board)', () => {
+describe('reviewing the set-aside cards (#1044, decided on #1017: the only way they reach the board)', () => {
   // Added and discarded files go to the Recycle Bin: a test trash folder here.
   const trashDir = join(base, 'set-aside-trash')
   beforeAll(() => {

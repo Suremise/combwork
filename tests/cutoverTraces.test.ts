@@ -17,6 +17,7 @@ import { commitsBehind } from '../src/main/workflow/queueControls'
 import { adoptionInputs } from '../src/main/workflow/upgrade'
 import { presetInputs } from '../src/main/workflow/optionsForm'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const FIXTURE = join(__dirname, 'fixtures', 'cutoverTraces.json')
 const RECORD = process.env.CW_RECORD_CUTOVER_TRACES === '1'
@@ -48,7 +49,7 @@ function same(step: string, trace: string[]): void {
   else expect(trace, step).toEqual(expected()[step])
 }
 
-describe("R9's moved callers keep their git commands (HI-2792)", { timeout: 90_000 }, () => {
+describe("R9's moved callers keep their git commands (HI-2792)", { timeout: timing('test.hang') }, () => {
   it('keeps .combwork out of a repository: ensured, read only, its tracked files listed and untracked, the whole check', async () => {
     const base = tempDir('cutover-traces-')
     const project = gitRepo(join(base, 'project'))

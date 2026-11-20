@@ -16,6 +16,7 @@ import { taskPrompt } from '../src/shared/tasks'
 import { taskRow, taskRowText } from '../src/shared/toolReplies'
 import { unexpectedCloseText } from '../src/shared/unexpectedClose'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-keys-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -29,7 +30,7 @@ const { openDb } = await import('../src/main/db')
 const { staleWhy } = await import('../src/main/deliveries')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 15000
+const HUNG_MS = timing('wait.hang')
 const user = { kind: 'user' } as const
 let n = 0
 type WS = ReturnType<typeof createWorkspaceService>
@@ -476,7 +477,7 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     for (const w of [w1, w2]) await close(w)
   })
 
-  it("every card argument of the Combwork tools takes a key as well as a number (Darren, 20 Oct: tools take a key string)", () => {
+  it("every card argument of the Combwork tools takes a key as well as a number (tools take a key string)", () => {
     const src = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8')
     // No card argument is a number alone: a card is cardArg or cardsArg, or a number-or-string `before`.
     for (const m of src.matchAll(/(\w+): \{ type: 'number'[^}]*\}/g)) expect({ arg: m[1], card: /card|before/i.test(m[1]) }).toEqual({ arg: m[1], card: false })

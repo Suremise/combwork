@@ -1,4 +1,4 @@
-// The CLI test homes start each run fresh, keeping only the sign-in (HI-2606; its design s17 with Darren's answers, 7 Nov).
+// The CLI test homes start each run fresh, keeping only the sign-in (HI-2606; its design s17 with the user's answers).
 // A real suite or a model trial runs a real CLI from a long-lived, signed-in home under %LOCALAPPDATA%\combwork-test;
 // what earlier runs left there (memory, transcripts, per-folder trust, a stray MCP server, history, skill use) could make
 // a test pass that a new user's CLI would fail. So, under the home's lease (testHomeLock.mjs), before each run:
@@ -30,6 +30,8 @@ import { classify, HOME_NAMES, KEPT_FIELDS, matches, SIGN_IN, UNCLASSIFIED } fro
 import { clearConsumers, holderOf } from './testHomeLock.mjs'
 
 const ctx = createRequire(import.meta.url)('./runContext.cjs')
+// HI-3378: the tests' one timing file, by name.
+const { timing } = createRequire(import.meta.url)('../timing.cjs')
 
 export const MARKER = '.reset-in-progress'
 export const BACKUP = '.reset-backup'
@@ -72,7 +74,7 @@ export function signInStatus(cli, home, { run = runCli } = {}) {
 function runCli(args, cli, env) {
   const exe = cli === 'claude' ? ['.local\\bin\\claude.exe'].map((f) => join(process.env.USERPROFILE ?? '', f)).find((f) => existsSync(f)) ?? 'claude' : 'codex'
   // Both streams, whatever it exits with: Codex says "Logged in…" on stderr (0.166.0).
-  const r = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${exe}" ${args.join(' ')}`], { env: ctx.childEnv(env), encoding: 'utf8', timeout: 30000, windowsHide: true, windowsVerbatimArguments: true, stdio: ['ignore', 'pipe', 'pipe'] })
+  const r = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${exe}" ${args.join(' ')}`], { env: ctx.childEnv(env), encoding: 'utf8', timeout: timing('spawn.hang'), windowsHide: true, windowsVerbatimArguments: true, stdio: ['ignore', 'pipe', 'pipe'] })
   if (r.error || typeof r.status !== 'number') return null
   return { code: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? '') }
 }
@@ -269,7 +271,7 @@ export async function freshenHome(cli, home, deps = {}) {
   throw new HomeNotReady('unknown', `${name}'s sign-in status in ${real} couldn't be read after it was reset: the run stops`)
 }
 
-/** What a reset said, as a line for the run's report (unclassified entries named, as Darren asked). */
+/** What a reset said, as a line for the run's report (unclassified entries named, as the user asked). */
 export function freshenedLine(cli, r) {
   const parts = [`${HOME_NAMES[cli]}'s test home reset: ${r.cleared.length} cleared${r.rewrote.length ? `, ${r.rewrote.join(', ')} rewritten` : ''}`]
   if (r.finishedInterrupted) parts.push('an interrupted reset finished')

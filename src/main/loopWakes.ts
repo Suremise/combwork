@@ -14,7 +14,7 @@ import { getTask, noteOnCard } from './tasks'
 import { actionsRunning, actionsSettled, onAction } from './workflow/actionWorker'
 import type { ActionRow } from './workflow/factStore'
 import { cardFacts } from './workflow/recorder'
-import { inFlightNow as watchesInFlight, itsBuilder, onWatchStarted, settled as watchesSettled, watchCovers, watchTold } from './watches'
+import { inFlightNow as watchesInFlight, itsBuilder, onWatchStarted, settled as watchesSettled, watchCovers, watchStillOn, watchTold } from './watches'
 import { agentMsg, inDialectOf, say, type AgentMsg } from '../shared/agentText'
 import { actionDelivered, cancelFromSource, createDelivery, everyFromSource, offerNow, registerSource } from './deliveries'
 import { isWaiting, type DeliveryRecord } from '../shared/deliveries'
@@ -120,7 +120,7 @@ export async function cardReviewer(ws: WorkspaceService, _projectPath: string, c
  * arrival in Review (not a builder reviewing its own card), else its builder (the card's agent, or `agent` when the
  * action named one: the runtime's builder); an agent of the project. Null: no one's.
  */
-async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopWakeKind, agent?: string): Promise<{ id: string; name: string } | null> {
+async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopWakeKind, agent?: string, byUser = false): Promise<{ id: string; name: string } | null> {
   const agents = projectAgents(await ws.projectConfig(projectPath)).map((a) => ({ id: a.id, name: a.name }))
   // The user's answer reaches the agent waiting on it in or out of a loop (#1269); a loop's handoffs need a reviewer.
   // A pool lane's design closed by its answer or its builder going ahead (HI-2325) leaves the card with no reviewer
@@ -128,7 +128,7 @@ async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCar
   // notice to the reviewer the pool gave that design (`agent`, the runtime's, kept by its wake).
   const poolStep = (kind === 'stepAnswer' || (kind === 'stepNotice' && !!agent)) && poolCard(ws, card)
   const reviewer = kind === 'answer' || poolStep ? null : await reviewerOf(ws, card)
-  if (!reviewer && kind !== 'answer' && !poolStep) return null
+  if (!reviewer && kind !== 'answer' && !poolStep && !(byUser && kind === 'verdict')) return null
   const target = kind === 'review' || toReviewer(kind) ? (agent ?? reviewer) : (agent ?? card.agent)
   if (!target || ((kind === 'review' || toReviewer(kind)) && target === card.agent)) return null
   const found = agents.find((a) => a.id === target)
@@ -147,6 +147,8 @@ interface Wake {
    * now (#1626). A pool design's going ahead (HI-2325): the reviewer the pool gave that design, not whoever reviews next.
    */
   to?: string
+  /** HI-3220: a verdict of the user's (comments sent to the builder): its builder's whether or not the card has a reviewer. */
+  byUser?: true
 }
 
 /**
@@ -173,7 +175,7 @@ const wakeOf = (r: DeliveryRecord): Wake | null => {
   if (typeof m.n !== 'number' || !LOOP_WAKE_KINDS.includes(m.kind as LoopWakeKind) || typeof m.agentName !== 'string') return null
   const since = typeof m.sinceAt === 'string' && m.sinceAt ? ({ at: m.sinceAt, ...(typeof m.sinceId === 'string' && m.sinceId ? { id: m.sinceId } : {}) } as TaskHistoryEntry) : null
   const text = textOf(m)
-  return { n: m.n, kind: m.kind as LoopWakeKind, agentName: m.agentName, since, ...(text ? { text } : {}), ...(typeof m.to === 'string' && m.to ? { to: m.to } : {}) }
+  return { n: m.n, kind: m.kind as LoopWakeKind, agentName: m.agentName, since, ...(text ? { text } : {}), ...(typeof m.to === 'string' && m.to ? { to: m.to } : {}), ...(m.byUser === true ? { byUser: true as const } : {}) }
 }
 
 /**
@@ -228,7 +230,7 @@ async function wakeAboutFor(ws: WorkspaceService, projectPath: string, card: Tas
  * waiting), unless its own watch tells it; made, and offered. `action`: the durable action making it (its delivery
  * carries the id: made once).
  */
-async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard, w: Pick<Wake, 'kind' | 'since' | 'text'>, to: { id: string; name: string }, action?: number): Promise<void> {
+async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard, w: Pick<Wake, 'kind' | 'since' | 'text' | 'byUser'>, to: { id: string; name: string }, action?: number): Promise<void> {
   // Kept with the wake (HI-2325): a pool design's notice stays with that design's reviewer when it is made again.
   const keepTo = w.kind === 'answer' || (w.kind === 'stepNotice' && poolCard(ws, card))
   if (covered(projectPath, to.id, card, w.kind)) return
@@ -237,11 +239,11 @@ async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard
     if (!ws.path || !ws.isProjectPath(projectPath)) return
     const kinds = kindsOf(w.kind)
     const answer = w.kind === 'answer'
-    const meta = { n: card.number, kind: w.kind, agentName: to.name, sinceAt: w.since?.at ?? '', sinceId: w.since?.id ?? '', ...textMeta(w.kind, w.text), ...(keepTo ? { to: to.id } : {}), ...(isReturnNote(w.kind, w.text) ? { queueReturn: true } : {}), ...(w.kind === 'step' ? { awaitsCheck: true } : {}) }
+    const meta = { n: card.number, kind: w.kind, agentName: to.name, sinceAt: w.since?.at ?? '', sinceId: w.since?.id ?? '', ...textMeta(w.kind, w.text), ...(keepTo ? { to: to.id } : {}), ...(isReturnNote(w.kind, w.text) ? { queueReturn: true } : {}), ...(w.kind === 'step' ? { awaitsCheck: true } : {}), ...(w.byUser ? { byUser: true } : {}) }
     // The user's answer is an answer from them (#1626: acked, never coalesced into the card's events), each its own (a
     // later handoff of the card, or another answer, doesn't replace it); the rest, Combwork's card events, the latest per card.
     const ref = answer ? `#${card.number}/answer${action ? `/${action}` : ''}` : `#${card.number}`
-    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : COMBWORK, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: await wakeAboutFor(ws, projectPath, card, w.kind, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref, replace: true, meta, ...(action ? { action } : {}) })
+    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : COMBWORK, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: await wakeAboutFor(ws, projectPath, card, w.kind, to.id) }, w.kind, w.text, undefined, watchStillOn(projectPath, to.id, card.number)), expiresMs: KEEP_MS, source: 'loop', ref, replace: true, meta, ...(action ? { action } : {}) })
     await offerNow(projectPath, to.id)
   }, scopeOfHost(projectPath)))
 }
@@ -258,7 +260,8 @@ function aboutOf(ws: WorkspaceService, a: ActionRow): { kind: LoopWakeKind; text
   if (f?.kind === 'ReviewerRequest') return { kind: 'request', text: String(data.text ?? '') }
   // A design or a follow-up asks its reviewer for a check; going ahead only tells it; an answer is its builder's.
   if (f?.kind === 'LoopStep') return { kind: data.step === 'ok' || data.step === 'gaps' ? 'stepAnswer' : data.step === 'proceed' ? 'stepNotice' : 'step', text: loopStepWords(String(data.step ?? ''), String(data.text ?? ''), typeof data.design === 'string' ? data.design : undefined, typeof data.of === 'string' ? data.of : undefined) }
-  if (f?.kind === 'Verdict') return { kind: 'verdict' }
+  // HI-3220: the user's own verdict (line comments sent to the builder) reaches the builder with no reviewer too.
+  if (f?.kind === 'Verdict') return { kind: 'verdict', ...(data.reviewer === 'user' ? { byUser: true } : {}) }
   if (f?.kind === 'Submitted' || (f?.kind === 'Moved' && data.to === 'review')) return { kind: 'review' }
   if (f?.kind === 'Moved' && (data.to === 'approved' || data.to === 'done')) return { kind: data.to }
   return { kind: 'note', ...(typeof p.why === 'string' && p.why ? { text: p.why } : {}) }
@@ -288,11 +291,12 @@ async function wakeFromAction(a: ActionRow, from: WorkspaceService): Promise<voi
   const named = kind !== 'review' && typeof p.agent === 'string' && p.agent !== 'builder' && p.agent !== 'reviewers' ? p.agent : undefined
   // A lane reviewed by the pool (#1443): the pool gives each submission to a reviewer and tells it (reviewerPool.ts).
   if (kind === 'review' && poolCard(ws, card)) return
-  const to = await targetOf(ws, projectPath, card, kind, named)
+  const byUser = 'byUser' in about && about.byUser === true
+  const to = await targetOf(ws, projectPath, card, kind, named, byUser)
   if (!to || p.by === `agent:${to.id}`) return
   const since = p.since && typeof p.since === 'object' ? (p.since as TaskHistoryEntry) : (card.history.at(-1) ?? null)
   try {
-    await enqueue(ws, projectPath, card, { kind, since, ...(about.text ? { text: about.text } : {}) }, to, a.id)
+    await enqueue(ws, projectPath, card, { kind, since, ...(about.text ? { text: about.text } : {}), ...(byUser ? { byUser: true as const } : {}) }, to, a.id)
   } catch (e) {
     // Another Combwork made it meanwhile (the unique row refused this one's): delivered.
     if (!actionDelivered(projectPath, a.id)) throw e
@@ -436,7 +440,7 @@ registerSource('loop', {
     // Only to whose wake it is now: another reviewer given the lane meanwhile gets it instead (#405 round 1 finding).
     // The user's answer stays with the agent waiting on it (#1626), while it is one of the project's agents.
     // A pool design's notice stays with that design's reviewer (HI-2325).
-    const to = await targetOf(ws, host, card, p.kind, p.kind === 'answer' || p.kind === 'stepNotice' ? p.to : undefined)
+    const to = await targetOf(ws, host, card, p.kind, p.kind === 'answer' || p.kind === 'stepNotice' ? p.to : undefined, p.byUser === true)
     if (to?.id !== r.agentId) {
       if (to) inBackground('a loop wake', enqueue(ws, host, card, p, to))
       return { cancel: endedWhy(host, r.agentId, T.otherAgent) }
@@ -448,7 +452,7 @@ registerSource('loop', {
     // In the dialect of the agent it is for; laneNextOf first, without waiting (HI-1990).
     return inDialectOf({ projectPath: host, agentId: r.agentId }, async () => {
       const next = laneNextOf(ws, card, r.agentId, p.kind)
-      return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: await wakeAboutFor(ws, host, card, p.kind, r.agentId) }, p.kind, p.text, next), meta: { ...r.meta, v } }
+      return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: await wakeAboutFor(ws, host, card, p.kind, r.agentId) }, p.kind, p.text, next, watchStillOn(host, r.agentId, p.n)), meta: { ...r.meta, v } }
     })
   },
   // Its version made, its watch not telling it, and its own card, lanes and project settings unchanged. The same check

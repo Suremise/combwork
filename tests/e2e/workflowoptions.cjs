@@ -20,7 +20,7 @@ const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'workflowoptions-profile')
 const ws = path.join(lib.WORK, 'workflowoptions-ws')
@@ -34,7 +34,7 @@ const check = (name, ok, extra = '') => {
 
 /** Writes to the workspace's board from outside Combwork, as another process would (the upgrade's marks, a lane's rows). */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
   try {
     db.prepare(sql).run(...args)
   } finally {
@@ -193,7 +193,7 @@ async function theForm(page, app, inv) {
     check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'merging', 'where', 'slots', 'github', 'loops', 'stages']), JSON.stringify(await groups()))
     const inGroup = async (g) => section.locator(`.workflow-group[data-group="${g}"] .workflow-option`).evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
     const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), loops: await inGroup('loops'), stages: await inGroup('stages') }
-    check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Combwork; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'otherTargets', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'], loops: ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes'], stages: ['stageNames'] }), JSON.stringify(layout))
+    check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Combwork; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'otherTargets', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'], loops: ['loopWakes', 'loopRounds', 'simplifyAt', 'churnStopAt', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes'], stages: ['stageNames'] }), JSON.stringify(layout))
     check('no Version control row: the header has the choice', (await section.locator('.workflow-platform').count()) === 0)
     check('no preset chosen', (await section.locator('.workflow-preset-now').innerText()).trim() === 'No preset chosen')
     check('every preset is offered, with All off', JSON.stringify(await section.locator('.workflow-choice').evaluateAll((els) => els.map((e) => e.getAttribute('data-choice')))) === JSON.stringify(['solo', 'pairAgent', 'pair', 'team', 'allOff']))
@@ -202,7 +202,16 @@ async function theForm(page, app, inv) {
     check('G4 says what each value does', (await row('sameness').innerText()).includes('a pass carries over to a clean rebase or squash of the same change; with Exact revision only, any new revision makes it stale'), await row('sameness').innerText())
     check('the shared-folder warning shows with everyone in the project folder', (await row('sharedFolderWarning').count()) === 1)
     // Card loops (HI-1766): options of their own, from the defaults; File locks with them.
-    check('Card loops: the defaults, Default as their origin', (await row('loopRounds').locator('input').getAttribute('placeholder')) === '10' && (await row('loopWaitHours').locator('input').getAttribute('placeholder')) === '6 hours' && (await row('loopStepWaitMinutes').locator('input').getAttribute('placeholder')) === '30 minutes' && (await row('loopRounds').locator('.workflow-origin').innerText()).includes('Default'), await section.locator('.workflow-group[data-group="loops"]').innerText())
+    check('Card loops: the defaults, Default as their origin', (await row('loopRounds').locator('input').getAttribute('placeholder')) === '10' && (await row('loopWaitHours').locator('input').getAttribute('placeholder')) === '6 hours' && (await row('loopStepWaitMinutes').locator('input').getAttribute('placeholder')) === '30 minutes' && (await row('loopRounds').locator('.workflow-origin').innerText()).includes('Default') && (await row('simplifyAt').locator('input').getAttribute('placeholder')) === '12' && (await row('churnStopAt').locator('input').getAttribute('placeholder')) === '30', await section.locator('.workflow-group[data-group="loops"]').innerText())
+    // HI-3211: Wake the Assistant for, Standard by default, each level said in full under the choice; Custom ticks the events.
+    await themes('assistant-wakes', row('assistantWakes'))
+    check('Wake the Assistant for: Standard, said in full', (await row('assistantWakes').locator('select').inputValue()) === 'standard' && (await row('assistantWakes').locator('[data-note="assistant-wakes"]').innerText()).includes('What Combwork has always woken it for.'), await row('assistantWakes').innerText())
+    await row('assistantWakes').locator('select').selectOption('custom')
+    await lib.until(async () => (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input[type="checkbox"]').count()) === 13, HUNG_MS)
+    await themes('assistant-wakes-custom', row('assistantWakes'))
+    check('…Custom: a tick per event, from the level left; a question for you always on', (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input:checked').count()) === 10 && (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input:disabled').count()) === 1, await row('assistantWakes').innerText())
+    await discard()
+    await lib.until(async () => (await row('assistantWakes').locator('select').inputValue()) === 'standard', HUNG_MS)
     check('File locks: Block, with what it applies to', (await row('fileLocks').locator('select').inputValue()) === 'block' && (await row('fileLocks').locator('[data-note="file-locks"]').innerText()) === 'Applies to agents working in the same folder, outside a slot.')
     await themes('groups-top', section.locator('.workflow-group[data-group="review"]'))
     await themes('groups-end', section.locator('.workflow-group[data-group="loops"]'))
@@ -315,7 +324,7 @@ async function theForm(page, app, inv) {
     await popups.filter({ hasText: 'Workflow options copied' }).waitFor({ timeout: HUNG_MS })
     check('…saying so in a pop-up; the pop-ups closed, nothing covers Paste JSON…', !!(await lib.until(async () => {
       if ((await popups.count()) === 0) return true
-      await popups.first().locator('.popup-close').click({ timeout: 2000 }).catch(() => undefined)
+      await popups.first().locator('.popup-close').click({ timeout: lib.timing('poll.clickMs') }).catch(() => undefined)
       return false
     }, HUNG_MS)), (await popups.allInnerTexts()).join(' | '))
     const pasteIn = async (json) => {
@@ -335,10 +344,10 @@ async function theForm(page, app, inv) {
     check('a good paste fills the form, to save', (await row('target').locator('input').inputValue()) === 'release')
     await discard()
 
-    // --- Pair (Combwork merges, #1355): Combwork merges, G9's checks suggested from the scripts with their commands, the install.
+    // --- Pair (Combwork merges, #1355): Combwork merges, G9's checks suggested from the scripts with their commands, the install, and the merge guards (HI-3284).
     await applyChoice('pair')
     check('Pair: Combwork merges into the repository’s own default branch, by name (master here)', (await row('finish').locator('select').inputValue()) === 'combworkMerges' && (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
-    check('…G9 in Checks: the quick checks from its scripts, with their commands', JSON.stringify(await inGroup('checks')) === JSON.stringify(['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall']) && JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('mergeChecks')))
+    check('…G9 in Checks: the quick checks from its scripts, with their commands', JSON.stringify(await inGroup('checks')) === JSON.stringify(['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall', 'mergeGuards']) && JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify({ checks: await inGroup('checks'), mergeChecks: await values('mergeChecks') }))
     check('…G8 shown in Merging while Combwork merges', (await inGroup('merging')).includes('strict'))
     // G18 (#1179): pushing the target after a merge, shown while Combwork merges, off in the preset; switched on and saved.
     const push = row('pushTarget').locator('[role="switch"]')
@@ -386,6 +395,39 @@ async function theForm(page, app, inv) {
     await themes('team', section.locator('.workflow-group[data-group="presets"]'))
     await saveAll()
     check('saved: Team, in project.json', !!(await lib.until(async () => projectJson().workflow?.preset === 'team' && saved().okBefore?.mode === 'labels', HUNG_MS)), JSON.stringify(projectJson().workflow))
+
+    // --- HI-3333: Save… off says why. The report's steps: Pair previewed, not used; down to Save…; back up to Use Pair.
+    // Save… then saves, and once saved it is off saying there is nothing to save, after the window reloads too.
+    const saveTip = async () => {
+      await page.mouse.move(5, 5)
+      await save.hover()
+      const tip = page.locator('.tip', { hasText: 'No changes to save' })
+      return !!(await lib.until(async () => (await tip.count()) === 1, HUNG_MS))
+    }
+    check('HI-3333: Save… off with nothing changed says so in its tooltip', (await save.isDisabled()) && (await save.getAttribute('data-off')) === 'noChanges' && (await saveTip()))
+    await choice('pair').click()
+    await preview.waitFor({ timeout: HUNG_MS })
+    await save.scrollIntoViewIfNeeded()
+    check('…Pair only previewed: still nothing to save', (await save.getAttribute('data-off')) === 'noChanges')
+    const use = preview.locator('[data-action="use-choice"]')
+    await use.scrollIntoViewIfNeeded()
+    await use.click()
+    await save.scrollIntoViewIfNeeded()
+    check('…Use Pair after scrolling: Save… on', !!(await lib.until(async () => !(await save.isDisabled()) && (await save.getAttribute('data-off')) === null, HUNG_MS)), String(await save.getAttribute('data-off')))
+    await saveAll()
+    check('…it saves Pair, and Save… is off again, saying there is nothing to save', !!(await lib.until(async () => projectJson().workflow?.preset === 'pair' && (await save.getAttribute('data-off')) === 'noChanges', HUNG_MS)) && (await saveTip()), JSON.stringify(projectJson().workflow?.preset))
+    await page.reload()
+    await lib.appReady(page)
+    await page.getByText('web', { exact: true }).first().click()
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await page.locator('.git-sections [data-section="workflow"]').click()
+    await section.waitFor({ timeout: HUNG_MS })
+    check('…after the window reloads: Pair shown, nothing to save', !!(await lib.until(async () => (await section.locator('.workflow-preset-now').getAttribute('data-preset-now')) === 'pair' && (await save.getAttribute('data-off')) === 'noChanges', HUNG_MS)))
+    // Team back, as the rest of the suite has it.
+    await applyChoice('team')
+    check('…a change turns Save… on again', !!(await lib.until(async () => !(await save.isDisabled()), HUNG_MS)))
+    await saveAll()
+    check('…Team saved again', !!(await lib.until(async () => projectJson().workflow?.preset === 'team' && saved().okBefore?.mode === 'labels', HUNG_MS)), JSON.stringify(projectJson().workflow))
 
     // --- Stage names (N5): a rename alone applies now, never "old rules".
     const stageBox = (stage) => row('stageNames').locator(`input[aria-label="Name of the stage ${stage}"]`)
@@ -490,7 +532,7 @@ async function theForm(page, app, inv) {
     check('None’s groups, in order', !!(await lib.until(async () => JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'work', 'loops', 'stages']), HUNG_MS)), JSON.stringify(await groups()))
     const noneLayout = { review: await inGroup('review'), checks: await inGroup('checks'), work: await inGroup('work') }
     check('…N1, N2 in Review, N3 in Checks, N4, N6 and N7 (File locks) in The work', JSON.stringify(noneLayout) === JSON.stringify({ review: ['review', 'noSelfReview'], checks: ['preChecks'], work: ['excluded', 'dependenciesDone', 'fileLocks'] }), JSON.stringify(noneLayout))
-    check('…and Card loops, as Git’s', JSON.stringify(await inGroup('loops')) === JSON.stringify(['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes']))
+    check('…and Card loops, as Git’s', JSON.stringify(await inGroup('loops')) === JSON.stringify(['loopWakes', 'loopRounds', 'simplifyAt', 'churnStopAt', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes']))
     check('…N1 reads “Who checks the work before it’s done”', (await row('review').innerText()).startsWith('Who checks the work before it’s done'))
     await themes('none', section.locator('.workflow-group[data-group="review"]'))
     check('…its Card loops from the defaults, Default as their origin', (await row('loopWakes').locator('.workflow-origin').innerText()).includes('Default') && (await row('fileLocks').locator('.workflow-origin').innerText()).includes('Default'))
@@ -614,10 +656,9 @@ async function theForm(page, app, inv) {
     await reopen()
     const base = (await inv('app:info')).language
     let messages = null
+    // Main reads the language's catalogue, not sent through app.evaluate (HI-3434); English: the window's own.
     const speak = async (code) => {
-      const dir = path.join(lib.ROOT, 'locales', code)
-      messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: messages ? { ...base, code, locale: code, messages } : base })
+      messages = await lib.speakLanguage(app, base, code === 'en' ? undefined : code)
     }
     /**
      * The save's dialog opened in the window's language (#1489): its title, message, what changes (Merge style, its
@@ -692,8 +733,8 @@ async function theForm(page, app, inv) {
     // The target moves on, and each builder rebases its card cleanly onto it.
     q.commitOn(fx, 'integration', { 'd.txt': 'elsewhere\n' }, 'Someone else’s change')
     for (const c of [kept, exact]) lib.git(c.builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'rebase', '-q', 'integration'])
-    check('Same change: the pass carries over (CarriedOver), the card stays approved', !!(await lib.until(async () => (await h.kinds(kept.n)).includes('CarriedOver'), 30000)) && !(await h.kinds(kept.n)).includes('Stale'), JSON.stringify(await h.kinds(kept.n)))
-    check('Exact revision only: the same rebase makes the pass stale', !!(await lib.until(async () => (await h.kinds(exact.n)).includes('Stale'), 30000)) && !(await h.kinds(exact.n)).includes('CarriedOver'), JSON.stringify(await h.kinds(exact.n)))
+    check('Same change: the pass carries over (CarriedOver), the card stays approved', !!(await lib.until(async () => (await h.kinds(kept.n)).includes('CarriedOver'), lib.timing('hang.ui'))) && !(await h.kinds(kept.n)).includes('Stale'), JSON.stringify(await h.kinds(kept.n)))
+    check('Exact revision only: the same rebase makes the pass stale', !!(await lib.until(async () => (await h.kinds(exact.n)).includes('Stale'), lib.timing('hang.step'))) && !(await h.kinds(exact.n)).includes('CarriedOver'), JSON.stringify(await h.kinds(exact.n)))
   } catch (e) {
     check('G4’s part ran to the end', false, e.stack ?? String(e))
   } finally {

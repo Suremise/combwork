@@ -11,7 +11,7 @@ fs.mkdirSync(path.join(ws, 'alpha'), { recursive: true })
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 ;(async () => {
   lib.enableProviders(userData)
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData }) })
@@ -42,7 +42,7 @@ const HUNG_MS = 10000
         await page.mouse.move(5, 5)
         await rows.nth(j).hover()
         // A tip would show after its delay: wait until one does or the bound passes, then say none came.
-        const came = await lib.until(async () => (await page.locator('.tip:visible').count()) > 0, 1500)
+        const came = await lib.until(async () => (await page.locator('.tip:visible').count()) > 0, lib.timing('quiet.tipMs'))
         check(`${what}: a name that fits shows no tooltip`, !came, all[j].text)
       }
       // A click on a row whose name is cut still opens its section.
@@ -82,7 +82,7 @@ const HUNG_MS = 10000
       // A cut name, focused by the keyboard, shows in full (HI-2531's tooltip).
       await page.keyboard.press('Home')
       for (let n = 0; n < cutAt; n++) await page.keyboard.press('ArrowDown')
-      const tip = await lib.until(async () => { const t = await page.locator('.tip:visible').last().innerText({ timeout: 1000 }).catch(() => ''); return t === all[cutAt].text && t }, HUNG_MS)
+      const tip = await lib.until(async () => { const t = await page.locator('.tip:visible').last().innerText({ timeout: lib.timing('poll.readMs') }).catch(() => ''); return t === all[cutAt].text && t }, HUNG_MS)
       check(`${what}: a cut name shows in full when the keyboard focuses it`, tip === all[cutAt].text, `${tip} (${all[cutAt].text})`)
       // While a search shows every section, none is chosen: the first row is in the Tab order, and Enter or Space chooses.
       await search.fill('a')

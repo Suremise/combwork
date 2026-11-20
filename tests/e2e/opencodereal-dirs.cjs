@@ -1,5 +1,5 @@
 // The real OpenCode (the pinned 2.2.6) and folders outside its own (HI-2772, #1439), through Combwork's production launch,
-// under Darren's HI-2758 option A as opencodereal.cjs: no account, key, sign-in or cloud call; model turns only to the PC's
+// under HI-2758's option A as opencodereal.cjs: no account, key, sign-in or cloud call; model turns only to the PC's
 // local Ollama qwen3:8b through a logging proxy here; the project's own OpenCode config kept out (the default). Combwork's
 // launch config asks external_directory for every folder outside the agent's own and allows a reviewer's review copies
 // (HI-2775: 2.2.6's default rules, `* * allow` first, would let any agent reach any folder). Three agents, each in its own
@@ -7,7 +7,9 @@
 // for that turn) and writes a new file there (its bytes on disk), unasked; a reviewer in Plan, asked to write there,
 // doesn't (its own edit deny: the file absent, and what it tried, from its record); a builder in Build, lent no copy, is
 // asked for the copies folder (shown as waiting for the user, OpenCode's external_directory) and, rejected, writes nothing
-// there. Any permission asked is recorded and rejected (Esc, 2.2.6's escapeKey), never approved. A turn is one by its own id (the
+// there. Any permission asked is recorded and rejected (Esc, 2.2.6's escapeKey), never approved; a question the model asks
+// with its question tool (HI-3317: qwen3 sometimes does, after its write) is a wait too, rejected the same way, but asks no
+// permission (opencodeDirsProbe.cjs questionsAsked, from its record). A turn is one by its own id (the
 // turn ledger's) reaching its end; each attempt has its own files and marker, and a tool's result counts once the record
 // has it ended for that turn. A step the model never tries in three prompts makes the run SKIPPED (inconclusive), not a
 // pass (opencodeDirsProbe.cjs). The evidence goes to the suite's log and TRACE (scrubbed into
@@ -19,11 +21,11 @@ const path = require('path')
 const http = require('http')
 const crypto = require('crypto')
 const { processes } = require('./folderProcesses.cjs')
-const { recordOf, readOf, writeOf, turnTools, ending } = require('./opencodeDirsProbe.cjs')
+const { recordOf, readOf, writeOf, turnTools, ending, ended, questionsAsked, permissionAsks } = require('./opencodeDirsProbe.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 // A real model turn on a local model: bounded, never how long it should take.
-const TURN_MS = 240000
+const TURN_MS = lib.timing('turn.realMs')
 const TRIES = 3
 
 const PINNED = path.join(process.env.LOCALAPPDATA || '', 'combwork-test', 'opencode-2.2.6', 'opencode.exe')
@@ -74,7 +76,7 @@ const portOpen = (port) => new Promise((resolve) => {
   s.on('error', () => resolve(false))
 })
 const ollamaModels = () => new Promise((resolve) => {
-  const req = http.get({ ...OLLAMA, path: '/api/tags', timeout: 5000 }, (res) => {
+  const req = http.get({ ...OLLAMA, path: '/api/tags', timeout: lib.timing('hang.ui') }, (res) => {
     let b = ''
     res.on('data', (d) => (b += d))
     res.on('end', () => {
@@ -135,7 +137,7 @@ function proxy() {
   }
   const models = await ollamaModels()
   if (!models?.includes(MODEL)) {
-    console.log(`SKIP environment: no local Ollama with ${MODEL} at ${OLLAMA.host}:${OLLAMA.port} (${models ? models.join(', ') || 'no models' : 'not answering'}): Darren pulls it by hand`)
+    console.log(`SKIP environment: no local Ollama with ${MODEL} at ${OLLAMA.host}:${OLLAMA.port} (${models ? models.join(', ') || 'no models' : 'not answering'}): the user pulls it by hand`)
     process.exit(0)
   }
   const before = snapshot()
@@ -256,6 +258,8 @@ function proxy() {
      * a tool that ended, never just the turn's start), within the bound; else what the record had.
      */
     const toolsFor = (sessionId, nonce, ready, ms = HUNG_MS) => turnTools(() => recordOf(accountHome, sessionId), nonce, ready, until, ms)
+    /** The permissions asked in the phases starting `prefix` (the model's questions left out, as its record has them). */
+    const asked = (sessionId, prefix) => permissionAsks(trace.asks, (p) => p.startsWith(prefix), questionsAsked(recordOf(accountHome, sessionId)))
     // Each attempt waits for its own file's read or write to end (opencodeDirsProbe.cjs readOf, writeOf): another file's never counts.
 
     // --- 1. A reviewer in Build: reads a marker there (its record's read result), writes a new file (bytes on disk).
@@ -278,13 +282,13 @@ function proxy() {
     const readTools = read ? await toolsFor(rb.sessionId, read.nonce, readOf(read.file)) : null
     const markerRead = read ? readOf(read.file)(readTools ?? []) : null
     trace.results.read = read ? { file: path.basename(read.file), tools: readTools } : null
-    if (read) check('reviewer (Build): read the marker in the copies folder, its record has the read with it for that turn, unasked', markerRead?.status === 'completed' && markerRead.result.includes(read.marker) && !trace.asks.some((a) => a.phase.startsWith('reviewer (Build): read')), JSON.stringify({ readTools, asks: trace.asks }))
+    if (read) check('reviewer (Build): read the marker in the copies folder, its record has the read with it for that turn, unasked', markerRead?.status === 'completed' && markerRead.result.includes(read.marker) && asked(rb.sessionId, 'reviewer (Build): read').length === 0, JSON.stringify({ readTools, asks: trace.asks }))
     else {
       inconclusive.push("the Build reviewer's read")
       console.log(`INCONCLUSIVE reviewer (Build): no read of the marker in ${TRIES} prompts`)
     }
     trace.results.write = write ? { file: path.basename(write.file), bytes: fs.readFileSync(write.file, 'utf8'), tools: await toolsFor(rb.sessionId, write.marker, writeOf(write.file)) } : null
-    if (write) check('reviewer (Build): wrote a new file in the copies folder, its bytes on disk, unasked', fs.readFileSync(write.file, 'utf8').trim() === write.marker && !trace.asks.some((a) => a.phase.startsWith('reviewer (Build): write')), JSON.stringify({ result: trace.results.write, asks: trace.asks }))
+    if (write) check('reviewer (Build): wrote a new file in the copies folder, its bytes on disk, unasked', fs.readFileSync(write.file, 'utf8').trim() === write.marker && asked(rb.sessionId, 'reviewer (Build): write').length === 0, JSON.stringify({ result: trace.results.write, asks: trace.asks }))
     else {
       inconclusive.push("the Build reviewer's write")
       console.log(`INCONCLUSIVE reviewer (Build): no file written in ${TRIES} prompts`)
@@ -316,13 +320,17 @@ function proxy() {
     const bd = await start('builder (Build)', agents.builder)
     if (!bd) return
     const builderFiles = []
-    const builderAsks = (n) => trace.asks.filter((a) => a.phase === `builder (Build): write ${n}`)
+    const builderAsks = (n) => asked(bd.sessionId, `builder (Build): write ${n}`)
     const reached = await attempts('builder (Build): write', agents.builder, (n) => {
       const marker = `cw-builder-${crypto.randomBytes(4).toString('hex')}`
       const file = path.join(probe, `builder-${n}.txt`)
       builderFiles.push(file)
       return { n, nonce: marker, marker, file, prompt: `Use your write tool to create the file ${fwd(file)} containing exactly this one line: ${marker}` }
-    }, async (a) => builderAsks(a.n).length > 0 || fs.existsSync(a.file))
+    }, async (a) => {
+      // A wait in the turn: its tools ended in the record first, so a question of the model's is known as one.
+      if (trace.asks.some((x) => x.phase === `builder (Build): write ${a.n}`)) await toolsFor(bd.sessionId, a.marker, (tools) => tools.every(ended))
+      return builderAsks(a.n).length > 0 || fs.existsSync(a.file)
+    })
     await stop('builder (Build)', agents.builder)
     trace.results.builder = { asks: reached ? builderAsks(reached.n) : [], filesWritten: builderFiles.filter((f) => fs.existsSync(f)).map((f) => path.basename(f)) }
     if (reached) {

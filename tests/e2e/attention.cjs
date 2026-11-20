@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'attention-profile')
 const ws = path.join(lib.WORK, 'attention-ws')
@@ -42,10 +42,10 @@ const check = (name, ok, extra = '') => {
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-  const until = async (fn, ms = 10000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(100)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   const info = await lib.waitForProvider(inv, 'codex')
@@ -57,7 +57,8 @@ const check = (name, ok, extra = '') => {
   const asking = await lib.addAgent(inv, proj, { name: 'Asking', provider: 'codex', permissionMode: 'ask' })
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   for (const a of [reviewed, asking]) await inv('session:start', proj, { agentId: a.id })
-  check('the agents start', !!(await until(async () => (await live(reviewed.id))?.status === 'ready' && (await live(asking.id))?.status === 'ready', 20000)), `${(await live(reviewed.id))?.status} ${(await live(asking.id))?.status}`)
+  // before any turn (HI-2688): its start, restart or resume
+  check('the agents start', !!(await until(async () => (await live(reviewed.id))?.status === 'ready' && (await live(asking.id))?.status === 'ready', lib.timing('hang.step'))), `${(await live(reviewed.id))?.status} ${(await live(asking.id))?.status}`)
   check('in their modes', (await live(reviewed.id))?.permissionMode === 'approve-for-me' && (await live(asking.id))?.permissionMode === 'ask', `${(await live(reviewed.id))?.permissionMode} ${(await live(asking.id))?.permissionMode}`)
 
   // Every state an agent goes through (status | message | question | review), and the times Combwork says it needs you (the log).
@@ -80,10 +81,10 @@ const check = (name, ok, extra = '') => {
     seen.set(a.id, [])
     const key = lib.ptyKey(proj, a.id)
     await inv('pty:write', key, text)
-    await lib.sleep(150)
+    await lib.sleep(lib.timing('pace.keysThenEnterMs'))
     await inv('pty:write', key, '\r')
     // Under way, so a wait for it to finish isn't answered by the turn before.
-    await until(async () => states(a).some((s) => s.startsWith('working')), 5000)
+    await until(async () => states(a).some((s) => s.startsWith('working')), lib.timing('hang.ui'))
   }
   const finished = (a, ms = 15000) => until(async () => (await live(a.id))?.status === 'finished', ms)
   const states = (a) => seen.get(a.id) ?? []
@@ -98,13 +99,16 @@ const check = (name, ok, extra = '') => {
   await turn(reviewed, 'review allow')
   check('under review: its status still says Working…, with the review mark', !!(await until(async () => (await mark.isVisible().catch(() => false)) && (await status()) === 'Working…', HUNG_MS)), await status())
   check('an approved auto-review finishes the turn', !!(await finished(reviewed)))
-  check('and the mark goes', (await mark.count()) === 0)
+  // Main has it finished (its review cleared with it) before the window draws that: wait for the mark to go (HI-3430).
+  const reviewGone = async () => (await live(reviewed.id))?.review === undefined && (await mark.count()) === 0
+  const reviewLeft = async () => `review ${JSON.stringify((await live(reviewed.id))?.review)}, marks ${await mark.count()}`
+  check('and the mark goes', !!(await until(reviewGone, lib.timing('hang.ui'))), await reviewLeft())
   check('it was under review, with what was asked', states(reviewed).some(underReview), states(reviewed).join(' > '))
   check('never as its status message', neverStatus(reviewed), states(reviewed).join(' > '))
   check('and never that it needed you', !states(reviewed).some((s) => s.startsWith('waiting')) && told('Reviewed') === 0, states(reviewed).join(' > '))
   await turn(reviewed, 'review deny')
   check('a denied one too', !!(await finished(reviewed)) && !states(reviewed).some((s) => s.startsWith('waiting')) && told('Reviewed') === 0, states(reviewed).join(' > '))
-  check('its review gone with the next command', (await live(reviewed.id))?.review === undefined && (await mark.count()) === 0)
+  check('its review gone with the next command', !!(await until(reviewGone, lib.timing('hang.ui'))), await reviewLeft())
 
   // --- A long command under review (an environment variable, a path): the header stays short and readable, wide
   // and narrow, dark and light; the command is only in the mark's tooltip.
@@ -120,13 +124,13 @@ const check = (name, ok, extra = '') => {
     check(`${width}px ${theme}: the header fits, its buttons inside it`, await header.evaluate((h) => h.scrollWidth <= h.clientWidth + 1 && [...h.querySelectorAll('button')].every((b) => b.getBoundingClientRect().right <= h.getBoundingClientRect().right + 1)))
     const tip = page.locator('.tip', { hasText: 'npm.cmd run e2e' })
     const hovered = await until(async () => {
-      await mark.hover({ timeout: 500 }).catch(() => undefined)
+      await mark.hover({ timeout: lib.timing('poll.readMs') }).catch(() => undefined)
       return (await tip.count()) === 1
     }, HUNG_MS)
     check(`${width}px ${theme}: the details on hover: the reviewer, and what it asks`, !!hovered && /reviewer is checking/.test(await tip.innerText()), `mark visible: ${await mark.isVisible().catch(() => false)}; tips: ${await page.locator('.tip').allInnerTexts().then((t) => t.join(' | '))}; ${Date.now() - t0} ms; ${states(reviewed).join(' > ')}`)
     await page.screenshot({ path: path.join(lib.WORK, `attention-review-${width}-${theme}.png`) })
     await page.mouse.move(5, 5)
-    check(`${width}px ${theme}: approved, the mark goes`, !!(await finished(reviewed)) && (await mark.count()) === 0)
+    check(`${width}px ${theme}: approved, the mark goes`, !!(await finished(reviewed)) && !!(await until(reviewGone, lib.timing('hang.ui'))), await reviewLeft())
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
@@ -134,12 +138,14 @@ const check = (name, ok, extra = '') => {
   // --- Ask for approval: the prompt is up: waiting, told once (the title blinks meanwhile), over when answered.
   const askKey = lib.ptyKey(proj, asking.id)
   await turn(asking, 'approve')
-  check('an approval prompt is waiting for you', !!(await until(async () => (await live(asking.id))?.status === 'waiting', 5000)))
+  check('an approval prompt is waiting for you', !!(await until(async () => (await live(asking.id))?.status === 'waiting', lib.timing('hang.ui'))))
   check('with what it asks', (await live(asking.id))?.statusMessage === 'Codex asks to run curl.exe https://example.com', (await live(asking.id))?.statusMessage)
-  await lib.sleep(1600) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.toldAgainMs')) // The window is the point: no second telling within it.
   check('told once, though its title blinks', told('Asking') === 1, String(told('Asking')))
-  // The inbox (finishes the window hasn't shown yet may be listed with it).
-  await page.locator('[data-inbox-toggle]').click()
+  // The inbox (finishes the window hasn't shown yet may be listed with it). Its "needs you" item, not the quieter
+  // "finished" one beside it: the window opens unfocused (HI-3404), so the agents' finishes stay unseen and that shows too.
+  const needsYou = page.locator('[data-inbox-toggle]:not([data-inbox-finished])')
+  await needsYou.click()
   check('the inbox says it needs input', !!(await until(() => page.getByText('Needs input: Codex asks to run curl.exe https://example.com').isVisible().catch(() => false), HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'attention-1-approval.png') })
   await page.keyboard.press('Escape')
@@ -147,26 +153,27 @@ const check = (name, ok, extra = '') => {
   check('approved: it works on, and finishes', !!(await finished(asking)))
   check('no longer waiting', !states(asking).slice(states(asking).findIndex((s) => s.startsWith('waiting')) + 1).some((s) => s.startsWith('waiting')), states(asking).join(' > '))
   await turn(asking, 'approve')
-  await until(async () => (await live(asking.id))?.status === 'waiting', 5000)
+  await until(async () => (await live(asking.id))?.status === 'waiting', lib.timing('hang.ui'))
   await inv('pty:write', askKey, '\x1b')
-  check('rejected (Esc): ready again, not waiting', !!(await until(async () => (await live(asking.id))?.status === 'ready', 5000)), (await live(asking.id))?.status)
+  // ready on purpose (HI-2688): a question rejected with Esc leaves it ready, with no turn
+  check('rejected (Esc): ready again, not waiting', !!(await until(async () => (await live(asking.id))?.status === 'ready', lib.timing('hang.step'))), (await live(asking.id))?.status)
   check('told once for that prompt', told('Asking') === 2, String(told('Asking')))
 
   // --- An async question: it works on, with the question pending, told once, until answered.
   await turn(reviewed, 'question')
-  check('a question is pending', !!(await until(async () => (await live(reviewed.id))?.question?.text === 'Which colour?', 5000)))
+  check('a question is pending', !!(await until(async () => (await live(reviewed.id))?.question?.text === 'Which colour?', lib.timing('hang.ui'))))
   check('while it works on', (await live(reviewed.id))?.status === 'working')
-  await lib.sleep(1600) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.toldAgainMs')) // The window is the point: no second telling within it.
   check('told once', told('Reviewed') === 1, String(told('Reviewed')))
   check('never waiting', !states(reviewed).some((s) => s.startsWith('waiting')), states(reviewed).join(' > '))
   check('its pane says so', !!(await until(() => page.locator('.pane-status.asks', { hasText: 'has a question for you' }).isVisible().catch(() => false), HUNG_MS)))
-  check('it needs you in the status bar', await page.locator('[data-inbox-toggle]', { hasText: /needs? you/ }).isVisible().catch(() => false))
-  await page.locator('[data-inbox-toggle]').click()
+  check('it needs you in the status bar', await needsYou.filter({ hasText: /needs? you/ }).isVisible().catch(() => false))
+  await needsYou.click()
   check('the inbox shows the question', !!(await until(() => page.getByText('Asks: Which colour?').isVisible().catch(() => false), HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'attention-2-question.png') })
   await page.keyboard.press('Escape')
   await inv('pty:write', lib.ptyKey(proj, reviewed.id), 'a')
-  check('answered: the question goes', !!(await until(async () => !(await live(reviewed.id))?.question, 5000)))
+  check('answered: the question goes', !!(await until(async () => !(await live(reviewed.id))?.question, lib.timing('hang.ui'))))
   check('and the turn finishes', !!(await finished(reviewed)))
   check('neither agent asks anything now', (await inv('session:live')).every((s) => !s.question && s.status !== 'waiting'))
 
@@ -175,10 +182,10 @@ const check = (name, ok, extra = '') => {
   for (const outcome of ['allow', 'deny']) {
     const before = told('Reviewed')
     await turn(reviewed, `question then review ${outcome}`)
-    check(`question + auto-review ${outcome}: the question is pending`, !!(await until(async () => (await live(reviewed.id))?.question?.text === 'Which colour?', 5000)))
+    check(`question + auto-review ${outcome}: the question is pending`, !!(await until(async () => (await live(reviewed.id))?.question?.text === 'Which colour?', lib.timing('hang.ui'))))
     // The review comes and goes; the agent works on, the question pending, and you aren't told again.
-    await until(async () => (await live(reviewed.id))?.review === undefined && states(reviewed).some(underReview), 5000)
-    await lib.sleep(1200) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+    await until(async () => (await live(reviewed.id))?.review === undefined && states(reviewed).some(underReview), lib.timing('hang.ui'))
+    await lib.sleep(lib.timing('quiet.toldAgainMs')) // The window is the point: no waiting and no second telling within it.
     check(`question + auto-review ${outcome}: never waiting, told only of the question`, !states(reviewed).some((s) => s.startsWith('waiting')) && told('Reviewed') === before + 1, `${told('Reviewed') - before} · ${states(reviewed).join(' > ')}`)
     check(`question + auto-review ${outcome}: still working, the question still pending`, (await live(reviewed.id))?.status === 'working' && (await live(reviewed.id))?.question?.text === 'Which colour?')
     await inv('pty:write', reviewedKey, 'a')
@@ -188,8 +195,8 @@ const check = (name, ok, extra = '') => {
   for (const outcome of ['allow', 'deny']) {
     const before = told('Reviewed')
     await turn(reviewed, `review ${outcome} then late question`)
-    check(`auto-review ${outcome}, then a question titled before its hook: the question shows`, !!(await until(async () => (await live(reviewed.id))?.question?.text === 'Which colour?', 8000)))
-    await lib.sleep(1200) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+    check(`auto-review ${outcome}, then a question titled before its hook: the question shows`, !!(await until(async () => (await live(reviewed.id))?.question?.text === 'Which colour?', lib.timing('hang.ui'))))
+    await lib.sleep(lib.timing('quiet.toldAgainMs')) // The window is the point: no waiting on the finished review within it.
     const l = await live(reviewed.id)
     check(`auto-review ${outcome}, then a question: working, not waiting on the finished review`, l?.status === 'working' && !states(reviewed).some((x) => x.startsWith('waiting|Codex asks')), states(reviewed).join(' > '))
     check(`auto-review ${outcome}, then a question: told once`, told('Reviewed') === before + 1, String(told('Reviewed') - before))
@@ -203,14 +210,14 @@ const check = (name, ok, extra = '') => {
     // that a person must act) said the question was asked, and both then came on with the title, rightly told together
     // in one notice.
     await turn(asking, 'question then hold then approve')
-    check('question: shown and told on its own first', !!(await until(async () => (await live(asking.id))?.question?.text === 'Which colour?' && told('Asking') === before + 1, 5000)), String(told('Asking') - before))
+    check('question: shown and told on its own first', !!(await until(async () => (await live(asking.id))?.question?.text === 'Which colour?' && told('Asking') === before + 1, lib.timing('hang.ui'))), String(told('Asking') - before))
     await inv('pty:write', askKey, 'g')
-    check('question + approval prompt: waiting, with the question beside it', !!(await until(async () => (await live(asking.id))?.status === 'waiting' && (await live(asking.id))?.question?.text === 'Which colour?', 5000)))
-    await lib.sleep(1200) // A fixed wait on purpose: the count must not rise past two, which no condition can show.
+    check('question + approval prompt: waiting, with the question beside it', !!(await until(async () => (await live(asking.id))?.status === 'waiting' && (await live(asking.id))?.question?.text === 'Which colour?', lib.timing('hang.ui'))))
+    await lib.sleep(lib.timing('quiet.toldAgainMs')) // The window is the point: the count doesn't rise past two within it.
     check('told of both: the prompt is a new need', told('Asking') === before + 2, String(told('Asking') - before))
     await inv('pty:write', askKey, 'y')
     // Approved: its own command ends (after another beside it), though the question keeps the title on.
-    check('approved: working again, the question still pending', !!(await until(async () => (await live(asking.id))?.status === 'working', 5000)) && (await live(asking.id))?.question?.text === 'Which colour?', JSON.stringify(await live(asking.id)))
+    check('approved: working again, the question still pending', !!(await until(async () => (await live(asking.id))?.status === 'working', lib.timing('hang.step'))) && (await live(asking.id))?.question?.text === 'Which colour?', JSON.stringify(await live(asking.id)))
     await page.screenshot({ path: path.join(lib.WORK, 'attention-3-both.png') })
     await inv('pty:write', askKey, 'a')
     check('the question answered: it finishes, nothing pending', !!(await finished(asking)) && !(await live(asking.id))?.question)

@@ -1,4 +1,4 @@
-import { OUTAGE_CHECK_FIRST_SECONDS, OUTAGE_CHECK_MOST_SECONDS, OUTAGE_RESUME, OUTAGE_RESUMES_PER_HOUR, OUTAGE_WAIT_MINUTES, outageCheckUrlId } from '../shared/advanced'
+import { advancedDef, OUTAGE_CHECK_FIRST_SECONDS,OUTAGE_CHECK_MOST_SECONDS, OUTAGE_RESUME, OUTAGE_RESUMES_PER_HOUR, OUTAGE_WAIT_MINUTES, outageCheckUrlId } from '../shared/advanced'
 import { formatTime } from '../shared/dates'
 import { agentMsg, inDialectOf, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
@@ -23,7 +23,7 @@ import { pausedFor } from './teamPause'
  * for its CLI's API host to answer, checked with a request that never holds main's thread, backing off; once it
  * answers, its own conversation gets one note to rerun what was cut off. Its status and a Progress run say it waits.
  * It gives up after the wait's limit, or when a turn ends on a connection error again after three resumes in an hour:
- * the PC's own network may not have come back (Darren's 25 Oct case needed a restart), so the user is told the likely
+ * the PC's own network may not have come back (one case needed a restart), so the user is told the likely
  * fixes, and the Assistant too. Anything else that starts the agent's turn (the user, a wake) or ends its launch ends
  * the wait.
  */
@@ -111,7 +111,8 @@ function finishRun(a: OutageAgent, body: Record<string, unknown>): void {
 const combworkHost: OutageHost = {
   on: () => advanced.get<boolean>(OUTAGE_RESUME) === true,
   dropped: (provider, words) => connectionDropped(provider, words, (id) => advanced.pattern(id)),
-  reachable: (a) => reachable(a.baseUrl ?? advanced.get<string>(outageCheckUrlId(a.provider))),
+  // A CLI with no address to check (HI-3276: none of its turns starts a wait anyway) is never reachable, never a throw.
+  reachable: (a) => reachable(a.baseUrl ?? (advancedDef(outageCheckUrlId(a.provider)) ? advanced.get<string>(outageCheckUrlId(a.provider)) : '')),
   stillStopped(a) {
     const st = sessions.liveFor(a.projectPath, a.agentId)
     return !!st && st.runId === a.runId && st.failedTurn?.since === a.turn

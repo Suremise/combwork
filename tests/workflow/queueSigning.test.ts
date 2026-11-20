@@ -16,6 +16,7 @@ import { gitExe } from '../../src/main/gitTool'
 import { withLauncherEnv } from '../../src/main/gitWorker'
 import { git } from '../../src/main/git'
 import { quoteArgMsvc } from '../../src/main/platform/signerRules'
+import { timing } from '../timing.cjs'
 
 let env: Env | null = null
 afterEach(() => {
@@ -26,7 +27,7 @@ afterEach(() => {
 
 const slash = (p: string): string => p.replace(/\\/g, '/')
 /** The bound of a wait for a condition: a hung run, never the wait itself. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const gitEnv = (): NodeJS.ProcessEnv => {
   const use = gitExe()
   return use.launcherEnv ? withLauncherEnv(process.env, use.launcherEnv) : process.env
@@ -40,10 +41,25 @@ const sshKeygen = (): string => keygen
 
 /** Windows' own ssh-keygen (OpenSSH for Windows), where it is installed. */
 const SYS_KEYGEN = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'OpenSSH', 'ssh-keygen.exe')
+const SYSTEM32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
+let userSid = ''
+/**
+ * HI-3422: a private key readable by its owner alone, as Windows' own ssh-keygen leaves one it makes. A file made or
+ * copied in the test's folder inherits that folder's entries (on a PC with Codex's sandbox, its CodexSandboxUsers group's),
+ * and Windows' OpenSSH refuses a key anyone else can read ("UNPROTECTED PRIVATE KEY FILE"), whichever ssh-keygen git
+ * finds first on PATH. Only the key file is changed, never the test folder's or the user's entries.
+ */
+function ownerOnly(file: string): void {
+  if (process.platform !== 'win32') return
+  if (!userSid) userSid = execFileSync(join(SYSTEM32, 'whoami.exe'), ['/user', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true }).trim().split(',').pop()!.replace(/"/g, '')
+  execFileSync(join(SYSTEM32, 'icacls.exe'), [file, '/inheritance:r', '/grant:r', `*${userSid}:F`], { stdio: 'pipe', windowsHide: true })
+}
+
 /** An ed25519 key pair in a folder of its own: with a passphrase when given, made by `maker` (Git's unless said). */
 function keyPair(passphrase = '', maker = sshKeygen()): { key: string; pub: string } {
   const key = slash(join(tempDir('key-'), 'id_ed25519'))
   execFileSync(maker, ['-q', '-t', 'ed25519', '-N', passphrase, '-C', 'combwork-test', '-f', key])
+  ownerOnly(key)
   return { key, pub: `${key}.pub` }
 }
 
@@ -57,6 +73,7 @@ function keyPairIn(name: string): { key: string; pub: string } {
   mkdirSync(dir)
   const key = slash(join(dir, 'id_ed25519'))
   copyFileSync(made.key, key)
+  ownerOnly(key) // HI-3422: the copy has its new folder's entries, not the key's own
   copyFileSync(made.pub, `${key}.pub`)
   return { key, pub: `${key}.pub` }
 }
@@ -134,7 +151,7 @@ describe('the merge queue checks signing before it signs (HI-1185)', () => {
     const t0 = Date.now()
     const out = await e.queue({ ...cfg, signTimeoutMs: 60_000 }).drain('main')
     expect(out.at(-1)).toMatchObject({ outcome: 'paused', reason: 'signingWaits' })
-    expect(Date.now() - t0).toBeLessThan(30_000)
+    expect(Date.now() - t0).toBeLessThan(timing('budget.promptEndMs'))
     expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
     expect(runs).toHaveLength(1)
     e.queue().resume('main')
@@ -346,11 +363,11 @@ describe('the signing check (HI-1185)', () => {
       worst = Math.max(worst, Date.now() - last)
       last = Date.now()
     }, 20)
-    const timed = await boundedSpawn(process.execPath, spin, { cwd: process.cwd(), env: process.env, timeoutMs: 400 })
+    const timed = await boundedSpawn(process.execPath, spin, { cwd: process.cwd(), env: process.env, timeoutMs: 400 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     clearInterval(beat)
     expect(timed.timedOut).toBe(true)
     expect(worst).toBeLessThan(500)
-    const running = boundedSpawn(process.execPath, spin, { cwd: process.cwd(), env: process.env, timeoutMs: 30_000, owner: 'C:/proj' })
+    const running = boundedSpawn(process.execPath, spin, { cwd: process.cwd(), env: process.env, timeoutMs: timing('spawn.hang'), owner: 'C:/proj' })
     let ended = false
     void running.then(() => (ended = true))
     await endBoundedSpawns((o) => o === 'C:/proj')

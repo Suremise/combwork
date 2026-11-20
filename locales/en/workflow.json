@@ -20,8 +20,8 @@
     "description": "Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) was set to have everyone work in the project folder. Keep jj (the tool’s name)."
   },
   "workflow.contradiction.jjYouIntegrate": {
-    "defaultMessage": "With jj, you integrate the reviewed work yourself: Combwork doesn’t merge it.",
-    "description": "Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) had another finish chosen than “You integrate it”. Keep jj (the tool’s name)."
+    "defaultMessage": "That choice is for another version control: with jj, Combwork or you integrate the work by moving the target bookmark; with Git, it is merged.",
+    "description": "Why workflow options cannot be saved (HI-2799, HI-3315: a jj project given one of Git’s finishes, or a Git project one of jj’s). Keep jj (the tool’s name) and Git; a bookmark is jj’s name for a branch."
   },
   "workflow.contradiction.mergeNeedsSlots": {
     "defaultMessage": "When Combwork or the agent merges, each card needs its own folder.",
@@ -62,6 +62,38 @@
   "workflow.earlierWork.title": {
     "defaultMessage": "{read, select, yes {{card}: its earlier work is on {line}} other {{card}: its earlier work couldn’t be read}}",
     "description": "HI-3107: a notice when a card starts: it ran before under another version control (Git, before the repository switched to jj), and its line from then may still have work (yes); or its earlier starts couldn’t be read, so that can’t be told (other). Keep the select keys. {card} is a card key; {line} a branch or bookmark name."
+  },
+  "workflow.forYou.advanceNote": {
+    "defaultMessage": "Combwork now integrates {project}’s jj cards itself once their merge checks pass: it moves the target bookmark to each card’s candidate. To do it yourself, choose You integrate it yourself under Version Control → Workflow → Who integrates, where the races that can still happen are listed.",
+    "description": "A notification, once per jj project (HI-3235): the new default of the workflow option “Who integrates” (Combwork integrates after the checks) applies to this project, which never chose. {project} a project name. “You integrate it yourself” and “Who integrates” are the option’s value and name, as translated there; Version Control → Workflow is the tab and section."
+  },
+  "workflow.forYou.advancePreview": {
+    "defaultMessage": "{again, select, planChanged {Asked again: the plan changed since the last preview. } other {}}Integrate {card} into {target}? Combwork moves {target} from {expected} to its candidate {result} ({style, select, squash {one squashed commit} rebase {its commits copied on top} other {a merge commit}}), adding: {commits}{more, plural, =0 {} other {, and # more}}. Integrate moves it now; Not for this plan dismisses this preview until the plan changes (a new candidate after the target moves or new work), and you can still integrate it yourself.",
+    "description": "A For you request (HI-3236, preview and click): Combwork shows what its jj advance would move, and moves the target bookmark ({target}) from its commit {expected} to the card’s candidate {result} (short commit ids) only when the user clicks Integrate. {commits}: the commits the move adds, each a short id and its first line, kept as they are; {more}: how many more there are. {style}: how the candidate was built (keep the select keys). {again}: planChanged when asked again because the plan changed. “Integrate” and “Not for this plan” are the buttons’ names, as translated there. {card} a card key like AM-12; a bookmark is jj’s name for a branch."
+  },
+  "workflow.forYou.advancePreviewClosed": {
+    "defaultMessage": "{clicked, select, yes {Integrate on the preview of {card} didn’t run} other {Combwork closed the preview of {card}}}: {why, select, finish {the project no longer integrates when you click (Version Control → Workflow → Who integrates)} blocked {it waits for {cards} to be Done, and is previewed again once they are} other {it no longer applies}}.",
+    "description": "A card comment (HI-3390): a preview of a jj card’s integration (the For you question with Integrate) was closed by Combwork, or the user’s Integrate click on it did nothing ({clicked}: yes), because the project’s Who integrates option no longer integrates on a click ({why}: finish) or the card now depends on cards that aren’t Done ({why}: blocked; {cards}: their keys, like AM-12, AM-13). Keep the select keys. “Integrate” is the button’s name and Version Control → Workflow → Who integrates the option’s place, as translated there."
+  },
+  "workflow.forYou.advanceRefused": {
+    "defaultMessage": "Combwork didn’t move {target} to {result} for {card}: {why, select, divergentStart {jj has more than one operation head} conflicted {{target} is conflicted} movedInGit {{target} moved in Git and jj hasn’t imported it} partialExport {jj and Git disagree on {target} (run jj git export if jj’s is right)} targetCheckedOut {{target} is checked out in a Git worktree: {detail}} pendingExports {other bookmarks or tags aren’t exported to Git yet: {detail}} noTarget {there’s no bookmark {target}} notInHistory {jj didn’t make the move} prepareInvalid {the move jj prepared wasn’t the one asked for ({detail})} other {{detail}}}. Nothing was changed. {next, select, plan {{mode, select, preview {Integrate isn’t offered again for this move, only once the target or the candidate changes; or you can integrate it yourself.} other {This move isn’t tried again, only a new one once the target or the candidate changes; or you can integrate it yourself.}}} other {{mode, select, preview {No preview is offered while this holds: one is offered once the repository changes, or you can integrate it yourself.} other {It tries again once the repository changes, or you can integrate it yourself.}}}}",
+    "description": "A card comment (HI-3235): Combwork’s automatic advance of a jj target bookmark ({target}) to a card’s candidate ({result}: a short commit id) was refused before it changed anything, or nothing moved for a reason of jj’s own (HI-3365: notInHistory, prepareInvalid), for the reason {why} (a code: keep the select keys); {detail}: refs or folders, kept as they are. {next}: repository when it is tried again once the repository changes, plan when only a new move (the target or the candidate changed) is; {mode}: preview when the finish only previews (Combwork never moves the target by itself; “Integrate” is the preview’s button, as translated there). Keep the select keys. {card} a card key like AM-12. A bookmark is jj’s name for a branch; “jj git export” is a command, as typed."
+  },
+  "workflow.forYou.advanceStopped": {
+    "defaultMessage": "{again, select, unreadable {Asked again: the attempt’s journal can’t be read. } missing {Asked again: the attempt’s journal is missing. } answered {Asked again: its earlier question was answered but not acted on. } stale {Asked again: an answer arrived that no longer applied. } startNeedsJournal {Asked again: starting again needs the attempt’s journal, which is missing or unreadable. } contains {Asked again: the target contains the card’s work, so choose It’s integrated if it is. } containsUnknown {Asked again: whether the target contains the card’s work couldn’t be read. } yourself {Asked again: you chose to settle it yourself. } undoNeedsJournal {Asked again: the undo needs the attempt’s journal, which is missing or unreadable. } undoNotStarted {Asked again: the undo didn’t start. } undoUnproved {Asked again: what the undo did couldn’t be proved. } earlierUndo {Asked again: an earlier undo may have run. } undoConditions {Asked again: the undo’s conditions no longer hold. } none {} other {Asked again. }}Combwork moved {target} to {result} for {card}, then {why, select, foreignRefs {saw its export change other refs too: {detail}} checkoutDetached {saw a Git checkout change: {detail}} partialExport {found jj and Git disagreeing on {target}} moved {found {target} moved by someone else} conflicted {found {target} conflicted} concurrent {found another jj operation in between} worktreesChanged {found a Git worktree added or removed: {detail}} proofDisagrees {couldn’t prove that {target} contains {card}’s work, though the move was exactly its own} other {couldn’t explain what it read ({detail})}}, so it stopped. Undo Combwork’s move reverts its own jj operation, after checking again; Leave it to me leaves it as it is for you to settle. Until then {card} takes no other integration.",
+    "description": "A For you request (Approve, HI-3235): Combwork’s automatic advance of a jj target bookmark ({target}: a bookmark name) to a card’s candidate ({result}: a short commit id) moved it, then saw a difference and stopped. Undo Combwork’s move (a button, as translated there) undoes Combwork’s own move with jj (op revert), checked again first; Leave it to me (a button) leaves it to the user. {why} is a code (keep the select keys); {detail}: refs, folders or a code, kept as they are. {again}: a code saying why this is asked again after an answer that couldn’t be acted on (none: asked the first time); keep the select keys. {card} a card key like AM-12. A bookmark is jj’s name for a branch."
+  },
+  "workflow.forYou.advanceSuperseded": {
+    "defaultMessage": "An integration of {card} into {target} from before it was restarted or archived was never settled: Combwork couldn’t prove what it did, so {target} may hold that move. Combwork may have integrated this card again since. Check {target}’s history if it matters.",
+    "description": "A card comment (HI-3367): Combwork’s automatic integration of a jj card (moving the target bookmark {target}) from an earlier round of the card was interrupted or left unanswered, and the card was restarted or archived since, so Combwork stopped tracking it; the target may already contain that move. {card} a card key like AM-12. A bookmark is jj’s name for a branch."
+  },
+  "workflow.forYou.advanceUncertain": {
+    "defaultMessage": "{again, select, unreadable {Asked again: the attempt’s journal can’t be read. } missing {Asked again: the attempt’s journal is missing. } answered {Asked again: its earlier question was answered but not acted on. } stale {Asked again: an answer arrived that no longer applied. } startNeedsJournal {Asked again: starting again needs the attempt’s journal, which is missing or unreadable. } contains {Asked again: the target contains the card’s work, so choose It’s integrated if it is. } containsUnknown {Asked again: whether the target contains the card’s work couldn’t be read. } yourself {Asked again: you chose to settle it yourself. } undoNeedsJournal {Asked again: the undo needs the attempt’s journal, which is missing or unreadable. } undoNotStarted {Asked again: the undo didn’t start. } undoUnproved {Asked again: what the undo did couldn’t be proved. } earlierUndo {Asked again: an earlier undo may have run. } undoConditions {Asked again: the undo’s conditions no longer hold. } none {} other {Asked again. }}Combwork couldn’t prove what its move of {target} to {result} for {card} did ({detail}). See jj op log in the repository{op, select, none {} other { (jj op revert {op} undoes Combwork’s operation)}}. Choose It’s integrated if {card}’s work is in {target}: Combwork marks it Done on your word, not as checked. Not integrated, start again: Combwork first checks that {target} doesn’t contain the work, then builds a new candidate. Until then {card} takes no other integration.",
+    "description": "A For you request (Approve, HI-3235): Combwork’s automatic advance of a jj target bookmark ({target}) to a card’s candidate ({result}: a short commit id) ended in a state it couldn’t prove (a crash, a read it couldn’t make, a stopped undo). {detail}: what was read, kept as it is; {op}: Combwork’s jj operation id, or none. It’s integrated (a button, as translated there): the user says the work is integrated (recorded as the user’s word, an override, never as checked). Not integrated, start again (a button): only once the target is known not to contain the work. {again}: a code saying why it is asked again (none: asked the first time); keep the select keys. {card} a card key like AM-12. Keep the select keys."
+  },
+  "workflow.forYou.churnLimit": {
+    "defaultMessage": "{card} has had {churn, plural, one {# round of back-and-forth} other {# rounds of back-and-forth}} (failed reviews, designs, requests and questions, with any card it continues): carry on with more, split it, accept it with follow-ups, or take it over?",
+    "description": "A For you request (Decide, HI-3188): the card reached its hard stop (Workflow → Card loops → Hard stop after): its counted loop work, {churn} (a number), reached the setting, so its loop pauses until the user chooses one of four ways on. {card} is a card key like AM-12."
   },
   "workflow.forYou.decidedAfterMerge": {
     "defaultMessage": "{card} was decided after it merged: does it need a follow-up?",
@@ -126,6 +158,10 @@
   "workflow.forYou.roundLimit": {
     "defaultMessage": "{card} failed {rounds, plural, one {# review} other {# reviews}}: carry on with more rounds, split it, accept it with follow-ups, or take it over?",
     "description": "A For you request (Decide): the card reached its card loop's round limit (Settings → Card loops), so its loop pauses until the user chooses one of four ways on. {card} is a card key like AM-12; {rounds} the reviews it failed (a number)."
+  },
+  "workflow.forYou.simplify": {
+    "defaultMessage": "{card} has had {churn, plural, one {# round of back-and-forth} other {# rounds of back-and-forth}} (failed reviews, designs, requests and questions): is what is still coming up worth handling, or should it be simplified, or its scope cut with follow-ups?",
+    "description": "A For you request (Decide, HI-3188): the card reached its simplify check (Workflow → Card loops → Simplify check after): its counted loop work, {churn} (a number), so its loop pauses until the user (or the Assistant) chooses: carry on, simplify, or cut scope. {card} is a card key like AM-12."
   },
   "workflow.forYou.slotDirty": {
     "defaultMessage": "{card} is Done, but {slot} has uncommitted changes, so it stays on {line}. Commit or discard them there: Combwork then detaches the slot at {target}, ready for its next card.",
@@ -202,6 +238,10 @@
   "workflow.form.copy": {
     "defaultMessage": "Copy as JSON",
     "description": "The button copying the project’s workflow options as JSON, to paste into another project."
+  },
+  "workflow.form.customWakesValue": {
+    "defaultMessage": "Custom: {events}",
+    "description": "An inherited value of the workflow option “Wake the Assistant for” (HI-3211) set to Custom: the events ticked, joined as a list (e.g. “A card fails review and A lane ends”)."
   },
   "workflow.form.defaultBranch": {
     "defaultMessage": "The repository’s default branch",
@@ -435,6 +475,10 @@
     "defaultMessage": "Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.",
     "description": "A note atop Project Settings → Workflow while the switch \"Workflow rules are enforced\" is off."
   },
+  "workflow.form.nothingToSave": {
+    "defaultMessage": "No changes to save: the options shown are those saved.",
+    "description": "HI-3333: the tooltip of the Save… button of the workflow options while it is off because nothing differs from the saved options."
+  },
   "workflow.form.off": {
     "defaultMessage": "Off",
     "description": "A workflow option’s value: off."
@@ -639,6 +683,130 @@
     "defaultMessage": "{styleTitle}: {style}. {messageTitle}: {message}.",
     "description": "The user's answer to the merge queue's question before an upgraded project's first merge, kept on the card as the user's own comment: the two workflow options they chose, each its name ({styleTitle}: Merge style; {messageTitle}: Commit message) and the value chosen ({style}: Squash, say; {message}: a value of Commit message). The names and values are the workflow options' own texts, already translated: arrange them as your language writes such a list."
   },
+  "workflow.mergeGuards.add": {
+    "defaultMessage": "Add Guard",
+    "description": "A button under the merge guards: adds an empty one (HI-3284)."
+  },
+  "workflow.mergeGuards.addName": {
+    "defaultMessage": "Add “Keep My Name Out of the Code”",
+    "description": "A button under the merge guards (HI-3284’s decision): adds a ready-made guard refusing the user’s own name (Settings → General → Your name) in what a merge adds. The quoted part is the guard’s name, as workflow.mergeGuards.nameGuard."
+  },
+  "workflow.mergeGuards.checking": {
+    "defaultMessage": "Looking for what it already matches in the project…",
+    "description": "Under a merge guard being edited (HI-3284), while Combwork looks for the lines of the project its pattern already matches."
+  },
+  "workflow.mergeGuards.down": {
+    "defaultMessage": "Move down",
+    "description": "The tooltip of the button moving a merge guard down the list (HI-3284)."
+  },
+  "workflow.mergeGuards.example": {
+    "defaultMessage": "Fills in a guard once from your name in Settings → General; edit or remove it like any other.",
+    "description": "The tooltip of the button adding the ready-made “Keep my name out of the code” merge guard (HI-3284)."
+  },
+  "workflow.mergeGuards.ignoreCase": {
+    "defaultMessage": "Ignore case",
+    "description": "A checkbox on a merge guard: its pattern matches capitals and small letters alike (HI-3284)."
+  },
+  "workflow.mergeGuards.matches": {
+    "defaultMessage": "{count, plural, one {It already matches # line in the project} other {It already matches # lines in the project}}, so check it isn’t too broad. It still saves: only the lines a merge adds are checked.",
+    "description": "Under a merge guard being edited (HI-3284): how many lines of the project’s files its pattern already matches; the first few follow as file:line. Existing matches don’t block anything (only the lines a merge adds are checked), but many suggest the pattern is too broad."
+  },
+  "workflow.mergeGuards.matchesNone": {
+    "defaultMessage": "It matches no line in the project now.",
+    "description": "Under a merge guard being edited (HI-3284): its pattern matches no line of the project’s files as they are now."
+  },
+  "workflow.mergeGuards.matchesUnknown": {
+    "defaultMessage": "{why, select, tooLarge {The project is too large to look for what it already matches.} timedOut {Looking for what it already matches took too long.} other {Combwork couldn’t look for what it already matches.}}",
+    "description": "Under a merge guard being edited (HI-3284): what its pattern already matches in the project could not be found out (select: translate each; keep the keys): too many files, the time limit, or another failure."
+  },
+  "workflow.mergeGuards.matchesWhere": {
+    "defaultMessage": "{where}{more, select, yes {, …} other {}}",
+    "description": "Under a merge guard being edited (HI-3284): where its pattern already matches, {where} a list of file:line places (paths: keep them); with more yes, there are more than those listed."
+  },
+  "workflow.mergeGuards.message": {
+    "defaultMessage": "What to do instead",
+    "description": "The placeholder and label of a merge guard’s message: what the builder is told to do instead when the guard matches (HI-3284)."
+  },
+  "workflow.mergeGuards.name": {
+    "defaultMessage": "Name",
+    "description": "The placeholder and label of a merge guard’s name field (HI-3284)."
+  },
+  "workflow.mergeGuards.nameGuard": {
+    "defaultMessage": "Keep my name out of the code",
+    "description": "The name the ready-made merge guard is given (HI-3284): it refuses the user’s own name in what a merge adds. The user can rename it."
+  },
+  "workflow.mergeGuards.nameMessage": {
+    "defaultMessage": "Your name is in this change. Cite the card or decision instead, or skip this file if a name belongs here.",
+    "description": "The message the ready-made merge guard is given (HI-3284’s wording): what the builder is told when the user’s name is in what a merge adds. Card: a task on Combwork’s board. The user can edit it."
+  },
+  "workflow.mergeGuards.none": {
+    "defaultMessage": "No merge guards.",
+    "description": "Under “Merge guards” (Version Control → Workflow) when there are none (HI-3284)."
+  },
+  "workflow.mergeGuards.paths": {
+    "defaultMessage": "Only these paths (e.g. src/**, *.ts)",
+    "description": "The placeholder and label of a merge guard’s field of paths it applies to, as globs separated by commas; empty means every file (HI-3284). Keep the examples as they are."
+  },
+  "workflow.mergeGuards.pattern": {
+    "defaultMessage": "Pattern (regular expression)",
+    "description": "The placeholder and label of a merge guard’s pattern field: a JavaScript regular expression (HI-3284)."
+  },
+  "workflow.mergeGuards.problem.empty": {
+    "defaultMessage": "Merge guard {n, number} has no {field, select, name {name} pattern {pattern} other {message}}.",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard’s name, pattern or message is empty (select: translate each; keep the keys). {n} is its position, from 1."
+  },
+  "workflow.mergeGuards.problem.glob": {
+    "defaultMessage": "Merge guard {n, number} has a path it can’t use: “{detail}”. Paths take *, **, ? and {braces} only, with / between folders, and no leading /, .. or [ ].",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard’s path (a glob, such as docs/** or *.md) uses something unsupported. {n} is its position, from 1; {detail} is the path as written. {braces} stands for the text \"{a,b}\": keep it as it is."
+  },
+  "workflow.mergeGuards.problem.invalid": {
+    "defaultMessage": "The pattern of merge guard {n, number} isn’t a regular expression JavaScript takes: {detail}",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard’s pattern does not compile. {n} is its position, from 1; {detail} is the JavaScript engine’s own message, in English."
+  },
+  "workflow.mergeGuards.problem.matchesEmpty": {
+    "defaultMessage": "The pattern of merge guard {n, number} matches an empty line, so it would refuse every line.",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard’s pattern matches the empty string. {n} is its position, from 1."
+  },
+  "workflow.mergeGuards.problem.notGuard": {
+    "defaultMessage": "Merge guard {n, number} isn’t a guard: it needs a name, a pattern and a message.",
+    "description": "Why workflow options cannot be saved (HI-3284): an entry of the merge guards has the wrong shape. {n} is its position, from 1."
+  },
+  "workflow.mergeGuards.problem.notList": {
+    "defaultMessage": "The merge guards aren’t a list of guards.",
+    "description": "Why workflow options cannot be saved (HI-3284): the merge guards option is not a list. A merge guard is a pattern Combwork refuses in the lines a merge adds."
+  },
+  "workflow.mergeGuards.problem.timedOut": {
+    "defaultMessage": "The pattern of merge guard {n, number} took too long to check.",
+    "description": "Why workflow options cannot be saved (HI-3284): checking a merge guard’s pattern ran past its time limit (a pattern that backtracks a lot). {n} is its position, from 1."
+  },
+  "workflow.mergeGuards.problem.tooLong": {
+    "defaultMessage": "The {field, select, name {name} pattern {pattern} other {message}} of merge guard {n, number} is longer than {max, number} characters.",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard’s name, pattern or message is too long (select: translate each; keep the keys). {n} is its position, from 1; {max} the most characters it takes."
+  },
+  "workflow.mergeGuards.problem.tooMany": {
+    "defaultMessage": "There are more than {max, number} merge guards.",
+    "description": "Why workflow options cannot be saved (HI-3284): too many merge guards. {max} is the most a project takes."
+  },
+  "workflow.mergeGuards.problem.tooManyGlobs": {
+    "defaultMessage": "Merge guard {n, number} has more than {max, number} paths in one list.",
+    "description": "Why workflow options cannot be saved (HI-3284): a merge guard lists too many paths it applies to or skips. {n} is its position, from 1; {max} the most."
+  },
+  "workflow.mergeGuards.problem.unchecked": {
+    "defaultMessage": "The pattern of merge guard {n, number} couldn’t be checked: Combwork couldn’t start the check.",
+    "description": "Why workflow options cannot be saved (HI-3284): the thread that checks merge guards’ patterns could not be started, so the pattern could not be checked. {n} is its position, from 1."
+  },
+  "workflow.mergeGuards.remove": {
+    "defaultMessage": "Remove",
+    "description": "The tooltip of the button removing a merge guard (HI-3284)."
+  },
+  "workflow.mergeGuards.skip": {
+    "defaultMessage": "Skip these paths (e.g. LICENSE, docs/**)",
+    "description": "The placeholder and label of a merge guard’s field of paths it skips, as globs separated by commas (HI-3284). Keep the examples as they are."
+  },
+  "workflow.mergeGuards.up": {
+    "defaultMessage": "Move up",
+    "description": "The tooltip of the button moving a merge guard up the list (HI-3284)."
+  },
   "workflow.missing.create": {
     "defaultMessage": "Create",
     "description": "HI-2807: the button beside a missing branch: creates it from the branch picked, without switching to it."
@@ -783,6 +951,22 @@
     "defaultMessage": "{name} is made here only and tracks no remote branch, which “The target branch follows its remote” needs before its first card starts. {how, select, ready {Publish it to {remote}: {publish}. Or, if {remote} has it already, set what it tracks: {track1}, then {track2}.} choose {This repository has no remote, or several, that Combwork can name: in these commands {remote} stands for the one {name} should follow. Publish it there: {publish}. Or, if it has it already, set what it tracks: {track1}, then {track2}.} shallow {This repository is a shallow clone, which follow mode can’t use: fetch its whole history (git fetch --unshallow) first, then publish {name}.} other {The remote it would follow ({remote}) has several push addresses, or none, and follow mode publishes to exactly one: leave it one, then publish {name}.}}",
     "description": "HI-3128: under the steps in the Start the next version dialog, with the workflow option “The target branch follows its remote” on (its name: use its words): the new branch {name} isn’t on any remote and tracks none, so its first card can’t start until the user publishes it (Combwork doesn’t). how (select, keep the keys): ready, a remote Combwork can name ({remote}); choose, none it can name ({remote} is a placeholder such as <remote> for the user to replace); shallow, a shallow clone; other, the named remote ({remote}) has several push addresses or none. {publish}, {track1}, {track2} are git commands: keep them exactly as they are."
   },
+  "workflow.option.assistantWakes.desc": {
+    "defaultMessage": "Which events in this project’s lanes wake the Assistant while it watches them (a question for you always does), each wake costing it tokens.",
+    "description": "What the workflow option “Wake the Assistant for” does (HI-3211), in one sentence, as every option’s is (HI-3253). A lane: a builder and a reviewer taking cards in turn (glossary: lane). A question for you: one an agent asks the user on a lane’s card. Tokens: what the Assistant’s coding agent uses up."
+  },
+  "workflow.option.assistantWakes.title": {
+    "defaultMessage": "Wake the Assistant for",
+    "description": "A workflow option, under Card loops (HI-3211): which events in this project’s lanes wake the Combwork Assistant while it watches them (glossary: lane, the Assistant)."
+  },
+  "workflow.option.churnStopAt.desc": {
+    "defaultMessage": "With a reviewer agent, once a card has had this much back-and-forth in all (with any card it was split from), Combwork stops its loop to ask you to carry on, split it, accept it with follow-ups or take it over (0 turns it off).",
+    "description": "What the workflow option “Hard stop after” does (Card loops, HI-3188)."
+  },
+  "workflow.option.churnStopAt.title": {
+    "defaultMessage": "Hard stop after",
+    "description": "A workflow option, under Card loops (HI-3188): after how much counted loop work on a card Combwork stops its loop and asks you how to go on. A number follows it; 0 turns it off."
+  },
   "workflow.option.commands.desc": {
     "defaultMessage": "The command each named check runs. A run counts as the check only when it runs that command.",
     "description": "What the workflow setting “Check commands” does."
@@ -830,6 +1014,14 @@
   "workflow.option.finish.desc": {
     "defaultMessage": "When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, or whenever it is moved there.",
     "description": "What the workflow option “Who merges” does (glossary 2.1: merge queue)."
+  },
+  "workflow.option.finish.jjDesc": {
+    "defaultMessage": "Once a card passes and its merge checks pass on its candidate, Combwork moves the target bookmark to the candidate, after you click Integrate on its preview, or you do it yourself. Combwork refuses first when anything is unexpected, and stops and tells you when it sees something change during the move. jj can’t make that move conditional, so a few races can still happen while Combwork moves it: a bookmark moved away and back, a move to an earlier commit of the candidate, or a Git checkout or another bookmark changed during the export. The preview decides when the move runs and what you agree to, but once you click it has the same races. Only You integrate it yourself avoids them.",
+    "description": "What the workflow option “Who integrates” does, for a project using jj (HI-3235, HI-2840/s30 and s34): the four residual races, in plain words; never call it safe. A bookmark is jj’s name for a branch: keep it as jj’s term. “You integrate it yourself” is the option’s other value, as translated there."
+  },
+  "workflow.option.finish.jjTitle": {
+    "defaultMessage": "Who integrates",
+    "description": "The workflow option “Who merges” (G5) for a project using jj (HI-3235): who moves the target bookmark to a passed card’s candidate."
   },
   "workflow.option.finish.title": {
     "defaultMessage": "Who merges",
@@ -923,6 +1115,22 @@
     "defaultMessage": "Checks pass on the merged result",
     "description": "A workflow option (glossary 2.6, G9): named commands Combwork’s merge queue runs on a card’s work merged with the target branch."
   },
+  "workflow.option.mergeGuards.desc": {
+    "defaultMessage": "Patterns a merge may not add, matched against only the lines it adds (never what the target already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.",
+    "description": "What the workflow option “Merge guards” does (HI-3284): each guard is a regular expression checked against the text lines a merge adds; a match returns the card. Secret scanning: tools that look for passwords and keys; say plainly that this is not one."
+  },
+  "workflow.option.mergeGuards.jjDesc": {
+    "defaultMessage": "Patterns a candidate may not add, matched against only the lines it adds to the target bookmark (never what it already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.",
+    "description": "What the workflow option “Merge guards” does for a project using jj (HI-3284). A candidate is the commit Combwork builds for the user to integrate; a bookmark is jj’s name for a branch: keep it as jj’s term. Secret scanning: tools that look for passwords and keys."
+  },
+  "workflow.option.mergeGuards.jjTitle": {
+    "defaultMessage": "Merge guards",
+    "description": "The workflow option “Merge guards” (HI-3284) for a project using jj: the same name."
+  },
+  "workflow.option.mergeGuards.title": {
+    "defaultMessage": "Merge guards",
+    "description": "A workflow option (HI-3284): patterns (regular expressions) Combwork refuses in the lines a merge adds. A guard here is a check that keeps something out, not a person."
+  },
   "workflow.option.mergeInstall.desc": {
     "defaultMessage": "Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.",
     "description": "What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value)."
@@ -961,7 +1169,7 @@
   },
   "workflow.option.otherTargets.title": {
     "defaultMessage": "Other branches work can merge into",
-    "description": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). Darren’s name for it."
+    "description": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). The user’s name for it."
   },
   "workflow.option.preChecks.desc": {
     "defaultMessage": "A card goes to review only once each of these named commands has passed on its work.",
@@ -1027,6 +1235,14 @@
     "defaultMessage": "Warn when a commit includes another agent’s files",
     "description": "A workflow option (glossary 2.6, G16)."
   },
+  "workflow.option.simplifyAt.desc": {
+    "defaultMessage": "With a reviewer agent, once a card has had this much more back-and-forth (failed reviews, designs and follow-ups, reviewer requests, questions to you), Combwork pauses its loop to ask whether it is worth handling, or to simplify or cut scope (0 turns it off).",
+    "description": "What the workflow option “Simplify check after” does (Card loops, HI-3188). “Back-and-forth” is the card’s counted loop work."
+  },
+  "workflow.option.simplifyAt.title": {
+    "defaultMessage": "Simplify check after",
+    "description": "A workflow option, under Card loops (HI-3188): after how much counted loop work on a card (failed reviews, design steps, requests, questions) Combwork asks whether to simplify. A number follows it; 0 turns it off."
+  },
   "workflow.option.slotsUpToDate.desc": {
     "defaultMessage": "Before a card starts in a slot, the slot is brought to the latest work of the target branch, and its dependencies are installed again when the lock file changed.",
     "description": "What the workflow option “Slots are brought up to date before each card” does (glossary 2.5: slot; lock file, as in the G15 value)."
@@ -1072,8 +1288,8 @@
     "description": "What the workflow option “Merge style” does."
   },
   "workflow.option.style.jjDesc": {
-    "defaultMessage": "Once a card passes, Combwork builds a candidate from it on the target bookmark: a merge commit, one squashed commit, or its commits copied on top. You move the bookmark to the candidate yourself; Combwork never does.",
-    "description": "What the workflow option “Candidate style” does, for a project using jj (HI-2871). A bookmark is jj’s name for a branch: keep it as jj’s term."
+    "defaultMessage": "Once a card passes, Combwork builds a candidate from it on the target bookmark: a merge commit, one squashed commit, or its commits copied on top. Who integrates says whether Combwork or you then move the bookmark to it.",
+    "description": "What the workflow option “Candidate style” does, for a project using jj (HI-2871, HI-3235). A bookmark is jj’s name for a branch: keep it as jj’s term. “Who integrates” is another option’s name, as translated there."
   },
   "workflow.option.style.jjTitle": {
     "defaultMessage": "Candidate style",
@@ -1139,6 +1355,30 @@
     "defaultMessage": "Wait for the OK, given on the card or in For you.",
     "description": "The next step after a move refused for want of the user’s approval."
   },
+  "workflow.refused.attempt.moved.message": {
+    "defaultMessage": "{card} was restarted, put back, finished or given to another agent after you last read it (it is at attempt {attempt}.{generation} now), so this was not applied.",
+    "description": "HI-3194: a refused change to a card: the card moved to a new attempt (restarted, put back, done, or reassigned) since the agent last read it or was given it, so the change was made for an earlier attempt. {card} is a card key like AM-12; {attempt} and {generation} are numbers."
+  },
+  "workflow.refused.attempt.moved.next": {
+    "defaultMessage": "Read {card} again (cw_read_task) and act on it as it is now, if it is still yours to act on.",
+    "description": "HI-3194: the next step after a change made for an earlier attempt of the card was refused. {card} is a card key; cw_read_task is a tool name: keep it as it is."
+  },
+  "workflow.refused.attempt.notAssignee.message": {
+    "defaultMessage": "{card} is {assignee, select, nobody {no agent's} other {{assignee}'s}} to build now: you aren't building it, so this was not applied.",
+    "description": "HI-3194: a refused builder's move (a submit, a merge report, a design step): the card is given to another agent (or to nobody) now, so the caller's attempt on it ended. {card} is a card key like AM-12; {assignee} (select) is the agent's name, or nobody."
+  },
+  "workflow.refused.attempt.notAssignee.next": {
+    "defaultMessage": "Leave it to its builder, or ask the user to give it back to you.",
+    "description": "HI-3194: the next step after a builder's move by an agent that no longer has the card was refused."
+  },
+  "workflow.refused.attempt.staleLaunch.message": {
+    "defaultMessage": "{card}: this call came from a session of yours that has since been replaced (a restart or a new conversation), so it wasn't applied.",
+    "description": "HI-3194: a refused change to a card: the agent's session (its launch) was replaced while the call was on its way, so the call belongs to the old session. {card} is a card key like AM-12."
+  },
+  "workflow.refused.attempt.staleLaunch.next": {
+    "defaultMessage": "Your current session has the card: read it there (cw_read_task) and carry on from what it says now.",
+    "description": "HI-3194: the next step after a call from a replaced session was refused. cw_read_task is a tool name: keep it as it is."
+  },
   "workflow.refused.card.plainNumber.message": {
     "defaultMessage": "A plain number is not a card reference.",
     "description": "A refused intent: the card was named by a bare number."
@@ -1166,6 +1406,14 @@
   "workflow.refused.done.contained.next": {
     "defaultMessage": "Merge {revision} into {target}, then report the merge again.",
     "description": "The next step after a refused report of a merge."
+  },
+  "workflow.refused.done.noCodeUnmerged.message": {
+    "defaultMessage": "{card} is no-code, so nothing of it is merged, but its branch {line} has {count, plural, one {# commit} other {# commits}} that {target} doesn't: {commits}{more, plural, =0 {} other { and # more}}.",
+    "description": "HI-3410: a refused submit, pass or approval of a no-code card (a card whose work is not code: nothing of it is merged when it is done): its own branch {line} has commits its target branch {target} doesn't have, which would stay on the branch alone. {card} is a card key like AM-12; {count} how many commits; {commits} the first few, each a short commit id and its subject, separated by semicolons (keep them as they are); {more} how many more there are (0: none, and nothing is added)."
+  },
+  "workflow.refused.done.noCodeUnmerged.next": {
+    "defaultMessage": "{reader, select, you {If they're to be merged, make the card code again (its kind), and submit its branch for review as code. If they're to be dropped, move the card to Done yourself.} other {Ask the user which (cw_ask_user): to merge them, the user (or the Assistant, with the user's reason) makes the card code again, and its branch is submitted for review as code; to drop them, the user moves the card to Done.}}",
+    "description": "HI-3410: the next step after that refusal: the commits are merged (the card's kind changed back to code, then its branch submitted for review as a code card) or dropped on purpose (the user moves the card to Done, which keeps the branch and merges nothing). {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences. cw_ask_user is a tool name: keep it as it is. Done is a column name: use it as Combwork shows it."
   },
   "workflow.refused.evidence.changed.message": {
     "defaultMessage": "What Combwork read for {card} changed while it decided.",
@@ -1252,8 +1500,16 @@
     "description": "A refused start (glossary 2.4): a lane takes one card at a time, so a card starts only once the cards before it in its lane are Done. {card} and {earlier} are card keys like AM-12."
   },
   "workflow.refused.lane.oneAtATime.next": {
-    "defaultMessage": "Finish {earlier} first: once it is Done, the lane goes on to {card}.",
-    "description": "The next step after a start refused because an earlier card of the lane is not Done. {card} and {earlier} are card keys like AM-12."
+    "defaultMessage": "Wait for {earlier} to be Done: end your turn, and Combwork starts {card} on you once it is and nothing else holds it. Taking {card} before {earlier} is a change of the lane’s order, the user’s or the Assistant’s.",
+    "description": "The next step after a start refused because an earlier card of the lane is not Done (HI-3361: the agent waits; Combwork starts the next card itself once the earlier is Done). {card} and {earlier} are card keys like AM-12. The Assistant: Combwork’s assistant (glossary)."
+  },
+  "workflow.refused.loop.churnPending.message": {
+    "defaultMessage": "{card} waits for an answer to its question {request} about how much back-and-forth it has had: its loop is paused until then.",
+    "description": "A refused loop step, request, question, review, verdict or forward move (HI-3188): the card reached its simplify check or its hard stop (Workflow → Card loops), and Combwork asked how to go on (For you); until that question ({request}, its id like AM-12/r40) is answered, the card's loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key."
+  },
+  "workflow.refused.loop.churnPending.next": {
+    "defaultMessage": "Wait for its answer (Combwork wakes you): you may still read the card, comment, or ask the Assistant.",
+    "description": "The next step while a card's loop is paused for its question about its back-and-forth (HI-3188). Read by agents: the Assistant is Combwork's Assistant."
   },
   "workflow.refused.loop.followUpChecked.message": {
     "defaultMessage": "{card}: a follow-up waits for its reviewer's check, with no going ahead without it.",
@@ -1262,6 +1518,14 @@
   "workflow.refused.loop.followUpChecked.next": {
     "defaultMessage": "{reader, select, you {The agent waits for the reviewer's ok or gaps; if none comes, it asks you.} other {Wait for the reviewer's ok or gaps; if none comes, ask the user.}}",
     "description": "The next step after going ahead with a follow-up unchecked (#1467). ok and gaps are the reviewer's answers, as agents name them: keep them as they are. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
+  "workflow.refused.loop.followUpInReview.message": {
+    "defaultMessage": "{card} is in Review: its reviewer gives a verdict on what was submitted, so a change now is not a follow-up for a check.",
+    "description": "A refused follow-up posted for the reviewer's check (HI-3419) on a card in Review: the review still owes its verdict, which a check (an OK or gaps) doesn't give, so a change made now goes to the reviewer another way (the next sentence). {card} is a card key."
+  },
+  "workflow.refused.loop.followUpInReview.next": {
+    "defaultMessage": "A commit: submit it with cw_submit and followUp: true, which keeps the card in Review with no round counted, and its reviewer reviews it again. No commit: say it to the reviewer in a comment.",
+    "description": "The next step after a follow-up refused on a card in Review (HI-3419): a commit is submitted as a follow-up, which its reviewer reviews again; a change with no commit (a screenshot) is said in a comment. Keep cw_submit and followUp: true as they are."
   },
   "workflow.refused.loop.followUpMerging.message": {
     "defaultMessage": "{card} is being merged now: a follow-up can no longer take it out of the merge queue.",
@@ -1304,12 +1568,12 @@
     "description": "The next step after an answer to an earlier design or follow-up (#1382, #1467)."
   },
   "workflow.refused.loop.stepNotHere.message": {
-    "defaultMessage": "{step, select, followUp {{card} is in {stage}: a follow-up is posted for its check once the work is in review or has passed it.} other {{card} is in {stage}: a design is posted for its check before the work goes to review.}}",
-    "description": "A refused card loop step (#1382, #1467): a design was posted for a card that isn't being worked on (not in Doing), or a follow-up (a change asked of reviewed work, such as a screenshot's) for a card that isn't in Review or Passed. {card} is a card key; {stage} the stage it is in; step (select): followUp, or other for a design. Translate each sentence."
+    "defaultMessage": "{step, select, followUp {{card} is in {stage}: a follow-up is posted for its check once the work has passed review.} other {{card} is in {stage}: a design is posted for its check before the work goes to review.}}",
+    "description": "A refused card loop step (#1382, #1467): a design was posted for a card that isn't being worked on (not in Doing), or a follow-up (a change asked of reviewed work, such as a screenshot's) for a card that hasn't passed review (HI-3419: one in Review has a refusal of its own). {card} is a card key; {stage} the stage it is in; step (select): followUp, or other for a design. Translate each sentence."
   },
   "workflow.refused.loop.stepNotHere.next": {
     "defaultMessage": "{step, select, followUp {Send the work to review, or say it in a comment.} other {Post it while the card is being worked on, or say it in a comment.}}",
-    "description": "The next step after a design posted for a card that is not being worked on, or a follow-up for a card not in Review or Passed (#1382, #1467). step (select): followUp, or other for a design. Translate each sentence."
+    "description": "The next step after a design posted for a card that is not being worked on, or a follow-up for a card that has not passed review (#1382, #1467, HI-3419). step (select): followUp, or other for a design. Translate each sentence."
   },
   "workflow.refused.loop.stepNotYours.message": {
     "defaultMessage": "{side, select, builder {Only the builder of {card} posts its design or follow-up, or goes ahead with a design.} other {Only the reviewer of {card} checks its design or follow-up.}}",
@@ -1330,6 +1594,14 @@
   "workflow.refused.loop.tooEarly.next": {
     "defaultMessage": "Wait for the answer; with none by then, go ahead as posted.",
     "description": "The next step after going ahead with a design too early (#1382)."
+  },
+  "workflow.refused.loop.usersChoice.message": {
+    "defaultMessage": "{card}: only the user answers {request} this way.",
+    "description": "A refused answer by the Assistant (HI-3188): it may answer a card's simplify check only with carry on or simplify; cutting scope, and the hard stop's question, are the user's. {card} is a card key; {request} the question's id like AM-12/r40."
+  },
+  "workflow.refused.loop.usersChoice.next": {
+    "defaultMessage": "Leave it for the user, under For you, or answer carry on or simplify if that is your call.",
+    "description": "The next step after a refused Assistant answer (HI-3188). For you is a label: use it as Combwork shows it."
   },
   "workflow.refused.merge.combworkMerges.change": {
     "defaultMessage": "This rule is set in Version Control → Who merges. A card keeps the rules it started with.",
@@ -1792,8 +2064,8 @@
     "description": "The next step after a refused submit for a commit's identity: {command} is the git command to use (kept as typed). {missing} (select; keep the keys): yes when git has no identity for the project; Version Control → Branches & remotes → Commit identity is where Combwork's window sets it (use the names Combwork shows for the tab, its section and heading)."
   },
   "workflow.refused.submit.notDuplicate.message": {
-    "defaultMessage": "{card} is already submitted at {revision} and waits for review or merging.",
-    "description": "A refused submit: the same revision is already waiting. {card} is a card key, {revision} a short revision id."
+    "defaultMessage": "{card} is already submitted{revision, select, none {} other { at {revision}}} and waits for review or merging.",
+    "description": "A refused submit: a submission is already waiting (the same revision, or any for a no-code card). {card} is a card key; {revision} the waiting submission's short revision id, or none when it has no revision (a no-code card's), which leaves out \"at …\" (HI-3409)."
   },
   "workflow.refused.submit.notDuplicate.next": {
     "defaultMessage": "Wait for its review or merge.",
@@ -1887,6 +2159,10 @@
     "defaultMessage": "{choice, select, carryOn {Carry on} split {Split it} accept {Accept with follow-ups} takeOver {Take it over} other {{choice}}}",
     "description": "One of the user's four choices when a card reaches its card loop's round limit: carry on with more review rounds, split the card into smaller ones, accept the work as it is with follow-up cards, or take the work over themselves. Translate each choice; keep the codes before the braces."
   },
+  "workflow.rule.advance.verified": {
+    "defaultMessage": "A card Combwork integrates is Done once its integration is proved",
+    "description": "HI-3236: a rule of the workflow, named where the user skips it: the user said a jj card is integrated (It’s integrated) where Combwork couldn’t prove its own move of the target bookmark, so the card is Done on their word."
+  },
   "workflow.rule.approval.given": {
     "defaultMessage": "Your OK before merging",
     "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G10)."
@@ -1898,6 +2174,10 @@
   "workflow.rule.done.contained": {
     "defaultMessage": "Combwork checks the merge",
     "description": "A rule of the workflow, named where a move skips or can't check it: a card is done only when its work is in its target (glossary 2.6: G5)."
+  },
+  "workflow.rule.done.noCodeUnmerged": {
+    "defaultMessage": "A no-code card leaves no commits unmerged",
+    "description": "A rule of the workflow, named where a move can't check it (HI-3410): a no-code card (nothing of it is merged) isn't finished while its own branch has commits its target branch lacks."
   },
   "workflow.rule.forward.resolutionSource": {
     "defaultMessage": "A resolution merges the commit it resolves",
@@ -1998,6 +2278,10 @@
   "workflow.rule.verdict.reviewing": {
     "defaultMessage": "A verdict follows a review",
     "description": "A rule of the workflow, named where a move skips or can't check it: a reviewer starts a review before giving a verdict (glossary 2.3: verdict)."
+  },
+  "workflow.simplifyChoice": {
+    "defaultMessage": "{choice, select, carryOn {Worth handling: carry on} simplify {Simplify} cutScope {Cut scope with follow-ups} other {{choice}}}",
+    "description": "One of the user's three choices when a card reaches its simplify check (HI-3188): what still comes up is worth handling (carry on), simplify (drop what isn't worth it), or cut the card's scope and put the rest on follow-up cards. Translate each choice; keep the codes before the braces."
   },
   "workflow.slots.archive": {
     "defaultMessage": "Archive script",
@@ -2387,6 +2671,10 @@
     "defaultMessage": "A reviewer agent, then you, check each card, after the quick checks and the tests pass.",
     "description": "What the Team preset sets up, for a project without version control."
   },
+  "workflow.unreadable.blockerWork": {
+    "defaultMessage": "whether {card}'s work is in the target ({what})",
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-3233): whether the work of a card this card waits for was merged into its target branch. {card} is that card's key (AM-12); {what} is what exactly couldn't be read, such as \"whether a1b2c3d is in e4f5a6b\"."
+  },
   "workflow.unreadable.branch": {
     "defaultMessage": "the branch checked out in {folder}",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\". {folder} is a folder path."
@@ -2535,6 +2823,26 @@
     "defaultMessage": "the files written in {folder}",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": which files changed in a folder. {folder} is a folder path."
   },
+  "workflow.value.assistantWakes.custom": {
+    "defaultMessage": "Custom",
+    "description": "A value of the workflow option “Wake the Assistant for” (HI-3211): the events you tick."
+  },
+  "workflow.value.assistantWakes.everything": {
+    "defaultMessage": "Everything",
+    "description": "A value of the workflow option “Wake the Assistant for” (HI-3211): every event in a lane."
+  },
+  "workflow.value.assistantWakes.important": {
+    "defaultMessage": "Important only",
+    "description": "A value of the workflow option “Wake the Assistant for” (HI-3211): failures, blocks, merges due, lanes ending and agents waiting for you."
+  },
+  "workflow.value.assistantWakes.quiet": {
+    "defaultMessage": "Quiet",
+    "description": "A value of the workflow option “Wake the Assistant for” (HI-3211): only agents waiting for you and lanes ending."
+  },
+  "workflow.value.assistantWakes.standard": {
+    "defaultMessage": "Standard",
+    "description": "A value of the workflow option “Wake the Assistant for” (HI-3211), the default: what woke it before this option existed."
+  },
   "workflow.value.commitMessage.branch": {
     "defaultMessage": "The branch’s own, with no card key or trailers",
     "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Combwork’s trailers. Trailers: git’s “Key: value” lines at a message’s end."
@@ -2547,6 +2855,10 @@
     "defaultMessage": "The agent merges, Combwork checks",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
   },
+  "workflow.value.finish.combworkAdvances": {
+    "defaultMessage": "Combwork integrates after the checks",
+    "description": "A value of the workflow option “Who integrates” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-3235): once a card passes and its merge checks pass on its candidate, Combwork moves the target bookmark to the candidate itself. The default for jj."
+  },
   "workflow.value.finish.combworkMerges": {
     "defaultMessage": "Combwork merges",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
@@ -2558,6 +2870,10 @@
   "workflow.value.finish.notChecked": {
     "defaultMessage": "Not checked",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.finish.previewAdvance": {
+    "defaultMessage": "Combwork integrates when you click",
+    "description": "A value of the workflow option “Who integrates” (glossary 2.6, G5) for a project using jj (HI-3236): once a card passes and its merge checks pass, For you shows what Combwork would move (the preview), and Combwork moves the target bookmark only when you click Integrate."
   },
   "workflow.value.finish.userIntegrates": {
     "defaultMessage": "You integrate it yourself",
@@ -2642,6 +2958,78 @@
   "workflow.value.style.squash": {
     "defaultMessage": "Squash",
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
+  },
+  "workflow.wakeEvent.abandoned": {
+    "defaultMessage": "A lane is abandoned",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.blocked": {
+    "defaultMessage": "A card is blocked",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.ended": {
+    "defaultMessage": "A lane ends",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.failed": {
+    "defaultMessage": "A card fails review",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.mergeDue": {
+    "defaultMessage": "A lane’s merge is due",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): every card of a lane passed review."
+  },
+  "workflow.wakeEvent.moved": {
+    "defaultMessage": "A card moves",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a card goes to another board column."
+  },
+  "workflow.wakeEvent.passed": {
+    "defaultMessage": "A card passes review",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.pausedMerge": {
+    "defaultMessage": "A lane waits for a merge",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a lane taking one card at a time waits for its last card to be merged."
+  },
+  "workflow.wakeEvent.pausedUser": {
+    "defaultMessage": "A question for you on a lane’s card (always)",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211), always on and not changeable: an agent or Combwork asks the user something on a lane’s card."
+  },
+  "workflow.wakeEvent.reblocked": {
+    "defaultMessage": "A blocked card has news",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a blocked card’s reason changed, or its agent commented."
+  },
+  "workflow.wakeEvent.stalled": {
+    "defaultMessage": "A card or a merge stalls",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): nothing has happened on a card for a long time, or a lane’s merge isn’t being done."
+  },
+  "workflow.wakeEvent.unblocked": {
+    "defaultMessage": "A card is unblocked",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane."
+  },
+  "workflow.wakeEvent.waiting": {
+    "defaultMessage": "An agent waits for you",
+    "description": "A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an agent of the project stops to wait for the user (a permission prompt, a question)."
+  },
+  "workflow.wakeLevel.custom": {
+    "defaultMessage": "The events you tick.",
+    "description": "Under the workflow option “Wake the Assistant for” while Custom is chosen (HI-3211); the events follow as ticks."
+  },
+  "workflow.wakeLevel.everything": {
+    "defaultMessage": "Every event in a lane: also each card passing review, each card moving, and a lane waiting for a merge. For a few big cards you want to follow closely.",
+    "description": "Under the workflow option “Wake the Assistant for” while Everything is chosen (HI-3211): what wakes the Assistant."
+  },
+  "workflow.wakeLevel.important": {
+    "defaultMessage": "A failed review, a card blocked, a lane whose merge is due, a lane ending, and an agent waiting for you. No stalls or unblocks: for busy projects of many small cards.",
+    "description": "Under the workflow option “Wake the Assistant for” while Important only is chosen (HI-3211): what wakes the Assistant."
+  },
+  "workflow.wakeLevel.quiet": {
+    "defaultMessage": "Only an agent waiting for you and a lane ending. The Assistant hears of failures and blocks when it next looks, or when you ask.",
+    "description": "Under the workflow option “Wake the Assistant for” while Quiet is chosen (HI-3211): what wakes the Assistant."
+  },
+  "workflow.wakeLevel.standard": {
+    "defaultMessage": "A failed review, a card blocked, unblocked or stalled, a lane whose merge is due or stalled, a lane ending, and an agent waiting for you. What Combwork has always woken it for.",
+    "description": "Under the workflow option “Wake the Assistant for” while Standard (the default) is chosen (HI-3211): what wakes the Assistant."
   },
   "workflow.why.commitMessage": {
     "defaultMessage": "Card titles can name people and details a public history shouldn’t keep; choose Combwork’s for the card’s key, linking each merge to its card.",

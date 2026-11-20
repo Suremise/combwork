@@ -26,7 +26,7 @@ const { DatabaseSync } = require('node:sqlite')
 const PORT = Number(lib.port(47804))
 const fx = q.queueProject('slotoptions')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -36,7 +36,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
 const projectJson = (p = fx.alpha) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
 /** Changes the workspace's board from outside Combwork, as another process would. */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
   try {
     db.prepare(sql).run(...args)
   } finally {
@@ -264,12 +264,8 @@ function board(sql, ...args) {
 
     // --- German.
     const lang = (await inv('app:info')).language
-    const speak = async (code) => {
-      const dir = path.join(lib.ROOT, 'locales', code)
-      const messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: messages ? { ...lang, code, locale: code, messages } : lang })
-      return messages
-    }
+    // Main reads the language's catalogue, not sent through app.evaluate (HI-3434); English: the window's own.
+    const speak = (code) => lib.speakLanguage(app, lang, code === 'en' ? undefined : code)
     await openWorkflow(fx.alpha)
     const de = await speak('de')
     check('the section shows in German', !!(await until(async () => (await section.innerText()).includes(de['workflow.slots.heading']), HUNG_MS)))

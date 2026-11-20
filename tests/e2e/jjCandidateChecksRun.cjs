@@ -16,7 +16,7 @@ const { execFileSync } = require('child_process')
 const { jjDir, portableJj } = require('../jjPortable.cjs')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 90000
+const HUNG_MS = lib.timing('hang.step')
 const exe = portableJj()
 if (!exe) {
   console.log("SKIP jjchecks: the pinned jj isn't fetched (npm run jj:fetch)")
@@ -157,18 +157,16 @@ const lintCmd = `${node} -e "if(require('fs').existsSync(${JSON.stringify(lintFa
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     }
     const quiet = await page.addStyleTag({ content: '.toasts { display: none !important; }' })
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     const english = (await inv('app:info')).language
-    const catalogue = (code) => Object.assign({}, ...fs.readdirSync(path.join(lib.ROOT, 'locales', code)).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', code, f), 'utf8'))))
     const inEach = async (loc, name, wanted) => {
       for (const language of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
-        const cat = catalogue(language)
-        await speak({ ...english, code: language, locale: language, messages: cat })
+        // The language's catalogue is read by main, not sent through app.evaluate (HI-3434).
+        const cat = await lib.speakLanguage(app, english, language)
         const want = wanted(cat)
         check(`${language}: ${name} in the language`, !!(await until(async () => (await text(loc)).includes(want), HUNG_MS)), await text(loc))
         await shoot(loc, `${name}-${language}`)
       }
-      await speak(english)
+      await lib.speakLanguage(app, english)
     }
 
     // --- Card 1: its checks run (the first held), then pass: offered only then; the user integrates it.

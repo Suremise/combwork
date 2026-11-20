@@ -7,7 +7,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path')
 const { putSessions } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 const scratch = lib.WORK, userData = path.join(scratch, 'resume-profile')
 // Outside the repository, so its CLAUDE.md (which imports AGENTS.md) doesn't apply to the test session (#174).
 const ws = path.join(scratch, 'resume-ws')
@@ -19,7 +19,6 @@ const g = (cmd) => lib.git(proj, cmd)
 g('init -q -b main'); g('config user.email test@example.com'); g('config user.name Test')
 fs.writeFileSync(path.join(proj, 'README.md'), '# Demo\n'); g('add -A'); g('commit -q -m init')
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n}.png`) })
@@ -34,9 +33,9 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const project = async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo')
-  await inv('workspace:open', ws); await sleep(800)
+  await lib.openWorkspace(inv, page, ws)
   await inv('project:setActive', proj, true)
-  await page.getByText('demo', { exact: true }).first().click(); await sleep(500)
+  await page.getByText('demo', { exact: true }).first().click(); await lib.projectShown(page)
 
   // Old sessions: two of Agent 1's, none of Agent 2's.
   const A1 = await lib.addAgent(inv, proj)
@@ -70,7 +69,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   // Start Agent 1 fresh (no prompt sent).
   const st = await inv('session:start', proj, { agentId: A1.id })
   await lib.acceptClaudeTrust(inv, proj, A1.id)
-  await lib.until(async () => (await inv('session:live')).some((l) => l.agentId === A1.id && l.status !== 'starting'), 30000)
+  await lib.until(async () => (await inv('session:live')).some((l) => l.agentId === A1.id && l.status !== 'starting'), lib.timing('hang.step'))
   p = await project()
   check('Agent 1 running', !!a1().live)
 
@@ -85,14 +84,14 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   const sessionItem = page.locator('.menu .menu-item', { hasText: 'Open in Sessions Tab' })
   const openSessionItem = async () => {
     await h1.getByRole('button', { name: 'More', exact: true }).click()
-    await lib.until(() => sessionItem.isVisible(), 5000)
+    await lib.until(() => sessionItem.isVisible(), lib.timing('hang.ui'))
   }
   await openSessionItem()
   check("its session is in its ⋯", (await sessionItem.count()) === 1)
   await page.keyboard.press('Escape')
 
   // Picker for Agent 2: Agent 1's open session greyed, old sessions resumable.
-  await pickFrom(h2); await lib.until(async () => (await page.locator('.menu .menu-item.two-line').count()) > 0, 10000)
+  await pickFrom(h2); await lib.until(async () => (await page.locator('.menu .menu-item.two-line').count()) > 0, lib.timing('hang.ui'))
   const rows = page.locator('.menu .menu-item.two-line')
   const texts = await rows.allTextContents()
   check('picker lists 3 sessions', texts.length === 3, JSON.stringify(texts))
@@ -100,33 +99,34 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   check('old sessions say who ran them', texts.filter((t) => /last run by Agent 1/.test(t)).length === 2)
   await shot(page, '1-picker')
   // Clicking the open one shows Agent 1 instead of resuming.
-  await page.locator('.menu .menu-item.muted').click(); await sleep(500)
-  check('clicking the open one focuses Agent 1', await page.locator('.pane-header-bar.focused', { hasText: 'Agent 1' }).count() === 1)
+  await page.locator('.menu .menu-item.muted').click()
+  check('clicking the open one focuses Agent 1', !!(await lib.until(async () => (await page.locator('.pane-header-bar.focused', { hasText: 'Agent 1' }).count()) === 1, lib.timing('hang.ui'))))
   check('still only Agent 1 runs', (await project()).agents.filter((a) => a.live).length === 1)
 
   // Session tag → Sessions tab on that session, with Show instead of Resume.
-  await openSessionItem(); await sessionItem.click(); await lib.until(async () => (await page.locator('.tabs .tab.active', { hasText: 'Sessions' }).count()) === 1 && (await page.locator('.session-row.selected').count()) === 1, 10000)
+  await openSessionItem(); await sessionItem.click(); await lib.until(async () => (await page.locator('.tabs .tab.active', { hasText: 'Sessions' }).count()) === 1 && (await page.locator('.session-row.selected').count()) === 1, lib.timing('hang.step'))
   check('Sessions tab opened', await page.locator('.tabs .tab.active', { hasText: 'Sessions' }).count() === 1)
   check('live session selected', await page.locator('.session-row.selected').count() === 1)
   check('Show button for the running session', await page.locator('.transcript-toolbar button', { hasText: 'Show' }).count() === 1)
   await shot(page, '2-sessions-live')
   // An old session: Resume goes to the free agent, ▾ offers both.
-  await page.locator('.session-row', { hasText: 'Tray fixes' }).click(); await sleep(800)
+  await page.locator('.session-row', { hasText: 'Tray fixes' }).click()
   const resumeBtn = page.locator('.transcript-toolbar .split-btn button').first()
+  await lib.until(async () => /Resume in/.test(await resumeBtn.textContent().catch(() => '')), lib.timing('hang.ui'))
   check('Resume in Agent 2 (Agent 1 is busy)', /Resume in Agent 2/.test(await resumeBtn.textContent()), await resumeBtn.textContent())
-  await page.locator('.transcript-toolbar .split-caret').click(); await sleep(400)
+  await page.locator('.transcript-toolbar .split-caret').click(); await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, lib.timing('hang.ui'))
   const inTexts = await page.locator('.menu .menu-item').allTextContents()
   check('Resume in menu lists both agents', inTexts.length === 2 && /running/.test(inTexts[0]), JSON.stringify(inTexts))
   await shot(page, '3-resume-in')
   await page.keyboard.press('Escape')
 
   // The agent's ⋯: Resume (disabled: nothing of its own) and Resume a Session…
-  await page.locator('.tabs .tab', { hasText: 'Session' }).first().click(); await sleep(500)
-  await page.locator('.pane-header-bar', { hasText: 'Agent 2' }).click(); await sleep(300)
+  await page.locator('.tabs .tab', { hasText: 'Session' }).first().click(); await lib.until(async () => (await page.locator('.tabs .tab.active', { hasText: 'Session' }).count()) === 1, lib.timing('hang.ui'))
+  await page.locator('.pane-header-bar', { hasText: 'Agent 2' }).click(); await lib.until(async () => (await page.locator('.pane-header-bar.focused', { hasText: 'Agent 2' }).count()) === 1, lib.timing('hang.ui'))
   await h2.getByRole('button', { name: 'More', exact: true }).click()
   check("Resume disabled in Agent 2's ⋯", await page.locator('.menu .menu-item', { hasText: /^\s*Resume\s*$/ }).evaluate((el) => el.classList.contains('disabled')).catch(() => false))
   await page.keyboard.press('Escape')
-  await pickFrom(h2); await lib.until(async () => (await page.locator('.menu .menu-header').textContent().catch(() => '')) === 'Resume in Agent 2', 10000)
+  await pickFrom(h2); await lib.until(async () => (await page.locator('.menu .menu-header').textContent().catch(() => '')) === 'Resume in Agent 2', lib.timing('hang.step'))
   check("the ⋯'s picker opens", (await page.locator('.menu .menu-header').textContent()) === 'Resume in Agent 2')
   await shot(page, '4-header')
   await page.keyboard.press('Escape')
@@ -138,10 +138,10 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
     const d = await sessionItem.locator('.menu-detail').innerText().catch(() => '')
     await page.keyboard.press('Escape')
     return /Renamed live/.test(d)
-  }, 5000)
+  }, lib.timing('hang.ui'))
   check('its detail follows rename', !!renamed)
 
-  await inv('session:stop', proj, A1.id); await lib.until(async () => !(await inv('session:live')).some((l) => l.agentId === A1.id), 15000)
+  await inv('session:stop', proj, A1.id); await lib.until(async () => !(await inv('session:live')).some((l) => l.agentId === A1.id), lib.timing('hang.step'))
   p = await project()
   check('after stop Agent 1 resume is back', !!a1().resume, JSON.stringify(a1().resume))
 
@@ -180,13 +180,13 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
     check(`round ${round}: the CLI has no copy`, cliCopy() === null)
     await inv('session:start', proj, { resumeId: OLDER, agentId: A1.id })
     await lib.acceptClaudeTrust(inv, proj, A1.id)
-    const up = await lib.until(async () => (await inv('session:live')).some((l) => l.agentId === A1.id && l.sessionId === OLDER && l.status !== 'starting'), 30000)
+    const up = await lib.until(async () => (await inv('session:live')).some((l) => l.agentId === A1.id && l.sessionId === OLDER && l.status !== 'starting'), lib.timing('hang.step'))
     check(`round ${round}: resumed from the compressed backup`, !!up)
     const restored = cliCopy()
     check(`round ${round}: restored where the CLI looks, decompressed`, !!restored && /Earlier work/.test(fs.readFileSync(restored, 'utf8')), String(restored))
-    await inv('session:stop', proj, A1.id); await lib.until(async () => !(await inv('session:live')).some((l) => l.agentId === A1.id), 15000)
+    await inv('session:stop', proj, A1.id); await lib.until(async () => !(await inv('session:live')).some((l) => l.agentId === A1.id), lib.timing('hang.step'))
     // Ended: its backup (written plain while it ran) is compressed again, and still holds the conversation.
-    const again = await lib.until(compressed, 15000)
+    const again = await lib.until(compressed, lib.timing('hang.ui'))
     check(`round ${round}: compressed again at its end`, !!again && /Earlier work/.test(zlib.gunzipSync(fs.readFileSync(gzB)).toString('utf8')))
     // The CLI forgets it again (as Claude Code does after 30 days).
     fs.rmSync(restored, { force: true })
@@ -200,21 +200,22 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   const stopA1 = async () => {
     fs.writeFileSync(fakeFile('fake-start-go'), '')
     await inv('session:stop', proj, A1.id)
-    await lib.until(async () => !(await inv('session:live')).some((l) => l.agentId === A1.id), 15000)
+    await lib.until(async () => !(await inv('session:live')).some((l) => l.agentId === A1.id), lib.timing('hang.step'))
     fs.rmSync(fakeFile('fake-start-go'), { force: true })
   }
   // Held, writing nothing: still starting once Combwork has looked at the transcript (transcriptBytes set).
   fs.writeFileSync(fakeFile('fake-start-hold'), '')
   await inv('session:start', proj, { resumeId: OLDER, agentId: A1.id })
-  const looked = await lib.until(async () => { const l = await liveA1(); return !fs.existsSync(fakeFile('fake-start-hold')) && l?.transcriptBytes !== undefined ? l : null }, 30000)
+  const looked = await lib.until(async () => { const l = await liveA1(); return !fs.existsSync(fakeFile('fake-start-hold')) && l?.transcriptBytes !== undefined ? l : null }, lib.timing('hang.step'))
   check('held, its transcript as it was: still starting after a look', looked?.status === 'starting', JSON.stringify(looked && { status: looked.status, transcriptBytes: looked.transcriptBytes }))
   await stopA1()
   // Held after writing its start (as soon as it runs, before Combwork's first look): ready from that write.
   fs.writeFileSync(fakeFile('fake-start-write'), '')
   fs.writeFileSync(fakeFile('fake-start-hold'), '')
   await inv('session:start', proj, { resumeId: OLDER, agentId: A1.id })
-  const wrote = await lib.until(() => !fs.existsSync(fakeFile('fake-start-write')) && !fs.existsSync(fakeFile('fake-start-hold')), 30000)
-  const up = await lib.until(async () => (await liveA1())?.status === 'ready', 30000)
+  const wrote = await lib.until(() => !fs.existsSync(fakeFile('fake-start-write')) && !fs.existsSync(fakeFile('fake-start-hold')), lib.timing('hang.step'))
+  // before any turn (HI-2688): its start, restart or resume
+  const up = await lib.until(async () => (await liveA1())?.status === 'ready', lib.timing('hang.step'))
   check('held after writing its start: ready, from what it wrote', !!wrote && !!up, JSON.stringify((await liveA1())?.status))
   await stopA1()
   await app.close()

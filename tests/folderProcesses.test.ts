@@ -5,15 +5,17 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 type Proc = { pid: number; parent?: number; commandLine: string; started: number }
 type Tree = { pid: number; started: number }[]
 const req = createRequire(import.meta.url)
-const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs, leftoverIdentities, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree } = req('./e2e/folderProcesses.cjs') as {
+const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs, leftoverIdentities, processes, endExactly, suspendExactly, suspensions, suspendRunning, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree } = req('./e2e/folderProcesses.cjs') as {
   processes: () => Proc[]
   endExactly: (targets: Tree) => number
   suspendExactly: (targets: Tree, resume?: boolean) => { done: Tree; failed: { pid: number; why: string }[] }
   suspensions: (act?: (t: Tree, resume?: boolean) => { done: Tree; failed: { pid: number; why: string }[] }, end?: (t: Tree) => number) => { held: () => Tree; suspend: (t: Tree) => { done: Tree; failed: { pid: number; why: string }[] }; resume: () => { pid: number; why: string }[]; release: () => { failed: { pid: number; why: string }[]; ended: Tree } }
+  suspendRunning: (held: { held: () => Tree; suspend: (t: Tree) => { done: Tree; failed: { pid: number; why: string }[] } }, find: () => Tree, kept?: (t: { pid: number; started: number; cli?: boolean }) => boolean, looks?: number) => { done: Tree; failed: { pid: number; why: string }[]; ended: Tree }
   childrenFirst: (list: Proc[], targets: Tree) => Tree
   namesFolder: (cmd: string, folder: string) => boolean
   namesFile: (list: Proc[], name: string) => boolean
@@ -140,7 +142,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     const exited = (c: ChildProcess) => c.exitCode !== null || c.signalCode !== null
     try {
       expect(stopProcessesIn(own, since)).toBe(1)
-      await vi.waitFor(() => expect(exited(kids.own)).toBe(true), { timeout: 15000, interval: 100 })
+      await vi.waitFor(() => expect(exited(kids.own)).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
       expect(exited(kids.sibling)).toBe(false)
       expect(exited(kids.other)).toBe(false)
       // Started before `since`: not the scenario's, so left alone.
@@ -149,7 +151,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     } finally {
       for (const c of Object.values(kids)) if (!exited(c)) c.kill()
     }
-  }, 30000)
+  }, timing('test.hang'))
 
   it.runIf(process.platform === 'win32')('never ends a pid that is now another process: only the one it was when listed (#547)', async () => {
     const kid = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { env: baseEnv(), stdio: 'ignore' })
@@ -162,13 +164,13 @@ describe("a scenario's leftover processes (#542, #402)", () => {
       expect(exited()).toBe(false)
       // The process it was when listed: ended.
       expect(endExactly([{ pid: kid.pid!, started: listed.started }])).toBe(1)
-      await vi.waitFor(() => expect(exited()).toBe(true), { timeout: 15000, interval: 100 })
+      await vi.waitFor(() => expect(exited()).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
       // Already gone: nothing to end, and no error.
       expect(endExactly([{ pid: kid.pid!, started: listed.started }])).toBe(0)
     } finally {
       if (!exited()) kid.kill()
     }
-  }, 30000)
+  }, timing('test.hang'))
 
   it("a test's suspensions: what failed to resume stays held, what has gone is dropped, cleanup ends what can't be resumed (#600)", () => {
     // Stubs only: no process is touched. A resume of pid 2 fails (a native status), pid 3 has gone, pid 1 resumes.
@@ -203,6 +205,37 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     expect(calls).toEqual(['suspend 1,2,3,9', 'resume 1,2,3', 'resume 2'])
   })
 
+  it("a CLI's tree is suspended while its short-lived children come and go: those ended are no failure, its own process gone is (HI-3432)", () => {
+    // Stubs only. The CLI (pid 1) and its MCP server (2) stay; children 3 and 4 have ended by the time they're reached,
+    // 5's pid names another process by now, and 6 starts between the first listing and the CLI's suspension.
+    type Failed = { pid: number; why: string }[]
+    const gone = new Map([[3, 'gone'], [4, 'gone'], [5, 'another process']])
+    const act = (targets: Tree) => ({ done: targets.filter((t) => !gone.has(t.pid)), failed: targets.filter((t) => gone.has(t.pid)).map((t) => ({ pid: t.pid, why: gone.get(t.pid)! })) })
+    const cli = { pid: 1, started: 10, cli: true }
+    const mcp = { pid: 2, started: 20 }
+    const late = { pid: 6, started: 60 }
+    const lists = [[cli, mcp, { pid: 3, started: 30 }, { pid: 4, started: 40 }, { pid: 5, started: 50 }], [cli, mcp, late], [cli, mcp, late]]
+    let looked = 0
+    const find = () => lists[Math.min(looked++, lists.length - 1)]
+    const kept = (t: { cli?: boolean }) => !!t.cli
+    const s = suspensions(act, () => 0)
+    const r = suspendRunning(s, find, kept)
+    expect(r.failed).toEqual([])
+    expect(r.done.map((t) => t.pid)).toEqual([1, 2, 6])
+    expect(r.ended.map((t) => t.pid)).toEqual([3, 4, 5])
+    expect(s.held().map((t) => t.pid)).toEqual([1, 2, 6])
+    expect(looked).toBe(3)
+    // The CLI's own process gone: the CLI has ended, a failure.
+    gone.set(1, 'gone')
+    expect(suspendRunning(suspensions(act, () => 0), () => [cli], kept).failed).toEqual([{ pid: 1, why: 'gone' }])
+    // A process that couldn't be suspended for another reason is a failure, never retried as new.
+    const denied = (targets: Tree) => ({ done: [] as Tree, failed: targets.map((t) => ({ pid: t.pid, why: '0xC0000022' })) as Failed })
+    expect(suspendRunning(suspensions(denied, () => 0), () => [mcp], kept).failed).toEqual([{ pid: 2, why: '0xC0000022' }])
+    // New ones still showing after the last look: `still starting`.
+    let n = 100
+    expect(suspendRunning(suspensions(act, () => 0), () => [{ pid: n++, started: n }], kept, 2).failed).toEqual([{ pid: 102, why: 'still starting' }])
+  })
+
   it.runIf(process.platform === 'win32')('suspends and resumes only the process a pid was when listed, and says what it did (#600)', async () => {
     // A process of the test's own that counts up in a file, so whether it runs shows.
     const own = tempDir('suspend')
@@ -215,7 +248,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     const me = identify([kid.pid!])[0]
     try {
       expect(me?.pid).toBe(kid.pid)
-      await vi.waitFor(() => expect(count()).toBeGreaterThan(0), { timeout: 15000, interval: 50 })
+      await vi.waitFor(() => expect(count()).toBeGreaterThan(0), { timeout: timing('wait.hang'), interval: 50 })
       // As if its pid named another process by now (started later): nothing is done, and it says why.
       const other = suspendExactly([{ pid: me.pid, started: me.started - 5000 }])
       expect(other).toEqual({ done: [], failed: [{ pid: me.pid, why: 'another process' }] })
@@ -225,13 +258,13 @@ describe("a scenario's leftover processes (#542, #402)", () => {
       expect(suspendExactly([me])).toEqual({ done: [me], failed: [] })
       const at = count()
       expect(suspendExactly([me], true)).toEqual({ done: [me], failed: [] })
-      await vi.waitFor(() => expect(count()).toBeGreaterThan(at), { timeout: 15000, interval: 50 })
+      await vi.waitFor(() => expect(count()).toBeGreaterThan(at), { timeout: timing('wait.hang'), interval: 50 })
     } finally {
       // Resumed in case a check failed while it was suspended: by its identity, so a pid reused since is left alone.
       if (me) suspendExactly([me], true)
       if (!exited()) kid.kill()
     }
-  }, 30000)
+  }, timing('test.hang'))
 
   it.runIf(process.platform === 'win32')('a process of its own and the child it started: each ended once, by what it was when listed', async () => {
     const own = join(tmp, 'tree')
@@ -244,19 +277,19 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     // Still that process (pid and start): a pid given to another process since counts as gone.
     const alive = (t: { pid: number; started: number }) => processes().some((p) => p.pid === t.pid && p.started === t.started)
     try {
-      await vi.waitFor(() => expect(existsSync(childPid) && Number(readFileSync(childPid, 'utf8')) > 0).toBe(true), { timeout: 15000, interval: 100 })
+      await vi.waitFor(() => expect(existsSync(childPid) && Number(readFileSync(childPid, 'utf8')) > 0).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
       const childPidNow = Number(readFileSync(childPid, 'utf8'))
       const child = processes().find((p) => p.pid === childPidNow)!
       expect(child).toBeTruthy()
       // The child is in a job that ends with its parent (Node's): only ending it first reaches it (#615).
       expect(stopProcessesIn(own, since)).toBe(2)
-      await vi.waitFor(() => expect(parent.exitCode !== null || parent.signalCode !== null).toBe(true), { timeout: 15000, interval: 100 })
+      await vi.waitFor(() => expect(parent.exitCode !== null || parent.signalCode !== null).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
       expect(alive(child)).toBe(false)
       expect(stopProcessesIn(own, since)).toBe(0)
     } finally {
       if (parent.exitCode === null && parent.signalCode === null) parent.kill()
     }
-  }, 60000)
+  }, timing('test.hang'))
 
   it("a tree ends only from the root's own identity: a root whose pid names another process by now ends nothing (#603)", () => {
     // The root as it was when taken (pid 100, started 1000); its pid is now an unrelated process's, with a child of its own.
@@ -277,7 +310,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     const parent = spawn(process.execPath, ['-e', script, childPid], { env: baseEnv(), stdio: 'ignore' })
     const exited = (c: ChildProcess) => c.exitCode !== null || c.signalCode !== null
     try {
-      await vi.waitFor(() => expect(existsSync(childPid) && Number(readFileSync(childPid, 'utf8')) > 0).toBe(true), { timeout: 15000, interval: 100 })
+      await vi.waitFor(() => expect(existsSync(childPid) && Number(readFileSync(childPid, 'utf8')) > 0).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
       const [root, child] = identify([parent.pid!, Number(readFileSync(childPid, 'utf8'))])
       expect(root && child).toBeTruthy()
       // As if the root had ended and Windows had given its pid to this process, started later: it and its child are left alone.
@@ -285,7 +318,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
       expect(stillSame([root, child])).toEqual([root.pid, child.pid])
       // Its own identity: both ended, the child first (ending the parent first would take the child with it: 1).
       expect(endTreeExactly(root)).toBe(2)
-      await vi.waitFor(() => expect(exited(parent)).toBe(true), { timeout: 15000, interval: 100 })
+      await vi.waitFor(() => expect(exited(parent)).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
       expect(stillSame([root, child])).toEqual([])
       // Gone: nothing to end, and no error; an exited ChildProcess is never looked up by its pid.
       expect(endTreeExactly(root)).toBe(0)
@@ -293,7 +326,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     } finally {
       if (!exited(parent)) parent.kill()
     }
-  }, 60000)
+  }, timing('test.hang'))
 
   it.runIf(process.platform === 'win32')('ends a ChildProcess it holds, with what it started (#603)', async () => {
     const childPid = join(tmp, 'held-603.pid')
@@ -301,15 +334,15 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     const parent = spawn(process.execPath, ['-e', script, childPid], { env: baseEnv(), stdio: 'ignore' })
     const exited = () => parent.exitCode !== null || parent.signalCode !== null
     try {
-      await vi.waitFor(() => expect(existsSync(childPid) && Number(readFileSync(childPid, 'utf8')) > 0).toBe(true), { timeout: 15000, interval: 100 })
+      await vi.waitFor(() => expect(existsSync(childPid) && Number(readFileSync(childPid, 'utf8')) > 0).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
       const [child] = identify([Number(readFileSync(childPid, 'utf8'))])
       expect(endChildTree(parent)).toBe(2)
-      await vi.waitFor(() => expect(exited()).toBe(true), { timeout: 15000, interval: 100 })
+      await vi.waitFor(() => expect(exited()).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
       expect(stillSame([child])).toEqual([])
     } finally {
       if (!exited()) parent.kill()
     }
-  }, 60000)
+  }, timing('test.hang'))
 })
 
 // HI-1453: a test copy of Combwork that outlived its suite (12 h, its runner gone). Each copy is recorded as it starts, and

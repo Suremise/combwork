@@ -30,7 +30,7 @@ cost tokens and fail for reasons that aren't the code. The full set (`--all`, or
 the runner lists the real suites it left out ("Not run: the real tier"), in its output and the run record. `--real` adds
 the real tier, `--only-real` runs only it; a suite named always runs.
 
-**The real Antigravity CLI** (`antigravityreal`; Darren's (b) on HI-2548: a launch and one tiny prompt a run, one agent)
+**The real Antigravity CLI** (`antigravityreal`; HI-2548's (b): a launch and one tiny prompt a run, one agent)
 has no test home: agy's sign-in is the PC's (Windows Credential Manager), read by agy, never changed by a test. The
 suite runs agy in its test copy's own profiles (the check profile and the agent's, under its test data; never your
 `~\.gemini`, which lib.cjs lists before and after), its updates off, and marks the check profile past agy's first-run
@@ -40,7 +40,7 @@ its installation id). It is skipped when agy isn't installed or signed in, or th
 Close your own agy first: one writing to `~\.gemini` meanwhile fails that check. Every fake agy suite stops before any
 session unless Combwork selected the fake (a fake it can't run must never fall back to the real one).
 
-**The real OpenCode** (`opencodereal`, `needs: ['opencode']`, HI-2763; Darren's HI-2758 option A: no account, key, sign-in
+**The real OpenCode** (`opencodereal`, `needs: ['opencode']`, HI-2763; HI-2758's option A: no account, key, sign-in
 or cloud call) runs only the pinned build: v2.2.6's `opencode-windows-x64.zip`, unzipped to
 `%LOCALAPPDATA%\combwork-test\opencode-2.2.6` (the zip's SHA-256 `f75c16b3…bb24be`, its `opencode.exe`'s `98cb0aa8…e9677`,
 which the suite checks), never one on the PATH. Its one prompt goes to your local Ollama's `qwen3:8b` through a logging
@@ -325,7 +325,9 @@ it. The side slot and model trials are set beside it (HI-2070), read the same wa
 
 **Unit tests under load.** `npm test` uses half the cores (`maxWorkers: '50%'` in `vitest.config.ts`) and allows 20 s
 a test and 30 s a hook, so a full run beside an e2e set doesn't hit Vitest's 5 s default. A test that needs longer says
-so itself (`it(…, 60_000)`), and a test that waits for something waits for it (polling), not for a fixed time.
+so itself (`it(…, 60_000)`), and a test that waits for something waits for it (polling), not for a fixed time. CI's
+run on GitHub's runner uses one worker (`--maxWorkers=1` in `.github/workflows/ci.yml`, HI-3355): with two, a test file
+there took several times as long as here, and bounds meant for a hung run tripped.
 
 ## Which suites to run, and who runs them
 
@@ -356,18 +358,19 @@ same code while every required check still runs:
   narrow a round's tests are, and what never runs on a card unless it asks, is AGENTS.md's **Tests per card**.
 - **A merge** (#1010; into main or an integration branch such as `feature/090-session`) runs **focused checks** on the
   merged code: typecheck, lint, `npm run check:repo` (the repo-wide checks: the i18n guard and the unit tests that
-  scan every file, under a minute, HI-2244), and the cards' own focused suites (those their reviews ran, plus any
+  scan every file, and the catalogue coverage tests, HI-2244, HI-3257), and the cards' own focused suites (those their reviews ran, plus any
   suite the merge's conflicts touched), `npm run e2e -- <suites> --build --record`. **Not** the full set and **not**
   `--affected`: merges take turns at one slot, and an hour or more of e2e for each kept every other lane waiting (a
   phase of five merges took hours) and was the load Combwork crashed under (#988). Every card has already passed review
   with its focused suites, which its reviewer checked. A pre-merge run still goes first in the slot queue (#558). A
   real suite skipped for the environment doesn't block a merge, but the record says so and the reviewer decides
-  whether it must run again first. The full unit run (`npm test`, about 7 minutes) is a release's checks, and on
-  request, never a card's while building (AGENTS.md, Tests per card: no builder or reviewer runs or asks for it); CI
+  whether it must run again first. The full unit run (`npm test`, about 7 minutes) is a release's checks (a version's full passes
+  included), and on request, never a card's while building (AGENTS.md, Tests per card: no builder or reviewer runs or asks for it); CI
   runs only the unit tests.
 - **The full set runs at checkpoints**: `npm run e2e -- --all --build --record` **on the integration branch when the
   lanes go quiet** (a phase's end, overnight with the load capped, before a long pause; a failure is carded at once and
-  bisected over the merge commits since the last full run), **once for a version's first RC** (RELEASING.md, What a
+  bisected over the merge commits since the last full run), **twice during a version, as its full passes**
+  (RELEASING.md, The release path, stage 1), **once for a version's first RC** (RELEASING.md, What a
   release checks; the real tier then runs on its own, `--all --only-real` with Copilot's suites named, RELEASING Step 4; an RC
   fix round and the release rerun only the slices a change invalidates, by the release's coverage ledger), and **on request** (the user, or a card that asks for it). Run the real tier on its own
   (`--all --only-real`) **after updating Claude Code or Codex**. `--affected` (below) stays a tool for picking the
@@ -408,7 +411,7 @@ reach a file that runs it. Lines that are only comments select nothing, unless a
 no longer does (`/*` and `*/` added around code). The IPC dispatch's own lines map only for its test seams' branches
 (`CW_TEST_SLOW_IPC`, `FAIL_IPC`, `BLOCK_IPC`, `HOLD_IPC`: the suites that set the seam); the rest of it (the access
 check, the error path) is every suite. **`WorkspaceService`'s members are followed by name because of a rule**
-(HI-2678, Darren's R2; `workspaceRule.mjs`): no value holding a `WorkspaceService` (a view of one, a container, a
+(HI-2678's R2; `workspaceRule.mjs`): no value holding a `WorkspaceService` (a view of one, a container, a
 callback returning one; one by an intersection, a subclass or sub-interface, a type parameter constrained to it, or a
 generic's own type parameter it went into) goes where its type is lost (`any`, `unknown`, `object`, an index signature, a cast, a slot whose
 type drops it) or is read by a key the code doesn't spell (a computed key, a destructuring by one or into a rest, a
@@ -427,7 +430,8 @@ touches one of its inputs (code, a tsconfig, `package.json` or the lock, its own
 from before the rule holds only when audited by hand (`workspaceRule.audited.json`: its exact git tree, the rule's and
 the compiler's identity, each escape's proof along its whole flow; `--reaudit <commit>` carries a record to a new rule
 only when the census still finds exactly what was audited, and never covers code outside the program, a member
-reached without its name or an edited Proxy). The `workspace` instance itself stays every suite. So
+reached without its name or an edited Proxy). Any change to the rule's file (a comment too), the compiler or the node
+types changes that identity, so `workspaceRuleCheck.mjs` fails until each record is reaudited (HI-3307). The `workspace` instance itself stays every suite. So
 HI-2654's `setAdvanced` selects 50 of 387 suites (`advanced`, `assistantsettings`, `consoletext`, `p7settings` among them;
 its two trees are audited), HI-2652's seam 2 suites, and HI-2653's New Project 28 from `actions.ts` (37 with its
 `Overlays.tsx`) (`tests/affectedUnits.test.ts` checks all three, and the suites they need; `tests/workspaceRule.test.ts`
@@ -482,7 +486,7 @@ running or naming a script); in `src/` it runs one of the build's entries (`elec
 it counts only when the change is in what an entry loads, or the entries can't be read; a `node -e` script is read as a
 file of its own. External programs (git, the CLIs) are the boundary, and so is a loader deliberately hidden (eval or
 `Function` reached through globals or built keys, a loader chosen through an environment variable): the gate covers
-the forms this repository's tests use or would plausibly write (Darren's review bar for HI-2677), still catching any
+the forms this repository's tests use or would plausibly write (HI-2677's review bar), still catching any
 `eval`, `Function` or `constructor` reference, and a guard can refuse hidden ones in tests if they ever appear. A changed `import type` counts for nothing. A
 `WorkspaceService` member, while its rule holds in both revisions (above), is searched by its own name rather than its
 class's (which nearly every test of main names), and a file outside the app where a `WorkspaceService` loses its type
@@ -654,7 +658,7 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   release-testing project that holds just the release-testing agent (the combwork-mcp repo's
   `servers/windows-sandbox/RELEASE-TESTING.md`).
 - **The 1.0 upgrade from installed 0.9** (S53, S60 and restore, #1227) is no longer tested: its suites (`upgradelane`,
-  `boardupgrade`) were retired (HI-2741, Darren on 8 Nov: everyone is on 1.1.0). The upgrades users need (1.0 and 1.1
+  `boardupgrade`) were retired (HI-2741: everyone is on 1.1.0). The upgrades users need (1.0 and 1.1
   to 1.2) are the Sandbox checks'. The fakes' old-release mode (HI-2614), which only `upgradelane` used, went with it
   (HI-2742); the fakes refuse an old release's names in every launch (`fake-claude/oldDialect.cjs`).
 - **The queue suites on a packaged build** (#1578; S54 and S55 among them, for #1449 and #1539): `queueFixture.cjs`
@@ -715,7 +719,7 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   that didn't let the home go, what that run left, and every CLI those started; a nested run reusing its parent's lease
   never resets. One
   whose status can't be read stops the suite. An entry `testHomeManifest.mjs` doesn't classify (a new CLI version's new
-  file) is kept, never deleted, and named in the suite's log (Darren, 7 Nov): classify it there. `--warm-homes` (e2e
+  file) is kept, never deleted, and named in the suite's log: classify it there. `--warm-homes` (e2e
   and scenarios) skips the reset, keeping what earlier runs left, on purpose; a suite needing state from an earlier,
   separate run says so with `home: 'warm'` in `suites.mjs` (none does today). Copilot has no long-lived test home: its
   suites make theirs each run, and its sign-in is in Windows Credential Manager. A suite run on its own (`node

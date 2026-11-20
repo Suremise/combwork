@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 import { copyFileSync, existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'original-fs'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { basename, join } from 'path'
-import type { StatementSync } from 'node:sqlite'
+import type { DatabaseSync, StatementSync } from 'node:sqlite'
 import { app } from 'electron'
 import { CW_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
@@ -17,9 +17,13 @@ import { NAMES_STEP } from './schema/namesStep'
 import { VALUES_STEP } from './schema/valuesStep'
 import { WORKSPACE_IDENTITY_STEP } from './schema/workspaceIdentityStep'
 import { JJ_PUBLISH_STEP } from './schema/jjPublishStep'
+import { REQUEST_RECEIPTS_STEP } from './schema/requestReceiptsStep'
+import { PROJECT_REVS_STEP } from './schema/projectRevsStep'
+import { QUEUE_REVS_STEP } from './schema/queueRevsStep'
+import { PROJECT_REVS_DROP_STEP } from './schema/projectRevsDropStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
-import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
-import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
+import { backupsOf, beginTransaction, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
+import { checkpointsLetGo, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { beginWrite, countedWrite } from './dbWrites'
 import { timedStep } from './stallWork'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
@@ -367,6 +371,50 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: JJ_PUBLISH_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => JJ_PUBLISH_STEP.up(db)
+  },
+  {
+    // HI-3195: each keyed Agent API write's durable "applied" marker, saved in the write's transaction
+    // (schema/requestReceiptsStep.ts, requestReceipts.ts). In the 1.0 group, as 25–29 are.
+    version: 30,
+    name: REQUEST_RECEIPTS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => REQUEST_RECEIPTS_STEP.up(db)
+  },
+  {
+    // HI-3291: each project's revision and the facts' epoch, kept by triggers, for caches of a project's board reads (the
+    // queue listings, FactStore.factsOfKind) (schema/projectRevsStep.ts). In the 1.0 group, as 25–30 are.
+    version: 31,
+    name: PROJECT_REVS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => PROJECT_REVS_STEP.up(db)
+  },
+  {
+    // HI-3296: each project's queue revision, what its queue listings are kept by: the project revision less the writes
+    // no listing reads, plus a blocker's change for the projects it blocks (schema/queueRevsStep.ts). In the 1.0 group.
+    version: 32,
+    name: QUEUE_REVS_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => QUEUE_REVS_STEP.up(db)
+  },
+  {
+    // HI-3306: v31's project revisions dropped, unread since HI-3296's queue revisions; the facts' epoch kept, its raises
+    // in triggers of their own (schema/projectRevsDropStep.ts). In the 1.0 group.
+    version: 33,
+    name: PROJECT_REVS_DROP_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => PROJECT_REVS_DROP_STEP.up(db)
+  },
+  {
+    // HI-3374: the quiet check's claims (quietClaims.ts): a copy's folder renamed aside, claimed before the rename and
+    // let go once it is back, so one left aside is put back by its claim (never by its name) at the next look. In the
+    // 1.0 group, as 25–33 are.
+    version: 34,
+    name: 'quiet claims',
+    group: UPGRADE_GROUP_ID,
+    up: (db) =>
+      db.exec(
+        'CREATE TABLE IF NOT EXISTS quiet_claims (project TEXT NOT NULL, kind TEXT NOT NULL, name TEXT NOT NULL, folder TEXT NOT NULL, aside TEXT NOT NULL, folder_id TEXT NOT NULL, owner_pid INTEGER NOT NULL, owner_started INTEGER NOT NULL, op TEXT, used_at TEXT, at TEXT NOT NULL, PRIMARY KEY (project, kind, name)) STRICT'
+      )
   }
 ]
 
@@ -530,7 +578,7 @@ function importFiles(b: Board, combwork: string, appVersion: string): void {
   const folder = `${TASKS}.imported-${stamp()}`
   const t0 = performance.now()
   const record: Imported = { at: new Date().toISOString(), cards: cards.length, damaged, appVersion, folder, pendingRename: names.length > 0 || existsSync(join(dir, 'board.json')) || existsSync(join(dir, 'archive-batches.json')) }
-  timedStep(`db begin ${DB_FILE}`, () => db.exec('BEGIN IMMEDIATE'))
+  timedStep(`db begin ${DB_FILE}`, () => beginTransaction(db))
   try {
     for (const c of cards) writeCardRows(db, decomposeCard(c.n, c.doc))
     // Cards from before 1.0 keep their number in their project (#1219: #1061 is HI-1061).
@@ -573,7 +621,7 @@ function finishMove(b: Board, combwork: string, record: Imported): void {
   if (record.pendingRename) setMeta(b.db.writer, 'imported', JSON.stringify({ ...record, pendingRename: false }))
 }
 
-/** Where cards an older version saved in the stub are set aside, intact, for the user to review (Darren, 17 Oct). */
+/** Where cards an older version saved in the stub are set aside, intact, for the user to review. */
 export const SET_ASIDE = `${TASKS}.set-aside`
 
 /**
@@ -754,7 +802,9 @@ function openBoard(path: string, upgrade: boolean): Board {
         if (othersPresent(combwork, presenceId()).length) throw new OtherCombworkError()
       },
       whileGroupLocked: boardTestHooks.whileUpgrading ?? holdForTest,
-      checkpointer: checkpointWhenIdle,
+      // The WAL's first write after a checkpoint is made under the board's lock, which every writer of the file takes (HI-3289),
+      // counted (HI-1368) so the workspace's close waits for the worker's answer rather than closing while it holds the lock.
+      checkpointer: (file, writer) => checkpointWhenIdle(file, writer, { hold: (fn) => countedWrite(path, () => withFileLock(boardLock(path), fn)) }),
       onIoRetry: (e, ms) => log.warn(`opening the board of ${userText(path)}: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}), tried again in ${ms} ms`),
       // Each step's time (HI-1694: an upgrade that took a minute said only that it had finished).
       onSteps: (steps, copyMs) => {
@@ -920,6 +970,88 @@ export function boardReadToken(ws: WorkspaceService): string | null {
   return `${b.generation}:${dbGenerationAt(b.place)}:${(b.version.get() as { data_version: number }).data_version}:${b.commits}`
 }
 
+/**
+ * HI-3296: a token for what is committed of one project's queue now, for its queue listings: its queue revision
+ * (schema/queueRevsStep.ts's `queue_revs`, raised by triggers for every connection's writes to the project's cards, less
+ * the writes no listing reads, plus its cards' blockers changing), and the database's generation. With `also`, what else a
+ * cache is made from, read on the same snapshot. Null as boardReadToken is (inside a write, or a read's snapshot that may
+ * be older), and on a board without the revisions (one waiting for its upgrade): a cache keeps nothing then. Reading it
+ * changes nothing. (HI-3306: HI-3291's project revision it was first made beside is gone, unread.)
+ */
+export function queueRevision(ws: WorkspaceService, project: string, also?: (db: Db['reader']) => string): string | null {
+  return revisionOf(ws, 'SELECT q AS r FROM queue_revs WHERE project = ?', project, also) // i18n-ignore: SQL
+}
+
+function revisionOf(ws: WorkspaceService, sql: string, project: string, also?: (db: Db['reader']) => string): string | null {
+  const path = pathOf(ws)
+  if (inWrite(keyOf(path))) return null
+  const b = boardOf(path)
+  if (b.db.reader.isTransaction || b.legacy || b.db.pending) return null
+  try {
+    return readSnapshot(ws, (_b, db) => {
+      const r = (db.prepare(sql).get(project) as { r: number } | undefined)?.r ?? 0
+      return [b.generation, dbGenerationAt(b.place), r, also?.(db) ?? ''].join('\n') // i18n-ignore: a key, never shown
+    })
+  } catch {
+    return null
+  }
+}
+
+/** HI-3291: which opening of which database the board reads now: another (replaced, opened again) means rowids read before name nothing. */
+export function boardDatabase(ws: WorkspaceService): string {
+  const b = boardOf(pathOf(ws))
+  return `${b.generation}:${dbGenerationAt(b.place)}`
+}
+
+/** HI-3291: the facts' epoch (schema/projectRevsStep.ts's `facts_epoch`) on a read's snapshot: raised whenever facts may have gone or changed hands. */
+export function factsEpochIn(db: Db['reader']): number {
+  return (db.prepare('SELECT g FROM facts_epoch').get() as { g: number } | undefined)?.g ?? 0 // i18n-ignore: SQL
+}
+
+/** HI-3291: the highest fact's rowid on a read's snapshot (0 for none): what a cache of facts read up to it starts above next time. */
+export function factsHighIn(db: Db['reader']): number {
+  return (db.prepare('SELECT max(rowid) AS m FROM card_facts').get() as { m: number | null }).m ?? 0 // i18n-ignore: SQL
+}
+
+/**
+ * HI-3301: where a read's snapshot stands, for a cache that later asks what changed since (changedCardsIn): the database's
+ * opening, the facts' epoch, the board's card revision mark and its highest fact rowid.
+ */
+export interface ChangeMarks {
+  db: string
+  epoch: number
+  rev: number
+  high: number
+}
+
+/** HI-3301: the change marks on a read's snapshot. */
+export function changeMarksIn(ws: WorkspaceService, db: Db['reader']): ChangeMarks {
+  const rev = (db.prepare('SELECT g FROM board_rev').get() as { g: number } | undefined)?.g ?? 0 // i18n-ignore: SQL
+  return { db: boardDatabase(ws), epoch: factsEpochIn(db), rev, high: factsHighIn(db) }
+}
+
+/**
+ * HI-3301: the cards changed between `since` and a read's snapshot, on that snapshot (board-wide, with each one's project):
+ * those whose revision is at `since`'s mark or above (a card at the mark keeps its revision when written again, so the
+ * card written last before `since` is always among them: one card too many at most, never one missed) and those with a
+ * fact above `since`'s highest. Null when it can't say: another database or facts epoch (a fact or card deleted, a
+ * card moved to another project), or more than `most` cards (a caller then starts again).
+ */
+export function changedCardsIn(ws: WorkspaceService, db: Db['reader'], since: ChangeMarks, most: number): { number: number; project: string }[] | null {
+  const now = changeMarksIn(ws, db)
+  if (now.db !== since.db || now.epoch !== since.epoch || now.rev < since.rev || now.high < since.high) return null
+  // Two reads, each by its index (cards_rev; the facts' rowid, then each card by number): one UNION scans every card.
+  const out = new Map<number, string>()
+  const add = (rows: { number: number; project: string | null }[]): boolean => {
+    for (const r of rows) out.set(r.number, r.project ?? '')
+    return out.size <= most
+  }
+  if (!add(db.prepare('SELECT number, project FROM cards WHERE rev >= ? LIMIT ?').all(since.rev, most + 1) as { number: number; project: string | null }[])) return null // i18n-ignore: SQL
+  const facts = db.prepare('SELECT c.number, c.project FROM card_facts f CROSS JOIN cards c ON c.number = f.card WHERE f.rowid > ? LIMIT ?').all(since.high, (most + 1) * 8) as { number: number; project: string | null }[] // i18n-ignore: SQL
+  if (facts.length > (most + 1) * 8 - 1 || !add(facts)) return null
+  return [...out].map(([number, project]) => ({ number, project }))
+}
+
 /** The lanes were saved (storeTables.ts, in this process): the board's revision moves on. */
 export function noteLanesSaved(path: string): void {
   const b = boards.get(keyOf(path))
@@ -976,6 +1108,8 @@ interface WriteState {
   open: boolean
   changed: boolean
   after: (() => void)[]
+  /** HI-3194: what must still hold as it commits (beforeBoardCommit), checked after the change's last await: one throwing undoes it whole. */
+  checks: Map<string, () => void>
   /** What to put back on disk if the change (or the savepoint it was asked in) is undone (onBoardUndone), newest first. */
   undone: (() => Promise<void>)[]
   /** SQLite undid its transaction part way (a full disk, an I/O error, #1017 round 1): nothing more is written, and the change fails. */
@@ -1021,12 +1155,18 @@ function boardWriteLocked<T>(ws: WorkspaceService, path: string, key: string, fn
     const b = boardOf(path)
     if (b.db.newer !== null) throw combworkError(M.newer, undefined, { kind: 'conflict' })
     if (b.db.pending) throw combworkError(M.upgradeFirst, undefined, { kind: 'conflict' })
-    const state: WriteState = { key, open: true, changed: false, after: [], undone: [], lost: null }
+    const state: WriteState = { key, open: true, changed: false, after: [], checks: new Map(), undone: [], lost: null }
     const db = b.db.writer
     let committed = false
-    timedStep(`db begin ${DB_FILE}`, () => db.exec('BEGIN IMMEDIATE'))
+    timedStep(`db begin ${DB_FILE}`, () => beginTransaction(db))
     try {
       const out = await writing.run(state, fn)
+      // HI-3194: what the change's callers need to still hold as it commits (a request's launch still current), with no
+      // await between them and the commit: one that no longer holds undoes it whole.
+      for (const check of state.checks.values()) check()
+      // HI-3195: a keyed Agent API request's applied marker, in this same transaction (requestReceipts.ts): its key already
+      // taken undoes the change.
+      commitHook?.(db, (then) => state.after.push(then), state.changed)
       if (!boards.has(key)) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
       // Undone part way, whatever the change made of the error meanwhile (a batch skips a card that fails): it fails whole.
       if (state.lost) throw state.lost
@@ -1040,6 +1180,7 @@ function boardWriteLocked<T>(ws: WorkspaceService, path: string, key: string, fn
     } catch (e) {
       state.changed = false
       state.after = []
+      partHooks?.undone()
       try {
         if (db.isTransaction) db.exec('ROLLBACK')
       } catch {
@@ -1095,6 +1236,35 @@ export function afterBoardWrite(ws: WorkspaceService, fn: () => void): void {
   const w = writing.getStore()
   if (ws.path && w && w.open && w.key === keyOf(ws.path)) w.after.push(fn)
   else writing.exit(fn)
+}
+
+/** HI-3195: what runs in every board change just before its COMMIT, on its connection (requestReceipts.ts's marker). */
+let commitHook: ((db: DatabaseSync, afterCommit: (fn: () => void) => void, changed: boolean) => void) | null = null
+export function setBoardCommitHook(fn: typeof commitHook): void {
+  commitHook = fn
+}
+
+/**
+ * HI-3271: what a request running board changes keeps of each part (requestReceipts.ts): `part()` as a part begins
+ * (boardSavepoint) returns what puts the request's notes back if that part throws (`kept`: its writes kept all the same, a
+ * refusal's record); `undone()` when a whole change is undone.
+ */
+let partHooks: { part: () => (kept: boolean) => void; undone: () => void } | null = null
+export function setBoardPartHooks(hooks: typeof partHooks): void {
+  partHooks = hooks
+}
+
+/**
+ * HI-3194: something that must still hold when the board change running here commits (an agent request's launch still
+ * the agent's current one), checked synchronously just before its COMMIT, after every await of the change: one that
+ * throws undoes the whole change, and its error is the change's. `id` names it once per change (a request's several
+ * writes ask for the same check). Outside a change of `ws`'s board it is checked now.
+ */
+export function beforeBoardCommit(ws: WorkspaceService, id: string, check: () => void): void {
+  const w = writing.getStore()
+  if (ws.path && w && w.open && w.key === keyOf(ws.path)) {
+    if (!w.checks.has(id)) w.checks.set(id, check)
+  } else check()
 }
 
 /**
@@ -1257,11 +1427,14 @@ export async function boardSavepoint<T>(ws: WorkspaceService, fn: () => Promise<
   const undone = state.undone.length
   const changed = state.changed
   db.exec(`SAVEPOINT ${name}`)
+  const restore = partHooks?.part()
   try {
     const out = await fn()
     db.exec(`RELEASE ${name}`)
     return out
   } catch (e) {
+    // HI-3271: what the part told the request it runs for (a keyed request's marker) goes with it: all of it when undone.
+    restore?.(!state.lost && db.isTransaction && keep(e))
     // Undone part way by SQLite meanwhile: the whole change fails (boardWrite), nothing to undo here.
     if (!state.lost && db.isTransaction) {
       if (!keep(e)) {
@@ -2059,9 +2232,9 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     const pending = boardOf(path).db.pending
     if (!pending) return { backup: null }
     const from09 = pending.from < FIRST_10
-    // The group runs with the file locked to one connection: the checkpoints' worker lets go of it first (HI-1691),
-    // awaited before the close, so nothing opens it again between the close and the upgrade's open.
-    await checkpointsReleased(join(path, CW_DIR, DB_FILE))
+    // The group runs with the file locked to one connection: the checkpoints' worker lets go of it first (HI-1691, its
+    // kept connection too: HI-3414), awaited before the close, so nothing opens it again between the close and the upgrade's open.
+    await checkpointsLetGo(join(path, CW_DIR, DB_FILE))
     // Opened for keeps: only while a window holds it (#1395), checked after that wait, nothing awaited since.
     assertAdmitted(join(path, CW_DIR, DB_FILE))
     closeBoard(path)
@@ -2117,9 +2290,9 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
     // The board put back takes no writes here: an agent running on would go unrecorded. Starts are refused from then on.
     if (agentsRunning() > 0) throw combworkError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
     if (othersPresent(combwork, presenceId()).length) throw combworkError(M.inUse, undefined, { kind: 'conflict' })
-    // Copied as its only connection, then replaced: the checkpoints' worker lets go of it first (HI-1691), awaited
-    // before the close, so nothing opens it again between the close and the copy.
-    await checkpointsReleased(file)
+    // Copied as its only connection, then replaced: the checkpoints' worker lets go of it first (HI-1691, its kept
+    // connection too: HI-3414), awaited before the close, so nothing opens it again between the close and the copy.
+    await checkpointsLetGo(file)
     // As they are after that wait: still a window's (#1395, HR6's round 3: closed meanwhile, nothing is changed), and no
     // agent or other Combwork on it.
     assertAdmitted(file)

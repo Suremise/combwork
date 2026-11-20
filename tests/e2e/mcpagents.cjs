@@ -8,7 +8,7 @@ const fs = require('fs')
 const path = require('path')
 const { createHash } = require('crypto')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'mcpagents-profile')
 const ws = path.join(lib.WORK, 'mcpagents-ws')
@@ -102,8 +102,8 @@ const check = (name, ok, extra = '') => {
       }
       return null
     }
-    const b = await lib.until(() => launched(builder.id), 30000)
-    const t = await lib.until(() => launched(tester.id), 30000)
+    const b = await lib.until(() => launched(builder.id), lib.timing('hang.step'))
+    const t = await lib.until(() => launched(tester.id), lib.timing('hang.step'))
     check("Builder's launch has both servers", !!b?.notes && !!b?.sandbox && !!b?.combwork, JSON.stringify(Object.keys(b ?? {})))
     check("Tester's launch has only sandbox, and the Combwork MCP server", !t?.notes && !!t?.sandbox && !!t?.combwork, JSON.stringify(Object.keys(t ?? {})))
 

@@ -4,13 +4,13 @@
 // - Typed prompts: line breaks at Alt+Enter, then at Ctrl+J: the prompt as written (blank lines, indentation, a CRLF;
 //   a tab as a space), in one prompt, nothing sent early;
 // - at Spaces (the default): on one line, as before.
-// One short turn each, at low effort. Darren's OK for this run: HI-1327/r10 (28 Oct).
+// One short turn each, at low effort. The user's OK for this run: HI-1327/r10.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'codex-newline-profile')
 const ws = path.join(lib.WORK, 'codex-newline-ws')

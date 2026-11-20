@@ -21,12 +21,17 @@ import { keyInfo, withKey } from './keyStore'
 import { plainHttpRequest, type PlainReply } from './plainHttpsJson'
 import { checkedUrl, onServerChanged, serverOf } from './serverConnections'
 import { createLogger } from './logger'
+import { combworkError } from './combworkError'
+import { msg } from '../shared/i18n/msg'
+import { SERVER_CHECK_INFER_SECONDS } from '../shared/advanced'
+import { advanced } from './advanced'
 
 const log = createLogger('servers')
 
-/** A read's deadline; an inference's (a model loading cold can take a while); the most of a reply read; of an error's. */
+/** A read's deadline; the most of a reply read; of an error's. */
 const READ_TIMEOUT_MS = 10_000
-const INFER_TIMEOUT_MS = 120_000
+/** An inference's deadline (HI-3375): Settings → Advanced's, a local model loading cold on modest hardware can take minutes. */
+const inferTimeoutMs = (): number => advanced.number(SERVER_CHECK_INFER_SECONDS) * 1000
 const MAX_BYTES = 1024 * 1024
 const ERROR_BYTES = 8 * 1024
 /** Checks at once, in all; results kept. */
@@ -77,7 +82,9 @@ function remember(id: string, model: string, part: Partial<LastCheck>): void {
  * it ends.
  */
 async function framed<T>(id: string, model: string, request: string, timeoutMs: number, body: (c: Frame) => Promise<T>, stale: T, busy: T): Promise<T> {
-  const { server } = serverOf(id)
+  const { a, server, caps } = serverOf(id)
+  // Its checks speak Anthropic's API (Claude Code's Messages API, HI-2683): never to a server speaking another (HI-3197).
+  if ((caps.api ?? 'anthropic') !== 'anthropic') throw combworkError(msg({ id: 'main.server.check.otherApi', defaultMessage: "Check Server tests a server that speaks Anthropic's API; {name}'s CLI talks to its server in OpenAI's.", description: "An error (HI-3197): Check Server was asked for a server connection ({name}, its name in Settings → Accounts & Connections) whose coding agent CLI speaks OpenAI's API, which the check doesn't test. Check Server is a button's name: keep it as Combwork shows it." }), { name: a.name }, { kind: 'conflict' })
   const b = checkedUrl(server.baseUrl)
   if (!server.models.some((m) => m.id === model)) return stale
   if (active >= CHECKS_MAX) return busy
@@ -208,7 +215,7 @@ export function testServerTools(id: string, model: string, request: string, rand
     id,
     model,
     request,
-    INFER_TIMEOUT_MS * 2,
+    inferTimeoutMs() * 2,
     async ({ b, current, signal, headers }) => {
       const url = `${b.url}/v1/messages`
       const send = async (body: unknown): Promise<StepReply | null> => {

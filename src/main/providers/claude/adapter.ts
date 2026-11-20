@@ -2,23 +2,25 @@ import { TOOLS_SERVER } from '../../../shared/assistantTools'
 import { homedir } from 'os'
 import { msg, tr } from '../../../shared/i18n'
 import { join, basename } from 'path'
-import { mkdir, open, readdir, readFile, stat, writeFile } from 'original-fs/promises'
+import { mkdir, open, readdir, readFile, realpath, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
 import type { AgentInstallInfo, AutoCompactSetting, HookCause, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
 import { assertSessionId, isSessionId } from '../../../shared/defaults'
 import { isCliOwnMode } from '../../../shared/cliOwnMode'
-import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwitchLive, footerMode, hookMode } from '../../../shared/claude'
+import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwitchLive, footerMode, hookMode } from '../../../shared/providers/claude'
 import { providerSettings } from '../../../shared/providers'
 import { samePath } from '../../../shared/movePaths'
 import { config } from '../../config'
-import { claudeAutoMemory, claudeFileAllowed, containsPlace, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
+import { containsPlace, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
-import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, updateStayedIssue, userMemoryLabel } from '../common'
+import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, updateStayedIssue, userMemoryLabel, WHERE_MS, cliProbeMs } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, HookOccurrence, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, HookOccurrence, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, RunningJobs, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, effectiveEnv, settingsScopes } from './autoCompact'
-import { claudeScopeHooks, rowsOfHooksTable } from '../../hookListing'
+import { rowsOfHooksTable } from '../../hookListing'
+import { claudeAutoMemory, claudeFileAllowed } from './files'
+import { claudeScopeHooks } from './hookListing'
 import type { HookListing } from '../../../shared/hooks'
 import { connectionsManaged } from '../../connectionSeam'
 import { combworkStatusLine, mergeLaunchSettings, ownStatusLine, userSettings, withoutSettingsArgs } from './launchSettings'
@@ -29,7 +31,8 @@ import { claudeSafeguards } from './safeguards'
 import { claudeTranscriptTurns } from './turns'
 import { claudeUpdateChannel, windowsChannelSources, type UpdateChannel } from './updateChannel'
 import { readHookCause } from './hookPolicy'
-import { CLAUDE_HOOK_EVENTS, HOOK_TOKEN_ENV, claudeHookHandlers, type HookTimeouts } from '../../../shared/claudeHookHandlers'
+import { CLAUDE_HOOK_EVENTS, claudeHookHandlers, type HookTimeouts } from '../../../shared/providers/claude/hookHandlers'
+import { HOOK_TOKEN_ENV } from '../../../shared/hooks'
 import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { ConversationParser, claudeImageData } from './conversation'
@@ -257,14 +260,91 @@ export function launchModel(ctx: Pick<LaunchContext, 'model' | 'use200kContext' 
   return lastModelArg(withoutSettingsArgs(ctx.extraArgs)) ?? modelArg(ctx)
 }
 
+
+/**
+ * HI-3376: the background jobs in what `claude agents --json` printed (Settings → Advanced's id and process fields), each
+ * with its own process id when it has one, and whether an id is named anywhere in it (HR3's round 2: a background row
+ * whose id field is wrong still names its job, so its absence from `jobs` isn't the job's); null when it isn't a JSON
+ * list (no answer, not the same as none running).
+ */
+export function runningJobsIn(stdout: string): RunningJobs | null {
+  let rows: unknown
+  try {
+    rows = JSON.parse(stdout)
+  } catch {
+    return null
+  }
+  if (!Array.isArray(rows)) return null
+  const idField = advanced.get<string>('claude-code.background.idField')
+  const pidField = advanced.get<string>('claude-code.background.pidField')
+  const jobs = rows.flatMap((x) => {
+    const id = x && typeof x === 'object' ? (x as Record<string, unknown>)[idField] : undefined
+    const pid = x && typeof x === 'object' ? (x as Record<string, unknown>)[pidField] : undefined
+    return typeof id === 'string' && id ? [{ id, pid: typeof pid === 'number' && Number.isInteger(pid) && pid > 0 ? pid : null }] : []
+  })
+  // Every string value in it, at any depth: an id named under any field (or as the start of one, as sessionId is).
+  const values: string[] = []
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') values.push(v)
+    else if (Array.isArray(v)) v.forEach(walk)
+    else if (v && typeof v === 'object') Object.values(v).forEach(walk)
+  }
+  walk(rows)
+  return { jobs, names: (id) => values.some((v) => v === id || v.startsWith(`${id}-`)) }
+}
 export class ClaudeCodeAdapter implements ProviderAdapter {
   readonly id = CLAUDE_CODE
   readonly descriptor = CLAUDE_DESCRIPTOR
+  // Its capability parts (ProviderAdapter), each implemented by this class's own members: a getter, so an object made from
+  // this one (Object.create) is its own parts too.
+  get install(): this {
+    return this
+  }
+  get launch(): this {
+    return this
+  }
+  get hooks(): this {
+    return this
+  }
+  get status(): this {
+    return this
+  }
+  get terminal(): this {
+    return this
+  }
+  get modes(): this {
+    return this
+  }
+  get transcript(): this {
+    return this
+  }
+  get usage(): this {
+    return this
+  }
+  get accounts(): this {
+    return this
+  }
+  get models(): this {
+    return this
+  }
+  get compaction(): this {
+    return this
+  }
+  get projectFiles(): this {
+    return this
+  }
+  get background(): this {
+    return this
+  }
+  /** Its admin snippet's values (HI-2777): the hooks' timeouts as Settings → Advanced has them, so it matches its launches. */
+  readonly adminSnippet = { settings: (): Record<string, number> => ({ ...launchHookTimeouts() }) }
   /** If Combwork itself was started from inside a Claude Code session, don't leak that session's identity. User configuration such as CLAUDE_CODE_GIT_BASH_PATH is kept. */
   readonly envToStrip = ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_AGENT_SDK_VERSION', 'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_SESSION_ATTENDED', 'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_CODE_SSE_PORT', 'CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING', 'MCP_CONNECTION_NONBLOCKING']
   readonly compactFailure = /not enough messages to compact|error during compaction|compaction failed/i
-  // Before a folder's first session: "Is this a project you created or one you trust? … trust this folder" (#367: an
-  // advanced setting, so a changed question can be fixed without a release).
+  // Before a folder's first session: "Is this a project you created or one you trust? … trust this folder"; and from
+  // 2.1.326, before each session, for an --add-dir folder outside every repository it trusts: "Adding a new directory:"
+  // (HI-3335). Both are drawn before its SessionStart hook. #367: an advanced setting, so a changed question can be fixed
+  // without a release.
   get startupQuestion(): RegExp {
     return advanced.pattern('claude-code.trust.prompt')
   }
@@ -278,7 +358,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const custom = providerSettings(config.settings, this.id).executablePath.trim()
     if (custom) out.push({ path: custom, source: 'settings' })
 
-    const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['claude'], 5000)
+    const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['claude'], WHERE_MS)
     for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
       // Prefer real executables over extension-less shims that node-pty cannot start on Windows.
       if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
@@ -322,7 +402,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
         info.rejected!.push(c.path)
         continue
       }
-      const r = await run(c.path, ['--version'])
+      const r = await run(c.path, ['--version'], cliProbeMs())
       const m = r.stdout.match(/(\d+\.\d+\.\d+[\w.-]*)/)
       if (!m) {
         log.warn(`Candidate ${userText(c.path)} did not report a version: ${userText(r.stderr.slice(0, 200))}`)
@@ -444,6 +524,18 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
         p = up
       }
     })
+  }
+
+  /**
+   * Its trust of a plain folder given with --add-dir (HI-3337): 2.1.326 asks about one outside every folder it trusts,
+   * before each session (HI-3335). Read as its folder trust is (an ancestor's entry covers a folder without Git), from
+   * the home's `.claude.json`; its own home's is beside `.claude` unless CLAUDE_CONFIG_DIR moves it.
+   */
+  async addedDirTrusted(home: string | null, folder: string): Promise<boolean | null> {
+    const at = home ?? (process.env.CLAUDE_CONFIG_DIR || homedir())
+    const real = await realpath(folder).catch(() => null)
+    const [r] = await this.connectionTrusts(at, [{ root: real, git: false, short: false }])
+    return r === true ? true : r === false ? false : null
   }
 
   accountSharedTarget(name: string): string {
@@ -848,6 +940,20 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     if (r.code !== 0) throw new Error((r.stderr || r.stdout).trim() || `claude stop ${jobId} failed`) // i18n-ignore: a CLI command's name, when it said nothing itself
   }
 
+  /**
+   * HI-3376: `claude agents --json` lists the sessions running now, interactive and background (2.1.327: a background one
+   * has `id`, the job's, and `pid`, its own claude.exe, a child of the shared background service; an interactive one has
+   * no `id`). A stopped job is gone from it at once (it stays in `--all`, without a pid). Run without
+   * CLAUDE_CODE_DISABLE_AGENT_VIEW, which turns the command off (Combwork sets it only in its agents' sessions).
+   */
+  async runningBackgroundJobs(executable: string, timeoutMs = 20000): Promise<RunningJobs | null> {
+    const env = { ...process.env }
+    delete env.CLAUDE_CODE_DISABLE_AGENT_VIEW
+    const r = await run(executable, ['agents', '--json'], timeoutMs, env)
+    if (r.code !== 0 || r.timedOut || r.ended) return null
+    return runningJobsIn(r.stdout)
+  }
+
   // -------------------------------------------------------------------------
   // Hooks
   // -------------------------------------------------------------------------
@@ -1238,3 +1344,6 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 }
 
 export const claudeCode = new ClaudeCodeAdapter()
+
+/** The adapter, as the registry finds it (src/main/providers/index.ts, HI-3201). */
+export default claudeCode

@@ -13,7 +13,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'wakepaste-profile')
 const ws = path.join(lib.WORK, 'wakepaste-ws')
@@ -79,9 +79,9 @@ const check = (name, ok, extra = '') => {
   // Wakes name the card by its key (#1219), not its number.
   const named = `${(await inv('tasks:list')).find((c) => c.number === card).key}`
   await inv('session:start', alpha, { agentId: agent.id })
-  check('the agent starts', !!(await lib.until(() => idle(alpha, agent.id), 30000)))
+  check('the agent starts', !!(await lib.until(() => idle(alpha, agent.id), lib.timing('hang.step'))))
   await inv('session:start', home, { agentId: 'assistant' })
-  check('the Assistant starts', !!(await lib.until(() => idle(home, 'assistant'), 30000)))
+  check('the Assistant starts', !!(await lib.until(() => idle(home, 'assistant'), lib.timing('hang.step'))))
 
   for (const [who, p, id] of [
     ['an agent', alpha, agent.id],

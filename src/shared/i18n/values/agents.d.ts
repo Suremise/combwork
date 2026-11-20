@@ -277,6 +277,16 @@ interface CombworkMessageValues {
   'agents.models.serverCloud': { model: string | number }
   'agents.models.serverCloudAs': { model: string | number; names: string | number }
   'agents.models.unavailableGroup': undefined
+  'agents.muse.extensionNote': undefined
+  'agents.muse.installNote': undefined
+  'agents.muse.modelPlaceholder': undefined
+  'agents.muse.never': undefined
+  'agents.muse.neverDescription': undefined
+  'agents.muse.onRequest': undefined
+  'agents.muse.onRequestDescription': undefined
+  'agents.muse.signInHelp': undefined
+  'agents.muse.untrusted': undefined
+  'agents.muse.untrustedDescription': undefined
   'agents.name.empty': undefined
   'agents.name.taken': { agent: string | number; project: string | number; suggestion: string | number }
   'agents.name.tooLong': { max: string | number }
@@ -355,6 +365,8 @@ interface CombworkMessageValues {
   'agents.resume.hold.holds': { agent: string | number; slot: string | number }
   'agents.resume.hold.reused': { slot: string | number; kind: string; work: string | number }
   'agents.resume.hold.reviewer': { agent: string | number; slot: string | number }
+  'agents.resume.noPrompt': { cli: string | number }
+  'agents.resume.noResume': { cli: string | number }
   'agents.resume.noRoom': undefined
   'agents.resume.noTranscript': { cli: string | number }
   'agents.resume.notInstalled': { cli: string | number }

@@ -3,7 +3,7 @@
 // agent's resume target and the session list carry its reason, the Sessions tab's Resume says it starts a new
 // conversation, and pressing it asks "Start a new conversation?", never the re-cache question. Cancel starts nothing;
 // Start New Conversation starts a new conversation for the agent, and the old one stays in Sessions. A current
-// conversation whose prompt cache expired still gets the re-cache question. Throwaway profile and workspace, the fake
+// conversation whose prompt cache expired, idle since September, gets Resume's long-idle question (HI-3360). Throwaway profile and workspace, the fake
 // Claude Code (fake-claude/); no prompt is typed. The fixture's records are put into the workspace's database once
 // Combwork has read the project, with Combwork's backups of their transcripts.
 const lib = require('./lib.cjs')
@@ -11,7 +11,7 @@ const fs = require('fs')
 const path = require('path')
 const { putSessions } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const scratch = lib.WORK
 const userData = path.join(scratch, 'freshresume-profile')
@@ -121,12 +121,13 @@ function backup(id, at) {
   await inv('session:stop', proj, worker.id)
   check('stopped again', !!(await lib.until(async () => !(await live()), HUNG_MS)))
 
-  // 5. A current conversation whose cache expired still gets the re-cache question.
+  // 5. A current conversation whose cache expired, idle since September, gets Resume's question about it (HI-3360: its age
+  //    and size), not the fresh-start one.
   await page.locator('.tabs .tab', { hasText: 'Sessions' }).first().click()
   await row('Current work').click()
   await lib.until(async () => await row('Current work').evaluate((el) => el.classList.contains('selected')).catch(() => false), HUNG_MS)
   await resumeBtn.click()
-  check('a current, expired conversation asks about re-caching', !!(await lib.until(async () => /re-cache about/.test(await dialog.innerText().catch(() => '')), HUNG_MS)), await dialog.innerText().catch(() => ''))
+  check('a current, long-idle conversation asks about its prompt cache', !!(await lib.until(async () => /was last active .* ago, with about .* tokens of context/.test(await dialog.innerText().catch(() => '')), HUNG_MS)), await dialog.innerText().catch(() => ''))
   check('…not the fresh-start question', !/Start a new conversation\?/.test(await dialog.innerText().catch(() => '')))
   await shot(page, '3-recache')
   await page.keyboard.press('Escape')

@@ -8,25 +8,28 @@
 // writes changes of the board and its actions run by the actions worker; reconciliation uses it. P4 routes `tasks.ts`'s
 // moves and the intents' routes through it (#1265 on). `tests/workflow` runs it on a store of its own, with `runActions`.
 
+import { appliesRequest, auditOnly } from '../requestReceipts'
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_STOPPED_GATE, agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type StageId, CHURN_GATES, CHURN_LIMIT_GATE, PAUSE_GATES, SIMPLIFY_GATE, churnDue, churnTotal, countsChurn, type PauseChoice } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
-import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
+import { finishOnCandidate, FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import { reviewsInProgress, submissionReviewers } from '../../shared/workflow/reviewerPool'
 import { ACCEPT_MAX, chosenTests, focusedCheckName, reviewProved, standingFocusedRun, validTestId, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
 import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
 import { FOR_YOU, UNREADABLE, workflowEnglish, workflowText } from '../../shared/workflow/texts'
+import { englishText, FOCUSED_PICK_DEFAULT_S } from '../../shared/advanced'
 import type { StoredText, TargetChanges } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
 import type { ForwardOverride } from '../../shared/workflow/forwardOrder'
 import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
 import { LANE_MAX_ROUNDS } from '../../shared/lanes'
-import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
+import type { AdvanceAnswer, FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
+import { advanceHostOf } from './advanceHost'
 import type { JjCardDeps } from '../platform/jjPlatform'
 import { adaptersFor } from '../platform/adapters'
 import { historyOf } from '../platform/historyPorts'
@@ -38,9 +41,13 @@ import { stillAsRead, unreleasedFor, type ReleaseReads } from '../platform/relea
 import { declaresPaths, hasCapability, needsRepository, platformName, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
+import { writeReadiness } from './dependencyReadiness'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
 import { checksView } from '../../shared/toolReplies'
 import { agentMsg, say, type AgentMsg, type AgentValues } from '../../shared/agentText'
+import { batchSent, feedbackExpectOf, foldLineComments, openReviewOf, sameExpect, type FeedbackExpect, type LineCommentView } from '../../shared/workflow/lineComments'
+import { FEEDBACK_REFUSED } from './feedbackText'
+import { combworkError } from '../combworkError'
 import { inDefaultDialect } from '../../shared/agentText/asyncScope'
 import { HISTORY, storedText } from '../../shared/taskHistory'
 
@@ -50,6 +57,8 @@ import { createLogger, userText } from '../logger'
 import { GatherDepth } from './gatherDepth'
 import { earlierWork, UNREAD, type EarlierLine } from './earlierWork'
 import { asCardCounts } from './containment'
+import { GUARD_CHECK_DEFAULTS, guardsOf, guardsRefuse, guardWarning } from '../../shared/workflow/mergeGuards'
+import { checkMergeGuards } from './mergeGuardsRun'
 
 const log = createLogger('workflow')
 
@@ -108,13 +117,38 @@ export interface Drag {
  */
 export interface Alongside {
   written: (w: Write) => Promise<void>
+  /**
+   * HI-3194: asked inside each write, in its transaction, before the write decides anything (the card as it was then): a
+   * throw undoes the write whole, refusals included (an agent request's attempt fence, tasks.ts runIntent).
+   */
+  before?: (w: Write) => void
 }
-const alongsideOf = new AsyncLocalStorage<Alongside>()
+const alongsideOf = new AsyncLocalStorage<{ a: Alongside; live: boolean }>()
 
-/** Runs `fn` (a runtime call) with `a` run inside each of its writes that change a card. */
-export function alongside<T>(a: Alongside, fn: () => Promise<T>): Promise<T> {
-  return alongsideOf.run(a, fn)
+/**
+ * Runs `fn` (a runtime call) with `a` run inside each of its writes that change a card, while the call runs. HI-3322: what
+ * the call sets off and outlives it (a reconciliation, a candidate's checks, a timer) inherits its async context, but
+ * never its hooks: a verdict's attempt fence would otherwise refuse Combwork's own later writes on the card once the
+ * reviewer's launch ended (attempt.staleLaunch), and its 0.9 fields would be saved in the agent's name.
+ */
+export async function alongside<T>(a: Alongside, fn: () => Promise<T>): Promise<T> {
+  const scope = { a, live: true }
+  try {
+    return await alongsideOf.run(scope, fn)
+  } finally {
+    scope.live = false
+  }
 }
+
+/**
+ * The scope of the intent running here (`alongside`), taken as a write begins; its hooks are asked for (`hooksOf`) inside
+ * the write's transaction, once its lock and prepare are behind it (HR1 on HI-3322): a write set off while the intent ran
+ * that gets the lock only after the intent returned is not the intent's.
+ */
+type AlongsideScope = { a: Alongside; live: boolean } | undefined
+const alongsideScope = (): AlongsideScope => alongsideOf.getStore()
+/** The scope's hooks while its intent still runs; none once it has returned. */
+const hooksOf = (s: AlongsideScope): Alongside | undefined => (s?.live ? s.a : undefined)
 
 export const isRefusal = (r: unknown): r is Refusal => !!r && typeof r === 'object' && (r as Refusal).refused === true
 
@@ -213,6 +247,10 @@ export interface WorkflowConfig {
   projectId?: () => string
   /** The project's resolved options (§16.6.6); a card in flight keeps its own ruleset. */
   options: () => WorkflowOptions
+  /** HI-3284: the merge guards' limits (Settings → Advanced), for submit's early warning; left out, 10 s and 200,000 lines. */
+  guardLimits?: () => { timeoutMs: number; maxLines: number }
+  /** HI-3235: whether the project's finish is its platform's default, set at no level (the one-time note's condition). */
+  finishInherited?: () => boolean
   /** Where cards' own folders go (the P2 spike's stand-in for slots, its unit tests only: the app lends slots, `slotFor`). */
   slots?: string
   /**
@@ -330,6 +368,13 @@ export interface WorkflowConfig {
   enforced?: () => boolean
   /** What runs a target's queue in this Combwork now (queueHost's queueLive, #1354); left out, nothing here runs one. */
   queueLive?: (target: string) => QueueLive
+  /**
+   * HI-3188: the churn's levels now (the project's preferences, `simplifyAt` and `churnStopAt`, 0 = off), read at each
+   * check so a change applies to cards in flight. Left out, both off.
+   */
+  churnLevels?: () => { simplifyAt: number; churnStopAt: number }
+  /** HI-3188: a churn question asked, once its write is committed (the app tells the Assistant of a simplify check). */
+  churnAsked?: (card: CardRecord, request: string, gate: string, churn: number) => void
 }
 
 /** A branch name's slug from a card title (§16.10.1): lower case ASCII letters, digits and hyphens, at most 40. */
@@ -371,6 +416,8 @@ const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) /
  */
 /** HI-2944: paths as a warning names them: three at most, then how many more (HI-2960: an agent's reply, kept short). */
 const FILES_NAMED = 3
+/** How many whole release reads a start makes at most while what they rest on moves under them (HI-3319). */
+export const RELEASE_READS = 3
 const filesNamed = (files: readonly string[]): string => (files.length <= FILES_NAMED ? files.join(', ') : say(W.moreFiles, { files: files.slice(0, FILES_NAMED).join(', '), more: files.length - FILES_NAMED }))
 
 /**
@@ -388,6 +435,9 @@ const W = {
   choiceSplit: agentMsg({ id: 'runtime.choice.split', text: 'split it', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
   choiceAccept: agentMsg({ id: 'runtime.choice.accept', text: 'accept it with follow-ups', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
   choiceTakeOver: agentMsg({ id: 'runtime.choice.takeOver', text: 'the user takes it over', note: "The user's choice at a lane's round limit, as its answer's wake says it." }),
+  choiceSimplify: agentMsg({ id: 'runtime.choice.simplify', text: "simplify: drop what isn't worth handling and finish what the card needs", note: "HI-3188: the choice at a card's simplify check (the user's or the Assistant's), as its answer's wake says it." }),
+  choiceCutScope: agentMsg({ id: 'runtime.choice.cutScope', text: 'cut scope: finish what the card has, and put the rest on follow-up cards', note: "HI-3188: the user's choice at a card's simplify check, as its answer's wake says it." }),
+  followUpsOf: agentMsg({ id: 'runtime.wake.followUpsOf', text: '{said}. Make each follow-up with cw_create_task and followUpOf: {card}, so it keeps this card\'s count', note: "HI-3188: added to the wake of a split, accept or cut-scope answer. {said}: the wake so far; {card}: the card's key. followUpOf is cw_create_task's argument." }),
   actionDone: agentMsg({ id: 'runtime.action.done', text: 'moved it to Done', note: 'What the user did with an action a question offered (#1630), as its answer\'s wake says it.' }),
   actionNoCode: agentMsg({ id: 'runtime.action.noCode', text: 'made it no code', note: 'What the user did with an action a question offered (#1630), as its answer\'s wake says it.' }),
   actionUnblock: agentMsg({ id: 'runtime.action.unblock', text: 'unblocked it', note: 'What the user did with an action a question offered (#1630), as its answer\'s wake says it.' }),
@@ -401,6 +451,9 @@ const W = {
   acceptTooMany: agentMsg({ id: 'runtime.verdict.acceptTooMany', text: 'accept: only the first {max} tests are taken', note: "HI-2660: more than ACCEPT_MAX tests in cw_verdict's accept. {max}: the limit." }),
   acceptNone: agentMsg({ id: 'runtime.verdict.acceptNone', text: "accept: {test} has no counted run at this revision (or its command changed since), so it isn't accepted", note: "HI-2660: no standing run of focused:<test> at the passed revision to accept. {test}: the test id." }),
   acceptFailed: agentMsg({ id: 'runtime.verdict.acceptFailed', text: "accept: {test}'s latest counted run at this revision failed, so it isn't accepted", note: "HI-2660: the standing run of focused:<test> at the passed revision didn't pass; an earlier pass never stands behind it. {test}: the test id." }),
+  mergeSeen: agentMsg({ id: 'runtime.reportMerge.mergeSeen', text: 'Done already: Combwork saw its merge into {target}; nothing more to report', note: "HI-3282: report merge's answer (an OK, nothing written), its reply's `already` value, on a card Combwork had already seen merged into its target this cycle (its reconciliation or merge queue, before the builder's report). Historical: no fresh check is made. {target}: the branch or bookmark." }),
+  mergeSeenMove: agentMsg({ id: 'runtime.reportMerge.mergeSeenMove', text: '{card} was already Done: Combwork saw its merge into {target}; nothing more to report.', note: "HI-3282: an agent's old move to Done (cw_update_task) on a card already Done whose merge Combwork saw this cycle: a line of its reply, as report merge answers. {target}: the branch or bookmark." }),
+  mergeSeenMoveNext: agentMsg({ id: 'runtime.reportMerge.mergeSeenMoveNext', text: 'As report merge: next time call {tool}', note: "HI-3282: the line after mergeSeenMove, as an old move translated into an intent says it (#1268). {tool}: cw_report_merge." }),
   questionDone: agentMsg({ id: 'runtime.wake.questionDone', text: '{card}: your question "{question}" no longer stands: the card is in Done.', note: "An asker's wake when the card reached Done with its question open. {question}: the question, quoted short (#1626)." }),
   boardDone: agentMsg({ id: 'runtime.repair.boardDone', text: 'the board had it in Done while its stage was {stage}', note: "A repair's reason, stored on the card's Moved fact: the board's column and the card's stage disagreed. {stage}: the stage id." }),
   laneStarted: agentMsg({ id: 'runtime.start.laneStarted', text: "Combwork started {card} for you, as your lane's next card: carry on with it.", note: "HI-2092: a lane's builder starting the card Combwork had already started for it: its start's warning." }),
@@ -414,7 +467,7 @@ const W = {
   staleChange: agentMsg({ id: 'runtime.wake.stalePaths', text: 'stale: your paths changed since the pass, submit again', note: "The builder's wake when its declared paths changed after its pass." }),
   approvedMerge: agentMsg({ id: 'runtime.wake.approvedMerge', text: 'approved: merge it and report the merge', note: "The builder's wake when its card passed and the builder merges it." }),
   movedAhead: agentMsg({ id: 'runtime.submit.movedAhead', text: 'moved ahead of {cards} (not started); its reviewer is told', note: "A submit's lane field: the card was moved before its lane's cards nobody has started. {cards}: their keys." }),
-  followUp: agentMsg({ id: 'runtime.wake.followUp', text: '{card}: follow-up submitted for review at {revision} (submission {submission}). Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused', note: "HI-1832: the reviewer's wake for a follow-up (the card stays in Review, so no arrival wakes it). {revision}: short. {submission}: its number." }),
+  followUp: agentMsg({ id: 'runtime.wake.followUp', text: '{card}: follow-up submitted for review{revision, select, none {} other { at {revision}}} (submission {submission}). Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused', note: "HI-1832: the reviewer's wake for a follow-up (the card stays in Review, so no arrival wakes it). {revision}: short, or none for a no-code card's follow-up, which records no revision (HI-3409). {submission}: its number." }),
   aheadInLane: agentMsg({ id: 'runtime.wake.aheadInLane', text: '{card} is in Review ahead of {cards}, earlier in its lane, which nobody has started: Combwork moved it before them in the lane. Review {card} now; the lane goes on to {next} after it', note: "The reviewer's wake for a card submitted ahead of its lane's unstarted cards. {cards}: their keys. {next}: the first of them." }),
   inReview: agentMsg({ id: 'runtime.wake.inReview', text: '{card} is in Review', note: "The reviewer's wake for a card's arrival in Review." }),
   failedReview: agentMsg({ id: 'runtime.wake.failedReview', text: '{card} failed review', note: "The builder's wake for a failing verdict." }),
@@ -443,7 +496,17 @@ const W = {
 const stored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect(() => say(m, values))
 
 /** The user's choice at the round limit, as an agent's wake says it. */
-const CHOICE_WORDS: Record<RoundChoice, AgentMsg> = { carryOn: W.choiceCarryOn, split: W.choiceSplit, accept: W.choiceAccept, takeOver: W.choiceTakeOver }
+const CHOICE_WORDS: Record<PauseChoice, AgentMsg> = { carryOn: W.choiceCarryOn, split: W.choiceSplit, accept: W.choiceAccept, takeOver: W.choiceTakeOver, simplify: W.choiceSimplify, cutScope: W.choiceCutScope }
+
+/** HI-3188: the moves a card's open churn question pauses (an agent's or the Assistant's: churnPending). */
+/**
+ * HI-3282: a Done card whose current cycle Combwork saw integrated in its target (by the reconciler, the queue or a
+ * report): foldCard clears `integrated` at each Started and Adopted, so one recorded is this cycle's. A Done card with
+ * none (the user's override, an earlier cycle's Done) isn't.
+ */
+const mergeSeen = (s: CardState): boolean => s.stage === 'done' && !!s.integrated && !!s.started && s.integrated.target === (s.started.target ?? '')
+
+const CHURN_PAUSED: readonly MoveId[] =['start', 'submit', 'requeue', 'startReview', 'verdict', 'reportMerge']
 /** What the user did with an action a question offered (#1630), as its answer's wake says it. */
 const ACTION_WORDS: Record<AskActionKind, AgentMsg> = { done: W.actionDone, noCode: W.actionNoCode, unblock: W.actionUnblock, skipReview: W.actionSkipReview }
 
@@ -760,35 +823,66 @@ export class Workflow {
    * One write for a card, in one transaction; then the actions run (unless left pending). `prepare`: what the write
    * decides on that lives outside the card's facts (a design's reviewer, #1382), read inside the same lock (in the app,
    * the same board change) just before the transaction, so nothing that change orders against comes between.
+   * `settled` (HI-3321): asked in the transaction before the intent's `before` (its attempt fence): true when the card
+   * already holds what the call asks for and `fn` answers from that, writing nothing (a merge report on a card whose
+   * merge Combwork saw this cycle, HI-3282). Such a write isn't fenced: it changes nothing a stale call could, and its
+   * answer is the one the same call gets when the card was already there at its read. Writing anything then throws.
    */
-  async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>): Promise<T> {
-    const also = alongsideOf.getStore()
+  async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>, opts: { runActions?: boolean; settled?: (w: Write) => boolean } = {}): Promise<T> {
+    const scope = alongsideScope()
     let movedTo: { from: StageId; to: StageId } | null = null
+    const asked: string[] = []
     const out = await this.locked(async () => {
       const prepared = (prepare ? await prepare() : undefined) as P
       let w: Write | null = null
+      // Whether this write is its intent's, decided once in its transaction (its `before` and `written` alike).
+      let also: Alongside | undefined
       const r = this.store.tx((tx) => {
+        also = hooksOf(scope)
         // The ruleset its facts name, stored with them.
         if (ruleset) tx.saveRuleset(ruleset)
         // Its base too (#1625): the rules it is found again by once its review skip is undone.
         const base = ruleset && this.skippedBases.get(ruleset.id)
         if (base) tx.saveRuleset(base)
         w = new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage)
+        const settled = opts.settled?.(w) === true
+        if (!settled) also?.before?.(w)
         const written = fn(w, prepared)
+        if (settled && w.written.length) throw new Error('a settled write wrote facts') // i18n-ignore: a programming error, for the log
+        // HI-3195: facts the requesting agent recorded (not its refusal): the write applies what a keyed request asked.
+        if (agentOf(w!.actor) && w!.written.some((f) => f.actor === w!.actor && f.source === 'recorded' && f.kind !== 'Refused')) appliesRequest()
         this.closeSettled(w)
+        // HI-3188: the churn's questions, in the write that counted (or that left one no longer holding).
+        this.churnAfter(w)
         // Into Done by whatever route: its finish, once, in the move's own transaction (HI-2014).
         if (w.current === 'done' && w.was !== 'done') {
           recordFinish(tx, w.card.id, w.actor, w.ruleset?.id ?? null, w.written, { claimed: w.claimed })
           this.kickDependents(w)
         }
+        // HI-3194: into or out of Done, its dependents' readiness in this same transaction: never one without the other.
+        if ((w.current === 'done') !== (w.was === 'done')) for (const dep of this.store.dependents(w.card.id)) writeReadiness(tx, dep, w.card.id, w.actor)
         return written
       })
       // What the call runs alongside (the board's 0.9 fields), in the same transaction, once this write changed the card.
       if (also && w && (w as Write).written.length) await also.written(w)
       const done = w as Write | null
       if (done && done.current !== done.was) movedTo = { from: done.was, to: done.current }
+      if (done) asked.push(...done.written.filter((f) => f.kind === 'ApprovalRequested' && CHURN_GATES.includes((f.data as FactData['ApprovalRequested']).gate)).map((f) => (f.data as FactData['ApprovalRequested']).request))
       return r
     })
+    // HI-3188: a churn question asked, once committed (a simplify check's goes to the Assistant first).
+    if (asked.length && this.cfg.churnAsked) {
+      const st = this.state(card)
+      for (const request of asked) {
+        const q = st.requests.find((x) => x.request === request)
+        if (!q) continue
+        try {
+          this.cfg.churnAsked(card, request, q.gate, churnTotal(st))
+        } catch {
+          // A hook's own failure never undoes or fails the committed write.
+        }
+      }
+    }
     // Set in the write's continuation above (TypeScript can't see it there).
     const m = movedTo as { from: StageId; to: StageId } | null
     if (m && this.cfg.moved) {
@@ -798,7 +892,9 @@ export class Workflow {
         // A hook's own failure never undoes or fails the committed write.
       }
     }
-    if (this.cfg.autoRun !== false) await this.runActions()
+    // HI-3235: a write made holding a platform's repository lock (an advance's records) leaves its actions for its caller to
+    // run once that lock is let go, so none of them (an advance answer's) runs nested inside it.
+    if (this.cfg.autoRun !== false && opts.runActions !== false) await this.runActions()
     return out
   }
 
@@ -939,7 +1035,17 @@ export class Workflow {
     const out = refusal(g.rule, g.values, override)
     if (card && actor !== 'user') {
       // Under the store's lock, as every write (in the app, a change of the board).
-      await this.locked(() => this.store.tx((tx) => tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } }))) // i18n-ignore: a fact's kind and codes, not text
+      const scope = alongsideScope()
+      await this.locked(() =>
+        this.store.tx((tx) => {
+          // HI-3194: a stale agent request is refused for that first (its fence, as in every write), not for what it found.
+          // Its intent's hooks only while that intent still runs, asked here past the lock (HI-3322).
+          hooksOf(scope)?.before?.(new Write(tx, tx.card(card.id), null, actor, tx.card(card.id).stage))
+          // HI-3195: a refusal's record applies nothing a keyed request asked: its commit takes no applied marker.
+          auditOnly()
+          tx.append(card.id, { kind: 'Refused', actor, source: 'recorded', data: { move, rule: g.rule, message: out.message, next: out.next, values: g.values } }) // i18n-ignore: a fact's kind and codes, not text
+        })
+      )
     }
     return out
   }
@@ -995,13 +1101,113 @@ export class Workflow {
     return { ok: true, card: card.key, from, to, ...(data ? { data } : {}), ...(warnings?.length ? { warnings } : {}) }
   }
 
-  /** Guards evaluated inside the transaction, on the card's facts as they are now. */
+  /**
+   * Guards evaluated inside the transaction, on the card's facts as they are now. HI-3188: the loop's own moves first wait
+   * for an open churn question (churnPending).
+   */
   private check(w: Write, move: MoveId, inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>, only?: (id: GuardId) => boolean): GuardRefusal | null {
+    if (CHURN_PAUSED.includes(move)) {
+      const paused = this.churnPending(w)
+      if (paused) return paused
+    }
     return evaluate(this.guardIds(w, move, only), this.guardInputs(w, inputs))
   }
 
+  /** HI-3188: the churn's levels now (cfg.churnLevels; both off when it is left out). */
+  private churnLevels(): { simplifyAt: number; churnStopAt: number } {
+    return this.cfg.churnLevels?.() ?? { simplifyAt: 0, churnStopAt: 0 }
+  }
+
   /**
-   * HI-2854 (Darren's B): an agent's own submit, in a ruleset that doesn't hold `submit.decisionsReceived` already (Solo,
+   * HI-3188: whether churn question `gate` holds on a card (§16.11.5): the rules enforced, the project's options with an
+   * agent reviewer now, and its count at its setting (churnDue). One that doesn't refuses nothing, and is closed.
+   */
+  churnGateHolds(s: CardState, gate: string): boolean {
+    if (!this.enforced() || !reviewerAgent(this.cfg.options().review)) return false
+    const l = this.churnLevels()
+    return churnDue(s, gate, gate === CHURN_LIMIT_GATE ? l.churnStopAt : l.simplifyAt)
+  }
+
+  /**
+   * HI-3188: after each write that wrote something, in its transaction: an open churn question that no longer holds (its
+   * setting 0 or raised, no agent reviewer, the rules off) is closed (`settingChanged`), never its count; and a write that
+   * counted asks one now due (askAtChurn).
+   */
+  private churnAfter(w: Write): void {
+    if (!w.written.length) return
+    const s = w.state()
+    for (const r of s.requests) if (CHURN_GATES.includes(r.gate) && !this.churnGateHolds(s, r.gate)) w.fact('RequestClosed', { request: r.request, why: 'settingChanged' }) // i18n-ignore: a fact's kind and codes, not text
+    if (w.written.some(countsChurn)) this.askAtChurn(w)
+  }
+
+  /**
+   * HI-3188 (§16.11.5): at its hard stop Combwork asks the round limit's question on the churn; else, at its simplify check,
+   * whether what still comes up is worth handling. Unbound (a new submission can't retire them), each once while open.
+   */
+  askAtChurn(w: Write): void {
+    const s = w.state()
+    const open = (gate: string): boolean => s.requests.some((r) => r.gate === gate)
+    if (open(CHURN_LIMIT_GATE)) return
+    const churn = churnTotal(s)
+    if (this.churnGateHolds(s, CHURN_LIMIT_GATE)) {
+      this.askUser(w, 'decide', CHURN_LIMIT_GATE, workflowText(FOR_YOU.churnLimit, { card: w.card.key, churn }), { unbound: true })
+      return
+    }
+    if (!open(SIMPLIFY_GATE) && this.churnGateHolds(s, SIMPLIFY_GATE)) this.askUser(w, 'decide', SIMPLIFY_GATE, workflowText(FOR_YOU.simplify, { card: w.card.key, churn }), { unbound: true })
+  }
+
+  /**
+   * HI-3188: the project's churn questions that no longer hold (a setting changed, the rules turned off, review no longer
+   * an agent's), closed (`settingChanged`), a write each, so For you and its lane let go at once rather than at the card's
+   * next write. Their counts stay. The number closed.
+   */
+  async closeStaleChurn(): Promise<number> {
+    let closed = 0
+    // HR3's round 1: the cards with an open churn question, whatever their stage (a stopped card the user finished, one
+    // put back), found by the board's requests, not by folding every unfinished card.
+    for (const card of this.store.cardsAsking(CHURN_GATES)) {
+      const s = this.state(card)
+      if (!s.requests.some((r) => CHURN_GATES.includes(r.gate) && !this.churnGateHolds(s, r.gate))) continue
+      await this.write(card, null, 'combwork', (w) => {
+        const st = w.state()
+        for (const r of st.requests) {
+          if (!CHURN_GATES.includes(r.gate) || this.churnGateHolds(st, r.gate)) continue
+          w.fact('RequestClosed', { request: r.request, why: 'settingChanged' }) // i18n-ignore: a fact's kind and codes, not text
+          closed++
+        }
+      })
+    }
+    return closed
+  }
+
+  /**
+   * HI-3188: a churn question asked now if one is due (askAtChurn), in a write of its own (joining the caller's board
+   * change): for counted facts written outside the runtime's writes (a lane reviewer's comment, recorder.ts).
+   */
+  async askChurnNow(card: CardRecord): Promise<void> {
+    await this.write(card, null, 'combwork', (w) => this.askAtChurn(w))
+  }
+
+  /** HI-3188: whether a churn question holds on the card now (its loop paused). */
+  churnHeld(card: CardRecord): boolean {
+    const s = this.state(card)
+    return s.requests.some((r) => CHURN_GATES.includes(r.gate) && this.churnGateHolds(s, r.gate))
+  }
+
+  /**
+   * HI-3188: refused while a churn question holds on the card: the loop's work (a step, a request, a question, a review, a
+   * verdict, a forward move) by an agent or the Assistant. The user and Combwork go on; reading, comments and asking the
+   * Assistant aren't writes this guards.
+   */
+  private churnPending(w: Write): GuardRefusal | null {
+    if (w.actor === 'user' || w.actor === 'combwork' || w.actor === 'outside') return null
+    const s = w.state()
+    const q = s.requests.find((r) => CHURN_GATES.includes(r.gate) && this.churnGateHolds(s, r.gate))
+    return q ? ({ rule: 'loop.churnPending', values: { card: w.card.key, request: q.request } } as GuardRefusal) : null
+  }
+
+  /**
+   * HI-2854 (B): an agent's own submit, in a ruleset that doesn't hold `submit.decisionsReceived` already (Solo,
    * All off: their compiled guards and ids unchanged, so the user's drags there still ask nothing), is refused all the
    * same while the agent hasn't seen a decision or a comment of the user's: work-on-card no longer reads the card again
    * before submitting. In the submit's write, under its lock; nothing with the rules off, or what an override leaves out.
@@ -1112,7 +1318,7 @@ export class Workflow {
       await this.cfg.hooks?.beforeWrite?.('start')
       // How many times it may be gathered again while only its fingerprint moved (its platform's; HI-2916: jj's head moves
       // with Combwork's own jj operations beside it).
-      const gathers = this.platform(g.o).startGathers ?? 1
+      const gathers = this.platform(g.o).gathers ?? 1
       // Each pass gathered again is awaited here, never returned bare (HI-2916): this pass's `finally` gives back the slot
       // it lent only once the pass after has started with it, or hasn't. Returned bare, the `finally` ran at once, so the
       // pass after found its lease ended, lent another, and a third could find the slot still settling and wait.
@@ -1176,9 +1382,9 @@ export class Workflow {
       // fingerprint unreadable at that instant (HI-2972): gathered again from the top while its platform allows more
       // passes (none beyond #1206's one unless it says so), else refused.
       if (out && evidenceMoved) {
-        const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.startAgain(card, from, g.o, g.before) : null
+        const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, from, g.o, g.before) : null
         if (again) {
-          this.startPassLog(card, 'write', again, gathers)
+          this.passLog(card, 'start', 'write', again, gathers)
           return await this.regather(card, () => this.start(ref, actor, opts))
         }
       }
@@ -1211,9 +1417,20 @@ export class Workflow {
     const by = actor === 'user' || actor === 'assistant' ? actor : null
     // The user's or the Assistant's for exactly this line: theirs whatever the line is now, so nothing to bind.
     if (given && by && given.target === target) return { grant: { rules: ['start.released'], move: 'start', by, reason: given.reason, target } }
-    const check = await reads.watch(this.cfg.project, target).catch(() => null)
-    const first = check ? check() : null
-    const r = first === null ? unknown(UNREADABLE.line, { branch: target }) : await reads.released(this.cfg.project, target)
+    let check: (() => string | null) | null = null
+    let first: string | null = null
+    let r: Awaited<ReturnType<ReleaseReads['released']>>
+    for (let i = 1; ; i++) {
+      check = await reads.watch(this.cfg.project, target).catch(() => null)
+      first = check ? check() : null
+      r = first === null ? unknown(UNREADABLE.line, { branch: target }) : await reads.released(this.cfg.project, target)
+      // HI-3319: unknown only because what it rests on was unsettled or moved under the read (jj's operation head while
+      // an operation lands, Combwork's own beside it: a slot made or detached), it is read again whole, at most
+      // RELEASE_READS reads in all, as jjTargetHead is (HI-2916); nothing of a moved read is kept. A steady unknown (a
+      // conflicted tag, a failed read) is not read again.
+      if (!isUnknown(r) || !check || stillAsRead(check, first) || i >= RELEASE_READS) break
+      log.info(`#${card.id}'s release read again (${first === null ? 'unsettled' : 'moved'} under it), read ${i + 1} of ${RELEASE_READS}`) // i18n-ignore: a log line
+    }
     if (!isUnknown(r) && !r) return { grant: null, bound: () => stillAsRead(check, first) }
     const laneId = card.lane ?? null
     if (laneId && this.cfg.releaseGrant?.(laneId) === target) return { grant: null, bound: () => this.cfg.releaseGrant?.(laneId) === target && (this.store.card(card.id).lane ?? null) === laneId }
@@ -1270,7 +1487,7 @@ export class Workflow {
     // covers, so a change to it before the write would go unseen (#1401 round 2).
     if (!this.platform(o).planCovered(before.primed, plan)) {
       if (lent) await this.slotUnused(card, lent)
-      this.startRefusedLog(card, 'plan', this.platform(o).startGathers ?? 1)
+      this.startRefusedLog(card, 'plan', this.platform(o).gathers ?? 1)
       return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
     }
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
@@ -1363,7 +1580,8 @@ export class Workflow {
 
   /**
    * How many passes deep each intent is in being gathered again (`regather`), its own call chain's (gatherDepth.ts): at
-   * most once, so a fingerprint moving again refuses, except a start on a platform allowing more (`startGathers`, HI-2916).
+   * most once, so a fingerprint moving again refuses, except a start or a verdict on a platform allowing more (`gathers`,
+   * HI-2916, HI-3216).
    */
   private readonly gathering = new GatherDepth()
 
@@ -1376,14 +1594,15 @@ export class Workflow {
    * fingerprint: the intent starts again, reading everything afresh, once (`regather`). A real change refuses at once,
    * as does a fingerprint moving again in the second pass. Git, the files and SQLite can't be one transaction:
    * reconciliation settles what comes after the transaction's read. `passes`: how many passes deep it may go (a start's
-   * platform may allow more than one, `startGathers`).
+   * platform may allow more than one, `gathers`).
    */
-  private async revalidate(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence, passes = 1): Promise<boolean> {
+  private async revalidate(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence, passes = 1, intent = 'start'): Promise<boolean> {
     if (this.gathering.depth(card.id) >= passes) return false
-    // A start allowed several passes (HI-2972): `startAgain`'s answer, a steady fingerprint going on to the write.
+    // An intent allowed several passes (HI-2972; a verdict's, HI-3216): `gatherAgain`'s answer, a steady fingerprint going
+    // on to the write.
     if (passes > 1) {
-      const again = await this.startAgain(card, s, o, before)
-      if (again === 'moved' || again === 'unreadable') this.startPassLog(card, 'before write', again, passes) // i18n-ignore: a log line's code, never shown
+      const again = await this.gatherAgain(card, s, o, before)
+      if (again === 'moved' || again === 'unreadable') this.passLog(card, intent, 'before write', again, passes) // i18n-ignore: a log line's code, never shown
       return again === 'moved' || again === 'unreadable'
     }
     const a = before.value === null ? null : this.evidenceNow(card, s, o, before.primed)
@@ -1391,7 +1610,7 @@ export class Workflow {
   }
 
   /**
-   * Whether a start on a platform allowing several passes (`startGathers`) is gathered again (HI-2972), asked with passes
+   * Whether a start or a verdict on a platform allowing several passes (`gathers`) is gathered again (HI-2972, HI-3216), asked with passes
    * left: `moved`, its fingerprint moved and its answer by content is the gathered one; `unreadable`, its fingerprint
    * couldn't be read when it was gathered or can't be now (jj's operation heads while any jj operation lands, Combwork's
    * own included: the new head is written before the old one goes); `steady`, the fingerprint is the gathered one;
@@ -1399,7 +1618,7 @@ export class Workflow {
    * still needs exactly the fingerprint it gathered, so nothing unreadable or changed is ever written on: unlike
    * `sameContent`, this asks no steadiness across its own read, since its answer only decides to read again.
    */
-  private async startAgain(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<'moved' | 'unreadable' | 'steady' | null> {
+  private async gatherAgain(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<'moved' | 'unreadable' | 'steady' | null> {
     if (before.value === null || before.content === null) return 'unreadable'
     const a = this.evidenceNow(card, s, o, before.primed)
     if (a === null) return 'unreadable'
@@ -1410,9 +1629,9 @@ export class Workflow {
     return content === before.content ? 'moved' : null
   }
 
-  /** A start gathered again (HI-2972): where, why, and the pass the next one is, in the log. */
-  private startPassLog(card: CardRecord, at: string, why: string, passes: number): void {
-    log.info(`#${card.id}'s start gathered again (${at}: fingerprint ${why}), pass ${this.gathering.depth(card.id) + 2} of ${passes}`)
+  /** An intent gathered again (HI-2972; a verdict's, HI-3216): which, where, why, and the pass the next one is, in the log. */
+  private passLog(card: CardRecord, intent: string, at: string, why: string, passes: number): void {
+    log.info(`#${card.id}'s ${intent} gathered again (${at}: fingerprint ${why}), pass ${this.gathering.depth(card.id) + 2} of ${passes}`)
   }
 
   /** A start refused as `evidence.changed` (HI-2972): which check, on which pass, in the log (` not started: `, as the platform's). */
@@ -1562,8 +1781,9 @@ export class Workflow {
         continue
       }
       // Done before 1.0, or never started under the rules (moved to Done by hand): nothing to look for in the target. An
-      // override's Done counts as accepted (HI-2014, Darren's option A): its dependents start without its work in the target.
-      if (d.accepted || dep.preWorkflow || !d.started || finishAccepts(d.finished)) continue
+      // override's Done counts as accepted (HI-2014, option A): its dependents start without its work in the target.
+      // HI-3233: another project's card, Done, counts: its work is in its own repository, never this card's target.
+      if (d.accepted || dep.preWorkflow || !d.started || finishAccepts(d.finished) || !this.store.isOwn(id)) continue
       const revision = d.integrated?.revision ?? d.approved?.revision ?? d.latest?.revision
       const base = d.approved?.base ?? d.latest?.base ?? d.started?.base
       if (!revision || !base || !target || revision === base) {
@@ -1571,7 +1791,9 @@ export class Workflow {
         continue
       }
       const c = asCardCounts(d, await this.platform(o).contains(target, { base, revision, key: d.latest?.key }))
-      if (isUnknown(c)) return c
+      // Unknown still refuses (never started on doubt), naming the card it waits for, not only its commit.
+      // agent-stored: refusalBody says whatText again for each reader (refusals' values take whatText before what)
+      if (isUnknown(c)) return { ...c, what: englishText({ m: UNREADABLE.blockerWork, values: { card: key, what: c.what } }), whatText: { id: UNREADABLE.blockerWork.id, values: { card: key, what: c.whatText ?? c.what } } }
       if (!c) out.push(key)
     }
     return out
@@ -1654,8 +1876,11 @@ export class Workflow {
    * limit (§16.11.4): only the user's answer resumes its loop. The user's own moves go on.
    */
   private atLimit(card: CardRecord, s: CardState, actor: Actor): GuardRefusal | null {
-    if (actor === 'user' || !this.enforced() || !s.requests.some((r) => r.gate === ROUND_LIMIT_GATE)) return null
-    return { rule: 'loop.roundLimit', values: { card: card.key } } as GuardRefusal
+    if (actor === 'user' || actor === 'combwork' || !this.enforced()) return null
+    if (s.requests.some((r) => r.gate === ROUND_LIMIT_GATE)) return { rule: 'loop.roundLimit', values: { card: card.key } } as GuardRefusal
+    // HI-3188: a churn question that holds pauses it too (checked again in the write: churnPending).
+    const q = s.requests.find((r) => CHURN_GATES.includes(r.gate) && this.churnGateHolds(s, r.gate))
+    return q ? ({ rule: 'loop.churnPending', values: { card: card.key, request: q.request } } as GuardRefusal) : null
   }
 
   /**
@@ -1718,6 +1943,18 @@ export class Workflow {
     w.action('enqueue', { target })
   }
 
+  /**
+   * HI-3410: a no-code card finishes with nothing merged, so it doesn't while its own line holds commits its target lacks
+   * (`FinishInputs.unmerged`, MC-1559's four): refused naming them, for the user to say whether they merge (the card made
+   * code again) or are dropped (the user moves it to Done). Refused too when the line can't be read, never taken for none.
+   */
+  private unmergedRefusal(card: CardRecord, fin: FinishInputs | Record<string, never>): GuardRefusal | null {
+    const u = (fin as FinishInputs).unmerged
+    if (!u) return null
+    if (isUnknown(u)) return { rule: 'platform.unknown', values: { card: card.key, what: u.whatText ?? u.what, rule: 'done.noCodeUnmerged' } }
+    return { rule: 'done.noCodeUnmerged', values: { card: card.key, line: u.line, target: u.target, count: u.count, commits: u.commits.join('; '), more: u.count - u.commits.length } }
+  }
+
   /** Finish (§16.7.2): after review, or straight after submit with no review. */
   finish(w: Write, fin: FinishInputs): void {
     const r = w.ruleset!
@@ -1776,6 +2013,13 @@ export class Workflow {
         // jj (HI-2868, option A): the user integrates what passed. It waits in Approved, its OK asked there first where G10
         // applies, until reconciliation finds it in its target (J9b2); Combwork never merges or moves anything for it.
         if (hasStage(r, 'approved')) w.move('approved', 'derived')
+        if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
+        return
+      case 'combworkAdvances':
+      case 'previewAdvance':
+        // HI-3235 (HI-3236: its preview too): Combwork integrates what passed (its platform's advance port): it waits in Approved, its OK asked there
+        // first where G10 applies, for its candidate and merge checks; the reconcile then calls the adapter's advance.
+        w.move('approved', 'derived')
         if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
         return
       default:
@@ -1882,7 +2126,8 @@ export class Workflow {
         const owner = this.store.cardAgent(card.id) ?? now.started?.builder ?? null
         if (agent && agent !== owner) return { rule: 'submit.followUpNotBuilder', values: { card: card.key } } as GuardRefusal
       }
-      const ins = this.submitInputs(g)
+      // A follow-up isn't a no-code card's second copy (HI-3409): submit.notDuplicate reads it.
+      const ins = { ...this.submitInputs(g), ...(followUp ? { followUp: true } : {}) }
       const bad = args.drag ? this.across(w, 'submit', 'review', ins, args.drag, g.only) : (this.check(w, 'submit', ins, g.only) ?? this.agentHasSeen(w, ins, g.only))
       if (bad) return bad
       // Ahead of earlier cards of its lane nobody has started (#1410): it goes before them, so its reviewer takes it next.
@@ -1956,6 +2201,8 @@ export class Workflow {
       ;({ revision, base, key, files, commits, paths, platform } = plan)
       Object.assign(inputs, plan.inputs)
       warnings.push(...plan.warnings, ...(await this.pathNotices(card, o, !!args.paths, op)))
+      // HI-3284: the merge guards' early warning (never a refusal, never evidence): what the revision adds since its base.
+      if (!predicted && plan.base && plan.revision) warnings.push(...(await this.guardWarnings(o, plan.base, plan.revision)))
       // The adapter may have reconciled (a shared folder's attribution): the card and its state as they are now.
       if (!predicted) {
         card = { ...this.store.card(card.id), ...(setPaths ? { paths: setPaths } : {}) }
@@ -1987,7 +2234,10 @@ export class Workflow {
       inputs.focused = await this.pickFor(o, this.folderOf(s), revision, base, args.tests, focusedOp)
     }
     const earlier = card.kind === 'code' && s.submissions.some((x) => x.revision === revision)
-    const fin = o.review === 'none' ? await this.finishInputs(card, s, r, revision) : {}
+    // HI-3410: a no-code card's own line is read at its submission too, so its builder hears of unmerged commits first.
+    const fin = o.review === 'none' || card.kind === 'no-code' ? await this.finishInputs(card, s, r, revision) : {}
+    const unmerged = card.kind === 'no-code' ? this.unmergedRefusal(card, fin) : null
+    if (unmerged) return unmerged
     const only = card.kind === 'no-code' ? (id: GuardId) => NO_CODE_GUARDS.includes(id) : undefined
     return { r, o, card, s, from, agent, runner, setPaths, revision, base, key, files, ...(commits ? { commits } : {}), ...(paths ? { paths } : {}), ...(platform ? { platform } : {}), inputs, warnings, earlier, fin, before, ...(only ? { only } : {}), ...(focusedOp ? { focusedOp } : {}) }
   }
@@ -2004,7 +2254,7 @@ export class Workflow {
   private async pickFor(o: WorkflowOptions, folder: string, revision: string, base: string, tests: FocusedTest[] | undefined, signal: AbortSignal): Promise<FocusedChoice> {
     const change = await pathChanges(folder, base, revision)
     const command = o.commands[FOCUSED_PICK]?.trim()
-    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.timeoutMs() ?? 60_000, signal }
+    const deps = { env: this.cfg.focused?.env ?? (() => ({})), timeoutMs: this.cfg.focused?.timeoutMs() ?? FOCUSED_PICK_DEFAULT_S * 1000, signal }
     let p: PickOutcome
     if (!change) p = { state: 'unknown', tests: [], why: 'noChange' } // i18n-ignore: codes (a why, a check name), never shown as text
     else if (!command) p = { state: 'unknown', tests: [], why: 'noPicker' } // i18n-ignore: codes (a why, a check name), never shown as text
@@ -2057,7 +2307,7 @@ export class Workflow {
       w.action('assignReviewer', { submission: sub.seq })
     }
     // A follow-up (HI-1832): the card stays in Review, so no arrival wakes its reviewer; told what to do, its words kept.
-    else if (reviewerAgent(g.o.review) && args.followUp) this.wake(w, this.reviewerOf(g.card), stored(W.followUp, { card: g.card.key, revision: (g.revision ?? '').slice(0, 7), submission: sub.seq }), 'review')
+    else if (reviewerAgent(g.o.review) && args.followUp) this.wake(w, this.reviewerOf(g.card), stored(W.followUp, { card: g.card.key, revision: g.revision ? g.revision.slice(0, 7) : 'none', submission: sub.seq }), 'review')
     else if (reviewerAgent(g.o.review) && ahead) {
       const keys = ahead.map((c) => c.key).join(', ')
       this.wake(w, this.reviewerOf(g.card), stored(W.aheadInLane, { card: g.card.key, cards: keys, next: ahead[0].key }), 'review')
@@ -2135,6 +2385,8 @@ export class Workflow {
     // builder submits the new revision, which runs its checks, the user's gates and a review copy as any submission does.
     if (args.pass && moved && !moved.same) return this.refuse(card, actor, 'verdict', { rule: 'review.headMoved', values: { card: card.key, submitted: (sub?.revision ?? '').slice(0, 7), head: moved.to.slice(0, 7) } } as GuardRefusal)
     const fin = args.pass ? await this.finishInputs(card, s, r, moved?.same ? moved.to : sub?.revision) : {}
+    const unmerged = args.pass && card.kind === 'no-code' ? this.unmergedRefusal(card, fin) : null
+    if (unmerged) return this.refuse(card, actor, 'verdict', unmerged)
     // HI-1734: a code card passing with nothing to merge (its change already in its target: HI-1449's checks only, which
     // others' merges had superseded) is proposed no code. Read before the write; unknown is no proposal.
     const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? asCardCounts(s, await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key })) : null
@@ -2143,10 +2395,20 @@ export class Workflow {
     // HI-2660: what the pass accepts of others' focused-test runs, worked out in the write on the card's facts then.
     let acceptance: ReturnType<typeof acceptedRuns> = { accepted: [], warnings: [] }
     await this.cfg.hooks?.beforeWrite?.('verdict')
-    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.verdict(ref, actor, args))
+    // As a start's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant, as often
+    // as its platform allows. jj's head moves with Combwork's own jj operations beside a review (its review copy put at
+    // the revision reviewed as start review leases it), which change nothing the verdict decides on.
+    const gathers = this.platform(r.options).gathers ?? 1
+    if (await this.revalidate(card, s, r.options, before, gathers, 'verdict')) return this.regather(card, () => this.verdict(ref, actor, args))
+    let evidenceMoved = false
     const out = await this.writeWhole(card, r, actor, (w) => {
-      const changed = this.stillAt(w, s, 'verdict') ?? this.evidenceChanged(w, r.options, before)
-      if (changed) return changed
+      const stale = this.stillAt(w, s, 'verdict')
+      if (stale) return stale
+      const changed = this.evidenceChanged(w, r.options, before)
+      if (changed) {
+        evidenceMoved = true
+        return changed
+      }
       // `startReview`: its review started in the same write, under start review's guards (an agent's old verdict, #1268:
       // one write, so a refusal or an error later in it leaves nothing of either).
       if (args.startReview && sub) {
@@ -2191,8 +2453,70 @@ export class Workflow {
       this.finish(w, fin)
       return null
     })
+    // Its fingerprint moved again between the last gather and the write, its answer by content the same, or unreadable at
+    // that instant (a start's rule, HI-2972): gathered again from the top while its platform allows more passes.
+    if (out && evidenceMoved) {
+      const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, s, r.options, before) : null
+      if (again) {
+        this.passLog(card, 'verdict', 'write', again, gathers)
+        return this.regather(card, () => this.verdict(ref, actor, args))
+      }
+      log.info(`#${card.id}'s verdict refused: evidence.changed at its write, pass ${this.gathering.depth(card.id) + 1} of ${gathers} (${this.noPassWhy(card, gathers)})`)
+    }
     if (out) return this.refuse(card, actor, 'verdict', out)
     return this.ok(card, 'review', this.state(card).stage, acceptance.accepted.length ? { accepted: acceptance.accepted } : undefined, acceptance.warnings)
+  }
+
+  /**
+   * HI-3220 (HI-3191's design): the user's open line comments sent to the card's builder as one
+   * fix round, from Review, Approved or queued. One write checks, refusing with nothing written: the stage; the card as the
+   * preview saw it (`expect`: its latest submission, decision generation and open review); a builder; the batch not sent
+   * before; every item open at the version shown; an agent's open review replaced only as confirmed (`replaces`, that very
+   * review); no merge under way (`queue.advancing`) and nothing integrated. Then a queued entry is taken out, and the
+   * user's failed verdict (its comment `message`'s), `FeedbackSent`, the move to Active and the builder's wake are written,
+   * the round counted and its limit asked as for any failed verdict. The window's refusals are thrown (FEEDBACK_REFUSED).
+   */
+  async feedback(ref: unknown, actor: Actor, args: { batch: string; items: readonly { id: string; version: number }[]; expect: FeedbackExpect; replaces?: { reviewer: string; submission: number } | null; message: (items: LineCommentView[], latest: { id: number; revision: string | null }) => string }): Promise<Reply> {
+    const card = this.resolve(ref, actor)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const r = s.started ? this.rulesetOf(card, s) : null
+    const out = await this.writeWhole(card, r, actor, (w) => {
+      const st = w.state()
+      if (st.stage !== 'review' && st.stage !== 'approved' && st.stage !== 'merging') throw combworkError(FEEDBACK_REFUSED.notHere)
+      if (st.integrated) throw combworkError(FEEDBACK_REFUSED.integrated)
+      if (!sameExpect(feedbackExpectOf(st), args.expect)) throw combworkError(FEEDBACK_REFUSED.changed)
+      const builder = st.started?.builder
+      if (!builder) throw combworkError(FEEDBACK_REFUSED.noBuilder)
+      const facts = w.tx.facts(card.id)
+      if (batchSent(facts, args.batch)) throw combworkError(FEEDBACK_REFUSED.alreadySent)
+      const views = foldLineComments(facts)
+      if (!args.items.length) throw combworkError(FEEDBACK_REFUSED.nothing)
+      const chosen = args.items.map((it) => {
+        const c = views.find((v) => v.id === it.id)
+        if (!c || c.state !== 'open' || c.version !== it.version) throw combworkError(FEEDBACK_REFUSED.itemsChanged)
+        return c
+      })
+      const review = openReviewOf(st)
+      if (review && (args.replaces?.reviewer !== review.reviewer || args.replaces?.submission !== review.submission)) throw combworkError(FEEDBACK_REFUSED.reviewing, { reviewer: review.reviewer })
+      const e = openEntry(st)
+      if (e?.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
+      if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'feedback' }) // i18n-ignore: a fact's kind and codes, not text
+      const latest = st.latest!
+      const round = st.rounds + 1
+      // agent-protocol: a fact's kind and codes; its comment is agent text, made in feedbackText.ts
+      const verdict = w.fact('Verdict', { reviewer: 'user', submission: latest.id, revision: latest.revision, pass: false, round, generation: st.generation, comment: args.message(chosen, { id: latest.id, revision: latest.revision }) }) // i18n-ignore: a fact's kind and codes; its comment is agent text (feedbackText.ts)
+      w.fact('FeedbackSent', { batch: args.batch, submission: latest.id, round, items: args.items.map(({ id, version }) => ({ id, version })) })
+      w.move('active', 'intent')
+      // Its wake names the user's verdict, not the move: a verdict of the user's reaches the builder whether or not the
+      // card has a reviewer (loopWakes.ts' targetOf), where a loop's handoffs need one.
+      w.action('wake', { agent: builder, why: stored(W.failedReview, { card: card.key }) }, verdict.seq)
+      w.woken.push(builder)
+      this.askAtLimit(w)
+      return null
+    })
+    if (out) return this.refuse(card, actor, 'feedback', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    return this.ok(card, s.stage, this.state(card).stage)
   }
 
   /**
@@ -2234,18 +2558,25 @@ export class Workflow {
   }
 
   /**
-   * The user answers a request (§16.8.5): only the user (Darren's point 7, #1269: never an agent or the Assistant). An
+   * The user answers a request (§16.8.5): only the user (point 7, #1269: never an agent or the Assistant). An
    * approval satisfies its gate; a decline of a gate's request is a round, the card back to its builder; a reply (`note`)
    * is relayed. At the round limit the answer is the user's `choice`, and a carry on adds `rounds`. A decision (`decided`:
    * a Decide answer, or an agent's question approved with a note, HI-2286) is the board's to record, beside this. The agent waiting on it is woken: whoever asked (an agent's own question), else the builder;
    * at the round limit the builder and the reviewer, whose lane paused for it.
    */
-  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', opts: { note?: string; choice?: RoundChoice; rounds?: number; decided?: boolean; action?: AskActionKind } = {}): Promise<Reply> {
+  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', opts: { note?: string; choice?: PauseChoice; rounds?: number; decided?: boolean; action?: AskActionKind; /** HI-3235: who answers (the window: the user): an advance's question takes only the user's; HI-3188: 'assistant' answers a simplify check (carry on or simplify). */ by?: string } = {}): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
+    // HI-3188: the Assistant answers only a simplify check, and only carry on or simplify; the rest is the user's.
+    const by: Actor = opts.by === 'assistant' ? 'assistant' : 'user'
     const req = s.requests.find((x) => x.request === request)
-    if (!req) return this.refuse(card, 'user', 'answer', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'answer', moves: '' } })
+    if (!req) return this.refuse(card, by, 'answer', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'answer', moves: '' } })
+    const usersOnly = (gate: string): GuardRefusal | null => (by === 'assistant' && (gate !== SIMPLIFY_GATE || (opts.choice !== 'carryOn' && opts.choice !== 'simplify')) ? ({ rule: 'loop.usersChoice', values: { card: card.key, request } } as GuardRefusal) : null)
+    const notTheirs = usersOnly(req.gate)
+    if (notTheirs) return this.refuse(card, by, 'answer', notTheirs)
+    // HI-3235: an advance's question is the user's alone (its Approve can be an attestation): only the window's answer.
+    if (ADVANCE_GATES.includes(req.gate) && ((opts.by ?? 'user') !== 'user' || (answer !== 'approved' && answer !== 'declined'))) return this.refuse(card, by, 'answer', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'answer', moves: '' } })
     const r = this.rulesetOf(card, s)
     const before = await this.evidenceOf(card, s, r.options)
     const fin = await this.finishInputs(card, s, r, s.approved?.revision ?? s.latest?.revision)
@@ -2254,12 +2585,25 @@ export class Workflow {
     // What the answer may be follows its request (HR3's #1269 round 1 finding 2): checked before anything is written.
     if (!answerFits(req, { outcome: answer, reply: !!note, decision: !!opts.decided, choice, rounds: opts.rounds, action }, LANE_MAX_ROUNDS)) throw new Error(`an answer (${answer}${choice ? `, ${choice}` : ''}) that doesn't fit request ${request} (${req.kind}, ${req.gate})`) // i18n-ignore: a programming error (tasks.ts checks first, in the user's words)
     const rounds = choice === 'carryOn' ? opts.rounds : undefined
+    // HI-3410: the user's approval of a no-code card's review finishes it: not while its own line holds unmerged commits.
+    const unmerged = req.gate === 'review' && answer === 'approved' && card.kind === 'no-code' ? this.unmergedRefusal(card, fin) : null
+    if (unmerged) return this.refuse(card, by, 'answer', unmerged)
     await this.cfg.hooks?.beforeWrite?.('answer')
-    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.answer(ref, request, answer, opts))
-    const out = await this.write(card, r, 'user', (w) => {
+    // HI-3391: as a verdict's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant,
+    // as often as its platform allows. jj's head moves with any jj operation in the repository (another lane's commit, a
+    // review copy's checkout), which changes nothing the answer decides on; a change by content still refuses at once.
+    const gathers = this.platform(r.options).gathers ?? 1
+    if (await this.revalidate(card, s, r.options, before, gathers, 'answer')) return this.regather(card, () => this.answer(ref, request, answer, opts))
+    let evidenceMoved = false
+    const out = await this.write(card, r, by, (w) => {
       // Under the transaction: the request still open (a newer submission retires the old one's), the card where it was.
-      const changed = this.stillAt(w, s, 'answer') ?? this.evidenceChanged(w, r.options, before)
-      if (changed) return changed
+      const stale = this.stillAt(w, s, 'answer')
+      if (stale) return stale
+      const changed = this.evidenceChanged(w, r.options, before)
+      if (changed) {
+        evidenceMoved = true
+        return changed
+      }
       const st = w.state()
       if (!st.requests.some((x) => x.request === request)) return { rule: 'move.notFromHere', values: { card: card.key, stage: st.stage, move: 'answer', moves: '' } } as GuardRefusal
       w.fact('Approval', { request, answer, ...(note ? { note } : {}), generation: st.generation, ...(req.submission !== undefined ? { submission: req.submission } : {}), ...(choice ? { choice } : {}), ...(rounds ? { rounds } : {}), ...(action ? { action } : {}) }) // i18n-ignore: a fact's kind and codes, not text
@@ -2272,6 +2616,8 @@ export class Workflow {
         let t = say(W.answered, { card: card.key, answer: answer === 'approved' || answer === 'declined' ? answer : 'other', question: quoted })
         if (choice) t = say(W.answeredChoice, { said: t, choice: say(CHOICE_WORDS[choice]) })
         if (choice && rounds) t = say(W.moreRounds, { said: t, rounds })
+        // HI-3188: a split or follow-ups the user accepted continue this card: made with followUpOf, they keep its count.
+        if (choice === 'split' || choice === 'accept' || choice === 'cutScope') t = say(W.followUpsOf, { said: t, card: card.key })
         if (action) {
           t = say(W.answeredAction, { said: t, action: say(ACTION_WORDS[action]) })
           if (note) t = say(W.answeredNote, { said: t, note })
@@ -2279,7 +2625,7 @@ export class Workflow {
         return t
       })
       w.answer = said
-      if (req.gate === ROUND_LIMIT_GATE) {
+      if (PAUSE_GATES.includes(req.gate)) {
         this.wake(w, builder, said, 'answer')
         // Its lane's reviewer, which paused with it.
         if (card.reviewer && card.reviewer !== builder) this.wake(w, card.reviewer, said, 'answer')
@@ -2297,6 +2643,13 @@ export class Workflow {
         // `publishUnknown` pause lifted, rather than waiting for a Resume, another card or a restart).
         const e = st.entries.find((x) => x.id === req.entry)
         if (e) w.action('enqueue', { target: e.target, ...(req.gate === QUEUE_STUCK_GATE ? { recheck: true } : {}) })
+      }
+      if (ADVANCE_GATES.includes(req.gate) && req.entry && req.result && (answer === 'approved' || answer === 'declined')) {
+        // HI-3235: the platform adapter takes the answer up in a durable action bound to what was asked (its request,
+        // attempt, plan, cycle and state): one per answer, its handler reading the attempt's journal before anything.
+        const payload: AdvanceAnswer = { request, gate: req.gate, attempt: req.entry, plan: req.result, cycle: st.cycle, state: req.gate === ADVANCE_STOPPED_GATE ? 'stopped' : req.gate === ADVANCE_PREVIEW_GATE ? 'preview' : 'uncertain', answer, project: this.cfg.project }
+        w.action('advanceAnswer', { ...payload })
+        return null
       }
       if (req.gate === MERGE_CHOICE_GATE) {
         // HI-1697: the merge style and commit message are saved with the answer (chooseMerge); its queue looks again now.
@@ -2327,12 +2680,22 @@ export class Workflow {
       if (!w.woken.includes(builder ?? '')) this.wake(w, builder, said)
       return null
     })
-    if (out) return this.refuse(card, 'user', 'answer', out)
+    // HI-3391: its fingerprint moved again between the last gather and the write, its answer by content the same, or
+    // unreadable at that instant (a verdict's rule): gathered again from the top while its platform allows more passes.
+    if (out && evidenceMoved) {
+      const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, s, r.options, before) : null
+      if (again) {
+        this.passLog(card, 'answer', 'write', again, gathers)
+        return this.regather(card, () => this.answer(ref, request, answer, opts))
+      }
+      log.info(`#${card.id}'s answer refused: evidence.changed at its write, pass ${this.gathering.depth(card.id) + 1} of ${gathers} (${this.noPassWhy(card, gathers)})`)
+    }
+    if (out) return this.refuse(card, by, 'answer', out)
     return this.ok(card, from, this.state(card).stage)
   }
 
   /**
-   * A decision the user made answers some of a card's open requests (HI-1932, Darren's decision): the questions it names,
+   * A decision the user made answers some of a card's open requests (HI-1932): the questions it names,
    * each answered by it, in one write. Each must still be open and one a decision may answer (`decisionAnswers`), checked
    * under the write: any that isn't refuses the whole of it, nothing written. Each request's asker (else the builder) is
    * woken once with the requests it answers; nothing moves. The caller adds the decision itself in the same write
@@ -2387,6 +2750,8 @@ export class Workflow {
     const combwork = r.options.finish === 'combworkMerges'
     const queued = this.combworkMergesRefusal(card, s)
     if (queued) return this.refuse(card, actor, 'report merge', queued, null) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    // HI-3282: this cycle's merge already seen (the reconciler or the queue finished it first): OK, nothing written.
+    if (mergeSeen(s)) return this.mergeSeenReply(card, s)
     // Only where the builder merges (or nothing is checked); with workflow rules off, a card Combwork merges is reported as
     // before 1.0 too, approved or waiting in the queue, whose entry it drops (a merge outside the queue, as S7's).
     const from = s.stage === 'approved' || (combwork && s.stage === 'merging') || awaitsAgentMerge(r, s)
@@ -2408,7 +2773,17 @@ export class Workflow {
       }
     }
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.reportMerge(ref, actor, args))
+    await this.cfg.hooks?.beforeWrite?.('report merge') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    let seen: CardState | null = null
     const out = await this.write(card, r, actor, (w) => {
+      // HI-3282: finished meanwhile by this cycle's merge (the reconciler between the reads and this write): read under the
+      // write's lock, nothing written (no Refused fact either). HI-3321: settled, so the agent's attempt fence, which that
+      // Done moved on, doesn't refuse it first: the builder is told its merge was seen, as when the Done came before its read.
+      const now = w.state()
+      if (mergeSeen(now)) {
+        seen = now
+        return null
+      }
       const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) ?? this.staleUnchecked(w, r, rev) ?? this.blockersNotDone(w) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
       if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' }) // i18n-ignore: a fact's kind and codes, not text
@@ -2419,9 +2794,27 @@ export class Workflow {
       // Its slot, lane and the rest follow its finish (HI-2014).
       w.move('done', 'intent')
       return null
-    })
+    }, undefined, { settled: (w) => mergeSeen(w.state()) })
+    // Set in the write's callback (TypeScript can't see it there).
+    const seenNow = seen as CardState | null
+    if (seenNow) return this.mergeSeenReply(card, seenNow)
     if (out) return this.refuse(card, actor, 'report merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     return this.ok(card, s.stage, 'done')
+  }
+
+  /** HI-3282: report merge's OK on a card whose merge this cycle Combwork had seen already: Done to Done, `already` saying so. */
+  private mergeSeenReply(card: CardRecord, s: CardState): Moved {
+    return this.ok(card, 'done', 'done', { already: say(W.mergeSeen, { target: s.integrated?.target ?? '' }) })
+  }
+
+  /**
+   * HI-3282: what an agent's old move to Done says on a card already there (P3's path, which moves nothing and keeps its
+   * comment): report merge's answer when this cycle's merge was seen, and the tool to call next time; else nothing.
+   */
+  mergeSeenLines(n: number): string[] {
+    const card = this.store.card(n)
+    const s = this.state(card)
+    return mergeSeen(s) ? [say(W.mergeSeenMove, { card: card.key, target: s.integrated?.target ?? '' }), say(W.mergeSeenMoveNext, { tool: 'cw_report_merge' })] : []
   }
 
   /**
@@ -2491,9 +2884,15 @@ export class Workflow {
     const reviews = this.reviewedRuleset(card, s).options.review !== 'none'
     const actions = (args.actions ?? []).filter((a) => a.kind !== 'skipReview' || reviews)
     let request = ''
-    await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w) => {
+    const out = await this.write(card, s.started ? this.rulesetOf(card, s) : null, actor, (w): GuardRefusal | null => {
+      // HI-3188: an agent's or the Assistant's question waits while its card's churn question is open (that one is the
+      // user's to answer); the user and Combwork go on (churnPending's own exceptions).
+      const paused = this.churnPending(w)
+      if (paused) return paused
       request = this.askUser(w, args.kind, 'ask', args.text, { asker: agentOf(actor), ...(args.revision ? { revision: args.revision } : {}), ...(args.checklist?.length ? { checklist: args.checklist } : {}), ...(actions.length ? { actions } : {}) })
+      return null
     })
+    if (out) return this.refuse(card, actor, 'ask', out)
     return this.ok(card, s.stage, s.stage, { request })
   }
 
@@ -2516,17 +2915,21 @@ export class Workflow {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
-    await this.write(card, this.rulesetOf(card, s), actor, (w) => {
+    const out = await this.write(card, this.rulesetOf(card, s), actor, (w): GuardRefusal | null => {
+      const paused = this.churnPending(w)
+      if (paused) return paused
       w.fact('ReviewerRequest', { text })
       this.wake(w, s.started?.builder, stored(W.reviewerAsks, { card: card.key, text }))
+      return null
     })
+    if (out) return this.refuse(card, actor, 'request', out)
     return this.ok(card, s.stage, s.stage)
   }
 
   /**
    * A card loop's step (#1382, #1467): the builder's design posted for its reviewer's check (in Doing), or its going ahead
    * with it unchecked once the check is due (`proceed`), or a follow-up of its work ready for the reviewer's check (in
-   * Review or Passed: a change asked of it, such as a screenshot's; never gone ahead with unchecked), or the reviewer's
+   * Passed: a change asked of it, such as a screenshot's; never gone ahead with unchecked; in Review, `loop.followUpInReview`), or the reviewer's
    * answer (`ok`, `gaps`). A design or a follow-up is named (`<key>/s<seq>`); a design is due `waitMinutes` after its post
    * (Card loops → Design check wait, the caller's), kept in its fact: an answer or `proceed` names the step it is about,
    * and one for an earlier step is refused, so a late reply never settles a newer one. Moves nothing; wakes the other side: the builder's steps its reviewer (the lane's, else the
@@ -2551,6 +2954,9 @@ export class Workflow {
         const side = loopStepSide(step)
         const at = opts.now ?? Date.now()
         if (this.enforced()) {
+          // HI-3188: no step while the card's churn question is open.
+          const paused = this.churnPending(w)
+          if (paused) return paused
           const builder = now.started?.builder ?? null
           // An answer or going ahead names a step waiting: none waiting, or an earlier one, is said first (HI-3011), so a
           // reviewer the pool gave a design that has since closed (the card put back) hears that, not that it isn't its.
@@ -2562,9 +2968,11 @@ export class Workflow {
           // builder, an answer by its reviewer, never its builder.
           if (agent && (side === 'builder' ? agent !== builder : agent !== reviewer || agent === builder)) return { rule: 'loop.stepNotYours', values: { card: card.key, side } } as GuardRefusal
           if (step === 'design' || step === 'followUp') {
-            // A design before the work goes to review; a follow-up of work reviewed or under review.
+            // A design before the work goes to review; a follow-up of work that has passed it. In Review (HI-3419: MC-1568
+            // stalled so) the review still owes its verdict: a change then is a follow-up submission, reviewed again, or a reply.
             // (Queued counts as approved: its entry is taken out below, #1623; one the queue is merging now can't be.)
-            const here = step === 'design' ? now.stage === 'active' : now.stage === 'review' || now.stage === 'approved' || now.stage === 'merging'
+            if (step === 'followUp' && now.stage === 'review') return { rule: 'loop.followUpInReview', values: { card: card.key } } as GuardRefusal
+            const here = step === 'design' ? now.stage === 'active' : now.stage === 'approved' || now.stage === 'merging'
             if (!here) return { rule: 'loop.stepNotHere', values: { card: card.key, stage: now.stage, step } } as GuardRefusal
             if (step === 'followUp' && openEntry(now)?.state === 'started') return { rule: 'loop.followUpMerging', values: { card: card.key } } as GuardRefusal
             // A pool lane's design (HI-2310) needs no reviewer yet: the pool gives it to the next free one.
@@ -2803,7 +3211,7 @@ export class Workflow {
       return null
     })
     if (out) return this.refuse(card, by, 'move', out)
-    // An override's Done (Darren's option A, HI-2014): the reply says which cards waiting on it start without its work.
+    // An override's Done (option A, HI-2014): the reply says which cards waiting on it start without its work.
     const waiting = to === 'done' && skipped.length ? this.store.cards().filter((c) => c.blockedBy.includes(card.id) && c.stage !== 'done').map((c) => c.key) : []
     return this.ok(card, from, to, undefined, waiting.length ? [say(W.doneByOverride, { cards: waiting.join(', '), card: card.key })] : undefined)
   }
@@ -2895,8 +3303,8 @@ export class Workflow {
       // agent-protocol: who can override, the refusal's override field (§16.8.3)
       if (releasedTarget && !opts.dry && opts.released !== releasedTarget) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'start', (releasedRule as { refusal: GuardRefusal }).refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
-      // A start's passes, as `start`'s (its platform's `startGathers`, HI-2916).
-      const gathers = gs ? (this.platform(gs.o).startGathers ?? 1) : 1
+      // A start's passes, as `start`'s (its platform's `gathers`, HI-2916).
+      const gathers = gs ? (this.platform(gs.o).gathers ?? 1) : 1
       if (gs && (await this.revalidate(card, s, gs.o, gs.before, gathers))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       const cause: FactData['Moved']['cause'] = skipped.length ? 'override' : 'user'
@@ -2952,9 +3360,9 @@ export class Workflow {
         if (releaseMoved && !this.gathering.depth(card.id)) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
         // The start's fingerprint moved again before the write, its content the same: gathered again while its platform
         // allows more passes (`start`'s rule, HI-2916).
-        const again = startMoved && gs && gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.startAgain(card, s, gs.o, gs.before) : null
+        const again = startMoved && gs && gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, s, gs.o, gs.before) : null
         if (again) {
-          this.startPassLog(card, 'write', again, gathers)
+          this.passLog(card, 'start', 'write', again, gathers)
           return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
         }
         if (startMoved) this.startRefusedLog(card, 'write', gathers, this.noPassWhy(card, gathers))
@@ -3298,6 +3706,21 @@ export class Workflow {
    * pre-fill's files the paths don't cover (paths set, none given), and the unclaimed changes. Never claimed: the
    * declared paths stay what the revision covers. Agent-facing English; empty elsewhere (Git, no-code).
    */
+  /**
+   * HI-3284: cw_submit's early warning from the merge guards (as the options are now, where the merge checks run): what
+   * `revision` adds since `base`, matched in their worker. A warning only: the merge's own check, on the merged result,
+   * decides. A read that failed or a cancel says nothing.
+   */
+  private async guardWarnings(o: WorkflowOptions, base: string, revision: string): Promise<string[]> {
+    const guards = guardsOf(this.cfg.options())
+    const adapter = this.platform(o)
+    if (!guards.length || !adapter.addedDiff || !(o.finish === 'combworkMerges' || finishOnCandidate(o.finish))) return []
+    // A warning only, which says nothing when it can't finish: never a submit held for the merge's own limit (HI-3377).
+    const limits = this.cfg.guardLimits?.() ?? GUARD_CHECK_DEFAULTS
+    const r = await checkMergeGuards(guards, () => adapter.addedDiff!(base, revision), { ...limits, timeoutMs: Math.min(limits.timeoutMs, SUBMIT_GUARDS_MS) })
+    return guardsRefuse(r) && !r.transient ? [guardWarning(r)] : []
+  }
+
   private async pathNotices(card: CardRecord, o: WorkflowOptions, given: boolean, signal?: AbortSignal): Promise<string[]> {
     if (!declaresPaths(o.platform) || card.kind !== 'code') return []
     const paths = card.paths ?? []
@@ -3600,6 +4023,11 @@ export class Workflow {
       case 'pin':
         await this.platformOf(card).perform(kind, payload)
         return
+      case 'advanceAnswer':
+        // HI-3235: the platform's handler (its journal first: a replay after a crash runs nothing it may have run), then the
+        // actions its records left (run here, outside its locks).
+        await this.platformOf(card).advanceAnswer?.(card, payload as unknown as AdvanceAnswer, advanceHostOf(this))
+        return
       // A finish (HI-2014) ends its lane once all its cards are Done, as `endLaneIfDone` (written before it) still does.
       case 'finish':
       case 'endLaneIfDone': {
@@ -3627,3 +4055,6 @@ export class Workflow {
 }
 
 export type { RuleId }
+
+/** HI-3377: the longest cw_submit's early merge-guards warning matches (the merge's own check takes the setting's time). */
+const SUBMIT_GUARDS_MS = 10_000

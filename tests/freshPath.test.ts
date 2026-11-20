@@ -3,9 +3,10 @@
 // never reads the machine's.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { expandVars, noteCliFolder, withCliFolders, mergePath, parseRegQuery, pathFolders, refreshPath, refreshPathBeforeStart, testRegistryPath } from '../src/main/freshPath'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 // The registry reads (PowerShell, reg.exe) are held until a test answers them: only the slow-read test makes one.
 const held = vi.hoisted(() => [] as ((err: Error | null, stdout: string) => void)[])

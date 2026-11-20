@@ -13,7 +13,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 const PORT = Number(lib.port(47699))
 
 const userData = path.join(lib.WORK, 'usagemove-profile')
@@ -85,7 +85,7 @@ const check = (name, ok, extra = '') => {
     await page.locator('.settings-nav').waitFor({ timeout: HUNG_MS })
     await page.locator('.settings-nav .row[data-section="accounts"]').click()
     const block = page.locator(`.account-block[data-account="${max1.id}"]`)
-    // HI-2528 (Darren, 21:40): the rule is off the card, in the account's settings, opened from its ⋯.
+    // HI-2528: the rule is off the card, in the account's settings, opened from its ⋯.
     await block.locator('[data-connections-of]').waitFor({ timeout: HUNG_MS })
     check('the rule is not on the account’s card', (await block.locator('[data-usage-move]').count()) === 0)
     await block.locator('.account-row [data-action="account-menu"]').click()

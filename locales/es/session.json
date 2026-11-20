@@ -21,6 +21,7 @@
   "session.compact.userTyped": "Escribiste en la terminal del agente mientras Combwork enviaba Compactar, así que no se envió: lo que escribiste se queda.",
   "session.compact.waiting": "El agente espera tu respuesta. Compacta cuando haya terminado.",
   "session.connection.fallback": "{why, select, missing {La conexión elegida para él se quitó} other {Su conexión {wanted} está desactivada en este espacio de trabajo}}, así que se inició con {name}, la primera conexión utilizable de su CLI aquí. Elige otra en su Configuración del agente.",
+  "session.connection.offMatched": "Su conexión {wanted} está en una cuenta desactivada en este espacio de trabajo, así que se inició con {name} ({account}): {by, select, tag {la conexión de allí con la misma etiqueta, {tag}} name {la conexión de allí con el mismo nombre} other {la primera conexión de esa cuenta, ya que ninguna allí tiene su etiqueta ni su nombre}}. Elige otra en su Configuración del agente.",
   "session.connection.fallbackTitle": "{agent} se ejecuta con otra conexión",
   "session.error.agentGone": "Ese agente ya no existe.",
   "session.error.inUseElsewhere": "Otro programa tiene abierta su transcripción. Ciérralo y vuelve a intentarlo.",
@@ -129,6 +130,8 @@
   "session.notice.untakenTitle": "{agent} no ha tomado una línea que escribió Combwork",
   "session.notice.waitingForInput": "Esperando tu respuesta",
   "session.orphan.body": "Proceso {pid}: el shell que lo inició ha terminado. Actividad lo muestra, con Terminarlo; también se avisa al agente.",
+  "session.orphan.bodyRunEnded": "El proceso {pid} sigue en ejecución después de que terminara su ejecución de cw-progress «{run}», sin el shell que lo inició. Actividad lo muestra, con Terminarlo; también se avisa al agente.",
+  "session.orphan.bodyRunUnconfirmed": "Proceso {pid}: su ejecución de cw-progress «{run}» ya no se ve en marcha, y el shell que lo inició ha terminado. Actividad lo muestra, con Terminarlo; también se avisa al agente.",
   "session.orphan.title": "{agent} dejó {command} en ejecución desde hace {time}",
   "session.plan.asking": "El agente te está preguntando algo. Respóndele primero.",
   "session.plan.noToggle": "{provider} no tiene un interruptor del modo Plan.",
@@ -163,6 +166,7 @@
   "session.start.archived": "Esta sesión está archivada. Desarchívala antes de reanudarla.",
   "session.start.args": "{problem} Corrígelo en su conexión, {connection}, en Configuración → Cuentas y conexiones.",
   "session.start.beingOpened": "Esta conversación ya se está abriendo en otro agente.",
+  "session.start.cantResume": "{provider} no puede reanudar una conversación: empieza una nueva.",
   "session.start.cleaning": "Combwork está archivando, eliminando o limpiando los archivos de esta sesión. Vuelve a intentarlo en un momento.",
   "session.start.cliRequired": "Se necesita {provider} para ejecutar sesiones.",
   "session.start.closing": "Combwork está deteniendo los agentes de este espacio de trabajo, así que ahora no puede iniciarse ninguno.",
@@ -227,5 +231,7 @@
   "session.tracker.stopped": "El rastreador de procesos de Combwork se detuvo ({why})",
   "session.tracker.title": "Combwork no puede rastrear los procesos de los agentes",
   "session.tracker.unavailable": "Su rastreador de procesos no está disponible",
-  "session.tracker.windowsOnly": "Rastrear procesos requiere Windows"
+  "session.tracker.windowsOnly": "Rastrear procesos requiere Windows",
+  "session.notice.startContextTitle": "{agent} se inició sin el contexto de inicio de Combwork",
+  "session.notice.startContextBody": "Combwork no pudo {why, select, slow {prepararlo a tiempo} failed {prepararlo} other {ponerlo en la sesión}}, así que {agent} trabaja por ahora sin la vista del tablero de Combwork ni su guía. Detenlo y vuelve a iniciarlo para intentarlo de nuevo."
 }

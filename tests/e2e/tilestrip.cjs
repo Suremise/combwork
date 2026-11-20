@@ -4,13 +4,13 @@
 // shown stays shown (its pane, the strip's mark). The keyboard: Alt+Up and Alt+Down on a row, its menu (Shift+F10: Move
 // Up, Move Down) and Move Agent Left/Right move that row's agent, the keyboard staying on it and a screen reader told
 // where it went (or that it can't go further). A row with a card chip (#1021) moves with its chip, and the line spans the
-// strip resized wider. By urgency, nothing moves. Screenshots in both themes (Darren's OK on the card). Six agents of the
+// strip resized wider. By urgency, nothing moves. Screenshots in both themes (the user's OK on the card). Six agents of the
 // fake Claude Code, none started; a throwaway profile, workspace and CLAUDE_CONFIG_DIR; a quiet test copy.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'tilestrip-profile')
 const ws = path.join(lib.WORK, 'tilestrip-ws')
@@ -203,7 +203,7 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await dragState()) === 'ended', HUNG_MS)
     check('…let go where it started: the order kept', saved() === order(fUp) && (await stripNames()).join() === order(fUp), saved())
 
-    // --- Dark too: the line and the menu (Darren's OK on the card).
+    // --- Dark too: the line and the menu (the user's OK on the card).
     await inv('settings:update', { appearance: { theme: 'dark' } })
     await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark', HUNG_MS)
     await drag(item('A'), [{ loc: item('B'), fy: 0.25, want: 'B>' }], 'drag-dark')

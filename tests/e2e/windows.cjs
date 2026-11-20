@@ -16,7 +16,6 @@ const wsB = path.join(lib.WORK, 'windows-ws-b')
 const aliasA = path.join(lib.WORK, 'windows-ws-a-alias')
 const claudeHome = path.join(lib.WORK, 'windows-claude-home')
 const PORT = Number(lib.port(47893))
-const sleep = lib.sleep
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -43,15 +42,7 @@ async function start() {
   return app
 }
 const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-async function waitFor(fn, ms = 15000) {
-  const t = Date.now()
-  while (Date.now() - t < ms) {
-    const v = await fn()
-    if (v) return v
-    await sleep(300)
-  }
-  return null
-}
+const waitFor = async (fn, ms = lib.timing('hang.ui')) => (await lib.until(fn, ms)) || null
 
 ;(async () => {
   // The alias first, as a link (rmdir never follows a junction into its folder).
@@ -83,7 +74,7 @@ async function waitFor(fn, ms = 15000) {
   const inv2 = invOn(p2)
   check('New Window opens a second window on the welcome page', (await inv2('workspace:get')) === null)
   await inv2('workspace:open', wsB)
-  await sleep(500)
+  await waitFor(async () => (await inv1('workspace:get'))?.path === wsA && (await inv2('workspace:get'))?.path === wsB)
   check('each window has its own workspace', (await inv1('workspace:get'))?.path === wsA && (await inv2('workspace:get'))?.path === wsB)
 
   // Opening A in window 2 brings window 1 forward and leaves window 2 as it is.
@@ -97,7 +88,7 @@ async function waitFor(fn, ms = 15000) {
 
   // A change in one window's workspace shows there only.
   await inv1('project:create', 'gamma')
-  await lib.until(async () => (await p1.locator('.sidebar').innerText().catch(() => '')).includes('gamma'), 10000)
+  await lib.until(async () => (await p1.locator('.sidebar').innerText().catch(() => '')).includes('gamma'), lib.timing('hang.ui'))
   const t1 = await p1.locator('.sidebar').innerText().catch(() => '')
   const t2 = await p2.locator('.sidebar').innerText().catch(() => '')
   check("a workspace's changes reach its own window", /gamma/.test(t1), t1.slice(0, 200))
@@ -126,13 +117,13 @@ async function waitFor(fn, ms = 15000) {
   check('API: …and answer with ?workspace=', r.status === 200, JSON.stringify(r))
 
   // --- Quit, and start again: both windows come back.
-  const exited = app.waitForEvent('close', { timeout: 20000 }).then(() => true).catch(() => false)
+  const exited = app.waitForEvent('close', { timeout: lib.timing('app.closeMs') }).then(() => true).catch(() => false)
   await inv1('app:quit').catch(() => undefined)
   check('Combwork quits with no agents running', await exited)
   app = await start()
   await app.firstWindow()
-  await waitFor(async () => app.windows().length >= 2, 15000)
-  await lib.until(async () => { const ws = app.windows(); if (ws.length < 2) return false; const paths = await Promise.all(ws.map((pg) => invOn(pg)('workspace:get').then((w) => w?.path ?? null).catch(() => null))); if (!paths.every(Boolean)) return false; const info = await invOn(ws[0])('provider:info').catch(() => null); return !!info && Object.values(info).every((p) => !p.checking) }, 60000) // both windows back, and the CLIs found again
+  await waitFor(async () => app.windows().length >= 2)
+  await lib.until(async () => { const ws = app.windows(); if (ws.length < 2) return false; const paths = await Promise.all(ws.map((pg) => invOn(pg)('workspace:get').then((w) => w?.path ?? null).catch(() => null))); if (!paths.every(Boolean)) return false; const info = await invOn(ws[0])('provider:info').catch(() => null); return !!info && Object.values(info).every((p) => !p.checking) }, lib.timing('hang.step')) // both windows back, and the CLIs found again
   const pages = app.windows()
   const shown = []
   for (const pg of pages) shown.push((await invOn(pg)('workspace:get'))?.path ?? null)
@@ -149,17 +140,17 @@ async function waitFor(fn, ms = 15000) {
   await lib.acceptClaudeTrust(invB, beta, agent.id)
   check('an agent runs in window B', !!(await waitFor(async () => (await invA('session:live')).length === 1)))
   await pb.evaluate(() => window.combwork.invoke('window:close')).catch(() => undefined)
-  const dialog = await waitFor(async () => (await pb.getByText('Close this window?').count()) > 0, 8000)
+  const dialog = await waitFor(async () => (await pb.getByText('Close this window?').count()) > 0)
   check('closing it asks first ("Close this window?")', !!dialog)
   await pb.screenshot({ path: path.join(lib.WORK, 'windows-close.png') }).catch(() => undefined)
   await pb.locator('.dialog .btn', { hasText: 'Close window' }).click().catch(() => undefined)
-  const closed = await waitFor(async () => app.windows().length === 1, 10000)
+  const closed = await waitFor(async () => app.windows().length === 1)
   check('the window closes', !!closed)
   check("its workspace's agent was stopped", (await invA('session:live')).length === 0)
   check('the other window stays, with its workspace', (await invA('workspace:get'))?.path === wsA)
   // Settings are saved a moment after they change.
   const readSaved = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).windows ?? []
-  const saved = (await waitFor(async () => (readSaved().length === 1 ? readSaved() : null), 5000)) ?? readSaved()
+  const saved = (await waitFor(async () => (readSaved().length === 1 ? readSaved() : null))) ?? readSaved()
   check('the closed window is no longer reopened at start', saved.length === 1 && saved[0].workspace === wsA, JSON.stringify(saved.map((w) => w.workspace)))
 
   // --- Switching a window's workspace with an agent running: asks (Cancel keeps everything), then stops it.
@@ -174,23 +165,27 @@ async function waitFor(fn, ms = 15000) {
   const openedLines = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n').filter((l) => l.includes('Opened workspace')).length
   const openedBefore = openedLines()
   const same = invA('workspace:open', aliasA)
-  const asked = await waitFor(async () => (await pa.getByText('Switch workspace?').count()) > 0, 4000)
+  // Its open answered with no question shown proves none was asked; a question holds the open until it's answered.
+  let opened = false
+  same.then(() => (opened = true), () => (opened = true))
+  await waitFor(async () => opened || (await pa.getByText('Switch workspace?').count()) > 0)
+  const asked = !opened && (await pa.getByText('Switch workspace?').count()) > 0
   await pa.screenshot({ path: path.join(lib.WORK, 'windows-alias-same.png') }).catch(() => undefined)
   if (asked) await pa.locator('.dialog .btn', { hasText: 'Cancel' }).click()
   const reopened = await same
   check('opening its own workspace by another name asks nothing', !asked)
   check('…keeps its name and its agent running', reopened?.path === wsA && (await invA('workspace:get'))?.path === wsA && (await invA('session:live')).length === 1, JSON.stringify({ path: reopened?.path, live: (await invA('session:live')).length }))
   let pending = invA('workspace:open', wsB)
-  check('switching workspace asks first ("Switch workspace?")', !!(await waitFor(async () => (await pa.getByText('Switch workspace?').count()) > 0, 8000)))
+  check('switching workspace asks first ("Switch workspace?")', !!(await waitFor(async () => (await pa.getByText('Switch workspace?').count()) > 0)))
   await pa.screenshot({ path: path.join(lib.WORK, 'windows-switch.png') }).catch(() => undefined)
   await pa.locator('.dialog .btn', { hasText: 'Cancel' }).click()
   check('Cancel keeps the workspace', (await pending)?.path === wsA)
   check('…and the agent running', (await invA('session:live')).length === 1)
   pending = invA('workspace:open', wsB)
-  await waitFor(async () => (await pa.getByText('Switch workspace?').count()) > 0, 8000)
+  await waitFor(async () => (await pa.getByText('Switch workspace?').count()) > 0)
   await pa.locator('.dialog .btn', { hasText: 'Switch workspace now' }).click()
   check('confirming switches the workspace', (await pending)?.path === wsB)
-  await waitFor(async () => openedLines() > openedBefore, 8000)
+  await waitFor(async () => openedLines() > openedBefore)
   check('…and opening its own workspace neither closed nor opened it again', openedLines() === openedBefore + 1, `${openedLines() - openedBefore} opened`)
   check("…after stopping the old workspace's agent", (await invA('session:live')).length === 0)
 

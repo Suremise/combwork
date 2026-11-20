@@ -1,5 +1,5 @@
 import type { SessionListItem } from './types'
-import { providerName } from './providers'
+import { providerModule, providerName } from './providers'
 import { msg, tr } from './i18n'
 import { shownText, withValues, type Text } from './advanced'
 import type { ResumeHold } from './agentFolders'
@@ -28,7 +28,7 @@ export interface ResumeContext {
   projectPath?: string
 }
 
-type Resumable = Pick<SessionListItem, 'provider' | 'sub' | 'hasTranscript' | 'hasBackup' | 'cwd' | 'agentId' | 'agentName' | 'hold'>
+type Resumable = Pick<SessionListItem, 'provider' | 'sub' | 'hasTranscript' | 'hasBackup' | 'cwd' | 'agentId' | 'agentName' | 'hold' | 'prompted'>
 
 /** What a lease was for, as the holds' messages name it: a card ("AM-14"), or a lane. */
 const workOf = (h: { card: number | null }): { kind: 'card' | 'lane'; work: string } => (h.card !== null ? { kind: 'card', work: cardRef(h.card) } : { kind: 'lane', work: '' })
@@ -82,7 +82,12 @@ export function resumeBlock(s: Resumable, ctx: ResumeContext): string | null {
   const who = providerName(s.provider)
   if (s.sub) return tr(msg({ id: 'agents.resume.sub', defaultMessage: "A {kind} {cli} ran for another session, not a conversation of its own: it can't be resumed.", description: "Why a session in the Sessions tab can't be resumed: it was a helper run (a {kind}, as the CLI names it: \"subagent\") that the CLI ({cli}) started for another session." }), { kind: s.sub.kind, cli: who })
   if (ctx.live) return tr(msg({ id: 'agents.resume.running', defaultMessage: 'It is running now.', description: "Why a session in the Sessions tab can't be resumed: it is running." }))
-  if (!s.hasTranscript && !s.hasBackup) return tr(msg({ id: 'agents.resume.noTranscript', defaultMessage: 'Neither {cli} nor Combwork has its transcript any more, so there is nothing to resume.', description: "Why a session can't be resumed: its conversation's file is gone from the CLI ({cli}) and from Combwork's backup." }), { cli: who })
+  // A CLI that runs from a description (HI-3196) resumes by Combwork's id, when its description says how, once the session
+  // has had a prompt; it has no transcript to look for.
+  const cli = providerModule(s.provider)?.cli
+  if (cli && !cli.session) return tr(msg({ id: 'agents.resume.noResume', defaultMessage: "{cli} can't resume a session: its description has no resume.", description: "Why a session in the Sessions tab can't be resumed (HI-3196): its CLI runs from a description that says no way to resume. {cli} is the CLI's name." }), { cli: who })
+  if (cli && !s.prompted) return tr(msg({ id: 'agents.resume.noPrompt', defaultMessage: 'It never had a prompt, so {cli} has nothing to resume.', description: "Why a session in the Sessions tab can't be resumed (HI-3196): its CLI (which runs from a description) was never given a prompt in it. {cli} is the CLI's name." }), { cli: who })
+  if (!cli && !s.hasTranscript && !s.hasBackup) return tr(msg({ id: 'agents.resume.noTranscript', defaultMessage: 'Neither {cli} nor Combwork has its transcript any more, so there is nothing to resume.', description: "Why a session can't be resumed: its conversation's file is gone from the CLI ({cli}) and from Combwork's backup." }), { cli: who })
   if (!ctx.providerEnabled) return tr(msg({ id: 'agents.resume.providerOff', defaultMessage: '{cli} is turned off. Turn it on in Settings → Providers to resume it.', description: "Why a session can't be resumed: its CLI ({cli}) is turned off. Settings → Providers is where: use its translated names." }), { cli: who })
   if (ctx.providerInstalled === false) return tr(msg({ id: 'agents.resume.notInstalled', defaultMessage: "{cli} isn't installed. Set it up in Provider Setup to resume it.", description: "Why a session can't be resumed: its CLI ({cli}) isn't installed. Provider Setup is a Help window: use its translated name." }), { cli: who })
   if (ctx.assistant) return null

@@ -1,3 +1,5 @@
+import { keyedWrite } from '../shared/requestKeys'
+import { fingerprintOf, KeyReused, KeysBusy, onceFor, REQUEST_KEY, type KeyedRequest } from './requestReceipts'
 import http, { type IncomingMessage, type ServerResponse } from 'http'
 import { AsyncLocalStorage } from 'async_hooks'
 import { randomBytes, timingSafeEqual } from 'crypto'
@@ -24,14 +26,16 @@ import { routePattern } from './routePattern'
 import { fallbackEfforts, infoAt, listedConnections, offeredModels } from '../shared/models'
 import { agentRuntime, hooksMissingText, retryWaitText, unknownStateText } from '../shared/runtime'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
-import { timeLeft } from '../shared/progress'
+import { shortDuration, timeLeft } from '../shared/progress'
+// How long a finish waits for its run's record as a check, to say how it counted (#1654, HI-3377).
+import { CHECK_REPLY_MS } from '../shared/checkReply'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
 import { cardOfRef, isCardRef, keysForSearch, withCardNames } from './projectKeys'
 import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLink, type RunLinkDeps } from './workflow/runLink'
 import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, isolatedRunEnded, takeStopped } from './copiesApp'
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
-import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
+import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reasonArg, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/combworkGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
 import { apiChainReady, inApiWorkspace, requestApiWorkspace } from './dialects/apiChain'
@@ -60,7 +64,7 @@ import { buildFactOf } from '../shared/buildFacts'
 import type { JournalSettings } from '../shared/journal'
 import { emit, onCombworkEvent, toast } from './events'
 import { msg, tr } from '../shared/i18n'
-import { addUsageToWatch, cancelWatch, encodeSince, onWatchPlacing, registerAgentWatch, registerLaneWatch, registerUsageWatch, registerWatch, scopedCard } from './watches'
+import { addUsageToWatch, cancelWatch, encodeSince, onWatchPlacing, isAssistantWatch, registerAgentWatch, registerLaneWatch, registerUsageWatch, registerWatch, scopedCard } from './watches'
 import { USAGE_WATCH_MAX, type UsageWatch } from '../shared/usageWatch'
 import { readLaneCards, readLaneCondition } from '../shared/laneWatch'
 import { agentBusy, AGENT_WATCH_MAX_AGENTS, type AgentNow, type WatchedAgent } from '../shared/agentWatch'
@@ -75,7 +79,7 @@ import { listMcp } from './mcp'
 import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, readNote, writeNote } from './notes'
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
-import { checkLanePool, launchRecordedLane, recordedLaneNote, resumeLaneBuilder, retryFreshStart } from './laneStart'
+import { checkLanePool, launchRecordedLane, poolUnlessNamed, recordedLaneNote, resumeLaneBuilder, retryFreshStart } from './laneStart'
 import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber, laneStateText, type LaneChange } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
@@ -91,7 +95,7 @@ import { agentNowOf, cardStall, laneOrderView, reviewDueOf, stepWaitOf, type Sta
 import { forwardWaitOf } from './queueReturn'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
 import { giveUnseen } from './cardFreshness'
-import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
+import { ackCardTask, ackDeliveries, ackThenRead, onCardTaskReceived, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NoInbox, NotGiven, readInbox, setAttemptStamp } from './deliveries'
 import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
 import { isDoorbell } from '../shared/doorbell'
 import type { DeliverySender, InboxItem } from '../shared/deliveries'
@@ -121,6 +125,8 @@ import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
 import { cardFacts, cardKind, cardReviewSkip, cardTarget, factRow, forYouOfCards } from './workflow/cardWork'
+import { feedbackRead, lineCommentsOf } from './workflow/lineComments'
+import { lineCommentCounts, pageOf } from '../shared/workflow/lineComments'
 import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
@@ -136,14 +142,15 @@ import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandl
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
 import type { GuidanceSeries, MetricOutcome, MetricsPart, MetricsQuery, MetricsReport } from '../shared/metrics'
-import { agentForToken, agentToken, agentTokenFile, onAgentTokenEnded, type AgentIdentity, type EndedLaunch } from './agentTokens'
+import { agentForToken, agentToken, agentTokenFile, currentAgentRun, onAgentTokenEnded, type AgentIdentity, type EndedLaunch } from './agentTokens'
+import { AttemptGuard, captureFence, issueAttempt, type RequestFence } from './attemptFence'
 import { API_EVENTS, apiEventFor, publicRun } from './apiEvents'
 import { clearDiscovery, writeDiscovery } from './apiDiscovery'
 import { createViewerToken, loadViewerTokens, revokeViewerToken, viewerForToken, viewerTokens } from './viewerTokens'
 import { hookTokenMatches, refusedHookNote, runForHookToken } from './hookTokens'
 import { answering, carrying, claimTwin, hasContext, type TwinEntry } from './hookTwins'
-import { fixedHookUrl, type ClaudeSnippetFacts } from '../shared/claudeHookHandlers'
-import { launchHookTimeouts } from './providers/claude/adapter'
+import { fixedHookUrl, type AdminSnippetFacts } from '../shared/hooks'
+import { provider as providerAdapter } from './providers'
 import { unusedWorktreeCounts } from './unusedWorktrees'
 import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
@@ -155,8 +162,20 @@ import { CONSOLE_KINDS, combworkName, mayRead, type ConsoleEvent, type ConsoleKi
 import { cardLabel, cardName, cardRef, namesOf } from '../shared/projectKeys'
 import { pauseTeam, resumeTeam } from './teamPause'
 import { scanWorkspace } from './teamParked'
+import { providerGaps, providerGapsForAgents } from '../shared/providers/gaps'
 
 const log = createLogger('servers')
+
+// HI-3194: a new delivery about a card is stamped with the card's attempt as it is made (deliveries.ts), read from the
+// board of the workspace its host is in (a host with none, or a card with no workflow record: no stamp).
+setAttemptStamp((host, card) => {
+  try {
+    const ws = workspaceOf(host)
+    return ws?.path ? tasks.attemptRead(ws, basename(host), card) : null
+  } catch {
+    return null
+  }
+})
 const MAX_BODY = 2 * 1024 * 1024
 
 function tokenMatches(header: string | undefined, token: string): boolean {
@@ -401,7 +420,7 @@ let apiToken = ''
 /** Who is calling: a script with the workspace token, the Assistant, or a project agent (by its own token). */
 /** An Assistant caller keeps the token it came with: one launch's, which its later work is checked against (#186). */
 /** A viewer (#620) reads and follows like the workspace token and changes nothing: every request but a GET is refused. */
-type Caller = { kind: 'api' } | { kind: 'viewer'; id: string; name: string } | { kind: 'assistant'; workspace: string; token: string } | ({ kind: 'agent'; runId: string } & AgentIdentity)
+type Caller = { kind: 'api' } | { kind: 'viewer'; id: string; name: string } | { kind: 'assistant'; workspace: string; token: string } | ({ kind: 'agent'; runId: string; fence?: RequestFence } & AgentIdentity)
 const callerStore = new AsyncLocalStorage<Caller>()
 
 function viewerCaller(): { id: string; name: string } | null {
@@ -410,7 +429,7 @@ function viewerCaller(): { id: string; name: string } | null {
 }
 
 /** The project agent making the call (known by its token), or null. */
-function agentCaller(): AgentIdentity | null {
+function agentCaller(): (AgentIdentity & { runId?: string; fence?: RequestFence }) | null {
   const c = callerStore.getStore()
   return c?.kind === 'agent' ? c : null
 }
@@ -490,14 +509,14 @@ function apiPort(): number {
 }
 
 /**
- * What the Claude Code admin snippet is made from (HI-2777): this Combwork's Agent API port, the other build's default
- * one (an installed app's 47821, a development build's 47822) and the hooks' timeouts as Settings → Advanced has them,
- * so a snippet made now matches the handlers Combwork's launches pass.
+ * What a provider's admin snippet is made from (HI-2777): this Combwork's Agent API port, the other build's default one
+ * (an installed app's 47821, a development build's 47822) and the provider's own values (Claude Code's hooks' timeouts as
+ * Settings → Advanced has them), so a snippet made now matches the handlers Combwork's launches pass.
  */
-export function claudeSnippetFacts(): ClaudeSnippetFacts {
+export function adminSnippetFacts(id: ProviderId): AdminSnippetFacts {
   const port = apiPort()
   const other = app.isPackaged ? DEFAULT_API_PORT + 1 : DEFAULT_API_PORT
-  return { port, otherPort: other === port ? null : other, packaged: app.isPackaged, listening: !!apiServer?.listening, timeouts: launchHookTimeouts() }
+  return { port, otherPort: other === port ? null : other, packaged: app.isPackaged, listening: !!apiServer?.listening, settings: providerAdapter(id).adminSnippet?.settings() ?? {} }
 }
 
 export function apiInfo(): AgentApiInfo {
@@ -522,7 +541,7 @@ export function assistantApiUrl(): string | null {
 /**
  * Environment passed to an agent's session so it (and its Combwork tools) can reach the API: the file holding the agent's
  * own token for this launch (agentTokens.ts), never the workspace's, so the API knows which project's agent is calling.
- * Never the token itself (HI-2262, Darren's decision): an agent listing its environment printed it (HI-2259).
+ * Never the token itself (HI-2262): an agent listing its environment printed it (HI-2259).
  */
 export function apiEnv(projectPath: string, agentId: string): Record<string, string> {
   const info = apiInfo()
@@ -1017,11 +1036,26 @@ route('GET', '/v1/projects/:name/sessions', async ({ params }) => {
   return sessions.list(p)
 })
 
+/**
+ * HI-3360: a start that would resume a long-idle conversation (`resumeId`, latest or named alike) is refused until its
+ * caller chooses: its age and size said, and `resumeIdle: true` to resume it anyway. The window asks its own question.
+ */
+async function refuseColdResume(p: string, agent: string, resumeId: string | undefined, body: any): Promise<void> {
+  if (!resumeId || body?.resumeIdle === true) return
+  const idle = await sessions.idleOf(p, resumeId).catch(() => null)
+  if (!idle) return
+  const size = idle.tokens !== null ? 'tokens' : idle.bytes !== null ? 'bytes' : 'other'
+  throw new HttpError(409, apiSaid(API.agent.idleResume, { agent, session: resumeId, idle: shortDuration(idle.idleMs), size, tokens: String(idle.tokens ?? ''), bytes: idle.bytes !== null ? `${(idle.bytes / 1048576).toFixed(1)} MB` : '' })) // agent-facing English, never the window's units
+}
+
 route('POST', '/v1/projects/:name/sessions', async ({ params, body }) => {
   const p = projectByName(params[0])
   if (assistantCaller()) throw new HttpError(400, apiSaid(API.agent.useStartAgent))
   ownProjectOnly(p, [API.own.starting])
-  return sessions.start(p, { resumeId: body?.resumeId, name: body?.name, agentId: await agentParam(p, body?.agent) })
+  const agentId = await agentParam(p, body?.agent)
+  const resumeId = typeof body?.resumeId === 'string' && body.resumeId ? body.resumeId : undefined
+  if (resumeId) await refuseColdResume(p, agentId ? (await agentDefOf(p, agentId)).name : '', resumeId, body)
+  return sessions.start(p, { resumeId: body?.resumeId, name: body?.name, agentId })
 })
 
 route('POST', '/v1/projects/:name/stop', async ({ params, query, body }) => {
@@ -1146,8 +1180,10 @@ route('GET', '/v1/providers', async () => {
       models,
       efforts: fallbackEfforts(p.id, s),
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
-      context200k: p.capabilities.contextLimit,
+      context200k: p.capabilities.compaction?.contextLimit ?? false,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
+      // What its CLI can't do in Combwork (HI-3196: one that runs from a description), only where it lacks something.
+      ...(providerGaps(p.id).length ? { gaps: providerGapsForAgents(p.id) } : {}),
       // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names. Each
       // with its own account's default and, where they aren't the provider's, its models (HI-2856).
       ...(here ? { connections: listedConnections(p.id, connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id), accountById, at, s, models) } : {})
@@ -1656,6 +1692,7 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
       resumeId = (await workspace.projectInfo(p)).agents.find((x) => x.id === agentId)?.resume?.id
       if (!resumeId) throw new HttpError(409, apiSaid(API.agent.noConversation, { agent: a.name }))
     }
+    await refuseColdResume(p, a.name, resumeId, body)
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     const st = prompt ? await startOnTask(p, agentId, a.name, prompt, (line) => sessions.start(p, { agentId, resumeId, prompt: line, allowed: guard })) : await sessions.start(p, { agentId, resumeId, allowed: guard })
     // A resume that started a new conversation says so, and why (HI-2540).
@@ -1732,6 +1769,8 @@ route('POST', '/v1/projects/:name/agents/:agent/prompt', async ({ params, body }
     // A task delivery (#649), given now or not at all: never queued behind the agent's work.
     const r = await deliverNow(p, { agentId, agentName: a.name, conversation: st.sessionId || null, kind: 'task', from: callerSender(), body: text, need: 'free' }).catch((e: Error) => {
       if (e instanceof NotGiven) throw new HttpError(409, apiSaid(API.agent.promptFailed, { agent: a.name, error: e.message }))
+      // It has no inbox (an Independent agent, a launch as if from a terminal, a CLI without Combwork's tools): said as such.
+      if (e instanceof NoInbox) throw new HttpError(409, apiSaid(API.agent.promptFailed, { agent: a.name, error: e.message }))
       throw e
     })
     return { done: [API.done.prompted, { agent: a.name, project: basename(p), given: r ? 'yes' : 'no', id: r?.id ?? '' }], said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { ok: true, ...(r ? { id: r.id } : {}) } }
@@ -1802,9 +1841,9 @@ function journalHome(): { home: string; settings: JournalSettings } {
   return { home: ws.assistantHome, settings }
 }
 /** A journal call: the caller's mistakes are 400s, said plainly; one while the journal is being deleted, 409. */
-function journalCall<T>(fn: () => T): T {
+async function journalCall<T>(fn: () => T | Promise<T>): Promise<T> {
   try {
-    return fn()
+    return await fn()
   } catch (e) {
     if (e instanceof JournalBusy) throw httpFrom(409, e)
     if (e instanceof JournalError) throw httpFrom(400, e)
@@ -1837,16 +1876,16 @@ function withCardLinks<T>(ws: WorkspaceService, body: T, fields: string[]): T {
 route('POST', '/v1/journal', async ({ body }) => {
   const { home, settings } = journalHome()
   const input = withCardLinks(requireWorkspace(), body, ['links'])
-  return { id: journalCall(() => writeEntry(home, settings, input, 'assistant')) }
+  return { id: await journalCall(() => writeEntry(home, settings, input, 'assistant')) }
 })
 route('POST', '/v1/journal/recall', async ({ body }) => {
   const { home } = journalHome()
   const query = withCardLinks(requireWorkspace(), body, ['link'])
-  return { entries: journalCall(() => recall(home, query)) }
+  return { entries: await journalCall(() => recall(home, query)) }
 })
 route('GET', '/v1/journal/:id', async ({ params }) => {
   const { home } = journalHome()
-  const e = journalCall(() => readEntry(home, entryId(params[0])))
+  const e = await journalCall(() => readEntry(home, entryId(params[0])))
   if (!e) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: params[0] }))
   return e
 })
@@ -1854,13 +1893,13 @@ route('PATCH', '/v1/journal/:id', async ({ params, body }) => {
   const { home, settings } = journalHome()
   const id = entryId(params[0])
   const patch = withCardLinks(requireWorkspace(), body, ['addLinks'])
-  if (!journalCall(() => updateEntry(home, settings, id, patch))) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: String(id) }))
+  if (!(await journalCall(() => updateEntry(home, settings, id, patch)))) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: String(id) }))
   return { id, updated: true }
 })
 route('DELETE', '/v1/journal/:id', async ({ params }) => {
   const { home } = journalHome()
   const id = entryId(params[0])
-  if (!journalCall(() => deleteEntry(home, id))) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: String(id) }))
+  if (!(await journalCall(() => deleteEntry(home, id)))) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: String(id) }))
   return { id, deleted: true }
 })
 
@@ -1869,7 +1908,7 @@ route('DELETE', '/v1/journal/:id', async ({ params }) => {
 route('POST', '/v1/builds', async ({ body }) => {
   const f = buildFactOf(body)
   if ('error' in f) throw new HttpError(400, f.error)
-  return recordBuild(requireWorkspace(), f)
+  return await recordBuild(requireWorkspace(), f)
 })
 
 /** Who is calling cw_inbox: a project agent (its own), or the Assistant (its home's). */
@@ -1892,10 +1931,37 @@ route('POST', '/v1/inbox', async ({ body }) => {
   if (body?.ack !== undefined) {
     if (!Array.isArray(body.ack) || !body.ack.length || body.ack.length > 200 || !body.ack.every((x: unknown) => typeof x === 'string' && x.length <= 32)) throw new HttpError(400, apiSaid(API.inbox.ackArg))
     const ids = (body.ack as string[]).map((x) => x.trim())
-    return body.read === true ? named(await ackThenRead(host, agentId, ids)) : ackDeliveries(host, agentId, ids)
+    return body.read === true ? named(await ackThenRead(host, agentId, ids, receivedAttempts, inboxFence())) : ackDeliveries(host, agentId, ids, inboxFence())
   }
-  return named(await readInbox(host, agentId))
+  return named(await readInbox(host, agentId, receivedAttempts, { fence: inboxFence() }))
 })
+
+/**
+ * HI-3195: a project agent's inbox read or ack fenced to the launch its request came from (captured as it arrived): one
+ * replaced since, before the read's or ack's save commits, is refused (409), nothing received or acked through it. The
+ * Assistant's inbox has no launch fence (its token is the workspace's Assistant's).
+ */
+function inboxFence(): (() => void) | undefined {
+  const me = agentCaller()
+  if (!me?.runId) return undefined
+  const { projectPath, agentId, runId } = me
+  return () => {
+    if (currentAgentRun(projectPath, agentId) !== runId) throw new HttpError(409, apiSaid(API.inbox.staleLaunch))
+  }
+}
+
+/**
+ * HI-3194: an inbox read's deliveries about cards, each stamped with the attempt it was made in: each such attempt is issued
+ * to the reading launch (attemptFence.ts: never past what it was made in).
+ */
+function receivedAttempts(issued: { card: number; attempt: string }[]): void {
+  const me = agentCaller()
+  if (!me?.runId) return
+  for (const x of issued) {
+    const [id, generation] = x.attempt.split('.').map(Number)
+    issueAttempt({ projectPath: me.projectPath, agentId: me.agentId, runId: me.runId }, x.card, { id, generation })
+  }
+}
 
 // An agent's deliveries with their states and times (#647): the newest `limit` (default 20, at most 200).
 route('GET', '/v1/projects/:name/agents/:agent/deliveries', async ({ params, query }) => {
@@ -2269,7 +2335,21 @@ route('GET', '/v1/lanes/next', async () =>
   laneCall(async () => {
     const a = agentCaller()
     if (!a) throw new HttpError(400, apiSaid(API.lane.nextIsAgents))
-    const r = await lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId)
+    // HI-3420: a lane that just ended or was abandoned is an answer (what it says, `ended`), not an error.
+    const r = await lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId).catch((e: unknown) => {
+      if (e instanceof lanes.LaneEnded) return { lane: null, next: null, waits: null, ended: { lane: e.lane, text: e.message } } as const
+      throw e
+    })
+    if (!r.lane) return r
+    // HI-3340: a card it says to start is issued to the calling launch at its attempt now, so the start it tells of is
+    // accepted (a binding from an earlier attempt, before a put-back or a lane reorder's restart, would refuse it). A card
+    // to carry on issues nothing: the agent's view of it may be from an attempt that has moved on, which the fence is for.
+    // Only while it is still in Todo, read with its attempt in one step (attemptToStart): laneNext awaits after taking its
+    // view, and a card started again meanwhile is in an attempt this reply never showed (HR2's round 1).
+    if (r.next && !r.next.carryOn && a.runId) {
+      const at = tasks.attemptToStart(requireWorkspace(), basename(a.projectPath), r.next.card)
+      if (at) issueAttempt({ projectPath: a.projectPath, agentId: a.agentId, runId: a.runId }, r.next.card, at)
+    }
     // Its passed cards Combwork merges, each with where it is in the merge queue (#1354): the next waits for them.
     const queue: { card: number; line: string }[] = []
     for (const c of r.lane.cards.filter((x) => x.column === 'passed')) {
@@ -2332,6 +2412,9 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   if (pool && a) throw new HttpError(403, apiSaid(API.lane.poolStartedBy))
   if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, apiSaid(API.lane.poolNoReviewer))
   if (pool) await checkLanePool(ws, p, builder)
+  // HI-3424: the Assistant's or a script's start naming neither a reviewer nor `pool`, in a project reviewed by a pool: a
+  // new lane is the pool's (refused as above where nobody but the builder reviews); an agent's own lane names its reviewer.
+  const byDefault = !a && body?.pool === undefined && !reviewer && unknownReviewer === undefined ? await poolUnlessNamed(ws, p, builder) : null
   // `commit`: the Assistant's guard, checked again in the lanes' save (HI-2420).
   const start = async (commit?: () => void) => {
     // Combwork's own start of the lane's card waits for this one to launch its agents (HI-2029); a builder registering its
@@ -2344,7 +2427,7 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     }
   }
   const started = async (commit?: () => void) => {
-    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, ...(args.target !== undefined ? { target: args.target } : {}), briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}), ...(released ? { released: { ...released, by: 'assistant' as const } } : {}) })
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, ...(args.target !== undefined ? { target: args.target } : {}), briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(byDefault ? { poolUnlessNamed: byDefault } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}), ...(released ? { released: { ...released, by: 'assistant' as const } } : {}) })
     // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
     // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
     const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
@@ -2991,7 +3074,8 @@ async function taskActor(): Promise<tasks.TaskActor> {
       .projectConfig(agent.projectPath)
       .then((cfg) => projectAgents(cfg).find((x) => x.id === agent.agentId))
       .catch(() => undefined)
-    return { kind: 'agent', name: `${def?.name ?? agent.agentId} (${project})`, self: { project, agentId: agent.agentId }, scope: project }
+    // HI-3194: its request's fence over each of its writes on a card (captured as the request arrived).
+    return { kind: 'agent', name: `${def?.name ?? agent.agentId} (${project})`, self: { project, agentId: agent.agentId }, scope: project, ...(agent.fence ? { guard: new AttemptGuard(agent.fence) } : {}) }
   }
   // agent-protocol: the name a script's change is recorded under
   return { kind: 'agent', name: 'Agent API' }
@@ -3258,7 +3342,9 @@ function taskPatch(body: any): TaskPatch {
   const out: TaskPatch = {}
   // Archiving is the user's (#351), one card or a batch: no call of the Agent API's makes it.
   if (body?.archived !== undefined) throw new HttpError(403, apiSaid(API.card.onlyUserArchives))
-  for (const k of ['title', 'description', 'project', 'blocked', 'waitingFor'] as const) if (body?.[k] !== undefined) out[k] = body[k] === null ? (null as never) : String(body[k])
+  for (const k of ['title', 'description', 'project'] as const) if (body?.[k] !== undefined) out[k] = body[k] === null ? (null as never) : String(body[k])
+  // A reason or none (HI-3234): null, false, empty, or a client's text for them ("null", "false") clears it.
+  for (const k of ['blocked', 'waitingFor'] as const) if (body?.[k] !== undefined) out[k] = reasonArg(body[k])
   if (body?.agent !== undefined) out.agent = body.agent ? String(body.agent) : null
   if (body?.column !== undefined) out.column = columnParam(body.column)
   if (body?.before !== undefined) out.before = body.before === null ? null : Number(String(cardRefIn(body.before)).replace(/^#/, ''))
@@ -3342,6 +3428,9 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   const me = agentCaller()
   if (me) {
     noteCardRead(me, view.number)
+    // HI-3194: the attempt this read shows is issued to the reading launch (attemptFence.ts), in every form of this read
+    // (and of the latest comment's, HI-3340).
+    if (me.runId && seen.attempt) issueAttempt({ projectPath: me.projectPath, agentId: me.agentId, runId: me.runId }, view.number, seen.attempt)
     // What it has received of the card's decisions, as a fact (#1216), in the background: the generation read with this
     // reply's decisions, never one written since.
     // HI-2854: the user's comments too, only from a read that gave every comment it keeps in full (not comments=n or
@@ -3361,9 +3450,40 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
     ...told,
     ...(archive.archived ? { commentsArchived: archive.archived } : {}),
     ...(archive.mayHaveBeenLost ? { commentsMayHaveBeenLost: true, commentsNote: say(API.card.commentsMayHaveBeenLost) } : {}),
-    ...(all > SPLIT_HINT_COMMENTS ? { hint: say(API.card.splitHint, { n: String(all) }) } : {})
+    ...(all > SPLIT_HINT_COMMENTS ? { hint: say(API.card.splitHint, { n: String(all) }) } : {}),
+    // HI-3219: its line comments as counts only (read in rows from /line-comments), when it has any.
+    ...lineCommentCountsOf(seen.card.number)
   }
   return query.get('history') === 'false' ? withoutHistory(withArchive) : withArchive
+})
+
+/** A card's line comments as counts (HI-3219), or nothing when it has none: a key read only with one card, never a listing. */
+function lineCommentCountsOf(n: number): { lineComments?: { open: number; sent: number; resolved: number } } {
+  const views = lineCommentsOf(workspace, n)
+  return views.length ? { lineComments: lineCommentCounts(views) } : {}
+}
+
+// HI-3219: a card's line comments, a page of rows (state=open, the default, or all), from `offset`, `next` while more remain.
+route('GET', '/v1/tasks/:n/line-comments', async ({ params, query }) => {
+  requireWorkspace()
+  const c = await tasks.readTask(taskNumber(params[0]), await taskActor())
+  const state = query.get('state') ?? 'open'
+  if (state !== 'open' && state !== 'all') throw new HttpError(400, apiSaid(API.card.lineCommentsState, { state }))
+  const rows = lineCommentsOf(workspace, c.number)
+    .filter((x) => state === 'all' || x.state === 'open')
+    .map(({ id, path, side, from, to, state: st, version, lines, before, after, body }) => ({ id, path, side, from, to, state: st, version, lines, before, after, body }))
+  const page = pageOf(rows, Number(query.get('offset') ?? 0))
+  return { number: c.number, lineComments: page.rows, ...(page.next !== undefined ? { next: page.next } : {}) }
+})
+
+// HI-3220: a batch of line comments the user sent to the card's builder, each as it was sent, a page from `offset`, `next` while more remain.
+route('GET', '/v1/tasks/:n/feedback/:batch', async ({ params, query }) => {
+  requireWorkspace()
+  const c = await tasks.readTask(taskNumber(params[0]), await taskActor())
+  const batch = decodeURIComponent(params[1])
+  const read = feedbackRead(workspace, c.number, batch, Number(query.get('offset') ?? 0))
+  if (!read) throw new HttpError(404, apiSaid(API.card.noFeedback, { card: cardRef(c.number), batch }))
+  return { number: c.number, ...read }
 })
 
 /** Past this many comments on a card (its archived ones counted), a read of it suggests splitting it (HI-2641). */
@@ -3439,7 +3559,7 @@ route('POST', '/v1/tasks', async ({ body }) => {
   requireWorkspace()
   const title = String(body?.title ?? '').trim()
   if (!title) throw new HttpError(400, apiSaid(API.card.titleRequired))
-  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}), ...(body?.target !== undefined ? { target: targetArg(body.target) } : {}) }
+  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked === undefined ? undefined : reasonArg(body.blocked), blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}), ...(body?.target !== undefined ? { target: targetArg(body.target) } : {}), ...(body?.followUpOf !== undefined && body?.followUpOf !== null ? { followUpOf: cardRefIn(body.followUpOf) as number } : {}) }
   const actor = await taskActor()
   // Placed on a lane as it is made (HI-2167): checked before the card is made; placed after, through cw_lane start's
   // own path, so nobody guesses its key.
@@ -3459,7 +3579,14 @@ route('POST', '/v1/tasks', async ({ body }) => {
   }
   // Placed once it is made (the Assistant's: its own change, as cw_lane start is), never inside the card's own change.
   const placing = async <R extends { number: number }>(r: R) => (lane ? { ...r, ...(await placeOnLane(lane, r.number)) } : r)
-  if (actor.kind !== 'assistant') return placing(await reply(await create()))
+  if (actor.kind !== 'assistant') {
+    const made = await create()
+    // HI-3194: an agent's own new card is issued to its launch as it was made (its attempt as it came out of its making).
+    const me = agentCaller()
+    const made0 = me?.runId ? tasks.attemptRead(workspace, made.project, made.number) : null
+    if (me?.runId && made0) issueAttempt({ projectPath: me.projectPath, agentId: me.agentId, runId: me.runId }, made.number, made0)
+    return placing(await reply(made))
+  }
   const project = typeof input.project === 'string' && input.project ? input.project : null
   // Made in Doing with nobody on it (HI-2062): refused before the user is asked to approve it (checked again as it is made).
   if (project && input.column === 'doing' && !input.agent) throw new tasks.TaskConflictError(tasks.DOING_NOBODY_NEW)
@@ -3501,7 +3628,10 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     changes.push(sayStored([API.card.saidTarget, { own: own ? 'yes' : 'no', target: own ?? '' }]))
     ownTargetNote = note
   }
-  const write = async (commit?: () => void): Promise<TaskCard> => {
+  // HI-3194: an agent's changes here that don't go through updateTask (its kind, review skip, target) fenced in their write.
+  const fenced = tasks.fenceCommit(actor, n)
+  const write = async (assistantGuard?: () => void): Promise<TaskCard> => {
+    const commit = assistantGuard ?? fenced
     if (confirmKind !== undefined) {
       await tasks.confirmKind(n, confirmKind, actor, { commit })
       changes.push(sayStored([confirmKind ? API.card.saidNoCode : API.card.saidCode]))
@@ -3516,7 +3646,8 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     }
     if (target !== undefined && !moving) await setCardTarget(commit)
     // A change and its comment are saved together: a card watch woken by the change names this comment.
-    const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor, { commit }) : await tasks.readTask(n, actor)
+    // updateTask and commentTask fence an agent's change themselves (with its facts, for a move): only the Assistant's guard.
+    const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit: assistantGuard }) : comment ? await tasks.commentTask(n, comment, actor, { commit: assistantGuard }) : await tasks.readTask(n, actor)
     if (comment) changes.push(say(API.card.saidCommented))
     return c
   }
@@ -3694,6 +3825,10 @@ route('GET', '/v1/tasks/:n/attachments/:name', async ({ params, query }) => {
 route('GET', '/v1/tasks/:n/comments/latest', async ({ params, query }) => {
   requireWorkspace()
   const r = await tasks.latestComment(taskNumber(params[0]), await taskActor())
+  // HI-3340: every form of cw_read_task of the card, its latest comment alone included, issues the attempt its snapshot
+  // shows (a refused agent told to read the card again clears the refusal with whichever read it makes).
+  const me = agentCaller()
+  if (me?.runId && r.attempt) issueAttempt({ projectPath: me.projectPath, agentId: me.agentId, runId: me.runId }, r.number, r.attempt)
   // summary=true (#532): its first line, with its whole length when there is more.
   const summary = query.get('summary') === 'true'
   // Its open requests first (HI-1992): "check the latest comment" is where an Assistant looks for a question, and an
@@ -3860,7 +3995,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     })
     // HI-2521: a named lane that has already ended is the answer at once; no watch started, so no usage beside it.
     if ('already' in r) return { lanesAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}) }
-    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events,...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
+    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events, ...(lc.follow && isAssistantWatch(ws, who) ? { follows: true } : {}), ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
   }
   if (body?.agents !== undefined) throw new HttpError(400, apiSaid(API.watch.agentsWithLanes))
   const cond = readCondition(body ?? {})
@@ -4211,6 +4346,23 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
   }
 }
 for (const [path, intentOf] of Object.entries(INTENT_ROUTES)) route('POST', `/v1/tasks/:n/${path}`, async ({ params, body }) => cardIntent(params[0], intentOf(body)))
+
+// HI-3188: the Assistant's answer to a card's simplify check (told to it first): carry on or simplify, nothing else.
+route('POST', '/v1/tasks/:n/answer-simplify', async ({ params, body }) => {
+  requireWorkspace()
+  const ref = intentRef(params[0])
+  const actor = await taskActor()
+  if (actor.kind !== 'assistant') throw new HttpError(403, apiSaid(API.change.onlyAssistant, { what: sayNow([API.change.answerSimplify, { card: cardRef(ref.n) }]) }))
+  const request = textField(body, 'request', true)
+  const choice = textField(body, 'choice', true)
+  const why = textField(body, 'why')
+  const was = await tasks.getTask(ref.n).catch(() => null)
+  return assistantChange('agents', [API.change.answerSimplify, { card: cardRef(ref.n) }], { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async (guard) => {
+    const card = await tasks.assistantAnswerSimplify(ref.n, request, choice, why, actor, guard)
+    const key = card.key ?? cardRef(ref.n)
+    return { done: [API.done.answerSimplify, { card: key, title: card.title, choice }], act: { column: card.column }, result: { ok: true, card: key, request, choice } }
+  })
+})
 
 // An agent asks the Combwork Assistant on a card (HI-1866): its comment, and the Assistant's inbox. An agent's alone: the
 // Assistant has its own tools, and the user acts on the board.
@@ -4752,8 +4904,6 @@ route('PATCH', '/v1/progress/:id', async ({ params, body }) =>
   })
 )
 
-/** How long a finish waits for its run's record as a check, to say how it counted (#1654): cw-progress waits a little longer. */
-const CHECK_REPLY_MS = 8000
 
 route('POST', '/v1/progress/:id/finish', async ({ params, body }) => {
   const recording: { check?: Promise<Recorded | null> } = {}
@@ -4844,7 +4994,8 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
   const caller: Caller | null = ownWorkspace
     ? { kind: 'assistant', workspace: ownWorkspace, token: bearer }
     : agent
-      ? { kind: 'agent', ...agent }
+      ? // HI-3194: its launch's attempt bindings as the request arrives, before anything is awaited (attemptFence.ts).
+        { kind: 'agent', ...agent, fence: captureFence(agent) }
       : viewer
         ? { kind: 'viewer', id: viewer.id, name: viewer.name }
         : enabled && tokenMatches(req.headers.authorization, apiToken)
@@ -4940,7 +5091,10 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
       if (!res.writableEnded) gone.abort()
     })
     // Its replies name cards by key (#1219: "HI-12 (#40)"), its workspace's.
-    const run = (): Promise<unknown> => withCardNames(ws, () => r.handler({ params, query: url.searchParams, body, signal: gone.signal }), callerScope())
+    const plain = (): Promise<unknown> => withCardNames(ws, () => r.handler({ params, query: url.searchParams, body, signal: gone.signal }), callerScope())
+    // HI-3195: a project agent's write sent with a request key is applied once (requestReceipts.ts).
+    const keyed = ws ? keyedRequest(req, url.pathname, r.template, params, body) : null
+    const run = keyed && ws ? (): Promise<unknown> => onceFor(ws, keyed, plain) : plain
     // A project agent's replies say when a card it works on or reviews has a new decision (#357), whatever it called:
     // the Combwork tools add the line to their reply. (The bridge's own reports about its calls aren't the agent's.) Its
     // cards as they were when the call began count too, so the call that moves a card on (to Review, say) still hears
@@ -4960,6 +5114,25 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     if (status >= 400 && status < 500) m.reason = reasonOf(e)
     send(res, status, body)
   }
+}
+
+/** HI-3195: the agent writes applied once with a request key: the card intents, its changes, a new card, a batch, comments. */
+
+/**
+ * HI-3195: a project agent's write on a keyed route sent with `X-Combwork-Request`: its launch, key, fingerprint and route,
+ * or null (no key, not an agent's, not a keyed route). A malformed key is a wrong call (400).
+ */
+function keyedRequest(req: IncomingMessage, path: string, template: string, params: readonly string[], body: unknown): KeyedRequest | null {
+  const header = req.headers['x-combwork-request']
+  const key = Array.isArray(header) ? header[0] : header
+  if (key === undefined) return null
+  const me = agentCaller()
+  // The writes cw-mcp keys (shared/requestKeys.ts), a project agent's only: the same list both sides read.
+  if (!me?.runId || !keyedWrite(req.method ?? '', path)) return null
+  if (!REQUEST_KEY.test(key)) throw new HttpError(400, apiSaid(API.http.requestKey))
+  // HR3's round 1: the marker is the agent's, not its launch's, so a retry after a restart (its next launch, the same
+  // key from cw-mcp's kept keys) finds it. A replaced launch's token is refused before this (401), and its writes fenced.
+  return { run: `${me.projectPath.toLowerCase()}#${me.agentId}`, key, fingerprint: fingerprintOf(req.method ?? '', template, params, body), route: `${req.method} ${template}`, ...(params[0] ? { card: params[0] } : {}) }
 }
 
 /**
@@ -5017,6 +5190,9 @@ async function decisionsNotice(ws: WorkspaceService | null, before: Map<number, 
  * dialect (dialects, HI-2440: a CombworkError's text, also one answered with another status, said in the request's scope).
  */
 export function apiErrorReply(e: unknown): { status: number; body: Record<string, unknown> } {
+  // HI-3195: a request key reused for another request; too many keyed requests in flight (try again in a moment).
+  if (e instanceof KeyReused) return { status: 409, body: { error: say(API.http.requestKeyReused), rule: 'request.keyReused' } }
+  if (e instanceof KeysBusy) return { status: 503, body: { error: say(API.http.requestsBusy) } }
   // A refusal's `error` is its `message`, word for word (HI-3136: the same sentence, filled as the reader's).
   if (e instanceof tasks.WorkflowRefusedError) {
     const refused = refusalBody(e.refusal)
@@ -5248,4 +5424,7 @@ onWatchPlacing(watchWhilePlaced)
 const routeHandler = (method: string, template: string): Handler | undefined => routes.find((r) => r.method === method && r.template === template)?.handler
 /** Runs fn as a project agent's request (HI-2691: tests run its routes' real errors), as serveApi's caller scope does. */
 const asAgent = <T>(workspacePath: string, projectPath: string, agentId: string, fn: () => T): T => callerStore.run({ kind: 'agent', runId: 'test', workspace: workspacePath, projectPath, agentId }, () => inRequestScope({ projectPath, agentId }, fn))
-export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, httpFrom }
+/** Runs fn as a request of an agent's launch (HI-3340: its token's run, with the fence it captured as it arrived), as handleApi does. */
+const asLaunch = <T>(workspacePath: string, launch: { projectPath: string; agentId: string; runId: string }, fn: () => T): T =>
+  callerStore.run({ kind: 'agent', workspace: workspacePath, ...launch, fence: captureFence(launch) }, () => inRequestScope({ projectPath: launch.projectPath, agentId: launch.agentId }, fn))
+export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, asLaunch, httpFrom }

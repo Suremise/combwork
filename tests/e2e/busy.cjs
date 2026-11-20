@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 // The calls the suite slows. Removing a project is slowed for long enough that "Hiding…" and an Escape fit in it under
 // load (#717); a step that slows another call puts this back afterwards.
 const SLOW_IPC = 'tasks:start=2000,tasks:delete=1500,tasks:comment=1500,project:remove=5000'
@@ -51,10 +51,10 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms = 10000) => {
+  const until = async (fn, ms) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
@@ -73,12 +73,12 @@ const check = (name, ok, extra = '') => {
   // --- Unsaved edits (#29) ---
   await tile(c1.number).click()
   const d1 = cardDialog(c1)
-  await d1.waitFor({ timeout: 5000 })
+  await d1.waitFor({ timeout: lib.timing('hang.ui') })
   await page.keyboard.press('Escape')
   check('an unchanged card closes at once', !!(await until(async () => (await d1.count()) === 0, HUNG_MS)))
 
   await tile(c1.number).click()
-  await d1.waitFor({ timeout: 5000 })
+  await d1.waitFor({ timeout: lib.timing('hang.ui') })
   await d1.getByRole('button', { name: 'Write' }).click()
   await d1.locator('.task-description-input').fill('EDITED-DESCRIPTION for the agent.')
   await page.keyboard.press('Escape')
@@ -100,25 +100,25 @@ const check = (name, ok, extra = '') => {
   check('Start… becomes Save and Start…', (await d1.getByRole('button', { name: 'Save and Start…' }).count()) === 1)
   await d1.locator('input[placeholder^="Cards to finish first"]').fill('#999')
   await d1.getByRole('button', { name: 'Save and Start…' }).click()
-  check('a failed save shows the error in the dialog', !!(await until(async () => /no card #999/.test(await d1.locator('.dialog-error').innerText().catch(() => '')), 5000)))
+  check('a failed save shows the error in the dialog', !!(await until(async () => /no card #999/.test(await d1.locator('.dialog-error').innerText().catch(() => '')), lib.timing('hang.ui'))))
   check('and starts nothing', (await page.locator('.dialog', { hasText: `Start ${c1.key ?? `#${c1.number}`}` }).count()) === 0 && (await card(c1.number)).description === 'Old description.')
   await d1.locator('input[placeholder^="Cards to finish first"]').fill('')
   await d1.getByRole('button', { name: 'Save and Start…' }).click()
   const startDialog = page.locator('.dialog', { hasText: `Start ${c1.key ?? `#${c1.number}`}` })
-  check('Save and Start saves, then asks which agent', !!(await until(async () => (await startDialog.count()) === 1, 5000)) && (await card(c1.number)).description.startsWith('EDITED'))
+  check('Save and Start saves, then asks which agent', !!(await until(async () => (await startDialog.count()) === 1, lib.timing('hang.step'))) && (await card(c1.number)).description.startsWith('EDITED'))
 
   // --- Start is busy (#34): spinner, can't close, runs once ---
   await startDialog.locator('label.choice', { hasText: 'A new agent' }).first().click()
   const startBtn = startDialog.locator('.dialog-footer .btn-primary, .dialog-footer button.primary').last()
   await startBtn.click()
-  await startBtn.click({ force: true, timeout: 500 }).catch(() => {})
+  await startBtn.click({ force: true, timeout: lib.timing('pace.actionTryMs') }).catch(() => {})
   check('Start shows Starting… while it runs', !!(await until(async () => /Starting…/.test(await startDialog.innerText().catch(() => '')), HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'busy-2-starting.png') })
   await page.keyboard.press('Escape')
   await page.mouse.click(5, 450)
   check('Escape and outside clicks don’t close it', (await startDialog.count()) === 1)
   check('× is disabled while it runs', await startDialog.locator('.dialog-header .icon-btn').isDisabled())
-  check('then it closes', !!(await until(async () => (await startDialog.count()) === 0, 10000)))
+  check('then it closes', !!(await until(async () => (await startDialog.count()) === 0, lib.timing('hang.ui'))))
   check('one agent was added, not two', (await project()).agents.length === 1, String((await project()).agents.length))
   const agent = (await project()).agents[0]
   // The fake CLI makes its transcripts folder with its first message.
@@ -127,33 +127,33 @@ const check = (name, ok, extra = '') => {
       .filter((f) => String(f).endsWith('.jsonl'))
       .map((f) => fs.readFileSync(path.join(claudeHome, 'projects', String(f)), 'utf8'))
       .join('\n')
-  check('the agent got the edited description', !!(await until(async () => (await tr()).includes('EDITED-DESCRIPTION'), 15000)))
+  check('the agent got the edited description', !!(await until(async () => (await tr()).includes('EDITED-DESCRIPTION'), lib.timing('hang.ui'))))
   check('the card is in Doing', (await card(c1.number)).column === 'doing' && (await card(c1.number)).agent === agent.id)
 
   // --- Comment: posted once, Save with a draft keeps it ---
   await tile(c2.number).click()
   const d2 = cardDialog(c2)
-  await d2.waitFor({ timeout: 5000 })
+  await d2.waitFor({ timeout: lib.timing('hang.ui') })
   await d2.locator('.task-comment-new textarea').fill('A comment draft')
   await page.keyboard.press('Escape')
   check('a comment draft asks before closing', !!(await until(async () => (await question.count()) === 1, HUNG_MS)) && /comment you are writing/.test(await question.innerText()))
   await question.getByRole('button', { name: 'Keep Editing' }).click()
   const commentBtn = d2.locator('.task-comment-new button')
   await commentBtn.click()
-  await commentBtn.click({ force: true, timeout: 300 }).catch(() => {})
+  await commentBtn.click({ force: true, timeout: lib.timing('pace.actionTryMs') }).catch(() => {})
   check('Comment shows Posting… while it runs', !!(await until(async () => /Posting…/.test(await d2.innerText()), HUNG_MS)))
-  await until(async () => !(await d2.innerText()).includes('Posting…'), 6000)
+  await until(async () => !(await d2.innerText()).includes('Posting…'), lib.timing('hang.ui'))
   check('the comment is posted once', (await card(c2.number)).comments.length === 1, String((await card(c2.number)).comments.length))
 
   // --- Delete: the question stays with a spinner until it's done ---
   await d2.getByRole('button', { name: 'Delete' }).click()
   const del = page.locator('.dialog', { hasText: `Delete ${c2.key ?? `#${c2.number}`}?` })
-  await del.waitFor({ timeout: 3000 })
+  await del.waitFor({ timeout: lib.timing('hang.ui') })
   await del.locator('.dialog-footer button').last().click()
   check('Delete shows Deleting…', !!(await until(async () => /Deleting…/.test(await del.innerText().catch(() => '')), HUNG_MS)))
   await page.keyboard.press('Escape')
   check('and can’t be closed part-way', (await del.count()) === 1)
-  check('then the card is gone and both dialogs close', !!(await until(async () => !(await card(c2.number)) && (await del.count()) === 0 && (await d2.count()) === 0, 8000)))
+  check('then the card is gone and both dialogs close', !!(await until(async () => !(await card(c2.number)) && (await del.count()) === 0 && (await d2.count()) === 0, lib.timing('hang.ui'))))
 
   // --- A new card with a title asks too ---
   await page.getByRole('button', { name: 'New Card', exact: true }).click()
@@ -171,19 +171,19 @@ const check = (name, ok, extra = '') => {
   const footer = page.locator('.agent-pane .pane-footer-bar').first()
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   // One typed exchange, so the conversation has usage to show: 30 in context (its 20 input and 10 output).
-  await until(async () => ['ready', 'finished'].includes((await live())?.status), 15000)
+  await until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.ui'))
   // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
   await lib.typeLine(inv, lib.ptyKey(alpha, agent.id), claudeHome, null, 'hello', { live })
-  check('the first conversation shows its usage', !!(await until(async () => /\bctx 30\b/.test(await footer.innerText().catch(() => '')), 15000)), await footer.innerText().catch(() => ''))
+  check('the first conversation shows its usage', !!(await until(async () => /\bctx 30\b/.test(await footer.innerText().catch(() => '')), lib.timing('hang.ui'))), await footer.innerText().catch(() => ''))
   const first = (await live())?.sessionId
   // Its usage is now slow to read: a new conversation shows a placeholder, never the old one's numbers.
   await app.evaluate(() => {
     process.env.CW_TEST_SLOW_IPC = 'session:usage=4000'
   })
   await inv('session:stop', alpha, agent.id)
-  await until(async () => !(await live()), 10000)
+  await until(async () => !(await live()), lib.timing('hang.ui'))
   await inv('session:start', alpha, { agentId: agent.id })
-  await until(async () => (await live())?.sessionId && (await live()).sessionId !== first && !(await live()).settingUp, 15000)
+  await until(async () => (await live())?.sessionId && (await live()).sessionId !== first && !(await live()).settingUp, lib.timing('hang.ui'))
   // Its own context, not yet read: "ctx –", never the previous conversation's "ctx 30" (#978's wording).
   const fresh = (t) => !/\bctx 30\b/.test(t) && /ctx –/.test(t)
   await until(async () => fresh(await footer.innerText().catch(() => '')), HUNG_MS)
@@ -195,15 +195,15 @@ const check = (name, ok, extra = '') => {
     process.env.CW_TEST_SLOW_IPC = v
   }, SLOW_IPC)
   await inv('session:stop', alpha, agent.id)
-  await until(async () => !(await live()), 10000)
+  await until(async () => !(await live()), lib.timing('hang.ui'))
 
   // --- Remove Project: spinner, no closing part-way ---
   await page.locator('.project-row', { hasText: 'beta' }).click()
   await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
   await page.locator('.menu .menu-item', { hasText: 'Remove Project…' }).click()
   const rd = page.locator('.dialog', { hasText: 'Remove beta' })
-  await rd.waitFor({ timeout: 5000 })
-  await until(async () => !(await rd.locator('.dialog-footer button').last().isDisabled()), 5000)
+  await rd.waitFor({ timeout: lib.timing('hang.ui') })
+  await until(async () => !(await rd.locator('.dialog-footer button').last().isDisabled()), lib.timing('hang.ui'))
   await rd.locator('.dialog-footer button').last().click()
   check('Remove Project shows Hiding…', !!(await until(async () => /Hiding…/.test(await rd.innerText().catch(() => '')), HUNG_MS)))
   await page.keyboard.press('Escape')
@@ -213,7 +213,7 @@ const check = (name, ok, extra = '') => {
   check('then beta is hidden', !!(await until(async () => !(await inv('workspace:get')).projects.some((p) => p.name === 'beta') && (await rd.count()) === 0, 5000 + HUNG_MS)))
 
   await inv('session:stop', alpha)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

@@ -23,14 +23,15 @@ import { entriesChanged, ignoredOnly, jjEntries, RUN_NAMES_MAX, RUN_READS_AT_ONC
 import type { ViewOf } from '../src/main/platform/jjView'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /** A bound for a hung run's waits (tests/README.md). */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 const profile = tempDir('cw-jjignored-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(profile, 'profile')
 
-describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes ignored files', { timeout: 180_000 }, () => {
+describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes ignored files', { timeout: timing('test.hangReal') }, () => {
   const h = harness()
   const o = new Observer()
   afterAll(() => o.dispose())
@@ -160,7 +161,7 @@ describe.skipIf(!jjExe)('HI-3121: a jj builder’s check in its slot that writes
       ).toMatchObject({ whyNot: 'changed', why: decides })
       rmSync(join(root, 'src', '__pycache__'), { recursive: true })
       // HR2's round 2: a file named `out` (the rule is `out/`, folders only) made where out/ was, read as a file by the
-      // watch before it's deleted and out/ made again. (Gone before it's read: the residual, Darren's r36.)
+      // watch before it's deleted and out/ made again. (Gone before it's read: the residual, r36.)
       expect(
         await run(async (start) => {
           rmSync(join(root, 'out'), { recursive: true, force: true })

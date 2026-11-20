@@ -7,6 +7,7 @@ import { hookSummary, launchEvent, transcriptEvent } from '../src/main/devConsol
 import { CONSOLE_NOT_CAPTURED, consoleEventsText, consoleSourcesText } from '../src/shared/toolReplies'
 import { say } from '../src/shared/agentText'
 import { SECRET_SAMPLES } from './secretSamples'
+import { timing } from './timing.cjs'
 
 // The developer console's capture (#636): bounded rings, kept only while a console watches, each raw event redacted
 // (the sensitive context following everything under it) and paired with what Combwork made of it; who may read which
@@ -19,7 +20,7 @@ const A1 = sessionSourceId(alpha, 'a1')
 const A2 = sessionSourceId(alpha, 'a2')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 const event = (seq: number, bytes = 10): ConsoleEvent => ({ seq, at: '2026-10-12T00:00:00.000Z', source: A1, kind: 'hook', name: 'Stop', summary: '', bytes })
 
@@ -171,7 +172,7 @@ describe('redactPayload', () => {
     const vmContext = createContext({ redactPayload, text: '' })
     for (const text of ['\\'.repeat(1_000_000), '"'.repeat(1_000_000), `--token ${'\\"'.repeat(500_000)}`]) {
       vmContext.text = text
-      const out = runInContext('redactPayload({ prompt: text }, { includeText: true })', vmContext, { timeout: 5000 }) as { prompt: string }
+      const out = runInContext('redactPayload({ prompt: text }, { includeText: true })', vmContext, { timeout: timing('spawn.hang') }) as { prompt: string }
       expect(out.prompt.length).toBeLessThanOrEqual(2001)
     }
   })

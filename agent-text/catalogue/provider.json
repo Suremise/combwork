@@ -1,0 +1,26 @@
+{
+  "provider.gap.cost": {
+    "text": "no cost (no prices)",
+    "note": "In the Agent API provider listing (HI-3196): what a CLI that runs from a description lacks, one item of a list."
+  },
+  "provider.gap.hooks": {
+    "text": "no hooks (no file locks or notices; status read from its screen)",
+    "note": "In the Agent API provider listing (HI-3196): what a CLI that runs from a description lacks, one item of a list."
+  },
+  "provider.gap.liveMode": {
+    "text": "no live mode switch (a restart changes its mode)",
+    "note": "In the Agent API provider listing (HI-3196): what a CLI that runs from a description lacks, one item of a list."
+  },
+  "provider.gap.resume": {
+    "text": "no resume (a stopped session starts a new conversation)",
+    "note": "In the Agent API provider listing (HI-3196): what a CLI that runs from a description lacks, one item of a list."
+  },
+  "provider.gap.tools": {
+    "text": "no Combwork tools, skills or guidance (no board or inbox)",
+    "note": "In the Agent API provider listing (HI-3196): what a CLI that runs from a description lacks, one item of a list."
+  },
+  "provider.gap.transcript": {
+    "text": "no transcript (no conversation view, usage or context)",
+    "note": "In the Agent API provider listing (HI-3196): what a CLI that runs from a description lacks, one item of a list."
+  }
+}

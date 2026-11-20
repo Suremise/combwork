@@ -16,7 +16,7 @@ const fs = require('fs')
 const path = require('path')
 const { deliveriesOf } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'combworktools-profile')
 const ws = path.join(lib.WORK, 'combworktools-ws')
@@ -85,8 +85,7 @@ const check = (name, ok, extra = '') => {
     check('the builder starts', !!(await until(() => idle(builder.id), HUNG_MS)))
     sessionId = (await live(builder.id)).sessionId
     // Its first launch's token, which stops working when that launch ends.
-    const tokenDir = path.join(userData, 'agent-api')
-    const firstToken = JSON.parse(fs.readFileSync(path.join(tokenDir, fs.readdirSync(tokenDir)[0]), 'utf8')).token
+    const firstToken = lib.launchToken(userData, (await live(builder.id)).runId)
     // Started fresh, its tools connect as it starts: a message is told to it at once.
     const m0 = await asAssistant('POST', `/v1/projects/alpha/agents/Builder/message`, { text: 'Hello from the suite (fresh start).' })
     check('a message for a fresh launch is given', m0.status === 200 && !!(await until(() => delivery(m0.body?.id)?.state === 'acked' || delivery(m0.body?.id)?.state === 'received', HUNG_MS)), JSON.stringify(m0))
@@ -126,7 +125,7 @@ const check = (name, ok, extra = '') => {
     await until(() => idle(builder.id), HUNG_MS)
 
     // --- 2. Only the launch's own token says it has connected.
-    const nowToken = JSON.parse(fs.readFileSync(path.join(tokenDir, fs.readdirSync(tokenDir)[0]), 'utf8')).token
+    const nowToken = lib.launchToken(userData, (await live(builder.id)).runId)
     const own = await call('POST', '/v1/launch/connected', {}, nowToken)
     check("the launch's own token is taken", own.status === 200 && own.body?.ok === true, JSON.stringify(own))
     const script = await call('POST', '/v1/launch/connected', {})

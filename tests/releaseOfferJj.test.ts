@@ -9,6 +9,7 @@ import * as electron from 'electron'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`releaseOfferJj.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -31,7 +32,7 @@ const { registerWorkspacePort } = await import('../src/main/platform/workspacePo
 const { offerFor, currentOffer, startReleaseOffers, stopReleaseOffers, releaseOfferTiming } = await import('../src/main/workflow/releaseOffer')
 const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 
-const REAL_JJ_MS = 180_000
+const REAL_JJ_MS = timing('wait.hangReal')
 const cleanups: (() => Promise<void> | void)[] = []
 afterAll(async () => {
   stopReleaseOffers()
@@ -80,7 +81,7 @@ describe.skipIf(!jjExe)('a release offer on jj (HI-3155)', () => {
         const x = currentOffer(ws, repo)
         if (ok(x)) return x
         if (Date.now() > end) throw new Error(`offer never came: ${JSON.stringify(x)}`)
-        await new Promise((r) => setTimeout(r, 100))
+        await new Promise((r) => setTimeout(r, timing('wait.interval')))
       }
     }
     await soon((x) => x?.move?.moveTo === '1.5.0')

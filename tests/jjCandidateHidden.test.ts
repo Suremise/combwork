@@ -15,17 +15,18 @@ import type { JjCandidatePoint, JjCandidateStyle } from '../src/main/platform/jj
 import { jjContextOf } from '../src/main/platform/jjDetect'
 import type { RunResult } from '../src/main/platform/repoContext'
 import { harness, jjExe } from './jjWorkspaceHarness'
+import { timing } from './timing.cjs'
 
 let n = 0
 const token = (): string => `t${Date.now().toString(36)}${(++n).toString(36)}`
 
-describe.skipIf(!jjExe)('a candidate after the user rewrote the reviewed commit (HI-3100)', { timeout: 180_000 }, () => {
+describe.skipIf(!jjExe)('a candidate after the user rewrote the reviewed commit (HI-3100)', { timeout: timing('test.hangReal') }, () => {
   const h = harness()
   const gitOn =
     (store: string) =>
     (args: readonly string[]): Promise<RunResult> =>
       new Promise((done) => {
-        execFile('git', ['--git-dir', store, ...args], { env: h.env, windowsHide: true, encoding: 'buffer', timeout: 60_000 }, (e, out, err) => {
+        execFile('git', ['--git-dir', store, ...args], { env: h.env, windowsHide: true, encoding: 'buffer', timeout: timing('spawn.hang') }, (e, out, err) => {
           const code = e ? (typeof (e as { code?: unknown }).code === 'number' ? (e as unknown as { code: number }).code : -1) : 0
           done({ ok: !e, out: out.toString('utf8'), buf: out, err: err.toString('utf8'), code })
         })

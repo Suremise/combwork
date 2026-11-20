@@ -6,12 +6,13 @@
 //   whose messages are bounded out (a message over the size bound, the page limit) fails the launch, nothing posted.
 import { spawn } from 'child_process'
 import { createRequire } from 'module'
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import http from 'http'
 import type { AddressInfo } from 'net'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { childEnv } = require('./e2e/runContext.cjs') as { childEnv: (vars?: Record<string, string>) => Record<string, string> }
@@ -28,7 +29,7 @@ afterAll(() => {
 type Msg = { id: string; type: string; [k: string]: unknown }
 
 /** OpenCode's server as the snapshot reads it (watermark 5, an idle session), its messages newest first, honouring limit and cursor; and the hook server. */
-async function standIn(messages: (limit: number, cursor: string | null) => { data: Msg[]; next: string | null }, session = '{"data":{"time":{"busy":1,"idle":2},"outcome":"succeeded"}}') {
+async function standIn(messages: (limit: number, cursor: string | null) => { data: Msg[]; next: string | null }, session = '{"data":{"time":{"busy":1,"idle":2},"outcome":"succeeded"}}', forms: string | null = '{"data":[]}') {
   const posts: Record<string, any>[] = []
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://x')
@@ -44,6 +45,10 @@ async function standIn(messages: (limit: number, cursor: string | null) => { dat
     res.setHeader('content-type', 'application/json')
     if (url.pathname.endsWith('/log')) return void res.end('data: {"type":"log.synced","seq":5}\n\n')
     if (url.pathname.endsWith('/permission')) return void res.end('{"data":[]}')
+    if (url.pathname.endsWith('/form')) {
+      if (forms === null) res.statusCode = 500
+      return void res.end(forms ?? '{}')
+    }
     if (url.pathname.endsWith('/message')) {
       const page = messages(Number(url.searchParams.get('limit') ?? 50), url.searchParams.get('cursor'))
       return void res.end(JSON.stringify({ data: page.data, cursor: page.next ? { next: page.next } : {} }))
@@ -103,35 +108,35 @@ describe.runIf(windows)("the launcher's recovery at its bounds (its own C#, a st
     const out = await drive(s.url, 'new', [`Take '${usage}' 512`, "State 'first' (Settle $false $false)", '[CwStream]::Resync()', `Take '${usage}' 10`, "State 'second' (Settle $false $false)"].join('\r\n'))
     expect(out[0]).toMatchObject({ name: 'first', ok: true, queue: 1, held: -1, first: expect.stringContaining('OpencodeSnapshot'), problem: expect.stringMatching(/queue holds/) })
     expect(out[1]).toMatchObject({ name: 'second', ok: true, queue: 11, held: -1, first: expect.stringContaining('OpencodeSnapshot') })
-  }, 60000)
+  }, timing('test.hang'))
 
   it('held events within the items bound but over the bytes bound: the same, all or nothing; 511 small ones fit beside the snapshot', async () => {
     const s = await standIn(pageOf([]))
     const out = await drive(s.url, 'new', [`Take '${longPrompt.replace(/'/g, "''")}' 500`, "State 'bytes' (Settle $false $false)", '[CwStream]::Resync()', `Take '${usage}' 511`, "State 'fits' (Settle $false $false)"].join('\r\n'))
     expect(out[0]).toMatchObject({ name: 'bytes', ok: true, queue: 1, held: -1, problem: expect.stringMatching(/queue holds/) })
     expect(out[1]).toMatchObject({ name: 'fits', ok: true, queue: 512, held: -1 })
-  }, 60000)
+  }, timing('test.hang'))
 
   it("a resumed baseline whose newest message is over the size bound (no idle marker reached): the launch fails, nothing posted", async () => {
     const s = await standIn(pageOf([{ id: 'huge', type: 'assistant', content: 'x'.repeat(1048577) }, { id: 'u1', type: 'user' }]))
     const out = await drive(s.url, 'resume', "State 'huge' (Settle $true $true)")
     expect(out[0]).toMatchObject({ ok: false, problem: expect.stringMatching(/history couldn't be read within its bounds \(a message over the size bound\)/) })
     expect(s.posts).toEqual([])
-  }, 60000)
+  }, timing('test.hang'))
 
   it('a resumed baseline with ten pages and no idle marker: the launch fails, nothing posted', async () => {
     const s = await standIn(pageOf(Array.from({ length: 600 }, (_, i) => ({ id: `a${i}`, type: 'assistant' }))))
     const out = await drive(s.url, 'resume', "State 'pages' (Settle $true $true)")
     expect(out[0]).toMatchObject({ ok: false, problem: expect.stringMatching(/within its bounds/) })
     expect(s.posts).toEqual([])
-  }, 60000)
+  }, timing('test.hang'))
 
   it('a resumed baseline stops at its newest idle marker, never reading the history before it (a message there over the size bound included)', async () => {
     const s = await standIn(pageOf([{ id: 'idle9', type: 'idle', outcome: 'succeeded' }, { id: 'u9', type: 'user' }, { id: 'huge', type: 'assistant', content: 'x'.repeat(1048577) }]))
     const out = await drive(s.url, 'resume', "State 'idle' (Settle $true $true)")
     expect(out[0]).toMatchObject({ ok: true })
     expect(s.posts.map((p) => [p.snapshot.baseline, p.snapshot.intent, p.snapshot.boundary, p.snapshot.messages.map((m: Msg) => m.id)])).toEqual([[true, 'resume', 'known', ['idle9']]])
-  }, 60000)
+  }, timing('test.hang'))
 
   it("a resumed session with an execution running: its baseline is that execution after the newest idle marker, which the tracker opens", async () => {
     const s = await standIn(pageOf([{ id: 'a2', type: 'assistant' }, { id: 'u2', type: 'user', text: 'go on' }, { id: 'idle1', type: 'idle', outcome: 'succeeded' }, { id: 'u1', type: 'user' }]), '{"data":{"time":{"busy":3,"idle":2}}}')
@@ -141,5 +146,23 @@ describe.runIf(windows)("the launcher's recovery at its bounds (its own C#, a st
     const t = newTracker()
     const hooks = applySnapshot(t, s.posts[0].gen, snap)
     expect([t.open, hooks.map((h) => h.event.kind)]).toEqual(['u2', ['prompt']])
-  }, 60000)
+  }, timing('test.hang'))
+
+  it("a question pending as 2.2.6 lists it (HI-3317, wire/forms.json): the snapshot carries it as events.ts has a form, and the tracker asks it", async () => {
+    const rec = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'opencode', 'real-2.2.6', 'wire', 'forms.json'), 'utf8'))['GET /api/session/{id}/form (a question pending)'].body.data[0]
+    const form = { ...rec, sessionID: 'ses_probe', metadata: { ...rec.metadata, tool: { ...rec.metadata.tool, messageID: 'a2' } } }
+    const s = await standIn(pageOf([{ id: 'a2', type: 'assistant' }, { id: 'u2', type: 'user', text: 'go on' }, { id: 'idle1', type: 'idle', outcome: 'succeeded' }]), '{"data":{"time":{"busy":3,"idle":2}}}', JSON.stringify({ data: [form] }))
+    await drive(s.url, 'resume', "State 'asking' (Settle $true $true)")
+    const snap = s.posts[0].snapshot
+    expect(snap.forms).toEqual([{ id: form.id, messageID: 'a2', callID: form.metadata.tool.id, text: 'Which file should I write?' }])
+    const hooks = applySnapshot(newTracker(), s.posts[0].gen, snap)
+    expect(hooks.map((h) => h.event)).toEqual([{ kind: 'prompt', text: 'go on' }, { kind: 'ask', ask: { kind: 'question', blocking: true, message: 'Which file should I write?', call: form.metadata.tool.id } }])
+  }, timing('test.hang'))
+
+  it("the questions can't be read: the snapshot fails, saying so, nothing posted", async () => {
+    const s = await standIn(pageOf([]), undefined, null)
+    const out = await drive(s.url, 'new', "State 'unread' (Settle $true $true)")
+    expect(out[0]).toMatchObject({ ok: false, problem: expect.stringMatching(/the questions couldn't be read/) })
+    expect(s.posts).toEqual([])
+  }, timing('test.hang'))
 })

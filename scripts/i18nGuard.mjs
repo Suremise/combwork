@@ -52,6 +52,7 @@ export const ALLOW_DIR = 'i18n/allow'
  */
 export const EXCLUDED = [
   [/^src\/main\/(launchGate|screenRecognition|terminalScreen)\.ts$/, "CLI-facing: a CLI's screen and text (#367)"],
+  [/^src\/shared\/providers\/muse\/names\.ts$/, "CLI-facing: Muse Code's own event, field and key names, its advanced mappings' defaults (HI-3202, #367)"],
   [/^src\/shared\/windowHealth\.ts$/, "combwork.log's lines of a window's long tasks and hangs (HI-1775): English, as main's stall warnings are"],
   // The 1.0 workflow core's files with no text the window shows (#1264): the rest of src/main/workflow and platform is
   // checked, its window text messages in src/shared/workflow (refusals.ts, texts.ts) kept as data beside the English.
@@ -65,11 +66,11 @@ export const EXCLUDED = [
   [/^src\/main\/exitLog\.ts$/, "log lines and Copy Diagnostics' report, in English (#985)"],
   [/^src\/main\/mainStalls\.ts$/, 'log lines of combwork.log, in English (#1109)'],
   [/^src\/main\/db\.ts$/, 'SQL statements and settings, no text (#1017)'],
-  [/^src\/main\/(codexLogWorker|providers\/codex\/retryLog)\.ts$/, "reading Codex's log for a retry wait (HI-1972): SQL, reasons for no answer and combwork.log lines, no window text"],
+  [/^src\/main\/providers\/codex\/(threads\/logWorker|retryLog)\.ts$/, "reading Codex's log for a retry wait (HI-1972): SQL, reasons for no answer and combwork.log lines, no window text"],
   [/^src\/main\/schema\//, "combwork.db's 1.0 tables and the card JSON contract: SQL, no text (#1208)"],
   [/^src\/main\/trash\.ts$/, 'test-only'],
   [/^src\/shared\/consoleFixtures\.mts$/, 'test-only'],
-  // Developer views (the developer console, Performance) are translated too (Darren, 19 Oct, #1104).
+  // Developer views (the developer console, Performance) are translated too (#1104).
   [/\.test\.tsx?$/, 'test-only']
 ]
 export const isExcluded = (rel) => isAgentFile(rel) || EXCLUDED.some(([re]) => re.test(rel))

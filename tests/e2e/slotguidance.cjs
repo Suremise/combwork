@@ -19,7 +19,7 @@ const path = require('path')
 const { execFileSync } = require('child_process')
 const { startFakeCopilotApi, copilotTestEnv, copilotInstalled } = require('./fake-copilot-api.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 
 const at = (x) => path.join(lib.WORK, `slotguidance-${x}`)
 const userData = at('profile')
@@ -91,7 +91,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
         if (s?.status === 'waiting') {
           // A folder new to the CLI asks to trust it first (Claude Code's menu starts on "No": lib answers it).
           const screen = lib.plainText(await inv('pty:buffer', lib.ptyKey(alpha, id)).catch(() => ''))
-          if (/trust this folder/i.test(screen) && !(await lib.acceptClaudeTrust(inv, alpha, id, 3000))) await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+          if (lib.CLAUDE_TRUST.test(screen) && !(await lib.acceptClaudeTrust(inv, alpha, id, 3000))) await inv('pty:write', lib.ptyKey(alpha, id), '\r')
           else if (/Do you trust the files/i.test(screen)) await inv('pty:write', lib.ptyKey(alpha, id), '\r')
         }
         return ['ready', 'finished'].includes(s?.status) ? s : null

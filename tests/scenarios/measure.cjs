@@ -9,6 +9,7 @@
 //
 //   npx electron-vite build && node tests/scenarios/measure.cjs        (writes measure.json and measure.md beside results)
 const fs = require('fs')
+const { timing } = require('../timing.cjs')
 const path = require('path')
 const { spawn } = require('child_process')
 const lib = require('../e2e/lib.cjs')
@@ -16,7 +17,7 @@ const lib = require('../e2e/lib.cjs')
 const OUT = path.join(lib.WORK, '..', 'scenarios', 'measure')
 const bytes = (s) => Buffer.byteLength(s ?? '', 'utf8')
 // The longest a measurement waits for what it is waiting on (the workspace, a turn, a stop): a bound for a hung run.
-const HUNG_MS = 30000
+const HUNG_MS = timing('hang.ui')
 
 /** The combwork MCP server's instructions and tools, started as the launch starts it. */
 function combworkServer(env) {
@@ -103,7 +104,7 @@ const tomlString = (v) => (v.startsWith('"') ? JSON.parse(v) : v)
         const runOnce = async (host, id, resumeId) => {
           await inv('session:start', host, { agentId: id, ...(resumeId ? { resumeId } : {}) })
           const t = Date.now()
-          while (Date.now() - t < 30000 && !['ready', 'finished'].includes((await live(host, id))?.status)) await lib.sleep(300)
+          while (Date.now() - t < lib.timing('hang.ui') && !['ready', 'finished'].includes((await live(host, id))?.status)) await lib.sleep(lib.timing('poll.intervalMs'))
           // One exchange, so there is a conversation to resume: sent, then over (the session back at its prompt).
           let worked = false
           await lib.sendPrompt(inv, lib.ptyKey(host, id), 'hello', { submitted: async () => (worked ||= ['working', 'finished'].includes((await live(host, id))?.status)) })

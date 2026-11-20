@@ -55,6 +55,10 @@
     "defaultMessage": "Copy revision {revision}",
     "description": "Tooltip of the button beside a branch's revision under review: copies the whole commit id. {revision} is its short form (a3f2c1d)."
   },
+  "git.branches.deletingOn": {
+    "defaultMessage": "Deleting branches on {remote}…",
+    "description": "HI-3372: a notification while Clean up deletes the ticked branches on the remote {remote}, with a Cancel button."
+  },
   "git.branches.earlierCards": {
     "defaultMessage": "{n, plural, one {+# earlier card} other {+# earlier cards}}",
     "description": "Beside a branch's card (Version Control → Branches & remotes): how many earlier cards worked on the same branch ({n}); its tooltip lists them."
@@ -317,7 +321,7 @@
   },
   "git.gate.advance.why": {
     "defaultMessage": "jj can’t move a bookmark safely when others move it too, so you integrate reviewed work yourself.",
-    "description": "Why Combwork doesn’t merge under jj (HI-2799, Darren’s decision A). Keep jj; a bookmark is jj’s named line."
+    "description": "Why Combwork doesn’t merge under jj (HI-2799, decision A). Keep jj; a bookmark is jj’s named line."
   },
   "git.gate.attributes.name": {
     "defaultMessage": "Git attributes and filters",
@@ -1860,8 +1864,8 @@
     "description": "In the warning before switching a jj project back to Git (HI-2799). Keep .jj and jj."
   },
   "git.vc.store.toJj": {
-    "defaultMessage": "Combwork never creates a jj repository or changes how it is colocated: .jj, and .git where there is one, stay as they are. Cards run in slots of their own, and you integrate the reviewed work yourself: Combwork never moves a bookmark or pushes.",
-    "description": "In the warning before switching to jj (HI-2799, HI-2896: a jj repository colocated with Git has a .git beside .jj, one not colocated has none; HI-2874: jj cards run). A bookmark is jj’s name for a branch. Keep jj, .jj and .git."
+    "defaultMessage": "Combwork never creates a jj repository or changes how it is colocated: .jj, and .git where there is one, stay as they are. Cards run in slots of their own. By default Combwork integrates each passed card itself once its merge checks pass, moving the target bookmark; Who integrates, in Workflow, can leave that to you. Combwork never pushes.",
+    "description": "In the warning before switching to jj (HI-2799, HI-2896: a jj repository colocated with Git has a .git beside .jj, one not colocated has none; HI-2874: jj cards run; HI-3235, HI-3315: Combwork integrates by default). Who integrates and Workflow are names in Combwork’s window. A bookmark is jj’s name for a branch. Keep jj, .jj and .git."
   },
   "git.vc.store.unknown": {
     "defaultMessage": "{gate}: couldn’t be checked ({what}), so it counts as used",

@@ -5,7 +5,7 @@
 // leasing one again, a resubmission's new revision, and a review waiting while every copy is in use, then told once it
 // has one. A real CopyPool on a real combwork.db and git repository; conditions, never time.
 import { spawn as nodeSpawn } from 'child_process'
-import { mkdirSync, readFileSync } from 'fs'
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -18,6 +18,7 @@ import type { WorkflowRole } from '../src/shared/workflow/roles'
 import type { CopyPool as Pool } from '../src/main/copies'
 import '../src/shared/agentText/asyncScope'
 import { inDialectOf, inDialectScope, setChainResolver, type DialectChain } from '../src/shared/agentText'
+import { timing } from './timing.cjs'
 
 // The app's message to a reviewer (tellReviewer) as leaveMessage gets it: its text, and the reviewer's.
 const sent = vi.hoisted(() => [] as { agent: string; text: string }[])
@@ -35,7 +36,7 @@ const { claudeCode } = await import('../src/main/providers/claude/adapter')
 const { codex } = await import('../src/main/providers/codex/adapter')
 const { copilot } = await import('../src/main/providers/copilot/adapter')
 const { boardFile, closeBoard, workspaceDb } = await import('../src/main/boardStore')
-const { COPIES_DIR, CopyPool, CopyStore, copiesDirOf, grantsCopies } = await import('../src/main/copies')
+const { COPIES_DIR, CopyPool, CopyStore, addedDirAsks, copiesDirOf, grantsCopies } = await import('../src/main/copies')
 const { fileSlotConn } = await import('../src/main/slots')
 const { BoundedLog, execCommand, FILE_IO } = await import('../src/main/workflow/queueChecks')
 const { COPY_WAIT_STALL_MS, copiesInUseText, copyWaitStall, ReviewCopies, reviewCopyText, tellReviewer } = await import('../src/main/reviewCopies')
@@ -87,12 +88,46 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
     expect(grant('reviewer', { on: false })).toBe(false)
   })
 
+  // HI-3337: Claude Code 2.1.326 asks about an --add-dir folder outside every folder it trusts at each start, for that
+  // session only (tests/fixtures/advanced/trust-added-claude-2.1.326.txt): withheld until its home trusts it, never
+  // started into the question; the other CLIs never ask, so they are always given it.
+  it("is withheld where the CLI would ask about it (HI-3337): Claude Code until its home trusts the worktrees folder; never Codex's or Copilot's", async () => {
+    const root = join(base, 'asks', 'ws.worktrees')
+    const copies = join(root, 'proj', COPIES_DIR)
+    mkdirSync(copies, { recursive: true })
+    const home = (name: string, trusted: string[]): string => {
+      const dir = join(base, 'asks', name)
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, '.claude.json'), JSON.stringify({ projects: Object.fromEntries(trusted.map((f) => [realpathSync.native(f).replace(/\\/g, '/'), { hasTrustDialogAccepted: true }])) }))
+      return dir
+    }
+    expect(await addedDirAsks(claudeCode, '2.1.326', home('none', []), copies)).toBe(true)
+    expect(await addedDirAsks(claudeCode, '2.1.326', home('root', [root]), copies)).toBe(false)
+    expect(await addedDirAsks(claudeCode, '2.1.326', home('copies', [copies]), copies)).toBe(false)
+    // A sibling folder trusted covers nothing here; an unreadable home counts as asking.
+    expect(await addedDirAsks(claudeCode, '2.1.326', home('other', [join(base, 'asks', 'none')]), copies)).toBe(true)
+    const broken = join(base, 'asks', 'broken')
+    mkdirSync(broken, { recursive: true })
+    writeFileSync(join(broken, '.claude.json'), '{')
+    expect(await addedDirAsks(claudeCode, '2.1.326', broken, copies)).toBe(true)
+    for (const cli of [codex, copilot]) expect(await addedDirAsks(cli, '2.1.326', home('none', []), copies), cli.id).toBe(false)
+    // HI-3342: a Claude Code before 2.1.326 never asks, so it is given the folder untrusted; a later one asks, and one whose
+    // version can't be told counts as asking.
+    expect(await addedDirAsks(claudeCode, '2.1.325', home('none', []), copies)).toBe(false)
+    expect(await addedDirAsks(claudeCode, '2.1.400', home('none', []), copies)).toBe(true)
+    for (const unknown of [null, undefined, 'not a version']) expect(await addedDirAsks(claudeCode, unknown, home('none', []), copies), String(unknown)).toBe(true)
+  })
+
   it('is one fixed folder per project, beside its slots', () => {
     expect(copiesDirOf('D:\\Work\\ws.worktrees', 'D:\\Work\\ws\\proj')).toBe(join('D:\\Work\\ws.worktrees', 'proj', COPIES_DIR))
   })
 
-  it("every provider Combwork has can be given folders (OpenCode since HI-2772: 2.2.6's default rules reach the copies, no grant needed)", () => {
-    for (const p of PROVIDERS) expect(p.capabilities.extraDirs, p.id).toBe(true)
+  // Muse Code (HI-3202): 1.4.20 has no option for a folder beside its own (`muse --help`, tests/fixtures/advanced/
+  // help-muse-1.4.20.txt; --workspace roots its tools at one folder instead of the session's), so its reviewers review the
+  // builder's folder read-only. A new provider must be decided on here, not left out by default (HI-3279).
+  const NO_EXTRA_DIRS = ['muse']
+  it("every provider Combwork has can be given folders but Muse Code, whose CLI has no option for one (OpenCode since HI-2772: 2.2.6's default rules reach the copies, no grant needed)", () => {
+    for (const p of PROVIDERS) expect(p.capabilities.session?.extraDirs, p.id).toBe(!NO_EXTRA_DIRS.includes(p.id))
   })
 
   it('Claude Code: --add-dir, always followed by an option (it takes several), never with none granted', () => {
@@ -191,7 +226,7 @@ function world(size = 2, tell?: ConstructorParameters<typeof ReviewCopies>[0]['t
     runner: async (r) => {
       const logPath = join(logs, `${runs++}.log`)
       const out = new BoundedLog(logPath, FILE_IO)
-      const e = await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: 60_000, env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)
+      const e = await execCommand({ spawn: nodeSpawn, platform: process.platform, timeoutMs: timing('spawn.hang'), env: () => ({ ...baseEnv(), ...r.env }) }, r.command, r.folder, out)
       out.close()
       return { ok: !e.spawnError && !e.timedOut && e.exitCode === 0, exitCode: e.exitCode, logPath, settled: true }
     },

@@ -11,6 +11,7 @@ import path from 'path'
 import { afterAll, beforeAll, test } from 'vitest'
 import { tempDir } from './tempDir'
 import { PROVIDERS } from '../src/shared/providers'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 // What the runner and the fakes read and write is plain JSON.
@@ -62,7 +63,7 @@ function scratch(name: string, fail: Json = {}) {
   }
 }
 const stops = (s: Json, by: string) => s.calls.filter((c: Json[string][]) => c[0] === 'stop' && c[2] === by).length
-const runner = (args: string[], env: Json) => spawnSync(process.execPath, [RUNNER, ...args], { env, encoding: 'utf8', timeout: 60_000 })
+const runner = (args: string[], env: Json) => spawnSync(process.execPath, [RUNNER, ...args], { env, encoding: 'utf8', timeout: timing('spawn.hang') })
 
 test('build folder: the common folder of both installers; different drives and the drive root refused (no endless climb)', () => {
   assert.strictEqual(buildRoot('D:\\h\\dist\\rc\\Combwork-Setup-0.6.0.exe', 'D:\\h\\dist\\Combwork-Setup-0.5.1.exe'), 'D:\\h\\dist')
@@ -109,7 +110,7 @@ test('the server from a worktree: the workspace of its main checkout, not the wo
   const slot = path.join(s.dir, 'ws.worktrees', 'combwork', 'slot-a')
   fs.mkdirSync(main, { recursive: true })
   const git = (cwd: string, ...args: string[]) => {
-    const r = spawnSync('git', ['-c', 'user.name=Combwork Test', '-c', 'user.email=combwork-test@example.invalid', ...args], { cwd, env: baseEnv(), encoding: 'utf8', windowsHide: true, timeout: 30_000 })
+    const r = spawnSync('git', ['-c', 'user.name=Combwork Test', '-c', 'user.email=combwork-test@example.invalid', ...args], { cwd, env: baseEnv(), encoding: 'utf8', windowsHide: true, timeout: timing('spawn.hang') })
     assert.strictEqual(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`)
   }
   git(main, 'init', '-q')
@@ -506,7 +507,7 @@ test('what the 1.1+ seeding calls is in 1.1.0 (its IPC channels and routes), and
   for (const r of ["'/v1/lanes'", '/v1/lanes?project=demo', '/v1/tasks/']) assert.ok(drive.includes(r), r)
   const api = fs.readFileSync(path.join(root, 'src', 'shared', 'api.ts'), 'utf8')
   assert.deepStrictEqual(reading.filter((c) => !api.includes(`'${c}'`)), [], 'channels after-upgrade reads, missing from src/shared/api.ts')
-  const show = (f: string) => spawnSync('git', ['show', `v1.1.0:${f}`], { cwd: root, env: baseEnv(), encoding: 'utf8', windowsHide: true, timeout: 30_000, maxBuffer: 64 * 1024 * 1024 })
+  const show = (f: string) => spawnSync('git', ['show', `v1.1.0:${f}`], { cwd: root, env: baseEnv(), encoding: 'utf8', windowsHide: true, timeout: timing('spawn.hang'), maxBuffer: 64 * 1024 * 1024 })
   const api11 = show('src/shared/api.ts')
   if (api11.status !== 0) return // no 1.1.0 tag here
   assert.deepStrictEqual(seeding.filter((c) => !api11.stdout.includes(`'${c}'`)), [], "channels the seeding calls, missing from 1.1.0's src/shared/api.ts")
@@ -524,6 +525,23 @@ test('--smart-app-control: only "off"; anything else is refused before anything 
   assert.strictEqual(r.status, 2)
   assert.match(r.stderr, /NOT RUN: --smart-app-control takes only "off"/)
   assert.deepStrictEqual(s.read().calls, [], 'wsb or the server was called')
+})
+
+test('--shot-fault (HI-3459): only "minimise", refused otherwise before anything runs; given, every drive step gets it and the report says it is a test of the driver', () => {
+  assert.throws(() => plan(['--shot-fault', 'hide', '--installer', 'x']), /--shot-fault takes only "minimise" .*, not "hide"/)
+  assert.throws(() => plan(['--installer', 'x', '--shot-fault']), /--shot-fault takes only "minimise" .*, not nothing$/)
+  const { r, json, md, guests, log } = runChecks('shot-fault', [], ['--shot-fault', 'minimise'])
+  assert.strictEqual(r.status, 1, r.stdout + r.stderr) // the fake drivers write no results
+  const drives = guests.filter((g) => /drive\.cjs /.test(g))
+  assert.ok(drives.length > 0, guests.join('\n'))
+  for (const g of drives) assert.match(g, /^set "CW_SANDBOX_SHOT_FAULT=minimise" && C:\\tools\\node\\node\.exe /)
+  assert.strictEqual(json.meta.shotFault, 'minimise')
+  assert.match(md, /^- \*\*Shot fault: minimise\*\* \(`--shot-fault`, HI-3459\): .* A test of the driver, not a release check\./m)
+  assert.match(log, /; shot fault: minimise \(a test of the driver, not a release check\)/)
+  // Without it, no drive step carries it.
+  const plain = runChecks('shot-fault-none', [], [])
+  assert.ok(!plain.guests.some((g) => /CW_SANDBOX_SHOT_FAULT/.test(g)), plain.guests.join('\n'))
+  assert.ok(!/Shot fault/.test(plain.md))
 })
 
 const SAC_OFF_NOW = SAC_ON.replace('0x1', '0x0')
@@ -654,6 +672,18 @@ const scripted = <T>(n: number, before: T, after: T) => {
   let calls = 0
   return { read: async () => (++calls <= n ? before : after), calls: () => calls }
 }
+
+test('within (HI-3459): the value once it settles, null for a call that never does, and no timer left either way, or the step would outlive its work', async () => {
+  const timers = () => process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length
+  const before = timers()
+  assert.strictEqual(await ready.within(Promise.resolve('drawn'), 600_000), 'drawn')
+  assert.strictEqual(timers(), before, 'a settled call left its timer running')
+  assert.strictEqual(await ready.within(new Promise(() => {}), 20), null)
+  assert.strictEqual(timers(), before, 'an expired call left a timer')
+  // A call that rejects rejects through it (the driver catches it where it records the window).
+  await assert.rejects(ready.within(Promise.reject(new Error('target closed')), 600_000), /target closed/)
+  assert.strictEqual(timers(), before, 'a rejected call left its timer running')
+})
 
 test('the new workspace counts as set up only once Combwork\'s status names it with its Combwork skills, however long it stays the same before', async () => {
   const ws = 'C:\\Users\\WDAGUtilityAccount\\Workspaces\\Fresh'

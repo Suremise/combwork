@@ -10,7 +10,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'lanenotices-profile')
 const ws = path.join(lib.WORK, 'lanenotices-ws')
@@ -49,12 +49,8 @@ const check = (name, ok, extra = '') => {
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-    const until = async (fn, ms) => {
-      const t = Date.now()
-      let v
-      while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-      return v
-    }
+    // HI-3385: lib's until (its bound required, the file's interval).
+    const until = (fn, ms) => lib.until(fn, ms)
     const say = async (id, text) => {
       // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
@@ -157,7 +153,8 @@ const check = (name, ok, extra = '') => {
     await inv('settings:update', { notifications: { desktopNotifications: false } })
     const told = notices().length
     await inv('tasks:update', a, { blocked: 'Waiting for the release' })
-    await lib.sleep(3000) // A fixed wait on purpose: this checks that nothing comes (a lane is looked at within a second of a change).
+    // A window on purpose (HI-3385: quiet.laneLookedMs): this checks that nothing comes, and a lane looks at a change within a second.
+    await lib.sleep(lib.timing('quiet.laneLookedMs'))
     check('with notifications off, a card blocked tells nothing', notices().length === told, JSON.stringify(notices().slice(told)))
 
     await inv('session:stop', alpha)

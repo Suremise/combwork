@@ -23,6 +23,12 @@ const WINDOW: RefusalFormat = { one: (m, values) => tr(m, values), list: (items)
 /** A value for every placeholder the refusals have. */
 const SAMPLE: RefusalValues = {
   card: 'AM-12',
+  // loop.churnPending, loop.usersChoice (HI-3188): the churn question's id.
+  request: 'AM-12/r40',
+  // attempt.* (HI-3194): the card's attempt key, and who builds it now.
+  attempt: 12,
+  generation: 3,
+  assignee: 'HB2',
   // platform.offLine (HI-3116): whether the card's line exists, its commands' arguments, the card's start.
   made: 'no',
   lineArg: 'cw/b1',
@@ -113,6 +119,9 @@ const SAMPLE: RefusalValues = {
   into: 'main',
   suggest: '1.5.0',
   alias: '#1061',
+  // done.noCodeUnmerged (HI-3410): the first commits its line has that its target lacks, and how many more.
+  commits: 'a1b2c3d The driver; e4f5a6b Its tests',
+  more: 1,
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',
   cause: 'passes',

@@ -18,7 +18,7 @@ const agentsOnly = async (d) => {
   if (await box.count()) await box.uncheck()
 }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'templatenames-profile')
 const ws = path.join(lib.WORK, 'templatenames-ws')
@@ -171,11 +171,9 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // column shows without scrolling sideways; German shot.
     await d.getByRole('button', { name: 'Cancel' }).click()
     const base = (await inv('app:info')).language
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     for (const code of ['de', 'pl']) {
-      const dir = path.join(lib.ROOT, 'locales', code)
-      const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-      await speak({ ...base, code, locale: code, messages })
+      // Main reads the language's catalogue, not sent through app.evaluate (HI-3434).
+      const messages = await lib.speakLanguage(app, base, code)
       await until(async () => (await page.locator('.session-toolbar .add-menu').innerText().catch(() => '')).includes(messages['panes.add.menu']), HUNG_MS)
       await lib.addMenuRun(page, messages['panes.add.templates'])
       await until(async () => (await menuItem('AM fixed').count()) === 1, HUNG_MS)
@@ -192,7 +190,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       await page.keyboard.press('Escape')
       await until(async () => (await there.count()) === 0, HUNG_MS)
     }
-    await speak(base)
+    await lib.speakLanguage(app, base)
     await until(async () => (await page.locator('.session-toolbar .add-menu').innerText().catch(() => '')).includes('Add'), HUNG_MS)
     // Back in English: fixed, then loaded with apiary's names.
     d = await openLoad('AM fixed')

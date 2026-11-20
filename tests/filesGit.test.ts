@@ -8,10 +8,11 @@ import { join } from 'path'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { appendIgnoreLines, exactIgnoreLine, extensionOf, extIgnoreLine, lineEnding, parseCheckIgnore, removableRule, removeIgnoreLine } from '../src/shared/gitIgnoreRules'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 // The run's allowlisted environment and test git config for every git child (never this process's environment), and a
 // bound for a hung one.
 const { gitEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
-const GIT_HUNG_MS = 30000
+const GIT_HUNG_MS = timing('wait.hang')
 
 describe('ignore lines', () => {
   it('names exactly one path: anchored, a folder with a trailing slash, pattern characters escaped', () => {

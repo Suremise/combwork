@@ -10,17 +10,18 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 import { as09 } from './boardDb'
+import { timing } from './timing.cjs'
 
-// The checkpoints' worker letting go of a file (HI-1691), held by a test: `gate` set, checkpointsReleased waits for it,
+// The checkpoints' worker letting go of a file (HI-1691), held by a test: `gate` set, checkpointsLetGo waits for it,
 // telling `reached` as it starts to.
 const held = vi.hoisted(() => ({ gate: null as Promise<void> | null, reached: null as (() => void) | null }))
 vi.mock('../src/main/walCheckpoint', async (original) => {
   const real = await original<typeof import('../src/main/walCheckpoint')>()
   return {
     ...real,
-    checkpointsReleased: (file: string) => {
+    checkpointsLetGo: (file: string) => {
       held.reached?.()
-      return held.gate ?? real.checkpointsReleased(file)
+      return held.gate ?? real.checkpointsLetGo(file)
     }
   }
 })
@@ -35,6 +36,7 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { keyProjects } = await import('../src/main/projectKeys')
 const { changeGroups } = await import('../src/main/assistantChanges')
+const { queueViews } = await import('../src/main/workflow/queueControls')
 const { BACKUPS_KEPT, DbInUseError, fileSchemaVersion, openDb, schemaVersion } = await import('../src/main/db')
 const { PRESENCE_DIR, STALE_MS } = await import('../src/main/presence')
 
@@ -54,7 +56,7 @@ afterEach(() => {
   held.reached = null
 })
 
-/** Holds checkpointsReleased (HI-1691): resolves once the code under test waits there; `release` lets it go on. */
+/** Holds checkpointsLetGo (HI-1691, HI-3414): resolves once the code under test waits there; `release` lets it go on. */
 function holdRelease(): { waiting: Promise<void>; release: () => void } {
   let release = (): void => undefined
   held.gate = new Promise<void>((r) => (release = r))
@@ -238,7 +240,7 @@ describe('a group of steps (db.ts)', () => {
       backupDir: f.backups,
       approve: () => true,
       whileGroupLocked: () => {
-        const other = new DatabaseSync(f.file, { timeout: 100 })
+        const other = new DatabaseSync(f.file, { timeout: 100 }) // timing-ok: the refusal under test: a brief busy wait, then refused while the run holds the file
         try {
           other.prepare('SELECT count(*) FROM a').get()
           during = 'read'
@@ -257,7 +259,7 @@ describe('a group of steps (db.ts)', () => {
     const f = at09()
     expect(() => openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true, beforeGroup: () => { throw new Error('another Combwork') } })).toThrow('another Combwork')
     expect(existsSync(f.backups)).toBe(false)
-    const other = new DatabaseSync(f.file, { timeout: 100 })
+    const other = new DatabaseSync(f.file, { timeout: timing('db.busyMs') })
     try {
       expect(schemaVersion(other)).toBe(2)
       other.exec('INSERT INTO a VALUES (3)')
@@ -500,6 +502,19 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
     await close(w)
   })
 
+  it("a project's queues, which the window lists as it opens, read as none while it waits (no \"no such table: workflow_queue_seen\"); listed once upgraded (HI-3310)", async () => {
+    const ws = await board09()
+    const w = await open(ws)
+    expect(store.boardReadOnly(w)).toBe(true)
+    const p = join(ws, 'p')
+    await expect(inWorkspace(w, () => queueViews(w, p))).resolves.toEqual([])
+    await expect(inWorkspace(w, () => queueViews(w, p, 'main', true))).resolves.toEqual([])
+    await inWorkspace(w, () => store.upgradeBoard(w))
+    expect(store.boardReadOnly(w)).toBe(false)
+    await expect(inWorkspace(w, () => queueViews(w, p))).resolves.toBeInstanceOf(Array)
+    await close(w)
+  })
+
   it("lanes' card owners, which the Lanes view reads as it opens, read as none while it waits (no \"no such table: lane_pending\"); read once upgraded (HI-1846)", async () => {
     const ws = await board09()
     const w = await open(ws)
@@ -651,7 +666,7 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
 describe("what services read before the database was replaced is read again (#1207 round 2)", () => {
   /** A delivery as a 0.9 build saves it, straight into the database (another process), with the host's next id. */
   function writtenBy09(ws: string, scope: string, id: string, next: number, body: string): void {
-    const raw = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
+    const raw = new DatabaseSync(store.boardFile(ws), { timeout: timing('db.busyMs') })
     try {
       const rec = { id, seq: Number(id.slice(1)), agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body, state: 'queued', created: new Date().toISOString(), expires: new Date(Date.now() + 86_400_000).toISOString() }
       raw.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET doc = excluded.doc').run('deliveries', scope, id, 0, JSON.stringify(rec))

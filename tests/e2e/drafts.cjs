@@ -10,7 +10,6 @@ const userData = path.join(lib.WORK, 'drafts-profile')
 const ws = path.join(lib.WORK, 'drafts-ws')
 const note = path.join(ws, '.combwork', 'shared', 'plan.md')
 const server = path.join(ws, '.combwork', 'mcp', 'demo.json')
-const sleep = lib.sleep
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -18,7 +17,7 @@ const check = (name, ok, extra = '') => {
 }
 const read = (f) => fs.readFileSync(f, 'utf8')
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
@@ -29,8 +28,7 @@ const HUNG_MS = 10000
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.appReady(page)
-  await page.evaluate((folder) => window.combwork.invoke('workspace:open', folder), ws)
-  await sleep(800)
+  await lib.openWorkspace((ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a]), page, ws)
   fs.writeFileSync(note, '# Plan\n')
   fs.mkdirSync(path.dirname(server), { recursive: true })
   fs.writeFileSync(server, '{ "command": "node", "args": [] }\n')
@@ -44,18 +42,18 @@ const HUNG_MS = 10000
     await lib.until(unsaved, HUNG_MS)
   }
   const unsaved = async () => (await toolbar.innerText()).includes('●')
-  const dialogText = () => page.locator('.dialog').last().innerText({ timeout: 1000 }).catch(() => '')
+  const dialogText = () => page.locator('.dialog').last().innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')
   const openNote = async () => {
     await page.keyboard.press('Control+Shift+H')
-    await sleep(600)
+    // Playwright's click waits for the view's row to show.
     await page.locator('.row', { hasText: 'plan.md' }).first().click()
-    await lib.until(async () => ((await page.locator('.row', { hasText: 'plan.md' }).first().getAttribute('class')) ?? '').includes('selected'), 10000)
+    await lib.until(async () => ((await page.locator('.row', { hasText: 'plan.md' }).first().getAttribute('class')) ?? '').includes('selected'), lib.timing('hang.ui'))
   }
   const openServer = async () => {
     await page.keyboard.press('Control+Shift+M')
-    await sleep(600)
+    // Playwright's click waits for the view's row to show.
     await page.locator('.row', { hasText: 'demo' }).first().click()
-    await lib.until(async () => ((await page.locator('.row', { hasText: 'demo' }).first().getAttribute('class')) ?? '').includes('selected'), 10000)
+    await lib.until(async () => ((await page.locator('.row', { hasText: 'demo' }).first().getAttribute('class')) ?? '').includes('selected'), lib.timing('hang.ui'))
   }
 
   // A note's edits survive going to another view and back.
@@ -66,7 +64,7 @@ const HUNG_MS = 10000
   await typeAtEnd('DRAFT-1 ')
   await openServer()
   await openNote()
-  check('note: unsaved edits kept after changing view', !!(await lib.until(async () => (await page.locator('.split-main .monaco').first().innerText({ timeout: 1000 }).catch(() => '')).includes('DRAFT-1'), HUNG_MS)))
+  check('note: unsaved edits kept after changing view', !!(await lib.until(async () => (await page.locator('.split-main .monaco').first().innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')).includes('DRAFT-1'), HUNG_MS)))
   check('note: still marked unsaved', !!(await lib.until(unsaved, HUNG_MS)))
 
   // Changed on disk meanwhile (as an agent would): Save asks before overwriting, Cancel keeps the disk's version.

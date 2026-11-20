@@ -64,7 +64,7 @@ function filesHolding(dir, text) {
   await lib.cliStep('SessionStart reaches Combwork', { session: key }, async () => {
     await lib.acceptClaudeTrust(inv, proj, agent.id, 30000)
     // Claude Code has no ready output Combwork reads: only its SessionStart hook makes the agent ready.
-    const ok = !!(await lib.until(async () => (await live())?.status === 'ready', 60000, 400))
+    const ok = !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'), 400))
     check('SessionStart, a curl command reading its header from the auth file, reached Combwork (the agent is ready)', ok, `${(await live())?.status}: ${lib.plainText(await inv('pty:buffer', key).catch(() => '')).slice(-300)}`)
   })
   const run = (await live())?.runId
@@ -88,7 +88,7 @@ function filesHolding(dir, text) {
     // The status line runs as Claude Code draws its prompt, before any request: Combwork learns the model (and the context
     // window) from it alone here, since no turn has written a transcript.
     // The context window comes only from the status line (a transcript doesn't carry it).
-    const ok = await lib.until(async () => !!(await live())?.modelName && !!(await live())?.contextWindow, 30000, 500)
+    const ok = await lib.until(async () => !!(await live())?.modelName && !!(await live())?.contextWindow, lib.timing('hang.ui'), 500)
     const l = await live()
     // No turn yet: what Combwork knows of the model came from the status line. Claude Code may already have written a
     // transcript of its startup (the SessionStart hook's result, the title, the mode: no model), sooner or later than
@@ -103,8 +103,8 @@ function filesHolding(dir, text) {
   // The session ends: its private folder goes, and its token is refused.
   const hook = run ? lib.launchHook(userData, run) : null
   await inv('session:stop', proj, agent.id)
-  await lib.until(async () => !(await live()), 20000)
-  check("the launch's private folder goes when it ends", !!(await lib.until(() => !fs.existsSync(dir), 5000)), dir)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
+  check("the launch's private folder goes when it ends", !!(await lib.until(() => !fs.existsSync(dir), lib.timing('hang.step'))), dir)
   const status = hook ? (await fetch(hook.url, { method: 'POST', headers: { Authorization: `Bearer ${hook.token}`, 'Content-Type': 'application/json' }, body: '{"hook_event_name":"Notification"}' })).status : 0
   check("the ended session's token is refused", status === 401, String(status))
 

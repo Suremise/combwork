@@ -178,12 +178,19 @@ function analyzeFiles(root, files) {
     return mod
   }
 
-  /** An import's module, as a path relative to root. */
+  /** An import's module, as a path relative to root; once per folder and specifier (HI-3318: a file check each time was a tenth of the scan). */
+  const importMemo = new Map()
   const resolveImport = (fromRel, spec) => {
     if (!spec.startsWith('.')) return null
     const base = posix.normalize(posix.join(posix.dirname(fromRel), spec)).replace(/\.(ts|tsx|mts)$/, '')
-    for (const c of [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`]) if (existsSync(join(root, c))) return c
-    return null
+    if (importMemo.has(base)) return importMemo.get(base)
+    let to = null
+    for (const c of [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`]) if (existsSync(join(root, c))) {
+      to = c
+      break
+    }
+    importMemo.set(base, to)
+    return to
   }
 
   /** An exported name of a module: the path of what it is (a declarator's init, a function), or null. */
@@ -552,9 +559,15 @@ function analyzeFiles(root, files) {
 
   /**
    * What a call's callee is, whatever it is called here: its definition (through an import's alias, a re-export or a
-   * namespace import), the name it is declared with, and the file it is declared in. Null for one it can't follow.
+   * namespace import), the name it is declared with, and the file it is declared in. Null for one it can't follow. Once per
+   * call: the wrappers' fixed point asks it each round (HI-3318).
    */
+  const identityMemo = new Map()
   const identity = (p) => {
+    if (!identityMemo.has(p)) identityMemo.set(p, identityOf(p))
+    return identityMemo.get(p)
+  }
+  const identityOf = (p) => {
     const c = p.node.callee
     let d = null
     if (c.type === 'Identifier') d = definition(p, c.name)

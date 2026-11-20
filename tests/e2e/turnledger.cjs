@@ -17,9 +17,9 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 // How long a running turn may be silent before Combwork looks for its end on screen or says its state is unknown.
-const SILENT_MS = 2000
+const SILENT_MS = lib.timing('seam.silentMs')
 
 const userData = path.join(lib.WORK, 'turnledger-profile')
 const ws = path.join(lib.WORK, 'turnledger-ws')
@@ -57,12 +57,7 @@ const check = (name, ok, extra = '') => {
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(100)
-    return v
-  }
+  const until = lib.until
   await lib.waitForProvider(inv, 'codex')
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
@@ -92,7 +87,8 @@ const check = (name, ok, extra = '') => {
     seen.set(a.id, [])
     const key = lib.ptyKey(proj, a.id)
     await inv('pty:write', key, text)
-    await lib.sleep(150)
+    // A typing pause, not a wait for a state: the fake Codex draws nothing typed, and reads a line before its Enter.
+    await lib.sleep(lib.timing('pace.keysThenEnterMs'))
     await inv('pty:write', key, '\r')
     return until(async () => (seen.get(a.id) ?? []).some((s) => s.startsWith('working|running')), HUNG_MS)
   }

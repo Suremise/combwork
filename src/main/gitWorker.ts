@@ -29,6 +29,8 @@ export interface GitRequest {
   exe?: string
   /** HI-2137: the environment Git for Windows' launcher would have given it (gitExe()). */
   launcherEnv?: LauncherEnv
+  /** HI-3372: the user can cancel it (a CancelRequest of its id): its tree is marked to be found, as a timed one's is. */
+  cancellable?: boolean
 }
 
 /**
@@ -53,6 +55,8 @@ export interface GitOutcome {
   held?: boolean
   /** Ended at its time limit, but its Git Bash programs couldn't be looked for, and why (HI-3047): its process tree alone was ended. */
   msysIncomplete?: string
+  /** Ended at its time limit, but some of what it started may be left running, and why (HI-3358). */
+  lateLeft?: string
 }
 
 const msysBins = new Map<string, string | null>()
@@ -104,6 +108,12 @@ export interface RefsRequest {
   max: number
 }
 
+/** HI-3372: the user's Cancel of a running command (its request's id): ended as its time limit ends it; an unknown id is nothing. */
+export interface CancelRequest {
+  id: number
+  kind: 'cancel'
+}
+
 export type GitReply = { id: number; outcome: GitOutcome } | { id: number; refs: RepoRefs }
 
 /**
@@ -113,7 +123,9 @@ export type GitReply = { id: number; outcome: GitOutcome } | { id: number; refs:
  * was never answered (HI-1854). Once git has exited, its output is read until it closes or goes quiet for
  * EXITED_QUIET_MS, then closed.
  */
-export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Promise<GitOutcome> {
+export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS, signal?: AbortSignal): Promise<GitOutcome> {
+  // HI-3372: cancelled before it starts: nothing runs.
+  if (signal?.aborted) return Promise.resolve(cancelledOutcome())
   return new Promise((res) => {
     let held = false
     let exited = false
@@ -125,36 +137,45 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Pr
     // leaves no parent behind), so no tree walk finds it; native ones (node, npm, python, gpg) are in it. HI-3047: those
     // are found by a marker in the timed git's environment, which they inherit (processTree's MsysMark).
     let timedOut = false
+    // HI-3372: ended by the user's Cancel, the same way as by the time limit; whichever ended it first is what it says.
+    let cancelled = false
     let bound: ReturnType<typeof setTimeout> | undefined
     let msysIncomplete: string | undefined
-    const bin = m.timeout && process.platform === 'win32' ? msysBinFor(m) : null
+    let lateLeft: string | undefined
+    const bin = (m.timeout || signal) && process.platform === 'win32' ? msysBinFor(m) : null
     const msys: MsysMark | undefined = bin ? { mark: randomBytes(16).toString('hex'), bin, onIncomplete: (why) => (msysIncomplete = why) } : undefined
-    const ending = treeEnding(process.platform, msys)
+    const ending = treeEnding(process.platform, msys, { onLateLeft: (why) => (lateLeft = why) })
     const given = m.launcherEnv ? withLauncherEnv(m.env ?? process.env, m.launcherEnv) : m.env
     const env = msys ? { ...(given ?? process.env), [RUN_MARK_VAR]: msys.mark } : given
     const child = execFile(m.exe ?? 'git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(env ? { env } : {}) }, (err, stdout, stderr) => {
       clearTimeout(quiet)
       clearTimeout(bound)
+      signal?.removeEventListener('abort', onCancel)
       const e = err as (Error & { code?: unknown; killed?: boolean; signal?: string | null }) | null
       ending.after(() =>
         res({
           stdout: (stdout as unknown as Buffer) ?? Buffer.alloc(0),
           stderr: (stderr as unknown as Buffer) ?? Buffer.alloc(0),
           // Ended at its limit: said as execFile's own time limit says it (killed, SIGTERM), whatever exit the end gave.
-          error: timedOut ? { code: null, killed: true, signal: 'SIGTERM' } : e ? { code: e.code, killed: !!e.killed, signal: e.signal ?? null } : null,
+          error: cancelled ? { code: CANCELLED, killed: true, signal: 'SIGTERM' } : timedOut ? { code: null, killed: true, signal: 'SIGTERM' } : e ? { code: e.code, killed: !!e.killed, signal: e.signal ?? null } : null,
           // Only asked when git didn't start: a folder that isn't there makes Node say ENOENT too.
           cwdExists: e && typeof e.code === 'string' ? existsSync(m.cwd) : true,
           ...(held ? { held } : {}),
-          ...(msysIncomplete ? { msysIncomplete } : {})
+          ...(msysIncomplete ? { msysIncomplete } : {}),
+          ...(lateLeft ? { lateLeft } : {})
         })
       )
     })
-    if (m.timeout)
-      bound = setTimeout(() => {
-        if (child.exitCode !== null || child.signalCode !== null) return
-        timedOut = true
-        ending.end(child)
-      }, m.timeout)
+    // Already exited (its own outcome stands, a success included), or already ended by the other: nothing more.
+    const endBy = (why: 'timedOut' | 'cancelled'): void => {
+      if (child.exitCode !== null || child.signalCode !== null || timedOut || cancelled) return
+      if (why === 'timedOut') timedOut = true
+      else cancelled = true
+      ending.end(child)
+    }
+    const onCancel = (): void => endBy('cancelled')
+    signal?.addEventListener('abort', onCancel, { once: true })
+    if (m.timeout) bound = setTimeout(() => endBy('timedOut'), m.timeout)
     // Closing them ends the call as their closing would have: execFile answers with what was read.
     const waitQuiet = (): void => {
       if (!exited) return
@@ -251,14 +272,30 @@ export function onOutputSettled(child: ChildProcess, settle: (code: number | nul
   child.once('close', (c, s) => once(...(exited ?? [c, s])))
 }
 
+/** HI-3372: the error code of a command the user's Cancel ended (gitAs reads it as `cancelled`). */
+export const CANCELLED = 'ERR_CANCELLED'
+
+/** A command cancelled before it started: it never ran. */
+const cancelledOutcome = (): GitOutcome => ({ stdout: new Uint8Array(), stderr: new Uint8Array(), error: { code: CANCELLED, killed: false, signal: null }, cwdExists: true })
+
+/** HI-3372: the commands running here, by their request's id, each with its Cancel: set as its request arrives, gone as it settles. */
+const running = new Map<number, AbortController>()
+
 const port = parentPort
 if (port) {
-  port.on('message', (m: GitRequest | RefsRequest) => {
+  port.on('message', (m: GitRequest | RefsRequest | CancelRequest) => {
+    if ('kind' in m && m.kind === 'cancel') {
+      running.get(m.id)?.abort()
+      return
+    }
     if ('kind' in m) {
       port.postMessage({ id: m.id, refs: readRepoRefs(m.common, m.max) } satisfies GitReply)
       return
     }
-    void runGit(m).then((outcome) => {
+    const ac = m.cancellable ? new AbortController() : null
+    if (ac) running.set(m.id, ac)
+    void runGit(m, EXITED_QUIET_MS, ac?.signal).then((outcome) => {
+      running.delete(m.id)
       // The output moves to main rather than being copied (a diff can be megabytes), when it has its memory to itself: a
       // small one can be a slice of Node's shared pool, which moving would take from every other buffer in it, so that
       // one is copied first.

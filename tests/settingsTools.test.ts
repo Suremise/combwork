@@ -8,6 +8,7 @@ import type { WorkspaceConfig } from '../src/shared/types'
 import { settingChangeTexts, settingEntry, settingReadOnly } from '../src/shared/settingsCatalog'
 import { advanced } from '../src/main/advanced'
 import { AGENT_TEMP_FOLDER_ID, CARD_ATTACHMENT_FOLDERS_ID } from '../src/shared/advanced'
+import { timing } from './timing.cjs'
 
 const prices = settingEntry('codex.prices')!
 const mine = { 'gpt-7': { input: 1, cachedInput: 0.1, output: 5 } }
@@ -22,6 +23,8 @@ async function withPrices(own: Record<string, unknown>, removed: string[], fn: (
     config.settings.providers = was
   }
 }
+/** Bounds a wait for a hung run (HI-3349): Vitest's default 1 s is a budget a loaded runner outlasts. */
+const HUNG_MS = timing('wait.hang')
 
 describe("the settings tools on a provider's prices", () => {
   it('null puts back the shipped models removed from the table, and says so', async () => {
@@ -145,7 +148,7 @@ describe("the settings tools on the workspace's copied files, in its save queue 
         if (!allowed) throw new Error('revoked')
       })
     )
-    await vi.waitFor(() => expect(w.queued()).toBe(true))
+    await vi.waitFor(() => expect(w.queued()).toBe(true), { timeout: HUNG_MS })
     allowed = false
     w.release()
     await expect(p).rejects.toThrow('revoked')
@@ -156,7 +159,7 @@ describe("the settings tools on the workspace's copied files, in its save queue 
     const w = heldWorkspace('old')
     const seen: unknown[] = []
     const p = inWorkspace(w.ws as never, () => applySetting(e, 'new', null, (now) => void seen.push(now)))
-    await vi.waitFor(() => expect(w.queued()).toBe(true))
+    await vi.waitFor(() => expect(w.queued()).toBe(true), { timeout: HUNG_MS })
     w.state.slotDefaults = { copy: 'meanwhile' }
     w.release()
     expect(await p).toEqual({ old: 'meanwhile', new: 'new' })

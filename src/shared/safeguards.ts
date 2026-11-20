@@ -2,6 +2,7 @@ import { msg, type Msg } from './i18n/msg'
 import type { Tr } from './tasks'
 import type { StoredText } from './types'
 import { HISTORY } from './taskHistory'
+import { PROVIDER_MODULES } from './providers/registry'
 
 /**
  * A CLI's safety classifier stopping an agent's response, or the model it runs on changing after one (#606): Opus 5.5's
@@ -12,35 +13,13 @@ import { HISTORY } from './taskHistory'
  */
 
 /**
- * What Combwork spots safeguards by, as named defaults in one place (data, not code). The note and the question are
- * Settings → Advanced's (#685: claude-code.safeguard.note, .prompt in ADVANCED_DEFS), which the detection reads through
- * `advanced`, so an override changes them; the lists join them once a real session of one is recorded (#697). Patterns
- * are a case-insensitive regular expression's source; lists are the CLI's own codes.
+ * What Combwork spots safeguards by, as named defaults (data, not code): each provider's are in its shared half
+ * (`safeguards`, HI-3201), gathered here by "<provider>.<name>". Patterns are a case-insensitive regular expression's
+ * source; lists are the CLI's own codes.
  */
-export const SAFEGUARD_DEFAULTS = {
-  /**
-   * Claude Code's transcript note when its safety classifier stops a response (2.1.296: a system entry, "Opus 5.5's
-   * safeguards stopped the response above · continuing once with that noted", and the notice it adds for the model,
-   * "Your response above was stopped by a safety classifier…").
-   */
-  claudeNote: String.raw`\bsafeguards?\b.{0,60}\bstopped\b|\bstopped by a safety classifier\b`,
-  /**
-   * Claude Code's records of a request its safeguards flagged (system entries, by subtype): answered by another model
-   * (`model_refusal_fallback`, saying which, and whether for the session or that response only), or by none.
-   */
-  claudeRecords: ['model_refusal_fallback', 'model_refusal_no_fallback'],
-  /**
-   * Claude Code's question while it asks about a flagged message (2.1.296: "…'s safeguards flagged this message. Switch to
-   * Opus 4.8 and keep going whenever this happens?", header "Model switch"), told by its two numbered choices while the
-   * dialog is open ("1. Switch automatically", "2. Stay on Opus 5.5"): an answered one shows only the answer, and the
-   * words "safeguards" or "safety classifier" elsewhere on screen never match.
-   */
-  claudePrompt: String.raw`^(?=[\s\S]*\b\d\.\s*Switch automatically\b)(?=[\s\S]*\b\d\.\s*Stay on\b)`,
-  /** Why Codex reroutes a request to another model (its rollout's model_reroute event: the request was flagged). */
-  codexReroute: ['high_risk_cyber_activity'],
-  /** Codex's error kinds (codex_error_info) for a turn its usage policy stopped. */
-  codexStop: ['cyber_policy', 'bio_policy']
-} as const
+export const SAFEGUARD_DEFAULTS: Readonly<Record<string, string | readonly string[]>> = Object.fromEntries(
+  PROVIDER_MODULES.flatMap((m) => Object.entries(m.safeguards ?? {}).map(([name, v]) => [`${m.descriptor.id}.${name}`, v]))
+)
 
 /** How many of the agent's last tool calls (their names) a stop keeps. */
 export const SAFEGUARD_TOOLS = 5

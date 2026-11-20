@@ -1,9 +1,9 @@
 // A launch's task on its CLI's command line (#712): the CLI is ready at its SessionStart and takes the task only after,
-// so until its first prompt the agent counts as given a task (pending: working to a wait), at most 30 s after it became
-// ready. The real SessionManager's agentNow, with hand-made live states.
+// so until its first prompt the agent counts as given a task (pending: working to a wait), at most PENDING_MS after it
+// became ready (HI-3373: 120 s, it was 30). The real SessionManager's agentNow, with hand-made live states.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { whyNoLine } from '../src/main/lineWriter'
-import { sessions } from '../src/main/sessions'
+import { PENDING_MS, sessions } from '../src/main/sessions'
 import { agentBusy } from '../src/shared/agentWatch'
 
 const project = 'C:/fake-ws/alpha'
@@ -40,8 +40,10 @@ describe("a launch's task until its CLI takes it (#712)", () => {
     expect(agentBusy(now(), false)).toBe(false)
   })
 
-  it('not taken 30 s after it became ready, it is idle again (a wait mustn’t hang on a dropped task)', () => {
-    running({ launchTask: true, since: ago(31_000) })
+  it('not taken PENDING_MS after it became ready, it is idle again (a wait mustn’t hang on a dropped task)', () => {
+    running({ launchTask: true, since: ago(PENDING_MS - 1000) })
+    expect(now().pending, 'just within it').toBe(true)
+    running({ launchTask: true, since: ago(PENDING_MS + 1000) })
     expect(now().pending).toBe(false)
   })
 
@@ -76,7 +78,7 @@ describe("no line of Combwork's before its CLI takes the launch's task (#721)", 
   function launched(): Entry {
     const e = running({ launchTask: true })
     Object.assign(e.state, { projectPath: project, agentId: id, agentName: 'B1', runtime: { lifecycle: 'running', maintenance: null, attention: null, composer: 'free' }, turn: { state: 'over' } })
-    Object.assign(e, { adapter: { descriptor: { capabilities: { startupSizeRefresh: false } } } })
+    Object.assign(e, { adapter: { descriptor: { capabilities: { terminal: { startupSizeRefresh: false } } } } })
     return e
   }
   const emit = (e: Entry) => (sessions as unknown as { emitState(s: unknown): void }).emitState(e.state)
@@ -116,11 +118,11 @@ describe("no line of Combwork's before its CLI takes the launch's task (#721)", 
     expect(whyNoLine(project, id) ?? '').not.toMatch(/launch's task/)
   })
 
-  it('at most 30 s from when it first became ready, which a watch coming or going does not move', () => {
+  it('at most PENDING_MS from when it first became ready, which a watch coming or going does not move', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     const e = launched()
     emit(e)
-    vi.setSystemTime(Date.now() + 20_000)
+    vi.setSystemTime(Date.now() + PENDING_MS - 10_000)
     watched.current = true
     emit(e)
     expect(sessions.launchTaskWaiting(project, id)).toBe(true)

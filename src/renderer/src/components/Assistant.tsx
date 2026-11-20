@@ -218,7 +218,7 @@ async function changeAssistant(patch: Omit<AgentPatch, 'name'>, restart: { title
     const ok = await confirm({ title: restart!.title, message: restart!.message, detail: tr(M.resumeLater), confirmLabel: tr(M.restartButton) })
     if (!ok) return false
     await actions.attempt(tr(M.stopFailed), () => call('session:stop', a.path, AGENT))
-    await actions.waitForStop(a.path, AGENT)
+    if (!(await actions.waitForStop(a.path, AGENT))) return !!actions.stillStopping(a.path, AGENT)
   }
   const done = await actions.attempt(tr(M.saveFailed), () => call('agents:update', a.path, AGENT, patch))
   await actions.refreshWorkspace()
@@ -260,9 +260,9 @@ export async function restartInMode(p: Pick<ModeInfo, 'id' | 'name' | 'bundled'>
   if (!(await actions.attempt(tr(M.saveModeFailed), () => call('agents:update', a.path, AGENT, { mode: p.id })))) return
   const item = (await call('session:list', a.path)).find((s) => s.id === live.sessionId)
   await actions.attempt(tr(M.stopFailed), () => call('session:stop', a.path, AGENT))
-  await actions.waitForStop(a.path, AGENT)
+  if (!(await actions.waitForStop(a.path, AGENT))) return actions.stillStopping(a.path, AGENT)
   await actions.refreshWorkspace()
-  await actions.resumeSession(a.path, { id: live.sessionId, recache: null, title: null, name: item?.name, agentId: AGENT, cwd: item?.cwd }, AGENT)
+  await actions.resumeSession(a.path, actions.restartItem({ sessionId: live.sessionId, agentId: AGENT }, item), AGENT)
 }
 
 // ---------------------------------------------------------------------------
@@ -942,12 +942,15 @@ export function AssistantSettingsDialog() {
     // Reset each time the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openFlag])
-  // None chosen yet (a new workspace's): the first usable in the order of accounts, as a new agent's (decision A).
+  // None chosen yet (a new workspace's): the first usable in the order of accounts, as a new agent's (decision A). Never
+  // over the Assistant's own (HI-3443): on a window's first open this ran with the empty value from before the reset
+  // above, so its connection showed as the first usable one, and Save moved it there.
   const providers = useStore((s) => s.providers)
   const first = firstUsableConnection(view, settings, cliReadyOf(providers))
+  const own = agent?.connection
   useEffect(() => {
-    if (openFlag && !connection && first) setConnection(first)
-  }, [openFlag, connection, first])
+    if (openFlag && !own && !connection && first) setConnection(first)
+  }, [openFlag, own, connection, first])
   if (!openFlag || !a || !agent) return null
   const close = (): void => set({ assistantSettingsOpen: false })
   const defaultMode = modes.find((p) => p.id === (settings?.assistant.mode || DEFAULT_MODE))

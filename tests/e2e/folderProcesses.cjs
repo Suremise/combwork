@@ -195,6 +195,35 @@ function suspensions(act = suspendExactly, end = endExactly) {
 }
 
 /**
+ * Suspends, through `held` (suspensions()), every process `find()` lists ({ pid, started }, parents before their children)
+ * that is still running, a CLI's whole tree whose short-lived children come and go (HI-3432: Copilot starts a child or two
+ * every few seconds, each gone within a second, and under load a child listed had ended by the time it was reached). A
+ * process that has ended meanwhile (`gone`, or its pid another process's by now) needn't be suspended, it reads no input,
+ * unless `kept(target)` says it must be there (the CLI's own process: gone, the CLI has ended). What a parent started
+ * between a listing and its suspension is found by listing again, up to `looks` times, until a listing shows nothing that
+ * isn't held. Returns { done, failed: [{ pid, why }], ended: the short-lived ones that had ended } (failed: one that
+ * couldn't be suspended, one `kept` that has gone, or `still starting` when a listing still showed new ones at the end).
+ */
+function suspendRunning(held, find, kept = () => false, looks = 3) {
+  const out = { done: [], failed: [], ended: [] }
+  const same = (a, b) => a.pid === b.pid && a.started === b.started
+  for (let look = 0; look < looks; look++) {
+    const fresh = find().filter((t) => !held.held().some((h) => same(h, t)) && !out.ended.some((e) => same(e, t)) && !out.failed.some((f) => f.pid === t.pid))
+    if (!fresh.length) return out
+    const r = held.suspend(fresh)
+    out.done.push(...r.done)
+    for (const f of r.failed) {
+      const t = fresh.find((x) => x.pid === f.pid)
+      if ((f.why === 'gone' || f.why === 'another process') && !kept(t)) out.ended.push(t)
+      else out.failed.push(f)
+    }
+  }
+  const left = find().filter((t) => !held.held().some((h) => same(h, t)) && !out.ended.some((e) => same(e, t)) && !out.failed.some((f) => f.pid === t.pid))
+  for (const t of left) out.failed.push({ pid: t.pid, why: 'still starting' })
+  return out
+}
+
+/**
  * `targets` ({ pid, started }) ordered so each comes before its parent when its parent is one of them (by `list`'s
  * parent links, a parent started after its child being a reused pid's): children are ended first. Ending a parent first
  * can take its children with it before they are reached: Node starts each child in a job that ends with its parent
@@ -432,4 +461,4 @@ function endCopies(folders, { before = Infinity, list } = {}) {
   return { ended: pick.size ? endExactly(childrenFirst(list, [...pick].map(([pid, started]) => ({ pid, started })))) : 0, unrecorded }
 }
 
-module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs, leftoverIdentities, processTree, processes, endExactly, suspendExactly, suspensions, childrenFirst, endAsCrash, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree, COPIES_FILE, recordCopy, recordMainProcess, launchedCopy, recordedCopies, copiesIn, lookLikeCopies, endCopies }
+module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs, leftoverIdentities, processTree, processes, endExactly, suspendExactly, suspensions, suspendRunning, childrenFirst, endAsCrash, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree, COPIES_FILE, recordCopy, recordMainProcess, launchedCopy, recordedCopies, copiesIn, lookLikeCopies, endCopies }

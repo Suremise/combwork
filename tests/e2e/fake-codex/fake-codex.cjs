@@ -3,7 +3,8 @@
 // in or spending tokens. It sends the hooks, in the order, and sets the terminal title the way Codex 0.160.0 did
 // (tests/hookStatus.test.ts has the sequences):
 // - `--version`, `login status` and the app server (hooks/list, account/read) answer as a signed-in Codex; in a
-//   connection's folder (HI-1757), `login` signs it in and account/read says who, signed out until then. With fake-busy
+//   connection's folder (HI-1757), `login` signs it in and account/read says who, signed out until then; outside one,
+//   `login status` says not logged in with fake-signed-out in CODEX_HOME (HI-3278). With fake-busy
 //   there, every run in it writes there all the time, as Codex's databases do (HI-1873).
 // - It titles its terminal "<project>", and "[ ! ] Action Required | <project>" (blinking with "[ . ]") while a
 //   person must act: one title for everything asked. It sends SessionStart with the first prompt, as Codex does.
@@ -22,7 +23,8 @@
 //   "work N" and "shell: <command line>" (run in cmd with the session's environment, between its PreToolUse and
 //   PostToolUse; fake-shell.jsonl in CODEX_HOME records it, #1486). "planusage F W": its rollout's rate limits, F% of
 //   the 5-hour window and W% of the weekly one (HI-1882). "patch FILE" (HI-2386): an apply_patch edit of FILE, which
-//   Combwork's file lock may refuse (fake-edits.jsonl in CODEX_HOME records each try). Anything else: a short turn.
+//   Combwork's file lock may refuse (fake-edits.jsonl in CODEX_HOME records each try). "waitfile NAME" (HI-3403): the
+//   steps after it wait for a file NAME in CODEX_HOME. Anything else: a short turn.
 //   The turn ledger's cases (#648): "latetool" (a command whose PostToolUse reaches Combwork after the turn's Stop),
 //   "loststop" (no Stop reaches Combwork; its rollout records the turn's end, task_complete) and "silent" (neither).
 //   "ratelimited" (HI-1972): a 429 recorded only in its log database (logs_2.sqlite), then no hook until
@@ -44,7 +46,8 @@
 // - Ctrl+C twice ends it with SessionEnd.
 // - While fake-nohooks-<agent> is in CODEX_HOME it sends no hook at all, as when a Codex update broke them (#1336). A
 //   wake it read is answered with the next line of fake-wakes-<agent>.txt there, when there is one. With
-//   FAKE_CODEX_VERSION 0.162.1 or later, a turn draws Codex's Working line as it begins.
+//   FAKE_CODEX_VERSION 0.162.1 or later, a turn draws Codex's Working line as it begins, and takes it off as it ends
+//   (HI-3415: Codex draws it only while a turn runs; left up, Combwork's screen reading took the turn as still working).
 // - "selfcompact" (HI-1916): a compaction it begins itself (PreCompact, PostCompact), then the turn under the same turn_id,
 //   as Codex 0.164.0 did.
 // - "compacting N" (#1514): a turn that compacts its conversation for N seconds first, as Codex's auto-compaction does
@@ -102,6 +105,11 @@ if (args[0] === 'login' && inConnection && args[1] !== 'status') {
   return
 }
 if (args[0] === 'login') {
+  // Its own home signed out (HI-3278): fake-signed-out there, as `codex login status` says it on a PC never signed in.
+  if (!inConnection && connectionHome && fs.existsSync(path.join(connectionHome, 'fake-signed-out'))) {
+    console.log('Not logged in')
+    process.exit(1)
+  }
   console.log('Logged in using ChatGPT')
   process.exit(0)
 }
@@ -280,7 +288,18 @@ function rolloutPath() {
 let rollout = null
 let started = false
 
-const out = (s) => process.stdout.write(s)
+/** While a turn's Working line is up: the lines written since it, so it can be taken off where it is (HI-3415). */
+let workingUp = null
+const out = (s) => {
+  if (workingUp !== null) workingUp += (s.match(/\n/g) || []).length
+  return process.stdout.write(s)
+}
+/** The turn's Working line taken off as the turn ends, as Codex does; not one scrolled off the screen. */
+function workingOff() {
+  if (workingUp === null) return
+  if (workingUp + 1 < (process.stdout.rows || 24)) process.stdout.write(`\x1b7\x1b[${workingUp + 1}A\r\x1b[2K\x1b8`)
+  workingUp = null
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const setTitle = (t) => out(`\x1b]0;${t}\x07`)
 
@@ -519,11 +538,12 @@ async function scripted(step) {
     await hook('PostToolUse', c)
   }
   // "planusage F W": a token_count record with its plan's rate limits, as Codex writes one after each request (HI-1882):
-  // F% of the 5-hour window and W% of the weekly one, each resetting in a few hours.
-  const plan = /\bplanusage\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/i.exec(step)
+  // F% of the 5-hour window and W% of the weekly one, each resetting in a few hours. "id=<id>" and "name=<name>" after
+  // them (HI-1125): the snapshot's limit_id and limit_name, one of Codex's limits other than its own.
+  const plan = /\bplanusage\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)(?:\s+id=(\S+))?(?:\s+name=(\S+))?/i.exec(step)
   if (plan) {
     const resets = Math.floor(Date.now() / 1000) + 3 * 3600
-    const rateLimits = { primary: { used_percent: Number(plan[1]), window_minutes: 300, resets_at: resets }, secondary: { used_percent: Number(plan[2]), window_minutes: 10080, resets_at: resets }, plan_type: 'plus' }
+    const rateLimits = { ...(plan[3] ? { limit_id: plan[3], limit_name: plan[4] ?? null } : {}), primary: { used_percent: Number(plan[1]), window_minutes: 300, resets_at: resets }, secondary: { used_percent: Number(plan[2]), window_minutes: 10080, resets_at: resets }, plan_type: 'plus' }
     fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'token_count', info: null, rate_limits: rateLimits } }) + '\n')
   }
   // "patch FILE" (HI-2386): an apply_patch edit appending a line to FILE (in its folder), which Codex asks Combwork about first;
@@ -667,12 +687,24 @@ async function runPrompt(text) {
     if (rows.length) text = work ? read : nextScripted() || ''
   }
   // As 0.162.1 does (FAKE_CODEX_VERSION), its Working line while a turn runs (#1336: what Combwork's screen reading looks for).
-  if (/^0\.16[2-9]|^0\.1[7-9]|^[1-9]/.test(process.env.FAKE_CODEX_VERSION || '')) out(`\r\n• Working (0s • esc to interrupt)\r\n`)
+  if (/^0\.16[2-9]|^0\.1[7-9]|^[1-9]/.test(process.env.FAKE_CODEX_VERSION || '')) {
+    out(`\r\n• Working (0s • esc to interrupt)\r\n`)
+    workingUp = 0
+  }
   let questions = 0
   let scriptedSteps = false
   // "latetool": a command whose PostToolUse reaches Combwork only after the turn's Stop (#648).
   let late = null
   for (const step of text.split(' then ')) {
+    // "waitfile NAME", a step of its own: the steps after it wait until the test makes a file NAME in CODEX_HOME (two
+    // minutes at most, in case the test died), as the fake Claude Code's does. Unlike "hold" no key is typed into its
+    // pane, which Combwork counts as the user typing there and holds its lines for (HI-3403).
+    const waitFile = /^waitfile\s+([\w.-]+)$/i.exec(step)
+    if (waitFile) {
+      const go = path.join(process.env.CODEX_HOME || '', waitFile[1])
+      for (const end = Date.now() + 120_000; !fs.existsSync(go) && Date.now() < end; ) await sleep(100)
+      continue
+    }
     if (step === 'latetool') {
       late = { ...bash('npm test'), tool_use_id: `exec-${randomUUID()}` }
       await hook('PreToolUse', late)
@@ -716,6 +748,7 @@ async function runPrompt(text) {
   // Its answer, as 0.159 records the model's reply: a message and the turn's item (#1371: the turn was taken up).
   record({ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: `Done: ${text}` }] })
   fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { type: 'AgentMessage', content: [{ type: 'Text', text: `Done: ${text}` }] } } }) + '\n')
+  workingOff()
   out(`\r\nDone: ${text}\r\n`)
   // "loststop": its Stop never reaches Combwork, though Codex records the turn's end; "silent": neither (#648).
   if (!/\b(loststop|silent)\b/.test(text)) {
@@ -737,7 +770,10 @@ async function runPrompt(text) {
   promptLine()
 }
 
-const promptLine = () => out('\r\n› Ask Codex to do anything\r\n')
+const promptLine = () => {
+  workingOff()
+  out('\r\n› Ask Codex to do anything\r\n')
+}
 
 /**
  * A "nudge" step this turn (true): its offer of a cheaper model shows once the turn is over (HI-2609); "creditnudge" or

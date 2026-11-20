@@ -1,7 +1,7 @@
-// Branches by state and Clean Up Merged Branches (#1642, Darren's 20 branches on rc.1 in small): a project on main
+// Branches by state and Clean Up Merged Branches (#1642, the user's 20 branches on rc.1 in small): a project on main
 // (its target: no workflow target set) with a branch checked out in a worktree (a slot's), three branches merged into
 // main and unused, one with two commits of its own, all pushed to a second remote, nas, plus one merged branch only nas
-// has. The list stays a list (Darren's decision) under three headings: In use, Merged into main, Not merged into main,
+// has. The list stays a list (decided) under three headings: In use, Merged into main, Not merged into main,
 // the last saying how many commits; the remote branches grouped the same way. Clean Up offers exactly the merged unused
 // ones, ticked, never main or the slot's branch, and nas's apart under a warning, none ticked; untick one, tick one on
 // nas, Delete Ticked: those go, the rest stay. Round 2: a third remote, other, unreachable by then, fails after the local
@@ -14,7 +14,7 @@ const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'gitcleanup-profile')
 const ws = path.join(lib.WORK, 'gitcleanup-ws')

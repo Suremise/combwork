@@ -2,11 +2,12 @@
 // window, checked and taken at once; another is refused while it holds it, saying why; only the claim's own operation
 // moves its steps on or lets it go, so a stale one can't clear a newer one's view.
 import { describe, expect, it, vi } from 'vitest'
+import { timing } from './timing.cjs'
 
 const { AfterOpen, assertNotOpening, claimWindow, openProgress, openStep, releaseWindow, windowClaim } = await import('../src/main/openProgress')
 type WS = Parameters<typeof claimWindow>[0]
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 /** A window's workspace service, as far as the claims see it (no window to tell). */
 const service = (): WS => ({ window: null }) as unknown as WS

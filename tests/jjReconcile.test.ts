@@ -25,6 +25,11 @@ import { jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
 import { B1, R1, moved } from './workflow/harness'
 import { closers, started, world, type World } from './jjCardsWorld'
+import { timing } from './timing.cjs'
+
+// A bound for a hung test (HI-3349): each runs many real jj and git commands, and a full unit run on a loaded machine
+// took one 13.7 s of Vitest's 20 s default.
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 if (!jjExe) console.warn(`jjReconcile.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 

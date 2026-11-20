@@ -3,7 +3,7 @@ import { formatDateTime } from './dates'
 import { msg } from './i18n/msg'
 import { cardRef } from './projectKeys'
 import { providerName } from './providers'
-import { durationText, type Tr } from './tasks'
+import { durationText, heardAt, type Tr } from './tasks'
 
 /**
  * The Progress panel's rules, shared by the main process (staleness, taskbar progress) and the panel (time left,
@@ -77,6 +77,18 @@ export const unseenTrouble = (r: Pick<ProgressRun, 'state' | 'dismissed' | 'seen
 /** Whether a run is still open: running or stale, and not ended (finished, or a stale one the user dismissed). */
 export function isOpenRun(run: Pick<ProgressRun, 'state' | 'finishedAt'>): boolean {
   return (run.state === 'running' || run.state === 'stale') && run.finishedAt === null
+}
+
+/**
+ * When an agent's progress runs were last heard from (HI-3406), of those started at or after `since` (when the tool call
+ * that started a background task was made, where its CLI's records say, else the task's start; less a few seconds for
+ * clocks: a run that task began, or a later one), or null with none. A run from before the call isn't the task's. Liveness
+ * for a long background task: its time limit counts from this, not from the task's start.
+ */
+export function lastHeard(runs: readonly Pick<ProgressRun, 'state' | 'finishedAt' | 'updatedAt' | 'startedAt'>[], since: number, now: number): number | null {
+  let latest: number | null = null
+  for (const r of runs) if (r.startedAt >= since - 5000) latest = Math.max(latest ?? 0, heardAt(r, now))
+  return latest
 }
 
 /** The time left in ms as of `now` (never negative), or null without an estimate. */

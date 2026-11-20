@@ -34,6 +34,16 @@
   "tool.agentActivity.description": {
     "placeholders": {}
   },
+  "tool.answerSimplify.description": {
+    "placeholders": {}
+  },
+  "tool.answerSimplify.done": {
+    "placeholders": {
+      "card": "plain",
+      "request": "plain",
+      "choice": "select"
+    }
+  },
   "tool.arg.agent": {
     "placeholders": {}
   },
@@ -140,6 +150,11 @@
       "preview": "plain"
     }
   },
+  "tool.call.appliedEarlier": {
+    "placeholders": {
+      "made": "select"
+    }
+  },
   "tool.call.error": {
     "placeholders": {
       "message": "plain"
@@ -159,6 +174,11 @@
   "tool.call.error.unknownTool": {
     "placeholders": {
       "name": "plain"
+    }
+  },
+  "tool.call.keyNotKept": {
+    "placeholders": {
+      "message": "plain"
     }
   },
   "tool.cannotWithinRules.arg.rule": {
@@ -248,6 +268,9 @@
     "placeholders": {}
   },
   "tool.createTask.arg.description": {
+    "placeholders": {}
+  },
+  "tool.createTask.arg.followUpOf": {
     "placeholders": {}
   },
   "tool.createTask.arg.kind": {
@@ -636,10 +659,19 @@
   "tool.readTask.arg.comments": {
     "placeholders": {}
   },
+  "tool.readTask.arg.feedback": {
+    "placeholders": {}
+  },
   "tool.readTask.arg.history": {
     "placeholders": {}
   },
   "tool.readTask.arg.latestComment": {
+    "placeholders": {}
+  },
+  "tool.readTask.arg.lineComments": {
+    "placeholders": {}
+  },
+  "tool.readTask.arg.offset": {
     "placeholders": {}
   },
   "tool.readTask.arg.summary": {

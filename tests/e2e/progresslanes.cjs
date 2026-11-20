@@ -19,7 +19,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47925))
 const userData = path.join(lib.WORK, 'progresslanes-profile')
@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
+const until = (fn, ms) => lib.until(fn, ms, 150)
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
@@ -68,7 +68,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha, b1.worktree?.path, b3.worktree?.path].filter(Boolean).map((d) => d.toLowerCase())))
   for (const a of [b1, r1, b3]) await inv('session:start', alpha, { agentId: a.id })
   const statuses = async () => (await Promise.all([b1, r1, b3].map((a) => live(a.id)))).map((s) => s?.status)
-  check('the agents start', !!(await until(async () => (await statuses()).every((s) => s === 'ready'), 45000)), JSON.stringify(await statuses()))
+  check('the agents start', !!(await until(async () => (await statuses()).every((s) => s === 'ready'), lib.timing('hang.step'))), JSON.stringify(await statuses()))
   // The fake CLI's launches as now (each launch has its own token): read again where an agent is relaunched.
   const launchesNow = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
   const launchesOf = (a) => launchesNow().filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase())
@@ -129,8 +129,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const shoot = async (name) => {
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
-      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
-      await lib.sleep(250)
+      await lib.themeShown(page, theme, HUNG_MS)
       await page.screenshot({ path: path.join(shots, `${name}-${theme}.png`) })
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -161,7 +160,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   }
   // B1 quiet first (idle, nothing of Combwork's being typed into it or waiting to be): the board set-up above sends it card
   // events, and taking them as its lane starts would make its new conversation owed (or leave it as it is, mid-turn).
-  check('B1 is quiet before its lane starts', !!(await until(async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tr), 45000)), JSON.stringify(await live(b1.id)))
+  check('B1 is quiet before its lane starts', !!(await until(async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tr), lib.timing('hang.step'))), JSON.stringify(await live(b1.id)))
   const l1 = await startLane('B1', 'R1', 'lanes and loops', lane1)
   const section = panel.locator('.progress-lanes')
   const list = section.locator('.progress-lanes-list')
@@ -178,7 +177,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // Only as tall as the lane, its margin and the list's padding (6 px each).
   check('one lane: the section is only as tall as it is', !!(await until(async () => (await section.locator('.progress-lane').count()) === 1 && showsWhole(await fit(), 1), HUNG_MS)) && (await fit()).client <= (await fit()).bottoms[0] + 12, JSON.stringify(await fit().catch(() => null)))
   // B3 quiet too, for the same reason: its 22 cards, made above, send it card events of its own.
-  check('B3 is quiet before its lane starts', !!(await until(async () => lib.agentQuiet(PORT, 'alpha', await live(b3.id), tr), 45000)), JSON.stringify(await live(b3.id)))
+  check('B3 is quiet before its lane starts', !!(await until(async () => lib.agentQuiet(PORT, 'alpha', await live(b3.id), tr), lib.timing('hang.step'))), JSON.stringify(await live(b3.id)))
   const l2 = await startLane('B3', 'R1', 'a long lane', long)
   // B1 and B3, idle builders outside slots, are given their new lanes in new conversations (HI-2232), so each has a new
   // launch and token: the merge slot's claims below are their new launches'.
@@ -293,7 +292,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     check(`the drag ${what} is kept and drawn (${rows} shown)`, !!done, JSON.stringify({ was, dy, kept: await kept(), says: await edgeSays(), box: b, now: await edge.boundingBox() }))
   }
   const kept = () => page.evaluate((w) => window.combwork.invoke('ui:get').then((ui) => ui.panes?.[`progress-lanes-rows:${w.toLowerCase()}`] ?? null), ws)
-  // Its floor (HI-1673, Darren): with more lanes than six, a drag never shows fewer than six.
+  // Its floor (HI-1673): with more lanes than six, a drag never shows fewer than six.
   check('the splitter ranges from six (the floor) to the lanes there are', (await edgeMin()) === 6 && (await edgeSays()).max === '7', JSON.stringify({ min: await edgeMin(), says: await edgeSays() }))
   // Dragged up by just under one: seven, kept.
   await drag(-pitch * 0.9, 'up just under a lane')
@@ -467,7 +466,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // A click opens the card.
   await row1.locator(`.lane-seg[data-card="${n6}"]`).click()
   const dialog = page.locator('.dialog[role="dialog"]').first()
-  check('a click on a segment opens its card', !!(await until(async () => (await dialog.locator('.task-title-input').inputValue().catch(() => '')) === 'Lane hover', 5000)))
+  check('a click on a segment opens its card', !!(await until(async () => (await dialog.locator('.task-title-input').inputValue().catch(() => '')) === 'Lane hover', lib.timing('hang.step'))))
   await page.keyboard.press('Escape')
   await until(async () => (await dialog.count()) === 0, HUNG_MS)
   // Folded to its bar, still right after the runs; and back.
@@ -492,8 +491,10 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const mergeCard = panel.locator('.progress-merge-card')
   check('a merge card shows on top', !!(await until(async () => (await mergeCard.count()) === 1, HUNG_MS)))
   const branch = b1.worktree?.branch
-  const text = await mergeCard.innerText()
-  check('it says who merges which cards, branch → main, the current step, time and who waits', new RegExp(`B1 is merging ${K(n8)}`).test(text) && text.includes(`${branch} → main`) && /Full test set · 113 of 146: mergeslot/.test(text) && /so far · \d+ min left/.test(text) && /Waiting: B3/.test(text), `${branch} | ${text}`)
+  // The card's whole text, waited for: B3's waiting line can be drawn a render after the card (HI-3401).
+  let text = ''
+  const says = () => new RegExp(`B1 is merging ${K(n8)}`).test(text) && text.includes(`${branch} → main`) && /Full test set · 113 of 146: mergeslot/.test(text) && /so far · \d+ min left/.test(text) && /Waiting: B3/.test(text)
+  check('it says who merges which cards, branch → main, the current step, time and who waits', !!(await until(async () => ((text = await mergeCard.innerText().catch(() => '')), says()), HUNG_MS)), `${branch} | ${text}`)
   check('with a divider under it', (await panel.locator('.progress-divider').count()) === 1)
   const colours = await page.evaluate(() => {
     const card = getComputedStyle(document.querySelector('.progress-merge-card')).borderTopColor
@@ -515,15 +516,14 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await mergeCard.getByRole('button', { name: 'Show the merge in full' }).click()
   check('…and opens again', !!(await until(async () => (await mergeCard.locator('.progress-merge-branch').count()) === 1, HUNG_MS)))
 
-  // --- A short window, zoomed in (1000×650 at 150%): the lanes take priority (HI-1673, Darren): they stay inside the
+  // --- A short window, zoomed in (1000×650 at 150%): the lanes take priority (HI-1673): they stay inside the
   // panel at its bottom, whole lanes, and the runs give way above them. Both themes.
   await lib.fitWindow(app, page, { width: 1000, height: 650 })
   const zoom = (f) => app.evaluate(({ webContents }, z) => webContents.getAllWebContents().filter((w) => w.getType() === 'window').forEach((w) => w.setZoomFactor(z)), f)
   await zoom(1.5)
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
-    await lib.sleep(400)
+    await lib.themeShown(page, theme, HUNG_MS)
     const box = await page.evaluate(() => {
       const r = (sel) => document.querySelector(sel)?.getBoundingClientRect().toJSON() ?? null
       return { panel: r('.progress-panel'), lanes: r('.progress-lanes'), body: r('.progress-body'), run: r('.progress-run'), merge: r('.progress-merge'), bar: r('.progress-lanes-bar') }
@@ -542,7 +542,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
 
   // Released: B3's turn, not taken yet, is no merge: no card. Once it claims, its card; released, none.
   await api(t1, 'POST', '/v1/projects/alpha/merge-slot/release', { branch: 'main' })
-  const turn = await until(async () => (await inv('mergeSlots:list')).find((s) => s.holder?.name === 'B3' && !s.holder.taken), 5000)
+  const turn = await until(async () => (await inv('mergeSlots:list')).find((s) => s.holder?.name === 'B3' && !s.holder.taken), lib.timing('hang.ui'))
   check("released, B3's turn (not taken yet) shows no card or divider", !!turn && !!(await until(async () => (await panel.locator('.progress-merge, .progress-divider').count()) === 0, HUNG_MS)), JSON.stringify(await inv('mergeSlots:list')))
   const again = await api(t3, 'POST', '/v1/projects/alpha/merge-slot/claim', { branch: 'main', cards: [long[18]], timeoutSeconds: 0 })
   check('once B3 claims it, its card shows', again.body?.held === true && !!(await until(async () => new RegExp(`B3 is merging ${K(long[18])}`).test(await mergeCard.innerText().catch(() => '')), HUNG_MS)))
@@ -757,24 +757,25 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     const answered = await until(async () => {
       if (await dontResume.count()) await dontResume.first().click().catch(() => undefined)
       return !fs.existsSync(restartRecord) && (await dontResume.count()) === 0
-    }, 30000)
+    }, lib.timing('hang.ui'))
     // Its outcome then shows for the usual time, counted only while the window is focused (Popups.tsx), and a test
     // window never is: closed with its × as the user would (HI-2370).
     const outcome = page2.locator('.toast.resolved .popup-close')
     const closed = await until(async () => {
       if (await outcome.count()) await outcome.first().click().catch(() => undefined)
       return (await outcome.count()) === 0
-    }, 10000)
+    }, lib.timing('hang.ui'))
     check("the offer to resume the lanes' agents answered Don't Resume, and gone", !!answered && !!closed, String(fs.existsSync(restartRecord)))
   }
-  if (!(await until(async () => (await page2.locator('.progress-panel').count()) === 1, 5000))) await page2.locator('.progress-rail').click()
+  // Its panel comes back open with the window (its saved layout), else it is opened.
+  if (!(await until(async () => (await page2.locator('.progress-panel').count()) === 1, lib.timing('pace.panelRestoredMs')))) await page2.locator('.progress-rail').click()
   const edge2 = page2.locator('.progress-lanes-edge')
   const rowsAfter = async () => {
     const now = await edge2.getAttribute('aria-valuenow').catch(() => null)
     const f = await page2.locator('.progress-lanes-list').evaluate((el) => ({ client: el.clientHeight, seventhTop: [...el.querySelectorAll('.progress-lane')][6]?.getBoundingClientRect().top - el.getBoundingClientRect().top })).catch(() => null)
     return { now, f }
   }
-  check('after a restart, the lanes chosen are kept', !!(await until(async () => { const r = await rowsAfter(); return r.now === '6' && !!r.f && Math.abs(r.f.seventhTop - r.f.client) <= 1 }, 20000)), JSON.stringify(await rowsAfter()))
+  check('after a restart, the lanes chosen are kept', !!(await until(async () => { const r = await rowsAfter(); return r.now === '6' && !!r.f && Math.abs(r.f.seventhTop - r.f.client) <= 1 }, lib.timing('hang.step'))), JSON.stringify(await rowsAfter()))
   const order2 = () => page2.locator('.progress-lane').evaluateAll((els) => els.map((e) => e.getAttribute('data-lane')))
   check("…and the user's order of lanes (#568)", !!(await until(async () => (await order2()).join() === [...mine, l4, l5, l6].join(), HUNG_MS)), JSON.stringify(await order2()))
   // The usual order again, from a lane's context menu: running ones newest first; nothing kept.
@@ -812,8 +813,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await queuedLine.scrollIntoViewIfNeeded()
   for (const theme of ['dark', 'light']) {
     await inv2('settings:update', { appearance: { theme } })
-    await until(async () => (await page2.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
-    await lib.sleep(250)
+    await lib.themeShown(page2, theme, HUNG_MS)
     await page2.screenshot({ path: path.join(shots, `lanes-queued-${theme}.png`) })
   }
   await inv2('settings:update', { appearance: { theme: 'dark' } })

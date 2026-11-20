@@ -128,6 +128,16 @@
       "host": "plain"
     }
   },
+  "providers.copilot.host.unknownCopilot": {
+    "placeholders": {
+      "host": "plain"
+    }
+  },
+  "providers.copilot.host.unknownGh": {
+    "placeholders": {
+      "host": "plain"
+    }
+  },
   "providers.copilot.planNote": {
     "placeholders": {}
   },
@@ -141,6 +151,58 @@
   },
   "providers.copilot.updateModified": {
     "placeholders": {}
+  },
+  "providers.muse.guidanceTooLong": {
+    "placeholders": {
+      "provider": "plain",
+      "max": "number"
+    }
+  },
+  "providers.muse.hookPath": {
+    "placeholders": {
+      "provider": "plain",
+      "folder": "plain"
+    }
+  },
+  "providers.muse.otherAccount": {
+    "placeholders": {
+      "provider": "plain",
+      "session": "plain"
+    }
+  },
+  "providers.muse.projectHooks": {
+    "placeholders": {
+      "provider": "plain",
+      "count": "plural",
+      "files": "plain"
+    }
+  },
+  "providers.muse.projectServers": {
+    "placeholders": {
+      "provider": "plain",
+      "count": "plural",
+      "files": "plain",
+      "servers": "plain"
+    }
+  },
+  "providers.muse.sandbox.action": {
+    "placeholders": {}
+  },
+  "providers.muse.sandbox.meanwhile": {
+    "placeholders": {}
+  },
+  "providers.muse.sandbox.needed": {
+    "placeholders": {}
+  },
+  "providers.muse.sandbox.runs": {
+    "placeholders": {}
+  },
+  "providers.muse.unreadableConfig": {
+    "placeholders": {
+      "provider": "plain",
+      "file": "plain",
+      "why": "plain"
+    }
   },
   "providers.opencode.adoptRefused": {
     "placeholders": {

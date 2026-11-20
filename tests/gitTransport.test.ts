@@ -6,7 +6,9 @@ import { appendFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { tempDir } from './tempDir'
-import { destinationOf, displayUrl, fetchHeadOf, HAVES_MAX, neverConnected, projectRelative, redactTransport } from '../src/main/platform/gitTransport'
+import { timing } from './timing.cjs'
+import { destinationOf, displayUrl, fetchHeadOf, HAVES_MAX, neverConnected, prePushOf, projectRelative, publishOf, redactTransport } from '../src/main/platform/gitTransport'
+import { platformLimits } from '../src/main/platform/limits'
 import { gitTree } from '../src/main/workflow/mergeQueue'
 import type { CandidateHost } from '../src/main/platform/integration'
 
@@ -149,7 +151,7 @@ describe('the sealed fetch offers the project’s commits as haves (HI-2987)', (
     return { project, host, snapshot: d.snapshot, before: objects(project), theirs }
   }
 
-  it('someone else pushed one commit: only its objects arrive, not the branch’s history again; then nothing new, nothing', { timeout: 120_000 }, async () => {
+  it('someone else pushed one commit: only its objects arrive, not the branch’s history again; then nothing new, nothing', { timeout: timing('test.hang') }, async () => {
     const { project, host, snapshot, before, theirs } = await pushedOnce(0)
     expect(await fetchHeadOf(host, snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
     // The new commit is three objects (commit, tree, blob); the branch's history is 360.
@@ -161,13 +163,35 @@ describe('the sealed fetch offers the project’s commits as haves (HI-2987)', (
     expect(objects(project)).toBe(again)
   })
 
-  it(`HI-3042: past ${HAVES_MAX} local branches sorting before the target, the target's own heads are still offered: only the new commit arrives`, { timeout: 120_000 }, async () => {
+  // HI-3372: the queue's fetch and publication bounded by cw.queue.networkMinutes, its pre-push hook (a check) by
+  // cw.queue.checkMinutes, each as main sets it: values of the test's own, seen in what each command is given.
+  it('its fetch and push take the merge queue network setting, its pre-push hook the check setting', { timeout: timing('test.hangReal') }, async () => {
+    const { host, snapshot, theirs } = await pushedOnce(0)
+    const given: [string, number | undefined][] = []
+    const seen: CandidateHost = { ...host, run: (cwd, args, opts) => (given.push([args.find((a) => ['fetch', 'push', 'hook'].includes(a)) ?? args[0], opts?.timeoutMs]), host.run(cwd, args, opts)) }
+    const was = { net: platformLimits.queueNetworkMs, check: platformLimits.queueCheckMs }
+    platformLimits.queueNetworkMs = () => 1_111_000
+    platformLimits.queueCheckMs = () => 2_222_000
+    try {
+      expect(await fetchHeadOf(seen, snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
+      expect(await prePushOf(seen, snapshot, theirs, theirs)).toBe('ok')
+      await publishOf(seen, snapshot, theirs, theirs)
+    } finally {
+      platformLimits.queueNetworkMs = was.net
+      platformLimits.queueCheckMs = was.check
+    }
+    expect(given.filter(([k]) => k === 'fetch').map(([, t]) => t)).toEqual([1_111_000])
+    expect(given.filter(([k]) => k === 'hook').map(([, t]) => t)).toEqual([2_222_000])
+    expect(given.filter(([k]) => k === 'push').map(([, t]) => t)).toEqual([1_111_000])
+  })
+
+  it(`HI-3042: past ${HAVES_MAX} local branches sorting before the target, the target's own heads are still offered: only the new commit arrives`, { timeout: timing('test.hang') }, async () => {
     const { project, host, snapshot, before, theirs } = await pushedOnce(HAVES_MAX + 4)
     expect(await fetchHeadOf(host, snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })
     expect(objects(project) - before).toBe(3)
   })
 
-  it(`HI-3042: past ${HAVES_MAX} local branches of their own tracking the target, the target's own heads come before them`, { timeout: 120_000 }, async () => {
+  it(`HI-3042: past ${HAVES_MAX} local branches of their own tracking the target, the target's own heads come before them`, { timeout: timing('test.hang') }, async () => {
     const { project, host, snapshot, before, theirs } = await pushedOnce(HAVES_MAX + 4, { tracking: true })
     expect(sh(project, 'rev-parse', '--symbolic-full-name', 'feature/0000@{upstream}')).toBe('refs/remotes/origin/main')
     expect(await fetchHeadOf(host, snapshot, 'refs/cw/queue/t-fetch')).toEqual({ head: theirs })

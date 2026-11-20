@@ -48,7 +48,7 @@ function title(a: Agent, asks: boolean): Agent {
 
 function send(adapter: ProviderAdapter, a: Agent, ...bodies: Record<string, unknown>[]): Agent {
   for (const body of bodies) {
-    const step = hookStep(adapter.normalizeHook(body).event, input(a, adapter.descriptor.capabilities.backgroundWakes))
+    const step = hookStep(adapter.hooks!.normalizeHook(body).event, input(a, adapter.descriptor.capabilities.background?.backgroundWakes))
     apply(a, step)
     // SessionManager.carryOut: the compaction Combwork asked for has begun, or is over (the step set the status).
     if (step.actions.includes('compactBegan')) a.compacting = 'started'
@@ -96,7 +96,7 @@ const providers = async (): Promise<[string, ProviderAdapter, Record<string, Rec
 
 describe("a prompt's text, for telling the user's replies from Combwork's lines (#418)", () => {
   it('each provider reports what its CLI took; a Codex answer to its question loses its tag', async () => {
-    for (const [name, adapter, h] of await providers()) expect(adapter.normalizeHook(h.prompt).event, name).toEqual({ kind: 'prompt', text: 'hi' })
+    for (const [name, adapter, h] of await providers()) expect(adapter.hooks?.normalizeHook(h.prompt).event, name).toEqual({ kind: 'prompt', text: 'hi' })
     const { codex } = await import('../src/main/providers/codex/adapter')
     expect(codex.normalizeHook({ hook_event_name: 'UserPromptSubmit', prompt: '<send_user_message_question_reply>Red' }).event).toEqual({ kind: 'prompt', text: 'Red' })
   })
@@ -210,7 +210,7 @@ describe('hook → status, for each provider', () => {
       expect([queued.status, queued.statusMessage], name).toEqual(['working', undefined])
       // Compacted while waiting on its background tasks (#521): background again, not ready, where they wake it.
       const waiting = send(adapter, agent('background', { tasks: 1 }), h.compactStart, h.compactEnd)
-      expect(waiting.status, name).toBe(adapter.descriptor.capabilities.backgroundWakes ? 'background' : 'ready')
+      expect(waiting.status, name).toBe(adapter.descriptor.capabilities.background?.backgroundWakes ? 'background' : 'ready')
     }
     const shown = agent('working', { statusMessage: COMPACTING_MESSAGE })
     expect(applyStep(shown, compactionOver(shown, 'background'))).toBe(true)
@@ -713,6 +713,29 @@ describe('background tasks: their time limit', () => {
     // At exactly the limit it stops counting.
     expect(expireTasks(new Map([['a', { at: now - 10 * min }]]), now, 10)).toEqual(['a'])
   })
+
+  // HI-3406: HB5's fake-codex scenario run (cw-progress at step 28 of 64) and HB6's two-hour unit run were dropped at a
+  // fixed 120 minutes; MB1's hyper-v run, silent from 03:34, really was stuck.
+  it("counts the limit from the agent's progress last heard from: a long run still reporting is kept, a stuck one dropped", async () => {
+    const { expireTasks } = await import('../src/main/hookStatus')
+    const { lastHeard } = await import('../src/shared/progress')
+    const now = Date.parse('2026-11-18T06:00:00Z')
+    const min = 60_000
+    const started = now - 150 * min
+    const run = (over: Record<string, unknown> = {}) => ({ state: 'running' as const, finishedAt: null, startedAt: started + 2_000, updatedAt: now - 20_000, ...over })
+    const heard = (runs: ReturnType<typeof run>[]) => (since: number) => lastHeard(runs, since, now)
+    const tasks = () => new Map([['tests', { at: started }]])
+    // A long run with progress: still reporting, so kept past the limit.
+    expect(expireTasks(tasks(), now, 120, heard([run()]))).toEqual([])
+    // A run gone quiet (stale) is heard from at its last report: kept for the limit from then, dropped after.
+    expect(expireTasks(tasks(), now, 120, heard([run({ state: 'stale', updatedAt: now - 60 * min })]))).toEqual([])
+    expect(expireTasks(tasks(), now, 120, heard([run({ state: 'stale', updatedAt: started + 4 * min })]))).toEqual(['tests'])
+    // A run that finished long ago, and no run at all: dropped at the limit from the task's start, as before.
+    expect(expireTasks(tasks(), now, 120, heard([run({ state: 'passed', finishedAt: started + 9 * min, updatedAt: started + 9 * min })]))).toEqual(['tests'])
+    expect(expireTasks(tasks(), now, 120, heard([]))).toEqual(['tests'])
+    // A run from before the task began isn't its: it keeps nothing counted.
+    expect(expireTasks(tasks(), now, 120, heard([run({ startedAt: started - 30 * min })]))).toEqual(['tests'])
+  })
 })
 
 describe("a CLI's start, read from its screen (#679)", () => {
@@ -755,5 +778,19 @@ describe("a CLI's start, read from its screen (#679)", () => {
     expect(startupWatched(state('ready'), claude)).toBe(false)
     expect(startupScreen(state('ready'), trust, claude)).toBeNull()
     expect(startupWatched(state('starting'), {})).toBe(false)
+  })
+
+  it("Claude Code 2.1.326's question about an added folder makes its start wait, after its folder question too (HI-3335)", async () => {
+    const { startupScreen } = await import('../src/main/hookStatus')
+    const { advancedDef } = await import('../src/shared/advanced')
+    const { readFileSync } = await import('fs')
+    const d = advancedDef('claude-code.trust.prompt')!
+    const real = { readyOutput: null, startupQuestion: new RegExp(d.default as string, d.flags) }
+    const screen = (name: string) => readFileSync(`tests/fixtures/advanced/${name}`, 'utf8').replace(/\r\n/g, '\n')
+    // Both were drawn before its SessionStart hook (probes in 2.1.326's own test homes): it is still starting.
+    for (const f of ['trust-added-claude-2.1.326.txt', 'trust-added-repo-claude-2.1.326.txt']) expect(startupScreen(state('starting'), screen(f), real), f).toEqual({ asked: 'Adding a new directory:' })
+    expect(startupScreen(state('starting'), screen('trust-term-claude-2.1.312.txt'), real)).toEqual({ asked: 'trust this folder' })
+    // In a folder it doesn't trust it asks that first, then about the added one: still waiting (asked), never ready.
+    expect(startupScreen(state('waiting', { askedAtStart: true }), screen('trust-added-claude-2.1.326.txt'), real)).toBeNull()
   })
 })

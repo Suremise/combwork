@@ -6,13 +6,15 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, groupName, onConnection, parseAdvancedFile, sampleMiss, shownText, type AdvancedDef } from '../src/shared/advanced'
-import { CLAUDE_FOOTER_MODES } from '../src/shared/claude'
-import { COPILOT_FOOTER_MODES } from '../src/shared/copilot'
+import { setCliAdvancedDefs } from '../src/shared/advancedDef'
+import { CLAUDE_FOOTER_MODES } from '../src/shared/providers/claude'
+import { COPILOT_FOOTER_MODES } from '../src/shared/providers/copilot'
 import { SETTINGS_CATALOG, checkSettingValue, settingDefault, settingEntry, settingPatch, settingValue, settingValueText } from '../src/shared/settingsCatalog'
 import { AdvancedStore, advanced, bindAdvancedSettings, mcpAdvancedEnv, resetSettingsChecked, updateSettingsChecked, waitMaxSeconds } from '../src/main/advanced'
 import { DEFAULT_SETTINGS, mergeDefaults } from '../src/shared/defaults'
 import type { AppSettings } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const ROOT = join(__dirname, '..')
 const def = (id: string): AdvancedDef => advancedDef(id)!
@@ -92,6 +94,11 @@ describe('advanced defaults', () => {
     const re = (id: string): RegExp => new RegExp(def(id).default as string, def(id).flags ?? '')
     expect(re('claude-code.trust.prompt').test(screen('advanced/trust-claude-2.1.296.txt'))).toBe(true)
     expect(re('claude-code.trust.prompt').test(screen('screen-claude-2.1.296-idle.txt'))).toBe(false)
+    // HI-3335: 2.1.326's question about a folder given with --add-dir, outside a repository and inside one; its folder
+    // question still reads as 2.1.312's.
+    expect(re('claude-code.trust.prompt').test(screen('advanced/trust-added-claude-2.1.326.txt'))).toBe(true)
+    expect(re('claude-code.trust.prompt').test(screen('advanced/trust-added-repo-claude-2.1.326.txt'))).toBe(true)
+    expect(re('claude-code.trust.prompt').test(screen('advanced/trust-term-claude-2.1.312.txt'))).toBe(true)
     expect(re('codex.trust.prompt').test(screen('advanced/trust-codex-0.162.1.txt'))).toBe(true)
     expect(re('codex.trust.prompt').test(screen('screen-codex-0.162.1-idle.txt'))).toBe(false)
     expect(re('copilot.trust.prompt').test(screen('advanced/trust-copilot-1.0.95.txt'))).toBe(true)
@@ -126,6 +133,57 @@ describe('an override', () => {
     expect(checkAdvanced(policy, true)).toMatchObject({ error: expect.any(String) })
     expect(advancedText(policy, 'ask')).toBe('ask')
     expect(advancedShown(policy, 'ask')).toBe('Ask each time')
+  })
+
+  // A list with roles (HI-3202): each role once as role=name, whole or not at all, by one parser for saving and reading.
+  it('takes a mapping only whole: every role once, well-formed names, no other role, no name twice where it must be distinct', async () => {
+    const { advancedRoles, advancedTakesText, parseRoles } = await import('../src/shared/advanced')
+    const map: AdvancedDef = { ...def('cw.showDeveloperFeatures'), id: 'cw.test.map', kind: 'list', roles: ['start', 'stop'], default: ['start=Begin', 'stop=End'] }
+    const distinct: AdvancedDef = { ...map, distinct: true }
+    expect(checkAdvanced(map, ['start=Begin', 'stop=End'])).toEqual({ value: ['start=Begin', 'stop=End'] })
+    // Comma-separated, as Settings' box gives it; spaces trimmed; any order; a dotted name is one name.
+    expect(checkAdvanced(map, ' stop=runtime.session , start=Begin ')).toEqual({ value: ['stop=runtime.session', 'start=Begin'] })
+    expect(advancedRoles(map, ['stop=runtime.session', 'start=Begin'])).toEqual({ start: 'Begin', stop: 'runtime.session' })
+    const refused = (v: unknown): void => expect(checkAdvanced(map, v), JSON.stringify(v)).toMatchObject({ error: expect.stringContaining('takes each of start, stop once, as role=name') })
+    refused(['start=Begin']) // a role missing
+    refused(['start=Begin', 'start=Again']) // a role twice
+    refused(['start=Begin', 'stop=End', 'other=X']) // a role not its own
+    refused(['start=Begin', 'end=End']) // an unknown role in place of one
+    refused(['start=Begin', 'stop=']) // no name
+    refused(['start=Begin', 'stop=a b']) // not a name
+    refused(['start=Begin', 'stop=1abc']) // starting with a digit
+    refused(['start=Begin', `stop=${'x'.repeat(101)}`]) // over 100 characters
+    refused(['start=Begin', '__proto__=X']) // never a key outside its roles
+    refused('')
+    refused(42)
+    // One name for two roles: refused where the roles must be told apart, taken where they needn't be.
+    expect(checkAdvanced(distinct, ['start=Same', 'stop=Same'])).toMatchObject({ error: expect.stringContaining('gives Same to more than one role') })
+    expect(checkAdvanced(map, ['start=Same', 'stop=Same'])).toEqual({ value: ['start=Same', 'stop=Same'] })
+    // Read the same way: anything checkAdvanced refuses is no map at all, never part of one.
+    expect(advancedRoles(map, ['start=Begin'])).toBeNull()
+    expect(advancedRoles(distinct, ['start=Same', 'stop=Same'])).toBeNull()
+    expect(parseRoles(map, ['start=Begin', 'stop=End'])).toMatchObject({ map: { start: 'Begin', stop: 'End' } })
+    const m = advancedRoles(map, ['start=Begin', 'stop=End'])!
+    expect(Object.getPrototypeOf(m)).toBeNull()
+    expect(Object.isFrozen(m)).toBe(true)
+    expect(shownText(advancedTakesText(map))).toContain('start, stop')
+    // A plain list and a folder list are as they were.
+    const names = def('codex.hooks.knownEvents')
+    expect(checkAdvanced(names, 'SessionStart, Stop')).toEqual({ value: ['SessionStart', 'Stop'] })
+    expect(checkAdvanced(names, ['start=Begin'])).toMatchObject({ error: expect.any(String) })
+  })
+
+  it("declares a mapping's rule soundly: roles only on a plain list, never with paths, distinct only with roles, its default whole", () => {
+    for (const d of ADVANCED_DEFS) {
+      if (d.distinct) expect(d.roles, d.id).toBeTruthy()
+      if (!d.roles) continue
+      expect(d.kind, d.id).toBe('list')
+      expect(d.paths, d.id).toBeFalsy()
+      expect(new Set(d.roles).size, d.id).toBe(d.roles.length)
+      expect(checkAdvanced(d, d.default), d.id).toEqual({ value: d.default })
+      // Each sample of a mapping names its role, one of its own.
+      for (const s of d.samples ?? []) expect(d.roles.includes(s.role!), `${d.id} ${s.text}`).toBe(true)
+    }
   })
 
   it('takes a pattern that compiles and finds something, text, a field name, names, a whole number in range', () => {
@@ -179,7 +237,7 @@ describe('an override', () => {
     // A value a workspace can't take is its own nowhere.
     expect(advancedRow(def('cw.mcp.replySeconds'), state({}, { 'cw.mcp.replySeconds': 900 })).value).toBe(300)
     const trust = def('claude-code.trust.prompt')
-    expect(advancedRow(trust, state({ 'claude-code.trust.prompt': '(' })).value).toBe('trust this folder')
+    expect(advancedRow(trust, state({ 'claude-code.trust.prompt': '(' })).value).toBe('trust this folder|Adding a new directory:')
   })
 
   it('is flagged once another CLI version is installed than the one it was made for', () => {
@@ -255,11 +313,11 @@ describe('the advanced store', () => {
     s.noteCli('codex', '0.162.1')
     s.load(dir)
     expect(s.state(null).madeFor['codex.trust.prompt']).toEqual({ version: '0.162.1', value: 'trust it' })
-    expect(s.number('codex.hooks.timeoutSeconds')).toBe(5)
+    expect(s.number('codex.hooks.timeoutSeconds')).toBe(30)
     expect(s.pattern('codex.trust.prompt').source).toBe('trust it')
     // Changed by hand while Combwork runs: read again when the file changes.
     writeFileSync(file, JSON.stringify({ format: 1, values: { 'codex.trust.prompt': 'trust here' } }))
-    await vi.waitFor(() => expect(s.pattern('codex.trust.prompt').source).toBe('trust here'), { timeout: 10_000 })
+    await vi.waitFor(() => expect(s.pattern('codex.trust.prompt').source).toBe('trust here'), { timeout: timing('wait.hang') })
   })
 
   it('writes back the CLI version a hand edit was made for, so a restart after the CLI updates still flags it', async () => {
@@ -268,7 +326,7 @@ describe('the advanced store', () => {
     writeFileSync(file, JSON.stringify({ values: { 'codex.trust.prompt': 'trust it', 'codex.ready.placeholder': 'Ask Codex' }, madeFor: { 'codex.ready.placeholder': { version: '0.150.0', value: 'Ask' } } }))
     s.noteCli('codex', '0.162.1')
     s.load(dir)
-    await vi.waitFor(() => expect(read(file).madeFor).toEqual({ 'codex.trust.prompt': { version: '0.162.1', value: 'trust it' }, 'codex.ready.placeholder': { version: '0.162.1', value: 'Ask Codex' } }), { timeout: 10_000 })
+    await vi.waitFor(() => expect(read(file).madeFor).toEqual({ 'codex.trust.prompt': { version: '0.162.1', value: 'trust it' }, 'codex.ready.placeholder': { version: '0.162.1', value: 'Ask Codex' } }), { timeout: timing('wait.hang') })
     s.stop()
     // Combwork starts again after Codex updated.
     const again = store().s
@@ -276,6 +334,26 @@ describe('the advanced store', () => {
     again.load(dir)
     expect(advancedRow(def('codex.trust.prompt'), again.state(null)).madeForOther).toBe('0.162.1')
     expect(again.diagnostics([null])).toContain('  - made for another CLI version than the installed one: codex.trust.prompt, codex.ready.placeholder')
+  })
+
+  it('keeps the record of a user’s own CLI’s override, read before its description registers (HI-3267)', async () => {
+    const { s, dir, file } = store()
+    const id = 'mycli.status.ready'
+    const written = { format: 1, values: { [id]: 'ready>' }, madeFor: { [id]: { version: '1.0.0', value: 'ready>' } } }
+    writeFileSync(file, JSON.stringify(written))
+    try {
+      // At startup advanced.json is read first, then the CLI's description registers, then the CLI is found (now 2.0).
+      s.load(dir)
+      expect(s.state(null).madeFor[id]).toEqual({ version: '1.0.0', value: 'ready>' })
+      setCliAdvancedDefs([{ id, group: 'mycli', title: 'Ready', desc: 'Ready', text: def('codex.trust.prompt').text, kind: 'pattern', default: '>', flags: 'im', applies: 'sessions' } as AdvancedDef])
+      s.definitionsChanged()
+      s.noteCli('mycli' as never, '2.0.0')
+      // Still made for 1.0, so Settings flags it; the file keeps its record.
+      expect(advancedRow(def(id), s.state(null)).madeForOther).toBe('1.0.0')
+      expect(read(file)).toEqual(written)
+    } finally {
+      setCliAdvancedDefs([])
+    }
   })
 
   it("tracks the version for every value of a CLI's, those Combwork gives it too (hooks, title, tool timeout)", async () => {
@@ -298,7 +376,7 @@ describe('the advanced store', () => {
     expect(read(file).values).toEqual({ 'acme.someday': 1 })
     expect(s.number('cw.mcp.replySeconds')).toBe(300)
     writeFileSync(file, '{')
-    await vi.waitFor(() => expect(s.state(null).fileError).toBeTruthy(), { timeout: 10_000 })
+    await vi.waitFor(() => expect(s.state(null).fileError).toBeTruthy(), { timeout: timing('wait.hang') })
     await expect(s.resetAll()).rejects.toThrow('Fix or delete advanced.json')
     expect(readFileSync(file, 'utf8')).toBe('{')
   })
@@ -345,7 +423,7 @@ describe('the advanced store', () => {
       expect([read(file).values, on()]).toEqual([{}, false])
       // The file edited by hand: the setting follows.
       writeFileSync(file, JSON.stringify({ format: 1, values: { 'cw.showDeveloperFeatures': true } }))
-      await vi.waitFor(() => expect(on()).toBe(true), { timeout: 10_000 })
+      await vi.waitFor(() => expect(on()).toBe(true), { timeout: timing('wait.hang') })
       expect(advanced.diagnostics([null])).toEqual(['- Advanced settings: 1 override (cw.showDeveloperFeatures)'])
       // Set from the list: the setting too.
       await advanced.set('cw.showDeveloperFeatures', false)
@@ -409,7 +487,7 @@ describe('the advanced store', () => {
     // Two provider checks finishing together, nothing awaited between them.
     s.noteCli('claude-code', '2.1.296')
     s.noteCli('codex', '0.162.1')
-    await vi.waitFor(() => expect([read(file).madeFor['claude-code.trust.prompt']?.version, read(file).madeFor['codex.trust.prompt']?.version]).toEqual(['2.1.296', '0.162.1']), { timeout: 10_000 })
+    await vi.waitFor(() => expect([read(file).madeFor['claude-code.trust.prompt']?.version, read(file).madeFor['codex.trust.prompt']?.version]).toEqual(['2.1.296', '0.162.1']), { timeout: timing('wait.hang') })
     expect([s.state(null).madeFor['claude-code.trust.prompt'].version, s.state(null).madeFor['codex.trust.prompt'].version]).toEqual(['2.1.296', '0.162.1'])
     await Promise.all([s.set('cw.mcp.replySeconds', 600), s.set('cw.wait.cardMaxSeconds', 700), s.set('codex.hooks.timeoutSeconds', 7), s.keep('codex.trust.prompt')])
     expect(read(file).values).toMatchObject({ 'cw.mcp.replySeconds': 600, 'cw.wait.cardMaxSeconds': 700, 'codex.hooks.timeoutSeconds': 7, 'codex.trust.prompt': 'trust (this|the) folder' })
@@ -429,13 +507,13 @@ describe('the advanced store', () => {
       await updateSettingsChecked({ general: { showTips: false } }, update)
       expect(updates).toHaveLength(2)
       writeFileSync(file, '{')
-      await vi.waitFor(() => expect(advanced.state(null).fileError).toBeTruthy(), { timeout: 10_000 })
+      await vi.waitFor(() => expect(advanced.state(null).fileError).toBeTruthy(), { timeout: timing('wait.hang') })
       await expect(updateSettingsChecked({ advanced: { showDeveloperFeatures: false } }, update)).rejects.toThrow('Fix advanced.json')
       expect(updates).toHaveLength(2)
       expect(readFileSync(file, 'utf8')).toBe('{')
       // An edit made since Combwork read the file: refused, the edit read.
       writeFileSync(file, JSON.stringify({ values: { 'cw.showDeveloperFeatures': true } }))
-      await vi.waitFor(() => expect(advanced.state(null).fileError).toBeNull(), { timeout: 10_000 })
+      await vi.waitFor(() => expect(advanced.state(null).fileError).toBeNull(), { timeout: timing('wait.hang') })
       advanced.stop()
       writeFileSync(file, JSON.stringify({ values: { 'cw.showDeveloperFeatures': true, 'cw.mcp.replySeconds': 400 } }))
       await expect(updateSettingsChecked({ advanced: { showDeveloperFeatures: false } }, update)).rejects.toThrow('changed outside Combwork')
@@ -451,7 +529,7 @@ describe('the advanced store', () => {
     writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 900 } }))
     s.load(dir)
     writeFileSync(file, '{ "values": { "cw.mcp.replySeconds": 9')
-    await vi.waitFor(() => expect(s.state(null).fileError).toMatch(/isn't valid JSON/), { timeout: 10_000 })
+    await vi.waitFor(() => expect(s.state(null).fileError).toMatch(/isn't valid JSON/), { timeout: timing('wait.hang') })
     expect(s.number('cw.mcp.replySeconds')).toBe(900)
     await expect(s.set('cw.mcp.replySeconds', 600)).rejects.toThrow('Fix advanced.json')
     // Through the Agent API (the Assistant's PATCH /v1/settings/:id reaches this set): a refusal by the file's state, 409
@@ -487,7 +565,7 @@ describe('the advanced store', () => {
     await s.set('copilot.trust.prompt', 'trust these files')
     expect(read(file).madeFor['copilot.trust.prompt'].version).toBeNull()
     s.noteCli('copilot', '1.0.95')
-    await vi.waitFor(() => expect(read(file).madeFor['copilot.trust.prompt'].version).toBe('1.0.95'), { timeout: 10_000 })
+    await vi.waitFor(() => expect(read(file).madeFor['copilot.trust.prompt'].version).toBe('1.0.95'), { timeout: timing('wait.hang') })
     s.noteCli('copilot', '1.0.99')
     const row = advancedRow(def('copilot.trust.prompt'), s.state(null))
     expect(row.madeForOther).toBe('1.0.95')

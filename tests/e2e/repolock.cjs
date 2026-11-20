@@ -10,7 +10,7 @@ const fs = require('fs')
 const net = require('net')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const root = path.join(lib.WORK, 'repolock')
 const profileA = path.join(root, 'repolock-a')

@@ -1,0 +1,244 @@
+import { AsyncLocalStorage } from 'async_hooks'
+import { createHash } from 'crypto'
+import type { DatabaseSync } from 'node:sqlite'
+import { advanced } from './advanced'
+import { boardRead, setBoardCommitHook, setBoardPartHooks } from './boardStore'
+import type { WorkspaceService } from './workspace'
+
+/**
+ * HI-3195 (decision (b); SPEC's Agent API, AGENT_API's request keys): a project agent's write sent with a request key
+ * (`X-Combwork-Request`, which cw-mcp makes for each write tool call and sends again on its own retry) is applied once.
+ * The write's own board transaction saves a durable "applied" marker for (launch, key) just before it commits (the board's
+ * commit hook): the write and its marker commit together, or neither. A retry with the same key then gets "already
+ * applied" with what the write produced (a created card's key), never a second write: after a lost reply, a crash or a
+ * restart alike. The original reply isn't replayed (decision (b)); while Combwork runs, a retry of a request still in
+ * flight waits for it and gets its reply. A write of several steps counts as applied at its first board commit.
+ *
+ * A key is bound to its exact request (its fingerprint: method, route, card and body); reused for another, it is refused
+ * (`409 request.keyReused`), never answered with another write's outcome. Markers are kept 24 hours: a retry within that
+ * window is never applied again.
+ */
+
+/** A request key: cw-mcp's (a UUID, or one with its write's index after it). */
+export const REQUEST_KEY = /^[A-Za-z0-9_-]{16,64}$/
+/** How long a marker is kept: a retry within this window is never applied again. */
+export const RECEIPT_HOURS = 24
+/** At most this many keyed requests in flight at once (each joined by its retries); past it, a new key waits its turn (503). */
+export const IN_FLIGHT_MAX = 256
+/**
+ * The longest a retry waits for the request in flight it joined before asking the table (a hung first try): HI-3377, its
+ * client's own reply time (Settings → Advanced, "Combwork tools: reply timeout", cw-mcp's wait before it retries) and
+ * JOIN_MARGIN_MS, so a first try still working when its client gave up is joined, not run beside (120 s was shorter than
+ * the client's 300 s).
+ */
+export function joinWaitMs(): number {
+  const s = Number(advanced.number(MCP_REPLY_SECONDS))
+  return Math.round((Number.isFinite(s) && s > 0 ? s : MCP_REPLY_DEFAULT_S) * 1000) + JOIN_MARGIN_MS
+}
+export const JOIN_MARGIN_MS = 30_000
+const MCP_REPLY_SECONDS = 'cw.mcp.replySeconds'
+const MCP_REPLY_DEFAULT_S = 300
+
+/**
+ * A keyed request: whose it is (`run`: the agent, `<project path>#<agent id>`, so a retry from its next launch after a
+ * restart finds the marker), its key, fingerprint and route, and the card its route names (if any).
+ */
+export interface KeyedRequest {
+  run: string
+  key: string
+  fingerprint: string
+  route: string
+  /** The card its route names, as the request named it (its key, or #n). */
+  card?: string
+}
+
+/** What a retry of an applied write is answered with. */
+export interface Applied {
+  replayed: true
+  applied: true
+  /** What the write produced: a created card's key (`created`), the card it was about (`card`). */
+  produced: Record<string, unknown>
+}
+
+/** A request key reused for another request. */
+export class KeyReused extends Error {
+  constructor() {
+    // agent-protocol: an internal error's tag, never said: servers.ts answers it with its refusal
+    super('request key reused') // i18n-ignore: as above
+  }
+}
+/** Too many keyed requests in flight: try again in a moment. */
+export class KeysBusy extends Error {
+  constructor() {
+    // agent-protocol: as KeyReused's
+    super('too many keyed requests in flight') // i18n-ignore: as KeyReused's
+  }
+}
+/** Its key was taken by another request's commit meanwhile (another process, or a race past the in-flight map). */
+class KeyTaken extends Error {}
+
+/** The request's scope while its handler runs: what its first board commit records. */
+interface Scope extends KeyedRequest {
+  produced: Record<string, unknown>
+  /** Its marker saved, or its handler over (HI-3271): nothing more is noted or saved for it. */
+  written: boolean
+  /**
+   * The request was refused (runtime.refuse recorded it) before anything it asked was applied: nothing it commits from
+   * then on (the refusal's record, the history line after it) takes a marker, so its retry is refused (or done) again.
+   * Within a part of a change that throws (a batch's card refused, HI-3271), the part's alone: put back as it ends.
+   */
+  auditOnly: boolean
+  /**
+   * HR3's round 1: the board change running now applies something the request asked (appliesRequest: the card's own
+   * save, the runtime's facts of the requesting agent): only such a change takes the marker, never Combwork's own
+   * bookkeeping in the same request (an observation made while gathering).
+   */
+  applies: boolean
+}
+const scope = new AsyncLocalStorage<Scope>()
+
+/** What the running keyed write produced (a created card's key), saved with its marker; nothing outside one. */
+export function noteProduced(o: Record<string, unknown>): void {
+  const s = scope.getStore()
+  if (s && !s.written) Object.assign(s.produced, o)
+}
+
+/**
+ * HR3's round 1: the board change running now only records a refusal (the runtime's `Refused` fact): it applies nothing
+ * the request asked, so its commit writes no marker, and a retry of the request is refused (or done) again.
+ */
+export function auditOnly(): void {
+  const s = scope.getStore()
+  if (s && !s.written) s.auditOnly = true
+}
+
+/** HR3's round 1: the board change running now applies what the keyed request asked: its commit takes the marker. */
+export function appliesRequest(): void {
+  const s = scope.getStore()
+  if (s && !s.written && !s.auditOnly) s.applies = true
+}
+
+/** The fingerprint of a request: its method, route template, resolved route values and its body as canonical JSON. */
+export function fingerprintOf(method: string, route: string, params: readonly string[], body: unknown): string {
+  return createHash('sha256').update(JSON.stringify([method, route, params, canonical(body)])).digest('hex')
+}
+
+/** A value with its objects' keys sorted, so the same body in another key order has the same fingerprint. */
+function canonical(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(canonical)
+  if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v as object).sort().map((k) => [k, canonical((v as Record<string, unknown>)[k])]))
+  return v
+}
+
+// The marker, written in the board change that commits first while the request runs (its first durable write).
+setBoardCommitHook((db: DatabaseSync, afterCommit, changed) => {
+  const s = scope.getStore()
+  if (!s || s.written) return
+  // Only a change that applies what the request asked takes the marker: not a refused request's record, nor Combwork's own
+  // bookkeeping in the request (each change is judged on its own), nor one that changed nothing.
+  const applies = s.applies
+  s.applies = false
+  if (s.auditOnly || !changed || !applies) return
+  const at = new Date().toISOString()
+  // Expired markers go first (a key past its 24 hours is free again).
+  db.prepare('DELETE FROM request_receipts WHERE at < ?').run(new Date(Date.now() - RECEIPT_HOURS * 3_600_000).toISOString()) // i18n-ignore: SQL
+  try {
+    db.prepare('INSERT INTO request_receipts (run, key, fingerprint, route, produced, at) VALUES (?, ?, ?, ?, ?, ?)').run(s.run, s.key, s.fingerprint, s.route, JSON.stringify({ ...(s.card !== undefined ? { card: s.card } : {}), ...s.produced }), at) // i18n-ignore: SQL
+  } catch (e) {
+    if (/UNIQUE|PRIMARY KEY|constraint/i.test(String((e as Error)?.message))) throw new KeyTaken()
+    throw e
+  }
+  afterCommit(() => void (s.written = true))
+})
+
+// HI-3271: what a part of a change told the request (a refusal recorded, something applied) is that part's alone. A batch's
+// card refused is a part that throws: its refusal no longer makes the other cards' change audit-only, in either order. A
+// part undone (or a whole change) takes back what it applied; one kept with its error (a refusal's record) keeps that.
+setBoardPartHooks({
+  part: () => {
+    const s = scope.getStore()
+    if (!s || s.written) return () => undefined
+    const was = { applies: s.applies, auditOnly: s.auditOnly }
+    return (kept) => {
+      if (s.written) return
+      s.auditOnly = was.auditOnly
+      if (!kept) s.applies = was.applies
+    }
+  },
+  undone: () => {
+    const s = scope.getStore()
+    if (s && !s.written) s.applies = false
+  }
+})
+
+/** The marker of (run, key) on the board, unexpired, or null. */
+function receipt(ws: WorkspaceService, run: string, key: string): { fingerprint: string; produced: Record<string, unknown> } | null {
+  const row = boardRead(ws, (db) => db.prepare('SELECT fingerprint, produced, at FROM request_receipts WHERE run = ? AND key = ?').get(run, key)) as { fingerprint: string; produced: string | null; at: string } | undefined // i18n-ignore: SQL
+  if (!row || Date.parse(row.at) < Date.now() - RECEIPT_HOURS * 3_600_000) return null
+  let produced: Record<string, unknown> = {}
+  try {
+    produced = row.produced ? (JSON.parse(row.produced) as Record<string, unknown>) : {}
+  } catch {
+    produced = {}
+  }
+  return { fingerprint: row.fingerprint, produced }
+}
+
+/** The answer to a retry of a request whose marker is saved: "already applied", or refused for another request. */
+function fromReceipt(r: { fingerprint: string; produced: Record<string, unknown> }, req: KeyedRequest): Applied {
+  if (r.fingerprint !== req.fingerprint) throw new KeyReused()
+  return { replayed: true, applied: true, produced: r.produced }
+}
+
+/** The keyed requests in flight, by launch and key: their fingerprint and outcome, for a retry to join. */
+const inFlight = new Map<string, { fingerprint: string; outcome: Promise<unknown> }>()
+
+/**
+ * Runs `handler` once for a keyed request: a retry of one in flight joins it (its reply); one whose marker is saved is
+ * answered `Applied`; otherwise the handler runs with its marker written in its first board commit. A key reused for
+ * another request is refused (KeyReused); past IN_FLIGHT_MAX, a new key is refused for now (KeysBusy).
+ */
+export async function onceFor<T>(ws: WorkspaceService, req: KeyedRequest, handler: () => Promise<T>): Promise<T | Applied> {
+  const id = `${req.run}\n${req.key}`
+  const joined = inFlight.get(id)
+  if (joined) {
+    if (joined.fingerprint !== req.fingerprint) throw new KeyReused()
+    const settled = await Promise.race([joined.outcome.then((v) => ({ v }), () => null), new Promise<null>((r) => setTimeout(() => r(null), joinWaitMs()).unref?.())])
+    if (settled) return settled.v as T
+    // Its first try failed, or hangs: what the table says (applied, or not, so it runs).
+    const r = receipt(ws, req.run, req.key)
+    if (r) return fromReceipt(r, req)
+  }
+  const saved = receipt(ws, req.run, req.key)
+  if (saved) return fromReceipt(saved, req)
+  if (inFlight.size >= IN_FLIGHT_MAX && !inFlight.has(id)) throw new KeysBusy()
+  const s: Scope = { ...req, produced: {}, written: false, auditOnly: false, applies: false }
+  // HI-3271 (HG1's suspicion on HI-3258): the scope ends with its handler. What the handler started that runs on after it
+  // (a change after a board write, a timer) keeps the scope's async context but is Combwork's own: it takes no marker, nor
+  // trips on one a retry saved meanwhile.
+  const ended = async (): Promise<T> => {
+    try {
+      return await handler()
+    } finally {
+      s.written = true
+    }
+  }
+  const outcome = scope.run(s, ended).catch((e: unknown) => {
+    // Taken by another request's commit meanwhile (this one's change undone): answered as that one's applied write.
+    if (e instanceof KeyTaken) {
+      const r = receipt(ws, req.run, req.key)
+      if (r) return fromReceipt(r, req)
+    }
+    throw e
+  })
+  const entry = { fingerprint: req.fingerprint, outcome }
+  if (!inFlight.has(id)) inFlight.set(id, entry)
+  try {
+    return (await outcome) as T | Applied
+  } finally {
+    if (inFlight.get(id) === entry) inFlight.delete(id)
+  }
+}
+
+/** For tests: the requests in flight now. */
+export const inFlightForTests = (): number => inFlight.size

@@ -8,6 +8,7 @@ import * as electron from 'electron'
 import type { LaneEdit, LaneEditResult } from '../src/shared/types'
 import { LANE_MAX_CARDS } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-lane-edit-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -20,7 +21,7 @@ const { advanced } = await import('../src/main/advanced')
 const { ENFORCE } = await import('../src/main/workflow/service')
 const { dayBounds } = await import('../src/shared/laneDay')
 
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 describe('laneEditOf: what IPC passes is checked field by field', () => {
   it('takes each op, and refuses a malformed one', () => {
@@ -124,6 +125,24 @@ describe('editLanes (HI-2898)', () => {
     await doing(b, 'b1')
     await expect(edit({ op: 'move', lane: l.id, rev, card: b, to: 2 })).rejects.toThrow(/has started/)
     expect((await raw(l.id)).cards).toEqual([a, b, c])
+  })
+
+  it('HI-3323: moves before the card in flight a card it waits on, queued as a yield (said so); any other card still keeps out; Cancel change drops the yield', async () => {
+    const [a, fix, c] = [await make('Trial'), await make('Fix'), await make('Other')]
+    const l = await start('b1', [a, fix, c])
+    await doing(a, 'b1')
+    await run(() => tasks.updateTask(a, { blockedBy: [fix] }, user))
+    const rev = (await lane(l.id)).listRev
+    // Not one it waits on: refused, as ever.
+    await expect(edit({ op: 'move', lane: l.id, rev, card: c, to: 0 })).rejects.toThrow(/keep their places/)
+    const r = await edit({ op: 'move', lane: l.id, rev, card: fix, to: 0 })
+    expect(r.lanes).toEqual([{ lane: l.id, queuedAfter: a, first: fix, rev: rev + 1 }])
+    const kept = await raw(l.id)
+    expect([kept.cards, kept.pending, kept.yieldFor?.card, kept.yieldFor?.first, kept.yieldFor?.by]).toEqual([[a, fix, c], [fix, a, c], a, fix, 'the user'])
+    expect((await lane(l.id)).status).toMatchObject({ reason: 'listChanges', card: a, first: fix })
+    await edit({ op: 'cancel', lane: l.id, rev: kept.listRev! })
+    const after = await raw(l.id)
+    expect([after.pending, after.yieldFor]).toEqual([undefined, undefined])
   })
 
   it('queues an edit behind the card in flight; editing that queued list keeps it queued; Cancel change drops it', async () => {
@@ -309,7 +328,7 @@ describe('editLanes (HI-2898)', () => {
     })
   })
 
-  it("refuses taking off, or moving away, a lane's last card to do, saving nothing (HI-3066, Darren's decision A)", async () => {
+  it("refuses taking off, or moving away, a lane's last card to do, saving nothing (HI-3066, decision A)", async () => {
     const [a, b, x] = [await make('A'), await make('B'), await make('X')]
     const l = await start('b1', [a])
     const to = await start('b2', [x])

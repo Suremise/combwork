@@ -59,6 +59,11 @@
     "note": "An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the address is neither.",
     "audience": "both"
   },
+  "mcp.catalog.stalled": {
+    "text": "{url} stopped sending (nothing received for {seconds, number} s).",
+    "note": "An error downloading a server from an MCP catalogue (HI-545, HI-3377): no data arrived for the time Settings → Advanced allows; a slow download that keeps receiving is never stopped.",
+    "audience": "both"
+  },
   "mcp.catalog.timeout": {
     "text": "{url} took too long (over {seconds, number} s).",
     "note": "An error downloading from an MCP catalogue (HI-545): no complete answer within the time limit (Settings → Advanced).",
@@ -97,6 +102,11 @@
   "mcp.error.noServerAdd": {
     "text": "The workspace has no MCP server named {name}.",
     "note": "An error adding a server to a project or the Combwork Assistant. {name} is its name.",
+    "audience": "both"
+  },
+  "mcp.error.placesChanged": {
+    "text": "Where {name} is added changed while you were replacing it, so nothing was changed: look again.",
+    "note": "An error replacing an MCP server (HI-3327): a project (or the Combwork Assistant) gained or lost the server after the Replace question showed where it is added (those places keep it), so nothing was written. {name} is the server.",
     "audience": "both"
   }
 }

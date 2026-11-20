@@ -6,6 +6,7 @@
 // icons, data-audience), never English text. Each case's close() removes what it added. The area's refusals reach the
 // window through IPC, which tests/i18n/content.test.ts checks in another language.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 
 /** Waits for a locator to be on the page; throws saying what didn't show. */
@@ -27,7 +28,7 @@ const untilRefreshed = (ctx, locator, n) =>
   ctx.lib.until(async () => {
     const count = await locator.count()
     if (n > 0 ? count > 0 : count === 0) return true
-    await iconButton(ctx, '.sidebar .pane-header', 'refresh').click({ timeout: 2000 }).catch(() => undefined)
+    await iconButton(ctx, '.sidebar .pane-header', 'refresh').click({ timeout: timing('poll.clickMs') }).catch(() => undefined)
     return false
   }, ctx.hungMs)
 
@@ -95,7 +96,7 @@ async function templateBlocked(ctx) {
   const rows = ctx.page.locator('.sidebar .template-row[data-scope="workspace"]')
   // Until the new one is there, first by name (its name is the template's, in any language).
   const first = async () => (await rows.count()) > 0 && (await rows.first().getAttribute('aria-label')) === 'Aardvark'
-  if (!(await ctx.lib.until(async () => (await first()) || (await iconButton(ctx, '.sidebar .pane-header', 'refresh').click({ timeout: 2000 }).then(() => false, () => false)), ctx.hungMs))) throw new Error('the template did not show')
+  if (!(await ctx.lib.until(async () => (await first()) || (await iconButton(ctx, '.sidebar .pane-header', 'refresh').click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)), ctx.hungMs))) throw new Error('the template did not show')
   await rows.first().click()
   await shown(ctx, ctx.page.locator('.template-detail .template-agents'), 'the template')
   await ctx.page.locator('.template-detail-actions button.primary').first().click()

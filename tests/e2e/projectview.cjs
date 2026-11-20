@@ -9,7 +9,7 @@ const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'projectview-profile')
 const ws = path.join(lib.WORK, 'projectview-ws')
@@ -64,7 +64,9 @@ function holdFile() {
     check('a config change while it is held fails with EPERM', /EPERM/.test(refused ?? ''), refused ?? 'it was written')
     const since = () => logText().slice(mark)
     check('combwork.log: the IPC call failed, with its code', !!(await lib.until(() => /\[WARN\] \[ipc\] ipc project:updateConfig failed: .*EPERM.* \(EPERM\)/.test(since()), HUNG_MS)), since().split('\n').filter((l) => /\[ipc\]|\[files\]/.test(l)).join(' | '))
-    check('combwork.log: the replace that gave up, with its tries and time', /\[WARN\] \[files\] replacing .*project\.json.* failed with EPERM after 21 tries over \d+ ms: another process had it open/.test(since()))
+    // Retried under a time bound (HI-3374), so how many tries fit in it varies (HI-3395: it was a fixed 21): more than one.
+    const gaveUp = /\[WARN\] \[files\] replacing .*project\.json.* failed with EPERM after (\d+) tries over \d+ ms: another process had it open/.exec(since())
+    check('combwork.log: the replace that gave up, with its tries and time', !!gaveUp && Number(gaveUp[1]) > 1, since().split('\n').filter((l) => /\[files\]/.test(l)).join(' | '))
     const named = await lib.until(() => /\[WARN\] \[files\] .*project\.json.* was open in (.*)/.exec(since())?.[1], HUNG_MS)
     check('combwork.log: what had it open, as Windows says', !!named && named.includes(String(hold.ps.pid)) && /PowerShell/i.test(named), named ?? 'no line')
     if (named) console.log(`  was open in ${named}`)

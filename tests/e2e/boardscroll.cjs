@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'boardscroll-profile')
 const ws = path.join(lib.WORK, 'boardscroll-ws')
@@ -31,12 +31,7 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms = 10000) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(100)
-    return v
-  }
+  const until = lib.until
 
   // Thirty cards in Todo and thirty in Doing: both columns far taller than the window.
   const todo = []
@@ -51,7 +46,20 @@ const check = (name, ok, extra = '') => {
   const tile = (n) => page.locator(`.task-card[data-task="${n}"]`)
   await until(async () => (await tile(todo[29]).count()) === 1, HUNG_MS)
   const scroll = (label) => body(label).evaluate((el) => ({ top: el.scrollTop, max: el.scrollHeight - el.clientHeight }))
-  const scrollTo = (label, top) => body(label).evaluate((el, t) => (el.scrollTop = t === 'end' ? el.scrollHeight : t), top)
+  /** Scrolls a column to `top` ('end': its bottom), and waits until it reads there (no fixed wait for the scroll). */
+  const scrollTo = async (label, top) => {
+    await body(label).evaluate((el, t) => (el.scrollTop = t === 'end' ? el.scrollHeight : t), top)
+    const there = await until(async () => {
+      const s = await scroll(label)
+      return top === 'end' ? s.top >= s.max - 1 : s.top === Math.min(top, s.max)
+    }, lib.timing('hang.ui'))
+    if (!there) throw new Error(`${label} didn't scroll to ${top} within ${lib.timing('hang.ui') / 1000} s`)
+  }
+  /** Waits until a column stops scrolling: two reads a look apart the same; its place then. */
+  const stopped = async (label) => {
+    if (!(await lib.steady(async () => (await scroll(label)).top, lib.timing('hang.ui')))) throw new Error(`${label} kept scrolling for ${lib.timing('hang.ui') / 1000} s`)
+    return (await scroll(label)).top
+  }
   check('the columns are taller than the window', (await scroll('Todo')).max > 400 && (await scroll('Active')).max > 400, JSON.stringify(await scroll('Todo')))
 
   /** Presses on a card and moves a little, so the drag starts. */
@@ -60,7 +68,8 @@ const check = (name, ok, extra = '') => {
     await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2)
     await page.mouse.down()
     await page.mouse.move(a.x + a.width / 2 + 6, a.y + a.height / 2 + 6, { steps: 3 })
-    await lib.sleep(150)
+    // The drag under way: the board marks the column it is over.
+    await until(async () => (await page.locator('.board-column.drag-over').count()) === 1, lib.timing('hang.ui'))
   }
   /**
    * Moves the dragged card to (x, y) and leaves the mouse there. A last small move makes sure the board hears where
@@ -68,10 +77,11 @@ const check = (name, ok, extra = '') => {
    */
   let held = null
   const holdAt = async (x, y) => {
+    // A gesture's pace, not a wait for a state: a pause after each move so Chromium sends its dragover for that place.
     await page.mouse.move(x, y, { steps: 6 })
-    await lib.sleep(100)
+    await lib.sleep(lib.timing('pace.dragMoveMs'))
     await page.mouse.move(x + 1, y, { steps: 1 })
-    await lib.sleep(100)
+    await lib.sleep(lib.timing('pace.dragMoveMs'))
     held = { x, y }
   }
   /** Lets go where the mouse is held: Playwright only drops on a release that straight follows a move. */
@@ -90,41 +100,37 @@ const check = (name, ok, extra = '') => {
 
   // --- The bottom card to the very top, held still at the top edge.
   await scrollTo('Todo', 'end')
-  await lib.sleep(200)
   const last = todo[29]
   await pick(last)
   const todoBox = await body('Todo').boundingBox()
   await holdAt(todoBox.x + todoBox.width / 2, todoBox.y + 6)
   const start = (await scroll('Todo')).top
-  await lib.sleep(400)
-  const moving = (await scroll('Todo')).top
-  check('held still at the top edge, the column scrolls', moving < start, `${start} → ${moving}`)
-  check('until it reaches the top', !!(await until(async () => (await scroll('Todo')).top === 0, 8000)), String((await scroll('Todo')).top))
-  await lib.sleep(300)
+  const moving = await until(async () => (await scroll('Todo')).top < start, lib.timing('hang.ui'))
+  check('held still at the top edge, the column scrolls', !!moving, `${start} → ${(await scroll('Todo')).top}`)
+  check('until it reaches the top', !!(await until(async () => (await scroll('Todo')).top === 0, lib.timing('hang.ui'))), String((await scroll('Todo')).top))
+  await lib.sleep(lib.timing('quiet.scrollStoppedMs')) // A quiet window on purpose: this checks that it doesn't scroll on.
   check('and stays there', (await scroll('Todo')).top === 0)
   check('the marker is before the first card', (await marker('Todo')) === todo[0], String(await marker('Todo')))
   await release()
-  check('dropped at the very top', !!(await until(async () => (await saved('todo'))[0] === last, 5000)), (await saved('todo')).slice(0, 3).join(','))
+  check('dropped at the very top', !!(await until(async () => (await saved('todo'))[0] === last, lib.timing('hang.ui'))), (await saved('todo')).slice(0, 3).join(','))
   await page.screenshot({ path: path.join(lib.WORK, 'boardscroll-1-top.png') })
 
   // --- The top card to the very bottom, held still at the bottom edge.
   await scrollTo('Todo', 0)
-  await lib.sleep(200)
   const first = (await saved('todo'))[0]
   await pick(first)
   await holdAt(todoBox.x + todoBox.width / 2, todoBox.y + todoBox.height - 6)
   check('held still at the bottom edge, it scrolls to the bottom', !!(await until(async () => {
     const s = await scroll('Todo')
     return s.top >= s.max - 1
-  }, 8000)))
+  }, lib.timing('hang.ui'))))
   check('the marker is at the end', !!(await until(async () => (await marker('Todo')) === 'end', HUNG_MS)), String(await marker('Todo')))
   await release()
-  check('dropped at the very bottom', !!(await until(async () => (await saved('todo')).at(-1) === first, 5000)), (await saved('todo')).slice(-3).join(','))
+  check('dropped at the very bottom', !!(await until(async () => (await saved('todo')).at(-1) === first, lib.timing('hang.ui'))), (await saved('todo')).slice(-3).join(','))
 
   // --- Into another long column scrolled elsewhere: Active scrolls to its top, and the card lands first.
   await scrollTo('Todo', 0)
   await scrollTo('Active', 300)
-  await lib.sleep(200)
   const moved = (await saved('todo'))[0]
   await pick(moved)
   const doingBox = await body('Active').boundingBox()
@@ -138,33 +144,30 @@ const check = (name, ok, extra = '') => {
   }, [doing[5], held.y])
   check('scrolled under a still pointer, the marker follows', sixth > 50 && !!(await until(async () => (await marker('Active')) === doing[5], HUNG_MS)), `${sixth}: ${await marker('Active')}`)
   await holdAt(doingBox.x + doingBox.width / 2, doingBox.y + 6)
-  check('over Active, Active scrolls to its top', !!(await until(async () => (await scroll('Active')).top === 0, 8000)))
+  check('over Active, Active scrolls to its top', !!(await until(async () => (await scroll('Active')).top === 0, lib.timing('hang.ui'))))
   check("Todo doesn't scroll meanwhile", (await scroll('Todo')).top === 0)
   check('the marker is before Active\'s first card', !!(await until(async () => (await marker('Active')) === doing[0], HUNG_MS)), String(await marker('Active')))
   await release()
   // Into Active from another column asks who works on it (Move to Active): the card has no agent, so Nobody yet.
   const ask = page.locator('.dialog', { hasText: `Move ${await lib.cardLabel(inv, moved)} to Active` })
-  await ask.waitFor({ timeout: 5000 })
+  await ask.waitFor({ timeout: lib.timing('hang.ui') })
   await ask.locator('.dialog-footer .btn.primary').click()
-  check('it lands first in Doing, where the marker was', !!(await until(async () => (await saved('doing'))[0] === moved, 5000)), (await saved('doing')).slice(0, 3).join(','))
+  check('it lands first in Doing, where the marker was', !!(await until(async () => (await saved('doing'))[0] === moved, lib.timing('hang.ui'))), (await saved('doing')).slice(0, 3).join(','))
 
   // --- Leaving the board stops the scrolling; afterwards the column scrolls as usual.
   await scrollTo('Active', 'end')
-  await lib.sleep(200)
   await pick(doing[29])
   await holdAt(doingBox.x + doingBox.width / 2, doingBox.y + 6)
-  await until(async () => (await scroll('Active')).top < (await scroll('Active')).max - 100, 5000)
+  await until(async () => (await scroll('Active')).top < (await scroll('Active')).max - 100, lib.timing('hang.ui'))
   // Out of the board, over the page header.
   await holdAt(doingBox.x + doingBox.width / 2, 20)
-  await lib.sleep(200)
-  const a1 = (await scroll('Active')).top
-  await lib.sleep(500)
+  const a1 = await stopped('Active')
+  await lib.sleep(lib.timing('quiet.scrollStoppedMs')) // A quiet window on purpose: this checks that it doesn't scroll on.
   const a2 = (await scroll('Active')).top
   check('leaving the board stops the scrolling', a1 === a2 && a1 > 0, `${a1} → ${a2}`)
   await release()
-  await lib.sleep(300)
-  const b1 = (await scroll('Active')).top
-  await lib.sleep(500)
+  const b1 = await stopped('Active')
+  await lib.sleep(lib.timing('quiet.scrollStoppedMs')) // A quiet window on purpose: this checks that it doesn't scroll on.
   check('dropping outside stops it too', (await scroll('Active')).top === b1)
   check('the card stayed where it was', (await saved('doing')).at(-1) === doing[29])
   const box = await body('Active').boundingBox()

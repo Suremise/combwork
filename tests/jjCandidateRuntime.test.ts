@@ -29,6 +29,7 @@ import { APPLY_OPTIONS } from '../src/shared/workflow/workView'
 import { jjExe } from './jjWorkspaceHarness'
 import { B1, R1, moved } from './workflow/harness'
 import { opts, started, world, type World } from './jjCardsWorld'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjCandidateRuntime.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -75,8 +76,11 @@ function reapply(w: World, card: { id: number }, o: Partial<WorkflowOptions>): v
   w.store.tx((tx) => tx.append(card.id, { kind: 'Override', actor: 'user', source: 'recorded', ruleset: r.id, data: { rules: Object.keys(o).map((k) => `option.${k}`), move: APPLY_OPTIONS, by: 'user', reason: '' } } as never))
 }
 
-/** A hung test's bound, as jjCandidatesReal's (HI-2921): each runs many real jj and git commands, slow on a busy machine. */
-const REAL_JJ_MS = 60_000
+/**
+ * A hung test's bound, as jjCandidatesReal's (HI-2921): each runs many real jj and git commands, slow on a busy machine.
+ * Alone the slowest took 36 s, and a full unit run on a loaded machine took one past 60 s (HI-3349).
+ */
+const REAL_JJ_MS = timing('wait.hangReal')
 
 describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_JJ.version}), HI-2871`, { timeout: REAL_JJ_MS }, () => {
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
@@ -720,7 +724,7 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
 
   // HI-2992 (found by HI-2967): a candidate's build interrupted, then more operations than recovery's old walk read.
   describe.each([true, false] as const)('an interrupted attempt recovered however far the operation log moved on (HI-2992), colocated: %s', (colocated) => {
-    it('a crash after its pins, then 205 operations: the next run recovers and drops it, and offers a new candidate', { timeout: 170_000 }, async () => {
+    it('a crash after its pins, then 205 operations: the next run recovers and drops it, and offers a new candidate', { timeout: timing('test.hangReal') }, async () => {
       const w = await world(colocated, { candidates: true, oneSlot: true })
       w.deps.candidateHook = async (point) => {
         if (point === 'pinned') throw new Error('crash')
@@ -782,8 +786,13 @@ describe.skipIf(!jjExe)(`jj candidates before the user integrates (jj ${TESTED_J
   // (a fast-forward), or onto their own work on top of it. Before, a rebase's copy was not the same change and returned
   // the card with its work in the target, stuck; a merge's or squash's empty build stayed in the user's log as uncertain.
   describe.each([true, false] as const)('integrated their own way between the proof and the step (HI-3044), colocated: %s', (colocated) => {
+    // HI-3241 (design HI-3241/s11): main onto the reviewed commit itself, for rebase only. The step's HI-3044 check
+    // (jjCandidateStep.ts, ancestry) and the proof (jjIntegration.ts, merge-base --is-ancestor) count the reviewed commit
+    // as its own ancestor, so main at it and main past it take the same branch; each style's own parts (its candidate,
+    // its drop by the sweeps after Done) are its "work on top of it" test's. Rebase, the style whose copy wasn't the
+    // same change, keeps the exact head in both modes.
     for (const style of ['rebase', 'squash', 'merge'] as const) {
-      for (const onto of ['reviewed', 'descendant'] as const) {
+      for (const onto of style === 'rebase' ? (['reviewed', 'descendant'] as const) : (['descendant'] as const)) {
         it(`${style}, main onto the ${onto === 'reviewed' ? 'reviewed commit' : 'user’s work on top of it'}: nothing built or returned; the next proof makes it Done; nothing left in the log`, async () => {
           const w = await world(colocated, { candidates: true, oneSlot: true })
           const { card, P } = await approved(w)

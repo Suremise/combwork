@@ -21,9 +21,10 @@ import { AGENT_LIMIT_DEFAULT } from '../src/shared/defaults'
 import { englishText } from '../src/shared/advanced'
 import { tempDir } from './tempDir'
 import { legacyWorktree, type StoredAgent } from '../src/shared/agentFolders'
+import { timing } from './timing.cjs'
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 const base = tempDir('cw-templates-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

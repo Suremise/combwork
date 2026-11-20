@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { msg, tr } from '../../../shared/i18n'
 import { spawn } from 'child_process'
-import { codexCheckHeld, ownedAppServerRequest, type CheckAnswer } from '../../codexChecks'
+import { codexCheckHeld, ownedAppServerRequest, stopCodexChecks, type CheckAnswer } from './checks'
 import { homedir, tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { readdir, readFile, stat } from 'original-fs/promises'
@@ -10,7 +10,7 @@ import { parse as parseToml } from 'smol-toml'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PermissionMode, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
 import { assertSessionId, isSessionId } from '../../../shared/defaults'
 import type { StartHint } from '../../../shared/startFailure'
-import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/codex'
+import { CODEX, CODEX_DESCRIPTOR, CODEX_MODE_FLAGS, CODEX_PERMISSION_MODES } from '../../../shared/providers/codex'
 import { providerSettings } from '../../../shared/providers'
 import type { TypedNewline } from '../../../shared/terminalInput'
 import { CW_TOOLS, TOOLS_SERVER } from '../../../shared/assistantTools'
@@ -20,10 +20,10 @@ import { createLogger, userText } from '../../logger'
 import { combworkError } from '../../combworkError'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { findSecretWarnings } from '../../mcpSecrets'
-import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, childArgs, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, childArgs, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel, WHERE_MS, cliProbeMs } from '../common'
 import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
-import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustReading, TrustTarget, ExternalSession, KeySteps, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
+import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustReading, TrustTarget, ExternalSession, KeyStep, KeySteps, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
 import { codexSafeguards } from './safeguards'
 import { codexTranscriptTurns } from './turns'
@@ -36,7 +36,8 @@ import { permissionsMenuLabel, permissionsMenuNumber } from './permissionsMenu'
 import { strayCodexWarning } from './strayFolder'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
-import { codexListedHooks } from '../../hookListing'
+import { connectionsManaged } from '../../connectionSeam'
+import { codexListedHooks } from './hookListing'
 import type { HookListing, HookRow } from '../../../shared/hooks'
 import { withoutCombworkAuth } from '../../../shared/hooks'
 
@@ -212,6 +213,16 @@ export function inputHolds(screen: string, command: string): boolean {
     .filter((l) => /^\s*›/.test(l))
     .at(-1)
   return input !== undefined && input.replace(/^\s*›\s*/, '') === command
+}
+/**
+ * Enter for a slash command typed into Codex's input: only once its input shows the command (HI-3437), and again while it
+ * still holds it unrun, once Codex is free (#363); never the command a second time. Busy starting up (its spinner just after it loads, as it shows its update notice),
+ * Codex draws what was typed late and drops an Enter that comes first, leaving the command in its input: an Enter checked
+ * against a screen that didn't show the command yet looked taken, and was never sent again.
+ */
+function enterOnceShown(command: string): KeyStep {
+  const holds = (screen: string): boolean => inputHolds(screen, command)
+  return { keys: '\r', waitMs: 200, shown: holds, what: `"${command}" in Codex's input`, heldOn: holds } // i18n-ignore: the CLI's command, quoted in callers' messages (PickNotFound's `what`)
 }
 /**
  * Codex's own terminal title items, set for Combwork's sessions and its sandbox setup so a user's [tui].terminal_title
@@ -441,7 +452,7 @@ function askAppServer(executable: string, args: string[], cwd: string, method: s
 
 /**
  * One request's answer from Codex's app server: its result, its error (`ok: false`, `error` its message), or none
- * (`error` says why). Run through Combwork's process ownership (codexChecks.ts, HI-1757): owned before it runs and confirmed
+ * (`error` says why). Run through Combwork's process ownership (checks.ts, HI-1757): owned before it runs and confirmed
  * gone before the answer is given; an end not confirmed is a failed answer, its connection held until it is.
  */
 function appServerAnswer(executable: string, args: string[], cwd: string, method: string, params: unknown, env: NodeJS.ProcessEnv | undefined, timeoutMs: number): Promise<CheckAnswer> {
@@ -498,6 +509,8 @@ export function codexMcpServer(name: string, def: McpServerDef, combwork: Combwo
   const table: Record<string, unknown> = { command: def.command, ...approval(name) }
   // Combwork's own tools can wait minutes (for agents to finish, or for the user to answer the Assistant).
   if (name === TOOLS_SERVER) table.tool_timeout_sec = advanced.number('codex.mcp.toolTimeoutSeconds')
+  // HI-3375: its startup bound given at every launch (Codex's own, 10 s, is too short for a cold Node start under antivirus).
+  if (name === TOOLS_SERVER) table.startup_timeout_sec = advanced.number('codex.mcp.startupTimeoutSeconds')
   if (def.args?.length) table.args = def.args.map(String)
   if (typeof def.cwd === 'string') table.cwd = def.cwd
   const env: Record<string, string> = {}
@@ -602,6 +615,43 @@ const idFromFile = (f: string): string | null => /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9
 export class CodexAdapter implements ProviderAdapter {
   readonly id = CODEX
   readonly descriptor = CODEX_DESCRIPTOR
+  // Its capability parts (ProviderAdapter), each implemented by this class's own members: a getter, so an object made from
+  // this one (Object.create) is its own parts too.
+  get install(): this {
+    return this
+  }
+  get launch(): this {
+    return this
+  }
+  get hooks(): this {
+    return this
+  }
+  get terminal(): this {
+    return this
+  }
+  get modes(): this {
+    return this
+  }
+  get transcript(): this {
+    return this
+  }
+  get usage(): this {
+    return this
+  }
+  get accounts(): this {
+    return this
+  }
+  get models(): this {
+    return this
+  }
+  get compaction(): this {
+    return this
+  }
+  get projectFiles(): this {
+    return this
+  }
+  /** Its connections' checks (HI-1757): those under way settled as Combwork closes (codex/checks.ts). */
+  readonly lifecycle = { closing: (): Promise<void> => stopCodexChecks() }
   /** A parent Codex session's identity, when Combwork runs inside one. User configuration (CODEX_HOME…) is kept. */
   readonly envToStrip = ['CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED', 'CODEX_THREAD_ID', 'CODEX_SESSION_ID', 'CODEX_CI']
   readonly compactFailure = null
@@ -649,7 +699,7 @@ export class CodexAdapter implements ProviderAdapter {
     const out: { path: string; source: string }[] = []
     const custom = providerSettings(config.settings, this.id).executablePath.trim()
     if (custom) out.push({ path: custom, source: 'settings' })
-    const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['codex'], 5000)
+    const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['codex'], WHERE_MS)
     for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
       if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
     }
@@ -680,7 +730,7 @@ export class CodexAdapter implements ProviderAdapter {
         info.rejected!.push(c.path)
         continue
       }
-      const r = await run(c.path, ['--version'])
+      const r = await run(c.path, ['--version'], cliProbeMs())
       const m = r.stdout.match(/(\d+\.\d+\.\d+[\w.-]*)/)
       if (!m) {
         log.warn(`Candidate ${userText(c.path)} did not report a version: ${userText(r.stderr.slice(0, 200))}`)
@@ -690,7 +740,9 @@ export class CodexAdapter implements ProviderAdapter {
       break
     }
     if (!info.found) info.editorExtensionOnly = await this.editorExtensionPresent()
-    if (info.path) {
+    // Its sign-in is its connections' (HI-1757, HI-3278), as Claude Code's is: ~/.codex's own login is never what its
+    // agents use, so it is never checked (it said "not signed in" to a user signed in only through a connection).
+    if (info.path && !connectionsManaged(this.id)) {
       const s = await run(info.path, ['login', 'status'], 10000)
       const text = `${s.stdout}\n${s.stderr}`
       if (/not logged in|logged out/i.test(text)) info.loggedIn = false
@@ -710,7 +762,7 @@ export class CodexAdapter implements ProviderAdapter {
   typedNewline(version: string | null): TypedNewline | null {
     const chosen = advanced.get<string>(NEWLINE_KEY)
     const key = chosen === 'auto' ? (version && NEWLINE_TRIED.includes(version) ? 'alt-enter' : null) : chosen
-    return this.descriptor.capabilities.typedNewlines?.find((k) => k === key) ?? null
+    return this.descriptor.capabilities.terminal?.typedNewlines?.find((k) => k === key) ?? null
   }
 
   /** Codex's Windows sandbox is set up once (windows.sandbox in its config); without it every command needs approval. */
@@ -872,7 +924,7 @@ export class CodexAdapter implements ProviderAdapter {
     return advanced.get<string[]>('codex.accounts.dropEnv')
   }
 
-  /** Whether a connection's folder is held by a check of Codex not yet confirmed ended (codexChecks.ts). */
+  /** Whether a connection's folder is held by a check of Codex not yet confirmed ended (checks.ts). */
   accountHeld(home: string): boolean {
     return codexCheckHeld(home)
   }
@@ -890,7 +942,7 @@ export class CodexAdapter implements ProviderAdapter {
     const s = toSpawnable(executable, ['--no-daemon', '-C', dir, '-c', `projects=${toToml({ [dir]: { trust_level: 'trusted' } })}`, '-c', `tui.terminal_title=${toToml(titleItems())}`, ...CODEX_MODE_FLAGS['read-only']])
     const before = this.sandboxKind()
     const keys = before === 'unelevated'
-      ? [{ keys: '/setup-default-sandbox', waitMs: 300 }, { keys: '\r', heldOn: (screen: string) => inputHolds(screen, '/setup-default-sandbox') }]
+      ? [{ keys: '/setup-default-sandbox', waitMs: 300 }, enterOnceShown('/setup-default-sandbox')]
       : this.modeMenuKeys('ask')
     // Codex stays open once the sandbox is set up: the task is done when its config names a new sandbox.
     const done = (): boolean => {
@@ -1042,7 +1094,7 @@ export class CodexAdapter implements ProviderAdapter {
     // On a connection (HI-1757): its login kept in its own folder, and the Windows sandbox this PC has (set up once, in
     // ~/.codex's config: its accounts are the machine's), unless the connection's own config names one.
     args.push(...launchConnectionArgs(ctx))
-    // Its own folder trusted for this launch (HI-1871, Darren 27 Oct: on by default, an Advanced off switch): Codex
+    // Its own folder trusted for this launch (HI-1871: on by default, an Advanced off switch): Codex
     // looks its cwd up first, so it never asks in Combwork's folders. The table merges into the home's own for this launch
     // (config overrides.rs, merge.rs at 6aaac69) and nothing is written.
     if (advanced.get<boolean>('codex.trust.perLaunch')) args.push('-c', `projects=${toToml({ [ctx.cwd]: { trust_level: 'trusted' } })}`)
@@ -1268,8 +1320,7 @@ export class CodexAdapter implements ProviderAdapter {
     return [
       { keys: '\x15', waitMs: 150 },
       { keys: '/permissions', waitMs: 200 },
-      // Enter again while Codex's input still holds the command, once it is free (#363); never a second /permissions.
-      { keys: '\r', waitMs: 200, heldOn: (screen) => inputHolds(screen, '/permissions') },
+      enterOnceShown('/permissions'),
       { pick: (screen) => permissionsMenuNumber(screen, target), what: `"${permissionsMenuLabel(target) ?? target}" in Codex's /permissions menu`, waitMs: 300 } // i18n-ignore: the CLI's menu item, quoted in callers' messages (PickNotFound's `what`)
     ]
   }
@@ -1492,3 +1543,6 @@ export class CodexAdapter implements ProviderAdapter {
 }
 
 export const codex = new CodexAdapter()
+
+/** The adapter, as the registry finds it (src/main/providers/index.ts, HI-3201). */
+export default codex

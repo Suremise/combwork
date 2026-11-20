@@ -12,7 +12,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'removeall-profile')
 const ws = path.join(lib.WORK, 'removeall-ws')
@@ -49,12 +49,8 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (proj, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 20000) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  // HI-3385: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
   // The question comes once main has checked each worktree agent's branch (git, per worktree: agents:worktreeChecks),
   // which a loaded machine makes take longer than the 5 s the suite allowed (#670). Waited for as it shows, bounded only
   // for a hung run; a slow one is logged with how long it took, and one that never came throws with what showed instead.
@@ -150,12 +146,14 @@ const check = (name, ok, extra = '') => {
   check('the box is offered for the merged, clean worktree only, unticked', (await box.count()) === 1 && (await box.innerText()).trim().endsWith('cw/removeall-ws/alpha/merged') && !/unmerged/.test(await box.innerText()) && !(await box.locator('input').isChecked()), await box.innerText().catch(() => ''))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await lib.themeShown(page, theme)
     await page.screenshot({ path: path.join(lib.WORK, `removeall-confirm-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await dialog.getByRole('button', { name: 'Cancel' }).click()
-  await lib.sleep(1500) // on purpose: nothing may stop or go after Cancel
+  await lib.until(async () => (await dialog.count()) === 0, lib.timing('hang.ui'))
+  // HI-3385: the question gone, a window in which nothing may stop or go (the point of the check).
+  await lib.sleep(lib.timing('quiet.afterCancelMs'))
   check('Cancel changes nothing', JSON.stringify(await agentsOf(alpha)) === JSON.stringify(['Worker', 'Idle', 'Merged', 'Unmerged']) && (await live(alpha, a.worker.id))?.status === 'working')
   const workerSession = (await live(alpha, a.worker.id)).sessionId
 
@@ -170,7 +168,7 @@ const check = (name, ok, extra = '') => {
     return n >= 2 ? n : 0
   }, HUNG_MS)
   check('the pane headers show the removing spinner (#975: the strip tabs did)', !!spinning, String(spinning))
-  check('every agent goes', !!(await until(async () => (await agentsOf(alpha)).length === 0, 30000)), JSON.stringify(await agentsOf(alpha)))
+  check('every agent goes', !!(await until(async () => (await agentsOf(alpha)).length === 0, lib.timing('hang.ui'))), JSON.stringify(await agentsOf(alpha)))
   check('the working one was stopped first', !(await live(alpha, a.worker.id)))
   check('its session stays in the Sessions tab', (await inv('session:list', alpha)).some((s) => s.id === workerSession))
   check('by default every worktree and branch is kept', fs.existsSync(a.merged.worktree.path) && fs.existsSync(a.unmerged.worktree.path) && ['cw/removeall-ws/alpha/merged', 'cw/removeall-ws/alpha/unmerged'].every((b) => branches(alpha).includes(b)), JSON.stringify(branches(alpha)))
@@ -190,7 +188,7 @@ const check = (name, ok, extra = '') => {
   await shown(betaDialog, "beta's question")
   await betaDialog.locator('.dialog-check input').check()
   await betaDialog.getByRole('button', { name: 'Remove 4 agents' }).click()
-  check('the others go', !!(await until(async () => JSON.stringify(await agentsOf(beta)) === JSON.stringify(['Worker']), 30000)), JSON.stringify(await agentsOf(beta)))
+  check('the others go', !!(await until(async () => JSON.stringify(await agentsOf(beta)) === JSON.stringify(['Worker']), lib.timing('hang.ui'))), JSON.stringify(await agentsOf(beta)))
   check('the merged, clean worktree and its branch are deleted', !!(await until(async () => !fs.existsSync(b.merged.worktree.path), HUNG_MS)) && !branches(beta).includes('cw/removeall-ws/beta/merged'), JSON.stringify(branches(beta)))
   check('the unmerged one is kept, ticked or not', fs.existsSync(b.unmerged.worktree.path) && branches(beta).includes('cw/removeall-ws/beta/unmerged'))
   const notice = page.locator('.toast', { hasText: '1 of 4 agents could not be removed' })

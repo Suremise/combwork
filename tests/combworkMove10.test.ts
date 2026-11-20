@@ -67,6 +67,22 @@ const before2587 = (s: string): string =>
       .replace(/,\n  \{\n    \/\/ HI-2587, the names upgrade[\s\S]*?\n  \}\n\]/, '\n]')
       .replace(/\/\*\*\n \* `schema_version`'s column[\s\S]*?\nexport function renameVersionColumn[\s\S]*?\n\}\n/, '')
       .replace(/^.*\n.*if \(newer === null\) renameVersionColumn\(writer\)\n/m, '')
+      // HI-3289's write guard and close, which change no schema: a transaction's BEGIN checks the checkpoints' guard
+      // first, and a close skips its optional PRAGMA optimize while their worker holds the write lock.
+      .replace(/\nexport const beginGuards = [^\n]*\n/, '\n')
+      .replace(/\nexport function beginTransaction\(db: DatabaseSync\): void \{\n[\s\S]*?\n\}\n/, '\n')
+      .replace(/\bbeginTransaction\(db\)/g, "db.exec('BEGIN IMMEDIATE')")
+      .replace('writer: DatabaseSync) => () => boolean | void', 'writer: DatabaseSync) => () => void')
+      .replace('const lockedElsewhere = stopCheckpoints?.() === true', 'stopCheckpoints?.()')
+      .replace("if (!lockedElsewhere) writer.exec('PRAGMA optimize')", "writer.exec('PRAGMA optimize')")
+      // HI-3374's bounds, which change no schema: the busy wait from Settings → Advanced (dbLimits, setDbBusyMs; 1.0 had
+      // 5 s), and the waits for a file left by a Combwork that ended (1.0: 20 s) and for a group's lock (1.0: 1 s).
+      .replace(/\nexport const dbLimits = \{ busyMs: [\d_]+ \}\n/, '\n')
+      .replace(/\nexport function setDbBusyMs\(ms: number\): void \{\n[\s\S]*?\n\}\n/, '\n')
+      .replace(/`PRAGMA busy_timeout = \$\{dbLimits\.busyMs\}`/g, "'PRAGMA busy_timeout = 5000'")
+      .replace(/\{ timeout: dbLimits\.busyMs \}/g, '{ timeout: 5000 }')
+      .replace(/export const OPENABLE_WAIT_MS = [\d_]+/, 'export const OPENABLE_WAIT_MS = 20_000')
+      .replace(/const GROUP_LOCK_WAIT_MS = [\d_]+/, 'const GROUP_LOCK_WAIT_MS = 1000')
   )
 /** Code without its comments and with the folder's name as 1.0 had it: what makes the schema. */
 const code = (s: string): string =>

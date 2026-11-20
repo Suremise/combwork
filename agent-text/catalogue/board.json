@@ -1,7 +1,7 @@
 {
   "board.agent.agentBusy": {
-    "text": "{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for the user} background {is waiting on background tasks it started} other {is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header)}}. Start the task once it's idle, or give it to another agent.",
-    "note": "#910: the words the Agent API always gave (the window says card). status: what the agent is doing (working, starting, waiting, background; other: a card watch)."
+    "text": "{agent} {status, select, working {is working. Start the task once it's idle, or give it to another agent.} starting {is starting. Start the task once it's idle, or give it to another agent.} waiting {is waiting for the user. Start the task once it's idle, or give it to another agent.} background {is waiting on background tasks it started. Start the task once it's idle, or give it to another agent.} other {is waiting on cards (a card watch): it takes no other work until it is woken. If it builds a lane, put the card in that lane where it should go (cw_lane start), and Combwork starts it on {agent} in turn; otherwise give it to another agent, or leave {agent} a message for the work it waits on (cw_message_agent), which wakes it and keeps its watch.}}",
+    "note": "#910: the words the Agent API always gave (the window says card). status: what the agent is doing (working, starting, waiting, background; other: a card watch). HI-3361: a watch may never end (a lane's builder goes from one to the next) and only the user cancels one, so a watching agent's ways on are its lane, another agent or a message."
   },
   "board.agent.chooseProject": {
     "text": "Choose a project before giving the task to an agent.",
@@ -53,6 +53,111 @@
   "board.error.upgradeFirstStart": {
     "text": "This workspace is from version 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).",
     "note": "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window.",
+    "audience": "both"
+  },
+  "board.work.changes.noRepository": {
+    "text": "This project has no repository to read the revision from.",
+    "note": "A card's revision diff couldn't be shown: the card's project has no version control (None).",
+    "audience": "both"
+  },
+  "board.work.changes.noRevision": {
+    "text": "This submission has no revision to compare: its commits weren't recorded.",
+    "note": "A card's revision diff couldn't be shown: the submission recorded no base or revision commit (a no-code card, or one from before revisions were recorded).",
+    "audience": "both"
+  },
+  "board.work.changes.noSubmission": {
+    "text": "This card has no such submission.",
+    "note": "A card's revision diff couldn't be shown: the submission it names isn't one of the card's (the card changed meanwhile).",
+    "audience": "both"
+  },
+  "board.work.changes.notListed": {
+    "text": "{path} isn't one of this submission's files.",
+    "note": "A card's revision diff couldn't be shown: the file isn't among the files the submission changed.",
+    "audience": "both"
+  },
+  "board.work.comments.binary": {
+    "text": "Lines of a binary file, or of one too large to compare, can’t be commented on.",
+    "note": "A line comment couldn't be added: the file is binary, or too large for its diff to be shown.",
+    "audience": "both"
+  },
+  "board.work.comments.changed": {
+    "text": "That comment was changed meanwhile: look at it again.",
+    "note": "A line comment's edit couldn't be saved: someone changed the comment since it was opened for editing.",
+    "audience": "both"
+  },
+  "board.work.comments.empty": {
+    "text": "A comment needs some text.",
+    "note": "A line comment on a card's revision diff couldn't be saved: its text is empty.",
+    "audience": "both"
+  },
+  "board.work.comments.lines": {
+    "text": "Lines {from} to {to} aren’t in that side of {path}.",
+    "note": "A line comment couldn't be added: the lines it names ({from} to {to}: line numbers, never formatted as amounts) aren't in that side (the original or the changed version) of the file {path}.",
+    "audience": "both"
+  },
+  "board.work.comments.noCard": {
+    "text": "This card’s work can’t be read, so it can’t take comments.",
+    "note": "A line comment couldn't be saved: the card's work record (its facts) can't be read: a card from before 1.0, or its project has none.",
+    "audience": "both"
+  },
+  "board.work.comments.noComment": {
+    "text": "That comment is no longer on this card.",
+    "note": "A line comment couldn't be changed: it was deleted meanwhile.",
+    "audience": "both"
+  },
+  "board.work.comments.sent": {
+    "text": "A comment sent to the builder can’t be deleted: resolve it instead.",
+    "note": "A line comment couldn't be deleted: it was already sent to the card's builder, so it can only be resolved. Glossary: builder.",
+    "audience": "both"
+  },
+  "board.work.comments.tooLong": {
+    "text": "A comment can be at most {max, number} characters.",
+    "note": "A line comment on a card's revision diff couldn't be saved: its text is longer than {max} characters.",
+    "audience": "both"
+  },
+  "board.work.comments.tooMany": {
+    "text": "This card has {max, number} open comments already: resolve some first.",
+    "note": "A line comment couldn't be added or reopened: the card already has the most open comments it can have ({max}).",
+    "audience": "both"
+  },
+  "board.work.send.alreadySent": {
+    "text": "These comments were sent already.",
+    "note": "Sending a card's line comments was refused: this very send was made already (a second click, or a retry).",
+    "audience": "both"
+  },
+  "board.work.send.changed": {
+    "text": "The card changed since you opened this: look again.",
+    "note": "Sending a card's line comments to its builder was refused: since the preview opened, the card got a new submission, a new decision, or a reviewer started or ended a review.",
+    "audience": "both"
+  },
+  "board.work.send.integrated": {
+    "text": "This card’s work is merged already: its comments can’t go back to the builder.",
+    "note": "Sending a card's line comments to its builder was refused: the card's work has been merged into its target already.",
+    "audience": "both"
+  },
+  "board.work.send.itemsChanged": {
+    "text": "A comment changed since you opened this (edited, resolved or deleted): look again.",
+    "note": "Sending a card's line comments was refused: one of the comments in the preview was edited, resolved or deleted since it opened.",
+    "audience": "both"
+  },
+  "board.work.send.noBuilder": {
+    "text": "This card has no builder to send its comments to.",
+    "note": "Sending a card's line comments was refused: no agent built the card's work (it has no builder). Glossary: builder.",
+    "audience": "both"
+  },
+  "board.work.send.notHere": {
+    "text": "Comments can be sent to the builder from Review or Approved only.",
+    "note": "Sending a card's line comments to its builder was refused: the card is in another column (Doing, Todo, Done…). Glossary: builder.",
+    "audience": "both"
+  },
+  "board.work.send.nothing": {
+    "text": "There are no open comments to send.",
+    "note": "Sending a card's line comments was refused: none of its comments is open.",
+    "audience": "both"
+  },
+  "board.work.send.reviewing": {
+    "text": "{reviewer} is reviewing this card: confirm replacing its review to send your comments.",
+    "note": "Sending a card's line comments was refused: a reviewer agent ({reviewer}, its name) is reviewing the card, and the send replaces that review only once the user confirms it.",
     "audience": "both"
   }
 }

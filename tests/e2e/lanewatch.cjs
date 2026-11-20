@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'lanewatch-profile')
 const ws = path.join(lib.WORK, 'lanewatch-ws')
@@ -48,12 +48,8 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 30000) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  // HI-3385: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
   /** The lines Combwork typed into the Assistant (fake-wakes.jsonl; the project agents' loop wakes left out), as text. */
   const rawWakes = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
@@ -82,16 +78,16 @@ const check = (name, ok, extra = '') => {
   const a = await newCard('Greeting says Hi', builder.id)
   const b = await newCard('Greeting trims the name', builder.id)
   await say(alpha, builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [a, b], reviewer: 'Reviewer', name: 'greetings' })}`)
-  await until(() => idle(alpha, builder.id), 15000)
+  await until(() => idle(alpha, builder.id), lib.timing('hang.ui'))
 
   // A release card in no lane (#726), Builder2's.
   const rel = await newCard('Release 0.7.0', builder2.id)
   // Its name in a watch's label: its key (HI-1688).
   const relKey = await lib.cardLabel(inv, rel)
   const watchAgain = async () => {
-    await until(async () => ['ready', 'finished'].includes((await live(home, 'assistant'))?.status), 20000)
+    await until(async () => ['ready', 'finished'].includes((await live(home, 'assistant'))?.status), lib.timing('hang.ui'))
     await say(home, 'assistant', 'cw cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}')
-    return until(async () => (await live(home, 'assistant'))?.status === 'watching' && (await live(home, 'assistant'))?.watch, 15000)
+    return until(async () => (await live(home, 'assistant'))?.status === 'watching' && (await live(home, 'assistant'))?.watch, lib.timing('hang.step'))
   }
 
   // HI-2069: a turn of the Assistant's ending with the lane running and no watch is carried on once by Combwork's line,
@@ -101,32 +97,33 @@ const check = (name, ok, extra = '') => {
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((x) => /Lanes are running/.test(x.text ?? ''))
   }
   await say(home, 'assistant', 'work 1')
-  check('a turn of the Assistant ending with the lane unwatched gets the line once, naming its builder (HI-2069)', !!(await until(async () => laneNotices().length === 1 && (await idle(home, 'assistant')), 20000)) && laneNotices()[0].text === '[CW] Lanes are running (Builder) and nothing will wake you about them: watch the lanes (cw_wait_for_tasks with lanes ["all"], wake) before you finish.' && laneNotices().length === 1, JSON.stringify(laneNotices()))
+  check('a turn of the Assistant ending with the lane unwatched gets the line once, naming its builder (HI-2069)', !!(await until(async () => laneNotices().length === 1 && (await idle(home, 'assistant')), lib.timing('hang.step'))) && laneNotices()[0].text === '[CW] Lanes are running (Builder) and nothing will wake you about them: watch the lanes (cw_wait_for_tasks with lanes ["all"], wake) before you finish.' && laneNotices().length === 1, JSON.stringify(laneNotices()))
 
   // The Assistant watches every running lane and the release card in one watch.
   await say(home, 'assistant', `cw cw_wait_for_tasks {"lanes":["all"],"cards":[${rel}],"wake":true,"limitMinutes":360}`)
-  check(`the Assistant watches the lanes and #${rel}: "Waiting on all running lanes and ${relKey}"`, !!(await until(async () => (await live(home, 'assistant'))?.status === 'watching' && (await live(home, 'assistant'))?.watch?.label === `Waiting on all running lanes and ${relKey}`, 15000)), JSON.stringify((await live(home, 'assistant'))?.watch))
+  check(`the Assistant watches the lanes and #${rel}: "Waiting on all running lanes and ${relKey}"`, !!(await until(async () => (await live(home, 'assistant'))?.status === 'watching' && (await live(home, 'assistant'))?.watch?.label === `Waiting on all running lanes and ${relKey}`, lib.timing('hang.step'))), JSON.stringify((await live(home, 'assistant'))?.watch))
   check('…and its turn ending on the lane watch gets no line (HI-2069)', laneNotices().length === 1, JSON.stringify(laneNotices()))
   const before = wakes().length
   await inv('tasks:update', a, { column: 'review' })
-  await lib.sleep(3000) // A fixed wait on purpose: this checks that a plain move into Review does NOT wake it.
+  // A window on purpose (HI-3385: quiet.laneLookedMs): this checks that a plain move into Review does NOT wake it.
+  await lib.sleep(lib.timing('quiet.laneLookedMs'))
   check('a card moved into Review stays quiet', wakes().length === before && (await live(home, 'assistant'))?.status === 'watching', JSON.stringify(wakes().slice(before)))
 
   // (a) A comment on the release card wakes the same watch.
   await inv('tasks:comment', rel, 'Draft release is up: push when ready')
   const relLine = () => wakes().slice(before).find((t) => t.startsWith(`[CW] #${rel} `))
-  check('a comment on the card outside the lanes wakes it', !!(await until(async () => !!relLine(), 20000)) && relLine().includes('"Draft release is up: push when ready"') && relLine().includes('Your lane watch has ended'), JSON.stringify(wakes().slice(before)))
+  check('a comment on the card outside the lanes wakes it', !!(await until(async () => !!relLine(), lib.timing('hang.step'))) && relLine().includes('"Draft release is up: push when ready"') && relLine().includes('Your lane watch has ended'), JSON.stringify(wakes().slice(before)))
   const kept = await watchAgain()
   check(`watched again with no cards, it keeps #${rel}`, kept?.label === `Waiting on all running lanes and ${relKey}`, JSON.stringify(kept))
 
   // The review fails: one line, naming the lane and the card.
-  await until(() => idle(alpha, reviewer.id), 20000)
+  await until(() => idle(alpha, reviewer.id), lib.timing('hang.ui'))
   await say(alpha, reviewer.id, `boardreview ${a} start`)
-  await until(async () => (await inv('tasks:list')).find((c) => c.number === a)?.review?.agent === reviewer.id, 15000)
-  await until(() => idle(alpha, reviewer.id), 15000)
+  await until(async () => (await inv('tasks:list')).find((c) => c.number === a)?.review?.agent === reviewer.id, lib.timing('hang.ui'))
+  await until(() => idle(alpha, reviewer.id), lib.timing('hang.ui'))
   await say(alpha, reviewer.id, `boardreview ${a} failed`)
   const failedLine = () => wakes().slice(before).find((t) => t.startsWith('[CW] Lane Builder / Reviewer (greetings):'))
-  check('a failed review wakes it: one line with the lane and the card', !!(await until(async () => !!failedLine(), 20000)) && failedLine().includes(`#${a} failed review (Reviewer (alpha))`) && failedLine().includes('Your lane watch has ended'), JSON.stringify(wakes().slice(before)))
+  check('a failed review wakes it: one line with the lane and the card', !!(await until(async () => !!failedLine(), lib.timing('hang.step'))) && failedLine().includes(`#${a} failed review (Reviewer (alpha))`) && failedLine().includes('Your lane watch has ended'), JSON.stringify(wakes().slice(before)))
   check('its wakes name cards by key alone (#1219, HI-1661)', rawWakes().some((t) => lib.KEYED.test(t)), JSON.stringify(rawWakes().slice(-2)))
 
   // (c) Builder2, on the release card, shows a permission prompt: the same watch wakes, naming it and its card.
@@ -134,33 +131,33 @@ const check = (name, ok, extra = '') => {
   const asked = wakes().length
   await say(alpha, builder2.id, 'ask then work 20 then done')
   const waitLine = () => wakes().slice(asked).find((t) => t.startsWith('[CW] Builder2 (alpha) is waiting for the user'))
-  check('an agent showing a permission prompt wakes it, naming the agent, its card and what it asks', !!(await until(async () => !!waitLine(), 30000)) && waitLine().includes(`on #${rel}: "Claude needs your permission to use Bash"`) && waitLine().includes('never answer it for them'), JSON.stringify(wakes().slice(asked)))
-  await until(() => idle(alpha, builder2.id), 40000)
+  check('an agent showing a permission prompt wakes it, naming the agent, its card and what it asks', !!(await until(async () => !!waitLine(), lib.timing('hang.ui'))) && waitLine().includes(`on #${rel}: "Claude needs your permission to use Bash"`) && waitLine().includes('never answer it for them'), JSON.stringify(wakes().slice(asked)))
+  await until(() => idle(alpha, builder2.id), lib.timing('hang.step'))
 
   // HI-1987: the same watch follows Builder2's work on no card (cw_wait_for_tasks with lanes and agents): its turn's
   // end wakes it, with the lane watch's own line.
-  await until(async () => ['ready', 'finished'].includes((await live(home, 'assistant'))?.status), 20000)
+  await until(async () => ['ready', 'finished'].includes((await live(home, 'assistant'))?.status), lib.timing('hang.ui'))
   await say(alpha, builder2.id, 'work 8')
-  await until(async () => (await live(alpha, builder2.id))?.status === 'working', 15000)
+  await until(async () => (await live(alpha, builder2.id))?.status === 'working', lib.timing('hang.step'))
   const built = wakes().length
   await say(home, 'assistant', 'cw cw_wait_for_tasks {"lanes":["all"],"agents":[{"project":"alpha","agent":"Builder2"}],"wake":true,"limitMinutes":360}')
-  check(`the lane watch takes an agent: "Waiting on all running lanes and ${relKey}, Builder2"`, !!(await until(async () => (await live(home, 'assistant'))?.watch?.label === `Waiting on all running lanes and ${relKey}, Builder2`, 15000)), JSON.stringify((await live(home, 'assistant'))?.watch))
+  check(`the lane watch takes an agent: "Waiting on all running lanes and ${relKey}, Builder2"`, !!(await until(async () => (await live(home, 'assistant'))?.watch?.label === `Waiting on all running lanes and ${relKey}, Builder2`, lib.timing('hang.step'))), JSON.stringify((await live(home, 'assistant'))?.watch))
   const builtLine = () => wakes().slice(built).find((t) => t.startsWith('[CW] Builder2 (alpha) finished'))
-  check("an agent's turn ending wakes the lane watch", !!(await until(async () => !!builtLine(), 30000)) && builtLine().includes('Your lane watch has ended') && builtLine().includes('less the agents told here'), JSON.stringify(wakes().slice(built)))
+  check("an agent's turn ending wakes the lane watch", !!(await until(async () => !!builtLine(), lib.timing('hang.step'))) && builtLine().includes('Your lane watch has ended') && builtLine().includes('less the agents told here'), JSON.stringify(wakes().slice(built)))
 
   // A lane started after its next watch began is followed too.
   await watchAgain()
   const c = await newCard('README usage', builder2.id)
   await say(alpha, builder2.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [c], reviewer: 'Reviewer' })}`)
-  await until(() => idle(alpha, builder2.id), 15000)
+  await until(() => idle(alpha, builder2.id), lib.timing('hang.ui'))
   await inv('tasks:update', c, { blocked: 'Which example should the README show?' })
   const blockedLine = () => wakes().find((t) => t.startsWith('[CW] Lane Builder2 / Reviewer:'))
-  check('a lane started later is followed: its blocked card wakes it', !!(await until(async () => !!blockedLine(), 20000)) && blockedLine().includes(`#${c} is blocked: "Which example should the README show?"`), JSON.stringify(wakes().slice(before)))
+  check('a lane started later is followed: its blocked card wakes it', !!(await until(async () => !!blockedLine(), lib.timing('hang.step'))) && blockedLine().includes(`#${c} is blocked: "Which example should the README show?"`), JSON.stringify(wakes().slice(before)))
   await page.screenshot({ path: path.join(lib.WORK, 'lanewatch.png') })
 
   await inv('session:stop', alpha)
   await inv('session:stop', home)
-  await until(async () => (await inv('session:live')).length === 0, 15000)
+  await until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(failed ? `\n${failed} FAILED` : '\nALL PASSED')
   process.exit(failed ? 1 : 0)

@@ -12,8 +12,9 @@ import * as electron from 'electron'
 import { ackText, isOverdue, type DeliverySender } from '../src/shared/deliveries'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
+import { timing } from './timing.cjs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 describe('messages left for agents (#530, #647)', async () => {
   const base = tempDir('cw-messages-')
@@ -115,7 +116,7 @@ describe('messages left for agents (#530, #647)', async () => {
     expect(st.typed).toHaveLength(1)
     // #726: its turn over while its own background tasks run (a timer), a new message rings at once.
     st.status = 'background'
-    expect(await leave('Darren pushed the tag.')).toEqual({ id: 'm3', fate: 'typed', queued: 0 })
+    expect(await leave('Sam pushed the tag.')).toEqual({ id: 'm3', fate: 'typed', queued: 0 })
     expect(st.typed).toHaveLength(2)
   })
 

@@ -144,6 +144,16 @@
     "note": "Provider Setup, GitHub Copilot (HI-2779): no sign-in found for a GitHub host Combwork’s projects use. {host} is the host (github.com, yourcompany.ghe.com).",
     "audience": "both"
   },
+  "providers.copilot.host.unknownCopilot": {
+    "text": "Couldn’t check Copilot’s sign-in on {host}: Copilot didn’t answer in time. Choose Check again.",
+    "note": "Provider Setup, GitHub Copilot (HI-3438): credentials are set for the host, and Copilot itself, asked for its models with them, gave no usable answer in time. {host} is the host (github.com, yourcompany.ghe.com). Check again is the dialog’s button.",
+    "audience": "both"
+  },
+  "providers.copilot.host.unknownGh": {
+    "text": "Couldn’t check Copilot’s sign-in on {host}: the GitHub CLI didn’t answer in time. Choose Check again.",
+    "note": "Provider Setup, GitHub Copilot (HI-3438): Copilot signs in through the GitHub CLI there, and its check (`gh auth status`) gave no usable answer in time, as on a busy PC. {host} is the host (github.com, yourcompany.ghe.com). Check again is the dialog’s button.",
+    "audience": "both"
+  },
   "providers.copilot.planNote": {
     "text": "Copilot Free uses Auto only; choosing a model needs a paid plan.",
     "note": "A note in Provider Setup under GitHub Copilot. Copilot Free is the plan's name; Auto is Copilot's model choice: keep both names.",
@@ -161,6 +171,56 @@
   "providers.copilot.updateModified": {
     "text": "WinGet could not remove the old Copilot package. Its installed files may have changed since WinGet installed them, often because Copilot updated itself. Update anyway asks WinGet to replace them with --force. Stop Copilot agents first.",
     "note": "Provider Setup after WinGet portable removal failed. The exit code can also mean other removal failures, so the cause is tentative. Update anyway is the adjacent button; keep WinGet, Copilot and --force unchanged.",
+    "audience": "both"
+  },
+  "providers.muse.guidanceTooLong": {
+    "text": "{provider} didn't start: Combwork's guidance is over {provider}'s start limit of {max, number} bytes, and even the pointer to the file that holds it doesn't fit. Raise \"Guidance: most Muse takes at start\" in Settings → Advanced.",
+    "note": "Why a Muse Code agent didn't start (its pane): its guidance, and the short pointer that replaces it, are both over Muse's start limit. {provider} is the CLI's name, {max} a size in bytes. The quoted text is an advanced setting's title: use that setting's translated title. Settings → Advanced is a place in Combwork.",
+    "audience": "both"
+  },
+  "providers.muse.hookPath": {
+    "text": "{provider} didn't start: its hook commands can't name Combwork's files in {folder}, because that path has a space or a character Windows' command prompt reads, and Windows has no short name for it. Muse runs its hooks in a way that can't quote a path. Turn on 8.3 short names for that drive, or move Combwork's data to a path without spaces.",
+    "note": "Why a Muse Code agent didn't start (its pane): Muse runs hook commands through cmd without being able to quote a path, and the folder of Combwork's launch files has a space or a special character and no 8.3 short name. {provider} is the CLI's name, {folder} a path. 8.3 short names is a Windows feature's name.",
+    "audience": "both"
+  },
+  "providers.muse.otherAccount": {
+    "text": "{provider} didn't resume {session}: it is in another Muse Code account's sessions, not the account this agent runs on now. Start a new session, or move the agent back to that account.",
+    "note": "Why a Muse Code agent didn't resume a session (its pane): each Muse Code account keeps its own sessions, and this one isn't in the account the agent runs on. {provider} is the CLI's name, {session} the session's id.",
+    "audience": "both"
+  },
+  "providers.muse.projectHooks": {
+    "text": "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} hooks of the project's own, which {provider} runs along with Combwork's tools. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, then start the agent again.",
+    "note": "Why a Muse Code agent didn't start (its pane): the project's own Muse hooks file defines hooks, which Muse can't be kept from running. {provider} is the CLI's name, {files} the files' paths joined as a list, {count} how many files.",
+    "audience": "both"
+  },
+  "providers.muse.projectServers": {
+    "text": "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} starts a project's servers along with Combwork's tools. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.",
+    "note": "Why a Muse Code agent didn't start (its pane): the project's own .mcp.json (or Muse settings) defines MCP servers the agent wasn't given, which Muse can't be kept from starting. {provider} is the CLI's name, {files} the config files' paths joined as a list, {count} how many files, {servers} the servers' names joined as a list. MCP servers is a place in Combwork.",
+    "audience": "both"
+  },
+  "providers.muse.sandbox.action": {
+    "text": "Set up",
+    "note": "Provider Setup's button: opens Muse Code's sandbox setup in a terminal.",
+    "audience": "both"
+  },
+  "providers.muse.sandbox.meanwhile": {
+    "text": "Combwork never answers that screen for an agent. Run Set up here once instead, or answer it in an agent’s pane yourself.",
+    "note": "Provider Setup, under Muse Code's sandbox Set up: Combwork doesn't answer Muse's sandbox screen by itself.",
+    "audience": "both"
+  },
+  "providers.muse.sandbox.needed": {
+    "text": "Muse's Windows sandbox isn't set up. Until it is, each new Muse agent shows Muse's setup screen in its pane, and waits there for you.",
+    "note": "Provider Setup and Settings → Providers: Muse Code's own Windows sandbox (where it runs an agent's commands) isn't set up on this PC.",
+    "audience": "both"
+  },
+  "providers.muse.sandbox.runs": {
+    "text": "**Set up** runs `muse sandbox windows setup` in a terminal. Muse asks for administrator permission there to create two local Windows accounts and a group for its sandbox: Windows asks you, and the choice is yours. Combwork types nothing into it.",
+    "note": "Provider Setup, under Muse Code's sandbox Set up: what it does. **…** marks bold text and `…` a command: keep the marks and the command.",
+    "audience": "both"
+  },
+  "providers.muse.unreadableConfig": {
+    "text": "{provider} didn't start: Combwork couldn't read {file} ({why}), which {provider} would load. Fix or remove the file, then start the agent again.",
+    "note": "Why a Muse Code agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words.",
     "audience": "both"
   },
   "providers.opencode.adoptRefused": {

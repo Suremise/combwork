@@ -3,7 +3,7 @@ import type { Server } from 'net'
 /** How often the Agent API's listen is tried again while its port is in use after an unexpected close (HI-2196). */
 export const LISTEN_RETRY_MS = 250
 /** How long, from the first try, it is tried again before giving up as a single try does. */
-export const LISTEN_RETRY_BOUND_MS = 5000
+export const LISTEN_RETRY_BOUND_MS = 60_000
 
 export interface ListenRetryOptions {
   /** Whether a port in use (EADDRINUSE) is tried again; without, the first try's error is the answer. */

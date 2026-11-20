@@ -62,7 +62,7 @@ function journalAtV2(h: string): { fact: number; mine: number; both: number } {
 }
 
 describe('the names step (version 3)', () => {
-  it("maps 1.0's source and tag to combwork, keeping rows, ids, links, tags and the FTS index", () => {
+  it("maps 1.0's source and tag to combwork, keeping rows, ids, links, tags and the FTS index", async () => {
     const h = home()
     const { fact, mine, both } = journalAtV2(h)
     // Opening runs the step.
@@ -76,9 +76,9 @@ describe('the names step (version 3)', () => {
     expect(j.readEntry(h, both)).toMatchObject({ source: 'combwork', tags: ['combwork', 'lane'] })
     expect(j.readEntry(h, mine)).toMatchObject({ source: 'assistant', why: 'Fewer moving parts' })
     // New entries under the new name, found by text; deleting one leaves the index right.
-    const added = j.writeEntry(h, all, { kind: 'event', summary: 'AM-3 "Ibis" is Done', tags: ['combwork'] }, 'combwork')
+    const added = await j.writeEntry(h, all, { kind: 'event', summary: 'AM-3 "Ibis" is Done', tags: ['combwork'] }, 'combwork')
     expect(j.recall(h, { query: 'ibis' }).map((r) => r.id)).toEqual([added])
-    expect(j.deleteEntry(h, both)).toBe(true)
+    expect(await j.deleteEntry(h, both)).toBe(true)
     expect(j.recall(h, { query: 'heron' })).toEqual([])
     j.closeJournal(h)
 
@@ -110,9 +110,9 @@ describe('the names step (version 3)', () => {
     }
   })
 
-  it('runs on a new journal too (versions 1 to 3 at once)', () => {
+  it('runs on a new journal too (versions 1 to 3 at once)', async () => {
     const h = home()
-    const id = j.writeEntry(h, all, { kind: 'event', summary: 'Fresh egret', tags: ['combwork'] }, 'combwork')
+    const id = await j.writeEntry(h, all, { kind: 'event', summary: 'Fresh egret', tags: ['combwork'] }, 'combwork')
     expect(j.recall(h, { query: 'egret' })).toMatchObject([{ id, source: 'combwork' }])
     j.closeJournal(h)
     const db = new DatabaseSync(j.journalFile(h), { readOnly: true })

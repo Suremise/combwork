@@ -45,8 +45,8 @@ const check = (name, ok, extra = '') => {
   const agent = await inv('agents:add', alpha, { location: 'project', provider: 'codex' })
   const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
-  check('a Codex agent starts', !!(await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 30000)), JSON.stringify(await live()))
-  await new Promise((r) => setTimeout(r, 1000))
+  check('a Codex agent starts', !!(await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.step'))), JSON.stringify(await live()))
+  await lib.sleep(lib.timing('quiet.folderWarningMs')) // The window is the point: no warning comes within it.
   check('…with no warning: the project’s .codex holds only Codex’s configuration (config, a custom agent, rules)', (await warnings()).length === 0, (await warnings()).join(' | '))
 
   // An agent writes its probe into .codex while the Codex agent works.
@@ -57,18 +57,18 @@ const check = (name, ok, extra = '') => {
   const turn = async (text) => {
     const done = async () => lib.plainText(await inv('pty:buffer', key)).includes(`Done: ${text}`)
     await lib.sendPrompt(inv, key, text, { submitted: done })
-    return lib.until(async () => (await done()) && (await live())?.status === 'finished', 30000)
+    return lib.until(async () => (await done()) && (await live())?.status === 'finished', lib.timing('hang.step'))
   }
   check('a turn ends', !!(await turn('hello')), JSON.stringify(await live()))
-  const told = await lib.until(async () => ((await warnings()).length ? await warnings() : null), 10000)
+  const told = await lib.until(async () => ((await warnings()).length ? await warnings() : null), lib.timing('hang.ui'))
   check('…and Combwork warns of the stray .codex folder, naming it and what it holds', told?.length === 1 && told[0].includes(path.join(alpha, '.codex')) && told[0].includes('scratch'), (told ?? []).join(' | '))
   await page.screenshot({ path: path.join(lib.WORK, 'codexfolder-warning.png') })
   check('another turn ends', !!(await turn('again')), JSON.stringify(await live()))
-  await new Promise((r) => setTimeout(r, 1000))
+  await lib.sleep(lib.timing('quiet.folderWarningMs')) // The window is the point: no second warning comes within it.
   check('…with no second warning', (await warnings()).length === 1, (await warnings()).join(' | '))
 
   await inv('session:stop', alpha, agent.id)
-  await lib.until(async () => !(await live()), 20000)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   await app.close()
   console.log(failed ? `\n${failed} check(s) failed` : '\nAll checks passed')
   process.exit(failed ? 1 : 0)

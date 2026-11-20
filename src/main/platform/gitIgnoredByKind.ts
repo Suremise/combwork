@@ -6,8 +6,8 @@
 // withoutIgnored); Git's record has no run watch, so its kinds come from the record: each event's entry as it was read
 // when the event came (observe.ts' FolderLog), a folder where the record has paths under it, and what is on disk now
 // where an event's entry wasn't read. A path is ignored only as every kind it had; one with no kind known is asked as a
-// file too (a folder-only rule then doesn't cover it: it counts). The residual is Darren's decision on HI-3158 (13 Nov,
-// option 2): a file named as an ignored folder, made and gone again before its event is read, passes as the folder.
+// file too (a folder-only rule then doesn't cover it: it counts). The residual is HI-3158's decision (option
+// 2): a file named as an ignored folder, made and gone again before its event is read, passes as the folder.
 
 import { lstat } from 'original-fs/promises'
 import { join } from 'path'

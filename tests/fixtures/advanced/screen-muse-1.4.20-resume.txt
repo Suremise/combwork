@@ -1,0 +1,13 @@
+  resumed session 01a1db05-0d5e-74d3-9d38-2f921b7c687e
+
+> hello from the sandbox
+
+♦ echo: hello from the sandbox
+
+  session 01a1db05-0d5e-74d3-9d38-2f921b7c687e does not record a usable model for provider echo; using the provider
+  default model
+
+── Voice input (Alt+V to start) ────────────────────────────────────────────────────────────────────────────────────────
+>
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  echo · C:\work\proj · Launch overrides

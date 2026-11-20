@@ -16,7 +16,7 @@ describe('the Tiles view (#976)', () => {
 
   it('holds as many tiles a page as fit (HI-1951): 13 agents on one page where 35 fit, paged where 12 or 6 fit', () => {
     const ids = Array.from({ length: 13 }, (_, i) => i)
-    // Darren's window: 5 columns, about 7 rows.
+    // The maintainer's window: 5 columns, about 7 rows.
     expect([0, 1, 13, 24, 35, 36].map((n) => tilePageCount(n, 35))).toEqual([1, 1, 1, 1, 1, 2])
     expect(tilesOnPage(ids, 0, 35)).toEqual(ids)
     expect(tilePageOf(12, 35)).toBe(0)
@@ -32,7 +32,7 @@ describe('the Tiles view (#976)', () => {
     expect(TILES_PER_PAGE).toBe(12)
     expect([tilesPerPage(null), tilesPerPage(0), tilesPerPage(undefined), tilesPerPage(7.9)]).toEqual([12, 12, 12, 7])
     expect(tilePageCount(13, 0)).toBe(2)
-    // Never fewer than 6 a page (Darren's decision: as Panes' largest page), however few fit: a small window scrolls.
+    // Never fewer than 6 a page (decided: as Panes' largest page), however few fit: a small window scrolls.
     expect(TILES_PER_PAGE_MIN).toBe(6)
     expect([1, 4, 6].map(tilesPerPage)).toEqual([6, 6, 6])
     expect(tilePageCount(13, 2)).toBe(3)

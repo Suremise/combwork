@@ -34,13 +34,14 @@ const check = (name, ok, extra = '') => {
   const agent = await lib.addAgent(inv, alpha, { name: 'Coder' })
   await inv('session:start', alpha, { agentId: agent.id })
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
-  await lib.until(async () => (await live())?.status === 'ready', 15000)
+  // before any turn (HI-2688): its start, restart or resume
+  await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))
   await lib.sendPrompt(inv, lib.ptyKey(alpha, agent.id), 'hello', { submitted: async () => ['working', 'finished'].includes((await live())?.status) })
-  await lib.until(async () => (await live())?.status === 'finished', 15000)
+  await lib.until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))
 
   await page.locator('.activitybar button[aria-label="Performance"]').click()
   const row = page.locator('.performance-page:visible .table-wrap .table:has(th .th-sort:text-is("Sessions")) tbody tr', { hasText: 'Claude Code' }).first()
-  check('Provider usage has the session’s row', !!(await lib.until(async () => (await row.count()) === 1, 15000)))
+  check('Provider usage has the session’s row', !!(await lib.until(async () => (await row.count()) === 1, lib.timing('hang.step'))))
 
   /** Each cell's lines: how many lines of text each of its parts takes, and whether the table scrolls. */
   const measure = () =>
@@ -87,17 +88,17 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'perftable-wide.png') })
   // Narrow: the table scrolls in its section rather than breaking cells.
   await page.setViewportSize({ width: 820, height: 900 })
-  await lib.sleep(400)
+  await lib.viewportIs(page, 820)
   await row.scrollIntoViewIfNeeded()
   const narrow = await verify('narrow')
   check('narrow: the table scrolls inside its section instead', narrow.scrolls)
   await page.screenshot({ path: path.join(lib.WORK, 'perftable-narrow.png') })
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.sleep(300)
+  await lib.themeSettled(page, 'light')
   await page.screenshot({ path: path.join(lib.WORK, 'perftable-narrow-light.png') })
   await inv('settings:update', { appearance: { theme: 'dark' } })
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1.25))
-  await lib.sleep(400)
+  await lib.themeSettled(page, 'dark')
+  await lib.zoomTo(app, page, 1.25)
   await verify('125%')
   await page.screenshot({ path: path.join(lib.WORK, 'perftable-125.png') })
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(1))
@@ -105,9 +106,9 @@ const check = (name, ok, extra = '') => {
   // The Workspace Overview's table by project, narrow: "≈ $…" one line, the table scrolling in its section instead.
   await page.keyboard.press('Control+Shift+O')
   const wsRow = page.locator('.ws-projects tbody tr', { hasText: 'alpha' })
-  check('Workspace Overview: the project row', !!(await lib.until(async () => (await wsRow.count()) === 1, 10000)))
+  check('Workspace Overview: the project row', !!(await lib.until(async () => (await wsRow.count()) === 1, lib.timing('hang.ui'))))
   await page.setViewportSize({ width: 620, height: 900 })
-  await lib.sleep(400)
+  await lib.viewportIs(page, 620)
   await wsRow.scrollIntoViewIfNeeded()
   const ws1 = await wsRow.evaluate((tr) => {
     const head = [...tr.closest('table').querySelectorAll('thead th')].map((th) => th.textContent.trim().toLowerCase())

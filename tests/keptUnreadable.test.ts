@@ -7,6 +7,7 @@ import { afterAll, afterEach, describe, expect, it, onTestFinished, vi } from 'v
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { closeAllBoards } from '../src/main/boardStore'
+import { timing } from './timing.cjs'
 
 /** Reads of these files (lower-case paths) fail as a locked file does: the next `transient` reads, or all while `locked`. */
 const reads = { locked: new Set<string>(), transient: new Map<string, number>(), peeking: false }
@@ -53,7 +54,7 @@ const { createWorkspaceService, disposeWorkspaceService } = await import('../src
 const { KEPT_TRIES, KeptFileUnreadable, readKeptJson, readKeptJsonSync, retryWhileSaving, writeKeptJson } = await import('../src/main/fsutil')
 
 // A refusal reads the file again after the pauses (about 1 s), KEPT_TRIES times for a change.
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const lock = (f: string): void => void reads.locked.add(f.toLowerCase())
 /** Something else saving a kept file in place, part way (changed "a moment ago" for the whole read: unsettled, #1600). */

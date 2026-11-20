@@ -3,18 +3,18 @@ import { msg } from '../../../shared/i18n'
 import { join } from 'path'
 import { existsSync } from 'original-fs'
 import type { AgentInstallInfo, HostCheck, ModelCatalog, ReadinessIssue } from '../../../shared/types'
-import { COPILOT, COPILOT_DESCRIPTOR } from '../../../shared/copilot'
+import { COPILOT, COPILOT_DESCRIPTOR } from '../../../shared/providers/copilot'
 import { isProviderEnabled, providerSettings } from '../../../shared/providers'
 import { config } from '../../config'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { listOf } from '../../../shared/advanced'
-import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable, updateIssue } from '../common'
+import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable, updateIssue, WHERE_MS, cliProbeMs } from '../common'
 import type { CommandSpec, UpdateRetry } from '../types'
 import { COPILOT_ENV_STRIP, copilotEnv, stripsTokens } from './home'
 import { GITHUB_COM } from '../../../shared/githubHost'
 import { askCopilotModels } from './models'
-import { checkRoutes, hostEvidence, loggedInOf, parseGhStatus as parseHostGh, readCliConfig, routeContext, routeListing, routeOf, routesInUse, type CopilotRoute, type GhHostStatus, type HostCheckDeps } from './hosts'
+import { checkRoutes, hostEvidence, loggedInOf, parseGhStatus as parseHostGh, readCliConfig, routeContext, routeListing, routeOf, routesInUse, sourceName, type CopilotRoute, type GhHostStatus, type HostCheckDeps } from './hosts'
 import type { ResolvedGithubHosts } from '../../../shared/githubHost'
 import type { CatalogRead } from '../types'
 import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
@@ -91,7 +91,7 @@ async function candidates(env: Record<string, string>): Promise<{ path: string; 
   const out: { path: string; source: string }[] = []
   const custom = providerSettings(config.settings, ID).executablePath.trim()
   if (custom) out.push({ path: custom, source: 'settings' })
-  const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['copilot'], 5000, env)
+  const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['copilot'], WHERE_MS, env)
   for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
     if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
   }
@@ -124,7 +124,7 @@ export async function locateCopilot(): Promise<AgentInstallInfo> {
       info.rejected!.push(c.path)
       continue
     }
-    const r = await run(c.path, ['--version'], 15000, env)
+    const r = await run(c.path, ['--version'], cliProbeMs(), env)
     const version = parseCopilotVersion(r.stdout)
     if (!version) {
       // The path and what the CLI printed are the user's (folder names, profile names): left out of Copy Diagnostics.
@@ -222,7 +222,9 @@ export const COPILOT_HOST_TEXT = {
   deviceCodeHost: msg({ id: 'providers.copilot.host.deviceCode', defaultMessage: 'For a code to enter instead, run `copilot login --host {host} --device-code` in a terminal.', description: 'Provider Setup, under GitHub Copilot’s Sign in for a GitHub host (HI-2779): another way to sign in. {host} is the host. `…` marks a command: keep it.' }),
   ghHost: msg({ id: 'providers.copilot.host.gh', defaultMessage: 'With no login of its own there, Copilot uses the GitHub CLI’s login on {host} (`gh auth login --hostname {host}`), never one on another host.', description: 'Provider Setup, under GitHub Copilot’s Sign in for a GitHub host (HI-2779): Copilot falls back to the GitHub CLI’s sign-in on the same host only. {host} is the host. `…` marks a command: keep it.' }),
   chooseHost: msg({ id: 'providers.copilot.host.choose', defaultMessage: '{repoHost} is a GitHub Enterprise Server host: choose where Copilot signs in (github.com or your GHE.com host) in Version Control → GitHub. Its Copilot agents don’t start until you do.', description: 'Provider Setup, GitHub Copilot (HI-2779): a project’s repositories are on a GitHub Enterprise Server host ({repoHost}), where cloud Copilot can’t sign in, and no Copilot host was chosen. Version Control → GitHub names the setting’s place. GHE.com is GitHub’s product name.' }),
-  proxy: msg({ id: 'providers.copilot.host.proxy', defaultMessage: 'GitHub Enterprise Server’s Copilot proxy is a preview Combwork doesn’t support yet: choose github.com or your GHE.com host in Version Control → GitHub. Its Copilot agents don’t start until you do.', description: 'Provider Setup, GitHub Copilot (HI-2779): the Copilot sign-in setting chose GitHub Enterprise Server’s Copilot proxy (a GitHub preview), not supported yet. Version Control → GitHub names the setting’s place. GHE.com is GitHub’s product name.' })
+  proxy: msg({ id: 'providers.copilot.host.proxy', defaultMessage: 'GitHub Enterprise Server’s Copilot proxy is a preview Combwork doesn’t support yet: choose github.com or your GHE.com host in Version Control → GitHub. Its Copilot agents don’t start until you do.', description: 'Provider Setup, GitHub Copilot (HI-2779): the Copilot sign-in setting chose GitHub Enterprise Server’s Copilot proxy (a GitHub preview), not supported yet. Version Control → GitHub names the setting’s place. GHE.com is GitHub’s product name.' }),
+  unknownGh: msg({ id: 'providers.copilot.host.unknownGh', defaultMessage: 'Couldn’t check Copilot’s sign-in on {host}: the GitHub CLI didn’t answer in time. Choose Check again.', description: 'Provider Setup, GitHub Copilot (HI-3438): Copilot signs in through the GitHub CLI there, and its check (`gh auth status`) gave no usable answer in time, as on a busy PC. {host} is the host (github.com, yourcompany.ghe.com). Check again is the dialog’s button.' }),
+  unknownCopilot: msg({ id: 'providers.copilot.host.unknownCopilot', defaultMessage: 'Couldn’t check Copilot’s sign-in on {host}: Copilot didn’t answer in time. Choose Check again.', description: 'Provider Setup, GitHub Copilot (HI-3438): credentials are set for the host, and Copilot itself, asked for its models with them, gave no usable answer in time. {host} is the host (github.com, yourcompany.ghe.com). Check again is the dialog’s button.' })
 }
 
 /** Sign in's words for a host: github.com's as before, another host's with `--host`. */
@@ -250,6 +252,9 @@ function hostIssues(checks: HostCheck[], combworkEnv: NodeJS.ProcessEnv): Readin
       out.push(i === 0 && c.host === GITHUB_COM ? { ...base, action: { ...base.action!, host: c.host } } : { ...base, id: `signed-out:${c.key}`, message: installText({ m: COPILOT_HOST_TEXT.signedOut, values: { host: c.host } }), action: { ...base.action!, host: c.host } })
     } else if (c.state === 'chooseHost') out.push({ id: `copilot-host:${c.key}`, level: 'error', message: installText({ m: COPILOT_HOST_TEXT.chooseHost, values: { repoHost: c.repoHost } }) })
     else if (c.state === 'proxyUnsupported') out.push({ id: `copilot-host:${c.key}`, level: 'error', message: installText(COPILOT_HOST_TEXT.proxy) })
+    // HI-3438: a check that gave no answer in time (gh's, or Copilot's own listing with credentials set) says so: info, as it
+    // usually passes on the next Check again, never shown as ready.
+    else if (c.state === 'unknown' && c.host) out.push({ id: `copilot-host-unknown:${c.key}`, level: 'info', message: installText({ m: c.source === sourceName({ source: 'gh', variable: null }) ? COPILOT_HOST_TEXT.unknownGh : COPILOT_HOST_TEXT.unknownCopilot, values: { host: c.host } }) })
   })
   return out
 }

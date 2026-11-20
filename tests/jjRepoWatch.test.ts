@@ -15,6 +15,7 @@ import { jjRepoWatch, type WatchFn, type Where } from '../src/main/platform/jjRe
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /** A test's watch: each subscription by folder, its callback and its close/error handlers. */
 function fakeWatch() {
@@ -106,13 +107,13 @@ describe.skipIf(!jjExe)(`a jj project's repository watch (jj ${TESTED_JJ.version
 })
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 /** Polls a condition until it holds, failing past `ms`. */
 async function until(ok: () => boolean, ms: number): Promise<void> {
   const end = Date.now() + ms
   while (!ok()) {
     if (Date.now() > end) throw new Error('timed out waiting')
-    await new Promise((r) => setTimeout(r, 20))
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
 }
 

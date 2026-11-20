@@ -13,9 +13,8 @@ const ws = path.join(lib.WORK, 'skills-ws')
 const oldWs = path.join(lib.WORK, 'skills-old-ws')
 const proj = path.join(ws, 'demo')
 const dump = path.join(lib.WORK, 'skills-dump')
-const sleep = lib.sleep
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 /** The bundled skills from before Combwork kept track of them (an existing workspace without them deleted them), and the newer ones. */
@@ -86,9 +85,9 @@ const check = (name, ok, extra = '') => {
   check('its page offers Revert to default', await becomes(async () => (await page.getByText('Revert to default').count()) === 1))
   check('a Combwork skill in preview: no warning over it', (await page.locator('.split .skills-warning').count()) === 0)
   await page.getByText('Revert to default').click()
-  await sleep(400)
+  await lib.until(async () => (await page.locator('.dialog .btn.primary', { hasText: 'Revert' }).count()) === 1, HUNG_MS)
   await page.locator('.dialog .btn.primary', { hasText: 'Revert' }).click()
-  await lib.until(async () => (await inv('skills:workspace')).find((s) => s.name === 'pick-up')?.bundled === 'same', 10000)
+  await lib.until(async () => (await inv('skills:workspace')).find((s) => s.name === 'pick-up')?.bundled === 'same', lib.timing('hang.ui'))
   list = await inv('skills:workspace')
   check('reverted: "same" again, edit gone', list.find((s) => s.name === 'pick-up')?.bundled === 'same' && !fs.readFileSync(pickUp, 'utf8').includes('My own step'))
 
@@ -108,9 +107,9 @@ const check = (name, ok, extra = '') => {
   check('its page says so, beside Revert to default', await becomes(async () => (await page.locator('.editor-toolbar .badge', { hasText: 'Update available' }).count()) === 1))
   await page.screenshot({ path: path.join(lib.WORK, 'skills-update.png') })
   await page.getByText('Revert to default').click()
-  await sleep(400)
+  await lib.until(async () => (await page.locator('.dialog .btn.primary', { hasText: 'Revert' }).count()) === 1, HUNG_MS)
   await page.locator('.dialog .btn.primary', { hasText: 'Revert' }).click()
-  await lib.until(async () => (await inv('skills:workspace')).find((s) => s.name === 'pick-up')?.bundled === 'same', 10000)
+  await lib.until(async () => (await inv('skills:workspace')).find((s) => s.name === 'pick-up')?.bundled === 'same', lib.timing('hang.ui'))
   list = await inv('skills:workspace')
   check('reverting takes the update', list.find((s) => s.name === 'pick-up')?.bundled === 'same' && !list.find((s) => s.name === 'pick-up')?.updateAvailable)
 
@@ -119,10 +118,10 @@ const check = (name, ok, extra = '') => {
   check('deleted bundled skill: folder gone', await becomes(() => !fs.existsSync(path.join(skillsDir, 'split-work'))))
   check('deleted bundled skill: listed greyed as deleted', await becomes(async () => (await page.locator('.skill-row.missing', { hasText: 'split-work' }).count()) === 1))
   await page.locator('.skill-row.missing', { hasText: 'split-work' }).click()
-  await sleep(800)
+  await lib.until(async () => (await page.locator('.editor-toolbar .btn', { hasText: 'Restore' }).count()) === 1, HUNG_MS)
   await page.screenshot({ path: path.join(lib.WORK, 'skills-missing.png') })
   await page.locator('.editor-toolbar .btn', { hasText: 'Restore' }).click()
-  await lib.until(async () => fs.existsSync(path.join(skillsDir, 'split-work', 'SKILL.md')) && (await page.locator('.skill-row.missing').count()) === 0, 10000)
+  await lib.until(async () => fs.existsSync(path.join(skillsDir, 'split-work', 'SKILL.md')) && (await page.locator('.skill-row.missing').count()) === 0, lib.timing('hang.ui'))
   check('restored', fs.existsSync(path.join(skillsDir, 'split-work', 'SKILL.md')) && (await page.locator('.skill-row.missing').count()) === 0)
 
   // HI-2011: a skill as a contents page. card-loop's page shows its files as tabs, a link in SKILL.md opens its file's
@@ -188,19 +187,18 @@ const check = (name, ok, extra = '') => {
   // Shown first, then deleted: the notice is for a skill that goes while it's on screen.
   await lib.until(async () => (await page.locator('.skill-row.selected', { hasText: 'deploy' }).count()) === 1, HUNG_MS)
   fs.rmSync(path.join(skillsDir, 'deploy'), { recursive: true, force: true })
-  await lib.until(async () => (await page.getByText('no longer exists in this workspace').count()) === 1, 10000)
+  await lib.until(async () => (await page.getByText('no longer exists in this workspace').count()) === 1, lib.timing('hang.ui'))
   check('a skill deleted meanwhile: "no longer exists"', (await page.getByText('no longer exists in this workspace').count()) === 1)
 
   // Project Skills tab (#118): Combwork's skills open at the top, then one provider's skills, folded, picked from a dropdown
   // that starts on the project's default provider; the choice and what is open are remembered for the project; local
   // skills added for both at once.
   await page.keyboard.press('Control+Shift+E')
-  await sleep(500)
   await page.getByText('demo', { exact: true }).first().click()
-  await sleep(600)
+  await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')).includes('demo'), HUNG_MS)
   await lib.openMoreTab(page, 'Skills')
   const pick = page.locator('.skill-provider-pick select')
-  await lib.until(async () => (await pick.count()) === 1, 10000)
+  await lib.until(async () => (await pick.count()) === 1, lib.timing('hang.ui'))
   const pickOptions = await pick.locator('option').allInnerTexts()
   check('project tab: a dropdown of the providers, starting on the default one', pickOptions.length === 2 && pickOptions[0].startsWith('Claude Code') && pickOptions[1].startsWith('Codex') && (await pick.inputValue()) === 'claude-code', JSON.stringify({ pickOptions, value: await pick.inputValue() }))
   const combworkToggle = page.locator('.skill-group-toggle', { hasText: 'Combwork' }).first()
@@ -219,7 +217,7 @@ const check = (name, ok, extra = '') => {
   await page.locator('.dialog input.input').fill('lint-rules')
   await page.locator('.dialog input[type=checkbox]').check()
   await page.locator('.dialog .btn.primary', { hasText: 'Create' }).click()
-  await lib.until(async () => fs.existsSync(path.join(proj, '.claude', 'skills', 'lint-rules', 'SKILL.md')) && fs.existsSync(path.join(proj, '.agents', 'skills', 'lint-rules', 'SKILL.md')), 10000)
+  await lib.until(async () => fs.existsSync(path.join(proj, '.claude', 'skills', 'lint-rules', 'SKILL.md')) && fs.existsSync(path.join(proj, '.agents', 'skills', 'lint-rules', 'SKILL.md')), lib.timing('hang.ui'))
   check('local skill added for Claude Code', fs.existsSync(path.join(proj, '.claude', 'skills', 'lint-rules', 'SKILL.md')))
   check('…and for Codex (tick box)', fs.existsSync(path.join(proj, '.agents', 'skills', 'lint-rules', 'SKILL.md')))
   const all = await inv('skills:list', proj)
@@ -232,9 +230,9 @@ const check = (name, ok, extra = '') => {
   await pick.selectOption('codex')
   await combworkToggle.click()
   await page.keyboard.press('Alt+1')
-  await sleep(300)
+  await lib.until(async () => (await page.locator('.tabs .tab-more.active').count()) === 0, HUNG_MS)
   await lib.openMoreTab(page, 'Skills')
-  await lib.until(async () => (await pick.count()) === 1, 5000)
+  await lib.until(async () => (await pick.count()) === 1, lib.timing('hang.ui'))
   const saved = await inv('ui:get')
   const savedPick = saved.skillsProvider ?? {}
   check('the provider shown is remembered for the project', (await pick.inputValue()) === 'codex' && savedPick[proj.toLowerCase()] === 'codex', JSON.stringify({ value: await pick.inputValue(), savedPick }))
@@ -245,7 +243,7 @@ const check = (name, ok, extra = '') => {
   await localRow.hover()
   await localRow.locator('button[aria-label="Delete skill"]').click()
   await page.locator('.dialog .btn.danger', { hasText: 'Delete' }).click()
-  await lib.until(async () => !fs.existsSync(path.join(proj, '.agents', 'skills', 'lint-rules')), 10000)
+  await lib.until(async () => !fs.existsSync(path.join(proj, '.agents', 'skills', 'lint-rules')), lib.timing('hang.ui'))
   check('local skill deleted in the project tab', !fs.existsSync(path.join(proj, '.agents', 'skills', 'lint-rules')) && fs.existsSync(path.join(proj, '.claude', 'skills', 'lint-rules')))
 
   // "Edit in workspace" on a Combwork skill opens it in the Skills view, in the editor. Combwork's group unfolded first.
@@ -253,7 +251,7 @@ const check = (name, ok, extra = '') => {
   check('the Combwork group unfolds', (await combworkToggle.getAttribute('aria-expanded')) === 'true' && !!(await lib.until(async () => (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1, HUNG_MS)))
   const combworkRow = page.locator('.skill-row', { hasText: 'workspace-note' }).first()
   await combworkRow.click()
-  await lib.until(async () => (await page.locator('.split .editor-toolbar', { hasText: 'workspace-note' }).count()) === 1, 5000)
+  await lib.until(async () => (await page.locator('.split .editor-toolbar', { hasText: 'workspace-note' }).count()) === 1, lib.timing('hang.ui'))
   check('project tab: a Combwork skill (view only) has no warning', (await page.locator('.skills-warning').count()) === 0)
   await combworkRow.hover()
   await combworkRow.locator('button[aria-label^="Edit in the workspace"]').click()
@@ -268,7 +266,7 @@ const check = (name, ok, extra = '') => {
   if (Date.now() - editAt > 2000 || !inSkillsView) console.log(`  (Edit in workspace: the Skills view drew the skill selected ${Date.now() - editAt} ms after the click; selected rows at first [all, visible]: ${JSON.stringify(firstLook)}, now ${JSON.stringify(await selectedRows())})`)
   // The Skills view's page loads its list, then Monaco (lazily) and the file: wait for its editor, or a preview (which
   // would mean it failed). The project tab's page for the same skill stays in the DOM, hidden: only visible ones count.
-  await lib.until(async () => (await page.locator('.split .monaco-editor:visible, .split .scroll-page:visible').count()) >= 1, 10000)
+  await lib.until(async () => (await page.locator('.split .monaco-editor:visible, .split .scroll-page:visible').count()) >= 1, lib.timing('hang.ui'))
   check('Edit in workspace: Skills view with the skill selected', inSkillsView)
   check('Edit in workspace: opens in the editor, not the preview', (await page.locator('.split .monaco-editor').count()) >= 1)
   const editWarning = await page.evaluate(() => {
@@ -281,7 +279,7 @@ const check = (name, ok, extra = '') => {
   check('editing a Combwork skill: the same warning, above the editor (#120)', editWarning?.text === 'Warning: Editing these skills may change agent behaviour in Combwork' && editWarning.between, JSON.stringify(editWarning))
   await page.screenshot({ path: path.join(lib.WORK, 'skills-edit.png') })
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await sleep(300)
+  await lib.themeShown(page, 'light')
   await page.screenshot({ path: path.join(lib.WORK, 'skills-edit-light.png') })
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await page.locator('.split button[aria-label="Preview"]').click()

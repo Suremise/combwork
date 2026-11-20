@@ -11,7 +11,7 @@ for (const n of ['alpha', 'beta']) fs.mkdirSync(path.join(ws, n), { recursive: t
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 ;(async () => {
   lib.enableProviders(userData)
@@ -33,7 +33,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
     }
     const left = async (label) => becomes(async () => !(await settingsShown()) && (await active()) === label)
 
-    // Settings on Agent API, as in Darren's screenshot.
+    // Settings on Agent API, as in the user's screenshot.
     check('the gear opens Settings', await gear())
     await page.locator('.settings-nav .row[data-section="agentApi"]').click()
     check('…on Agent API', await becomes(async () => (await section()) === 'agentApi'))

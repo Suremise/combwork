@@ -10,6 +10,7 @@ import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
 import type { GitlinkChange } from './gitlink'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
+import type { IdleResume } from './sessionFresh'
 import type { FreshReason } from './sessionFresh'
 import type { TipsState } from './tips'
 import type { GithubHostSettings } from './githubHost'
@@ -31,6 +32,7 @@ import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
 import type { NamedFolder, ResumeHold, ShownPlace } from './agentFolders'
 import type { StageNameProblem } from './workflow/stages'
+import type { GuardProblem } from './workflow/mergeGuards'
 import type { TemplateWorkflow, TemplateWorkflowOverlay } from './workflow/templateOptions'
 import type { StageId } from './workflow/facts'
 import type { StageDef } from './workflow/compile'
@@ -82,7 +84,7 @@ export type WindowTextField =
   | 'notFilteredText'
 
 export type ThemeSetting = 'dark' | 'light' | 'system'
-/** A coding-agent CLI Combwork can run ("claude-code", "codex"). See src/shared/providers.ts. */
+/** A coding-agent CLI Combwork can run ("claude-code", "codex"): its descriptor's id (src/shared/providers/registry.ts lists them). */
 export type ProviderId = string
 /** A permission mode id from the agent's provider (e.g. Claude Code's "auto", Codex's "approve-for-me"). */
 export type PermissionMode = string
@@ -467,7 +469,7 @@ export interface AssistantProviderSettings {
   effort: EffortLevel | ''
   permissionMode: PermissionMode | ''
   extraArgs: string
-  /** Run with a 200K context window instead of the model's 1M one (capabilities.contextLimit); '' follows the provider's settings. */
+  /** Run with a 200K context window instead of the model's 1M one (capabilities.compaction.contextLimit); '' follows the provider's settings. */
   use200kContext: '' | 'on' | 'off'
 }
 
@@ -505,12 +507,12 @@ export interface ProviderSettings {
   enableDangerousMode: boolean
   extraArgs: string
   checkUpdatesOnLaunch: boolean
-  /** Let sessions move into the CLI's own background service (capabilities.backgroundSessions). Off: Combwork turns it off. */
+  /** Let sessions move into the CLI's own background service (capabilities.background.backgroundSessions). Off: Combwork turns it off. */
   allowBackgroundSessions: boolean
-  /** Run sessions with a 200K context window instead of the model's 1M one (capabilities.contextLimit). */
+  /** Run sessions with a 200K context window instead of the model's 1M one (capabilities.compaction.contextLimit). */
   use200kContext: boolean
   /**
-   * Where a session's cost comes from when the provider reports one (capabilities.reportsCost, #436): the CLI's own
+   * Where a session's cost comes from when the provider reports one (capabilities.usage.reportsCost, #436): the CLI's own
    * report (the truth, from its own price table: Combwork never recomputes it), or Combwork's estimate from the price table.
    */
   costSource: 'reported' | 'prices'
@@ -736,7 +738,7 @@ export interface PlanLimit {
    * `firstSeenAt` (the session's first report of this figure), and after `changedAfter` (its report before, of another
    * figure; absent for a session's first). Two readings so ordered: the newer one is what it is now, even lower.
    * `takenAfter` (HI-3187): its run's launch, where the provider's readings all come from the run's own API calls
-   * (capabilities.planUsageSinceLaunch), so a run's first report is dated too.
+   * (capabilities.usage.planUsageSinceLaunch), so a run's first report is dated too.
    */
   firstSeenAt?: string
   changedAfter?: string
@@ -746,6 +748,11 @@ export interface PlanLimit {
    * `gemini`, `otherModels` (agy's third-party models), `premium` (Copilot's premium requests), else the provider's own word.
    */
   models?: string
+  /**
+   * A provider's own name for the part of the plan a limit covers, shown as it is (HI-1125: Codex's `limit_name`, else its
+   * `limit_id`, bounded): never read as one of `models`' kinds, so a limit named `chat` is "chat", not Copilot's chat messages.
+   */
+  scope?: string
   /**
    * An unlimited entitlement the provider reported (HI-2734: Copilot): shown as such, no meter, never warned of. Its
    * usedPercent is 0, a placeholder, never a measured 0: every reader checks hasShare() (shared/planLimits.ts) first.
@@ -810,7 +817,7 @@ export interface Account {
   id: string
   provider: ProviderId
   /**
-   * Where it gets its model (Darren, 27 Oct ~08:55): `signIn`, a login folder of Combwork's signed in through the CLI's own
+   * Where it gets its model: `signIn`, a login folder of Combwork's signed in through the CLI's own
    * sign-in; `server`, a server it reaches by a base URL, with a key or none (HI-1772: DeepSeek, Ollama…), in a folder of
    * Combwork's too. Absent in a record from before it: signIn.
    */
@@ -1000,7 +1007,7 @@ export interface ConnectionDefaults {
 export type MovedField = 'model' | 'effort' | 'use200kContext'
 
 /**
- * A CLI's project overrides moved onto the project's agents (HI-1770, Darren's 26 Oct ~23:25 (2)): when, and each value
+ * A CLI's project overrides moved onto the project's agents (HI-1770, (2)): when, and each value
  * an agent was given (`id`: `<cli>:<agentId>:<field>`, stable, for the notice and its dismissal).
  */
 export interface ConnectionsMoved {
@@ -1147,6 +1154,19 @@ export interface CloseCommandSetting {
 export type CloseReason = 'window' | 'switch' | 'quit' | 'update'
 
 /** A close command's run as its panel shows it (HI-1368): the `close-command` event's and closeCommand:state's. */
+/**
+ * HI-3376: a window waiting for agents to close (its workspace closing or switching, or Combwork quitting): how many runs
+ * are still running, starts still being cancelled, and slot writers not yet released; `late` once it has waited longer
+ * than their CLIs' exit graces give. Its own wait's (`id`), never a close command run's.
+ */
+export interface ClosingAgentsState {
+  id: string
+  running: number
+  starting: number
+  writers: number
+  late: boolean
+}
+
 export interface CloseCommandRun {
   id: string
   /** 'workspace': this window's workspace's; 'quit': When Combwork quits, run. */
@@ -1664,7 +1684,7 @@ export type WorkflowProblem = OwnWorkflowProblem | { kind: 'inheritor'; project:
  * A problem of the options being saved themselves; an inheritor's (#1422): a project inheriting a level's change would
  * have that problem in its own options.
  */
-export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | ({ kind: 'stageName' } & StageNameProblem) | { kind: 'bad'; why: string }
+export type OwnWorkflowProblem = { kind: 'contradiction'; id: Contradiction } | ({ kind: 'stageName' } & StageNameProblem) | ({ kind: 'guard' } & GuardProblem) | { kind: 'bad'; why: string }
 
 /** The levels of workflow defaults the window edits (#1422): Combwork's (config) and the workspace's (workspace.json). */
 export type WorkflowLevel = 'global' | 'workspace'
@@ -2056,7 +2076,7 @@ export interface ProjectProviderConfig {
   effort: Inherit<EffortLevel>
   permissionMode: Inherit<PermissionMode>
   extraArgs: string
-  /** 200K context instead of 1M (capabilities.contextLimit). */
+  /** 200K context instead of 1M (capabilities.compaction.contextLimit). */
   use200kContext: Inherit<'on' | 'off'>
 }
 
@@ -2077,7 +2097,7 @@ export interface AgentDef {
   model?: string
   effort?: EffortLevel
   permissionMode?: PermissionMode
-  /** 200K context instead of 1M (capabilities.contextLimit); as model. */
+  /** 200K context instead of 1M (capabilities.compaction.contextLimit); as model. */
   use200kContext?: boolean
   /** Session to resume for this agent. */
   lastSessionId?: string
@@ -2481,6 +2501,11 @@ export interface SessionRecord {
   serverLocal?: true
   notLocal?: true
   id: string
+  /**
+   * It has had its first prompt (HI-3196): a CLI that resumes by Combwork's id alone (no transcript Combwork reads) has a
+   * conversation to resume only then. Kept once set.
+   */
+  prompted?: true
   /** The provider that ran it ("claude-code", "codex"). The field name predates providers. */
   agent: ProviderId
   name: string
@@ -3074,7 +3099,7 @@ export interface MoveHostPlan {
 
 /**
  * An agent's branch in Combwork's form, cw/<workspace>/<project>/<agent>, whose workspace or project part is an old one
- * (#1305, Darren's decision on #1303: renamed, never offered): `to` is its name here. `remote`: the remote it tracks,
+ * (#1305, decided on #1303: renamed, never offered): `to` is its name here. `remote`: the remote it tracks,
  * which keeps the old name (pushing under the new one is the user's step). `kept`: why it isn't renamed now
  * (`exists`: a branch of that name is already there). `pending`: a rename a Repair before began and couldn't finish
  * (project.json's `pendingBranchRenames`), finished now from where it stopped.
@@ -3500,7 +3525,7 @@ export interface SessionUsage {
    */
   costUnreported?: Pick<SessionUsage, 'inputTokens' | 'outputTokens' | 'cacheWriteTokens' | 'cacheReadTokens'>
   /**
-   * It ran only on servers on this PC (HI-1772, Darren 27 Oct): free, its cost a known $0, shown as "free (local)"; its
+   * It ran only on servers on this PC (HI-1772): free, its cost a known $0, shown as "free (local)"; its
    * tokens counted as any session's.
    */
   costFree?: true
@@ -3698,6 +3723,8 @@ export interface SessionListItem extends Partial<SessionRecord> {
   deleted?: boolean
   usage: SessionUsage | null
   recache: RecacheEstimate | null
+  /** HI-3360: idle so long its resume counts as cold (Settings → Advanced), with its age and size; absent: it doesn't, or the rule is off. */
+  idle?: IdleResume
   /** The usage history doesn't have it yet (#1106): its figures follow once the worker has read it (the window is told). */
   pending?: boolean
   /** The slot it ran in (#1434), if it ran in one of the project's. */
@@ -4304,6 +4331,8 @@ export interface OpenProgress {
 
 /** Events pushed from main to renderer. */
 export type CombworkEvent =
+  /** The user's own CLIs as main read them now (HI-3196): every window registers this snapshot, replacing the last. */
+  | { type: 'clis'; snapshot: import('./providers/cliSnapshot').CliSnapshotView }
   | { type: 'workspace-changed'; workspace: WorkspaceInfo | null }
   /** A workspace's team paused or resumed (HI-2081): its pause now, or null. */
   | { type: 'team-pause-changed'; workspacePath: string; pause: import('./teamPause').TeamPause | null; was?: import('./teamPause').TeamPause | null }
@@ -4353,6 +4382,8 @@ export type CombworkEvent =
   | { type: 'quit-pending'; pending: boolean; working: number }
   /** This window's close command (HI-1368): the panel shows it while it runs or failed; null: none (the panel goes). */
   | { type: 'close-command'; run: CloseCommandRun | null }
+  /** HI-3376: this window waits for agents to close: the panel shows it; null: none (the panel goes). */
+  | { type: 'closing-agents'; state: ClosingAgentsState | null }
   /** How many working agents keep the PC awake (0: it may sleep). */
   | { type: 'keep-awake'; working: number }
   /** Files changed in a project that has a Files or Images tab open. dirs are relative, '' is the root. */
@@ -4598,9 +4629,10 @@ export interface LaneEditResult {
   card: number | null
   /**
    * Each lane it changed, with the card in flight its change was queued after (null: applied now), and the revision its
-   * list is at after this edit (HI-2932: the window names it in its next quick edit).
+   * list is at after this edit (HI-2932: the window names it in its next quick edit). `first` (HI-3323): queued as a yield
+   * to that card, which the card in flight waits on: it switches at its builder's turn end, not at its Done.
    */
-  lanes: { lane: string; queuedAfter: number | null; rev: number }[]
+  lanes: { lane: string; queuedAfter: number | null; rev: number; first?: number }[]
   undo: LaneEditUndo | null
   /** Cancel Change (HI-3062): the cards its queued change took off that couldn't come back now, left where they are. */
   leftOut?: number[]
@@ -4688,6 +4720,11 @@ export interface LaneStatus {
   why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies' | 'stopped'
   /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */
   waitsFor?: string
+  /**
+   * listChanges (HI-3323): the queued list puts this card first, which `card` (in Doing) waits on: the lane switches to it
+   * once its builder (`agent`) is out of a turn with `card`'s work committed, `card` put back to Todo meanwhile.
+   */
+  first?: number
   /** startWait `dependencies` (HI-2618): every card it depends on that isn't Done yet, by key, in its `blockedBy` order. */
   waitingOn?: string[]
   /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */
@@ -4806,6 +4843,11 @@ export interface ProgressRun {
   heldEstimateMs: number | null
   /** The reporting process, when the reporter gave it: once it is gone, an open run ends as stopped (gone). */
   pid: number | null
+  /**
+   * HI-3206: the reporter's own clock just before it sent its start (ms), when it gave one: a process by `pid` created
+   * strictly before it is the reporter (runProcesses.ts), so its process tree is the run's. Absent: none is.
+   */
+  reporterSentAt?: number
   summary: string | null
   /** The user dismissed it: listed under Recent only. */
   dismissed: boolean

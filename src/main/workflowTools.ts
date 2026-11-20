@@ -1,5 +1,5 @@
 /**
- * The Combwork tools a project's workflow makes unusable (HI-2694, Darren 7 Nov: launch-only): left out of a project
+ * The Combwork tools a project's workflow makes unusable (HI-2694: launch-only): left out of a project
  * agent's tool list when it launches (CW_WORKFLOW_HIDDEN, beside HI-2664's CW_SIDE), and a workflow settings change
  * restarts the agents whose list it changes, as a role change does (sessions.restartForTools: idle at once, busy after
  * asking), only for the tools that change moved (HI-2744). Hidden only where every set of rules still in force forbids a tool: the project's options now, and each ruleset
@@ -90,7 +90,7 @@ export function forgetWorkflowHidden(): void {
 }
 
 /**
- * Restarts a project's running agents whose tool list its workflow now changes (HI-2694, Darren's decision: as a role
+ * Restarts a project's running agents whose tool list its workflow now changes (HI-2694: as a role
  * change does, through sessions.restartForTools): an idle one at once; busy ones are asked about in the window, once for
  * this change (`tools-restart-asked`), and keep their old tools until they restart (sessions.sideAllows holds work that
  * needs the new ones meanwhile).

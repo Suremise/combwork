@@ -8,6 +8,7 @@ import { whyNoLine } from '../src/main/lineWriter'
 import { advanced } from '../src/main/advanced'
 import { sessions } from '../src/main/sessions'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const project = 'C:/fake-ws/alpha'
 const id = 'b1'
@@ -23,7 +24,7 @@ function launched(status = 'ready', tools = true): Entry {
     prompts: 0,
     ...(tools ? { combworkTools: 'connecting' as const } : {})
   }
-  Object.assign(e, { adapter: { descriptor: { capabilities: { startupSizeRefresh: false } } } })
+  Object.assign(e, { adapter: { descriptor: { capabilities: { terminal: { startupSizeRefresh: false } } } } })
   live.set(key, e)
   emit(e)
   return e
@@ -123,7 +124,7 @@ describe("no line of Combwork's before a launch's Combwork tools have connected 
       expect(settled).toBe(false)
       // Past the lowered bound (not the old 30 s): the wait, looking again when its timer for what was left fires, ends.
       vi.setSystemTime(Date.now() + 1_100)
-      await vi.waitFor(() => expect(settled).toBe(true), { timeout: 10_000 })
+      await vi.waitFor(() => expect(settled).toBe(true), { timeout: timing('wait.hang') })
       expect(sessions.combworkToolsWaiting(project, id)).toBe(false)
       await wait
     } finally {

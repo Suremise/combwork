@@ -1,5 +1,6 @@
-import type { Account, Connection, ConnectionDefaults, LaunchValues, ProviderId, WorkspaceConnections, WorkspaceConfig } from './types'
-import { permissionLabel, providerDescriptor } from './providers'
+import type { Account, AppSettings, Connection, ConnectionDefaults, LaunchValues, ProviderId, WorkspaceConnections, WorkspaceConfig } from './types'
+import { agentProvider, permissionLabel, providerDescriptor } from './providers'
+import { agentWorkflowRole, reviewsWork, type WorkflowRole } from './workflow/roles'
 
 /**
  * Combwork's accounts (HI-980) and connections (HI-2106): what an account's state is from its two identities, which accounts
@@ -12,16 +13,41 @@ import { permissionLabel, providerDescriptor } from './providers'
  * (its main repository root) its CLI doesn't trust yet, where Set Up opens; `unknown`, some couldn't be told.
  */
 export interface ConnectionTrust {
-  /** The folders still to trust; `git`: a Git root, which a trusted folder above it never covers (HI-2520). */
-  pending: { project: string; folder: string; git: boolean }[]
+  /**
+   * The folders still to trust; `git`: a Git root, which a trusted folder above it never covers (HI-2520); `copies`: the
+   * workspace's worktrees folder, where its reviewers' review copies are (HI-3337), its `project` that folder's name.
+   */
+  pending: { project: string; folder: string; git: boolean; copies?: true }[]
   unknown: boolean
   /**
    * Where Set Up asks the trust question next (HI-1871): the workspace's folder (`workspace`), which covers the
    * projects without Git in it for a CLI whose trust is inherited, else the first pending project's main root.
    */
-  setUpIn?: { folder: string; project?: string; workspace?: true }
+  setUpIn?: { folder: string; project?: string; workspace?: true; copies?: true }
   /** Its answer for the workspace's current projects isn't in yet (HI-1870 round 3): shown as Checking…, never set up. */
   checking?: true
+}
+
+/** An agent as trustInputsKey reads it: what decides its CLI, its connection and whether it reviews. */
+type TrustAgent = { id?: string; name: string; role?: string; workflowRole?: WorkflowRole; provider?: ProviderId; connection?: string }
+
+/**
+ * What the folders each connection's trust is read for depend on (main's projectsFor), as one key: the window reads
+ * the connections again when it changes (HI-1870, HI-1871). Each agent's CLI as its launch resolves it, its connection,
+ * and whether it reviews (HI-3341: a reviewer's connection also needs the review copies' folder, HI-3337); whether
+ * review copies are on, and each CLI's version (HI-3342: only a version that asks needs that folder).
+ */
+export function trustInputsKey(
+  projects: readonly { path: string; agents: readonly TrustAgent[] }[],
+  assistant: readonly TrustAgent[],
+  settings: Pick<AppSettings, 'providers'> | null | undefined,
+  copiesReview: boolean,
+  versions: Partial<Record<ProviderId, { version: string | null } | undefined>>
+): string {
+  const agent = (a: TrustAgent): string => `${a.id ?? ''}=${agentProvider(a, settings)}/${a.connection ?? ''}${reviewsWork(agentWorkflowRole(a)) ? '/r' : ''}`
+  const each = projects.map((p) => `${p.path}:${p.agents.map(agent).join(',')}`).join('|')
+  const cli = Object.entries(versions).map(([p, v]) => `${p}@${v?.version ?? ''}`).join(',')
+  return `${each}#${assistant.map(agent).join(',')}#${copiesReview ? 1 : 0}#${cli}`
 }
 
 /**
@@ -104,9 +130,10 @@ export interface ConnectionsView {
   /** `setUp` (HI-1870): its CLI's first-run setup done in its folder, as last read; null, can't be told; absent, not read yet. */
   /**
    * The accounts (HI-2106; Combwork's folders only, not the CLI's own homes), as today's screens show them until HI-2107:
-   * `defaults`, its base connection's model, effort and context.
+   * `defaults`, its base connection's model, effort and context. `gone`: its CLI isn't registered now (HI-3270: a
+   * description removed or renamed), so it can only be removed, or used again once that description is back.
    */
-  connections: (Account & { defaults?: ConnectionDefaults; defaultsFrom?: 'cli'; signingIn: boolean; folder: string; key?: { last4: string; at: string }; setUp?: boolean | null; trust?: ConnectionTrust })[]
+  connections: (Account & { gone?: true; defaults?: ConnectionDefaults; defaultsFrom?: 'cli'; signingIn: boolean; folder: string; key?: { last4: string; at: string }; setUp?: boolean | null; trust?: ConnectionTrust })[]
   /** Per provider, as it applies (workspaceAccounts); absent: not set up in this workspace. */
   workspace: Partial<Record<ProviderId, WorkspaceConnections>>
   /** Providers a test copy runs on its CLI test home where nothing is on (the test seam, HI-1755): no setup is asked for. */
@@ -193,7 +220,7 @@ export function acceptable(o: Account['observed'], orgs = true): { email: string
 
 /**
  * A workspace's connections for a provider as they apply: ids of connections that no longer exist (or are another
- * provider's) dropped, in the preference order, and its `default` **derived** (HI-1875, Darren 27 Oct): the first
+ * provider's) dropped, in the preference order, and its `default` **derived** (HI-1875): the first
  * connection in the order that's on here (`firstOn`), never a stored choice (one left in workspace.json is ignored).
  * `undefined`: not set up yet.
  */
@@ -360,7 +387,7 @@ export function launchValues(v: LaunchValues | null | undefined, cli: ProviderId
   const out: LaunchValues = {}
   if (v?.model?.trim()) out.model = v.model.trim()
   if (v?.effort && !server) out.effort = v.effort
-  if (v?.use200kContext === true && !server && d.capabilities.contextLimit) out.use200kContext = true
+  if (v?.use200kContext === true && !server && d.capabilities.compaction?.contextLimit) out.use200kContext = true
   if (v?.permissionMode && v.permissionMode !== d.defaultPermissionMode) out.permissionMode = v.permissionMode
   if (v?.extraArgs?.trim()) out.extraArgs = v.extraArgs.trim()
   return out
@@ -379,6 +406,25 @@ export const connectionsOn = <C extends Pick<Connection, 'account'>>(account: st
 
 /** An account's base connection (HI-2106): its first, made with it; none while it has none. */
 export const baseConnection = (account: string, connections: readonly Connection[]): Connection | undefined => connections.find((c) => c.account === account)
+
+/** Which rule matched an agent's connection on another account (HI-2530, HI-3213), said in the notice. */
+export type MatchedBy = 'tag' | 'name' | 'default'
+
+/**
+ * The connection on account `target` an agent's connection goes to (HI-2530: a usage move; HI-3213: its account off
+ * here): the first there with the same tag as the one it is on (any case and spacing; an untagged connection skips
+ * this), else the same name (any case), else the target's first connection, its default. Undefined only when the
+ * target has none.
+ */
+export function matchConnection(from: Pick<Connection, 'name' | 'tag'>, target: string, connections: readonly Connection[]): { connection: Connection; by: MatchedBy } | undefined {
+  const on = connectionsOn(target, connections)
+  const byTag = cleanTag(from.tag) ? on.find((c) => sameTag(c.tag, from.tag)) : undefined
+  if (byTag) return { connection: byTag, by: 'tag' }
+  const key = from.name.trim().toLowerCase()
+  const byName = on.find((c) => c.name.trim().toLowerCase() === key)
+  if (byName) return { connection: byName, by: 'name' }
+  return on[0] ? { connection: on[0], by: 'default' } : undefined
+}
 
 /** The connection on an account whose values are these (as launchValues keeps them), the earliest; none if no such one. */
 export function matchingConnection(account: Pick<Account, 'id' | 'provider' | 'kind'>, values: LaunchValues, connections: readonly Connection[]): Connection | undefined {
@@ -424,21 +470,29 @@ export function accountOnIn(cfg: Pick<WorkspaceConfig, 'connections'> | null | u
  * Which connection a launch uses (HI-2106, decision H), from the agent's (or the Assistant's) connection and the
  * workspace's accounts:
  * - its connection, on an account of its CLI that's on here: that one;
- * - its account off here, or the connection removed (or another CLI's), or none: its CLI's first usable connection here
- *   (the base connection of the first account in the order that's on here and has one), noted when it named one
- *   (`offFallback`, `missing`);
+ * - its account off here (`offFallback`): on the first account in the order that's on here and has a connection, the one
+ *   matching its own as a usage move matches (HI-3213, matchConnection: the same tag, else the same name, else that
+ *   account's first), `by` saying which;
+ * - the connection removed (or another CLI's), or none: its CLI's first usable connection here (the base connection of
+ *   the first account in the order that's on here and has one), noted when it named one (`missing`);
  * - none usable: refused (`none`: nothing named; `offNoDefault`: named, but none to fall back to).
  */
-export type AgentConnection = { ok: true; connection: Connection; account: Account; note?: 'offFallback' | 'missing' } | { ok: false; why: 'none' | 'offNoDefault'; wanted?: string }
+export type AgentConnection = { ok: true; connection: Connection; account: Account; note?: 'offFallback' | 'missing'; by?: MatchedBy } | { ok: false; why: 'none' | 'offNoDefault'; wanted?: string }
 
 export function resolveAgentConnection(cfg: Pick<WorkspaceConfig, 'connections'> | null | undefined, cli: ProviderId, wanted: string | null | undefined, accounts: readonly Account[], connections: readonly Connection[]): AgentConnection {
   const c = wanted ? connections.find((x) => x.id === wanted) : undefined
   const a = c ? accounts.find((x) => x.id === c.account) : undefined
   if (c && a && a.provider === cli && accountOnIn(cfg, a, accounts)) return { ok: true, connection: c, account: a }
+  const off = !!c && !!a && a.provider === cli
   for (const x of accounts) {
     if (x.provider !== cli || !accountOnIn(cfg, x, accounts)) continue
+    if (off) {
+      const m = matchConnection(c!, x.id, connections)
+      if (m) return { ok: true, connection: m.connection, account: x, note: 'offFallback', by: m.by }
+      continue
+    }
     const base = baseConnection(x.id, connections)
-    if (base) return { ok: true, connection: base, account: x, ...(wanted ? { note: c && a && a.provider === cli ? ('offFallback' as const) : ('missing' as const) } : {}) }
+    if (base) return { ok: true, connection: base, account: x, ...(wanted ? { note: 'missing' as const } : {}) }
   }
   return wanted ? { ok: false, why: 'offNoDefault', wanted } : { ok: false, why: 'none' } // i18n-ignore: a reason's code, not text
 }

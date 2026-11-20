@@ -6,7 +6,7 @@ import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, RESUME_IDLE_ASK, RESUME_IDLE_MINUTES, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { launchPolicy, MCP_ISOLATION, terminalPreset, type LaunchPolicy } from '../shared/launchPolicy'
 import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
 import { assertUpgraded } from './boardStore'
@@ -24,6 +24,7 @@ import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { backgroundTaskMinutes } from '../shared/tasks'
+import { lastHeard } from '../shared/progress'
 import { assistantTools, hiddenForSide, isReservedServerName, sideAllows, toolSideOf, TOOLS_SERVER, workflowAllows, workflowHiddenOf } from '../shared/assistantTools'
 import { CW_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, launchedWithOf, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
@@ -32,9 +33,9 @@ import { coalesced, joined } from '../shared/coalesce'
 import { atMost, whenAll } from '../shared/atMost'
 import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter, slotHeldWords } from './agentFolders'
 import { slotEnv } from './slots'
-import { copiesDirOf, grantsCopies } from './copies'
+import { addedDirAsks, copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, inWorkflow, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
-import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
+import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake, providerSwitchOn } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
 import { accountInfo, dialectModelId, modelIdName, modelSwitched, resolvedModel } from '../shared/models'
 import type {
@@ -54,6 +55,7 @@ import type {
   McpServerInfo,
   PermissionMode,
   ProjectConfig,
+  ProgressRun,
   ProviderId,
   InboxSummary,
   SessionBulkAction,
@@ -79,13 +81,15 @@ import { provider as providerAdapter, allProviders } from './providers'
 import { runSwitch, SlotHeld, SwitchIntents, type SwitchOp, type UsageIntent } from './connectionSwitch'
 import { agentLaunchView, allAccounts, allConnections, checkAccount, getConnection, launchCli, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
 import { effortUsable, ensureMigrated, migrationDue } from './connectionMoves'
-import { resolveAgentConnection } from '../shared/accounts'
+import { cleanTag, resolveAgentConnection } from '../shared/accounts'
 import { connectionSwitchDue } from '../shared/connectionLabel'
 import { ptyArgs, recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
 import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
+import { listProcesses, TREE_END_BOUNDS, type ListedProcess } from './processTree'
+import type { ClosingPending } from './closingAgents'
 import type { AdoptionHandle, Ask, BackgroundTaskType, ExternalSession, HookEvent, HookOccurrence, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
@@ -95,9 +99,9 @@ import { presentWindow, testNotifyLog, testQuiet } from './testQuiet'
 import { admitLaunch, endAdmission, setLiveFolders } from './launchHolds'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
-import { HOOK_AUTH_FILE_ENV, HOOK_URL_ENV } from '../shared/claudeHookHandlers'
+import { HOOK_AUTH_FILE_ENV, HOOK_URL_ENV } from '../shared/hooks'
 import { COMPACTING_TEXT, HOOKS_DOUBLED_NOTE, hooksMissingNote, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
-import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
+import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep, screenStep, type TerminalReading, type StartupState } from './hookStatus'
 import { latestStop, memoModel, memoTools, memoTurn, newTurn, noteSafeguard, placeEvent, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
 import { applyStatus, idleNow, NO_STATUS, type StatusState } from './statusLineState'
 import { acceptTurn, admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
@@ -129,6 +133,8 @@ import { combworkSkills, parseSkillFrontmatter, skillFor } from './skills'
 import { copyBook, sessionEnded } from './skillCopies'
 import { workspaceNotesFor } from './workspaceNotes'
 import { independentIn } from './independent'
+import { inLaunchScope, pinInLaunchScope } from './launchScope'
+import { serverLaunch } from './serverLaunch'
 import { skillOff } from '../shared/skillDelivery'
 import { samePath } from '../shared/movePaths'
 import { chainGuidanceRevision, GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
@@ -156,7 +162,7 @@ import { agentTempSetting, prepareAgentTemp, protectedFolders, withAgentTemp } f
 import { ServerMarks } from './serverMarks'
 import { usageHistory, type StoredUsage } from './usageHistory'
 import { journalSettingsOf } from './journalService'
-import { endAgentToken, newAgentToken } from './agentTokens'
+import { agentRequestKeysFile, endAgentToken, launchTokenFile, newAgentToken } from './agentTokens'
 import { endHookToken, hooksRefused, newHookToken } from './hookTokens'
 import { lookAtTurns, type TurnsReading } from './turnsReader'
 import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, SeenOnce, transcriptReset, transcriptTurns, turnHeard, typedPending, type HooksWatch } from './hooksHealth'
@@ -169,8 +175,10 @@ import { observer } from './platform/observe'
 import { projectPreferences } from './workflow/preferences'
 import { driveExitKeys, type ExitKeysIO } from './exitKeys'
 import { movedFolders, movedPath } from './combworkMove'
-import { freshReasonOf, SESSION_NAMES, type FreshReason } from '../shared/sessionFresh'
+import { freshReasonOf, idleResume, SESSION_NAMES, type FreshReason, type IdleResume } from '../shared/sessionFresh'
 import type { FolderMove } from '../shared/combworkFolderMove'
+import { LEGACY_PROVIDER } from '../shared/providers'
+import { clearKeyWaitId } from '../shared/advancedDef'
 
 const log = createLogger('sessions')
 
@@ -201,11 +209,13 @@ const BUSY: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'wo
  * replies, deliveries), the log and the developer console stay English.
  */
 const M = {
+  cantResume: msg({ id: 'session.start.cantResume', defaultMessage: "{provider} can't resume a conversation: start a new one instead.", description: 'Starting an agent on a conversation failed (HI-3196): its CLI runs from a description that has no way to resume. {provider} is its name.' }),
   modelSwitchTitle: msg({ id: 'session.model.switchedTitle', defaultMessage: '{agent} runs another model', description: "A notice's title (HI-2609): an agent's coding agent now runs another model than Combwork started it with (its connection's). {agent} is the agent." }),
   modelSwitch: msg({ id: 'session.model.switched', defaultMessage: "{cli} now runs {running}, not {launched}, which its connection gave it. Restart the agent to go back to {launched}.", description: "The notice that an agent runs another model (HI-2609): its coding agent ({cli}, e.g. Codex) changed model by itself or at a prompt of its own. {running} and {launched} are model names (\"GPT-6 Luna\"); its connection is the account Combwork started it on." }),
   assistantCliOwn: msg({ id: 'session.mode.assistantCliOwn', defaultMessage: "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.", description: "Switching the Combwork Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting." }),
   connectionFallbackTitle: msg({ id: 'session.connection.fallbackTitle', defaultMessage: '{agent} runs on another connection', description: "A notice's title (HI-2108): an agent started on another connection than its own (its own is off in this workspace, or was removed). {agent} is the agent." }),
   connectionFallback: msg({ id: 'session.connection.fallback', defaultMessage: "{why, select, missing {The connection chosen for it was removed} other {Its connection {wanted} is off in this workspace}}, so it started on {name}, its CLI's first usable one here. Choose another in its Agent Settings.", description: "A notice (HI-2108) when an agent starts on another connection than its own: its own was removed, or is on an account turned off in this workspace ({wanted}: its name). {name} is the account it started on. Agent Settings names a dialog." }),
+  connectionOffMatched: msg({ id: 'session.connection.offMatched', defaultMessage: "Its connection {wanted} is on an account that's off in this workspace, so it started on {name} ({account}): {by, select, tag {the connection there with the same tag, {tag}} name {the connection there with the same name} other {that account's first connection, as none there has its tag or name}}. Choose another in its Agent Settings.", description: "A notice (HI-3213) when an agent starts on another connection than its own because its own ({wanted}: its name) is on an account turned off in this workspace. {name} is the connection it started on, {account} that connection's account (\"Anthropic-2\"), the first account on here. {by}: how that connection was matched: tag (the same tag as its own, {tag}: the tag, such as Builders), name (the same name), other (neither matched, so that account's first connection). Agent Settings names a dialog." }),
   noSession: msg({ id: 'session.error.noSession', defaultMessage: 'No session is running for this agent.', description: "An action on an agent's session is refused: the agent isn't running." }),
   moveFailed: msg({ id: 'session.start.moveFailed', defaultMessage: "Combwork couldn't move {project}'s model settings to its agents: {error}. Start it again.", description: "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start." }),
   independentNoTask: msg({ id: 'session.start.independentTask', defaultMessage: '{agent} is Independent: Combwork gives it no tasks. Start it and work with it in its pane.', description: "Starting an agent on a task is refused (HI-2670): the agent's role is Independent (its own, or its connection launches it without Combwork's tools), so Combwork never types a task into it. {agent} is the agent's name." }),
@@ -324,12 +334,83 @@ const howLong = (ms: number): string => (ms < 120_000 ? `${Math.round(ms / 1000)
 const SIZE_REFRESH_DELAY_MS = 500
 /** How many running agents "Switch Now" switches at once (applyModeSettings): the rest wait for one to end. */
 const MODE_SWITCHES_AT_ONCE = 6
+/** HI-3376: the least a restart in a new mode waits for the old run's exit (it ends as soon as the run exits). */
+export const MODE_RESTART_STOP_MS = 30_000
+/** HI-3376: the time a close gives the slot writers of its stopped runs to be released, after their exit (closeDeadlineMs). */
+export const CLOSE_WRITERS_MS = 30_000
+/** HI-3376: how long Stop It and Resume waits to see a stopped background job end before it gives up (and doesn't resume). */
+export const BACKGROUND_END_MS = 30_000
+/** How often it looks meanwhile (each look is a CLI run and a process listing). */
+const BACKGROUND_LOOK_MS = 1000
 
-/** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). */
-const KILL_EXIT_MS = 1000
+/** Tests: the process listing backgroundJobEnded uses (null: processTree's). */
+export const backgroundTestHooks: { list?: (timeoutMs: number) => Promise<ListedProcess[] | null> } = {}
+const listAll = (timeoutMs: number): Promise<ListedProcess[] | null> => (backgroundTestHooks.list ?? listProcesses)(timeoutMs)
+
+/**
+ * HI-3376: what is known of a background job before it is told to stop (HR1's round 1: never one null for all of it):
+ * its own process (`process`: its pid as the CLI lists the job, and that process's start as a complete listing of
+ * Windows' has it); not running (`notRunning`: a parsed listing of the CLI's that doesn't name it); its process already
+ * gone (`gone`: named with a pid that a complete listing doesn't have); or `unknown` (a listing failed, or the CLI names
+ * it without a process: Settings → Advanced's fields wrong, or a CLI that gives none).
+ */
+export type JobBefore = { kind: 'process'; proc: ListedProcess } | { kind: 'notRunning' } | { kind: 'gone' } | { kind: 'unknown' }
+
+export async function jobProcess(adapter: ProviderAdapter, exe: string, jobId: string): Promise<JobBefore> {
+  const listed = adapter.background?.runningBackgroundJobs ? await adapter.background.runningBackgroundJobs(exe).catch(() => null) : null
+  if (listed === null) return { kind: 'unknown' }
+  const job = listed.jobs.find((j) => j.id === jobId)
+  // Named in the listing but not read as a job (its fields wrong, HR3's round 2): unknown, never not running.
+  if (!job) return listed.names(jobId) ? { kind: 'unknown' } : { kind: 'notRunning' }
+  if (!job.pid) return { kind: 'unknown' }
+  const list = await listAll(TREE_END_BOUNDS.listMs).catch(() => null)
+  if (list === null) return { kind: 'unknown' }
+  const proc = list.find((p) => p.pid === job.pid)
+  return proc ? { kind: 'process', proc } : { kind: 'gone' }
+}
+
+/**
+ * HI-3376: whether a background job told to stop has ended, looked at until it has or BACKGROUND_END_MS passes, each look
+ * bounded by the time left: `ended` once a parsed listing of the CLI's running jobs doesn't name it and, when its own
+ * process was known (`before`), a complete listing of Windows' no longer has that process (by pid and start); `running`
+ * while either still holds; `unknown` when what was known before the stop is unknown, or a listing fails at the last look.
+ */
+export async function backgroundJobEnded(adapter: ProviderAdapter, exe: string, jobId: string, before: JobBefore, now = Date.now): Promise<'ended' | 'running' | 'unknown'> {
+  // Not known before the stop: nothing seen after it can show its end (HR1's round 1).
+  if (before.kind === 'unknown' || !adapter.background?.runningBackgroundJobs) return 'unknown'
+  const deadline = now() + BACKGROUND_END_MS
+  const left = (): number => deadline - now()
+  // What the last look saw; a look begun with no time left isn't made.
+  let state: 'ended' | 'running' | 'unknown' = 'unknown'
+  while (left() > 0) {
+    const listed = await adapter.background.runningBackgroundJobs(exe, left()).catch(() => null)
+    state = listed === null ? 'unknown' : listed.jobs.some((j) => j.id === jobId) ? 'running' : listed.names(jobId) ? 'unknown' : 'ended'
+    if (state === 'ended' && before.kind === 'process') {
+      const list = left() > 0 ? await listAll(Math.min(TREE_END_BOUNDS.listMs, left())).catch(() => null) : null
+      state = list === null ? 'unknown' : list.some((p) => p.pid === before.proc.pid && p.started === before.proc.started) ? 'running' : 'ended'
+    }
+    if (state === 'ended') return state
+    if (left() > 0) await new Promise((r) => setTimeout(r, Math.min(BACKGROUND_LOOK_MS, left())))
+  }
+  return state
+}
+
+/** After a kill, how long a CLI's console takes to be gone (its processes listed and ended, then its exit). HI-3376: 5 s, a listing on a busy machine taking seconds itself. */
+export const KILL_EXIT_MS = 5000
 
 /** The most a start waits for its agent's ended runs' slot writers to be released (HI-1867): a bound for a hung one. */
 const WRITER_SETTLE_MS = 15_000
+
+/** HI-3360: the minutes after which a resume counts as cold (Settings → Advanced), or null with the rule turned off. */
+export function resumeIdleMinutes(): number | null {
+  return advanced.get<boolean>(RESUME_IDLE_ASK) === false ? null : advanced.number(RESUME_IDLE_MINUTES)
+}
+
+/** A listed session's `idle` (HI-3360): its tokens where its transcript gives them (0: not known), apart from its bytes. */
+function idleField(since: string | null | undefined, usage: SessionUsage | null, bytes: number | null, minutes: number | null): { idle?: IdleResume } {
+  const idle = idleResume(since, { tokens: usage?.contextTokens || null, bytes }, minutes)
+  return idle ? { idle } : {}
+}
 
 /**
  * How long stopping sessions waits for them to end: its own timeout, or longer where a CLI is given time to exit by
@@ -356,7 +437,7 @@ interface LiveSession {
   costFree?: boolean
   /** The terminal as rendered, for an adapter that reads it (its footer's mode, or a menu to pick from: #396). */
   screen?: TerminalScreen | null
-  /** The size refreshes given so far, for a CLI that needs them (capabilities.startupSizeRefresh, #486). */
+  /** The size refreshes given so far, for a CLI that needs them (capabilities.terminal.startupSizeRefresh, #486). */
   sizeRefreshed?: 'started' | 'ready'
   /** The transcript's modified time and size at the last look ("mtime:size"). */
   transcriptMtime: string
@@ -498,6 +579,8 @@ interface LiveSession {
   slotEnv?: Record<string, string>
   /** The folders its launch was granted outside its own (#1439: its project's review copies). */
   extraDirs?: string[]
+  /** Folders it would have been granted that its CLI doesn't trust yet (HI-3337): its review copies, withheld. */
+  withheldDirs?: string[]
   /**
    * The CLI's version as this run was launched (HI-1327): what a version gate goes by while it runs, not the CLI
    * installed now (updated or switched since, it isn't this process). Null: not known.
@@ -529,9 +612,11 @@ interface LiveSession {
    * Background tasks started in this launch that haven't ended: id → when it started, when it expires, what it is and
    * its CLI's description (a subagent's, #1584: user text).
    */
-  tasks?: Map<string, { at: number; expiresAt?: number; type?: BackgroundTaskType; description?: string }>
+  tasks?: Map<string, { at: number; began?: number; expiresAt?: number; type?: BackgroundTaskType; description?: string }>
   /** Tasks seen to end, so a start read late doesn't count one again. */
   tasksEnded?: Set<string>
+  /** Tasks the time limit stopped counting (HI-3406): one that ends later still wakes the CLI, as a counted one does. */
+  tasksDropped?: Set<string>
   /** Bytes of the transcript already read for background tasks. */
   tasksOffset?: number
   /** What the adapter keeps between those reads (a call whose output comes later). */
@@ -592,7 +677,7 @@ interface LiveSession {
   lastReply?: string
   /** Its latest hooks (what they were, when, and the status they left), for the log when the CLI turns out idle (#612). */
   recentHooks?: { kind: HookEvent['kind']; at: number; status: SessionStatus }[]
-  /** Its hooks for its Hooks dialog (HI-982): what its launch has (adapter.launchHooks), and what Combwork received, newest last. */
+  /** Its hooks for its Hooks dialog (HI-982): what its launch has (adapter.hooks.launchHooks), and what Combwork received, newest last. */
   hooks?: LaunchHooks
   hookHistory?: HookFired[]
   /**
@@ -606,6 +691,18 @@ interface LiveSession {
   turnRecord?: { turn: string; at: string } | null
   /** When the CLI answered its Stops this launch, as it recorded them (LiveDetails.stopsAnswered, ms; the latest STOPS_KEPT). */
   stopsAnswered?: number[]
+  /** Its typed first prompt is being typed now (HI-3196: typeFirstPrompt), so no second try starts meanwhile. */
+  firstPromptTyping?: boolean
+  /** Why its first prompt last waited (firstPromptHeld), said in the log once each time it changes (HI-3261). */
+  firstPromptHeld?: string
+  /** Its first prompt's try when the user's typing pause ends (firstPromptWhenQuiet): cancelled when it is sent or the run ends. */
+  firstPromptWait?: { at: number; timer: ReturnType<typeof setTimeout> }
+  /** Its first prompt is on its record (HI-3196: a CLI that resumes by Combwork's id; notePrompted). */
+  prompted?: boolean
+  /** Its first prompt, to type once its screen first says it is ready (HI-3196: a CLI whose prompt is typed). */
+  typedFirstPrompt?: string
+  /** Its first prompt went on its command line: work its screen shows during its start is that turn (HI-3266, screenStatus). */
+  promptOnCommandLine?: boolean
   /** Its screen's reading of the CLI's turn (idle, working, not sure), for this launch's CLI version (ProviderAdapter.turnScreen). */
   turnScreen?: (screen: string) => 'idle' | 'working' | null
   /** The environment it was launched with: where its CLI keeps its records (HI-1972, ProviderAdapter.retryWait). */
@@ -651,9 +748,15 @@ interface LiveSession {
    * Its input box taking no keys (HI-2191): INPUT_BLOCKED_AFTER clears in a row refused so, something else on its screen
    * takes them (a dialog Combwork doesn't know). The agent waits for the user with `ask`, and Combwork presses no key there until
    * it is seen to take keys again (inputBlockedDrawn, a hook, Try again), in this run (`runId`). `box`: its box as read
-   * then; `since`: when (ms); `retrying` while Try again's clear runs.
+   * then; `since`: when (ms); `retrying` while Try again's clear runs. `hidden` (HI-3411): blocked because its box stayed
+   * off the screen (boxHidden), so the box drawn again frees it.
    */
-  inputBlocked?: { runId: string; ask: Ask; box: string | null; since: number; retrying?: boolean }
+  inputBlocked?: { runId: string; ask: Ask; box: string | null; since: number; retrying?: boolean; hidden?: boolean }
+  /**
+   * Its input box off the screen since a clear was refused for it (HI-3411: a dialog drawn in its place), in this run: the
+   * box seen again, or a clear that empties it, ends it. Past Advanced's Input box hidden: wait, the input is blocked.
+   */
+  boxHidden?: { runId: string; since: number }
   /** A look at its screen for that question and a lost line is queued (one at a time, however much the CLI draws). */
   idleChecking?: boolean
   /** The user was told this launch runs another model than it was given (HI-2609): once a launch. */
@@ -933,7 +1036,7 @@ export function rollbackKeys(typed: readonly number[]): number {
 
 /**
  * How many Backspaces take back a prompt Combwork stopped part-way in an input box whose Ctrl+U deletes only the row the
- * cursor is on (capabilities.ctrlUClearsRow, HI-1974: Claude Code 2.1.312 kept a stopped wake's first rows, and the
+ * cursor is on (capabilities.terminal.ctrlUClearsRow, HI-1974: Claude Code 2.1.312 kept a stopped wake's first rows, and the
  * next wake was sent after them): one for each code point Combwork wrote (`written`: the one-line prompt, or what
  * typeSegments recorded, each line's UTF-16 units and a key between lines). A Backspace deletes characters, however
  * wide they are drawn or wherever its rows wrapped (tried on 2.1.312 with CJK text, an emoji sequence and long words).
@@ -942,6 +1045,18 @@ export function rollbackKeys(typed: readonly number[]): number {
  */
 export function backspaceKeys(written: string | readonly number[]): number {
   return typeof written === 'string' ? [...written].length : written.reduce((n, chars, i) => n + chars + (i > 0 ? 1 : 0), 0)
+}
+
+/**
+ * For the datacli suite (unpackaged builds only, HI-3196): a launch waits before its last checks and its spawn while
+ * CW_TEST_HOLD_LAUNCH's file exists (writing `<file>.held` once it waits), so a reload can land while it prepares.
+ */
+async function heldLaunch(label: string): Promise<void> {
+  const file = app.isPackaged ? undefined : process.env.CW_TEST_HOLD_LAUNCH
+  if (!file || !existsSync(file)) return
+  log.info(`${userText(label)}: its launch is held before its spawn (a test's)`)
+  await writeFile(`${file}.held`, '').catch(() => undefined)
+  while (existsSync(file)) await new Promise((r) => setTimeout(r, 50))
 }
 
 /**
@@ -1008,13 +1123,21 @@ export function withoutInvisible(line: string): string {
 
 /**
  * Whether a line Combwork is typing has been drawn on an agent's screen (#600): its end (spaces left out, as a CLI wraps
- * it) shows more often than when this was called, before it was typed (a doorbell's end is in its earlier ones too).
+ * it) is what the screen shows just before the CLI's cursor, which stands after what its input holds (HI-3345). Never a
+ * count of the ends on the screen: an earlier doorbell's shows there too, and a line wrapping in a narrow pane scrolls
+ * the screen, so an earlier one's leaves it as this one's is drawn and the count stays as it was. And never what showed
+ * there when this was called, after the input's clear and before the line was typed: a busy CLI that hasn't drawn the
+ * clear yet still shows an earlier doorbell before its cursor, ending the same, and an Enter then would go with the line
+ * it hasn't read (HR1's round 1). The same line left there, the wait runs out and Enter goes anyway.
  */
-export function drawnLine(screen: Pick<TerminalScreen, 'text'>, line: string): () => boolean {
+export function drawnLine(screen: Pick<TerminalScreen, 'textToCursor'>, line: string): () => boolean {
   const end = line.replace(/\s+/g, '').slice(-40)
-  const count = (): number => (end ? screen.text().replace(/\s+/g, '').split(end).length - 1 : 0)
-  const before = count()
-  return () => count() > before
+  const toCursor = (): string => screen.textToCursor(line.length).replace(/\s+/g, '')
+  const before = toCursor()
+  return () => {
+    const now = toCursor()
+    return !!end && now !== before && now.endsWith(end)
+  }
 }
 
 /**
@@ -1209,7 +1332,7 @@ class Moves {
   }
 }
 
-export const recordProvider = (rec: Pick<SessionRecord, 'agent'> | undefined): ProviderId => rec?.agent || 'claude-code'
+export const recordProvider = (rec: Pick<SessionRecord, 'agent'> | undefined): ProviderId => rec?.agent || LEGACY_PROVIDER
 
 /** A usage with the safeguard stops seen only on screen added (#606: kept on its record; the transcript's count doesn't have them). */
 function withScreenStopsIn(usage: SessionUsage, screen: SessionRecord['screenStops']): SessionUsage {
@@ -1241,7 +1364,7 @@ export async function deliveredSkillSizes(adapter: ProviderAdapter, ctx: LaunchC
   for (const [name, d] of Object.entries(delivered)) {
     if (!d.revision) continue
     try {
-      const copy = adapter.skillCopyPath(ctx, name)
+      const copy = adapter.launch.skillCopyPath(ctx, name)
       const head = await headerOf(join(copy, 'SKILL.md'), parseSkillFrontmatter)
       const size = await treeSignature(copy)
       // No header, or one that couldn't be read as a skill's (invalid YAML, a key twice, an unknown audience): unknown.
@@ -1258,11 +1381,26 @@ export async function deliveredSkillSizes(adapter: ProviderAdapter, ctx: LaunchC
 /** How soon after the user's Enter in an agent's pane its CLI must take a prompt for it to count as theirs (#418). */
 const USER_REPLY_MS = 15_000
 
-/** How long a prompt Combwork typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416). */
-const PENDING_MS = 30_000
+/**
+ * How long a prompt Combwork typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416).
+ * HI-3373: 120 s (it was 30): a CLI starting several MCP servers can be ready long before it takes its first task, and
+ * pending ends at that first prompt anyway.
+ */
+export const PENDING_MS = 120_000
 
-/** Settings → Advanced: how long a Ctrl+U clearing Claude Code's input has to be answered on its screen (HI-1979). */
-const CLEAR_KEY_WAIT = 'claude-code.prompt.clearKeySeconds'
+/** The longest a Shift+Tab press waits for the footer to show the mode it moved to (HI-3373: 4 s gave up on a busy machine). */
+const MODE_PRESS_MS = 30_000
+
+/** How often a connection switch waiting for its safe point looks again with no event (HI-3213: as a lane's end does). */
+const SWITCH_RECHECK_MS = 5000
+
+/**
+ * Whether a user's key not sent leaves a draft in an agent's prompt (HI-3213), from its CLI's input as read on its screen
+ * (promptText: '' empty, null unreadable): only an empty input says there is none; unreadable, it may be one.
+ */
+export function userDraftShown(input: string | null): boolean {
+  return input !== ''
+}
 /**
  * The most Ctrl+U clearing an input may press (HI-1979): one deletes a row of a draft, so this is a draft of as many
  * rows; more ends the try, unseen empty.
@@ -1278,6 +1416,8 @@ const CLEAR_PROBE = 'x'
  * counts as blocked (HI-2191): one delivery's tries. A clear answered late but answered resets the count.
  */
 const INPUT_BLOCKED_AFTER = 3
+/** How long its input box may stay off the screen, from a clear refused for it, before its input is blocked (HI-3411): Settings → Advanced. */
+export const INPUT_HIDDEN_SECONDS = 'cw.input.hiddenSeconds'
 
 /**
  * A launch's task on its CLI's command line not taken yet (#712): the CLI is ready at its SessionStart and takes the task
@@ -1310,6 +1450,8 @@ export type NoticeDraft = { text: string; commit: () => void }
 
 class SessionManager {
   private live = new Map<string, LiveSession>()
+  /** An agent's own progress runs (progressService's, HI-3406): their reports keep its background tasks counted. */
+  private progressRuns: (projectPath: string, agentId: string) => readonly Pick<ProgressRun, 'state' | 'finishedAt' | 'updatedAt' | 'startedAt'>[] = () => []
   /** Server markers of runs that have ended, held until their record says so or they are kept (HI-1829: serverRunEnding). */
   private readonly serverEnding = new Map<string, number>()
   /**
@@ -1379,8 +1521,12 @@ class SessionManager {
   onAssistantPrompt: (projectPath: string) => void = () => undefined
   /** The Combwork Assistant's process ended (its token is revoked, its questions withdrawn). */
   onAssistantExit: (projectPath: string) => void = () => undefined
-  /** When the user last typed in each terminal (by pty key), so nothing else types over them. */
-  private userInput = new Map<string, { at: number; enter: boolean }>()
+  /**
+   * When the user last typed in each terminal (by pty key), so nothing else types over them: its run's own (HI-3261: a run's
+   * start forgets an earlier run's). `answer`: one key alone typed while its CLI's question before its start showed (y, 1,
+   * Esc), the first since the run began or since an Enter: the question took it, so it leaves no draft.
+   */
+  private userInput = new Map<string, { at: number; enter: boolean; answer?: boolean }>()
   /** The Combwork Assistant's instructions for a launch (who it is, and its mode's), and the mode's name and id. */
   assistantInstructions: (projectPath: string, agent: AgentDef) => Promise<{ text: string; mode: string; modeId: string; modeText: string }> = async () => ({ text: '', mode: '', modeId: '', modeText: '' })
   /**
@@ -1717,6 +1863,11 @@ class SessionManager {
     return this.live.get(liveId(projectPath, agentId))?.extraDirs ?? []
   }
 
+  /** The folders a running agent's launch would have been granted but its CLI doesn't trust yet (HI-3337); none if not running. */
+  withheldDirs(projectPath: string, agentId: string): readonly string[] {
+    return this.live.get(liveId(projectPath, agentId))?.withheldDirs ?? []
+  }
+
   projectStates(projectPath: string): LiveSessionState[] {
     const prefix = `${projectPath.toLowerCase()}#`
     return [...this.live.entries()].filter(([k]) => k.startsWith(prefix)).map(([, l]) => l.state)
@@ -1825,8 +1976,8 @@ class SessionManager {
     // Its connection's launch policy (HI-2670): without Combwork's tools, no combwork server and none of Combwork's or the
     // workspace's skills; with its MCP isolation off too, none of the workspace's servers either (the CLI's own config
     // decides, as in a terminal). Part of the signature, so a change of it asks running agents for a restart.
-    // An agent whose role is Independent launches as if its connection's switches were all off (HI-2731, Darren's 7 Nov
-    // 22:15 decision: "Independent behaves as if connection level switches are off"): the "Launch as from a terminal"
+    // An agent whose role is Independent launches as if its connection's switches were all off (HI-2731:
+    // Independent behaves as if connection level switches are off): the "Launch as from a terminal"
     // preset, whatever its connection says. Its role is in the signature too, so a role change restarts it. Its own saved
     // role: an agent a tools-off connection makes Independent launches as that connection says (its other switches).
     const independent = !assistant && forAgent?.workflowRole === 'independent'
@@ -1845,6 +1996,13 @@ class SessionManager {
   signature(e: EffectiveSettings): string {
     // The permission mode can be switched live (setPermissionMode), so it doesn't ask for a restart.
     const { chime: _c, skills: _s, permissionMode: _p, connectionName: _n, connectionId: _i, ...rest } = e
+    // Each launch's own token file (HI-3195) is no setting: read before its launch makes the token it is '', and after,
+    // that launch's file, so it would ask every running agent for a restart (HI-3314).
+    const tools = rest.mcpServers[TOOLS_SERVER]
+    if (tools?.env && 'CW_API_TOKEN_FILE' in tools.env) {
+      const { CW_API_TOKEN_FILE: _t, ...env } = tools.env
+      return hashText(JSON.stringify({ ...rest, mcpServers: { ...rest.mcpServers, [TOOLS_SERVER]: { ...tools, env } } }))
+    }
     return hashText(JSON.stringify(rest))
   }
 
@@ -1982,11 +2140,11 @@ class SessionManager {
         continue
       }
       for (const f of own) {
-        const t = await adapter.transcriptPath(f, sessionId, recorded)
+        const t = await adapter.transcript?.transcriptPath(f, sessionId, recorded)
         if (t) return { path: t, provider: id }
       }
       for (const f of await othersOf()) {
-        const t = await adapter.transcriptPath(f, sessionId, recorded)
+        const t = await adapter.transcript?.transcriptPath(f, sessionId, recorded)
         if (t) return { path: t, provider: id }
       }
     }
@@ -2032,7 +2190,8 @@ class SessionManager {
     const times = new StepTimes()
     // A new conversation (HI-2197): the agent's watch from before ended first, its wake cancelled, before anything launches.
     const before = freshFrom ? (this.deliveries?.carry(projectPath, agentId, freshFrom) ?? Promise.resolve(0)).then(() => undefined) : opts.resumeId || opts.keepWatch ? Promise.resolve() : this.conversationEnds(projectPath, agentId)
-    const run = before.then(() => this.startReserved(projectPath, agentId, id, opts, times))
+    // Its own steps in a scope of their own (HI-3196: launchScope.ts), where the copy of its CLI it takes is what they read.
+    const run = before.then(() => inLaunchScope(() => this.startReserved(projectPath, agentId, id, opts, times)))
     pending.done = run.catch(() => undefined)
     pending.outcome = run
     try {
@@ -2221,6 +2380,33 @@ class SessionManager {
   }
 
   /**
+   * HI-3376: what of the projects `which` names (every one without it) is still closing, for closingAgents.ts: runs still
+   * running (each until it has been through onExit), starts not yet cancelled, slot writers not yet released (or found held).
+   */
+  closingPending(which?: (projectPath: string) => boolean): ClosingPending {
+    const mine = (p: string): boolean => !which || which(p)
+    // A run counts from its launch until its exit work is over (`exiting`), not only while it is in `live`.
+    const runs = new Set([...[...this.live.values()].filter((l) => mine(l.state.projectPath)).map((l) => l.state.runId), ...[...this.exiting].filter(([, p]) => mine(p)).map(([r]) => r)])
+    return {
+      running: runs.size,
+      starting: [...this.starting.values()].filter((p) => mine(p.projectPath)).length,
+      writers: which ? [...this.writerSettlingOf.values()].filter((e) => which(e.projectPath)).length : this.writersSettling.size
+    }
+  }
+
+  /**
+   * HI-3376: how long closing the runs `which` names may take before the closing window says they are still closing: the
+   * longest of their CLIs' exit graces with the kill's time after it (stopWaitMs), and the slot writers' release after
+   * that (CLOSE_WRITERS_MS). With the defaults: 30 + 5 + 30 s. A threshold for saying so, never taken as their end.
+   */
+  closeDeadlineMs(which?: (projectPath: string) => boolean): number {
+    // A CLI without an exit of its own (killed at once: Claude Code) still takes its kill's time to exit (HI-3374: it
+    // counted as 0, so a quit with no window went on at once, before the runs' exit work).
+    const graces = [...this.live.values()].filter((l) => !which || which(l.state.projectPath)).map((l) => l.adapter.launch.exitKeys?.graceMs ?? 0)
+    return stopWaitMs(KILL_EXIT_MS, graces) + CLOSE_WRITERS_MS
+  }
+
+  /**
    * Once the slot writers of the runs that have ended are released (or found held), at most `timeoutMs` (HI-1801: Combwork
    * quitting closed the workspace before a stopped run's release was written, its outcome known only after the
    * leftovers' look, so the next start found the slot held by a Combwork that had gone). Combwork's quit, after the leftovers;
@@ -2250,6 +2436,17 @@ class SessionManager {
     if (l) return { run: l.state.runId, starting: false }
     const p = this.starting.get(liveId(projectPath, agentId))
     return p ? { run: p.runId, starting: true } : null
+  }
+
+  /**
+   * Whether run `run` of an agent is ending on request (HI-3326): its stop asked (a lease's end, Stop, a quit typed) or its
+   * start cancelled, while runNow still gives it until it has exited. A run that isn't the agent's now: false.
+   */
+  stopAsked(projectPath: string, agentId: string, run: string): boolean {
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (l) return l.state.runId === run && !!l.stopRequested
+    const p = this.starting.get(liveId(projectPath, agentId))
+    return !!p && p.runId === run && !!p.cancelled
   }
 
   /**
@@ -2307,8 +2504,9 @@ class SessionManager {
     // A provider this version doesn't know: nothing it could resume. A lookup that fails throws (unknown: tried again).
     const adapter = allProviders().find((p) => p.id === provider)
     if (!adapter) return { is: 'none' }
-    const transcript = await adapter.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath)
-    if (!transcript) return { is: 'none' }
+    // A CLI with a transcript, by its transcript; one without (HI-3196), by whether it resumes by id and the session had a prompt.
+    const found = adapter.transcript ? !!(await adapter.transcript.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath)) : await this.resumable(adapter, projectPath, rec.id, rec)
+    if (!found) return { is: 'none' }
     const hold = resumeHold(await folderFacts(projectPath), folderAgent(agent), rec)
     return hold ? { is: 'held', hold } : { is: 'resume', id: rec.id, name: rec.name }
   }
@@ -2355,8 +2553,15 @@ class SessionManager {
     await refreshPathBeforeStart()
     times.mark('refreshPath')
     this.assertStarting(id)
-    const adapter = providerAdapter(providerId)
+    // The adapter this launch uses from here to its end (HI-3196): a data-only CLI's copy, its description and patterns
+    // taken now, so a reload or an override changed later never reaches it; the same instance serves the live session,
+    // its status readers and its command.
+    const registered = providerAdapter(providerId)
+    const adapter = registered.launch.forLaunch?.() ?? registered
+    // What its own steps read by id is that copy too (its policy, modes, models): in its launch's scope alone (start's).
+    if (registered.launch.forLaunch) pinInLaunchScope(adapter.descriptor)
     const name = adapter.descriptor.name
+    if (opts.resumeId && !adapter.transcript && !adapter.launch.resumesById) throw combworkError(M.cantResume, { provider: name }, { kind: 'conflict' })
     const resuming = opts.resumeId ? 'yes' : 'no'
     if (!isProviderEnabled(config.settings, providerId)) throw combworkError(msg({ id: 'session.start.providerOff', defaultMessage: '{provider} is turned off. {resuming, select, yes {Turn it on in Settings → Providers to resume this conversation.} other {Turn it on in Settings → Providers to run {agent}.}}', description: "Starting an agent is refused: its coding agent is turned off in Settings → Providers. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation." }), { provider: name, resuming, agent: agent.name }, { kind: 'conflict' })
     const info = providerService.info(providerId)
@@ -2378,7 +2583,7 @@ class SessionManager {
 
     if (existing?.archived) throw combworkError(msg({ id: 'session.start.archived', defaultMessage: 'This session is archived. Unarchive it before resuming.', description: 'Resuming an archived session is refused (Sessions tab: Unarchive).' }), undefined, { kind: 'conflict' })
     // A sub-session (a Codex guardian review, say) is not a conversation: never resumed (#239).
-    const sub = opts.resumeId ? (existing ? await this.recordSub(projectPath, existing) : (await adapter.listSessions(cwd).catch(() => [])).find((e) => e.id === opts.resumeId)?.sub) : undefined
+    const sub = opts.resumeId ? (existing ? await this.recordSub(projectPath, existing) : (await adapter.transcript?.listSessions(cwd).catch(() => []))?.find((e) => e.id === opts.resumeId)?.sub) : undefined
     times.mark('recordSub')
     if (sub) throw combworkError(msg({ id: 'session.start.subSession', defaultMessage: "That session is a {kind} {provider} ran for another session, not a conversation: it can't be resumed.", description: "Resuming a session is refused: the coding agent ran it for another session (a guardian review). {kind} is the coding agent's name for it, as it came; {provider} the coding agent's name (Codex)." }), { kind: sub.kind, provider: name }, { kind: 'conflict' })
     this.assertStarting(id)
@@ -2387,7 +2592,7 @@ class SessionManager {
       throw combworkError(msg({ id: 'session.start.otherFolder', defaultMessage: 'This session ran in {folder}. Resume it with the agent that works in that folder.', description: "Resuming a session is refused: it ran in another folder (another agent's worktree). {folder} is that folder's path." }), { folder: existing.cwd ?? projectPath }, { kind: 'conflict' })
     }
     // Providers that choose their own session id report it once started (see the start hook).
-    const sessionId = opts.resumeId ?? (adapter.descriptor.capabilities.fixedSessionId ? (adapter.newSessionId?.() ?? randomUUID()) : '')
+    const sessionId = opts.resumeId ?? (adapter.descriptor.capabilities.session?.fixedSessionId ? (adapter.launch.newSessionId?.() ?? randomUUID()) : '')
 
     const mode = assistant ? (await this.assistantInstructions(projectPath, agent).catch(() => null))?.mode : undefined
     times.mark('assistantInstructions')
@@ -2432,7 +2637,9 @@ class SessionManager {
       launchSignature: '',
       unseen: false
     }
-    this.live.set(id, { state, adapter, transcriptMtime: '', defaultModel: false, modeTail: '', recognition: new ScreenRecognition(adapter), launchMode: null, configuredMode: undefined, modeOverride: opts.permissionMode, name: sessionName, transcriptPath: existing?.transcriptPath, initialPrompt: opts.prompt?.trim() || undefined, ...(opts.prompt?.trim() ? { launchTask: true as const } : {}), ...(opts.handedOverFrom ? { handedOverFrom: opts.handedOverFrom } : {}), startAllowed: opts.allowed, resumed: !!opts.resumeId, ...(place.lease ? { lease: place.lease } : {}), ...(place.lease && place.slot ? { slotEnv: slotEnv(place.slot) } : {}) })
+    // What the user typed into an earlier run went to its process (HI-3261): no draft or typing of theirs in this one.
+    this.userInput.delete(key)
+    this.live.set(id, { state, adapter, transcriptMtime: '', defaultModel: false, modeTail: '', recognition: new ScreenRecognition({ readyOutput: adapter.launch.readyOutput, footerMode: adapter.modes?.footerMode?.bind(adapter.modes) }), launchMode: null, configuredMode: undefined, modeOverride: opts.permissionMode, name: sessionName, transcriptPath: existing?.transcriptPath, initialPrompt: opts.prompt?.trim() || undefined, ...(opts.prompt?.trim() ? { launchTask: true as const } : {}), ...(opts.handedOverFrom ? { handedOverFrom: opts.handedOverFrom } : {}), startAllowed: opts.allowed, resumed: !!opts.resumeId, ...(place.lease ? { lease: place.lease } : {}), ...(place.lease && place.slot ? { slotEnv: slotEnv(place.slot) } : {}) })
     this.runs.set(runId, id)
 
     const setup = cfg.worktreeSetup.trim()
@@ -2529,7 +2736,7 @@ class SessionManager {
     l.state.settingUp = false
     setStatus(l.state, null)
     try {
-      await this.launch(projectPath, ({ ...agent, needsSetup: false } as StoredAgent), launch)
+      await inLaunchScope(() => this.launch(projectPath, ({ ...agent, needsSetup: false } as StoredAgent), launch), l?.adapter.descriptor)
     } catch (e) {
       void this.afterLaunch(l.state.runId, this.label(l.state))
       this.forget(id)
@@ -2591,7 +2798,7 @@ class SessionManager {
    */
   /**
    * A running agent whose tool list changed since it launched, restarted to load the new one, resuming its conversation,
-   * as a connection switch does: its role changed its side of the workflow (HI-2664, Darren's decision), or its project's
+   * as a connection switch does: its role changed its side of the workflow (HI-2664), or its project's
    * workflow settings changed the tools they make unusable (HI-2694, the same decision: either way, added or removed). Every
    * role change runs it (projectAgents.updateAgent: Agent Settings, the Agent API, the Assistant's cw_update_agent), and
    * every workflow settings change (workflowTools.ts, at any level, and the rules' switch):
@@ -2703,9 +2910,17 @@ class SessionManager {
     const running = (): boolean => this.live.get(id)?.state.runId === runId
     /** The slot its resume was refused for (HI-2304), while it waits for it. */
     let heldSlot: string | null = null
+    /** What held it at the last look (HI-3213: each new reason logged, so a switch that waits says why). */
+    let heldFor: string | null = null
+    const heldNow = (): string | null => {
+      const why = this.inputHeld(projectPath, agentId) ?? this.safePointHeld(projectPath, agentId, runId)
+      if (why && why !== heldFor) log.info(`${label}: connection switch: waits, ${why}`)
+      heldFor = why
+      return why
+    }
     const op = runSwitch({
       running,
-      heldNow: () => this.safePointHeld(projectPath, agentId, runId),
+      heldNow,
       // A usage move's write, once (HR1: checked under the agent's lock then); rejected, it is dropped alone.
       commit: () => intents.commit(),
       quit: () => this.quit(projectPath, agentId, runId, { fenced: hostOpen, why: 'a switch of connection', ready: () => this.safePointHeld(projectPath, agentId, runId) }), // i18n-ignore: for the log
@@ -2733,16 +2948,21 @@ class SessionManager {
       waits: (e) => (e instanceof SlotHeld ? e.why : null),
       told: (why) => toast('warning', tr(msg({ id: 'session.switch.waitsTitle', defaultMessage: "{agent}'s switch of connection waits for {slot}", description: "A notice's title (HI-2304): an agent was stopped to switch it to another connection (account), and Combwork can't resume it yet because its slot (a worktree Combwork lends it, \"slot-a\") is still held. {agent} is the agent's name." }), { agent: l.state.agentName ?? this.label(l.state), slot: heldSlot ?? '' }), tr(msg({ id: 'session.switch.waits', defaultMessage: '{why}. Combwork resumes it once the slot is free.', description: "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop." }), { why }), undefined, projectPath, agentTarget(projectPath, l.state.agentId, l.state.agentName ?? this.label(l.state))),
       // A slot of its project freed (HI-2304): what its resume waits for, when it does.
+      // Its progress runs too, and a look every SWITCH_RECHECK_MS (HI-3213, as a lane's end does): a hold that ends with no
+      // event of its own (a line's wait, the typing pause, a delivery reaching it) is seen without one.
       watch: (look) => {
         const offEvents = onCombworkEvent((e) => {
-          if ((e.type === 'session-status' && e.state.projectPath === projectPath && e.state.agentId === agentId) || (e.type === 'session-exit' && e.projectPath === projectPath && e.agentId === agentId)) look()
+          if ((e.type === 'session-status' && e.state.projectPath === projectPath && e.state.agentId === agentId) || (e.type === 'session-exit' && e.projectPath === projectPath && e.agentId === agentId) || e.type === 'progress-changed') look()
         })
         const offFreed = this.slotFreedWatch((p) => {
           if (heldSlot && samePlace(p, projectPath)) look()
         })
+        const recheck = setInterval(look, SWITCH_RECHECK_MS)
+        recheck.unref?.()
         return () => {
           offEvents()
           offFreed()
+          clearInterval(recheck)
         }
       },
       log: (line) => log.info(`${label}: connection switch: ${line}`)
@@ -2913,13 +3133,18 @@ class SessionManager {
     if (!info.path) throw combworkError(msg({ id: 'session.start.cliRequired', defaultMessage: '{provider} is required to run sessions.', description: "Starting an agent failed: its coding agent's CLI wasn't found. {provider} is the coding agent's name." }), { provider: adapter.descriptor.name }, { kind: 'conflict' })
 
     let resume = opts.resume
-    if (resume) {
+    if (resume && !adapter.transcript) {
+      // A CLI with no transcript Combwork reads (HI-3196, data-only): resumed by Combwork's id alone when it can be and the
+      // session has had a prompt (before one, the CLI made nothing to resume: it starts fresh under the same id).
+      resume = await this.resumable(adapter, projectPath, sessionId)
+      if (!resume) log.info(`${sessionId} has nothing to resume yet (no prompt), or its CLI can't resume: starting it fresh`)
+    } else if (resume) {
       const recorded = l.transcriptPath
-      if (!(await adapter.transcriptPath(cwd, sessionId, recorded))) {
+      if (!(await adapter.transcript?.transcriptPath(cwd, sessionId, recorded))) {
         // The provider has deleted it: put Combwork's backup back where the provider looks for it (a compressed one
         // decompressed, #1110: the only time it is).
         const backup = this.backupCopy(projectPath, sessionId)
-        const dest = adapter.restorePath(cwd, sessionId, recorded)
+        const dest = adapter.transcript?.restorePath(cwd, sessionId, recorded)
         if (dest && backup) {
           await mkdir(dirname(dest), { recursive: true })
           if (isGz(backup)) await decompressTo(backup, dest)
@@ -2929,11 +3154,11 @@ class SessionManager {
       }
       // A session restarted before anything was typed has no transcript: start it fresh under the same id
       // where the provider allows choosing it, else as a new session.
-      resume = !!(await adapter.transcriptPath(cwd, sessionId, recorded))
+      resume = !!(await adapter.transcript?.transcriptPath(cwd, sessionId, recorded))
       times?.mark('transcript')
       if (!resume) {
         log.info(`No transcript for ${sessionId}; starting it fresh instead of resuming`)
-        if (!adapter.descriptor.capabilities.fixedSessionId) state.sessionId = ''
+        if (!adapter.descriptor.capabilities.session?.fixedSessionId) state.sessionId = ''
       }
     }
 
@@ -2943,7 +3168,7 @@ class SessionManager {
     const eff = await this.effective(projectPath, pinProvider(agent, state.provider))
     times?.mark('effective')
     // The model it runs as, the choice's (an alias resolved) or the CLI's default: for its dialect and its compaction.
-    const chosenModel = eff.model || (conn ? adapter.configuredDefaultModel(conn.folder) : null) || info.defaultModel || ''
+    const chosenModel = eff.model || (conn ? adapter.models?.configuredDefaultModel(conn.folder) : null) || info.defaultModel || ''
     // Its dialect chain, pinned for this launch (HI-2443): from its CLI, the real model ID it runs and its Dialect
     // setting as saved now, before any text of this launch is said. Files that can't be read: the Default.
     const pick = pickOf(((await workspaceOf(projectPath).savedAgent(projectPath, agent.id)) ?? agent).dialect)
@@ -2965,11 +3190,18 @@ class SessionManager {
     l.combworkTools = eff.mcpServers[TOOLS_SERVER] ? 'connecting' : undefined
     // What of Combwork's it launches with (HI-2670), frozen for this run: its hooks and deliveries read this, not a
     // connection changed since (they also read its role as it is now, so an agent made Independent gets nothing more).
-    const policy = eff.launch
+    // A CLI that takes none of Combwork's tools (HI-3196), as its pinned copy says, whatever was read by id meanwhile.
+    const noTools = adapter.descriptor.capabilities.session?.combworkTools === false
+    const policy = noTools ? { ...eff.launch, tools: false, guidance: false } : eff.launch
+    if (noTools) l.combworkTools = undefined
     l.policy = policy
     // Its own Agent API token for this launch, which confines its board calls to its project (the Assistant has its own).
     // None without Combwork's tools (HI-2670): nothing of Combwork's to call it with.
-    if (!workspace.isAssistantHome(projectPath) && policy.tools) await newAgentToken({ workspace: workspaceOf(projectPath).path!, projectPath, agentId: agent.id }, state.runId)
+    const ownToken = !workspace.isAssistantHome(projectPath) && policy.tools
+    if (ownToken) await newAgentToken({ workspace: workspaceOf(projectPath).path!, projectPath, agentId: agent.id }, state.runId)
+    // HI-3195: its combwork server names this launch's own token file (its run's folder), set here once the token is made:
+    // its settings may have been read while an earlier launch's token was the agent's.
+    const tokenEnv: Record<string, string> = ownToken ? { CW_API_TOKEN_FILE: launchTokenFile(state.runId), CW_REQUEST_KEYS_FILE: agentRequestKeysFile(projectPath, agent.id) } : {}
     const assistantText = workspace.isAssistantHome(projectPath) ? await this.assistantInstructions(projectPath, agent).catch(() => null) : null
     // A new conversation starts in its mode; a resumed one is told it if it was last given another (below).
     l.mode = !resume ? assistantText?.modeId || undefined : undefined
@@ -2995,9 +3227,15 @@ class SessionManager {
     // A reviewer's grant of the project's review copies (#1439): one fixed folder, made if new, so it never changes
     // between submissions. Never in a slot (either building there) nor with review copies off.
     const copies = copiesDirOf(workspaceOf(projectPath).worktreesRoot, projectPath)
-    const granted = grantsCopies({ capable: adapter.descriptor.capabilities.extraDirs, on: advanced.get(COPIES_REVIEW) !== false, reviews: policy.tools && reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
-    const extraDirs = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false)) ? [copies] : []
+    const granted = grantsCopies({ capable: adapter.descriptor.capabilities.session?.extraDirs ?? false, on: advanced.get(COPIES_REVIEW) !== false, reviews: policy.tools && reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
+    const made = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false))
+    // HI-3337: a CLI that asks about such a folder at every start (Claude Code 2.1.326 and later, HI-3342) isn't given it
+    // until its home trusts it (Set Up, at the worktrees folder): a reviewer never starts into a question nobody may answer.
+    const untrusted = made && (await addedDirAsks(adapter, info.version, conn?.homeEnv && conn.folder ? conn.folder : null, copies))
+    if (untrusted) log.info(`${userText(this.label(state))}: no review copies this launch: ${adapter.descriptor.name} doesn't trust ${userText(copies)} on its connection yet (Set Up)`)
+    const extraDirs = made && !untrusted ? [copies] : []
     l.extraDirs = extraDirs
+    l.withheldDirs = untrusted ? [copies] : []
     l.cliVersion = info.version ?? null
     // Its side of the workflow for its metrics (HI-2049), once: its part in the running lanes now, else its own role.
     l.workflow = workspace.isAssistantHome(projectPath) ? 'none' : launchWorkflow(agentWorkflowRole(agent), await this.laneParts(projectPath, agent.id).catch(() => []))
@@ -3023,7 +3261,7 @@ class SessionManager {
       resume,
       name: opts.name,
       skills: eff.skills,
-      mcpServers: eff.mcpServers[TOOLS_SERVER] && dialectEnv.CW_DIALECT_FILE ? { ...eff.mcpServers, [TOOLS_SERVER]: { ...eff.mcpServers[TOOLS_SERVER], env: { ...eff.mcpServers[TOOLS_SERVER].env, ...dialectEnv } } } : eff.mcpServers,
+      mcpServers: eff.mcpServers[TOOLS_SERVER] && (dialectEnv.CW_DIALECT_FILE || tokenEnv.CW_API_TOKEN_FILE) ? { ...eff.mcpServers, [TOOLS_SERVER]: { ...eff.mcpServers[TOOLS_SERVER], env: { ...eff.mcpServers[TOOLS_SERVER].env, ...dialectEnv, ...tokenEnv } } } : eff.mcpServers,
       model: eff.model,
       // An effort the model that runs doesn't take (HI-1770: one moved onto it, or a connection's default) is kept, not used.
       effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, modelAccount, eff.effort) ? null : eff.effort,
@@ -3060,7 +3298,7 @@ class SessionManager {
       // no cw-progress on its PATH.
       // Its signer last (HI-2867): with Combwork's tools and the Advanced switch on, its commits sign through cw-sign,
       // never waiting for a passphrase; entries of another Combwork's signer are dropped either way.
-      env: withSessionSigner(withAgentTemp(binPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
+      env: withSessionSigner(withAgentTemp(binPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? (adapter.accounts ?? null) : null, childEnv({
         CW_HOOK_TOKEN: hookAuth.token,
         // Claude Code's hook commands (HI-2777: SessionStart, the admin snippet's status line) read where to post and the
         // auth file's header from these, so no command names a port or holds the token.
@@ -3074,14 +3312,25 @@ class SessionManager {
         // Its slot's name and port block (#1429's slotEnv), while it runs in one.
         ...l.slotEnv,
         // Its connection's folder as the CLI's home (HI-1755): its login, settings and memory, its transcripts shared.
-        ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
+        ...(conn?.homeEnv && conn.folder ? { [conn.homeEnv]: conn.folder } : {}),
         // Not for the Assistant: it reaches the API through its Combwork tools, with its own token.
         ...(workspace.isAssistantHome(projectPath) || !policy.tools ? {} : this.apiEnv(projectPath, agent.id))
       }))), this.binDir), tempDir), this.signer && policy.tools && advanced.get<boolean>(SIGN_FAIL_FAST) ? { ...this.signer, timeoutMs: advanced.number(SIGN_TIMEOUT) * 1000 } : null)
     }
+    // A server connection's values from its CLI's templates (HI-3197), from the model this launch runs as resolved (the one its
+    // command line names): over everything else in its environment and its description's own. On its CLI's own setup (no
+    // server), none of the variables they name, from Combwork's environment or its description alike.
+    const serverCaps = adapter.descriptor.capabilities.connections?.server
+    if (serverCaps?.launch) {
+      const served = serverLaunch(serverCaps, conn?.server?.on ?? null, ctx.model ?? null)
+      const named = new Set(served.names.map((n) => n.toLowerCase()))
+      const env = Object.fromEntries(Object.entries(ctx.env).filter(([k]) => !named.has(k.toLowerCase())))
+      ctx.env = { ...env, ...served.env }
+      ctx.serverLaunch = { args: served.args, names: served.names }
+    }
     // The GitHub hosts a CLI signing in on one launches with (HI-2779): its project's, its workspace's, else the environment's.
     if (adapter.descriptor.capabilities.githubHost) ctx.githubHosts = await githubHostsFor(workspaceOf(projectPath), projectPath, ctx.env)
-    const delivered = await adapter.prepareLaunch(ctx)
+    const delivered = await adapter.launch.prepareLaunch(ctx)
     times?.mark('prepareLaunch')
     // A local model's limits as applied (HI-2682), for its context meter: this launch's, never read again.
     state.localLimits = ctx.localLimits ?? undefined
@@ -3118,12 +3367,19 @@ class SessionManager {
     state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...named, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models, local: conn.server.local } } : {}) } : undefined
     if (conn?.server && state.sessionId) (l.serverSids ??= new Set()).add(state.sessionId)
     // Decision H (HI-2108): its connection is off here or gone, so it runs on its CLI's first usable one: said once a launch.
-    if (conn?.note === 'offFallback' || conn?.note === 'missing') toast('warning', tr(M.connectionFallbackTitle, { agent: this.label(state) }), tr(M.connectionFallback, { why: conn.note, wanted: getConnection(agent.connection)?.name ?? '', name: conn.name }), undefined, projectPath, agentTarget(projectPath, state.agentId, this.label(state))) // i18n-ignore: select keys, never shown
-    if (!isProviderEnabled(config.settings, adapter.id)) throw combworkError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name }, { kind: 'conflict' })
+    // Its account off here (HI-3213): the connection matched on the account it runs on, and how (the same tag, name, or its first).
+    if (conn?.note === 'offFallback' || conn?.note === 'missing') {
+      const own = getConnection(agent.connection)
+      const body = conn.note === 'offFallback' && named.connection ? tr(M.connectionOffMatched, { wanted: own?.name ?? '', name: named.connection.name, account: conn.name, by: conn.by ?? 'default', tag: cleanTag(own?.tag) ?? '' }) : tr(M.connectionFallback, { why: conn.note, wanted: own?.name ?? '', name: conn.name }) // i18n-ignore: select keys, never shown
+      toast('warning', tr(M.connectionFallbackTitle, { agent: this.label(state) }), body, undefined, projectPath, agentTarget(projectPath, state.agentId, this.label(state)))
+    }
+    await heldLaunch(this.label(state))
+    // Its switch alone (HI-3196): a CLI whose description was removed while it prepared still launches from its copy.
+    if (!providerSwitchOn(config.settings, adapter.id)) throw combworkError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name }, { kind: 'conflict' })
     l.startAllowed?.()
-    const cmd = adapter.buildCommand(info.path, ctx)
+    const cmd = adapter.launch.buildCommand(info.path, ctx)
     // What the user should know about this launch: once per agent, folder and notice while Combwork runs.
-    const notice = adapter.launchNotice?.(ctx)
+    const notice = adapter.launch.launchNotice?.(ctx)
     const noticeKey = notice ? `${id}\n${ctx.cwd}\n${notice.title}` : ''
     if (notice && !this.launchNotices.has(noticeKey)) {
       this.launchNotices.add(noticeKey)
@@ -3133,28 +3389,32 @@ class SessionManager {
     // Where it compacts by itself (#242): for the model it runs as (chosenModel, above).
     // Once the session reports the model it runs, that model alone: another model's window isn't its own.
     const modelsFor = (running?: string): string[] => (running ? [running] : [chosenModel && resolvedModel(info, chosenModel), chosenModel].filter((m): m is string => !!m))
-    l.autoCompactFor = adapter.autoCompact ? (running) => adapter.autoCompact!(ctx, cmd, modelsFor(running)) : undefined
+    const autoCompact = adapter.compaction?.autoCompact?.bind(adapter.compaction)
+    l.autoCompactFor = autoCompact ? (running) => autoCompact(ctx, cmd, modelsFor(running)) : undefined
     state.autoCompact = l.autoCompactFor?.()
     // Its hooks, for its Hooks dialog (HI-982): never a reason for the launch to fail.
     try {
-      l.hooks = adapter.launchHooks?.(ctx, cmd)
+      l.hooks = adapter.hooks?.launchHooks?.(ctx, cmd)
     } catch (e) {
       log.warn(`${userText(this.label(state))}: its hooks couldn't be listed`, e)
     }
     l.hookHistory = []
     l.hookBlock = undefined
-    l.titleAttention = adapter.titleAttention?.(info.version, ctx) ?? undefined
-    l.terminalTurnOf = adapter.terminalTurn ? () => adapter.terminalTurn!() : undefined
+    l.titleAttention = adapter.terminal?.titleAttention?.(info.version, ctx) ?? undefined
+    const terminalTurn = adapter.terminal?.terminalTurn?.bind(adapter.terminal)
+    l.terminalTurnOf = terminalTurn ? () => terminalTurn() : undefined
     l.terminalSaid = undefined
     l.terminalCarry = ''
-    l.turnScreen = adapter.turnScreen?.(info.version) ?? undefined
+    l.turnScreen = adapter.terminal?.turnScreen?.(info.version) ?? undefined
     l.ledger = newLedger()
     // Whether its hooks reach Combwork (#1336), and what can say why they don't.
-    l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.startHook, adapter.transcriptTurns ? (adapter.turnsJoin ?? 'id') : null)
-    l.hooksOffIn = adapter.hooksOffIn ? () => adapter.hooksOffIn!(ctx) : undefined
+    // A CLI with no hooks (HI-3196) expects none: no watch for them, its status the terminal's (screenStatus).
+    if (adapter.hooks) l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.session?.startHook, adapter.transcript?.transcriptTurns ? (adapter.transcript?.turnsJoin ?? 'id') : null)
+    const hooksOffIn = adapter.hooks?.hooksOffIn?.bind(adapter.hooks)
+    l.hooksOffIn = hooksOffIn ? () => hooksOffIn(ctx) : undefined
     // Read once, in the background: the warning names it if its hooks don't come (HI-2777).
-    if (adapter.hookCause) {
-      void adapter.hookCause(ctx).then(
+    if (adapter.hooks?.hookCause) {
+      void adapter.hooks?.hookCause(ctx).then(
         (c) => (l.hookCause = c),
         () => (l.hookCause = null)
       )
@@ -3201,7 +3461,7 @@ class SessionManager {
     const key = this.key(projectPath, agent.id)
     const size = startSize(key)
     const caps = l.adapter.descriptor.capabilities
-    const screen = l.adapter.footerMode || l.adapter.modeMenuKeys || l.turnScreen || caps.bracketedPaste || caps.enterOnceDrawn ? new TerminalScreen(size.cols, size.rows) : null
+    const screen = l.adapter.modes?.footerMode || l.adapter.modes?.modeMenuKeys || l.turnScreen || caps.terminal?.bracketedPaste || caps.terminal?.enterOnceDrawn ? new TerminalScreen(size.cols, size.rows) : null
     l.screen = screen
     // The developer console (#636): how it was started (launchEvent: never its arguments).
     devConsole.capture([sessionSourceId(projectPath, agent.id)], () => launchEvent({ provider: adapter.id, name: adapter.descriptor.name, file: cmd.file, args: cmd.args, cwd, version: info.version, state, resumed: !!l.resumed }))
@@ -3223,6 +3483,8 @@ class SessionManager {
           this.screenDrawn(id, l)
           this.idleScreenDrawn(id, l)
           this.inputBlockedDrawn(id, l)
+          this.startupDrawn(id, l)
+          this.screenStatus(id, l)
         })
         this.watchTitle(id, data)
         this.watchTerminalTurn(id, data)
@@ -3252,7 +3514,14 @@ class SessionManager {
     this.writerSpawned(state.runId)
     // A task on its command line is its first prompt (#1336: a hook should follow it), though it is still starting: no
     // turn of its own runs yet.
-    if (l.initialPrompt) this.notePrompt(l, true)
+    // A CLI whose first prompt is typed (HI-3196, data-only): kept until its screen first says it is ready, then typed as
+    // any line Combwork types is (sendPrompt, its guards): never on its command line.
+    // A resume whose CLI takes no prompt with it (HI-3202) types it the same way.
+    if (l.initialPrompt && (adapter.launch.promptTyped || (l.resumed && adapter.launch.resumePromptTyped))) l.typedFirstPrompt = l.initialPrompt
+    else if (l.initialPrompt) {
+      this.notePrompt(l, true)
+      l.promptOnCommandLine = true
+    }
     l.initialPrompt = undefined
     l.startAllowed = undefined
     // After each look at the transcript, whether its CLI waits to retry (HI-1972), then the silence check: what the CLI
@@ -3320,7 +3589,7 @@ class SessionManager {
       // Combwork's own instructions were given it (#1433): kept, never cleared, so later resumes refresh its prompt.
       ...(l.promptAdded ? { promptAdded: true as const } : {}),
       // Providers that choose their own ids file transcripts by date, not folder: remember where.
-      ...(l.transcriptPath && !l.adapter.descriptor.capabilities.fixedSessionId ? { transcriptPath: l.transcriptPath } : {}),
+      ...(l.transcriptPath && !l.adapter.descriptor.capabilities.session?.fixedSessionId ? { transcriptPath: l.transcriptPath } : {}),
       // Where it ran (#1434: always, the project folder too): a conversation resumes only there.
       cwd: state.cwd,
       ...(legacyWorktree(agent) ? { branch: legacyWorktree(agent)!.branch } : {}),
@@ -3331,7 +3600,7 @@ class SessionManager {
       ...(state.signInHost ? { signInHost: state.signInHost } : {}),
       // On a server connection (HI-1772), kept once set: its CLI's cost reports are never counted for it.
       ...(state.launchedConnection?.server ? { serverRan: true as const } : {}),
-      // Free (HI-1772, Darren 27 Oct) only while every run of it was on a server on this PC: kept once set, each.
+      // Free (HI-1772) only while every run of it was on a server on this PC: kept once set, each.
       ...(state.launchedConnection?.server?.local ? { serverLocal: true as const } : { notLocal: true as const })
     }, { createdAt: state.sessionCreatedAt })
     // Its record says it ran on a server (HI-1772, now or in an earlier run): its reads leave the CLI's cost reports out
@@ -3404,7 +3673,9 @@ class SessionManager {
   /**
    * Why nothing may be typed into an agent's prompt now (HI-1706's quit), or null: Combwork typing into it, a line of Combwork's
    * not taken yet (#430: or confirming, or the user's draft over it), the user typing within the pause, or what the user
-   * typed last not sent (a draft of theirs in its prompt).
+   * typed last not sent (a draft of theirs in its prompt). That draft is read from its screen where its CLI's input can
+   * be (HI-3213: a last key that wasn't Enter, such as Esc, Shift+Tab or an arrow, leaves an empty prompt, which holds
+   * nothing); unreadable (a dialog, a CLI that can't say), a key not sent still holds it.
    */
   inputHeld(projectPath: string, agentId: string): string | null {
     const l = this.live.get(liveId(projectPath, agentId))
@@ -3414,7 +3685,7 @@ class SessionManager {
     if (this.lineBlocked(l)) return "a line Combwork typed isn't taken yet" // i18n-ignore: a reason for the log
     if (this.userMayBeTyping(projectPath, agentId)) return 'the user is typing there' // i18n-ignore: a reason for the log
     const u = this.userInput.get(key)
-    if (u && !u.enter) return "the user's draft is in its prompt" // i18n-ignore: a reason for the log
+    if (u && !u.enter && !u.answer && userDraftShown(l.adapter.terminal?.promptText && l.screen ? l.adapter.terminal.promptText(l.screen.textWithoutDim()) : null)) return "the user's draft is in its prompt" // i18n-ignore: a reason for the log
     return null
   }
 
@@ -3438,8 +3709,8 @@ class SessionManager {
     if (l.ending) return 'sent'
     const label = userText(this.label(l.state))
     const held = this.inputHeld(projectPath, agentId) ?? (force ? null : (o.ready?.() ?? null))
-    const line = l.adapter.quitLine
-    const keys = l.adapter.exitKeys
+    const line = l.adapter.launch.quitLine
+    const keys = l.adapter.launch.exitKeys
     if (held || (!line && !keys)) {
       if (held && !force) return 'held'
       log.info(`${label}: killed (${why}${held ? `; ${held}` : ', its CLI has no exit command'})`)
@@ -3506,7 +3777,7 @@ class SessionManager {
    */
   private endProcess(l: LiveSession): void {
     const key = this.key(l.state.projectPath, l.state.agentId)
-    const exit = l.adapter.exitKeys
+    const exit = l.adapter.launch.exitKeys
     if (!exit || l.state.settingUp || l.ending) return killPty(key)
     l.ending = true
     const id = liveId(l.state.projectPath, l.state.agentId)
@@ -3567,7 +3838,7 @@ class SessionManager {
       if (cause) l.stopCause ??= cause
       this.endProcess(l)
     }
-    const waitMs = stopWaitMs(timeoutMs, chosen.map(([, l]) => l.adapter.exitKeys?.graceMs))
+    const waitMs = stopWaitMs(timeoutMs, chosen.map(([, l]) => l.adapter.launch.exitKeys?.graceMs))
     await Promise.race([Promise.all([...waits, ...pending.map((p) => p.done)]), new Promise((r) => setTimeout(r, waitMs))])
   }
 
@@ -3601,7 +3872,7 @@ class SessionManager {
     check(l)
     // Reserved while Combwork types the command (a long focus takes a while), so nothing else is typed or compacted
     // meanwhile; Compaction's limits run from its submission.
-    const c: Compaction = new Compaction(before, l.adapter.compactFailure, () => this.compactionDone(id, l, c))
+    const c: Compaction = new Compaction(before, l.adapter.compaction?.compactFailure ?? null, () => this.compactionDone(id, l, c))
     l.compacting = c
     this.fact(l.state, { maintenance: 'compacting' })
     l.state.status = 'working'
@@ -3627,7 +3898,7 @@ class SessionManager {
       // Settings → Advanced can leave the CLI's draft in front of it (#1286); cleared as a prompt's is (HI-1979).
       if (advanced.get<boolean>(PROMPT_CLEAR_DRAFT)) await this.clearInput(l, key, stillSame)
       // On one line, without control characters (HI-1920): typed key by key, one would press a key.
-      const text = l.adapter.descriptor.capabilities.compactFocus ? promptInput((focus ?? '').replace(/\s+/g, ' ').trim(), false, false) : ''
+      const text = l.adapter.descriptor.capabilities.compaction?.compactFocus ? promptInput((focus ?? '').replace(/\s+/g, ' ').trim(), false, false) : ''
       // Written in one go, a long line counts as a paste, and pasted input is sent as a message even when
       // it starts with "/compact". So type the command on its own, then the focus in small pieces.
       stillSame()
@@ -3709,10 +3980,63 @@ class SessionManager {
     l.terminalCarry = carry
     if (!turn || turn === l.terminalSaid) return
     l.terminalSaid = turn
+    // A CLI with no hooks (HI-3196): its status follows what its terminal says, as its screen is read.
+    if (!l.adapter.hooks) return this.screenStatus(id, l)
     if (!l.state.hooksMissing) return
     // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
     devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'turn state', provider: l.state.provider, made: { terminal: turn }, summary: `terminal: its turn ${turn} (its hooks missing)` }))
     this.terminalTurnShown(l)
+  }
+
+  /**
+   * A CLI with no hooks (HI-3196, data-only): its status from its terminal alone, from its start on: its OSC 7501 state where
+   * it writes one, its title, then its screen's rules (a question, work, ready), then its process's end. Never "hooks
+   * missing": none are expected.
+   */
+  private screenStatus(id: string, l: LiveSession): void {
+    if (l.adapter.hooks || this.live.get(id) !== l) return
+    // A first prompt still waiting for a safe point (HI-3196): looked at again as its screen changes.
+    if (l.typedFirstPrompt) queueMicrotask(() => this.typeFirstPrompt(l))
+    const screen = l.screen?.text() ?? ''
+    const said = l.terminalTurnOf ? l.terminalSaid : undefined
+    const reading: TerminalReading =
+      l.titleRead || (screen && l.adapter.terminal?.idleQuestion?.(screen))
+        ? 'asks'
+        : said === 'working'
+          ? 'working'
+          : said === 'idle'
+            ? 'ready'
+            : l.turnScreen && screen
+              ? ((r) => (r === 'idle' ? 'ready' : r))(l.turnScreen(screen))
+              : null
+    // Still starting, and its terminal says its turn is idle (its OSC 7501 state or its turn rules, which come with its output
+    // and not only with a draw): its start is over, as its prompt showing says (startupDrawn), whichever comes first.
+    if (l.state.status === 'starting' && reading === 'ready' && l.adapter.launch.startupOnScreen && !l.askedAtStart) {
+      log.info(`${userText(this.label(l.state))}: ready, as its terminal says its turn is idle`) // i18n-ignore: for the log
+      return this.startupReady(l, screen)
+    }
+    // Still starting (or at its question before its start), its first prompt given on its command line, and its terminal
+    // says it works (HI-3266): that prompt is its first turn. Its start is over, and its screen's steps carry the turn from
+    // here: working (its prompt taken), then finished when its prompt is back. A CLI working by itself before a typed prompt
+    // has no turn to end: left to its start.
+    if ((l.state.status === 'starting' || l.askedAtStart) && reading === 'working' && l.promptOnCommandLine && l.adapter.launch.startupOnScreen) {
+      log.info(`${userText(this.label(l.state))}: working on the prompt on its command line, as its terminal says: its start is over`) // i18n-ignore: for the log
+      this.startupAnswered(l)
+      l.startupDone = true
+      this.fact(l.state, { lifecycle: 'running' })
+      l.state.status = 'ready'
+    }
+    const step = screenStep(reading, this.statusInput(l))
+    if (step.next === null && !step.actions.length) return
+    const runId = l.state.runId
+    void this.inHookOrder(runId, () => {
+      const now = this.live.get(id)
+      if (now !== l || now.state.runId !== runId) return
+      const again = screenStep(reading, this.statusInput(now))
+      if (again.next !== null || again.actions.length) this.carryOut(id, now, again, 'screen')
+      // Its prompt free now (a question answered, a turn over): a first prompt still waiting is tried again.
+      if (now.typedFirstPrompt) this.typeFirstPrompt(now)
+    }).catch((e) => log.warn('screen status: could not apply it', e))
   }
 
   /** While its hooks are missing (#1336), what its terminal last said of its turn (HI-2802) is its status's last resort. */
@@ -3723,13 +4047,32 @@ class SessionManager {
     this.emitState(l.state)
   }
 
+  /** How far a launch's start is, for startupScreen. */
+  private startupState(l: LiveSession): StartupState {
+    return { status: l.state.status, askedAtStart: !!l.askedAtStart, settled: (l.prompts ?? 0) > 0 || !!l.startupDone }
+  }
+
   /** For CLIs whose first hook waits for the first prompt: the prompt showing in the terminal means ready. */
   private watchReadyOutput(id: string, data: string): void {
     const l = this.live.get(id)
-    const s = l && { status: l.state.status, askedAtStart: !!l.askedAtStart, settled: (l.prompts ?? 0) > 0 || !!l.startupDone }
-    if (!l || !s || !startupWatched(s, l.adapter)) return
+    // One read from its rendered screen is read as each draw lands (startupDrawn).
+    if (!l || l.adapter.launch.startupOnScreen) return
+    const s = this.startupState(l)
+    if (!startupWatched(s, l.adapter.launch)) return
     l.modeTail = (l.modeTail + data.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, ' ')).slice(-600)
-    const seen = startupScreen(s, l.modeTail.replace(/\s+/g, ' '), l.adapter)
+    this.startupSeen(l, s, l.modeTail.replace(/\s+/g, ' '))
+  }
+
+  /** A CLI whose start is read from its rendered screen (HI-3196, startupOnScreen): its lines as each draw lands. */
+  private startupDrawn(id: string, l: LiveSession): void {
+    if (!l.adapter.launch.startupOnScreen || !l.screen || this.live.get(id) !== l) return
+    const s = this.startupState(l)
+    if (startupWatched(s, l.adapter.launch)) this.startupSeen(l, s, l.screen.text())
+  }
+
+  /** What the start's screen `text` says: its question (waiting for the user), or its prompt (ready, its first prompt typed). */
+  private startupSeen(l: LiveSession, s: StartupState, text: string): void {
+    const seen = startupScreen(s, text, l.adapter.launch)
     if (seen && seen !== 'ready') {
       const asked = seen.asked
       // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
@@ -3746,14 +4089,18 @@ class SessionManager {
       setStatus(l.state, asks)
       this.notify(l.state.projectPath, withValues(M.needsInput, { agent: this.label(l.state) }), asks, 'waiting', undefined, l.state.agentId)
       this.emitState(l.state)
-    } else if (seen === 'ready') {
-      // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
-      devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'ready', provider: l.state.provider, raw: { screen: l.modeTail.replace(/\s+/g, ' ').slice(-200) }, made: { status: 'ready' }, safe: { made: { status: true } }, summary: 'terminal: its prompt shows; ready' }))
-      this.startupAnswered(l)
-      this.fact(l.state, { lifecycle: 'running' })
-      l.state.status = 'ready'
-      this.emitState(l.state)
-    }
+    } else if (seen === 'ready') this.startupReady(l, text)
+  }
+
+  /** Its start is over, its prompt showing: ready, and its typed first prompt tried. */
+  private startupReady(l: LiveSession, text: string): void {
+    // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
+    devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'ready', provider: l.state.provider, raw: { screen: text.replace(/\s+/g, ' ').slice(-200) }, made: { status: 'ready' }, safe: { made: { status: true } }, summary: 'terminal: its prompt shows; ready' }))
+    this.startupAnswered(l)
+    this.fact(l.state, { lifecycle: 'running' })
+    l.state.status = 'ready'
+    this.emitState(l.state)
+    this.typeFirstPrompt(l)
   }
 
   /**
@@ -3767,6 +4114,80 @@ class SessionManager {
   }
 
   /** The question before the start was answered: the agent is starting again. */
+  /**
+   * The first prompt of a CLI that takes it typed (HI-3196), once its screen first says it is ready: through sendPrompt and
+   * its guards (its question, its work, a draft of the user's), as any line Combwork types; once.
+   */
+  private typeFirstPrompt(l: LiveSession): void {
+    const text = l.typedFirstPrompt
+    if (!text || l.firstPromptTyping || !this.owns(l)) return
+    const { projectPath, agentId, runId } = l.state
+    // Only at a safe point: at its prompt, nothing on its screen asking or taking its keys, nobody typing there, no draft
+    // of the user's in it and no line of Combwork's waiting (inputHeld). Not yet: kept, and tried again as its screen
+    // draws, as its status changes, and when the user's typing pause ends (which neither of those says).
+    if (this.firstPromptHeld(l)) return this.firstPromptWhenQuiet(l)
+    this.cancelFirstPromptWait(l)
+    l.firstPromptTyping = true
+    const since = Date.now()
+    void this.sendPrompt(projectPath, agentId, text, () => {
+      const now = this.live.get(liveId(projectPath, agentId))
+      if (now?.state.runId !== runId) throw combworkError(M.stoppedBeforeStart)
+      // As it types and before its Enter: the user typing there, or it busy or asking, puts it off (taken back, kept).
+      // agent-protocol: why a first prompt was put off, for the log only (caught below)
+      if (!AT_PROMPT.has(now.state.status)) throw new Error(`it is ${now.state.status}`) // i18n-ignore: why a first prompt was put off, for the log only
+      // agent-protocol: why a first prompt was put off, for the log only (caught below)
+      if (this.userTypedAt(projectPath, agentId) >= since) throw new Error('the user typed there') // i18n-ignore: why a first prompt was put off, for the log only
+    })
+      .then(() => {
+        if (l.typedFirstPrompt === text) l.typedFirstPrompt = undefined
+        this.cancelFirstPromptWait(l)
+      })
+      .catch((e: Error) => {
+        // Its Enter was pressed (the line recorded as typed): never typed again. Else kept, for the next safe point.
+        if (l.typed && l.typed.at >= since && l.typedFirstPrompt === text) l.typedFirstPrompt = undefined
+        log.info(`${userText(this.label(l.state))}: its first prompt is put off: ${e.message}`)
+      })
+      .finally(() => {
+        l.firstPromptTyping = false
+      })
+  }
+
+  /**
+   * A first prompt held by the user's typing pause (userMayBeTyping) is tried again when that pause ends (userQuietAt),
+   * once; anything else that holds it (a draft, a question, work) ends with a draw or a status change, which try it again.
+   */
+  private firstPromptWhenQuiet(l: LiveSession): void {
+    const { projectPath, agentId } = l.state
+    const at = this.userQuietAt(projectPath, agentId)
+    if (at === null || l.firstPromptWait?.at === at) return
+    this.cancelFirstPromptWait(l)
+    const timer = setTimeout(() => {
+      if (l.firstPromptWait?.timer !== timer) return
+      l.firstPromptWait = undefined
+      if (this.owns(l)) this.typeFirstPrompt(l)
+    }, Math.max(0, at - Date.now()) + 1)
+    timer.unref?.()
+    l.firstPromptWait = { at, timer }
+  }
+
+  private cancelFirstPromptWait(l: LiveSession): void {
+    if (l.firstPromptWait) clearTimeout(l.firstPromptWait.timer)
+    l.firstPromptWait = undefined
+  }
+
+  /**
+   * Why a launch's first prompt can't be typed now (typeFirstPrompt), or null: the same guards any line of Combwork's has.
+   * A reason other than the last is logged (HI-3261: a draft of the user's holds it until they press Enter there).
+   */
+  private firstPromptHeld(l: LiveSession): string | null {
+    const { projectPath, agentId } = l.state
+    if (!AT_PROMPT.has(l.state.status) || l.askedAtStart) return 'not at its prompt' // i18n-ignore: a reason, not logged (its start's own wait)
+    const why = this.cliAsks(projectPath, agentId) ? 'its CLI asks something' : this.inputBlocked(projectPath, agentId) ? 'something on its screen takes its keys' : this.inputHeld(projectPath, agentId) // i18n-ignore: reasons for the log
+    if (why && why !== l.firstPromptHeld) log.info(`${userText(this.label(l.state))}: its first prompt waits: ${why}`) // i18n-ignore: for the log
+    l.firstPromptHeld = why ?? undefined
+    return why
+  }
+
   private startupAnswered(l: LiveSession): void {
     if (!l.askedAtStart) return
     l.askedAtStart = false
@@ -3810,13 +4231,13 @@ class SessionManager {
 
   /** Reads the mode from the CLI's footer on its screen as it redraws, so a mode change in the terminal shows in Combwork at once. */
   private readFooterMode(l: LiveSession, screen: TerminalScreen): void {
-    if (this.live.get(liveId(l.state.projectPath, l.state.agentId)) !== l || !l.adapter.footerMode) return
+    if (this.live.get(liveId(l.state.projectPath, l.state.agentId)) !== l || !l.adapter.modes?.footerMode) return
     const text = screen.text()
     // The first footer recognised this launch, whatever the mode was before (#638's contract marker).
     const first = l.recognition.footerOf(text, l.launchMode)
     // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
     if (first) devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'footer seen', provider: l.state.provider, raw: { footer: first }, made: { recognised: 'footer', permissionMode: first }, safe: { raw: { footer: true }, made: { recognised: true, permissionMode: true } }, summary: `terminal footer recognised: mode ${first}` }))
-    const mode = l.adapter.footerMode(text, l.launchMode)
+    const mode = l.adapter.modes?.footerMode(text, l.launchMode)
     if (mode && (mode !== l.state.permissionMode || mode !== l.state.modeObserved)) {
       // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
       devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'footer mode', provider: l.state.provider, raw: { footer: mode }, made: { permissionMode: mode, was: l.state.permissionMode }, safe: { raw: { footer: true }, made: { permissionMode: true, was: true } }, summary: `terminal footer: mode ${mode}` }))
@@ -3850,9 +4271,9 @@ class SessionManager {
     if (st.permissionMode === mode) return { ok: true }
     if (workspace.isAssistantHome(projectPath) && isCliOwnMode(mode)) throw combworkError(M.assistantCliOwn, undefined, { kind: 'conflict' })
     if (!modeAllowed(p, mode, config.settings)) throw combworkError(msg({ id: 'session.mode.off', defaultMessage: '{mode} is turned off in Settings → {provider}.', description: "Switching an agent's permission mode is refused: that mode is turned off. {mode} is the mode's name; {provider} the coding agent's (its Settings section)." }), { mode: permissionLabel(p, mode, tr), provider: name }, { kind: 'conflict' })
-    const how = l.adapter.descriptor.capabilities.liveModeSwitch
+    const how = l.adapter.descriptor.capabilities.modes?.liveModeSwitch
     // Never to or from the CLI's own setting (#1284): Combwork doesn't know where such a session started.
-    if (how === 'none' || !canSwitchModeLive(l.adapter.descriptor, mode, st.permissionMode, l.launchMode) || !l.adapter.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
+    if (!how || how === 'none' || !canSwitchModeLive(l.adapter.descriptor, mode, st.permissionMode, l.launchMode) || !l.adapter.modes?.canSwitchLive(mode, st.permissionMode, l.launchMode)) {
       return { ok: false, restart: true, message: tr(msg({ id: 'session.mode.restart', defaultMessage: "{mode} can't be switched to inside a running session. Restart the session in that mode; the conversation continues.", description: "Switching an agent's permission mode needs a restart. {mode} is the mode's name." }), { mode: permissionLabel(p, mode, tr) }) }
     }
     if (st.status === 'waiting') throw combworkError(msg({ id: 'session.mode.asking', defaultMessage: 'The agent is asking you something. Answer it first, then switch the mode.', description: "Switching an agent's permission mode is refused: it waits for the user's answer." }), undefined, { kind: 'conflict' })
@@ -3876,7 +4297,7 @@ class SessionManager {
     const name = l.adapter.descriptor.name
     const id = liveId(st.projectPath, st.agentId)
     const key = this.key(st.projectPath, st.agentId)
-    if (how === 'menu' && l.adapter.modeMenuKeys) {
+    if (how === 'menu' && l.adapter.modes?.modeMenuKeys) {
       // The CLI's own menu (Codex: /permissions). Only while idle: typed into a working agent it would queue.
       if (st.status === 'working') throw combworkError(msg({ id: 'session.mode.working', defaultMessage: '{provider} is working. Switch the mode once it has finished.', description: "Switching an agent's permission mode is refused while it works. {provider} is the coding agent's name." }), { provider: name }, { kind: 'conflict' })
       const before = st.permissionMode
@@ -3902,7 +4323,7 @@ class SessionManager {
         return englishText(text)
       }
       try {
-        await typeKeySteps(l.adapter.modeMenuKeys(mode), {
+        await typeKeySteps(l.adapter.modes?.modeMenuKeys(mode), {
           write: (keys) => writePty(key, keys),
           screen: () => l.screen?.text() ?? null,
           // Asked before every key (#363): safe while this session runs, isn't asking the user anything, and isn't
@@ -3911,7 +4332,7 @@ class SessionManager {
             for (const t0 = Date.now(); ; await new Promise((r) => setTimeout(r, 200))) {
               if (!same()) return stop(msg({ id: 'session.mode.why.ended', defaultMessage: 'its session ended', description: "Why Combwork stopped switching an agent's permission mode (a clause: \"Combwork didn't switch to Auto, as its session ended.\")." }))
               if (asking()) return stop(withValues(msg({ id: 'session.mode.why.asking', defaultMessage: '{provider} is asking you something', description: "Why Combwork stopped switching an agent's permission mode (a clause). {provider} is the coding agent's name." }), { provider: name }))
-              if (st.status !== 'working' && !l.adapter.busyScreen?.(l.screen?.text() ?? '')) return true
+              if (st.status !== 'working' && !l.adapter.terminal?.busyScreen?.(l.screen?.text() ?? '')) return true
               if (Date.now() - t0 >= 30_000) return stop(withValues(msg({ id: 'session.mode.why.busy', defaultMessage: '{seconds, plural, one {{provider} stayed busy for # second} other {{provider} stayed busy for # seconds}}', description: "Why Combwork stopped switching an agent's permission mode (a clause). {provider} is the coding agent's name; {seconds} how many seconds Combwork waited." }), { provider: name, seconds: 30 }))
             }
           }
@@ -3933,12 +4354,12 @@ class SessionManager {
       // The CLI records the new settings in its transcript at once: read them back rather than assume.
       const src = await this.liveTranscript(l)
       if (!same()) return notSwitched(tr(M.switchEnded, { mode: permissionLabel(p, mode, tr) }))
-      const details = !!src && !!l.adapter.transcriptDetails
+      const details = !!src && !!l.adapter.transcript?.transcriptDetails
       // The CLI's own question about the mode picked (Codex's warning before Full Access, #1014): the user answers it in
       // the terminal, so the switch waits for the answer, however long (up to the adapter's answerMs: an advanced
       // setting), and the 12 seconds the CLI has to confirm start once it is answered. What the CLI printed before the
       // answer doesn't count: the user may still cancel.
-      const wait = l.adapter.modeConfirmWait?.() ?? { appearMs: 0, answerMs: 0 }
+      const wait = l.adapter.modes?.modeConfirmWait?.() ?? { appearMs: 0, answerMs: 0 }
       let asked = false
       const askedAt = Date.now()
       for (let t = Date.now(); same(); ) {
@@ -3948,7 +4369,7 @@ class SessionManager {
           if (s) await this.readDetails(l, src!, s.size, hooks)
           if (st.permissionMode === mode) break
         }
-        if (l.adapter.modeConfirmScreen?.(l.screen?.text() ?? '')) {
+        if (l.adapter.modes?.modeConfirmScreen?.(l.screen?.text() ?? '')) {
           if (!asked) log.info(`${userText(this.label(st))}: ${name} asks to confirm ${mode} in its terminal`)
           asked = true
           if (Date.now() - askedAt >= wait.answerMs) break
@@ -3957,7 +4378,7 @@ class SessionManager {
         } else {
           if (Date.now() - t >= 12_000) break
           // The CLI's own confirmation in the terminal comes first (the transcript record a few seconds later).
-          const said = l.adapter.modeFromOutput?.(l.switchTail ?? '')
+          const said = l.adapter.modes?.modeFromOutput?.(l.switchTail ?? '')
           if (said) {
             st.permissionMode = said
             if (said === mode) break
@@ -3998,8 +4419,10 @@ class SessionManager {
       if (before) seen.add(before)
       writePty(key, '\x1b[Z')
       const t = Date.now()
-      // The footer redraw that shows the new mode can take a few seconds on a busy machine or just after the start.
-      while (Date.now() - t < 4000 && st.permissionMode === before) await new Promise((r) => setTimeout(r, 50))
+      // Each press waits for the footer to show its effect before the next (HI-3373): the redraw can take seconds on a busy
+      // machine or just after the start, and a press before it would cycle past the mode. MODE_PRESS_MS bounds a redraw
+      // that never comes (nothing changed: the mode isn't offered), never how long one should take.
+      while (Date.now() - t < MODE_PRESS_MS && st.permissionMode === before) await new Promise((r) => setTimeout(r, 50))
       if (st.permissionMode === mode) {
         log.info(`${userText(this.label(st))}: switched to ${mode}`)
         this.refreshSizeSoon(l)
@@ -4031,11 +4454,16 @@ class SessionManager {
   noteUserInput(key: string, data: string): void {
     // xterm's own replies (focus in/out, cursor reports, colour queries) aren't typing.
     const typed = typedText(data)
-    if (typed) this.userInput.set(key, { at: Date.now(), enter: typed.endsWith('\r') })
+    const l = typed ? [...this.live.values()].find((x) => this.key(x.state.projectPath, x.state.agentId) === key) : undefined
+    // One key alone (y, 1, Esc) while its question before its start shows went to that question (HI-3261): no draft of the
+    // user's. Only the first key since the run began or since an Enter: more text in the same write (a paste, keys sent
+    // together: `ydraft`), or a later key before its screen says the question is gone, may be a draft left in its prompt.
+    const prev = this.userInput.get(key)
+    const answer = !!typed && !!l?.askedAtStart && [...typed].length === 1 && (!prev || prev.enter)
+    if (typed) this.userInput.set(key, { at: Date.now(), enter: typed.endsWith('\r'), ...(answer ? { answer: true } : {}) })
     if (typed?.includes('\r')) {
       this.userEnter.set(key, Date.now())
       // A prompt of the user's, perhaps (#1336): a hook should follow it if it starts a turn.
-      const l = [...this.live.values()].find((x) => this.key(x.state.projectPath, x.state.agentId) === key)
       if (l) this.notePrompt(l, false, true)
     }
   }
@@ -4047,6 +4475,33 @@ class SessionManager {
   private notePrompt(l: LiveSession, launch = false, byUser = false): void {
     const idle = launch || ['ready', 'finished', 'watching', 'background'].includes(l.state.status)
     if (l.hooksWatch) promptSent(l.hooksWatch, Date.now(), idle, byUser)
+    this.notePrompted(l, launch, byUser)
+  }
+
+  /**
+   * A session of a CLI that resumes by Combwork's id (HI-3196) has had its first prompt, kept on its record once: its launch's
+   * task on its command line, a line Combwork typed, or the user's own Enter while the CLI is at its prompt (not one
+   * answering its question at start, a permission question or another dialog on its screen).
+   */
+  private notePrompted(l: LiveSession, launch: boolean, byUser: boolean): void {
+    if (!l.adapter?.launch.resumesById || l.prompted || !l.state.sessionId) return
+    if (byUser) {
+      const screen = l.screen?.text() ?? ''
+      if (!AT_PROMPT.has(l.state.status) || l.askedAtStart || (screen && l.adapter.terminal?.idleQuestion?.(screen))) return
+    } else if (!launch && !AT_PROMPT.has(l.state.status)) return
+    l.prompted = true
+    void workspace.upsertSession(l.state.projectPath, { id: l.state.sessionId, prompted: true }).catch((e) => log.warn(`${userText(this.label(l.state))}: could not record its first prompt`, e))
+  }
+
+  /**
+   * Whether a session can be resumed (HI-3196): a CLI with a transcript part, by its transcript (as launchOnHere restores and
+   * checks it); one that resumes by Combwork's id, once its record has had a prompt; any other, never.
+   */
+  async resumable(adapter: ProviderAdapter, projectPath: string, sessionId: string, rec?: SessionRecord): Promise<boolean> {
+    if (adapter.transcript) return true
+    if (!adapter.launch.resumesById) return false
+    const r = rec ?? (await workspace.sessionsFile(projectPath)).sessions.find((x) => x.id === sessionId)
+    return !!r?.prompted
   }
 
   /**
@@ -4067,7 +4522,7 @@ class SessionManager {
       if (hold && existsSync(hold)) return
       // A question at its start (its folder's trust) waits for the user while it is on its screen.
       const text = l.screen?.text() ?? null
-      const startWaits = st.status === 'waiting' || (!!l.askedAtStart && (text === null || !l.adapter.startupQuestion || l.adapter.startupQuestion.test(text.replace(/\s+/g, ' '))))
+      const startWaits = st.status === 'waiting' || (!!l.askedAtStart && (text === null || !l.adapter.launch.startupQuestion || l.adapter.launch.startupQuestion.test(text.replace(/\s+/g, ' '))))
       const after = hooksMissing(w, { startWaits, screen: this.screenTurn(l) }, Date.now(), advanced.number('cw.hooks.missingSeconds') * 1000)
       if (after) this.hooksGone(l, after)
     })
@@ -4086,7 +4541,7 @@ class SessionManager {
     // What on the PC would keep them away (HI-2777), read at launch: a setting and where; else hooksOffIn's answer. An
     // allowlist without the token's variable sends them with no token, which Combwork refuses: the allowlist is the cause.
     const cause = l.hookCause ?? (offIn ? { why: 'off' as const, setting: 'disableAllHooks', where: offIn, snippet: false } : null) // i18n-ignore: a select key and a setting's name, never shown
-    const remote = !!l.adapter.descriptor.capabilities.remoteHookPolicy
+    const remote = !!l.adapter.descriptor.capabilities.hooks?.remoteHookPolicy
     const events = l.heard ?? new Set<string>()
     const why: HooksMissing['why'] =
       cause?.why === 'blocked' ? 'blocked'
@@ -4139,7 +4594,7 @@ class SessionManager {
     // Its screen as it is now, not only at its next draw (HR3's round 1): a dialog that took the line and has closed may
     // have left the input empty already, and nothing more may be drawn.
     const id = liveId(projectPath, agentId)
-    if (l.adapter?.idleQuestion && l.screen) void this.inHookOrder(runId, () => (this.live.get(id) === l ? this.lookAtIdleScreen(id, l) : undefined)).catch((e) => log.warn('lost line: check failed', e))
+    if (l.adapter?.terminal?.idleQuestion && l.screen) void this.inHookOrder(runId, () => (this.live.get(id) === l ? this.lookAtIdleScreen(id, l) : undefined)).catch((e) => log.warn('lost line: check failed', e))
     const label = this.label(l.state)
     const body = retried
       ? msg({ id: 'session.notice.untakenRetried', defaultMessage: "Combwork typed it and pressed Enter twice, but its CLI wasn't reading its input. Show it, click its terminal and press Enter.", description: "The notification that an agent's CLI didn't take a line Combwork typed into it." })
@@ -4283,8 +4738,8 @@ class SessionManager {
   /**
    * Clears a CLI's input before Combwork types into it (Settings → Advanced: Clear the CLI's draft before Combwork types). One
    * Ctrl+U where it clears the whole line, as before. Where it deletes only the row the cursor is on
-   * (capabilities.ctrlUClearsRow, HI-1979: Claude Code 2.1.312), Ctrl+U a key at a time while its input box
-   * (adapter.promptBox) holds anything. Empty is only ever what a key of Combwork's draws now, never a box already on the
+   * (capabilities.terminal.ctrlUClearsRow, HI-1979: Claude Code 2.1.312), Ctrl+U a key at a time while its input box
+   * (adapter.terminal.promptBox) holds anything. Empty is only ever what a key of Combwork's draws now, never a box already on the
    * screen (its redraw may be late, HR6's round 1): a letter typed (CLEAR_PROBE) must show alone in the box, then the
    * Backspace that takes it back must leave the box empty; a draft left shows the letter at its end, and is cleared with
    * it. Each key must be answered within Advanced's wait for each key, by the box drawn differently, or, while the box
@@ -4294,7 +4749,7 @@ class SessionManager {
    * same run, the caller's guard: the user typing there stops it, their draft theirs).
    */
   private async clearInput(l: LiveSession | undefined, key: string, check: () => void): Promise<void> {
-    if (!l?.adapter?.descriptor.capabilities.ctrlUClearsRow) {
+    if (!l?.adapter?.descriptor.capabilities.terminal?.ctrlUClearsRow) {
       writePty(key, '\x15')
       await new Promise((r) => setTimeout(r, 150))
       check()
@@ -4303,9 +4758,9 @@ class SessionManager {
     const screen = l.screen
     const { projectPath, agentId, runId } = l.state
     const since = Date.now()
-    // The box as drawn (adapter.promptBox): a key that deletes only an empty row (a line break's) changes it too. Empty
+    // The box as drawn (adapter.terminal.promptBox): a key that deletes only an empty row (a line break's) changes it too. Empty
     // is nothing but spacing in it.
-    const drawn = (): string | null => (screen && l.adapter.promptBox ? l.adapter.promptBox(screen.textWithoutDim()) : null)
+    const drawn = (): string | null => (screen && l.adapter.terminal?.promptBox ? l.adapter.terminal?.promptBox(screen.textWithoutDim()) : null)
     const read = (): string | null => {
       const box = drawn()
       return box === null ? null : box.trim() ? box : ''
@@ -4315,9 +4770,11 @@ class SessionManager {
       log.info(`${userText(this.label(l.state))}: its input wasn't seen empty, so nothing is typed into it: ${why}`) // i18n-ignore: why, for the log
       return combworkError(msg({ id: 'session.prompt.inputNotCleared', defaultMessage: "Its input couldn't be seen empty after Combwork cleared it: nothing is typed into it until it can be.", description: "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Combwork pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards." }), undefined, { kind: 'conflict' })
     }
-    const waitMs = advanced.number(CLEAR_KEY_WAIT) * 1000
+    const waitMs = advanced.number(clearKeyWaitId(l.adapter.id)) * 1000
     // Refused because a key went unanswered while the box read empty (HI-2191): something else may take its keys.
     let unanswered = false
+    // Refused while its box wasn't on the screen (HI-3411): something may be drawn in its place.
+    let hidden = false
     /** The box once the key just pressed is answered: drawn differently from `before`, or null while it can't be read and the screen changed. */
     const answered = async (keyName: string, before: string | null, shown: string | null): Promise<string | null> => {
       const t = Date.now()
@@ -4328,6 +4785,7 @@ class SessionManager {
         if (before === null && box === null && shown !== null && screen!.text() !== shown) return null
         if (Date.now() - t > waitMs) {
           unanswered = before === ''
+          hidden = before === null
           throw notCleared(before === null ? "its input box isn't on the screen" : `${keyName} wasn't answered within ${waitMs} ms (the box read "${userText(words(before).slice(0, 60))}")`) // i18n-ignore: why, for the log
         }
       }
@@ -4343,7 +4801,10 @@ class SessionManager {
     let probe = false
     try {
       for (let n = 0; ; n++) {
-        if (n >= CLEAR_KEYS_MOST) throw notCleared(`${CLEAR_KEYS_MOST} keys didn't empty it`) // i18n-ignore: why, for the log
+        if (n >= CLEAR_KEYS_MOST) {
+          hidden = box === null
+          throw notCleared(`${CLEAR_KEYS_MOST} keys didn't empty it`) // i18n-ignore: why, for the log
+        }
         check()
         if (box === '') {
           probe = true
@@ -4359,6 +4820,7 @@ class SessionManager {
           if (box !== '') throw notCleared(`the letter Combwork typed and took back left "${userText(words(box).slice(0, 60))}"`) // i18n-ignore: why, for the log
           check()
           l.unanswered = 0
+          l.boxHidden = undefined
           return
         }
         box = await press('\x15', 'A Ctrl+U', box)
@@ -4367,6 +4829,7 @@ class SessionManager {
       const same = this.live.get(liveId(projectPath, agentId)) === l && l.state.runId === runId
       if (probe && same && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x7f')
       if (unanswered && same) this.inputUnanswered(l)
+      if (hidden && same) this.inputHidden(l)
       throw e
     }
   }
@@ -4383,20 +4846,23 @@ class SessionManager {
   /**
    * Why Combwork keeps out of an agent (HI-2670): `independent`, its role now (its own, or its connection launching
    * without Combwork's tools), whatever its launch got; `plain`, the launch it runs got neither Combwork's tools nor its
-   * typing. Null: Combwork may type into it, deliver to it and add to its context. Read at each use from the workspace's
-   * projects as held (no file is read): hooks and deliveries ask it. The Assistant: never.
+   * typing; `noTools`, its CLI takes none of Combwork's tools (HI-3196: one that runs from a description), so it has no
+   * inbox, though its launch's prompt is typed. Null: Combwork may type into it, deliver to it and add to its context. Read
+   * at each use from the workspace's projects as held (no file is read): hooks and deliveries ask it. The Assistant: never.
    */
-  keepsOut(projectPath: string, agentId: string): 'independent' | 'plain' | null {
+  keepsOut(projectPath: string, agentId: string): 'independent' | 'plain' | 'noTools' | null {
     const ws = workspaceFor(projectPath)
     if (!ws || ws.isAssistantHome(projectPath)) return null
     if (independentIn(ws, projectPath, agentId)) return 'independent'
-    const policy = this.live.get(liveId(projectPath, agentId))?.policy
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (l?.adapter?.descriptor.capabilities.session?.combworkTools === false) return 'noTools'
+    const policy = l?.policy
     return policy && (!policy.tools || !policy.typing) ? 'plain' : null
   }
 
   /** Its input box as drawn now, as clearInput reads it ('' when empty, null when none is on the screen). */
   private boxNow(l: LiveSession): string | null {
-    const box = l.screen && l.adapter.promptBox ? l.adapter.promptBox(l.screen.textWithoutDim()) : null
+    const box = l.screen && l.adapter.terminal?.promptBox ? l.adapter.terminal?.promptBox(l.screen.textWithoutDim()) : null
     return box === null ? null : box.trim() ? box : ''
   }
 
@@ -4409,15 +4875,40 @@ class SessionManager {
   private inputUnanswered(l: LiveSession): void {
     l.unanswered = (l.unanswered ?? 0) + 1
     if (l.unanswered < INPUT_BLOCKED_AFTER || l.inputBlocked) return
+    this.blockInput(l, `its input took no key in ${l.unanswered} clears in a row: something on its screen takes them`) // i18n-ignore: for the log
+  }
+
+  /**
+   * A clear refused because its input box wasn't on the screen (HI-3411: a dialog of its CLI's drawn in its place, which
+   * Combwork doesn't recognise, refused every wake, message and slot hand-off every 2.5 s for days while nobody was told).
+   * The first starts its time hidden (boxHidden); one past Advanced's Input box hidden: wait (minutes: a draft taller than
+   * the screen, cleared meanwhile, or a dialog the user is answering, isn't one) blocks its input as HI-2191 does, logging
+   * its screen's last rows. Its box seen again ends both (inputBlockedDrawn).
+   */
+  private inputHidden(l: LiveSession): void {
+    const st = l.state
+    const now = Date.now()
+    if (l.boxHidden?.runId !== st.runId) l.boxHidden = { runId: st.runId, since: now }
+    const hiddenMs = now - l.boxHidden.since
+    if (l.inputBlocked || hiddenMs < advanced.number(INPUT_HIDDEN_SECONDS) * 1000) return
+    const rows = (l.screen?.text() ?? '').split('\n').map((r) => r.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(-4).join(' | ')
+    this.blockInput(l, `its input box hasn't been on the screen for ${Math.round(hiddenMs / 1000)} s (its screen's last rows: "${userText(rows.slice(-300))}")`, true) // i18n-ignore: for the log
+  }
+
+  /**
+   * Blocks an agent's input (HI-2191, HI-3411): the agent waits for the user with why, unless it already waits on something
+   * else, whose reason stays (nothing is typed meanwhile either way). `why`: for the log.
+   */
+  private blockInput(l: LiveSession, why: string, hidden = false): void {
     const st = l.state
     const id = liveId(st.projectPath, st.agentId)
     const text = msg({ id: 'session.status.inputBlocked', defaultMessage: 'Something on its screen is taking its keys: answer it there, then Try again', description: "An agent's status: Combwork typed into its coding agent's input and nothing reached it (a dialog or question of the coding agent's own, which Combwork doesn't recognise, takes the keys). The user answers it in the agent's terminal. Try again is the button beside this status: keep its name as it is translated there." })
     // agent-stored: agentField says it for each agent where its status is sent (setStatus keeps its text)
     const ask: Ask = { kind: 'question', blocking: true, message: englishText(text), text }
     const at = Date.now()
-    l.inputBlocked = { runId: st.runId, ask, box: this.boxNow(l), since: at }
+    l.inputBlocked = { runId: st.runId, ask, box: this.boxNow(l), since: at, ...(hidden ? { hidden } : {}) }
     st.inputBlocked = { since: new Date(at).toISOString() }
-    log.info(`${userText(this.label(st))}: its input took no key in ${l.unanswered} clears in a row: something on its screen takes them; it waits for the user, and nothing is typed into it until it takes keys again`) // i18n-ignore: for the log
+    log.info(`${userText(this.label(st))}: ${why}; it waits for the user, and nothing is typed into it until it takes keys again`) // i18n-ignore: for the log
     const ev: HookEvent = { kind: 'ask', ask }
     if (AT_PROMPT.has(st.status)) this.carryOut(id, l, hookStep(ev, this.statusInput(l)), 'screen', ev)
     else this.emitState(st)
@@ -4433,6 +4924,7 @@ class SessionManager {
     if (!b || this.live.get(id) !== l || l.state.runId !== b.runId) return
     l.inputBlocked = undefined
     l.unanswered = 0
+    l.boxHidden = undefined
     l.state.inputBlocked = undefined
     log.info(`${userText(this.label(l.state))}: its input takes keys again (${why})`) // i18n-ignore: for the log
     if (l.state.status === 'waiting' && l.waitingOn === b.ask) this.carryOut(id, l, idleQuestionGone(this.statusInput(l)), 'screen')
@@ -4445,7 +4937,17 @@ class SessionManager {
    */
   private inputBlockedDrawn(id: string, l: LiveSession): void {
     const b = l.inputBlocked
-    if (!b || b.retrying || this.userTypedAt(l.state.projectPath, l.state.agentId) < b.since) return
+    // Its box off the screen (HI-3411): drawn again, it is back, whoever answered what hid it (a dialog's own timeout too).
+    if (!b) {
+      if (l.boxHidden && this.boxNow(l) !== null) l.boxHidden = undefined
+      return
+    }
+    if (b.retrying) return
+    if (b.hidden) {
+      if (this.boxNow(l) !== null) this.unblockInput(id, l, 'its input box is on the screen again') // i18n-ignore: for the log
+      return
+    }
+    if (this.userTypedAt(l.state.projectPath, l.state.agentId) < b.since) return
     const box = this.boxNow(l)
     if (box !== null && box !== b.box) this.unblockInput(id, l, "its input box took the user's key") // i18n-ignore: for the log
   }
@@ -4545,16 +5047,16 @@ class SessionManager {
       // paste is text however it arrives. A slash command is still typed: pasted, it is sent as a message.
       // Enter once the CLI has drawn the line (#600: a busy Codex drops an Enter it reads with the line): its end shows
       // on the screen once more than before it was typed.
-      const paste = !!l?.screen?.bracketedPaste() && l.adapter.descriptor.capabilities.bracketedPaste && !line.startsWith('/')
+      const paste = !!l?.screen?.bracketedPaste() && !!l.adapter.descriptor.capabilities.terminal?.bracketedPaste && !line.startsWith('/')
       // Typed as written into a CLI with a new-line key (HI-1327, Settings → Advanced): its line breaks are that key. A
       // slash command keeps spaces.
       // By the CLI's version as this run was launched, never the one installed since (HR6's round 1).
-      const newline = !paste && asTyped && !line.startsWith('/') && l ? l.adapter.typedNewline?.(l.cliVersion ?? null) : null
+      const newline = !paste && asTyped && !line.startsWith('/') && l ? l.adapter.launch.typedNewline?.(l.cliVersion ?? null) : null
       const segments = newline ? typedPrompt(line, TYPED_NEWLINE_KEYS[newline]) : null
       // What Enter waits to see drawn: the last piece with something visible in it (a line of spaces draws nothing to
       // find); none, no wait, as for an empty line.
       const out = segments ? segments.flatMap((s) => ('text' in s && s.text.trim() ? [s.text] : [])).at(-1) ?? '' : promptInput(line, paste, asTyped)
-      const drawn = l?.screen && l.adapter.descriptor.capabilities.enterOnceDrawn && out.trim() ? drawnLine(l.screen, out) : null
+      const drawn = l?.screen && l.adapter.descriptor.capabilities.terminal?.enterOnceDrawn && out.trim() ? drawnLine(l.screen, out) : null
       typedOut = out
       if (paste) writePty(key, `\x1b[200~${out}\x1b[201~`)
       else if (segments) {
@@ -4617,7 +5119,7 @@ class SessionManager {
         // deletes one wrapped row gets a Backspace for each character instead, a few at a time as typing goes (HI-1974).
         // Each take-back is logged as its keys are written (HI-2875: a put-off line's take-back had no time in the log).
         let pressed = 0
-        const rows = !!l?.adapter.descriptor.capabilities.ctrlUClearsRow
+        const rows = !!l?.adapter.descriptor.capabilities.terminal?.ctrlUClearsRow
         const n = rows ? backspaceKeys(lines ?? typedOut) : lines ? rollbackKeys(lines) : 1
         if (rows) {
           for (let i = 0; i < n; i += 8) {
@@ -4808,9 +5310,10 @@ class SessionManager {
   async newConversation(projectPath: string, agentId: string, prompt: string, allowed?: () => void, purpose?: FolderPurpose): Promise<LiveSessionState> {
     projectPath = workspace.assertProject(projectPath)
     const now = this.agentNow(projectPath, agentId)
-    // Never for an agent Combwork keeps out of (HI-2670): the task would be typed into it.
+    // Never for an agent Combwork keeps out of (HI-2670): the task would be typed into it. One whose CLI takes no tools
+    // (HI-3196) takes its task as its new launch's prompt, typed as it is.
     const out = this.keepsOut(projectPath, agentId)
-    if (out) throw combworkError(out === 'independent' ? M.independentNoTask : M.plainNoTask, { agent: this.liveFor(projectPath, agentId)?.agentName ?? agentId }, { kind: 'conflict' })
+    if (out && out !== 'noTools') throw combworkError(out === 'independent' ? M.independentNoTask : M.plainNoTask, { agent: this.liveFor(projectPath, agentId)?.agentName ?? agentId }, { kind: 'conflict' })
     if (!now) throw combworkError(msg({ id: 'session.newConversation.notRunning', defaultMessage: "It isn't running.", description: 'Giving an agent a task in a new conversation is refused: it isn\'t running.' }), undefined, { kind: 'conflict' })
     if (now.pending || this.delivering.has(this.key(projectPath, agentId))) throw combworkError(msg({ id: 'session.newConversation.pending', defaultMessage: 'It has just been given a prompt that its CLI has not taken yet.', description: "Giving an agent a task in a new conversation is refused: a prompt Combwork typed hasn't been taken yet." }), undefined, { kind: 'conflict' })
     allowed?.()
@@ -4845,12 +5348,12 @@ class SessionManager {
     projectPath = workspace.assertSessionHost(projectPath)
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || l.state.settingUp) throw combworkError(M.noSession, undefined, { kind: 'conflict' })
-    if (!l.adapter.planToggleKey) throw combworkError(msg({ id: 'session.plan.noToggle', defaultMessage: '{provider} has no Plan mode toggle.', description: "Turning Plan mode on or off is refused: the coding agent has no such toggle. {provider} is its name." }), { provider: l.adapter.descriptor.name }, { kind: 'invalid' })
+    if (!l.adapter.modes?.planToggleKey) throw combworkError(msg({ id: 'session.plan.noToggle', defaultMessage: '{provider} has no Plan mode toggle.', description: "Turning Plan mode on or off is refused: the coding agent has no such toggle. {provider} is its name." }), { provider: l.adapter.descriptor.name }, { kind: 'invalid' })
     if (l.state.status === 'waiting') throw combworkError(msg({ id: 'session.plan.asking', defaultMessage: 'The agent is asking you something. Answer it first.', description: 'Turning Plan mode on or off is refused: the agent waits for the user.' }), undefined, { kind: 'conflict' })
     if (!!l.state.planMode === on) return
     // Not into a line Combwork is typing (#649: the composer is reserved meanwhile).
     if (this.delivering.has(this.key(projectPath, agentId))) throw combworkError(msg({ id: 'session.plan.typing', defaultMessage: 'Combwork is typing a line into this agent. Try again in a moment.', description: 'Turning Plan mode on or off is refused for a moment: Combwork is typing into the terminal.' }), undefined, { kind: 'conflict' })
-    writePty(this.key(projectPath, agentId), l.adapter.planToggleKey)
+    writePty(this.key(projectPath, agentId), l.adapter.modes?.planToggleKey)
     l.state.planMode = on
     this.emitState(l.state)
   }
@@ -4879,7 +5382,7 @@ class SessionManager {
     // fixed 8 s a slow CLI outlasts (HI-1869). Exited, its slot's writer release is under way, and the start below waits
     // for it (placeFor's earlierWritersSettled, HI-1867), refused only if its processes are kept or not known to end.
     let timer: NodeJS.Timeout | undefined
-    await Promise.race([exited, new Promise((r) => (timer = setTimeout(r, stopWaitMs(8000, [l.adapter.exitKeys?.graceMs]))))])
+    await Promise.race([exited, new Promise((r) => (timer = setTimeout(r, stopWaitMs(MODE_RESTART_STOP_MS, [l.adapter.launch.exitKeys?.graceMs]))))])
     clearTimeout(timer)
     // Still running: said so, rather than the start's "already running" (its old run keeps its slot meanwhile).
     if (this.live.get(id)?.state.runId === l.state.runId) throw combworkError(msg({ id: 'session.restartMode.didntStop', defaultMessage: "{agent} didn't stop in time, so it wasn't restarted in the new mode. Try again once it has stopped.", description: "Switching a running agent's permission mode (it restarts in the new mode) is refused: the agent ({agent}, its name) was told to stop but hadn't ended yet, so nothing was started." }), { agent: l.state.agentName ?? agentId }, { kind: 'conflict' })
@@ -5049,11 +5552,18 @@ class SessionManager {
       const adapter = providerAdapter((await this.resumeProvider(projectPath, sessionId, rec)) ?? agentProvider(agent, config.settings))
       if (!stillApplies()) return
       const info = providerService.info(adapter.id)
-      if (!adapter.stopBackgroundJob || !info.path) throw combworkError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
-      await adapter.stopBackgroundJob(info.path, jobId)
-      // The job lets go of the conversation as it exits.
-      await new Promise((r) => setTimeout(r, 1500))
+      if (!adapter.background?.stopBackgroundJob || !info.path) throw combworkError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
+      // HI-3376: the job's own process, as it is before the stop, so its end can be seen by identity (pid and start).
+      const before = await jobProcess(adapter, info.path, jobId)
+      await adapter.background?.stopBackgroundJob(info.path, jobId)
+      // The job lets go of the conversation as it exits: resumed only once it is seen to have ended (bounded).
+      const ended = await backgroundJobEnded(adapter, info.path, jobId, before)
       if (!stillApplies()) return
+      if (ended !== 'ended') {
+        log.warn(`Stop It and Resume: ${adapter.descriptor.name}'s background job ${jobId} was told to stop but is ${ended === 'running' ? 'still running' : 'not known to have ended'} after ${BACKGROUND_END_MS / 1000} s, so its conversation wasn't resumed`) // i18n-ignore: for the log
+        resolveOffer(offer, tr(OUTCOME.stillInBackground))
+        return
+      }
       await this.start(projectPath, { agentId, resumeId: sessionId })
       resolveOffer(offer, tr(OUTCOME.stoppedAndResumed))
     } finally {
@@ -5070,7 +5580,24 @@ class SessionManager {
     return this.liveStates().filter((s) => s.status === 'working' || s.status === 'waiting' || s.status === 'background' || s.status === 'watching')
   }
 
+  /**
+   * HI-3376 (HR1's round 1): each run whose exit work is under way (onExit, from its first line to its last, errors
+   * included), by run, with its project: it leaves `live` part way through, before its transcript's check and its
+   * session list's write, which a close still waits for (closingPending).
+   */
+  private readonly exiting = new Map<string, string>()
+
   private async onExit(projectPath: string, agentId: string, runId: string, code: number, output = ''): Promise<void> {
+    this.exiting.set(runId, projectPath)
+    try {
+      await this.exitWork(projectPath, agentId, runId, code, output)
+    } finally {
+      this.exiting.delete(runId)
+    }
+  }
+
+  /** What a run's exit does (onExit's). */
+  private async exitWork(projectPath: string, agentId: string, runId: string, code: number, output: string): Promise<void> {
     // What notices offered about this run no longer applies (HI-2320): its conversation ended here.
     resolveOffers((o) => o.startsWith(`transcript:${liveId(projectPath, agentId)}#`), tr(OUTCOME.conversationEnded))
     this.modeOfferGone(liveId(projectPath, agentId))
@@ -5086,7 +5613,7 @@ class SessionManager {
     const sessionId = l?.state.sessionId ?? ''
     // The CLI refused to open a conversation it is running as a background job (e.g. Claude Code's agent view):
     // say so, and offer to stop that job and resume here.
-    const job = l && !l.stopRequested && sessionId ? l.adapter.backgroundJobIn?.(output) : null
+    const job = l && !l.stopRequested && sessionId ? l.adapter.background?.backgroundJobIn?.(output) : null
     if (l && job) {
       toast(
         'warning',
@@ -5104,7 +5631,7 @@ class SessionManager {
           { status: l.state.status, settingUp: l.state.settingUp, stopRequested: !!l.stopRequested || this.shuttingDown, backgroundJob: !!job, resumed: !!l.resumed },
           code,
           output,
-          { name: l.adapter.descriptor.name, startHint: l.adapter.startHint?.bind(l.adapter) }
+          { name: l.adapter.descriptor.name, startHint: l.adapter.launch.startHint?.bind(l.adapter.launch) }
         )
       : undefined
     if (failure) {
@@ -5120,6 +5647,8 @@ class SessionManager {
       // Its CLI has exited: its transcript is finished (archiving it at once is fine, inUse).
       this.noteExit(l.state.sessionId)
       this.live.delete(id)
+      // A first prompt still waiting for the user's typing pause to end (HI-3196) goes with its run.
+      this.cancelFirstPromptWait(l)
       this.recheckTools(id)
       // The last of Combwork's sessions in its folder: Combwork's skill copies there go, as Settings → Advanced says (#1431). Not
       // as Combwork quits: the next start's sweep does it, unless sessions resume there first.
@@ -5144,6 +5673,10 @@ class SessionManager {
         // Its transcript is finished: what it used goes into the usage history now (#1106), and its backup is compressed (#1110).
         usageHistory.sessionEnded(projectPath, sessionId)
         void this.compressBackups(projectPath, sessionId)
+      } else if (l && !l.adapter.transcript && (l.prompted || (await this.resumable(l.adapter, projectPath, sessionId)))) {
+        // A CLI that resumes by Combwork's id (HI-3196) keeps no transcript Combwork reads: its session had a prompt, so
+        // its CLI has it to resume.
+        await workspace.upsertSession(projectPath, { id: sessionId, lastActiveAt: new Date().toISOString() }).catch(() => undefined)
       } else {
         // Nothing was ever said (e.g. closed at the login screen) — there is nothing to resume.
         await workspace
@@ -5238,7 +5771,7 @@ class SessionManager {
   private async liveTranscript(l: LiveSession): Promise<string | null> {
     if (!l.state.sessionId) return null
     if (l.transcriptPath && existsSync(l.transcriptPath)) return l.transcriptPath
-    const t = await l.adapter.transcriptPath(l.state.cwd, l.state.sessionId, l.transcriptPath)
+    const t = (await l.adapter.transcript?.transcriptPath(l.state.cwd, l.state.sessionId, l.transcriptPath)) ?? null
     if (t) l.transcriptPath = t
     return t
   }
@@ -5382,7 +5915,7 @@ class SessionManager {
     }
     if (l.costFree) return this.setLiveCost(l, 0, false)
     const own = onServer || usesOwnPrices(l.state.provider, config.settings)
-    if (l.adapter.descriptor.capabilities.reportsCost && !own) return this.setLiveCost(l, l.reportedCost, false)
+    if (l.adapter.descriptor.capabilities.usage?.reportsCost && !own) return this.setLiveCost(l, l.reportedCost, false)
     if (!force && Date.now() - (l.costAt ?? 0) <= COST_INTERVAL_MS) return
     l.costAt = Date.now()
     const usage = await this.usageFor(l.state.projectPath, src, l.state.sessionId, l.state.provider, this.costPolicy(l))
@@ -5411,7 +5944,7 @@ class SessionManager {
         .filter((l) => l.state.sessionId)
         .map((l) =>
           this.liveTranscript(l)
-            .then((src) => (src ? this.liveCost(l, src, true) : l.adapter.descriptor.capabilities.reportsCost && !usesOwnPrices(l.state.provider, config.settings) ? this.setLiveCost(l, l.reportedCost, false) : undefined))
+            .then((src) => (src ? this.liveCost(l, src, true) : l.adapter.descriptor.capabilities.usage?.reportsCost && !usesOwnPrices(l.state.provider, config.settings) ? this.setLiveCost(l, l.reportedCost, false) : undefined))
             .catch((e) => log.warn('could not price a live session again', e))
         )
     )
@@ -5422,7 +5955,7 @@ class SessionManager {
    * bytes: the transcript when the launch had had `hooks` hooks (hooksSeen).
    */
   private async readDetails(l: LiveSession, path: string, size: number, hooks = l.hooksSeen ?? 0): Promise<void> {
-    if (!l.adapter.transcriptDetails) return
+    if (!l.adapter.transcript?.transcriptDetails) return
     const from = l.detailsOffset ?? 0
     if (size <= from) {
       if (size < from) {
@@ -5439,7 +5972,7 @@ class SessionManager {
     if (end < 0) return
     l.detailsOffset = start + Buffer.byteLength(text.slice(0, end + 1))
     const chunk = text.slice(0, end + 1)
-    const d = l.adapter.transcriptDetails(chunk, (l.detailsMemo ??= {}))
+    const d = l.adapter.transcript?.transcriptDetails(chunk, (l.detailsMemo ??= {}))
     devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => transcriptEvent(l.state.provider, chunk, d))
     this.applyDetails(l, d, hooks)
   }
@@ -5455,7 +5988,7 @@ class SessionManager {
    */
   private async readTurns(l: LiveSession, path: string, size: number): Promise<void> {
     const w = l.hooksWatch
-    const turnsOf = l.adapter.transcriptTurns?.bind(l.adapter)
+    const turnsOf = l.adapter.transcript?.transcriptTurns?.bind(l.adapter.transcript)
     // Still its transcript (a hook may have named another file while the look before this read waited): else it isn't read.
     if (!w || !turnsOf || l.transcriptPath !== path) return
     const sessionId = l.state.sessionId
@@ -5482,7 +6015,7 @@ class SessionManager {
    * one it stopped itself).
    */
   private async readBackground(l: LiveSession, path: string, size: number): Promise<boolean> {
-    if (!l.adapter.backgroundTasks) return false
+    if (!l.adapter.transcript?.backgroundTasks) return false
     const from = l.tasksOffset ?? 0
     if (size <= from) {
       if (size < from) {
@@ -5501,16 +6034,18 @@ class SessionManager {
     const tasks = (l.tasks ??= new Map())
     const ended = (l.tasksEnded ??= new Set())
     let woke = false
-    for (const ev of l.adapter.backgroundTasks(text.slice(0, end + 1), (l.tasksMemo ??= {}))) {
+    for (const ev of l.adapter.transcript?.backgroundTasks?.(text.slice(0, end + 1), (l.tasksMemo ??= {})) ?? []) {
       if (ev.at < since) continue
       if (ev.kind === 'start') {
         // A start read after its end counts nothing, unless the task starts again (a subagent resumed, #1584).
         if (ev.resumed) ended.delete(ev.id)
-        if (!ended.has(ev.id)) tasks.set(ev.id, { at: ev.at, expiresAt: ev.expiresAt, type: ev.type, description: ev.description })
+        if (!ended.has(ev.id)) tasks.set(ev.id, { at: ev.at, ...(ev.began !== undefined ? { began: ev.began } : {}), expiresAt: ev.expiresAt, type: ev.type, description: ev.description })
         continue
       }
-      // A task the agent stopped itself wakes nothing (#640: read after its Stop, it showed HB3 working with no turn).
-      if (tasks.delete(ev.id) && !ev.stopped) woke = true
+      // A task the agent stopped itself wakes nothing (#640: read after its Stop, it showed HB3 working with no turn). One the
+      // time limit stopped counting wakes it as a counted one does (HI-3406): its CLI begins that turn all the same.
+      const counted = tasks.delete(ev.id)
+      if ((l.tasksDropped?.delete(ev.id) || counted) && !ev.stopped) woke = true
       ended.add(ev.id)
       if (ended.size > 500) ended.delete(ended.values().next().value!)
     }
@@ -5529,7 +6064,7 @@ class SessionManager {
   }
 
   private async readSafeguardsNow(l: LiveSession, path: string): Promise<void> {
-    if (!l.adapter.safeguards) return
+    if (!l.adapter.transcript?.safeguards) return
     const size = (await stat(path).catch(() => null))?.size
     if (size === undefined) return
     const from = l.guardOffset ?? 0
@@ -5548,7 +6083,7 @@ class SessionManager {
     if (end < 0) return
     l.guardOffset = start + Buffer.byteLength(text.slice(0, end + 1))
     const since = Date.parse(l.state.startedAt) - 5000
-    for (const ev of l.adapter.safeguards(text.slice(0, end + 1), (l.guardMemo ??= {}))) if (ev.at >= since) this.noteSafeguard(l, ev)
+    for (const ev of l.adapter.transcript?.safeguards?.(text.slice(0, end + 1), (l.guardMemo ??= {})) ?? []) if (ev.at >= since) this.noteSafeguard(l, ev)
   }
 
   /** A safeguard event on the agent's state (noteSafeguard); a switch to another model is told: Combwork's own notice, and a note on its Doing cards. */
@@ -5593,8 +6128,8 @@ class SessionManager {
    * it waits on, or any blocking ask naming no tool). False when Combwork doesn't read its screen.
    */
   private guardShown(l: LiveSession, ask: Ask = { kind: 'question', blocking: true, message: '' }): boolean {
-    const screen = l.adapter.safeguardAsk ? l.screen?.text() : null
-    return !!screen && l.adapter.safeguardAsk!(ask, screen)
+    const screen = l.adapter.terminal?.safeguardAsk ? l.screen?.text() : null
+    return !!screen && !!l.adapter.terminal?.safeguardAsk?.(ask, screen)
   }
 
   /**
@@ -5609,7 +6144,7 @@ class SessionManager {
 
   /** A blocking ask naming no tool, from a CLI that tells a safeguard prompt by its screen (a permission request its own reviewer decides is none). */
   private guardCandidate(l: LiveSession, ev: HookEvent): ev is Extract<HookEvent, { kind: 'ask' }> {
-    if (ev.kind !== 'ask' || !ev.ask.blocking || !l.adapter.safeguardAsk) return false
+    if (ev.kind !== 'ask' || !ev.ask.blocking || !l.adapter.terminal?.safeguardAsk) return false
     return !(ev.ask.kind === 'permission' && l.adapter.descriptor.permissionModes.find((m) => m.value === modeInEffect(l.state))?.reviewed)
   }
 
@@ -5716,7 +6251,7 @@ class SessionManager {
    */
   cliAsks(projectPath: string, agentId: string): boolean {
     const l = this.live.get(liveId(projectPath, agentId))
-    const ask = l?.adapter?.idleQuestion?.bind(l.adapter)
+    const ask = l?.adapter?.terminal?.idleQuestion?.bind(l.adapter.terminal)
     const screen = ask ? l!.screen?.text() : null
     return !!screen && !!ask!(screen)
   }
@@ -5726,7 +6261,9 @@ class SessionManager {
    * is between turns, waits on that question, or holds a line, one look at a time and in order with the hooks.
    */
   private idleScreenDrawn(id: string, l: LiveSession): void {
-    if (!l.adapter.idleQuestion || !l.screen || l.idleChecking) return
+    // A CLI with no hooks (HI-3196) has its questions read with the rest of its status (screenStatus): one reader only.
+    if (!l.adapter.hooks) return
+    if (!l.adapter.terminal?.idleQuestion || !l.screen || l.idleChecking) return
     const st = l.state
     if (!l.idleAsk && !st.untakenLine && !AT_PROMPT.has(st.status)) return
     l.idleChecking = true
@@ -5743,8 +6280,8 @@ class SessionManager {
    */
   private lookAtIdleScreen(id: string, l: LiveSession): void {
     const st = l.state
-    if (!l.adapter.idleQuestion || !l.screen) return
-    const question = l.adapter.idleQuestion(l.screen.text())
+    if (!l.adapter.terminal?.idleQuestion || !l.screen) return
+    const question = l.adapter.terminal?.idleQuestion(l.screen.text())
     if (question && !l.idleAsk && AT_PROMPT.has(st.status)) {
       const text = withValues(msg({ id: 'session.status.cliAsks', defaultMessage: '{provider} asks: {question}', description: "An agent's status: its coding agent ({provider}, e.g. Claude Code) shows a question of its own on its screen and waits for the user to answer it there. {question} is the question, in the coding agent's own words (English)." }), { provider: l.adapter.descriptor.name, question })
       // agent-stored: agentField says it for each agent where its status is sent (setStatus keeps its text)
@@ -5764,7 +6301,7 @@ class SessionManager {
 
   /** One look at a held line (heldLineLost): the agent, its screen with dim hints left out, and what was taken since. */
   private heldLook(l: LiveSession, asked: boolean): boolean {
-    return heldLineLost({ asked, input: l.adapter.promptText?.(l.screen!.textWithoutDim()) ?? null, status: l.state.status, takenSince: (l.prompts ?? 0) > (l.untakenPrompts ?? 0) })
+    return heldLineLost({ asked, input: l.adapter.terminal?.promptText?.(l.screen!.textWithoutDim()) ?? null, status: l.state.status, takenSince: (l.prompts ?? 0) > (l.untakenPrompts ?? 0) })
   }
 
   /**
@@ -5774,7 +6311,7 @@ class SessionManager {
    */
   private lookAtHeldLine(id: string, l: LiveSession, asked: boolean): void {
     const u = l.state.untakenLine
-    if (!u || !l.adapter.promptText || !this.heldLook(l, asked)) return this.dropLostLook(l)
+    if (!u || !l.adapter.terminal?.promptText || !this.heldLook(l, asked)) return this.dropLostLook(l)
     if (l.lostSeen?.since === u.since) return
     this.dropLostLook(l)
     const runId = l.state.runId
@@ -5798,8 +6335,8 @@ class SessionManager {
     if (this.live.get(id) !== l || l.lostSeen?.since !== since) return
     l.lostSeen = undefined
     const st = l.state
-    if (st.untakenLine?.since !== since || !l.screen || !l.adapter.promptText) return
-    if (!this.heldLook(l, !!l.adapter.idleQuestion?.(l.screen.text()))) return
+    if (st.untakenLine?.since !== since || !l.screen || !l.adapter.terminal?.promptText) return
+    if (!this.heldLook(l, !!l.adapter.terminal?.idleQuestion?.(l.screen.text()))) return
     const text = l.untakenText ?? st.untakenLine.text
     const rang = [...(l.untakenFor ?? [])]
     this.clearUntaken(l, rang.length ? 'gone from its input, nothing taken: what it rang for is offered again' : 'gone from its input, nothing taken: told to the user') // i18n-ignore: for the log
@@ -5817,11 +6354,27 @@ class SessionManager {
     if (src && s) await this.readBackground(l, src, s.size).catch((e) => log.warn('background tasks: read failed', e))
   }
 
-  /** Drops tasks past their expiry or the time limit and updates the count. True if the limit dropped one. */
+  /** Follows the agents' progress runs (progressService, at startup; HI-3406). */
+  followProgress(runsOf: (projectPath: string, agentId: string) => readonly Pick<ProgressRun, 'state' | 'finishedAt' | 'updatedAt' | 'startedAt'>[]): void {
+    this.progressRuns = runsOf
+  }
+
+  /**
+   * Drops tasks past their expiry or the time limit and updates the count. True if the limit dropped one. The limit
+   * counts from the agent's progress runs last heard from, where later (HI-3406: a long test run still reporting isn't
+   * dropped); a dropped task is remembered, so its end still wakes the agent (readBackground).
+   */
   private sweepTasks(l: LiveSession): boolean {
     const minutes = taskMinutes()
-    const dropped = l.tasks ? expireTasks(l.tasks, Date.now(), minutes) : []
-    for (const id of dropped) log.info(`${userText(this.label(l.state))}: stopped counting background task ${id} after ${minutes} minutes`)
+    const now = Date.now()
+    const progressHeard = (since: number): number | null => lastHeard(this.progressRuns(l.state.projectPath, l.state.agentId), since, now)
+    const dropped = l.tasks ? expireTasks(l.tasks, now, minutes, progressHeard) : []
+    for (const id of dropped) {
+      log.info(`${userText(this.label(l.state))}: stopped counting background task ${id} after ${minutes} minutes with no progress reported`)
+      const set = (l.tasksDropped ??= new Set())
+      set.add(id)
+      if (set.size > 100) set.delete(set.values().next().value!)
+    }
     const had = l.state.backgroundTasks
     l.state.backgroundTasks = l.tasks?.size || undefined
     // When they last ended (HI-1993): a review waiting on them starts its stall clock again from then.
@@ -5831,7 +6384,7 @@ class SessionManager {
 
   /** The status a turn's end (or an interruption) leaves: background while tasks will start the agent again. */
   private idleStatus(l: LiveSession, idle: 'finished' | 'ready'): SessionStatus {
-    return idleAfter({ backgroundWakes: l.adapter.descriptor.capabilities.backgroundWakes, tasks: l.tasks?.size ?? 0 }, idle)
+    return idleAfter({ backgroundWakes: l.adapter.descriptor.capabilities.background?.backgroundWakes ?? false, tasks: l.tasks?.size ?? 0 }, idle)
   }
 
   /**
@@ -5843,7 +6396,7 @@ class SessionManager {
     const before = st.backgroundTasks
     const dropped = this.sweepTasks(l)
     let changed = before !== st.backgroundTasks
-    if (l.adapter.descriptor.capabilities.backgroundWakes) {
+    if (l.adapter.descriptor.capabilities.background?.backgroundWakes) {
       if (st.status === 'background' && !l.tasks?.size) {
         if (woke) {
           st.status = 'working'
@@ -5862,6 +6415,13 @@ class SessionManager {
         st.status = 'background'
         st.unseen = false
         changed = true
+      } else if (woke && st.status === 'finished') {
+        // A task the time limit stopped counting has ended (HI-3406): its CLI begins a turn for it, as for a counted one.
+        st.status = 'working'
+        setStatus(st, null)
+        st.unseen = false
+        l.woke = true
+        changed = true
       } else if (woke && st.status === 'background') {
         // One of several ended (subagents a turn started together, #1584): its CLI begins a turn for it while the others
         // run on, so that wake may open a turn too (turnLedger rule 1).
@@ -5875,6 +6435,7 @@ class SessionManager {
   private clearTasks(l: LiveSession): void {
     l.tasks?.clear()
     l.tasksEnded?.clear()
+    l.tasksDropped?.clear()
     l.tasksOffset = 0
     l.tasksMemo = undefined
     l.state.backgroundTasks = undefined
@@ -5895,7 +6456,7 @@ class SessionManager {
     const limitMB = transcriptWarnLimit(project?.config, Number(config.settings.sessions.transcriptWarnMB) || 0)
     if (!limitMB || bytes < limitMB * 1024 * 1024 || !st.sessionId || l.sizeWarned === st.sessionId) return
     const assistant = workspace.isAssistantHome(st.projectPath)
-    // In a turn, the notice waits for its end (HI-1695, Darren's option 1): a transcript grows only in a turn, so it is
+    // In a turn, the notice waits for its end (HI-1695, option 1): a transcript grows only in a turn, so it is
     // nearly always crossed then, and the notice made then had no Hand Over to…, never offered again. The look at the
     // turn's end (or the next one) makes it, once, with the button when the agent may hand over then.
     if (!assistant && (st.status === 'working' || st.status === 'starting' || st.status === 'waiting')) return
@@ -6000,7 +6561,7 @@ class SessionManager {
    */
   private refreshSize(state: LiveSessionState): void {
     const l = this.live.get(liveId(state.projectPath, state.agentId))
-    if (!l || l.state !== state || !l.adapter.descriptor.capabilities.startupSizeRefresh || state.settingUp || state.status === 'starting' || l.sizeRefreshed === 'ready') return
+    if (!l || l.state !== state || !l.adapter.descriptor.capabilities.terminal?.startupSizeRefresh || state.settingUp || state.status === 'starting' || l.sizeRefreshed === 'ready') return
     const ready = state.status !== 'waiting'
     if (l.sizeRefreshed === 'started' && !ready) return
     l.sizeRefreshed = ready ? 'ready' : 'started'
@@ -6009,7 +6570,7 @@ class SessionManager {
 
   /** A size refresh a moment from now, so the CLI has drawn what it shows by then, for a CLI that needs it (refreshSize). */
   private refreshSizeSoon(l: LiveSession): void {
-    if (!l.adapter.descriptor.capabilities.startupSizeRefresh) return
+    if (!l.adapter.descriptor.capabilities.terminal?.startupSizeRefresh) return
     const { projectPath, agentId } = l.state
     setTimeout(() => {
       if (this.live.get(liveId(projectPath, agentId)) === l) refreshPty(this.key(projectPath, agentId))
@@ -6139,8 +6700,28 @@ class SessionManager {
   /** The launch a hook call belongs to: named by its run id, else (older launch folders) by session id. */
   /** A hook's occurrence identity (HI-2777: hookTwins), as its launch's CLI gives one; null when it gives none. */
   hookOccurrence(runId: string, body: Record<string, any>): HookOccurrence | null {
+    body = this.canonicalHook(runId, body)
     const l = this.findLaunch(runId, body.session_id)?.[1]
-    return l?.adapter.hookOccurrence?.(body) ?? null
+    return l?.adapter.hooks?.hookOccurrence?.(body) ?? null
+  }
+
+  /** Each hook body as it came, and the body its launch's CLI says it is in Combwork's vocabulary (canonicalHook). */
+  private canonical = new WeakMap<object, Record<string, any>>()
+
+  /**
+   * A hook's body in the vocabulary shared hook code reads (HI-3202: the CLI's hooks part, canonicalHook; Muse's names
+   * are settings, mapped by its launch), the same object each time it is asked for one body, so every step of one hook
+   * (its occurrence, observation, reply and handling, keyed by its body) reads that one. Found by its run id: before the
+   * body is read. A body of no launch, or of a CLI that reads its own as they come, is itself.
+   */
+  canonicalHook(runId: string | null, body: Record<string, any>): Record<string, any> {
+    const done = this.canonical.get(body)
+    if (done) return done
+    const hooks = this.findLaunch(runId, body.session_id)?.[1]?.adapter.hooks
+    const out = hooks?.canonicalHook?.(body) ?? body
+    this.canonical.set(body, out)
+    if (out !== body) this.canonical.set(out, out)
+    return out
   }
 
   /**
@@ -6212,16 +6793,17 @@ class SessionManager {
   /** A provider's status report (Claude Code's status line): the session's model, effort and cost, and the plan's limits. */
   handleStatusLine(runId: string | null, body: Record<string, any>): void {
     const found = this.findLaunch(runId, body.session_id)
-    if (!found?.[1].adapter.statusLine) return
+    const status = found?.[1].adapter.status
+    if (!found || !status) return
     const l = found[1]
-    const d = l.adapter.statusLine!(body)
+    const d = status.statusLine(body)
     // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
     devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'statusline', name: 'status line', provider: l.state.provider, raw: body, made: d, safe: { raw: STATUSLINE_FIELDS, made: DETAILS_FIELDS }, summary: statusLineSummary(d) }))
     flightRecorder.arrived(l.state, () => this.label(l.state), 'statusline', body)
     this.applyDetails(l, d)
     // A CLI that names its conversation only after it starts (HI-2544: the Antigravity CLI), in its status line: this
     // launch's (its run id and token), taken while it has none; a known conversation is never replaced by another.
-    const conv = l.adapter.statusLineSession?.(body) ?? null
+    const conv = l.adapter.status?.statusLineSession?.(body) ?? null
     // Only the current launch's own status line (a stale one of an earlier run of this agent never names this one's).
     if (conv && runId !== l.state.runId) log.warn(`${userText(this.label(l.state))}: a status line of run ${runId ?? 'none'} named conversation ${conv}: not this launch's (${l.state.runId}), ignored`)
     else if (conv && !l.state.sessionId) void this.adoptSessionId(l, conv, 'status line') // i18n-ignore: a log line's words
@@ -6229,7 +6811,7 @@ class SessionManager {
     // A CLI whose first hook waits for its first prompt (agy 1.5.0: SessionStart comes with it), started with none: its
     // status line saying idle is its prompt showing (HI-2548; recorded: authenticating, initializing, then idle before
     // any prompt). The current launch's only, in hook order, while it is still starting and asked nothing at its start.
-    if (runId === l.state.runId && l.state.status === 'starting' && l.adapter.statusLineIdle?.(body)) {
+    if (runId === l.state.runId && l.state.status === 'starting' && l.adapter.status?.statusLineIdle?.(body)) {
       const id = liveId(l.state.projectPath, l.state.agentId)
       void this.inHookOrder(l.state.runId, () => {
         if (this.live.get(id) !== l || l.state.runId !== runId || l.state.status !== 'starting' || l.askedAtStart) return
@@ -6240,10 +6822,10 @@ class SessionManager {
     }
     // What only the status line tells of (HI-2545, agy): its permission prompt and a turn ended with no hook. The current
     // launch's own only, about the conversation it runs, applied in hook order and only to a turn that runs then.
-    if ((l.adapter.statusLineAsk || l.adapter.statusLineIdle) && runId === l.state.runId) {
+    if ((l.adapter.status?.statusLineAsk || l.adapter.status?.statusLineIdle) && runId === l.state.runId) {
       const id = liveId(l.state.projectPath, l.state.agentId)
-      const ask = l.adapter.statusLineAsk?.(body) ?? null
-      const idle = !!l.adapter.statusLineIdle?.(body)
+      const ask = l.adapter.status?.statusLineAsk?.(body) ?? null
+      const idle = !!l.adapter.status?.statusLineIdle?.(body)
       // Derived in one place, never tracked at the door (the Assistant's note on HI-2545, after HR1's and HR2's rounds):
       // every report is queued in hook order as it comes, unfiltered, and only there validated: still this launch, about
       // the conversation it runs, and the turn running as it arrived still the running one. applyStatus then owns all
@@ -6292,7 +6874,7 @@ class SessionManager {
         this.carryOut(id, l, hookStep({ kind: 'interrupt' }, this.statusInput(l)), 'statusline', { kind: 'interrupt' })
         this.noteTurn(l)
       })
-    }, l.adapter.idleGraceMs?.() ?? 3000)
+    }, l.adapter.status?.idleGraceMs?.() ?? 3000)
     timer.unref?.()
     l.idleGrace = { ...grace, timer }
   }
@@ -6324,7 +6906,7 @@ class SessionManager {
   }
 
   /** `hooks`: details read from the transcript, as it was when the launch had had that many hooks (readDetails). */
-  private applyDetails(l: LiveSession, d: ReturnType<NonNullable<ProviderAdapter['statusLine']>>, hooks?: number): void {
+  private applyDetails(l: LiveSession, d: LiveDetails, hooks?: number): void {
     // The session's log says a turn ended on a refused sign-in (Codex, which sends no hook then): as a hook would, in
     // order with the launch's hooks.
     // A conversation's log read from its start (a resumed one) may end on an older refusal: only this launch's count.
@@ -6351,7 +6933,7 @@ class SessionManager {
         l.failure = rec
         // A CLI that sends no Stop after a failed turn (Copilot, HI-1960): its record ends the running turn, failed, as
         // that Stop would (failedIfRecorded gives it the CLI's words).
-        if (l.adapter.descriptor.capabilities.failureEndsTurn && l.ledger && failureTurn(l.ledger, rec) === 'running') return this.endTurnFrom(id, l, 'transcript', `${l.adapter.descriptor.name} recorded its turn failed at ${d.turnFailedAt}`) // i18n-ignore: the log and the hook journal (English)
+        if (l.adapter.descriptor.capabilities.session?.failureEndsTurn && l.ledger && failureTurn(l.ledger, rec) === 'running') return this.endTurnFrom(id, l, 'transcript', `${l.adapter.descriptor.name} recorded its turn failed at ${d.turnFailedAt}`) // i18n-ignore: the log and the hook journal (English)
         this.settleFailure(id, l)
       })
     }
@@ -6391,7 +6973,7 @@ class SessionManager {
     if (d.turnEnded || answered.length) this.reconcileTurn(l)
     // The connection it launched on (HI-1756): its usage is that login's. Its launch dates its readings where they are all
     // its own run's (HI-3187).
-    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId, l.state.launchedConnection, l.state.runId, providerDescriptor(l.state.provider).capabilities.planUsageSinceLaunch ? l.state.startedAt : undefined)
+    if (d.planUsage) reportPlanUsage(l.state.provider, d.planUsage, l.state.agentName ?? l.state.agentId, l.state.launchedConnection, l.state.runId, providerDescriptor(l.state.provider).capabilities.usage?.planUsageSinceLaunch ? l.state.startedAt : undefined)
     const learn = l.defaultEffort
     const learnModel = d.modelId ?? learn?.model
     if (learn && d.effort && learnModel) {
@@ -6494,10 +7076,14 @@ class SessionManager {
    * hook's reply, or null to let the edit go ahead as usual.
    */
   preToolUse(runId: string | null, body: Record<string, any>): Record<string, unknown> | null {
+    body = this.canonicalHook(runId, body)
     const found = this.findLaunch(runId, body.session_id)
     if (!found) return null
     const [id, l] = found
-    const hook = l.adapter.normalizeHook(body)
+    const hooks = l.adapter.hooks
+    // A CLI without hooks (no hooks part) sends none: one that arrives anyway is ignored.
+    if (!hooks) return null
+    const hook = hooks.normalizeHook(body)
     // Any tool call of its own ends the block its last edit had (HI-982): it went on with something, or tries again.
     if (hook.event.kind === 'toolStart' && !hook.ids.sub) l.hookBlock = undefined
     if (hook.event.kind !== 'toolStart' || !hook.editedPaths.length) return null
@@ -6531,9 +7117,9 @@ class SessionManager {
       const block = { key: keys.get(abs)!, file: abs, holderLiveId: held!.liveId, holderRunId: holder.state.runId }
       if (mode === 'warn') {
         decided('warned', who)
-        return this.editAccepted(id, files, l.adapter.lockReply({ kind: 'warn', context: say(SESSION.lock.warn, { holder: who, file: rel }) }), keys)
+        return this.editAccepted(id, files, hooks.lockReply({ kind: 'warn', context: say(SESSION.lock.warn, { holder: who, file: rel }) }), keys)
       }
-      if (mode === 'ask' && !l.adapter.descriptor.capabilities.lockAsk) {
+      if (mode === 'ask' && !l.adapter.descriptor.capabilities.session?.lockAsk) {
         // The CLI can't show its own approval for this, so Combwork asks the user and the agent waits.
         const key = `${id}|${keys.get(abs)!}`
         // Allowed against this claim (HI-2386: an Allow given against another claim of the file allows nothing here, and
@@ -6557,12 +7143,12 @@ class SessionManager {
         }
         const asked = say(SESSION.lock.asked, { holder: who, file: rel })
         decided('asked', asked, { ...block, kind: 'asked' })
-        return l.adapter.lockReply({ kind: 'deny', reason: asked })
+        return hooks.lockReply({ kind: 'deny', reason: asked })
       }
       // The lock's reply to the agent, or its CLI's own question.
       const reason = say(SESSION.lock.blocked, { holder: who, file: rel })
       decided(mode === 'ask' ? 'asked' : 'blocked', reason, { ...block, kind: mode === 'ask' ? 'asked' : 'blocked' })
-      return l.adapter.lockReply({ kind: mode === 'ask' ? 'ask' : 'deny', reason })
+      return hooks.lockReply({ kind: mode === 'ask' ? 'ask' : 'deny', reason })
     }
     let fresh = false
     // Claims taken over from another holder (an allowed edit, or a holder whose claim had expired) end here, as a
@@ -6811,6 +7397,8 @@ class SessionManager {
    * own); else nothing.
    */
   hookReply(runId: string | null, body: Record<string, any>): Promise<Record<string, unknown> | null> {
+    // Routed by what it is in Combwork's vocabulary (HI-3202: a renamed event still reaches the file locks).
+    body = this.canonicalHook(runId, body)
     // What a hook's reply says is said to its session, in its pinned chain (HI-2443).
     return this.inLaunchDialect(runId, body.session_id, () => this.hookReplyHere(runId, body))
   }
@@ -6831,7 +7419,7 @@ class SessionManager {
     if (body.hook_event_name === 'PreToolUse') {
       const lock = this.preToolUse(runId, body)
       // A CLI that takes no answer as a denial (HI-2545: agy) gets its own allow for a tool Combwork doesn't refuse.
-      return Promise.resolve(lock ?? this.findLaunch(runId, body.session_id)?.[1]?.adapter.preToolUseDefault?.() ?? null)
+      return Promise.resolve(lock ?? this.findLaunch(runId, body.session_id)?.[1]?.adapter.hooks?.preToolUseDefault?.() ?? null)
     }
     if (!this.inboxNotice) return Promise.resolve(null)
     const l = this.findLaunch(runId, body.session_id)?.[1]
@@ -6839,13 +7427,14 @@ class SessionManager {
     const raw = String(body.hook_event_name ?? '')
     // A CLI whose events say what they are only once prepared (HI-2545: agy's PreInvocation and Stop): its reply is
     // decided in the launch's order (noticeIn, after prepareHook), and always settled there.
-    if (l.adapter.noticeEvents?.includes(raw)) return new Promise((settle) => this.noticeReplies.set(body, settle))
-    const hook = l.adapter.normalizeHook(body)
+    if (l.adapter.hooks?.noticeEvents?.includes(raw)) return new Promise((settle) => this.noticeReplies.set(body, settle))
+    const hook = l.adapter.hooks?.normalizeHook(body)
+    if (!hook) return Promise.resolve(null)
     const ev = hook.event
     // Never a sub-agent's (its context isn't the agent's), nor a Stop that follows a continuation (stop_hook_active).
     if (hook.ids.sub || !(ev.kind === 'toolEnd' || (ev.kind === 'stop' && !ev.failed && !hook.ids.continued))) return Promise.resolve(null)
     // An event this CLI can't carry a notice on is never asked about.
-    if (!l.adapter.noticeReply(String(body.hook_event_name ?? ''), NOTICE_PREFIX)) return Promise.resolve(null)
+    if (!l.adapter.hooks?.noticeReply(String(body.hook_event_name ?? ''), NOTICE_PREFIX)) return Promise.resolve(null)
     return new Promise((settle) => this.noticeReplies.set(body, settle))
   }
 
@@ -6858,12 +7447,12 @@ class SessionManager {
   /** A SessionStart's reply: the start context, where the CLI can carry it (startContextReply); never a sub-agent's. */
   private async startReply(runId: string | null, body: Record<string, any>): Promise<Record<string, unknown> | null> {
     const l = this.findLaunch(runId, body.session_id)?.[1]
-    if (!l || !this.startContext || !l.adapter.startContextReply) return null
+    if (!l || !this.startContext || !l.adapter.hooks?.startContextReply) return null
     // A CLI whose hooks say what they are only once prepared (HI-2545: agy's SessionStart, unprepared, is nothing): its
     // reply is decided in the launch's order, after prepareHook (handleHookIn), and always settled there (HI-2548).
-    if (l.adapter.prepareHook) return new Promise((settle) => this.noticeReplies.set(body, settle))
-    const hook = l.adapter.normalizeHook(body)
-    if (hook.ids.sub || hook.event.kind !== 'start') return null
+    if (l.adapter.hooks?.prepareHook) return new Promise((settle) => this.noticeReplies.set(body, settle))
+    const hook = l.adapter.hooks?.normalizeHook(body)
+    if (!hook || hook.ids.sub || hook.event.kind !== 'start') return null
     return this.startContextFor(l, hook.event.source)
   }
 
@@ -6878,16 +7467,20 @@ class SessionManager {
   private compactionContextReply(runId: string | null, body: Record<string, any>): Promise<Record<string, unknown> | null> | null {
     if (!this.startContext) return null
     const l = this.findLaunch(runId, body.session_id)?.[1]
-    if (!l || l.adapter.startContextAfterCompaction !== 'prompt') return null
-    const hook = l.adapter.normalizeHook(body)
-    if (hook.ids.sub) return null
+    if (!l || l.adapter.hooks?.startContextAfterCompaction !== 'prompt') return null
+    const hook = l.adapter.hooks?.normalizeHook(body)
+    if (!hook || hook.ids.sub) return null
     if (hook.event.kind === 'compactStart') this.contextDue.add(l)
     else if (hook.event.kind === 'prompt' && this.contextDue.delete(l)) return this.startContextFor(l, 'compact')
     return null
   }
 
-  /** The whole start step's budget (HI-2771): building the view and putting it, well inside the launcher's 5 s wait. */
-  static readonly SESSION_CONTEXT_MS = 2500
+  /**
+   * The whole start step's budget (HI-2771): building the view and putting it, inside the launcher's own wait for its
+   * post (30 s, launcher.ts' Post). HI-3375: 20 s, a bound for a hung step, not a performance budget: main stalls of 2–4 s
+   * happen, and a start context skipped is told to the user (startContextSkipped), never only logged.
+   */
+  static readonly SESSION_CONTEXT_MS = 20_000
   /** Each launch's start context in its session (HI-2771): its start step taken, compactions refreshed, its queue, its generation. */
   private sessionContexts = new WeakMap<LiveSession, { started: boolean; compactions: Set<string>; chain: Promise<void>; gen: number }>()
   /** The post that was its launch's start (its first baseline): its own expanded hooks are history the start's view covers. */
@@ -6906,7 +7499,7 @@ class SessionManager {
    */
   private sessionContextStep(runId: string | null, body: Record<string, any>): Promise<null> | null {
     const l = this.findLaunch(runId, body.session_id)?.[1]
-    const trigger = l?.adapter.deliverStartContext ? l.adapter.startContextTrigger?.(body) : null
+    const trigger = l?.adapter.hooks?.deliverStartContext ? l.adapter.hooks?.startContextTrigger?.(body) : null
     if (!l || trigger?.source !== 'start') return null
     const s = this.sessionContextOf(l)
     if (s.started) return null
@@ -6922,7 +7515,7 @@ class SessionManager {
    * brings (closed history the start's view already covers), nor a sub-agent's.
    */
   private compactionIntoSession(l: LiveSession, post: Record<string, any>, hook: NormalizedHook): void {
-    if (!l.adapter.deliverStartContext || hook.event.kind !== 'compactEnd' || hook.ids.sub || this.startPosts.has(post)) return
+    if (!l.adapter.hooks?.deliverStartContext || hook.event.kind !== 'compactEnd' || hook.ids.sub || this.startPosts.has(post)) return
     const s = this.sessionContextOf(l)
     const id = hook.ids.turn ?? ''
     if (s.compactions.has(id)) return
@@ -6943,15 +7536,41 @@ class SessionManager {
     const barred = (): boolean => l.policy?.guidance === false || !!this.keepsOut(l.state.projectPath, l.state.agentId)
     const run = s.chain.then(async () => {
       const ac = new AbortController()
-      const timer = setTimeout(() => ac.abort(), SessionManager.SESSION_CONTEXT_MS)
+      // Test copies only (unpackaged): CW_TEST_START_CONTEXT_MS shortens the deadline, so a check can see a skipped start
+      // context told (HI-3375, its notice) through the real path.
+      const testMs = !app.isPackaged ? Number(process.env.CW_TEST_START_CONTEXT_MS) : NaN
+      const timer = setTimeout(() => ac.abort(), Number.isFinite(testMs) && testMs > 0 ? testMs : SessionManager.SESSION_CONTEXT_MS)
       try {
-        if (!current(ac.signal) || !sessionId) return
-        const built = !barred() && this.startContext ? this.startContext(l.state, source).catch(() => null) : Promise.resolve(null)
+        // Only a CLI that takes a start context in its session (its hooks part's deliverStartContext) is sent one.
+        const deliver = l.adapter.hooks?.deliverStartContext?.bind(l.adapter.hooks)
+        if (!current(ac.signal) || !sessionId || !deliver) return
+        const wanted = !barred() && !!this.startContext
+        // HI-3375 (HR1's round 1): a build that failed is told apart from one that made nothing on purpose (null: an
+        // ordinary agent, the Assistant's journal or guidance off), which is no skip.
+        let failed = false
+        const built = wanted ? this.startContext!(l.state, source).catch((e) => ((failed = true), log.warn('start context: building it', e), null)) : Promise.resolve(null)
         const text = await Promise.race([built, new Promise<null>((done) => ac.signal.addEventListener('abort', () => done(null), { once: true }))])
+        // Still this launch's latest delivery, its agent's running launch, its session the same: what may be told of it
+        // (never a warning against a replacement, or of a delivery a newer one superseded).
+        const still = (): boolean => gen === s.gen && this.live.get(liveId(l.state.projectPath, l.state.agentId)) === l && l.state.sessionId === sessionId
         // Asked again once it is made (as startContextFor): out of time, superseded, or barred meanwhile, nothing is sent.
-        if (!current(ac.signal)) return
-        const outcome = await l.adapter.deliverStartContext!(l.state.runId, sessionId, text && !barred() ? text : null, ac.signal)
+        // HI-3375: out of time (the deadline, its launch still this agent's), it is told: the agent works without it.
+        if (!current(ac.signal)) {
+          if (wanted && ac.signal.aborted && still()) this.startContextSkipped(l, 'slow')
+          return
+        }
+        // Wanted and its build failed: nothing to put (its old entry removed as before), and told.
+        if (failed && wanted && !barred()) {
+          const outcome = await deliver(l.state.runId, sessionId, null, ac.signal)
+          log.info(`start context into ${l.state.agentId}'s session (${source}): build failed, ${outcome}`)
+          if (still()) this.startContextSkipped(l, 'failed')
+          return
+        }
+        const outcome = await deliver(l.state.runId, sessionId, text && !barred() ? text : null, ac.signal)
         log.info(`start context into ${l.state.agentId}'s session (${source}): ${outcome}`)
+        // HI-3375: one made and not put (refused, too large, not sent, or cut off at the deadline): told, never only logged,
+        // and only while that launch is still its agent's (a stop or a newer delivery meanwhile says nothing).
+        if (text && !barred() && outcome !== 'put' && outcome !== 'removed' && still()) this.startContextSkipped(l, 'notSent')
       } catch (e) {
         log.warn('start context into a session', e)
       } finally {
@@ -6962,16 +7581,34 @@ class SessionManager {
     return run.then(() => null, () => null)
   }
 
+  /**
+   * HI-3375: a launch's start context (Combwork's view of the board, its guidance and state) that couldn't be made in time
+   * (`slow`), couldn't be made at all (`failed`: its build threw), or couldn't be put into its session (`notSent`): the user is told, as the agent then works without it until its next
+   * compaction or start. A notice, never a chime.
+   */
+  private startContextSkipped(l: LiveSession, why: 'slow' | 'failed' | 'notSent'): void {
+    log.warn(`start context into ${l.state.agentId}'s session skipped (${why})`)
+    const agent = this.label(l.state)
+    this.notify(
+      l.state.projectPath,
+      withValues(msg({ id: 'session.notice.startContextTitle', defaultMessage: "{agent} started without Combwork's start context", description: "A notification's title (HI-3375): an agent ({agent}, its name) started, or went on after compacting its conversation, without the start context Combwork puts into its session (Combwork's view of the board, its guidance and its state)." }), { agent }),
+      withValues(msg({ id: 'session.notice.startContextBody', defaultMessage: "Combwork couldn't {why, select, slow {make it in time} failed {make it} other {put it into the session}}, so {agent} works without Combwork's view of the board and its guidance for now. Stop it and start it again to try again.", description: "The notification that an agent ({agent}) started without Combwork's start context (HI-3375). why: slow, it took too long to make (this PC was busy); failed, making it failed; other, it couldn't be put into the agent's session. Stop and start are the agent's buttons." }), { agent, why }), // i18n-ignore: select keys, never shown
+      'notice',
+      undefined,
+      l.state.agentId
+    )
+  }
+
   /** The start context for a launch, in its CLI's reply form, or null (none, or it couldn't be made). */
   private async startContextFor(l: LiveSession, source: string | null): Promise<Record<string, unknown> | null> {
-    if (!this.startContext || !l.adapter.startContextReply) return null
+    if (!this.startContext || !l.adapter.hooks?.startContextReply) return null
     // Context of Combwork's (HI-2670): never without its guidance, nor into an agent Combwork keeps out of.
     const barred = (): boolean => l.policy?.guidance === false || !!this.keepsOut(l.state.projectPath, l.state.agentId)
     if (barred()) return null
     try {
       const text = await this.startContext(l.state, source)
       // Asked again once it is made (HR1 on s44): made Independent meanwhile, it gets none.
-      return text && !barred() ? l.adapter.startContextReply(text) : null
+      return text && !barred() ? l.adapter.hooks?.startContextReply(text) : null
     } catch (e) {
       log.warn('start context', e)
       return null
@@ -6985,13 +7622,16 @@ class SessionManager {
    * A hook arriving on its launch's own authenticated route (the hook server, HI-982): its observation, which its lock
    * decision and the turn ledger fill in, for the launch's Hooks dialog; null when no launch of Combwork's has it.
    */
-  observeHook(runId: string | null, body: Record<string, any>): HookObservation | null {
+  observeHook(runId: string | null, given: Record<string, any>): HookObservation | null {
+    // Recorded under the body as it came and as it is read (canonicalHook), which the later steps look it up by.
+    const body = this.canonicalHook(runId, given)
     const l = this.findLaunch(runId, body.session_id)?.[1]
     if (!l?.hookHistory) return null
     const event = clip(typeof body.hook_event_name === 'string' ? body.hook_event_name : '?', HOOK_SHORT_MAX).text
     ;(l.heard ??= new Set()).add(event)
     const obs: HookObservation = { l, started: performance.now(), fired: { at: Date.now(), event, receiver: l.hooks?.receivers[event] ?? 'combwork', response: 'none', ledger: 'none', ms: 0 } }
     this.hookObs.set(body, obs)
+    if (given !== body) this.hookObs.set(given, obs)
     return obs
   }
 
@@ -7064,17 +7704,18 @@ class SessionManager {
     // Never into a launch without Combwork's typing or tools, nor an agent Independent now (HI-2670): its hooks still
     // report its status, and add nothing to its context.
     if (this.noticeBarred(l)) return null
-    const hook = l.adapter.normalizeHook(body)
+    const hook = l.adapter.hooks?.normalizeHook(body)
+    if (!hook) return null
     const ev = hook.event
     const raw = String(body.hook_event_name ?? '')
     // A notice event as prepared (HI-2545, agy): never a sub-agent's, a turn's start, or one its CLI says carries none (a
     // place that had one already).
-    if (l.adapter.noticeEvents?.includes(raw)) {
+    if (l.adapter.hooks?.noticeEvents?.includes(raw)) {
       if (hook.ids.sub || ev.kind === 'prompt' || (ev.kind === 'stop' && (ev.failed || hook.ids.continued))) return null
       if (ev.kind !== 'stop' && ev.kind !== 'ignore') return null
       // A checkpoint between a turn's model calls: only in that very turn, while it runs (its id the active one).
       if (ev.kind === 'ignore' && (!hook.ids.turn || ledger.active?.id !== hook.ids.turn || ledger.active.state !== 'running')) return null
-      if (l.adapter.noticeWanted && !l.adapter.noticeWanted(body, (l.hookMemo ??= {}))) return null
+      if (l.adapter.hooks?.noticeWanted && !l.adapter.hooks?.noticeWanted(body, (l.hookMemo ??= {}))) return null
     }
     // What the ledger would make of it (a copy: it is admitted below, with what it was told).
     if (admit(structuredClone(ledger), ev, hook.ids, { woke, typed, now: at }).verdict === 'stale') return null
@@ -7088,13 +7729,13 @@ class SessionManager {
     // and still one Combwork may add to (HR1 on s44: made Independent while the notice was worked out, it gets none).
     if (!text || this.findLaunch(runId, body.session_id)?.[1] !== l || ledger.active !== turn || this.noticeBarred(l)) return null
     // Past the time its CLI waits for this reply (HI-2545): the reply never reaches it, so the notice isn't given.
-    const deadline = l.adapter.noticeDeadlineMs?.(raw)
+    const deadline = l.adapter.hooks?.noticeDeadlineMs?.(raw)
     if (deadline != null && Date.now() - at >= deadline) return null
-    const reply = l.adapter.noticeReply(raw, text)
+    const reply = l.adapter.hooks?.noticeReply(raw, text) ?? null
     // A CLI that takes the drain as a new prompt: that prompt is Combwork's own, in the turn it carries on.
-    if (reply && drain && l.adapter.drainIsPrompt) expectInjected(ledger, text)
+    if (reply && drain && l.adapter.hooks?.drainIsPrompt) expectInjected(ledger, text)
     if (reply) {
-      l.adapter.noticeGiven?.(body, (l.hookMemo ??= {}))
+      l.adapter.hooks?.noticeGiven?.(body, (l.hookMemo ??= {}))
       if (drafted && typeof drafted === 'object') drafted.commit()
     }
     return reply
@@ -7106,6 +7747,8 @@ class SessionManager {
    * session) must not land after a newer one's status.
    */
   handleHook(runId: string | null, body: Record<string, any>, reply: unknown = null): Promise<void> {
+    // Read in Combwork's vocabulary (HI-3202), the same body hookReply routed (canonicalHook).
+    body = this.canonicalHook(runId, body)
     // A turn's end releases only the locks claimed before it arrived: PreToolUse claims them at once, outside this queue.
     const arrived = this.lockSeq
     // When it reached Combwork, before it waits its turn: a turn begins then, for comparing with the CLI's records (#648).
@@ -7158,8 +7801,8 @@ class SessionManager {
     // What the hook needs from the CLI's own records first (HI-2545: the Antigravity CLI's user prompt), in this order.
     // Any hook of the launch is news of it: a status line's idle no longer stands for a silent end (idleGrace).
     this.cancelIdleGrace(l)
-    if (l.adapter.prepareHook) {
-      await l.adapter.prepareHook(body, { agentId: st.agentId, workspacePath: workspaceOf(st.projectPath).path!, sessionId: st.sessionId, memo: (l.hookMemo ??= {}), alive: () => this.live.get(id) === l }).catch((e) => log.warn(`${userText(this.label(st))}: could not read what its hook needs`, e))
+    if (l.adapter.hooks?.prepareHook) {
+      await l.adapter.hooks?.prepareHook(body, { agentId: st.agentId, workspacePath: workspaceOf(st.projectPath).path!, sessionId: st.sessionId, memo: (l.hookMemo ??= {}), alive: () => this.live.get(id) === l }).catch((e) => log.warn(`${userText(this.label(st))}: could not read what its hook needs`, e))
       if (this.live.get(id) !== l) return
     }
     // A body that stands for several hooks (HI-2760: OpenCode's forwarded events and snapshots, which its prepareHook
@@ -7168,12 +7811,15 @@ class SessionManager {
       for (const sub of body.combworkExpanded as Record<string, any>[]) {
         if (this.live.get(id) !== l) return
         // A compaction's end among them (live, or recovered by a resync): the start context refreshed in the session (HI-2771).
-        if (l.adapter.deliverStartContext) this.compactionIntoSession(l, body, l.adapter.normalizeHook(sub))
+        const hooks = l.adapter.hooks
+        if (hooks?.deliverStartContext) this.compactionIntoSession(l, body, hooks.normalizeHook(sub))
         await this.handleHookIn(runId, sub, arrived, hooksBefore, at, null, null)
       }
       return
     }
-    const hook = l.adapter.normalizeHook(body)
+    const hook = l.adapter.hooks?.normalizeHook(body)
+    // A CLI without hooks (no hooks part) sends none: one that arrives anyway is ignored.
+    if (!hook) return
     const label = this.label(st)
     flightRecorder.arrived(st, () => label, 'hook', body)
     // Still this launch after each wait below (#650): one stopped or started again meanwhile gets nothing more of this
@@ -7214,10 +7860,10 @@ class SessionManager {
     // A CLI that wakes when its background tasks end begins that turn itself: while its transcript says one just ended
     // (never merely because one runs), a tool call it never saw may open that turn should its prompt hook be lost
     // (turnLedger rule 1).
-    const woke = l.adapter.descriptor.capabilities.backgroundWakes && !!l.woke
+    const woke = !!l.adapter.descriptor.capabilities.background?.backgroundWakes && !!l.woke
     // A CLI that may begin the turn the user's typing starts with no prompt hook (HI-2673, Claude Code's `!` command): while
     // the user's Enter into the idle pane waits for its hook, a new tool call of a turn never seen may open that turn.
-    const typed = l.adapter.descriptor.capabilities.typedTurnsWithoutPrompt && typedPending(l.hooksWatch)
+    const typed = !!l.adapter.descriptor.capabilities.session?.typedTurnsWithoutPrompt && typedPending(l.hooksWatch)
     // Its notice (#650), from the ledger as it is now, before it is admitted with what it was told.
     if (decide) {
       // A SessionStart whose CLI says what it is only once prepared (HI-2548: agy's, startReply): its start context, the
@@ -7230,7 +7876,7 @@ class SessionManager {
       if (!current()) return
       decide(reply as Record<string, unknown> | null)
     }
-    const continued = hook.event.kind === 'stop' && !hook.event.failed && !!reply && typeof reply === 'object' && l.adapter.stopContinues(reply as Record<string, unknown>)
+    const continued = hook.event.kind === 'stop' && !hook.event.failed && !!reply && typeof reply === 'object' && l.adapter.hooks?.stopContinues(reply as Record<string, unknown>)
     const was = ledger.active
     const took = admit(ledger, hook.event, ids, { combworkContinued: continued, woke, typed, now: at })
     if (ledger.active !== was) l.woke = false
@@ -7292,6 +7938,8 @@ class SessionManager {
       if (ev.kind !== 'stop') this.settleFailure(id, l)
       this.carryOut(id, l, step, String(body.hook_event_name ?? ''), ev, arrived)
       actions = step.actions
+      // A first prompt still waiting to be typed (resumePromptTyped): its start hook, or a turn's end, may make it safe now.
+      if (l.typedFirstPrompt) queueMicrotask(() => this.typeFirstPrompt(l))
       if (ev.kind !== 'ignore') (l.recentHooks ??= []).push({ kind: ev.kind, at: Date.now(), status: st.status })
       if ((l.recentHooks?.length ?? 0) > RECENT_HOOKS) l.recentHooks!.shift()
     } else if (guard && hook.event.kind === 'ask') {
@@ -7443,18 +8091,18 @@ class SessionManager {
       endRetryWait(st, now)
       this.emitState(st)
     }
-    if (!l.adapter.retryWait || !l.launchEnv) return
+    if (!l.adapter.usage?.retryWait || !l.launchEnv) return
     const turn = l.ledger.active
     const sessionId = st.sessionId
     if (!sessionId || !turn || turn.state !== 'running' || st.status !== 'working' || l.retryLooking) return
     const lastHook = Math.max(l.lastHookAt ?? 0, turn.startedAt)
-    if (now - lastHook < (l.adapter.retryLookAfterMs?.() ?? DEFAULT_RETRY_LOOK_AFTER_MS)) return
+    if (now - lastHook < (l.adapter.usage?.retryLookAfterMs?.() ?? DEFAULT_RETRY_LOOK_AFTER_MS)) return
     if (l.retryLookedAt !== undefined && now - l.retryLookedAt < RETRY_LOOK_EVERY_MS) return
     l.retryLookedAt = now
     l.retryLooking = true
     const seen = l.hooksSeen ?? 0
     void l.adapter
-      .retryWait({ sessionId, env: l.launchEnv, transcriptPath: l.transcriptPath, since: lastHook })
+      .usage?.retryWait({ sessionId, env: l.launchEnv, transcriptPath: l.transcriptPath, since: lastHook })
       .catch((e: unknown) => {
         log.warn(`${userText(this.label(st))}: could not look for a retry wait`, e)
         return null
@@ -7510,7 +8158,8 @@ class SessionManager {
   private checkSilence(projectPath: string, agentId: string): void {
     const id = liveId(projectPath, agentId)
     const l = this.live.get(id)
-    if (!l?.ledger) return
+    // A CLI with no hooks (HI-3196): its terminal says whether it works; silence says nothing of it.
+    if (!l?.ledger || !l.adapter.hooks) return
     const quiet = (): boolean => {
       const st = l.state
       const silent = silentFor(l.ledger!)
@@ -7573,7 +8222,7 @@ class SessionManager {
       statusMessage: st.statusMessage,
       askedAtStart: !!l.askedAtStart,
       compacting: l.compacting ? (l.compacting.started ? 'started' : 'requested') : null,
-      backgroundWakes: l.adapter.descriptor.capabilities.backgroundWakes,
+      backgroundWakes: l.adapter.descriptor.capabilities.background?.backgroundWakes ?? false,
       tasks: l.tasks?.size ?? 0,
       attention: l.titleAttention ? 'title' : 'hooks',
       // The mode the CLI is in: on the CLI's own setting, the one it showed (#1284).
@@ -7608,6 +8257,7 @@ class SessionManager {
     if (unblocked) {
       l.inputBlocked = undefined
       l.unanswered = 0
+      l.boxHidden = undefined
       st.inputBlocked = undefined
       log.info(`${userText(label)}: its input takes keys again (its CLI sent ${ev!.kind})`) // i18n-ignore: for the log
     }
@@ -8113,9 +8763,9 @@ class SessionManager {
    */
   private checkFolder(projectPath: string, folder: string): void {
     for (const a of allProviders()) {
-      if (!a.folderWarning || !isProviderEnabled(config.settings, a.id)) continue
+      if (!a.launch.folderWarning || !isProviderEnabled(config.settings, a.id)) continue
       const key = `${a.id}\n${resolve(folder).toLowerCase()}`
-      const w = a.folderWarning(folder)
+      const w = a.launch.folderWarning(folder)
       if (!w) this.folderWarnings.delete(key)
       else if (!this.folderWarnings.has(key)) {
         this.folderWarnings.add(key)
@@ -8280,7 +8930,7 @@ class SessionManager {
     if (rec) return recordProvider(rec)
     const live = this.projectStates(projectPath).find((s) => s.sessionId === sessionId)
     if (live) return live.provider
-    return (await this.providerTranscript(projectPath, sessionId, ctx))?.provider ?? 'claude-code'
+    return (await this.providerTranscript(projectPath, sessionId, ctx))?.provider ?? LEGACY_PROVIDER
   }
 
   /**
@@ -8304,7 +8954,8 @@ class SessionManager {
       if (p) usage = await this.usageFor(projectPath, p, sessionId, await this.sessionProvider(projectPath, sessionId, ctx), { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal })
     }
     if (!usage && (!running || ctx?.stored)) {
-      const stored = (ctx?.stored ?? (await usageHistory.storedUsage(projectPath).catch(() => null)))?.get(sessionId)
+      // Alone (no list): only this session from the history (HI-3295), never every session of the project.
+      const stored = ctx?.stored ? ctx.stored.get(sessionId) : await usageHistory.storedSessionUsage(projectPath, sessionId).catch(() => null)
       if (stored) usage = this.titled(stored.usage)
     }
     if (!usage && ctx?.stored) {
@@ -8346,7 +8997,7 @@ class SessionManager {
     if (!p) return { usage: await this.usage(projectPath, sessionId, undefined, { noWait: true }), known: true }
     const st = await stat(p).catch(() => null)
     if (!st) return { usage: null, known: false }
-    const stored = (await usageHistory.storedUsage(projectPath).catch(() => null))?.get(sessionId)
+    const stored = await usageHistory.storedSessionUsage(projectPath, sessionId).catch(() => null)
     if (stored && stored.read.path?.toLowerCase() === p.toLowerCase() && stored.read.size === st.size && stored.read.mtime === st.mtimeMs) return { usage: withScreenStopsIn(this.titled(stored.usage), rec?.screenStops), known: true }
     const provider = await this.sessionProvider(projectPath, sessionId)
     const o = { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }
@@ -8368,7 +9019,7 @@ class SessionManager {
     if (usage.title) return usage
     let title: string | null = null
     try {
-      title = providerAdapter(usage.provider).usageTitle?.(usage.sessionId) ?? null
+      title = providerAdapter(usage.provider).usage?.usageTitle?.(usage.sessionId) ?? null
     } catch {
       // A provider this version doesn't know.
     }
@@ -8397,6 +9048,17 @@ class SessionManager {
     const key = resolve(projectPath).toLowerCase()
     if (opts.own) return this.ownRunning.get(key) ?? this.ownListing(key, projectPath)
     return this.listNow(key, projectPath)
+  }
+
+  /**
+   * HI-3360: whether resuming conversation `id` counts as cold (idle past Settings → Advanced's minutes, and not small),
+   * as its listing says it; null when it doesn't, the rule is off, or it isn't listed (nothing to tell it by). One that
+   * can't continue (HI-2540's `fresh`) never resumes, so it never counts: the start gives it a new conversation, as before.
+   */
+  async idleOf(projectPath: string, id: string): Promise<IdleResume | null> {
+    if (resumeIdleMinutes() === null) return null
+    const item = (await this.list(projectPath)).find((i) => i.id === id)
+    return item && !item.fresh ? (item.idle ?? null) : null
   }
 
   private ownListing(key: string, projectPath: string): Promise<SessionListItem[]> {
@@ -8436,6 +9098,8 @@ class SessionManager {
     // Read once for the whole list, not once per session.
     const ctx: ListContext = { records: file.sessions, cfg: await workspace.projectConfig(projectPath), stored: await usageHistory.storedUsage(projectPath).catch(() => new Map()) }
     const ttl = config.settings.sessions.cacheTtl
+    // Long idle when resumed (HI-3360), by the rule the API and the placement read.
+    const idleMinutes = resumeIdleMinutes()
     // Which start fresh when resumed (HI-2540), by the rule the start reads: the window asks before, not afterwards.
     const moves = await this.folderMoves(projectPath)
     const items: SessionListItem[] = []
@@ -8448,7 +9112,7 @@ class SessionManager {
       const provider = recordProvider(rec)
       let transcript: string | null = null
       try {
-        transcript = await providerAdapter(provider).transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath)
+        transcript = (await providerAdapter(provider).transcript?.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath)) ?? null
       } catch {
         // A provider this version doesn't know.
       }
@@ -8475,7 +9139,8 @@ class SessionManager {
         transcriptBytes: st?.size ?? null,
         ...(!ctx.stored?.has(rec.id) && (hasTranscript || hasBackup) ? { pending: true } : {}),
         usage,
-        recache: usage && providerDescriptor(provider).capabilities.promptCacheTtl ? recacheEstimate(usage, ttl) : null
+        recache: usage && providerDescriptor(provider).capabilities.usage?.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
+        ...idleField(usage?.lastActivity ?? rec.lastActiveAt, usage, st?.size ?? null, idleMinutes)
       }
     })
     items.push(...listed)
@@ -8515,7 +9180,7 @@ class SessionManager {
     const folders = this.sessionFolders(projectPath, file.sessions, cfg)
     const asks = allProviders().flatMap((adapter) => folders.map((folder, i) => ({ adapter, folder, i })))
     // A few folders at once: each waits on the disk.
-    const found = await atMost(OTHER_FOLDERS_AT_ONCE, asks, (a) => a.adapter.listSessions(a.folder, skip).catch(() => [] as ExternalSession[]))
+    const found = await atMost(OTHER_FOLDERS_AT_ONCE, asks, (a) => a.adapter.transcript?.listSessions(a.folder, skip).catch(() => [] as ExternalSession[]) ?? Promise.resolve([] as ExternalSession[]))
     const items: SessionListItem[] = []
     for (const [n, { adapter, i }] of asks.entries()) {
       for (const ext of found[n]) {
@@ -8543,7 +9208,8 @@ class SessionManager {
           transcriptBytes: st?.size ?? null,
           ...(same ? {} : { pending: true }),
           usage,
-          recache: usage && adapter.descriptor.capabilities.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
+          recache: usage && adapter.descriptor.capabilities.usage?.promptCacheTtl ? recacheEstimate(usage, ttl) : null,
+          ...idleField(usage?.lastActivity ?? ext.modified, usage, st?.size ?? null, resumeIdleMinutes()),
           ...(ext.sub ? { sub: ext.sub } : {})
         })
       }
@@ -8575,9 +9241,9 @@ class SessionManager {
     if (rec.sub) return rec.sub
     try {
       const adapter = providerAdapter(recordProvider(rec))
-      const cli = transcript !== undefined ? transcript : await adapter.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath).catch(() => null)
+      const cli = transcript !== undefined ? transcript : await adapter.transcript?.transcriptPath(rec.cwd ?? projectPath, rec.id, rec.transcriptPath).catch(() => null)
       const path = cli ?? this.backupCopy(projectPath, rec.id) ?? this.backupCopy(projectPath, rec.id, true)
-      return path ? await adapter.subSessionOf(path, rec.id, path === cli ? mtimeMs : undefined) : null
+      return path ? ((await adapter.transcript?.subSessionOf(path, rec.id, path === cli ? mtimeMs : undefined)) ?? null) : null
     } catch {
       return null
     }
@@ -8695,7 +9361,7 @@ class SessionManager {
    * Backup retention (#1110, Settings → Sessions → Keep transcript backups; off by default): Combwork's copies of a host's
    * sessions last active more than that many days ago go to the Recycle Bin (trash()), only where the CLI still has the
    * session's transcript (it can still be opened and resumed from there), and only once the usage history has what it
-   * used. A session whose only copy is Combwork's is never touched (the Assistant for Darren, 20 Oct): deleting those stays
+   * used. A session whose only copy is Combwork's is never touched: deleting those stays
    * the user's (Delete, Clean Up). Running sessions and those whose files are moving are skipped; each is checked again
    * with its backups locked, just before they go. Returns how many sessions' copies went. `signal`: the workspace's
    * opening it runs in (background housekeeping), ending it when the workspace closes (#1379).
@@ -9200,21 +9866,21 @@ class SessionManager {
 
   private async adoptNow(projectPath: string, sessionId: string): Promise<void> {
     const src = await this.providerTranscript(projectPath, sessionId)
-    const provider = src?.provider ?? 'claude-code'
+    const provider = src?.provider ?? LEGACY_PROVIDER
     // As its record says, if it has one (HI-1829): a conversation that ran on a server is never read Claude-priced.
     const rec = await workspace.sessionRecord(projectPath, sessionId).catch(() => undefined)
     const usage = src ? await this.usageFor(projectPath, src.path, sessionId, provider, { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }) : null
     // A sub-session (a Codex guardian review, say) stays one: never an agent's session to resume.
     const adapter = providerAdapter(provider)
     // Found in another of the host's folders, it is still one: its transcript's first line says so too (HI-2774).
-    const sub = src ? ((await adapter.listSessions(projectPath).catch(() => [])).find((e) => e.id === sessionId)?.sub ?? (await adapter.subSessionOf(src.path, sessionId).catch(() => null)) ?? undefined) : undefined
+    const sub = src ? ((await adapter.transcript?.listSessions(projectPath).catch(() => []))?.find((e) => e.id === sessionId)?.sub ?? (await adapter.transcript?.subSessionOf(src.path, sessionId).catch(() => null)) ?? undefined) : undefined
     // A conversation the CLI keeps by a record of Combwork's (OpenCode's mark, HI-2774) is taken over in the CLI's data
     // first, or refused with why; what that made is taken back if the record can't be written, so nothing half-adopted stays.
     let handle: AdoptionHandle | null = null
-    if (src && !sub && adapter.adopting) {
+    if (src && !sub && adapter.transcript?.adopting) {
       const file = await workspace.sessionsFile(projectPath)
       const cfg = await workspace.projectConfig(projectPath)
-      handle = await adapter.adopting(projectPath, sessionId, src.path, this.sessionFolders(projectPath, file.sessions, cfg))
+      handle = await adapter.transcript?.adopting(projectPath, sessionId, src.path, this.sessionFolders(projectPath, file.sessions, cfg))
     }
     try {
       await handle?.commit()
@@ -9238,7 +9904,7 @@ class SessionManager {
       titleAtRename: usage?.customTitle ?? null,
       createdAt: usage?.firstActivity ?? new Date().toISOString(),
       lastActiveAt: usage?.lastActivity ?? new Date().toISOString(),
-      ...(src && !providerDescriptor(provider).capabilities.fixedSessionId ? { transcriptPath: src.path } : {})
+      ...(src && !providerDescriptor(provider).capabilities.session?.fixedSessionId ? { transcriptPath: src.path } : {})
     })
   }
 }

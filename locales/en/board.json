@@ -1379,6 +1379,54 @@
     "defaultMessage": "Assistant and scripts",
     "description": "A choice of the Progress panel's project filter: the runs of the Combwork Assistant and of scripts, which belong to no project."
   },
+  "board.forYou.advanceAttest": {
+    "defaultMessage": "It’s integrated",
+    "description": "A button on a For you item about Combwork’s jj advance whose outcome it couldn’t prove (HI-3236): the user says the card’s work is in its target."
+  },
+  "board.forYou.advanceAttestTip": {
+    "defaultMessage": "Done on your word: Combwork marks the card Done without proving its integration.",
+    "description": "Tooltip of the It’s integrated button (HI-3236): recorded as the user’s override, never as a checked integration."
+  },
+  "board.forYou.advanceIntegrate": {
+    "defaultMessage": "Integrate",
+    "description": "A button on a For you preview of Combwork’s jj advance (HI-3236): Combwork moves the target bookmark to the card’s candidate now, as the preview shows."
+  },
+  "board.forYou.advanceIntegrateTip": {
+    "defaultMessage": "Combwork moves the target to the candidate now, checking first that nothing changed since this preview.",
+    "description": "Tooltip of the Integrate button on a For you preview of Combwork’s jj advance (HI-3236). The target: the bookmark the card merges into."
+  },
+  "board.forYou.advanceLeave": {
+    "defaultMessage": "Leave it to me",
+    "description": "A button on a For you item about Combwork’s jj advance that stopped (HI-3236): the user settles it themselves."
+  },
+  "board.forYou.advanceLeaveTip": {
+    "defaultMessage": "Combwork changes nothing. It asks you next whether the card is integrated.",
+    "description": "Tooltip of the Leave it to me button on a stopped Combwork jj advance (HI-3236)."
+  },
+  "board.forYou.advanceNotThisPlan": {
+    "defaultMessage": "Not for this plan",
+    "description": "A button on a For you preview of Combwork’s jj advance (HI-3236): dismisses this preview until the plan changes."
+  },
+  "board.forYou.advanceNotThisPlanTip": {
+    "defaultMessage": "Dismisses this preview until the plan changes (a new candidate after the target moves or new work). You can still integrate it yourself.",
+    "description": "Tooltip of the Not for this plan button on a For you preview of Combwork’s jj advance (HI-3236). Never promise to ask again later for the same plan."
+  },
+  "board.forYou.advanceStartAgain": {
+    "defaultMessage": "Not integrated, start again",
+    "description": "A button on a For you item about Combwork’s jj advance whose outcome it couldn’t prove (HI-3236): start again with a new candidate."
+  },
+  "board.forYou.advanceStartAgainTip": {
+    "defaultMessage": "Only once the target is known not to contain the work: then a new candidate and its checks.",
+    "description": "Tooltip of the Not integrated, start again button (HI-3236)."
+  },
+  "board.forYou.advanceUndo": {
+    "defaultMessage": "Undo Combwork’s move",
+    "description": "A button on a For you item about Combwork’s jj advance that stopped (HI-3236): reverts Combwork’s own jj operation, checking again first."
+  },
+  "board.forYou.advanceUndoTip": {
+    "defaultMessage": "Combwork reverts its own jj operation, after checking again that nothing else changed, and frees the card.",
+    "description": "Tooltip of the Undo button on a stopped Combwork jj advance (HI-3236)."
+  },
   "board.forYou.agree": {
     "defaultMessage": "{action, select, done {Move to Done With This Reply} noCode {Make It No Code With This Reply} skipReview {Skip Review With This Reply} other {Unblock With This Reply}}",
     "description": "A button under an agent's question for the user (For you), beside Send, when the question offers one action: does that action as the user, with the reply typed in the box as its reason, and answers the question. Keep the select keys as they are; translate each choice."
@@ -1442,6 +1490,10 @@
   "board.forYou.heading": {
     "defaultMessage": "For you",
     "description": "A heading in the card dialog, above what on the card waits for the user (approvals, decisions, questions). Glossary: For you."
+  },
+  "board.forYou.moreChurn": {
+    "defaultMessage": "More",
+    "description": "HI-3188: the label of the number box beside Carry on, at a card's hard stop: how much more back-and-forth (failed reviews, designs, requests, questions) the card gets before it stops again."
   },
   "board.forYou.offer": {
     "defaultMessage": "{action, select, done {Move to Done} noCode {Make It No Code} skipReview {Skip Review} other {Unblock}}",
@@ -1883,6 +1935,10 @@
     "defaultMessage": "It applies once {card} is Done.",
     "description": "HI-2898: under the title of the notification after changing a lane's cards in Progress → Lanes, when the change waits for the lane's card in progress ({card}, its key) to be Done first."
   },
+  "board.laneEdit.queuedYield": {
+    "defaultMessage": "{card} waits on {first}: once its builder ends its turn with {card}’s work committed, {card} goes back to Todo (its work kept) and {first} starts.",
+    "description": "HI-3323: under the title of the notification after changing a lane's cards in Progress → Lanes, when the change puts first {first}, a card that the lane's card in progress ({card}) waits on (both keys). Combwork switches the lane to {first} once the builder's turn is over, putting {card} back in the Todo column with its work kept on its branch; the lane comes back to {card} after."
+  },
   "board.laneEdit.remove": {
     "defaultMessage": "Take {card} off the lane (it goes back to the board)",
     "description": "HI-2898: tooltip of the × on a card waiting its turn in a lane's cards (Progress → Lanes): takes it off the lane; the card stays on the board, in To do. {card} is its key."
@@ -2045,7 +2101,7 @@
   },
   "board.laneStart.target": {
     "defaultMessage": "Merges into",
-    "description": "HI-2556: a field label in the Start Lane dialog: the branch the lane’s cards are made from and merge into (Darren’s name for it)."
+    "description": "HI-2556: a field label in the Start Lane dialog: the branch the lane’s cards are made from and merge into (the user’s name for it)."
   },
   "board.laneStart.targetDefault": {
     "defaultMessage": "{branch} (the project’s)",
@@ -2066,6 +2122,14 @@
   "board.laneStart.waiting": {
     "defaultMessage": "Waiting for these agents to be idle: {agents}…",
     "description": "In the Start Lane dialog, after Wait and Start: it waits for the busy agents ({agents}: their names, joined) before starting the lane. Cancel stops waiting. The names follow a colon (glossary §1 rule 4)."
+  },
+  "board.laneStart.yieldCantStart": {
+    "defaultMessage": "{card} waits on {first}, which can’t start yet (it is blocked, or waits on a card of its own): this list applies once {card} is Done, and Apply now changes nothing before that.",
+    "description": "HI-3368: under the Apply now checkbox of the Start Lane dialog, instead of the usual hint, when the new list puts first {first} (a card's key, such as HI-28), a card that the builder's card in progress {card} (its key) waits on, but {first} can't be started yet: it is blocked, or a card it depends on isn't Done where the project's rules wait for that. So the lane doesn't switch to it: the list waits until {card} is Done, with or without Apply now."
+  },
+  "board.laneStart.yieldHint": {
+    "defaultMessage": "{card} waits on {first}: once {builder} ends its turn with {card}’s work committed, {card} goes back to Todo (its work stays on its branch), this list applies and {first} starts. The lane comes back to {card} after.",
+    "description": "HI-3323: under the Apply now checkbox of the Start Lane dialog, instead of the usual hint, when the new list puts first {first}, a card that the builder's card in progress {card} waits on (both keys). {builder} is an agent's name. Combwork makes the switch by itself at the builder's turn end, Apply now or not. Todo is a board column."
   },
   "board.lanes.abandon": {
     "defaultMessage": "Abandon Lane…",
@@ -2243,6 +2307,10 @@
     "defaultMessage": "{n, plural, one {{cards} taken off} other {{cards} taken off}}",
     "description": "Part of a lane's queued list change (Progress panel → Lanes, HI-2151): the cards {cards} (their keys, joined; {n} of them) are taken off the lane's list. Combwork joins the parts with commas."
   },
+  "board.lanes.queuedYield": {
+    "defaultMessage": "Next, once {builder} ends its turn: {first} first, as {card} waits on it ({card} goes back to Todo, its work kept). New order: {cards}",
+    "description": "A line under a lane's cards in the Progress panel's Lanes tab (HI-3323): the lane's list was changed to put first {first}, a card that the card being worked ({card}) waits on. Once the builder {builder} (an agent's name) ends its turn with {card}'s work committed, Combwork puts {card} back in Todo (its work stays on its branch) and starts {first}. {cards}: the whole new list in order (keys joined with commas). Glossary: lane, Todo."
+  },
   "board.lanes.retryFresh": {
     "defaultMessage": "Retry New Conversation",
     "description": "A button in a lane's header (Progress panel) and an item of its menu (HI-2034): one of the lane's agents was owed a new conversation, and Combwork stopped trying to start it (it wasn't free in time, Combwork closed while starting it, or its start failed); this tries again, once the agent is free. Glossary: lane, conversation."
@@ -2378,6 +2446,10 @@
   "board.lanes.waitsStartHeld": {
     "defaultMessage": "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{agent}’s session is still in it} left {{agent}’s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{agent}’s last run there isn’t known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox’s broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}), and Combwork tries again",
     "description": "Why a lane waits, in its header in the Progress panel (HI-2468): its card {card} (its key, such as HI-12) is due to start, but Combwork's start of it was refused because its slot {slot} (a working folder Combwork lends to a lane, such as slot-a: keep it as it is) is still in use. held (select): session, the agent {agent} (an agent's name) still has a session running in it; left, the agent {agent}'s last run left programs running in it ({program}: the first one's process name, such as node: keep it as it is; {more}: how many more, a number); lastRun, that last run of {agent}'s there isn't known to have ended; broker, a process still has a file or folder in it open, and Windows Sandbox's broker ({broker}: its process name, WindowsSandboxServer: keep it as it is) is seen using the slot as its working folder; other, a process still has a file or folder in it open (often a program the last agent there started, still closing). idle (select, only with broker): yes, no Windows Sandbox is running; no, one is; other, not known (nothing said). Combwork tries the start again. Translate each. The lane isn't paused."
+  },
+  "board.lanes.waitsYield": {
+    "defaultMessage": "{first} next, once {agent} ends its turn with {card} committed ({card} waits on it, and goes back to Todo meanwhile)",
+    "description": "Why a lane waits, in its header in the Progress panel (HI-3323): its list was changed to put first {first} (a card's key, such as HI-12), a card that the card being worked, {card}, waits on. Once its builder {agent} (an agent's name) ends its turn with {card}'s work committed, Combwork puts {card} back in Todo (its work stays on its branch) and starts {first}; the lane comes back to {card} after. Glossary: lane, Todo. The lane isn't paused."
   },
   "board.leftOut.detail": {
     "defaultMessage": "{hasPaths, select, yes {Its paths: {paths}.} other {It has no paths yet.}} A file changed meanwhile may be another card's work or your own: include only what belongs to {card}.",
@@ -3889,7 +3961,7 @@
   },
   "board.target.field": {
     "defaultMessage": "Merges into",
-    "description": "HI-2556: a field label in the card dialog: the branch the card’s work is made from and merges into (Darren’s name for it)."
+    "description": "HI-2556: a field label in the card dialog: the branch the card’s work is made from and merges into (the user’s name for it)."
   },
   "board.target.kept": {
     "defaultMessage": "Its work is kept on {branch}: it starts there again, whatever this says.",
@@ -4111,9 +4183,161 @@
     "defaultMessage": "{commits, plural, one {change {change}} other {change {change}, # commits}}",
     "description": "Beside a jj card's revision in the card dialog's Work section (HI-2869): its jj change id (short), and how many commits its submitted work holds when more than one. “change” is jj's term."
   },
+  "board.work.changes": {
+    "defaultMessage": "Changes",
+    "description": "A button in the card dialog's Work section, on a revision (HI-3218): shows the revision's own diff, each file from the submission's base to its revision; a click again hides it."
+  },
+  "board.work.changes.between": {
+    "defaultMessage": "{base} ↔ {revision}",
+    "description": "Beside the file's name above its diff in the card dialog's view of a revision's changes: the two commits compared, the submission's base and its revision (short ids). Keep the arrow."
+  },
+  "board.work.changes.binary": {
+    "defaultMessage": "Binary file: no text to compare.",
+    "description": "In place of a file's diff in the card dialog's view of a revision's changes: the file is binary."
+  },
+  "board.work.changes.failed": {
+    "defaultMessage": "Couldn’t read this file’s changes: {error}",
+    "description": "The card dialog's view of a revision's changes when the chosen file's diff couldn't be read. {error} is why, in the words of the error."
+  },
+  "board.work.changes.files": {
+    "defaultMessage": "Files in this revision",
+    "description": "The accessible name of the list of a revision's files in the card dialog's view of its changes: choosing one shows its diff."
+  },
+  "board.work.changes.inline": {
+    "defaultMessage": "Inline",
+    "description": "A button's tooltip above a file's diff in the card dialog's view of a revision's changes: shows the changes in one column."
+  },
+  "board.work.changes.noRepository": {
+    "defaultMessage": "This project has no repository to read the revision from.",
+    "description": "A card's revision diff couldn't be shown: the card's project has no version control (None)."
+  },
+  "board.work.changes.noRevision": {
+    "defaultMessage": "This submission has no revision to compare: its commits weren't recorded.",
+    "description": "A card's revision diff couldn't be shown: the submission recorded no base or revision commit (a no-code card, or one from before revisions were recorded)."
+  },
+  "board.work.changes.noSubmission": {
+    "defaultMessage": "This card has no such submission.",
+    "description": "A card's revision diff couldn't be shown: the submission it names isn't one of the card's (the card changed meanwhile)."
+  },
+  "board.work.changes.notListed": {
+    "defaultMessage": "{path} isn't one of this submission's files.",
+    "description": "A card's revision diff couldn't be shown: the file isn't among the files the submission changed."
+  },
+  "board.work.changes.openComments": {
+    "defaultMessage": "{n, plural, one {# open comment} other {# open comments}}",
+    "description": "Beside a file in the list of a revision's files in the card dialog (HI-3219): how many of the card's line comments on that file are open."
+  },
+  "board.work.changes.reading": {
+    "defaultMessage": "Reading its changes…",
+    "description": "The card dialog's view of a revision's changes while the chosen file's diff is being read."
+  },
+  "board.work.changes.retry": {
+    "defaultMessage": "Retry",
+    "description": "A button in the card dialog's view of a revision's changes, after a file's diff couldn't be read: reads it again."
+  },
+  "board.work.changes.sideBySide": {
+    "defaultMessage": "Side by side",
+    "description": "A button's tooltip above a file's diff in the card dialog's view of a revision's changes: shows the two versions side by side."
+  },
   "board.work.check": {
     "defaultMessage": "{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}",
     "description": "A check under a revision in the card dialog's Work section: its name (typecheck, as the project names it), then a colon and how it ended; (not counted) when it doesn't count for the revision (its hover says why). Keep the select keys. Glossary: check."
+  },
+  "board.work.churn": {
+    "defaultMessage": "{total, plural, one {# round of back-and-forth} other {# rounds of back-and-forth}}: {failed, plural, =0 {} one {# failed review, } other {# failed reviews, }}{declined, plural, =0 {} one {# declined, } other {# declined, }}{designs, plural, =0 {} one {# design, } other {# designs, }}{followUps, plural, =0 {} one {# follow-up, } other {# follow-ups, }}{requests, plural, =0 {} one {# reviewer request, } other {# reviewer requests, }}{asks, plural, =0 {} one {# question to you} other {# questions to you}}{inherited, plural, =0 {} other {; # from {parent}}}",
+    "description": "HI-3188: tooltip and accessible name of a card's churn count on the board: its counted loop work in all ({total}), then each kind's count (failed reviews, your declines, design steps, follow-up steps, reviewer requests, agents' questions to the user), each left out when 0, and what it inherited from the card it continues ({parent}, a card key). Translate each plural; keep the =0 cases empty."
+  },
+  "board.work.comments.add": {
+    "defaultMessage": "Comment on this line, or on the lines selected",
+    "description": "The tooltip of the + beside a line of a card revision's diff (HI-3219): opens a box to comment on that line, or on the lines selected if it is beside one of them."
+  },
+  "board.work.comments.binary": {
+    "defaultMessage": "Lines of a binary file, or of one too large to compare, can’t be commented on.",
+    "description": "A line comment couldn't be added: the file is binary, or too large for its diff to be shown."
+  },
+  "board.work.comments.cancel": {
+    "defaultMessage": "Cancel",
+    "description": "A button under a line comment being written or edited: drops what was typed."
+  },
+  "board.work.comments.changed": {
+    "defaultMessage": "That comment was changed meanwhile: look at it again.",
+    "description": "A line comment's edit couldn't be saved: someone changed the comment since it was opened for editing."
+  },
+  "board.work.comments.delete": {
+    "defaultMessage": "Delete",
+    "description": "A button on a line comment not yet sent to the card's builder: takes it back."
+  },
+  "board.work.comments.edit": {
+    "defaultMessage": "Edit",
+    "description": "A button on a line comment on a card revision's diff: changes its text."
+  },
+  "board.work.comments.edited": {
+    "defaultMessage": "edited",
+    "description": "A mark beside a line comment's time: its text was changed after it was written."
+  },
+  "board.work.comments.elsewhere": {
+    "defaultMessage": "Comments on the original side (shown side by side)",
+    "description": "A heading above a card revision's diff while it shows inline: the comments on lines of the original file, which the inline diff doesn't show, are listed here; side by side shows them on their lines."
+  },
+  "board.work.comments.empty": {
+    "defaultMessage": "A comment needs some text.",
+    "description": "A line comment on a card's revision diff couldn't be saved: its text is empty."
+  },
+  "board.work.comments.length": {
+    "defaultMessage": "{n, number} / {max, number}",
+    "description": "Under a line comment being written: how many characters it has, of the most it may have."
+  },
+  "board.work.comments.lines": {
+    "defaultMessage": "Lines {from} to {to} aren’t in that side of {path}.",
+    "description": "A line comment couldn't be added: the lines it names ({from} to {to}: line numbers, never formatted as amounts) aren't in that side (the original or the changed version) of the file {path}."
+  },
+  "board.work.comments.noCard": {
+    "defaultMessage": "This card’s work can’t be read, so it can’t take comments.",
+    "description": "A line comment couldn't be saved: the card's work record (its facts) can't be read: a card from before 1.0, or its project has none."
+  },
+  "board.work.comments.noComment": {
+    "defaultMessage": "That comment is no longer on this card.",
+    "description": "A line comment couldn't be changed: it was deleted meanwhile."
+  },
+  "board.work.comments.placeholder": {
+    "defaultMessage": "Comment in Markdown (Ctrl+Enter to save)",
+    "description": "The empty comment box under a line of a card revision's diff: the comment is written in Markdown, and Ctrl+Enter saves it."
+  },
+  "board.work.comments.reopen": {
+    "defaultMessage": "Reopen",
+    "description": "A button on a resolved line comment on a card revision's diff: makes it open again."
+  },
+  "board.work.comments.resolve": {
+    "defaultMessage": "Resolve",
+    "description": "A button on an open line comment on a card revision's diff: marks it dealt with."
+  },
+  "board.work.comments.resolved": {
+    "defaultMessage": "Resolved",
+    "description": "A mark on a line comment on a card revision's diff: it was dealt with."
+  },
+  "board.work.comments.save": {
+    "defaultMessage": "Save",
+    "description": "A button under a line comment being written or edited on a card revision's diff: saves it."
+  },
+  "board.work.comments.sent": {
+    "defaultMessage": "A comment sent to the builder can’t be deleted: resolve it instead.",
+    "description": "A line comment couldn't be deleted: it was already sent to the card's builder, so it can only be resolved. Glossary: builder."
+  },
+  "board.work.comments.tooLong": {
+    "defaultMessage": "A comment can be at most {max, number} characters.",
+    "description": "A line comment on a card's revision diff couldn't be saved: its text is longer than {max} characters."
+  },
+  "board.work.comments.tooMany": {
+    "defaultMessage": "This card has {max, number} open comments already: resolve some first.",
+    "description": "A line comment couldn't be added or reopened: the card already has the most open comments it can have ({max})."
+  },
+  "board.work.comments.where": {
+    "defaultMessage": "{side, select, old {Original} other {Changed}} {from}{same, select, yes {} other {–{to}}}",
+    "description": "Where a line comment is, above it: which side of the diff (old: the original file; other: the changed one) and its line, or its first and last lines (12–14): line numbers, never formatted as amounts. Keep the select keys."
+  },
+  "board.work.comments.you": {
+    "defaultMessage": "You",
+    "description": "Who wrote a line comment on a card revision's diff, when it was the user."
   },
   "board.work.doneUnproved": {
     "defaultMessage": "Done by you, integration not proved ({when}).",
@@ -4179,6 +4403,10 @@
     "defaultMessage": "Not started in {slot} yet: {stale, select, yes {another jj workspace rewrote its working copy, so it is stale. Recover it under Version Control → Slots and copies, and the card is prepared there again.} other {Combwork couldn’t get it ready ({why}).}}",
     "description": "The card dialog's Work section (HI-2913): the card's slot ({slot}, slot-a) couldn't be prepared for its start, so its work hasn't started there. {stale} yes: the slot is a stale jj workspace (another workspace rewrote the commit it works on), which the user mends with Recover… in the Slots and copies list; other: {why} is the reason, in English as its builder was told. Keep the select keys."
   },
+  "board.work.openComments": {
+    "defaultMessage": "{n, plural, one {# open comment} other {# open comments}}",
+    "description": "In the card dialog's Work section (HI-3219): how many of the card's line comments on its revisions' diffs are open, beside the revisions heading and on each revision that has some."
+  },
   "board.work.openFile": {
     "defaultMessage": "Open {path} in Files",
     "description": "Tooltip of a file a revision changed (card dialog's Work section): opens it in the project's Files tab. {path} is the file's path."
@@ -4222,6 +4450,70 @@
   "board.work.round": {
     "defaultMessage": "Round {round, number}",
     "description": "Beside a revision in the card dialog's Work section: the review round it was submitted in (1, 2…)."
+  },
+  "board.work.send.alreadySent": {
+    "defaultMessage": "These comments were sent already.",
+    "description": "Sending a card's line comments was refused: this very send was made already (a second click, or a retry)."
+  },
+  "board.work.send.button": {
+    "defaultMessage": "{n, plural, one {Send # comment to {builder}} other {Send # comments to {builder}}}",
+    "description": "A button in the card dialog's Work section (HI-3220): sends the card's open line comments to its builder ({builder}, an agent's name) as one fix round. Glossary: builder."
+  },
+  "board.work.send.changed": {
+    "defaultMessage": "The card changed since you opened this: look again.",
+    "description": "Sending a card's line comments to its builder was refused: since the preview opened, the card got a new submission, a new decision, or a reviewer started or ended a review."
+  },
+  "board.work.send.editedSince": {
+    "defaultMessage": "edited since sent",
+    "description": "A mark on a line comment in the send dialog: it was sent before, and its text changed since."
+  },
+  "board.work.send.integrated": {
+    "defaultMessage": "This card’s work is merged already: its comments can’t go back to the builder.",
+    "description": "Sending a card's line comments to its builder was refused: the card's work has been merged into its target already."
+  },
+  "board.work.send.intro": {
+    "defaultMessage": "They go to {builder} as one fix round: the card goes back to Doing, and the round counts toward its limit.",
+    "description": "At the top of the dialog sending a card's line comments to its builder ({builder}): what sending does. Glossary: round."
+  },
+  "board.work.send.itemsChanged": {
+    "defaultMessage": "A comment changed since you opened this (edited, resolved or deleted): look again.",
+    "description": "Sending a card's line comments was refused: one of the comments in the preview was edited, resolved or deleted since it opened."
+  },
+  "board.work.send.noBuilder": {
+    "defaultMessage": "This card has no builder to send its comments to.",
+    "description": "Sending a card's line comments was refused: no agent built the card's work (it has no builder). Glossary: builder."
+  },
+  "board.work.send.notHere": {
+    "defaultMessage": "Comments can be sent to the builder from Review or Approved only.",
+    "description": "Sending a card's line comments to its builder was refused: the card is in another column (Doing, Todo, Done…). Glossary: builder."
+  },
+  "board.work.send.nothing": {
+    "defaultMessage": "There are no open comments to send.",
+    "description": "Sending a card's line comments was refused: none of its comments is open."
+  },
+  "board.work.send.reading": {
+    "defaultMessage": "Reading its comments…",
+    "description": "The send dialog while the card's open line comments are read."
+  },
+  "board.work.send.replace": {
+    "defaultMessage": "Replace {reviewer}’s review, which is under way",
+    "description": "A checkbox in the send dialog, shown while a reviewer agent ({reviewer}, its name) is reviewing the card: sending replaces that review, so it must be ticked first."
+  },
+  "board.work.send.reviewing": {
+    "defaultMessage": "{reviewer} is reviewing this card: confirm replacing its review to send your comments.",
+    "description": "Sending a card's line comments was refused: a reviewer agent ({reviewer}, its name) is reviewing the card, and the send replaces that review only once the user confirms it."
+  },
+  "board.work.send.send": {
+    "defaultMessage": "{n, plural, one {Send # comment} other {Send # comments}}",
+    "description": "The send dialog's button: sends this many line comments to the card's builder."
+  },
+  "board.work.send.sentBefore": {
+    "defaultMessage": "sent before",
+    "description": "A mark on a line comment in the send dialog: it was sent to the builder before and is still open, so it goes again."
+  },
+  "board.work.send.title": {
+    "defaultMessage": "Send comments to {builder}",
+    "description": "The title of the dialog that previews sending a card's open line comments to its builder ({builder}, an agent's name)."
   },
   "board.work.staleChange": {
     "defaultMessage": "Stale: the pass was for {approved}; the card is now at {current}.",

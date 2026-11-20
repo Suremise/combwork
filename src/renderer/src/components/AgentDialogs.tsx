@@ -29,6 +29,7 @@ import { MergeSlotNote, projectSlots, useMergeSlots } from './MergeSlots'
 import { confirmLineMerge, LineCardNote, QUEUE_MERGES, QueueCardNote } from './BranchMerge'
 import { pasteIntoTerminal } from './TerminalView'
 import { BusyButton, Icon, Modal, Tooltip, useBusy } from './ui'
+import { gapsLine } from './Clis'
 
 /** Markup in messages (tRich): <code> and <b>, keyed by their text. */
 const CODE = (chunks: ReactNode[]): ReactNode => <code key={String(chunks)}>{chunks}</code>
@@ -628,7 +629,7 @@ export function AgentSettingsDialog() {
         )
       }
       cliLocked={agent.live ? { cli: current, why: tr(msg({ id: 'agents.settings.otherCliStopped', defaultMessage: "Another CLI's connection can be chosen once {agent} is stopped: its conversations stay with {cli}.", description: "Under the connection in Agent Settings of a running agent ({agent}) (HI-2108): only its own CLI's ({cli}: \"Claude Code\") connections are offered while it runs." }), { agent: agent.name, cli: providerDescriptor(current).name }) } : undefined}
-      note={agent.live ? tr(msg({ id: 'agents.settings.appliesNext', defaultMessage: 'Changes apply the next time {agent} starts; the running session keeps its settings until then.', description: 'Under Agent Settings for a running agent ({agent}).' }), { agent: agent.name }) : undefined}
+      note={[agent.live ? tr(msg({ id: 'agents.settings.appliesNext', defaultMessage: 'Changes apply the next time {agent} starts; the running session keeps its settings until then.', description: 'Under Agent Settings for a running agent ({agent}).' }), { agent: agent.name }) : undefined, gapsLine(current)].filter(Boolean).join(' ') || undefined}
       nameProblem={nameProblem}
       confirmSave={async (f) => {
         // Made Independent while on a lane or holding cards (HI-2670): asked first, naming them.
@@ -664,7 +665,7 @@ export function AgentSettingsDialog() {
           confirmed.current
         )
         await actions.refreshWorkspace()
-        // A new role gives it another side's tools (HI-2664, Darren's decision): restarted to load them, at once if it is
+        // A new role gives it another side's tools (HI-2664): restarted to load them, at once if it is
         // idle; busy, asked first (restart when its turn is over, or later: it keeps its old tools until it restarts).
         if (f.workflowRole !== initial.workflowRole) {
           const r = await call('session:restartForTools', project.path, agent.id, 'ifIdle').catch(() => 'same' as const)
@@ -692,7 +693,7 @@ export function AgentSettingsDialog() {
  * or lane's. No connection (HI-2109: the user picks connections when loading it), but the CLI it suggests.
  */
 /**
- * Busy agents whose tools a workflow change changes (HI-2694, Darren's decision: as a role change, HI-2664): asked once
+ * Busy agents whose tools a workflow change changes (HI-2694: as a role change, HI-2664): asked once
  * whether to restart them when their turn is over, in the same conversation, or later (they keep their old tools until
  * they restart, and are given no work that needs the new ones meanwhile). Idle ones were restarted already.
  */

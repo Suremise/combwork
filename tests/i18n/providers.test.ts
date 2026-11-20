@@ -121,8 +121,8 @@ describe('errors thrown at a launch (#842): English for the Agent API, as before
 
 describe("a provider's install info: English for agents and Combwork's own code, the window's language for the window", () => {
   it('reads as before in English', () => {
-    expect(provider('claude-code').readiness(info({ found: false }))).toEqual([{ id: 'not-installed', level: 'error', message: 'Claude Code is not installed.', action: { label: 'Install', task: 'install' } }])
-    expect(provider('codex').readiness(info({ provider: 'codex', loggedIn: false, updateAvailable: true }))).toEqual([
+    expect(provider('claude-code').install.readiness(info({ found: false }))).toEqual([{ id: 'not-installed', level: 'error', message: 'Claude Code is not installed.', action: { label: 'Install', task: 'install' } }])
+    expect(provider('codex').install.readiness(info({ provider: 'codex', loggedIn: false, updateAvailable: true }))).toEqual([
       { id: 'signed-out', level: 'error', message: 'Codex is not signed in.', action: { label: 'Sign in', task: 'login' } },
       { id: 'update', level: 'info', message: 'Codex 2.2.0 is available.', action: { label: 'Update', task: 'update' } }
     ])
@@ -147,7 +147,7 @@ describe("a provider's install info: English for agents and Combwork's own code,
     const off = onCombworkEvent((e) => void seen.push(e as never))
     try {
       // As a detection leaves it: English.
-      ;(providerService as unknown as { infos: Map<string, Info> }).infos.set('codex', info({ provider: 'codex', readiness: provider('codex').readiness(info({ provider: 'codex', found: false })) }))
+      ;(providerService as unknown as { infos: Map<string, Info> }).infos.set('codex', info({ provider: 'codex', readiness: provider('codex').install.readiness(info({ provider: 'codex', found: false })) }))
       setLanguage(PSEUDO_LANGUAGE, {})
       const sent = seen.find((e) => e.type === 'provider-install' && e.info?.provider === 'codex')
       expect(sent?.info?.readiness?.[0].message).toMatch(PSEUDO)
@@ -227,11 +227,11 @@ describe('the rest of the area', () => {
     expect([stray.title, stray.message].every((t) => PSEUDO.test(t))).toBe(true)
     expect(stray.message).toContain(join(folder, '.codex'))
     const copilot = provider('copilot')
-    expect(copilot.launchNotice?.({ permissionMode: 'accept-edits', cwd: 'C:\\a (b)' } as never)?.title).toMatch(PSEUDO)
+    expect(copilot.launch.launchNotice?.({ permissionMode: 'accept-edits', cwd: 'C:\\a (b)' } as never)?.title).toMatch(PSEUDO)
     for (const id of ['claude-code', 'codex', 'copilot'] as const) {
       const p = provider(id)
-      expect(p.startHint?.('error: unknown model "x" not found')?.hint, id).toMatch(PSEUDO)
-      expect(p.exportSubtitle('s1', 'site'), id).toMatch(PSEUDO)
+      expect(p.launch.startHint?.('error: unknown model "x" not found')?.hint, id).toMatch(PSEUDO)
+      expect(p.transcript?.exportSubtitle('s1', 'site'), id).toMatch(PSEUDO)
     }
     expect(problems).toEqual([])
   })

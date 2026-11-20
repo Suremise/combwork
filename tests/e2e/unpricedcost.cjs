@@ -18,12 +18,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 10000) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+const until = lib.until
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
@@ -51,19 +46,18 @@ const until = async (fn, ms = 10000) => {
   const key = lib.ptyKey(alpha, agent.id)
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
-  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', 20000)))
-  await inv('pty:write', key, 'hello')
-  await lib.sleep(100)
-  await inv('pty:write', key, '\r')
-  check('it answers', !!(await until(async () => (await live())?.status === 'finished', 10000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
+  await lib.typeThenEnter(inv, key, 'hello')
+  check('it answers', !!(await until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))))
 
   // --- The agent's footer: $?, saying which model has no price and where to add one.
   const footer = page.locator('.pane-footer-bar').first()
   const unknown = footer.locator('.pane-foot-item', { hasText: '$?' })
-  check('footer: the cost is $?', !!(await until(() => unknown.isVisible().catch(() => false), 10000)), await footer.innerText().catch(() => ''))
+  check('footer: the cost is $?', !!(await until(() => unknown.isVisible().catch(() => false), lib.timing('hang.ui'))), await footer.innerText().catch(() => ''))
   await unknown.hover()
   const tip = page.locator('.tip', { hasText: 'claude-fake' }).last()
-  check('…naming the model and API prices on hover', !!(await until(async () => /no API price for claude-fake.*API prices/s.test((await tip.innerText().catch(() => '')) || ''), 5000)))
+  check('…naming the model and API prices on hover', !!(await until(async () => /no API price for claude-fake.*API prices/s.test((await tip.innerText().catch(() => '')) || ''), lib.timing('hang.ui'))))
   check('footer: never $0', !/\$0\.00/.test(await footer.innerText()))
   await page.mouse.move(0, 0)
   await page.screenshot({ path: path.join(lib.WORK, 'unpricedcost-1-footer.png') })
@@ -72,15 +66,15 @@ const until = async (fn, ms = 10000) => {
   await page.locator('.tab', { hasText: 'Overview' }).click()
   const costCards = page.locator('.card', { has: page.locator('h3', { hasText: 'API-equivalent cost' }) })
   const values = async () => (await costCards.locator('.value').allInnerTexts().catch(() => [])).map((s) => s.trim())
-  check('Overview: every cost card says Unknown', !!(await until(async () => (await values()).length >= 3 && (await values()).every((v) => v === 'Unknown'), 10000)), JSON.stringify(await values()))
+  check('Overview: every cost card says Unknown', !!(await until(async () => (await values()).length >= 3 && (await values()).every((v) => v === 'Unknown'), lib.timing('hang.ui'))), JSON.stringify(await values()))
   check('…none says $0.00', !(await values()).some((v) => v.includes('$0')))
   const running = page.locator('.running-row').first()
-  check('Running now: Unknown', !!(await until(async () => /Unknown/.test(await running.innerText().catch(() => '')), 5000)), await running.innerText().catch(() => ''))
+  check('Running now: Unknown', !!(await until(async () => /Unknown/.test(await running.innerText().catch(() => '')), lib.timing('hang.ui'))), await running.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'unpricedcost-2-overview.png') })
 
   // --- The Workspace Overview: its summary, the project's row and the provider's card.
   await page.keyboard.press('Control+Shift+O')
-  check('Workspace Overview: its cost cards say Unknown', !!(await until(async () => (await page.locator('h1', { hasText: 'Workspace Overview' }).count()) === 1 && (await values()).length >= 2 && (await values()).every((v) => v === 'Unknown'), 10000)), JSON.stringify(await values()))
+  check('Workspace Overview: its cost cards say Unknown', !!(await until(async () => (await page.locator('h1', { hasText: 'Workspace Overview' }).count()) === 1 && (await values()).length >= 2 && (await values()).every((v) => v === 'Unknown'), lib.timing('hang.ui'))), JSON.stringify(await values()))
   const row = page.locator('.ws-projects tbody tr', { hasText: 'alpha' })
   check("…and the project's row", /Unknown/.test(await row.innerText().catch(() => '')) && !/\$0\.00/.test(await row.innerText().catch(() => '')), await row.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'unpricedcost-3-workspace.png') })
@@ -91,22 +85,22 @@ const until = async (fn, ms = 10000) => {
   await page.reload()
   await lib.appReady(page)
   await page.locator('.tab', { hasText: 'Overview' }).click()
-  check('priced: the cost cards show an estimate', !!(await until(async () => (await values()).length >= 3 && (await values()).every((v) => /^≈\s\$\d/.test(v)), 15000)), JSON.stringify(await values()))
-  check('…and Running now', !!(await until(async () => /≈\s\$\d/.test(await running.innerText().catch(() => '')), 10000)), await running.innerText().catch(() => ''))
+  check('priced: the cost cards show an estimate', !!(await until(async () => (await values()).length >= 3 && (await values()).every((v) => /^≈\s\$\d/.test(v)), lib.timing('hang.ui'))), JSON.stringify(await values()))
+  check('…and Running now', !!(await until(async () => /≈\s\$\d/.test(await running.innerText().catch(() => '')), lib.timing('hang.ui'))), await running.innerText().catch(() => ''))
   await page.locator('.tab', { hasText: 'Session' }).first().click()
-  check('…and the footer', !!(await until(async () => /≈\$\d/.test(await footer.innerText().catch(() => '')) && !(await unknown.count()), 10000)), await footer.innerText().catch(() => ''))
+  check('…and the footer', !!(await until(async () => /≈\$\d/.test(await footer.innerText().catch(() => '')) && !(await unknown.count()), lib.timing('hang.ui'))), await footer.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'unpricedcost-4-priced.png') })
 
   // --- A click on the cost opens the Overview at this session's details, its agent picked (#122); its tooltip says so.
   const cost = footer.locator('.foot-cost')
   await cost.hover()
   const costTip = page.locator('.tip', { hasText: 'API-equivalent cost' }).last()
-  check("the cost's tooltip ends with what a click does", !!(await until(async () => ((await costTip.innerText().catch(() => '')) || '').endsWith("\n\nClick to see this session's details in the Overview"), 5000)), await costTip.innerText().catch(() => ''))
+  check("the cost's tooltip ends with what a click does", !!(await until(async () => ((await costTip.innerText().catch(() => '')) || '').endsWith("\n\nClick to see this session's details in the Overview"), lib.timing('hang.step'))), await costTip.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'unpricedcost-5-cost-tip.png') })
   await cost.click()
   const head = page.locator('.session-head')
-  check('a click opens the Overview', !!(await until(async () => (await page.locator('.tab.active', { hasText: 'Overview' }).count()) === 1, 5000)))
-  check("…at this session's details, in view (its agent picked when there are several)", !!(await until(async () => (await head.count()) === 1 && (await head.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight - 100 })), 5000)) && ((await head.locator('select').count()) === 0 || (await head.locator('select').inputValue()) === agent.id), await head.innerText().catch(() => ''))
+  check('a click opens the Overview', !!(await until(async () => (await page.locator('.tab.active', { hasText: 'Overview' }).count()) === 1, lib.timing('hang.ui'))))
+  check("…at this session's details, in view (its agent picked when there are several)", !!(await until(async () => (await head.count()) === 1 && (await head.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight - 100 })), lib.timing('hang.step'))) && ((await head.locator('select').count()) === 0 || (await head.locator('select').inputValue()) === agent.id), await head.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'unpricedcost-6-session.png') })
 
   // --- HI-2675: a session on two models, one without a price, shows the known part + ?, never the rest as $0. The fake
@@ -120,12 +114,12 @@ const until = async (fn, ms = 10000) => {
   check('two models: the fake takes the prompt', typed.attempt > 0, JSON.stringify(typed.lost))
   // "≈ $1.20 + ?", or "≈ < $0.01 + ?" for the fake's few tokens; never $0.00.
   const part = /^[^$]*≈\s?(<\s?)?\$(?!0\.00\b)\d[\d.,]*\s\+\s\?/
-  check('two models: the live cost is an estimate, priced in part', !!(await until(async () => { const l = await live(); return l?.costEstimated && l.costUnpriced && l.costUsd > 0 }, 20000)), JSON.stringify(await live().then((l) => ({ costUsd: l?.costUsd, costEstimated: l?.costEstimated, costUnpriced: l?.costUnpriced }))))
-  check('…the footer: the known part + ?', !!(await until(async () => part.test(await footer.locator('.foot-cost').innerText().catch(() => '')), 10000)), await footer.innerText().catch(() => ''))
+  check('two models: the live cost is an estimate, priced in part', !!(await until(async () => { const l = await live(); return l?.costEstimated && l.costUnpriced && l.costUsd > 0 }, lib.timing('hang.ui'))), JSON.stringify(await live().then((l) => ({ costUsd: l?.costUsd, costEstimated: l?.costEstimated, costUnpriced: l?.costUnpriced }))))
+  check('…the footer: the known part + ?', !!(await until(async () => part.test(await footer.locator('.foot-cost').innerText().catch(() => '')), lib.timing('hang.ui'))), await footer.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'unpricedcost-7-part-footer.png') })
   await page.locator('.tab', { hasText: 'Overview' }).click()
-  check('…Running now: the known part + ?', !!(await until(async () => part.test(await running.innerText().catch(() => '')), 10000)), await running.innerText().catch(() => ''))
-  check("…the Overview's cost cards: the known part + ?, none $0", !!(await until(async () => (await values()).length >= 3 && (await values()).every((v) => part.test(v)), 10000)), JSON.stringify(await values()))
+  check('…Running now: the known part + ?', !!(await until(async () => part.test(await running.innerText().catch(() => '')), lib.timing('hang.ui'))), await running.innerText().catch(() => ''))
+  check("…the Overview's cost cards: the known part + ?, none $0", !!(await until(async () => (await values()).length >= 3 && (await values()).every((v) => part.test(v)), lib.timing('hang.ui'))), JSON.stringify(await values()))
   await page.screenshot({ path: path.join(lib.WORK, 'unpricedcost-8-part-overview.png') })
 
   await inv('session:stop', alpha, agent.id).catch(() => undefined)

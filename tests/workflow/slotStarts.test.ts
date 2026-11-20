@@ -7,6 +7,8 @@ import { B1, commit, moved, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { lineName, slugOf, type SlotForStart } from '../../src/main/workflow/runtime'
 import { tempDir } from '../tempDir'
+import { platformLimits } from '../../src/main/platform/limits'
+import { gitTestHooks } from '../../src/main/git'
 import { reconcile, slotPreparationOwed } from '../../src/main/workflow/reconcile'
 import type { FactData } from '../../src/shared/workflow/facts'
 import { GUARD_FNS, type GuardInputs } from '../../src/shared/workflow/guards'
@@ -355,7 +357,19 @@ describe('a slotted card whose target follows its remote (G21, HI-1183)', () => 
   it('starts from the remote’s head (fetched, never the local one), pinned until its line holds it', async () => {
     const { e, bare } = following(true)
     const card = e.wf.createCard({ title: 'From the remote' })
-    moved(await e.wf.start(card.key, B1))
+    // HI-3372: its fetch bounded by cw.queue.networkMinutes as main sets it (a value of the test's own, seen at git's start).
+    const fetches: (number | undefined)[] = []
+    const was = platformLimits.queueNetworkMs
+    platformLimits.queueNetworkMs = () => 4_321_000
+    gitTestHooks.started = (_cwd, args, timeout) => void (args.includes('fetch') && fetches.push(timeout))
+    try {
+      moved(await e.wf.start(card.key, B1))
+    } finally {
+      platformLimits.queueNetworkMs = was
+      gitTestHooks.started = undefined
+    }
+    expect(fetches.length).toBeGreaterThan(0)
+    expect(fetches.every((t) => t === 4_321_000)).toBe(true)
     const remote = sh(bare, 'rev-parse', 'main')
     expect(remote).not.toBe(sh(e.project, 'rev-parse', 'main'))
     expect(e.wf.state(card).started?.base).toBe(remote)

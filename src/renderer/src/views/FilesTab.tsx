@@ -1287,7 +1287,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
                 {formatLongDay(a.modified)}
               </div>
             ) : null
-            const label = g.provider ? attachmentLabel(a.kind, providerDescriptor(g.provider).capabilities.attachments, providerDescriptor(g.provider).name) : null
+            const label = g.provider ? attachmentLabel(a.kind, providerDescriptor(g.provider).capabilities.terminal?.attachments ?? [], providerDescriptor(g.provider).name) : null
             const tile = (
               <Tooltip key={a.path} content={`${a.name} · ${attachmentTime(a)} · ${formatBytes(a.size)}${label ? `\n${label.detail}` : ''}`}>
                 <div
@@ -1446,7 +1446,7 @@ const cardViewed = (a: CardAttachment): Viewed => ({ path: a.path, name: a.name,
 /**
  * The attachment viewer (pane and card attachments alike, HI-1958): the one shown, arrows through the others shown,
  * and its actions. An image or a PDF opens in its app; any other kind is shown in its folder, never opened (#387:
- * nothing attached is ever run; Darren's decision on HI-1958). `remove`: its label (Delete, Remove from Card) and why it
+ * nothing attached is ever run; HI-1958). `remove`: its label (Delete, Remove from Card) and why it
  * can't be now, or null.
  */
 function AttachmentViewer<T>({

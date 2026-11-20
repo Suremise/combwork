@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { PREFERENCE_DEFAULTS } from '../src/shared/workflow/preferences'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-wfservice-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -24,7 +25,7 @@ const { observer } = await import('../src/main/platform/observe')
 const { isUnknown } = await import('../src/main/platform/types')
 
 /** The bound for a hung run: the watcher's events and the folder settling come well within it. */
-const HUNG_MS = 20_000
+const HUNG_MS = timing('wait.hang')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []

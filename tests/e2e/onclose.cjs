@@ -12,7 +12,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'onclose-profile')
 const wsA = path.join(lib.WORK, 'onclose-ws-a')
@@ -210,7 +210,7 @@ async function shots(page, name) {
   await page.keyboard.press('Escape')
   check('…which closes it', !!(await lib.until(async () => !(await about.isVisible().catch(() => false)), HUNG_MS)))
 
-  // --- 2c. The saving step (Darren's decisions, 28 Oct ~14:15 and ~15:30): no timer; the panel says it waits for the
+  // --- 2c. The saving step (decided): no timer; the panel says it waits for the
   // workspace to finish saving, and Skip the command there means the command never runs (the close itself finishing).
   await lib.openWorkspace(inv, page, wsB)
   await saveClose(inv, command('b-held', 'quick'))

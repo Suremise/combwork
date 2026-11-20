@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-assistantmcp-')
 const profile = join(base, 'profile')
@@ -145,7 +146,7 @@ describe("the Assistant's MCP servers move from the old Advanced switch (HI-1472
     }
     const opening = w.open(ws)
     try {
-      await vi.waitFor(() => expect(entered).toBe(true), { timeout: 15000 })
+      await vi.waitFor(() => expect(entered).toBe(true), { timeout: timing('wait.hang') })
       // Started while the move is held: without waiting for it, it would read no choices and give none.
       const launch = assistantGets(w)
       release()

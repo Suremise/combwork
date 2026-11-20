@@ -13,17 +13,18 @@ const { execFile } = require('child_process')
 const { lstatSync } = require('fs')
 const { join } = require('path')
 const os = require('os')
+const { timing } = require('../timing.cjs')
 
 const WSB = join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WindowsApps', 'wsb.exe')
 const STOP_ATTEMPTS = 3
-const STOP_RETRY_MS = Number(process.env.WSB_STOP_RETRY_MS || 3000)
+const STOP_RETRY_MS = Number(process.env.WSB_STOP_RETRY_MS || timing('sandbox.stopRetryMs'))
 // Ids are GUIDs; checked before an id goes into a command line.
 const ID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
 
 const command = () => (process.env.WSB_STUB ? { file: process.execPath, pre: [process.env.WSB_STUB] } : { file: WSB, pre: [] })
 
 /** Runs wsb with --raw; resolves { code, json, stdout, stderr }. Never rejects. */
-function wsb(args, timeoutMs = 120_000) {
+function wsb(args, timeoutMs = timing('spawn.hang')) {
   const { file, pre } = command()
   return new Promise(resolve => {
     execFile(file, [...pre, ...args, '--raw'], { timeout: timeoutMs, windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -37,7 +38,7 @@ function wsb(args, timeoutMs = 120_000) {
 
 /** Ids of the running Sandboxes. Throws unless list succeeded with the expected shape: unknown is never "none". */
 async function list() {
-  const r = await wsb(['list'], 60_000)
+  const r = await wsb(['list'], timing('spawn.hang'))
   const envs = r.json?.WindowsSandboxEnvironments
   if (r.code !== 0 || !Array.isArray(envs) || envs.some(e => typeof e?.Id !== 'string' || !e.Id)) {
     throw new Error(`wsb list failed or replied unexpectedly (exit ${r.code}): ${(r.stderr || r.stdout || 'no output').slice(0, 300)}`)
@@ -53,7 +54,7 @@ async function stopConfirmed(id, { attempts = STOP_ATTEMPTS, retryMs = STOP_RETR
   if (!ID_RE.test(id)) return { ok: false, attempts: [{ error: `not a Sandbox id: ${id}` }] }
   const tries = []
   for (let n = 1; n <= attempts; n++) {
-    const r = await wsb(['stop', '--id', id], 120_000)
+    const r = await wsb(['stop', '--id', id], timing('spawn.hang'))
     const t = { code: r.code, stderr: r.stderr ? r.stderr.slice(0, 300) : undefined, gone: false }
     try { t.gone = !(await list()).includes(id) } catch (e) { t.listError = e.message }
     tries.push(t)

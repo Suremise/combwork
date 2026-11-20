@@ -77,6 +77,8 @@ const PASS_ENV = {
   CW_TEST_CLAUDE_HOME: 'another Claude Code test home (CLAUDE_TEST_HOME above)',
   CW_TEST_QUIET: '0 shows the test copies of Combwork (taking focus, notifying), to watch a run',
   CW_TEST_PROGRESS_TIMINGS: "where the Progress panel's suite timings are kept (tests/progressReport.mts)",
+  CW_TEST_TIMING: 'a JSON file of test timings merged over tests/timing.json by name (HI-3378: to tighten or loosen a wait in one place)',
+  CW_TEST_TIMING_SCALE: "a factor for tests/timing.json's hang values alone (HI-3378: a slow machine)",
   CW_PROGRESS_CHECK_DEV: "1: packaged-progress checks the dev build's cw-progress",
   CW_SIGN_CHECK_DEV: "1: packaged-sign checks the dev build's cw-sign (HI-2867)",
   CW_EXE: 'plan and lib.launch run this packaged Combwork executable instead of the dev build (the queue suites on a packaged build, #1578)',

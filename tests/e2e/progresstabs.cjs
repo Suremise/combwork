@@ -13,7 +13,7 @@ const { createHash } = require('crypto')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47842))
 const userData = path.join(lib.WORK, 'progresstabs-profile')
@@ -430,7 +430,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     await app.close().catch(() => undefined)
   }
 
-  // --- HI-1701: Today by card. A third launch with a busy Today kept, like Darren's (26 Oct): a heading per card, the
+  // --- HI-1701: Today by card. A third launch with a busy Today kept, like the user's: a heading per card, the
   // card with the newest run first and Other last; every card's runs shown, none folded (HI-1925: a line per run, only
   // its details folded); a line per run (who, what, how long), the card's key not repeated, review copies' names only in the
   // hover, retries folded with a failure-aware icon and the merge queue's checks in one line; the filters filter runs
@@ -534,8 +534,8 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
       // The runs are docked at the bottom (HI-1925), where the window's notices show: those first.
       // Each click is bounded like the hover (HI-2703): a notice whose button can't be clicked
       // held click()'s default 30 s, the whole of this wait, so the hover never came.
-      for (const x of await page.locator('.toasts button[aria-label="Dismiss"]').all()) await x.click({ timeout: 2000 }).catch(() => undefined)
-      await reviewRow.hover({ timeout: 2000 }).catch(() => undefined)
+      for (const x of await page.locator('.toasts button[aria-label="Dismiss"]').all()) await x.click({ timeout: lib.timing('poll.clickMs') }).catch(() => undefined)
+      await reviewRow.hover({ timeout: lib.timing('poll.clickMs') }).catch(() => undefined)
       return false
     }, HUNG_MS)), await tipText())
     await page.mouse.move(5, 5)

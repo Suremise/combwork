@@ -23,10 +23,6 @@
     "defaultMessage": "Adds {file} to the workspace (.combwork/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Assistant’s view, or Add to… here. It runs:",
     "description": "Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .combwork/mcp as it is; \"MCP tab\" and \"Add to…\" as Combwork shows them."
   },
-  "mcp.addFile.replaceDetailAdded": {
-    "defaultMessage": "Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Assistant that had the old one lose it. Or choose another name.",
-    "description": "When a server of that name exists, under Replace or Choose Another Name (HI-2059)."
-  },
   "mcp.catalog.allSources": {
     "defaultMessage": "All sources",
     "description": "The Catalogue's source picker (HI-545): every catalogue."
@@ -50,6 +46,10 @@
   "mcp.catalog.badgeUpdate": {
     "defaultMessage": "Update to {version}",
     "description": "A badge on a catalogue server (HI-545): a newer version is available."
+  },
+  "mcp.catalog.cancelDownload": {
+    "defaultMessage": "Cancel download",
+    "description": "A catalogue server's view (HI-545, HI-3377), in place of Install… or Update… while its download runs: stops the download; nothing is installed."
   },
   "mcp.catalog.cantRun": {
     "defaultMessage": "This PC doesn't meet a requirement above, so it can't be installed.",
@@ -159,6 +159,10 @@
     "defaultMessage": "Installed: {version}",
     "description": "A catalogue server's view (HI-545): the version installed."
   },
+  "mcp.catalog.installedKept": {
+    "defaultMessage": "It replaced the server of that name, and stays added where that one was.",
+    "description": "Under \"Installed {name}\" (HI-3327): the catalogue server replaced one of the same name, and the projects (and the Assistant) that had it keep it."
+  },
   "mcp.catalog.installedNext": {
     "defaultMessage": "It runs nowhere yet: Add to… in its view adds it to the projects (and the Assistant) that need it.",
     "description": "Under \"Installed {name}\" (HI-545): what to do next. Add to… is the button in the server's view in the MCP view."
@@ -202,6 +206,10 @@
   "mcp.catalog.ok": {
     "defaultMessage": "Met",
     "description": "A requirement's state in a catalogue server's view (HI-545), for screen readers."
+  },
+  "mcp.catalog.otherDownload": {
+    "defaultMessage": "Downloading {name}: one server downloads at a time.",
+    "description": "A catalogue server's view (HI-545, HI-3377) while another server's download for Install or Update runs: this one's Install… and Update… wait. {name} is the server downloading; Cancel download stops it."
   },
   "mcp.catalog.pick": {
     "defaultMessage": "Select a server in the Catalogue to see what it needs and install it.",
@@ -250,6 +258,10 @@
   "mcp.catalog.sourceUrl": {
     "defaultMessage": "A catalogue is an https:// or file:// address of its catalog.json.",
     "description": "An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the address is neither."
+  },
+  "mcp.catalog.stalled": {
+    "defaultMessage": "{url} stopped sending (nothing received for {seconds, number} s).",
+    "description": "An error downloading a server from an MCP catalogue (HI-545, HI-3377): no data arrived for the time Settings → Advanced allows; a slow download that keeps receiving is never stopped."
   },
   "mcp.catalog.timeout": {
     "defaultMessage": "{url} took too long (over {seconds, number} s).",
@@ -326,6 +338,10 @@
   "mcp.error.noServerAdd": {
     "defaultMessage": "The workspace has no MCP server named {name}.",
     "description": "An error adding a server to a project or the Combwork Assistant. {name} is its name."
+  },
+  "mcp.error.placesChanged": {
+    "defaultMessage": "Where {name} is added changed while you were replacing it, so nothing was changed: look again.",
+    "description": "An error replacing an MCP server (HI-3327): a project (or the Combwork Assistant) gained or lost the server after the Replace question showed where it is added (those places keep it), so nothing was written. {name} is the server."
   },
   "mcp.import.added": {
     "defaultMessage": "Added to {project} for new sessions.",
@@ -430,6 +446,18 @@
   "mcp.places.title": {
     "defaultMessage": "Add {name} to…",
     "description": "Title of the dialog in the MCP view (HI-2059) that chooses the projects, and the Combwork Assistant, an MCP server is added to. {name} is the server."
+  },
+  "mcp.replace.detailKept": {
+    "defaultMessage": "Replace moves the old one (and the folder of one added from a .zip) to the Recycle Bin. Sessions running it get the new one when they restart. Or choose another name.",
+    "description": "When a server of that name exists, under Replace or Choose Another Name (HI-3327): what Replace does with the old server; the places it is added keep it."
+  },
+  "mcp.replace.messageChanged": {
+    "defaultMessage": "The workspace has a server named {name}. {where}: those places keep it. What it runs changes (− now, + after):",
+    "description": "The question when the workspace already has an MCP server of that name (HI-3327), above the lines of what it runs that change. {where} says where it is added (\"Added in demo\", \"Not added anywhere\"): replacing it keeps it there."
+  },
+  "mcp.replace.messageSame": {
+    "defaultMessage": "The workspace has a server named {name}. {where}: those places keep it. What it runs stays the same.",
+    "description": "The question when the workspace already has an MCP server of that name (HI-3327) and the new one runs the same command. {where} says where it is added (\"Added in demo\", \"Not added anywhere\"): replacing it keeps it there."
   },
   "mcp.tab.hintAdded": {
     "defaultMessage": "The workspace's MCP servers this project's agents get. Add one from the workspace's servers; Remove takes it off this project only.",

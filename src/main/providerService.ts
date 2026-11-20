@@ -1,8 +1,9 @@
 import { homedir } from 'os'
+import { existsSync } from 'original-fs'
 import { app } from 'electron'
 import type { AccountModels, AgentInstallInfo, ModelCatalog, ProviderId, ProviderTask } from '../shared/types'
 import { cachedCatalogFor, observedEffortKey } from '../shared/models'
-import { autoProviderPending, isProviderEnabled, providerSettings, setInstalledCheck } from '../shared/providers'
+import { autoProviderPending, isProviderEnabled, providerSettings, setInstalledCheck, signInConnections } from '../shared/providers'
 import { ptyArgs, shownInstallInfo, toSpawnable, withoutAccountEnv, withServerEnv } from './providers/common'
 import { allProviders, provider } from './providers'
 import type { CommandSpec, KeySteps, UpdateRetry } from './providers/types'
@@ -14,7 +15,7 @@ import { overrides } from './advancedValues'
 import { overrideId } from '../shared/advanced'
 import { noteCliFolder, refreshPath } from './freshPath'
 import { emit, onCombworkEvent, toast } from './events'
-import { createLogger } from './logger'
+import { createLogger, userText } from './logger'
 import { childEnv, hasPty, killPty, spawnPty, startSize, writePty } from './ptyHost'
 import { judgeStayed, type StayedRecord, type UpdateExpectation } from './updateStayed'
 import { connectionsManaged } from './connectionSeam'
@@ -54,6 +55,18 @@ const blank = (id: ProviderId): AgentInstallInfo => ({
   readiness: []
 })
 
+/**
+ * Tests only (unpackaged builds, HI-3442): CW_TEST_HOLD_DETECT="claude-code=<file>" holds that provider's detection while
+ * the file exists, so a suite keeps it "still looking" for as long as its checks need it, whatever the machine's load
+ * (CW_TEST_SLOW_DETECT's fixed time ran out under load).
+ */
+async function heldDetection(id: ProviderId): Promise<void> {
+  const file = app.isPackaged ? undefined : (process.env.CW_TEST_HOLD_DETECT ?? '').split(',').find((x) => x.startsWith(`${id}=`))?.slice(id.length + 1)
+  if (!file || !existsSync(file)) return
+  log.info(`${id}: its detection is held while a test's file exists`)
+  while (existsSync(file)) await new Promise((r) => setTimeout(r, 50))
+}
+
 /** Tracks each provider's installed CLI and runs its install, update, sign-in and setup tasks in visible terminals. */
 class ProviderService {
   private infos = new Map<ProviderId, AgentInstallInfo>(allProviders().map((p) => [p.id, blank(p.id)]))
@@ -85,7 +98,7 @@ class ProviderService {
    */
   private resolveDefaultModel(id: ProviderId, catalog?: ModelCatalog | null): string | null {
     // Its connections' settings are each their own (HI-1755: a launch reads its connection's); ~/.claude's isn't theirs.
-    const own = connectionsManaged(id) ? null : provider(id).configuredDefaultModel()
+    const own = connectionsManaged(id) ? null : provider(id).models?.configuredDefaultModel()
     return own ?? catalog?.defaultModel ?? config.get().observedDefaultModel[id] ?? null
   }
 
@@ -114,7 +127,7 @@ class ProviderService {
     // A CLI whose catalogue depends on a context (HI-2779: its GitHub host and sign-in): only the one read in the context
     // it has now, never another host's or account's; none known now (a check after a change), none.
     const adapter = provider(id)
-    return cachedCatalogFor(config.get().modelCatalogs?.[id], version, adapter.catalogContext ? adapter.catalogContext() : undefined)
+    return cachedCatalogFor(config.get().modelCatalogs?.[id], version, adapter.install.catalogContext ? adapter.install.catalogContext() : undefined)
   }
 
   /**
@@ -131,7 +144,7 @@ class ProviderService {
 
   /** Records the model seen answering in a session started without a model choice. */
   observeDefaultModel(id: ProviderId, model: string): void {
-    if (!provider(id).ownsModel(model) || config.get().observedDefaultModel[id] === model) return
+    if (!provider(id).models?.ownsModel(model) || config.get().observedDefaultModel[id] === model) return
     config.update((c) => {
       c.observedDefaultModel = { ...c.observedDefaultModel, [id]: model }
     })
@@ -261,22 +274,23 @@ class ProviderService {
       // Tests only (unpackaged builds): CW_TEST_SLOW_DETECT="claude-code=6000" holds that provider's detection (#506).
       const slow = app.isPackaged ? 0 : Number((process.env.CW_TEST_SLOW_DETECT ?? '').split(',').find((x) => x.startsWith(`${id}=`))?.slice(id.length + 1) ?? 0)
       if (slow > 0) await new Promise((r) => setTimeout(r, slow))
-      const found = await adapter.locate()
+      await heldDetection(id)
+      const found = await adapter.install.locate()
       // Its folder on the PATH of what Combwork starts, so its sessions and terminals find the CLI Provider Setup found (#1103).
       if (this.refreshes.get(id) === run) noteCliFolder(id, found.path)
       // Found is known before its version, models and sign-in are: Automatic's pick needs only that (#506).
       if (found.path && this.refreshes.get(id) === run && !this.info(id).found) this.set(id, { ...this.info(id), found: true, path: found.path })
       // What the found copy's own installer can deliver (HI-2729): a WinGet install's from WinGet, not npm.
-      const latest = latestWanted ? await adapter.latestVersion(found.path) : prev.latestVersion
+      const latest = latestWanted ? await adapter.install.latestVersion(found.path) : prev.latestVersion
       // The version this release was tested with, against the installed one (#365).
       const tested = await testedVersion(id)
       // The CLI's own models and what each can do, so new models show without a Combwork update (#125). If it can't say,
       // its last good answer for this version, else none (the pickers then use the fallbacks in Settings).
-      const read = found.path && adapter.listModels ? await adapter.listModels(found.path, childEnv()).catch(() => null) : null
+      const read = found.path && adapter.models?.listModels ? await adapter.models?.listModels(found.path, childEnv()).catch(() => null) : null
       let catalog: ModelCatalog | null = null
       if (read) {
         // Read in its context (HI-2779), kept with it: a cached catalogue is used again only there.
-        const context = adapter.catalogContext?.() ?? null
+        const context = adapter.install.catalogContext?.() ?? null
         catalog = { source: 'cli', version: found.version, models: read.models, ...(read.defaultModel ? { defaultModel: read.defaultModel } : {}), at: new Date().toISOString(), ...(context ? { context } : {}) }
         const keep = catalog
         // Only the latest refresh's answer is kept (an older one still running mustn't replace a newer one's).
@@ -286,28 +300,28 @@ class ProviderService {
           })
       } else {
         catalog = this.cachedCatalog(id, found.version)
-        if (found.path && adapter.listModels) log.warn(`${adapter.descriptor.name} ${found.version ?? ''} didn't say which models it has: ${catalog ? 'using its last answer' : 'using the fallback list'}`)
+        if (found.path && adapter.models?.listModels) log.warn(`${adapter.descriptor.name} ${found.version ?? ''} didn't say which models it has: ${catalog ? 'using its last answer' : 'using the fallback list'}`)
       }
       next = {
         ...found,
         provider: id,
         defaultModel: this.resolveDefaultModel(id, catalog),
         latestVersion: latest,
-        updateAvailable: !!(found.version && latest && adapter.isNewer(latest, found.version)),
+        updateAvailable: !!(found.version && latest && adapter.install.isNewer(latest, found.version)),
         catalog,
         // Each account's kept catalogue for this version (HI-2852) until its own read, started below, lands.
         accountCatalogs: this.accountModels?.cached(id, found.version),
-        configuredEffort: adapter.configuredDefaultEffort?.() ?? null,
+        configuredEffort: adapter.models?.configuredDefaultEffort?.() ?? null,
         observedEfforts: this.observedEfforts(id),
-        tested: tested ? compareTested(tested, found.version, (a, b) => adapter.isNewer(a, b)) : null,
+        tested: tested ? compareTested(tested, found.version, (a, b) => adapter.install.isNewer(a, b)) : null,
         checking: false
       }
       // A CLI an organisation can govern remotely, staying on its version after an update (HI-2777): Provider Setup says a
       // policy may decide it rather than offer the same update as if nothing happened.
-      if (adapter.descriptor.capabilities.remoteHookPolicy) {
+      if (adapter.descriptor.capabilities.hooks?.remoteHookPolicy) {
         const expect = this.updateExpect.get(id) ?? null
         if (expect && !hasPty(`task:${id}:update`)) this.updateExpect.delete(id)
-        const stayed = judgeStayed({ expect: hasPty(`task:${id}:update`) ? null : expect, prev: { path: prev.path, version: prev.version }, next: { path: found.path, version: found.version, latest }, held: this.stayed.get(id) ?? null, now: Date.now(), isNewer: (a, b) => adapter.isNewer(a, b) })
+        const stayed = judgeStayed({ expect: hasPty(`task:${id}:update`) ? null : expect, prev: { path: prev.path, version: prev.version }, next: { path: found.path, version: found.version, latest }, held: this.stayed.get(id) ?? null, now: Date.now(), isNewer: (a, b) => adapter.install.isNewer(a, b) })
         if (stayed) this.stayed.set(id, stayed)
         else this.stayed.delete(id)
         if (stayed && next.updateAvailable) next.updateStayed = { version: stayed.version, offered: stayed.offered }
@@ -316,13 +330,13 @@ class ProviderService {
       log.error(`Failed to locate ${adapter.descriptor.name}`, e)
       next = { ...prev, checking: false }
     }
-    next.readiness = adapter.readiness(next)
+    next.readiness = adapter.install.readiness(next)
     if (this.refreshes.get(id) !== run) return this.info(id)
     this.set(id, next)
     // Each sign-in account's own models (HI-2852), read in its folder after the check: never awaited, so a slow account
     // can't hold the CLI's readiness or a launch; each is published as it lands.
     if (next.path) this.accountModels?.refresh(id)
-    await noteSelectedCli(next, adapter.configHome?.() ?? null)
+    await noteSelectedCli(next, adapter.install.configHome?.() ?? null)
     return next
   }
 
@@ -335,9 +349,9 @@ class ProviderService {
     let sent = !typed
     let finished = false
     // Typed once its screen shows it ready (typeWhenIdle).
-    // A key picked from the screen (a menu entry, #396), or a submission checked against it (#363), needs the screen
-    // after it is ready too.
-    const keepScreen = !!typed?.keys.some((k) => 'pick' in k || ('heldOn' in k && !!k.heldOn))
+    // A key picked from the screen (a menu entry, #396), a submission checked against it (#363), or keys held until it
+    // shows what they act on (HI-3437), needs the screen after it is ready too.
+    const keepScreen = !!typed?.keys.some((k) => 'pick' in k || !!k.heldOn || !!k.shown)
     const gate = typed?.ready
       ? new KeyGate({ ready: typed.ready, busyTitle: typed.busyTitle, busyScreen: typed.busyScreen, ...startSize(key), onReady: () => typeWhenIdle(), keepScreen })
       : null
@@ -413,7 +427,8 @@ class ProviderService {
         if (code === 0 || finished || endedWell) toast('success', tr(msg({ id: 'service.providers.taskDone', defaultMessage: '{task} finished', description: "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended well." }), { task: shown() }))
         else toast('warning', tr(msg({ id: 'service.providers.taskFailed', defaultMessage: '{task} exited with code {code}', description: "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended with the exit code {code}." }), { task: shown(), code: String(code) }))
         if (task === 'login' && code === 0) this.signedIn(id)
-        void this.refresh(id, true)
+        // Caught (HI-3285): its CLI's description may have been removed while the task ran.
+        void this.refresh(id, true).catch((e) => log.warn(`looking for ${userText(id)} after its task failed`, e))
       }
     })
     return key
@@ -433,11 +448,11 @@ class ProviderService {
     // The connection's own sign-in where the CLI has one (HI-1757), without the variables it would read as a login. A
     // server connection's Set Up (HI-1772) runs the CLI itself instead, with its server's variables, for its first-run
     // screens: the user answers them in the CLI's own way.
-    const home = env[adapter.descriptor.capabilities.connections?.homeEnv ?? '']
-    const cmd: CommandSpec = setUp ? ((home && adapter.accountSetUpCommand?.(info.path, home)) || { file: info.path, args: (home && adapter.connectionSetUpArgs?.(home)) || [] }) : (adapter.accountLoginCommand?.(info.path, home) ?? adapter.loginCommand(info.path))
+    const home = env[signInConnections(adapter.descriptor)?.homeEnv ?? '']
+    const cmd: CommandSpec = setUp ? ((home && adapter.accounts?.accountSetUpCommand?.(info.path, home)) || { file: info.path, args: (home && adapter.accounts?.connectionSetUpArgs?.(home)) || [] }) : (adapter.accounts?.accountLoginCommand?.(info.path, home) ?? adapter.launch.loginCommand?.(info.path) ?? noTask(adapter.descriptor.name, 'login'))
     const s = cmd.line !== undefined ? cmd : toSpawnable(cmd.file, cmd.args)
     log.info(`${adapter.descriptor.name} ${setUp ? 'set-up' : 'sign-in'} for account ${accountId}`)
-    spawnPty(key, { file: s.file, args: ptyArgs(s), cwd: setUp?.cwd ?? homedir(), env: { ...withServerEnv(setUp?.env, withoutAccountEnv(adapter, childEnv(env))), ...cmd.env }, onExit })
+    spawnPty(key, { file: s.file, args: ptyArgs(s), cwd: setUp?.cwd ?? homedir(), env: { ...withServerEnv(setUp?.env, withoutAccountEnv(adapter.accounts ?? null, childEnv(env))), ...cmd.env }, onExit })
     return key
   }
 
@@ -449,7 +464,7 @@ class ProviderService {
     // The task's name: English for the log, in the window's language when its toasts say it.
     const shown = (): string => tr(TASK, { task, cli: name })
     if (task === 'install') {
-      const cmd = adapter.installCommand()
+      const cmd = adapter.install.installCommand?.() ?? noTask(name, task)
       return this.runTask(id, task, cmd, `${name} install`, undefined, shown) // i18n-ignore: the task's name in the log
     }
     if (!info.path) throw combworkError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: name }, { kind: 'conflict' })
@@ -458,14 +473,14 @@ class ProviderService {
       const pending = this.updateRetries.get(id)
       if (retryUpdate && (!pending || pending.path !== info.path || pending.version !== info.version)) throw combworkError(msg({ id: 'service.providers.retryUnavailable', defaultMessage: 'This update retry is no longer available. Check again, then try Update.', description: 'Provider Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons.' }), undefined, { kind: 'conflict' })
       if (hasPty(`task:${id}:${task}`)) return `task:${id}:${task}`
-      const cmd = retryUpdate ? pending!.retry.command : adapter.updateCommand(info.path)
+      const cmd = retryUpdate ? pending!.retry.command : (adapter.install.updateCommand?.(info.path) ?? noTask(name, task))
       // What the check after it compares (HI-2777: a version that stays put).
       this.updateExpect.set(id, { path: info.path, from: info.version, offered: info.latestVersion })
       const key = this.runTask(id, task, cmd, `${name} update`, undefined, shown, (code) => { // i18n-ignore: the task's name in the log
         if (code !== 0) this.updateExpect.delete(id)
         // Its installer having nothing newer (WinGet's 0x8A15002B) isn't a failure: the check after it says up to date.
-        if (code !== 0 && adapter.updateUpToDate?.(info.path!, code)) return true
-        const retry = adapter.updateRetry?.(info.path!, code)
+        if (code !== 0 && adapter.install.updateUpToDate?.(info.path!, code)) return true
+        const retry = adapter.install.updateRetry?.(info.path!, code)
         if (retry && this.info(id).path === info.path && this.info(id).version === info.version) this.updateRetries.set(id, { path: info.path!, version: info.version, retry })
         this.set(id, this.info(id))
       })
@@ -478,13 +493,21 @@ class ProviderService {
       if (connectionsManaged(id)) throw combworkError(msg({ id: 'service.providers.signInConnections', defaultMessage: '{cli} signs in per account: sign in from Settings → Accounts & Connections.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "Claude Code") in, but its logins are accounts (Settings → Accounts & Connections names a section).' }), { cli: name }, { kind: 'conflict' })
       // On a GitHub host (HI-2779): only one its checks found in use, and its own sign-in there, in its environment.
       if (host !== undefined && (!adapter.descriptor.capabilities.githubHost || !info.hostChecks?.some((c) => c.host === host))) throw combworkError(msg({ id: 'service.providers.unknownHost', defaultMessage: 'No project uses that GitHub host for {cli} now. Check again, then sign in.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "GitHub Copilot") in on a GitHub host none of the open projects uses any more (HI-2779). Check again is the button.' }), { cli: name }, { kind: 'conflict' })
-      const cmd = adapter.loginCommand(info.path, host)
+      const cmd = adapter.launch.loginCommand?.(info.path, host) ?? noTask(name, task)
       return this.runTask(id, task, cmd, `${name} sign-in`, undefined, shown, undefined, cmd.env || host ? { ...(cmd.env ? { env: cmd.env } : {}), ...(host ? { keySuffix: host } : {}) } : undefined) // i18n-ignore: the task's name in the log
     }
-    if (!adapter.setupCommand) throw combworkError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Combwork to run.' }), { cli: name }, { kind: 'invalid' })
-    const cmd = adapter.setupCommand(info.path)
+    if (!adapter.install.setupCommand) throw combworkError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Combwork to run.' }), { cli: name }, { kind: 'invalid' })
+    const cmd = adapter.install.setupCommand(info.path)
     return this.runTask(id, task, cmd, `${name} setup`, cmd.keys ? { keys: cmd.keys, ready: cmd.readyPattern, busyTitle: cmd.busyTitle, busyScreen: cmd.busyScreen, done: cmd.done } : undefined, shown, undefined, { env: cmd.env, cwd: cmd.cwd })
   }
+}
+
+/**
+ * A task its CLI has none of (HI-3196: a data-only provider has no install, update or sign-in task): refused, whoever asks
+ * (Provider Setup hides the button; IPC and the Agent API asking anyway get this).
+ */
+export function noTask(cli: string, task: ProviderTask): never {
+  throw combworkError(msg({ id: 'service.providers.noTask', defaultMessage: '{cli} has no {task, select, install {install} update {update} login {sign-in} other {setup}} task in Combwork.', description: 'An error: a task was asked of a coding agent CLI that has none (HI-3196: a CLI that runs from a description has no install, update or sign-in task in Combwork). {cli} is its name.' }), { cli, task }, { kind: 'invalid' })
 }
 
 export const providerService = new ProviderService()
@@ -494,11 +517,12 @@ onLanguageChange(() => providerService.relabel())
 // An override among them is read as Combwork's own runs of the CLI read it (HI-2670: from its connections), so a change of
 // a connection's launch settings checks it again too.
 const locateValue = (p: ProviderId, id: string): unknown => (id.startsWith(overrideId(p, '')) ? overrides(p, id.slice(overrideId(p, '').length)) : advanced.get(id))
-const locateValues = (): Map<ProviderId, string> => new Map(allProviders().map((p) => [p.id, JSON.stringify((p.locateSettings ?? []).map((id) => locateValue(p.id, id)))]))
+const locateValues = (): Map<ProviderId, string> => new Map(allProviders().map((p) => [p.id, JSON.stringify((p.install.locateSettings ?? []).map((id) => locateValue(p.id, id)))]))
 let lastLocateValues = locateValues()
 const relocate = (): void => {
   const now = locateValues()
-  for (const [id, v] of now) if (v !== lastLocateValues.get(id) && providerService.info(id).found) void providerService.refresh(id)
+  // Caught (HI-3285): a described CLI can be gone by the time its refresh runs (its description removed), and then it throws.
+  for (const [id, v] of now) if (v !== lastLocateValues.get(id) && providerService.info(id).found) void providerService.refresh(id).catch((e) => log.warn(`looking for ${userText(id)} again failed`, e))
   lastLocateValues = now
 }
 advanced.onChange(relocate)

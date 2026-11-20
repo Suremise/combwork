@@ -7,7 +7,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'taskoverview-profile')
 const ws = path.join(lib.WORK, 'taskoverview-ws')
@@ -17,12 +17,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 8000) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
-  return v
-}
+const until = lib.until
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
@@ -74,7 +69,7 @@ const until = async (fn, ms = 8000) => {
   const showOverview = async (name) => {
     await page.locator('.project-row', { hasText: name }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Overview' }).click()
-    await page.locator('.overview-head').first().waitFor({ timeout: 8000 })
+    await page.locator('.overview-head').first().waitFor({ timeout: lib.timing('hang.ui') })
   }
 
   // --- The Workspace Overview: every card.
@@ -91,11 +86,12 @@ const until = async (fn, ms = 8000) => {
   const seen = []
   const watching = (async () => {
     const t = Date.now()
-    while (Date.now() - t < 1500) {
+    // A watch over the switch, its length the point (a moment of alpha's counts is what it looks for), sampled often.
+    while (Date.now() - t < lib.timing('quiet.switchWatchMs')) {
       const p = await strip.first().getAttribute('data-project').catch(() => null)
       const r = await read().catch(() => null)
       if (p && r) seen.push({ p, r })
-      await lib.sleep(20)
+      await lib.sleep(lib.timing('poll.sampleMs'))
     }
   })()
   await showOverview('beta')

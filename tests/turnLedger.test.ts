@@ -36,7 +36,7 @@ function feed(a: Agent, ev: HookEvent, i: HookIds, continued = false): Agent {
 /** Hook bodies through a provider's own normaliser. */
 function send(adapter: ProviderAdapter, a: Agent, bodies: Record<string, unknown>[], continued: (body: Record<string, unknown>, i: number) => boolean = () => false): Agent {
   bodies.forEach((body, i) => {
-    const h = adapter.normalizeHook(body)
+    const h = adapter.hooks!.normalizeHook(body)
     feed(a, h.event, h.ids, h.event.kind === 'stop' && continued(body, i))
   })
   return a
@@ -207,7 +207,7 @@ describe('the turn ledger', () => {
     feed(d, { kind: 'compactStart', trigger: 'manual' }, ids('k1'))
     feed(d, { kind: 'compactEnd' }, ids('k2'))
     expect([d.status, d.statusMessage, d.stale]).toEqual(['ready', undefined, ['a compaction start of an earlier turn']])
-    // Only while no turn runs (Darren, option B): one under an id of another while a turn runs opens nothing, and the
+    // Only while no turn runs (option B): one under an id of another while a turn runs opens nothing, and the
     // running turn's own news goes on.
     const c = feed(agent(), { kind: 'prompt' }, ids('t1'))
     feed(c, { kind: 'compactStart', trigger: 'auto' }, ids('k2'))
@@ -317,7 +317,7 @@ describe('the turn ledger', () => {
     })
   })
 
-  it("a background task's wake (Darren, 12 Oct): its prompt opens it; should that hook be lost, only a tool call the launch never saw does, only while the CLI woke", () => {
+  it("a background task's wake: its prompt opens it; should that hook be lost, only a tool call the launch never saw does, only while the CLI woke", () => {
     const woke = (a: Agent, ev: HookEvent, i: HookIds, yes: boolean): Agent => {
       const took = admit(a.ledger, ev, i, { woke: yes, now: a.ledger.seq })
       if (took.verdict === 'apply') applyStep(a, hookStep(took.event, input(a)))

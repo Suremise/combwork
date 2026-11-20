@@ -15,9 +15,9 @@ const { createHash } = require('crypto')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 // Overdue this long after it was made (instead of 30 minutes), so the suite sees one become overdue.
-const OVERDUE_MS = 8000
+const OVERDUE_MS = lib.timing('seam.deliveryOverdueMs')
 
 const userData = path.join(lib.WORK, 'deliveries-profile')
 const ws = path.join(lib.WORK, 'deliveries-ws')
@@ -117,7 +117,7 @@ async function start() {
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
       env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }),
-      timeout: 60000
+      timeout: lib.timing('spawn.hang')
     }).toString()
     const r = JSON.parse(out.split('\n')[0]).result
     return { text: r.content[0].text, isError: !!r.isError }

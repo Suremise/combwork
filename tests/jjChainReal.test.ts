@@ -33,6 +33,7 @@ import { recoverStale, type GitRun } from '../src/main/platform/jjRecovery'
 import type { Fact } from '../src/shared/workflow/facts'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjChainReal.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -42,21 +43,25 @@ const QUIET: WriteLog = { settled: async () => undefined, changedBetween: async 
 let tokens = 0
 const token = (): string => `c${Date.now().toString(36)}${(++tokens).toString(36)}`
 
-describe.skipIf(!jjExe)(`jj's component chain on the real jj (${TESTED_JJ.version}), HI-2801`, () => {
+// Each test runs dozens of real jj and git commands, nothing it could wait on instead: alone the longest took 9 s, and a
+// full run on a loaded machine took it past the 20 s default (HI-3349). Its own bound, for a hung run.
+const REAL_JJ_MS = timing('wait.hangReal')
+
+describe.skipIf(!jjExe)(`jj's component chain on the real jj (${TESTED_JJ.version}), HI-2801`, { timeout: REAL_JJ_MS }, () => {
   const h = harness()
   const env = { ...h.env, GIT_TERMINAL_PROMPT: '0' }
   const gitOn =
     (store: string) =>
     (args: readonly string[]): Promise<RunResult> =>
       new Promise((done) => {
-        execFile('git', ['--git-dir', store, ...args], { env, windowsHide: true, encoding: 'buffer', timeout: 60_000 }, (e, out, err) => {
+        execFile('git', ['--git-dir', store, ...args], { env, windowsHide: true, encoding: 'buffer', timeout: timing('spawn.hang') }, (e, out, err) => {
           const code = e ? (typeof (e as { code?: unknown }).code === 'number' ? (e as { code: number }).code : -1) : 0
           done({ ok: !e, out: out.toString('utf8'), buf: out, err: err.toString('utf8'), code })
         })
       })
   const recoveryGit: GitRun = async (cwd, args) => {
     try {
-      const buf = execFileSync('git', args, { cwd, env, windowsHide: true, timeout: 60_000, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+      const buf = execFileSync('git', args, { cwd, env, windowsHide: true, timeout: timing('spawn.hang'), maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
       return { ok: true, out: buf.toString('utf8'), buf, err: '' }
     } catch (e) {
       const err = e as { stderr?: Buffer; stdout?: Buffer }

@@ -1,10 +1,10 @@
-// Tools by side (HI-2664, Darren's decision): a project agent's Combwork tools follow its side of the workflow, set on
+// Tools by side (HI-2664): a project agent's Combwork tools follow its side of the workflow, set on
 // its launch (CW_SIDE in the combwork server's env, its saved role's); a role change restarts it to load the new list,
 // in the same conversation: an idle agent at once, by the change itself (every path's: updateAgent), a busy one only
 // once asked (busy, then the window's Later: never; Restart When Its Turn Is Over: atSafePoint, at its turn's end). The
 // work it gets meanwhile is the unit tests' (reviewerPool, laneStart, lanes). The agent is the fake Claude Code; the
 // launch's --mcp-config is read for its combwork env.
-// Tools by workflow (HI-2694, Darren's decision: launch-only): the tools its project's workflow makes unusable are left out
+// Tools by workflow (HI-2694: launch-only): the tools its project's workflow makes unusable are left out
 // too (CW_WORKFLOW_HIDDEN); a workflow change restarts an agent whose list it changes the same way, either way (added or
 // removed): an idle one at once, a busy one once asked; until it has relaunched, it is given no work needing the new
 // tools (a lane naming it as reviewer is refused).
@@ -13,7 +13,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'toolsides-profile')
 const ws = path.join(lib.WORK, 'toolsides-ws')

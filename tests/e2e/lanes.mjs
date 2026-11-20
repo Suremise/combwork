@@ -11,6 +11,7 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createServer } from 'net'
 import { join } from 'path'
+import { createRequire } from 'module'
 import { processAlive } from './logs.mjs'
 
 /**
@@ -26,9 +27,15 @@ export const LANES = 10
 export const LANE_PORTS = 10
 /** A claim older than this is from a runner that never finished (or one stuck far beyond any run). */
 const CLAIM_MAX_MS = 24 * 60 * 60_000
-/** The lock held while a runner looks at the claims and writes its own: only for milliseconds, so an old one is a crash. */
+/**
+ * The lock held while a runner looks at the claims and writes its own: only for milliseconds, so an old one is a crash.
+ * Counted stale after the timing file's runner.lockStaleMs (HI-3378: 60 s, so a live holder on a slow disk keeps it).
+ */
 const LOCK = '.claiming'
-const LOCK_MAX_MS = 10_000
+const { timing } = createRequire(import.meta.url)('../timing.cjs')
+const LOCK_MAX_MS = timing('runner.lockStaleMs')
+/** How often the claims lock is tried again while it's held (its bound: 4 × LOCK_MAX_MS). */
+const LOCK_RETRY_MS = timing('runner.lockRetryMs')
 
 /**
  * Where the lanes of a pool of its own (CW_TEST_LANES_DIR, runContext's OWN_LANES: concurrency.mjs's check of a run
@@ -104,7 +111,7 @@ export async function withLock(dir, fn) {
       // stat): EPERM, at times EACCES (HI-1800: 3 of 36 runners racing for it). Taken again once it is gone, within the
       // same bound; a folder Combwork can't write to at all still fails then.
       if ((e.code === 'EPERM' || e.code === 'EACCES') && Date.now() - start <= 4 * LOCK_MAX_MS) {
-        await sleep(50)
+        await sleep(LOCK_RETRY_MS)
         continue
       }
       if (e.code !== 'EEXIST') throw e
@@ -116,7 +123,7 @@ export async function withLock(dir, fn) {
       }
       if (age > LOCK_MAX_MS) rmSync(lock, { recursive: true, force: true })
       else if (Date.now() - start > 4 * LOCK_MAX_MS) throw new Error(`The test claims lock ${lock} is still held`, { cause: e })
-      else await sleep(50)
+      else await sleep(LOCK_RETRY_MS)
     }
   }
   try {

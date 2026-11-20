@@ -15,6 +15,7 @@ import { SUITES } from './e2e/suites.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { isRealCli } from './e2e/runner.mjs'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 const root = join(__dirname, '..')
@@ -507,7 +508,7 @@ describe('real changes: before every suite, now the suites their parts need (git
       if (label === 'RC4 3' || label === 'RC4 4') expect(units['src/main/workspace.ts']?.all, label).toMatch(/WorkspaceService rule doesn't hold/)
     }
     // RC4 3 and 4's base trees censused (the rule stops at the first tree it doesn't hold in): about 30 s each.
-  }, 300_000)
+  }, timing('test.hangReal'))
 
   const names = (SUITES as { name: string }[]).map((s) => s.name)
   const realNames = (SUITES as { name: string; needs?: string[] }[]).filter(isRealCli).map((s) => s.name)
@@ -527,7 +528,7 @@ describe('real changes: before every suite, now the suites their parts need (git
     expect(after.suites.length).toBeLessThan(names.length / 5)
     expect(after.why.join('\n')).toMatch(/WorkspaceService\.setAdvanced → src\/main\/settingsTools\.ts/)
     // Two censuses of the rule's scope, each its own tree read from git: about 30 s each.
-  }, 300_000)
+  }, timing('test.hangReal'))
   for (const c of changes) {
     it(`${c.card}: a named handful, with ${c.needs.join(', ')}`, () => {
       const base = `${c.commit}^1`

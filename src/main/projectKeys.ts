@@ -29,7 +29,7 @@ const inScope = (ws: WorkspaceService, of: { project: string; projectId: string 
   scope === null || projectNow(ws.projectIdsNow(), of.project, of.projectId).toLowerCase() === scope.toLowerCase()
 
 // ---------------------------------------------------------------------------
-// Card names in what agents read (#1219; HI-1661, Darren 26 Oct: by key only, "HI-1230").
+// Card names in what agents read (#1219; HI-1661: by key only, "HI-1230").
 // ---------------------------------------------------------------------------
 
 /** The names in force for the work running now: an Agent API request's, a wake's or a delivery's (withCardNames). */
@@ -234,7 +234,7 @@ export function sayKeysOnce(ws: WorkspaceService): void {
 }
 
 /**
- * The card a reference names, for the Agent API and the Combwork tools (#1219; Darren, 20 Oct: tools take a key string too):
+ * The card a reference names, for the Agent API and the Combwork tools (#1219: tools take a key string too):
  * a key (`HI-12`, any case, an old key too), an old number as `#1061`, or the number the tools take (`1061`, the old global
  * number until P8). Null for a key or number no card has.
  */

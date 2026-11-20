@@ -12,20 +12,25 @@ const crypto = require('crypto')
 const { pathToFileURL } = require('url')
 const { zipSync, strToU8 } = require('fflate')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'mcpcatalog-profile')
 const ws = path.join(lib.WORK, 'mcpcatalog-ws')
 const proj = path.join(ws, 'demo')
 const share = path.join(lib.WORK, 'mcpcatalog-share')
 const share2 = path.join(lib.WORK, 'mcpcatalog-share2')
+// HI-3377: while this file exists the dev build holds a file:// download (CW_TEST_CATALOG_HOLD), so Cancel download can be pressed.
+const hold = path.join(lib.WORK, 'mcpcatalog-hold')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** Publishes demo at `version` (running `script`) and a server only macOS can run, as a file:// catalogue in `dir`. */
+/**
+ * Publishes demo at `version` (running `script`), helper (another this PC can run: HI-3377's one download at a time) and a
+ * server only macOS can run, as a file:// catalogue in `dir`.
+ */
 function publish(dir, version, script, name = 'Test catalogue') {
   fs.mkdirSync(dir, { recursive: true })
   const def = { description: 'A demo server', command: 'node', args: [`\${CW_MCP_DIR}/demo/${script}`] }
@@ -34,16 +39,16 @@ function publish(dir, version, script, name = 'Test catalogue') {
   fs.writeFileSync(zipFile, zip)
   const z = { url: pathToFileURL(zipFile).href, sha256: crypto.createHash('sha256').update(zip).digest('hex'), size: zip.length }
   const server = (n, os, description) => ({ name: n, version, description, tags: ['demo'], requires: { os }, zip: z })
-  fs.writeFileSync(path.join(dir, 'catalog.json'), JSON.stringify({ schemaVersion: 1, name, servers: [server('demo', ['windows', 'macos', 'linux'], 'A demo server for tests'), server('mac-only', ['macos'], 'Runs on macOS only')] }))
+  fs.writeFileSync(path.join(dir, 'catalog.json'), JSON.stringify({ schemaVersion: 1, name, servers: [server('demo', ['windows', 'macos', 'linux'], 'A demo server for tests'), server('helper', ['windows', 'macos', 'linux'], 'A second server for tests'), server('mac-only', ['macos'], 'Runs on macOS only')] }))
   return pathToFileURL(path.join(dir, 'catalog.json')).href
 }
 
 ;(async () => {
-  for (const d of [userData, ws, share, share2]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, share, share2, hold]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(path.join(proj, '.combwork'), { recursive: true })
   fs.mkdirSync(path.join(ws, '.combwork', 'mcp'), { recursive: true })
   const source = publish(share, '1.0.0', 'server.js')
-  const env = lib.fakeClaude(userData, path.join(lib.WORK, 'mcpcatalog-claude-home'), [proj])
+  const env = { ...lib.fakeClaude(userData, path.join(lib.WORK, 'mcpcatalog-claude-home'), [proj]), CW_TEST_CATALOG_HOLD: hold }
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.mcpCatalogs = { oursOn: false, sources: [{ url: source, on: true }] }
@@ -86,6 +91,26 @@ function publish(dir, version, script, name = 'Test catalogue') {
     const detail = page.locator('[data-catalog-detail="demo"]')
     check("demo's view shows its requirement met", !!(await lib.until(async () => (await detail.locator('[data-check="ok"]').count()) === 1, HUNG_MS)), await detail.innerText().catch(() => ''))
     await shots('catalogue')
+    // HI-3377: while its download runs, Cancel download takes Install…'s place; pressed, nothing is installed and nothing
+    // is said (no error), and Install… is back.
+    fs.writeFileSync(hold, '')
+    await detail.locator('[data-action="catalog-install"]').click()
+    const cancel = detail.locator('[data-action="catalog-cancel"]')
+    check('while it downloads, Cancel download takes the place of Install…', !!(await lib.until(async () => (await cancel.count()) === 1 && (await detail.locator('[data-action="catalog-install"]').count()) === 0, HUNG_MS)), await detail.innerText().catch(() => ''))
+    await shots('downloading')
+    // One download at a time (HR1's round 1): another server's view names demo's download, with its Cancel in place of
+    // Install…; back on demo, its own Cancel is still there.
+    await row('helper').click()
+    const helper = page.locator('[data-catalog-detail="helper"]')
+    check("helper's view names demo's download, with Cancel download in place of Install…", !!(await lib.until(async () => (await helper.locator('[data-catalog-downloading="demo"]').count()) === 1 && (await helper.locator('[data-action="catalog-cancel"]').count()) === 1 && (await helper.locator('[data-action="catalog-install"]').count()) === 0, HUNG_MS)), await helper.innerText().catch(() => ''))
+    await row('demo').click()
+    check("back on demo, its Cancel download is still there", !!(await lib.until(async () => (await cancel.count()) === 1, HUNG_MS)), await detail.innerText().catch(() => ''))
+    await row('helper').click()
+    await helper.locator('[data-action="catalog-cancel"]').click()
+    check("Cancel download from helper's view stops demo's: Install… is back, nothing asked, said or installed", !!(await lib.until(async () => (await helper.locator('[data-action="catalog-install"]').count()) === 1 && (await helper.locator('[data-catalog-downloading]').count()) === 0, HUNG_MS)) && (await page.getByRole('dialog').count()) === 0 && (await page.locator('.toast-title', { hasText: 'Could not get' }).count()) === 0 && !fs.existsSync(path.join(ws, '.combwork', 'mcp', 'demo-cat.json')), JSON.stringify(await page.getByRole('dialog').allInnerTexts()))
+    await row('demo').click()
+    check('…and demo shows Install… again', !!(await lib.until(async () => (await detail.locator('[data-action="catalog-install"]').count()) === 1, HUNG_MS)), await detail.innerText().catch(() => ''))
+    fs.rmSync(hold, { force: true })
     await detail.locator('[data-action="catalog-install"]').click()
     const ask = page.getByRole('dialog', { name: 'Install demo 1.0.0?' })
     check('Install shows what it runs first, and its name', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)) && (await ask.innerText()).includes('Runs: node ${CW_MCP_DIR}/demo/server.js') && (await ask.locator('input').inputValue()) === 'demo', JSON.stringify(await page.getByRole('dialog').allInnerTexts()))

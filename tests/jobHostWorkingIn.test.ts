@@ -11,10 +11,11 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { JobHost, MAX_WORKING_IN } from '../src/main/processSupervisor'
 import { brokersWorkingIn, folderInside, parseWorkingIn } from '../src/main/systemBrokers'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 60_000
+const HUNG_MS = timing('wait.hang')
 const dir = tempDir('cw-jobhost-workingin-')
 const SLOT = join(dir, 'slot-a')
 const ELSEWHERE = join(dir, 'elsewhere')

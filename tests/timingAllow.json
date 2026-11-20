@@ -1,0 +1,4 @@
+{
+  "$comment": "HI-3378: the test files' waits and timeouts that still write numbers in place, by occurrence (each its kind and its line's text, whitespace folded): the backlog HI-3381 (unit) and HI-3382 (e2e, scenarios) migrate to names from tests/timing.json (scripts/timingLiterals.mjs). check:repo fails a literal no entry here covers (added, or changed), and an entry with no literal left; `node scripts/testWaits.mjs --literals --shrink` drops those, and never adds one. Never add an entry by hand.",
+  "files": {}
+}

@@ -9,7 +9,10 @@
 // - with a pool of two, R1 and R2 review at once; E1's start review waits ("Waiting for a review copy", the card's
 //   history says so); R1's verdict returns copy-1, which E1 is then leased and told of (its inbox);
 // - R2's session ending gives its review up: copy-2 is returned and freed; with review copies off, R2 started again has
-//   no --add-dir and its start review leases nothing.
+//   no --add-dir and its start review leases nothing;
+// - HI-3337: Claude Code's home must trust the worktrees folder (its .claude.json, seeded here): untrusted, E1 started
+//   again has no --add-dir and its start review says why in one line; trusted again and restarted, the grant and a copy
+//   come back.
 // Dev build (or CW_EXE), throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
@@ -17,9 +20,10 @@ const fs = require('fs')
 const path = require('path')
 const { fromCodexTable } = require('./fake-bridge.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
-// The pools are looked at again every 30 s (copiesApp.ts): a wait for a copy to come free spans one look at least.
-const LOOK_MS = 120000
+const HUNG_MS = lib.timing('hang.step')
+// The pools are looked at again every 30 s (copiesApp.ts): a wait for a copy to come free spans one look at least, within
+// a step's hang bound.
+const LOOK_MS = lib.timing('hang.step')
 
 const PORT = Number(lib.port(47802))
 const at = (x) => path.join(lib.WORK, `reviewcopies-${x}`)
@@ -56,6 +60,13 @@ const starts = () => lines(started)
   const script = path.join(tools, 'check.js')
   fs.writeFileSync(script, `require('fs').appendFileSync(${JSON.stringify(started)}, JSON.stringify({ cwd: process.cwd() }) + '\\n')\n`)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase()]))
+  // HI-3337: Claude Code 2.1.326 asks about an --add-dir folder outside the folders it trusts at every start, so Combwork
+  // grants the copies folder only once the home trusts the workspace's worktrees folder, read from its .claude.json:
+  // recorded as Claude Code writes it (its real path, forward slashes; tests/fixtures/advanced/trust-entry-*).
+  fs.mkdirSync(`${ws}.worktrees`, { recursive: true })
+  const worktreesKey = fs.realpathSync.native(`${ws}.worktrees`).replace(/\\/g, '/')
+  const trustWorktrees = (yes) => fs.writeFileSync(path.join(claudeHome, '.claude.json'), JSON.stringify({ projects: yes ? { [worktreesKey]: { hasTrustDialogAccepted: true } } : {} }))
+  trustWorktrees(true)
   lib.enableProviders(userData, ['claude-code', 'codex'])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -205,6 +216,40 @@ const starts = () => lines(started)
     const tr2b = await codexToken(r2.id)
     const rb2 = await call(tr2b, 'PATCH', `/v1/tasks/${b}`, { review: 'start', reply: 'short' })
     check('…and its start review leases nothing', rb2.status === 200 && !(rb2.body?.changes ?? []).some((x) => /review copy|Review in/.test(x)) && !(await copyOf(b, r2.id)), JSON.stringify(rb2.body))
+
+    // --- HI-3337: review copies on again, but Claude Code's home no longer trusts the worktrees folder: E1 started again
+    // isn't granted the copies folder (never started into 2.1.326's question), and its start review says why in one line.
+    // The folder trusted again (as Set Up records it) and E1 restarted, the grant and a copy come back.
+    await inv('advanced:set', 'cw.copies.review', null)
+    const restartE1 = async () => {
+      const launchedBefore = lines(path.join(claudeHome, 'fake-launches.jsonl')).length
+      await inv('session:stop', alpha, e1.id)
+      const stopped = !!(await until(async () => !(await live(e1.id)), HUNG_MS))
+      await inv('session:start', alpha, { agentId: e1.id })
+      const up = !!(await ready(e1.id))
+      const l = await until(async () => {
+        const sessionId = (await live(e1.id))?.sessionId
+        return lines(path.join(claudeHome, 'fake-launches.jsonl')).slice(launchedBefore).findLast((x) => x.sessionId === sessionId && x.opts['--mcp-config'])
+      }, HUNG_MS)
+      return { ok: stopped && up && !!l, launch: l }
+    }
+    trustWorktrees(false)
+    const untrusted = await restartE1()
+    check('E1 started again, its home not trusting the worktrees folder: no --add-dir', untrusted.ok && !untrusted.launch.opts['--add-dir'], JSON.stringify(untrusted.launch?.opts))
+    check("…C's copy for E1 returned with its session", !!(await until(async () => !(await copyOf(c, e1.id)), LOOK_MS)), JSON.stringify(await copies()))
+    const te1b = await claudeToken(e1.id)
+    const ru = await call(te1b, 'POST', `/v1/tasks/${encodeURIComponent(await keyOf(c))}/start-review`, {})
+    const why = ru.body?.data?.reviewCopy ?? ''
+    check("…its start review says it has no review copy, and why: the worktrees folder isn't trusted yet, Set Up", ru.status === 200 && why.startsWith('No review copy') && /doesn't trust/.test(why) && why.toLowerCase().includes(`${ws}.worktrees`.toLowerCase()) && /Set Up/.test(why), JSON.stringify(ru.body))
+    check('…in one line of at most 300 characters', why.length <= 300 && !why.includes('\n'), String(why.length))
+    check('…and leases nothing', !(await copyOf(c, e1.id)), JSON.stringify(await copies()))
+    trustWorktrees(true)
+    const trusted = await restartE1()
+    check('trusted again and E1 restarted: --add-dir the copies folder again', trusted.ok && same(trusted.launch.opts['--add-dir'], copiesDir), JSON.stringify(trusted.launch?.opts))
+    const te1c = await claudeToken(e1.id)
+    const rt = await call(te1c, 'POST', `/v1/tasks/${encodeURIComponent(await keyOf(c))}/start-review`, {})
+    const back = await until(() => copyOf(c, e1.id), LOOK_MS)
+    check('…and its start review leases it a copy at C’s revision', rt.status === 200 && !!back && gitIn(back.folder, 'rev-parse', 'HEAD') === revs[c], JSON.stringify({ rt: rt.body, copies: await copies() }))
   } catch (e) {
     check('no unexpected error', false, e.stack)
   } finally {

@@ -106,10 +106,10 @@ describe('one pop-up system: stacking, timing, roles', () => {
     expect(popupMs({ level: 'info', actions: [{ label: 'Undo', command: 'x' }] }, 6)).toBe(15_000)
     expect(popupMs({ level: 'info', actions: [{ label: 'Undo', command: 'x' }], resolved: 'Done' }, 6)).toBe(6000)
     expect(popupMs({ level: 'info' }, 30)).toBe(30_000)
-    expect(popupMs({ level: 'info', timeoutMs: 10_000 }, 6)).toBe(10_000)
+    expect(popupMs({ level: 'info', timeoutMs: 10_000 }, 6)).toBe(10_000) // timing-ok: data, not a wait
     // Its own time is for answering it: resolved, the setting's (HI-2370).
-    expect(popupMs({ level: 'info', timeoutMs: 120_000, actions: [{ label: 'Resume', command: 'x' }], resolved: 'Not resumed' }, 6)).toBe(6000)
-    expect(popupMs({ level: 'error', timeoutMs: 120_000, resolved: 'Done' }, 6)).toBe(15_000)
+    expect(popupMs({ level: 'info', timeoutMs: 120_000, actions: [{ label: 'Resume', command: 'x' }], resolved: 'Not resumed' }, 6)).toBe(6000) // timing-ok: data, not a wait
+    expect(popupMs({ level: 'error', timeoutMs: 120_000, resolved: 'Done' }, 6)).toBe(15_000) // timing-ok: data, not a wait
   })
 
   it('announced at once when it needs you or is an error; politely otherwise', () => {

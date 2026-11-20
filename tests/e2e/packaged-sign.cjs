@@ -13,9 +13,9 @@ const exe = dev ? lib.ELECTRON : lib.PACKAGED_EXE
 const launcher = dev ? path.join(lib.ROOT, 'out', 'bin', 'cw-sign.exe') : path.join(lib.ROOT, 'dist', 'win-unpacked', 'resources', 'bin', 'cw-sign.exe')
 const script = dev ? path.join(lib.ROOT, 'out', 'main', 'cw-sign.js') : path.join(lib.ROOT, 'dist', 'win-unpacked', 'resources', 'app.asar.unpacked', 'out', 'main', 'cw-sign.js')
 /** A commit's bound: a hang is a failure, never a wait. */
-const HUNG_MS = 60_000
+const HUNG_MS = lib.timing('hang.step')
 /** How fast a commit that needs someone must fail. */
-const FAST_MS = 15_000
+const FAST_MS = lib.timing('budget.signAtOnceMs')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

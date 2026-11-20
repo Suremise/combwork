@@ -1,4 +1,4 @@
-// HI-3155 (Darren's 1A and 2A, 13 Nov; design s7 → s11 with HR1): the release offer, a project's own For you item. When
+// HI-3155 (1A and 2A; design s7 → s11 with HR1): the release offer, a project's own For you item. When
 // a project's Work merges into (G7) is released (HI-3148's release reads: a tag named after it, the line in the main line),
 // Combwork offers to move G7 on to the next version (or to start it), and to take released versions off Other branches
 // work can merge into (G7b), each part on its own. Never applied by itself: Move… opens the Save… preview, Start… the

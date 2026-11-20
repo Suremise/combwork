@@ -16,6 +16,8 @@ import { CombworkError, combworkError } from '../combworkError'
 import type { OpsFor } from '../platform/repoOps'
 import { fmt, msg, tr } from '../../shared/i18n'
 import { withValues } from '../../shared/advanced'
+// HI-3126: how long a forward request waits for each remote branch it fetches: cw.queue.networkMinutes (HI-3372).
+import { platformLimits } from '../platform/limits'
 import { forwardOf } from '../../shared/workflow/compile'
 import { merges } from '../../shared/platform/descriptors'
 import { branchExists, defaultBranch, forwardSources, projectTargets, type ProjectTargets } from './targets'
@@ -26,8 +28,10 @@ import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import { withFileLock } from '../fsutil'
 import { CW_DIR } from '../../shared/defaults'
-import { boardRevision } from '../boardStore'
+import { changedCardsIn, changeMarksIn, queueRevision, upgradeWaiting, type ChangeMarks } from '../boardStore'
+import type { DatabaseSync } from 'node:sqlite'
 import { runCardIntent } from '../cardIntents'
+import { measured } from '../stallWork'
 import { onCombworkEvent } from '../events'
 import type { TaskActor } from '../tasks'
 import type { FolderChangeAction, QueueChangesSettled, QueuePauseRef, TaskCard } from '../../shared/types'
@@ -92,18 +96,20 @@ interface QueueScope {
  * `window`: the window's own detail, each target's forward merges and the returns' test seam.
  */
 export function queueViews(ws: WorkspaceService, projectPath: string, target?: string, window = false): Promise<QueueView[]> {
-  const stamp = viewsStamp(ws, projectPath)
-  if (stamp === null) return makeViews(ws, projectPath, target, window)
+  const stamp = viewsStamp(ws, projectPath)?.key ?? null
+  if (stamp === null) return makeViews(ws, projectPath, target, window).then((m) => m.views)
   const key = [ws.path!.toLowerCase(), projectPath.toLowerCase(), target ?? '', window ? 'window' : ''].join('\n') // i18n-ignore: a key, never shown
   const now = Date.now()
   for (const [k, e] of viewsKept) if (e.until <= now) viewsKept.delete(k)
   const had = viewsKept.get(key)
   if (had && had.stamp === stamp) return had.views
-  const entry: KeptViews = { stamp, until: now + VIEWS_KEPT_MS, views: makeViews(ws, projectPath, target, window) }
+  const made = makeViews(ws, projectPath, target, window)
+  const entry: KeptViews = { stamp, until: now + VIEWS_KEPT_MS, views: made.then((m) => m.views) }
   viewsKept.set(key, entry)
-  entry.views.then(
+  made.then(
     // A return seen leaves the listing RETURN_SEEN_SHOWN_MS after it was seen (recentOutcomes): kept until the first does.
-    (views) => (entry.until = Math.min(entry.until, ...views.flatMap((v) => v.returns.flatMap((r) => (r.seen ? [Date.parse(r.seen) + RETURN_SEEN_SHOWN_MS] : []))))),
+    // HI-3301: and never past what it read from git (its GitPart's own expiry, HR1's round 2).
+    ({ views, gitUntil }) => (entry.until = Math.min(entry.until, gitUntil, ...views.flatMap((v) => v.returns.flatMap((r) => (r.seen ? [Date.parse(r.seen) + RETURN_SEEN_SHOWN_MS] : []))))),
     () => void (viewsKept.get(key) === entry && viewsKept.delete(key))
   )
   return entry.views
@@ -130,44 +136,314 @@ onCombworkEvent((e) => {
 })
 
 /**
- * What a project's queue listings are made from, as a token: the board's revision (its facts, pauses, leases and seen
- * returns, committed here or by another process), this Combwork's hosts of the project's queues, its options written, the
- * rules switch and the test seam. Null when the board can't say (no listing is kept then).
+ * What a project's queue listings are made from, as a token (HI-3291: the project's own, so another project's change keeps
+ * them): its queue revision (HI-3296: its cards' rows, facts and child rows, committed here or by another process, less the
+ * writes no listing reads, such as comments, history and TargetMoved, plus its cards' blockers in any project changing:
+ * queueRevision) and its queue tables on the same snapshot (queueTables), this Combwork's hosts of the project's queues, its options written,
+ * the rules switch and the test seam. Null when the board can't say (no listing is kept then).
+ *
+ * HI-3301: given the marks a board part was made at (`since`), the cards changed since then, on the same snapshot.
  */
-function viewsStamp(ws: WorkspaceService, projectPath: string): string | null {
+function viewsStamp(ws: WorkspaceService, projectPath: string, since?: ChangeMarks): Stamp | null {
   if (!ws.path) return null
+  const name = boardName(ws, projectPath)
+  if (!name) return null
   try {
-    return [boardRevision(ws), queueHostsStamp(ws, projectPath), optionsWritten, workflowEnforced(), process.env.CW_TEST_QUEUE_RETURNS ?? ''].join('\n')
+    let tables = ''
+    let marks: ChangeMarks | null = null
+    let changed: ChangedCard[] | null = null
+    const rev = queueRevision(ws, name, (db) => {
+      tables = queueTables(db, name)
+      marks = changeMarksIn(ws, db)
+      changed = since ? changedCardsIn(ws, db, since, CHANGED_MOST) : null
+      return tables
+    })
+    if (rev === null || !marks) return null
+    const rest = [tables, queueHostsStamp(ws, projectPath), optionsWritten, workflowEnforced(), process.env.CW_TEST_QUEUE_RETURNS ?? ''].join('\n')
+    return { key: [rev, rest].join('\n'), rest, marks, changed }
   } catch {
     return null
   }
 }
 
-async function makeViews(ws: WorkspaceService, projectPath: string, target: string | undefined, window: boolean): Promise<QueueView[]> {
-  const wf = await workflowFor(ws, projectPath)
-  if (!wf) return []
-  // HI-2994: read for every listing, the window's or the API's: a queue's cards in flight keep it from being a past
-  // branch's (markPast, HI-2927), for agents as for the user.
-  const scope = await queueScope(wf, projectPath)
-  // HI-2679: each of the project's targets that exists, so a destination with nothing queued yet has its card (its
-  // reminder and its Bring up to date… button), and its queue is cw_queue's too.
-  const targets = scope.current ? await existingTargets(ws, projectPath) : []
-  const also = [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets]
-  const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope, window))
-  markPast(views, await projectTargets(ws, projectPath).catch(() => null))
-  // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
-  // HI-2892: only those in the release path's direction into it: none offered, none counted, against it.
+/**
+ * HI-3301: viewsStamp's answer: the token (`key`), all of it but the queue revision (`rest`), and, on the same snapshot,
+ * its change marks and the cards changed since the marks it was asked about (null: it can't say, or wasn't asked).
+ */
+interface Stamp {
+  key: string
+  rest: string
+  marks: ChangeMarks
+  changed: ChangedCard[] | null
+}
+type ChangedCard = { number: number; project: string }
+
+/** HI-3301: past this many cards changed since a board part was made, it is made again whole. */
+const CHANGED_MOST = 200
+
+/** A project's name on the board (its cards' `project`, its store's scope), as the workflow's store has it. */
+function boardName(ws: WorkspaceService, projectPath: string): string | null {
+  return ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.name ?? null
+}
+
+/**
+ * HI-3291: a project's queue tables as a token, on the caller's snapshot: its pauses (their files and commands), seen
+ * returns, runners (who holds each target: not when a lease was renewed, which shows nothing) and its workflow values
+ * (`workflow:<project>:…` in board_meta: purge marks, catch-up, push logs). Each is a few rows.
+ */
+function queueTables(db: DatabaseSync, project: string): string {
+  const all = (sql: string, ...args: string[]): unknown[] => db.prepare(sql).all(...args)
+  const prefix = `workflow:${project.toLowerCase()}:`
+  return JSON.stringify([
+    all('SELECT * FROM workflow_queue_pauses WHERE project = ? ORDER BY target', project), // i18n-ignore: SQL
+    all('SELECT * FROM workflow_queue_pause_files WHERE project = ? ORDER BY target, ord', project), // i18n-ignore: SQL
+    all('SELECT * FROM workflow_queue_pause_commands WHERE project = ? ORDER BY target, ord', project), // i18n-ignore: SQL
+    all('SELECT * FROM workflow_queue_pause_command_args WHERE project = ? ORDER BY target, command, ord', project), // i18n-ignore: SQL
+    all('SELECT entry, seen_at FROM workflow_queue_seen WHERE project = ? ORDER BY entry', project), // i18n-ignore: SQL
+    all('SELECT target, lease, token, profile, pid, started, taken_at FROM queue_runners WHERE project = ? ORDER BY target', project), // i18n-ignore: SQL
+    // board_meta's key is its primary key: a range of it (';' is the character after ':').
+    all('SELECT key, value FROM board_meta WHERE key >= ? AND key < ? ORDER BY key', prefix, `${prefix.slice(0, -1)};`) // i18n-ignore: SQL
+  ])
+}
+
+/**
+ * HI-3291: what a project's listings take from the board alone, kept while its stamp (viewsStamp) is unchanged and until the
+ * first seen return folds (`until`): its open cards, its cards in flight and each target's view. The listing's own
+ * VIEWS_KEPT_MS is for what it reads from git (the default branch, the targets, how far behind): once that is up, a listing
+ * is made again reading git, and this part is reused. One a project, per workspace.
+ */
+interface BoardPart {
+  stamp: string
+  /** HI-3301: the stamp but its queue revision, and the change marks it was read with (none without a stamp). */
+  rest: string
+  marks: ChangeMarks | null
+  until: number
+  inFlight: Map<string, number[]>
+  /** HI-3301: the target each card in flight is in flight into (inFlight's source, updated for the cards changed alone). */
+  flights: ReadonlyMap<number, string>
+  open: ReadonlyMap<number, CardRecord>
+  /**
+   * Each target's view (by target and window) and what it was made with beyond the facts naming its target. HI-3301:
+   * carried from the part before less every view the cards changed since then touch, asked for or not (HR1's round 1: a
+   * view not asked for in a part must not outlive a change it never saw), so each one here saw every change up to `marks`.
+   */
+  views: Map<string, KeptView>
+}
+const boardParts = new WeakMap<WorkspaceService, Map<string, BoardPart>>()
+
+/** HI-3301: the targets whose views were made (not carried), in order, for tests to see which were worked out again. */
+export const queueViewsMade: string[] = []
+
+/**
+ * HI-3301: a target's view as kept, with what decides whether a later part may use it: the cards in flight into it and
+ * whether the project's options merge into it when it was made (compared, as they come from all the project's cards and
+ * its options), and `deps`, every card its open entries' cards are blocked by (Done, missing or another project's ones
+ * too), the only cards it reads with no fact naming its target.
+ */
+interface KeptView {
+  target: string
+  view: QueueView
+  inFlight: string
+  current: boolean
+  deps: ReadonlySet<number>
+}
+
+/** HI-3301: what the cards changed since a board part touch (touchedBy): their targets, the cards, the project's own ones. */
+interface Touched {
+  targets: ReadonlySet<string>
+  cards: ReadonlySet<number>
+  own: readonly number[]
+}
+
+/** A board part's open cards and cards in flight, read whole. */
+function wholeSets(wf: Workflow): Pick<BoardPart, 'open' | 'flights'> {
+  return { open: new Map(wf.store.cardsOpen().map((c) => [c.id, c])), flights: flightsOf(wf, wf.store.cardsInFlight()) }
+}
+
+/** HI-3301: the part before's open cards and cards in flight, with the project's changed cards read and folded again. */
+function carriedSets(wf: Workflow, had: BoardPart, own: readonly number[]): Pick<BoardPart, 'open' | 'flights'> {
+  const open = new Map(had.open)
+  const flights = new Map(had.flights)
+  for (const n of own) {
+    open.delete(n)
+    flights.delete(n)
+  }
+  for (const c of own.length ? wf.store.cardsOpen(own) : []) open.set(c.id, c)
+  for (const [n, t] of own.length ? flightsOf(wf, wf.store.cardsInFlight(own)) : []) flights.set(n, t)
+  // In number order, as read whole (openPairs takes the first by number).
+  return { open: new Map([...open].sort((a, b) => a[0] - b[0])), flights }
+}
+
+/**
+ * The board part as the board is now: the one kept while its stamp is unchanged, else a new one (none kept without a
+ * stamp). HI-3301: a new one whose stamp differs from the kept one's only by its queue revision, with the cards changed
+ * since read on the stamp's snapshot, carries the kept views those cards can't touch; anything else (its rest changed, a
+ * seen return folded, another database or facts epoch, too many cards, a card it can't read) makes it whole.
+ */
+function boardPart(ws: WorkspaceService, wf: Workflow, projectPath: string): BoardPart {
+  const now = Date.now()
+  let byProject = boardParts.get(ws)
+  if (!byProject) boardParts.set(ws, (byProject = new Map()))
+  const key = projectPath.toLowerCase()
+  const live = byProject.get(key)
+  const had = live && live.until > now ? live : undefined
+  const stamp = viewsStamp(ws, projectPath, had?.marks ?? undefined)
+  if (stamp && had && had.stamp === stamp.key) return had
+  // A return seen leaves RETURN_SEEN_SHOWN_MS after it was seen (recentOutcomes reads the clock): kept until the first does.
+  const folds = [...wf.store.queueSeen().values()].map((at) => Date.parse(at) + RETURN_SEEN_SHOWN_MS).filter((t) => t > now)
+  const touched = stamp && had && had.rest === stamp.rest && stamp.changed ? touchedBy(wf, stamp.changed) : null
+  // Named in a stall they make (HI-3293). HI-3301: carried, only the project's changed cards are read and folded again.
+  const sets = measured('queue open cards and cards in flight', () => (touched && had ? carriedSets(wf, had, touched.own) : wholeSets(wf))) // i18n-ignore: a stall label for combwork.log, in English
+  const part: BoardPart = {
+    stamp: stamp?.key ?? '',
+    rest: stamp?.rest ?? '',
+    marks: stamp?.marks ?? null,
+    until: stamp === null ? 0 : Math.min(Infinity, ...folds),
+    ...sets,
+    inFlight: byTarget(sets.flights),
+    views: touched && had ? new Map([...had.views].filter(([, v]) => !touches(touched, v))) : new Map()
+  }
+  if (stamp === null) byProject.delete(key)
+  else byProject.set(key, part)
+  return part
+}
+
+/**
+ * HI-3301: the targets the changed cards of this project touch: each one's targets in its facts (requested, merged or
+ * returned into, so its earlier entries' too; a cancel's entry is one of its requests) and the target it started into; with
+ * every changed card (any project's: a blocker). Null when a card can't be read (the part is made whole).
+ */
+function touchedBy(wf: Workflow, changed: readonly ChangedCard[]): Touched | null {
+  const targets = new Set<string>()
+  const own: number[] = []
+  const project = wf.store.scope.project.toLowerCase()
+  try {
+    for (const c of changed) {
+      if (c.project.toLowerCase() !== project) continue
+      own.push(c.number)
+      for (const f of wf.store.facts(c.number)) {
+        if (f.kind === 'IntegrationRequested' || f.kind === 'Integrated' || f.kind === 'IntegrationFailed') targets.add((f.data as { target: string }).target)
+      }
+      const started = wf.state(c.number).started?.target
+      if (started) targets.add(started)
+    }
+  } catch {
+    return null
+  }
+  return { targets, cards: new Set(changed.map((c) => c.number)), own }
+}
+
+/** HI-3301: whether the changed cards touch a kept view: a fact naming its target, a card it started into, one of its blockers. */
+const touches = (t: Touched, v: KeptView): boolean => t.targets.has(v.target) || [...v.deps].some((d) => t.cards.has(d))
+
+/** HI-3301: every card a view's open entries' cards (queued or testing) are blocked by, as the part's open cards name them. */
+function depsOf(v: QueueView, open: ReadonlyMap<number, CardRecord>): Set<number> {
+  const out = new Set<number>()
+  for (const c of [...v.queued.map((q) => q.card), ...(v.testing ? [v.testing.card] : [])]) for (const b of open.get(c)?.blockedBy ?? []) out.add(b)
+  return out
+}
+
+/**
+ * HI-3301: what a project's listings read from git: the target its options merge into (its default branch when they name
+ * none), the targets that exist (HI-2679: each of the project's targets, so a destination with nothing queued yet has its
+ * card, its reminder and its Bring up to date… button, and its queue is cw_queue's too), the project's targets for
+ * markPast, and, for the window's, the forward sources (HI-2885: the default branch too, so a project with one target
+ * still brings it up to date with main; HI-2892: only those in the release path's direction), the default branch and how
+ * far behind each pair is. Kept for VIEWS_KEPT_MS from its read, whatever the board does (a board change used to read it
+ * all again); its options written or the rules switched read it again. One a project and kind (window, API).
+ */
+interface GitPart {
+  current: string | null
+  targets: string[]
+  named: ProjectTargets | null
+  sources: string[]
+  main: string | null
+  behind(from: string, to: string): Promise<number | null>
+}
+const gitParts = new WeakMap<WorkspaceService, Map<string, { key: string; until: number; part: Promise<GitPart> }>>()
+
+/** The git part as it is now, and when it expires (counted from its read's start: a listing made from it ends no later). */
+function gitPart(ws: WorkspaceService, wf: Workflow, projectPath: string, window: boolean): { part: Promise<GitPart>; until: number } {
+  const now = Date.now()
+  let byProject = gitParts.get(ws)
+  if (!byProject) gitParts.set(ws, (byProject = new Map()))
+  const at = `${projectPath.toLowerCase()}\n${window ? 'window' : ''}` // i18n-ignore: a key, never shown
+  const key = [optionsWritten, workflowEnforced()].join('\n')
+  for (const [k, e] of byProject) if (e.until <= now) byProject.delete(k)
+  const had = byProject.get(at)
+  if (had && had.key === key) return had
+  const entry = { key, until: now + VIEWS_KEPT_MS, part: readGit(ws, wf, projectPath, window) }
+  byProject.set(at, entry)
+  entry.part.catch(() => void (byProject.get(at) === entry && byProject.delete(at)))
+  return entry
+}
+
+async function readGit(ws: WorkspaceService, wf: Workflow, projectPath: string, window: boolean): Promise<GitPart> {
+  const o = wf.currentRuleset(false).options
+  let current: string | null = null
+  if (merges(o.platform) && o.finish === 'combworkMerges') {
+    const def = o.target ? o.target : await lineHistory().defaultTarget(projectPath).catch(() => null)
+    current = def && !isUnknown(def) ? def : null
+  }
+  const targets = current ? await existingTargets(ws, projectPath) : []
+  const named = await projectTargets(ws, projectPath).catch(() => null)
   // The window's alone (its Bring up to date… button and how far behind): not read for the API's listing.
   const sources = window && targets.length ? await forwardSources(ws, projectPath, targets) : []
   const main = sources.length > 1 ? await defaultBranch(ws, projectPath) : null
+  const counted = new Map<string, Promise<number | null>>()
+  const behind = (from: string, to: string): Promise<number | null> => {
+    const k = pairKey(from, to)
+    let n = counted.get(k)
+    if (!n) counted.set(k, (n = commitsBehind(projectPath, from, to)))
+    return n
+  }
+  return { current, targets, named, sources, main, behind }
+}
+
+/** A listing, and when the git part it was made from expires (HI-3301: a kept listing ends no later). */
+async function makeViews(ws: WorkspaceService, projectPath: string, target: string | undefined, window: boolean): Promise<{ views: QueueView[]; gitUntil: number }> {
+  // HI-3310: a board waiting for its upgrade to 1.0 has no queues, and lacks the tables and columns a listing reads: none,
+  // like the Assistant's changes (HI-1820). Never kept (it has no stamp), so the first listing after the upgrade reads them.
+  if (upgradeWaiting(ws.path!)) return { views: [], gitUntil: Infinity }
+  const wf = await workflowFor(ws, projectPath)
+  if (!wf) return { views: [], gitUntil: Infinity }
+  // HI-3291: the board part on the stamp as it is now, after the await (a change meanwhile has a stamp of its own).
+  const part = boardPart(ws, wf, projectPath)
+  // HI-3301: what the listing reads from git, kept for VIEWS_KEPT_MS whatever the board does (GitPart).
+  const gitKept = gitPart(ws, wf, projectPath, window)
+  const git = await gitKept.part
+  // HI-2994: read for every listing, the window's or the API's: a queue's cards in flight keep it from being a past
+  // branch's (markPast, HI-2927), for agents as for the user.
+  const scope: QueueScope = { inFlight: part.inFlight, current: git.current, open: part.open }
+  const targets = git.targets
+  const also = [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets]
+  // Each target's view from the board part, a copy (the listing marks it past and adds its forward merges). HI-3301: one
+  // carried from the part before is used while nothing it was made from changed (KeptView, Touched).
+  const viewOf = (t: string): QueueView => {
+    const k = `${t}\n${window ? 'window' : ''}` // i18n-ignore: a key, never shown
+    const inFlight = (scope.inFlight.get(t) ?? []).join(',')
+    const current = scope.current === t
+    const kept = part.views.get(k)
+    // Kept views saw every change up to the part's marks (BoardPart.views); those made from all the project's cards and
+    // its options are compared.
+    if (kept && kept.inFlight === inFlight && kept.current === current) return { ...kept.view }
+    const view = queueView(ws, wf, projectPath, t, scope, window)
+    part.views.set(k, { target: t, view, inFlight, current, deps: depsOf(view, scope.open) })
+    if (queueViewsMade.push(t) > 1000) queueViewsMade.splice(0, 500)
+    return { ...view }
+  }
+  // Named in a stall it makes (HI-3293): each queue's facts folded on main.
+  const views = measured('queue views', () => (target ? [target] : queueTargets(wf, also)).map(viewOf)) // i18n-ignore: a stall label for combwork.log, in English
+  markPast(views, git.named)
+  const { sources, main } = git
   // HI-3000: the pairs' open work, read once for the listing (the open cards alone folded), not per pair.
   const open = sources.length ? openPairs(wf, scope.open.values()) : new Map<string, CardRecord>()
   for (const v of views) {
     if (!targets.includes(v.target)) continue
-    const f = await forwardOfTarget(wf, open, projectPath, v.target, sources.filter((b) => b !== v.target && forwardDirection(b, v.target, main).dir === 'forward'))
+    const f = await forwardOfTarget(wf, open, git, v.target, sources.filter((b) => b !== v.target && forwardDirection(b, v.target, main).dir === 'forward'))
     if (f.others.length) v.forward = f
   }
-  return views
+  return { views, gitUntil: gitKept.until }
 }
 
 /**
@@ -202,13 +478,13 @@ async function existingTargets(ws: WorkspaceService, projectPath: string): Promi
  * A target's forward merges (HI-2679): the other branches it may be brought up to date with (forwardSources, HI-2892: in
  * the release path's direction), and how far behind each it is; HI-3000: and the card resolving that pair, while one is open.
  */
-async function forwardOfTarget(wf: Workflow, open: ReadonlyMap<string, CardRecord>, projectPath: string, to: string, sources: readonly string[]): Promise<QueueForward> {
+async function forwardOfTarget(wf: Workflow, open: ReadonlyMap<string, CardRecord>, git: GitPart, to: string, sources: readonly string[]): Promise<QueueForward> {
   const others = sources.filter((b) => b !== to)
   const behind: QueueForward['behind'] = []
   for (const from of others) {
     const r = open.get(pairKey(from, to))
     const resolving = r && wf.state(r).resolves ? { card: r.id, key: r.key } : null
-    behind.push({ from, commits: await commitsBehind(projectPath, from, to), ...(resolving ? { resolving } : {}) })
+    behind.push({ from, commits: await git.behind(from, to), ...(resolving ? { resolving } : {}) })
   }
   // HI-3126: under follow mode the window offers every source, whatever its local count (the request reads the remotes).
   return { others, behind, ...(followsRemote(wf) ? { follows: true } : {}) }
@@ -254,36 +530,33 @@ export async function commitsBehind(projectPath: string, from: string, to: strin
   return n
 }
 
-/**
- * Which of a project's cards are in flight under Combwork merges, by target (started, not Done: a card keeps the ruleset it
- * started with, so after a switch to "The agent merges" its queue stays until its last entry has an outcome), and the
- * target its current options merge into.
- */
-async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope> {
-  const inFlight = cardsInFlightByTarget(wf)
-  const o = wf.currentRuleset(false).options
-  let current: string | null = null
-  if (merges(o.platform) && o.finish === 'combworkMerges') {
-    const def = o.target ? o.target : await lineHistory().defaultTarget(projectPath).catch(() => null)
-    current = def && !isUnknown(def) ? def : null
-  }
-  return { inFlight, current, open: new Map(wf.store.cardsOpen().map((c) => [c.id, c])) }
-}
-
 /** Per target, the cards in flight whose own ruleset has Combwork merge into it, in number order (QueueScope.inFlight). */
 function cardsInFlightByTarget(wf: Workflow): Map<string, number[]> {
-  const inFlight = new Map<string, number[]>()
-  // Only the cards past Todo and not Done are read (#1629: the window polls this, and a board keeps every card it had).
-  // HI-3177: nor On Hold: a held card works toward no queue until it's taken out, so one held since its target was
-  // dropped (HI-1758, started into 1.0.0) doesn't keep that past branch's queue live; taken out, it counts again.
-  for (const card of wf.store.cardsInFlight()) {
+  return byTarget(flightsOf(wf, wf.store.cardsInFlight()))
+}
+
+/**
+ * The target each of these cards is in flight into under Combwork merges, by card. Only the cards past Todo and not Done
+ * are read (#1629: the window polls this, and a board keeps every card it had). HI-3177: nor On Hold: a held card works
+ * toward no queue until it's taken out, so one held since its target was dropped (HI-1758, started into 1.0.0) doesn't
+ * keep that past branch's queue live; taken out, it counts again.
+ */
+function flightsOf(wf: Workflow, cards: Iterable<CardRecord>): Map<number, string> {
+  const out = new Map<number, string>()
+  for (const card of cards) {
     const s = wf.state(card)
     if (!s.started || s.stage === 'todo' || s.stage === 'hold' || s.stage === 'done') continue
     const o = wf.rulesetOf(card, s).options
     const t = s.started.target
-    if (!merges(o.platform) || o.finish !== 'combworkMerges' || !t) continue
-    inFlight.set(t, [...(inFlight.get(t) ?? []), card.id])
+    if (merges(o.platform) && o.finish === 'combworkMerges' && t) out.set(card.id, t)
   }
+  return out
+}
+
+/** Cards by the target they are in flight into, each target's in number order (QueueScope.inFlight). */
+function byTarget(flights: ReadonlyMap<number, string>): Map<string, number[]> {
+  const inFlight = new Map<string, number[]>()
+  for (const [card, t] of [...flights].sort((a, b) => a[0] - b[0])) inFlight.set(t, [...(inFlight.get(t) ?? []), card])
   return inFlight
 }
 
@@ -677,8 +950,6 @@ const FORWARD_TEXT = {
   noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
 }
 
-/** HI-3126: how long a forward request waits for each remote branch it fetches (the window or the Assistant waits for it). */
-const FORWARD_FETCH_MS = 60_000
 
 /** Whether the project's targets follow their remotes now (G21: the options as they are, as the queue reads them). */
 function followsRemote(wf: Workflow): boolean {
@@ -714,7 +985,7 @@ async function forwardEnds(wf: Workflow, projectPath: string, from: string, to: 
   const P = historyFor(wf.cfg.options().platform)
   const pin = (branch: string): string => `refs/cw/forward/${branch.replace(/[^A-Za-z0-9._-]/g, '-')}`
   const remoteHead = async (branch: string, own: string): Promise<string> => {
-    const r = await P.trackedHead!(projectPath, branch, pin(branch), FORWARD_FETCH_MS)
+    const r = await P.trackedHead!(projectPath, branch, pin(branch), platformLimits.queueNetworkMs())
     if (isUnknown(r)) throw unreadableForward(from, to ?? from, r)
     return r === 'untracked' ? own : r
   }

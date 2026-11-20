@@ -1,11 +1,11 @@
-// Archived cards' attachments cleaned up (HI-1842, Darren's decisions of 27 Oct 2026), on the real board (a temp combwork.db):
+// Archived cards' attachments cleaned up (HI-1842), on the real board (a temp combwork.db):
 // only archived cards, the project's days after archiving (30 by default, Never keeps them); open and Done cards keep theirs,
 // as do cards brought back from the archive, or archived with their hidden or removed project. Round 2 (HR5's review): a
 // plan and an apply that checks it again in each card's change: only planned files
 // still the same on disk, in a folder of the project's own (never through a junction), of a card still archived in the
 // planned project and due under the project's setting now; a plan kept for Clean Up Now is used once, within its
 // workspace's lifetime; the plan's candidates leave out cards that can never be due; the automatic run waits for an idle PC.
-// Round 3 (no worker, Darren's decision): a project hidden or removed since the plan keeps its cards' files; one listener
+// Round 3 (no worker, as decided): a project hidden or removed since the plan keeps its cards' files; one listener
 // per workspace lifetime, however many previews and queueings.
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { getEventListeners } from 'events'
@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-cardcleanup-')
 const trashDir = join(base, 'trash')
@@ -129,7 +130,8 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     expect(r.bytes).toBeGreaterThan(0)
     expect(rows(w, archived.n)).toBe(0)
     expect(archived.paths.every((f) => !existsSync(f))).toBe(true)
-    await expect.poll(() => archived.paths.every((f) => trashed().some((t) => t.endsWith(f.split(/[\\/]/).pop()!)))).toBe(true)
+    // The Recycle Bin's move ends after the commit, in the background (HI-3349): bounded for a hung run, not Vitest's 1 s.
+    await expect.poll(() => archived.paths.every((f) => trashed().some((t) => t.endsWith(f.split(/[\\/]/).pop()!))), { timeout: timing('wait.hang') }).toBe(true)
     const after = await inWorkspace(w, () => tasks.getTask(archived.n))
     expect(after.archived).toBe(true)
     const said = after.comments.at(-1)!

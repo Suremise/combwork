@@ -10,6 +10,7 @@ import { DatabaseSync } from 'node:sqlite'
 import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { writeCardOutside } from './boardDb'
+import { timing } from './timing.cjs'
 
 // The card documents read (one card's, or a list of them), counted; the reads themselves unchanged.
 const reads = vi.hoisted(() => ({ docs: 0 }))
@@ -89,7 +90,7 @@ describe('placing a card on a big board (#458, #1017)', () => {
     // The last card in Hold, then removed: the next card goes after the one that is left.
     writeCardOutside(wsPath, 8, card(8, { column: 'hold', order: 500 }))
     writeCardOutside(wsPath, 9, card(9, { column: 'hold', order: 600 }))
-    const db = new DatabaseSync(boardFile(wsPath), { timeout: 5000 })
+    const db = new DatabaseSync(boardFile(wsPath), { timeout: timing('db.busyMs') })
     db.prepare('DELETE FROM cards WHERE number = 9').run()
     db.close()
     expect((await run(() => tasks.createTask({ title: 'After 8', project: 'p', column: 'hold' }, user))).order).toBe(501)

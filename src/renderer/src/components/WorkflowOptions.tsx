@@ -2,13 +2,17 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { OwnWorkflowProblem, ProjectInfo, RetargetPreview, RetargetResult, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import { accepts, hasCapability, hasOperation, merges, type PlatformId } from '@shared/platform/descriptors'
 import { allOff, formFinishes, formFolders, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
-import { GROUP_TEXT, optionDesc, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
+import { GROUP_TEXT, optionDesc, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT, WAKE_EVENT_TEXT, WAKE_LEVEL_TEXT } from '@shared/workflow/optionTexts'
+import { ASSISTANT_WAKES_DEFAULT, LANE_EVENTS, WAKE_EVENT_ORDER, WAKE_LEVELS, wakeEventsOf, type AssistantWakes, type WakeLevel } from '@shared/laneEvents'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX, FILE_LOCK_MODES } from '@shared/defaults'
 import { ManyAgentsNote } from './ManyAgentsNote'
 import { NumberField } from './NumberField'
 import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from '@shared/lanes'
+import { CHURN_MAX } from '@shared/loopLimits'
 import { compile, mustCompile } from '@shared/workflow/compile'
 import { STAGE_TEXT, stageNameProblems, stageNameProblemText, type StageNames } from '@shared/workflow/stages'
+import { guardProblems, guardProblemText, type MergeGuard } from '@shared/workflow/mergeGuards'
+import { MergeGuardsEditor } from './MergeGuardsEditor'
 import type { StageId } from '@shared/workflow/facts'
 import { shownText } from '@shared/advanced'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
@@ -27,6 +31,7 @@ import { overlayTemplateWorkflow } from '@shared/workflow/templateOptions'
 import { PLATFORM_NAME } from '@shared/platform/switching'
 import { isVersionBranch } from '@shared/nextVersion'
 import { MissingBranches, missingSaveText, newlyNamed, NextVersionButton, startNextVersion } from './NextVersion'
+import { afterSave, saveOff } from './workflowFormState'
 
 /**
  * The Version Control tab's Workflow section (#1418, SPEC §16.6; P4's plain form before it, #1278): the presets, each
@@ -94,6 +99,7 @@ const T = {
   readOnly: msg({ id: 'workflow.form.readOnly', defaultMessage: '{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.', description: 'Under “Reviewers” (G17) when some reviewing agents use a coding agent that Combwork can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names.' }),
   stageName: msg({ id: 'workflow.form.stageName', defaultMessage: 'Name of the stage {stage}', description: 'Accessible name of a stage’s name box under “Stage names” (glossary 2.2: stage). {stage} is its default name.' }),
   stageNamesValue: msg({ id: 'workflow.form.stageNamesValue', defaultMessage: '{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}', description: 'A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage).' }),
+  customWakesValue: msg({ id: 'workflow.form.customWakesValue', defaultMessage: 'Custom: {events}', description: 'An inherited value of the workflow option “Wake the Assistant for” (HI-3211) set to Custom: the events ticked, joined as a list (e.g. “A card fails review and A lane ends”).' }),
   fileLocksNote: msg({ id: 'workflow.form.fileLocksNote', defaultMessage: 'Applies to agents working in the same folder, outside a slot.', description: 'Under the workflow option “File locks”: a slot is a folder Combwork lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file.' }),
   loopsReadNote: msg({ id: 'workflow.form.loopsReadNote', defaultMessage: 'Read when a loop starts: a loop already running keeps its own, and one started with its own (“rounds: 5, wait: 2h”) keeps those.', description: 'Under the workflow options “Rounds” and “Wait (hours)” (Card loops), when a change applies. “rounds: 5, wait: 2h” is what the user types to an agent: keep it in English.' }),
   overMax: msg({ id: 'workflow.form.overMax', defaultMessage: 'This project has {count, plural, one {# agent} other {# agents}}: none is removed, but no agent can be added until it has fewer than {max, number}.', description: 'Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max}): nobody can add one (HI-2058), neither the user nor the Assistant.' }),
@@ -103,6 +109,7 @@ const T = {
   notEnforced: msg({ id: 'workflow.form.notEnforced', defaultMessage: 'Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.', description: 'A note atop Project Settings → Workflow while the switch "Workflow rules are enforced" is off.' }),
   invalid: msg({ id: 'workflow.form.invalid', defaultMessage: 'These options can’t be used, so every rule is off in this project:', description: 'A note atop Project Settings → Workflow: the saved options contradict each other or can’t be read; the reason follows.' }),
   save: msg({ id: 'workflow.form.save', defaultMessage: 'Save…', description: 'The button saving the workflow options (it shows what changes first).' }),
+  nothingToSave: msg({ id: 'workflow.form.nothingToSave', defaultMessage: 'No changes to save: the options shown are those saved.', description: 'HI-3333: the tooltip of the Save… button of the workflow options while it is off because nothing differs from the saved options.' }),
   saveBlocked: msg({ id: 'workflow.form.saveBlocked', defaultMessage: 'Resolve what the options say first.', description: 'The tooltip of Save… in the Workflow section while some options contradict each other (their reasons are shown under them).' }),
   discard: msg({ id: 'workflow.form.discard', defaultMessage: 'Discard Changes', description: 'The button dropping unsaved changes to the workflow options.' }),
   copy: msg({ id: 'workflow.form.copy', defaultMessage: 'Copy as JSON', description: 'The button copying the project’s workflow options as JSON, to paste into another project.' }),
@@ -159,7 +166,7 @@ const LEVEL_NAME: Record<PlatformId, Msg> = { none: T.levelNone, git: T.levelGit
 const LEVEL_FOR: Record<PlatformId, Msg> = { none: T.levelForNone, git: T.levelForGit, jj: T.levelForJj }
 
 /** A problem's sentence, in the window's language (an English reason when it has no message). */
-const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.why)
+const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.kind === 'guard' ? shownText(guardProblemText(p)) : p.why)
 
 /** A problem's lines: an inheriting project's (a level's save, #1422) names it, its reason on a line of its own. */
 const problemLines = (p: WorkflowProblem): string[] => (p.kind === 'inheritor' ? [tr(T.inheritor, { project: p.project }), ownProblemText(p.problem)] : [ownProblemText(p)])
@@ -286,11 +293,15 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   const draft = loaded?.for === source.key ? loaded.draft : null
   const error = failed?.for === source.key ? failed.error : null
 
-  /** The form as read (or saved) for a project, its draft reset to it; any read still under way is outdated by it. */
-  const show = useCallback((path: string, f: WorkflowForm): void => {
+  /**
+   * The form as read (or saved) for a project, its draft reset to it; any read still under way is outdated by it. A save's
+   * answer (`editedSince`: the draft's edits when it began) keeps a draft edited meanwhile (HI-3333).
+   */
+  const show = useCallback((path: string, f: WorkflowForm, editedSince?: number): void => {
     reads.current++
     if (pathRef.current !== path) return
-    setLoaded({ for: path, form: f, draft: { preset: f.preset, options: { ...f.own } } })
+    const editedMeanwhile = editedSince !== undefined && edits.current !== editedSince
+    setLoaded((l) => afterSave(l, path, f, editedMeanwhile))
     setProblems([])
     setFailed(null)
   }, [])
@@ -426,6 +437,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   const live = liveContradictions(effective)
   const stageProblems = stageNameProblems(effective.stageNames, tr)
   const blocked = contradictions(effective).length > 0 || stageProblems.length > 0
+  const off = saveOff({ dirty, settings: !!settings, blocked, missingBranches: missingNow?.names.length ?? 0 })
   const set = <K extends OptionKey>(key: K, value: WorkflowOptions[K]): void => setDraft({ ...draft, options: setOption(draft.options, effective, key, value) })
   const inheritKey = (key: OptionKey): void => {
     const { [key]: _gone, ...rest } = draft.options
@@ -447,10 +459,12 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   const save = async (offer?: string): Promise<void> => {
     // What the form was read with: the save is refused if the project's options are no longer these (#1418).
     const change: WorkflowChange = { ...draft, base: { preset: form.preset, options: form.own } }
+    // HI-3333: an edit made from here until the save returns stays in the draft, not replaced by what was saved.
+    const editedSince = edits.current
     const check = await source.check(change)
     setProblems(check.problems)
     if (check.problems.length) return
-    // Each option that changes, its value now and its new one (the Assistant for Darren: a list, never one sentence).
+    // Each option that changes, its value now and its new one (the Assistant for the user: a list, never one sentence).
     const changes = check.changed.flatMap((k) => {
       const title = k === 'platform' ? null : (optionTitle(k, platform, effective.folder) ?? OPTION_TEXT[k]?.title)
       return title && k !== 'platform' ? [tr(T.changeLine, { option: tr(title), from: valueText(k, form.options[k]), to: valueText(k, effective[k]) })] : []
@@ -469,7 +483,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       run: async () => {
         const path = source.key
         try {
-          show(path, await source.save(change, [...picked], offer))
+          show(path, await source.save(change, [...picked], offer), editedSince)
           // Saved: then what follows the new target, as previewed, each item rechecked; said whatever came of it.
           if (retargets && retarget.has('on')) {
             const r = await call('workflow:retarget', path, retargets).catch((e: unknown) => {
@@ -536,8 +550,10 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     const origin = originOf(key)
     const reasons = live[key] ?? []
     const stageReasons = key === 'stageNames' ? stageProblems : []
+    // HI-3284: each merge guard that can't be saved, as it is typed.
+    const guardReasons = key === 'mergeGuards' ? guardProblems(effective.mergeGuards) : []
     return (
-      <div className={cx('setting', 'workflow-option', (reasons.length > 0 || stageReasons.length > 0) && 'contradicted')} key={key} data-option={key}>
+      <div className={cx('setting', 'workflow-option', (reasons.length > 0 || stageReasons.length > 0 || guardReasons.length > 0) && 'contradicted')} key={key} data-option={key}>
         <div className="s-text">
           <div className="s-title">
             {key in draft.options && <span className="modified" />}
@@ -563,6 +579,11 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
           {stageReasons.map((p) => (
             <div className="workflow-contradiction" role="alert" data-stage-problem={`${p.stage}:${p.why}`} key={`${p.stage}:${p.why}`}>
               <Icon name="warning" /> {shownText(stageNameProblemText(p))}
+            </div>
+          ))}
+          {guardReasons.map((p) => (
+            <div className="workflow-contradiction" role="alert" data-guard-problem={`${p.guard}:${p.field}:${p.why}`} key={`${p.guard}:${p.field}:${p.why}`}>
+              <Icon name="warning" /> {shownText(guardProblemText(p))}
             </div>
           ))}
         </div>
@@ -597,12 +618,14 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     const carried = project?.agents.filter((a) => a.carriedSlot) ?? []
     if (key === 'folder' && effective.folder === 'slots' && carried.length) return <div className="s-desc" data-note="carried">{tr(T.carried, { agents: fmt.list(carried.map((a) => a.name)) })}</div>
     // A reviewer whose CLI can't be given folders reviews the builder's folder read-only (§16.10.5).
-    const readOnly = project?.agents.filter((a) => reviewsWork(agentWorkflowRole(a)) && !providerDescriptor(agentProviderOf(a)).capabilities.extraDirs) ?? []
+    const readOnly = project?.agents.filter((a) => reviewsWork(agentWorkflowRole(a)) && !providerDescriptor(agentProviderOf(a)).capabilities.session?.extraDirs) ?? []
     if (key === 'reviewerMode' && readOnly.length) return <div className="s-desc" data-note="read-only">{tr(T.readOnly, { agents: fmt.list(readOnly.map((a) => a.name)) })}</div>
     // The preferences (HI-1766): where file locks apply, and when a change reaches a loop.
     if (key === 'fileLocks') return <div className="s-desc" data-note="file-locks">{tr(T.fileLocksNote)}</div>
     if (key === 'loopRounds' || key === 'loopWaitHours') return <div className="s-desc" data-note="loop-read">{tr(T.loopsReadNote)}</div>
     if (key === 'loopStepWaitMinutes') return <div className="s-desc" data-note="step-wait">{tr(T.stepWaitNote)}</div>
+    // Wake the Assistant for (HI-3211): what the chosen level wakes it for, in full (each level clearly described).
+    if (key === 'assistantWakes') return <div className="s-desc" data-note="assistant-wakes">{tr(WAKE_LEVEL_TEXT[(effective.assistantWakes ?? ASSISTANT_WAKES_DEFAULT).level])}</div>
     // Maximum agents (HI-2001): above the default, what more agents cost here; below the agents there are, that none go.
     if (key === 'maxAgents') {
       const max = effective.maxAgents ?? AGENT_LIMIT_DEFAULT
@@ -678,6 +701,37 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         return <Switch checked={effective.loopWakes !== false} onChange={(v) => set('loopWakes', v)} />
       case 'fileLocks':
         return select('fileLocks', FILE_LOCK_MODES.map((m) => [m.value, tr(m.text.label)]))
+      case 'simplifyAt':
+      case 'churnStopAt':
+        // HI-3188: the churn's levels, 0 turning either off.
+        return <NumberField live value={draft.options[key] ?? null} min={0} max={CHURN_MAX} step={1} label={tr(optionTitle(key, platform)!)} inherit={valueText(key, form.inherited[key])} onCommit={(v) => (v === null ? inheritKey(key) : set(key, v))} />
+      case 'assistantWakes': {
+        // HI-3211: a level, or Custom's ticks (starting from the level it leaves, the first time). A question for the
+        // user is always counted: its tick is on and can't be changed.
+        const w: AssistantWakes = effective.assistantWakes ?? ASSISTANT_WAKES_DEFAULT
+        const level = (l: WakeLevel): void => set('assistantWakes', { level: l, events: l === 'custom' && !w.events.length ? wakeEventsOf(w) : w.events })
+        const tick = (e: (typeof LANE_EVENTS)[number], on: boolean): void => set('assistantWakes', { level: 'custom', events: LANE_EVENTS.filter((x) => (x === e ? on : w.events.includes(x))) })
+        return (
+          <div className="workflow-stack">
+            <select className="select" value={w.level} aria-label={tr(optionTitle('assistantWakes', platform)!)} onChange={(e) => level(e.target.value as WakeLevel)}>
+              {WAKE_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {tr(VALUE_TEXT.assistantWakes[l])}
+                </option>
+              ))}
+            </select>
+            {w.level === 'custom' && (
+              <div className="choice-list" role="group" aria-label={tr(optionTitle('assistantWakes', platform)!)} data-note="assistant-wake-events">
+                {WAKE_EVENT_ORDER.map((e) => (
+                  <label key={e} className="flex">
+                    <input type="checkbox" className="checkbox" checked={e === 'paused-user' || w.events.includes(e)} disabled={e === 'paused-user'} onChange={(x) => tick(e, x.target.checked)} /> {tr(WAKE_EVENT_TEXT[e])}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      }
       case 'loopRounds':
       case 'loopWaitHours':
       case 'loopStepWaitMinutes':
@@ -714,6 +768,10 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       case 'otherTargets':
         // HI-2556: branch names, comma separated, each once; none left inherits.
         return <DraftText value={(effective.otherTargets ?? []).join(', ')} placeholder={tr(T.otherTargets)} onCommit={(v) => { const b = [...new Set(list(v))]; if (b.length) set('otherTargets', b); else inheritKey('otherTargets') }} />
+      case 'mergeGuards':
+        // HI-3284: none left is a list of none (the level's own), not inherited: Inherit takes the level's above.
+        // A project's form previews what each guard already matches there (a level has no project to look in).
+        return <MergeGuardsEditor guards={effective.mergeGuards ?? []} project={source.level ? null : (project?.path ?? null)} onChange={(g) => set('mergeGuards', g)} />
       case 'stageNames':
         return <StageNamesEditor options={effective} onChange={(names) => (Object.keys(names).length ? set('stageNames', names) : inheritKey('stageNames'))} />
       default:
@@ -803,8 +861,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       {/* Discard Changes reads the form again too: a change elsewhere it skipped while the draft was unsaved (another level
           saved meanwhile, HI-1768) shows at once. */}
       <div className="workflow-actions">
-        <Tooltip content={blocked ? tr(T.saveBlocked) : missingNow?.names.length ? missingSaveText(missingNow.names) : null}>
-          <button className="btn primary" data-action="save" disabled={!dirty || !settings || blocked || !!missingNow?.names.length} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
+        <Tooltip content={off === 'noChanges' ? tr(T.nothingToSave) : off === 'blocked' ? tr(T.saveBlocked) : off === 'missingBranches' && missingNow ? missingSaveText(missingNow.names) : null}>
+          <button className="btn primary" data-action="save" data-off={off ?? undefined} disabled={!!off} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
             {tr(T.save)}
           </button>
         </Tooltip>
@@ -883,9 +941,16 @@ export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId
     return id ? tr(T.identityValue, { name: id.name, email: id.email }) : tr(T.off)
   }
   if (key === 'stageNames') return tr(T.stageNamesValue, { n: Object.keys((v as StageNames | undefined) ?? {}).length })
+  // HI-3284: the guards by name (the user's own words), or none.
+  if (key === 'mergeGuards') return Array.isArray(v) && v.length ? fmt.list((v as MergeGuard[]).map((g) => g.name)) : tr(T.noneValue)
   if (key === 'reviewers' || key === 'loopRounds' || key === 'maxAgents') return fmt.number(v as number)
+  if (key === 'simplifyAt' || key === 'churnStopAt') return v === 0 ? tr(T.off) : fmt.number(v as number)
   if (key === 'loopWaitHours') return tr(T.hoursValue, { n: v as number })
   if (key === 'loopStepWaitMinutes') return tr(T.minutesValue, { n: v as number })
+  if (key === 'assistantWakes') {
+    const w = v as AssistantWakes
+    return w.level === 'custom' ? tr(T.customWakesValue, { events: w.events.length ? fmt.list(w.events.map((e) => tr(WAKE_EVENT_TEXT[e]))) : tr(T.noneValue) }) : tr(VALUE_TEXT.assistantWakes[w.level])
+  }
   if (key === 'fileLocks') {
     const mode = FILE_LOCK_MODES.find((m) => m.value === v)
     return mode ? tr(mode.text.label) : String(v)

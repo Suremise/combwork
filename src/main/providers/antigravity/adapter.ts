@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'path'
 import { existsSync, mkdirSync, writeFileSync } from 'original-fs'
 import { cp, mkdir, rm, stat, writeFile } from 'original-fs/promises'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PathDataCopy, PermissionMode, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
-import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR, antigravityModeFlags } from '../../../shared/antigravity'
+import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR, antigravityModeFlags } from '../../../shared/providers/antigravity'
 import { ASSISTANT_AGENT_ID } from '../../../shared/assistant'
 import { TOOLS_SERVER } from '../../../shared/assistantTools'
 import { isProviderEnabled } from '../../../shared/providers'
@@ -33,7 +33,7 @@ import { AGY_ALLOW, agyForwardCommand, agyHookEnv, agyHooks, agyLockReply, agyNo
 // because agy keeps its conversations there (brain\<id>), with HOME left the user's. Each launch rewrites the profile's
 // MCP servers (Combwork's, with the launch's token). A workspace folder's own MCP servers the agent wasn't given refuse the
 // launch (profileConfig: agy can't be kept from starting them). The user's own global agy customizations (~\.gemini) are
-// never read (Darren, 7 Nov: hidden for now).
+// never read (hidden for now).
 // Hooks are HI-2545's (hooks.ts). Transcripts and usage are HI-2546's (transcript.ts, conversations.ts).
 
 const NAME = ANTIGRAVITY_DESCRIPTOR.name
@@ -46,7 +46,7 @@ const NOTICE = {
   autoUnknown: msg({ id: 'providers.antigravity.notice.autoUnknown', defaultMessage: 'Auto runs commands inside Antigravity’s own sandbox, which needs Windows 11 24H2 or later with the August 2026 update or later. Combwork couldn’t read this PC’s Windows version, so it can’t tell whether Auto applies here: if Antigravity refuses Auto or asks before commands, choose another mode in Agent Settings, or update Windows.', description: "Part of a notice as an Antigravity CLI agent starts in Auto mode where Combwork couldn't read the Windows version, so it can't tell whether Antigravity's sandbox applies. Auto is a permission mode, Agent Settings a place in Combwork: keep them; Windows 11 24H2 is a version." })
 }
 
-/** Provider Setup's first-run step (HI-2547, Darren's (a)). */
+/** Provider Setup's first-run step (HI-2547, (a)). */
 const SETUP = {
   needed: msg({ id: 'providers.antigravity.setup.needed', defaultMessage: 'Antigravity needs a one-time setup: its first-run screens. Until then each new agent shows them in its pane.', description: "Provider Setup and Settings → Providers: Antigravity CLI's first-run screens (a colour scheme, its terms of service) aren't done yet." }),
   action: msg({ id: 'providers.antigravity.setup.action', defaultMessage: 'Set up', description: "Provider Setup's button: opens Antigravity CLI's first-run screens in a terminal." }),
@@ -259,6 +259,38 @@ export function statusLineConversation(body: Record<string, any>): string | null
 export class AntigravityAdapter implements ProviderAdapter {
   readonly id = ANTIGRAVITY
   readonly descriptor = ANTIGRAVITY_DESCRIPTOR
+  // Its capability parts (ProviderAdapter), each implemented by this class's own members: a getter, so an object made from
+  // this one (Object.create) is its own parts too.
+  get install(): this {
+    return this
+  }
+  get launch(): this {
+    return this
+  }
+  get hooks(): this {
+    return this
+  }
+  get status(): this {
+    return this
+  }
+  get modes(): this {
+    return this
+  }
+  get transcript(): this {
+    return this
+  }
+  get usage(): this {
+    return this
+  }
+  get models(): this {
+    return this
+  }
+  get compaction(): this {
+    return this
+  }
+  get projectFiles(): this {
+    return this
+  }
   /** agy's account and updater variables are handled in its own environment (antigravityEnv): nothing for every child. */
   readonly envToStrip: string[] = []
   /** agy is checked in its sessions' environment (antigravityEnv), which these switches change. */
@@ -324,7 +356,7 @@ export class AntigravityAdapter implements ProviderAdapter {
   }
 
   /**
-   * A removed agent's private profile goes to the Recycle Bin (HI-2731, Darren's decision of 7 Nov): its rules, MCP config
+   * A removed agent's private profile goes to the Recycle Bin (HI-2731): its rules, MCP config
    * and conversations are its alone, and no new agent has its id. Agents a template load replaced keep theirs, which the
    * load's undo gives back with their ids.
    */
@@ -649,3 +681,6 @@ export class AntigravityAdapter implements ProviderAdapter {
 }
 
 export const antigravity = new AntigravityAdapter()
+
+/** The adapter, as the registry finds it (src/main/providers/index.ts, HI-3201). */
+export default antigravity

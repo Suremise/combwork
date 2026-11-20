@@ -7,6 +7,13 @@ tests run git with no global config, as CI does), `cliHomes.ts` (each test file 
 Copilot homes, never the user's, whatever the shell sets: HI-1703), `loggerListeners.ts` (takes off the process
 listeners a test's fresh load of the logger added: HI-1728), and `electron-stub.ts` standing in for `electron`.
 
+**Which Node runs them** (HI-3435): CI runs the unit tests on the Node inside the Electron Combwork ships, not the
+latest Node 24, because the tests use `node:sqlite` directly, and the SQLite it bundles changes with Node's version.
+The runner's Node 24.22.3 had SQLite 3.54.1, which opens a WAL database whose -shm another process maps, where Electron
+44.10's 3.53.4 refuses it (HI-3426, the HI-2199/HI-2200 waits): CI then skipped the product's open-and-wait path.
+`scripts/installElectronCi.mjs --node` reads that version from the installed Electron, and CI fails if the Node running
+the tests doesn't match it (`--check-node`, which says on any machine whether the local Node matches).
+
 **The test area** is `%LOCALAPPDATA%\combwork-test` (`testArea.cjs`): the test profiles, the signed-in Claude Code and
 Codex test homes, the scenario baselines and results, the e2e lanes and logs, the Sandbox reports and the runs' temp
 folders. Before 1.1 it had the old name: `npm run test:move-area` (`moveTestArea.mjs`, HI-2590) moves it once, one way,
@@ -25,7 +32,12 @@ scanning setting covers the test area, and thousands of folders made and removed
 Vitest's own copies of the modules, Combwork's code under test and the programs tests start (git) put theirs there. The e2e
 and scenario runners do the same for their suites (HI-2102: Playwright's `playwright-artifacts-*`, the test copies of
 Combwork, the CLIs), and remove theirs as they exit (an e2e run with `--record` keeps it). Each run has its own folder
-there, `run-<pid>-<random>` (`runTemp.mts`), and a run's start removes those older than a day whose run has ended, as the board's evidence rules allow
+there, `run-<pid>-<random>` (`runTemp.mts`). Before a run makes it the temp folder, it starts a keeper, Git's `cat.exe`
+with the user's temp folder, which lives as long as the run (`msysTemp.mts`, HI-3447). If the keeper doesn't start, the run
+stops before it starts anything. Git Bash keeps one mount table per
+Windows session, and the first MSYS process sets its `/tmp` from its own temp folder. A run's hook or shell started as
+that first process fixed `/tmp` at the run's folder for every Git Bash on the PC until all of them ended, long after the
+run had removed the folder. A run's start also removes the run folders older than a day whose run has ended, as the board's evidence rules allow
 (`e2e/evidence.cjs`: nothing an open card cites, nothing while the board can't be read). A
 unit run's is removed once the run has ended (`tempRun.ts`, #995), with whatever Combwork's code wrote
 late; and every folder `tempDir()` makes is removed when its test file ends (`tempCleanup.ts`), after the file's own
@@ -89,8 +101,8 @@ Anyone who clones the repository must get the same results, on any machine and u
 - **A timeout bounds a hung run, and never makes a test pass.** Make it generous, and name or explain it. Raising a
   timeout isn't a fix: a change that raises one says why, in the code and on the card.
 - **Every wait states its bound** (#570). No `vi.waitFor`, `expect.poll` or `until` is left to its default (Vitest's
-  1 s is a time budget under load; until's 10 s is a default nobody chose): each passes a named bound for a hung run,
-  `HUNG_MS` (10–30 s) in the file, as `until(fn, HUNG_MS)` or `{ timeout: HUNG_MS }`. A bound under 5 s is a time
+  1 s is a time budget under load; until's default is a value nobody chose): each passes a named bound for a hung run
+  from the timing file (below), as `until(fn, lib.timing('hang.ui'))`, `waitUntil(fn)` or `{ timeout: timing('wait.hang') }`. A bound under 5 s is a time
   budget, so it needs a comment saying why it is short: a retry's pace (press again if this one was lost), or a quiet
   period that is the point of the check (nothing comes within it).
 - **Wait for Combwork to settle, not for a quiet spell.** Watches and loop wakes finish their work in the background (a
@@ -137,6 +149,61 @@ lines before its check, and a wait under another helper's name; and a comment co
 Reviewers look for those and judge the reasons. `-- --all` lists every such wait and sleep in the tests, the older
 ones too (the backlog in #524's audit); it is a report and exits 0. Builders run the default check before Review, and reviewers fail a new or changed test that sleeps and then
 checks, reads state once after an action, or raises a timeout with no stated reason.
+
+## Timing: every wait and timeout by name, in one file (HI-3378) <a id="timing"></a>
+
+Every test wait and timeout reads a name from **`tests/timing.json`**, never a number written in place, so a run can
+tighten or loosen them in one place. Read one with `timing(name)` from `tests/timing.cjs` (unit tests import it, or
+`waitUntil`/`waitOptions` from `tests/waits.ts`; e2e suites have it as `lib.timing`); an unknown name throws, so a typo
+can't become a default. Each entry says its kind:
+
+- **`hang`**: generous, it only bounds a hung run: `test.hang` (a unit test, `vitest.config.ts`' testTimeout),
+  `wait.hang` (a unit test's wait), `spawn.hang`, `hang.ui` (an e2e wait for the window, and Playwright's default),
+  `hang.step` (a step of Combwork's), `hang.slow`, `app.readyMs`, `suite.limitMs` and the rest. A unit test's come in
+  steps for what it drives: `test.hang`, `test.hangReal` (real git or processes at length), `test.hangRealJj` (the real
+  jj), `test.hangStress`; the same for `wait.*` and `spawn.*`; `db.busyMs` is a test's SQLite busy timeout.
+- **`budget`**: narrow on purpose: a performance check, its number the point (`budget.promptEndMs`: an end that must come
+  well before the slow path's own limit; `budget.scanMs`: a scan that must stay linear; one of its own where a check has
+  its own number). A budget must stay under what it guards: a check that something ends before a 60 s wait never reads
+  a hang name, which is as long as the wait.
+- **`quiet`** and **`pace`**: a window where nothing happening is the point (`quiet.nothingMs`, `quiet.unitMs`,
+  `quiet.briefMs`), a sleep that paces input (`pace.tick`, a turn of the event loop; `pace.shortMs`).
+- **`interval`**: how often a wait looks. **`seam`**: a value given to one of Combwork's `CW_TEST_*` seams.
+- **`lock`**: an ownership threshold (`runner.lockStaleMs`: when one run may take another's claims lock on this
+  shared machine), never scaled.
+
+**To check a narrow result**, change the value in one place, without touching a test:
+
+- a file of your own, of the same shape or plain numbers by name, named by **`CW_TEST_TIMING`** (merged over the
+  defaults by name; a name it gives that the file doesn't have is an error). CI commits `tests/timing.ci.json` and
+  sets it once in its workflow;
+- **`CW_TEST_TIMING_SCALE=<n>`**: multiplies the `hang` values alone (a slow machine), never a budget, a quiet window, a
+  pace, an interval or a lock's age.
+
+Every value in force is a whole number of ms from 1 to a Node timer's most (2^31 − 1), after an override and a scale, or
+loading fails; names are own properties only (`constructor` is no timing).
+
+Both are passed from the e2e runner to its suites (`PASS_ENV` in `tests/e2e/runContext.cjs`). The Sandbox checks' scripts
+(`tests/sandbox`, HI-3393) read the same file. The tests folder is mapped whole into the Sandbox, so the scripts inside
+it read the defaults: the host's `CW_TEST_TIMING` doesn't reach them. `muse-real/stage.mjs` copies `timing.json` beside
+the bundle it stages. A new kind of wait gets
+a new name in `tests/timing.json`, with its kind and a note.
+
+**`check:repo` fails a number written in place** (`npm run test:waits -- --literals`, `scripts/timingLiterals.mjs`):
+a test's or hook's timeout, `vi.setConfig`'s limits, a `timeout:` value, `until`'s bound (`until(check, N)`, whatever
+expression gives the check; only a literal first argument, as in `until('reads', 2)`, counts something else), `sleep`/`waitForTimeout`, a
+Promise around `setTimeout`, a `Date.now() - t < N` loop, a `*_MS` constant, or `toBeLessThan(N)` on a clock reading,
+anywhere in `tests/**` (fakes, fixtures and the timing files apart; simulated time is none). A number that is no wait
+(a value under test, a child's own lifetime) says `timing-ok: <why>` on its line or the line above: a timeout whose
+expiry the test checks (`{ timeout: 5000 }` then `timedOut: true`, a SQLite `timeout: 0` refused at once) keeps its
+number, since a hang name there would only make the test wait longer for the same result.
+Each file is parsed (`@babel/parser`, its syntax tree), so a call counts as the call it is: written over several lines,
+with a trailing comma or a regular expression inside, or made by `it.each(…)(…)`; text that only looks like a wait (in a
+string, a template, a regular expression or a comment) is none, and a file that can't be parsed is a finding of its own. `tests/timingAllow.json` is the backlog not migrated yet (the
+unit tests are off it since HI-3381; HI-3382 for e2e and scenarios), **by occurrence**: each existing literal's kind and line text. A literal it
+doesn't cover fails, in a backlog file too (one added, or one changed); an entry with no literal left fails until
+`node scripts/testWaits.mjs --literals --shrink` drops it, which never adds one. `-- --literals --all` prints the backlog,
+per file.
 
 A test that flakes anyway is investigated with the `investigate-flake` skill (`.claude/skills`, `.agents/skills`).
 

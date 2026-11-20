@@ -26,6 +26,16 @@
   "api.agent.freshWhySession": {
     "placeholders": {}
   },
+  "api.agent.idleResume": {
+    "placeholders": {
+      "agent": "plain",
+      "session": "plain",
+      "idle": "plain",
+      "size": "select",
+      "tokens": "plain",
+      "bytes": "plain"
+    }
+  },
   "api.agent.inputDisabled": {
     "placeholders": {}
   },
@@ -354,6 +364,11 @@
   "api.card.lanePosition": {
     "placeholders": {}
   },
+  "api.card.lineCommentsState": {
+    "placeholders": {
+      "state": "plain"
+    }
+  },
   "api.card.madeKind": {
     "placeholders": {
       "kind": "plain"
@@ -375,6 +390,12 @@
     "placeholders": {
       "position": "plain",
       "column": "plain"
+    }
+  },
+  "api.card.noFeedback": {
+    "placeholders": {
+      "card": "plain",
+      "batch": "plain"
     }
   },
   "api.card.notANumber": {
@@ -496,6 +517,11 @@
   },
   "api.change.addConnection": {
     "placeholders": {}
+  },
+  "api.change.answerSimplify": {
+    "placeholders": {
+      "card": "plain"
+    }
   },
   "api.change.cancelMessages": {
     "placeholders": {
@@ -969,6 +995,13 @@
       "project": "plain"
     }
   },
+  "api.done.answerSimplify": {
+    "placeholders": {
+      "card": "plain",
+      "title": "plain",
+      "choice": "select"
+    }
+  },
   "api.done.branchCreated": {
     "placeholders": {
       "name": "plain",
@@ -1315,6 +1348,15 @@
       "port": "plain"
     }
   },
+  "api.http.requestKey": {
+    "placeholders": {}
+  },
+  "api.http.requestKeyReused": {
+    "placeholders": {}
+  },
+  "api.http.requestsBusy": {
+    "placeholders": {}
+  },
   "api.http.tokenFileNote": {
     "placeholders": {}
   },
@@ -1328,6 +1370,9 @@
     "placeholders": {}
   },
   "api.inbox.readArg": {
+    "placeholders": {}
+  },
+  "api.inbox.staleLaunch": {
     "placeholders": {}
   },
   "api.intent.acceptArg": {

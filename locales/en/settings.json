@@ -31,6 +31,10 @@
     "defaultMessage": "Checked {when}",
     "description": "The tooltip of a connection's state (Settings → Accounts & Connections): when it was last checked. {when} is how long ago (\"5 min ago\")."
   },
+  "settings.accounts.cliGone": {
+    "defaultMessage": "{cli}'s description is gone (removed, or its id changed), so this connection can't be used. Remove it, or put the description back and choose Reload.",
+    "description": "A warning on a connection (Settings → Accounts & Connections, HI-3270) whose coding agent CLI ran from a description file the user removed or renamed. {cli} is the CLI's id from that file (such as mycli). Reload is the button in Settings that reads the CLIs' descriptions again."
+  },
   "settings.accounts.closeRunningConfirm": {
     "defaultMessage": "Close Terminal",
     "description": "The confirm button of that dialog: ends the CLI and hides its terminal."
@@ -327,6 +331,10 @@
     "defaultMessage": "resets {when}",
     "description": "Beside a plan-usage bar (HI-2528): the limit resets another day; {when} is a weekday and time (\"Thu 09:00\") or a date and time further out. Lower case, after the bar's percentage."
   },
+  "settings.accounts.reviewCopies": {
+    "defaultMessage": "review copies",
+    "description": "In the list after \"Not trusted yet in this workspace:\" (settings.accounts.notTrusted), beside project names (HI-3337): the workspace's worktrees folder, where reviewers' review copies are, which the coding agent CLI doesn't trust yet. Lower case, a list item."
+  },
   "settings.accounts.sameLoginAccount": {
     "defaultMessage": "Signed in to the same login as another account: {names}",
     "description": "A warning on an account (Settings → Accounts & Connections, HI-2107): other accounts are signed in as the same login. {names} is their names, listed."
@@ -342,6 +350,10 @@
   "settings.accounts.setUpIn": {
     "defaultMessage": "It opens in {project}'s folder, {folder}: answer {cli}'s question to trust it.",
     "description": "Above a connection's Set Up terminal when it opens in a project's folder its coding agent CLI ({cli}) doesn't trust yet (HI-1870): {project} is the project's name, {folder} the folder."
+  },
+  "settings.accounts.setUpInCopies": {
+    "defaultMessage": "It opens in this workspace's worktrees folder, {folder}, where reviewers' review copies are: answer {cli}'s question to trust it. Until then, reviewers on this connection review without a copy, since {cli} would ask about it at every start.",
+    "description": "Above a connection's Set Up terminal when it opens in the open workspace's worktrees folder (HI-3337): the coding agent CLI ({cli}) asks about the reviewers' review-copies folder at each start until it trusts this folder once. {folder} is the folder."
   },
   "settings.accounts.setUpInWorkspace": {
     "defaultMessage": "It opens in this workspace's folder, {folder}: answer {cli}'s question to trust it, and with it every project in it that isn't a Git repository. A Git repository is asked in its own folder next.",
@@ -763,6 +775,22 @@
     "defaultMessage": "Offer auto mode's environment setup",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto mode is one of Claude Code's permission modes."
   },
+  "settings.advanced.claude-code.background.idField.desc": {
+    "defaultMessage": "The field of `claude agents --json` with a background session's id (the one `claude stop` takes). Stop It and Resume reads it to see the session has stopped before resuming its conversation (HI-3376). Wrong, Combwork can't tell, and Stop It and Resume says so instead of resuming.",
+    "description": "What the advanced setting \"Background sessions: job id field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude agents --json`, `claude stop` and Stop It and Resume (a button's name) as they are."
+  },
+  "settings.advanced.claude-code.background.idField.title": {
+    "defaultMessage": "Background sessions: job id field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.claude-code.background.pidField.desc": {
+    "defaultMessage": "The field of `claude agents --json` with a background session's own process id (not its background service's). Stop It and Resume waits for that process to be gone before resuming its conversation (HI-3376). Wrong, Combwork relies on the listing alone.",
+    "description": "What the advanced setting \"Background sessions: process field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude agents --json` and Stop It and Resume (a button's name) as they are."
+  },
+  "settings.advanced.claude-code.background.pidField.title": {
+    "defaultMessage": "Background sessions: process field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
   "settings.advanced.claude-code.connections.remoteModels.desc": {
     "defaultMessage": "The model names Ollama runs on ollama.com rather than on this PC (its cloud models, such as gpt-oss:120b-cloud), as a regular expression, for an Ollama connection's models typed in rather than read from Ollama (Read Models asks Ollama, which says). Such a connection's sessions aren't free (local). Wrong, a cloud model typed in is counted as free, or a local one as not free.",
     "description": "What the advanced setting \"Connections: Ollama cloud models\" is for, and what goes wrong when it is wrong (Settings → Advanced). Ollama, ollama.com and Read Models (a button) are names; \"free (local)\" is how Combwork shows the cost of sessions run only on this PC."
@@ -850,6 +878,14 @@
   "settings.advanced.claude-code.memory.setting.title": {
     "defaultMessage": "Auto memory folder setting",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. Auto memory is Claude Code's own notes it keeps per project."
+  },
+  "settings.advanced.claude-code.monitor.expired.desc": {
+    "defaultMessage": "What a Monitor's last notification says when its time limit ends it, as a regular expression; its other notifications report events while it runs on. Wrong, an agent whose Monitor expires shows finished, with a notification, as its expiry wakes it.",
+    "description": "What the advanced setting \"Transcript: Monitor expired\" is for, and what goes wrong when it is wrong (Settings → Advanced). A Monitor is a Claude Code tool that watches a long-running command in the background."
+  },
+  "settings.advanced.claude-code.monitor.expired.title": {
+    "defaultMessage": "Transcript: Monitor expired",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A Monitor is a Claude Code tool that watches a long-running command in the background."
   },
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": {
     "defaultMessage": "Right-click in a Claude Code pane is Combwork's, as in every pane: it copies the terminal's selection, or pastes. Turned on, Combwork passes right-clicks to Claude Code instead. Claude Code doesn't use the mouse at its prompt, so there a right-click then does nothing: copy and paste with Ctrl+C and Ctrl+V.",
@@ -1268,7 +1304,7 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.mcp.startupTimeoutSeconds.desc": {
-    "defaultMessage": "How long Codex waits for Combwork's combwork server to start, when your own Codex config has a server named combwork with a startup timeout of its own: Combwork gives Codex this one instead (otherwise Codex's own, 10 s, applies). Too short, and Codex agents start without Combwork's tools.",
+    "defaultMessage": "How long Codex waits for Combwork's combwork server to start: Combwork gives Codex this one for it at every launch, over Codex's own (10 s) and over a startup timeout your own Codex config sets for a server named combwork. Too short, and Codex agents start without Combwork's tools.",
     "description": "What the advanced setting \"Combwork tools: startup timeout in Codex\" is for, and what goes wrong when it is wrong (Settings → Advanced). combwork is the name of Combwork's MCP server."
   },
   "settings.advanced.codex.mcp.startupTimeoutSeconds.title": {
@@ -1379,12 +1415,36 @@
     "defaultMessage": "Don't offer a cheaper model near the limit",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork (HI-2609): Codex's offer to switch to a cheaper model when the account nears its usage limit."
   },
+  "settings.advanced.codex.rateLimits.defaultLimitId.desc": {
+    "defaultMessage": "The id of Codex's own plan limits (its 5-hour and weekly ones). A reading with another id is a limit of its own, shown by its name. Wrong, Codex's own limits are shown as a separate limit, and their earlier readings and warnings start again.",
+    "description": "What the advanced setting \"Session file: Codex's own limit id\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.rateLimits.defaultLimitId.title": {
+    "defaultMessage": "Session file: Codex's own limit id",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
   "settings.advanced.codex.rateLimits.field.desc": {
     "defaultMessage": "The field of Codex's token counts with a subscription's limits. Wrong, Combwork shows no plan limits for Codex.",
     "description": "What the advanced setting \"Session file: plan limits field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
   },
   "settings.advanced.codex.rateLimits.field.title": {
     "defaultMessage": "Session file: plan limits field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.codex.rateLimits.limitId.desc": {
+    "defaultMessage": "The plan limits' field naming which of Codex's limits they are. Wrong, Combwork takes every reading for Codex's own limit, and a second limit's figures are mixed into it.",
+    "description": "What the advanced setting \"Session file: limit's id field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.rateLimits.limitId.title": {
+    "defaultMessage": "Session file: limit's id field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.codex.rateLimits.limitName.desc": {
+    "defaultMessage": "The plan limits' field with the name Codex gives a limit other than its own. Wrong, Combwork names such a limit by its id.",
+    "description": "What the advanced setting \"Session file: limit's name field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.codex.rateLimits.limitName.title": {
+    "defaultMessage": "Session file: limit's name field",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.codex.rateLimits.usedPercent.desc": {
@@ -1895,6 +1955,14 @@
     "defaultMessage": "Suggest a shorter title past",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in characters (\"80 characters\"): the length of a card title an agent writes past which Combwork suggests a shorter one."
   },
+  "settings.advanced.cw.cli.probeSeconds.desc": {
+    "defaultMessage": "How long each coding agent's CLI gets to print its version when Combwork looks for it (at start, Check Again, after an install). One that takes longer is skipped and shows as not installed: a CLI's first start, with antivirus scanning it on a slow disk, can take tens of seconds.",
+    "description": "What the advanced setting \"Finding the CLIs: version check timeout\" does (Settings → Advanced, under Combwork). A CLI is the command-line program of a coding agent (Claude Code, Codex)."
+  },
+  "settings.advanced.cw.cli.probeSeconds.title": {
+    "defaultMessage": "Finding the CLIs: version check timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\")."
+  },
   "settings.advanced.cw.console.showText.desc": {
     "defaultMessage": "Show the text in the developer console: prompts, replies, commands and tools' arguments, under a banner saying it is unredacted, and start each recording with its text box ticked. Tokens, API keys and sign-in details stay masked whatever this says; agents' cw_console stays redacted, and a recording with text is never attached to Copy Diagnostics.",
     "description": "What the advanced setting \"Developer console: show prompt, reply and command text\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
@@ -1919,6 +1987,14 @@
     "defaultMessage": "Reviewers review in review copies",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork. A review copy is a folder Combwork keeps at the exact revision a reviewer reviews, which nothing else writes."
   },
+  "settings.advanced.cw.db.busySeconds.desc": {
+    "defaultMessage": "How long a write to the board, the Assistant's journal or the usage history waits while another program (another Combwork on this workspace, a script) holds its database's lock, before the write is refused. It bounds a wait, not a speed: a write to the board waits on Combwork's main thread, so the window doesn't respond while it waits. Takes effect after Combwork restarts.",
+    "description": "What the advanced setting \"Databases: wait for another program's lock\" does (Settings → Advanced, HI-3374). The window not responding while it waits is a real warning: keep it."
+  },
+  "settings.advanced.cw.db.busySeconds.title": {
+    "defaultMessage": "Databases: wait for another program's lock",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"15 s\")."
+  },
   "settings.advanced.cw.disableHardwareAcceleration.desc": {
     "defaultMessage": "Draw Combwork without the graphics card, for a graphics driver that leaves Combwork's window blank, flickering or crashing. Terminals then draw without WebGL. Takes effect when Combwork restarts; to start once without it, run Combwork with --disable-gpu.",
     "description": "What the advanced setting \"Disable hardware acceleration\" is for, and what goes wrong when it is wrong (Settings → Advanced). --disable-gpu is a command-line option: keep it."
@@ -1934,6 +2010,22 @@
   "settings.advanced.cw.focused.pickSeconds.title": {
     "defaultMessage": "Focused tests: longest the choice of tests runs",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge."
+  },
+  "settings.advanced.cw.git.commitMinutes.desc": {
+    "defaultMessage": "How long Commit and Set aside of a folder's changes may run, the repository's pre-commit hook, filters and signer included, before Combwork ends git as stuck. You can cancel one from the window at any time: this is a last resort for one nobody is watching. Raise it if a hook really runs longer.",
+    "description": "What the advanced setting \"Git: longest a commit or set aside takes\" does, and when to change it (Settings → Advanced, HI-3372)."
+  },
+  "settings.advanced.cw.git.commitMinutes.title": {
+    "defaultMessage": "Git: longest a commit or set aside takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes. Commit and Set aside are the buttons that commit or stash a folder's uncommitted changes (HI-3372)."
+  },
+  "settings.advanced.cw.git.networkMinutes.desc": {
+    "defaultMessage": "How long Fetch, Pull and Push in Version Control (and Push to…, pushing a tag, deleting remote branches) may run, a sign-in window included, before Combwork ends git as stuck. You can cancel one from the window at any time; raise it for a large first fetch or push on a slow connection.",
+    "description": "What the advanced setting \"Git: longest a fetch, pull or push takes\" does, and when to change it (Settings → Advanced, HI-3372). Push to… is an action's name."
+  },
+  "settings.advanced.cw.git.networkMinutes.title": {
+    "defaultMessage": "Git: longest a fetch, pull or push takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the Fetch, Pull and Push actions in Version Control (HI-3372)."
   },
   "settings.advanced.cw.guidance.desc": {
     "defaultMessage": "With Combwork's tools, each project agent gets Combwork's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the combwork server's instructions, Codex after your own developer_instructions. Turned off, agents still get Combwork's tools, without the guidance, from their next session. The Assistant always gets its own: they are its role.",
@@ -1982,6 +2074,22 @@
   "settings.advanced.cw.inbox.stopContinuation.title": {
     "defaultMessage": "Keep an agent going when it stops with unread items",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork: when an agent is about to end its turn with items in its inbox it hasn't read, Combwork makes it carry on and read them."
+  },
+  "settings.advanced.cw.input.hiddenSeconds.desc": {
+    "defaultMessage": "How long an agent's input box may stay off its screen, from the first time Combwork couldn't type into it for that, before Combwork stops trying and shows the agent as waiting for you (HI-3411): something its CLI drew in the box's place, such as a question Combwork doesn't recognise, takes the keys. Once the box shows again, what waited is typed.",
+    "description": "What the advanced setting \"Input box hidden: wait\" is for (Settings → Advanced). HI-3411 is a card key: keep it as it is."
+  },
+  "settings.advanced.cw.input.hiddenSeconds.title": {
+    "defaultMessage": "Input box hidden: wait",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"120 s\"). The input box: where a coding agent's terminal takes what is typed to it."
+  },
+  "settings.advanced.cw.jj.commandSeconds.desc": {
+    "defaultMessage": "How long one jj command Combwork runs may take, a snapshot of a large working copy included, before Combwork ends it: a read then counts as unknown, and a change made during a merge is left for you to settle. Raise it for a very large repository or a slow disk.",
+    "description": "What the advanced setting \"jj: longest a command takes\" does, and when to change it (Settings → Advanced, HI-3372). jj is the Jujutsu version control tool."
+  },
+  "settings.advanced.cw.jj.commandSeconds.title": {
+    "defaultMessage": "jj: longest a command takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. jj is the Jujutsu version control tool: keep its name (HI-3372)."
   },
   "settings.advanced.cw.journal.builds.desc": {
     "defaultMessage": "When Combwork's own installer is built from its source code (npm run dist, or npm run release), Combwork writes the build into the Assistant's journal as its own entry: the version, the commit, what kind of build it was and where the installer is. Only a successful build is written, and only while the journal is on with events in its scope. Turned off, builds aren't written, and a build left for Combwork while it was closed is dropped when the workspace opens.",
@@ -2064,8 +2172,8 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.cw.mcpCatalog.downloadSeconds.desc": {
-    "defaultMessage": "How long Install and Update wait for a catalogue server's zip, redirects included, before they stop with nothing installed. Raise it on a slow connection.",
-    "description": "What the advanced setting \"MCP catalogues: downloading a server\" is for (Settings → Advanced, HI-545)."
+    "defaultMessage": "How long Install and Update wait with nothing arriving while they download a catalogue server's zip, before they stop with nothing installed. A slow download that keeps arriving is never stopped; Cancel download stops one. Raise it on a connection that pauses for long.",
+    "description": "What the advanced setting \"MCP catalogues: downloading a server\" is for (Settings → Advanced, HI-545). HI-3377: the time with no data arriving, not the whole download’s time."
   },
   "settings.advanced.cw.mcpCatalog.downloadSeconds.title": {
     "defaultMessage": "MCP catalogues: downloading a server",
@@ -2094,6 +2202,22 @@
   "settings.advanced.cw.merge.lockWaitSeconds.title": {
     "defaultMessage": "Merges: wait for another Combwork",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork. Another Combwork: the installed Combwork and a dev or test Combwork on the same machine."
+  },
+  "settings.advanced.cw.mergeGuards.maxLines.desc": {
+    "defaultMessage": "The most lines a merge may add for its merge guards to check them (and at most 64 MB of them). A merge that adds more isn’t checked at all: it goes back like a match, never through on the part that was read.",
+    "description": "What the advanced setting \"Merge guards: most lines a merge adds\" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284). MB is megabytes."
+  },
+  "settings.advanced.cw.mergeGuards.maxLines.title": {
+    "defaultMessage": "Merge guards: most lines a merge adds",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a number of lines. Merge guards are patterns Combwork refuses in the lines a merge adds (HI-3284)."
+  },
+  "settings.advanced.cw.mergeGuards.seconds.desc": {
+    "defaultMessage": "How long matching the merge guards against a merge’s added lines may take, once their check has started. Past it the merge isn’t checked: nothing merges, and the card comes back to be submitted again unchanged, naming the guard that was running (not as a match). Raise it for very large merges; a pattern that takes this long usually needs rewriting.",
+    "description": "What the advanced setting \"Merge guards: longest the check takes\" does, and what goes wrong when it is wrong (Settings → Advanced, HI-3284, HI-3377)."
+  },
+  "settings.advanced.cw.mergeGuards.seconds.title": {
+    "defaultMessage": "Merge guards: longest the check takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. Merge guards are patterns Combwork refuses in the lines a merge adds (HI-3284)."
   },
   "settings.advanced.cw.none.baselineSeconds.desc": {
     "defaultMessage": "In a project without version control, Combwork reads the project's files in the background when a card starts, when it is submitted, and when a check of it starts and ends, to find what changed outside the card's files. A read that takes longer than this is stopped: the card starts or is submitted without that list, and the check doesn't count.",
@@ -2191,8 +2315,24 @@
     "defaultMessage": "Resuming after a connection drops: wait at most",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\")."
   },
+  "settings.advanced.cw.processes.knownHosts.desc": {
+    "defaultMessage": "Programs expected to keep running after the shell that started them is gone, such as Windows Sandbox's guest: a regular expression matched against the program's file name. Combwork never tells these as left running; Activity still lists them, with End It. Add a program here to stop its notices.",
+    "description": "What the advanced setting \"Processes left running: known hosts\" does (Settings → Advanced). Activity is a tab of Combwork's; End It its button. Keep \"Windows Sandbox\" as it is (a product)."
+  },
+  "settings.advanced.cw.processes.knownHosts.title": {
+    "defaultMessage": "Processes left running: known hosts",
+    "description": "An advanced setting's title (Settings → Advanced): the programs expected to keep running after the shell that started them is gone (the Windows Sandbox guest's), which Combwork never tells as left running."
+  },
+  "settings.advanced.cw.processes.orphanMinutes.desc": {
+    "defaultMessage": "How long a process an agent's command started may run with the shell that started it gone before Combwork tells you and the agent. A longer wait means fewer notices for processes you expect to keep running a while.",
+    "description": "What the advanced setting \"Processes left running: minutes before telling\" does (Settings → Advanced, under Combwork)."
+  },
+  "settings.advanced.cw.processes.orphanMinutes.title": {
+    "defaultMessage": "Processes left running: minutes before telling",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"10 min\"): how long a process an agent's command left running, its shell gone, runs before Combwork tells it."
+  },
   "settings.advanced.cw.processes.orphanNotice.desc": {
-    "defaultMessage": "When a process an agent's command started is still running ten minutes on with the shell that started it gone, Combwork says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. Turned off, neither is told; Activity still lists the process as left running, with End It.",
+    "defaultMessage": "When a process an agent's command started is still running with the shell that started it gone (for as long as “Processes left running: minutes before telling” says), Combwork says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. A process of a cw-progress run that is still running, or of a known host, isn't told. Turned off, nothing is told; Activity still lists the process as left running, with End It.",
     "description": "What the advanced setting \"Processes left running: tell me and the agent\" does (Settings → Advanced, under Combwork). Activity is a tab of Combwork's; End It is its button."
   },
   "settings.advanced.cw.processes.orphanNotice.title": {
@@ -2208,7 +2348,7 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.cw.progress.replySeconds.desc": {
-    "defaultMessage": "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 2 minutes at most.",
+    "defaultMessage": "How long cw-progress waits for Combwork to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks again (after 5 s, then 15 s), then runs nothing and says Combwork is slow. Raise it when a busy Combwork makes checks fail with \"Combwork is slow to answer\" (HI-1892). Kept at 10 minutes at most.",
     "description": "What the advanced setting \"cw-progress: Combwork's reply time\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
   },
   "settings.advanced.cw.progress.replySeconds.title": {
@@ -2286,6 +2426,14 @@
   "settings.advanced.cw.queue.networkCodes.title": {
     "defaultMessage": "Merge queue: network errors that count as temporary",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork. The merge queue tests a card's work before merging it; a check that fails for the network, not the work, lets the card's builder submit the same revision again."
+  },
+  "settings.advanced.cw.queue.networkMinutes.desc": {
+    "defaultMessage": "How long the merge queue's own fetches and pushes may take: pushing a merged target, a target that follows its remote (its fetch and push), reading the remote's head as a card starts, and Bring up to date. Past it git is ended and the merge waits or pauses. Raise it for a slow connection or a large repository.",
+    "description": "What the advanced setting \"Merge queue: longest a fetch or push takes\" does, and when to change it (Settings → Advanced, HI-3372). Bring up to date is an action's name."
+  },
+  "settings.advanced.cw.queue.networkMinutes.title": {
+    "defaultMessage": "Merge queue: longest a fetch or push takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the merge queue's own fetches and pushes (HI-3372)."
   },
   "settings.advanced.cw.queue.signSeconds.desc": {
     "defaultMessage": "When a repository signs its commits, how long the merge queue waits for its merge commit, hooks included, before it takes the signer to be waiting for a passphrase. It then ends the commit, changes nothing in the target and pauses the queue with “signing waits for you”. Raise it when signing or the repository’s commit hooks really take longer; too long, and a signer waiting for you holds the queue up that long.",
@@ -2375,6 +2523,22 @@
     "defaultMessage": "Resuming after a restart: ready within",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"90 s\")."
   },
+  "settings.advanced.cw.resume.idleAsk.desc": {
+    "defaultMessage": "A conversation idle longer than the time below has most likely lost the CLI's prompt cache, so resuming it may process its whole context again. Resume asks first, offering a fresh start, and says how long it has been idle and how big it is; the Assistant is told the same and chooses. A lane's or a card's start gives its builder a new conversation instead, with the card as its prompt. Agents Combwork resumes after a restart, an update or a quit resume as before. Turned off, every resume goes ahead as it did before, with only the expired-cache question Claude Code's sessions had.",
+    "description": "What the advanced setting \"Resume: ask before reopening a long-idle conversation\" does (Settings → Advanced, under Combwork). A prompt cache is what a CLI keeps of a conversation so a resumed one is read cheaply; a lane is a card loop; the Assistant is Combwork's own assistant."
+  },
+  "settings.advanced.cw.resume.idleAsk.title": {
+    "defaultMessage": "Resume: ask before reopening a long-idle conversation",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork: before a conversation idle for a long time is resumed, Combwork asks whether to start a fresh one instead, as resuming it may cost many tokens."
+  },
+  "settings.advanced.cw.resume.idleMinutes.desc": {
+    "defaultMessage": "How long since a conversation's last activity (its transcript's last entry, else when Combwork last saw it) before its resume asks first. The default is the longest prompt cache the CLIs keep: an hour.",
+    "description": "What the advanced setting \"Resume: a conversation counts as long-idle after\" does (Settings → Advanced, under Combwork). A prompt cache is what a CLI keeps of a conversation so a resumed one is read cheaply."
+  },
+  "settings.advanced.cw.resume.idleMinutes.title": {
+    "defaultMessage": "Resume: a conversation counts as long-idle after",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (\"60 min\"): how long a conversation must be idle before Resume asks first."
+  },
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": {
     "defaultMessage": "How long an agent's coding agent may keep waiting to retry its model request (rate-limited, or its service unreachable) in one turn before Combwork tells the Assistant, once a turn. 0: never.",
     "description": "What the advanced setting \"Retry wait: tell the Assistant after\" does (Settings → Advanced)."
@@ -2382,6 +2546,14 @@
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": {
     "defaultMessage": "Retry wait: tell the Assistant after",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again."
+  },
+  "settings.advanced.cw.server.checkInferSeconds.desc": {
+    "defaultMessage": "How long Check Server waits for a model server to answer its test request. A local model that isn't loaded yet loads first, which on modest hardware can take minutes; past this time the check reports a timeout.",
+    "description": "What the advanced setting \"Check Server: test request timeout\" does (Settings → Advanced, under Combwork). Check Server tests a model server the user added for a CLI (its address and model)."
+  },
+  "settings.advanced.cw.server.checkInferSeconds.title": {
+    "defaultMessage": "Check Server: test request timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"600 s\"). Check Server is a button for a model server (Settings → Accounts & Connections)."
   },
   "settings.advanced.cw.sessions.signFailFast.desc": {
     "defaultMessage": "When a repository signs commits, an agent's commit with Git for Windows' gpg or ssh-keygen, GnuPG's gpg or Windows' ssh-keygen signs with nobody there, or fails at once and tells the agent why, instead of waiting for a passphrase nobody can type. Signing stays on, and your git and gpg settings are never changed: sessions get a signer of Combwork's in their environment only. Other signers run as before. Turned off, sessions use git's own signer, as before.",
@@ -2503,6 +2675,14 @@
     "defaultMessage": "A CLI putting text on the clipboard",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork: what Combwork does when an agent's CLI asks to set the clipboard (OSC 52)."
   },
+  "settings.advanced.cw.typed.takeSeconds.desc": {
+    "defaultMessage": "How long an agent's CLI has to take a line Combwork typed into it (start working on it) before Combwork presses Enter again, once, as soon as that is safe (within six times this). Not taken in this time again, Combwork tells you the line may be waiting in its prompt and types nothing more into that agent until it is taken. Raise it if a slow or busy machine shows that notice for lines that were taken.",
+    "description": "What the advanced setting \"Typed line: wait to be taken\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-3373)."
+  },
+  "settings.advanced.cw.typed.takeSeconds.title": {
+    "defaultMessage": "Typed line: wait to be taken",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. A line: a message Combwork typed into an agent's terminal; taken: the agent's CLI started working on it."
+  },
   "settings.advanced.cw.usage.timelineDetailDays.desc": {
     "defaultMessage": "How long the usage history keeps when each request happened, to the second, after a session ends. Past it, a session's use over time is kept in 1-hour steps, so the history stays small. Totals, tokens and costs stay exact; only where a card's or lane's share began or ended inside an hour is less exact, for sessions that old.",
     "description": "What the advanced setting \"Usage history: keep full detail for\" does, and what is lost past it (Settings → Advanced, under Combwork). A lane is a card loop: a builder and a reviewer taking cards in turn."
@@ -2615,6 +2795,14 @@
     "defaultMessage": "{title} takes a regular expression (as text).",
     "description": "Why an advanced setting's new value isn't taken (Settings → Advanced). {title} is the setting's title."
   },
+  "settings.advanced.error.roles": {
+    "defaultMessage": "{title} takes each of {roles} once, as role=name (a name of letters, digits, _, . and -, at most 100 characters), separated by commas.",
+    "description": "Why an advanced setting's new value (a mapping from Combwork's roles to a CLI's own names) isn't taken. {title} is the setting's title; {roles} lists the roles, as advanced.json writes them: keep them as they are. role=name is the form, keep it."
+  },
+  "settings.advanced.error.rolesTwice": {
+    "defaultMessage": "{title} gives {name} to more than one role: each needs a name of its own.",
+    "description": "Why an advanced setting's new value (a mapping from Combwork's roles to a CLI's own names) isn't taken. {title} is the setting's title; {name} is the CLI's name given twice, as written."
+  },
   "settings.advanced.error.text": {
     "defaultMessage": "{title} takes text.",
     "description": "Why an advanced setting's new value isn't taken. {title} is the setting's title."
@@ -2642,6 +2830,118 @@
   "settings.advanced.miss.text": {
     "defaultMessage": "It doesn't find what {cli} {version} showed (\"{shown}\"). Fine if {cli} has changed since.",
     "description": "Under an advanced setting whose value no longer finds what the CLI was recorded showing (Settings → Advanced). {cli} is the CLI's name, {version} its version; {shown} is the CLI's own text, in English."
+  },
+  "settings.advanced.muse.guidance.maxBytes.desc": {
+    "defaultMessage": "The most of a start hook's output Muse keeps as the session's context (1.4.20 keeps none of a longer one). Combwork's guidance, the agent's instructions and the Workspace notes go in whole when they fit; when they don't, Combwork gives a short pointer to the file that holds them instead. Too large, Muse drops them, and the agent starts without them.",
+    "description": "What the advanced setting \"Guidance: most Muse takes at start\" is for, and what goes wrong when it is wrong (Settings → Advanced). Workspace notes is a place in Combwork."
+  },
+  "settings.advanced.muse.guidance.maxBytes.title": {
+    "defaultMessage": "Guidance: most Muse takes at start",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.muse.hooks.editTools.desc": {
+    "defaultMessage": "The names of Muse's tools that change files, which Combwork checks against other agents' file locks before they run. Wrong, an edit of a locked file isn't refused.",
+    "description": "What the advanced setting \"Hooks: tools that edit files\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.muse.hooks.editTools.title": {
+    "defaultMessage": "Hooks: tools that edit files",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.muse.hooks.pathField.desc": {
+    "defaultMessage": "The field of an editing tool's input that names the file it changes (a patch names its own files). Wrong, Combwork can't tell which file an edit changes, so a file lock doesn't stop it.",
+    "description": "What the advanced setting \"Hooks: an edit's file\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.muse.hooks.pathField.title": {
+    "defaultMessage": "Hooks: an edit's file",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.muse.hooks.timeoutSeconds.desc": {
+    "defaultMessage": "How long Muse waits for Combwork to take one of its hooks (an edit waits for a file lock). Too short, Combwork misses what Muse reports, an agent may look stuck, and an edit of a locked file can go ahead before Combwork refuses it.",
+    "description": "What the advanced setting \"Hooks: timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.muse.hooks.timeoutSeconds.title": {
+    "defaultMessage": "Hooks: timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.muse.names.configKeys.desc": {
+    "defaultMessage": "The keys of the settings Combwork gives each Muse launch for that run only (its hooks, its MCP servers and an MCP server's mode, the skills and rules other CLIs keep for you left out). Nothing is written to Muse's own settings. Wrong, Muse refuses the launch or runs without Combwork's tools.",
+    "description": "What the advanced setting \"Launch setting keys\" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code). MCP is a protocol name: keep it."
+  },
+  "settings.advanced.muse.names.configKeys.title": {
+    "defaultMessage": "Launch setting keys",
+    "description": "An advanced setting's title (Settings → Advanced, under Muse Code): the names of the CLI's settings that Combwork gives each launch with -c, mapped from Combwork's roles."
+  },
+  "settings.advanced.muse.names.hookEvents.desc": {
+    "defaultMessage": "Muse's name for each hook event Combwork gives it and reads back (a session's start, a prompt, a tool's use, a question, a turn's end…). Wrong, Muse refuses the launch or the agent's status stops following it.",
+    "description": "What the advanced setting \"Hook events\" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code)."
+  },
+  "settings.advanced.muse.names.hookEvents.title": {
+    "defaultMessage": "Hook events",
+    "description": "An advanced setting's title (Settings → Advanced, under Muse Code): the names of the CLI's hook events, mapped from Combwork's roles."
+  },
+  "settings.advanced.muse.names.hookFields.desc": {
+    "defaultMessage": "Muse's name for each field Combwork reads in its hooks (the event, the session, the turn, the tool and its input…), and for the reply that stops a tool a file lock holds. Wrong, the agent's status, turns or locks stop following Muse.",
+    "description": "What the advanced setting \"Hook fields\" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code)."
+  },
+  "settings.advanced.muse.names.hookFields.title": {
+    "defaultMessage": "Hook fields",
+    "description": "An advanced setting's title (Settings → Advanced, under Muse Code): the names of the fields in the CLI's hooks, mapped from Combwork's roles."
+  },
+  "settings.advanced.muse.names.sessionLog.desc": {
+    "defaultMessage": "The field names and record kinds Combwork reads in Muse's session log (session.jsonl): its prompts, replies, model requests and their tokens. Wrong, an agent's conversation or usage stays empty.",
+    "description": "What the advanced setting \"Session log names\" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code). session.jsonl is a file name: keep it."
+  },
+  "settings.advanced.muse.names.sessionLog.title": {
+    "defaultMessage": "Session log names",
+    "description": "An advanced setting's title (Settings → Advanced, under Muse Code): the field names and record kinds of the CLI's session log, mapped from Combwork's roles."
+  },
+  "settings.advanced.muse.override.keepPersonalOut.desc": {
+    "defaultMessage": "Muse also reads the personal skills and rules you keep for other CLIs (such as Claude Code's and Codex's, in your user folder). Combwork turns that off for its agents' launches (context.foreign_personal_skills and context.foreign_personal_rules, for that run only), so an agent has the skills and instructions Combwork gave it. Turned off, Muse reads them as it would outside Combwork.",
+    "description": "What the advanced setting \"Keep other CLIs' personal skills and rules out\" does (Settings → Advanced, under Muse Code). context.foreign_personal_skills and context.foreign_personal_rules are setting names: keep them."
+  },
+  "settings.advanced.muse.override.keepPersonalOut.title": {
+    "defaultMessage": "Keep other CLIs' personal skills and rules out",
+    "description": "An advanced setting's title (Settings → Advanced, under Muse Code): one of Combwork's overrides of the CLI, on by default."
+  },
+  "settings.advanced.muse.override.keepProjectConfigOut.desc": {
+    "defaultMessage": "Muse starts Combwork's tools only in a workspace it trusts, and trusting one also loads that project's own .mcp.json servers and .muse\\hooks.json hooks, which Muse can't be told to leave out. So Combwork doesn't start a Muse agent where those files define a server or hook the agent wasn't given, or can't be read, and says which. Turned off, such an agent starts and Muse runs them too: the project's own config then runs inside Combwork's agents, outside what you gave them.",
+    "description": "What the advanced setting \"Keep the project's own Muse MCP servers and hooks out\" does (Settings → Advanced, under Muse Code). .mcp.json and .muse\\hooks.json are file names: keep them."
+  },
+  "settings.advanced.muse.override.keepProjectConfigOut.title": {
+    "defaultMessage": "Keep the project's own Muse MCP servers and hooks out",
+    "description": "An advanced setting's title (Settings → Advanced, under Muse Code): one of Combwork's overrides of the CLI, on by default."
+  },
+  "settings.advanced.muse.override.stripAccountVars.desc": {
+    "defaultMessage": "Muse uses META_API_KEY over an account's own sign-in, and sends the headers in MUSE_CUSTOM_HEADERS with its requests. Combwork leaves both out wherever Muse runs on an account (its sessions, sign-in and checks), so each agent runs as the account it was given. Turned off, a key or header set in Combwork's environment applies to every Muse agent.",
+    "description": "What the advanced setting \"Keep Meta API keys in the environment away from Muse\" does (Settings → Advanced, under Muse Code). META_API_KEY and MUSE_CUSTOM_HEADERS are environment variables: keep them."
+  },
+  "settings.advanced.muse.override.stripAccountVars.title": {
+    "defaultMessage": "Keep Meta API keys in the environment away from Muse",
+    "description": "An advanced setting's title (Settings → Advanced, under Muse Code): one of Combwork's overrides of the CLI, on by default."
+  },
+  "settings.advanced.muse.ready.input.desc": {
+    "defaultMessage": "The top of the box Muse types prompts in. A resumed Muse says it has started only with its first prompt, so Combwork takes this box on screen to mean it is ready, and then types the prompt it was resumed with. Wrong, a resumed agent stays starting and its prompt is never typed.",
+    "description": "What the advanced setting \"Input box\" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code)."
+  },
+  "settings.advanced.muse.ready.input.title": {
+    "defaultMessage": "Input box",
+    "description": "An advanced setting's title (Settings → Advanced, under Muse Code): the pattern of the CLI's input box, which shows once it is ready for a prompt."
+  },
+  "settings.advanced.muse.sandbox.setupRequired.desc": {
+    "defaultMessage": "What muse sandbox windows check prints when Muse's Windows sandbox isn't set up. Combwork then says so in Provider Setup, and that each new agent will show Muse's setup screen. Wrong, Combwork doesn't tell you, and agents wait at that screen.",
+    "description": "What the advanced setting \"Sandbox not set up\" is for (Settings → Advanced, under Muse Code). muse sandbox windows check is a command: keep it. Provider Setup is a dialog's name."
+  },
+  "settings.advanced.muse.sandbox.setupRequired.title": {
+    "defaultMessage": "Sandbox not set up (muse sandbox windows check)",
+    "description": "An advanced setting's title (Settings → Advanced, under Muse Code): the pattern of the CLI's check saying its Windows sandbox needs setting up. muse sandbox windows check is a command: keep it."
+  },
+  "settings.advanced.muse.sandbox.setupScreen.desc": {
+    "defaultMessage": "The screen Muse shows before a session when its Windows sandbox isn't set up, asking for administrator rights. Combwork never answers it: it shows the agent as waiting for you. Wrong, the agent looks as if it is still starting.",
+    "description": "What the advanced setting \"Sandbox setup screen\" is for, and what goes wrong when it is wrong (Settings → Advanced, under Muse Code)."
+  },
+  "settings.advanced.muse.sandbox.setupScreen.title": {
+    "defaultMessage": "Sandbox setup screen",
+    "description": "An advanced setting's title (Settings → Advanced, under Muse Code): the pattern of the CLI's first-run screen asking to set up its Windows sandbox."
   },
   "settings.advanced.off": {
     "defaultMessage": "off",
@@ -2835,6 +3135,10 @@
     "defaultMessage": "A regular expression (JavaScript, flags {flags}).",
     "description": "What an advanced setting takes (Settings → Advanced). {flags} are a regular expression's flags (such as i): keep them."
   },
+  "settings.advanced.takes.roles": {
+    "defaultMessage": "Each of {roles} once, as role=name, separated by commas: the name being what the CLI calls it.",
+    "description": "What an advanced setting takes (Settings → Advanced): a mapping from Combwork's roles to a CLI's own names. {roles} lists the roles as advanced.json writes them: keep them. role=name is the form, keep it."
+  },
   "settings.advanced.takes.text": {
     "defaultMessage": "Text, found as it is.",
     "description": "What an advanced setting takes (Settings → Advanced): text Combwork looks for on a CLI's screen, as it is."
@@ -2858,6 +3162,10 @@
   "settings.advanced.unit.lanes": {
     "defaultMessage": "{n, plural, one {# lane} other {# lanes}}",
     "description": "An advanced setting's value: a number of card-loop lanes the Progress panel shows."
+  },
+  "settings.advanced.unit.lines": {
+    "defaultMessage": "{n, plural, one {# line} other {# lines}}",
+    "description": "An advanced setting's value: a number of lines of text (HI-3284: the lines a merge adds)."
   },
   "settings.advanced.unit.minutes": {
     "defaultMessage": "{n, number} min",
@@ -2890,6 +3198,10 @@
   "settings.advanced.unitLabel.lanes": {
     "defaultMessage": "lanes",
     "description": "Beside the box of an advanced setting that is a number of card-loop lanes the Progress panel shows (Settings → Advanced)."
+  },
+  "settings.advanced.unitLabel.lines": {
+    "defaultMessage": "lines",
+    "description": "Beside the box of an advanced setting that is a number of lines of text (Settings → Advanced), as in \"200000 lines\" (HI-3284)."
   },
   "settings.advanced.unitLabel.minutes": {
     "defaultMessage": "min",
@@ -3160,7 +3472,7 @@
     "description": "What the setting \"Count background tasks for up to\" does, under its title (Settings → Agents)."
   },
   "settings.agents.backgroundTaskMinutes.tip": {
-    "defaultMessage": "An agent that ends its turn while a task it started is still running shows as waiting on background tasks, not finished: Claude Code carries on by itself when the task ends. Combwork can't tell a test run from something that never ends, such as a dev server, so it stops counting a task after this long (a Monitor also when it expires). Codex isn't told when its background terminals end, so they are only counted and shown. {min, number} to {max, plural, one {# minute} other {# minutes}}.",
+    "defaultMessage": "An agent that ends its turn while a task it started is still running shows as waiting on background tasks, not finished: Claude Code carries on by itself when the task ends. Combwork can't tell a test run from something that never ends, such as a dev server, so it stops counting a task after this long (a Monitor also when it expires). A run under cw-progress that still reports keeps its task counted, and this time then counts from its last report. Codex isn't told when its background terminals end, so they are only counted and shown. {min, number} to {max, plural, one {# minute} other {# minutes}}.",
     "description": "The info tip of the setting \"Count background tasks for up to\" (Settings → Agents): more on what it does and when it applies. {min} and {max} are the fewest and most minutes it can be set to."
   },
   "settings.agents.backgroundTaskMinutes.title": {
@@ -3773,7 +4085,7 @@
   },
   "settings.connections.add.from": {
     "defaultMessage": "Gets its model from",
-    "description": "Label of the choice in Add Connection (Settings → Accounts & Connections): where the connection gets its model, its sign-in or a server (Darren, 27 Oct)."
+    "description": "Label of the choice in Add Connection (Settings → Accounts & Connections): where the connection gets its model, its sign-in or a server."
   },
   "settings.connections.add.fromServer": {
     "defaultMessage": "A server",
@@ -4227,6 +4539,10 @@
     "defaultMessage": "Context size and Output budget are used when an agent starts on that model (not for IDs Claude Code reads as its own, nor where the session’s settings map the ID to a Claude model). A change applies when its agents next start.",
     "description": "Under a server connection's model list (HI-2682): when the models' Context size and Output budget fields are used. Context size and Output budget are the fields' names."
   },
+  "settings.connections.server.limitsHintGeneric": {
+    "defaultMessage": "Context size and Output budget go to the CLI when an agent starts on that model, where its description passes them ('{context}' and '{output}').",
+    "description": "Under a server connection's model list (HI-3197), for a CLI that runs from a description: when a model's context size and output budget are used. Keep '{context}' and '{output}' as they are (quoted in ICU): they are the description's placeholders, not values."
+  },
   "settings.connections.server.local": {
     "defaultMessage": "{name} (on this PC)",
     "description": "A preset of a server connection that runs on the user's own computer ({name}: \"Ollama\")."
@@ -4258,6 +4574,10 @@
   "settings.connections.server.notBelow": {
     "defaultMessage": "The output budget must be smaller than the context size.",
     "description": "Under a server connection's model's fields (HI-2682): its output budget isn't smaller than its context size, so it can't be saved."
+  },
+  "settings.connections.server.notPassed": {
+    "defaultMessage": "Not set: not passed (the CLI’s own)",
+    "description": "The placeholder of an empty Context size or Output budget field of a server connection's model (HI-3197), for a CLI that runs from a description: a value left empty isn't given to the CLI, which then uses its own. Keep it short."
   },
   "settings.connections.server.output": {
     "defaultMessage": "Output budget",
@@ -4696,7 +5016,7 @@
     "description": "A setting's title (Settings → General)."
   },
   "settings.general.userName.desc": {
-    "defaultMessage": "How Combwork names you to the Assistant when it tells it you replied to an agent (\"Darren replied to B1 on #399\").",
+    "defaultMessage": "How Combwork names you to the Assistant when it tells it you replied to an agent (\"Sam replied to B1 on #399\").",
     "description": "What the setting \"Your name\" does, under its title (Settings → General)."
   },
   "settings.general.userName.placeholder": {
@@ -6477,7 +6797,7 @@
   },
   "settings.workflow.combworkDefaults.title": {
     "defaultMessage": "Combwork defaults",
-    "description": "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)."
+    "description": "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (HI-1768)."
   },
   "settings.workflow.tabs": {
     "defaultMessage": "Workflow defaults",

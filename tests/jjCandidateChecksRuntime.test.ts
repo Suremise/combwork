@@ -32,16 +32,21 @@ import type { WorkflowOptions } from '../src/shared/workflow/options'
 import { APPLY_OPTIONS } from '../src/shared/workflow/workView'
 import { jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { withGuardsWorker } from './guardsWorker'
 import { B1, R1, moved } from './workflow/harness'
 import { opts, started, world, type World } from './jjCardsWorld'
+import { timing } from './timing.cjs'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 
 if (!jjExe) console.warn(`jjCandidateChecksRuntime.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
-/** A hung test's bound, as jjCandidatesReal's (HI-2921): many real jj and git commands, and real check runs. */
-const REAL_JJ_MS = 120_000
+/**
+ * A hung test's bound, as jjCandidatesReal's (HI-2921): many real jj and git commands, and real check runs. A full unit
+ * run on a loaded machine took one 62 s (HI-3349).
+ */
+const REAL_JJ_MS = timing('wait.hangRealJj')
 const NODE = `"${process.execPath}"`
 const PASS = `${NODE} -e "process.exit(0)"`
 const FAIL = `${NODE} -e "console.log('lint: 1 problem');process.exit(1)"`
@@ -588,10 +593,18 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       await vi.waitFor(() => expect(jjp.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
       expect(x.leases[0].given).toBe('invalid')
       const checksKey = checksJournalKey('p-jj', card.key, cycle, rec.offer!.attempt)
-      // The lease not freed yet: the candidate dropped, its checks journal kept (its lease ref the evidence).
-      await jjp.afterRun()
-      expect(w.store.boardMeta(checksKey)).not.toBeNull()
-      expect(w.refAt(`refs/cw/jj/${card.key}/${rec.offer!.attempt}/candidate`)).toBeNull()
+      // The lease not freed yet: the candidate dropped, its checks journal kept (its lease ref the evidence). The drop waits
+      // for the pool to have the copy back (parkFree: free, not returning while its ended job's processes exit, slower on a
+      // busy machine, HI-3228), so the sweep runs until it is dropped; the journal is kept on every run.
+      await vi.waitFor(
+        async () => {
+          await x.pool.refresh()
+          await jjp.afterRun()
+          expect(w.store.boardMeta(checksKey)).not.toBeNull()
+          expect(w.refAt(`refs/cw/jj/${card.key}/${rec.offer!.attempt}/candidate`)).toBeNull()
+        },
+        { timeout: REAL_JJ_MS, interval: 200 }
+      )
       // Freed: the next sweep removes the journal and the window's row.
       freed = true
       await jjp.afterRun()
@@ -652,7 +665,7 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       const child: ChildProcess = jobSpawn(job)(process.execPath, ['-e', "setInterval(()=>require('fs').writeFileSync('beat.txt',String(Date.now())),50)"], { cwd: copy, env: baseEnv() })
       ends.push(() => void child.kill())
       const beat = join(copy, 'beat.txt')
-      await vi.waitFor(() => expect(existsSync(beat)).toBe(true), { timeout: 30_000, interval: 50 })
+      await vi.waitFor(() => expect(existsSync(beat)).toBe(true), { timeout: timing('wait.hang'), interval: 50 })
       const j: ChecksJournal = { fp: rec.fp, attempt: rec.offer!.attempt, result: rec.offer!.result, expected: rec.offer!.expected, checksKey: rec.checks!.key, lease: old, checks: [{ name: 'typecheck', command: PASS, phase: 'started' }] }
       await w.deps.records!.write((db) => writeChecksJournal(db as unknown as SqlDb, checksJournalKey('p-jj', card.key, cycle, rec.offer!.attempt), j))
       x.h.lease = lease
@@ -668,18 +681,18 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       expect(shown(w, card, cycle)?.checks).toMatchObject({ state: 'waiting', why: 'previous' })
       expect(leasedWhileAlive).toBe(0)
       const t0 = statSync(beat).mtimeMs
-      await vi.waitFor(() => expect(statSync(beat).mtimeMs).toBeGreaterThan(t0), { timeout: 30_000, interval: 50 })
+      await vi.waitFor(() => expect(statSync(beat).mtimeMs).toBeGreaterThan(t0), { timeout: timing('wait.hang'), interval: 50 })
       // Its tree ended (as the pool's barrier settles a returned lease's job): then the interrupted check runs again.
       expect(await job.end()).toBe(true)
       await job.close()
-      await vi.waitFor(async () => expect(await leaseJobGone(sup, old)).toBe(true), { timeout: 30_000, interval: 100 })
+      await vi.waitFor(async () => expect(await leaseJobGone(sup, old)).toBe(true), { timeout: timing('wait.hang'), interval: 100 })
       await due(w, card, cycle)
       next.checksWanted()
       await vi.waitFor(() => expect(next.checksBusy()).toBe(false), { timeout: REAL_JJ_MS, interval: 100 })
       expect(shown(w, card, cycle)?.checks).toMatchObject({ state: 'passed' })
       expect(x.leases.length).toBe(1)
       // The old tree ended before the new run leased its copy (no overlap): its process is gone.
-      await vi.waitFor(() => expect(child.exitCode !== null || child.signalCode !== null).toBe(true), { timeout: 30_000, interval: 50 })
+      await vi.waitFor(() => expect(child.exitCode !== null || child.signalCode !== null).toBe(true), { timeout: timing('wait.hang'), interval: 50 })
     })
   })
 
@@ -721,5 +734,45 @@ describe.skipIf(!jjExe)(`merge checks on a jj card's candidate (jj ${TESTED_JJ.v
       expect(shown(w, card, cycle)?.checks).toMatchObject({ state: 'passed' })
       expect(x.leases.map((l) => l.given)).toEqual(['checksEnded', 'checksEnded'])
     })
+  })
+})
+
+// HI-3284: the merge guards on a jj card's candidate, on the real jj: jj's own diff of what the candidate adds to the
+// target bookmark, matched in the guards' worker path; a match returns the card (the check `merge guards`, its
+// diagnostics); none passes and is offered; a guard changed after it passed makes its key, and the offer's consent
+// bound to it, stale: the checks run again under the new guards before anything is offered.
+describe.skipIf(!jjExe)(`merge guards on a jj card's candidate (jj ${TESTED_JJ.version}), HI-3284`, { timeout: REAL_JJ_MS }, () => {
+  // A user's pattern runs only in the guards' worker: the real one, built for these tests.
+  withGuardsWorker()
+  const refusing = { name: 'No work', pattern: '^work$', message: 'Name it something else.' }
+  const passing = { name: 'Nothing', pattern: 'zzz-never', message: 'n/a' }
+
+  it('a candidate adding a match: the card back to its builder, the guard, file and line named; never offered', async () => {
+    const w = await world(true, { candidates: true })
+    host(w)
+    withChecks(w, {}, { mergeGuards: [refusing] })
+    const { card } = await approved(w)
+    await settle(w, card)
+    const failed = w.store.facts(card.id).find((f) => f.kind === 'IntegrationFailed')
+    expect(failed?.data).toMatchObject({ reason: 'checks', check: 'merge guards', guards: { hits: [{ guard: 'No work', file: 'work.txt', line: 1, excerpt: 'work' }], messages: [{ guard: 'No work', message: 'Name it something else.' }] } })
+    expect(w.wf.state(card).stage).toBe('active')
+  })
+
+  it('no match: passed and offered; a guard changed after that makes it stale, checked again, and refused', async () => {
+    const w = await world(true, { candidates: true })
+    host(w)
+    withChecks(w, {}, { mergeGuards: [passing] })
+    const { card } = await approved(w)
+    await settle(w, card)
+    const cycle = w.wf.state(card).cycle
+    const before = shown(w, card, cycle)!
+    expect(before.checks).toMatchObject({ state: 'passed', names: ['merge guards'] })
+    expect(waiting(w, card.id)?.candidate).toMatchObject({ state: 'ready', checks: { state: 'passed' } })
+    // The project's guards change: the key the offer passed under is no longer the one the options give.
+    withChecks(w, {}, { mergeGuards: [passing, refusing] })
+    await settle(w, card)
+    const failed = w.store.facts(card.id).find((f) => f.kind === 'IntegrationFailed')
+    expect(failed?.data).toMatchObject({ check: 'merge guards', guards: { hits: [{ guard: 'No work' }] } })
+    expect(w.wf.state(card).stage).toBe('active')
   })
 })

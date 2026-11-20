@@ -8,7 +8,7 @@
 // Combwork's wait (CW_TEST_DETECT_WAIT_MS): a new conversation of the Assistant, switched back to Claude Code, and an
 // agent added with no connection are refused, not guessed.
 // 5. A Claude Code agent switched to Codex resumes its Claude Code conversation in Claude Code; a new one runs Codex.
-// 6. Claude Code held beyond the wait again: a launch of a known provider waits only for its own CLI, so the Assistant
+// 6. Claude Code held beyond the wait again (until the suite lets it go, CW_TEST_HOLD_DETECT): a launch of a known provider waits only for its own CLI, so the Assistant
 // switched to Codex starts a conversation, and the agent resumes its Codex one. 7. The Claude Code conversation with
 // its Combwork record gone (one started outside Combwork) still resumes in Claude Code, found by its transcript.
 // Throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME; quiet. No real CLI runs.
@@ -22,7 +22,8 @@ const userData = path.join(lib.WORK, 'provdetect-profile')
 const ws = path.join(lib.WORK, 'provdetect-ws')
 const claudeHome = path.join(lib.WORK, 'provdetect-claude-home')
 const codexHome = path.join(lib.WORK, 'provdetect-codex-home')
-const HOLD_MS = 12000
+// How long Claude Code's detection is held back (CW_TEST_SLOW_DETECT): Codex's must come well within it.
+const HOLD_MS = lib.timing('seam.slowDetectMs')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -48,7 +49,7 @@ const check = (name, ok, extra = '') => {
     const p = await a.firstWindow()
     p.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(a, p, { width: 1400, height: 850 })
-    await lib.until(() => p.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false), 30000)
+    await lib.until(() => p.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false), lib.timing('hang.ui'))
     return { app: a, page: p, inv: (ch, ...x) => p.evaluate(([c, args]) => window.combwork.invoke(c, ...args), [ch, x]) }
   }
   /** The Assistant's CLI changed (HI-2108: it follows its connection; Codex has no account here, so its test home's, decision H), as part 5's agent's. */
@@ -64,11 +65,11 @@ const check = (name, ok, extra = '') => {
   const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.agentId === 'assistant')
   const started = await inv('session:start', home, { agentId: 'assistant' })
   check('the Assistant’s conversation runs Claude Code (the first usable connection’s: first in order, installed)', started.provider === 'claude-code', started.provider)
-  const ready = await lib.until(async () => ((await live())?.sessionId && ['ready', 'finished'].includes((await live()).status) ? await live() : null), 30000)
+  const ready = await lib.until(async () => ((await live())?.sessionId && ['ready', 'finished'].includes((await live()).status) ? await live() : null), lib.timing('hang.ui'))
   const sid = ready?.sessionId
   check('…and is ready', !!sid, JSON.stringify(await live()))
   await inv('session:stop', home, 'assistant')
-  await lib.until(async () => !(await live()), 20000)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   await app.close()
 
   // 2. Restarted with Claude Code's detection held back: Codex answers first.
@@ -89,20 +90,20 @@ const check = (name, ok, extra = '') => {
   const stillChecking = (await info())['claude-code']?.checking
   const resumed = await inv('session:start', home, { agentId: 'assistant', resumeId: sid })
   check('resuming it while Claude Code is still being looked for waits, then runs Claude Code', stillChecking && resumed.provider === 'claude-code' && resumed.sessionId === sid, JSON.stringify({ stillChecking, provider: resumed.provider, sessionId: resumed.sessionId }))
-  await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 30000)
+  await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.ui'))
   await inv('session:stop', home, 'assistant')
-  await lib.until(async () => !(await live()), 20000)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
 
   // 3. The Assistant switched to Codex: its Claude Code conversation still resumes in Claude Code.
   await lib.waitForProvider(inv, 'claude-code', 20000)
   await assistantOn('codex')
   const again = await inv('session:start', home, { agentId: 'assistant', resumeId: sid })
   check('with the Assistant switched to Codex, its Claude Code conversation resumes in Claude Code', again.provider === 'claude-code' && again.sessionId === sid, JSON.stringify({ provider: again.provider, sessionId: again.sessionId }))
-  await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 30000)
+  await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.ui'))
   const restart = (await inv('workspace:refresh')).assistant.agents[0]?.restartNeeded
   check('…and asks for no restart: the connection is for its next new conversation', restart === false, String(restart))
   await inv('session:stop', home, 'assistant')
-  await lib.until(async () => !(await live()), 20000)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   // Back on Claude Code for part 4, while both are found.
   await assistantOn('claude-code')
   await app.close()
@@ -130,22 +131,22 @@ const check = (name, ok, extra = '') => {
   await lib.waitForProvider(inv, 'claude-code', 20000)
   const fresh = await inv('session:start', home, { agentId: 'assistant' })
   check('once Claude Code has answered, a new conversation runs Claude Code', fresh.provider === 'claude-code', fresh.provider)
-  await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 30000)
+  await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.ui'))
   await inv('session:stop', home, 'assistant')
-  await lib.until(async () => !(await live()), 20000)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   const added = await inv('agents:add', alpha, { location: 'project' })
   check('…and a new agent is a Claude Code one', added.provider === 'claude-code', added.provider)
 
   // 5. An agent of its own provider switched since: its conversation still resumes in the provider that recorded it
-  // (Darren's decision on #506); a new conversation runs its provider now.
+  // (#506); a new conversation runs its provider now.
   const agentLive = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === added.id)
   const agentReady = async () => ['ready', 'finished'].includes((await agentLive())?.status)
   const stopAgent = async () => {
     await inv('session:stop', alpha, added.id)
-    await lib.until(async () => !(await agentLive()), 20000)
+    await lib.until(async () => !(await agentLive()), lib.timing('hang.ui'))
   }
   const first = await inv('session:start', alpha, { agentId: added.id })
-  check('a Claude Code agent’s first conversation is ready', !!(await lib.until(agentReady, 30000)), JSON.stringify(await agentLive()))
+  check('a Claude Code agent’s first conversation is ready', !!(await lib.until(agentReady, lib.timing('hang.ui'))), JSON.stringify(await agentLive()))
   const asid = (await agentLive())?.sessionId
   // A prompt, so Claude Code has its transcript (part 7).
   await lib.sendPrompt(inv, lib.ptyKey(alpha, added.id), 'hello', { submitted: async () => ((await inv('session:usage', alpha, asid))?.requests ?? 0) > 0 })
@@ -153,13 +154,13 @@ const check = (name, ok, extra = '') => {
   await inv('agents:update', alpha, added.id, { provider: 'codex' })
   const back = await inv('session:start', alpha, { agentId: added.id, resumeId: asid })
   check('an agent switched from Claude Code to Codex resumes its Claude Code conversation in Claude Code', first.provider === 'claude-code' && back.provider === 'claude-code' && back.sessionId === asid, JSON.stringify({ first: first.provider, back: back.provider, asid, sessionId: back.sessionId }))
-  await lib.until(agentReady, 30000)
+  await lib.until(agentReady, lib.timing('hang.ui'))
   const agentInfo = async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'alpha')?.agents.find((a) => a.id === added.id)
   check('…asking for no restart', (await agentInfo())?.restartNeeded === false, String((await agentInfo())?.restartNeeded))
   await stopAgent()
   const now = await inv('session:start', alpha, { agentId: added.id })
   check('…and a new conversation runs Codex, its provider now', now.provider === 'codex', now.provider)
-  await lib.until(agentReady, 30000)
+  await lib.until(agentReady, lib.timing('hang.ui'))
   // Codex has its conversation's id with the first prompt.
   await lib.sendPrompt(inv, lib.ptyKey(alpha, added.id), 'hello', { submitted: async () => !!(await agentLive())?.sessionId })
   const csid = (await agentLive())?.sessionId
@@ -172,7 +173,11 @@ const check = (name, ok, extra = '') => {
   check('the Claude Code conversation has a Combwork record, to remove', saved.sessions.some((s) => s.id === asid))
   saved.sessions = saved.sessions.filter((s) => s.id !== asid)
   putSessions(alpha, saved)
-  ;({ app, page, inv } = await launchHeld({ CW_TEST_SLOW_DETECT: 'claude-code=9000', CW_TEST_DETECT_WAIT_MS: '1500' }))
+  // Claude Code is held while this file exists (HI-3442: a fixed hold ran out under load before the second check), and
+  // let go once both checks have run.
+  const holdFile = path.join(lib.WORK, 'provdetect-hold-claude-code')
+  fs.writeFileSync(holdFile, '')
+  ;({ app, page, inv } = await launchHeld({ CW_TEST_HOLD_DETECT: `claude-code=${holdFile}`, CW_TEST_DETECT_WAIT_MS: '1500' }))
   await lib.openWorkspace(inv, page, ws)
   home = (await inv('workspace:refresh')).assistant.path
   await lib.waitForProvider(inv, 'codex')
@@ -183,16 +188,17 @@ const check = (name, ok, extra = '') => {
     (e) => String(e.message)
   )
   check('with Claude Code still being looked for, past the wait, the Assistant switched to Codex starts a Codex conversation', codexNew === 'codex' && (await held()), `${codexNew}; Claude Code checking: ${await held()}`)
-  await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 30000)
+  await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.ui'))
   await inv('session:stop', home, 'assistant')
-  await lib.until(async () => !(await live()), 20000)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   const codexBack = await inv('session:start', alpha, { agentId: added.id, resumeId: csid }).then(
     (st) => `${st.provider} ${st.sessionId}`,
     (e) => String(e.message)
   )
   check('…and the agent resumes its Codex conversation', codexBack === `codex ${csid}` && (await held()), `${codexBack}; Claude Code checking: ${await held()}`)
-  await lib.until(agentReady, 30000)
+  await lib.until(agentReady, lib.timing('hang.ui'))
   await stopAgent()
+  fs.rmSync(holdFile, { force: true })
 
   // 7. A conversation Combwork has no record of resumes in the provider whose CLI has its transcript.
   await lib.waitForProvider(inv, 'claude-code', 20000)
@@ -200,7 +206,7 @@ const check = (name, ok, extra = '') => {
   check('the Claude Code conversation is listed as external, Claude Code’s', listed?.provider === 'claude-code' && listed?.source === 'external', JSON.stringify({ provider: listed?.provider, source: listed?.source }))
   const external = await inv('session:start', alpha, { agentId: added.id, resumeId: asid })
   check('…and the Codex agent resumes it in Claude Code', external.provider === 'claude-code' && external.sessionId === asid, JSON.stringify({ provider: external.provider, sessionId: external.sessionId }))
-  await lib.until(agentReady, 30000)
+  await lib.until(agentReady, lib.timing('hang.ui'))
   await stopAgent()
 
   await app.close()

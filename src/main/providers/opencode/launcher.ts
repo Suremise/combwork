@@ -69,7 +69,7 @@ public static class CwStream {
   public static string Url, Auth, Session, HookUrl, HookToken, Intent;
   /** A test's relay for the event stream alone (CW_OC_STREAM_VIA, to force a disconnect); Combwork never sets it. */
   public static string StreamVia = "";
-  static readonly string[] Types = { "session.inbox.enqueued", "session.step.started", "session.tool.called", "session.tool.success", "session.tool.failed", "permission.asked", "permission.replied", "session.retry.scheduled", "session.execution.succeeded", "session.execution.failed", "session.execution.interrupted", "session.compaction.started", "session.compaction.ended", "session.usage.updated" };
+  static readonly string[] Types = { "session.inbox.enqueued", "session.step.started", "session.tool.called", "session.tool.success", "session.tool.failed", "permission.asked", "permission.replied", "form.created", "form.replied", "form.cancelled", "session.retry.scheduled", "session.execution.succeeded", "session.execution.failed", "session.execution.interrupted", "session.compaction.started", "session.compaction.ended", "session.usage.updated" };
   const int FrameMax = 262144, PageBytes = 1048576, BodyMax = 65536, QueueItems = 512, PageLimit = 50, Pages = 10;
   const long QueueBytes = 1048576;
   static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 4 * 1048576 };
@@ -98,7 +98,8 @@ public static class CwStream {
     seq = -1;
     string type = G(raw, "type") as string;
     object d = G(raw, "data");
-    if (type == null || Array.IndexOf(Types, type) < 0 || (G(d, "sessionID") as string) != Session) return null;
+    // form.created names its session in the form; every other event in its data.
+    if (type == null || Array.IndexOf(Types, type) < 0 || (G(type == "form.created" ? G(d, "form") : d, "sessionID") as string) != Session) return null;
     var e = new Dictionary<string, object>();
     e["type"] = type;
     object dur = G(raw, "durable");
@@ -112,6 +113,8 @@ public static class CwStream {
       if (res != null) { var parts = new List<string>(); foreach (object r in res) if (r is string) parts.Add((string)r); Put(e, "resources", S(string.Join(" ", parts.ToArray()), 500)); }
     }
     if (type == "permission.replied") { Put(e, "requestID", G(d, "requestID") as string); Put(e, "reply", G(d, "reply") as string); }
+    if (type == "form.created") ProjectForm(G(d, "form"), e, "requestID");
+    if (type == "form.replied" || type == "form.cancelled") Put(e, "requestID", G(d, "id") as string);
     object err = G(d, "error");
     if (err != null) { var x = new Dictionary<string, object>(); Put(x, "type", S(G(err, "type"), 200)); Put(x, "message", S(G(err, "message"), 500)); if (G(err, "status") is int) x["status"] = G(err, "status"); e["error"] = x; }
     Put(e, "reason", S(G(d, "reason"), 200));
@@ -124,6 +127,19 @@ public static class CwStream {
     }
     return e;
   }
+  /** A question form as events.ts has it (formQuestion): its id, its tool's message and call, its first question cut. */
+  static void ProjectForm(object f, Dictionary<string, object> into, string idKey) {
+    Put(into, idKey, G(f, "id") as string);
+    object tool = G(G(f, "metadata"), "tool");
+    Put(into, "messageID", G(tool, "messageID") as string); Put(into, "callID", G(tool, "id") as string);
+    var fields = G(f, "fields") as object[];
+    object first = fields != null && fields.Length > 0 ? fields[0] : null;
+    foreach (object s in new object[] { G(first, "description"), G(first, "title"), G(f, "title") }) {
+      var t = s as string;
+      if (t != null && t.Trim().Length > 0) { Put(into, "text", S(t, 500)); break; }
+    }
+  }
+
   /** A number as JSON gives one (int, long, decimal or double), else null. */
   static object Num(object v) { return v is int || v is long || v is decimal || v is double ? v : null; }
 
@@ -150,11 +166,11 @@ public static class CwStream {
     }
   }
 
-  /** Posts one body to Combwork's hook server; whether it took it. */
+  /** Posts one body to Combwork's hook server; whether it took it. 30 s (HI-3375): Combwork's start step takes up to 20 s (SESSION_CONTEXT_MS). */
   static bool Post(string body) {
     try {
       var r = (HttpWebRequest)WebRequest.Create(HookUrl);
-      r.Method = "POST"; r.Timeout = 5000; r.ReadWriteTimeout = 5000; r.Proxy = null; r.ContentType = "application/json";
+      r.Method = "POST"; r.Timeout = 30000; r.ReadWriteTimeout = 30000; r.Proxy = null; r.ContentType = "application/json";
       r.Headers["Authorization"] = "Bearer " + HookToken;
       byte[] data = Encoding.UTF8.GetBytes(body);
       r.ContentLength = data.Length;
@@ -209,6 +225,16 @@ public static class CwStream {
       if (res != null) { var parts = new List<string>(); foreach (object r in res) if (r is string) parts.Add((string)r); Put(q, "resources", S(string.Join(" ", parts.ToArray()), 500)); }
       permissions.Add(q);
     }
+    // The question tool's pending forms (HI-3317, wire/forms.json), read as the permissions are.
+    if (Get("/api/session/" + Uri.EscapeDataString(Session) + "/form", PageBytes, out t) != 200) { LastProblem = "the questions couldn't be read"; return null; }
+    var forms = new List<object>();
+    var flist = G(Json.DeserializeObject(t), "data") as object[];
+    if (flist != null) foreach (object f in flist) {
+      if (forms.Count >= 20) break;
+      var q = new Dictionary<string, object>();
+      ProjectForm(f, q, "id");
+      forms.Add(q);
+    }
     // The messages, newest first, back to a user message already known, the baseline's idle marker, or the start.
     var newestFirst = new List<Dictionary<string, object>>();
     HashSet<string> knownNow;
@@ -242,7 +268,7 @@ public static class CwStream {
     settled = w1 == w2;
     w = w2;
     newestFirst.Reverse();
-    var snap = new Dictionary<string, object> { { "w", w2 }, { "session", session }, { "permissions", permissions }, { "messages", newestFirst }, { "boundary", boundary } };
+    var snap = new Dictionary<string, object> { { "w", w2 }, { "session", session }, { "permissions", permissions }, { "forms", forms }, { "messages", newestFirst }, { "boundary", boundary } };
     if (baseline) { snap["baseline"] = true; snap["intent"] = Intent; }
     // Within the body's bound: the oldest messages go first (and the boundary is then partial).
     while (newestFirst.Count > 0 && Json.Serialize(snap).Length > BodyMax - 512) { newestFirst.RemoveAt(0); snap["boundary"] = "partial"; }
@@ -642,7 +668,7 @@ public static class CwOpencode {
     if (rulesAgent == "") rulesAgent = "build";
     int slash = model.IndexOf('/');
     string modelProvider = slash > 0 ? model.Substring(0, slash) : "", modelId = slash > 0 ? model.Substring(slash + 1) : "";
-    int readyMs; if (!int.TryParse(E("CW_OC_READY_MS"), out readyMs) || readyMs < 1000) readyMs = 30000;
+    int readyMs; if (!int.TryParse(E("CW_OC_READY_MS"), out readyMs) || readyMs < 1000) readyMs = 120000;
     long logMax; if (!long.TryParse(E("CW_OC_LOG_MAX"), out logMax) || logMax < 4096) logMax = 1048576;
     exe0 = exe; sayLog = log == "" ? null : log;
     foreach (string a in E("CW_OC_PREFIX").Split('\u001f')) if (a.Length > 0) prefix.Add(a);

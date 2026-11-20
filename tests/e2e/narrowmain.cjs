@@ -10,7 +10,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'narrowmain-profile')
 const ws = path.join(lib.WORK, 'narrowmain-ws')
@@ -96,7 +96,8 @@ const check = (name, ok, extra = '') => {
   const explanation = () => page.evaluate(() => !![...document.querySelectorAll('.session-empty-card > h2 + p')].find((e) => e.checkVisibility({ visibilityProperty: true })))
   const run = async (label, project, buttons, panes) => {
     await page.locator('.project-row', { hasText: project }).first().click()
-    await lib.sleep(500)
+    // HI-3396: its project shown, laid out.
+    await lib.readyWithin('its project shown', async () => (await page.locator('.project-row.selected', { hasText: project }).count()) === 1, lib.timing('hang.ui'))
     const p = await probe()
     check(`${label}: the main area is squeezed between the panels`, !!p.main && p.main.width < 400 && !!p.sides.assistant && !!p.sides.progress && p.panes === panes, JSON.stringify(p))
     check(`${label}: nothing of the main area over the side panels${panes > 1 ? ', nor of a pane over the other' : ''}`, p.leakCount === 0, JSON.stringify(p))
@@ -112,10 +113,9 @@ const check = (name, ok, extra = '') => {
     await page.reload()
     await lib.appReady(page)
     if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')
-    await lib.until(async () => (await page.locator('.assistant-panel').count()) === 1 && (await page.locator('.progress-panel').count()) === 1, 10000)
+    await lib.until(async () => (await page.locator('.assistant-panel').count()) === 1 && (await page.locator('.progress-panel').count()) === 1, lib.timing('hang.ui'))
     for (const z of [1, 1.25]) {
-      await zoom(z)
-      await lib.sleep(400)
+      await lib.zoomTo(app, page, z)
       const tag = `Assistant ${side}, ${z * 100}%`
       const p = await run(`${tag}, no agents`, 'alpha', [['New Session', '.session-empty-card .btn.act-start']], 1)
       const lead = await explanation()
@@ -130,8 +130,8 @@ const check = (name, ok, extra = '') => {
   }
   // Light theme, the tightest case again.
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await zoom(1.25)
-  await lib.sleep(400)
+  await lib.themeSettled(page, 'light')
+  await lib.zoomTo(app, page, 1.25)
   await run('light, 125%, no agents', 'alpha', [['New Session', '.session-empty-card .btn.act-start']], 1)
   await page.screenshot({ path: path.join(lib.WORK, 'narrowmain-light-125-alpha.png') })
 
@@ -232,7 +232,7 @@ const check = (name, ok, extra = '') => {
   await lib.appReady(page)
   await lib.fitWindow(app, page, { width: 1600, height: 900 })
   await page.locator('.project-row', { hasText: 'alpha' }).first().click()
-  await lib.sleep(500)
+  await lib.readyWithin('its project shown', async () => (await page.locator('.project-row.selected', { hasText: 'alpha' }).count()) === 1, lib.timing('hang.ui'))
   const roomy = await page.evaluate(() => {
     const e = [...document.querySelectorAll('.session-empty')].find((x) => x.getClientRects().length)
     const c = e?.querySelector('.session-empty-card')?.getBoundingClientRect()

@@ -38,15 +38,18 @@ import { config } from './config'
 import { onCombworkEvent } from './events'
 import { placeKey, readCapped, readJson, realPath, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readStore, saveTable, storeValue } from './storeRows'
+import { measured } from './stallWork'
 import { boardLock, dbGenerationAt, onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
 import { transaction } from './db'
-import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, saveDeliveryChanges, StaleDeliveries } from './schema/sessionDeliveryTables'
+import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, StaleDeliveries } from './schema/sessionDeliveryTables'
+import { saveDeliveryChanges } from './deliveryChanges'
 import { canTypeLine, lineBusy, typeLine, whyNoLine } from './lineWriter'
 import { createLogger, userText } from './logger'
 import { readyFor } from './readiness'
 import { sessions } from './sessions'
 import { folderChanging, folderSteady, inFolder, onFolderSteady } from './folderFence'
 import { cardsNow } from './tasks'
+import { noToolsIn } from './independent'
 import { workspaceFor, WorkspaceService } from './workspace'
 import { pausedFor } from './teamPause'
 import { pauseHolds } from '../shared/teamPause'
@@ -74,7 +77,7 @@ import { saidError } from './combworkError'
  * before it was read, is uncertain: it may not have reached the agent, so it is offered once more, saying it may repeat,
  * and stays uncertain (shown) if that one isn't received either.
  *
- * **No inbox** (Darren's decision on #650): an agent that can't read an inbox (`readsInbox`: a project agent while the
+ * **No inbox** (#650): an agent that can't read an inbox (`readsInbox`: a project agent while the
  * Agent API or its combwork server is off) is given no delivery, and its bodies are never typed instead: each is refused with
  * the reason its sender sees (`noInbox`: made, NoInbox; one already waiting, refused when next looked at). Only the
  * user's own action, a task they give it from Combwork (Start), is typed as their input, as their typing in its pane is: no
@@ -167,6 +170,7 @@ const T = {
   assistantEnded: agentMsg({ id: 'inbox.refused.assistantEnded', text: "the Assistant's session that left it ended", note: 'Why a delivery the Assistant left was refused, as its sender reads it.' }),
   noInbox: agentMsg({ id: 'inbox.refused.noInbox', text: '{name} has no inbox: turn on the Agent API', note: "Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. name: the agent's name." }),
   independent: agentMsg({ id: 'inbox.refused.independent', text: '{name} is Independent: Combwork gives it nothing, and the user works with it in its pane', note: "Why an Independent agent (HI-2670) is given no delivery, as its sender sees it: it takes no part in the workflow. name: the agent's name." }),
+  noTools: agentMsg({ id: 'inbox.refused.noTools', text: "{name}'s CLI takes none of Combwork's tools (it runs from a description), so it has no inbox: start it on a task, or the user types to it in its pane", note: "Why an agent on a CLI that runs from a description (HI-3196) is given no delivery, as its sender sees it: its CLI takes no MCP server or skills from Combwork. A task can still be its launch's prompt. name: the agent's name." }),
   plain: agentMsg({ id: 'inbox.refused.plain', text: "{name} runs as if started from a terminal, without Combwork's tools or typing, so it has no inbox until it restarts", note: "Why an agent is given no delivery (HI-2670), as its sender sees it: its running session launched without Combwork's tools or without Combwork typing into it (its connection's launch settings). name: the agent's name." }),
   late: agentMsg({ id: 'inbox.expired.late', text: 'not received in time', note: 'Why a delivery expired, as its sender reads it: not read before its expiry.' }),
   runEnded: agentMsg({ id: 'inbox.expired.sessionEnded', text: 'the session it was for has ended', note: 'Why a delivery for one launch of its agent expired, as its sender reads it.' }),
@@ -389,12 +393,21 @@ export function waitingForRunNow(host: string, agentId: string, run: string, con
   return (stores.get(keyOf(host))?.records ?? []).filter((r) => r.agentId === agentId && (r.state === 'queued' || r.state === 'offered' || r.state === 'uncertain') && Date.parse(r.expires) > now && (!r.conversation || !conversation || r.conversation === conversation) && (!r.forRun || r.forRun === run))
 }
 
-/** Runs fn after the host's transactions before it (and before later ones). */
+/**
+ * Runs fn after the host's transactions before it (and before later ones), once the event loop has turned (HI-3298): the
+ * awaits in a transaction resolve without a turn (the board's lock is a chain of promises, its database synchronous), so
+ * a burst of them (a lane's wakes, each made and offered) was one task on main, keystrokes queued behind all of it. The
+ * turn is taken holding the host's lock, before fn reads anything: the order of its transactions is as it was, and
+ * nothing is awaited between a plan and its save.
+ */
 function locked<T>(store: Store, fn: () => Promise<T>): Promise<T> {
-  const run = store.lock.then(fn)
+  const run = store.lock.then(turn).then(fn)
   store.lock = run.catch(() => undefined)
   return run
 }
+
+/** Resolves on the event loop's next turn, after what is waiting for main (input, IPC, I/O) has had it. */
+const turn = (): Promise<void> => new Promise((r) => setImmediate(r))
 
 /**
  * A transaction (see the top): `plan` checks and changes a copy of what is published (synchronously, under the host's
@@ -425,7 +438,8 @@ function transactAfter<P, T>(store: Store, read: () => Promise<P>, plan: (d: Dra
     for (let tries = 1; ; tries++) {
       // From here to the save, nothing is awaited: the plan is made from `got` as `again` last judged it.
       const d: Draft = { records: [...store.records], next: store.next, invalid: [...store.invalid], dirty: false, after: [] }
-      const planned = plan(d, got)
+      // Named in a stall it makes (HI-3293): a plan rechecks every unread delivery of the host.
+      const planned = measured('deliveries plan', () => plan(d, got)) // agent-protocol: a stall's label, for combwork.log
       if (!d.dirty) return planned
       try {
         await save(store, d)
@@ -648,10 +662,40 @@ async function readFileOf(host: string): Promise<{ deliveries: unknown[]; next: 
 const fileText = (d: Pick<Draft, 'records' | 'next' | 'invalid'>): string => JSON.stringify({ version: 1, next: d.next, deliveries: d.records, ...(d.invalid.length ? { invalid: d.invalid } : {}) }, null, 2) + '\n'
 
 /**
+ * Each record's bytes in fileText, as an element of its deliveries list (indented two levels), kept while the record is
+ * (HI-3290: a save sized every record the host keeps, on main, several times a delivery). A record is never changed in
+ * place, but for the id its save gave it (forgotten here then).
+ */
+const recordBytes = new WeakMap<DeliveryRecord, number>()
+const bytesOf = (r: DeliveryRecord): number => {
+  let n = recordBytes.get(r)
+  if (n === undefined) {
+    const text = JSON.stringify(r, null, 2)
+    let lines = 0
+    for (let i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', i + 1)) lines++
+    // Each of its lines but the first indented four more; "    " before it, and ",\n" or "\n" after it.
+    n = Buffer.byteLength(text) + 4 * lines + 6
+    recordBytes.set(r, n)
+  }
+  return n
+}
+
+/** Buffer.byteLength(fileText(d)), from each record's bytes kept (bytesOf) rather than all of them written out again. */
+const fileBytes = (d: Pick<Draft, 'records' | 'next' | 'invalid'>): number => {
+  const empty = Buffer.byteLength(fileText({ records: [], next: d.next, invalid: d.invalid }))
+  if (!d.records.length) return empty
+  // "[]" becomes "[\n", its elements, then "\n  ]", less the last element's comma.
+  let n = empty + 2
+  for (const r of d.records) n += bytesOf(r)
+  return n
+}
+export const fileBytesForTests = (records: DeliveryRecord[], next: number, invalid: unknown[] = []): { bytes: number; text: number } => ({ bytes: fileBytes({ records, next, invalid }), text: Buffer.byteLength(fileText({ records, next, invalid })) })
+
+/**
  * Whether a draft fits the file's budget, with room for each live delivery to grow to its end (times, a reason): what
  * Combwork writes stays well under what it reads back (MAX_FILE_BYTES), so a file it wrote is never set aside as too big.
  */
-const fits = (d: Draft): boolean => Buffer.byteLength(fileText(d)) + d.records.filter(isLive).length * GROWTH_PER_LIVE <= fileBudget
+const fits = (d: Draft): boolean => fileBytes(d) + d.records.filter(isLive).length * GROWTH_PER_LIVE <= fileBudget
 
 /** Makes room in the budget by dropping the oldest ended deliveries (their history), if need be. False if it still doesn't fit. */
 function makeRoom(d: Draft): boolean {
@@ -687,10 +731,17 @@ async function save(store: Store, d: Draft): Promise<void> {
   }
   // What is written is what reads back (#649): one check, readDelivery's, for saving and restoring alike; a record it
   // wouldn't read back fails the save (nothing changes), never a delivery lost on the next start.
-  // agent-protocol: a mistake in Combwork's code (a record it made that doesn't read back), for the log and its bug report
-  for (const r of d.records) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Combwork could read back`)
-  const text = fileText(d)
-  if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw saidError(T.tooMany)
+  // Only the records this transaction changed (HI-3290): the rest are those published, each checked as it was read or saved.
+  const was = new Map(store.records.map((r) => [r.id, r]))
+  const now = new Set(d.records.map((r) => r.id))
+  const changed = d.records.filter((r) => was.get(r.id) !== r)
+  // Named in a stall it makes (HI-3293).
+  // agent-protocol: a stall's label, for combwork.log
+  measured('deliveries save check', () => {
+    // agent-protocol: a mistake in Combwork's code (a record it made that doesn't read back), for the log and its bug report
+    for (const r of changed) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Combwork could read back`)
+    if (fileBytes(d) > MAX_FILE_BYTES) throw saidError(T.tooMany)
+  })
   // Read from a database since replaced (the upgrade to 1.0, a restore): never saved over what the file has now.
   const guard = (): void => {
     if (store.gen !== dbGenerationAt(store.place.key)) throw saidError(T.dbReplaced)
@@ -705,9 +756,6 @@ async function save(store: Store, d: Draft): Promise<void> {
   // transaction, against the rows as they are committed (#1266): a row another Combwork changed since this store read it
   // fails the save (StaleDeliveries: planned again on the rows as they are), its rows saved since are never touched, and
   // a new delivery whose id it took takes the next free one (made here, before it is published).
-  const was = new Map(store.records.map((r) => [r.id, r]))
-  const now = new Set(d.records.map((r) => r.id))
-  const changed = d.records.filter((r) => was.get(r.id) !== r) as unknown as Record<string, unknown>[]
   const removed = [...was.keys()].filter((id) => !now.has(id))
   let saved: ReturnType<typeof saveDeliveryChanges> = { written: new Map(), renamed: new Map() }
   const once = d.once
@@ -719,7 +767,7 @@ async function save(store: Store, d: Draft): Promise<void> {
       // Its receipt (HI-2618), read in this transaction against what is committed: one there means its delivery was made
       // (by another pass, another Combwork, or before a restart), and nothing of this plan is saved.
       if (once && storeValue(db, 'deliveries', store.place.scope, ONCE + once.key) !== null) throw new OnceTaken(once.key)
-      saved = saveDeliveryChanges(db, store.place.scope, { put: changed, removed, base: store.base })
+      saved = saveDeliveryChanges(db, store.place.scope, { put: changed as unknown as Record<string, unknown>[], removed, base: store.base })
       // Receipts past their keeping go (their producers no longer retry them).
       db.prepare("DELETE FROM store_meta WHERE store = 'deliveries' AND scope = ? AND substr(key, 1, 5) = ? AND json_extract(value, '$.at') < ?").run(store.place.scope, ONCE, new Date(Date.now() - ONCE_KEEP_MS).toISOString()) // agent-protocol: SQL
     },
@@ -729,8 +777,9 @@ async function save(store: Store, d: Draft): Promise<void> {
   for (const r of d.records) {
     const to = saved.renamed.get(r.id)
     if (!to) continue
-    // The same record (what the transaction returns is it): its id is the one saved.
+    // The same record (what the transaction returns is it): its id is the one saved, its size worked out again.
     Object.assign(r, to)
+    recordBytes.delete(r)
     d.next = Math.max(d.next, to.seq + 1)
   }
   // What this store now last wrote: the rows it saves next are changed only from these.
@@ -740,17 +789,30 @@ async function save(store: Store, d: Draft): Promise<void> {
   store.base = base
 }
 
+/** When an ended delivery ended, kept while the record is (HI-3290: prune parsed every ended one's time at each save). */
+const endedTimes = new WeakMap<DeliveryRecord, number>()
+const endedAt = (r: DeliveryRecord): number => {
+  let t = endedTimes.get(r)
+  if (t === undefined) endedTimes.set(r, (t = Date.parse(r.ended ?? r.acked ?? r.received ?? r.created)))
+  return t
+}
+
 /** Ended deliveries beyond what is kept (per agent, by age) go; received ones never acked expire after a week. */
 function prune(store: Store, d: Draft): void {
   const now = Date.now()
   for (const r of [...d.records]) if (r.state === 'received' && needsAck(r.kind) && now - Date.parse(r.received ?? r.created) > KEEP_RECEIVED_MS) set(store, d, r, 'expired', say(T.notAcked))
   const ended = new Map<string, DeliveryRecord[]>()
-  for (const r of d.records) if (!isLive(r)) ended.set(r.agentId, [...(ended.get(r.agentId) ?? []), r])
+  for (const r of d.records) {
+    if (isLive(r)) continue
+    const list = ended.get(r.agentId)
+    if (list) list.push(r)
+    else ended.set(r.agentId, [r])
+  }
   const drop = new Set<DeliveryRecord>()
   for (const list of ended.values()) {
     list.sort((a, b) => b.seq - a.seq)
     list.forEach((r, i) => {
-      if (i >= KEEP_ENDED || now - Date.parse(r.ended ?? r.acked ?? r.received ?? r.created) > KEEP_ENDED_MS) drop.add(r)
+      if (i >= KEEP_ENDED || now - endedAt(r) > KEEP_ENDED_MS) drop.add(r)
     })
   }
   if (drop.size) d.records = d.records.filter((r) => !drop.has(r))
@@ -874,7 +936,7 @@ const noInbox = (name: string): string => say(T.noInbox, { name })
 /** Why Combwork gives an agent nothing (HI-2670: sessions.keepsOut), as its sender sees it; null when it may. */
 function keptOut(host: string, agentId: string, name: string): string | null {
   const why = sessions.keepsOut(host, agentId)
-  return why ? say(why === 'independent' ? T.independent : T.plain, { name }) : null
+  return why ? say(why === 'independent' ? T.independent : why === 'noTools' ? T.noTools : T.plain, { name }) : null
 }
 /** A delivery refused because its agent can't read an inbox: the message says so, and what to do. */
 export class NoInbox extends Error {}
@@ -1016,7 +1078,7 @@ export const waitingCount = (host: string, agentId: string, kind: DeliveryKind):
  * One already waiting with the same source and ref is returned instead (made again from this one with `replace`).
  */
 export async function createDelivery(host: string, nd: NewDelivery, hooks?: DeliveryHooks): Promise<DeliveryRecord> {
-  const { meta, agentName } = checkedNew(host, nd)
+  const { meta, agentName, attempt } = checkedNew(host, nd)
   const store = await load(host)
   const r = await transact(store, (d) => {
     const why = senderRefusal(nd.from)
@@ -1032,11 +1094,11 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
     }
     if (had) {
       if (!nd.replace) return had
-      const again: DeliveryRecord = { ...had, body: nd.body, ...(nd.card ? { card: nd.card } : {}), ...(meta ? { meta } : {}), ...(nd.forRun ? { forRun: nd.forRun } : {}), expires: new Date(Date.now() + (nd.expiresMs ?? DELIVERY_EXPIRY_HOURS * 60 * 60_000)).toISOString() }
+      const again: DeliveryRecord = { ...had, body: nd.body, ...(nd.card ? { card: nd.card, ...(attempt ? { attempt } : {}) } : {}), ...(meta ? { meta } : {}), ...(nd.forRun ? { forRun: nd.forRun } : {}), expires: new Date(Date.now() + (nd.expiresMs ?? DELIVERY_EXPIRY_HOURS * 60 * 60_000)).toISOString() }
       put(d, had, again)
       return again
     }
-    const rec = addNew(d, nd, meta, agentName)
+    const rec = addNew(d, nd, meta, agentName, attempt)
     d.after.push(() => log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} queued`))
     return rec
   })
@@ -1055,7 +1117,7 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
  */
 export async function createDeliveryOnce(host: string, nd: NewDelivery & { once: string }): Promise<{ record: DeliveryRecord | null; made: boolean }> {
   if (nd.once.length > 300) throw saidError(T.badKey, undefined, { kind: 'invalid' })
-  const { meta, agentName } = checkedNew(host, nd)
+  const { meta, agentName, attempt } = checkedNew(host, nd)
   const store = await load(host)
   try {
     const out = await transact(store, (d) => {
@@ -1063,7 +1125,7 @@ export async function createDeliveryOnce(host: string, nd: NewDelivery & { once:
       if (why) throw saidError(T.notSent, { why })
       const live = nd.source && nd.ref !== undefined ? d.records.find((x) => x.source === nd.source && x.ref === nd.ref && x.agentId === nd.agentId && isLive(x)) : undefined
       if (live) return { record: live, made: false }
-      const rec = addNew(d, nd, meta, agentName)
+      const rec = addNew(d, nd, meta, agentName, attempt)
       d.once = { key: nd.once, at: nowIso() }
       d.after.push(() => log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} queued, once (${userText(nd.once)})`))
       return { record: rec as DeliveryRecord | null, made: true }
@@ -1096,7 +1158,7 @@ export async function deliveryReceiptForTests(host: string, key: string): Promis
 }
 
 /** A new delivery's checks before anything is read: refused (an Error) as createDelivery says; its meta and name as kept. */
-function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta']; agentName: string | undefined } {
+function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta']; agentName: string | undefined; attempt: string | undefined } {
   // Only what reads back is saved (readDelivery's limits): a longer text is refused here, never lost on a restart.
   if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw saidError(T.tooLong, { length: String(nd.body.length), max: String(DELIVERY_BODY_MAX_CHARS) }, { kind: 'invalid' })
   if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw saidError(T.badKey, undefined, { kind: 'invalid' })
@@ -1107,11 +1169,19 @@ function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta
   // Nor one Combwork keeps out of (HI-2670): an Independent agent, or a session without Combwork's tools or typing.
   const out = keptOut(host, nd.agentId, agentName ?? nd.agentId)
   if (out) throw new NoInbox(out)
-  return { meta, agentName }
+  // HI-3194: stamped with its card's attempt as it is made (what its receipt may issue, never more).
+  const a = nd.card ? attemptStamp?.(host, nd.card) : null
+  return { meta, agentName, attempt: a ? `${a.id}.${a.generation}` : undefined }
+}
+
+/** HI-3194: reads a card's attempt key for a host's new delivery (set by servers.ts, which can read the board). */
+let attemptStamp: ((host: string, card: number) => { id: number; generation: number } | null) | null = null
+export function setAttemptStamp(fn: typeof attemptStamp): void {
+  attemptStamp = fn
 }
 
 /** A new delivery added to a draft, within its limits (how many wait, how many are live, the file's budget), or refused. */
-function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined): DeliveryRecord {
+function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined, attempt?: string): DeliveryRecord {
   // agent-protocol: for the log; its caller says it in its own words (agentMessages.ts)
   if (nd.maxWaiting !== undefined && d.records.filter((x) => x.agentId === nd.agentId && x.kind === nd.kind && isWaiting(x)).length >= nd.maxWaiting) throw new TooManyWaiting(`${nd.maxWaiting} already wait`)
   if (d.records.filter(isLive).length >= MAX_LIVE_PER_HOST) throw new DeliveriesFull(say(T.projectFull, { max: String(MAX_LIVE_PER_HOST) }))
@@ -1124,7 +1194,7 @@ function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentNa
     conversation: nd.conversation || null,
     kind: nd.kind,
     from: nd.from,
-    ...(nd.card ? { card: nd.card, ...(nd.round ? { round: nd.round } : {}) } : {}),
+    ...(nd.card ? { card: nd.card, ...(nd.round ? { round: nd.round } : {}), ...(attempt ? { attempt } : {}) } : {}),
     body: nd.body,
     state: 'queued',
     created: nowIso(),
@@ -1212,7 +1282,10 @@ function leftOnLease(host: string, place: HostPlace, nd: NewDelivery, meta: Deli
         const now = new Set(d.records.map((r) => r.id))
         const saved = saveDeliveryChanges(w, place.scope, { put: [rec as unknown as Record<string, unknown>], removed: read.records.filter((r) => !now.has(r.id)).map((r) => r.id), base: read.base })
         const to = saved.renamed.get(rec.id)
-        if (to) Object.assign(rec, to)
+        if (to) {
+          Object.assign(rec, to)
+          recordBytes.delete(rec)
+        }
         const value = w.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES ('deliveries', ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value") // agent-protocol: SQL
         value.run(place.scope, 'next', JSON.stringify(Math.max(d.next, rec.seq + 1)))
         log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} left for when its workspace opens`)
@@ -1304,10 +1377,22 @@ export async function cancelFromSource(host: string, source: string, ref: string
  * before and not acked (of the kinds it acks). What may no longer be given out is refused or expired instead, checked in
  * the same transaction.
  */
-export async function readInbox(host: string, agentId: string): Promise<{ items: InboxItem[]; unacked: string[] }> {
+/**
+ * HI-3195: a read's or ack's launch fence, the caller's (servers.ts: the request's launch, captured as it arrived): it throws
+ * once that launch is no longer the agent's current one. Asked before anything, and again as the store's commit guard
+ * (save's `d.commit`, after every await), so a launch replaced meanwhile commits no received or acked transition.
+ */
+export type LaunchFence = () => void
+
+export async function readInbox(host: string, agentId: string, receivedAbout?: (issued: { card: number; attempt: string }[]) => void, opts: { fence?: LaunchFence; ack?: readonly string[] } = {}): Promise<{ items: InboxItem[]; unacked: string[]; acks?: AckResult }> {
+  opts.fence?.()
   const store = await load(host)
   const given: DeliveryRecord[] = []
   let unacked: string[] | null = null
+  // HI-3195: ack-then-read's acks, in the read's own save (made in its first attempt): both kept, or neither. HI-3272: made
+  // in each plan until that save is through, so a plan made again on another Combwork's rows (StaleDeliveries) acks too.
+  let acks: AckResult | undefined
+  let acksSaved = false
   // The conversation reading (what a carried delivery is shown again to once: replayedTo), or its launch while its CLI
   // hasn't named the conversation yet.
   const live = sessions.liveFor(host, agentId)
@@ -1327,8 +1412,10 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
         store,
         () => relevanceNow(store, agentId),
         (d, rel) => {
+          if (opts.fence) d.commit = opts.fence
           const held = applyRelevance(store, d, rel, agentId)
           recheck(store, d, agentId)
+          if (opts.ack && !acksSaved) acks = ackIn(store, d, agentId, opts.ack)
           const may = gate(d)
           const mine = d.records.filter((x) => x.agentId === agentId)
           const give = mine.filter((x) => may(x) && !held.has(x.id))
@@ -1348,15 +1435,45 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
       // Nothing received yet: the read fails, and gave nothing. A retry failing keeps what the attempts before it
       // received (saved as received): this read returns them, and what it missed waits for the next.
       if (!attempt) throw e
+      // HI-3195: a launch replaced meanwhile is refused, never given what an earlier attempt received.
+      opts.fence?.()
       log.warn(`${userText(agentId)}'s inbox read gave what it had: trying again failed`, e)
       break
     }
+    acksSaved = true
     given.push(...r.give)
     unacked ??= r.before
     if (!r.missed) break
   }
   show(store, agentId)
-  return { items: inDialectOf({ projectPath: host, agentId }, () => inboxItems(given)), unacked: unacked ?? [] }
+  // HI-3194: what this read received about a card, with the attempt each was made in (its caller issues those, never more).
+  receivedAbout?.(given.flatMap((x) => (x.card && x.attempt ? [{ card: x.card, attempt: x.attempt }] : [])))
+  return { items: inDialectOf({ projectPath: host, agentId }, () => inboxItems(given)), unacked: unacked ?? [], ...(acks ? { acks } : {}) }
+}
+
+/** What an ack did: acked (now or before), unknown (not the agent's, or ended unreceived), unread (not read yet). */
+export interface AckResult {
+  acked: string[]
+  unknown: string[]
+  unread: string[]
+}
+
+/** The acks of `ids` by `agentId`, in a draft (ackDeliveries' rules). */
+function ackIn(store: Store, d: Draft, agentId: string, ids: readonly string[]): AckResult {
+  const acked: string[] = []
+  const unknown: string[] = []
+  const unread: string[] = []
+  for (const id of [...new Set(ids)]) {
+    const x = byId(d.records, id)
+    if (!x || x.agentId !== agentId) unknown.push(id)
+    else if (x.state === 'acked') acked.push(id)
+    // Not read yet: read it first (never acked, nor its source told it was received, from its id alone).
+    else if (isUnread(x)) unread.push(id)
+    else if (x.state === 'received' && set(store, d, x, 'acked')) acked.push(id)
+    // Ended without being received (cancelled, refused, expired): not for it to act on.
+    else unknown.push(id)
+  }
+  return { acked, unknown, unread }
 }
 
 /**
@@ -1364,24 +1481,14 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
  * alone is no sign of reading; one not read yet is `unread`, nothing changes, and the agent reads it first). Ids that
  * aren't its own, or don't exist, are unknown (nothing said of them). Acked again: still acked.
  */
-export async function ackDeliveries(host: string, agentId: string, ids: readonly string[]): Promise<{ acked: string[]; unknown: string[]; unread: string[] }> {
+export async function ackDeliveries(host: string, agentId: string, ids: readonly string[], fence?: LaunchFence): Promise<AckResult> {
+  fence?.()
   const store = await load(host)
   const r = await transact(store, (d) => {
+    // HI-3195: the acking launch still the agent's current one as the ack commits.
+    if (fence) d.commit = fence
     recheck(store, d, agentId)
-    const acked: string[] = []
-    const unknown: string[] = []
-    const unread: string[] = []
-    for (const id of [...new Set(ids)]) {
-      const x = byId(d.records, id)
-      if (!x || x.agentId !== agentId) unknown.push(id)
-      else if (x.state === 'acked') acked.push(id)
-      // Not read yet: read it first (never acked, nor its source told it was received, from its id alone).
-      else if (isUnread(x)) unread.push(id)
-      else if (x.state === 'received' && set(store, d, x, 'acked')) acked.push(id)
-      // Ended without being received (cancelled, refused, expired): not for it to act on.
-      else unknown.push(id)
-    }
-    return { acked, unknown, unread }
+    return ackIn(store, d, agentId, ids)
   })
   show(store, agentId)
   return { acked: r.acked, unknown: r.unknown, unread: r.unread }
@@ -1424,9 +1531,10 @@ export function onCardTaskReceived(fn: typeof cardTaskReceived): void {
   cardTaskReceived = fn
 }
 
-export async function ackThenRead(host: string, agentId: string, ids: readonly string[]): Promise<{ acked: string[]; unknown: string[]; unread: string[]; items: InboxItem[]; unacked: string[] }> {
-  const acked = await ackDeliveries(host, agentId, ids)
-  return { ...acked, ...(await readInbox(host, agentId)) }
+export async function ackThenRead(host: string, agentId: string, ids: readonly string[], receivedAbout?: (issued: { card: number; attempt: string }[]) => void, fence?: LaunchFence): Promise<{ acked: string[]; unknown: string[]; unread: string[]; items: InboxItem[]; unacked: string[] }> {
+  // HI-3195: one save for both (the acks made in the read's plan, before what it gives): a fence refusing it keeps neither.
+  const { acks, ...read } = await readInbox(host, agentId, receivedAbout, { fence, ack: ids })
+  return { ...(acks ?? (await ackDeliveries(host, agentId, ids, fence))), ...read }
 }
 
 /**
@@ -2006,6 +2114,10 @@ export async function launchWith<T extends { runId: string }>(host: string, nd: 
   // The user's own task for an agent that can't read an inbox (#650's decision): its launch's prompt, as their input,
   // no delivery. Anyone else's is refused (createDelivery, below) before anything is launched.
   if (!readsInbox(host, nd.agentId) && nd.from.kind === 'user') return { record: null, launched: await start(nd.body) }
+  // An agent whose CLI takes none of Combwork's tools (HI-3196) has no inbox either: whoever sends it, its task is its
+  // launch's prompt, typed as it is (never a line telling it to call cw_inbox), with no delivery.
+  const ws = workspaceFor(host)
+  if (ws && noToolsIn(ws, host, nd.agentId)) return { record: null, launched: await start(nd.body) }
   // Saved as offered before anything is launched (persist before the effect, #647): not saved, nothing starts. From
   // here a crash leaves it offered, so it is uncertain after the restart, never queued and typed again as if new. The
   // scheduler never offers it (it isn't waiting), and the checks leave it alone while the launch starts.

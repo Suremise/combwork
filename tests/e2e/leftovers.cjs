@@ -67,13 +67,13 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     const leaveRunning = async (n) => {
       const before = lingering()
       await inv('session:start', proj, { agentId: agent.id })
-      await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 30000)
+      await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.ui'))
       await lib.sendPrompt(inv, key, `linger ${n}`, { submitted: async () => lingering().length >= before.length + n })
-      await lib.until(async () => (await live())?.status === 'finished', 20000)
+      await lib.until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))
       const pids = lingering().slice(before.length)
       remember(pids)
       await inv('session:stop', proj, agent.id)
-      await lib.until(async () => !(await live()), 15000)
+      await lib.until(async () => !(await live()), lib.timing('hang.ui'))
       return pids
     }
     await page.getByText('site', { exact: true }).first().click()
@@ -82,22 +82,22 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     const atStart = path.join(home, 'fake-linger-at-start.txt')
     fs.writeFileSync(atStart, '1')
     await inv('session:start', proj, { agentId: agent.id })
-    await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 30000)
+    await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.ui'))
     fs.rmSync(atStart)
-    await lib.until(() => lingering().length >= 1, 10000)
+    await lib.until(() => lingering().length >= 1, lib.timing('hang.ui'))
     const early = lingering()
     remember(early)
     await inv('session:stop', proj, agent.id)
-    await lib.until(async () => !(await live()), 15000)
-    const earlyListed = await lib.until(async () => (await listed())?.processes.length === early.length && (await listed()), 15000)
+    await lib.until(async () => !(await live()), lib.timing('hang.ui'))
+    const earlyListed = await lib.until(async () => (await listed())?.processes.length === early.length && (await listed()), lib.timing('hang.ui'))
     check('a process the CLI started the moment it ran, on the first launch, is listed', early.length === 1 && !!earlyListed && earlyListed.processes[0].pid === early[0], JSON.stringify({ early, earlyListed }))
-    check('ended through the API, it is gone', (await inv('session:settleLeftovers', proj, agent.id, 'end')) === 1 && (await lib.until(() => early.every((p) => !alive(p)), 10000)))
+    check('ended through the API, it is gone', (await inv('session:settleLeftovers', proj, agent.id, 'end')) === 1 && (await lib.until(() => early.every((p) => !alive(p)), lib.timing('hang.ui'))))
     // Its notice's offer goes with them (HI-2320, HI-2372): it loses its buttons and says they have ended. The entry
     // itself stays its time to be read (Popups.tsx), and a test window is never focused, so it isn't waited out.
     const earlyToast = page.locator('.toast', { hasText: 'left 1 process running' })
     check(
       'and so is the notification offering to end it',
-      await lib.until(async () => (await earlyToast.locator('button', { hasText: /End Them|Keep Running/ }).count()) === 0 && (await earlyToast.filter({ hasText: 'They have ended' }).count()) > 0, 5000),
+      await lib.until(async () => (await earlyToast.locator('button', { hasText: /End Them|Keep Running/ }).count()) === 0 && (await earlyToast.filter({ hasText: 'They have ended' }).count()) > 0, lib.timing('hang.ui')),
       JSON.stringify(await earlyToast.allInnerTexts().catch(() => []))
     )
 
@@ -106,12 +106,12 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     // The notification is a toast for 15 s from the stop, then only in the Notifications panel (without its buttons):
     // looked for from now, beside the checks below, not after them, which can take longer than that under load (#673).
     const toast = page.locator('.toast', { hasText: 'left 2 processes running' })
-    const offered = lib.until(async () => (await toast.locator('button', { hasText: 'End Them' }).count()) > 0, 30000).catch(() => false)
+    const offered = lib.until(async () => (await toast.locator('button', { hasText: 'End Them' }).count()) > 0, lib.timing('hang.ui')).catch(() => false)
     check('the agent left two processes running as it stopped', two.length === 2 && two.every(alive), JSON.stringify(two))
     const found = await lib.until(async () => {
       const l = await listed()
       return l?.processes.length === 2 && l
-    }, 15000)
+    }, lib.timing('hang.ui'))
     check('Combwork lists the two it left, by pid, as node processes', !!found && two.every((p) => found.processes.some((x) => x.pid === p)) && found.processes.every((x) => x.label.startsWith('node ')), JSON.stringify(found))
     check("the stranger's process isn't listed", !!found && !found.processes.some((x) => x.pid === stranger.pid))
     // Its pane's ⋯ (#977): an amber badge, "2 left running" in its name's description, and an entry whose menu ends them.
@@ -122,18 +122,18 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
       await more.click()
       await page.locator('.menu .menu-item', { hasText: `${n} left running` }).click()
     }
-    check("the pane's ⋯ shows \"2 left running\", with an amber badge", !!(await lib.until(async () => /2 left running/.test(await said()) && (await chip.count()) === 1, 10000)), await said())
+    check("the pane's ⋯ shows \"2 left running\", with an amber badge", !!(await lib.until(async () => /2 left running/.test(await said()) && (await chip.count()) === 1, lib.timing('hang.ui'))), await said())
     check('a notification offers to end them', !!(await offered))
     await page.screenshot({ path: path.join(shots, 'leftovers-header.png') })
     await openLeftovers(2)
     await page.getByText('End All 2', { exact: true }).click()
-    check('End ends both', await lib.until(() => two.every((p) => !alive(p)), 10000))
-    check('and they are no longer listed or shown', (await lib.until(async () => !(await listed()) && (await chip.count()) === 0, 10000)) === true)
+    check('End ends both', await lib.until(() => two.every((p) => !alive(p)), lib.timing('hang.ui')))
+    check('and they are no longer listed or shown', (await lib.until(async () => !(await listed()) && (await chip.count()) === 0, lib.timing('hang.ui'))) === true)
     check("the stranger's process still runs", alive(stranger.pid))
 
     // Keep Running: no longer listed, still running.
     const one = await leaveRunning(1)
-    await lib.until(async () => (await listed())?.processes.length === 1, 15000)
+    await lib.until(async () => (await listed())?.processes.length === 1, lib.timing('hang.ui'))
     const kept = await inv('session:settleLeftovers', proj, agent.id, 'keep')
     check('Keep Running stops listing it and leaves it running', kept === 1 && !(await listed()) && one.every(alive), JSON.stringify({ kept, one }))
     lib.endExactly(one.map((p) => ids.get(p)).filter(Boolean))
@@ -141,23 +141,23 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     // End them (the setting): ended as the agent stops, never listed.
     await inv('settings:update', { agents: { leftoverProcesses: 'end' } })
     const auto = await leaveRunning(1)
-    check('with End them set, they are ended as the agent stops', await lib.until(() => auto.every((p) => !alive(p)), 15000), JSON.stringify(auto))
+    check('with End them set, they are ended as the agent stops', await lib.until(() => auto.every((p) => !alive(p)), lib.timing('hang.ui')), JSON.stringify(auto))
     check('and nothing is listed', !(await listed()))
 
     // End them, but Windows refuses (CW_TEST_JOB_KILL_FAILS): still listed and offered, and End from the ⋯ works.
     await app.evaluate(() => (process.env.CW_TEST_JOB_KILL_FAILS = '1'))
     const refused = await leaveRunning(1)
     const offer = page.locator('.toast', { hasText: "couldn't end it by itself" })
-    check("a refused End leaves it listed, offered, and says Combwork couldn't end it", (await lib.until(async () => (await listed())?.processes.length === 1, 15000)) && (await offer.first().waitFor({ timeout: 10000 }).then(() => true, () => false)) && refused.every(alive))
+    check("a refused End leaves it listed, offered, and says Combwork couldn't end it", (await lib.until(async () => (await listed())?.processes.length === 1, lib.timing('hang.ui'))) && (await offer.first().waitFor({ timeout: lib.timing('hang.ui') }).then(() => true, () => false)) && refused.every(alive))
     await app.evaluate(() => delete process.env.CW_TEST_JOB_KILL_FAILS)
     await openLeftovers(1)
     await page.getByText('End It', { exact: true }).click()
-    check('trying again from the ⋯ ends it', (await lib.until(() => refused.every((p) => !alive(p)), 10000)) && (await lib.until(async () => !(await listed()), 10000)))
+    check('trying again from the ⋯ ends it', (await lib.until(() => refused.every((p) => !alive(p)), lib.timing('hang.ui'))) && (await lib.until(async () => !(await listed()), lib.timing('hang.ui'))))
 
     // Quitting with some listed asks, and ends them on End Them.
     await inv('settings:update', { agents: { leftoverProcesses: 'ask' } })
     const atQuit = await leaveRunning(1)
-    await lib.until(async () => (await listed())?.processes.length === 1, 15000)
+    await lib.until(async () => (await listed())?.processes.length === 1, lib.timing('hang.ui'))
     const asked = path.join(base, 'quit-asked.json')
     await app.evaluate(({ dialog }, f) => {
       dialog.showMessageBox = async (_w, opts) => {
@@ -168,7 +168,7 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     await app.close()
     const q = fs.existsSync(asked) ? JSON.parse(fs.readFileSync(asked, 'utf8')) : null
     check('quitting asks about what the agent left running', !!q && /left 1 process running/.test(q.message) && /site · Website: node /.test(q.detail) && q.buttons[0] === 'End Them', JSON.stringify(q))
-    check('and End Them ends it', await lib.until(() => atQuit.every((p) => !alive(p)), 10000))
+    check('and End Them ends it', await lib.until(() => atQuit.every((p) => !alive(p)), lib.timing('hang.ui')))
     check("the stranger's process outlives Combwork", alive(stranger.pid), `checked ${Math.round((Date.now() - strangerAt) / 1000)} s after it started`)
   } finally {
     await app.close().catch(() => undefined)
@@ -186,12 +186,12 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     const live2 = async () => (await inv2('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === agentId)
     for (let round = 0; round < 2; round++) {
       await inv2('session:start', proj, { agentId })
-      check(`untracked, the agent still starts (launch ${round + 1})`, await lib.until(async () => ['ready', 'finished'].includes((await live2())?.status), 30000))
+      check(`untracked, the agent still starts (launch ${round + 1})`, await lib.until(async () => ['ready', 'finished'].includes((await live2())?.status), lib.timing('hang.ui')))
       await inv2('session:stop', proj, agentId)
-      await lib.until(async () => !(await live2()), 15000)
+      await lib.until(async () => !(await live2()), lib.timing('hang.ui'))
     }
     const notice = p2.locator('.toast', { hasText: "Combwork can't keep track of agents' processes" })
-    check('Combwork says once that it can’t track agents’ processes', (await notice.first().waitFor({ timeout: 5000 }).then(() => notice.count(), () => 0)) === 1)
+    check('Combwork says once that it can’t track agents’ processes', (await notice.first().waitFor({ timeout: lib.timing('hang.ui') }).then(() => notice.count(), () => 0)) === 1)
     const diag = await inv2('app:diagnostics')
     check('Diagnostics says why', /Agents' processes: not tracked: The PowerShell helper of Combwork's process tracker didn't start within 3 seconds/.test(diag), diag.split('\n').find((l) => l.includes("Agents' processes")))
   } finally {

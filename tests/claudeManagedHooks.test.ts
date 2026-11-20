@@ -9,6 +9,7 @@ import http from 'http'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // A child's environment from the run context's allowlist, never this shell's (tests/README.md, Isolation).
 const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { childEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
@@ -16,7 +17,8 @@ const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { c
 const userData = await vi.hoisted(async () => (await import('./tempDir')).tempDir('cw-managed-hooks-'))
 vi.mock('electron', () => ({ app: { getPath: () => userData, getVersion: () => '0.0.0-test', isPackaged: false } }))
 
-const { CLAUDE_HOOK_EVENTS, claudeHookHandlers, claudeManagedSnippet, fixedHookUrl, forwardCommand, forwardScript } = await import('../src/shared/claudeHookHandlers')
+const { CLAUDE_HOOK_EVENTS, claudeHookHandlers, claudeManagedSnippet, forwardCommand, forwardScript } = await import('../src/shared/providers/claude/hookHandlers')
+const { fixedHookUrl } = await import('../src/shared/hooks')
 const { hookCause, urlAllowed } = await import('../src/main/providers/claude/hookPolicy')
 const { usedAdminSources, parseRegSettings, managedFiles } = await import('../src/main/providers/claude/updateChannel')
 
@@ -38,7 +40,7 @@ describe('the admin snippet (HI-2777)', () => {
       expect(h).toEqual({ type: 'http', url: URL47821, timeout: ev === 'PreToolUse' ? 10 : 5, headers: { Authorization: 'Bearer $CW_HOOK_TOKEN' }, allowedEnvVars: ['CW_HOOK_TOKEN'] })
     }
     expect(s.hooks.PreToolUse[0].matcher).toBe('*')
-    expect(s.hooks.SessionStart[0].hooks[0]).toMatchObject({ type: 'command', timeout: 5 })
+    expect(s.hooks.SessionStart[0].hooks[0]).toMatchObject({ type: 'command', timeout: 5 }) // timing-ok: data, not a wait
     expect(s.statusLine.command).toMatch(/^powershell\.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand [A-Za-z0-9+/=]+$/)
     // No port in the command hooks (they read CW_HOOK_URL), no token anywhere.
     expect(JSON.stringify(s.hooks.SessionStart)).not.toContain('4782')
@@ -67,7 +69,7 @@ describe('the admin snippet (HI-2777)', () => {
   it("the user guide's snippet is the one Combwork makes for port 47821 and the default timeouts, its script decoded", async () => {
     const { advancedDef } = await import('../src/shared/advanced')
     const defaults = { hook: advancedDef('claude-code.hooks.timeoutSeconds')!.default as number, preToolUse: advancedDef('claude-code.hooks.preToolUseTimeoutSeconds')!.default as number }
-    const { claudeManagedSnippetText, MANAGED_POLICY_GUIDE } = await import('../src/shared/claudeHookHandlers')
+    const { claudeManagedSnippetText, MANAGED_POLICY_GUIDE } = await import('../src/shared/providers/claude/hookHandlers')
     const guide = readFileSync(join(__dirname, '..', 'docs', 'USER_GUIDE.md'), 'utf8').replace(/\r\n/g, '\n')
     const section = guide.slice(guide.indexOf(`<a id="${MANAGED_POLICY_GUIDE}"></a>`))
     expect(section.length).toBeLessThan(guide.length)
@@ -83,7 +85,7 @@ describe('the admin snippet (HI-2777)', () => {
     const ctx = { projectPath: project, agentId: 'a1', cwd: project, skills: [], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=r', fixedHookUrl: URL47821, env: { CLAUDE_CONFIG_DIR: join(base, 'home') }, extraArgs: [], hookAuthFile: join(priv, 'hook-auth.txt'), privateDir: priv, overrides: {} }
     await claudeCode.prepareLaunch(ctx as never)
     const settings = JSON.parse(readFileSync(join(priv, 'settings.json'), 'utf8'))
-    const snippet = claudeManagedSnippet([47821], { hook: 5, preToolUse: 10 }) as { hooks: Record<string, unknown> }
+    const snippet = claudeManagedSnippet([47821], { hook: 30, preToolUse: 30 }) as { hooks: Record<string, unknown> }
     expect(settings.hooks).toEqual(snippet.hooks)
     // With the Agent API not listening: the run's server, which knows the run by its token, then they differ.
     expect(claudeHookHandlers(['http://127.0.0.1:9/hook?run=r'], T)).not.toEqual(snippet.hooks)
@@ -196,7 +198,7 @@ describe("what would keep Combwork's hooks away, from recorded managed settings 
 })
 
 // The longest a shell run here takes: a bound for a hung one, never how long it should take.
-const CHILD_HUNG_MS = 20000
+const CHILD_HUNG_MS = timing('wait.hang')
 
 /** Runs `command` through `shell` with `input` on stdin, in the run context's environment plus `env`; bounded. */
 function run(shell: string, args: string[], input: string, env: Record<string, string>): Promise<{ code: number | null; out: string }> {
@@ -264,5 +266,5 @@ describe.runIf(process.platform === 'win32')("the snippet's command through Git 
     } finally {
       server.close()
     }
-  }, 30000)
+  }, timing('test.hang'))
 })

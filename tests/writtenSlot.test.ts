@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => true }))
 // The lanes running (the slot pass ends a lane's lease once its lane isn't): the next ones, never the one that ended.
@@ -32,7 +33,7 @@ const { setAgentBusy } = await import('../src/main/workflow/lineUpdates')
 const tasks = await import('../src/main/tasks')
 const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 
-const HUNG_MS = 20_000
+const HUNG_MS = timing('wait.hang')
 const cleanups: (() => Promise<void> | void)[] = []
 afterEach(async () => {
   for (const c of cleanups.splice(0).reverse()) await c()
@@ -227,6 +228,56 @@ describe("B1's next start takes over the slot its own run still writes in (HI-17
     expect(t.pool.slots().length).toBe(slotsBefore)
     await t.store.jobSettled(b1.slot, 'job-1')
     expect(await t.lane('lane-next')).toEqual({ slot: b1.slot })
+  })
+
+  it("B1's run already being stopped (HI-3326: the old lease's gentle end stopped it at its idle moment, and runNow still gives it until it exits): never taken over; the start is refused while its writer holds the slot, as an ended run's is", async () => {
+    const t = await setup('stopping')
+    const b1 = await t.laneEndedWithB1There()
+    const r2 = await t.start(await t.card('B2s', 'b2'), 'b2')
+    expect(r2 && 'lease' in r2 ? r2.slot : r2).not.toBe(b1.slot)
+    const stopAsked = vi.spyOn(sessions, 'stopAsked').mockImplementation((_p: string, agent: string, run: string) => agent === 'b1' && run === 'run-b1')
+    cleanups.push(() => stopAsked.mockRestore())
+    const next = await t.card('B1 next', 'b1')
+    // Neither the dry start nor the real one names B1's own slot as its to take; the real one is refused, nothing lent.
+    expect(await t.start(next, 'b1', true)).not.toMatchObject({ slot: b1.slot })
+    expect(await t.start(next, 'b1')).toMatchObject({ wait: expect.any(String) })
+    expect(t.leases('b1')).toEqual([])
+    expect(t.writerOf(b1.slot)).toMatchObject({ run: 'run-b1', lease: b1.old })
+    expect(stopAsked).toHaveBeenCalledWith(t.project, 'b1', 'run-b1')
+  })
+
+  it("B1's stop asked after its slot was chosen, before the takeover's write (HR1 on HI-3326): the write refuses it, nothing lent or rebound; a dry start whose look sees the stop arrive advertises nothing", async () => {
+    const t = await setup('stoplate')
+    const b1 = await t.laneEndedWithB1There()
+    const r2 = await t.start(await t.card('B2s', 'b2'), 'b2')
+    expect(r2 && 'lease' in r2 ? r2.slot : r2).not.toBe(b1.slot)
+    let stopped = false
+    const stopAsked = vi.spyOn(sessions, 'stopAsked').mockImplementation((_p: string, agent: string, run: string) => stopped && agent === 'b1' && run === 'run-b1')
+    cleanups.push(() => stopAsked.mockRestore())
+    const next = await t.card('B1 next', 'b1')
+    // The dry start: the stop arrives during its look at the takeover's conditions (writtenNotTakeable's await).
+    const look = t.pool.writtenNotTakeable.bind(t.pool)
+    const looked = vi.spyOn(t.pool, 'writtenNotTakeable').mockImplementationOnce(async (...a: Parameters<typeof look>) => {
+      const r = await look(...a)
+      stopped = true
+      return r
+    })
+    expect(await t.start(next, 'b1', true)).not.toMatchObject({ slot: b1.slot })
+    expect(looked).toHaveBeenCalledTimes(1)
+    looked.mockRestore()
+    // The real start: chosen while its run goes on, the stop arriving at the pool's takeover (before its holder's await and the write).
+    stopped = false
+    const take = t.pool.takeWrittenSlot.bind(t.pool)
+    const taking = vi.spyOn(t.pool, 'takeWrittenSlot').mockImplementation(async (...a: Parameters<typeof take>) => {
+      stopped = true
+      return take(...a)
+    })
+    cleanups.push(() => taking.mockRestore())
+    expect(await t.start(next, 'b1')).toMatchObject({ wait: expect.any(String) })
+    expect(taking).toHaveBeenCalledTimes(1)
+    expect(t.leases('b1')).toEqual([])
+    expect(t.writerOf(b1.slot)).toMatchObject({ run: 'run-b1', lease: b1.old })
+    expect(await t.sessionLease()).toBe(b1.old)
   })
 
   it("another agent's writer is not B1's: B1 is lent another slot; B1's own run held by another Combwork: it waits, never a second slot", async () => {

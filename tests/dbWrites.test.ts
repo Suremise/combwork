@@ -12,6 +12,7 @@ const COUNTED: Record<string, string> = {
   'boardStore.ts boardWriteLocked': 'boardWrite counts it (countedWrite) before its wait for the lock',
   'boardStore.ts upgradeBoard': 'countedWrite around its lock',
   'boardStore.ts restoreBoardBackup': 'countedWrite around its lock',
+  'boardStore.ts openBoard': "countedWrite around its lock (HI-3289: the checkpoints' worker's first write after a checkpoint)",
   'boardStore.ts withLeasedDb': 'its lease (leaseDb counts each lease until it is released)',
   'deliveries.ts leftOnLease': 'its lease (withLeasedDb), taken before the lock',
   'sessionStore.ts changeSessions': 'its lease (withLeasedDb), taken before its save waits for the lock',

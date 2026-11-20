@@ -2,7 +2,7 @@
 // .zip of a server folder are added from the MCP view's button (the file picker stubbed), the dialog showing what each
 // runs; each is added nowhere, with no questions; a name in use asks to replace it or choose another. Add to… in a
 // server's view shows what it runs and ticks the projects it is added to: Save adds where ticked and removes where
-// unticked. The MCP view searches and filters. A project's MCP tab lists only its added servers, each with Remove, and
+// unticked. Replacing a server with a newer zip keeps it added where it was (HI-3327). The MCP view searches and filters. A project's MCP tab lists only its added servers, each with Remove, and
 // Add Server… picks one of the others (search, what it runs, Add); Copy to workspace adds a project's own server there.
 // A new session gets only the servers added to its project (the fake Claude Code's --mcp-config); deleting one asks,
 // saying where it is added. Screenshots in mcpfile-shots (the project tab and the picker in both themes). Throwaway
@@ -12,7 +12,7 @@ const fs = require('fs')
 const path = require('path')
 const { zipSync, strToU8 } = require('fflate')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'mcpfile-profile')
 const ws = path.join(lib.WORK, 'mcpfile-ws')
@@ -39,6 +39,9 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(dump, 'github.json'), JSON.stringify({ description: 'GitHub issues', command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'], env: { GITHUB_TOKEN: '${GITHUB_TOKEN}' } }))
   const notes = { description: 'Notes', command: 'node', args: ['${CW_MCP_DIR}/notes/server.js'], env: { NOTES_DIR: 'C:\\notes' } }
   fs.writeFileSync(path.join(dump, 'notes.zip'), zipSync({ 'notes/combwork-mcp.json': strToU8(JSON.stringify(notes)), 'notes/server.js': strToU8('// notes server') }))
+  // Its newer version (HI-3327), the zip named after the release: the folder names the server.
+  const notes2 = { ...notes, args: ['${CW_MCP_DIR}/notes/server2.js'] }
+  fs.writeFileSync(path.join(dump, 'notes-v2.zip'), zipSync({ 'notes/combwork-mcp.json': strToU8(JSON.stringify(notes2)), 'notes/server2.js': strToU8('// notes server 2') }))
   const env = lib.fakeClaude(userData, home, [proj, other])
   const { app, page, inv } = await lib.launch({ userData, env })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -155,6 +158,21 @@ const check = (name, ok, extra = '') => {
   await save(again)
   check('unticked in demo: removed there, kept in other', !!(await lib.until(async () => (await where('notes')) === 'Added in other', HUNG_MS)) && !(projectMcp(proj).enabled ?? []).includes('notes') && (projectMcp(other).enabled ?? []).includes('notes'), JSON.stringify([projectMcp(proj), projectMcp(other)]))
 
+  // --- An upgrade (HI-3327): a newer zip of notes, Replace: the question says where it is added (those places keep it)
+  // and what it runs changes; replaced, it is still added in other, running the new code.
+  await pick(path.join(dump, 'notes-v2.zip'))
+  await addButton.click()
+  await lib.until(async () => (await add.count()) === 1, HUNG_MS)
+  await add.getByRole('button', { name: 'Add' }).click()
+  check('the upgrade asks to replace notes', !!(await lib.until(async () => (await clash.count()) === 1, HUNG_MS)))
+  const upgradeSaid = await clash.innerText()
+  check('saying where it is added, and that those places keep it', upgradeSaid.includes('Added in other: those places keep it.'), upgradeSaid)
+  check('and what it runs changes', upgradeSaid.includes('− Runs: node ${CW_MCP_DIR}/notes/server.js') && upgradeSaid.includes('+ Runs: node ${CW_MCP_DIR}/notes/server2.js'), upgradeSaid)
+  await shot('4b-upgrade')
+  await clash.getByRole('button', { name: 'Replace', exact: true }).click()
+  check('replaced: running the new code', !!(await lib.until(async () => (await server('notes'))?.def?.args?.[0] === '${CW_MCP_DIR}/notes/server2.js', HUNG_MS)) && fs.existsSync(path.join(mcpDir, 'notes', 'server2.js')) && !fs.existsSync(path.join(mcpDir, 'notes', 'server.js')))
+  check('still added in other, and only there', !!(await lib.until(async () => (await where('notes')) === 'Added in other', HUNG_MS)) && (projectMcp(other).enabled ?? []).includes('notes') && !(projectMcp(proj).enabled ?? []).includes('notes'), JSON.stringify([projectMcp(proj), projectMcp(other)]))
+
   // --- Search and filter in the MCP view.
   const search = page.locator('.sidebar [data-mcp-search]')
   const listed = async () => (await page.locator('.pane-body .row .label').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== 'combwork') // the built-in server (HI-2463)
@@ -204,7 +222,7 @@ const check = (name, ok, extra = '') => {
       const lines = fs.existsSync(path.join(home, 'fake-launches.jsonl')) ? fs.readFileSync(path.join(home, 'fake-launches.jsonl'), 'utf8').trim().split('\n') : []
       const l = lines.map((x) => JSON.parse(x)).find((x) => x.opts?.['--mcp-config'] && x.cwd.toLowerCase() === cwd.toLowerCase())
       return l && fs.existsSync(l.opts['--mcp-config']) ? JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers : null
-    }, 30000)
+    }, lib.timing('hang.step'))
   const agent = await lib.addAgent(inv, proj, { name: 'User' })
   await inv('session:start', proj, { agentId: agent.id })
   const launched = await mcpOf(proj)
@@ -227,6 +245,39 @@ const check = (name, ok, extra = '') => {
   await deleting.getByRole('button', { name: 'Delete', exact: true }).click()
   check('deleting it moves its folder too', !!(await lib.until(async () => !fs.existsSync(path.join(mcpDir, 'notes-2')) && !fs.existsSync(path.join(mcpDir, 'notes-2.json')), HUNG_MS)))
   check('…and removes it from other', !!(await lib.until(async () => !(projectMcp(other).enabled ?? []).includes('notes-2'), HUNG_MS)), JSON.stringify(projectMcp(other)))
+
+  // --- HI-3371: a folder left without its definition (a .zip's, kept when a plain .json replaced it and then deleted):
+  // the name is taken though no server is listed. Adding a .zip of that name asks Replace (added nowhere), and Replace
+  // puts it in the folder's place.
+  fs.mkdirSync(path.join(mcpDir, 'leftover'), { recursive: true })
+  fs.writeFileSync(path.join(mcpDir, 'leftover', 'old.js'), '// left behind')
+  fs.writeFileSync(path.join(dump, 'leftover.zip'), zipSync({ 'leftover/combwork-mcp.json': strToU8(JSON.stringify({ command: 'node', args: ['${CW_MCP_DIR}/leftover/server.js'] })), 'leftover/server.js': strToU8('// leftover server') }))
+  check('the leftover folder is no listed server', !(await server('leftover')))
+  await pick(path.join(dump, 'leftover.zip'))
+  await addButton.click()
+  await lib.until(async () => (await add.count()) === 1, HUNG_MS)
+  await add.getByRole('button', { name: 'Add' }).click()
+  const leftover = dialog('Replace leftover?')
+  check('adding a .zip whose name has only a leftover folder asks Replace', !!(await lib.until(async () => (await leftover.count()) === 1, HUNG_MS)), JSON.stringify(await page.getByRole('dialog').allInnerTexts()))
+  check('…saying it is added nowhere, and what it will run', /Not added anywhere: those places keep it\./.test(await leftover.innerText()) && (await leftover.innerText()).includes('+ Runs: node ${CW_MCP_DIR}/leftover/server.js'), await leftover.innerText().catch(() => ''))
+  await shot('8-leftover-replace')
+  await leftover.getByRole('button', { name: 'Replace', exact: true }).click()
+  check('Replace adds it in the folder’s place, added nowhere', !!(await lib.until(async () => (await server('leftover'))?.def?.args?.[0] === '${CW_MCP_DIR}/leftover/server.js', HUNG_MS)) && fs.existsSync(path.join(mcpDir, 'leftover', 'server.js')) && !fs.existsSync(path.join(mcpDir, 'leftover', 'old.js')) && JSON.stringify((await server('leftover'))?.projects) === '[]', JSON.stringify(await server('leftover')))
+  // HR1's round 1: the same with a name typed in the dialog (another .zip, renamed to a leftover folder's name): main
+  // says the typed name is taken, and Replace is asked there too.
+  fs.mkdirSync(path.join(mcpDir, 'leftover-2'), { recursive: true })
+  fs.writeFileSync(path.join(mcpDir, 'leftover-2', 'old.js'), '// left behind')
+  fs.writeFileSync(path.join(dump, 'fresh.zip'), zipSync({ 'fresh/combwork-mcp.json': strToU8(JSON.stringify({ command: 'node', args: ['${CW_MCP_DIR}/fresh/server.js'] })), 'fresh/server.js': strToU8('// fresh server') }))
+  await pick(path.join(dump, 'fresh.zip'))
+  await addButton.click()
+  await lib.until(async () => (await add.count()) === 1, HUNG_MS)
+  check('the other .zip offers its own name', (await add.locator('input').inputValue()) === 'fresh')
+  await add.locator('input').fill('leftover-2')
+  await add.getByRole('button', { name: 'Add' }).click()
+  const typed = dialog('Replace leftover-2?')
+  check('a typed name that only a leftover folder has asks Replace', !!(await lib.until(async () => (await typed.count()) === 1, HUNG_MS)), JSON.stringify(await page.getByRole('dialog').allInnerTexts()))
+  await typed.getByRole('button', { name: 'Replace', exact: true }).click()
+  check('…and Replace adds it there under that name, running its own folder', !!(await lib.until(async () => (await server('leftover-2'))?.def?.args?.[0] === '${CW_MCP_DIR}/leftover-2/server.js', HUNG_MS)) && fs.existsSync(path.join(mcpDir, 'leftover-2', 'server.js')) && !fs.existsSync(path.join(mcpDir, 'leftover-2', 'old.js')), JSON.stringify(await server('leftover-2')))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'All checks passed')

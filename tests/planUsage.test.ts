@@ -24,7 +24,10 @@ vi.mock('electron', () => ({
 const { config } = await import('../src/main/config')
 const { connectionLoginChanged, forgetConnectionUsage, mergePlanUsage, nextWarning, planNotice, readingAges, reportPlanUsage, usageLogin, warnedAfterDrop, warningKey } = await import('../src/main/planUsage')
 const { parseClaudePlanUsage } = await import('../src/main/providers/claude/adapter')
-const { rolloutPlanUsage } = await import('../src/main/providers/codex/rollout')
+const { LIMIT_NAME_MAX, rolloutDetails, rolloutPlanUsage } = await import('../src/main/providers/codex/rollout')
+const { readAdvancedFrom, valuesReader } = await import('../src/main/advancedValues')
+const { limitName } = await import('../src/shared/planLimits')
+const { setLanguage } = await import('../src/shared/i18n')
 const { onCombworkEvent } = await import('../src/main/events')
 const { setNotifyHost } = await import('../src/main/notify')
 const { DEFAULT_SETTINGS } = await import('../src/shared/defaults')
@@ -522,5 +525,95 @@ describe('the plan usage Combwork keeps from its sessions (#383)', () => {
     const onlyWeekly = { ...claude(61), limits: claude(61).limits.filter((l) => l.id === 'seven_day') }
     const next = mergePlanUsage(both, onlyWeekly, at)
     expect(next.limits.map((l) => [l.id, l.usedPercent])).toEqual([['seven_day', 61], ['five_hour', 0]])
+  })
+})
+
+// HI-1125: Codex's limits by their limit_id (tests/fixtures/planusage-codex-limits-synthetic.json: SYNTHETIC, from Codex's
+// own test values, since no real record has had a second id yet). One token_count is one limit; a rollout alternates them.
+describe("Codex's limits other than its own (HI-1125)", () => {
+  const synthetic = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'planusage-codex-limits-synthetic.json'), 'utf8'))
+  const lines: string[] = synthetic.rollout
+  const records = lines.map((l) => JSON.parse(l) as { timestamp: string; payload: { rate_limits: Record<string, unknown> } })
+  const parsed = records.map((r) => rolloutPlanUsage(r.payload.rate_limits, r.timestamp)!)
+  const figures = (u: { limits: { id: string; usedPercent: number }[] }) => Object.fromEntries(u.limits.map((l) => [l.id, l.usedPercent]))
+  const snapshot = (rateLimits: Record<string, unknown>) => rolloutPlanUsage({ primary: { used_percent: 20, window_minutes: 300, resets_at: 1794657600 }, ...rateLimits }, '2026-11-14T10:00:00Z')!.limits[0]
+  afterEach(() => readAdvancedFrom(valuesReader({})))
+
+  it("keeps Codex's own limits under their old ids, and gives another its id and name", () => {
+    expect(parsed[0].limits.map((l) => [l.id, l.scope])).toEqual([['w300', undefined], ['w10080', undefined]])
+    expect(parsed[1].limits.map((l) => [l.id, l.scope, l.windowMinutes])).toEqual([['codex_other/w300', 'codex_other', 300]])
+    expect(parsed[2].limits.map((l) => [l.id, l.scope, l.windowMinutes])).toEqual([['codex_bengalfox/w60', 'gpt-5.2-codex-sonic', 60], ['codex_bengalfox/w1440', 'gpt-5.2-codex-sonic', 1440]])
+    // No id, an empty one, or the default: Codex's own (codex-rs defaults a missing id to "codex").
+    for (const id of [undefined, null, '', '  ', 'codex']) expect(snapshot({ limit_id: id }).id).toBe('w300')
+  })
+
+  it('two ids sharing a window stay apart from the parser to the merge, however the records alternate', () => {
+    // Before HI-1125, codex_other's 80% for the same 300-minute window merged into Codex's own (the highest per period).
+    let kept: ReturnType<typeof mergePlanUsage> | undefined
+    for (const [i, u] of parsed.entries()) kept = mergePlanUsage(kept, u, Date.parse(records[i].timestamp), 'C1')
+    expect(figures(kept!)).toEqual({ w300: 13, w10080: 40, 'codex_other/w300': 81, 'codex_bengalfox/w60': 30, 'codex_bengalfox/w1440': 55 })
+    // The lines read at once, as a session's appended rollout is: each limit's latest reading, none dropped.
+    const read = rolloutDetails(lines.join('\n')).planUsage!
+    expect(figures(read)).toEqual({ 'codex_bengalfox/w60': 30, 'codex_bengalfox/w1440': 55, w300: 13, w10080: 40, 'codex_other/w300': 81 })
+    expect(figures(mergePlanUsage(undefined, read, Date.parse(records[4].timestamp)))).toEqual(figures(kept!))
+  })
+
+  it('an odd id (slashes, long, another case) is its own limit, kept whole; only its name is bounded', () => {
+    const long = `team/${'x'.repeat(300)}`
+    const a = snapshot({ limit_id: 'codex/other' })
+    const b = snapshot({ limit_id: long })
+    const c = snapshot({ limit_id: 'CODEX' })
+    expect([a.id, a.scope]).toEqual(['codex/other/w300', 'codex/other'])
+    expect(b.id).toBe(`${long}/w300`)
+    expect(b.scope).toHaveLength(LIMIT_NAME_MAX)
+    expect(b.scope!.endsWith('…')).toBe(true)
+    // Never folded into the default: "CODEX" isn't "codex".
+    expect(c.id).toBe('CODEX/w300')
+    expect(new Set([a.id, b.id, c.id, 'w300']).size).toBe(4)
+  })
+
+  it('reads the fields and the default id as the advanced settings say', () => {
+    readAdvancedFrom(valuesReader({ 'codex.rateLimits.limitId': 'bucket', 'codex.rateLimits.limitName': 'bucket_name', 'codex.rateLimits.defaultLimitId': 'main' }))
+    expect(snapshot({ bucket: 'main', limit_id: 'codex_other' }).id).toBe('w300')
+    expect([snapshot({ bucket: 'codex', bucket_name: 'Sonic' }).id, snapshot({ bucket: 'codex', bucket_name: 'Sonic' }).scope]).toEqual(['codex/w300', 'Sonic'])
+  })
+
+  it("names them in the window's language, a weekly and a 5-hour one; Codex's own as before", () => {
+    const weekly = { label: 'weekly', windowMinutes: 10080, scope: 'gpt-5.2-codex-sonic' }
+    const fiveHour = { label: '5-hour', windowMinutes: 300, scope: 'codex_other' }
+    const day = { label: '24-hour', windowMinutes: 1440, scope: 'gpt-5.2-codex-sonic' }
+    expect([weekly, fiveHour, day].map(limitName)).toEqual(['gpt-5.2-codex-sonic, weekly', 'codex_other, 5-hour', 'gpt-5.2-codex-sonic, 24-hour'])
+    expect(limitName(parsed[0].limits[0])).toBe('5-hour')
+    const de = JSON.parse(readFileSync(join(__dirname, '..', 'locales', 'de', 'project.json'), 'utf8')) as Record<string, string>
+    try {
+      setLanguage('de', de)
+      expect([weekly, fiveHour, day].map(limitName)).toEqual(['gpt-5.2-codex-sonic, wöchentlich', 'codex_other, 5 Stunden', 'gpt-5.2-codex-sonic, 24 Stunden'])
+      expect(limitName({ ...day, windowMinutes: 60 })).toBe('gpt-5.2-codex-sonic, 1 Stunde')
+      // A notice's title says it in the window's language; the Agent API's stays English.
+      const n = planNotice('codex', { ...fiveHour, usedPercent: 85, resetsAt: null }, 80)
+      expect(n.title).toContain('codex_other, 5 Stunden')
+      expect(n.apiTitle).toContain('codex_other, 5-hour')
+    } finally {
+      setLanguage('en', {})
+    }
+  })
+
+  it("a name that looks like another provider's kind (chat, premium, gemini…) is shown as it is, parsed to formatted (HR1's round 1)", () => {
+    // Copilot's and Antigravity's limits keep their kinds in `models`, which the names translate; Codex's names are its own.
+    const reserved = ['chat', 'premium', 'completions', 'gemini', 'otherModels']
+    const named = reserved.map((id) => snapshot({ limit_id: id }))
+    expect(named.map((l) => [l.id, l.scope, l.models])).toEqual(reserved.map((id) => [`${id}/w300`, id, undefined]))
+    expect(named.map(limitName)).toEqual(reserved.map((id) => `${id}, 5-hour`))
+    expect(limitName(snapshot({ limit_id: 'codex_other', limit_name: 'premium' }))).toBe('premium, 5-hour')
+    const de = JSON.parse(readFileSync(join(__dirname, '..', 'locales', 'de', 'project.json'), 'utf8')) as Record<string, string>
+    try {
+      setLanguage('de', de)
+      expect(named.map(limitName)).toEqual(reserved.map((id) => `${id}, 5 Stunden`))
+      expect(planNotice('codex', { ...named[0], usedPercent: 85 }, 80).title).toContain('chat, 5 Stunden')
+      // Copilot's own kind is still translated.
+      expect(limitName({ label: 'chat', windowMinutes: null, models: 'chat' })).toBe('Chatnachrichten')
+    } finally {
+      setLanguage('en', {})
+    }
   })
 })

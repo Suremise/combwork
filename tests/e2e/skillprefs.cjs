@@ -24,7 +24,7 @@ const skillsTab = async (page, name) => {
   await page.getByText(name, { exact: true }).first().click()
   await lib.openMoreTab(page, 'Skills')
   const pick = page.locator('.skill-provider-pick select')
-  await lib.until(async () => (await pick.count()) === 1, 10000)
+  await lib.until(async () => (await pick.count()) === 1, lib.timing('hang.ui'))
   return { pick, combwork: page.locator('.skill-group-toggle', { hasText: 'Combwork' }).first(), provider: page.locator('.skill-provider-toggle') }
 }
 
@@ -59,7 +59,7 @@ const skillsTab = async (page, name) => {
   const saved = await lib.until(async () => {
     const ui = await inv('ui:get')
     return ui.skillsFold?.[ka] && ui.skillsFold?.[kb] ? ui : null
-  }, 5000)
+  }, lib.timing('hang.ui'))
   const ui = saved ?? (await inv('ui:get'))
   check("window 2's change keeps window 1's project: both providers saved", ui.skillsProvider?.[ka] === 'codex' && !(kb in (ui.skillsProvider ?? {})), JSON.stringify(ui.skillsProvider))
   check('…and both projects’ open groups', JSON.stringify(ui.skillsFold?.[ka]) === '{"combwork":false,"provider":false}' && JSON.stringify(ui.skillsFold?.[kb]) === '{"combwork":true,"provider":true}', JSON.stringify(ui.skillsFold))

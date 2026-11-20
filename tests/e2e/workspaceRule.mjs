@@ -1,4 +1,4 @@
-// The WorkspaceService rule (HI-2678, Darren's R2): a WorkspaceService, a view of one or a value whose type holds one
+// The WorkspaceService rule (HI-2678's R2): a WorkspaceService, a view of one or a value whose type holds one
 // never goes where its type is lost (any, unknown, an index signature, a cast, a slot that drops it), and is never
 // reached by a key the code doesn't spell (a computed key, a spread, for-in). With the rule holding, every use of one
 // of its members spells the member's name somewhere in the program, so test selection finds a member's consumers by
@@ -17,7 +17,7 @@
 // or sub-interface, a generic's own type parameter it went into, censused in that generic's body), and code the census
 // can't read fails closed rather than being followed: a function declared only (a .d.ts, a `declare`, an overload's
 // implementation taking less), a value declared without its code, a .js implementation, code outside the program
-// loading workspace.ts. The boundary (Darren's review bar, HI-2677's (a)): a loader or a key deliberately hidden (a
+// loading workspace.ts. The boundary (HI-2677's review bar, (a)): a loader or a key deliberately hidden (a
 // path or a name built from pieces to escape a search), which no code here writes.
 // check:repo runs it (workspaceRuleCheck.mjs) on the working tree when a change touches one of its inputs (ruleInput).
 // tests/workspaceRule.test.ts checks each rule.

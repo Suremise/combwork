@@ -16,12 +16,15 @@ import { samePath } from '@shared/movePaths'
 import { legacyOf, namedFolder } from './agentPlace'
 import { eachAgent, sessionsToArchive, type BatchResult } from '@shared/startAll'
 import { serverAddedIn } from '@shared/agentMcp'
-import { shownText } from '@shared/advanced'
+import { RESUME_IDLE_ASK, RESUME_IDLE_MINUTES, advancedDef, advancedRow, shownText, type AdvancedState } from '@shared/advanced'
 import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
 import { freshQuestion } from './freshResume'
+import { IDLE_RESUME_FLOOR_TOKENS, idleResume, type IdleResume } from '@shared/sessionFresh'
+import { durationText } from '@shared/tasks'
+import { formatBytes } from '@shared/units'
 import { HAND_OVER_TEXT } from '@shared/handOver'
-import type { McpCatalogRow, McpServerInfo, ProjectInfo, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
+import type { McpCatalogPrepared, McpCatalogRow, McpServerInfo, ProjectInfo, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
 import type { TemplateWorkflow } from '@shared/workflow/templateOptions'
 import { TEMPLATE_NAME_MAX, namesFollowKey, templateAgentNames, usesKey, type TemplateEntry, type TemplateScope } from '@shared/templates'
 import { PLATFORM_NAME } from '@shared/platform/switching'
@@ -274,21 +277,48 @@ export async function setProjectActive(path: string, active: boolean): Promise<v
       })
       if (!ok) return undefined
       await call('session:stop', path)
-      await waitForStop(path)
+      if (!(await waitForStop(path))) return stillStopping(path)
     }
     return call('project:setActive', path, active)
   })
   if (ws) set({ workspace: movesShown.keep(ws) })
 }
 
-/** Waits until an agent's session (or, without agentId, every agent of the project) has stopped. */
-export async function waitForStop(path: string, agentId?: string, timeoutMs = 8000): Promise<void> {
-  const start = Date.now()
-  while (Date.now() - start < timeoutMs) {
-    const live = await call('session:live')
-    if (!live.some((l) => l.projectPath.toLowerCase() === path.toLowerCase() && (!agentId || l.agentId === agentId))) return
+/** HI-3376: how long the window waits for an agent to stop before saying it is still stopping (a CLI's exit grace alone is 30 s). */
+export const STOP_WAIT_MS = 60_000
+/** One look at the running sessions: one that doesn't answer in this long counts as still running for that look. */
+const LIVE_LOOK_MS = 5000
+
+/**
+ * Waits until an agent's session (or, without agentId, every agent of the project) has stopped: true once it has; false
+ * when it is still stopping after `timeoutMs` (HI-3376: the caller then goes no further, stillStopping). Each look is
+ * bounded, and the last one is made at the bound.
+ */
+export async function waitForStop(path: string, agentId?: string, timeoutMs = STOP_WAIT_MS): Promise<boolean> {
+  const stopped = async (): Promise<boolean> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const live = await Promise.race([call('session:live').catch(() => null), new Promise<null>((r) => (timer = setTimeout(() => r(null), LIVE_LOOK_MS)))])
+    clearTimeout(timer)
+    return live !== null && !live.some((l) => l.projectPath.toLowerCase() === path.toLowerCase() && (!agentId || l.agentId === agentId))
+  }
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (await stopped()) return true
     await new Promise((r) => setTimeout(r, 150))
   }
+  return stopped()
+}
+
+/** HI-3376: says that an agent (or, without agentId, the project's agents; `n` of them) is still stopping, so what was asked wasn't done. */
+export function stillStopping(path: string, agentId?: string, n = 1): undefined {
+  const p = project(path)
+  const agent = agentId ? (agentOf(p, agentId)?.name ?? '') : ''
+  notify(
+    'warning',
+    tr(msg({ id: 'actions.stillStopping.title', defaultMessage: '{named, select, yes {{agent} is still stopping} other {{n, plural, one {An agent is still stopping} other {# agents are still stopping}}}}', description: "A warning's title (HI-3376): an agent ({agent}, its name; named: yes), or {n} of a project's agents, hadn't stopped after a minute, so what was asked next (restart, resume, remove, rename…) wasn't done." }), { named: agent ? 'yes' : 'no', agent, n }),
+    tr(msg({ id: 'actions.stillStopping.message', defaultMessage: 'Nothing else was done. Try again once it has stopped.', description: 'Under the warning that an agent is still stopping (HI-3376): what was asked after stopping it was not done.' }))
+  )
+  return undefined
 }
 
 /**
@@ -523,7 +553,7 @@ async function stopIfRunning(path: string, agentId: string, action: StopFor, the
   })
   if (!ok) return false
   await call('session:stop', path, agentId)
-  await waitForStop(path, agentId)
+  if (!(await waitForStop(path, agentId))) return !!stillStopping(path, agentId)
   return true
 }
 
@@ -593,7 +623,59 @@ export function agentsForSession(p: ProjectInfo, item: Pick<SessionListItem, 'cw
   return p.agents.filter((a) => sessionInAgentFolder(p.path, a, item))
 }
 
-type ResumeItem = Pick<SessionListItem, 'id' | 'recache' | 'title' | 'name' | 'agentId' | 'agentName' | 'cwd' | 'slot' | 'hold' | 'fresh'> & { provider?: ProviderId }
+/**
+ * HI-3360: the question Resume asks before it starts anything, decided at the click (HR3's round 1: a row's `idle` is
+ * as it was when the list loaded, and a row left open past the threshold, or across a change of the setting, is cold now
+ * all the same): HI-2540's can't-continue first; else long idle by its last activity against Settings → Advanced's
+ * threshold and switch now; else the expired cache, as before; else none. A row with no last activity (a restart's,
+ * restartItem) is never long idle: a restart carries on its work.
+ */
+export function resumeQuestion(item: Pick<ResumeItem, 'fresh' | 'lastActivity' | 'usage' | 'transcriptBytes' | 'recache'>, advanced: AdvancedState | null, now = Date.now()): { is: 'fresh' } | { is: 'idle'; idle: IdleResume } | { is: 'recache' } | null {
+  if (item.fresh) return { is: 'fresh' }
+  const on = advancedRow(advancedDef(RESUME_IDLE_ASK)!, advanced).value !== false
+  const minutes = Number(advancedRow(advancedDef(RESUME_IDLE_MINUTES)!, advanced).value)
+  const idle = on ? idleResume(item.lastActivity, { tokens: item.usage?.contextTokens || null, bytes: item.transcriptBytes ?? null }, minutes, now) : null
+  if (idle) return { is: 'idle', idle }
+  return item.recache && !item.recache.warm && item.recache.tokens > IDLE_RESUME_FLOOR_TOKENS ? { is: 'recache' } : null
+}
+
+/**
+ * HI-3360: why resuming a long-idle conversation may cost tokens, for Resume's question: how long ago it was last active
+ * (days past two, else a duration) and its size as far as it is known, worded as an estimate.
+ */
+function idleMessage(idle: IdleResume, what: 'conversation' | 'session'): string {
+  const days = Math.floor(idle.idleMs / 86_400_000)
+  const size = idle.tokens !== null ? 'tokens' : idle.bytes !== null ? 'bytes' : 'none'
+  return tr(
+    msg({
+      id: 'actions.idleResume.message',
+      defaultMessage: '{what, select, conversation {This conversation} other {This session}} was last active {unit, select, days {{days, plural, one {# day} other {# days}}} other {{duration}}} ago{size, select, tokens {, with about {tokens} tokens of context} bytes {; its transcript is {bytes}} other {}}. It has most likely lost its prompt cache, so resuming may process that context again.',
+      description: "The question before resuming a session (what: other) or an Assistant conversation idle for a long time (HI-3360). unit: days, {days} whole days; other, {duration} a short duration such as 5 h. size: tokens, about {tokens} tokens (\"120K\") of context; bytes, only the transcript's size on disk is known ({bytes}, such as 4.2 MB: never call it tokens); other, nothing is known. A prompt cache is what the CLI keeps of a conversation so a resumed one is read cheaply: it is an estimate, so keep the 'most likely' and 'may'."
+    }),
+    { what, unit: days >= 2 ? 'days' : 'other', days, duration: durationText(idle.idleMs, tr), size, tokens: idle.tokens !== null ? formatTokens(idle.tokens) : '', bytes: idle.bytes !== null ? formatBytes(idle.bytes) : '' }
+  ) // i18n-ignore: select keys, never shown
+}
+
+/** HI-3360: a line of Resume All's question for an agent whose conversation is long idle: its age and size, as idleMessage says them. */
+function idleLine(agent: string, idle: IdleResume): string {
+  const days = Math.floor(idle.idleMs / 86_400_000)
+  const size = idle.tokens !== null ? 'tokens' : idle.bytes !== null ? 'bytes' : 'none'
+  return tr(
+    msg({ id: 'actions.resumeAll.idleLine', defaultMessage: '• {agent} — last active {unit, select, days {{days, plural, one {# day} other {# days}}} other {{duration}}} ago{size, select, tokens {, about {tokens} tokens} bytes {, transcript {bytes}} other {}}', description: "A line of Resume All's question (HI-3360): an agent ({agent}) whose conversation has been idle a long time. unit: days, {days} whole days; other, {duration} a short duration such as 5 h. size: tokens, about {tokens} tokens (\"120K\") of context; bytes, only its transcript's size on disk is known ({bytes}, such as 4.2 MB: never call it tokens); other, nothing is known." }),
+    { agent, unit: days >= 2 ? 'days' : 'other', days, duration: durationText(idle.idleMs, tr), size, tokens: idle.tokens !== null ? formatTokens(idle.tokens) : '', bytes: idle.bytes !== null ? formatBytes(idle.bytes) : '' }
+  ) // i18n-ignore: select keys, never shown
+}
+
+type ResumeItem = Partial<Pick<SessionListItem, 'lastActivity' | 'usage'>> & Pick<SessionListItem, 'id' | 'idle' | 'transcriptBytes' | 'recache' | 'title' | 'name' | 'agentId' | 'agentName' | 'cwd' | 'slot' | 'hold' | 'fresh'> & { provider?: ProviderId }
+
+/**
+ * What a restart resumes (stopped, then resumed at once): its running conversation, with its name, folder and slot as the
+ * Sessions list read them before the stop (HI-3213: without its slot, one that ran in a slot was read as a worktree no
+ * agent uses, and couldn't be resumed).
+ */
+export function restartItem(live: { sessionId: string; agentId: string }, item: Pick<SessionListItem, 'name' | 'cwd' | 'slot'> | undefined): ResumeItem {
+  return { id: live.sessionId, recache: null, title: null, name: item?.name, agentId: live.agentId, cwd: item?.cwd, ...(item?.slot ? { slot: item.slot } : {}) }
+}
 
 export async function resumeSession(path: string, item: ResumeItem, agentId?: string): Promise<void> {
   // Its buttons show it resuming from the click until it runs (#1177): under its agent, or, with none to run it yet,
@@ -637,22 +719,26 @@ async function resume(path: string, item: ResumeItem, held: string | null, agent
     notify('info', tr(msg({ id: 'actions.resume.alreadyOpen', defaultMessage: 'Already open', description: "A notification's title: the conversation is open in another agent." })), tr(msg({ id: 'actions.resume.alreadyOpenMessage', defaultMessage: 'This conversation is open in {agent}. An agent can only resume a session no other agent is running.', description: 'Under the notification that a conversation is open in another agent ({agent}).' }), { agent: holder.name }))
     return
   }
-  if (item.fresh) {
+  const question = resumeQuestion(item, get().advanced)
+  if (question?.is === 'fresh' && item.fresh) {
     // HI-2540: it can't continue, so a new conversation starts instead (main decides it by the same rule): asked now,
     // never the re-cache question, whose re-cache wouldn't happen.
     const assistant = isAssistantPath(path)
     const ok = await confirm({ ...freshQuestion(item.fresh, { assistant, agent: agentOf(p, target)?.name ?? item.agentName ?? '' }), action: 'start' })
     if (!ok) return
-  } else if (item.recache && !item.recache.warm && item.recache.tokens > 20000) {
+  } else if (question) {
     // The Combwork Assistant's are conversations; an agent's are sessions.
     const what = isAssistantPath(path) ? 'conversation' : 'session'
     const choice = await choose({
       title: tr(msg({ id: 'actions.recache.title', defaultMessage: '{what, select, conversation {Resume conversation?} other {Resume session?}}', description: "Title of the question before resuming a session (other) or an Assistant conversation whose prompt cache expired." }), { what }),
-      message: tr(msg({ id: 'actions.recache.message', defaultMessage: '{what, select, conversation {The prompt cache for this conversation has expired.} other {The prompt cache for this session has expired.}} Resuming will re-cache about {tokens} tokens on the first message.', description: "The question before resuming a session whose prompt cache expired: resuming costs about {tokens} tokens (\"120K\") again." }), { what, tokens: formatTokens(item.recache.tokens) }),
+      // Long idle (HI-3360): its age and size, as an estimate (tokens when known, else the transcript's size, never called
+      // tokens); else the expired cache, as before.
+      message: question.is === 'idle' ? idleMessage(question.idle, what) : tr(msg({ id: 'actions.recache.message', defaultMessage: '{what, select, conversation {The prompt cache for this conversation has expired.} other {The prompt cache for this session has expired.}} Resuming will re-cache about {tokens} tokens on the first message.', description: "The question before resuming a session whose prompt cache expired: resuming costs about {tokens} tokens (\"120K\") again." }), { what, tokens: formatTokens(item.recache?.tokens ?? 0) }),
       detail: tr(msg({ id: 'actions.recache.detail', defaultMessage: '{what, select, conversation {To save tokens, archive it and start a fresh conversation instead. The archived one stays readable.} other {To save tokens, archive it and start a fresh session instead. The archived one stays readable, and a handover note can carry the work on.}}', description: 'Under the question before resuming a session (other) or an Assistant conversation whose prompt cache expired.' }), { what }),
+      // The last is the default (HI-3360): Archive and Start Fresh, Resume one click away.
       choices: [
-        { label: tr(msg({ id: 'actions.recache.fresh', defaultMessage: 'Archive and Start Fresh', description: 'Button: archives the session and starts a new one.' })), value: 'fresh', action: 'archive-start' },
-        { label: tr(msg({ id: 'actions.recache.resume', defaultMessage: 'Resume', description: 'Button: resumes the session anyway.' })), value: 'resume', action: 'resume' }
+        { label: tr(msg({ id: 'actions.recache.resume', defaultMessage: 'Resume', description: 'Button: resumes the session anyway.' })), value: 'resume', action: 'resume' },
+        { label: tr(msg({ id: 'actions.recache.fresh', defaultMessage: 'Archive and Start Fresh', description: 'Button: archives the session and starts a new one.' })), value: 'fresh', action: 'archive-start' }
       ]
     })
     if (!choice) return
@@ -766,7 +852,9 @@ export async function stopAllAgents(path: string): Promise<void> {
     action: 'stop',
     run: async () => {
       await call('session:stop', path)
-      await Promise.all(running.map((a) => waitForStop(path, a.id)))
+      const stopped = await Promise.all(running.map((a) => waitForStop(path, a.id)))
+      const still = running.filter((_, i) => !stopped[i])
+      if (still.length) stillStopping(path, still.length === 1 ? still[0].id : undefined, still.length)
     }
   })
 }
@@ -810,14 +898,16 @@ async function resumeAll_(path: string): Promise<void> {
     if (a.live) return []
     const s = list.find((x) => x.id === a.resume!.id)
     // One that starts a new conversation (HI-2540) re-caches nothing.
-    const r = s && !s.fresh ? s.recache : null
-    return r && !r.warm && r.tokens > 20000 ? [tr(msg({ id: 'actions.resumeAll.coldLine', defaultMessage: '• {agent} — about {tokens} tokens', description: "A line of Resume All's question: an agent ({agent}) whose prompt cache expired, and about how many tokens ({tokens}: \"120K\") resuming re-caches." }), { agent: a.name, tokens: formatTokens(r.tokens) })] : []
+    const q = s ? resumeQuestion(s, get().advanced) : null
+    if (q?.is === 'idle') return [idleLine(a.name, q.idle)]
+    const r = q?.is === 'recache' ? s!.recache : null
+    return r ? [tr(msg({ id: 'actions.resumeAll.coldLine', defaultMessage: '• {agent} — about {tokens} tokens', description: "A line of Resume All's question: an agent ({agent}) whose prompt cache expired, and about how many tokens ({tokens}: \"120K\") resuming re-caches." }), { agent: a.name, tokens: formatTokens(r.tokens) })] : []
   })
   if (cold.length) {
     const n = stopped.length
     const ok = await confirm({
       title: tr(msg({ id: 'actions.resumeAll.title', defaultMessage: '{n, plural, one {Resume the agent?} other {Resume all agents?}}', description: "Title of Resume All's question about expired prompt caches ({n} agents to resume)." }), { n }),
-      message: tr(msg({ id: 'actions.resumeAll.message', defaultMessage: 'The prompt cache has expired for {who, select, all {all of them} other {{cold, plural, one {one agent} other {# agents}}}}. Resuming re-caches on the first message:', description: "Resume All's question, above the agents whose prompt cache expired: all of them (all), or how many ({cold})." }), { who: cold.length === n && cold.length > 1 ? 'all' : 'some', cold: cold.length }),
+      message: tr(msg({ id: 'actions.resumeAll.message', defaultMessage: 'The prompt cache has most likely expired for {who, select, all {all of them} other {{cold, plural, one {one agent} other {# agents}}}}. Resuming may process their context again on the first message:', description: "Resume All's question, above the agents whose prompt cache has expired or most likely expired (HI-3360: idle a long time): all of them (all), or how many ({cold}). An estimate: keep 'most likely' and 'may'." }), { who: cold.length === n && cold.length > 1 ? 'all' : 'some', cold: cold.length }),
       detail: cold.join('\n'),
       confirmLabel: tr(msg({ id: 'actions.resumeAll.confirm', defaultMessage: '{n, plural, one {Resume} other {Resume all}}', description: "Resume All's button ({n} agents)." }), { n }),
       action: 'resume'
@@ -968,7 +1058,10 @@ async function startNewAll_(path: string, archive: boolean): Promise<void> {
   // As they are now: one may have stopped or started while the dialog was open.
   const now = (id: string) => agentOf(project(path), id)
   for (const a of agents) if (now(a.id)?.live) await call('session:stop', path, a.id).catch(() => undefined)
-  await Promise.all(agents.map((a) => waitForStop(path, a.id)))
+  // HI-3376: none is started over while one is still stopping.
+  const stopped = await Promise.all(agents.map((a) => waitForStop(path, a.id)))
+  const still = agents.filter((_, i) => !stopped[i])
+  if (still.length) return stillStopping(path, still.length === 1 ? still[0].id : undefined, still.length)
   const result = await eachAgent(agents, async (a) => {
     const provider = agentProviderOf(a)
     const name = providerName(provider)
@@ -1012,7 +1105,7 @@ export async function archiveCurrent(path: string | null = get().selectedProject
   if (!ok) return
   if (live) {
     await call('session:stop', path, id)
-    await waitForStop(path, id)
+    if (!(await waitForStop(path, id))) return stillStopping(path, id)
   }
   const archived = await attempt(tr(msg({ id: 'actions.archive.failed', defaultMessage: 'Could not archive session', description: "An error's title: archiving a session failed." })), () => call('session:archive', path, target.id, true).then(() => true))
   if (archived) await newSession(path, id)
@@ -1118,11 +1211,34 @@ const CATALOG_FAILED = msg({ id: 'mcp.catalog.failed', defaultMessage: 'Could no
 
 /**
  * Install (HI-545): the catalogue server downloaded and checked against its catalogue (size, sha256) first, then #550's
- * Add dialog: what it runs, and its name, another one when it is taken, or Replace only if the user says so. Installed,
- * it is added to no project yet (HI-2059): its view opens, for Add to….
+ * Add dialog: what it runs, and its name, another one when it is taken, or Replace only if the user says so (which keeps
+ * the old one's places, HI-3327). Otherwise installed, it is added to no project yet (HI-2059): its view opens, for Add to….
  */
+/**
+ * HI-3377: a catalogue server downloaded and checked for Install or Update, cancellable meanwhile (Cancel download): its
+ * own id, so a Cancel ends only this one. One at a time in the window (HR1's round 1): while one runs, the others' Install
+ * and Update are off and their views name it, with its Cancel, so none loses its Cancel and none opens a dialog behind
+ * another's. Cancelled, or another running: null, and nothing is said; failed: undefined, said.
+ */
+async function prepareCatalog(row: Pick<McpCatalogRow, 'source' | 'name'>): Promise<McpCatalogPrepared | null | undefined> {
+  if (get().catalogPreparing) return null
+  const op = crypto.randomUUID()
+  set({ catalogPreparing: { source: row.source, name: row.name, op } })
+  try {
+    return await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name, op))
+  } finally {
+    set((s) => (s.catalogPreparing?.op === op ? { catalogPreparing: null } : {}))
+  }
+}
+
+/** HI-3377: the row's Cancel download: ends the preparation running now (its download stops; nothing is installed). */
+export function cancelCatalogPrepare(): void {
+  const p = get().catalogPreparing
+  if (p) void call('mcp:catalogCancel', p.op).catch(() => undefined)
+}
+
 export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | 'name' | 'version'>): Promise<boolean> {
-  const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
+  const p = await prepareCatalog(row)
   if (!p) return false
   // #550's Add: what it runs, the name (another if it is taken, or Replace).
   const picked = await chooseServerName({
@@ -1132,16 +1248,19 @@ export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | '
     detail: p.secretWarnings.join('\n') || undefined,
     initial: p.server.name,
     initialTaken: p.nameTaken,
+    folder: true,
     confirmLabel: tr(msg({ id: 'mcp.catalog.installButton', defaultMessage: 'Install', description: 'Button (HI-545): installs the catalogue server.' }))
   })
   if (!picked) {
     void call('mcp:catalogDrop', p.id).catch(() => undefined)
     return false
   }
-  const done = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogInstall', p.id, picked.name, picked.replace).then(() => true))
+  const done = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogInstall', p.id, picked.name, picked.replace, picked.places).then(() => true))
   if (!done) return false
   set((s) => ({ skillsVersion: s.skillsVersion + 1, mcpCatalogVersion: s.mcpCatalogVersion + 1, mcpTab: 'installed', selectedMcp: picked.name }))
-  notify('success', tr(msg({ id: 'mcp.catalog.installed', defaultMessage: 'Installed {name}', description: "A notification's title (HI-545): a catalogue server was installed." }), { name: picked.name }), tr(msg({ id: 'mcp.catalog.installedNext', defaultMessage: 'It runs nowhere yet: Add to… in its view adds it to the projects (and the Assistant) that need it.', description: 'Under "Installed {name}" (HI-545): what to do next. Add to… is the button in the server\'s view in the MCP view.' })))
+  // A replace keeps the places the old one had (HI-3327): only one added nowhere needs Add to….
+  const kept = !!picked.places && (picked.places.projects.length > 0 || picked.places.assistant)
+  notify('success', tr(msg({ id: 'mcp.catalog.installed', defaultMessage: 'Installed {name}', description: "A notification's title (HI-545): a catalogue server was installed." }), { name: picked.name }), kept ? tr(msg({ id: 'mcp.catalog.installedKept', defaultMessage: 'It replaced the server of that name, and stays added where that one was.', description: 'Under "Installed {name}" (HI-3327): the catalogue server replaced one of the same name, and the projects (and the Assistant) that had it keep it.' })) : tr(msg({ id: 'mcp.catalog.installedNext', defaultMessage: 'It runs nowhere yet: Add to… in its view adds it to the projects (and the Assistant) that need it.', description: 'Under "Installed {name}" (HI-545): what to do next. Add to… is the button in the server\'s view in the MCP view.' })))
   await refreshWorkspace()
   return true
 }
@@ -1152,7 +1271,7 @@ export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | '
  * change before it is applied, Combwork writes nothing and the dialog opens again from what is there now.
  */
 export async function updateCatalogServer(row: Pick<McpCatalogRow, 'source' | 'name' | 'version'>, again = 0): Promise<boolean> {
-  const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
+  const p = await prepareCatalog(row)
   if (!p) return false
   const ex = p.existing
   if (!ex) {
@@ -1212,8 +1331,8 @@ export function mcpWhereText(server: Pick<McpServerInfo, 'def' | 'projects' | 'a
 
 /**
  * Add MCP Server from File (#550): a .json definition, or a .zip of a server folder. The dialog shows what it runs and
- * the name it gets (the file's, editable); a name in use asks to replace it or choose another. It is added to no project
- * (HI-2059): a project's MCP tab, the Assistant's view or Add to… adds it where it runs.
+ * the name it gets (the file's, editable); a name in use asks to replace it (its places keep it, HI-3327) or choose
+ * another. A new one is added to no project (HI-2059): a project's MCP tab, the Assistant's view or Add to… adds it.
  */
 export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
   const file = await attempt(tr(msg({ id: 'actions.mcp.openFailed', defaultMessage: 'Could not open the file', description: "An error's title: picking an MCP server's file failed." })), () => call('mcp:pickFile'))
@@ -1234,10 +1353,11 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
     detail: server.secretWarnings.length ? server.secretWarnings.join('\n') : undefined,
     initial: server.name,
     initialTaken: server.exists,
+    folder: server.files > 0,
     confirmLabel: tr(msg({ id: 'actions.mcp.add', defaultMessage: 'Add', description: 'Button: adds the MCP server to the workspace.' }))
   })
   if (!picked) return null
-  const added = await attempt(addServerFailed(), () => call('mcp:addFromFile', file, picked.name, picked.replace))
+  const added = await attempt(addServerFailed(), () => call('mcp:addFromFile', file, picked.name, picked.replace, picked.places))
   if (!added) return null
   set((s) => ({ skillsVersion: s.skillsVersion + 1, selectedMcp: added.name }))
   await refreshWorkspace()
@@ -1249,7 +1369,7 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
  * name in use asks to Replace that server or choose another. `initialTaken`: whether the name offered is in use. Null
  * when cancelled.
  */
-async function chooseServerName(o: { title: string; message: string; list: string[]; detail?: string; initial: string; initialTaken: boolean; confirmLabel: string }): Promise<{ name: string; replace: boolean } | null> {
+async function chooseServerName(o: { title: string; message: string; list: string[]; detail?: string; initial: string; initialTaken: boolean; folder: boolean; confirmLabel: string }): Promise<{ name: string; replace: boolean; places?: { projects: string[]; assistant: boolean } } | null> {
   let name = o.initial
   for (;;) {
     const picked = await prompt({
@@ -1264,12 +1384,31 @@ async function chooseServerName(o: { title: string; message: string; list: strin
     })
     if (!picked) return null
     name = picked.trim()
-    const taken = name === o.initial ? o.initialTaken : ((await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:list'))) ?? []).some((m) => m.name.toLowerCase() === name.toLowerCase())
-    if (!taken) return { name, replace: false }
+    const servers = name === o.initial && !o.initialTaken ? [] : await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:list'))
+    if (!servers) return null
+    const listed = servers.find((m) => m.name.toLowerCase() === name.toLowerCase())
+    // HI-3371: a name taken though no server is listed under it: a folder left without its definition (a .zip's, kept when
+    // a plain .json replaced it, or a definition deleted by hand), which takes the name for a server bringing a folder.
+    // Main refuses it unless replaced, so Replace is asked for as for any server, one added nowhere and running nothing
+    // (1.5.0 asked it for the name offered). The name offered: as its preview said; another typed: main says, as its add
+    // would decide (mcp:nameTaken). Main's own check at the add stays the one that decides.
+    const taken = listed ? true : name.toLowerCase() === o.initial.toLowerCase() ? o.initialTaken : await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:nameTaken', name, o.folder))
+    if (taken === null) return null
+    if (!listed && !taken) return { name, replace: false }
+    const existing = listed ?? { name, def: undefined, runs: [] as string[], projects: [] as string[], assistant: false }
+    name = existing.name
+    // An upgrade (HI-3327): the places it is added keep it, and what it runs is shown changed (− now, + after).
+    const where = mcpWhereText({ def: existing.def ?? {}, projects: existing.projects, assistant: existing.assistant }, get().workspace?.projects ?? [])
+    const now = new Set(existing.runs)
+    const next = new Set(o.list)
+    const changed = [...existing.runs.filter((l) => !next.has(l)).map((l) => `− ${l}`), ...o.list.filter((l) => !now.has(l)).map((l) => `+ ${l}`)]
     const choice = await choose({
       title: tr(msg({ id: 'actions.mcp.replaceTitle', defaultMessage: 'Replace {name}?', description: 'Title of the question when the workspace already has an MCP server of that name ({name}).' }), { name }),
-      message: tr(msg({ id: 'actions.mcp.replaceMessage', defaultMessage: 'The workspace has a server named {name}.', description: 'The question when the workspace already has an MCP server of that name ({name}).' }), { name }),
-      detail: tr(msg({ id: 'mcp.addFile.replaceDetailAdded', defaultMessage: 'Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Assistant that had the old one lose it. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name (HI-2059).' })),
+      message: changed.length
+        ? tr(msg({ id: 'mcp.replace.messageChanged', defaultMessage: 'The workspace has a server named {name}. {where}: those places keep it. What it runs changes (− now, + after):', description: 'The question when the workspace already has an MCP server of that name (HI-3327), above the lines of what it runs that change. {where} says where it is added ("Added in demo", "Not added anywhere"): replacing it keeps it there.' }), { name, where })
+        : tr(msg({ id: 'mcp.replace.messageSame', defaultMessage: 'The workspace has a server named {name}. {where}: those places keep it. What it runs stays the same.', description: 'The question when the workspace already has an MCP server of that name (HI-3327) and the new one runs the same command. {where} says where it is added ("Added in demo", "Not added anywhere"): replacing it keeps it there.' }), { name, where }),
+      list: changed.length ? changed : undefined,
+      detail: tr(msg({ id: 'mcp.replace.detailKept', defaultMessage: 'Replace moves the old one (and the folder of one added from a .zip) to the Recycle Bin. Sessions running it get the new one when they restart. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name (HI-3327): what Replace does with the old server; the places it is added keep it.' })),
       danger: true,
       choices: [
         { label: tr(msg({ id: 'actions.mcp.rename', defaultMessage: 'Choose Another Name', description: 'Button: goes back to choose another name for the MCP server.' })), value: 'rename' },
@@ -1278,7 +1417,7 @@ async function chooseServerName(o: { title: string; message: string; list: strin
     })
     if (!choice) return null
     if (choice === 'rename') continue
-    return { name, replace: true }
+    return { name, replace: true, places: { projects: existing.projects, assistant: existing.assistant } }
   }
 }
 
@@ -1502,7 +1641,7 @@ export async function saveTemplate(path: string): Promise<void> {
   if (!p?.agents.length) return notify('info', tr(msg({ id: 'actions.template.noAgents', defaultMessage: 'No agents to save', description: "A notification's title: the project has no agents to save as a template." })), tr(msg({ id: 'actions.template.noAgentsMessage', defaultMessage: 'Add the agents first, then save them as a template.', description: 'Under the notification that there are no agents to save as a template.' })))
   let workspaceScope = false
   // Names that follow the project's key (HI-B1…) can be kept as patterns (#1440), so the template names its agents from
-  // the key of whichever project it is loaded into; Darren's HB1-style names aren't the key and stay as they are.
+  // the key of whichever project it is loaded into; the user's HB1-style names aren't the key and stay as they are.
   const key = get().projectKeys.find((k) => k.projectPath.toLowerCase() === path.toLowerCase())?.key ?? null
   const offerPatterns = namesFollowKey(p.agents.map((a) => a.name), key)
   let usePatterns = offerPatterns
@@ -1848,7 +1987,10 @@ async function removeAllAgents_(path: string): Promise<void> {
   let result: BatchResult
   try {
     for (const a of agents) if (agentOf(project(path), a.id)?.live) await call('session:stop', path, a.id).catch(() => undefined)
-    await Promise.all(agents.map((a) => waitForStop(path, a.id)))
+    // HI-3376: none is removed while one is still stopping.
+    const stopped = await Promise.all(agents.map((a) => waitForStop(path, a.id)))
+    const still = agents.filter((_, i) => !stopped[i])
+    if (still.length) return stillStopping(path, still.length === 1 ? still[0].id : undefined, still.length)
     result = await eachAgent(agents, async (a) => {
       try {
         const r = await call('agents:remove', path, a.id, { deleteWorktree: deleteMerged ? 'merged-clean' : false, mergedInto: into ?? null, releaseCards })
@@ -1956,7 +2098,7 @@ export async function discardAgent(path: string, agentId: string): Promise<void>
   const done = await runOnce(`removeAgent:${path}#${agentId}`, async () => {
     if (a.live) {
       await call('session:stop', path, agentId)
-      await waitForStop(path, agentId)
+      if (!(await waitForStop(path, agentId))) return !!stillStopping(path, agentId)
     }
     return attempt(tr(msg({ id: 'actions.discard.failed', defaultMessage: 'Could not discard agent', description: "An error's title: discarding a worktree agent failed." })), () => call('agents:remove', path, agentId, { deleteWorktree: true, releaseCards }).then(() => true))
   })

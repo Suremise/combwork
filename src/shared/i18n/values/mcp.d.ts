@@ -7,13 +7,13 @@ interface CombworkMessageValues {
   'mcp.add.title': { project: string | number }
   'mcp.add.titleAssistant': undefined
   'mcp.addFile.messageAdded': { file: string | number; files: number }
-  'mcp.addFile.replaceDetailAdded': undefined
   'mcp.catalog.allSources': undefined
   'mcp.catalog.badName': undefined
   'mcp.catalog.badgeInstalled': undefined
   'mcp.catalog.badgeNeeds': undefined
   'mcp.catalog.badgeOther': undefined
   'mcp.catalog.badgeUpdate': { version: string | number }
+  'mcp.catalog.cancelDownload': undefined
   'mcp.catalog.cantRun': undefined
   'mcp.catalog.check.app': { value: string | number }
   'mcp.catalog.check.build': { value: string | number }
@@ -41,6 +41,7 @@ interface CombworkMessageValues {
   'mcp.catalog.installTitle': { name: string | number; version: string | number }
   'mcp.catalog.installed': { name: string | number }
   'mcp.catalog.installedAt': { version: string | number }
+  'mcp.catalog.installedKept': undefined
   'mcp.catalog.installedNext': undefined
   'mcp.catalog.loading': undefined
   'mcp.catalog.mismatch': { name: string | number }
@@ -52,6 +53,7 @@ interface CombworkMessageValues {
   'mcp.catalog.notInstalled': { name: string | number }
   'mcp.catalog.notRead': { reason: string | number }
   'mcp.catalog.ok': undefined
+  'mcp.catalog.otherDownload': { name: string | number }
   'mcp.catalog.pick': undefined
   'mcp.catalog.placesChanged': { name: string | number }
   'mcp.catalog.redirects': { url: string | number }
@@ -64,6 +66,7 @@ interface CombworkMessageValues {
   'mcp.catalog.source': undefined
   'mcp.catalog.sourceTaken': undefined
   'mcp.catalog.sourceUrl': undefined
+  'mcp.catalog.stalled': { url: string | number; seconds: number }
   'mcp.catalog.timeout': { url: string | number; seconds: number }
   'mcp.catalog.tooLarge': { url: string | number; max: number }
   'mcp.catalog.tooManySources': { max: number }
@@ -83,6 +86,7 @@ interface CombworkMessageValues {
   'mcp.error.invalidName': undefined
   'mcp.error.noProject': { project: string | number }
   'mcp.error.noServerAdd': { name: string | number }
+  'mcp.error.placesChanged': { name: string | number }
   'mcp.import.added': { project: string | number }
   'mcp.import.changedAdded': { count: number; names: string | number }
   'mcp.import.confirmButtonAdded': undefined
@@ -109,6 +113,9 @@ interface CombworkMessageValues {
   'mcp.places.projectsLabel': undefined
   'mcp.places.removedFrom': { places: string | number }
   'mcp.places.title': { name: string | number }
+  'mcp.replace.detailKept': undefined
+  'mcp.replace.messageChanged': { name: string | number; where: string | number }
+  'mcp.replace.messageSame': { name: string | number; where: string | number }
   'mcp.tab.hintAdded': undefined
   'mcp.tab.projectDefinedAdded': undefined
   'mcp.view.addTo': undefined

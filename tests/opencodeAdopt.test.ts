@@ -8,9 +8,10 @@ import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 const base = tempDir('cw-oc-adopt-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -57,7 +58,7 @@ describe("adopting an OpenCode session Combwork didn't make (HI-2774)", () => {
   afterAll(async () => {
     sessions.writeAdopted = realWrite
     await history.historyWorkerForTests(null)
-    disposeWorkspaceService(w)
+    await disposeWorkspaceService(w)
   })
 
   it('takes it over: a record of its own, and the mark in its account that lets it resume', async () => {

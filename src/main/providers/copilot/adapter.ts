@@ -7,7 +7,7 @@ import { existsSync, readFileSync, statSync } from 'original-fs'
 import type { AgentInstallInfo, LaunchedSignInHost, McpServerDef, MemorySource, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
 import { assertSessionId } from '../../../shared/defaults'
 import type { StartHint } from '../../../shared/startFailure'
-import { COPILOT, COPILOT_DESCRIPTOR, COPILOT_FOOTER_MODES, copilotCanApproveEdits, copilotCanSwitchLive, copilotFooterMode, copilotModeFlags } from '../../../shared/copilot'
+import { COPILOT, COPILOT_DESCRIPTOR, COPILOT_FOOTER_MODES, copilotCanApproveEdits, copilotCanSwitchLive, copilotFooterMode, copilotModeFlags } from '../../../shared/providers/copilot'
 import { isProviderEnabled } from '../../../shared/providers'
 import { config } from '../../config'
 import { writeJsonAtomic } from '../../fsutil'
@@ -21,7 +21,7 @@ import { overrideId } from '../../../shared/advanced'
 import { copilotTranscriptTurns } from './turns'
 import { CopilotConversationParser, CopilotUsageParser, copilotDetailsMemo, copilotEventsPath, copilotImageData, eventsDetails, listCopilotSessions, parseEvents, workspaceInfo, type CopilotDetailsMemo } from './events'
 import { COPILOT_HOST_TEXT, copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, copilotUpdateUpToDate, launchRoute, locateCopilot, primaryContext, primaryModels } from './install'
-import { signInSnapshot } from './hosts'
+import { newGeneration, signInSnapshot } from './hosts'
 import { resolveGithubHosts, type ResolvedGithubHosts } from '../../../shared/githubHost'
 import { combworkError } from '../../combworkError'
 import { advanced } from '../../advanced'
@@ -131,6 +131,41 @@ function mcpServersIn(file: string): Record<string, McpServerDef> {
 export class CopilotAdapter implements ProviderAdapter {
   readonly id = COPILOT
   readonly descriptor = COPILOT_DESCRIPTOR
+  // Its capability parts (ProviderAdapter), each implemented by this class's own members: a getter, so an object made from
+  // this one (Object.create) is its own parts too.
+  get install(): this {
+    return this
+  }
+  get launch(): this {
+    return this
+  }
+  get hooks(): this {
+    return this
+  }
+  get terminal(): this {
+    return this
+  }
+  get modes(): this {
+    return this
+  }
+  get transcript(): this {
+    return this
+  }
+  get usage(): this {
+    return this
+  }
+  get githubHost(): this {
+    return this
+  }
+  get models(): this {
+    return this
+  }
+  get compaction(): this {
+    return this
+  }
+  get projectFiles(): this {
+    return this
+  }
   /**
    * The question an ask_user call asks, per Copilot session, from its PreToolUse until the call ends (HI-1945): from
    * 1.0.104 its elicitation_dialog Notification says only "Information requested", so the question comes from here.
@@ -223,6 +258,11 @@ export class CopilotAdapter implements ProviderAdapter {
   }
 
   /** What a launch on these hosts would sign in as (HI-2779): as prepareLaunch records it, with the switches as they are now. */
+
+  githubHostsChanged(): void {
+    newGeneration()
+  }
+
   signInHostFor(hosts: ResolvedGithubHosts, env: Record<string, string>): Promise<LaunchedSignInHost | null> {
     return signInSnapshot(hosts, copilotEnv(launchRoute(hosts, env).env))
   }
@@ -636,3 +676,6 @@ export class CopilotAdapter implements ProviderAdapter {
 }
 
 export const copilot = new CopilotAdapter()
+
+/** The adapter, as the registry finds it (src/main/providers/index.ts, HI-3201). */
+export default copilot

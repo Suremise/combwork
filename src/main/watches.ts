@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto'
+import { RENAME_RETRY } from './retryBounds'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { CW_DIR, projectAgents } from '../shared/defaults'
@@ -11,6 +12,8 @@ import { rebase } from '../shared/movePaths'
 import type { LaneInfo, LaneTitle, LiveSessionState, StoredText, TaskCard, TaskColumn, TaskWatchInfo } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
+import { wakeEventsOf, type LaneEvent } from '../shared/laneEvents'
+import { assistantHomeIn } from './combworkFolder'
 import { config } from './config'
 import { onCombworkEvent } from './events'
 import { placeKey, readCapped, renameRetrying } from './fsutil'
@@ -299,6 +302,8 @@ export const testHooks: {
   beforeWakeCancel?: () => Promise<void>
   /** HI-2521: a pause in a lane watch's setup, after its lanes were read and before it is saved. */
   afterLanesRead?: () => Promise<void>
+  /** HI-3280: a lane watch set up, every read done, just before it replaces the agent's watch (a receipt landing there). */
+  beforeLaneWatchSaved?: () => Promise<void>
   /** HI-2889: a pause in endOwnLaneWatch, under the store's lock, before the caller's lane reading (a lane changing meanwhile). */
   inOwnLaneEnd?: () => Promise<void>
 } = {}
@@ -543,7 +548,7 @@ async function readFileOf(path: string, open: () => boolean): Promise<Saved | nu
   const aside = async (why: string): Promise<Saved> => {
     const to = `${file}.${why}-${Date.now()}`
     try {
-      await renameRetrying(file, to, 20, () => {
+      await renameRetrying(file, to, RENAME_RETRY, () => {
         if (!open()) throw closedError()
       }, renameOnce)
     } catch (e) {
@@ -1146,8 +1151,13 @@ export async function endWatchOf(projectPath: string, agentId: string, why: stri
  * caller's synchronous reading of the lane as it is then (HR1 on HI-2889), run under the lock just before the record is
  * removed: its cards now when the start is still due on a builder still watching, else null and nothing is ended (a lane
  * paused, ended, reassigned or changed while this waited for the lock).
+ *
+ * HI-3300: a card watch on cards of that lane alone that aren't started yet (`unstarted`: its own open cards in Todo or On
+ * Hold, from its next card on) is ended the same way. After a Done, `cw_lane next` said "waiting for the user on CL-305",
+ * so CB1 watched CL-305; the Assistant then put CL-310 ahead of it, and CL-310 sat until the stall 34 min later. Such a
+ * watch waits for the lane to reach those cards, which it does after the card now started.
  */
-export async function endOwnLaneWatch(projectPath: string, agentId: string, laneId: string, current: () => readonly number[] | null): Promise<string | null> {
+export async function endOwnLaneWatch(projectPath: string, agentId: string, laneId: string, current: () => LaneCardsNow | null): Promise<string | null> {
   const ws = workspaceFor(projectPath)
   if (!ws?.path) return null
   const store = await load(ws)
@@ -1157,8 +1167,8 @@ export async function endOwnLaneWatch(projectPath: string, agentId: string, lane
     await testHooks.inOwnLaneEnd?.()
     // Read again after any await: the record as it is now, and the lane.
     if (recordOf(store, projectPath, agentId) !== r || r.fired || store.delivering.has(r.id)) return null
-    const cards = current()
-    if (!cards || !ownLaneOnly(r, { id: laneId, cards })) return null
+    const now = current()
+    if (!now || !ownLaneOnly(r, { id: laneId, ...now })) return null
     const before = store.list
     store.list = store.list.filter((x) => x !== r)
     try {
@@ -1176,10 +1186,20 @@ export async function endOwnLaneWatch(projectPath: string, agentId: string, lane
   return infoOf(rec).label
 }
 
-/** HI-2889: a watch on lane `lane` alone (no other lane, nor "all"), no agents or usage beside it, and only cards of that lane. */
-function ownLaneOnly(r: WatchRecord, lane: { id: string; cards: readonly number[] }): boolean {
-  if (!r.lanes || r.lanes.ids === 'all' || !r.lanes.ids.length || r.lanes.ids.some((id) => id !== lane.id)) return false
+/** A lane's cards as endOwnLaneWatch's caller reads them: all of them, and those not started yet from its next card on (HI-3300). */
+export interface LaneCardsNow {
+  cards: readonly number[]
+  unstarted: readonly number[]
+}
+
+/**
+ * HI-2889: a watch on lane `lane` alone (no other lane, nor "all"), no agents or usage beside it, and only cards of that
+ * lane. HI-3300: or a card watch (no lanes, agents or usage) on only the lane's cards not started yet.
+ */
+function ownLaneOnly(r: WatchRecord, lane: { id: string } & LaneCardsNow): boolean {
   if (r.agents || r.usage) return false
+  if (!r.lanes) return r.cond.cards.length > 0 && r.cond.cards.every((n) => lane.unstarted.includes(n))
+  if (r.lanes.ids === 'all' || !r.lanes.ids.length || r.lanes.ids.some((id) => id !== lane.id)) return false
   return r.cond.cards.every((n) => lane.cards.includes(n))
 }
 
@@ -1699,8 +1719,10 @@ export function lanesNowIn(ws: WorkspaceService, laneMarks: Record<string, LaneM
   return lanesIn(ws, { scope: null, lanes: { ids: 'all', events: [] }, laneMarks, since }, laneBoard(ws))
 }
 
-async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'lanes' | 'laneMarks'> & { since?: string; laneSince?: string }, board: LaneBoard): Promise<LaneNow[]> {
+async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'lanes' | 'laneMarks'> & { since?: string; laneSince?: string; agentId?: string; projectPath?: string }, board: LaneBoard): Promise<LaneNow[]> {
   const cond = rec.lanes!
+  // HI-3211 (HR1's round 1): the Assistant's echo is left out only for its workspace's Assistant, by host and id.
+  const assistant = !!rec.projectPath && !!rec.agentId && isAssistantWatch(ws, { projectPath: rec.projectPath, agentId: rec.agentId })
   const inView = (await listLanes(ws, { all: true })).filter((l) => rec.scope === null || same(l.project, rec.scope))
   // Every running lane, and a lane it follows until its end has been told (round 1 finding: one that ended between a
   // wake and the watch after it, which starts from what the wake told).
@@ -1733,7 +1755,8 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
       const stall = card && !card.archived ? await cardStallWith(ws, card, agents, order) : null
       const stalled = stall?.why ?? null
       // An ended lane's cards are another lane's or nobody's: no requests of theirs are told for it.
-      const asked = running(l) && asks ? newestAsk(asks.get(lc.number)) : undefined
+      // HI-3211: for the Assistant, never one it asked itself (its echo), by the request's actor, never a name.
+      const asked = running(l) && asks ? newestAsk(asks.get(lc.number), assistant) : undefined
       marks[lc.number] = laneCardMark(card, stalled, asked)
       changed.push({ mark: marks[lc.number], updatedAt: card?.updatedAt })
       const v = card ? verdictsOf(card) : null
@@ -1746,7 +1769,7 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
     // A builder queued to resume after a restart (HI-1707) isn't a stall meanwhile.
     const resuming = !builder && !!ws.path && isResuming(join(ws.path, l.project), l.builder.id)
     const mergeStall = resuming ? null : mergeStallReason({ state: l.state, builder: l.builder.name, cards: changed }, builder)
-    out.push({ id: l.id, label, short: l.name?.trim() || pair, mark: { state: l.state, mergeDue: mergeDue(Object.values(marks)), ...(mergeStall ? { ms: true } : {}), cards: marks }, cards, mergeStall, status: l.status, mergeCommit: l.mergeCommit })
+    out.push({ id: l.id, label, short: l.name?.trim() || pair, project: l.project, mark: { state: l.state, mergeDue: mergeDue(Object.values(marks)), ...(mergeStall ? { ms: true } : {}), cards: marks }, cards, mergeStall, status: l.status, mergeCommit: l.mergeCommit })
   }
   return out
 }
@@ -1763,9 +1786,15 @@ interface LaneBoard {
   asks(numbers: readonly number[]): Map<number, ForYouItem[]> | null
 }
 
-/** A card's newest open request for the user (HI-1991), as a lane watch tells it; null for none. */
-function newestAsk(items: readonly ForYouItem[] | undefined): LaneAsked | null {
-  const i = items?.reduce<ForYouItem | null>((a, b) => (!a || b.since > a.since ? b : a), null)
+/**
+ * A card's newest open request for the user (HI-1991), as a lane watch tells it; null for none. For the Assistant's watch
+ * (`assistant`: isAssistantWatch, its host and id), never one the Assistant asked (HI-3211, decision (c): its echo, an exception of the
+ * Assistant's alone): left out before the newest is taken, so another agent's on the same card is still told, and the
+ * left-out one never moves the card's mark.
+ */
+function newestAsk(items: readonly ForYouItem[] | undefined, assistant = false): LaneAsked | null {
+  const own = (x: ForYouItem): boolean => assistant && !!x.byAssistant
+  const i = items?.filter((x) => !own(x)).reduce<ForYouItem | null>((a, b) => (!a || b.since > a.since ? b : a), null)
   return i ? { since: i.since, by: i.asker, text: i.text, ...(i.shown ? { shown: i.shown } : {}) } : null
 }
 
@@ -1850,11 +1879,15 @@ async function laneRoundFor(store: Store, rec: WatchRecord, board: LaneBoard): P
   const started = new Map(listed.map((l) => [l.id, l.startedAt]))
   const hits: LaneHit[] = []
   const next: Record<string, LaneMark> = cond.ids === 'all' ? {} : { ...rec.laneMarks }
+  const eventsOf = laneEventsFor(store.ws, rec)
   for (const n of nows) {
     const from = rec.laneSince ?? rec.since
     const was = rec.laneMarks?.[n.id] ?? (Date.parse(started.get(n.id) ?? '') > Date.parse(from) ? newLaneBase(n, from) : undefined)
+    // HI-3211: what it counts of this lane, its project's Wake the Assistant for when it follows the setting. Its marks
+    // move on below whatever is counted, so an event left out is never told later, under another level.
+    const events = await eventsOf(n.project)
     // Its hits' texts name cards as the watch's line does (HI-1777): by key, whatever workspace is the context meanwhile.
-    const h = withCardNames(store.ws, () => laneHits(was, n, cond.events, from), rec.scope)
+    const h = withCardNames(store.ws, () => laneHits(was, n, events, from), rec.scope)
     if (h) hits.push(h)
     next[n.id] = keepAsked(was, n.mark, from)
   }
@@ -1863,7 +1896,43 @@ async function laneRoundFor(store: Store, rec: WatchRecord, board: LaneBoard): P
   // Named lanes: the waits of their projects' agents; "all": of every project in the watcher's view.
   const named = cond.ids === 'all' ? null : new Set(listed.filter((l) => (cond.ids as string[]).includes(l.id)).map((l) => l.project.toLowerCase()))
   const waitSeq = latestWaitSeq()
-  return { hits, next, cards: c ? c.hits.filter((h) => !drop.includes(h.number)) : [], told: c ? Object.fromEntries(Object.entries(c.told).filter(([n]) => !drop.includes(Number(n)))) : {}, drop, done: c?.released ?? [], waits: await waitsSince(store, rec, board, named), waitSeq }
+  return { hits, next, cards: c ? c.hits.filter((h) => !drop.includes(h.number)) : [], told: c ? Object.fromEntries(Object.entries(c.told).filter(([n]) => !drop.includes(Number(n)))) : {}, drop, done: c?.released ?? [], waits: await waitsSince(store, rec, board, named, eventsOf), waitSeq }
+}
+
+/** Whether a watch is its workspace's Assistant's (HI-3211): its host the Assistant's home there, its agent the Assistant. */
+export function isAssistantWatch(ws: WorkspaceService, rec: Pick<WatchRecord, 'projectPath' | 'agentId'>): boolean {
+  return !!ws.path && rec.agentId === ASSISTANT_AGENT_ID && same(rec.projectPath, assistantHomeIn(ws.path))
+}
+
+/**
+ * What a lane watch counts of a project's lanes (and its agents' waits), by the project's folder name (HI-3211): for its
+ * workspace's Assistant's watch that named no events, that project's Wake the Assistant for (Combwork's, the workspace's
+ * or its own level, read now, so a change applies from the next check), with what every watch counts; else its events.
+ * Each project is read once a round.
+ */
+function laneEventsFor(ws: WorkspaceService, rec: WatchRecord): (project: string | undefined) => Promise<LaneEvent[]> {
+  const cond = rec.lanes!
+  if (!cond.follow || !isAssistantWatch(ws, rec) || !ws.path) return () => Promise.resolve(cond.events)
+  const read = new Map<string, Promise<LaneEvent[]>>()
+  return (project) => {
+    if (!project) return Promise.resolve(cond.events)
+    const key = project.toLowerCase()
+    if (!read.has(key)) {
+      const projectPath = join(ws.path!, project)
+      read.set(
+        key,
+        ws
+          .projectConfig(projectPath)
+          .catch(() => null)
+          .then((cfg) => withAlwaysEvents(cond.ids, wakeEventsOf(projectPreferences(ws, projectPath, cfg).assistantWakes)))
+          .catch((e) => {
+            log.warn(`reading what wakes the Assistant in ${userText(project)}`, e)
+            return cond.events
+          })
+      )
+    }
+    return read.get(key)!
+  }
 }
 
 /**
@@ -1891,14 +1960,16 @@ function dropLaneCards(rec: WatchRecord, r: Pick<LaneRound, 'drop' | 'done'>, en
  * same launch (a wait the user answered at once has nothing left to tell); its latest wait, with its card (the one it
  * works on in Doing, else the one it reviews) and what it asks.
  */
-async function waitsSince(store: Store, rec: WatchRecord, board: LaneBoard, named: Set<string> | null): Promise<WaitHit[]> {
-  if (!rec.lanes?.events.includes('waiting')) return []
+async function waitsSince(store: Store, rec: WatchRecord, board: LaneBoard, named: Set<string> | null, eventsOf: (project: string) => Promise<LaneEvent[]> = () => Promise.resolve(rec.lanes?.events ?? [])): Promise<WaitHit[]> {
+  if (!rec.lanes || (!rec.lanes.follow && !rec.lanes.events.includes('waiting'))) return []
   const from = rec.waitSeq ?? 0
   const latest = new Map<string, WaitStart>()
   for (const w of waitStarts) {
     if (w.seq <= from || (same(w.projectPath, rec.projectPath) && w.agentId === rec.agentId) || !mayWatch(store.ws, store.path, rec.projectPath, w.projectPath)) continue
     const project = basename(resolve(w.projectPath)).toLowerCase()
     if ((rec.scope !== null && project !== rec.scope.toLowerCase()) || (named && !named.has(project))) continue
+    // HI-3211: as the waiting agent's project's level says, for the Assistant following the setting.
+    if (!(await eventsOf(basename(resolve(w.projectPath)))).includes('waiting')) continue
     latest.set(agentKey(w.projectPath, w.agentId), w)
   }
   const out: WaitHit[] = []
@@ -1989,6 +2060,9 @@ export type LaneWatchResult = LaneWatching | { already: string[]; replaced?: str
  * out, the last lane watch's cards are kept (the one it replaces, or the one whose wake was read), less those since done
  * or gone; [] drops them. The reply says which (`cards`).
  */
+/** What an agent's last received lane wake told (Store.wokeLanes' values). */
+type WokeLanes = Store['wokeLanes'] extends Map<string, infer V> ? V : never
+
 // A watch on every running lane names no lane that has ended: it is always a watch.
 export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, asked: LaneWatchCondition & { ids: 'all' }, limitMinutes?: number, extra?: { cards?: number[]; changes?: WatchChange[]; agents?: AgentWatchCondition }): Promise<LaneWatching>
 export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, asked: LaneWatchCondition, limitMinutes?: number, extra?: { cards?: number[]; changes?: WatchChange[]; agents?: AgentWatchCondition }): Promise<LaneWatchResult>
@@ -2017,14 +2091,23 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
   const result = await locked(store, async (): Promise<LaneWatchResult> => {
     await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
     const since = new Date().toISOString()
-    const told = store.wokeLanes.get(agentKey(projectPath, agentId))
-    // After a wake, what is new is measured from when its line was made: a lane started or a card added since then is
-    // told (round 2 finding); otherwise from now.
+    const old = recordOf(store, projectPath, agentId)
+    // Replacing a lane watch: from where that one was (HI-3280), as its cards beside the lanes are kept, so what it hadn't
+    // handed over yet (an event it was waiting to tell, a wake not read with cw_inbox, whose delivery the replacement
+    // cancels) is told by this one, never lost. Else after a wake, from when its line was made: a lane started or a card
+    // added since then is told (round 2 finding); otherwise from now.
+    // A wake recorded since that watch began is its own, received (`received` records it before the watch is taken off
+    // the list): from what it told, so nothing it told is told again. A wake received while this one is set up (its receipt
+    // isn't under this lock: HR1's round 1) is taken again just before it replaces the old record, below.
+    const wakeKey = agentKey(projectPath, agentId)
+    const startOf = (woke: WokeLanes | undefined): { at: string; marks: Map<string, LaneMark> } | undefined =>
+      old?.lanes && old.laneMarks && !(woke && Date.parse(woke.at) >= Date.parse(old.since)) ? { at: old.laneSince ?? old.since, marks: new Map(Object.entries(old.laneMarks)) } : woke
+    const woke = store.wokeLanes.get(wakeKey)
+    const told = startOf(woke)
     const laneSince = told?.at ?? since
     const toldMarks = told ? Object.fromEntries(told.marks) : undefined
     const nows = await lanesNow(store, { scope, lanes: cond, laneSince, ...(toldMarks ? { laneMarks: toldMarks } : {}) })
     await testHooks.afterLanesRead?.()
-    const old = recordOf(store, projectPath, agentId)
     // HI-2521: a lane it names that has ended or been abandoned is the answer at once, as an agent not working is for an
     // agent watch: no watch starts (it would start from the end, with nothing left to tell), and one it had ends.
     const over = cond.ids === 'all' ? [] : nows.flatMap((n) => laneOverPart(n) ?? [])
@@ -2050,16 +2133,22 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     // The watched lanes' own cards (#1531, #1346 item 3): listed as cards too, each wakes it on every move.
     const watchedIds = new Set(nows.map((n) => n.id))
     const laneCards = new Set(allLanes.filter((l) => watchedIds.has(l.id)).flatMap((l) => l.cards.map((c) => c.number)))
-    const laneMarks: Record<string, LaneMark> = {}
-    for (const n of nows) {
-      const t = told?.marks.get(n.id)
-      if (t) laneMarks[n.id] = t
-      // Started since that wake: left unmarked, so the first check measures it from an empty start.
-      else if (!(told && Date.parse(started.get(n.id) ?? '') > Date.parse(laneSince))) laneMarks[n.id] = keepAsked(null, n.mark, laneSince)
+    // Each lane's mark from where it starts. The lanes read from an earlier start are still right for a later one (a wake
+    // since: a later boundary, so they are as many or more), and a lane it no longer tells is left as it is now.
+    const marksFrom = (start: typeof told, from: string): Record<string, LaneMark> => {
+      const out: Record<string, LaneMark> = {}
+      for (const n of nows) {
+        const t = start?.marks.get(n.id)
+        if (t) out[n.id] = t
+        // Started since that wake: left unmarked, so the first check measures it from an empty start.
+        else if (!(start && Date.parse(started.get(n.id) ?? '') > Date.parse(from))) out[n.id] = keepAsked(null, n.mark, from)
+      }
+      return out
     }
+    const laneMarks = marksFrom(told, laneSince)
     // The cards beside its lanes (#726): those named, else the last lane watch's (the one it replaces, or the one whose
     // wake was read), less those done or gone since (a card named must be one it may see).
-    const last = old?.lanes ? (old.cond.cards.length ? { cards: old.cond.cards, changes: old.cond.changes } : undefined) : told?.cards
+    const last = old?.lanes ? (old.cond.cards.length ? { cards: old.cond.cards, changes: old.cond.changes } : undefined) : woke?.cards
     const keep = extra.cards === undefined
     const changes = extra.changes ?? (keep ? last?.changes : undefined) ?? LANE_CARD_CHANGES
     const toldCards = self ? store.woke.get(agentKey(projectPath, agentId)) : undefined
@@ -2092,7 +2181,7 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     // wake didn't tell); [] drops them. One not working now isn't followed: its state is the reply, as for an agent watch.
     const watcher = agentKey(projectPath, agentId)
     const keepAgents = extra.agents === undefined
-    const wanted = extra.agents ?? (old?.lanes ? old.agents : told?.agents)
+    const wanted = extra.agents ?? (old?.lanes ? old.agents : woke?.agents)
     const toldSeqs = store.wokeAgents.get(watcher)
     const agentMarks: Record<string, AgentMark> = {}
     const followed: WatchedAgent[] = []
@@ -2122,13 +2211,22 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
         : undefined
     // The waits for the user it starts from (#726): the watch it replaces, else what its last wake told, else when this
     // call began.
-    const waitSeq = (old?.lanes ? old.waitSeq : undefined) ?? told?.waitSeq ?? waitsFrom
+    const waitSeq = (old?.lanes ? old.waitSeq : undefined) ?? woke?.waitSeq ?? waitsFrom
     const before = store.list
     if (!old && store.list.length >= MAX_WATCHES) throw saidError(T.tooMany, { max: String(MAX_WATCHES) })
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     const rec: WatchRecord = { id: randomBytes(6).toString('hex'), projectPath, ...projectIdOf(ws, projectPath), agentId, scope, cond: cardCond, lanes: cond, laneMarks, ...(titles ? { laneTitles: titles } : {}), laneSince, waitSeq, ...(followed.length ? { agents: { ignoreBackground: wanted!.ignoreBackground, agents: followed }, agentMarks } : {}), marks, current, since, ...from, limitMinutes: minutes, limitAt: new Date(Date.now() + minutes * 60_000).toISOString() }
     const next = [...store.list.filter((x) => x !== old), rec]
     if (budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES)) throw saidError(T.tooBig)
+    await testHooks.beforeLaneWatchSaved?.()
+    // HR1's round 1: a wake received during the reads above (its receipt isn't under this lock) is taken now, with nothing
+    // awaited from here to the replacement, so the old watch's marks from before it never start this one.
+    const wokeNow = store.wokeLanes.get(wakeKey)
+    if (wokeNow !== woke) {
+      const start = startOf(wokeNow)
+      rec.laneSince = start?.at ?? since
+      rec.laneMarks = marksFrom(start, rec.laneSince)
+    }
     store.list = next
     try {
       await save(store)
@@ -2178,6 +2276,17 @@ const settling = new Set<string>()
  * move into Passed or Done with no verdict, #1266); one that counts a reviewer's request or a decision (`request`,
  * `decision`: hearsHandoffs, #1272); or one that has fired and tells the card. Its watches not loaded yet: false.
  */
+/**
+ * Whether an agent's own card watch still follows a card (HI-3211): one on the card that
+ * hasn't fired, read when a loop wake's line is made just before it is given, so the line says its watch is still on only
+ * when it is (one ended or fired meanwhile says nothing).
+ */
+export function watchStillOn(projectPath: string, agentId: string, n: number): boolean {
+  const store = storeFor(projectPath)
+  const rec = store && recordOf(store, projectPath, agentId)
+  return !!rec && !agentOnly(rec) && rec.cond.cards.includes(n) && !rec.fired
+}
+
 export function watchCovers(projectPath: string, agentId: string, n: number, kind: 'review' | 'verdict' | 'moved' | 'request' | 'decision', column: TaskColumn): boolean {
   const store = storeFor(projectPath)
   const rec = store && recordOf(store, projectPath, agentId)

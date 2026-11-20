@@ -3,7 +3,7 @@ import { watch, type FSWatcher } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { readFileSync } from 'original-fs'
 import { join } from 'path'
-import { ADVANCED_DEFS, LEGACY_ADVANCED, advancedDef, advancedFileText, advancedRegExp, advancedRow, checkAdvanced, cliFacing, literalRegExp, onConnection, parseAdvancedFile, withValues, type AdvancedDef, type AdvancedState, type MadeFor, type Text } from '../shared/advanced'
+import { ADVANCED_DEFS, LEGACY_ADVANCED, allAdvancedDefs, advancedDef, advancedFileText, advancedRegExp, advancedRow, checkAdvanced, cliFacing, literalRegExp, onConnection, parseAdvancedFile, withValues, type AdvancedDef, type AdvancedState, type MadeFor, type Text } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { CombworkError, combworkError } from './combworkError'
 import type { AppSettings, ProviderId } from '../shared/types'
@@ -12,6 +12,7 @@ import { emit } from './events'
 import { writeTextUnlessChanged } from './fsutil'
 import { createLogger } from './logger'
 import { readAdvancedFrom } from './advancedValues'
+import { PROVIDERS } from '../shared/providers'
 
 const log = createLogger('advanced')
 
@@ -94,25 +95,65 @@ export class AdvancedStore {
         this.fileErrorText = null
         this.values = parsed.values
         this.unknown = parsed.unknown
-        // A value edited by hand is made for the CLI installed now: its old record was for another value. Written back to
-        // the file (writeRecords), so the record outlives a restart after the CLI updates.
-        const made: Record<string, MadeFor> = {}
-        for (const [id, value] of Object.entries(parsed.values)) {
-          const def = advancedDef(id)
-          if (!def || !cliFacing(def)) continue
-          const was = parsed.madeFor[id]
-          const installed = this.cli[def.group as ProviderId] ?? null
-          // A record of no version yet takes the one Combwork knows now.
-          made[id] = was && JSON.stringify(was.value) === JSON.stringify(value) ? (was.version || !installed ? was : { version: installed, value }) : { version: installed, value }
-        }
+        const made = this.records(parsed.values, parsed.madeFor)
         this.madeFor = made
         this.recordsDue = JSON.stringify(made) !== JSON.stringify(parsed.madeFor)
-        if (this.unknown.length) log.warn(`advanced.json names settings this Combwork doesn't know: ${this.unknown.join(', ')}`)
+        if (this.definitionsKnown) this.warnUnknown()
       }
     }
     this.warned.clear()
     this.patterns.clear()
     return true
+  }
+
+  /**
+   * The version records of `values`, from those `given`. A value edited by hand is made for the CLI installed now: its old
+   * record was for another value. Written back to the file (writeRecords), so the record outlives a restart after the CLI
+   * updates. An id with no definition yet (a user's own CLI's, read before its description is: HI-3267) keeps its record
+   * as it is, worked out once it has one (definitionsChanged).
+   */
+  private records(values: Record<string, unknown>, given: Record<string, MadeFor>): Record<string, MadeFor> {
+    const made: Record<string, MadeFor> = {}
+    for (const [id, value] of Object.entries(values)) {
+      const def = advancedDef(id)
+      const was = given[id]
+      if (!def) {
+        if (was) made[id] = was
+        continue
+      }
+      if (!cliFacing(def)) continue
+      const installed = this.cli[def.group as ProviderId] ?? null
+      // A record of no version yet takes the one Combwork knows now.
+      made[id] = was && JSON.stringify(was.value) === JSON.stringify(value) ? (was.version || !installed ? was : { version: installed, value }) : { version: installed, value }
+    }
+    return made
+  }
+
+  /** The user's own CLIs' definitions are registered (HI-3267): until then an id of theirs isn't told apart from an unknown one. */
+  private definitionsKnown = false
+
+  /**
+   * The user's own CLIs' advanced values were registered or changed (clis.ts' applyClis): their overrides' records are
+   * worked out now, and only ids still unknown are logged.
+   */
+  definitionsChanged(): void {
+    this.definitionsKnown = true
+    this.patterns.clear()
+    this.warned.clear()
+    if (this.fileError) return
+    this.warnUnknown()
+    const made = this.records(this.values, this.madeFor)
+    if (JSON.stringify(made) === JSON.stringify(this.madeFor)) return
+    this.madeFor = made
+    this.recordsDue = true
+    if (!this.loaded) return
+    this.changed()
+    this.writeRecords()
+  }
+
+  private warnUnknown(): void {
+    const unknown = this.unknown.filter((id) => !advancedDef(id))
+    if (unknown.length) log.warn(`advanced.json names settings this Combwork doesn't know: ${unknown.join(', ')}`)
   }
 
   /** Watches the profile folder for advanced.json (an editor saves by replacing it, which a watch on the file loses). */
@@ -221,7 +262,7 @@ export class AdvancedStore {
 
   /** The state Settings → Advanced shows, with a workspace's own values. */
   state(workspaceValues: Record<string, unknown> | null): AdvancedState {
-    return { file: this.loaded ? this.path : '', fileError: this.fileError, fileErrorText: this.fileErrorText, values: { ...this.values }, madeFor: { ...this.madeFor }, unknown: [...this.unknown], workspace: workspaceValues ? { ...workspaceValues } : null, cli: { ...this.cli }, atStart: { ...this.atStart } }
+    return { file: this.loaded ? this.path : '', fileError: this.fileError, fileErrorText: this.fileErrorText, values: { ...this.values }, madeFor: { ...this.madeFor }, unknown: this.unknown.filter((id) => !advancedDef(id)), workspace: workspaceValues ? { ...workspaceValues } : null, cli: { ...this.cli }, atStart: { ...this.atStart } }
   }
 
   /** What the values that apply at a restart were when Combwork started: Settings offers a restart once one differs. */
@@ -361,7 +402,7 @@ export class AdvancedStore {
   /** Help → Copy Diagnostics: how many overrides, which (Combwork's names, no values), and which need a look. */
   diagnostics(workspaces: (Record<string, unknown> | null)[]): string[] {
     const ids = Object.keys(this.values).filter((id) => advancedDef(id)).sort()
-    const rows = ADVANCED_DEFS.map((d) => advancedRow(d, { values: this.values, madeFor: this.madeFor, workspace: null, cli: this.cli }))
+    const rows = allAdvancedDefs().map((d) => advancedRow(d, { values: this.values, madeFor: this.madeFor, workspace: null, cli: this.cli }))
     const invalid = rows.filter((r) => r.problem).map((r) => r.def.id)
     const other = rows.filter((r) => r.madeForOther).map((r) => r.def.id)
     const own = workspaces.reduce((n, w) => n + Object.keys(w ?? {}).length, 0)
@@ -369,7 +410,7 @@ export class AdvancedStore {
       `- Advanced settings: ${ids.length ? `${ids.length} override${ids.length === 1 ? '' : 's'} (${ids.join(', ')})` : 'no overrides'}${own ? `; ${own} workspace value${own === 1 ? '' : 's'}` : ''}`, // i18n-ignore: Help → Copy Diagnostics, a report in English
       ...(invalid.length ? [`  - not valid, so the default is used: ${invalid.join(', ')}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
       ...(other.length ? [`  - made for another CLI version than the installed one: ${other.join(', ')}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
-      ...(this.unknown.length ? [`  - unknown to this Combwork: ${this.unknown.length}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
+      ...(this.unknown.filter((id) => !advancedDef(id)).length ? [`  - unknown to this Combwork: ${this.unknown.filter((id) => !advancedDef(id)).length}`] : []), // i18n-ignore: Help → Copy Diagnostics, a report in English
       ...(this.fileError ? ["  - advanced.json can't be read as it is now"] : []) // i18n-ignore: Help → Copy Diagnostics, a report in English
     ]
   }
@@ -399,12 +440,13 @@ export interface ChangeHooks {
 export const workspaceDefs = (): AdvancedDef[] => ADVANCED_DEFS.filter((d) => d.workspace)
 
 /**
- * The longest a card wait or an agents wait holds a call (seconds): the advanced setting, kept a minute under Codex's
- * timeout for Combwork's tools so the reply always arrives in time.
+ * The longest a card wait or an agents wait holds a call (seconds): the advanced setting, kept a minute under each CLI's
+ * timeout for Combwork's tools (its descriptor's mcpToolTimeoutSetting: Codex's) so the reply always arrives in time.
  */
 export function waitMaxSeconds(kind: 'cards' | 'agents'): number {
   const own = advanced.number(kind === 'cards' ? 'cw.wait.cardMaxSeconds' : 'cw.wait.agentsMaxSeconds')
-  return Math.max(30, Math.min(own, advanced.number('codex.mcp.toolTimeoutSeconds') - 60))
+  const limits = PROVIDERS.flatMap((p) => (p.capabilities.session?.mcpToolTimeoutSetting ? [advanced.number(p.capabilities.session?.mcpToolTimeoutSetting) - 60] : []))
+  return Math.max(30, Math.min(own, ...limits))
 }
 
 /** What the combwork MCP server needs of the advanced settings, as its environment (it runs outside Combwork: Node built-ins only). */

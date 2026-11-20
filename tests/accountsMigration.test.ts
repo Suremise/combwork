@@ -3,8 +3,9 @@ import type { Account, AgentDef, AppSettings, Connection, LegacyConnection, Proj
 import { DEFAULT_APP_CONFIG, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, mergeDefaults, migrateConfig, migrateProjectConfig, withLegacyProjectFields } from '../src/shared/defaults'
 import { agentLaunchSettings, autoProvider, setInstalledCheck, splitArgs } from '../src/shared/providers'
 import { connectionName, joinArgs, launchValues, matchingConnection, resolveAgentConnection, sameValues } from '../src/shared/accounts'
-import { type AccountStore, type LegacyInputs, COPILOT_ACCOUNT, assistantHasSetup, baseValues, connectionFor, legacyEffective, legacyLaunchSettings, migrateAccounts, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, seamAccountId, unpinAssistant } from '../src/shared/connectionDefaults'
+import { type AccountStore, type LegacyInputs, assistantHasSetup, baseValues, connectionFor, legacyEffective, legacyLaunchSettings, migrateAccounts, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, seamAccountId, unpinAssistant } from '../src/shared/connectionDefaults'
 import { ASSISTANT_AGENT_ID, assistantProjectConfig } from '../src/shared/assistant'
+import { COPILOT_ACCOUNT } from '../src/shared/providers/copilot'
 
 /**
  * The accounts migration (HI-2106): the data model, each row of HI-2105's table (s11 as revised by s13), and the full
@@ -97,6 +98,35 @@ describe('connections: the model (HI-2106)', () => {
     expect(resolveAgentConnection({}, 'copilot', 'cp', accounts, connections)).toMatchObject({ ok: true, connection: { id: 'cp' } })
     expect(resolveAgentConnection({}, 'claude-code', 'c1', accounts, connections)).toEqual({ ok: false, why: 'offNoDefault', wanted: 'c1' })
     expect(resolveAgentConnection({}, 'codex', undefined, accounts, connections)).toEqual({ ok: false, why: 'none' })
+  })
+
+  it('an account off here: its agents go to the first account on, to the connection with the same tag, else name, else its first (HI-3213)', () => {
+    // The user's switch: both accounts' connections tagged alike, Anthropic-1 turned off.
+    const accounts: Account[] = [account('a1', 'claude-code'), account('a2', 'claude-code'), account('a3', 'claude-code')]
+    const connections: Connection[] = [
+      { id: 'b1', account: 'a1', name: 'Anthropic-1', tag: 'Builders' },
+      { id: 's1', account: 'a1', name: 'Anthropic-1 · Assistant', tag: 'Assistant' },
+      { id: 'r1', account: 'a1', name: 'Reviewers' },
+      { id: 'u1', account: 'a1', name: 'Odd one' },
+      { id: 'b2', account: 'a2', name: 'Anthropic-2', tag: ' builders ' },
+      { id: 'r2', account: 'a2', name: 'reviewers' },
+      { id: 's2', account: 'a2', name: 'Anthropic-2 · Assistant', tag: 'Assistant' }
+    ]
+    const ws = { connections: { 'claude-code': { on: ['a3', 'a2'] } } }
+    const to = (wanted: string) => {
+      const r = resolveAgentConnection(ws, 'claude-code', wanted, accounts, connections)
+      return r.ok ? { id: r.connection.id, account: r.account.id, note: r.note, by: r.by } : r
+    }
+    // a3 is on but has no connection: the next account on, in the order of accounts, takes them.
+    expect(to('b1')).toEqual({ id: 'b2', account: 'a2', note: 'offFallback', by: 'tag' })
+    expect(to('s1')).toEqual({ id: 's2', account: 'a2', note: 'offFallback', by: 'tag' })
+    expect(to('r1')).toEqual({ id: 'r2', account: 'a2', note: 'offFallback', by: 'name' })
+    // Neither its tag nor its name there: that account's first, said so.
+    expect(to('u1')).toEqual({ id: 'b2', account: 'a2', note: 'offFallback', by: 'default' })
+    // A connection removed is no match to make: the first usable account's base, as before.
+    expect(to('gone')).toEqual({ id: 'b2', account: 'a2', note: 'missing', by: undefined })
+    // Its own on: untouched.
+    expect(to('s2')).toEqual({ id: 's2', account: 'a2', note: undefined, by: undefined })
   })
 
   it('joins extra arguments so they split into exactly the same', () => {

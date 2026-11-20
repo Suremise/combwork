@@ -39,11 +39,13 @@
 // (agentFolders.ts), and lending for a card's start is #1438's: this module only keeps the pool.
 
 import { createHash, randomBytes } from 'crypto'
+import { untilBound, type RetryBound } from './retryBounds'
+import { claimOf, recoverClaim, releaseClaim, takeClaim, type QuietTarget } from './quietClaims'
 import type { DatabaseSync } from 'node:sqlite'
 import { admitOrThrow } from './platform/fenceAdmit'
-import { existsSync, lstatSync } from 'original-fs'
+import { existsSync, lstatSync, readdirSync } from 'original-fs'
 import { mkdir, readdir, readFile, rename } from 'original-fs/promises'
-import { dirname, join } from 'path'
+import { basename, dirname, join } from 'path'
 import { BOARD_MIGRATIONS } from './boardStore'
 import { openDb } from './db'
 import { samePlace } from './fsutil'
@@ -816,12 +818,15 @@ export class SlotStore {
    * while the slot has no open lease, operation or job, is lent with no warm error, its writer is that agent's run `run`
    * held by this Combwork (`holder`), and the agent holds no other dispatch lease. The lease begins on the slot, the writer
    * moves to it (the old lease's end then no longer owns the run: it stops nothing), and `also` (the caller's rebinding of
-   * the run's conversations) runs in the same write. Null when it can't be now; nothing written.
+   * the run's conversations) runs in the same write. `still` (the caller's, HI-3326: the run still the agent's and its
+   * stop not asked) is asked first in that write, with nothing awaited after it, so a stop asked since the caller chose
+   * the slot wins. Null when it can't be now; nothing written.
    */
-  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, run: string, holder: { pid: number; started: number }, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
+  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, run: string, holder: { pid: number; started: number }, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void, still?: () => boolean): Promise<SlotLease | null> {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane') // agent-protocol: a programming error (its caller's), never an agent's or the user's
     try {
       return await this.conn.write((db) => {
+        if (still && !still()) return null
         if (this.writtenNotTakeableIn(db, slot, req.agent, run, holder)) return null
         // The card it is for has a slot kept for it elsewhere (HI-3032): never placed here instead.
         if (this.keptElsewhereIn(db, req.card ?? req.startsCard, slot)) return null
@@ -1690,6 +1695,11 @@ export class SlotPool {
     this.store = deps.store
   }
 
+  /** HI-3374: what a quiet check of slot `name` claims its folder through: this pool's store, in the board's database. */
+  private quietTarget(name: string): QuietTarget {
+    return { conn: this.store.conn, project: this.store.project, kind: 'slot', name }
+  }
+
   /** The workspace lifecycle port its slots are made and inspected with (SPEC §16.3.6 Port 2): the deps', else the slots' platform's. */
   private get port(): WorkspacePort {
     return this.deps.workspaces ?? this.deps.workspacesFor?.() ?? slotWorkspaces()
@@ -1782,7 +1792,7 @@ export class SlotPool {
     if (held) return held
     const session = this.deps.sessionIn?.(s.folder)
     if (session) return `session ${session}` // agent-protocol: a log line's detail, never sent to an agent
-    return (await quiet(s.folder)) ? null : 'the folder is in use' // agent-protocol: a log line's detail, never sent to an agent
+    return (await quiet(s.folder, this.quietTarget(s.name))) ? null : 'the folder is in use' // agent-protocol: a log line's detail, never sent to an agent
   }
 
   /** A slot's removal journal (HI-2795: a jj removal's phases, so an interrupted one resumes), board_meta by key. */
@@ -1848,13 +1858,13 @@ export class SlotPool {
    * its workspace no longer listed (forgotten outside Combwork, `slot.kept.forgotten`).
    */
   private async goneWhy(s: Slot): Promise<AgentMsg> {
-    return (await folderThere(s.folder)) ? T.keptForgotten : T.keptGone
+    return (await folderThere(s.folder, this.quietTarget(s.name))) ? T.keptForgotten : T.keptGone
   }
 
   /** The kept slot of a card being lent, `gone` with its folder there (HI-3097): read before the lend's write, for its words. */
   private async forgottenKept(card: number | undefined): Promise<Set<string>> {
     const k = card !== undefined ? this.store.keptSlotFor(card) : null
-    return k && k.slot.state === 'gone' && (await folderThere(k.slot.folder)) ? new Set([k.slot.name]) : new Set()
+    return k && k.slot.state === 'gone' && (await folderThere(k.slot.folder, this.quietTarget(k.slot.name))) ? new Set([k.slot.name]) : new Set()
   }
 
   async keptPreview(card: number): Promise<{ slot: Slot } | { wait: string } | null> {
@@ -2042,8 +2052,8 @@ export class SlotPool {
   }
 
   /** The slot an agent's own run still writes in, taken over by its next card or lane (HI-1762, SlotStore.takeWrittenSlot), held by this Combwork. */
-  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, run: string, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
-    return this.store.takeWrittenSlot(slot, req, run, await this.deps.holder.self(), also)
+  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; startsCard?: number }, run: string, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void, still?: () => boolean): Promise<SlotLease | null> {
+    return this.store.takeWrittenSlot(slot, req, run, await this.deps.holder.self(), also, still)
   }
 
   /** Why takeWrittenSlot wouldn't take it now (SlotStore.writtenNotTakeable), held by this Combwork; null: it would. */
@@ -2143,7 +2153,7 @@ export class SlotPool {
     const s = this.store.slot(name)
     if (!s || s.writer) return
     const last = this.store.lastLease(name)
-    if (last?.to && !last.endRev && this.hasPort(s) && (await folderThere(s.folder))) {
+    if (last?.to && !last.endRev && this.hasPort(s) && (await folderThere(s.folder, this.quietTarget(s.name)))) {
       const rev = await this.portOf(s).head(s.folder)
       if (!isUnknown(rev)) await this.store.finalizeEndRev(last.id, rev)
     }
@@ -2520,7 +2530,7 @@ export class SlotPool {
 
   /** Whether a slot is there: its folder, and git lists it; null when git's listing fails (#734: never an empty one). */
   private async present(s: Slot): Promise<boolean | null> {
-    if (!(await folderThere(s.folder))) return false
+    if (!(await folderThere(s.folder, this.quietTarget(s.name)))) return false
     if (!this.hasPort(s)) return null
     const listed = await this.portOf(s).list(this.deps.project).catch(() => null)
     return listed ? listed.some((l) => samePlace(l.path, s.folder)) : null
@@ -2684,7 +2694,7 @@ export class SlotPool {
     const s = this.store.slot(name)
     if (!i || !s) return { kind: 'kept', why: 'changed' }
     const seen = await withFolderRepoLocks([this.deps.project], async () => {
-      if (!(await folderThere(s.folder))) return 'gone' as const
+      if (!(await folderThere(s.folder, this.quietTarget(s.name)))) return 'gone' as const
       const d = await this.port.dirty(s.folder)
       const h = await this.port.head(s.folder)
       if (isUnknown(d) || isUnknown(h)) return 'unreadable' as const
@@ -2862,7 +2872,7 @@ export class SlotPool {
         }
         if (!there) {
           // Gone from disk while free: made again where it was (git's stale entry pruned first).
-          if (await folderThere(slot.folder)) return await fail(sayFor(this.port, 'notListed'))
+          if (await folderThere(slot.folder, this.quietTarget(slot.name))) return await fail(sayFor(this.port, 'notListed'))
           await this.store.fenced(name, token, () => undefined)
           await this.port.prune(this.deps.project)
           made = true
@@ -2871,7 +2881,7 @@ export class SlotPool {
           // the folder, HR1's HI-2795 round 1) is asked only once nothing holds the slot; Git's read stays first, as before.
           const held = async (): Promise<SlotRefusal | null> => {
             const session = !!this.deps.sessionIn?.(slot.folder)
-            if (!session && (await quiet(slot.folder))) return null
+            if (!session && (await quiet(slot.folder, this.quietTarget(slot.name)))) return null
             await pass(reclaim ? 'dirty' : 'ready', 'busy')
             return session ? { why: 'busy', slot: name, held: 'session' } : await processHeld(name, slot.folder, this.deps.brokerIn)
           }
@@ -3384,7 +3394,7 @@ export class SlotPool {
         if (resuming) {
           const r = await removeIt()
           if (r) return r
-        } else if (await folderThere(slot.folder)) {
+        } else if (await folderThere(slot.folder, this.quietTarget(slot.name))) {
           const opts = await this.deps.options()
           if (opts.archive.trim()) {
             const end = await this.run(name, token, { slot: name, what: 'archive', command: opts.archive.trim(), folder: slot.folder, env: slotEnv(slot) })
@@ -3469,7 +3479,7 @@ export class SlotPool {
     // The folder as it is now must be that mode, here and again under the removal's operation: a folder missing when
     // confirmed but back now (or the reverse) is `changed`, for the user to look again. This read only makes it
     // eligible: the port proves the absence again itself, right before the trash.
-    if ((await folderThere(seen!.folder)) !== forgotten) return { ok: false, why: 'changed' }
+    if ((await folderThere(seen!.folder, this.quietTarget(seen!.name))) !== forgotten) return { ok: false, why: 'changed' }
     if (forgotten && (await this.present(seen!)) !== false) return { ok: false, why: 'changed' }
     let changed = false
     // HI-3069: a slot of a platform switched from, its folder missing: only Combwork's record forgotten (`recordOnly`),
@@ -3487,7 +3497,7 @@ export class SlotPool {
     const still = async (slot: Slot, token: string): Promise<boolean> => {
       // The row as read before its removal began (`removing` now, by this operation): its record and folder as then (its
       // folder still absent, or still there and still not listed: HI-3097).
-      const ok = same(slot) && (await folderThere(slot.folder)) === forgotten && (!forgotten || (await this.present(slot)) === false) && (await admits(slot, token))
+      const ok = same(slot) && (await folderThere(slot.folder, this.quietTarget(slot.name))) === forgotten && (!forgotten || (await this.present(slot)) === false) && (await admits(slot, token))
       changed = !ok
       return ok
     }
@@ -3504,7 +3514,7 @@ export class SlotPool {
    * The window's read, for its Remove…; `removeForgotten` decides again.
    */
   async forgottenFree(s: Slot): Promise<boolean> {
-    return forgettable(s) && !this.store.keptRecord(s.name) && (await folderThere(s.folder)) && (await this.present(s)) === false
+    return forgettable(s) && !this.store.keptRecord(s.name) && (await folderThere(s.folder, this.quietTarget(s.name))) && (await this.present(s)) === false
   }
 
   /**
@@ -3520,7 +3530,7 @@ export class SlotPool {
    */
   async removeForgotten(name: string, generation: string): Promise<{ ok: true } | { ok: false; why: 'changed' } | { ok: false; why: 'kept'; kept: SlotKept }> {
     const same = (s: Slot | null): boolean => !!s && forgettable(s) && (s.platform ?? 'git') === this.port.platform && this.hasPort(s) && !this.store.keptRecord(s.name) && s.identity?.generation === generation
-    const eligible = async (s: Slot | null): Promise<boolean> => same(s) && (await folderThere(s!.folder)) && (await this.present(s!)) === false
+    const eligible = async (s: Slot | null): Promise<boolean> => same(s) && (await folderThere(s!.folder, this.quietTarget(s!.name))) && (await this.present(s!)) === false
     const seen = this.store.slot(name)
     if (!(await eligible(seen))) return { ok: false, why: 'changed' }
     let changed = false
@@ -3555,8 +3565,8 @@ export class SlotPool {
     const session = this.deps.sessionIn?.(s.folder)
     if (session) return { why: 'session', detail: session }
     for (const card of this.store.cardsOf(s.name)) if (await this.deps.inFlight?.(card)) return { why: 'inFlight', card }
-    if (!(await folderThere(s.folder))) return null
-    if (probe && !(await quiet(s.folder))) return { why: 'process' }
+    if (!(await folderThere(s.folder, this.quietTarget(s.name)))) return null
+    if (probe && !(await quiet(s.folder, this.quietTarget(s.name)))) return { why: 'process' }
     if (forgotten) return null
     // Its holder's record (HI-2795) where it holds the slot (a removal's operation); a listing's read otherwise.
     const port = this.portOf(s)
@@ -3622,21 +3632,78 @@ export class SlotPool {
 
 /**
  * Whether no process holds a folder (its working folder, or a file open in it): Windows refuses to rename a folder then.
- * Renamed aside and back at once; a folder that can't be put back is retried, and left aside (and logged) only if that
- * keeps failing, which nothing holding it can cause (it couldn't have been renamed).
+ * Renamed aside and back at once. HI-3374: with its pool's `target`, the rename is claimed first in the board's database
+ * (quietClaims.ts) and the claim let go once the folder is back; putting it back is retried for at least a minute
+ * (QUIET_BACK), and a folder still aside then keeps its claim, so the next look (or start) puts it back by that claim.
+ * A claim standing (another Combwork's check, one left behind) is recovered first, or the folder is held.
  *
  * One check per folder at a time (HI-1753): a caller while one runs waits for its answer and shares it. Windows renames
  * a folder through a handle opened by its path, so two checks that opened it before either renamed it both "succeed":
  * the second moves it on from the first's aside name to its own, and the first can't put it back (ENOENT, logged five
  * times on 26 Oct when several isolated checks' leases each looked at the pool's returning copies at once).
  */
-export function quiet(folder: string): Promise<boolean> {
+export function quiet(folder: string, target?: QuietTarget): Promise<boolean> {
   const key = folder.toLowerCase()
   const going = quieting.get(key)
   if (going) return going
-  const check = quietOnce(folder).finally(() => quieting.delete(key))
+  const check = quietOnce(folder, target).finally(() => quieting.delete(key))
   quieting.set(key, check)
   return check
+}
+
+/** The quiet check's rename (tests replace it: a put-back refused for a while). */
+export const quietDeps = { rename: (from: string, to: string): Promise<void> => rename(from, to) }
+
+/** HI-3374: how long a check keeps trying to put a folder back from its aside: at least a minute, waits doubling to 2 s. */
+export const QUIET_BACK: RetryBound = { boundMs: 60_000, firstMs: 50, capMs: 2000 }
+
+/**
+ * HI-3374 (HR3's round 1): a folder that isn't there with an aside of a quiet check beside it and no claim (left by a
+ * Combwork from before claims, or a claim lost): never put back by its name, and never read as gone either. It needs
+ * the user (said once), and the slot or copy stays held. False when the folder is there, or no such aside is.
+ */
+function unclaimedAside(folder: string): boolean {
+  if (existsSync(folder)) return false
+  const prefix = `${basename(folder)}.cw-quiet-`.toLowerCase()
+  let names: string[] = []
+  try {
+    names = readdirSync(dirname(folder)).filter((n) => n.toLowerCase().startsWith(prefix))
+  } catch {
+    return false
+  }
+  if (!names.length) return false
+  const key = folder.toLowerCase()
+  const aside = join(dirname(folder), names[0])
+  if (!needsYou.has(key)) log.warn(`${userText(folder)} isn't there, and ${userText(aside)} (a quiet check's aside, with no claim) is: not put back by its name; it needs the user (HI-3374)`)
+  needsYou.set(key, { folder, aside, why: 'an aside with no claim' }) // agent-protocol: a log line's detail, never sent to an agent
+  return true
+}
+
+/** HI-3374: the folders whose claim couldn't be recovered (nothing touched), and why, by folder (lower-cased): copies.ts says so. */
+const needsYou = new Map<string, { folder: string; aside: string; why: string }>()
+
+/** A folder whose quiet claim needs the user (its paths left as they are), or null. */
+export const quietNeeds = (folder: string): { folder: string; aside: string; why: string } | null => needsYou.get(folder.toLowerCase()) ?? null
+
+/**
+ * A standing claim on `target` recovered (quietClaims.ts's recoverClaim), under the folder's own serialization: true when
+ * it is gone (the folder back where it was, or there all along); false when it stands (held, or needs the user).
+ */
+async function recoverStanding(folder: string, target: QuietTarget): Promise<boolean> {
+  const standing = claimOf(target)
+  if (!standing) return !unclaimedAside(folder)
+  const r = await recoverClaim(target, standing)
+  const key = folder.toLowerCase()
+  if (r.state === 'released') {
+    needsYou.delete(key)
+    log.info(`put ${userText(folder)} back from ${userText(standing.aside)}, where a quiet check had left it (HI-3374)`)
+    return true
+  }
+  if (r.state === 'needs') {
+    if (!needsYou.has(key)) log.warn(`${userText(folder)} was left renamed aside at ${userText(standing.aside)} by a quiet check, and isn't put back: ${r.why} (HI-3374)`)
+    needsYou.set(key, { folder, aside: standing.aside, why: r.why })
+  }
+  return false
 }
 
 /** The quiet checks under way, by folder (lower-cased). */
@@ -3657,12 +3724,19 @@ function forgettable(s: Slot): boolean {
   return s.state === 'ready' || s.state === 'gone' || s.state === 'dirty' || (s.state === 'creating' && !!s.warmError)
 }
 
-export async function folderThere(folder: string): Promise<boolean> {
+export async function folderThere(folder: string, target?: QuietTarget): Promise<boolean> {
   const key = folder.toLowerCase()
   for (let going = quieting.get(key); going; going = quieting.get(key)) {
     waiting++
     await going.catch(() => false).finally(() => waiting--)
   }
+  // HI-3374: a claim standing on it is recovered first, serialized as a check is; while it stands, it is there (never
+  // marked gone or made again: its folder may be aside).
+  if (target && claimOf(target)) {
+    const recovery = recoverStanding(folder, target).finally(() => quieting.delete(key))
+    quieting.set(key, recovery)
+    if (!(await recovery)) return true
+  } else if (target && unclaimedAside(folder)) return true
   return existsSync(folder)
 }
 
@@ -3672,23 +3746,25 @@ let waiting = 0
 /** How many callers of folderThere wait for a quiet check now (tests). */
 export const folderWaiting = (): number => waiting
 
-async function quietOnce(folder: string): Promise<boolean> {
+async function quietOnce(folder: string, target?: QuietTarget): Promise<boolean> {
+  // A claim standing (one left behind, or another Combwork's check): recovered first, or the folder is held.
+  if (target && !(await recoverStanding(folder, target))) return false
   const aside = `${folder}.cw-quiet-${randomBytes(3).toString('hex')}`
+  const claim = target ? await takeClaim(target, folder, aside) : null
+  if (target && !claim) return false
   try {
-    await rename(folder, aside)
+    await quietDeps.rename(folder, aside)
   } catch {
+    if (claim) await releaseClaim(target!, claim)
     return false
   }
-  for (let i = 0; ; i++) {
-    try {
-      await rename(aside, folder)
-      return true
-    } catch (e) {
-      if (i >= 20) {
-        log.error(`Could not put slot folder ${userText(folder)} back from ${userText(aside)}`, e)
-        return false
-      }
-      await new Promise((r) => setTimeout(r, 50))
-    }
+  try {
+    await untilBound(() => quietDeps.rename(aside, folder), { bound: QUIET_BACK, transient: (e) => (e as NodeJS.ErrnoException).code !== 'ENOENT' })
+  } catch (e) {
+    // Its claim stays: the next look (or start) puts it back by it.
+    log.error(`Could not put slot folder ${userText(folder)} back from ${userText(aside)} after ${QUIET_BACK.boundMs / 1000} s; ${claim ? 'its claim stays, and the next look puts it back' : 'it stays aside'}`, e)
+    return false
   }
+  if (claim) await releaseClaim(target!, claim)
+  return true
 }

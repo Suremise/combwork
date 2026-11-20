@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'devconsole-profile')
 const ws = path.join(lib.WORK, 'devconsole-ws')
@@ -123,8 +123,8 @@ const check = (name, ok, extra = '') => {
     check("the window's snapshot is the same events", snap.length >= 4 && snap.every((e) => e.source === b1Source.id), String(snap.length))
 
     // --- B1 reads its own session over the Agent API (its own token), and no other source.
-    const tokenDir = path.join(userData, 'agent-api')
-    const b1Token = JSON.parse(fs.readFileSync(path.join(tokenDir, fs.readdirSync(tokenDir).find((f) => f.endsWith('.json'))), 'utf8')).token
+    // Its launch's own token file (HI-3195), its only agent's.
+    const b1Token = lib.launchTokens(userData)[0]?.token ?? null
     const own = await api('GET', '/v1/console/events', b1Token)
     check('an agent reads its own session: rows, not payloads', own.status === 200 && own.body.events.some((e) => e.name === 'UserPromptSubmit') && own.body.events.every((e) => e.raw === undefined), JSON.stringify(own.body).slice(0, 400))
     const launchFull = await api('GET', `/v1/console/events?seq=${launched.seq}`, b1Token)

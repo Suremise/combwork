@@ -3,6 +3,7 @@ import { createContext, runInContext, runInNewContext } from 'vm'
 import { argsForLog, userText } from '../src/main/logger'
 import { MARKED_LOG, OLDER_LINE, maskSecrets, maskText, redact, redactLog, type RedactContext } from '../src/shared/redact'
 import { SECRET_SAMPLES } from './secretSamples'
+import { timing } from './timing.cjs'
 
 const ctx: RedactContext = {
   home: 'C:\\Users\\Jo Smith',
@@ -112,7 +113,7 @@ describe('diagnostics redaction', () => {
     for (const w of WHITESPACE) {
       for (const text of shapes(w)) {
         // A masking that never ends would hang the test: vm's bound stops it, and the test fails with a timeout error.
-        const out = runInNewContext('maskText(text)', { maskText, text }, { timeout: 5000 }) as string
+        const out = runInNewContext('maskText(text)', { maskText, text }, { timeout: timing('budget.scanMs') }) as string
         // Whatever separates the words, on one line or more, everything after a credential's name is masked.
         if (text.includes('secret')) expect(out, JSON.stringify(text)).not.toContain('secret')
       }
@@ -120,7 +121,7 @@ describe('diagnostics redaction', () => {
     // Long input, shaped to make a backtracking pattern slow: words that hold a credential's name many times over, many
     // names, long runs of spaces, quotes and continuations. Each must finish well inside the bound.
     const long = ['token'.repeat(200_000), 'x-'.repeat(500_000), '--verbose '.repeat(100_000), 'mytoken'.repeat(100_000) + ' = v', `"${'a'.repeat(1_000_000)}`, ' '.repeat(1_000_000) + 'token=x', '"token": "'.repeat(100_000), 'a `\n'.repeat(200_000), `code${' '.repeat(1_000_000)}x`, `a.${'b.'.repeat(500_000)}`, `${'a@'.repeat(300_000)}`, '-u "'.repeat(250_000), `-u "${'a b'.repeat(300_000)}`, ' -u x'.repeat(200_000), '{"a":'.repeat(200_000), `"${'a'.repeat(99)}`.repeat(10_000), '{"config":{"x":['.repeat(60_000), `{"token":"${'\\"'.repeat(300_000)}`]
-    for (const text of long) expect(() => runInNewContext('maskText(text)', { maskText, text }, { timeout: 5000 }), text.slice(0, 20)).not.toThrow()
+    for (const text of long) expect(() => runInNewContext('maskText(text)', { maskText, text }, { timeout: timing('budget.scanMs') }), text.slice(0, 20)).not.toThrow()
   })
 
   // #699 round 6 (the Assistant's rule): backslashes and quotes at 10k, 100k and 1M characters, through masking whole
@@ -131,7 +132,7 @@ describe('diagnostics redaction', () => {
     for (const n of [10_000, 100_000, 1_000_000]) {
       for (const text of [BS.repeat(n), '"'.repeat(n), "'".repeat(n), `${BS}"`.repeat(n / 2), `"${BS.repeat(n)}`, `-u ${BS.repeat(n)}`, `"token":${BS.repeat(n)}`, `${'"a'.repeat(n / 2)}`]) {
         vmContext.text = text
-        expect(() => runInContext('maskText(text)', vmContext, { timeout: 5000 }), `${n}: ${JSON.stringify(text.slice(0, 8))}`).not.toThrow()
+        expect(() => runInContext('maskText(text)', vmContext, { timeout: timing('budget.scanMs') }), `${n}: ${JSON.stringify(text.slice(0, 8))}`).not.toThrow()
       }
     }
   })
@@ -156,14 +157,14 @@ describe('diagnostics redaction', () => {
     for (const text of [...pairs, ...prefixed]) {
       vmContext.text = text
       // A pattern that reads a run again from inside it would blow the bound; vm stops it and the test fails.
-      expect(() => runInContext('maskText(text)', vmContext, { timeout: 5000 }), JSON.stringify(text.slice(0, 12))).not.toThrow()
+      expect(() => runInContext('maskText(text)', vmContext, { timeout: timing('budget.scanMs') }), JSON.stringify(text.slice(0, 12))).not.toThrow()
     }
     // The log too (a line at a time, its user-text marks first), on one long line of each case.
     for (const text of [...pairs, ...prefixed].filter((t) => !t.includes('\n'))) {
       vmContext.text = start + text
-      expect(() => runInContext('redactLog(text, ctx)', vmContext, { timeout: 5000 }), `log ${JSON.stringify(text.slice(0, 12))}`).not.toThrow()
+      expect(() => runInContext('redactLog(text, ctx)', vmContext, { timeout: timing('budget.scanMs') }), `log ${JSON.stringify(text.slice(0, 12))}`).not.toThrow()
     }
-  }, 300_000)
+  }, timing('test.hangReal'))
 
   it("names and identifiers keep their shape: no sign-in code is read into them, a session id's parts included", () => {
     for (const id of ['0B6F5D1E-6D5A-4C1F-9A4E-1C2D3E4F5A6B', 'ABCD-EFGH', 'cw.console.showText', 'PreToolUse']) expect(maskSecrets(id)).toBe(id)

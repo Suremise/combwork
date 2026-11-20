@@ -264,6 +264,7 @@ async function tui() {
 
   // The session's events, from its server.
   let waiting = null // a permission asked: { id }
+  let questioned = null // the question tool's form pending: { id }
   const ac = new AbortController()
   ;(async () => {
     const r = await fetch(url + '/api/event', { headers: { authorization: headers.authorization, accept: 'text/event-stream' }, signal: ac.signal })
@@ -282,8 +283,12 @@ async function tui() {
         } catch {
           continue
         }
-        if (!sid || e.data?.sessionID !== sid) continue
+        if (!sid || (e.data?.form?.sessionID ?? e.data?.sessionID) !== sid) continue
         if (e.type === 'session.text.ended') out(`${e.data.text}\n`)
+        else if (e.type === 'form.created') {
+          questioned = { id: e.data.form.id }
+          out(`${e.data.form.fields[0]?.description ?? e.data.form.title}\n`)
+        } else if ((e.type === 'form.replied' || e.type === 'form.cancelled') && questioned?.id === e.data.id) questioned = null
         else if (e.type === 'session.tool.called') out(`· ${JSON.stringify(e.data.input)}\n`)
         else if (e.type === 'permission.asked' && has('--auto')) {
           // --help: "Auto-approve permissions that are not explicitly denied": 2.2.6's TUI replies once to each ask
@@ -309,6 +314,14 @@ async function tui() {
       waiting = null
       const decision = /^y/i.test(t) ? 'once' : /^a/i.test(t) ? 'always' : 'reject'
       await api('POST', `/api/session/${sid}/permission/${w.id}/reply`, { decision })
+      return
+    }
+    // A line typed while a question shows is its answer (its custom one), as 2.2.6's TUI took a prompt typed then (HI-3317:
+    // the real tier's opencodereal-dirs on 1.6.0-rc.2, its record's question result).
+    if (questioned) {
+      const q = questioned
+      questioned = null
+      await api('POST', `/api/session/${sid}/form/${q.id}/reply`, { answer: { q0: t } })
       return
     }
     if (absent) {

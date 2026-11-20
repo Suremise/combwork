@@ -17,12 +17,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 10000) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+const until = lib.until
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
@@ -54,7 +49,8 @@ const until = async (fn, ms = 10000) => {
   const key = lib.ptyKey(alpha, agent.id)
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
-  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', 20000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
 
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
   await inv('tasks:create', { title: 'Greeting', project: 'alpha', column: 'review' })
@@ -78,10 +74,10 @@ const until = async (fn, ms = 10000) => {
   // --- Undone from the board: right-click → Move to → Review.
   await page.getByRole('button', { name: 'Task Board' }).click()
   const tile = page.locator('.task-card[data-task="1"]')
-  await tile.waitFor({ timeout: 5000 })
+  await tile.waitFor({ timeout: lib.timing('hang.ui') })
   await tile.click({ button: 'right' })
   await page.locator('.menu .menu-item', { hasText: 'Review' }).click()
-  check('the user moves it back to Review from the board', !!(await until(async () => (await card(1)).column === 'review', 5000)))
+  check('the user moves it back to Review from the board', !!(await until(async () => (await card(1)).column === 'review', lib.timing('hang.ui'))))
   check('…and that is in its history too', (await moves(1)).at(-1) === 'You: Moved to Review', JSON.stringify(await moves(1)))
   await page.screenshot({ path: path.join(lib.WORK, 'donemove-board.png') })
 
@@ -93,18 +89,18 @@ const until = async (fn, ms = 10000) => {
   // The card dialog says the window's column names (#1458): Active, where agents' English says Doing.
   await tile.click()
   const dialog = lib.cardDialog(page, await lib.cardLabel(inv, 1))
-  await dialog.waitFor({ timeout: 5000 })
+  await dialog.waitFor({ timeout: lib.timing('hang.ui') })
   await dialog.locator('.task-section-h[data-section="history"]').click()
   const history = dialog.locator('.task-history')
   const shownMoves = async () => (await history.innerText().catch(() => '')).split('\n').filter((l) => / Moved to /.test(l))
-  check("the card's history in the window says Active", !!(await until(async () => (await shownMoves()).some((l) => l.endsWith('Mover (alpha) Moved to Active')), 5000)) && !(await shownMoves()).some((l) => / Moved to (Doing|Passed)$/.test(l)), JSON.stringify(await shownMoves()))
+  check("the card's history in the window says Active", !!(await until(async () => (await shownMoves()).some((l) => l.endsWith('Mover (alpha) Moved to Active')), lib.timing('hang.ui'))) && !(await shownMoves()).some((l) => / Moved to (Doing|Passed)$/.test(l)), JSON.stringify(await shownMoves()))
   await page.keyboard.press('Escape')
-  await dialog.waitFor({ state: 'detached', timeout: 5000 })
+  await dialog.waitFor({ state: 'detached', timeout: lib.timing('hang.ui') })
 
   // --- The card's prompt still asks for Review when the work is done (and Done only once merged, or when the user asks).
   const n = (await inv('tasks:create', { title: 'Docs', project: 'alpha' })).number
   await inv('tasks:start', n, { kind: 'agent', agentId: agent.id })
-  check('Start puts the card in Doing', !!(await until(async () => (await card(n)).column === 'doing', 10000)))
+  check('Start puts the card in Doing', !!(await until(async () => (await card(n)).column === 'doing', lib.timing('hang.step'))))
   // The prompt names the card by its key with the number the tools take (#1219): its own key, from the board.
   const nName = `${(await card(n)).key}`
   check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(nName), nName)
@@ -114,7 +110,7 @@ const until = async (fn, ms = 10000) => {
     // Read from its inbox (#650: the task's doorbell names it; the cw_inbox call's result has its text).
     const content = lines.length ? JSON.parse(lines.at(-1)).message.content : null
     return typeof content === 'string' || content === null ? content : (content.find?.((c) => typeof c.content === 'string')?.content ?? null)
-  }, 15000)
+  }, lib.timing('hang.ui'))
   // The prompt points to the work-on-card skill, which the agent's launch carries, and which says Review when done (by
   // submitting it, #1274) and Done only once merged (#170). The session's Combwork instructions say both too, with "or when the
   // user asks", for a session without the skill (tests/guidance.test.ts checks those).

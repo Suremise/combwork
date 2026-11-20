@@ -17,9 +17,12 @@ import { again } from './again'
 import { configRead } from './gitCommits'
 import type { Again, CandidateHost, FollowSetupPause, PublishReply, QueueGitResult, TransportSnapshot, UpstreamRemedy } from './integration'
 import { REMOTE_PLACEHOLDER, upstreamCommands } from '../../shared/workflow/queue'
+import { platformLimits } from './limits'
 
-/** A fetch or a publication reaches the remote and may wait on a sign-in window: as G18's push, long but never forever. */
-export const TRANSPORT_MS = 5 * 60_000
+/**
+ * A fetch or a publication reaches the remote and may wait on a sign-in window: as G18's push, `cw.queue.networkMinutes`
+ * (HI-3372: 5 min cut a slow link short). The pre-push hook is a check: `cw.queue.checkMinutes`.
+ */
 
 /**
  * The settings carried into the sealed context: how the endpoint is reached and signed in to, never which endpoint it is.
@@ -212,7 +215,7 @@ async function havesOf(h: CandidateHost, snap: TransportSnapshot, into: string):
 }
 
 /** Fetches the snapshot's ref into the sealed context's own ref, reads that fetch's head there, and pins it in the project as `into`. */
-export async function fetchHeadOf(h: CandidateHost, snap: TransportSnapshot, into: string, timeoutMs = TRANSPORT_MS): Promise<{ head: string } | { failed: string }> {
+export async function fetchHeadOf(h: CandidateHost, snap: TransportSnapshot, into: string, timeoutMs = platformLimits.queueNetworkMs()): Promise<{ head: string } | { failed: string }> {
   const haves = await havesOf(h, snap, into)
   return sealed(snap, async (ctx, env) => {
     const f = await h.run(ctx, ['fetch', '--no-tags', '--no-write-fetch-head', '--no-auto-gc', '--no-auto-maintenance', '--', snap.url, `+${snap.ref}:refs/cw/r`], { env, timeoutMs })
@@ -237,7 +240,7 @@ export async function prePushOf(h: CandidateHost, snap: TransportSnapshot, lease
     const stdin = join(dir, 'stdin')
     writeFileSync(stdin, `${result} ${result} ${snap.ref} ${lease}\n`)
     const env: NodeJS.ProcessEnv = { ...process.env, ...quiet }
-    const r = await h.run(h.project, ['hook', 'run', '--ignore-missing', `--to-stdin=${stdin}`, 'pre-push', '--', snap.remote, snap.display], { env, timeoutMs: TRANSPORT_MS })
+    const r = await h.run(h.project, ['hook', 'run', '--ignore-missing', `--to-stdin=${stdin}`, 'pre-push', '--', snap.remote, snap.display], { env, timeoutMs: platformLimits.queueCheckMs() })
     if (r.ok) return 'ok'
     if (r.timedOut) return { timedOut: redactTransport(r.errAtTimeout ?? said(r), snap) }
     return { refused: redactTransport(said(r), snap) }
@@ -263,7 +266,7 @@ export const neverConnected = (err: string): boolean => NEVER_CONNECTED.test(err
  */
 export function publishOf(h: CandidateHost, snap: TransportSnapshot, lease: string, result: string): Promise<PublishReply> {
   return sealed(snap, async (ctx, env) => {
-    const r = await h.run(ctx, ['push', '--porcelain', '--no-verify', `--force-with-lease=${snap.ref}:${lease}`, '--', snap.url, `${result}:${snap.ref}`], { env, timeoutMs: TRANSPORT_MS })
+    const r = await h.run(ctx, ['push', '--porcelain', '--no-verify', `--force-with-lease=${snap.ref}:${lease}`, '--', snap.url, `${result}:${snap.ref}`], { env, timeoutMs: platformLimits.queueNetworkMs() })
     const words = redactTransport(said(r), snap)
     // Never started: nothing was sent.
     if (r.notRun) return { stale: words }
@@ -276,7 +279,7 @@ export function publishOf(h: CandidateHost, snap: TransportSnapshot, lease: stri
       if (/\[remote rejected\]/i.test(line!)) return { refused: words }
       if (/\[rejected\]|stale info|non-fast-forward|fetch first/i.test(line!)) return { stale: words }
     }
-    // HI-3091 (Darren's decision): no ref line, and git says plainly it never reached the remote (no repository there, no
+    // HI-3091: no ref line, and git says plainly it never reached the remote (no repository there, no
     // connection, no sign-in), with nothing of a transfer begun: failed, nothing sent. Anything else stays unknown.
     if (!line && !r.ok && neverConnected(r.err)) return { failed: words }
     return { unknown: words }

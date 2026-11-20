@@ -1,3 +1,4 @@
+import { appliesRequest, noteProduced } from './requestReceipts'
 import { createHash, randomBytes } from 'crypto'
 import { basename, join } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
@@ -28,7 +29,9 @@ import { holdsOf, trackHolds } from '../shared/cardCosts'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName, type ProjectIdIndex } from '../shared/projectIds'
 import { actorOf, cardFacts, changeByRuntime, commentGenerations, commentReceiptFor, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { noteCard } from './assistantChanges'
-import { FactStore } from './workflow/factStore'
+import { FactStore, type CardRecord } from './workflow/factStore'
+import type { AttemptGuard } from './attemptFence'
+import { writeReadiness } from './workflow/dependencyReadiness'
 import { loopReviewerOf } from './loopReviewer'
 import { readStep } from './platform/historyPorts'
 import type { CardKind, Fact } from '../shared/workflow/facts'
@@ -37,11 +40,12 @@ import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCar
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, laneTargetOf, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
-import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
+import { decisionWithChoice } from '../shared/decisionChoice'
+import { answerFits, CHURN_GATES, churnTotal, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, advanceUnresolved, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type PauseChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { refusal as refusalOf, refusalText, type Refusal } from '../shared/workflow/refusals'
-import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, archiveComments, archivedComments, commentArchiveOf, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, inBoardWrite, type CardQuery } from './boardStore'
+import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, afterBoardWrite, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, archiveComments, archivedComments, commentArchiveOf, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, inBoardWrite, beforeBoardCommit, type CardQuery } from './boardStore'
 import type { Evicted } from './schema/commentArchive'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
@@ -100,7 +104,11 @@ const ERR = {
  * `self` is the agent whose call it is (its project's folder name and id); scripts have none. `scope` confines a
  * project agent to its project's cards: others are "unknown" to it, as if they didn't exist.
  */
-export type TaskActor = { kind: 'user' } | { kind: 'assistant' } | { kind: 'agent'; name: string; self?: { project: string; agentId: string }; scope?: string }
+/**
+ * Who changes a card. A project agent's own call (`self`) carries its request's attempt fence (`guard`, HI-3194,
+ * attemptFence.ts): each of its writes on a card is checked against it in that write's transaction.
+ */
+export type TaskActor = { kind: 'user' } | { kind: 'assistant' } | { kind: 'agent'; name: string; self?: { project: string; agentId: string }; scope?: string; guard?: AttemptGuard }
 
 /** Combwork itself starting a lane's next card on its builder (HI-1990, laneStarts.ts): its start goes through the card's rules. */
 // agent-protocol: who did it, as cards' history stores it: Combwork's own name (HI-2463)
@@ -612,7 +620,7 @@ export async function cardWithFacts(ws: WorkspaceService, n: number, opts: { pro
   return { card, facts: got.facts, archived: got.archived }
 }
 
-export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card: TaskCard; generation: number; comments: number; at: number }> {
+export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card: TaskCard; generation: number; comments: number; at: number; attempt: AttemptKey | null }> {
   const ws = workspace
   if (!Number.isInteger(n) || n < 1 || !ws.path) throw unknownTask(n)
   const ids = await ws.projectIds()
@@ -620,15 +628,17 @@ export async function readTaskSeen(n: number, actor: TaskActor): Promise<{ card:
   // HI-2854: an agent's receipt of the user's comments in the same snapshot, only as far as the comments this read gives
   // (never past one archived since, HR2's round 1 finding 2); for anyone else, the newest.
   const agent = actor.kind === 'agent' ? actor.self?.agentId : undefined
-  const { raw, generation, comments, key } = boardRead(ws, () => {
+  const { raw, generation, comments, key, attempt } = boardRead(ws, () => {
     const doc = cardDoc(ws, n)
     const given = new Set(((doc as { comments?: { id?: string }[] } | null)?.comments ?? []).flatMap((x) => (x.id ? [x.id] : [])))
-    return { raw: doc, generation: decisionGenerations(ws, [n]).get(n) ?? 0, comments: agent ? commentReceiptFor(ws, n, agent, given) : (commentGenerations(ws, [n]).get(n) ?? 0), key: cardKeys(ws, [n]).get(n) }
+    // HI-3194: its attempt in the same snapshot: what this read issues to an agent's launch is the attempt it shows.
+    const project = typeof doc?.project === 'string' ? doc.project : ''
+    return { raw: doc, generation: decisionGenerations(ws, [n]).get(n) ?? 0, comments: agent ? commentReceiptFor(ws, n, agent, given) : (commentGenerations(ws, [n]).get(n) ?? 0), key: cardKeys(ws, [n]).get(n), attempt: doc ? attemptRead(ws, project, n) : null }
   })
   if (!raw) throw unknownTask(n)
   const c = withoutGone(clean(raw, n, ids, key), (x) => hasCard(ws, x))
   if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
-  return { card: c, generation, comments, at: Date.now() }
+  return { card: c, generation, comments, at: Date.now(), attempt }
 }
 
 /**
@@ -730,6 +740,8 @@ const keptCards = new WeakMap<WorkspaceService, { path: string; generation: numb
  * guard) checks it here, after the last await and just before the write (HI-2415), so a revoked change saves nothing.
  */
 async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?: TaskCard | null, withRow?: () => void, commit?: () => void): Promise<void> {
+  // HI-3195: a keyed agent request's card saved: its change applies what it asked (requestReceipts.ts' marker).
+  appliesRequest()
   // Who holds it now, for its cost (#602): a hold that ended gets its end, a new one starts.
   trackHolds(card, new Date().toISOString())
   const ids = await ws.projectIds()
@@ -900,7 +912,7 @@ export async function setAsideCards(ws: WorkspaceService = workspace): Promise<S
 }
 
 /**
- * Adds a set-aside card to the board (#1044, Darren's decision on #1017): under its old number if no card has it, else
+ * Adds a set-aside card to the board (#1044, #1017): under its old number if no card has it, else
  * the next free one, with everything it had (comments, decisions, links as they were: nothing else is rewritten), placed
  * last in its column and a line in its history by Repair saying where it came from. In one board change, the file read
  * again there; its content is recorded as added in the same transaction, so it is never added twice.
@@ -1096,11 +1108,20 @@ function queueDependencyEdit(ws: WorkspaceService, card: TaskCard, had: number[]
   }
   const own = stage(card.number)
   if (!own) return
-  const e = openEntry(foldCard(store.facts(card.number), own))
+  const folded = foldCard(store.facts(card.number), own)
+  const late = (): number[] => card.blockedBy.filter((b) => !had.includes(b) && stage(b) !== 'done')
+  const tooLate = (target: string, cards: number[]): CombworkError => combworkError(ERR.dependencyTooLate, { card: cardRef(card.number), cards: cards.map(cardRef).join(', '), target }, { kind: 'conflict' })
+  // HI-3265: a platform's advance attempted and not yet settled (jj's, `AdvanceAttempted`) is begun as IntegrationStarted
+  // is: its blockers were read in that write, so one added now can't hold it.
+  if (advanceUnresolved(folded)) {
+    const added = late()
+    if (added.length) throw tooLate(folded.started?.target ?? '', added)
+  }
+  const e = openEntry(folded)
   if (!e) return
   if (e.state === 'started') {
-    const late = card.blockedBy.filter((b) => !had.includes(b) && stage(b) !== 'done')
-    if (late.length) throw combworkError(ERR.dependencyTooLate, { card: cardRef(card.number), cards: late.map(cardRef).join(', '), target: e.target }, { kind: 'conflict' })
+    const added = late()
+    if (added.length) throw tooLate(e.target, added)
     return
   }
   if (had.some((b) => !card.blockedBy.includes(b))) store.tx((tx) => tx.action(card.number, 'enqueue', { target: e.target }, null))
@@ -1110,7 +1131,7 @@ function queueDependencyEdit(ws: WorkspaceService, card: TaskCard, had: number[]
  * The cards a list names (blockedBy, links), checked. A confined agent can only name its project's cards; when it
  * changes a card's list, the cards from other projects already on it (`kept`, which it sees only as numbers) stay.
  */
-async function cardRefs(v: unknown, self: number | null, what: 'blockedBy' | 'links', scope: string | null = null, kept: number[] = []): Promise<number[]> {
+async function cardRefs(v: unknown, self: number | null, what: 'blockedBy' | 'links' | 'followUpOf', scope: string | null = null, kept: number[] = []): Promise<number[]> {
   // `what` is the call's field, named as it is in every language.
   if (!Array.isArray(v)) throw combworkError(msg({ id: 'tasks.error.refsList', defaultMessage: '{field} must be a list of card numbers', description: 'An error: the call gave {field} (the name of its field: blockedBy or links, kept as it is) as something other than a list of card numbers.' }), { field: what }, { kind: 'invalid' })
   const nums = [...new Set(v.map((x) => Number(String(x).replace(/^#/, ''))))]
@@ -1123,6 +1144,64 @@ async function cardRefs(v: unknown, self: number | null, what: 'blockedBy' | 'li
     if (!hidden.includes(n) && !inScope(await getTask(n), scope)) throw noCard(n)
   }
   return [...nums, ...hidden.filter((n) => !nums.includes(n))]
+}
+
+/**
+ * HI-3188: the card's runtime and whether a churn question holds on it now, or null (no project, no workflow, no record).
+ */
+async function churnRuntime(ws: WorkspaceService, card: Pick<TaskCard, 'project' | 'number'>): Promise<{ wf: Workflow; rec: CardRecord; held: boolean } | null> {
+  if (!card.project || !ws.path) return null
+  const { workflowFor } = await import('./workflow/service')
+  const wf = await workflowFor(ws, join(ws.path, card.project)).catch(() => null)
+  if (!wf) return null
+  try {
+    const rec = wf.store.card(card.number)
+    return { wf, rec, held: wf.churnHeld(rec) }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * HI-3188 (HR3's round 1): a lane reviewer's comment recorded as its request (recorder.ts' ReviewerRequest) counts: the
+ * churn question it makes due is asked in the same board change, as a runtime write's is.
+ */
+async function askChurnAfterRequest(ws: WorkspaceService, card: TaskCard, said: StoredText | null | undefined): Promise<void> {
+  if (said?.id !== HISTORY.reviewerRequest.id) return
+  const r = await churnRuntime(ws, card)
+  if (r) await r.wf.askChurnNow(r.rec)
+}
+
+/** HI-3188: a follow-up's errors. */
+const FOLLOW_UP = {
+  otherProject: msg({ id: 'tasks.error.followUpOtherProject', defaultMessage: 'followUpOf: {card} is another project’s card; a follow-up continues a card of its own project.', description: 'An error (HI-3188): a new card named a card of another project as the card it continues (followUpOf, a field’s name: keep it as it is). {card} is a card key.' }),
+  archived: msg({ id: 'tasks.error.followUpArchived', defaultMessage: 'followUpOf: {card} is archived; bring it back first, or make the card without followUpOf.', description: 'An error (HI-3188): a new card named an archived card as the card it continues (followUpOf, a field’s name: keep it as it is). {card} is a card key.' })
+}
+
+/**
+ * HI-3188: the card a new card continues (`followUpOf`): its number and its state now, to inherit its churn. Its own
+ * project's, not archived; an agent's or the Assistant's refused while a churn question holds on it (answered first: only
+ * an answer gives a chain more room). A card with no workflow record continues nothing countable: an empty state.
+ */
+async function followUpParent(v: unknown, project: string, actor: TaskActor, scope: string | null): Promise<{ n: number; state: CardState }> {
+  const [n] = await cardRefs([v], null, 'followUpOf', scope)
+  const c = await getTask(n)
+  if (c.project !== project) throw combworkError(FOLLOW_UP.otherProject, { card: cardRef(n) }, { kind: 'invalid' })
+  if (c.archived) throw combworkError(FOLLOW_UP.archived, { card: cardRef(n) }, { kind: 'conflict' })
+  const { workflowFor } = await import('./workflow/service')
+  const wf = project && workspace.path ? await workflowFor(workspace, join(workspace.path, project)).catch(() => null) : null
+  let state: CardState | null = null
+  try {
+    state = wf ? wf.state(wf.store.card(n)) : null
+  } catch {
+    state = null
+  }
+  if (!state) return { n, state: foldCard([]) }
+  if (wf && actor.kind !== 'user') {
+    const held = state.requests.find((r) => CHURN_GATES.includes(r.gate) && wf.churnGateHolds(state!, r.gate))
+    if (held) throw new WorkflowRefusedError(refusalOf('loop.churnPending', { card: cardRef(n), request: held.request }))
+  }
+  return { n, state }
 }
 
 /** The order that puts a card before `before` in `column` (at the end without one). */
@@ -1316,7 +1395,8 @@ export const replyNote = (said: string): StoredText => storedText(HISTORY.builde
  * builder's reply to its reviewer (HI-2302). Null: only a comment.
  */
 async function commentNote(ws: WorkspaceService, card: TaskCard, patch: TaskPatch, actor: TaskActor, said: StoredText[], comment: string): Promise<StoredText | null> {
-  if (await laneReviewerAsks(ws, card, patch, actor, said)) return requestNote(comment)
+  // HI-3188: while the card's churn question holds, a lane reviewer's comment is a plain comment: no request, no more loop work.
+  if (await laneReviewerAsks(ws, card, patch, actor, said)) return (await churnRuntime(ws, card))?.held ? null : requestNote(comment)
   if (await builderReplies(ws, card, patch, actor, said)) return replyNote(comment)
   return null
 }
@@ -1462,7 +1542,7 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
 export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultMessage: 'A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).', description: "An error said to the Combwork Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names." })
 
 async function createTaskLocked(
-  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string; target?: string | null },
+  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string; target?: string | null; followUpOf?: number },
   actor: TaskActor,
   opts: { commit?: () => void; pinTarget?: boolean } = {}
 ): Promise<TaskCard> {
@@ -1486,7 +1566,10 @@ async function createTaskLocked(
   const by = actorName(actor)
   const now = new Date().toISOString()
   const blockedBy = input.blockedBy ? await cardRefs(input.blockedBy, null, 'blockedBy', scope) : []
-  const links = input.links ? await cardRefs(input.links, null, 'links', scope) : []
+  // HI-3188: a continuation of a card (a split, follow-ups the user accepted) keeps its count; linked to it too.
+  const parent = input.followUpOf === undefined ? null : await followUpParent(input.followUpOf, project, actor, scope)
+  const links0 = input.links ? await cardRefs(input.links, null, 'links', scope) : []
+  const links = parent && !links0.includes(parent.n) ? [...links0, parent.n] : links0
   const context = input.context ? contextOf(input.context) : []
   const problems = context.length ? await contextProblems(project && workspace.path ? join(workspace.path, project) : null, workspace.sharedDir, context) : []
   // Its kind (#1277, §16.7.3): the user's or the Assistant's from the start; a project agent's only proposed (OP-6/OP-7).
@@ -1534,7 +1617,12 @@ async function createTaskLocked(
   // A revocable caller's authority checked as it is written (HI-2415: saveCard's `commit`), so a revoked one makes no card.
   const kept = { ...(kind === 'no-code' && !proposes ? { kind } : {}), ...(target ? { target } : {}) }
   await saveCard(ws, n, card, null, store && Object.keys(kept).length ? () => store.updateCard(n, kept) : undefined, opts.commit)
+  // HI-3195: a keyed create's marker keeps the card it made, by its key (saveCard gave it), so a retry is told which card;
+  // still in the change's transaction, which the marker commits with (requestReceipts.ts).
+  noteProduced({ created: card.key ?? cardRef(n) })
   if (store && proposes) store.tx((tx) => tx.append(n, { kind: 'KindProposed', actor: actorOf(actor), source: 'recorded', data: { kind } }))
+  // HI-3188: its churn starts where its parent's is now, with the parent's bases, in the creation's transaction.
+  if (parent && card.project) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => tx.append(n, { kind: 'SplitFrom', actor: actorOf(actor), source: 'recorded', data: { parent: parent.n, total: churnTotal(parent.state), stop: parent.state.churnStop, simplifyBase: parent.state.simplifyBase } })) // i18n-ignore: a fact's kind and codes, not text
   if (skipReason !== null) {
     const facts = store ?? FactStore.forBoard(ws, { project: card.project, key: '' })
     const setBy = actor.kind === 'assistant' ? 'assistant' : 'user'
@@ -1567,8 +1655,29 @@ export async function updateTask(...args: Parameters<typeof updateTaskLocked>): 
   // An agent's column move or review, translated into its intent for one transition (#1268).
   const asAgent = await agentGateOf(ws, n, patch, actor)
   if (asAgent) return moveAsAgent(asAgent, n, patch, actor, opts)
+  const seen = await mergeSeenOnDone(ws, n, patch, actor)
   const reads = await gatherReads(ws, await planned(ws, [n], patch, actor))
-  return recording(actor, reads, () => boardLock(ws, () => updateTaskLocked(...args)))
+  const card = await recording(actor, reads, () => boardLock(ws, () => updateTaskLocked(...args)))
+  opts.said?.push(...seen)
+  return card
+}
+
+/**
+ * HI-3282: a project agent's old move to Done on a card already Done goes P3's way (it moves nothing; its comment is
+ * kept), and says what report merge would: the line that Combwork saw its merge, when it did this cycle. Null otherwise
+ * and the tool to call next time. None otherwise (any other Done card keeps P3's plain answer: nothing new is refused).
+ */
+async function mergeSeenOnDone(ws: WorkspaceService, n: number, patch: TaskPatch, actor: TaskActor): Promise<string[]> {
+  if (actor.kind !== 'agent' || !actor.self || patch.column !== 'done' || patch.review !== undefined) return []
+  const { workflowEnforced, workflowFor } = await import('./workflow/service')
+  const head = cardHeads(ws, [n])[0]
+  if (!ws.path || !workflowEnforced() || !head || head.column !== 'done' || typeof head.project !== 'string' || !head.project) return []
+  const wf = await workflowFor(ws, join(ws.path, head.project)).catch(() => null)
+  try {
+    return wf ? wf.mergeSeenLines(n) : []
+  } catch {
+    return []
+  }
 }
 
 /** An override is the user's or the Assistant's (SPEC §16.8.4): agents never override a rule. */
@@ -1762,7 +1871,10 @@ async function moveAsAgent(g: AgentGate, n: number, patch: TaskPatch, actor: Tas
         patch: { ...(first ? rest : {}), ...placed, ...(review && self ? { review } : {}), ...(started && rest.agent === undefined && self ? { agent: self.agentId } : {}) },
         opts: { ...(first ? { check: opts.check, commit: opts.commit } : { commit: opts.commit }), said: opts.said, ...(withComment && opts.comment !== undefined ? { comment: opts.comment } : {}), keepAgent: !started }
       }
-    }
+    },
+    undefined,
+    // HI-3194: a move to Review or Done is its submit or merge report (#1268), the builder's own.
+    { builder: !g.review && (g.column === 'review' || g.column === 'done') }
   )
   if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
   const intent = String((reply as { data?: { useNextTime?: string } }).data?.useNextTime ?? '')
@@ -1790,6 +1902,117 @@ export type MoveResult = TaskMoveResult
  * by the runtime before its writes, outside the lock unless the caller holds it (a batch). Returns the intent's reply
  * and the card as last saved (null: nothing was written).
  */
+/** HI-3194: the guard of a project agent's own request (attemptFence.ts), or none: the user, the Assistant and scripts aren't fenced. */
+const guardOf = (actor: TaskActor): AttemptGuard | undefined => (actor.kind === 'agent' && actor.self ? actor.guard : undefined)
+
+/** HI-3194: a card's attempt key in the board change running here (null: it has no workflow record to fence by). */
+function attemptIn(ws: WorkspaceService, project: string, n: number): AttemptKey | null {
+  if (!project) return null
+  return FactStore.forBoard(ws, { project, key: '' }).tx((tx) => {
+    try {
+      return foldCard(tx.facts(n), tx.card(n).stage).attempt
+    } catch {
+      return null
+    }
+  })
+}
+
+/** HI-3194: the columns of a card in an attempt (Active, Review, Approved: Merging is in Approved's). */
+const ATTEMPT_COLUMNS: ReadonlySet<TaskColumn> = new Set(['doing', 'review', 'passed'])
+
+/** HI-3194: card n given to `agent` (null: nobody) while in an attempt: an `AttemptBound` moves its attempt on. */
+function attemptReassigned(ws: WorkspaceService, project: string, n: number, agent: string | null, actor: Actor): void {
+  FactStore.forBoard(ws, { project, key: '' }).tx((tx) => {
+    let stage: StageId
+    try {
+      stage = tx.card(n).stage
+    } catch {
+      return
+    }
+    if (ATTEMPT_STAGES.includes(stage)) tx.append(n, { kind: 'AttemptBound', actor, source: 'recorded', data: { why: 'reassigned', assignee: agent } }) // i18n-ignore: a fact's kind and codes, not text
+  })
+}
+
+/** HI-3194: a card's attempt key as read (outside a write: the reader's snapshot), or null with no workflow record. */
+export function attemptRead(ws: WorkspaceService, project: string, n: number): AttemptKey | null {
+  if (!project) return null
+  try {
+    const store = FactStore.forBoard(ws, { project, key: '' })
+    return foldCard(store.facts(n), store.card(n).stage).attempt
+  } catch {
+    return null
+  }
+}
+
+/**
+ * HI-3340: card n's attempt for a start cw_lane next advises, read in one synchronous step with its stage: only while the
+ * card is in Todo (out of any attempt, so the only write the advice leads to is a start, which makes a new one), else
+ * null. A card started again since the lane view was read is in an attempt the caller never saw: nothing is issued.
+ */
+export function attemptToStart(ws: WorkspaceService, project: string, n: number): AttemptKey | null {
+  if (!project) return null
+  try {
+    const store = FactStore.forBoard(ws, { project, key: '' })
+    const s = foldCard(store.facts(n), store.card(n).stage)
+    return s.stage === 'todo' ? s.attempt : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * HI-3194: refused unless the agent request's fence holds for card n at attempt `pre` (null: only its launch is checked).
+ * Its launch is checked again as the board change commits (beforeBoardCommit), after every await the change makes (the
+ * card's own save included): a launch replaced meanwhile undoes the whole change, its facts too, `attempt.staleLaunch`.
+ */
+function fenceOrThrow(g: AttemptGuard, n: number, pre: AttemptKey | null, ws: WorkspaceService = workspace): void {
+  const r = g.check(n, cardRef(n), pre ?? null)
+  if (r) throw new WorkflowRefusedError(r)
+  beforeBoardCommit(ws, `attempt:${g.fence.runId}:${n}`, () => {
+    const late = g.check(n, cardRef(n), null)
+    if (late) throw new WorkflowRefusedError(late)
+  })
+}
+
+/**
+ * HI-3194: a builder's own moves (submit, a merge report, declaring paths, a design, going ahead, a follow-up) are only for
+ * the agent building the card's attempt: its agent now, else the cycle's builder. Read in the write, before it.
+ */
+function assigneeOrThrow(ws: WorkspaceService, store: FactStore, n: number, agentId: string, pre: { started: { builder: string } | null }): void {
+  const assignee = store.cardAgent(n) ?? pre.started?.builder ?? null
+  if (assignee === agentId) return
+  const name = assignee ? (cardDoc(ws, n)?.agentName as string | undefined) ?? assignee : 'nobody'
+  throw new WorkflowRefusedError(refusalOf('attempt.notAssignee', { card: cardRef(n), assignee: name }, null))
+}
+
+/**
+ * HI-3194: an agent's card change outside updateTask that moves no attempt (its kind, review skip or target), fenced
+ * through its `commit` (checked in its write): undefined for anyone else, who passes its own.
+ */
+export function fenceCommit(actor: TaskActor, n: number): (() => void) | undefined {
+  const g = guardOf(actor)
+  if (!g) return undefined
+  return () => {
+    const doc = cardDoc(workspace, n)
+    const pre = attemptIn(workspace, typeof doc?.project === 'string' ? doc.project : '', n)
+    fenceOrThrow(g, n, pre)
+    if (pre) g.accepted(n, pre, (fn) => afterBoardWrite(workspace, fn))
+  }
+}
+
+/**
+ * HI-3194: a builder's own runtime change that saves no card (declaring paths), fenced as runIntent fences a write: called
+ * in its board change, before the runtime writes, on the card's attempt as it is then.
+ */
+export function fenceNow(wf: Workflow, n: number, actor: TaskActor): void {
+  const g = guardOf(actor)
+  if (!g || actor.kind !== 'agent' || !actor.self) return
+  const pre = wf.store.tx((tx) => foldCard(tx.facts(n), tx.card(n).stage))
+  fenceOrThrow(g, n, pre.attempt)
+  assigneeOrThrow(workspace, wf.store, n, actor.self.agentId, pre)
+  g.accepted(n, pre.attempt, (fn) => afterBoardWrite(workspace, fn))
+}
+
 export async function runIntent<R>(
   wf: Workflow,
   n: number,
@@ -1798,17 +2021,33 @@ export async function runIntent<R>(
   zero9: (w: Pick<Write, 'was' | 'current' | 'written'>, first: boolean) => { patch?: TaskPatch; opts?: Parameters<typeof updateTaskLocked>[3] } = () => ({}),
   // A revocable caller's check (HI-2420, the Assistant's guard): made as each of the card's writes saves the card, in
   // the write's own transaction after the runtime's facts, so a refusal undoes its facts too.
-  commit?: () => void
+  commit?: () => void,
+  // HI-3194: the intent is one of the builder's own moves (assigneeOrThrow).
+  fence: { builder?: boolean } = {}
 ): Promise<{ reply: R; saved: TaskCard | null }> {
   let saved: TaskCard | null = null
   let first = true
+  const g = guardOf(actor)
   const reply = await recording(actor, null, () =>
     alongside(
       {
+        // HI-3194: an agent's write on this card checked against its request's fence, in the write's transaction before it
+        // decides anything (the card's attempt as it was then): refused, the write is undone whole, its own refusal too.
+        ...(g
+          ? {
+              before: (w: Write) => {
+                if (w.card.id !== n) return
+                const pre = w.state()
+                fenceOrThrow(g, n, pre.attempt)
+                if (fence.builder && actor.kind === 'agent' && actor.self) assigneeOrThrow(workspace, wf.store, n, actor.self.agentId, pre)
+              }
+            }
+          : {}),
         written: async (w) => {
           // Only this intent's own card's writes: another card's write made under its context (something it set off,
           // scheduled from inside it) is that card's business, never this card's 0.9 fields (#1287).
           if (w.card.id !== n) return
+          const own = w.written.filter((f) => f.kind !== 'Refused')
           const extra = zero9(w, first)
           first = false
           // Requests the write closed unanswered (#1638): a line each in the card's history.
@@ -1819,7 +2058,9 @@ export async function runIntent<R>(
           // Its column only when it moved: a write that moves nothing (an answer, a review's start) leaves the card's
           // place, so a failed card still in Review isn't "returned for review" by it (#1269 round 3).
           const p: TaskPatch = { ...extra.patch, ...(moved !== null ? { column: STAGE_CATEGORY[w.current] } : {}) }
-          saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was], ...(commit ? { commit } : {}) }), moved)
+          saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was], ...(commit ? { commit } : {}), fenced: true }), moved)
+          // Written: what this request's next write expects, and once committed its launch's binding (HI-3194).
+          if (g && own.length) g.accepted(n, foldCard(w.tx.facts(n), w.current).attempt, (fn) => afterBoardWrite(workspace, fn))
         }
       },
       // One read step (#1376): what it asks git about fixed commits is asked once in it.
@@ -2130,7 +2371,7 @@ const WAITING_STAGES: readonly StageId[] = ['hold', 'todo']
 const TARGET = {
   agents: msg({ id: 'tasks.error.targetNotAgents', defaultMessage: 'Only the user or the Assistant sets which branch a card merges into.', description: 'HI-2556: an error, an agent tried to set a card’s Merges into (the branch its work merges into); only the user or the Combwork Assistant can.' }),
   notListed: msg({ id: 'tasks.error.targetNotListed', defaultMessage: '{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a card’s Merges into is for Git projects.}}', description: 'HI-2556: an error setting a card’s or lane’s Merges into to a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys.' }),
-  started: msg({ id: 'tasks.error.targetHasWork', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}', description: 'HI-2556: an error changing a card’s Merges into once its branch has work of its own (Darren: no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys.' }),
+  started: msg({ id: 'tasks.error.targetHasWork', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}', description: 'HI-2556: an error changing a card’s Merges into once its branch has work of its own (no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys.' }),
   missing: msg({ id: 'tasks.error.targetMissing', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so nothing was changed.} other {There is no branch {target} in this repository: make it first, then pick it.}}', description: 'HI-2556: an error setting a card’s Merges into to a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys.' }),
   defaultMoved: msg({ id: 'tasks.error.targetDefaultMoved', defaultMessage: 'Work merges into changed again while {card} was being moved, so it stays as it is.', description: 'HI-2680: a card left out of a retarget: the project’s Work merges into (an option’s name: as translated there) changed again between the preview and the move. {card} is its key (HI-12).' }),
   changed: msg({ id: 'tasks.error.targetChanged', defaultMessage: '{card}’s Merges into changed since it was listed, so it stays as it is.', description: 'HI-2680: a card left out of a retarget: its Merges into changed between the preview and the move. {card} is its key (HI-12).' }),
@@ -2329,7 +2570,7 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ c
   if (wf && def && IN_FLIGHT_STAGES.includes(wf.state(wf.store.card(n)).stage)) {
     const target = await targetPick(first.project, raw, actor, !!res)
     // HI-3129: a platform that can't move started work (jj: its bookmarks, no `retarget`) keeps a card in flight where
-    // it started (Darren's decision (a)): its target and its proof there. Refused as the card's work keeping it.
+    // it started (decision (a)): its target and its proof there. Refused as the card's work keeping it.
     const startedOn = wf.state(wf.store.card(n)).started?.target ?? def
     if ((await projectTargets(ws, projectPath).catch(() => null))?.fixedInFlight && (target ?? def) !== startedOn) throw new TaskConflictError(withValues(TARGET.started, { card: cardRef(n), target: startedOn, unknown: 'no' }))
     if (res && wf.state(wf.store.card(n)).started?.target === res.to) return first
@@ -2351,7 +2592,7 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ c
       const s = wf ? wf.state(wf.store.card(n)) : null
       const waiting = !!s && WAITING_STAGES.includes(s.stage)
       // HI-3152: where work can't move between targets (its platform lacks `retarget`: jj), a waiting card's work is its
-      // kept slot (Darren's decision (a)), read through its platform, never Git's lines (`ownWork`, `dropEmptyLines`).
+      // kept slot (decision (a)), read through its platform, never Git's lines (`ownWork`, `dropEmptyLines`).
       const viaKept = !!wf && !!s && !platformMoves(wf, n, s)
       const kept = viaKept && waiting ? await keptWorkOf(wf!, n, s!) : null
       // No work of its own (HR2's round 1: its slot's changes not committed too), read here under the board's lock, where
@@ -2414,7 +2655,7 @@ async function doAskAction(n: number, kind: AskActionKind, reason: string | unde
 }
 
 /**
- * The user answers a card's request (IPC `tasks:answer`, #1269, SPEC §16.8.5): only the user (Darren's point 7: never
+ * The user answers a card's request (IPC `tasks:answer`, #1269, SPEC §16.8.5): only the user (point 7: never
  * an agent or the Assistant). On the intent path (`runIntent`), so the answer, what it moves and the card's 0.9 fields
  * are one transaction, checked there (the request still open, the card where it was asked, its generation current). A
  * decision (a Decide answer) is the card's, added with the answer's write: a new generation, its agents told (#1266). A
@@ -2456,19 +2697,22 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   const reply = one ? undefined : typed
   const outcome = one ? 'answered' : a.outcome
   // HI-2286: an agent's question approved with a note: the note is a reply and the user's decision on the card too.
-  const decision = !asked && !one && req.kind === 'approve' && a.outcome === 'approved' && reply && approveNote(req) === 'decision' ? text(reply, MAX_DECISION, 'decision') : decided
+  const typedDecision = !asked && !one && req.kind === 'approve' && a.outcome === 'approved' && reply && approveNote(req) === 'decision' ? text(reply, MAX_DECISION, 'decision') : decided
+  // HI-3356: a bare option label ("A", "(a)", "2") is recorded with what it chose, or with the question whole: never a
+  // bare letter. Its length was checked as typed; what it adds is the request's own stored text, never cut.
+  const decision = typedDecision === undefined ? undefined : decisionWithChoice(typedDecision, req.text, req.request)
   // What each kind takes (answerFits): an approval is approved or declined; at the round limit, a choice (a carry on with
   // its rounds); any other question, a reply or a decision. Checked before anything is written.
-  const choice = a.choice as RoundChoice | undefined
+  const choice = a.choice as PauseChoice | undefined
   if (!answerFits(req, { outcome, reply: !!reply, decision: !!decision, choice, rounds: a.rounds, ...(action ? { action } : {}) }, LANE_MAX_ROUNDS)) throw bad()
   const answerIt = async (): Promise<TaskCard> => {
     const { reply: r } = await runIntent(
       wf,
       n,
       actor,
-      (w) => w.answer(n, request, outcome, { ...(reply ? { note: reply } : reason ? { note: reason } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}), ...(action ? { action } : {}) }),
+      (w) => w.answer(n, request, outcome, { by: actor.kind, ...(reply ? { note: reply } : reason ? { note: reason } : {}), ...(decision ? { decided: true } : {}), ...(choice ? { choice } : {}), ...(choice === 'carryOn' ? { rounds: a.rounds } : {}), ...(action ? { action } : {}) }),
       // A reply is on the card too, as the user's comment (#1626), so the card shows it and the wake's "in full" is there.
-      (_w, first) => ({ patch: first && decision ? { decision } : {}, ...(first && reply ? { opts: { comment: reply } } : {}) })
+      (_w, first) => ({ patch: first && decision ? { decision } : {}, opts: { ...(first && reply ? { comment: reply } : {}), ...(decision !== typedDecision ? { expanded: true } : {}) } })
     )
     if (isRefusal(r)) throw new WorkflowRefusedError(r)
     return getTask(n, ws)
@@ -2493,6 +2737,28 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   })
 }
 
+/**
+ * HI-3188 (Q4): the Assistant's answer to a card's simplify check, told to it first: carry on or simplify,
+ * nothing else (cutting scope, and the hard stop's question, are the user's: `loop.usersChoice`). `why`, if given, is its
+ * comment on the card. Through runIntent as the user's answer is, the runtime checking the request still open and the
+ * choice in the write; `commit` is assistantChange's guard (its Control, its session), checked in that write.
+ */
+export async function assistantAnswerSimplify(n: number, request: string, choice: unknown, why: unknown, actor: TaskActor, commit?: () => void): Promise<TaskCard> {
+  const ws = workspace
+  if (actor.kind !== 'assistant') throw new TaskPermissionError(DECIDE.agents)
+  if (typeof request !== 'string' || !request) throw combworkError(BAD_ANSWER, { max: LANE_MAX_ROUNDS }, { kind: 'invalid' })
+  const head = ws.path ? cardHeads(ws, [n])[0] : undefined
+  if (!head) throw unknownTask(n)
+  if (choice !== 'carryOn' && choice !== 'simplify') throw new WorkflowRefusedError(refusalOf('loop.usersChoice', { card: cardRef(n), request }))
+  const reason = typeof why === 'string' && why.trim() ? text(why.trim(), MAX_TEXT, 'comment') : undefined
+  const { workflowFor } = await import('./workflow/service')
+  const wf = typeof head.project === 'string' && head.project && ws.path ? await workflowFor(ws, join(ws.path, head.project)).catch(() => null) : null
+  if (!wf) throw new WorkflowRefusedError(refusalOf('move.notFromHere', { card: cardRef(n), stage: CATEGORY_STAGE[head.column as TaskColumn] ?? 'todo', move: 'answer', moves: '' }))
+  const { reply } = await runIntent(wf, n, actor, (w) => w.answer(n, request, 'answered', { choice, by: 'assistant', ...(reason ? { note: reason } : {}) }), (_w, first) => (first && reason ? { opts: { comment: reason } } : {}), commit)
+  if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
+  return getTask(n, ws)
+}
+
 const DECIDE = {
   agents: msg({ id: 'tasks.error.answersNotAgents', defaultMessage: "Only the user, or the Assistant recording the user's decision, closes a request for the user.", description: "An error (HI-1932): an agent recorded a decision naming the card's requests it answers (For you); only the user, or the Combwork Assistant writing down the user's own decision, may close them that way." }),
   shape: msg({ id: 'tasks.error.answersShape', defaultMessage: 'answers takes the ids of 1 to {max, number} of the card’s open requests, with a decision and nothing else in the same change.', description: "An error (HI-1932): a decision naming the card's requests it answers was sent wrongly: answers must list between 1 and {max} request ids (For you's requests), together with the decision's text and no other change. Keep answers as it is (a field's name)." }),
@@ -2511,7 +2777,7 @@ export function checkDecisionAnswers(actor: TaskActor, answers: unknown, wrong: 
 }
 
 /**
- * A decision the user made answers some of a card's open requests (HI-1932, Darren's decision of 28 Oct: the Assistant
+ * A decision the user made answers some of a card's open requests (HI-1932: the Assistant
  * records it naming the requests it answers, and Combwork closes them). The user's or the Assistant's only, never an
  * agent's: no agent closes its own request. `answers`: 1 to DECISION_ANSWERS_MAX request ids (duplicates once), with a
  * non-empty decision and nothing else. Each must be an open request a decision may answer (`decisionAnswers`), checked
@@ -2522,8 +2788,8 @@ export function checkDecisionAnswers(actor: TaskActor, answers: unknown, wrong: 
 async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3] = {}): Promise<TaskCard> {
   const ws = workspace
   const { answers, decision, ...rest } = patch
-  const t = typeof decision === 'string' ? text(decision, MAX_DECISION, 'decision').trim() : ''
-  checkDecisionAnswers(actor, answers, !t || Object.entries(rest).some(([, v]) => v !== undefined) || !!opts.comment)
+  const said = typeof decision === 'string' ? text(decision, MAX_DECISION, 'decision').trim() : ''
+  checkDecisionAnswers(actor, answers, !said || Object.entries(rest).some(([, v]) => v !== undefined) || !!opts.comment)
   const requests = [...new Set(answers.map((x) => x.trim()))]
   const head = ws.path ? cardHeads(ws, [n])[0] : undefined
   if (!head) throw unknownTask(n)
@@ -2540,6 +2806,10 @@ async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, op
     const req = open.find((r) => r.request === id)
     if (!req || !decisionAnswers(req)) throw combworkError(DECIDE.not, { why: req ? 'kind' : 'open', request: id, card: cardRef(n) }, { kind: req ? 'invalid' : 'conflict' }) // i18n-ignore: select keys, never shown
   }
+  // HI-3356: a bare option label answering one request is recorded with what it chose (decisionWithChoice); answering
+  // several, it is kept as written: which question's options it names isn't guessed.
+  const one = requests.length === 1 ? open.find((r) => r.request === requests[0])! : null
+  const t = one ? decisionWithChoice(said, one.text, one.request) : said
   const decisionId = entryId()
   const recordedBy = actorName(actor)
   const lines = requests.map((id) => storedText(HISTORY.closedByDecision, { question: clip(open.find((r) => r.request === id)!.text) }))
@@ -2553,7 +2823,7 @@ async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, op
     // Only with the write that holds its answers: a refusal is written too (its Refused fact), and takes no decision.
     // HI-2220: what it wrote (the decision, each question closed) goes to the caller's `said` with that write only, so
     // the short reply confirms it rather than "No change", and a refusal confirms nothing.
-    (w) => (w.written.some((f) => f.kind === 'Approval' && !!(f.data as { byDecision?: unknown }).byDecision) ? { patch: { decision: t, decisionId }, opts: { note: lines, ...(opts.commit ? { commit: opts.commit } : {}), ...(opts.said ? { said: opts.said } : {}) } } : {})
+    (w) => (w.written.some((f) => f.kind === 'Approval' && !!(f.data as { byDecision?: unknown }).byDecision) ? { patch: { decision: t, decisionId }, opts: { note: lines, ...(t !== said ? { expanded: true } : {}), ...(opts.commit ? { commit: opts.commit } : {}), ...(opts.said ? { said: opts.said } : {}) } } : {})
   )
   if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
   return getTask(n, ws)
@@ -2617,7 +2887,7 @@ async function planned(ws: WorkspaceService, numbers: number[], patch: Pick<Task
 /** For tests: runs as a card's change begins, in its board change (to hold a batch at a card). */
 export const taskTestHooks: { beforeUpdate: ((n: number) => Promise<void>) | null } = { beforeUpdate: null }
 
-async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; ask?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean } } = {}): Promise<TaskCard> {
+async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; ask?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean }; expanded?: boolean } = {}): Promise<TaskCard> {
   // Its facts are this actor's (#1216), with the reads its caller made before the change, if any.
   return recordingAs(actor, () => updateTaskAs(n, patch, actor, opts))
 }
@@ -2633,7 +2903,7 @@ async function stageNamesOf(ws: WorkspaceService, project: string | null | undef
   return names && Object.keys(names).length ? names : null
 }
 
-async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean } }): Promise<TaskCard> {
+async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean }; fenced?: boolean; expanded?: boolean }): Promise<TaskCard> {
   await taskTestHooks.beforeUpdate?.(n)
   const ws = workspace
   const by = actorName(actor)
@@ -2649,6 +2919,10 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     if (!inScope(card, scope)) throw unknownTask(n)
     // The caller's own conditions, on the card as it is now (Start: not archived or done meanwhile).
     opts.check?.(card)
+    // HI-3194: an agent's own change (a comment, a plain update) checked against its request's fence, on the card's attempt
+    // as this change finds it, under the board's lock; an intent's writes were checked by runIntent with their facts.
+    const g = opts.fenced ? undefined : guardOf(actor)
+    if (g) fenceOrThrow(g, n, attemptIn(ws, card.project, n), ws)
     if (card.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
     // A card in Doing with another agent is that agent's work in progress: a project agent can't move it on to Review or
     // Done (a reviewer whose review ended when it came back for more work, say). Checked on the card as it is, before
@@ -2767,7 +3041,9 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     if (patch.decision !== undefined) {
       // Recorded by whoever calls (the user, the Assistant, an agent), decided by the user: agents only write down what
       // the user decided (their tool's description says so). Editing or removing one is the user's (editDecision).
-      const t = text(patch.decision, MAX_DECISION, 'decision').trim()
+      // HI-3356: `expanded` only from answerTask and decideAndAnswer, a bare option label already checked as typed and
+      // expanded with its request's own stored text (decisionWithChoice): kept whole, never refused for that text's length.
+      const t = text(patch.decision, opts.expanded ? Infinity : MAX_DECISION, 'decision').trim()
       if (!t) throw combworkError(ERR.emptyDecision)
       const list = card.decisions ?? []
       if (list.length >= MAX_DECISIONS) throw combworkError(msg({ id: 'tasks.error.tooManyDecisions', defaultMessage: 'A card can have up to {max} decisions.', description: 'An error: a card already has as many decisions as it may have ({max}, a number).' }), { max: MAX_DECISIONS }, { kind: 'invalid' })
@@ -2864,8 +3140,16 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // while those awaits run (the Assistant's control and session) checks it there, so a revoked change saves nothing.
     // Unlike `check`, it doesn't see the card as it was before this change.
     await saveCard(ws, n, card, before, undefined, opts.commit)
+    // HI-3188: a lane reviewer's request recorded with it counts, and may make a churn question due.
+    await askChurnAfterRequest(ws, card, said.find((x) => x.id === HISTORY.reviewerRequest.id))
     // Nobody on it, by the user's reason: recorded as an override is (setKind's), with the rule it passes.
     if (nobody) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => tx.append(n, { kind: 'Override', actor: actorOf(actor), source: 'recorded', data: { rules: ['move.doingNobody'], move: `${CATEGORY_STAGE[before.column]}→active`, by: 'assistant', reason: nobody } })) // i18n-ignore: a fact's kind and codes, not text
+    // HI-3194: given to another agent (or nobody) during an attempt: its attempt moves on, in this change.
+    // Not a start's own giving (its column before the move was Todo or On Hold: its Started began the attempt).
+    if (card.agent !== hadAgent && !transferred && card.project && ATTEMPT_COLUMNS.has(before.column)) attemptReassigned(ws, card.project, n, card.agent, actorOf(actor))
+    // HI-3194: its dependencies edited: its readiness in this change too.
+    if (patch.blockedBy !== undefined && card.project) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => writeReadiness(tx, n, null, actorOf(actor), card.blockedBy))
+    if (g) g.accepted(n, attemptIn(ws, card.project, n) ?? { id: 0, generation: 0 }, (fn) => afterBoardWrite(ws, fn))
     return card
   })()
   changed(ws)
@@ -2925,8 +3209,12 @@ async function updateTasksUnbatched(numbers: number[], patch: BatchPatch, actor:
           // An agent's move, translated into its intent (#1268), as a single change's.
           const asAgent = await agentGateOf(workspace, n, patch, actor)
           if (asAgent) return await moveAsAgent(asAgent, n, patch, actor, { said, commit: opts.commit })
+          // HI-3282: a Done card's merge already seen, said as a single change's old move to Done says it.
+          const seen = await mergeSeenOnDone(workspace, n, patch, actor)
           // The locked change itself: the batch's reads were made before its lock, never under it (HR4's #1216 round 1).
-          return await updateTaskLocked(n, patch, actor, { said, commit: opts.commit })
+          const updated = await updateTaskLocked(n, patch, actor, { said, commit: opts.commit })
+          said.push(...seen)
+          return updated
         },
         (e) => e instanceof WorkflowRefusedError
       )
@@ -3004,11 +3292,12 @@ export async function noteOnCard(n: number, what: string | StoredText, ws: Works
  * `key`: the comment's id, at most once on the card. Or both (HI-2087): its English as agents read it (`text`, longer
  * than the window's), and the message the window shows (`shown`).
  */
-export async function commentAsCombwork(n: number, said: string | StoredText | { text: string; shown: StoredText }, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string): Promise<boolean> {
+export async function commentAsCombwork(n: number, said: string | StoredText | { text: string; shown: StoredText }, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string, evenArchived = false): Promise<boolean> {
   return boardLock(ws, async () => {
     const card = await getTask(n, ws)
-    // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing.
-    if (card.archived || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
+    // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing. An archived card
+    // gets none unless `evenArchived` (HI-3367: a notice that replaces a question it lost).
+    if ((card.archived && !evenArchived) || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
     // Agents' English beside the window's message (and, where it is worded apart, what it is said from: `agent`).
     if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.combwork, said.text, said.shown, key)
     else addComment(card, BY.combwork, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)
@@ -3150,12 +3439,13 @@ export async function endReviewsWithoutSession(ws: WorkspaceService, live: (proj
 /**
  * A card's newest comment (the last one added; comments are kept in the order they were added, so equal times
  * don't matter), or null when it has none. Read as `readTask` reads: a confined agent can't read another project's.
+ * `attempt` (HI-3340): the card's attempt in the same snapshot, which the route issues to a reading agent's launch.
  */
-export async function latestComment(n: number, actor: TaskActor): Promise<{ number: number; comment: TaskComment | null; commentId: string | null; sources: Pick<TaskComment, 'id' | 'by' | 'at'>[] }> {
-  const c = await readTask(n, actor)
+export async function latestComment(n: number, actor: TaskActor): Promise<{ number: number; comment: TaskComment | null; commentId: string | null; sources: Pick<TaskComment, 'id' | 'by' | 'at'>[]; attempt: AttemptKey | null }> {
+  const { card: c, attempt } = await readTaskSeen(n, actor)
   const last = c.comments.at(-1)
   // Its id and the card's comments' authors and times (HI-2402): for its attachments and where each came, never in a reply.
-  return { number: c.number, comment: last ? withoutId(last) : null, commentId: last?.id ?? null, sources: c.comments.map(({ id, by, at }) => ({ id, by, at })) }
+  return { number: c.number, comment: last ? withoutId(last) : null, commentId: last?.id ?? null, sources: c.comments.map(({ id, by, at }) => ({ id, by, at })), attempt }
 }
 
 /**
@@ -3221,6 +3511,10 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
   return recordingAs(actor, () => boardLock(ws, async () => {
     const c = await getTask(n, ws)
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
+    // HI-3194: an agent's comment fenced as any of its writes, on the card's attempt as this change finds it.
+    const g = guardOf(actor)
+    const pre = g ? attemptIn(ws, c.project, n) : null
+    if (g) fenceOrThrow(g, n, pre, ws)
     if (c.archived && actor.kind !== 'user') throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
     // A loop's request or reply (HI-2428), as updateTask's comment: its history line, which watches count and the
     // recorder wakes the other side with, in the same change.
@@ -3230,6 +3524,10 @@ export async function commentTask(n: number, comment: string, actor: TaskActor, 
     if (own) note(c, by, own, at)
     addComment(c, by, t, undefined, undefined, at)
     await saveCard(ws, n, c, undefined, undefined, opts.commit)
+    // HI-3188: a request it recorded counts, and may make a churn question due.
+    await askChurnAfterRequest(ws, c, own)
+    // Written: its launch is bound to the card's attempt (a first contact's binding, HI-3194).
+    if (g && pre) g.accepted(n, pre, (fn) => afterBoardWrite(ws, fn))
     changed(ws)
     return c
   }))
@@ -3249,16 +3547,27 @@ export async function askAssistantOn(n: number, asked: string, actor: TaskActor,
   return recordingAs(actor, () => boardLock(ws, async () => {
     const c = await getTask(n, ws)
     if (!inScope(c, scopeOf(actor))) throw unknownTask(n)
+    // HI-3194: an agent's request on a card fenced as any of its writes (its comment, and the waiting mark it may set),
+    // on the card's attempt as this change finds it, its launch again as the change commits. HI-3420: a request is a
+    // message, so an attempt that moved on since the agent's (the card finished, put back, restarted, given to another)
+    // doesn't refuse it: MR1's answer on MC-1568, sent just after its verdict merged the card, was refused and never
+    // reached the Assistant. Only its launch is fenced then; it sets no waiting mark (the card's attempt isn't the
+    // agent's) and binds the launch to nothing, so the agent's later changes of the card are still refused.
+    const g = guardOf(actor)
+    const pre = g ? attemptIn(ws, c.project, n) : null
+    const moved = !!g && g.check(n, cardRef(n), pre)?.rule === 'attempt.moved'
+    if (g) fenceOrThrow(g, n, moved ? null : pre, ws)
     check(c)
     const by = actorName(actor)
     note(c, by, storedText(HISTORY.assistantAsked, { text: clip(t) }))
     addComment(c, by, t)
-    if (ref && actor.kind === 'agent' && actor.self && c.agent === actor.self.agentId && c.column === 'doing' && !c.waitingFor) {
+    if (ref && !moved && actor.kind === 'agent' && actor.self && c.agent === actor.self.agentId && c.column === 'doing' && !c.waitingFor) {
       const reason = clip(t.replace(/\s+/g, ' ').trim(), 200)
       c.waitingFor = { reason, by, at: new Date().toISOString(), ask: ref }
       note(c, by, storedText(HISTORY.waiting, { reason }))
     }
     await saveCard(ws, n, c)
+    if (g && pre && !moved) g.accepted(n, pre, (fn) => afterBoardWrite(ws, fn))
     changed(ws)
     return c
   }))
@@ -3305,6 +3614,12 @@ export async function changeWithAttachments(actor: TaskActor, files: ChangeAttac
       const made = await run()
       const n = made.number
       const before = await getTask(n, ws)
+      // HI-3244: a project agent's files are a write on the card like any other, fenced by its request's attempt and launch
+      // in this board change: checked on the card's attempt as `run` left it (a change of its own already moved what the
+      // request expects, so it isn't refused), its launch again as the change commits (fenceOrThrow), the files' publish
+      // and the card's save undone with it. An attachments-only change (`run` only reads) is fenced here alone.
+      const g = guardOf(actor)
+      if (g) fenceOrThrow(g, n, attemptIn(ws, before.project, n), ws)
       const card = structuredClone(before)
       const comment = where === 'comment' ? card.comments.at(-1) : undefined
       const pub = await publish(ws, n, files.staging, actorName(actor), null)
@@ -3327,6 +3642,9 @@ export async function changeWithAttachments(actor: TaskActor, files: ChangeAttac
       if (comment?.id) linkToComment(ws, n, fresh.filter((id) => inComment.has(id)), comment.id)
       linkToComment(ws, n, fresh.filter((id) => !inComment.has(id)), 'description')
       await saveCard(ws, n, card, before, undefined, commit)
+      // Written: its launch is bound to the card's attempt (a first contact's binding, HI-3194).
+      const post = g ? attemptIn(ws, card.project, n) : null
+      if (g && post) g.accepted(n, post, (fn) => afterBoardWrite(ws, fn))
       changed(ws)
       return { ...card, attached: pub.attachments.map((a, i) => ({ name: a.name, path: a.path, added: pub.added[i] })) }
     })

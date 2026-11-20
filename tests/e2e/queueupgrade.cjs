@@ -21,7 +21,7 @@ const q = require('./queueFixture.cjs')
 const PORT = Number(lib.port(47900))
 const fx = q.queueProject('queueupgrade')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 const ASK = "Upgrade this workspace's board to 1.0?"
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -75,7 +75,7 @@ function board09() {
 
 /** The board's rows for a query, read on a connection of the suite's own. */
 function rows(sql, ...args) {
-  const db = new DatabaseSync(dbFile, { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(dbFile, { readOnly: true, timeout: lib.timing('db.busyMs') })
   try {
     return db.prepare(sql).all(...args)
   } finally {
@@ -189,7 +189,7 @@ const log = () => {
     const unchosen = async (crash) => {
       await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { commitMessage: undefined }) })
       await h.app.close().catch(() => {})
-      const db = new DatabaseSync(dbFile, { timeout: 5000 })
+      const db = new DatabaseSync(dbFile, { timeout: lib.timing('db.busyMs') })
       try {
         db.prepare("DELETE FROM board_meta WHERE key = 'workflow:alpha:mergeChoice'").run()
       } finally {

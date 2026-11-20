@@ -11,6 +11,7 @@ import type { CombworkEvent, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { writeCardOutside } from './boardDb'
 import { DatabaseSync } from 'node:sqlite'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-board-events-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -39,10 +40,13 @@ const tasks = await import('../src/main/tasks')
 const { onCombworkEvent } = await import('../src/main/events')
 const { coalesced, coalescing } = await import('../src/main/coalesce')
 const { recordLiveCardsSoon } = await import('../src/main/cardSessions')
-const { boardFile } = await import('../src/main/boardStore')
+const { boardFile, boardLock } = await import('../src/main/boardStore')
+const wal = await import('../src/main/walCheckpoint')
+const { checkpointHooks } = await import('../src/main/walCheckpointWorker')
+const { fileLockDepth } = await import('../src/main/fsutil')
 
 /** Bounds a hung run; the tests wait for what they expect, never for a time. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const user = { kind: 'user' } as const
 
 describe('coalesced (#1011)', () => {
@@ -164,7 +168,7 @@ describe('board events (#1011)', () => {
     const cards = await doneCards(3)
     const before = await Promise.all(cards.map((n) => run(() => tasks.getTask(n))))
     // As a full disk or an I/O error would: SQLite rolls the whole transaction back on the middle card's write.
-    const outside = new DatabaseSync(boardFile(wsPath), { timeout: 5000 })
+    const outside = new DatabaseSync(boardFile(wsPath), { timeout: timing('db.busyMs') })
     outside.exec(`CREATE TRIGGER undo_test BEFORE UPDATE ON cards WHEN old.number = ${cards[1]} BEGIN SELECT RAISE(ROLLBACK, 'disk I/O error (test)'); END`)
     // The trigger is another connection's commit, which the board's poll tells (#1017): wait for that, so it isn't taken for the batches'.
     await vi.waitFor(() => expect(seen).toHaveLength(1), { timeout: HUNG_MS })
@@ -228,6 +232,62 @@ describe('board events (#1011)', () => {
     await vi.waitFor(() => expect(seen.length).toBeGreaterThan(0), { timeout: HUNG_MS })
     await vi.waitFor(async () => expect((await run(() => tasks.allTasks(w))).filter((c) => c.number >= 9100).length).toBe(30), { timeout: HUNG_MS })
     expect(seen.length).toBeLessThan(10)
+  })
+
+  it("the WAL's first write after a checkpoint (HI-3289) is made under the board's lock, so a change waits for it; it is told as another connection's commit is, and another process's change just before or just after it is never lost", async () => {
+    const doc = (n: number) => ({ number: n, title: `Outside ${n}`, project: 'alpha', column: 'todo', order: n, history: [], comments: [] })
+    const file = boardFile(wsPath)
+    // A clock of its own, moved on past the triggers each time: a checkpoint's time is its last one's from then on.
+    let clock = performance.now()
+    const due = (): void => {
+      wal.checkpointTick((clock += 1000))
+      wal.checkpointTick((clock += 10 * (wal.checkpointLimits.everyMs + wal.checkpointLimits.idleMs)))
+    }
+    try {
+      for (const [when, at] of [
+        ['before', 'none'],
+        ['after', 'after']
+      ] as const) {
+        await run(() => tasks.createTask({ title: `Written ${when}`, project: 'alpha' }, user))
+        seen.length = 0
+        const n = when === 'before' ? 9301 : 9302
+        // Another process's change just before the restart begins, or just after its commit, before main has its answer.
+        if (when === 'before') writeCardOutside(wsPath, n, doc(n))
+        let during: Promise<unknown> | null = null
+        let lockHeld = false
+        checkpointHooks.inRestart = (f) => {
+          if (f !== file) return
+          lockHeld = fileLockDepth(boardLock(wsPath)) > 0
+          // A change of the board asked for meanwhile: it waits for the lock, so never meets the restart's write lock.
+          during = run(() => tasks.createTask({ title: `During ${when}`, project: 'alpha' }, user))
+        }
+        checkpointHooks.afterRestart = (f) => {
+          if (f === file && at === 'after') writeCardOutside(wsPath, n, doc(n))
+        }
+        const restarts = wal.checkpointStats.restarts
+        due()
+        await vi.waitFor(() => expect(wal.checkpointStats.restarts).toBe(restarts + 1), { timeout: HUNG_MS })
+        expect(lockHeld).toBe(true)
+        expect(during).not.toBeNull()
+        await during
+        // Told (the poll sees the writer's data_version move: the restart's and the other process's commit alike).
+        await vi.waitFor(() => expect(seen.length).toBeGreaterThan(0), { timeout: HUNG_MS })
+        expect((await run(() => tasks.getTask(n))).title).toBe(`Outside ${n}`)
+        expect((await run(() => tasks.allTasks(w))).some((c) => c.title === `During ${when}`)).toBe(true)
+      }
+      // The restart alone: told once too (one refresh, the conservative way, HI-3289's review).
+      await run(() => tasks.createTask({ title: 'Written alone', project: 'alpha' }, user))
+      checkpointHooks.inRestart = null
+      checkpointHooks.afterRestart = null
+      seen.length = 0
+      const restarts = wal.checkpointStats.restarts
+      due()
+      await vi.waitFor(() => expect(wal.checkpointStats.restarts).toBe(restarts + 1), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(seen.length).toBe(1), { timeout: HUNG_MS })
+    } finally {
+      checkpointHooks.inRestart = null
+      checkpointHooks.afterRestart = null
+    }
   })
 
   it("recording the running agents' cards reads the board once a run, one run at a time, with one more for the changes told meanwhile", async () => {

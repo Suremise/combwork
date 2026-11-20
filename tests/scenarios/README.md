@@ -262,6 +262,13 @@ its Combwork tool does, so a model trial gets the same fixture as a fake (#1545)
     authenticate: OAuth session expired and could not be refreshed", exit 1) is matched by its last screen, the reason
     Combwork logs, or, for Claude Code, its own `auth status --json` in the test home; anything else ends the trial at once
     as `ERROR the session ended at launch: …`, not after the trial's limits (#577). `--signed-out=launch` acts it out.
+    One that ends after its session started but before its prompt was taken (HI-3392: Claude Code's blank starts, its
+    status ready, then stopped) is the same, by its terminal's end in Combwork's log: matched as above, or
+    `ERROR the session ended at launch (exit code n)` at once, never a prompt typed into it and "never taken".
+    `--exits-at-launch` acts it out (fakes only).
+    Claude Code's trust question at launch is seen by its title or first words on its screen as drawn, not only by its
+    choices (HI-3392: 2.1.327's for the Assistant's workspace had no choices in its output's plain text, went unanswered,
+    and the prompt typed into it chose "No, exit").
     A prompt the CLI never takes is checked again (#1321): what it drew once the prompt was typed (Claude Code can show
     "Not logged in · Run /login" only then; not what the prompt itself names) or, for Claude Code, its `auth status
     --json` saying it isn't logged in skips the trial for the environment, rather than running the checks on an untouched

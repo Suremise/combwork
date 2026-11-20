@@ -13,11 +13,12 @@ import { withSessionSigner, encodeArgv, SIGN_ENV, type SessionSigner } from '../
 import { configuredSigner } from '../../src/main/platform/signerPick'
 // @ts-expect-error: a build script (JavaScript), its one function used here
 import { buildSignLauncher, frameworkCsc } from '../../scripts/buildSignLauncher.mjs'
+import { timing } from '../timing.cjs'
 
 /** The bound of one git run or signer: a hung run, never a wait. */
-const HUNG_MS = 60_000
+const HUNG_MS = timing('wait.hang')
 /** How fast a commit that needs someone must fail: seconds, not the minutes a prompt would wait. */
-const FAST_MS = 15_000
+const FAST_MS = timing('budget.promptEndMs')
 const win = process.platform === 'win32'
 const ROOT = join(__dirname, '..', '..')
 const GIT_ROOT = 'C:\\Program Files\\Git'
@@ -28,6 +29,15 @@ const ready = win && !!frameworkCsc() && existsSync(join(GB, 'gpg.exe')) && exis
 const slash = (p: string): string => p.replace(/\\/g, '/')
 let dir = ''
 let home = ''
+/**
+ * gpg's home (GNUPGHOME), a short folder of its own (HI-3457): gpg-agent makes its sockets there and refuses a socket path
+ * of SOCKET_MAX + 1 characters or more (Cygwin's sun_path is 108 bytes, its NUL included). Git's gpg sees the folder by
+ * its MSYS path, which is long since HI-3447's keeper keeps /tmp at the user's temp folder (no longer the run's, which
+ * shortened it to /tmp/…): on CI, h\.gnupg in the test's folder made S.gpg-agent.extra 107 characters, and gpg failed with
+ * "No agent running".
+ */
+let gnupg = ''
+const SOCKET_MAX = 106
 let signer: SessionSigner
 /** The test's own environment: an allowlist, a home of its own, no system or global git config. */
 let base: Record<string, string> = {}
@@ -36,7 +46,7 @@ beforeAll(async () => {
   if (!ready) return
   dir = tempDir('sign-')
   home = join(dir, 'h')
-  mkdirSync(join(home, '.gnupg'), { recursive: true })
+  mkdirSync(home)
   writeFileSync(join(home, '.gitconfig'), '')
   const launcher = buildSignLauncher(join(dir, 'bin'), () => undefined)
   const script = join(dir, 'cw-sign.js')
@@ -45,6 +55,11 @@ beforeAll(async () => {
   for (const k of ['PATH', 'PATHEXT', 'SystemRoot', 'windir', 'ComSpec', 'TEMP', 'TMP', 'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432', 'SystemDrive', 'ProgramData']) if (process.env[k]) base[k] = process.env[k]!
   // Git's own folders first, as a session started from Git's installation finds gpg (git adds them for its children).
   base = { ...base, HOME: home, USERPROFILE: home, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(home, '.gitconfig') }
+  // By its MSYS path: MSYS converts HOME and PATH from Windows' form, not GNUPGHOME (gpg would take C:\… as relative).
+  const g = spawnSync(join(GB, 'cygpath.exe'), ['-u', tempDir('g')], { env: base, encoding: 'utf8', windowsHide: true, timeout: HUNG_MS })
+  expect(g.status, g.stderr).toBe(0)
+  gnupg = g.stdout.trim()
+  base.GNUPGHOME = gnupg
 }, HUNG_MS)
 
 afterAll(() => {
@@ -287,8 +302,16 @@ describe.skipIf(!ready)('gpg signing through cw-sign', () => {
   let key = ''
   let open = ''
   beforeAll(() => {
-    expect(gpgRun(['--batch', '--pinentry-mode', 'loopback', '--passphrase', 'secret', '--quick-gen-key', 'Test <test@example.invalid>', 'ed25519', 'sign', 'never']).status).toBe(0)
-    expect(gpgRun(['--batch', '--pinentry-mode', 'loopback', '--passphrase', '', '--quick-gen-key', 'Open <open@example.invalid>', 'ed25519', 'sign', 'never']).status).toBe(0)
+    // The sockets gpg-agent would make, as Git's gpg names them: one too long fails here, saying so, not as "No agent".
+    const dirs = spawnSync(join(GB, 'gpgconf.exe'), ['--list-dirs'], { env: base, encoding: 'utf8', windowsHide: true, timeout: HUNG_MS })
+    expect(dirs.status, dirs.stderr).toBe(0)
+    const sockets = dirs.stdout.split('\n').filter((l) => /^[\w-]*socket:/.test(l)).map((l) => l.slice(l.indexOf(':') + 1).trim())
+    expect(sockets).not.toEqual([])
+    expect(sockets.filter((s) => s.length > SOCKET_MAX), `gpg-agent refuses a socket path over ${SOCKET_MAX} characters: the test's gpg home is too deep`).toEqual([])
+    for (const [uid, pass] of [['Test <test@example.invalid>', 'secret'], ['Open <open@example.invalid>', '']]) {
+      const g = gpgRun(['--batch', '--pinentry-mode', 'loopback', '--passphrase', pass, '--quick-gen-key', uid, 'ed25519', 'sign', 'never'])
+      expect(g.status, `gpg --quick-gen-key ${uid}: ${g.stderr}`).toBe(0)
+    }
     key = fpr('test@example.invalid')
     open = fpr('open@example.invalid')
     spawnSync(join(GB, 'gpgconf.exe'), ['--kill', 'gpg-agent'], { env: base, windowsHide: true, timeout: HUNG_MS })
@@ -307,7 +330,8 @@ describe.skipIf(!ready)('gpg signing through cw-sign', () => {
   })
 
   it("signs once the passphrase is cached: gpg reads git's whole payload after its end (stdin's end isn't a cancel), and verifies", () => {
-    expect(gpgRun(['--batch', '--pinentry-mode', 'loopback', '--passphrase', 'secret', '-u', key, '-bsa'], 'warm').status).toBe(0)
+    const warm = gpgRun(['--batch', '--pinentry-mode', 'loopback', '--passphrase', 'secret', '-u', key, '-bsa'], 'warm')
+    expect(warm.status, warm.stderr).toBe(0)
     const r = repo('openpgp', key)
     const c = commit(r, session())
     expect(c.err).toBe('')
@@ -325,7 +349,7 @@ describe.skipIf(!ready)('gpg signing through cw-sign', () => {
 
   it("ends a signer at the Advanced setting's bound and says so (not a passphrase)", () => {
     const r = repo('openpgp', open)
-    const c = commit(r, session({ ...signer, timeoutMs: 1 }))
+    const c = commit(r, session({ ...signer, timeoutMs: 1 })) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(c.status).not.toBe(0)
     expect(c.err).toContain("didn't finish within")
     expect(c.err).not.toContain(NEEDS_LINE)

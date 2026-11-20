@@ -14,7 +14,7 @@ const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'dialectlaunch-profile')
 const ws = path.join(lib.WORK, 'dialectlaunch-ws')
@@ -102,7 +102,7 @@ function initialize(def) {
   const until = async (fn, ms = HUNG_MS) => {
     const t = Date.now()
     let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
+    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
     return v
   }
   await lib.waitForProvider(inv, 'codex')
@@ -217,7 +217,7 @@ function initialize(def) {
   check('…and her launch record has no dialect in it (the Default, its model known)', !!d5 && !('dialect' in d5), JSON.stringify(d5))
   await page.screenshot({ path: path.join(lib.WORK, 'dialectlaunch.png') })
   for (const id of [clara.id, cody.id]) await inv('session:stop', proj, id).catch(() => undefined)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
 
   // --- Two windows, two workspaces (HR1 on HI-2443): a caller with no session is said the wording of the workspace its
   // request names, whichever window has the focus, its early and error replies too; naming none of two, the Default.

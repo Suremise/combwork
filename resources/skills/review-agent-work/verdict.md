@@ -13,4 +13,6 @@ If the card leaves Review while you review it (taken back to Doing for more work
 
 ## Reviewing again
 
+**New edge cases round after round** (each round or design check turning up a different one): don't open another. Ask whether they're worth handling, or to simplify or cut scope: `cw_ask_assistant` when the Assistant can act, else `cw_ask_user` (`kind: "decide"`); if Combwork already asked (a simplify check or hard stop under For you), wait for that answer instead. Until it's answered, no ok, gaps, request or verdict.
+
 When the card comes back after fixes, review what changed since your last verdict: the new revision's changes, the comments after yours, and any decision recorded since (a reply flags a new one). Re-run a check only when what it covers has changed, or for a doubt you name, and confirm each earlier finding is fixed or still open.

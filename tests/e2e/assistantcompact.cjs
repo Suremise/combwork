@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'assistantcompact-profile')
 const ws = path.join(lib.WORK, 'assistantcompact-ws')
@@ -54,15 +54,16 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Control+Alt+I')
   const panel = page.locator('.assistant-panel')
   const header = panel.locator('.assistant-header')
-  await lib.until(async () => (await header.count()) === 1, 5000)
+  await lib.until(async () => (await header.count()) === 1, lib.timing('hang.ui'))
   await header.getByRole('button', { name: 'Start', exact: true }).click()
-  check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', 20000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
   await inv('pty:write', lib.ptyKey(home, 'assistant'), 'hello context 300000')
-  await lib.sleep(300) // on purpose: the fake reads a typed line before its Enter, as a CLI does
+  await lib.sleep(lib.timing('pace.keysThenEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
   await inv('pty:write', lib.ptyKey(home, 'assistant'), '\r')
-  check('it answers', !!(await lib.until(async () => (await live())?.status === 'finished', 20000)))
+  check('it answers', !!(await lib.until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))))
   const ctx = panel.locator('.assistant-footer .pane-foot-item', { has: page.locator('.ctx-text') })
-  check('its footer shows the context, about 300k', !!(await lib.until(async () => /300/.test(await ctx.innerText().catch(() => '')), 10000)), await ctx.innerText().catch(() => ''))
+  check('its footer shows the context, about 300k', !!(await lib.until(async () => /300/.test(await ctx.innerText().catch(() => '')), lib.timing('hang.ui'))), await ctx.innerText().catch(() => ''))
 
   /** Compact… in the header's ⋯ (#979: the header's Compact button before), as its menu shows it: label and detail. */
   const compactItem = async () => {
@@ -114,7 +115,7 @@ const check = (name, ok, extra = '') => {
     await box.press('Delete')
     await page.keyboard.type(text)
     await box.press('Enter')
-    return lib.until(async () => (await settings()).assistant.compactSuggestTokens === Number(text), 5000)
+    return lib.until(async () => (await settings()).assistant.compactSuggestTokens === Number(text), lib.timing('hang.ui'))
   }
   check('250000 saves', await enter('250000'))
   check('…and both are highlighted at once', await highlighted(true), JSON.stringify(await shown()))
@@ -130,10 +131,10 @@ const check = (name, ok, extra = '') => {
 
   // --- Never: neither, whatever the context.
   await never.check()
-  check('Never saves 0', !!(await lib.until(async () => (await settings()).assistant.compactSuggestTokens === 0, 5000)))
+  check('Never saves 0', !!(await lib.until(async () => (await settings()).assistant.compactSuggestTokens === 0, lib.timing('hang.ui'))))
   check('…and neither is highlighted', await highlighted(false), JSON.stringify(await shown()))
   await never.uncheck()
-  check('unticking Never brings back 250000, highlighted again', !!(await lib.until(async () => (await settings()).assistant.compactSuggestTokens === 250000, 5000)) && (await highlighted(true)), JSON.stringify(await shown()))
+  check('unticking Never brings back 250000, highlighted again', !!(await lib.until(async () => (await settings()).assistant.compactSuggestTokens === 250000, lib.timing('hang.ui'))) && (await highlighted(true)), JSON.stringify(await shown()))
 
   // --- Back over the context: neither.
   check('400000 saves', await enter('400000'))

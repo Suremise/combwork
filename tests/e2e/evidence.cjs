@@ -21,6 +21,7 @@ const os = require('os')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const runContext = require('./runContext.cjs')
+const { timing } = require('../timing.cjs')
 const { readCitingDocs } = require('./boardRows.cjs')
 
 /** Areas: folders that hold evidence rather than being it (relative to combwork-test). Naming one keeps nothing. */
@@ -122,7 +123,7 @@ function readDbCards(file) {
   let db
   try {
     const { DatabaseSync } = require('node:sqlite')
-    db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
+    db = new DatabaseSync(file, { readOnly: true, timeout: timing('db.busyMs') })
     const cards = []
     for (const row of readCitingDocs(db)) {
       const c = citing({ ...row.doc, number: row.number })

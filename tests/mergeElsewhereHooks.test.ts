@@ -74,7 +74,7 @@ describe('a merge into a branch checked out nowhere, with a post-checkout hook (
   })
 })
 
-describe("a commit hook needing the project folder's untracked files (HI-3109, Darren's decision A)", () => {
+describe("a commit hook needing the project folder's untracked files (HI-3109, decision A)", () => {
   for (const squash of [false, true]) {
     it(`refused (${squash ? 'squash' : 'merge commit'}), saying the hooks ran in a temporary checkout and where to merge instead`, async () => {
       // Husky's way: a commit-msg hook running a tool in node_modules, which only the project folder has.

@@ -307,6 +307,14 @@
       "folder": "plain"
     }
   },
+  "service.folderChanges.commitCancelled": {
+    "placeholders": {}
+  },
+  "service.folderChanges.commitCancelledMoved": {
+    "placeholders": {
+      "head": "select"
+    }
+  },
   "service.folderChanges.commitFailed": {
     "placeholders": {
       "why": "plain"
@@ -370,6 +378,12 @@
   "service.folderChanges.removedForFolder": {
     "placeholders": {
       "file": "plain"
+    }
+  },
+  "service.folderChanges.stashCancelled": {
+    "placeholders": {
+      "made": "select",
+      "stash": "plain"
     }
   },
   "service.folderChanges.stashFailed": {
@@ -568,6 +582,9 @@
     }
   },
   "service.git.outside": {
+    "placeholders": {}
+  },
+  "service.gitCancel.taken": {
     "placeholders": {}
   },
   "service.gitCompare.noBranch": {
@@ -774,6 +791,11 @@
       "now": "plain"
     }
   },
+  "service.gitRepo.stopped": {
+    "placeholders": {
+      "kind": "select"
+    }
+  },
   "service.gitRepo.switchFailed": {
     "placeholders": {
       "branch": "plain",
@@ -895,6 +917,16 @@
   },
   "service.intent.queueNotAgents": {
     "placeholders": {}
+  },
+  "service.jj.revisionNoRepo": {
+    "placeholders": {}
+  },
+  "service.jj.revisionUnreadable": {
+    "placeholders": {
+      "path": "plain",
+      "commit": "plain",
+      "error": "plain"
+    }
   },
   "service.keys.closed": {
     "placeholders": {}
@@ -1180,6 +1212,12 @@
   "service.providers.noSetup": {
     "placeholders": {
       "cli": "plain"
+    }
+  },
+  "service.providers.noTask": {
+    "placeholders": {
+      "cli": "plain",
+      "task": "select"
     }
   },
   "service.providers.notInstalled": {

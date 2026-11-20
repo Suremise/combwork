@@ -10,7 +10,7 @@ const { createHash } = require('crypto')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'idle-profile')
 const ws = path.join(lib.WORK, 'idle-ws')
@@ -48,12 +48,8 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (p, agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === agentId)
-  const until = async (fn, ms) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-    return v
-  }
+  // HI-3396: lib's until (its bound required, the file's interval).
+  const until = (fn, ms) => lib.until(fn, ms)
   // Giving agents tasks is the Assistant's: start it (also the fake) and use its token.
   const home = (await inv('workspace:refresh')).assistant.path
   await inv('session:start', home, { agentId: 'assistant' })

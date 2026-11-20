@@ -9,6 +9,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const source = process.env.CW_BOARD_BENCH_DB
 const base = tempDir('cw-search-bench-')
@@ -34,7 +35,7 @@ afterAll(async () => {
 const WORDS = ['usage', 'release', 'resume', 'board search', 'the', 'flaky', 'e2e', 'worktree', 'Assistant', 'translation', 'zzzzqx', 'card loop']
 
 describe('the full-text search on a real board’s copy', () => {
-  it.skipIf(!source)('costs and saves, timed, and finds what the board finds', { timeout: 600_000 }, async () => {
+  it.skipIf(!source)('costs and saves, timed, and finds what the board finds', { timeout: timing('test.hangRealJj') }, async () => {
     const ws = join(base, 'ws')
     mkdirSync(join(ws, '.combwork'), { recursive: true })
     const file = join(ws, '.combwork', 'combwork.db')

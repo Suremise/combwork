@@ -4,12 +4,14 @@
 // and a deletion; a refusing hook losing nothing; a stash told by its object, kept and named when git fails after making
 // it; the caller's guard, an operation under way, a busy folder; Files' Commit it committing .gitignore alone. Real git
 // in throwaway repositories.
-import { execFileSync, spawn } from 'child_process'
+import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { sleeperScript, startSleeper, winpidsIn } from './msysSleeper'
 import { tempDir } from './tempDir'
+import { timing, waitOptions } from './waits'
 import { commit, gitRepo, sh } from './workflow/harness'
 import type { GitResult } from '../src/main/git'
 import { msysBinFor } from '../src/main/gitWorker'
@@ -53,8 +55,8 @@ vi.mock('original-fs', async (original) => {
 })
 /** HI-3022: a file written just before the next `checkout-index` (a rename's old side put back) runs. */
 let beforeRestore: { file: string; text: string } | null = null
-/** HI-3021: each git command and its bound, while a test collects them (null: none). */
-let gitCalls: { args: string[]; timeout?: number }[] | null = null
+/** HI-3021: each git command, its bound and when it was started (Date.now()), while a test collects them (null: none). */
+let gitCalls: { args: string[]; timeout?: number; at: number }[] | null = null
 /** HI-3021: the next `rev-parse --verify HEAD` fails as an unreadable HEAD does (not an unborn branch's exit 1). */
 let failHeadOnce = false
 /** HI-3053: run with the folder once the next commit or `stash push` is made, before Combwork takes its entries in. */
@@ -72,7 +74,7 @@ vi.mock('../src/main/git', async (original) => {
   return {
     ...real,
     git: async (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]): Promise<GitResult> => {
-      gitCalls?.push({ args, timeout: opts?.timeout })
+      gitCalls?.push({ args, timeout: opts?.timeout, at: Date.now() })
       if (failHeadOnce && args[0] === 'rev-parse' && args.includes('--verify') && args.includes('HEAD')) {
         // HI-3021 (HR2's round 2): HEAD unreadable for a moment, as git fails reading it.
         failHeadOnce = false
@@ -135,10 +137,11 @@ vi.mock('../src/main/gitRepo', async (original) => {
   }
 })
 
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const changes = await import('../src/main/gitFolderChanges')
+const { cancellableGit } = await import('../src/main/gitCancel')
 const { checkouts, worktreeNow } = await import('../src/main/platform/git')
 const { GitPlatform } = await import('../src/main/platform/gitPlatform')
 const { isUnknown } = await import('../src/main/platform/types')
@@ -534,15 +537,16 @@ describe('a commit or stash past its bound (HI-3021)', () => {
    * `pids` and running 30 s (past any bound here): a hook's node, npm or gpg. With `msys` (HI-3047), first a Git Bash
    * `sleep 30` of its own, started in the background by a subshell that then exits: outside Windows' process tree (MSYS's
    * exec leaves its Windows parent gone, and its shell is gone too), found by the timed git's marker. Its winpid is
-   * written once it is sleep (until MSYS's exec, `$!` names the forked sh.exe).
+   * written once it is sleep (until MSYS's exec, `$!` names the forked sh.exe). `started`: a file the script makes before
+   * anything else, the moment git has run it.
    */
-  const slowScript = (pids: string, msys = false): string => {
+  const slowScript = (pids: string, msys = false, started?: string): string => {
     const node = `"${fwd(process.execPath)}" -e 'require("fs").appendFileSync(process.argv[1], process.pid + "\\n"); setTimeout(() => {}, 30000)' "${fwd(pids)}"`
-    return `#!/bin/sh\n${msys ? `( ${sleeper(pids)} )\n` : ''}${node} &\n${node}\n`
+    return `#!/bin/sh\n${started ? `: > "${fwd(started)}"\n` : ''}${msys ? `( ${sleeper(pids)} )\n` : ''}${node} &\n${node}\n`
   }
-  /** Git Bash: a background `sleep 30`, its winpid added to `pids` once it is sleep. */
-  const sleeper = (pids: string): string => `sleep 30 & while :; do read -r e < /proc/$!/exename; case "$e" in */sleep*) break;; esac; done; read -r w < /proc/$!/winpid; echo "$w" >> "${fwd(pids)}"`
-  const pidsIn = (file: string): number[] => (existsSync(file) ? readFileSync(file, 'utf8').split(/\s+/).map(Number).filter((pid) => pid > 0) : [])
+  /** Git Bash: a background `sleep 30`, its winpid added to `pids` once it is sleep (tests/msysSleeper.ts). */
+  const sleeper = sleeperScript
+  const pidsIn = winpidsIn
   const lines = (): string[] => status().split('\n').map((l) => l.trim()).filter(Boolean).sort()
   /** Combwork's own git (GIT_PREFIX: no optional locks, no index refresh), as the queue's advance runs it. */
   const realGit = async (cwd: string, args: string[]): Promise<GitResult> => (await import('../src/main/git')).git(cwd, args)
@@ -560,15 +564,12 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     // HI-3047 (Git for Windows): the hook starts a Git Bash sleep too; and an unrelated one, started as the hook's is but
     // outside the commit (no marker), is left running.
     const msys = process.platform === 'win32'
-    const control = join(tempDir('cw-folderchanges-control-'), 'pids')
     let controlId: { pid: number; started: number }[] = []
     if (msys) {
       const bin = msysBinFor({ env: process.env })
       expect(bin).not.toBeNull()
-      spawn(join(bin!, 'sh.exe'), ['-c', sleeper(control)], { stdio: 'ignore', windowsHide: true, env: baseEnv() }).unref()
-      await vi.waitFor(() => expect(pidsIn(control)).toHaveLength(1), { timeout: 20_000 })
       // Its identity while it is known to be the test's own (#603): ended by it afterwards.
-      controlId = identify(pidsIn(control))
+      controlId = identify([await startSleeper({ bin: bin!, env: baseEnv() })])
       expect(controlId).toHaveLength(1)
     }
     onTestFinished(() => void endExactly(controlId))
@@ -580,11 +581,11 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const before = head()
     const done = settle('commit', ['new.txt', 'a.txt']).catch((e: Error) => e)
     // While the hook runs, the user's own git add works: the real index isn't locked.
-    await vi.waitFor(() => expect(pidsIn(pids)).toHaveLength(msys ? 3 : 2), { timeout: 20_000 })
+    await vi.waitFor(() => expect(pidsIn(pids)).toHaveLength(msys ? 3 : 2), { timeout: timing('wait.hang') })
     sh(proj, 'add', 'b.txt')
     const err = await done
     expect(String(err)).toMatch(/didn't finish the commit in 3 seconds.*The files and the index are as they were/)
-    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: 10_000 })
+    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: timing('wait.hang') })
     expect(stillSame(controlId)).toEqual(controlId.map((c) => c.pid))
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
@@ -600,23 +601,35 @@ describe('a commit or stash past its bound (HI-3021)', () => {
 
   it('Set Aside held up past the bound in a step that holds the index (a slow smudge filter as the files are put back): ended, the stash named, the real index never locked, nothing left', async () => {
     const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
-    const filter = join(tempDir('cw-folderchanges-filter-'), 'slow.sh')
-    writeFileSync(filter, slowScript(pids))
+    const dir = tempDir('cw-folderchanges-filter-')
+    const filter = join(dir, 'slow.sh')
+    const started = join(dir, 'started')
+    writeFileSync(filter, slowScript(pids, false, started))
     sh(proj, 'config', 'filter.slow.clean', 'cat')
-    sh(proj, 'config', 'filter.slow.smudge', `sh "${fwd(filter)}"`)
+    sh(proj, 'config', 'filter.slow.smudge', 'cat')
     writeFileSync(join(proj, '.git', 'info', 'attributes'), 'a.txt filter=slow\n')
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
+    // The bound fits this machine as it is now (HI-3338): the same Set Aside with a filter that holds nothing, timed, and
+    // the bound well past it. A fixed 3 s was ended before git reached the filter on a loaded runner, and nothing held.
+    const t0 = performance.now()
+    await settle('setAside', ['a.txt'])
+    const took = performance.now() - t0
+    sh(proj, 'stash', 'pop', '-q')
+    expect(read('a.txt')).toBe('edit\n')
+    const seconds = Math.min(20, Math.max(3, Math.ceil((3 * took) / 1000)))
+    changes.folderChangesBounds.actMs = seconds * 1000
+    sh(proj, 'config', 'filter.slow.smudge', `sh "${fwd(filter)}"`)
     const done = settle('setAside', ['a.txt']).catch((e: Error) => e)
-    // While git checks a.txt out again (its index lock held), the real index is free.
-    await vi.waitFor(() => expect(pidsIn(pids).length).toBeGreaterThan(0), { timeout: 20_000 })
+    // While git checks a.txt out again (its index lock held), the real index is free. Reached, by the filter's own word.
+    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: timing('wait.hang') })
     expect(existsSync(lockPath())).toBe(false)
     sh(proj, 'add', 'b.txt')
     const err = await done
-    expect(String(err)).toMatch(/didn't finish setting the changes aside in 3 seconds/)
+    expect(String(err)).toMatch(new RegExp(`didn't finish setting the changes aside in ${seconds} seconds`))
     const made = sh(proj, 'rev-parse', 'refs/stash')
     expect(String(err)).toContain(made.slice(0, 12))
     expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('edit')
-    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: 10_000 })
+    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: timing('wait.hang') })
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
     // Usable again: git add, and Commit.
@@ -628,18 +641,143 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit again')
   })
 
+  // HI-3372: the user's Cancel, at the same boundaries as the bound (a hook, a clean filter before any stash, a smudge
+  // filter after it): ended the same way, its tree included, and said as theirs, with what is true (no commit; no stash;
+  // the stash made, named, to look at). Its recovery (HEAD read, the stashes listed, the index left) runs uncancelled.
+  describe('cancelled by the user (HI-3372)', () => {
+    /** Runs `fn` cancellable, cancels it once `started` is there (the hook or filter running), and gives its outcome. */
+    const cancelAt = async (started: string, fn: () => Promise<unknown>): Promise<unknown> => {
+      const ac = new AbortController()
+      const done = cancellableGit(ac.signal, fn).catch((e: Error) => e)
+      await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: timing('wait.hang') })
+      ac.abort()
+      return done
+    }
+    beforeEach(() => {
+      // The bound out of the way (it only bounds a hung one): the Cancel ends it.
+      changes.folderChangesBounds.actMs = 120_000
+    })
+
+    it('Commit cancelled while its pre-commit hook runs: the hook ended too; nothing committed, the index as it was', async () => {
+      const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+      const started = join(tempDir('cw-folderchanges-started-'), 'started')
+      mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+      writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), slowScript(pids, false, started))
+      writeFileSync(join(proj, 'new.txt'), 'new\n')
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const before = head()
+      const was = lines()
+      const err = await cancelAt(started, () => settle('commit', ['new.txt', 'a.txt']))
+      expect(String(err)).toMatch(/You cancelled the commit.*Nothing was committed, and the files and the index are as they were/)
+      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: timing('wait.hang') })
+      expect(head()).toBe(before)
+      expect(lines()).toEqual(was)
+      expect(existsSync(lockPath())).toBe(false)
+      expect(leftovers()).toEqual([])
+    })
+
+    it('a Cancel never pressed: Commit and Set Aside (a staged file) done as without one', async () => {
+      const ac = new AbortController()
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const done = await cancellableGit(ac.signal, () => settle('commit', ['a.txt'])).catch((e: Error) => e)
+      expect(done).not.toBeInstanceOf(Error)
+      expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit')
+      writeFileSync(join(proj, 'b.txt'), 'staged\n')
+      sh(proj, 'add', 'b.txt')
+      const aside = await cancellableGit(ac.signal, () => settle('setAside', ['b.txt'])).catch((e: Error) => e)
+      expect(String(aside instanceof Error ? aside.message : 'ok')).toBe('ok')
+      expect(sh(proj, 'show', 'refs/stash:b.txt')).toBe('staged')
+    })
+
+    it('Commit cancelled before it starts: no git commit runs (no hook), nothing committed', async () => {
+      const started = join(tempDir('cw-folderchanges-started-'), 'started')
+      mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+      writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\n: > "${fwd(started)}"\n`)
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const before = head()
+      const ac = new AbortController()
+      ac.abort()
+      const err = await cancellableGit(ac.signal, () => settle('commit', ['a.txt'])).catch((e: Error) => e)
+      expect(String(err)).toMatch(/You cancelled the commit/)
+      expect(existsSync(started)).toBe(false)
+      expect(head()).toBe(before)
+      expect(leftovers()).toEqual([])
+    })
+
+    it('Set Aside cancelled in a clean filter, before any stash: no stash made, said so; the files as they were', async () => {
+      const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+      const dir = tempDir('cw-folderchanges-filter-')
+      const filter = join(dir, 'slow.sh')
+      const started = join(dir, 'started')
+      writeFileSync(filter, slowScript(pids, false, started))
+      sh(proj, 'config', 'filter.slow.required', 'true')
+      sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
+      sh(proj, 'config', 'filter.slow.smudge', 'cat')
+      writeFileSync(join(proj, '.git', 'info', 'attributes'), 'new.txt filter=slow\n')
+      writeFileSync(join(proj, 'new.txt'), 'new\n')
+      const err = await cancelAt(started, () => settle('setAside', ['new.txt']))
+      expect(String(err)).toMatch(/You cancelled setting the changes aside.*No stash was made/)
+      expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: timing('wait.hang') })
+      expect(existsSync(lockPath())).toBe(false)
+      expect(leftovers()).toEqual([])
+      expect(read('new.txt')).toBe('new\n')
+    })
+
+    it('Set Aside cancelled in a smudge filter, after its stash: the stash named, to look at; kept', async () => {
+      const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
+      const dir = tempDir('cw-folderchanges-filter-')
+      const filter = join(dir, 'slow.sh')
+      const started = join(dir, 'started')
+      writeFileSync(filter, slowScript(pids, false, started))
+      sh(proj, 'config', 'filter.slow.clean', 'cat')
+      sh(proj, 'config', 'filter.slow.smudge', `sh "${fwd(filter)}"`)
+      writeFileSync(join(proj, '.git', 'info', 'attributes'), 'a.txt filter=slow\n')
+      writeFileSync(join(proj, 'a.txt'), 'edit\n')
+      const err = await cancelAt(started, () => settle('setAside', ['a.txt']))
+      const made = sh(proj, 'rev-parse', 'refs/stash')
+      expect(String(err)).toMatch(/You cancelled setting the changes aside.*Git had made a stash \(\w+\) by then: look at it/)
+      expect(String(err)).toContain(made.slice(0, 12))
+      expect(sh(proj, 'show', 'refs/stash:a.txt')).toBe('edit')
+      await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: timing('wait.hang') })
+      expect(existsSync(lockPath())).toBe(false)
+      expect(leftovers()).toEqual([])
+    })
+  })
+
   it('Set Aside held up in a clean filter, before any stash: ended, no stash, the real index and the files as they were', async () => {
     const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
-    const filter = join(tempDir('cw-folderchanges-filter-'), 'slow.sh')
-    writeFileSync(filter, slowScript(pids))
-    sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
+    const dir = tempDir('cw-folderchanges-filter-')
+    const filter = join(dir, 'slow.sh')
+    const started = join(dir, 'started')
+    writeFileSync(filter, slowScript(pids, false, started))
+    // HI-3346: the bound ends git's tree leaves first, so the filter goes before git; a filter not required that fails
+    // is passed over (the file taken unfiltered), and on a slow runner git went on to make the stash before it was ended
+    // itself. Required, a filter ended fails git's stash there, before any stash, whatever the order of the end.
+    sh(proj, 'config', 'filter.slow.required', 'true')
+    sh(proj, 'config', 'filter.slow.clean', 'cat')
+    sh(proj, 'config', 'filter.slow.smudge', 'cat')
     writeFileSync(join(proj, '.git', 'info', 'attributes'), 'new.txt filter=slow\n')
     writeFileSync(join(proj, 'new.txt'), 'new\n')
-    const err = await settle('setAside', ['new.txt']).catch((e: Error) => e)
-    expect(String(err)).toMatch(/didn't finish setting the changes aside in 3 seconds/)
+    // The bound fits this machine as it is now (HI-3338): the same Set Aside with a filter that holds nothing, timed, and
+    // the bound well past it, so git reaches the filter before it.
+    const t0 = performance.now()
+    await settle('setAside', ['new.txt'])
+    const took = performance.now() - t0
+    sh(proj, 'stash', 'pop', '-q')
+    expect(read('new.txt')).toBe('new\n')
+    expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
+    const seconds = Math.min(20, Math.max(3, Math.ceil((3 * took) / 1000)))
+    changes.folderChangesBounds.actMs = seconds * 1000
+    sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
+    const done = settle('setAside', ['new.txt']).catch((e: Error) => e)
+    // Held at the filter, by its own word, and kept there (30 s) until the bound ends it.
+    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: timing('wait.hang') })
+    const err = await done
+    expect(String(err)).toMatch(new RegExp(`didn't finish setting the changes aside in ${seconds} seconds`))
     expect(String(err)).not.toMatch(/in a stash/)
     expect(() => sh(proj, 'rev-parse', '-q', '--verify', 'refs/stash')).toThrow()
-    await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
+    await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: timing('wait.hang') })
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
     expect(read('new.txt')).toBe('new\n')
@@ -651,7 +789,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     writeFileSync(join(proj, '.git', 'hooks', 'post-commit'), `#!/bin/sh\n: > "${fwd(marker)}"\n"${fwd(process.execPath)}" -e 'setTimeout(() => {}, 30000)'\n`)
   }
 
-  // HI-3075 (Darren, 12 Nov): a commit ended at its bound is never credited, even one made before its post-commit hook
+  // HI-3075: a commit ended at its bound is never credited, even one made before its post-commit hook
   // was ended: a hook's own git can move HEAD or commit too, and nothing proves which made it. HEAD moved: said so, with
   // where it is now; the index left as it was, for the user to settle.
   const moved = (sha: string): string => `The branch moved meanwhile, to ${sha.slice(0, 12)}, and Combwork can't tell that it is this commit, so it left the index as it was. Check git log and git status`
@@ -678,7 +816,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
     const before = head()
     const done = settle('commit', ['a.txt']).catch((e: Error) => e)
-    await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: 20_000 })
+    await vi.waitFor(() => expect(existsSync(marker)).toBe(true), { timeout: timing('wait.hang') })
     // Another program takes the index lock and holds it, open, while git still runs and after.
     const fs = await import('fs')
     const fd = fs.openSync(lockPath(), 'wx')
@@ -703,7 +841,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     writeFileSync(join(proj, 'b.txt'), 'theirs\n')
     const before = head()
     const done = settle('commit', ['a.txt']).catch((e: Error) => e)
-    await vi.waitFor(() => expect(pidsIn(pids)).toHaveLength(2), { timeout: 20_000 })
+    await vi.waitFor(() => expect(pidsIn(pids)).toHaveLength(2), { timeout: timing('wait.hang') })
     // The user's own commit meanwhile, with the real index and no hooks.
     sh(proj, '-c', `core.hooksPath=${fwd(join(tempDir('cw-folderchanges-nohooks-'), 'none'))}`, 'commit', '-q', '-m', 'theirs', '--', 'b.txt')
     const theirs = head()
@@ -850,9 +988,9 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     expect(add[0].args.some((a) => a.startsWith('core.hooksPath=') && a.endsWith('.no-hooks'))).toBe(true)
     // The hook hung in the commit itself (bounded) or nowhere: never past the bound in a step without one (it took
     // 30 s before). A bound for a hung run, generous for git's own work.
-    expect(took).toBeLessThan(20_000)
+    expect(took).toBeLessThan(timing('budget.promptEndMs'))
     console.log(`HI-3079: ${out instanceof Error ? out.message : `made ${out.made}`} in ${Math.round(took)} ms`)
-    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: 10_000 })
+    await vi.waitFor(() => expect(pidsIn(pids).filter(alive)).toEqual([]), { timeout: timing('wait.hang') })
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
   })
@@ -950,21 +1088,79 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     })
 
   it("the refresh of what was taken in runs no hook, is bounded and never holds the real index (HR3's round 1): the user's git add while its clean filter runs works and is kept; the filter ended at its bound, the commit said made", async () => {
-    const pids = join(tempDir('cw-folderchanges-pids-'), 'pids')
-    const filter = join(tempDir('cw-folderchanges-filter-'), 'slow.sh')
-    // Slow only for the real index's refresh (the scratch): the private commit's own clean runs at once.
-    writeFileSync(filter, `#!/bin/sh\ncase "$GIT_INDEX_FILE" in\n*.take)\n${slowScript(pids).split('\n').slice(1).join('\n')}\n;;\nesac\ncat\n`)
-    sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
+    const regs = join(tempDir('cw-folderchanges-pids-'), 'pids')
+    const dir = tempDir('cw-folderchanges-filter-')
+    const filter = join(dir, 'slow.sh')
+    const fast = join(dir, 'fast.sh')
+    // HI-3355: each slow filter run's two nodes register themselves, a line each: the run's own id, the node's pid and a
+    // moment it was running (Date.now()). Slow only for the real index's refresh (the scratch): the private commit's own
+    // clean runs at once. Each refresh is held by a run of its own, so each is established on its own.
+    const node = `"${fwd(process.execPath)}" -e 'require("fs").appendFileSync(process.argv[1], process.argv[2] + " " + process.pid + " " + Date.now() + "\\n"); setTimeout(() => {}, 30000)' "${fwd(regs)}" "$run"`
+    writeFileSync(filter, `#!/bin/sh\ncase "$GIT_INDEX_FILE" in\n*.take)\nrun="$$-$RANDOM"\n${node} &\n${node}\n;;\nesac\ncat\n`)
+    writeFileSync(fast, '#!/bin/sh\ncat\n')
+    type Reg = { pid: number; at: number }
+    /** The filter runs whose two nodes have both registered, in the order they did. */
+    const established = (): Reg[][] => {
+      const runs = new Map<string, Reg[]>()
+      for (const [run, pid, at] of (existsSync(regs) ? readFileSync(regs, 'utf8') : '').split(/\r?\n/).map((l) => l.trim().split(' ')))
+        if (run && Number(pid) > 0 && Number(at) > 0) runs.set(run, [...(runs.get(run) ?? []), { pid: Number(pid), at: Number(at) }])
+      return [...runs.values()].filter((r) => r.length === 2)
+    }
+    // Each node by its identity (pid and start time), never its pid alone: a pid ended may name another process by the
+    // time it is looked at. Taken while the run is known to hold (both registered, its bound not reached), and only a
+    // process started by the moment it registered is that node (a reused pid's process starts after the node has gone).
+    const exact = process.platform === 'win32'
+    const identities = (run: Reg[]): Ids => identify(run.map((r) => r.pid)).filter((id) => id.started <= run.find((r) => r.pid === id.pid)!.at)
+    const ids: Ids = []
+    onTestFinished(() => void endExactly(ids))
     writeFileSync(join(proj, '.git', 'info', 'attributes'), 'a.txt filter=slow\n')
+    // The bound fits this machine as it is now (HI-3338): the same Commit with a filter that holds nothing, timed, and
+    // the bound well past it and past taking each run's identities, so both nodes have started and are identified before
+    // it. Headroom only: each run is checked below to have been established before its bound, and fails saying so.
+    sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(fast)}"`)
+    writeFileSync(join(proj, 'a.txt'), 'calibrate\n')
+    const t0 = performance.now()
+    await settle('commit', ['a.txt'])
+    const took = performance.now() - t0
+    const t1 = performance.now()
+    identify([process.pid])
+    const looking = performance.now() - t1
+    changes.folderChangesBounds.actMs = Math.min(20, Math.max(3, Math.ceil((3 * took + 2 * looking) / 1000))) * 1000
+    sh(proj, 'config', 'filter.slow.clean', `sh "${fwd(filter)}"`)
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
     writeFileSync(join(proj, 'b.txt'), 'staged by the user meanwhile\n')
     gitCalls = []
     const settling = settle('commit', ['a.txt'])
-    // While the refresh's filter runs, the real index is free: the user's own git add works (no index.lock).
-    await vi.waitFor(() => expect(pidsIn(pids).length).toBeGreaterThan(0), { timeout: 20_000 })
+    // While the first refresh's filter holds (both its nodes running), the real index is free: the user's own git add
+    // works (no index.lock).
+    const first = await vi.waitFor(
+      () => {
+        const run = established()[0]
+        if (!run) throw new Error("the first refresh's filter has not started both its processes")
+        return run
+      },
+      // HI-3378: HI-3355's bounds as names from the tests' timing file.
+      waitOptions()
+    )
     expect(existsSync(lockPath())).toBe(false)
     sh(proj, 'add', 'b.txt')
+    // The add overlapped the hold (HR2's round 1): done before the first refresh's bound, and its nodes, identified only
+    // now, still running after it. Checked once the Commit has settled.
+    const added = Date.now()
+    const firstIds = identities(first)
+    ids.push(...firstIds)
+    // The refresh made again from the index the user's add wrote: its own run, established while it holds too.
+    const second = vi.waitFor(
+      () => {
+        const run = established()[1]
+        if (!run) throw new Error("the second refresh's filter has not started both its processes")
+        ids.push(...identities(run))
+        return run
+      },
+      { timeout: changes.folderChangesBounds.actMs + timing('wait.hang'), interval: timing('wait.interval') }
+    )
     const done = await settling
+    const runs = [first, await second]
     expect(done.made).toBe(head())
     expect(sh(proj, 'show', 'HEAD:a.txt')).toBe('edit')
     const refresh = gitCalls.filter((c) => c.args.includes('add') && c.args.includes('--refresh'))
@@ -975,14 +1171,28 @@ describe('a commit or stash past its bound (HI-3021)', () => {
       expect(r.timeout).toBe(changes.folderChangesBounds.actMs)
       expect(r.args).toContain('core.fsmonitor=false')
     }
-    await vi.waitFor(() => expect(pidsIn(pids).length > 0 && pidsIn(pids).filter(alive).length === 0).toBe(true), { timeout: 10_000 })
+    // Each run's nodes registered after its refresh started and before its bound, and were identified then: what the
+    // bound ended was an established tree. Else the headroom above was too little on this machine, said as such.
+    runs.forEach((run, i) => {
+      for (const r of run) {
+        expect(r.at, `refresh ${i + 1}: a node registered before its git started`).toBeGreaterThanOrEqual(refresh[i].at)
+        expect(r.at, `refresh ${i + 1}: a node registered only after its bound (${changes.folderChangesBounds.actMs} ms): too little headroom here`).toBeLessThan(refresh[i].at + changes.folderChangesBounds.actMs)
+      }
+    })
+    expect(added, `the user's add finished only after the first refresh's bound (${changes.folderChangesBounds.actMs} ms): too little headroom here`).toBeLessThan(refresh[0].at + changes.folderChangesBounds.actMs)
+    if (exact) expect(firstIds, "the first refresh's nodes still running after the user's add: else it was ended first, too little headroom here").toHaveLength(2)
+    if (exact) expect(ids, 'each node identified while its refresh held').toHaveLength(4)
+    // The refresh's outcome comes once its teardown is over (treeEnding): each node already gone. The bound here is for a
+    // hung run only.
+    await vi.waitFor(() => expect(exact ? stillSame(ids) : runs.flat().map((r) => r.pid).filter(alive)).toEqual([]), { timeout: timing('wait.hang') })
     sh(proj, 'config', '--unset', 'filter.slow.clean')
     // The user's staging kept; a.txt taken in.
     expect(sh(proj, 'show', ':b.txt')).toBe('staged by the user meanwhile')
     expect(lines()).toEqual(['M  b.txt'])
     expect(existsSync(lockPath())).toBe(false)
     expect(leftovers()).toEqual([])
-  })
+    // A calibrated Commit and two bounds of up to 20 s each.
+  }, timing('test.hang'))
 
   it("another git writing the real index during every refresh (HR3's round 1): made again a few times, then taken in under the lock unrefreshed; each of its writes kept, the commit made", async () => {
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
@@ -1014,7 +1224,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const t = performance.now()
     expect(changes.changedPaths(files, was, now)).toEqual(['f7', 'f9', 'f11'])
     // A bound for a hung run, not how long it should take (a scan per path took seconds at 5,000).
-    expect(performance.now() - t).toBeLessThan(5_000)
+    expect(performance.now() - t).toBeLessThan(timing('budget.scanMs'))
     // A path's entries in another order are the same.
     expect(changes.changedPaths(['c'], ['100644 a 2\tc', '100644 b 3\tc'], ['100644 b 3\tc', '100644 a 2\tc'])).toEqual([])
     expect(changes.changedPaths(['new'], [], ['100644 a 0\tnew'])).toEqual(['new'])
@@ -1026,7 +1236,7 @@ describe('a commit or stash past its bound (HI-3021)', () => {
     const t = performance.now()
     expect(changes.sameEntries(a, b)).toBe(true)
     // A bound for a hung run, not how long it should take (once per entry, it took minutes).
-    expect(performance.now() - t).toBeLessThan(5_000)
+    expect(performance.now() - t).toBeLessThan(timing('budget.scanMs'))
     expect(changes.sameEntries(a, [...b.slice(1), 'other'])).toBe(false)
     expect(changes.sameEntries(a, b.slice(1))).toBe(false)
   })
@@ -1255,8 +1465,8 @@ describe('a file in conflict, no operation under way (HI-3025)', () => {
 })
 
 // HI-2982: Files' Stop Tracking (`git rm --cached`) leaves the file's removal staged and the file in the folder. Commit
-// took each path from the folder (`commit --only`), so the file went back into Git with its local content. Darren's
-// decision (11 Nov 2026): git does all the index work; such a path is refused by name, nothing committed or changed.
+// took each path from the folder (`commit --only`), so the file went back into Git with its local content. The
+// decision: git does all the index work; such a path is refused by name, nothing committed or changed.
 describe('a file the user stopped tracking (its removal staged, the file kept)', () => {
   const stopTracking = (file: string, content: string, ignore: boolean): void => {
     commit(proj, { [file]: '{}\n' }, 'tracked')
@@ -1493,14 +1703,18 @@ describe('many changed files', () => {
     return out
   }
 
-  it('Commit of 1,000 untracked files (about 100,000 characters of paths), with a tracked edit: all committed, nothing else', async () => {
-    const files = many(1000)
+  // HI-3332: as many files as pass the command line and no more (each path is 79 characters, so about 410 do): git
+  // writes each one's blob before its hook runs, and 1,000 timed out at 60 s on a busy CI runner.
+  const PAST_THE_LINE = 500
+
+  it('Commit of 500 untracked files (about 40,000 characters of paths), with a tracked edit: all committed, nothing else', async () => {
+    const files = many(PAST_THE_LINE)
     expect(files.join(' ').length).toBeGreaterThan(32_767)
     writeFileSync(join(proj, 'a.txt'), 'edit\n')
     writeFileSync(join(proj, 'b.txt'), 'staged\n')
     sh(proj, 'add', 'b.txt')
     const done = await settle('commit', [...files, 'a.txt'])
-    expect(done.files).toHaveLength(1001)
+    expect(done.files).toHaveLength(PAST_THE_LINE + 1)
     expect(committed()).toEqual([...files, 'a.txt'].sort())
     expect(status()).toBe('M  b.txt')
   })
@@ -1552,15 +1766,18 @@ describe('many changed files', () => {
     expect(status()).toBe(before)
   })
 
-  it('a refusing hook with 1,000 untracked files: the intent-to-add entries taken out again, nothing lost', async () => {
-    const files = many(1000)
+  // HI-3332: since HI-3021 the intent-to-add entries go only into the private index, removed whole on a refusal, so the
+  // count only has to pass the command line.
+  it('a refusing hook with 500 untracked files: the intent-to-add entries never in the real index, nothing lost', async () => {
+    const files = many(PAST_THE_LINE)
+    expect(files.join(' ').length).toBeGreaterThan(32_767)
     mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
     writeFileSync(join(proj, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n')
     const before = head()
     await expect(settle('commit', files)).rejects.toThrow(/Git did not commit/)
     expect(head()).toBe(before)
     expect(sh(proj, 'ls-files', '--stage')).not.toContain('generated')
-    expect(status().split('\n')).toHaveLength(1000)
+    expect(status().split('\n')).toHaveLength(PAST_THE_LINE)
   })
 })
 

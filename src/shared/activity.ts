@@ -82,8 +82,11 @@ export interface ActivityTask {
 /** A process as the tab lists it: Stop's tracking's, with its whole command line, masked like the log. */
 export type ActivityProcess = AgentProcess & {
   command?: string
-  /** Left running by the agent's command (HI-2111): its parent has exited, and it has run past ten minutes; its CPU time in ms. */
-  orphan?: { cpuMs: number }
+  /**
+   * Left running by the agent's command (HI-2111): its parent has exited; its CPU time in ms. Told once it ran past the
+   * minutes set; HI-3206: `run`, held back as a live cw-progress run's (its title), or `host`, a known host, never told.
+   */
+  orphan?: { cpuMs: number; run?: string; host?: true }
 }
 
 /** A running launch's processes (Stop's tracking): its agent, the agent's CLI among them, and the rest. */

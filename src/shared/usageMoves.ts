@@ -1,5 +1,6 @@
 import type { Account, Connection, PlanLimit, PlanUsage, UsageMoveLimit, UsageMoveRecord, UsageMoveRule } from './types'
-import { cleanTag, connectionsOn, sameTag } from './accounts'
+import { connectionsOn } from './accounts'
+import { limitWindow } from './planLimits'
 
 /**
  * Usage moves (HI-2195, SPEC §11.2): an account's rule moves its agents to another account's connections when one of its
@@ -7,16 +8,19 @@ import { cleanTag, connectionsOn, sameTag } from './accounts'
  * watches, when one is due, the period's record, the connection an agent moves to, and why a target can't take them.
  */
 
-const WEEK_MINUTES = 7 * 24 * 60
-const FIVE_HOURS = 5 * 60
-
-/** The limit kind a rule can watch, from its window: the weekly one, the 5-hour one, else none. */
-export function limitKind(l: Pick<PlanLimit, 'windowMinutes'>): Exclude<UsageMoveLimit, 'any'> | null {
-  return l.windowMinutes === WEEK_MINUTES ? 'weekly' : l.windowMinutes === FIVE_HOURS ? 'fiveHour' : null
+/**
+ * The limit kind a rule can watch: the account's own weekly or 5-hour limit, else none. A limit of part of the plan (HI-3262,
+ * decision (a)): Codex's limit for some models (`scope`, HI-1125), Antigravity's per-model weekly quotas or another
+ * named part (`models`, HI-2734), never fires a rule or a watch, whatever its window: moving every agent because one
+ * model is nearly used up is the wrong move. The same rule as what usage calls the 5-hour and weekly limits (limitWindow).
+ */
+export function limitKind(l: Pick<PlanLimit, 'windowMinutes' | 'models' | 'scope'>): Exclude<UsageMoveLimit, 'any'> | null {
+  const w = limitWindow(l)
+  return w === 'other' ? null : w
 }
 
 /** The limits a rule watches: of its kind, or (`any`) the weekly and 5-hour ones, each on its own. */
-export function ruleLimits<L extends Pick<PlanLimit, 'windowMinutes'>>(rule: Pick<UsageMoveRule, 'limit'>, limits: readonly L[]): L[] {
+export function ruleLimits<L extends Pick<PlanLimit, 'windowMinutes' | 'models' | 'scope'>>(rule: Pick<UsageMoveRule, 'limit'>, limits: readonly L[]): L[] {
   return limits.filter((l) => {
     const k = limitKind(l)
     return !!k && (rule.limit === 'any' || rule.limit === k)
@@ -48,23 +52,8 @@ export function periodRecord(kept: UsageMoveRecord | undefined, l: Pick<PlanLimi
 /** Whether a rule is the one a record fired with (HR1: a rule changed since drops what that firing queued). */
 export const sameRule = (a: UsageMoveRule | undefined, b: UsageMoveRule | undefined): boolean => !!a && !!b && a.percent === b.percent && a.limit === b.limit && a.to === b.to
 
-/** Which rule matched an agent's connection on the target (HI-2530), said in the move's notice. */
-export type MatchedBy = 'tag' | 'name' | 'default'
-
-/**
- * The connection an agent moves to (HI-2530): the first on the target account with the same tag as the one it is on
- * (any case and spacing; an untagged connection skips this), else the same name (any case), else the target's first
- * connection, its default. Undefined only when the target has none.
- */
-export function matchConnection(from: Pick<Connection, 'name' | 'tag'>, target: string, connections: readonly Connection[]): { connection: Connection; by: MatchedBy } | undefined {
-  const on = connectionsOn(target, connections)
-  const byTag = cleanTag(from.tag) ? on.find((c) => sameTag(c.tag, from.tag)) : undefined
-  if (byTag) return { connection: byTag, by: 'tag' }
-  const key = from.name.trim().toLowerCase()
-  const byName = on.find((c) => c.name.trim().toLowerCase() === key)
-  if (byName) return { connection: byName, by: 'name' }
-  return on[0] ? { connection: on[0], by: 'default' } : undefined
-}
+/** The connection an agent moves to (HI-2530): accounts.ts's matchConnection, which an account off here uses too (HI-3213). */
+export { matchConnection, type MatchedBy } from './accounts'
 
 /** Why a usage move's target can't take an account's agents anywhere (an account off in one workspace is that workspace's). */
 export type UsageMoveProblem = 'missing' | 'signedOut' | 'noConnections' | 'full' | 'off' | 'failed'

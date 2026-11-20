@@ -13,7 +13,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'unusedwt-profile')
 const ws = path.join(lib.WORK, 'unusedwt-ws')
@@ -75,15 +75,16 @@ function pathWithoutGit() {
   await page.locator('.menu-item', { hasText: 'Remove Agent…' }).click()
   await page.locator('.dialog').getByRole('button', { name: 'Keep worktree and branch' }).click()
   const keptToast = /Merged's worktree is kept/
-  check('removing it keeping its worktree says so once', !!(await lib.until(async () => (await toasts(keptToast)) === 1, 10000)), String(await toasts(keptToast)))
+  check('removing it keeping its worktree says so once', !!(await lib.until(async () => (await toasts(keptToast)) === 1, lib.timing('hang.step'))), String(await toasts(keptToast)))
   await inv('agents:remove', repo, ahead.id, { deleteWorktree: false })
-  await lib.sleep(500)
+  // HI-3385: a window in which a second toast for it would show (the point of the check).
+  await lib.sleep(lib.timing('quiet.toastOnceMs'))
   check('…once only', (await toasts(keptToast)) === 1)
 
   // --- Review: the Changes tab's list of them (#400).
   await page.locator('.toast', { hasText: keptToast }).getByRole('button', { name: 'Review unused worktrees' }).click()
   const section = page.locator('.unused-worktrees-pane .unused-worktrees')
-  check('Review opens Changes at Unused worktrees (2)', !!(await lib.until(async () => (await section.count()) === 1 && /Unused worktrees\s*2/.test(await section.locator('h2').innerText()), 10000)) && (await page.locator('.tab.active, .tab[aria-selected="true"]', { hasText: 'Version Control' }).count()) >= 1, await section.innerText().catch(() => ''))
+  check('Review opens Changes at Unused worktrees (2)', !!(await lib.until(async () => (await section.count()) === 1 && /Unused worktrees\s*2/.test(await section.locator('h2').innerText()), lib.timing('hang.step'))) && (await page.locator('.tab.active, .tab[aria-selected="true"]', { hasText: 'Version Control' }).count()) >= 1, await section.innerText().catch(() => ''))
   const picker = page.locator('.split-list .root-select')
   check('…the folder picker shows "Unused worktrees (2)", first, in its group (#476)', (await picker.inputValue()) === 'unused' && (await picker.locator('optgroup[label^="Unused worktrees"] option').allInnerTexts()).join('|').includes('Unused worktrees (2)') && (await picker.locator('option').evaluateAll((os) => os.map((o) => o.value).find((v) => !(v.startsWith('compare:') || v === 'leftovers')))) === 'unused', (await picker.locator('option').allInnerTexts()).join('|'))
   check('…each made by Combwork (its agent never ran a session there)', (await section.locator('[data-origin="combwork"]').count()) === 2, await section.innerText().catch(() => ''))
@@ -91,7 +92,7 @@ function pathWithoutGit() {
   // Its ⓘ says where they come from, without promising a template gives them back (#1562: 1.0's agents get no worktree).
   await section.locator('h2 .info-icon').first().hover()
   const tipText = async () => (await page.locator('.tip:visible').allInnerTexts()).join(' ')
-  check('…its ⓘ: removed agents (by hand or by a template), made outside Combwork, which can go; no template gives them back', !!(await lib.until(async () => /when a template's agents replaced it.*made outside Combwork.*Loading a template gives none of them to its agents\. Those merged into/s.test(await tipText()), 5000)) && !/gives them back/.test(await tipText()), await tipText())
+  check('…its ⓘ: removed agents (by hand or by a template), made outside Combwork, which can go; no template gives them back', !!(await lib.until(async () => /when a template's agents replaced it.*made outside Combwork.*Loading a template gives none of them to its agents\. Those merged into/s.test(await tipText()), lib.timing('hang.step'))) && !/gives them back/.test(await tipText()), await tipText())
   await shot('changes-tip')
   await page.mouse.move(0, 0)
   const row = (wt) => section.locator(`.unused-wt[data-path="${wt.worktree.path.replace(/\\/g, '\\\\')}"]`)
@@ -100,7 +101,7 @@ function pathWithoutGit() {
   check(`the merged one: "Merged into ${main} · clean", with Remove`, (await mergedRow.innerText()).includes(`Merged into ${main} · clean`) && (await mergedRow.getByRole('button', { name: 'Remove', exact: true }).count()) === 1, await mergedRow.innerText().catch(() => ''))
   check(`the unmerged one: "1 commit not on ${main}", its last commit, no plain Remove`, (await aheadRow.innerText()).includes(`1 commit not on ${main}`) && (await aheadRow.innerText()).includes('Unmerged work') && (await aheadRow.getByRole('button', { name: 'Remove', exact: true }).count()) === 0, await aheadRow.innerText().catch(() => ''))
   check('…Remove anyway…, and no Give to an agent… (#1555)', (await aheadRow.getByRole('button', { name: 'Give to an agent…' }).count()) === 0 && (await aheadRow.getByRole('button', { name: 'Remove anyway…' }).count()) === 1)
-  check('sizes are measured', !!(await lib.until(async () => /\d+(\.\d+)? (B|KB|MB)/.test(await mergedRow.innerText()), 15000)), await mergedRow.innerText())
+  check('sizes are measured', !!(await lib.until(async () => /\d+(\.\d+)? (B|KB|MB)/.test(await mergedRow.innerText()), lib.timing('hang.ui'))), await mergedRow.innerText())
   check('Remove all merged (1)…', (await section.getByRole('button', { name: 'Remove all merged (1)…' }).count()) === 1)
   // No badge is ever cut (the Assistant's OK on #1314): each shows its whole text inside its cell, at every width.
   const badgesWhole = () =>
@@ -187,11 +188,11 @@ function pathWithoutGit() {
   // --- Open the unmerged one: its changes since it left main, and Merge (#400).
   await aheadRow.getByRole('button', { name: 'Open' }).click()
   const fileRow = page.locator('.split-list .row', { hasText: 'work.txt' })
-  check('Open shows its changes like an agent worktree\'s (work.txt), since it left main', !!(await lib.until(async () => (await fileRow.count()) === 1, 10000)) && (await page.locator('.split-list').innerText()).includes(`since it left ${main}`), await page.locator('.split-list').innerText().catch(() => ''))
+  check('Open shows its changes like an agent worktree\'s (work.txt), since it left main', !!(await lib.until(async () => (await fileRow.count()) === 1, lib.timing('hang.step'))) && (await page.locator('.split-list').innerText()).includes(`since it left ${main}`), await page.locator('.split-list').innerText().catch(() => ''))
   check('…the picker names it', (await picker.inputValue()).toLowerCase() === `unused:${ahead.worktree.path}`.toLowerCase())
   await page.locator('.split-list .pane-header [aria-label^="Merge"]').click()
   const mergeDialog = page.locator('.dialog', { hasText: `Merge ${ahead.worktree.branch}` })
-  check('…its Merge opens the Merge dialog on it', !!(await lib.until(async () => (await mergeDialog.count()) === 1 && /Merges\s+1 commit\s+from/.test(await mergeDialog.innerText()), 8000)), await page.locator('.dialog').last().innerText().catch(() => ''))
+  check('…its Merge opens the Merge dialog on it', !!(await lib.until(async () => (await mergeDialog.count()) === 1 && /Merges\s+1 commit\s+from/.test(await mergeDialog.innerText()), lib.timing('hang.step'))), await page.locator('.dialog').last().innerText().catch(() => ''))
   check('…offering to remove it afterwards (not "and the agent", nor moving its branch)', (await mergeDialog.innerText()).includes('Remove the worktree and branch afterwards') && !(await mergeDialog.innerText()).includes('and the agent'))
   await shot('changes-merge-dark')
   await theme('light')
@@ -207,21 +208,21 @@ function pathWithoutGit() {
   // --- The Overview: one line, linking to Changes.
   await page.locator('.tab', { hasText: 'Overview' }).click()
   const line = page.locator('.unused-worktrees-line')
-  check('the Overview shows one line: "2 unused worktrees (1 merged) — Review in Changes"', !!(await lib.until(async () => (await line.count()) === 1, 8000)) && /2 unused worktrees \(1 merged\)\s*—\s*Review in Changes/.test(await line.innerText()) && (await page.locator('.unused-wt').count()) === 0, await line.innerText().catch(() => ''))
+  check('the Overview shows one line: "2 unused worktrees (1 merged) — Review in Changes"', !!(await lib.until(async () => (await line.count()) === 1, lib.timing('hang.step'))) && /2 unused worktrees \(1 merged\)\s*—\s*Review in Changes/.test(await line.innerText()) && (await page.locator('.unused-wt').count()) === 0, await line.innerText().catch(() => ''))
   await shot('overview-line-dark')
   await theme('light')
   await shot('overview-line-light')
   await theme('dark')
   await line.getByText('Review in Changes').click()
-  check('…which opens Changes at the list', !!(await lib.until(async () => (await section.count()) === 1, 8000)))
+  check('…which opens Changes at the list', !!(await lib.until(async () => (await section.count()) === 1, lib.timing('hang.ui'))))
 
   // --- Changes' project folder: the notice, only while one holds work.
   await picker.selectOption('')
   const notice = page.locator('.unused-work-notice')
-  check('Changes says an unused worktree has work not on main', !!(await lib.until(async () => (await notice.count()) === 1, 8000)) && (await notice.innerText()).includes(`1 unused worktree has work that isn't on ${main}`), await notice.innerText().catch(() => ''))
+  check('Changes says an unused worktree has work not on main', !!(await lib.until(async () => (await notice.count()) === 1, lib.timing('hang.step'))) && (await notice.innerText()).includes(`1 unused worktree has work that isn't on ${main}`), await notice.innerText().catch(() => ''))
   await shot('changes')
   await notice.getByText('Review').click()
-  check('…its Review goes to the list', !!(await lib.until(async () => (await section.count()) === 1, 8000)))
+  check('…its Review goes to the list', !!(await lib.until(async () => (await section.count()) === 1, lib.timing('hang.ui'))))
 
   // --- Storage: a line for them.
   const st = await inv('storage:project', repo, true)
@@ -234,7 +235,7 @@ function pathWithoutGit() {
 
   // --- Remove the merged one: folder and branch.
   await mergedRow.getByRole('button', { name: 'Remove', exact: true }).click()
-  check('Remove deletes the merged one and its branch', !!(await lib.until(async () => (await mergedRow.count()) === 0 && !fs.existsSync(merged.worktree.path), 10000)) && !branches().includes(merged.worktree.branch), JSON.stringify(branches()))
+  check('Remove deletes the merged one and its branch', !!(await lib.until(async () => (await mergedRow.count()) === 0 && !fs.existsSync(merged.worktree.path), lib.timing('hang.step'))) && !branches().includes(merged.worktree.branch), JSON.stringify(branches()))
 
   // --- The unmerged one: plain removal refused; Remove anyway….
   const refused = await inv('worktrees:removeUnused', repo, ahead.worktree.path, {})
@@ -242,7 +243,7 @@ function pathWithoutGit() {
   await shot('holds-work')
   await aheadRow.getByRole('button', { name: 'Remove anyway…' }).click()
   const danger = page.locator('.dialog', { hasText: 'Remove the worktree anyway?' })
-  await lib.until(async () => (await danger.count()) === 1, 5000)
+  await lib.until(async () => (await danger.count()) === 1, lib.timing('hang.ui'))
   check('Remove anyway… names what goes', (await danger.innerText()).includes(`1 commit on ${ahead.worktree.branch} not on ${main}`), await danger.innerText())
   await shot('anyway')
   // Changed while the question is open: confirming removes nothing; the question closes, Combwork checks again and asks
@@ -250,7 +251,7 @@ function pathWithoutGit() {
   fs.writeFileSync(path.join(ahead.worktree.path, 'later.txt'), 'written after the question')
   await danger.getByRole('button', { name: 'Remove Anyway' }).click()
   const again = page.locator('.dialog', { hasText: 'Checked again: remove it anyway?' })
-  check('a worktree changed while the question was open is kept, and asked about again as it is now', !!(await lib.until(async () => (await again.count()) === 1, 8000)) && /Nothing was removed: it changed since you were shown/.test(await again.innerText()) && (await again.innerText()).includes('1 uncommitted file') && fs.existsSync(path.join(ahead.worktree.path, 'later.txt')), await page.locator('.dialog').last().innerText().catch(() => ''))
+  check('a worktree changed while the question was open is kept, and asked about again as it is now', !!(await lib.until(async () => (await again.count()) === 1, lib.timing('hang.step'))) && /Nothing was removed: it changed since you were shown/.test(await again.innerText()) && (await again.innerText()).includes('1 uncommitted file') && fs.existsSync(path.join(ahead.worktree.path, 'later.txt')), await page.locator('.dialog').last().innerText().catch(() => ''))
   check('…no Try Again', (await page.getByRole('button', { name: 'Try Again' }).count()) === 0)
   await shot('again-dark')
   await theme('light')
@@ -264,16 +265,17 @@ function pathWithoutGit() {
   })
   await again.getByRole('button', { name: 'Remove Anyway' }).click()
   const expired = page.locator('.dialog', { hasText: 'more than 15 minutes ago' })
-  check('a question left open past 15 minutes removes nothing, and asks again with a new check', !!(await lib.until(async () => (await expired.count()) === 1, 8000)) && fs.existsSync(ahead.worktree.path), await page.locator('.dialog').last().innerText().catch(() => ''))
+  check('a question left open past 15 minutes removes nothing, and asks again with a new check', !!(await lib.until(async () => (await expired.count()) === 1, lib.timing('hang.ui'))) && fs.existsSync(ahead.worktree.path), await page.locator('.dialog').last().innerText().catch(() => ''))
   await app.evaluate(() => {
     Date.now = globalThis.__realNow
   })
   await expired.getByRole('button', { name: 'Remove Anyway' }).click()
-  check('…and removes it, branch too (the branch goes just after the folder)', !!(await lib.until(async () => !fs.existsSync(ahead.worktree.path) && !branches().includes(ahead.worktree.branch), 10000)), JSON.stringify([fs.existsSync(ahead.worktree.path), branches(), (await page.locator('.toast').allInnerTexts()).join(' | ')]))
-  check('the list goes with the last of them (the page says there are none, #476)', !!(await lib.until(async () => (await section.locator('.unused-wt').count()) === 0 && /no unused worktrees/.test(await section.innerText().catch(() => '')), 8000)), await section.innerText().catch(() => ''))
+  check('…and removes it, branch too (the branch goes just after the folder)', !!(await lib.until(async () => !fs.existsSync(ahead.worktree.path) && !branches().includes(ahead.worktree.branch), lib.timing('hang.step'))), JSON.stringify([fs.existsSync(ahead.worktree.path), branches(), (await page.locator('.toast').allInnerTexts()).join(' | ')]))
+  check('the list goes with the last of them (the page says there are none, #476)', !!(await lib.until(async () => (await section.locator('.unused-wt').count()) === 0 && /no unused worktrees/.test(await section.innerText().catch(() => '')), lib.timing('hang.step'))), await section.innerText().catch(() => ''))
   // The tab loads its list first; the notice would be there by then.
-  await lib.until(async () => (await page.locator('.split-list .pane-header', { hasText: 'Changes' }).count()) === 1, 8000)
-  await lib.sleep(500)
+  await lib.until(async () => (await page.locator('.split-list .pane-header', { hasText: 'Changes' }).count()) === 1, lib.timing('hang.ui'))
+  // HI-3385: a window in which the loaded list would draw the notice (its absence is the point).
+  await lib.sleep(lib.timing('quiet.listDrawnMs'))
   check('…and the Changes notice', (await notice.count()) === 0)
 
   // Claudette removed keeping its worktree: the unused one the steps below use.
@@ -301,18 +303,18 @@ function pathWithoutGit() {
   await page.getByText('repo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Version Control' }).click()
   const picker2 = page.locator('.split-list .root-select')
-  await lib.until(async () => (await picker2.locator(`option[value="unused:${claudette.worktree.path.replace(/\\/g, '\\\\')}"]`).count()) === 1, 10000)
+  await lib.until(async () => (await picker2.locator(`option[value="unused:${claudette.worktree.path.replace(/\\/g, '\\\\')}"]`).count()) === 1, lib.timing('hang.step'))
   await picker2.selectOption(`unused:${claudette.worktree.path}`)
-  await lib.until(async () => (await page.locator('.split-list .row', { hasText: 'claudette.txt' }).count()) === 1, 10000)
+  await lib.until(async () => (await page.locator('.split-list .row', { hasText: 'claudette.txt' }).count()) === 1, lib.timing('hang.ui'))
   await page.locator('.split-list .pane-header [aria-label^="Merge"]').click()
   const merging = page.locator('.dialog', { hasText: `Merge ${claudette.worktree.branch}` })
-  await lib.until(async () => (await merging.count()) === 1 && /Merges/.test(await merging.innerText()), 8000)
+  await lib.until(async () => (await merging.count()) === 1 && /Merges/.test(await merging.innerText()), lib.timing('hang.step'))
   await merging.locator('label', { hasText: 'Remove the worktree and branch afterwards' }).locator('input').check()
   await merging.getByRole('button', { name: 'Merge', exact: true }).click()
   const onMain = () => lib.git(repo, ['log', '--format=%s', main]).includes('Claudette kept work') || fs.existsSync(path.join(repo, 'claudette.txt'))
-  check('Merge brings its work onto main', !!(await lib.until(async () => onMain(), 15000)), lib.git(repo, ['log', '--oneline', '-5']))
-  check('…and removes its folder and branch afterwards', !!(await lib.until(async () => !fs.existsSync(claudette.worktree.path) && !branches().includes(claudette.worktree.branch), 10000)), JSON.stringify([fs.existsSync(claudette.worktree.path), branches()]))
-  check('…and the picker no longer lists it', !!(await lib.until(async () => (await picker2.locator(`option[value="unused:${claudette.worktree.path.replace(/\\/g, '\\\\')}"]`).count()) === 0, 8000)))
+  check('Merge brings its work onto main', !!(await lib.until(async () => onMain(), lib.timing('hang.step'))), lib.git(repo, ['log', '--oneline', '-5']))
+  check('…and removes its folder and branch afterwards', !!(await lib.until(async () => !fs.existsSync(claudette.worktree.path) && !branches().includes(claudette.worktree.branch), lib.timing('hang.step'))), JSON.stringify([fs.existsSync(claudette.worktree.path), branches()]))
+  check('…and the picker no longer lists it', !!(await lib.until(async () => (await picker2.locator(`option[value="unused:${claudette.worktree.path.replace(/\\/g, '\\\\')}"]`).count()) === 0, lib.timing('hang.step'))))
   await app.close()
 
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

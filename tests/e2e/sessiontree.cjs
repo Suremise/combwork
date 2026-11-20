@@ -14,9 +14,9 @@ const fs = require('fs')
 const path = require('path')
 const { sessionsOf, putSessions } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 // The whole list held 20 s by the test seam below, then read: a bound for a hung read beyond that.
-const HELD_LIST_HUNG_MS = 40000
+const HELD_LIST_HUNG_MS = lib.timing('hang.step')
 
 const userData = path.join(lib.WORK, 'sessiontree-profile')
 const ws = path.join(lib.WORK, 'sessiontree-ws')
@@ -93,13 +93,14 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const claude = await lib.addAgent(inv, alpha, { name: 'Claude' })
   const codexette = await lib.addAgent(inv, alpha, { name: 'Codexette', provider: 'codex' })
   await inv('session:start', alpha, { agentId: claude.id })
-  await lib.until(async () => ['waiting', 'ready'].includes((await live(claude.id))?.status), 20000)
+  await lib.until(async () => ['waiting', 'ready'].includes((await live(claude.id))?.status), lib.timing('hang.ui'))
   if ((await live(claude.id))?.status === 'waiting') await inv('pty:write', lib.ptyKey(alpha, claude.id), '\r')
-  await lib.until(async () => (await live(claude.id))?.status === 'ready', 20000)
+  // before any turn (HI-2688): its start, restart or resume
+  await lib.until(async () => (await live(claude.id))?.status === 'ready', lib.timing('hang.step'))
   await inv('pty:write', lib.ptyKey(alpha, claude.id), 'hello')
-  await lib.sleep(300)
+  await lib.sleep(lib.timing('pace.keysThenEnterMs')) // on purpose: the fake reads a typed line before its Enter, as a CLI does
   await inv('pty:write', lib.ptyKey(alpha, claude.id), '\r')
-  check('Claude runs a session', !!(await lib.until(async () => (await live(claude.id))?.status === 'finished', 20000)))
+  check('Claude runs a session', !!(await lib.until(async () => (await live(claude.id))?.status === 'finished', lib.timing('hang.step'))))
   const liveId = (await live(claude.id)).sessionId
   await inv('session:rename', alpha, liveId, 'Running now')
 
@@ -144,15 +145,15 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const DE = path.join(lib.ROOT, 'locales', 'de')
   const german = Object.assign({}, ...fs.readdirSync(DE).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(DE, f), 'utf8'))))
   const base = (await inv('app:info')).language
-  /** The window shown in a language, as main sends a change of language (i18nlive's way). */
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+  /** The window shown in a language (`code`; none: English), as main sends a change of language; main reads its catalogue (HI-3434). */
+  const speak = (code) => lib.speakLanguage(app, base, code)
   const archivedBox = () => page.locator('.sessions-filters label').innerText().catch(() => '')
   const narrowShots = async (name, el) => {
     const width = await list.evaluate((e) => e.style.width)
     await list.evaluate((e) => (e.style.width = '200px'))
     await lib.until(async () => Math.round((await list.boundingBox()).width) === 200, HUNG_MS)
-    for (const [lang, language, label] of [['en', base, 'Archived'], ['de', { ...base, code: 'de', locale: 'de', messages: german }, german['sessions.filter.archived']]]) {
-      await speak(language)
+    for (const [lang, code, label] of [['en', undefined, 'Archived'], ['de', 'de', german['sessions.filter.archived']]]) {
+      await speak(code)
       await lib.until(async () => (await archivedBox()).trim() === label, HUNG_MS)
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
@@ -166,7 +167,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
         await list.screenshot({ path: path.join(lib.WORK, `sessiontree-narrow-${name}-${lang}-${theme}.png`) })
       }
     }
-    await speak(base)
+    await speak()
     await lib.until(async () => (await archivedBox()).trim() === 'Archived', HUNG_MS)
     await inv('settings:update', { appearance: { theme: 'dark' } })
     await list.evaluate((e, w) => (e.style.width = w), width)
@@ -187,7 +188,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const row = (name) => page.locator('.sessions-tree .session-row', { hasText: name })
   const branch = (label) => page.locator('.sessions-tree .session-branch', { has: page.locator('.label', { hasText: new RegExp(`^${label.replace(/[()]/g, '\\$&')}$`) }) })
   const names = async () => (await page.locator('.sessions-tree .session-row strong').allInnerTexts()).map((t) => t.trim())
-  await lib.until(async () => (await page.locator('.sessions-tree .session-branch').count()) > 0, 15000)
+  await lib.until(async () => (await page.locator('.sessions-tree .session-branch').count()) > 0, lib.timing('hang.step'))
 
   // --- Shape and counts.
   const providers = (await page.locator('.session-branch-provider .label').allInnerTexts()).map((t) => t.trim())
@@ -222,7 +223,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   check('a provider folds', !(await names()).includes('Codex work'))
   await page.locator('.tab', { hasText: 'Files' }).click()
   await page.locator('.tab', { hasText: 'Sessions' }).click()
-  await lib.until(async () => (await page.locator('.sessions-tree .session-branch').count()) > 0, 10000)
+  await lib.until(async () => (await page.locator('.sessions-tree .session-branch').count()) > 0, lib.timing('hang.step'))
   check('folded stays folded when the tab opens again', !(await names()).includes('Codex work') && (await names()).includes('Old notes'))
   // Settings are saved a moment after they change.
   const savedPrefs = () => {
@@ -232,15 +233,20 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
       return {}
     }
   }
-  await lib.until(async () => savedPrefs()['p:codex'] === false, 5000)
+  await lib.until(async () => savedPrefs()['p:codex'] === false, lib.timing('hang.ui'))
   const saved = savedPrefs()
   check('the folding is saved for the project', saved['p:codex'] === false, JSON.stringify(saved))
   // A branch folded with its session shown stays folded when the list refreshes.
   await row('Old notes').click()
   await branch('Claude').first().click()
   await lib.until(async () => !(await names()).includes('Old notes'), HUNG_MS)
+  // HI-3386: a session the list hasn't shown yet, recorded before the Refresh: shown, it says the refreshed list has
+  // landed, and only then does the branch staying folded mean anything.
+  const refreshed = sessionsOf(alpha)
+  refreshed.sessions.push(rec(id(14), 'Listed on refresh', 3, { agentId: 'a-0c0de00', agentName: 'Coder' }))
+  putSessions(alpha, refreshed)
   await page.locator('.sessions-list .pane-header [aria-label="Refresh"]').click()
-  await lib.sleep(700)
+  check('the refreshed list lands', !!(await lib.until(async () => (await names()).includes('Listed on refresh'), lib.timing('hang.ui'))), JSON.stringify(await names()))
   check('a folded branch stays folded when the list refreshes, though its session is shown', !(await names()).includes('Old notes') && /Old notes/.test(await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')))
   await branch('Claude').first().click()
   await lib.until(async () => (await names()).includes('Old notes'), HUNG_MS)
@@ -248,10 +254,10 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   // --- Search filters the tree and opens what matches.
   const search = page.locator('.sessions-list .files-filter input')
   await search.fill('Review push')
-  await lib.until(async () => JSON.stringify(await names()) === JSON.stringify(['Codex work', 'Review push']), 8000)
+  await lib.until(async () => JSON.stringify(await names()) === JSON.stringify(['Codex work', 'Review push']), lib.timing('hang.step'))
   check('search by name opens the folded branch to the match (and its session)', JSON.stringify(await names()) === JSON.stringify(['Codex work', 'Review push']), JSON.stringify(await names()))
   await search.fill('zebra')
-  await lib.until(async () => (await page.locator('.sessions-tree .search-hit').count()) > 0, 10000)
+  await lib.until(async () => (await page.locator('.sessions-tree .search-hit').count()) > 0, lib.timing('hang.step'))
   check('search finds transcript text, with the match under its session', JSON.stringify(await names()) === JSON.stringify(['Old notes']) && /zebra/i.test(await page.locator('.sessions-tree .search-hit').first().innerText()), JSON.stringify(await names()))
   check('the count says how many sessions and matches', /1 session · \d+ match/.test(await page.locator('.sessions-scope').innerText()), await page.locator('.sessions-scope').innerText())
   await narrowShots('count', page.locator('.sessions-scope'))
@@ -284,7 +290,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     await list.evaluate((e, w) => (e.style.width = w), width)
   }
   await search.fill('')
-  await lib.until(async () => (await names()).length > 1, 5000)
+  await lib.until(async () => (await names()).length > 1, lib.timing('hang.ui'))
 
   // --- Keyboard like Files.
   await tree.focus()
@@ -296,7 +302,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   check('↓ moves down (to the Claude agent)', (await at_()) === 'Claude', await at_())
   await page.keyboard.press('ArrowDown')
   const firstSession = await at_()
-  check('moving onto a session shows its transcript', firstSession === 'Running now' && !!(await lib.until(async () => (await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')).trim() === firstSession, 5000)), firstSession)
+  check('moving onto a session shows its transcript', firstSession === 'Running now' && !!(await lib.until(async () => (await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')).trim() === firstSession, lib.timing('hang.step'))), firstSession)
   await page.keyboard.press('ArrowLeft')
   check('← goes to the branch above', (await at_()) === 'Claude', await at_())
   await page.keyboard.press('ArrowLeft')
@@ -334,12 +340,12 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     })
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300)
+    await lib.themeSettled(page, theme)
     const button = await legible(blocked.locator('button.act-resume[disabled]'))
     check(`${theme}: the blocked Resume is unfaded and readable`, button.opacity === 1 && button.ratio >= 4.5, JSON.stringify(button))
     await row('Gone session').click({ button: 'right' })
     const entry = page.locator('.menu .menu-item.act-resume.disabled', { hasText: 'Resume' })
-    await entry.waitFor({ timeout: 3000 }).catch(() => undefined)
+    await lib.until(async () => (await entry.count()) > 0, lib.timing('hang.ui'))
     const item = (await entry.count()) ? await legible(entry.locator('.menu-label')) : null
     check(`${theme}: its menu's disabled Resume is unfaded and readable`, !!item && item.opacity === 1 && item.ratio >= 4.5, JSON.stringify(item))
     await page.keyboard.press('Escape')
@@ -351,13 +357,13 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
       await el.hover().catch(() => undefined)
       tip = await page.locator('.tip').last().innerText().catch(() => '')
       return tip.length > 0
-    }, 8000)
+    }, lib.timing('hang.ui'))
     return tip
   }
   const why = await tipFor(blocked)
   check('…with the reason as its tooltip', /Neither Claude Code nor Combwork has its transcript/.test(why), why)
   await branch('Codex').first().click()
-  await lib.until(async () => (await names()).includes('Review rm'), 5000)
+  await lib.until(async () => (await names()).includes('Review rm'), lib.timing('hang.ui'))
   await row('Review rm').click()
   check('a guardian review is marked, and its Resume is disabled', (await page.locator('.transcript-toolbar .sub-kind').count()) === 1 && (await blocked.locator('button[disabled]').count()) === 1)
   const subWhy = await tipFor(blocked)
@@ -372,7 +378,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const holder = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$f = [IO.File]::Open('${backup(C.notes).replace(/'/g, "''")}', 'Open', 'Read', 'None'); [Console]::Out.WriteLine('held'); [Console]::Out.Flush(); Start-Sleep -Seconds 120`], { env: lib.baseEnv(), windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
   let held = false
   holder.stdout.on('data', (d) => (held ||= String(d).includes('held')))
-  await lib.until(async () => held, 20000)
+  await lib.until(async () => held, lib.timing('hang.ui'))
   check('a backup is held open by another program', held)
   await branch('Claude').first().click({ button: 'right' })
   const menu = page.locator('.menu').last()
@@ -386,10 +392,10 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   await page.screenshot({ path: path.join(lib.WORK, 'sessiontree-3-confirm.png') })
   await page.locator('.dialog-footer button', { hasText: /^Delete All$/ }).click()
   const toast = page.locator('.toast', { hasText: 'skipped' })
-  await lib.until(async () => (await toast.count()) > 0, 10000)
+  await lib.until(async () => (await toast.count()) > 0, lib.timing('hang.ui'))
   const said = await toast.first().innerText().catch(() => '')
   check('the result says what was skipped and why', /Deleted 2 sessions; 2 skipped: 1 running, 1 in use/.test(said), said)
-  await lib.until(async () => !(await names()).includes('Tray fixes'), 8000)
+  await lib.until(async () => !(await names()).includes('Tray fixes'), lib.timing('hang.ui'))
   const after = await names()
   check('the rest are gone; the running and held ones stay', !after.includes('Tray fixes') && !after.includes('Gone session') && after.includes('Old notes') && after.includes('Running now'), JSON.stringify(after))
   check("Combwork's copy of a deleted one is in the Recycle Bin, the held one's is kept", !fs.existsSync(backup(C.tray)) && fs.existsSync(backup(C.notes)))
@@ -401,14 +407,14 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   // --- Archive all on Codex, with its session's transcript open here: the view closes first (an open one is in use),
   // nothing is skipped for it, and the result says so. Its guardian reviews go with it; the orphan stays.
   await row('Codex work').click()
-  await lib.until(async () => /Codex work/.test(await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')), 5000)
+  await lib.until(async () => /Codex work/.test(await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')), lib.timing('hang.ui'))
   await branch('Codex').first().click({ button: 'right' })
   await lib.until(async () => (await menu.count()) > 0, HUNG_MS)
   await menu.locator('.menu-item', { hasText: /^Archive All… \(3\)/ }).click()
   await page.locator('.dialog-footer button', { hasText: /^Archive All$/ }).click()
-  await lib.until(async () => !(await names()).includes('Codex work'), 8000)
+  await lib.until(async () => !(await names()).includes('Codex work'), lib.timing('hang.ui'))
   const archivedToast = page.locator('.toast', { hasText: 'Archived 3 sessions' })
-  await lib.until(async () => (await archivedToast.count()) > 0, 8000)
+  await lib.until(async () => (await archivedToast.count()) > 0, lib.timing('hang.ui'))
   const archivedSaid = await archivedToast.first().innerText().catch(() => '')
   check('the open transcript closed first, nothing was skipped for it, and the result says so', /Archived 3 sessions\./.test(archivedSaid) && !/skipped/.test(archivedSaid) && /closed first/.test(archivedSaid), archivedSaid)
   check('its view stays closed', !/Codex work/.test(await page.locator('.transcript-toolbar strong').first().innerText().catch(() => '')))
@@ -417,7 +423,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   check('the guardian review whose session isn’t listed stays', archived.includes('Lost review'))
   check('it is archived in Combwork', sessionsOf(alpha).sessions.find((s) => s.id === C.codex)?.archived === true)
   await page.getByText('Archived', { exact: true }).click()
-  await lib.until(async () => (await names()).includes('Codex work'), 5000)
+  await lib.until(async () => (await names()).includes('Codex work'), lib.timing('hang.ui'))
   check('Archived shows it again, with its sub-sessions', (await names()).includes('Codex work') && (await names()).includes('Review rm'))
 
   await app.close()

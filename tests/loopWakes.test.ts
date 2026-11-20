@@ -7,6 +7,7 @@ import { laneStartDue } from '../src/shared/lanes'
 import type { LaneCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
+import { timing } from './timing.cjs'
 
 /** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
 const { returns, resubmits } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>(), resubmits: new Map<number, string>() }))
@@ -112,7 +113,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
   // lands is kept for later (#560): so a check waits for the outcome, trying the waiting wakes as it polls, never reads
   // once after a try. Waiting gives up after 10 s, not vi.waitFor's 1 s, which four unit suites at once outran (#560):
   // the bound only says when one has hung.
-  const HANG = { timeout: 10_000 }
+  const HANG = { timeout: timing('wait.hang') }
   /** Waits until `count` lines in all were typed, trying the waiting wakes meanwhile. */
   const typedUntil = async (st: { typed: unknown[] }, count: number) =>
     vi.waitFor(async () => {
@@ -678,11 +679,15 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     // It names the design, which the answer names.
     expect(st.typed[0].text).toContain(`The builder: "design ${id} posted for your check (answer with its id): Design: a step the reviewer is woken for."`)
     expect(st.typed[0].text).toContain("check it and answer with cw_loop_step (ok, or gaps saying what's missing, and its id)")
+    // HI-3211 (decision (b)): R1's own watch, for Review alone, didn't fire, and is still on: the line says so.
+    expect(st.typed[0].text).toContain("This is your card loop's handoff (Wake reviewers and builders), not your card watch, which is still on.")
     st.status.set('b1', 'ready')
     await inWorkspace(w, () => runCardIntent({ n: c, plain: false }, r1, { kind: 'loopStep', step: 'ok', text: 'Holds: build it.', design: id }))
     await typedUntil(st, 2)
     expect(st.typed[1]).toMatchObject({ agent: 'b1' })
     expect(st.typed[1].text).toContain(`The reviewer: "design ${id} is OK: Holds: build it."`)
+    // B1 has no card watch: nothing said of one.
+    expect(st.typed[1].text).not.toContain('still on')
     await vi.waitFor(async () => expect(await history(w, c)).toEqual(expect.arrayContaining(['Combwork: Woke R1 (alpha) with a card loop step (a loop wake)', 'Combwork: Woke B1 (alpha) with a card loop step (a loop wake)'])), HANG)
     await disposeWorkspaceService(w)
   })

@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'pages-profile')
 const ws = path.join(lib.WORK, 'pages-ws')
@@ -35,7 +35,7 @@ const check = (name, ok, extra = '') => {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('crowd', { exact: true }).first().click()
-  await lib.sleep(500)
+  await lib.readyWithin('its project shown', async () => (await page.locator('.project-row.selected', { hasText: 'crowd' }).count()) === 1, lib.timing('hang.ui'))
   // Panes on screen, and the agents in them (an empty pane has no header).
   const panes = () => page.locator('.agent-pane').count()
   const shown = async () => (await page.locator('.pane-header-bar .agent-name').allInnerTexts()).map((t) => t.trim()).join(',')
@@ -44,17 +44,18 @@ const check = (name, ok, extra = '') => {
   const add = async (n) => {
     for (let i = 0; i < n; i++) await inv('agents:add', proj, { location: 'project', provider: 'claude-code' })
     await inv('workspace:refresh')
-    await lib.sleep(600)
+    // HI-3396: what main told the window of them drawn.
+    await lib.answersDrawn(inv, page)
   }
   const cfg = async () => (await inv('workspace:refresh')).projects[0].config
   const choose = async (label) => {
     await page.locator(`.layout-switch button[aria-label="${label}"]`).click()
-    await lib.until(async () => (await page.locator(`.layout-switch button.active[aria-label="${label}"]`).count()) === 1, 5000)
-    await lib.sleep(300)
+    await lib.until(async () => (await page.locator(`.layout-switch button.active[aria-label="${label}"]`).count()) === 1, lib.timing('hang.ui'))
+    await lib.framesDrawn(page)
   }
   const go = async (n) => {
     await page.locator(`.page-switch button[aria-label="Agent page ${n}"]`).click()
-    await lib.until(async () => (await active()) === String(n), 5000)
+    await lib.until(async () => (await active()) === String(n), lib.timing('hang.ui'))
   }
 
   // Four agents in three columns: two pages, the fourth alone on page 2 (beside two empty panes).
@@ -80,14 +81,14 @@ const check = (name, ok, extra = '') => {
   // A fresh hover (the tooltip hides on the click that went to page 2).
   await page.mouse.move(0, 0)
   await page.locator('.page-switch button[aria-label="Agent page 2"]').hover()
-  const tipText = async () => (await page.locator('.tip').first().textContent({ timeout: 500 }).catch(() => '')) ?? ''
+  const tipText = async () => (await page.locator('.tip').first().textContent({ timeout: lib.timing('poll.readMs') }).catch(() => '')) ?? ''
   check('the page button names its agents', !!(await lib.until(async () => (await tipText()).startsWith('Page 2: Agent 5 and Agent 6'), HUNG_MS)), await tipText())
   await page.mouse.move(0, 0)
   // One at a time: no page buttons, the focused agent shown; choosing an agent in the summary chip's list shows it (#975).
   await choose('One at a time')
   check('one at a time: no page buttons, one pane', (await buttons()) === 0 && (await panes()) === 1, `${await buttons()} / ${await panes()}`)
   await lib.showAgent(page, 'Agent 2')
-  await lib.until(async () => (await shown()) === 'Agent 2', 5000)
+  await lib.until(async () => (await shown()) === 'Agent 2', lib.timing('hang.ui'))
   check("the summary chip's list shows its agent", (await shown()) === 'Agent 2', await shown())
   // The one that shows them all (six: a 3×2 grid) is automatic again.
   await choose('Grid of six')
@@ -96,21 +97,21 @@ const check = (name, ok, extra = '') => {
   // The seventh (added here, the quick add) opens page 2 of the automatic grid, with a note about memory.
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+Shift+N')
-  await lib.until(async () => (await active()) === '2', 10000)
+  await lib.until(async () => (await active()) === '2', lib.timing('hang.ui'))
   check('the seventh agent opens page 2', (await active()) === '2')
   check('page 2 shows it, its spare panes empty', (await shown()) === 'Agent 7' && (await panes()) === 6, `${await shown()} / ${await panes()}`)
   check('a note on what seven agents cost', (await page.locator('.toast', { hasText: '7 agents in this project' }).count()) === 1)
   await page.screenshot({ path: path.join(lib.WORK, 'pages-2-page2.png') })
   await page.keyboard.press('Control+Alt+PageUp')
-  await lib.until(async () => (await active()) === '1', 5000)
+  await lib.until(async () => (await active()) === '1', lib.timing('hang.ui'))
   check('Ctrl+Alt+PageUp: page 1, its six', (await active()) === '1' && (await shown()).split(',').length === 6)
   await page.keyboard.press('Control+Alt+PageDown')
-  await lib.until(async () => (await active()) === '2', 5000)
+  await lib.until(async () => (await active()) === '2', lib.timing('hang.ui'))
   await add(1)
   check('Ctrl+Alt+PageDown: page 2, which grows as agents are added', (await active()) === '2' && (await shown()) === 'Agent 7,Agent 8', await shown())
   // Clicking an agent on the other page goes to that page.
   await lib.showAgent(page, 'Agent 3')
-  await lib.until(async () => (await active()) === '1', 5000)
+  await lib.until(async () => (await active()) === '1', lib.timing('hang.ui'))
   check("choosing an agent on page 1 in the summary chip's list goes there", (await active()) === '1')
 
   // Twelve, the workflow's Maximum agents by default: raised below to go past it (HI-2001, HI-2058).
@@ -128,7 +129,7 @@ const check = (name, ok, extra = '') => {
     await page.locator('.menu-item', { hasText: 'Remove Agent…' }).click()
     await page.locator('.dialog-footer button', { hasText: /^Remove$/ }).click()
     // Gone from Combwork and from the panes (the dialog closes before the removal has finished).
-    await lib.until(async () => !(await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === name) && !(await page.locator('.pane-header-bar .agent-name').allInnerTexts()).some((t) => t.trim() === name), 10000)
+    await lib.until(async () => !(await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === name) && !(await page.locator('.pane-header-bar .agent-name').allInnerTexts()).some((t) => t.trim() === name), lib.timing('hang.ui'))
   }
   await remove('Agent 9')
   check('removing an agent on page 2 stays on page 2', (await active()) === '2', await active())
@@ -138,7 +139,7 @@ const check = (name, ok, extra = '') => {
   const left = (await inv('workspace:refresh')).projects[0].agents
   for (const a of left.slice(7)) await inv('agents:remove', proj, a.id, { deleteWorktree: false })
   await inv('workspace:refresh')
-  await lib.sleep(600)
+  await lib.answersDrawn(inv, page)
   await remove('Agent 7')
   check('removing the only agent on page 2 goes to page 1', (await page.locator('.page-switch').count()) === 0 && (await panes()) >= 1)
 

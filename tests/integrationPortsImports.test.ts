@@ -72,7 +72,7 @@ describe("the merge queue's candidate through the integration port", () => {
     expect(files.filter((f) => importsOf(f).includes('src/main/platform/gitIntegration'))).toEqual(['src/main/platform/integrationPorts.ts'])
   })
 
-  it("HI-2794: jj's advance probe is evidence only: nothing in src imports it, and it imports no port or fact writer", () => {
+  it("HI-3235: jj's advance (J1's probe promoted) is the jj adapter's alone: only src/main/platform imports it, and it imports no port or fact writer", () => {
     const files: string[] = []
     const walk = (dir: string): void => {
       for (const e of readdirSync(join(root, dir))) {
@@ -82,8 +82,11 @@ describe("the merge queue's candidate through the integration port", () => {
       }
     }
     walk('src')
-    // gate:advance stays closed (SPEC §16.3.6, "Open: jj's target advance"): no product code may advance a jj target with it.
-    expect(files.filter((f) => importsOf(f).includes('src/main/platform/jjAdvanceProbe'))).toEqual([])
-    expect(importsOf('src/main/platform/jjAdvanceProbe.ts').sort()).toEqual(['src/main/platform/jjRunner', 'src/main/platform/repoContext'])
+    // Its facts are the workflow's (advanceHost.ts, through the adapter's AdvanceHost): the workflow, the queue and the
+    // window never reach jj's advance, only the adapter's optional ports (HI-2840's decision: no jj in the app's code).
+    expect(files.filter((f) => importsOf(f).includes('src/main/platform/jjAdvance')).filter((f) => !f.startsWith('src/main/platform/'))).toEqual([])
+    expect(files.filter((f) => importsOf(f).includes('src/main/platform/jjAdvance'))).toEqual(['src/main/platform/jjPlatform.ts'])
+    // HI-3374: and retryBounds (no imports of its own: its rename's retry bound).
+    expect(importsOf('src/main/platform/jjAdvance.ts').sort()).toEqual(['src/main/platform/jjRunner', 'src/main/platform/repoContext', 'src/main/retryBounds'])
   })
 })

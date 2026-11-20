@@ -10,11 +10,12 @@
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { createHash } = require('crypto')
-const { execFileSync } = require('child_process')
+const { execFileSync, spawn } = require('child_process')
+const http = require('http')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47832))
 const userData = path.join(lib.WORK, 'intents-profile')
@@ -26,12 +27,8 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+// HI-3396: lib's until (its bound required, the file's interval).
+const until = (fn, ms) => lib.until(fn, ms)
 const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: alpha, env: lib.gitEnv(), encoding: 'utf8' }).trim()
 
 ;(async () => {
@@ -159,7 +156,8 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     await until(async () => (await live(reviewer.id))?.status === 'ready' && (await live(builder.id))?.status === 'ready', HUNG_MS)
     const [reviewerWakes, builderWakes] = [wakesOf('Reviewer').length, wakesOf('Builder').length]
     const notYours = await asReviewer(`/v1/tasks/${ref}/loop-step`, { step: 'design', text: 'Mine?' })
-    check("the reviewer can't post the builder's design (409, loop.stepNotYours)", notYours.status === 409 && notYours.body?.rule === 'loop.stepNotYours', JSON.stringify(notYours.body))
+    // HI-3194: a design is the builder's own move, refused for an agent not building the card before its loop rules are asked.
+    check("the reviewer can't post the builder's design (409, attempt.notAssignee)", notYours.status === 409 && notYours.body?.rule === 'attempt.notAssignee', JSON.stringify(notYours.body))
     const designed = await asBuilder(`/v1/tasks/${ref}/loop-step`, { step: 'design', text: 'Design: greet with Hi, tested by b.test.' })
     const designId = designed.body?.data?.design
     check('the builder posts a design in Doing: it stays, and the reply names it and when its check is due', designed.status === 200 && designed.body?.to === 'active' && /\/s\d+$/.test(designId ?? '') && designed.body.data.waitMinutes === 30 && Date.parse(designed.body.data.until) > Date.now() && (await card(n))?.column === 'doing', JSON.stringify(designed.body))
@@ -207,6 +205,9 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const putBack = await call(assistantToken, `/v1/tasks/${n}/put-back`, { why: 'The user wants it later.' })
     check("at Control agents the Assistant puts it back, by its number: Todo", putBack.status === 200 && putBack.body?.to === 'todo' && (await card(n))?.column === 'todo' && (await card(n))?.comments.at(-1)?.text === 'The user wants it later.', JSON.stringify(putBack.body))
     check("…listed in what it did", (await inv('assistant:actions')).some((x) => x.ok && x.text.includes('put back')), JSON.stringify((await inv('assistant:actions')).map((x) => x.text)))
+    // HI-3194: the Assistant put the card back after the builder last acted on it (its attempt ended): the builder reads it
+    // again, as its put-back wake would have it do, before acting on it anew (asking the Assistant, starting it).
+    await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${ref}`, { headers: { Authorization: `Bearer ${tokens.builder}` } })
 
     // An agent asks the Assistant on a card (HI-1866): its comment and a history line, and the Assistant's inbox, whose
     // doorbell its idle session takes. Refused, with nothing written: a plain number, no text, the Assistant itself, and
@@ -244,6 +245,145 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     const reply = JSON.parse(out.split('\n')[0]).result
     check('cw_start_card starts it: a line saying where it went', !reply.isError && reply.content[0].text.startsWith(`${key}: todo → active.`), JSON.stringify(reply))
     check("…and it is in Doing, the builder's", (await card(n))?.column === 'doing' && (await card(n))?.agent === builder.id, JSON.stringify(await card(n)))
+
+    // HI-3234: cw_update_task clears waitingFor and blocked with null, false, empty, or the text a client's tool makes of
+    // them ("null", "false"); none is ever kept as the reason.
+    const tool = (name, args) => {
+      const o = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n', env: lib.childEnv(builderCombwork.env), timeout: HUNG_MS }).toString()
+      return JSON.parse(o.split('\n')[0]).result
+    }
+    const kept = []
+    for (const field of ['waitingFor', 'blocked']) {
+      for (const clear of [null, 'null', 'false', false, '', '""']) {
+        const set = tool('cw_update_task', { number: key, [field]: 'Held for a quiet window' })
+        const now = await card(n)
+        const setOk = !set.isError && (field === 'waitingFor' ? now?.waitingFor?.reason : now?.blocked) === 'Held for a quiet window'
+        const cleared = tool('cw_update_task', { number: key, [field]: clear })
+        const now2 = await card(n)
+        const value = field === 'waitingFor' ? (now2?.waitingFor ?? null) : (now2?.blocked ?? null)
+        if (!setOk || cleared.isError || value !== null) kept.push({ field, clear, setOk, cleared: cleared.content?.[0]?.text, value })
+      }
+    }
+    check('cw_update_task clears waitingFor and blocked with null, "null", "false", false, empty and \'""\', none kept as the reason (HI-3234)', kept.length === 0, JSON.stringify(kept))
+
+    // HI-3195: a keyed write is applied once. The same comment sent again with its request key (its reply lost): one
+    // comment, the retry answered "already applied"; the key reused for another body: refused, nothing written.
+    const keyed = async (k, text) => {
+      const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${ref}/comments`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.builder}`, 'Content-Type': 'application/json', 'X-Combwork-Request': k }, body: JSON.stringify({ text }) })
+      return { status: res.status, body: await res.json().catch(() => null) }
+    }
+    const before = (await card(n)).comments.length
+    const k1 = `e2e-${Date.now()}-keyed-comment`
+    const first = await keyed(k1, 'Applied once.')
+    const retry = await keyed(k1, 'Applied once.')
+    check('a keyed comment sent twice is one comment; the retry is answered "already applied"', first.status === 200 && retry.status === 200 && retry.body?.replayed === true && retry.body?.applied === true && (await card(n)).comments.length === before + 1, JSON.stringify({ first, retry, comments: (await card(n)).comments.length - before }))
+    const reused = await keyed(k1, 'Another comment.')
+    check('…its key reused for another body is refused (409 request.keyReused), nothing written', reused.status === 409 && reused.body?.rule === 'request.keyReused' && (await card(n)).comments.length === before + 1, JSON.stringify(reused))
+    const malformed = await keyed('short', 'x')
+    check('…a malformed key is a wrong call (400)', malformed.status === 400, JSON.stringify(malformed))
+
+    // cw-mcp's side, against a server of the suite's own: the first reply to its write lost (the connection dropped), it
+    // sends the write again with the same key; told it was applied, its tool says so.
+    const seen = []
+    const fake = http.createServer((q, r) => {
+      if (q.method === 'GET') return r.end('{}')
+      seen.push(q.headers['x-combwork-request'])
+      if (seen.length === 1) return q.socket.destroy()
+      r.writeHead(200, { 'Content-Type': 'application/json' })
+      r.end(JSON.stringify({ replayed: true, applied: true, produced: { card: key } }))
+    })
+    await new Promise((res) => fake.listen(0, '127.0.0.1', res))
+    const viaFake = await new Promise((resolve) => {
+      const child = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: { ...lib.childEnv(builderCombwork.env), CW_API_URL: `http://127.0.0.1:${fake.address().port}` }, windowsHide: true })
+      let said = ''
+      child.stdout.on('data', (d) => {
+        said += d
+        if (said.includes('\n')) {
+          child.kill()
+          resolve(JSON.parse(said.split('\n')[0]).result)
+        }
+      })
+      child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_update_task', arguments: { number: key, comment: 'Lost reply.' } } }) + '\n')
+    })
+    fake.close()
+    check('cw-mcp sends a write whose reply was lost again, with the same request key', seen.length === 2 && !!seen[0] && seen[0] === seen[1], JSON.stringify(seen))
+    check('…and says it was applied earlier, naming the card', !viaFake.isError && /already applied/.test(viaFake.content[0].text) && viaFake.content[0].text.includes(key), JSON.stringify(viaFake))
+
+    // HR3's round 1: a write the server doesn't deduplicate (cw_notify) is sent once, never again after a lost reply; and a
+    // write that got no reply at all is kept, by key, in the agent's own file, so its next launch's same call reuses it.
+    const runMcp = (port, name, args, extraEnv = {}) =>
+      new Promise((resolve) => {
+        const child = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: { ...lib.childEnv(builderCombwork.env), CW_API_URL: `http://127.0.0.1:${port}`, ...extraEnv }, windowsHide: true })
+        let got = ''
+        child.stdout.on('data', (d) => {
+          got += d
+          if (got.includes('\n')) {
+            child.kill()
+            resolve(JSON.parse(got.split('\n')[0]).result)
+          }
+        })
+        child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n')
+      })
+    const dropping = (drops) => {
+      const calls = []
+      const server = http.createServer((q, r) => {
+        if (q.method === 'GET') return r.end('{}')
+        calls.push({ path: q.url, key: q.headers['x-combwork-request'], at: Date.now() })
+        if (calls.length <= drops) return q.socket.destroy()
+        r.writeHead(200, { 'Content-Type': 'application/json' })
+        r.end(JSON.stringify({ replayed: true, applied: true, produced: { card: key } }))
+      })
+      return new Promise((res) => server.listen(0, '127.0.0.1', () => res({ server, calls, port: server.address().port })))
+    }
+    const unkeyed = await dropping(1)
+    const notified = await runMcp(unkeyed.port, 'cw_notify', { title: 'Sent once' })
+    unkeyed.server.close()
+    check("a write Combwork doesn't apply once by key (cw_notify) isn't sent again after a lost reply, nor keyed", unkeyed.calls.length === 1 && !unkeyed.calls[0].key && notified.isError, JSON.stringify({ calls: unkeyed.calls, notified }))
+    const keysFile = path.join(lib.probeDir('request-keys'), 'agent-keys.json')
+    const lost = await dropping(99)
+    const first3 = await runMcp(lost.port, 'cw_update_task', { number: key, comment: 'Kept key.' }, { CW_REQUEST_KEYS_FILE: keysFile })
+    lost.server.close()
+    const keptKeys = fs.existsSync(keysFile) ? JSON.parse(fs.readFileSync(keysFile, 'utf8')) : null
+    check('a write with no reply after its retries is kept by its key in the agent\'s file', first3.isError && lost.calls.length === 3 && keptKeys?.entries?.length === 1, JSON.stringify({ calls: lost.calls, keptKeys }))
+    // HI-3377: its retries back off (2 s, then 10 s), never three tries in a row; the gaps are at least the waits, never a bound.
+    const gaps = lost.calls.slice(1).map((c, i) => c.at - lost.calls[i].at)
+    check('a lost write is sent again after 2 s, then after 10 s', gaps.length === 2 && gaps[0] >= 1900 && gaps[1] >= 9900, JSON.stringify(gaps))
+    const later = await dropping(0)
+    const relaunched = await runMcp(later.port, 'cw_update_task', { number: key, comment: 'Kept key.' }, { CW_REQUEST_KEYS_FILE: keysFile })
+    later.server.close()
+    const base = (k) => (k ?? '').replace(/-\d+$/, '')
+    check("…and the agent's next launch (another cw-mcp) sends the same call with that key, told it was applied earlier", later.calls.length === 1 && base(later.calls[0].key) === base(lost.calls[0].key) && /already applied/.test(relaunched.content?.[0]?.text ?? ''), JSON.stringify({ first: lost.calls[0], later: later.calls, relaunched }))
+
+    // HR3's round 2: the launch ends while its write is on its way (the server applied it, its reply not yet sent): nothing
+    // more runs in it, so the key must already be kept; the next launch's same call sends it with that key.
+    const crashKeys = path.join(lib.probeDir('request-keys-crash'), 'agent-keys.json')
+    const held = []
+    let child1
+    const holding = http.createServer((q, r) => {
+      if (q.method === 'GET') return r.end('{}')
+      held.push({ key: q.headers['x-combwork-request'], kept: fs.existsSync(crashKeys) ? fs.readFileSync(crashKeys, 'utf8') : null })
+      child1.kill()
+    })
+    await new Promise((res) => holding.listen(0, '127.0.0.1', res))
+    await new Promise((resolve) => {
+      child1 = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: { ...lib.childEnv(builderCombwork.env), CW_API_URL: `http://127.0.0.1:${holding.address().port}`, CW_REQUEST_KEYS_FILE: crashKeys }, windowsHide: true })
+      child1.on('exit', resolve)
+      child1.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_update_task', arguments: { number: key, comment: 'Ended mid-write.' } } }) + '\n')
+    })
+    holding.close()
+    const keptAtEnd = held[0]?.kept && held[0].key ? JSON.parse(held[0].kept).entries?.some((e) => held[0].key.startsWith(e.base)) : false
+    check("a keyed write's key is kept in the agent's file before it is sent (a launch ended while it is on its way)", held.length === 1 && keptAtEnd, JSON.stringify(held))
+    const afterCrash = await dropping(0)
+    const resumed = await runMcp(afterCrash.port, 'cw_update_task', { number: key, comment: 'Ended mid-write.' }, { CW_REQUEST_KEYS_FILE: crashKeys })
+    afterCrash.server.close()
+    check("…and the agent's next launch sends the same call with that key, told it was applied earlier", afterCrash.calls.length === 1 && base(afterCrash.calls[0].key) === base(held[0]?.key) && /already applied/.test(resumed.content?.[0]?.text ?? ''), JSON.stringify({ held, later: afterCrash.calls, resumed }))
+    // …and one whose key can't be kept (the file's folder is a file) isn't sent at all.
+    const blocker = path.join(lib.probeDir('request-keys-blocked'), 'a-file')
+    fs.writeFileSync(blocker, '')
+    const unkept = await dropping(0)
+    const refusedSend = await runMcp(unkept.port, 'cw_update_task', { number: key, comment: 'Never sent.' }, { CW_REQUEST_KEYS_FILE: path.join(blocker, 'agent-keys.json') })
+    unkept.server.close()
+    check("a keyed write whose key can't be kept isn't sent, and says so", unkept.calls.length === 0 && refusedSend.isError && /Not sent/.test(refusedSend.content?.[0]?.text ?? ''), JSON.stringify({ calls: unkept.calls, refusedSend }))
 
     await inv('session:stop', alpha)
     await until(async () => (await inv('session:live')).length === 0, HUNG_MS)

@@ -9,9 +9,10 @@ import { build } from 'esbuild'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /** A bound for a hung run (the waits are for conditions). */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const base = tempDir('cw-log-writer-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -25,7 +26,7 @@ const lines = (f: string): string[] => (existsSync(f) ? readFileSync(f, 'utf8').
 
 beforeAll(async () => {
   await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'logWriter.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
-}, 60_000)
+}, timing('hook.hang'))
 afterAll(async () => {
   await logger.useLogWriter(null)
 })
@@ -36,7 +37,7 @@ describe("the log's writer thread (HI-1730)", () => {
     const from = performance.now()
     for (let i = 0; i < 50; i++) logger.hookJournal(`order ${i}`)
     // Fifty lines queued with each write held 200 ms: main took nothing like a write's hold.
-    expect(performance.now() - from).toBeLessThan(150)
+    expect(performance.now() - from).toBeLessThan(timing('budget.logWriteMs'))
     await vi.waitFor(() => expect(lines(hooks).filter((l) => l.includes(' order ')).length).toBe(50), { timeout: HUNG_MS })
     expect(lines(hooks).filter((l) => l.includes(' order ')).map((l) => l.split(' order ')[1])).toEqual(Array.from({ length: 50 }, (_, i) => String(i)))
   })

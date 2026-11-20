@@ -22,10 +22,11 @@ import { TESTED_JJ } from '../src/shared/jjTool'
 import { admitted } from './admitted'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjSlotKeptTakeBack.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
-const REAL_JJ_MS = 180_000
+const REAL_JJ_MS = timing('wait.hangReal')
 const closers: (() => void | Promise<void>)[] = []
 afterEach(async () => {
   for (const c of closers.splice(0).reverse()) await c()
@@ -118,7 +119,7 @@ describe.skipIf(!jjExe)('a kept jj slot taken back (HI-3032)', { timeout: REAL_J
       w.runs.gate = new Promise<void>((res) => (open = res))
       const before = w.runs.calls
       const going = w.poolOf(2).lend({ card: 1, agent: 'a-1' }, { target: 'main' })
-      await expect.poll(() => w.runs.calls, { timeout: 60_000 }).toBeGreaterThan(before)
+      await expect.poll(() => w.runs.calls, { timeout: timing('wait.hang') }).toBeGreaterThan(before)
       w.dead.add(2)
       await w.pool.refresh()
       w.runs.gate = null
@@ -145,7 +146,7 @@ describe.skipIf(!jjExe)('a kept jj slot taken back (HI-3032)', { timeout: REAL_J
     const p2 = w.poolOf(2)
     const before = w.runs.calls
     const going = p2.lend({ card: 1, agent: 'a-1' }, { target: 'main' })
-    await expect.poll(() => w.runs.calls, { timeout: 60_000 }).toBeGreaterThan(before)
+    await expect.poll(() => w.runs.calls, { timeout: timing('wait.hang') }).toBeGreaterThan(before)
     w.dead.add(2)
     await w.pool.refresh()
     expect(w.store.slot(a.name)).toMatchObject({ state: 'dirty', warmError: expect.any(String), op: null })

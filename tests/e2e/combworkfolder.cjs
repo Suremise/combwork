@@ -11,7 +11,7 @@ const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 // old-name: begin combworkfolder-inputs
 /** 1.0's folder, board file and exclude line: what the workspace is put back as. */
 const OLD_DIR = '.hive'

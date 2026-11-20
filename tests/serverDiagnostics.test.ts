@@ -9,6 +9,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-serverdiag-')
 const home = join(base, 'claude-home')
@@ -46,7 +47,7 @@ beforeAll(async () => {
   writeFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
-  vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
+  vi.spyOn(provider('claude-code').accounts!, 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
   w = createWorkspaceService()
   await w.open(wsPath)
 })
@@ -244,7 +245,7 @@ describe('the checks, against fake servers', () => {
       })
       const a = await connect(s.url, { key: KEY })
       const test = here(() => diag.testServerTools(a.id, 'm1', `t-${change}`))
-      await vi.waitFor(() => expect(s.seen.length).toBe(1), { timeout: 10_000 })
+      await vi.waitFor(() => expect(s.seen.length).toBe(1), { timeout: timing('wait.hang') })
       if (change === 'key') await here(() => servers.setServerKey(a.id, KEY2))
       if (change === 'model') await here(() => servers.editServerConnection(a.id, { models: [{ id: 'm2' }] }))
       if (change === 'remove') await here(() => accounts.removeAccount(a.id))
@@ -264,7 +265,7 @@ describe('the checks, against fake servers', () => {
     expect(await here(() => diag.readServerContext(a.id, 'm1', 'r1'))).toMatchObject({ ok: true })
     expect(diag.lastServerCheck(a.id, 'm1').context).toBeTruthy()
     const test = here(() => diag.testServerTools(a.id, 'm1', 't1'))
-    await vi.waitFor(() => expect(s.seen.some((x) => x.path === '/v1/messages')).toBe(true), { timeout: 10_000 })
+    await vi.waitFor(() => expect(s.seen.some((x) => x.path === '/v1/messages')).toBe(true), { timeout: timing('wait.hang') })
     await here(() => accounts.removeAccount(a.id))
     // Settled by the removal itself (its deadline is minutes away), and nothing of it kept.
     expect(await test).toMatchObject({ ok: false, why: 'stale' })
@@ -272,7 +273,7 @@ describe('the checks, against fake servers', () => {
     // Its slot was freed: CHECKS_MAX more can run.
     const b = await connect(s.url, { models: [{ id: 'm1' }, { id: 'm2' }, { id: 'm3' }, { id: 'm4' }] })
     const more = ['m1', 'm2', 'm3', 'm4'].map((m) => here(() => diag.testServerTools(b.id, m, `x-${m}`)))
-    await vi.waitFor(() => expect(s.seen.filter((x) => x.path === '/v1/messages').length).toBe(1 + diag.CHECKS_MAX), { timeout: 10_000 })
+    await vi.waitFor(() => expect(s.seen.filter((x) => x.path === '/v1/messages').length).toBe(1 + diag.CHECKS_MAX), { timeout: timing('wait.hang') })
     await here(() => accounts.removeAccount(b.id))
     expect((await Promise.all(more)).every((r) => !r.ok && r.why === 'stale')).toBe(true)
   })
@@ -287,7 +288,7 @@ describe('the checks, against fake servers', () => {
     })
     const a = await connect(s.url)
     const older = here(() => diag.testServerTools(a.id, 'm1', 'old'))
-    await vi.waitFor(() => expect(s.seen.length).toBe(1), { timeout: 10_000 })
+    await vi.waitFor(() => expect(s.seen.length).toBe(1), { timeout: timing('wait.hang') })
     const newer = here(() => diag.testServerTools(a.id, 'm1', 'new'))
     expect(await older).toMatchObject({ ok: false, why: 'stale' })
     diag.cancelServerChecks(a.id, 'm1', 'old')
@@ -299,7 +300,7 @@ describe('the checks, against fake servers', () => {
     const s = await fake(() => undefined)
     const a = await connect(s.url)
     const test = here(() => diag.testServerTools(a.id, 'm1', 'c1'))
-    await vi.waitFor(() => expect(s.seen.length).toBe(1), { timeout: 10_000 })
+    await vi.waitFor(() => expect(s.seen.length).toBe(1), { timeout: timing('wait.hang') })
     diag.cancelServerChecks(a.id, 'm1', 'c1')
     expect(await test).toMatchObject({ ok: false, why: 'stale' })
   })
@@ -324,7 +325,7 @@ describe('the checks, against fake servers', () => {
     const hung = await fake(() => undefined)
     const c = await connect(hung.url, { models: [{ id: 'm1' }, { id: 'm2' }, { id: 'm3' }, { id: 'm4' }, { id: 'm5' }] })
     const running = ['m1', 'm2', 'm3', 'm4'].map((m) => here(() => diag.testServerTools(c.id, m, `h-${m}`)))
-    await vi.waitFor(() => expect(hung.seen.length).toBe(diag.CHECKS_MAX), { timeout: 10_000 })
+    await vi.waitFor(() => expect(hung.seen.length).toBe(diag.CHECKS_MAX), { timeout: timing('wait.hang') })
     expect(await here(() => diag.testServerTools(c.id, 'm5', 'h-m5'))).toMatchObject({ ok: false, why: 'busy' })
     diag.cancelServerChecks(c.id)
     await Promise.all(running)

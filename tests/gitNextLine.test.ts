@@ -16,6 +16,7 @@ import { lineAtBaseHooks } from '../src/main/platform/gitWorkspacePort'
 import { gitTool, setGitToolForTests } from '../src/main/gitTool'
 import { shellLine } from '../src/shared/workflow/queue'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const closers: (() => void | Promise<void>)[] = []
 let env: Env | null = null
@@ -88,7 +89,7 @@ async function world(finish: 'merge' | 'squash' | 'ff') {
   return { e, pool, store, lent, folder, c1, c2, s1, s2, line1, line2, inPlace, waiting, bytes }
 }
 
-describe("a Git lane's next line made in place on the last card's line (HI-3116)", { timeout: 120_000 }, () => {
+describe("a Git lane's next line made in place on the last card's line (HI-3116)", { timeout: timing('test.hang') }, () => {
   it.each(['merge', 'squash', 'ff'] as const)('%s: made at the base, HEAD on it, no file or index byte changed, the uncommitted edit kept', async (finish) => {
     const w = await world(finish)
     expect(sh(w.folder, 'symbolic-ref', 'HEAD')).toBe(w.line1)
@@ -235,7 +236,7 @@ describe("a Git lane's next line made in place on the last card's line (HI-3116)
   })
 })
 
-describe("the off-line advice (HI-3116): never a branch that isn't there", { timeout: 120_000 }, () => {
+describe("the off-line advice (HI-3116): never a branch that isn't there", { timeout: timing('test.hang') }, () => {
   it("its line missing: make it from where the card started; its line there: switch back", async () => {
     const w = await world('squash')
     w.e.wf.cfg.slotHeld = undefined

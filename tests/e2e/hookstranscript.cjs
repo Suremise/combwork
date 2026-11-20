@@ -12,7 +12,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'hookstranscript-profile')
 const ws = path.join(lib.WORK, 'hookstranscript-ws')
@@ -78,7 +78,11 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
     await lib.waitForProvider(inv)
     await lib.waitForProvider(inv, 'codex')
     const live = async (a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === a.id)
-    const raw = async (a) => (await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => '')) ?? ''
+    // The output as it came (HI-3311, HI-3312's recorder), recorded before the agents start: what came after a mark is past it.
+    // pty:buffer may be the screen drawn afresh (a resize in its queue), where a turn's lines land above the input box, before
+    // the mark, so a turn's end could be missed and its prompt sent again.
+    await lib.recordPtyOutput(page)
+    const raw = (a) => lib.ptyOutput(page, lib.ptyKey(alpha, a.id))
 
     /**
      * One quick turn, with Combwork's checks held: typed, then over on its screen (this prompt's own end, after a mark) and
@@ -97,7 +101,8 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
     // --- Claude Code: its turns by promptId (prompt_id in its hooks).
     const cc = await lib.addAgent(inv, alpha, { name: 'Builder' })
     await inv('session:start', alpha, { agentId: cc.id })
-    check('Claude Code starts', !!(await until(async () => (await live(cc))?.status === 'ready', 45000)))
+    // before any turn (HI-2688): its start, restart or resume
+    check('Claude Code starts', !!(await until(async () => (await live(cc))?.status === 'ready', lib.timing('hang.step'))))
     const sessionId = (await live(cc))?.sessionId
     const transcript = path.join(claudeHome, 'projects', alpha.replace(/[^a-zA-Z0-9]/g, '-'), `${sessionId}.jsonl`)
     const promptIdOf = (text) => jsonl(transcript).find((e) => e.type === 'user' && e.message?.content === text)?.promptId ?? null
@@ -123,7 +128,8 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
     // --- Codex: its turns by turn_id. Started with its hooks on, so its session (and rollout) is known.
     const cx = await lib.addAgent(inv, alpha, { name: 'Cx', provider: 'codex' })
     await inv('session:start', alpha, { agentId: cx.id })
-    check('Codex starts', !!(await until(async () => (await live(cx))?.status === 'ready', 45000)))
+    // before any turn (HI-2688): its start, restart or resume
+    check('Codex starts', !!(await until(async () => (await live(cx))?.status === 'ready', lib.timing('hang.step'))))
     const turnIdOf = (text) =>
       rollouts()
         .flatMap(jsonl)

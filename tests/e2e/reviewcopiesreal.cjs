@@ -21,13 +21,12 @@
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { execFileSync, spawnSync } = require('child_process')
-const { createHash } = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const { CLAUDE_TEST_HOME, CODEX_HOME } = require('./runContext.cjs')
 const { startFakeCopilotApi, copilotTestEnv, copilotInstalled } = require('./fake-copilot-api.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 // A real model's turn: building and running a test, under load.
 const TURN_MS = 5 * 60000
 
@@ -54,7 +53,7 @@ const claudeExe = (() => {
 })()
 const claudeSignedIn = (() => {
   if (!claudeExe) return false
-  const s = spawnSync(claudeExe, ['auth', 'status', '--json'], { encoding: 'utf8', timeout: 30000, env: lib.childEnv({ CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME }) })
+  const s = spawnSync(claudeExe, ['auth', 'status', '--json'], { encoding: 'utf8', timeout: lib.timing('spawn.hang'), env: lib.childEnv({ CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME }) })
   try {
     return JSON.parse(s.stdout).loggedIn !== false
   } catch {
@@ -69,11 +68,11 @@ const parts = {
 if (parts.copilot) lib.skip(`${parts.copilot}: it builds the cards`)
 if (parts.claude && parts.codex) lib.skip(`${parts.claude}; ${parts.codex}`)
 
-/** An agent's Agent API token, from the file Combwork keeps for it (agentTokens.ts). */
+/** An agent's Agent API token: its live launch's own file (HI-3195, agentTokens.ts), by the run id the window shows. */
+const runs = new Map()
 const tokenOf = (projectPath, agentId) => {
-  const h = createHash('sha256').update(`${projectPath.toLowerCase()}#${agentId}`).digest('hex').slice(0, 16)
-  const f = path.join(userData, 'agent-api', `${h}.json`)
-  return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).token : null
+  const run = runs.get(`${projectPath.toLowerCase()}#${agentId}`)
+  return run ? lib.launchToken(userData, run) : null
 }
 
 /** The command lines of the processes that name the copies folder (read only). */
@@ -132,8 +131,18 @@ const namingCopies = () => {
       { key: 'copilot', def: await lib.addAgent(inv, alpha, { name: 'RP', provider: 'copilot', permissionMode: 'accept-edits', workflowRole: 'reviewer' }) }
     ]
     for (const [k, why] of Object.entries(parts)) if (why && k !== 'copilot') console.log(`SKIP the ${k} reviewer: ${why}`)
-    const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
+    const live = async (id) => {
+      const s = (await inv('session:live')).find((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === id)
+      // Its launch's run id, for its token file (tokenOf).
+      if (s) runs.set(`${alpha.toLowerCase()}#${id}`, s.runId)
+      return s
+    }
     const started = async (a) => {
+      // HI-3342: Claude Code 2.1.326 and later asks about the copies folder at every start until its home trusts the
+      // workspace's worktrees folder, so Combwork withholds it till then (HI-3337). Recorded as Set Up leaves it, just
+      // before RC starts: a Claude Code another lane starts in the shared test home writes its file back and may drop it
+      // (as jjslot-claude's slot entry). It names the worktrees folder, not the copies folder, so the check below holds.
+      if (a.key === 'claude') console.log(`INFO ${CLAUDE_TEST_HOME} trusts ${lib.trustWorktrees(CLAUDE_TEST_HOME, ws)} (Set Up's answer)`)
       await inv('session:start', alpha, { agentId: a.def?.id ?? a.id })
       const id = a.def?.id ?? a.id
       if (a.key === 'claude') await lib.acceptClaudeTrust(inv, alpha, id, HUNG_MS)
@@ -225,7 +234,7 @@ const namingCopies = () => {
           if (!fs.existsSync(built)) askedBeforeEdit = true
           asked++
           await inv('pty:write', key, '\r')
-          await lib.until(async () => (await live(r.def.id))?.status !== 'waiting', 15000, 500)
+          await lib.until(async () => (await live(r.def.id))?.status !== 'waiting', lib.timing('hang.ui'), 500)
         }
         return fs.existsSync(built) && fs.existsSync(ran) && ['ready', 'finished', 'waiting'].includes(s?.status) ? true : null
       }, TURN_MS)

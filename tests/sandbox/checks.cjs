@@ -10,6 +10,10 @@
  *   npm run sandbox-checks -- --installer <Combwork-Setup-x.y.z.exe> [--previous <older installer>] [--repo <Combwork repo>]
  *        [--server <windows-sandbox server.js>] [--report <folder>] [--only fresh|upgrade|manual|edges|clean|upgrade-rc|profile-move] [--short <installer>] [--wait-min N]
  *        [--smart-app-control off] [--git <Git for Windows' folder>] [--previous-rc <a release candidate's installer>]
+ *        [--shot-fault minimise]
+ *
+ * --shot-fault minimise (HI-3459, a test of the driver, never a release check): drive.cjs minimises each window before
+ * its screenshot, the state that stalls Chromium's capture, so a run shows the driver restores it; the report says so.
  *
  * --previous-rc (HI-2587): a release candidate, for scenario 10: the upgrade from it, run beside scenario 4's whenever it is
  * given. Its version decides what scenario 10 seeds and checks, as --previous's does scenario 4's (HI-2834, previousEra):
@@ -40,6 +44,7 @@ const os = require('os')
 const path = require('path')
 const crypto = require('crypto')
 const { execFileSync } = require('child_process')
+const { timing } = require('../timing.cjs')
 const { server } = require('./client.cjs')
 const { stopConfirmed, list, hostProblem, SAC_QUERY, sacState } = require('./wsb.cjs')
 const { evaluate, markdown, verdict, KINDS } = require('./report.cjs')
@@ -69,7 +74,7 @@ const INSIDE = 'C:\\tools\\combwork-tests\\sandbox\\inside'
 function mainCheckout(dir) {
   let common
   try {
-    common = execFileSync('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', windowsHide: true, timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'], env: baseEnv() }).trim()
+    common = execFileSync('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', windowsHide: true, timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'ignore'], env: baseEnv() }).trim()
   } catch { return dir }
   return common && path.basename(common).toLowerCase() === '.git' ? path.dirname(path.resolve(common)) : dir
 }
@@ -127,7 +132,7 @@ function gitRoot(opt) {
   const ok = d => !!d && fs.existsSync(path.join(d, 'cmd', 'git.exe'))
   if (opt) return ok(path.resolve(opt)) ? path.resolve(opt) : null
   let found = ''
-  try { found = execFileSync('where.exe', ['git'], { encoding: 'utf8', windowsHide: true, timeout: 10_000 }).split(/\r?\n/)[0].trim() } catch { /* none */ }
+  try { found = execFileSync('where.exe', ['git'], { encoding: 'utf8', windowsHide: true, timeout: timing('spawn.hang') }).split(/\r?\n/)[0].trim() } catch { /* none */ }
   // git.exe is in <root>\cmd (or <root>\bin, <root>\mingw64\bin): the root is the folder above it holding cmd\git.exe.
   if (!found) return null
   for (let d = path.dirname(found); d !== path.dirname(d); d = path.dirname(d)) if (ok(d)) return d
@@ -184,6 +189,8 @@ function plan(argv) {
   if (only !== undefined && !KINDS.includes(only)) throw new Error(`--only is ${KINDS.join(' or ')}, not "${only}"`)
   const sac = opt('--smart-app-control')
   if (argv.includes('--smart-app-control') && sac !== 'off') throw new Error(`--smart-app-control takes only "off" (turned off inside the Sandbox; leave it out to keep Windows' setting), not ${sac === undefined ? 'nothing' : `"${sac}"`}`)
+  const shotFault = opt('--shot-fault')
+  if (argv.includes('--shot-fault') && shotFault !== 'minimise') throw new Error(`--shot-fault takes only "minimise" (each window minimised before its screenshot, HI-3459), not ${shotFault === undefined ? 'nothing' : `"${shotFault}"`}`)
   const repo = path.resolve(opt('--repo', process.env.CW_REPO || REPO))
   const serverOpt = opt('--server', process.env.WSB_SERVER)
   const serverJs = serverOpt ? path.resolve(serverOpt) : serverCandidates(repo).find(f => fs.existsSync(f))
@@ -249,6 +256,7 @@ function plan(argv) {
     report: path.resolve(opt('--report', path.join(process.env.LOCALAPPDATA, 'combwork-test', 'sandbox-reports', stamp))),
     waitMin: Number(opt('--wait-min', 0)),
     sacOff: sac === 'off',
+    shotFault: shotFault || null,
     // Git for the clean install's project, and for the git project (and its slot) an upgrade from 1.1 on seeds.
     git: ran.includes('clean') || (upgrade && era === 'combwork' && (ran.includes('upgrade') || ran.includes('manual'))) || rcEra === 'combwork' ? gitRoot(opt('--git')) : null
   }
@@ -312,7 +320,8 @@ function steps(srv, ctx) {
   }
   const ps = (scenario, what, script, args, o) => run(scenario, what, `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${INSIDE}\\${script} ${args}`, o)
   // `era`: what the release before the upgrade left (previousEra), for the upgrade's steps.
-  const drive = (scenario, what, step, prefix, timeoutSec = 420, era = '') => run(scenario, what, `C:\\tools\\node\\node.exe ${INSIDE}\\drive.cjs ${step} ${prefix}${era ? ` ${era}` : ''}`, { timeoutSec })
+  // --shot-fault reaches drive.cjs as CW_SANDBOX_SHOT_FAULT (a test of its screenshot recovery, HI-3459).
+  const drive = (scenario, what, step, prefix, timeoutSec = 420, era = '') => run(scenario, what, `${ctx.shotFault ? `set "CW_SANDBOX_SHOT_FAULT=${ctx.shotFault}" && ` : ''}C:\\tools\\node\\node.exe ${INSIDE}\\drive.cjs ${step} ${prefix}${era ? ` ${era}` : ''}`, { timeoutSec })
   /** Smart App Control's state in this Sandbox, read only; logged and kept for the reason if an install is blocked. */
   const readSac = async () => {
     const r = await srv.call('sandbox_run', { command: SAC_QUERY, as: 'user', timeoutSec: 30 }).catch(e => ({ text: e.message }))
@@ -356,9 +365,9 @@ function steps(srv, ctx) {
 }
 
 const SCENARIO_OF = { fresh: 1, upgrade: 4, manual: 7, edges: 8, clean: 9, 'upgrade-rc': 10, 'profile-move': 11 }
-// How long Settings gets to open inside the Sandbox before its screenshot (nothing there to wait on from the host); the
-// unit tests, whose fake server shows nothing, set it to 0.
-const SETTINGS_OPEN_MS = Number(process.env.CW_SANDBOX_TEST_SETTINGS_MS ?? 6000)
+// How long Settings gets to open inside the Sandbox before its screenshot (nothing there to wait on from the host:
+// the timing file's sandbox.settingsOpenMs, a pace); the unit tests, whose fake server shows nothing, set it to 0.
+const SETTINGS_OPEN_MS = Number(process.env.CW_SANDBOX_TEST_SETTINGS_MS ?? timing('sandbox.settingsOpenMs'))
 
 async function main(argv) {
   const t0 = Date.now()
@@ -369,14 +378,14 @@ async function main(argv) {
   const problem = hostProblem()
   if (problem) { log('NOT RUN:', problem); return 2 }
   for (const [kind, why] of Object.entries(p.skipped)) log(`${kind}: ${why}`)
-  log(`installer ${p.installer} (${versionOf(p.installer)}); previous ${p.previous ? `${p.previous} (${p.previousEra})` : '-'}${p.previousRc ? `; release candidate ${p.previousRc} (${p.previousRcEra})` : ''}; build folder ${p.root}; server ${p.serverJs}; report ${p.report}${p.sacOff ? '; Smart App Control: off inside the Sandbox, by option' : ''}`)
+  log(`installer ${p.installer} (${versionOf(p.installer)}); previous ${p.previous ? `${p.previous} (${p.previousEra})` : '-'}${p.previousRc ? `; release candidate ${p.previousRc} (${p.previousRcEra})` : ''}; build folder ${p.root}; server ${p.serverJs}; report ${p.report}${p.sacOff ? '; Smart App Control: off inside the Sandbox, by option' : ''}${p.shotFault ? `; shot fault: ${p.shotFault} (a test of the driver, not a release check)` : ''}`)
   for (const t0w = Date.now(); ;) {
     let ids
     try { ids = await list() } catch (e) { log('NOT RUN:', e.message); return 2 }
     if (!ids.length) break
     if (Date.now() - t0w >= p.waitMin * 60_000) { log(`NOT RUN: another Sandbox is running (${ids.join(', ')}), not ours`); return 2 }
     log('waiting for another Sandbox to finish:', ids.join(', '))
-    await new Promise(r => setTimeout(r, 30_000))
+    await new Promise(r => setTimeout(r, timing('sandbox.otherPollMs')))
   }
   // The server's environment: the run context's allowlist (nothing else of this shell's: tests/e2e/runContext.cjs) and
   // its settings. WSB_STUB and WSB_STUB_STATE only ever come from the unit tests (tests/sandboxChecks.test.ts).
@@ -392,7 +401,7 @@ async function main(argv) {
       WSB_STUB_STATE: process.env.WSB_STUB_STATE
     })
   }
-  const ctx = { report: p.report, files: {}, shots: [], steps: [], timings: {}, leftRunning: [], notRun: {}, sac: null, sacOff: p.sacOff }
+  const ctx = { report: p.report, files: {}, shots: [], steps: [], timings: {}, leftRunning: [], notRun: {}, sac: null, sacOff: p.sacOff, shotFault: p.shotFault }
   const start = { build: p.root, network: false, session: true, tools: ['node', 'playwright', 'combwork-tests'], maxMinutes: 30, ...(p.sacOff ? { smartAppControl: 'off' } : {}) }
   const time = async (k, fn) => { const t = Date.now(); const r = await fn(); ctx.timings[k] = `${((Date.now() - t) / 1000).toFixed(1)} s`; return r }
   const overPrevious = async (srv, n, pre, args, from = { installer: p.guestPrevious, era: p.previousEra }) => {
@@ -525,7 +534,8 @@ async function main(argv) {
     leftRunning: ctx.leftRunning,
     notRun: ctx.notRun,
     git: p.git,
-    smartAppControl: sacMeta(ctx.sac, p.sacOff)
+    smartAppControl: sacMeta(ctx.sac, p.sacOff),
+    shotFault: p.shotFault
   }
   const result = evaluate(meta, ctx.files)
   fs.writeFileSync(path.join(p.report, 'report.json'), JSON.stringify(result, null, 2))

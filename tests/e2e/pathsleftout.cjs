@@ -13,7 +13,7 @@ const q = require('./queueFixture.cjs')
 const PORT = Number(lib.port(47708))
 const fx = q.queueProject('pathsleftout')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

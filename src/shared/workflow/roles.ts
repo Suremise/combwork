@@ -34,7 +34,7 @@ export const independentByConnection = (a: object): boolean => toolsOffReader(a)
 
 export const isWorkflowRole = (v: unknown): v is WorkflowRole => typeof v === 'string' && (WORKFLOW_ROLES as readonly string[]).includes(v)
 
-/** A reviewer's name as the shipped patterns and Darren's agents give it: HR1 (up to three letters), HI-R2 and ABCD-R1
+/** A reviewer's name as the shipped patterns and the maintainer's agents give it: HR1 (up to three letters), HI-R2 and ABCD-R1
  * (`{key}-R{n}`, a project key's 2–4 letters: `KEY_FORM`, #704). */
 const REVIEWER_NAME = /^(?:[a-z]{0,3}|[a-z]{2,4}-)r\d+$/i
 

@@ -11,6 +11,7 @@ import type { AddressInfo } from 'net'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { childEnv } = require('./e2e/runContext.cjs') as { childEnv: (vars?: Record<string, string>) => Record<string, string> }
@@ -29,13 +30,13 @@ afterAll(() => {
 })
 
 /** Polls until fn gives something truthy (a bound for a hung run, never how long it should take). */
-async function until<T>(fn: () => T | Promise<T>, what: string, ms = 30000): Promise<NonNullable<T>> {
+async function until<T>(fn: () => T | Promise<T>, what: string, ms = timing('wait.hang')): Promise<NonNullable<T>> {
   const end = Date.now() + ms
   for (;;) {
     const v = await fn()
     if (v) return v as NonNullable<T>
     if (Date.now() > end) throw new Error(`timed out waiting for ${what}`)
-    await new Promise((r) => setTimeout(r, 50))
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
 }
 const alive = (pid: number): boolean => {
@@ -164,7 +165,33 @@ describe.runIf(windows)("the launcher follows OpenCode's session: baseline first
     expect(tracked(hook.bodies)).toEqual({ prompts: 1, ends: ['stop'], open: null })
     l.child.kill()
     await l.exit
-  }, 60000)
+  }, timing('test.hang'))
+
+  it("the question tool's form (HI-3317): projected as events.ts does, a question the agent waits on; read with the snapshot's forms; answered, the turn finishes", async () => {
+    const hook = await hookServer()
+    const r = setUp({ hookUrl: '' })
+    r.env.CW_OC_HOOK_URL = hook.url
+    const l = launch(r)
+    const first = await until(() => hook.bodies[0], 'the baseline')
+    expect(first.snapshot.forms).toEqual([])
+    await prompt(r, 'question: Which file should I write?')
+    const created = await until(() => hook.bodies.find((b) => b.event?.type === 'form.created'), 'the form')
+    expect(created.event).toEqual({ type: 'form.created', requestID: expect.stringMatching(/^frm_/), messageID: expect.stringMatching(/^msg_/), callID: expect.stringMatching(/^call_/), text: 'Which file should I write?' })
+    const t = newTracker()
+    const asks = hook.bodies.flatMap((b) => (b.hook_event_name === 'OpencodeSnapshot' ? applySnapshot(t, b.gen, b.snapshot) : applyEvent(t, b.gen, b.event))).filter((h) => h.event.kind === 'ask')
+    expect(asks.map((h) => h.event)).toEqual([{ kind: 'ask', ask: { kind: 'question', blocking: true, message: 'Which file should I write?', call: created.event.callID } }])
+    // The pending form as the server lists it, then answered through it, as the TUI would.
+    const info = infoOf(r)!
+    const auth = { authorization: 'Basic ' + Buffer.from(`opencode:${r.password}`).toString('base64'), 'content-type': 'application/json' }
+    const listed = await (await fetch(info.url + `/api/session/${info.sessionId}/form`, { headers: auth })).json()
+    expect(listed.data.map((f: { id: string }) => f.id)).toEqual([created.event.requestID])
+    await fetch(info.url + `/api/session/${info.sessionId}/form/${created.event.requestID}/reply`, { method: 'POST', headers: auth, body: JSON.stringify({ answer: { q0: 'a.txt' } }) })
+    await until(() => tracked(hook.bodies).ends.length === 1, 'the turn to end')
+    expect(hook.bodies.find((b) => b.event?.type === 'form.replied')?.event).toEqual({ type: 'form.replied', requestID: created.event.requestID })
+    expect(tracked(hook.bodies)).toEqual({ prompts: 1, ends: ['stop'], open: null })
+    l.child.kill()
+    await l.exit
+  }, timing('test.hang'))
 
   it('the stream dropped mid-turn: the turn ends while disconnected, the settled snapshot after the reconnect ends it, the prompt counted once', async () => {
     const hook = await hookServer()
@@ -181,7 +208,7 @@ describe.runIf(windows)("the launcher follows OpenCode's session: baseline first
     expect(gens).toEqual([...gens].sort((a, b) => a - b))
     l.child.kill()
     await l.exit
-  }, 60000)
+  }, timing('test.hang'))
 
   it('a turn that ends between the last message page and the second watermark: that snapshot is never posted; the next, settled one is, each prompt counted once', async () => {
     const hook = await hookServer()
@@ -203,7 +230,7 @@ describe.runIf(windows)("the launcher follows OpenCode's session: baseline first
     expect(snaps.at(-1)!.snapshot.messages.some((m: { type: string; text?: string }) => m.type === 'user' && m.text === 'raced')).toBe(true)
     l.child.kill()
     await l.exit
-  }, 60000)
+  }, timing('test.hang'))
 
   it('an over-long frame, and a hook server refusing one post: each resyncs, and the state ends true', async () => {
     let refuse = false
@@ -230,7 +257,7 @@ describe.runIf(windows)("the launcher follows OpenCode's session: baseline first
     expect(hook.bodies.filter((b) => b.hook_event_name === 'OpencodeSnapshot').length).toBeGreaterThan(afterLong)
     l.child.kill()
     await l.exit
-  }, 60000)
+  }, timing('test.hang'))
 
   it("the baseline can't be posted (the hook server refuses): the launch fails, the TUI never starts, the server ends", async () => {
     const hook = await hookServer(() => 500)
@@ -242,7 +269,7 @@ describe.runIf(windows)("the launcher follows OpenCode's session: baseline first
     expect(l.output()).toContain("couldn't follow its session")
     const serve = fakeLog(r).find((e) => e.kind === 'listening')
     if (serve) await until(() => !alive(serve.pid), 'the server to end')
-  }, 60000)
+  }, timing('test.hang'))
 
   it('a resumed session: its closed history in the baseline counts nothing; the next prompt counts once', async () => {
     const hook1 = await hookServer()
@@ -271,5 +298,5 @@ describe.runIf(windows)("the launcher follows OpenCode's session: baseline first
     expect(tracked(hook2.bodies)).toEqual({ prompts: 1, ends: ['stop'], open: null })
     b.child.kill()
     await b.exit
-  }, 90000)
+  }, timing('test.hang'))
 })

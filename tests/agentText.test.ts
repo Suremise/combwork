@@ -31,7 +31,7 @@ import { restartingLine, resumeNote as restartResumeNote } from '../src/shared/r
 import { resumeNote as outageResumeNote } from '../src/main/outageCore'
 import { teamPauseLine } from '../src/shared/teamPause'
 // @ts-expect-error: a plain .mjs module without types
-import { extractAgentMessages, extractDrift, messageProblems, readCatalogue } from '../scripts/agentTextExtract.mjs'
+import { extractDrift, messageProblems, readCatalogue } from '../scripts/agentTextExtract.mjs'
 
 const ROOT = join(__dirname, '..')
 type Catalogue = Record<string, { text: string; note?: string }>
@@ -175,11 +175,12 @@ describe("cw-mcp.js and cw-progress.js's dialect file", () => {
 })
 
 describe('the catalogue', () => {
-  it("is up to date with the code, and its schema is each message's placeholders", () => {
-    expect(extractDrift(ROOT)).toEqual([])
-    const messages = extractAgentMessages(ROOT) as Catalogue
-    expect(messages).toEqual(catalogue)
-    for (const [id, m] of Object.entries(messages)) expect(schema(id.split('.')[0])[id].placeholders, id).toEqual(placeholdersOf(parseIcu(m.text)))
+  // Whether the catalogue is the code's is `node scripts/agentTextExtract.mjs --check` (check:repo, CI's `npm run
+  // agent-text:extract -- --check`): a scan of the whole source, following every file's bindings, that was also run here
+  // until HI-3318, the same scan twice (as the guard's, HI-2689), and past this test's 20 s on CI's runner.
+  it("makes its schema files, and its schema is each message's placeholders as say()'s formatter reads them", () => {
+    expect(extractDrift(ROOT, catalogue)).toEqual([])
+    for (const [id, m] of Object.entries(catalogue)) expect(schema(id.split('.')[0])[id].placeholders, id).toEqual(placeholdersOf(parseIcu(m.text)))
   })
 })
 
@@ -265,6 +266,8 @@ describe('the canary dialect over wakes, doorbells and the inbox (card 4, HI-243
     add('numbers, more', wakeLines(Array.from({ length: 200 }, (_, i) => flags(i + 1))))
     // Loop wakes, each kind, and a lane's next card.
     for (const kind of LOOP_WAKE_KINDS) add(`loop ${kind}`, loopWakeLine(commented(1), kind, 'needs logs'))
+    // HI-3211: the agent's own card watch still on.
+    add('loop step, watch on', loopWakeLine(change(1), 'step', 'design text', undefined, true))
     for (const next of ['paused', 'last', ...(['combworkStarts', 'start', 'started', 'waits'] as const).map((is) => ({ card: 9, title: 'Fix the parser', is }))] as const) add(`next ${JSON.stringify(next)}`, loopWakeLine(change(1, { column: 'done' }), 'done', undefined, laneNextWords(next)))
     for (const step of ['design', 'followUp', 'proceed', 'ok', 'gaps']) for (const of of ['design', 'followUp']) add(`step ${step} ${of}`, loopWakeLine(change(1), 'step', loopStepWords(step, 'design text', 'd1', of)), ['d1'])
     // The Assistant's card wake with the user's replies, and cards that left a watch.

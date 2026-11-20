@@ -6,7 +6,7 @@ export const LANE_MAX_CARDS = 50
 export const LANE_MAX_ROUNDS = 50
 export const LANE_MAX_WAIT_MINUTES = 24 * 60
 
-/** Card loops' rounds and wait when nothing says otherwise (#412: Darren's Rounds 10, Wait 6h). */
+/** Card loops' rounds and wait when nothing says otherwise (#412: Rounds 10, Wait 6h). */
 export const LOOP_ROUNDS = 10
 export const LOOP_WAIT_HOURS = 6
 /** The wait settings' range, in hours (a lane's wait is at most a day). */
@@ -18,3 +18,11 @@ export const LOOP_WAIT_MAX_HOURS = LANE_MAX_WAIT_MINUTES / 60
  */
 export const LOOP_STEP_WAIT_MINUTES = 30
 export const LOOP_STEP_WAIT_MAX_MINUTES = 240
+
+/**
+ * HI-3188: a card's churn (its counted loop work, CardState.churn): the simplify check and the hard stop when nothing says
+ * otherwise (12 and 30, 0 = off), and the most either setting, or a carry on at the hard stop, can say.
+ */
+export const SIMPLIFY_AT = 12
+export const CHURN_STOP_AT = 30
+export const CHURN_MAX = 999

@@ -50,7 +50,7 @@ const M = {
   intro: msg({ id: 'board.laneStart.intro', defaultMessage: 'The builder works through the cards in this order, one at a time, and the reviewer reviews each. Both start in a new conversation with a brief: the cards, where the builder works, what the project’s rules ask, and your note.', description: 'At the top of the Start Lane dialog. Glossary: lane, rule.' }),
   project: msg({ id: 'board.laneStart.project', defaultMessage: 'Project', description: "A field label in the Start Lane dialog: the project whose cards the lane works through." }),
   builder: msg({ id: 'board.laneStart.builder', defaultMessage: 'Builder', description: 'A field label in the Start Lane dialog: the agent that builds the cards. Glossary: builder.' }),
-  target: msg({ id: 'board.laneStart.target', defaultMessage: 'Merges into', description: 'HI-2556: a field label in the Start Lane dialog: the branch the lane’s cards are made from and merge into (Darren’s name for it).' }),
+  target: msg({ id: 'board.laneStart.target', defaultMessage: 'Merges into', description: 'HI-2556: a field label in the Start Lane dialog: the branch the lane’s cards are made from and merge into (the user’s name for it).' }),
   targetDefault: msg({ id: 'board.laneStart.targetDefault', defaultMessage: '{branch} (the project’s)', description: 'HI-2556: the first choice of the Start Lane dialog’s Merges into: the project’s Work merges into, {branch} its name.' }),
   reviewer: msg({ id: 'board.laneStart.reviewer', defaultMessage: 'Reviewer', description: 'A field label in the Start Lane dialog: the agent that reviews each card. Glossary: reviewer.' }),
   pool: msg({ id: 'board.laneStart.pool', defaultMessage: 'The reviewer pool ({agents})', description: 'A choice of the Start Lane dialog’s reviewer (#1443): the lane is reviewed by the project’s pool of reviewer agents ({agents}: their names, joined), each card going to the next free one. Glossary: reviewer pool.' }),
@@ -81,6 +81,8 @@ const M = {
   notStarted: msg({ id: 'board.laneStart.notStarted', defaultMessage: "{agent} didn't start", description: "A toast's title: the lane was recorded, but one of its agents ({agent}) couldn't be started. The reason follows." }),
   notStartedText: msg({ id: 'board.laneStart.notStartedText', defaultMessage: '{why} The lane is recorded: start {agent} yourself, or end the lane from its row in the Progress panel.', description: "The text of the toast when a lane's agent ({agent}) didn't start: why ({why}, a sentence), and what the user can do." }),
   applyNow: msg({ id: 'board.laneStart.applyNow', defaultMessage: 'Apply now', description: "A checkbox of the Start Lane dialog (HI-1995), off by default, shown when the builder's running lane has a card being worked: the new list applies at once instead of after that card is Done." }),
+  yieldHint: msg({ id: 'board.laneStart.yieldHint', defaultMessage: '{card} waits on {first}: once {builder} ends its turn with {card}’s work committed, {card} goes back to Todo (its work stays on its branch), this list applies and {first} starts. The lane comes back to {card} after.', description: "HI-3323: under the Apply now checkbox of the Start Lane dialog, instead of the usual hint, when the new list puts first {first}, a card that the builder's card in progress {card} waits on (both keys). {builder} is an agent's name. Combwork makes the switch by itself at the builder's turn end, Apply now or not. Todo is a board column." }),
+  yieldCantStart: msg({ id: 'board.laneStart.yieldCantStart', defaultMessage: '{card} waits on {first}, which can’t start yet (it is blocked, or waits on a card of its own): this list applies once {card} is Done, and Apply now changes nothing before that.', description: "HI-3368: under the Apply now checkbox of the Start Lane dialog, instead of the usual hint, when the new list puts first {first} (a card's key, such as HI-28), a card that the builder's card in progress {card} (its key) waits on, but {first} can't be started yet: it is blocked, or a card it depends on isn't Done where the project's rules wait for that. So the lane doesn't switch to it: the list waits until {card} is Done, with or without Apply now." }),
   applyNowHint: msg({ id: 'board.laneStart.applyNowHint', defaultMessage: "{builder}'s lane is working on {card}: this list applies once {card} is Done. Apply now puts {card} back in Todo first (its work stays on its branch), so the new order applies at once, and tells {builder}.", description: "Under the Apply now checkbox of the Start Lane dialog (HI-1995): {builder} (an agent's name) has a running lane whose card {card} (its key) is in progress. Todo is a board column." }),
   applyNowNot: msg({ id: 'board.laneStart.applyNowNot', defaultMessage: "{builder}'s lane is working on {card}, which is in {column, select, review {Review} other {Approved}}: this list applies once it is Done. It can't be put back now without losing its {column, select, review {review} other {approval and merge}}.", description: "In the Start Lane dialog (HI-1995), with Apply now unavailable: the builder's ({builder}) lane card {card} is already in the Review or Approved column (select; translate each)." }),
   releasedReason: msg({ id: 'board.laneStart.releasedReason', defaultMessage: 'Why start it there anyway (a hotfix, say)', description: 'HI-3148: a field label in the Start Lane dialog, shown when the branch the lane would merge into is already released (or Combwork couldn’t check): the user’s reason for starting on it anyway, recorded with the lane.' }),
@@ -186,6 +188,26 @@ export function LaneStartDialog() {
     return c ? cardLabel(c) : `#${n}`
   }
   const canApplyNow = !!flying && flying.column === 'doing' && cards[0] !== flying.number
+  // HI-3323: the list makes the lane yield (the start's own rule, laneYieldFirst): it keeps the card in Doing and puts first
+  // a card in Todo that card waits on, so the lane switches at the builder's turn end. A list without that card (this
+  // dialog's own lists are Todo cards) is an ordinary list change, and its hint says so.
+  // HI-3368 (HR1's round 1): the card the lane would yield to, asked of main (lanes:yieldTo): the start's own rule and
+  // board, the first card's dependency wait by its project's rules, so the hint is what the start does. Null until known.
+  const [yieldTo, setYieldTo] = useState<{ to: number } | { cantStart: number } | null>(null)
+  const behind = canApplyNow ? flying!.number : null
+  const listKey = cards.join(',')
+  const path = project?.path ?? null
+  useEffect(() => {
+    setYieldTo(null)
+    if (!path || behind === null || !builder) return
+    let live = true
+    call('lanes:yieldTo', path, builder, listKey ? listKey.split(',').map(Number) : [], behind).then((y) => live && setYieldTo(y), () => undefined)
+    return () => {
+      live = false
+    }
+  }, [path, builder, listKey, behind])
+  const yieldsTo = yieldTo && 'to' in yieldTo ? yieldTo.to : null
+  const cantStart = yieldTo && 'cantStart' in yieldTo ? yieldTo.cantStart : null
 
   const go = async (): Promise<void> => {
     // Only for the request still open: a dialog closed or opened again since starts nothing.
@@ -370,7 +392,7 @@ export function LaneStartDialog() {
                 <input type="checkbox" checked={applyNow} disabled={waiting} onChange={(e) => setApplyNow(e.target.checked)} /> {tr(M.applyNow)}
               </label>
             )}
-            <p className="faint">{canApplyNow ? tr(M.applyNowHint, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number) }) : tr(M.applyNowNot, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number), column: flying.column === 'review' ? 'review' : 'passed' })}</p>
+            <p className="faint">{yieldsTo !== null ? tr(M.yieldHint, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number), first: keyOf(yieldsTo) }) : cantStart !== null ? tr(M.yieldCantStart, { card: keyOf(flying.number), first: keyOf(cantStart) }) : canApplyNow ? tr(M.applyNowHint, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number) }) : tr(M.applyNowNot, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number), column: flying.column === 'review' ? 'review' : 'passed' })}</p>
           </div>
         )}
         {busyNow.length > 0 && <p className="lane-start-busy">{waiting ? tr(M.waiting, { agents: names }) : tr(M.busy, { agents: names, n: busyNow.length })}</p>}

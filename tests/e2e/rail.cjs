@@ -7,11 +7,10 @@ const scratch = lib.WORK, userData = path.join(scratch, 'rail-profile')
 const ws = path.join(scratch, 'rail-ws')
 for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
 for (const n of ['harbour', 'web-dashboard', 'apiServer', 'notes']) fs.mkdirSync(path.join(ws, n), { recursive: true })
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 ;(async () => {
@@ -22,7 +21,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-  await inv('workspace:open', ws); await sleep(800)
+  await lib.openWorkspace(inv, page, ws)
   await inv('project:setActive', path.join(ws, 'harbour'), true)
   await inv('project:setActive', path.join(ws, 'web-dashboard'), true)
   const sbWidth = () => page.locator('.sidebar').first().evaluate((e) => Math.round(e.getBoundingClientRect().width)).catch(() => -1)
@@ -59,7 +58,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('click selects project', await becomes(() => page.locator('.rail-project').nth(1).evaluate((e) => e.classList.contains('selected'))))
   // A tip shows after its delay (ui.tsx): wait for it, not for the delay.
   await page.locator('.rail-project').nth(0).hover()
-  const tipText = () => page.locator('.tip').first().textContent({ timeout: 1000 }).catch(() => '').then((t) => t ?? '')
+  const tipText = () => page.locator('.tip').first().textContent({ timeout: lib.timing('poll.readMs') }).catch(() => '').then((t) => t ?? '')
   const tip = (await lib.until(async () => { const t = await tipText(); return /harbour/.test(t) && /No session/.test(t) && t }, HUNG_MS)) || (await tipText())
   check('tooltip shows name and status', /harbour/.test(tip) && /No session/.test(tip), JSON.stringify(tip))
   await page.screenshot({ path: path.join(scratch, 'rail-1-tip.png') })
@@ -109,8 +108,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
     })
   })
   for (const zoom of [1, 1.25, 1.5]) {
-    await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
-    await sleep(400)
+    await lib.zoomTo(app, page, zoom)
     const bad = await page.evaluate(() => {
       const list = document.querySelector('.rail-list').getBoundingClientRect()
       const out = (r, pad) => r.top - pad < list.top - 0.5 || r.bottom + pad > list.bottom + 0.5 || r.left - pad < list.left - 0.5 || r.right + pad > list.right + 0.5
@@ -143,8 +141,10 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await page.screenshot({ path: path.join(scratch, 'rail-3-full.png') })
 
   // Light theme look
-  await page.keyboard.press('Control+Alt+B'); await sleep(300)
-  await page.evaluate(() => { document.documentElement.dataset.theme = 'light' }); await sleep(300)
+  await page.keyboard.press('Control+Alt+B')
+  await lib.until(async () => (await sbWidth()) === 48 && (await page.locator('.rail').count()) === 1, HUNG_MS)
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'light' })
+  await lib.themeShown(page, 'light')
   await page.screenshot({ path: path.join(scratch, 'rail-4-light.png') })
 
   await app.close()

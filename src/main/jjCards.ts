@@ -12,6 +12,7 @@
 
 import { knownStamp, setupStampOf } from './jjSetupStamp'
 import { basename } from 'path'
+import { app } from 'electron'
 import { git } from './git'
 import { jjRunner, storeGatedHistory, storeGitGated } from './platform/jjRunner'
 import { historyFor } from './platform/historyPorts'
@@ -31,6 +32,7 @@ import { candidateCheckLease, candidateLeaseBack, candidateRun, copyAt, copyLeas
 import { appQueueChecks } from './workflow/queueChecksApp'
 import { jobSpawn } from './workflow/jobSpawn'
 import type { Spawn } from './workflow/queueChecks'
+import { guardLimits } from './workflow/mergeGuardLimits'
 
 /** A project's jj card dependencies in a workspace. `projectId`: the slot tables' id of the project (as poolFor keys it). */
 export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId: () => string): JjCardDeps {
@@ -43,6 +45,8 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
   }
   return {
     runner: jjRunner,
+    // HI-3236's e2e seam (HR1's bounds on HI-3236/s7): an unpackaged test launch only, never an installed Combwork.
+    ...(!app.isPackaged && process.env.CW_TEST_ADVANCE_STOP === 'undo' ? { advanceTestStop: true } : {}),
     port: () => jjPort(),
     lock: (store) => (fn) => storeLock(store, fn),
     git: gitOn,
@@ -145,6 +149,8 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
       runCheck: (name, command, folder, ctx, spawn) => checksIn(folder, spawn).runCheck(name, command, folder, ctx),
       install: (folder, ctx, spawn) => checksIn(folder, spawn).install(folder, true, ctx),
       stopped: (run) => takeStopped(run),
+      // HI-3284: the merge guards' limits, as Settings → Advanced says at each check.
+      guardLimits: () => guardLimits(),
       // The workspace's life: its close ends a running check's job and gives the lease back (HI-2938/s11 §3).
       signal: ws.lifetime
     }

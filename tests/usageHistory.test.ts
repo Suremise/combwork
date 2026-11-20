@@ -10,6 +10,7 @@ import { priceUsage } from '../src/shared/usageDays'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import type { SessionListItem, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-usage-history-')
 // The CLIs' homes are the test's own (HI-1666): a list looks in each for sessions started outside Combwork, and the user's
@@ -138,7 +139,7 @@ describe('the usage history of a workspace', () => {
     appendFileSync(cliFile(id), request(id, 9, 90))
     // The sweep (every ten minutes, and after a workspace's import) finds it changed and reads it.
     await usageHistory['sweep'](w)
-    await vi.waitFor(async () => expect(outputOf(await run(() => sessions.usageItems(p)), id)).toBe(100), { timeout: 10_000 })
+    await vi.waitFor(async () => expect(outputOf(await run(() => sessions.usageItems(p)), id)).toBe(100), { timeout: timing('wait.hang') })
   })
 
   it("a deleted session's usage is recorded before its copies go, and stays in the totals", async () => {
@@ -151,6 +152,31 @@ describe('the usage history of a workspace', () => {
     const kept = await run(() => sessions.keptUsage(p))
     expect(kept.find((k) => k.id === id)).toMatchObject({ deleted: true, name: 'to delete', agentId: 'c1' })
     expect(outputOf(kept, id)).toBe(70)
+  })
+
+  it("a stopped session's usage is read from the history alone, as the host's list prices it (HI-3295)", async () => {
+    const id = newId()
+    const other = newId()
+    for (const [s, out] of [[id, 25], [other, 35]] as const) {
+      await run(() => workspace.upsertSession(p, { id: s, agent: 'claude-code', agentId: 'c1', name: 'stopped', lastActiveAt: new Date(T0).toISOString() }))
+      write(cliFile(s), transcript(s, [out]))
+      expect((await usageHistory.ingest(p, s, { priority: 1, keepState: 'no' }))?.status).toBe('written')
+    }
+    const one = await usageHistory.storedSessionUsage(p, id)
+    expect(one).toEqual((await usageHistory.storedUsage(p)).get(id))
+    expect(one?.usage.outputTokens).toBe(25)
+    expect(await usageHistory.storedSessionUsage(p, newId())).toBeNull()
+    // sessions.usage asks the worker for that session only, never the host's every session.
+    const asked: unknown[] = []
+    const call = usageHistory['call'].bind(usageHistory)
+    const spy = vi.spyOn(usageHistory as unknown as { call: typeof call }, 'call').mockImplementation((m) => (asked.push(m), call(m)))
+    try {
+      expect((await run(() => sessions.usage(p, other)))?.outputTokens).toBe(35)
+    } finally {
+      spy.mockRestore()
+    }
+    expect(asked).toContainEqual(expect.objectContaining({ type: 'sessions', sessions: expect.objectContaining({ sessions: [other] }) }))
+    expect(asked).not.toContainEqual(expect.objectContaining({ type: 'sessions', sessions: undefined }))
   })
 
   it("a session started outside Combwork is kept for the Sessions list, never counted, until a record makes it Combwork's", async () => {
@@ -407,7 +433,8 @@ describe('the usage history of a workspace', () => {
     // The queue held by a job before it; the roll-up queued behind it, then the session resumed while it waits.
     let open!: () => void
     const gate = usageHistory['enqueue']('gate', 0, () => new Promise<null>((r) => (open = () => r(null))))
-    await vi.waitFor(() => expect(open).toBeTypeOf('function'))
+    // Bounded for a hung run (HI-3349), not Vitest's 1 s, which a loaded runner outlasts.
+    await vi.waitFor(() => expect(open).toBeTypeOf('function'), { timeout: timing('wait.hang') })
     usageHistory['rolledUp'].clear()
     const rolled = run(() => usageHistory['rollUp'](w, { path: w.path!, signal: w.lifetime }))
     live.set(`${p.toLowerCase()}#resumed`, { state: { sessionId: resumed, projectPath: p, provider: 'claude-code' } })

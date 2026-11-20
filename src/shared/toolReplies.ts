@@ -136,6 +136,7 @@ const R = {
   waitNotFollowed: agentMsg({ id: 'reply.wait.notFollowed', text: 'Not followed, not working now: {agents}.', note: 'A lane watch: agents not followed for not working now, each with its state.' }),
   waitAlsoCards: agentMsg({ id: 'reply.wait.alsoCards', text: 'a change to {cards}', note: 'What else wakes a lane watch: a change to its cards.' }),
   waitAlsoAgents: agentMsg({ id: 'reply.wait.alsoAgents', text: '{agents} finishing, waiting for the user or stopping', note: 'What else wakes a lane watch: its agents.' }),
+  waitFollows: agentMsg({ id: 'reply.wait.follows', text: "what Wake the Assistant for says, each lane by its project's level", note: "HI-3211: a lane watch's events when the Assistant named none: the user's setting (Wake the Assistant for: keep its name as written, a workflow option's title), read for each lane from its project." }),
   waitLane: agentMsg({ id: 'reply.wait.lane', text: '{watching}{events}. End your turn now: Combwork types a line into this session on a lane event{hasAlso, select, yes { or {also}} other {}}, or at {limit} if none comes.', note: "A lane watch begun (#531): what it watches (and its events, when they aren't the default), and what wakes it." }),
   waitReplaced: agentMsg({ id: 'reply.wait.replaced', text: 'It replaces your watch ({watch}).', note: 'A watch begun: the watch it replaced.' }),
   theLimit: agentMsg({ id: 'reply.wait.theLimit', text: 'the limit', note: "When a watch ends if nothing comes, where its limit's time isn't known." }),
@@ -998,7 +999,7 @@ export interface WaitChange {
  * card, where it is now, who changed it, the latest comment's author and first line), or no change; with `since` for the
  * next wait. Short: the full comment is cw_read_task with latestComment.
  */
-type WaitReply = { done?: string; unsubmitted?: UnsubmittedCard[]; idle?: number; watching?: string; limitAt?: string; already?: WaitChange; usageAlready?: string[]; lanesAlready?: string[]; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
+type WaitReply = { done?: string; unsubmitted?: UnsubmittedCard[]; idle?: number; watching?: string; limitAt?: string; already?: WaitChange; usageAlready?: string[]; lanesAlready?: string[]; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; follows?: boolean; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
 
 /**
  * HI-1987: a card or agent watch that replaces a lane watch while its lanes run says what it drops, and how to keep them
@@ -1024,7 +1025,8 @@ function waitText(r: WaitReply): string {
     const a = r.agents
     const agents = a ? `${a.kept && a.now.length ? ` ${say(R.waitKeptAgents, { agents: a.now.join(', ') })}` : ''}${a.already?.length ? ` ${say(R.waitNotFollowed, { agents: a.already.join('; ') })}` : ''}` : ''
     const also = [...(c?.now.length ? [say(R.waitAlsoCards, { cards: list(c.now) })] : []), ...(a?.now.length ? [say(R.waitAlsoAgents, { agents: a.now.join(', ') })] : [])]
-    const head = say(R.waitLane, { watching: r.watching, events: own ? ` (${r.events.join(', ')})` : '', hasAlso: yn(also.length), also: also.length ? joined(also, R.or) : '', limit: r.limitAt ?? say(R.theLimit) })
+    // HI-3211: the Assistant's watch naming no events follows the user's setting, each lane by its project's level.
+    const head = say(R.waitLane, { watching: r.watching, events: r.follows ? ` (${say(R.waitFollows)})` : own ? ` (${r.events.join(', ')})` : '', hasAlso: yn(also.length), also: also.length ? joined(also, R.or) : '', limit: r.limitAt ?? say(R.theLimit) })
     return `${head}${r.replaced ? ` ${say(R.waitReplaced, { watch: lowerWaiting(r.replaced) })}` : ''}${cards}${agents}`
   }
   const line = (c: WaitChange): string => {

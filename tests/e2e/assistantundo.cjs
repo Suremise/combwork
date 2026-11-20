@@ -12,7 +12,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'assistantundo-profile')
 const ws = path.join(lib.WORK, 'assistantundo-ws')
@@ -144,15 +144,12 @@ const check = (name, ok, extra = '') => {
     await head(1).click()
     check('…and after a reload', !!(await lib.until(async () => (await partlyRow.count()) === 1, HUNG_MS)), await groups.nth(1).innerText().catch(() => ''))
 
-    // --- In Polish (as main sends a change of language, with Polish's own catalogue).
+    // --- In Polish (as main sends a change of language, with Polish's own catalogue, which main reads: HI-3434).
     const base = (await inv('app:info')).language
-    const dir = path.join(lib.ROOT, 'locales', 'pl')
-    const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
-    await speak({ ...base, code: 'pl', locale: 'pl', messages })
+    await lib.speakLanguage(app, base, 'pl')
     check('the list in Polish', !!(await lib.until(async () => !/Your message at/.test(await panel().locator('.assistant-actions').innerText().catch(() => 'Your message at')), HUNG_MS)), await panel().locator('.assistant-actions').innerText().catch(() => ''))
     await panel().screenshot({ path: path.join(lib.WORK, 'assistantundo-pl.png') })
-    await speak(base)
+    await lib.speakLanguage(app, base)
   } finally {
     await app.close()
   }

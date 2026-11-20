@@ -1,4 +1,4 @@
-// Room for the work beside the Assistant's panel (HI-1737, Darren's decision, then the Assistant's rule): in a narrow or
+// Room for the work beside the Assistant's panel (HI-1737, the user's decision, then the Assistant's rule): in a narrow or
 // zoomed window what is beside the work gives way in order, covering nothing, and the work never goes below 280 px while
 // anything can still give way. At 900 px and 150% (600 CSS px) the sidebar and the panel had left the main pane 0 px.
 // The window at 900 px with the sidebar on Projects and the Assistant's panel open, at 100%, 125% and 150%: the main
@@ -16,7 +16,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'panelroom-profile')
 const ws = path.join(lib.WORK, 'panelroom-ws')

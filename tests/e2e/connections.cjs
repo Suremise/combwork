@@ -3,7 +3,7 @@
 // (the fake Claude Code signs in, no browser); agents of one workspace on different connections at once (each launch
 // logged in its own connection's folder); a second window's workspace on its own connection; a connection turned off
 // moves its agent to the default at its next safe point (its turn over, its exit typed once, resumed in the same
-// conversation); a signed-out connection is refused. The footer names the connection. A connection's own CLAUDE.md,
+// conversation); a signed-out connection is refused, and Provider Setup warns that the one on isn't signed in (HI-3278). The footer names the connection. A connection's own CLAUDE.md,
 // opened new in Memory, starts under the connection's name for its agents in every project (HI-2667). Screenshots in
 // both themes.
 // Nothing is turned on by itself (HI-2650): a connection added is on nowhere, a new workspace starts with none on, and
@@ -13,7 +13,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'connections-profile')
 const home = path.join(lib.WORK, 'connections-claude-home')
@@ -294,6 +294,20 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     fs.rmSync(path.join(accountsRoot, max1.id, 'fake-account.json'))
     const out = await failure(inv('session:start', alpha, { agentId: 'a-one' }))
     check('a signed-out connection is refused, saying so', /Max 1 is signed out/.test(out ?? ''), out ?? 'started')
+    // HI-3278: Provider Setup's line warns when every account on here is signed out (Max 1, the only one on), and the CLI's
+    // tab never says it isn't signed in from its own home's sign-in.
+    await page.keyboard.press('Control+Shift+P')
+    await page.locator('.palette input').waitFor({ timeout: HUNG_MS })
+    await page.locator('.palette input').fill('Provider Setup')
+    await page.locator('.palette-item[data-command="help.agentSetup"]').waitFor({ timeout: HUNG_MS })
+    await page.keyboard.press('Enter')
+    const setup2 = page.locator('.dialog', { hasText: 'Provider Setup' })
+    await setup2.locator('.setup-tab', { hasText: 'Claude Code' }).click({ timeout: HUNG_MS })
+    const setupLine = setup2.locator('[data-connection-setup-line]')
+    check("Provider Setup: every account on here signed out, its line warns to sign one in (HI-3278)", !!(await lib.until(async () => (await setupLine.getAttribute('data-signed-out').catch(() => null)) === 'true' && /the one on in this workspace is not signed in: sign it in/.test(await setupLine.innerText()), HUNG_MS)), await setupLine.innerText().catch(() => ''))
+    check('…and no "not signed in" of the CLI itself, nor a Sign in button', !/Claude Code is not signed in/.test(await setup2.innerText()) && (await setup2.locator('button', { hasText: /^Sign in/ }).count()) === 0)
+    await shots('setup-signed-out')
+    await page.keyboard.press('Escape')
     await inv('session:stop', alpha, 'a-two')
   } catch (e) {
     check('the suite ran to its end', false, e.stack)

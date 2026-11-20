@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'keysui-profile')
 const ws = path.join(lib.WORK, 'keysui-ws')
@@ -76,8 +76,8 @@ const check = (name, ok, extra = '') => {
     const error = dialog.locator('.field-error')
     const hint = dialog.locator('.field-hint')
     // The dialog as it is: both boxes, the hint and the error, for a check's evidence.
-    const boxes = async () => `[name: ${await name.inputValue().catch(() => '?')}, key: ${await key.inputValue().catch(() => '?')}, hint: ${await hint.innerText({ timeout: 500 }).catch(() => '')}, error: ${await error.innerText({ timeout: 500 }).catch(() => '')}]`
-    const textOf = (loc) => loc.innerText({ timeout: 500 }).catch(() => '')
+    const boxes = async () => `[name: ${await name.inputValue().catch(() => '?')}, key: ${await key.inputValue().catch(() => '?')}, hint: ${await hint.innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')}, error: ${await error.innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')}]`
+    const textOf = (loc) => loc.innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')
     await name.fill('web-app')
     check('the key follows the name typed: a suggestion, saying how its cards will be named', !!(await lib.until(async () => (await key.inputValue()) === 'WE' && /WE-1, WE-2/.test(await textOf(hint)), HUNG_MS)), await boxes())
     // A key typed while the window hasn't the keys yet is checked once it has them, with nothing typed again (HI-2653).
@@ -251,7 +251,7 @@ const check = (name, ok, extra = '') => {
       await dialog.waitFor({ timeout: HUNG_MS })
       const key = dialog.getByRole('textbox', { name: T('actions', 'actions.project.key'), exact: true })
       const name = dialog.locator('input').first()
-      const textOf = (loc) => loc.innerText({ timeout: 500 }).catch(() => '')
+      const textOf = (loc) => loc.innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')
       const boxes = async () => `[name: ${await name.inputValue().catch(() => '?')}, key: ${await key.inputValue().catch(() => '?')}, hint: ${await textOf(dialog.locator('.field-hint'))}, error: ${await textOf(dialog.locator('.field-error'))}]`
       await name.fill('gamma-app')
       check(`${lang}: the New Project key box and its hint in ${lang}`, !!(await lib.until(async () => (await key.inputValue()) === 'GA' && (await textOf(dialog.locator('.field-hint'))) === T('actions', 'actions.project.keyHint', { first: 'GA-1', second: 'GA-2' }), HUNG_MS)), await boxes())

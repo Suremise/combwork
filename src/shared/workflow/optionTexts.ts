@@ -5,6 +5,7 @@
 import { msg, type Msg } from '../i18n/msg'
 import { accepts, merges, type PlatformId } from '../platform/descriptors'
 import type { FormGroupId, OptionKey, PresetId } from './options'
+import type { LaneEvent, WakeLevel } from '../laneEvents'
 
 interface OptionText {
   title: Msg
@@ -43,14 +44,22 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   finish: {
     title: msg({ id: 'workflow.option.finish.title', defaultMessage: 'Who merges', description: 'A workflow option (glossary 2.6, G5).' }),
-    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, or whenever it is moved there.', description: 'What the workflow option “Who merges” does (glossary 2.1: merge queue).' })
+    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, or whenever it is moved there.', description: 'What the workflow option “Who merges” does (glossary 2.1: merge queue).' }),
+    integrates: {
+      title: msg({ id: 'workflow.option.finish.jjTitle', defaultMessage: 'Who integrates', description: 'The workflow option “Who merges” (G5) for a project using jj (HI-3235): who moves the target bookmark to a passed card’s candidate.' }),
+      desc: msg({
+        id: 'workflow.option.finish.jjDesc',
+        defaultMessage: 'Once a card passes and its merge checks pass on its candidate, Combwork moves the target bookmark to the candidate, after you click Integrate on its preview, or you do it yourself. Combwork refuses first when anything is unexpected, and stops and tells you when it sees something change during the move. jj can’t make that move conditional, so a few races can still happen while Combwork moves it: a bookmark moved away and back, a move to an earlier commit of the candidate, or a Git checkout or another bookmark changed during the export. The preview decides when the move runs and what you agree to, but once you click it has the same races. Only You integrate it yourself avoids them.',
+        description: 'What the workflow option “Who integrates” does, for a project using jj (HI-3235, HI-2840/s30 and s34): the four residual races, in plain words; never call it safe. A bookmark is jj’s name for a branch: keep it as jj’s term. “You integrate it yourself” is the option’s other value, as translated there.'
+      })
+    }
   },
   style: {
     title: msg({ id: 'workflow.option.style.title', defaultMessage: 'Merge style', description: 'A workflow option (glossary 2.6, G6).' }),
     desc: msg({ id: 'workflow.option.style.desc', defaultMessage: 'How a card’s work is merged into the target branch.', description: 'What the workflow option “Merge style” does.' }),
     integrates: {
       title: msg({ id: 'workflow.option.style.jjTitle', defaultMessage: 'Candidate style', description: 'The workflow option “Merge style” (G6) for a project using jj (HI-2871): how the candidate commit Combwork builds for the user to integrate is made (merge commit, squash or rebase). Candidate: the commit Combwork builds.' }),
-      desc: msg({ id: 'workflow.option.style.jjDesc', defaultMessage: 'Once a card passes, Combwork builds a candidate from it on the target bookmark: a merge commit, one squashed commit, or its commits copied on top. You move the bookmark to the candidate yourself; Combwork never does.', description: 'What the workflow option “Candidate style” does, for a project using jj (HI-2871). A bookmark is jj’s name for a branch: keep it as jj’s term.' })
+      desc: msg({ id: 'workflow.option.style.jjDesc', defaultMessage: 'Once a card passes, Combwork builds a candidate from it on the target bookmark: a merge commit, one squashed commit, or its commits copied on top. Who integrates says whether Combwork or you then move the bookmark to it.', description: 'What the workflow option “Candidate style” does, for a project using jj (HI-2871, HI-3235). A bookmark is jj’s name for a branch: keep it as jj’s term. “Who integrates” is another option’s name, as translated there.' })
     }
   },
   target: {
@@ -58,7 +67,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     desc: msg({ id: 'workflow.option.target.desc', defaultMessage: 'The branch a card’s work is merged into: the repository’s default branch when left empty.', description: 'What the workflow option “Work merges into” does.' })
   },
   otherTargets: {
-    title: msg({ id: 'workflow.option.otherTargets.title', defaultMessage: 'Other branches work can merge into', description: 'A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). Darren’s name for it.' }),
+    title: msg({ id: 'workflow.option.otherTargets.title', defaultMessage: 'Other branches work can merge into', description: 'A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). The user’s name for it.' }),
     desc: msg({ id: 'workflow.option.otherTargets.desc', defaultMessage: 'Branches a lane or a card can merge into instead (its Merges into), each through its own merge queue with the same merge checks, separated by commas.', description: 'What the workflow option “Other branches work can merge into” does (HI-2556). Merges into is the lane’s and card’s field: as translated there.' })
   },
   mergeChecks: {
@@ -67,6 +76,14 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     integrates: {
       title: msg({ id: 'workflow.option.mergeChecks.jjTitle', defaultMessage: 'Checks pass on the candidate', description: 'The workflow option “Checks pass on the merged result” (G9) for a project using jj (HI-2938): named commands Combwork runs on the candidate it builds for the user to integrate. Candidate: the commit Combwork builds.' }),
       desc: msg({ id: 'workflow.option.mergeChecks.jjDesc', defaultMessage: 'Combwork runs these named commands on the candidate, in a check copy of its own, and offers the candidate for you to integrate only once each one has passed. One that fails sends the card back to its builder.', description: 'What the workflow option “Checks pass on the candidate” does, for a project using jj (HI-2938). A check copy is a working folder Combwork keeps for checks (glossary).' })
+    }
+  },
+  mergeGuards: {
+    title: msg({ id: 'workflow.option.mergeGuards.title', defaultMessage: 'Merge guards', description: 'A workflow option (HI-3284): patterns (regular expressions) Combwork refuses in the lines a merge adds. A guard here is a check that keeps something out, not a person.' }),
+    desc: msg({ id: 'workflow.option.mergeGuards.desc', defaultMessage: 'Patterns a merge may not add, matched against only the lines it adds (never what the target already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.', description: 'What the workflow option “Merge guards” does (HI-3284): each guard is a regular expression checked against the text lines a merge adds; a match returns the card. Secret scanning: tools that look for passwords and keys; say plainly that this is not one.' }),
+    integrates: {
+      title: msg({ id: 'workflow.option.mergeGuards.jjTitle', defaultMessage: 'Merge guards', description: 'The workflow option “Merge guards” (HI-3284) for a project using jj: the same name.' }),
+      desc: msg({ id: 'workflow.option.mergeGuards.jjDesc', defaultMessage: 'Patterns a candidate may not add, matched against only the lines it adds to the target bookmark (never what it already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.', description: 'What the workflow option “Merge guards” does for a project using jj (HI-3284). A candidate is the commit Combwork builds for the user to integrate; a bookmark is jj’s name for a branch: keep it as jj’s term. Secret scanning: tools that look for passwords and keys.' })
     }
   },
   focusedTests: {
@@ -162,6 +179,14 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     title: msg({ id: 'workflow.option.loopRounds.title', defaultMessage: 'Rounds', description: 'A workflow option, under Card loops: how many rounds (a build and its review) a card gets before its agents ask you.' }),
     desc: msg({ id: 'workflow.option.loopRounds.desc', defaultMessage: 'How many rounds a card gets in a card loop (a build and its review each) before its agents stop and ask you, when the loop doesn’t say.', description: 'What the workflow option “Rounds” does (Card loops).' })
   },
+  simplifyAt: {
+    title: msg({ id: 'workflow.option.simplifyAt.title', defaultMessage: 'Simplify check after', description: 'A workflow option, under Card loops (HI-3188): after how much counted loop work on a card (failed reviews, design steps, requests, questions) Combwork asks whether to simplify. A number follows it; 0 turns it off.' }),
+    desc: msg({ id: 'workflow.option.simplifyAt.desc', defaultMessage: 'With a reviewer agent, once a card has had this much more back-and-forth (failed reviews, designs and follow-ups, reviewer requests, questions to you), Combwork pauses its loop to ask whether it is worth handling, or to simplify or cut scope (0 turns it off).', description: 'What the workflow option “Simplify check after” does (Card loops, HI-3188). “Back-and-forth” is the card’s counted loop work.' })
+  },
+  churnStopAt: {
+    title: msg({ id: 'workflow.option.churnStopAt.title', defaultMessage: 'Hard stop after', description: 'A workflow option, under Card loops (HI-3188): after how much counted loop work on a card Combwork stops its loop and asks you how to go on. A number follows it; 0 turns it off.' }),
+    desc: msg({ id: 'workflow.option.churnStopAt.desc', defaultMessage: 'With a reviewer agent, once a card has had this much back-and-forth in all (with any card it was split from), Combwork stops its loop to ask you to carry on, split it, accept it with follow-ups or take it over (0 turns it off).', description: 'What the workflow option “Hard stop after” does (Card loops, HI-3188).' })
+  },
   loopWaitHours: {
     title: msg({ id: 'workflow.option.loopWaitHours.title', defaultMessage: 'Wait (hours)', description: 'A workflow option, under Card loops: how many hours an agent in a card loop waits with no change before it tells you.' }),
     desc: msg({ id: 'workflow.option.loopWaitHours.desc', defaultMessage: 'How many hours, up to a day, an agent in a card loop waits with no change before it tells you, when the loop doesn’t say.', description: 'What the workflow option “Wait (hours)” does (Card loops).' })
@@ -169,6 +194,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   loopStepWaitMinutes: {
     title: msg({ id: 'workflow.option.loopStepWaitMinutes.title', defaultMessage: 'Design check wait (minutes)', description: 'A workflow option, under Card loops: how long a builder waits for its reviewer to check a design it posted.' }),
     desc: msg({ id: 'workflow.option.loopStepWaitMinutes.desc', defaultMessage: 'How many minutes, up to 4 hours, a card loop’s builder waits for its reviewer to check a design it posted before it goes ahead as posted.', description: 'What the workflow option “Design check wait (minutes)” does (Card loops). A design: the plan a builder posts on its card before building.' })
+  },
+  assistantWakes: {
+    title: msg({ id: 'workflow.option.assistantWakes.title', defaultMessage: 'Wake the Assistant for', description: 'A workflow option, under Card loops (HI-3211): which events in this project’s lanes wake the Combwork Assistant while it watches them (glossary: lane, the Assistant).' }),
+    desc: msg({ id: 'workflow.option.assistantWakes.desc', defaultMessage: 'Which events in this project’s lanes wake the Assistant while it watches them (a question for you always does), each wake costing it tokens.', description: 'What the workflow option “Wake the Assistant for” does (HI-3211), in one sentence, as every option’s is (HI-3253). A lane: a builder and a reviewer taking cards in turn (glossary: lane). A question for you: one an agent asks the user on a lane’s card. Tokens: what the Assistant’s coding agent uses up.' })
   }
 }
 
@@ -190,6 +219,8 @@ export const VALUE_TEXT = {
     agentMerges: msg({ id: 'workflow.value.finish.agentMerges', defaultMessage: 'The agent merges, Combwork checks', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     committed: msg({ id: 'workflow.value.finish.committed', defaultMessage: 'Committed is done', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     notChecked: msg({ id: 'workflow.value.finish.notChecked', defaultMessage: 'Not checked', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
+    combworkAdvances: msg({ id: 'workflow.value.finish.combworkAdvances', defaultMessage: 'Combwork integrates after the checks', description: 'A value of the workflow option “Who integrates” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-3235): once a card passes and its merge checks pass on its candidate, Combwork moves the target bookmark to the candidate itself. The default for jj.' }),
+    previewAdvance: msg({ id: 'workflow.value.finish.previewAdvance', defaultMessage: 'Combwork integrates when you click', description: 'A value of the workflow option “Who integrates” (glossary 2.6, G5) for a project using jj (HI-3236): once a card passes and its merge checks pass, For you shows what Combwork would move (the preview), and Combwork moves the target bookmark only when you click Integrate.' }),
     userIntegrates: msg({ id: 'workflow.value.finish.userIntegrates', defaultMessage: 'You integrate it yourself', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj; you bring the reviewed work into its target with jj.' })
   },
   style: {
@@ -215,11 +246,44 @@ export const VALUE_TEXT = {
     slots: msg({ id: 'workflow.value.folder.slots', defaultMessage: 'Each card in its own folder', description: 'A value of the workflow option “Where cards are built” (glossary 2.6, G11). The folder is a slot, a worktree Combwork lends to the card or its lane (glossary 2.5: slot).' }),
     project: msg({ id: 'workflow.value.folder.project', defaultMessage: 'Everyone in the project folder', description: 'A value of the workflow option “Where cards are built” (glossary 2.6, G11).' })
   },
+  assistantWakes: {
+    everything: msg({ id: 'workflow.value.assistantWakes.everything', defaultMessage: 'Everything', description: 'A value of the workflow option “Wake the Assistant for” (HI-3211): every event in a lane.' }),
+    standard: msg({ id: 'workflow.value.assistantWakes.standard', defaultMessage: 'Standard', description: 'A value of the workflow option “Wake the Assistant for” (HI-3211), the default: what woke it before this option existed.' }),
+    important: msg({ id: 'workflow.value.assistantWakes.important', defaultMessage: 'Important only', description: 'A value of the workflow option “Wake the Assistant for” (HI-3211): failures, blocks, merges due, lanes ending and agents waiting for you.' }),
+    quiet: msg({ id: 'workflow.value.assistantWakes.quiet', defaultMessage: 'Quiet', description: 'A value of the workflow option “Wake the Assistant for” (HI-3211): only agents waiting for you and lanes ending.' }),
+    custom: msg({ id: 'workflow.value.assistantWakes.custom', defaultMessage: 'Custom', description: 'A value of the workflow option “Wake the Assistant for” (HI-3211): the events you tick.' })
+  },
   reviewerMode: {
     lane: msg({ id: 'workflow.value.reviewerMode.lane', defaultMessage: 'One per lane', description: 'A value of the workflow option “Reviewers” (glossary 2.6, G17): each lane has its own reviewer agent.' }),
     pool: msg({ id: 'workflow.value.reviewerMode.pool', defaultMessage: 'A shared pool', description: 'A value of the workflow option “Reviewers” (glossary 2.6, G17): lanes share a pool of reviewer agents, each card going to the next free one.' })
   }
 } satisfies Record<string, Record<string, Msg>>
+
+/** What each level of “Wake the Assistant for” wakes it for (HI-3211), said under the choice. */
+export const WAKE_LEVEL_TEXT: Record<WakeLevel, Msg> = {
+  everything: msg({ id: 'workflow.wakeLevel.everything', defaultMessage: 'Every event in a lane: also each card passing review, each card moving, and a lane waiting for a merge. For a few big cards you want to follow closely.', description: 'Under the workflow option “Wake the Assistant for” while Everything is chosen (HI-3211): what wakes the Assistant.' }),
+  standard: msg({ id: 'workflow.wakeLevel.standard', defaultMessage: 'A failed review, a card blocked, unblocked or stalled, a lane whose merge is due or stalled, a lane ending, and an agent waiting for you. What Combwork has always woken it for.', description: 'Under the workflow option “Wake the Assistant for” while Standard (the default) is chosen (HI-3211): what wakes the Assistant.' }),
+  important: msg({ id: 'workflow.wakeLevel.important', defaultMessage: 'A failed review, a card blocked, a lane whose merge is due, a lane ending, and an agent waiting for you. No stalls or unblocks: for busy projects of many small cards.', description: 'Under the workflow option “Wake the Assistant for” while Important only is chosen (HI-3211): what wakes the Assistant.' }),
+  quiet: msg({ id: 'workflow.wakeLevel.quiet', defaultMessage: 'Only an agent waiting for you and a lane ending. The Assistant hears of failures and blocks when it next looks, or when you ask.', description: 'Under the workflow option “Wake the Assistant for” while Quiet is chosen (HI-3211): what wakes the Assistant.' }),
+  custom: msg({ id: 'workflow.wakeLevel.custom', defaultMessage: 'The events you tick.', description: 'Under the workflow option “Wake the Assistant for” while Custom is chosen (HI-3211); the events follow as ticks.' })
+}
+
+/** Each lane event as the Custom ticks of “Wake the Assistant for” name it (HI-3211). A question for you is always on. */
+export const WAKE_EVENT_TEXT: Record<LaneEvent, Msg> = {
+  failed: msg({ id: 'workflow.wakeEvent.failed', defaultMessage: 'A card fails review', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  passed: msg({ id: 'workflow.wakeEvent.passed', defaultMessage: 'A card passes review', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  blocked: msg({ id: 'workflow.wakeEvent.blocked', defaultMessage: 'A card is blocked', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  reblocked: msg({ id: 'workflow.wakeEvent.reblocked', defaultMessage: 'A blocked card has news', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a blocked card’s reason changed, or its agent commented.' }),
+  unblocked: msg({ id: 'workflow.wakeEvent.unblocked', defaultMessage: 'A card is unblocked', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  stalled: msg({ id: 'workflow.wakeEvent.stalled', defaultMessage: 'A card or a merge stalls', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): nothing has happened on a card for a long time, or a lane’s merge isn’t being done.' }),
+  moved: msg({ id: 'workflow.wakeEvent.moved', defaultMessage: 'A card moves', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a card goes to another board column.' }),
+  'merge-due': msg({ id: 'workflow.wakeEvent.mergeDue', defaultMessage: 'A lane’s merge is due', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): every card of a lane passed review.' }),
+  'paused-merge': msg({ id: 'workflow.wakeEvent.pausedMerge', defaultMessage: 'A lane waits for a merge', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): a lane taking one card at a time waits for its last card to be merged.' }),
+  ended: msg({ id: 'workflow.wakeEvent.ended', defaultMessage: 'A lane ends', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  abandoned: msg({ id: 'workflow.wakeEvent.abandoned', defaultMessage: 'A lane is abandoned', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an event in a lane.' }),
+  waiting: msg({ id: 'workflow.wakeEvent.waiting', defaultMessage: 'An agent waits for you', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211): an agent of the project stops to wait for the user (a permission prompt, a question).' }),
+  'paused-user': msg({ id: 'workflow.wakeEvent.pausedUser', defaultMessage: 'A question for you on a lane’s card (always)', description: 'A tick of the workflow option “Wake the Assistant for”, Custom (HI-3211), always on and not changeable: an agent or Combwork asks the user something on a lane’s card.' })
+}
 
 /** The presets' names (glossary 2.1). */
 export const PRESET_TEXT: Record<PresetId | 'custom', Msg> = {

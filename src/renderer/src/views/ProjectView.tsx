@@ -543,7 +543,8 @@ export function ProjectView({ visible }: { visible: boolean }) {
     await call('session:stop', project.path, live.agentId)
     const start = Date.now()
     while (Date.now() - start < 8000 && (await call('session:live')).some((l) => l.projectPath === project.path && l.agentId === live.agentId)) await new Promise((r) => setTimeout(r, 150))
-    await actions.resumeSession(project.path, { id: live.sessionId, recache: null, title: null, name: item?.name, agentId: live.agentId, cwd: item?.cwd }, live.agentId)
+    // Its slot too (HI-3213): one that ran in a slot resumes with its own agent, never read as a worktree no agent uses.
+    await actions.resumeSession(project.path, actions.restartItem(live, item), live.agentId)
   }
 
   return (
@@ -743,7 +744,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
 }
 
 /**
- * Asks for a connection (HI-1755, Darren's 1a): in a project whose agents' CLI has connections but none is on in its
+ * Asks for a connection (HI-1755, 1a): in a project whose agents' CLI has connections but none is on in its
  * workspace, nothing of that CLI starts (it never falls back to the CLI's own login): Add a Connection opens Settings →
  * Connections. Not asked for a test copy on its CLI test home.
  */

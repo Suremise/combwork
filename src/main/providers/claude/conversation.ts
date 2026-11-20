@@ -1,5 +1,5 @@
 import type { TranscriptImageRef, TranscriptItem, TranscriptTool } from '../../../shared/types'
-import { NOTICE_TEXT, firstLine, noticeOf, shortPath, toolLabel, type NewItem } from '../conversation'
+import { NOTICE_TEXT, firstLine, formatToolInput, noticeOf, shortPath, toolLabel, type NewItem } from '../conversation'
 import type { ConversationParserLike, ImageLocation } from '../types'
 import { SidechainFilter } from './usage'
 
@@ -48,17 +48,6 @@ export function toolSummary(name: string, input: Record<string, unknown>, root: 
   }
   const first = Object.values(input).find((v) => typeof v === 'string' && v.trim())
   return firstLine(first).slice(0, 200)
-}
-
-/** Tool input as readable text: the command itself for shells, otherwise one "key: value" per field. */
-export function formatToolInput(name: string, input: Record<string, unknown>): string {
-  if ((name === 'Bash' || name === 'PowerShell') && typeof input.command === 'string') return input.command
-  return Object.entries(input)
-    .map(([k, v]) => {
-      if (typeof v === 'string') return v.includes('\n') ? `${k}:\n${v}` : `${k}: ${v}`
-      return `${k}: ${JSON.stringify(v, null, 2)}`
-    })
-    .join('\n')
 }
 
 /** Claude Code's transcript parser. Image locations are content-block indices from message.content (tool results nest one level deeper). */

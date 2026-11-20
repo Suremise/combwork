@@ -1,6 +1,7 @@
 // Codex connections (HI-1757; the test seam off so the real rule
 // applies), on the fake Codex (no browser, no real sign-in): with none on, a Codex agent is refused; two connections
-// signed in with Codex's own login in each one's folder; two agents on them at once, each launch's CODEX_HOME its own
+// signed in with Codex's own login in each one's folder, Provider Setup then never saying Codex isn't signed in though
+// its own home is (HI-3278); two agents on them at once, each launch's CODEX_HOME its own
 // folder, its login kept there (the file store) and a token in Combwork's environment never passed on; a conversation
 // carried from one connection to the other (its rollout in the shared sessions folder, resumed), its plan usage then
 // the connection's own, in the status bar (HI-1882); a login changed in a
@@ -11,7 +12,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'connections-codex-profile')
 const claudeHome = path.join(lib.WORK, 'connections-codex-claude-home')
@@ -35,6 +36,8 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
   for (const d of [userData, claudeHome, codexHome]) fs.mkdirSync(d, { recursive: true })
   // Codex's own home: its Windows sandbox set up (the PC's, the default admin one), as Codex keeps it.
   fs.writeFileSync(path.join(codexHome, 'config.toml'), '[windows]\nsandbox = "elevated"\n')
+  // …and never signed in there (HI-3278): a user who signs in only through connections, as Combwork intends.
+  fs.writeFileSync(path.join(codexHome, 'fake-signed-out'), '')
   lib.gitProject(alpha)
   fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'codex' }, { id: 'a-two', name: 'Two', provider: 'codex' }, { id: 'a-three', name: 'Three', provider: 'codex' }] }))
@@ -86,7 +89,24 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     await inv('connections:setOn', home.id, true)
     check('the first turned on is the default', (await inv('connections:list')).workspace.codex?.default === work.id)
 
-    // --- Set up for this workspace. Combwork's per-launch trust (HI-1871, Darren: on by default) gives each launch its own
+    // --- Signed in only through connections, Codex's own home signed out (HI-3278): Provider Setup's Codex tab never says
+    // Codex isn't signed in (its home's sign-in isn't checked: its agents never use it), and offers no sign-in of its own.
+    await inv('provider:refresh', 'codex').catch(() => undefined)
+    await lib.waitForProvider(inv, 'codex')
+    await page.keyboard.press('Control+Shift+P')
+    await page.locator('.palette input').waitFor({ timeout: HUNG_MS })
+    await page.locator('.palette input').fill('Provider Setup')
+    await page.locator('.palette-item[data-command="help.agentSetup"]').waitFor({ timeout: HUNG_MS })
+    await page.keyboard.press('Enter')
+    const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
+    await setup.locator('.setup-tab', { hasText: 'Codex' }).click({ timeout: HUNG_MS })
+    const codexLine = setup.locator('[data-connection-setup-line]')
+    check("Provider Setup's Codex tab: its line says 2 accounts are on, and nothing says Codex isn't signed in", !!(await lib.until(async () => /Codex signs in per account: 2 are on in this workspace/.test(await codexLine.innerText().catch(() => '')), HUNG_MS)) && !/Codex is not signed in/.test(await setup.innerText()) && (await setup.locator('button', { hasText: /^Sign in/ }).count()) === 0, await setup.innerText().catch(() => ''))
+    check("…Codex's own home was never asked for its sign-in", (await inv('provider:info'))?.codex?.loggedIn == null)
+    await page.screenshot({ path: path.join(lib.WORK, 'connections-codex-setup-signed-in-by-account.png') })
+    await page.keyboard.press('Escape')
+
+    // --- Set up for this workspace. Combwork's per-launch trust (HI-1871: on by default) gives each launch its own
     // folder trusted, so nothing is pending; with it off (Advanced), Codex's trust of the project's repository root is
     // read from the connection's config.toml (Combwork writes none) and Set Up opens there (HI-1870).
     const root = fs.realpathSync.native(alpha)
@@ -125,7 +145,6 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
 
     // --- A conversation carried over: Two's first turn on Home, then resumed on Work, through the shared rollouts.
     await inv('pty:write', lib.ptyKey(alpha, 'a-two'), 'hello')
-    await lib.sleep(300) // on purpose: the fake takes a typed line before its Enter, as Codex does
     await inv('pty:write', lib.ptyKey(alpha, 'a-two'), '\r')
     const first = await lib.until(async () => (await live('a-two'))?.sessionId || null, HUNG_MS)
     check("Two's conversation has begun on Home", !!first)
@@ -141,13 +160,16 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     // rollout's rate limits kept as Work's, and the status bar's Work item shows them.
     await lib.until(async () => (await live('a-two'))?.status === 'ready', HUNG_MS)
     await inv('pty:write', lib.ptyKey(alpha, 'a-two'), 'planusage 12 57')
-    await lib.sleep(300) // on purpose: the fake takes a typed line before its Enter, as Codex does
     await inv('pty:write', lib.ptyKey(alpha, 'a-two'), '\r')
     const keptWork = await lib.until(async () => (await inv('app:connectionPlanUsage'))[work.id] ?? null, HUNG_MS)
     check("Two's rollout's rate limits are kept as Work's", keptWork?.limits?.map((l) => l.usedPercent).join(',') === '12,57' && !(await inv('app:planUsage')).codex, JSON.stringify({ kept: keptWork, cli: (await inv('app:planUsage')).codex ?? null }))
     const workItem = page.locator(`.statusbar .status-item[data-plan-connection="${work.id}"]`)
     const workText = async () => ((await workItem.count()) === 1 ? (await workItem.innerText()).replace(/\s+/g, ' ') : '')
     check('…and the status bar shows Work’s: 5h 12% · Week 57%', !!(await lib.until(async () => /Work.*5h 12%.*Week 57%/.test(await workText()), HUNG_MS)), await workText())
+    // A second of Codex's limits, of the same windows (HI-1125): its own item beside Codex's, by its name, never mixed in.
+    await inv('pty:write', lib.ptyKey(alpha, 'a-two'), 'planusage 70 20 id=codex_bengalfox name=gpt-5.2-codex-sonic')
+    await inv('pty:write', lib.ptyKey(alpha, 'a-two'), '\r')
+    check("…a second Codex limit (another limit_id) shows by its name, Codex's own figures unchanged", !!(await lib.until(async () => /5h 12%.*Week 57%/.test(await workText()) && /gpt-5\.2-codex-sonic 5h 70%/.test(await workText()) && /gpt-5\.2-codex-sonic wk 20%/.test(await workText()), HUNG_MS)), await workText())
 
     // --- A third agent on a busy connection (HI-1873): One and Two run on Work, writing in its folder all the time as
     // Codex's databases do (and so does each check's app server), its login untouched. Three starts there, every time.

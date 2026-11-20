@@ -16,16 +16,17 @@ import { endedLine, failedLine, readBaseline, useBaselineWorker, type BaselineTh
 import { MARKED_LOG, redactLog, type RedactContext } from '../src/shared/redact'
 import { scanProject } from '../src/main/noneBaselineWorker'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 
 const tmp = tempDir('cw-none-baseline-')
 const bundle = join(tmp, 'none-baseline-worker.cjs')
 
 beforeAll(async () => {
   await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'noneBaselineWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
-}, 60_000)
+}, timing('hook.hang'))
 afterAll(() => void useBaselineWorker(null))
 
 let n = 0
@@ -43,11 +44,11 @@ function project(files: number, size = 16): string {
 }
 
 /** Waits for a condition, bounded by HUNG_MS. */
-async function until(ok: () => boolean): Promise<void> {
-  const end = Date.now() + HUNG_MS
+async function until(ok: () => boolean, ms: number): Promise<void> {
+  const end = Date.now() + ms
   while (!ok()) {
-    if (Date.now() > end) throw new Error('still not so after HUNG_MS')
-    await new Promise((r) => setTimeout(r, 5))
+    if (Date.now() > end) throw new Error(`still not so after ${ms} ms`)
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
 }
 
@@ -80,7 +81,7 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
     let ticks = 0
     const tick = setInterval(() => void ticks++, 5)
     try {
-      await until(() => ticks >= 20)
+      await until(() => ticks >= 20, HUNG_MS)
       expect(answered).toBe(false)
       expect(t.pending).toBe(1)
     } finally {
@@ -103,13 +104,13 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
     // b's read waits behind a's (one at a time); its only caller stops waiting: it isn't sent.
     const left = new AbortController()
     const other = readBaseline(b, left.signal)
-    await until(() => t.pending === 3)
+    await until(() => t.pending === 3, HUNG_MS)
     gone.abort()
     left.abort()
     expect(await three).toBeNull()
     expect(await other).toBeNull()
     // two still waits on the shared queued read: it stays.
-    await until(() => t.pending === 2)
+    await until(() => t.pending === 2, HUNG_MS)
     t.release()
     const [x, y] = await Promise.all([one, two])
     expect(x).not.toBeNull()
@@ -125,12 +126,12 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
     t.hold({ after: true })
     const held = t.answersHeld
     const first = readBaseline(a)
-    await until(() => t.answersHeld === held + 1)
+    await until(() => t.answersHeld === held + 1, HUNG_MS)
     // The file changes, as the watcher would see it (an invalidation: the generation doesn't change).
     writeFileSync(file, 'changed since the first read')
     a.invalidate('assets/0/0.txt')
     const later = readBaseline(a)
-    await until(() => t.pending === 2)
+    await until(() => t.pending === 2, HUNG_MS)
     t.release()
     const [x, y] = (await Promise.all([first, later])) as Record<string, string>[]
     expect(x['assets/0/0.txt']).not.toBe(y['assets/0/0.txt'])
@@ -151,7 +152,7 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
     t.hold()
     const first = readBaseline(busy)
     const old = readBaseline(a)
-    await until(() => t.pending === 2)
+    await until(() => t.pending === 2, HUNG_MS)
     a.setExcluded(['assets', 'node_modules'])
     const fresh = readBaseline(a)
     expect(await old).toBeNull()
@@ -165,7 +166,7 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
     const a = new NoneAdapter(project(3), ['node_modules'])
     t.hold()
     const read = readBaseline(a)
-    await until(() => t.pending === 1)
+    await until(() => t.pending === 1, HUNG_MS)
     await t.kill()
     expect(await read).toBeNull()
     expect(t.pending).toBe(0)
@@ -174,7 +175,7 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
   })
 
   it('a read past its bound ends its worker and is answered with nothing; a late answer is no later read\'s', async () => {
-    const bounded = useBaselineWorker(bundle, { timeoutMs: 150 })
+    const bounded = useBaselineWorker(bundle, { timeoutMs: 150 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     try {
       const a = new NoneAdapter(project(3), ['node_modules'])
       bounded.hold()
@@ -214,5 +215,5 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
     const inWorker = await gapDuring(() => readBaseline(new NoneAdapter(root)))
     console.info(`HI-2340 benchmark, 5,000 x 1 KB: main's longest gap ${Math.round(onMain)} ms on main's thread, ${Math.round(inWorker)} ms with the read in its worker`)
     expect(inWorker).toBeGreaterThanOrEqual(0)
-  }, 120_000)
+  }, timing('test.hang'))
 })

@@ -52,6 +52,7 @@ const root = join(here, '..', '..')
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
 // A process tree ended by identity, never taskkill /T on a pid (#603).
 const { endChildTree } = createRequire(import.meta.url)('./folderProcesses.cjs')
+const { timing } = createRequire(import.meta.url)('../timing.cjs')
 
 const argv = process.argv.slice(2)
 const repeat = Math.max(1, Number(argv[argv.indexOf('--repeat') + 1]) || 1)
@@ -121,9 +122,9 @@ function start({ name, cwd, script, args, polluted, env: extra = {}, started = (
   })
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-/** Waits until fn() is true, checking every 100 ms, up to ms; returns whether it was. */
+/** Waits until fn() is true, checking every poll.intervalMs, up to ms; returns whether it was. */
 async function until(fn, ms) {
-  for (const t = Date.now(); Date.now() - t < ms; await sleep(100)) if (fn()) return true
+  for (const t = Date.now(); Date.now() - t < ms; await sleep(timing('poll.intervalMs'))) if (fn()) return true
   return false
 }
 
@@ -209,7 +210,7 @@ async function heavyRound(k, worktrees) {
   try {
     const runs = Promise.all(worktrees.map((w, i) => start({ name: `worktree ${i + 1}, heavy e2e`, cwd: w, script: 'tests/e2e/run.mjs', args, env })))
     // While two hold the slots and one waits: a run with --no-wait fails at once.
-    const queued = await until(() => slots() === 2 && waiting() === 1, 120_000)
+    const queued = await until(() => slots() === 2 && waiting() === 1, timing('hang.step'))
     check('two heavy runs hold the slots and the third waits', queued, `slots ${slots()}, waiting ${waiting()}`)
     const refused = await start({ name: '--no-wait', cwd: root, script: 'tests/e2e/run.mjs', args: [...args.slice(0, -1), '--no-wait'], env })
     check('a run with --no-wait fails at once, saying who holds the slots', refused.code === 2 && /No test slot free \(--no-wait\).*held by .*e2e: 2 suites × 2/.test(refused.out) && refused.ms < 15_000, `exit ${refused.code} in ${refused.ms} ms: ${refused.out.trim().split('\n').at(-1)}`)
@@ -249,7 +250,7 @@ async function heavyRound(k, worktrees) {
     // A run killed while it holds a slot: with one slot, the next run takes it without waiting.
     let child
     const killed = start({ name: 'killed', cwd: root, script: 'tests/e2e/run.mjs', args, env: { ...env, CW_TEST_HEAVY_SLOTS: '1' }, started: (p) => (child = p) })
-    const held = await until(() => slots() === 1, 60_000)
+    const held = await until(() => slots() === 1, timing('hang.step'))
     endChildTree(child)
     await killed
     const next = await start({ name: 'after a killed run', cwd: root, script: 'tests/e2e/run.mjs', args, env: { ...env, CW_TEST_HEAVY_SLOTS: '1' } })
@@ -262,14 +263,14 @@ async function heavyRound(k, worktrees) {
     const slotFile = () => readdirSync(pool).find((f) => /^slot-\d+\.json$/.test(f))
     let gate = await trySlot(pool, { slots: 1, what: 'the checker', root })
     const earlier = [run(0, 'B1')]
-    let lined = await until(() => waiting() === 1, 60_000)
+    let lined = await until(() => waiting() === 1, timing('hang.step'))
     earlier.push(run(1, 'B2'))
-    lined = lined && (await until(() => waiting() === 2, 60_000))
+    lined = lined && (await until(() => waiting() === 2, timing('hang.step')))
     let merger
     const merging = run(2, 'HB', (p) => (merger = p))
-    lined = lined && (await until(() => waiting() === 3, 60_000))
+    lined = lined && (await until(() => waiting() === 3, timing('hang.step')))
     rmSync(join(pool, `slot-${gate.slot}.json`), { force: true })
-    const taken = await until(() => slots() === 1, 60_000)
+    const taken = await until(() => slots() === 1, timing('hang.step'))
     const holder = taken ? JSON.parse(readFileSync(join(pool, slotFile()), 'utf8')) : null
     check('a pre-merge run (its agent holds the merge slot) takes the slot before two runs that asked earlier', lined && holder?.pid === merger.pid && holder.first === true, `queued ${lined}, slot held by ${JSON.stringify(holder)}, pre-merge run ${merger?.pid}`)
     const all = await Promise.all([merging, ...earlier])
@@ -279,9 +280,9 @@ async function heavyRound(k, worktrees) {
     gate = await trySlot(pool, { slots: 1, what: 'the checker', root })
     const ordinary = run(0, 'B1')
     let doomed
-    lined = await until(() => waiting() === 1, 60_000)
+    lined = await until(() => waiting() === 1, timing('hang.step'))
     const killedMerge = run(2, 'HB', (p) => (doomed = p))
-    lined = lined && (await until(() => waiting() === 2 && existsSync(join(pool, `wait-${doomed.pid}.json`)), 60_000))
+    lined = lined && (await until(() => waiting() === 2 && existsSync(join(pool, `wait-${doomed.pid}.json`)), timing('hang.step')))
     endChildTree(doomed)
     await killedMerge
     rmSync(join(pool, `slot-${gate.slot}.json`), { force: true })
@@ -348,7 +349,7 @@ async function laneWaitCheck(wt) {
       start({ name: 'e2e waiting for a lane', cwd: wt, script: 'tests/e2e/run.mjs', args: ['about', '--build', '--record', '--no-progress'], env, started: listen('e2e') }),
       start({ name: 'scenario waiting for a lane', cwd: wt, script: 'tests/scenarios/run.mjs', args: ['--only', SCENARIO, '--no-progress'], env, started: listen('scenario') })
     ])
-    const waiting = await until(() => waitLine.test(said.e2e) && waitLine.test(said.scenario), 300_000)
+    const waiting = await until(() => waitLine.test(said.e2e) && waitLine.test(said.scenario), timing('hang.slow'))
     check('both runs wait for a test lane, every lane of their pool being held', waiting, JSON.stringify({ e2e: said.e2e.slice(-300), scenario: said.scenario.slice(-300) }))
     // The source changes while they wait: what they test must be this, not what was there when they started.
     writeFileSync(probe, '// A source file added while runs waited for a test lane (concurrency.mjs, #735).\nexport {}\n')

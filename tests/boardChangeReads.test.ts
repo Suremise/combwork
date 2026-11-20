@@ -8,9 +8,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { CombworkEvent, TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /** A bound for a hung run (the waits are for conditions). */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 // The card documents read (one card's, or a list of them), counted; the reads themselves unchanged.
 const reads = vi.hoisted(() => ({ docs: 0, heads: 0 }))

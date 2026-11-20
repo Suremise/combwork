@@ -8,6 +8,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { metricsSaved, putMetrics } from './storeDocs'
+import { timing } from './timing.cjs'
 
 const lines: string[] = []
 vi.mock('../src/main/logger', async (original) => {
@@ -104,7 +105,7 @@ describe('HI-2628: 30 days kept, trims logged, folds keep their totals', () => {
     expect(count).toBeLessThanOrEqual(8 * ROUTES.length * 30 * 24)
     expect(coverage.evictedThrough).toBeUndefined()
     await disposeWorkspaceService(w)
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('over the cap the oldest buckets go, days before hours: logged, and reported as removed', async () => {
     const { w, path } = await open()

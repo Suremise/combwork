@@ -31,7 +31,7 @@ export interface HookStatusInput {
   askedAtStart: boolean
   /** A Compact Combwork asked for: not begun yet, under way, or none. */
   compacting: 'requested' | 'started' | null
-  /** The CLI starts a new turn by itself when its background tasks end (capabilities.backgroundWakes). */
+  /** The CLI starts a new turn by itself when its background tasks end (capabilities.background.backgroundWakes). */
   backgroundWakes: boolean
   /** Background tasks still counted (for a stop, after reading the transcript). */
   tasks: number
@@ -162,6 +162,27 @@ export function titleStep(asks: boolean, s: HookStatusInput): HookStep {
   return { ...step, ...(prompt && question ? { question: question.message } : {}), open: s.open.filter((a) => a !== prompt && a !== question) }
 }
 
+/**
+ * What a launch's terminal says of it, for a CLI with no hooks (HI-3196, data-only): it asks the user something (its title,
+ * or a question on its screen), works, or is ready at its prompt; null when it can't tell.
+ */
+export type TerminalReading = 'asks' | 'working' | 'ready' | null
+
+/**
+ * How a CLI with no hooks moves on, from its terminal alone (HI-3196): a question waits for the user (told once); its
+ * question gone, it works or is ready again; work begun is working, a prompt taken (nothing else says one was); ready after
+ * work is finished (told, its turn ended); nothing else changes it. The start is its startup's (startupScreen), and the
+ * end its process's.
+ */
+export function screenStep(reading: TerminalReading, s: HookStatusInput): HookStep {
+  const none: HookStep = { next: null, actions: [] }
+  if (reading === null || s.status === 'starting' || s.status === 'stopped') return none
+  if (reading === 'asks') return s.status === 'waiting' ? none : raise(null, s)
+  if (s.status === 'waiting') return reading === 'working' ? lower(s) : { next: idleAfter(s, 'ready'), message: null, question: null, ...RESOLVED, actions: [] }
+  if (reading === 'working') return s.status === 'working' ? none : { next: 'working', message: null, failed: null, actions: ['prompted'] }
+  return s.status === 'working' ? { next: idleAfter(s, 'finished'), review: null, ...RESOLVED, actions: ['notifyFinished', 'turnEnded'] } : none
+}
+
 /** A launch as its start is read from its screen (startupScreen). `settled`: it has taken a prompt, or its question was answered. */
 export interface StartupState {
   status: SessionStatus
@@ -173,6 +194,16 @@ export interface StartupState {
 export interface StartupScreen {
   readyOutput?: RegExp | null
   startupQuestion?: RegExp | null
+  /** Read from its whole rendered screen (HI-3196), where what came before stays: the one matched last counts (HI-3246). */
+  startupOnScreen?: boolean
+}
+
+/** A pattern's last match in a text (where, and what), at -1 when it has none. */
+function lastMatchIn(re: RegExp | null | undefined, text: string): { at: number; text: string } {
+  let last = { at: -1, text: '' }
+  if (!re) return last
+  for (const m of text.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`))) last = { at: m.index, text: m[0] }
+  return last
 }
 
 /**
@@ -188,6 +219,15 @@ export function startupWatched(s: StartupState, screen: StartupScreen): boolean 
 /** What the start's screen text means now: its question (the agent waits for you), its prompt (ready), or nothing yet. */
 export function startupScreen(s: StartupState, text: string, screen: StartupScreen): { asked: string } | 'ready' | null {
   if (!startupWatched(s, screen)) return null
+  // A whole screen keeps an old prompt above its question, and an answered question above its new prompt (HI-3246): the
+  // later of the two says where its start is, its question on a tie (as the terminal reader's latest). A streamed tail is
+  // emptied when its question is seen, so it has no such past.
+  if (screen.startupOnScreen) {
+    const q = lastMatchIn(screen.startupQuestion, text)
+    const r = lastMatchIn(screen.readyOutput, text)
+    if (q.at >= 0 && q.at >= r.at) return s.askedAtStart ? null : { asked: q.text }
+    return r.at > q.at && (s.status === 'starting' || s.askedAtStart) ? 'ready' : null
+  }
   const asked = s.askedAtStart ? null : screen.startupQuestion?.exec(text)
   if (asked) return { asked: asked[0] }
   if ((s.status === 'starting' || s.askedAtStart) && screen.readyOutput?.test(text)) return 'ready'
@@ -374,12 +414,15 @@ export function applyStep(st: { status: SessionStatus; statusMessage?: string; s
 /**
  * Drops background tasks past their own expiry (a Monitor's) or the time limit (`minutes`, Settings → Agents &
  * Worktrees: Combwork can't tell a test run from a dev server that never ends). Returns the ids the limit dropped.
+ * The limit counts from the task's start or, later, when its agent's progress runs were last heard from (`heard`, given
+ * when the task's tool call was made, `began`, else its start; HI-3406: lastHeard): a run still reporting keeps its task
+ * counted, and one gone quiet has the limit from its last report, so a stuck run still stops counting.
  */
-export function expireTasks(tasks: Map<string, { at: number; expiresAt?: number }>, now: number, minutes: number): string[] {
+export function expireTasks(tasks: Map<string, { at: number; began?: number; expiresAt?: number }>, now: number, minutes: number, heard?: (since: number) => number | null): string[] {
   const dropped: string[] = []
   for (const [id, t] of tasks) {
     if (t.expiresAt && t.expiresAt <= now) tasks.delete(id)
-    else if (now - t.at >= minutes * 60_000) {
+    else if (now - t.at >= minutes * 60_000 && now - (heard?.(t.began ?? t.at) ?? 0) >= minutes * 60_000) {
       tasks.delete(id)
       dropped.push(id)
     }

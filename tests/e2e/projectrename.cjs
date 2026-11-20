@@ -29,7 +29,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `projec
 const shots = async (page, name) => {
   await shot(page, `${name}-dark`)
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
-  await lib.sleep(200)
+  await lib.themeShown(page, 'light')
   await shot(page, `${name}-light`)
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
 }
@@ -40,7 +40,7 @@ const rename = async (from, to) => {
       return fs.renameSync(from, to)
     } catch (e) {
       if (i >= 40 || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e
-      await lib.sleep(250)
+      await lib.sleep(lib.timing('pace.folderRenameAgainMs'))
     }
   }
 }
@@ -102,19 +102,19 @@ const oldCard = (n, proj, agent) =>
   // #514: its handover from before the rename is still its latest (what cw_read_latest_handover reads).
   const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const handovers = async (name) => (await (await fetch(`http://127.0.0.1:${env.CW_API_PORT}/v1/shared/handovers?project=${name}`, { headers: { Authorization: `Bearer ${apiToken}` } })).json())
-  check("the renamed project's latest handover is the one from before its rename", !!(await lib.until(async () => (await handovers('gamma'))[0]?.path === 'handovers/2026-10-01-alpha-plan.md', 10000)), JSON.stringify(await handovers('gamma')))
+  check("the renamed project's latest handover is the one from before its rename", !!(await lib.until(async () => (await handovers('gamma'))[0]?.path === 'handovers/2026-10-01-alpha-plan.md', lib.timing('hang.ui'))), JSON.stringify(await handovers('gamma')))
   check("…and the workspace's record of names has its rename, by its id", !!(await lib.until(() => {
     const j = fs.existsSync(path.join(ws, '.combwork', 'project-names.json')) ? readJson(path.join(ws, '.combwork', 'project-names.json')) : null
     return j?.projects?.[id]?.name === 'gamma' && JSON.stringify(j.projects[id].former) === '["alpha"]'
-  }, 10000)))
-  check('the saved cards catch up when the workspace opens', !!(await lib.until(() => lib.readCard(ws, doing.number).project === 'gamma', 10000)))
+  }, lib.timing('hang.ui'))))
+  check('the saved cards catch up when the workspace opens', !!(await lib.until(() => lib.readCard(ws, doing.number).project === 'gamma', lib.timing('hang.ui'))))
   await page.getByRole('button', { name: 'Task Board' }).click()
   const tile = page.locator(`.task-card[data-task="${doing.number}"]`)
-  await tile.waitFor({ timeout: 10000 })
+  await tile.waitFor({ timeout: lib.timing('hang.ui') })
   const tileText = await tile.innerText()
   check('on the board, with its agent (not "(removed)")', /Builder/.test(tileText) && !/removed/.test(tileText), tileText)
   const banner = page.locator('.moved-banner')
-  check('the banner offers Repair…', !!(await lib.until(async () => (await banner.count()) === 1, 15000)))
+  check('the banner offers Repair…', !!(await lib.until(async () => (await banner.count()) === 1, lib.timing('hang.ui'))))
   const bannerText = await banner.innerText().catch(() => '')
   check("…naming old-site's cards", /2 cards of old-site belong to site/.test(bannerText), bannerText)
   await shots(page, 'board')
@@ -122,14 +122,14 @@ const oldCard = (n, proj, agent) =>
   // --- Repair gives old-site's cards to site.
   await page.locator('.moved-banner button', { hasText: 'Repair…' }).click()
   const dialog = page.locator('.dialog', { has: page.locator('.move-repair') })
-  await dialog.waitFor({ timeout: 10000 })
-  check('the plan gives the cards saved under old-site to site', !!(await lib.until(async () => /Board: old-site; will give 2 cards \(#1, #2\) to site/.test(await dialog.innerText()), 10000)), await dialog.innerText())
+  await dialog.waitFor({ timeout: lib.timing('hang.ui') })
+  check('the plan gives the cards saved under old-site to site', !!(await lib.until(async () => /Board: old-site; will give 2 cards \(#1, #2\) to site/.test(await dialog.innerText()), lib.timing('hang.ui'))), await dialog.innerText())
   await shots(page, 'repair-plan')
   await dialog.getByRole('button', { name: 'Repair', exact: true }).click()
-  check('Repair says what it did', !!(await lib.until(async () => /2 cards of old-site now belong to site/.test(await dialog.innerText()), 15000)), await dialog.innerText())
+  check('Repair says what it did', !!(await lib.until(async () => /2 cards of old-site now belong to site/.test(await dialog.innerText()), lib.timing('hang.ui'))), await dialog.innerText())
   await shots(page, 'repair-report')
   await dialog.locator('.btn.primary', { hasText: 'Close' }).click()
-  check('…and the banner is gone', !!(await lib.until(async () => (await banner.count()) === 0, 10000)))
+  check('…and the banner is gone', !!(await lib.until(async () => (await banner.count()) === 0, lib.timing('hang.ui'))))
   const websiteCards = (await cards()).filter((c) => c.number === 1 || c.number === 2)
   check("old-site's cards are site's, still archived, with their agent", websiteCards.every((c) => c.project === 'site' && c.archived) && websiteCards.find((c) => c.number === 1)?.agent === 'a-claude', JSON.stringify(websiteCards.map((c) => [c.project, c.archived, c.agent])))
   check('each says so in its history', websiteCards.every((c) => c.history.at(-1)?.what === 'Project: old-site → site (renamed or moved)'))
@@ -140,32 +140,76 @@ const oldCard = (n, proj, agent) =>
   // --- The archive lists them under their projects now.
   await page.locator('.board-toolbar label', { hasText: 'Archived (' }).click()
   const table = page.locator('.archived-cards')
-  await table.waitFor({ timeout: 10000 })
+  await table.waitFor({ timeout: lib.timing('hang.ui') })
   // A row by its card's number (its cell shows the card's key, #1221).
   const rowOf = (n) => table.locator('tbody tr', { has: page.locator(`.task-number[data-task="${n}"]`) })
   check('Archived shows the renamed project’s card under its new name, with its agent', !!(await lib.until(async () => {
     const t = await rowOf(old.number).innerText().catch(() => '')
     return /gamma/.test(t) && /Builder/.test(t) && !/removed/.test(t)
-  }, 10000)), await rowOf(old.number).innerText().catch((e) => e.message))
+  }, lib.timing('hang.ui'))), await rowOf(old.number).innerText().catch((e) => e.message))
   check('…and the repaired ones under site', /site/.test(await rowOf(1).innerText().catch(() => '')))
   await shots(page, 'archive')
   await page.locator('.board-toolbar label', { hasText: 'Archived (' }).click()
 
   // --- Renamed while Combwork runs: the card follows it.
+  // The card's own write is told and read before the rename, and the rename is told by an event of its own after it, so
+  // only the rename can bring the new name to the board (#508 round 1: a late write's notice had hidden that it didn't;
+  // HR1's round 1 of HI-3397: proved by what was read and told, never by a time).
+  // Workspace events, as the window gets them (the Agent API's stream, the workspace token's).
+  const events = { text: '' }
+  const stream = new AbortController()
+  fetch(`http://127.0.0.1:${env.CW_API_PORT}/v1/events`, { headers: { Authorization: `Bearer ${apiToken}` }, signal: stream.signal })
+    .then(async (res) => {
+      const reader = res.body.getReader()
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done) break
+        events.text += Buffer.from(value).toString('utf8')
+      }
+    })
+    .catch(() => undefined)
+  check('the event stream is open', !!(await lib.until(() => events.text.includes(': connected'), lib.timing('hang.ui'))))
+  const boardTold = () => (events.text.match(/"type":"(?:tasks|workspace)-changed"/g) ?? []).length
+  // The window's reads of the board (main's answers to them; the suite reads none meanwhile).
+  const boardReads = async () => (await lib.ipcSettled(r.app, 'tasks:changes')) + (await lib.ipcSettled(r.app, 'tasks:list'))
+  // The card write's refresh is slowed past the 2 s the suite used to wait (CW_TEST_SLOW_IPC, its first read): the rename
+  // still begins only once that read has been answered and drawn.
+  await r.app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = 'tasks:changes=3000*1,tasks:list=3000*1'))
+  const readsBefore = await boardReads()
   const live = await inv('tasks:create', { title: 'Beta card', project: 'beta' })
-  // Shown on the board, then a pause on purpose: the card's own write has been told and read before the rename, so only
-  // the rename can bring the new name to the board (#508 round 1: a late write's notice had hidden that it didn't).
-  check('the board shows the card under beta', !!(await lib.until(async () => /beta/.test(await page.locator(`.task-card[data-task="${live.number}"]`).innerText().catch(() => '')), 10000)))
-  await lib.sleep(2000) // on purpose: the card write above is told and read first
+  check('the board shows the card under beta', !!(await lib.until(async () => /beta/.test(await page.locator(`.task-card[data-task="${live.number}"]`).innerText().catch(() => '')), lib.timing('hang.ui'))))
+  // Its notice consumed: a board read answered since the write (the one that drew it), then all main has sent drawn.
+  await lib.until(async () => (await boardReads()) > readsBefore, lib.timing('hang.ui'))
+  await lib.answersDrawn(inv, page)
+  await r.app.evaluate(() => void delete process.env.CW_TEST_SLOW_IPC)
+  check("the card write's refresh, slowed past 2 s, was read before the rename began", (await boardReads()) > readsBefore, `${readsBefore} → ${await boardReads()}`)
+  // HR1's round 2: a read of the board or the projects can find the moved folder itself and tell it (projectIds, after its
+  // cache's second), so the rename's own telling is waited for with every such call of the window and the suite held in
+  // main (CW_TEST_HOLD_IPC, before their handlers run): only Combwork's own discovery can tell it then. None answered
+  // meanwhile, checked; then they go, and the board and the card list are read.
+  const PROBES = ['tasks:list', 'tasks:changes', 'board:state', 'board:stages', 'project:keys', 'project:movedCardNames', 'workspace:get', 'workspace:refresh']
+  const probesAnswered = async () => (await Promise.all(PROBES.map((c) => lib.ipcSettled(r.app, c)))).reduce((a, b) => a + b, 0)
+  const holdProbes = (on) => r.app.evaluate((_e, v) => void (v ? (process.env.CW_TEST_HOLD_IPC = v) : delete process.env.CW_TEST_HOLD_IPC), on ? PROBES.join(',') : null)
+  await holdProbes(true)
+  const probesBefore = await probesAnswered()
+  const toldBefore = boardTold()
   await rename(beta, delta)
-  check('a project renamed while Combwork runs keeps its cards', !!(await lib.until(async () => (await cards()).find((c) => c.number === live.number)?.project === 'delta', 15000)), JSON.stringify((await cards()).find((c) => c.number === live.number)?.project))
-  check('…and the board lists it under the new name', !!(await lib.until(async () => /delta/.test(await page.locator(`.task-card[data-task="${live.number}"]`).innerText().catch(() => '')), 10000)))
+  let told = false
+  try {
+    told = !!(await lib.until(() => boardTold() > toldBefore, lib.timing('hang.ui')))
+    check('…the rename told to the window by an event of its own, with no read of the board or the projects answered meanwhile', told && (await probesAnswered()) === probesBefore, `told ${told}, reads answered ${probesBefore} → ${await probesAnswered()}; ${events.text.slice(-300)}`)
+  } finally {
+    await holdProbes(false)
+  }
+  check('…and the board lists it under the new name', !!(await lib.until(async () => /delta/.test(await page.locator(`.task-card[data-task="${live.number}"]`).innerText().catch(() => '')), lib.timing('hang.ui'))))
+  check('a project renamed while Combwork runs keeps its cards', !!(await lib.until(async () => (await cards()).find((c) => c.number === live.number)?.project === 'delta', lib.timing('hang.ui'))), JSON.stringify((await cards()).find((c) => c.number === live.number)?.project))
+  stream.abort()
   const sidebar = async () => (await inv('workspace:get'))?.projects?.map((p) => p.name) ?? []
   check('…and the project list says delta, not beta', !!(await lib.until(async () => {
     const names = await sidebar()
     return names.includes('delta') && !names.includes('beta')
-  }, 10000)), JSON.stringify(await sidebar()))
-  await page.locator('.sidebar', { hasText: 'delta' }).first().waitFor({ timeout: 5000 }).catch(() => undefined)
+  }, lib.timing('hang.ui'))), JSON.stringify(await sidebar()))
+  await page.locator('.sidebar', { hasText: 'delta' }).first().waitFor({ timeout: lib.timing('hang.ui') }).catch(() => undefined)
   await shots(page, 'live-rename')
 
   await r.app.close()

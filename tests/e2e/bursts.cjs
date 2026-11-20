@@ -7,7 +7,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'bursts-profile')
 const ws = path.join(lib.WORK, 'bursts-ws')
@@ -19,10 +19,10 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 10000) => {
+const until = async (fn, ms) => {
   const t = Date.now()
   let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
+  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(lib.timing('poll.intervalMs'))
   return v
 }
 
@@ -64,18 +64,19 @@ const until = async (fn, ms = 10000) => {
   const agents = [[alpha, one], [alpha, two], [beta, three]]
   const live = async (proj, a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === a.id)
   for (const [p, a] of agents) await inv('session:start', p, { agentId: a.id })
-  check('three agents start', !!(await until(async () => (await Promise.all(agents.map(([p, a]) => live(p, a)))).every((s) => s?.status === 'ready'), 25000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('three agents start', !!(await until(async () => (await Promise.all(agents.map(([p, a]) => live(p, a)))).every((s) => s?.status === 'ready'), lib.timing('hang.step'))))
   const send = async (p, a, text) => {
     await inv('pty:write', lib.ptyKey(p, a.id), text)
-    await lib.sleep(100)
+    await lib.sleep(lib.timing('pace.keysThenEnterMs'))
     await inv('pty:write', lib.ptyKey(p, a.id), '\r')
   }
 
   // --- All three finish together.
   const chimesBefore = await chimes()
   for (const [p, a] of agents) await send(p, a, 'go work 2')
-  check('they all finish', !!(await until(async () => (await Promise.all(agents.map(([p, a]) => live(p, a)))).every((s) => s?.status === 'finished'), 15000)))
-  await lib.sleep(4500) // A fixed wait on purpose: it waits out the burst window (agents finishing together are told in one notification, gathered over a few seconds) to show only one arrives.
+  check('they all finish', !!(await until(async () => (await Promise.all(agents.map(([p, a]) => live(p, a)))).every((s) => s?.status === 'finished'), lib.timing('hang.step'))))
+  await lib.sleep(lib.timing('quiet.finishGroupMs')) // The window is the point: it waits out the burst window (agents finishing together are told in one notification, gathered over a few seconds) to show only one arrives.
   const burst = await notes()
   check('one notification for the three', burst.length === 1, JSON.stringify(burst))
   check('counted by project', burst[0]?.title === '3 agents finished' && burst[0]?.body === 'alpha (2), beta (1)', JSON.stringify(burst[0]))
@@ -83,10 +84,10 @@ const until = async (fn, ms = 10000) => {
 
   // --- Two in one project: named.
   clearNotes()
-  await lib.sleep(2500) // A fixed wait on purpose: the previous burst's window has to close first, or these finishes would join it.
+  await lib.sleep(lib.timing('quiet.finishGroupMs')) // The window is the point: the previous burst's window closes first, or these finishes would join it.
   await send(alpha, one, 'go work 1')
   await send(alpha, two, 'go work 1')
-  await until(async () => (await notes()).length > 0, 10000)
+  await until(async () => (await notes()).length > 0, lib.timing('hang.ui'))
   const pair = await notes()
   check('two in one project: named', pair.length === 1 && pair[0].title === '2 agents finished in alpha' && pair[0].body === 'One, Two', JSON.stringify(pair))
 
@@ -98,11 +99,11 @@ const until = async (fn, ms = 10000) => {
   const asked = await until(async () => (await notes()).find((n) => /needs your input/.test(n.title)), HUNG_MS)
   check('a question is told at once', !!asked, JSON.stringify(await notes()))
   check('on its own', !!asked && !/finished/.test(asked.title) && /One/.test(asked.title), JSON.stringify(asked))
-  await until(async () => (await notes()).some((n) => /finished/.test(n.title)), 8000)
+  await until(async () => (await notes()).some((n) => /finished/.test(n.title)), lib.timing('hang.ui'))
   const fin = (await notes()).filter((n) => /finished/.test(n.title))
   check('and the finish that came meanwhile is told after, alone', fin.length === 1 && /Three finished|beta/.test(fin[0].title), JSON.stringify(fin))
   fs.writeFileSync(path.join(claudeHome, 'bursts-one-go'), '')
-  check('One finishes once released', !!(await until(async () => (await live(alpha, one))?.status === 'finished', 10000)))
+  check('One finishes once released', !!(await until(async () => (await live(alpha, one))?.status === 'finished', lib.timing('hang.step'))))
 
   // --- HI-2312: a finish whose agent starts its next turn before the group is told (as Combwork's delivery typed at a turn's
   // end starts one) isn't told: told then, it arrived as the agent worked again, with the last turn's message. Two

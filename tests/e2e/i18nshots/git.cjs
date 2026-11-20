@@ -6,8 +6,10 @@
 // language-changed event, command ids and structural hooks (data-section, data-action, data-git-*, classes), never
 // English text. See tests/e2e/i18nshots.cjs for ctx.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 const { execFileSync } = require('child_process')
+const { processes, descendantsIn, namesFolder } = require('../folderProcesses.cjs')
 
 /** Waits for a locator to be on the page; throws saying what didn't show. */
 async function shown(ctx, locator, what) {
@@ -23,7 +25,7 @@ async function gone(ctx, locator, what) {
 /** Closes the dialog on top with its Cancel (the first subtle button, whatever its words). */
 async function cancelDialog(ctx) {
   const { page, lib } = ctx
-  const cancel = () => page.locator('.dialog').last().locator('button.subtle').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const cancel = () => page.locator('.dialog').last().locator('button.subtle').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.dialog').count()) === 0 || (await cancel()), ctx.hungMs))) throw new Error("the dialog didn't close")
 }
 
@@ -37,6 +39,7 @@ const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'u
 
 const gitView = (ctx) => ctx.page.locator('.git-view').first()
 const section = async (ctx, id, hook, what) => {
+  await gitTab(ctx)
   await ctx.page.locator(`.git-sections [data-section="${id}"]`).first().click()
   return shown(ctx, ctx.page.locator(hook), what)
 }
@@ -68,12 +71,65 @@ function seedRepo(ctx) {
 }
 
 /**
+ * What may hold a folder in the project open (HI-3441), for a refused rename's message: the test Combwork's own
+ * processes (its git commands) and any other naming the project. Windows refuses to rename a folder while anything has
+ * a file or folder inside it open (a git command's index or refs, a directory read, a scan), and says EPERM; a
+ * recursive watch on the folder above doesn't count. Not found among them: Combwork's main process itself (its ref
+ * reads run on a worker thread there) or a scanner.
+ */
+function holders(ctx) {
+  try {
+    const list = processes()
+    const pid = ctx.app.process().pid
+    const tree = new Set(descendantsIn(list, pid).map((p) => p.pid))
+    // Electron's own helpers (GPU, renderer, crash handler: `--type=`) and consoles open nothing in a project.
+    const helper = (p) => /\s--type=/.test(p.commandLine) || /\\conhost\.exe/i.test(p.commandLine)
+    const named = list.filter((p) => !helper(p) && (tree.has(p.pid) || (p.pid !== process.pid && namesFolder(p.commandLine, ctx.project))))
+    return named.length ? named.map((p) => `${p.pid}${tree.has(p.pid) ? ' (Combwork\'s)' : ''}: ${p.commandLine.slice(0, 200)}`).join('; ') : `nothing running beside Combwork's main process (${pid}): it or a scan`
+  } catch (e) {
+    return `the processes couldn't be listed (${e.message})`
+  }
+}
+
+/**
+ * Renames a folder in the project, waiting until nothing holds it (HI-3441: under load a read of Combwork's could hold
+ * .git at that moment): the rename is the check, tried until it lands or the bound passes. A refusal other than a
+ * folder held is thrown at once; still held at the bound, it throws naming what was running at the first refusal and
+ * at the end. A refusal that lands later is logged, with what was running then, so a run names the holder.
+ */
+async function renameWhenFree(ctx, from, to) {
+  let refused = null
+  let first = null
+  const done = await ctx.lib.until(() => {
+    try {
+      fs.renameSync(from, to)
+      return true
+    } catch (e) {
+      if (e.code !== 'EPERM' && e.code !== 'EBUSY' && e.code !== 'EACCES') throw e
+      refused ??= { at: Date.now(), code: e.code, n: 0 }
+      refused.n++
+      first ??= holders(ctx)
+      return false
+    }
+  }, ctx.hungMs)
+  const what = `${path.basename(from)} → ${path.basename(to)}`
+  if (!done) throw new Error(`renaming ${what} was refused (${refused.code}) ${refused.n} times over ${Date.now() - refused.at} ms: held at the first refusal by ${first}; at the end by ${holders(ctx)}`)
+  if (refused) console.log(`renaming ${what} was refused (${refused.code}) ${refused.n} times, then landed after ${Date.now() - refused.at} ms: held at the first refusal by ${first}`)
+}
+
+/** The Git tab shown, if it isn't: a case after one that failed before showing it starts from it all the same. */
+async function gitTab(ctx) {
+  if ((await ctx.page.locator('.git-view').count()) === 0) await ctx.command('project.tab.changes')
+  return shown(ctx, gitView(ctx), 'the Git tab')
+}
+
+/**
  * The Git tab of a project that isn't a repository: its .git set aside while the screen shows. Its header says the
  * repository is gone, with the offer (#1492: the tab's read has the workspace read again), never a mix.
  */
 async function gitSetup(ctx) {
   seedRepo(ctx)
-  fs.renameSync(path.join(ctx.project, '.git'), path.join(ctx.project, '.git-aside'))
+  await renameWhenFree(ctx, path.join(ctx.project, '.git'), path.join(ctx.project, '.git-aside'))
   await ctx.command('project.tab.changes')
   await shown(ctx, ctx.page.locator('[data-git-setup]'), 'the Git tab without a repository')
   await shown(ctx, ctx.page.locator('[data-vc-offer="repositoryGone"]'), 'the offer: the repository gone')
@@ -82,14 +138,16 @@ async function gitSetup(ctx) {
 
 /** Its Initialise dialog: what it will do, the starter .gitignore, and who it will commit as (the test identity, #1466). */
 async function initDialog(ctx) {
+  if (!fs.existsSync(path.join(ctx.project, '.git-aside'))) throw new Error("the project's .git wasn't set aside (git-setup didn't reach its screen)")
   await ctx.page.locator('[data-git-setup] [data-git-init]').first().click()
   return shown(ctx, ctx.page.locator('.dialog', { has: ctx.page.locator('[data-git-init-form]') }).last(), 'the Initialise dialog')
 }
 
-/** Its Cancel, and the repository back. */
+/** Its Cancel, and the repository back (left where it is if git-setup never set it aside). */
 async function closeInit(ctx) {
   await cancelDialog(ctx)
-  fs.renameSync(path.join(ctx.project, '.git-aside'), path.join(ctx.project, '.git'))
+  if (!fs.existsSync(path.join(ctx.project, '.git-aside'))) return
+  await renameWhenFree(ctx, path.join(ctx.project, '.git-aside'), path.join(ctx.project, '.git'))
   // The tab reads git again when the window gets focus (as after using a terminal).
   await ctx.page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await gone(ctx, ctx.page.locator('[data-git-setup]'), 'the Git tab without a repository')
@@ -119,9 +177,13 @@ async function history(ctx) {
 /** The pseudo-locale (shared/i18n/languages.ts): every message shows changed from its English. */
 const PSEUDO = 'en-XA'
 
-/** Tells the window its language changed, as Settings → General → Language does (the language-changed event). */
-const sendLanguage = (ctx, language) =>
-  ctx.app.evaluate(({ BrowserWindow }, l) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'language-changed', language: l }), language)
+/**
+ * Tells the window its language changed, as Settings → General → Language does (the language-changed event). A language
+ * with translations (the run's, from app:info) goes by its code, main reading its catalogue: a whole catalogue sent
+ * through app.evaluate can crash the test app's main process (lib.speakLanguage, HI-3434). English and the
+ * pseudo-locale have none to send.
+ */
+const sendLanguage = (ctx, language) => ctx.lib.speakLanguage(ctx.app, language)
 
 /**
  * The notices closed. Putting .git back (closeInit) raises "Version control changed in alpha" at the window's bottom
@@ -130,7 +192,7 @@ const sendLanguage = (ctx, language) =>
  */
 async function noNotices(ctx) {
   const { page, lib } = ctx
-  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.toasts .toast').count()) === 0 || (await dismiss()), ctx.hungMs))) throw new Error("the notices didn't close")
 }
 

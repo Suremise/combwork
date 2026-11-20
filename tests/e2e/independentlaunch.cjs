@@ -1,4 +1,4 @@
-// An Independent agent launches as from a terminal (HI-2731, Darren's 7 Nov 22:15 decision: "Independent behaves as if
+// An Independent agent launches as from a terminal (HI-2731: "Independent behaves as if
 // connection level switches are off"), on the fake Claude Code and the fake Codex: one agent of each Either → Independent
 // → Either, a new session each time, beside a fresh agent only ever Independent. Either gets Combwork's server, its
 // skills and its variables (and, on Codex, its developer_instructions); made Independent its next launch gets none of
@@ -10,7 +10,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'independentlaunch-profile')
 const ws = path.join(lib.WORK, 'independentlaunch-ws')

@@ -1,0 +1,50 @@
+{
+  "cli": "1.4.20",
+  "recorded": "2026-11-14, HI-3202: muse.exe 1.4.20 (SHA-256 2d223f7f…6618a) on the host, offline echo provider, a test home; a SessionStart command hook `type <file>` printing the file. Context blocks from each run's session.jsonl (text shortened to its head and tail here).",
+  "runs": [
+    {
+      "hookOutputBytes": 16384,
+      "multibyte": "é (2 bytes) repeated, after a first line with — and ✓",
+      "hooks": [
+        {
+          "status": "completed",
+          "exit_code": 0,
+          "duration_ms": 21
+        },
+        {
+          "status": "completed",
+          "exit_code": 0,
+          "duration_ms": 55
+        }
+      ],
+      "contextBlocks": [
+        {
+          "id": "hook:session_start:session:0",
+          "role": "developer",
+          "source": "runtime_hook",
+          "lifecycle": "session_start",
+          "bytes": 16383,
+          "head": "PROBE-GUIDANCE-MARKER héllo — ünïcode ✓\n",
+          "tail": "\nPROBE-GUIDANCE-TAIL"
+        }
+      ]
+    },
+    {
+      "hookOutputBytes": 16385,
+      "multibyte": "é (2 bytes) repeated, after a first line with — and ✓",
+      "hooks": [
+        {
+          "status": "failed",
+          "exit_code": null,
+          "duration_ms": 17
+        },
+        {
+          "status": "completed",
+          "exit_code": 0,
+          "duration_ms": 53
+        }
+      ],
+      "contextBlocks": []
+    }
+  ]
+}

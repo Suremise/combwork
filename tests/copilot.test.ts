@@ -6,7 +6,7 @@ import { copilot, copilotHooks, copilotMcpServer, toolNamesLine } from '../src/m
 import { COPILOT_ENV_STRIP, copilotEnv } from '../src/main/providers/copilot/home'
 import { parseCopilotModels } from '../src/main/providers/copilot/models'
 import type { LaunchContext } from '../src/main/providers/types'
-import { COPILOT_DESCRIPTOR, copilotCanApproveEdits, copilotCanSwitchLive, copilotFooterMode, copilotModeFlags, copilotModelLabel, copilotPathGlob } from '../src/shared/copilot'
+import { COPILOT_DESCRIPTOR, copilotCanApproveEdits, copilotCanSwitchLive, copilotFooterMode, copilotModeFlags, copilotModelLabel, copilotPathGlob } from '../src/shared/providers/copilot'
 import { isKnownProvider, providerDescriptor } from '../src/shared/providers'
 import { tempDir } from './tempDir'
 import { resolveGithubHosts } from '../src/shared/githubHost'
@@ -40,7 +40,7 @@ describe('Copilot descriptor', () => {
     // Only Autopilot is behind the opt-in: Allow all is Copilot's low-interaction mode, offered to all (#490).
     expect(d.permissionModes.filter((m) => m.danger).map((m) => m.value)).toEqual(['autopilot'])
     expect(d.effortLevels.map((e) => e.value)).toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
-    expect(d.capabilities).toMatchObject({ fixedSessionId: true, liveModeSwitch: 'cycle', reportsCost: true, lockAsk: true, compactFocus: true })
+    expect(d.capabilities).toMatchObject({ session: { fixedSessionId: true, lockAsk: true }, modes: { liveModeSwitch: 'cycle' }, usage: { reportsCost: true }, compaction: { compactFocus: true } })
     expect(d.modelGroups[0].models.map((m) => m.value)).toEqual(['auto'])
   })
 
@@ -238,7 +238,7 @@ describe('Copilot launch', () => {
     const { stopWaitMs } = await import('../src/main/sessions')
     expect(stopWaitMs(3000, [exit.graceMs])).toBeGreaterThan(exit.graceMs)
     expect(stopWaitMs(3000, [undefined, undefined])).toBe(3000)
-    expect(stopWaitMs(15_000, [exit.graceMs])).toBe(15_000)
+    expect(stopWaitMs(exit.graceMs * 2, [exit.graceMs])).toBe(exit.graceMs * 2)
   })
 
   it('never passes --mouse or --no-mouse, which Copilot saves into the user\'s own settings (#737)', () => {
@@ -252,17 +252,18 @@ describe('Copilot launch', () => {
     const { stopWaitMs } = await import('../src/main/sessions')
     advanced.load(tempDir('cw-copilot-advanced-'))
     try {
-      expect(copilot.exitKeys.graceMs).toBe(10_000)
+      // HI-3376: 30 s by default (a slow disk's last writes), at most 300.
+      expect(copilot.exitKeys.graceMs).toBe(30_000)
       await advanced.set('copilot.exit.graceSeconds', 25)
       expect(copilot.exitKeys.graceMs).toBe(25_000)
       // Quitting waits past the longer grace too.
       expect(stopWaitMs(3000, [copilot.exitKeys.graceMs])).toBeGreaterThan(25_000)
       // A grace shorter than the keys take, or one that would hold quitting for minutes, is refused.
-      await expect(advanced.set('copilot.exit.graceSeconds', 2)).rejects.toThrow(/whole number from 3 to 60/)
-      await expect(advanced.set('copilot.exit.graceSeconds', 61)).rejects.toThrow(/whole number from 3 to 60/)
+      await expect(advanced.set('copilot.exit.graceSeconds', 2)).rejects.toThrow(/whole number from 3 to 300/)
+      await expect(advanced.set('copilot.exit.graceSeconds', 301)).rejects.toThrow(/whole number from 3 to 300/)
       expect(copilot.exitKeys.graceMs).toBe(25_000)
       await advanced.set('copilot.exit.graceSeconds', null)
-      expect(copilot.exitKeys.graceMs).toBe(10_000)
+      expect(copilot.exitKeys.graceMs).toBe(30_000)
     } finally {
       await advanced.resetAll()
       advanced.stop()
@@ -273,8 +274,10 @@ describe('Copilot launch', () => {
     const h = copilotHooks('http://127.0.0.1:5000/hook?run=r1', 'tok') as { version: number; hooks: Record<string, { type: string; url: string; headers: Record<string, string>; timeoutSec: number }[]> }
     expect(h.version).toBe(1)
     expect(Object.keys(h.hooks)).toEqual(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Notification', 'Stop', 'ErrorOccurred', 'PreCompact', 'SessionEnd'])
-    expect(h.hooks.PreToolUse).toEqual([{ type: 'http', url: 'http://127.0.0.1:5000/hook?run=r1', headers: { Authorization: 'Bearer tok' }, timeoutSec: 10 }])
-    expect(h.hooks.Stop[0].timeoutSec).toBe(5)
+    // Each hook's timeout is Settings → Advanced's (HI-3373: 30 s each by default).
+    expect(h.hooks.PreToolUse).toEqual([{ type: 'http', url: 'http://127.0.0.1:5000/hook?run=r1', headers: { Authorization: 'Bearer tok' }, timeoutSec: advanced.number('copilot.hooks.preToolUseTimeoutSeconds') }])
+    expect(h.hooks.Stop[0].timeoutSec).toBe(advanced.number('copilot.hooks.timeoutSeconds'))
+    expect([h.hooks.PreToolUse[0].timeoutSec, h.hooks.Stop[0].timeoutSec]).toEqual([30, 30])
   })
 
   it('converts workspace MCP servers to Copilot’s format', () => {

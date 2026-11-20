@@ -16,10 +16,11 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import type { OwnWorkflowProblem, WorkflowChange, WorkflowDefaults, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowProblem } from '../../shared/types'
 import { openWorkspaces, type WorkspaceService } from '../workspace'
 import { checkOptions, resolveOptions, workflowChanged, type OptionLevels } from './rulesets'
-import { workflowEnforced } from './service'
+import { closeStaleChurn, workflowEnforced } from './service'
 import { cardsInFlight, keptNames, problemEnglish, WorkflowRefused, WorkflowStale } from './optionsForm'
 import { workflowWrite } from './writes'
 import { hasRepository, withFolderRepoLocks } from '../platform/repoPorts'
+import { changeGuards, refuseGuardsAtSave } from './guardsSave'
 
 const log = createLogger('workflow')
 
@@ -129,7 +130,9 @@ export async function checkLevelChange(ws: WorkspaceService, rawLevel: unknown, 
  * contradict), or as changed meanwhile when the form's base is no longer the level's. Combwork's in config, the workspace's
  * in workspace.json (written in turn, kept with a backup). The inheriting projects' views read again. Returns the form.
  */
-export function setLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlatform: unknown, raw: unknown): Promise<WorkflowForm> {
+export async function setLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlatform: unknown, raw: unknown): Promise<WorkflowForm> {
+  // HI-3284: the merge guards' empty-match rule, in their worker, before the locks.
+  await refuseGuardsAtSave(changeGuards(raw))
   // The level and every project it reaches checked as they are now, and written in the same turn of workflow writes:
   // no project or level changes between the check and the write (HR5's round 1).
   // Every repository the level reaches locked first (#1642 round 5): a level's target is each inheriting Git project's.
@@ -162,7 +165,12 @@ async function saveLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlat
     void ws.refresh().catch((e: unknown) => log.warn('reading the workspace again after its workflow defaults changed', e))
   }
   log.info(`the ${level} workflow defaults for ${platform} changed: ${check.changed.join(', ') || 'none'}`)
-  for (const p of check.projects ?? []) workflowChanged(reached(ws, level).find((w) => w.info()?.projects.some((x) => x.path === p.path)) ?? ws, p.path)
+  for (const p of check.projects ?? []) {
+    const at = reached(ws, level).find((w) => w.info()?.projects.some((x) => x.path === p.path)) ?? ws
+    workflowChanged(at, p.path)
+    // HI-3188: a churn question the level's new preferences no longer hold is closed now.
+    await closeStaleChurn(at, p.path)
+  }
   return levelForm(ws, level, platform)
 }
 

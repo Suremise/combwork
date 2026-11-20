@@ -3,14 +3,15 @@
 // files.ts asks the port rather than git.
 
 import { INDEX_BUSY, git } from '../git'
+import { INDEX_BUSY as INDEX_BOUNDS, retryWhile, triesWithin } from '../retryBounds'
+/** How many check-ignore runs a busy index can take before the folder is listed again (INDEX_BOUNDS.read's tries; tests). */
+export const IGNORE_TRIES = triesWithin(INDEX_BOUNDS.read)
 import { parseCheckIgnore, type IgnoreRule } from '../../shared/gitIgnoreRules'
 import { createLogger, userText } from '../logger'
 
 const log = createLogger('files')
 
 /** check-ignore's tries when git can't open or read the index (another git command is rewriting it), and the pause. */
-export const IGNORE_TRIES = 4
-const IGNORE_RETRY_MS = 50
 const NOT_A_REPO = /not a git repository/i
 
 /**
@@ -25,11 +26,8 @@ export async function ignoredSet(projectPath: string, rels: string[]): Promise<M
   for (let i = 0; i < rels.length; i += 200) {
     // -z needs --stdin, which the helper does not support, so read one path per line.
     const args = ['check-ignore', '-v', '--', ...rels.slice(i, i + 200)]
-    let r = await git(projectPath, args)
-    for (let t = 1; t < IGNORE_TRIES && r.code !== 0 && r.code !== 1 && INDEX_BUSY.test(r.err); t++) {
-      await new Promise((res) => setTimeout(res, IGNORE_RETRY_MS))
-      r = await git(projectPath, args)
-    }
+    // HI-3374: tried again while the index is busy, for INDEX_BOUNDS.read (as gitReading's).
+    const r = await retryWhile(() => git(projectPath, args), (x) => x.code !== 0 && x.code !== 1 && INDEX_BUSY.test(x.err), { bound: INDEX_BOUNDS.read })
     if (r.code !== 0 && r.code !== 1) {
       if (NOT_A_REPO.test(r.err)) return 'none'
       ignoreFailed(projectPath, r.err)

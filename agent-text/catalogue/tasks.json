@@ -154,6 +154,16 @@
     "note": "An error: a failed review also tried to move card {card} (its key, such as HI-12) somewhere other than Doing; a failed card goes back to Doing, to the agent that built it. \"column\" is the name of the call's field: keep it as it is.",
     "audience": "both"
   },
+  "tasks.error.followUpArchived": {
+    "text": "followUpOf: {card} is archived; bring it back first, or make the card without followUpOf.",
+    "note": "An error (HI-3188): a new card named an archived card as the card it continues (followUpOf, a field’s name: keep it as it is). {card} is a card key.",
+    "audience": "both"
+  },
+  "tasks.error.followUpOtherProject": {
+    "text": "followUpOf: {card} is another project’s card; a follow-up continues a card of its own project.",
+    "note": "An error (HI-3188): a new card named a card of another project as the card it continues (followUpOf, a field’s name: keep it as it is). {card} is a card key.",
+    "audience": "both"
+  },
   "tasks.error.holdCard": {
     "text": "Only the user or the Assistant puts cards On Hold. Where the user has decided to park {card}, ask the Assistant (cw_ask_assistant); otherwise ask the user.",
     "note": "An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do (HI-2227): a decision already made goes to the Assistant, cw_ask_assistant (a tool name: keep it as it is), else the user is asked.",
@@ -386,7 +396,7 @@
   },
   "tasks.error.targetHasWork": {
     "text": "{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}",
-    "note": "HI-2556: an error changing a card’s Merges into once its branch has work of its own (Darren: no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys.",
+    "note": "HI-2556: an error changing a card’s Merges into once its branch has work of its own (no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys.",
     "audience": "both"
   },
   "tasks.error.targetLane": {
@@ -610,8 +620,8 @@
     "audience": "both"
   },
   "tasks.history.followUpSubmitted": {
-    "text": "Follow-up submitted for review at {revision}",
-    "note": "A line in a card's history (HI-1832): while the card was in Review, its builder submitted a change its reviewer asked for (a follow-up), which its reviewer reviews now, with no new round. {revision} is a commit's short hash (keep it as it is).",
+    "text": "Follow-up submitted for review{revision, select, none {} other { at {revision}}}",
+    "note": "A line in a card's history (HI-1832): while the card was in Review, its builder submitted a change its reviewer asked for (a follow-up), which its reviewer reviews now, with no new round. {revision} is a commit's short hash (keep it as it is), or none for a no-code card's follow-up, which records no revision and leaves out \"at …\" (HI-3409).",
     "audience": "both"
   },
   "tasks.history.forwardResolving": {
@@ -732,6 +742,26 @@
   "tasks.history.placed": {
     "text": "Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
     "note": "A line in a card's history: an agent put the column's cards in order, and this card is now at place {place} (an ordinal: 2nd, 3rd). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each.",
+    "audience": "both"
+  },
+  "tasks.history.queueGuarded": {
+    "text": "Came back from the merge queue: {count, plural, one {a merge guard matched lines it adds} other {# merge guards matched lines it adds}}. {guards}{others, plural, =0 {} one { One more guard matched too.} other { # more guards matched too.}} The card’s Work section shows the run.",
+    "note": "A comment Combwork writes on a card when the merge queue sends it back because merge guards matched (HI-3284: patterns the project refuses in the lines a merge adds). {count}: how many guards matched; {guards}: the first of them, each as tasks.history.queueGuardedOne, joined by tasks.history.queueGuardedJoin (already translated); {others}: how many more matched, not listed. \"Merge queue\" and \"Work section\" are Combwork’s terms.",
+    "audience": "both"
+  },
+  "tasks.history.queueGuardedIncomplete": {
+    "text": "Came back from the merge queue: the merge guards couldn’t finish checking the lines it adds ({why, select, timedOut {guard “{guard}” ran past its time limit} tooLarge {the merge adds more than they check} unreadable {its changes couldn’t be read} malformed {its changes couldn’t be followed} matchesEmpty {guard “{guard}” matches an empty line} invalid {guard “{guard}” has an invalid pattern} cancelled {the check was stopped} other {their check ended}}), so it wasn’t merged. The card’s Work section shows the run.",
+    "note": "A comment Combwork writes on a card when the merge queue sends it back because its merge guards check could not finish (HI-3284), which never lets a merge through. {why} (select: translate each; keep the keys): a guard (its name, {guard}, the user’s own text) ran past the time limit; the merge adds more text or lines than the limits; the changes could not be read or parsed; a guard’s pattern matches the empty string or does not compile; the check was stopped; another failure. \"Merge queue\" and \"Work section\" are Combwork’s terms.",
+    "audience": "both"
+  },
+  "tasks.history.queueGuardedJoin": {
+    "text": "{first} {rest}",
+    "note": "Two matching merge guards’ parts of a returned card’s comment, one after the other (HI-3284, tasks.history.queueGuardedOne each): keep both, separated as your language separates two sentences.",
+    "audience": "both"
+  },
+  "tasks.history.queueGuardedOne": {
+    "text": "“{guard}” matched {count, plural, one {# line} other {# lines}}, first in {where}: {message}",
+    "note": "One matching merge guard in a returned card’s comment (HI-3284, inside tasks.history.queueGuarded): {guard} is its name and {message} its message, the user’s own words on what to do instead (any language: insert them as they are); {count}: the lines it matched; {where}: the first, a file path and line number such as src/a.ts:12 (keep it).",
     "audience": "both"
   },
   "tasks.history.queueReturned": {

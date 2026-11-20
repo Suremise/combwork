@@ -24,6 +24,7 @@ export const API = {
     messageNotTyped: agentMsg({ id: 'api.agent.messageNotTyped', text: 'The message wasn\'t typed into {agent}: {why}.', note: 'why: the delivery\'s fate (cancelled, expired, refused, stale) and its detail.' }),
     messageTooLong: agentMsg({ id: 'api.agent.messageTooLong', text: 'text is at most {max} characters (this has {length})' }),
     noConversation: agentMsg({ id: 'api.agent.noConversation', text: '{agent} has no conversation to resume. Start it without resume.' }),
+    idleResume: agentMsg({ id: 'api.agent.idleResume', text: "{agent}'s conversation {session} was last active {idle} ago{size, select, tokens {, with about {tokens} tokens of context} bytes {; its transcript is {bytes}} other {}}. It has most likely lost its prompt cache, so resuming it may process that context again; a fresh conversation may save tokens. Leave resume out for a new conversation, or pass resumeIdle: true to resume this one anyway.", note: "HI-3360: a start that would resume a long-idle conversation is refused until the caller chooses. {idle}: how long, such as 3 h 5 min; size: tokens (the context's, when the CLI says), bytes (only the transcript's size known: never called tokens), other (neither). resume and resumeIdle are the start's arguments." }),
     noSessions: agentMsg({ id: 'api.agent.noSessions', text: 'No sessions for this project' }),
     none: agentMsg({ id: 'api.agent.none', text: 'This project has no agents yet' }),
     notPinned: agentMsg({ id: 'api.agent.notPinned', text: 'Agents aren\'t pinned to worktrees in 1.0: slots are lent per card or lane.', note: '#1451: why a worktree of an agent\'s own is refused.' }),
@@ -116,7 +117,9 @@ export const API = {
     unknownColumn: agentMsg({ id: 'api.card.unknownColumn', text: 'Unknown column "{column}": {choices}.' }),
     unknownPosition: agentMsg({ id: 'api.card.unknownPosition', text: 'Unknown position "{position}": top or bottom.' }),
     unknownReview: agentMsg({ id: 'api.card.unknownReview', text: 'Unknown review "{review}": start, passed or failed.' }),
-    unknownView: agentMsg({ id: 'api.card.unknownView', text: 'Unknown view "{view}": short or full.' })
+    unknownView: agentMsg({ id: 'api.card.unknownView', text: 'Unknown view "{view}": short or full.' }),
+    lineCommentsState: agentMsg({ id: 'api.card.lineCommentsState', text: 'Unknown state "{state}": open or all.' }),
+    noFeedback: agentMsg({ id: 'api.card.noFeedback', text: '{card} has no sent batch "{batch}".' })
   },
   change: {
     activateProject: agentMsg({ id: 'api.change.activateProject', text: 'activate the project {project}', note: 'What an Assistant\'s change is called: in its refusals ("Only the Combwork Assistant can …", "don\'t let you …") and, capitalised, in its activity.' }),
@@ -132,6 +135,7 @@ export const API = {
     endALane: agentMsg({ id: 'api.change.endALane', text: 'end a lane' }),
     endLane: agentMsg({ id: 'api.change.endLane', text: 'end lane {lane}' }),
     handOver: agentMsg({ id: 'api.change.handOver', text: 'hand {from}\'s work over to {to} in {project}' }),
+    answerSimplify: agentMsg({ id: 'api.change.answerSimplify', text: "answer {card}'s simplify check", note: "HI-3188: the Assistant's answer to a card's simplify check, as its refusals and activity call it." }),
     intent: agentMsg({ id: 'api.change.intent', text: '{kind, select, start {start} putBack {put back} submit {submit} declarePaths {declare the paths of} startReview {start the review of} verdict {give the verdict on} reportMerge {report the merge of} ask {ask the user about} cannot {report a rule blocking} request {ask the builder of} loopStep {take a card loop step on} focusedSkip {decide on the skipped focused tests of} removeFromQueue {take out of the merge queue} retryMerge {retry the merge of} other {{kind}}} {card}', note: 'A card intent the Assistant runs, by its kind (#1267).' }),
     joinLane: agentMsg({ id: 'api.change.joinLane', text: 'join a lane in {project}' }),
     listTemplates: agentMsg({ id: 'api.change.listTemplates', text: 'list a project\'s templates' }),
@@ -246,6 +250,7 @@ export const API = {
     createdProject: agentMsg({ id: 'api.done.createdProject', text: 'Created the project {name}' }),
     freshRetried: agentMsg({ id: 'api.done.freshRetried', text: '{retried, plural, =0 {Lane {lane}: no new conversation was waiting to be retried} one {Lane {lane}: {total} new conversation tried again} other {Lane {lane}: {total} new conversations tried again}}' }),
     handingOver: agentMsg({ id: 'api.done.handingOver', text: 'Handing {from}\'s work over to {to} in {project}{latest, select, yes { (from the latest handover)} other {}}' }),
+    answerSimplify: agentMsg({ id: 'api.done.answerSimplify', text: "{card} {title}: answered its simplify check, {choice, select, carryOn {carry on} other {simplify}}", note: "HI-3188: the Assistant's answer to a card's simplify check, in its activity." }),
     intent: agentMsg({ id: 'api.done.intent', text: '{card} {title}: {kind, select, start {started} putBack {put back} submit {submitted} declarePaths {declared its paths} startReview {started its review} verdict {gave the verdict} reportMerge {reported its merge} ask {asked the user} cannot {reported a rule blocking it} request {asked its builder} loopStep {took a card loop step} focusedSkip {decided on its skipped focused tests} removeFromQueue {taken out of the merge queue} retryMerge {queued again (Retry merge)} other {{kind}}}{moved, select, yes {, {from} → {to}} other {}}' }),
     laneEnded: agentMsg({ id: 'api.done.laneEnded', text: 'Lane {lane} in {project}: {state}' }),
     laneJoined: agentMsg({ id: 'api.done.laneJoined', text: '{hasReviewer, select, yes {{reviewer}} other {A reviewer}} joined lane {lane} in {project}' }),
@@ -285,6 +290,9 @@ export const API = {
     userTyping: agentMsg({ id: 'api.handover.userTyping', text: 'The user has just typed in {agent}\'s terminal and may still be writing there. Ask the user before handing over.' })
   },
   http: {
+    requestKey: agentMsg({ id: 'api.http.requestKey', text: 'X-Combwork-Request must be 16 to 64 letters, digits, - or _.', note: 'HI-3195: a malformed request key header (cw-mcp makes it; X-Combwork-Request is a header name).' }),
+    requestKeyReused: agentMsg({ id: 'api.http.requestKeyReused', text: 'That request key was used for another request: nothing was done. Send a new request without reusing its key.', note: 'HI-3195: an Agent API write sent with a request key that an earlier, different request of the same launch used.' }),
+    requestsBusy: agentMsg({ id: 'api.http.requestsBusy', text: 'Too many writes are in flight right now: nothing was done. Try again in a moment.', note: 'HI-3195: the keyed writes in flight are at their limit; the request may be sent again.' }),
     apiOff: agentMsg({ id: 'api.http.apiOff', text: 'The Agent API is turned off in Settings → Agent API' }),
     badToken: agentMsg({ id: 'api.http.badToken', text: 'Missing or invalid bearer token' }),
     bodyJson: agentMsg({ id: 'api.http.bodyJson', text: 'Body must be JSON' }),
@@ -297,6 +305,7 @@ export const API = {
     viewerReadOnly: agentMsg({ id: 'api.http.viewerReadOnly', text: 'A viewer token is read-only: it can read Combwork (GET) and follow its events (GET /v1/events), not change anything' })
   },
   inbox: {
+    staleLaunch: agentMsg({ id: 'api.inbox.staleLaunch', text: 'This launch of yours was replaced (a restart or a new conversation): nothing was read or acked through it. Your current launch reads its inbox.', note: 'HI-3195: an inbox read or ack from an agent launch that has since been replaced.' }),
     ackArg: agentMsg({ id: 'api.inbox.ackArg', text: 'ack is a list of delivery ids ("m12"), at most 200' }),
     noInbox: agentMsg({ id: 'api.inbox.noInbox', text: 'Only an agent or the Assistant has an inbox.' }),
     readArg: agentMsg({ id: 'api.inbox.readArg', text: 'read is true or false' })

@@ -1,6 +1,6 @@
 // The admin snippet's transport on the real Claude Code (HI-2777), no inference: a stub server of the suite's own stands
 // for Combwork and answers UserPromptSubmit with a block, so Claude Code stops before any model call. Combwork's hook
-// handlers (built from src/shared/claudeHookHandlers.ts, the generator Combwork's launch hooks and the snippet both come
+// handlers (built from src/shared/providers/claude/hookHandlers.ts, the generator Combwork's launch hooks and the snippet both come
 // from; tests/claudeManagedHooks.test.ts holds the adapter's to it) go in two settings scopes: the project's
 // .claude/settings.json and a --settings file. It shows, with the real CLI:
 // 1. identical handlers in two files run once (Claude Code's own dedup): one SessionStart, one UserPromptSubmit;
@@ -21,7 +21,7 @@ const path = require('path')
 const http = require('http')
 const { spawn } = require('child_process')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 90000
+const HUNG_MS = lib.timing('hang.step')
 
 const work = path.join(lib.WORK, 'claudemanagedreal')
 let failed = 0
@@ -37,7 +37,9 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(work, { recursive: true })
   // The generator, from the source of this revision.
   const gen = path.join(work, 'claudeHookHandlers.cjs')
-  require('esbuild').buildSync({ entryPoints: [path.join(lib.ROOT, 'src', 'shared', 'claudeHookHandlers.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: gen, logLevel: 'warning' })
+  // Claude Code's handlers and the fixed hook URL (shared/hooks.ts, HI-3201), in one bundle.
+  const entry = "export { claudeHookHandlers } from './src/shared/providers/claude/hookHandlers'; export { fixedHookUrl } from './src/shared/hooks'"
+  require('esbuild').buildSync({ stdin: { contents: entry, resolveDir: lib.ROOT, loader: 'ts' }, bundle: true, platform: 'node', format: 'cjs', outfile: gen, logLevel: 'warning' })
   const { claudeHookHandlers, fixedHookUrl } = require(gen)
 
   // The stub: records each call; blocks the prompt, so no inference.

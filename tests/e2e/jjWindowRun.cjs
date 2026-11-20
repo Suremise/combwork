@@ -28,7 +28,7 @@ const { DatabaseSync } = require('node:sqlite')
 const { jjDir, portableJj } = require('../jjPortable.cjs')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 const exe = portableJj()
 if (!exe) {
   console.log("SKIP jjwindow: the pinned jj isn't fetched (npm run jj:fetch)")
@@ -66,7 +66,7 @@ const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), wind
 const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', rev, '-T', t).trim()
 const dbFile = path.join(ws, '.combwork', 'combwork.db')
 const onDb = (fn) => {
-  const db = new DatabaseSync(dbFile, { timeout: 5000 })
+  const db = new DatabaseSync(dbFile, { timeout: lib.timing('db.busyMs') })
   try {
     return fn(db)
   } finally {
@@ -178,19 +178,17 @@ const onDb = (fn) => {
     }
     const quiet = await page.addStyleTag({ content: '.toasts { display: none !important; }' })
     // The window's language, as a change of it reaches the window (jjview's way). Names change with it: each view is
-    // reached in English, then shown in each language where it is, in both themes.
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+    // reached in English, then shown in each language where it is, in both themes. Main reads each catalogue itself
+    // (lib.speakLanguage, HI-3428).
     const english = (await inv('app:info')).language
-    const catalogue = (code) => Object.assign({}, ...fs.readdirSync(path.join(lib.ROOT, 'locales', code)).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', code, f), 'utf8'))))
     const inEach = async (loc, name, wanted) => {
       for (const language of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
-        const cat = catalogue(language)
-        await speak({ ...english, code: language, locale: language, messages: cat })
+        const cat = await lib.speakLanguage(app, english, language)
         const want = wanted(cat)
         check(`${language}: ${name} in the language`, !!want && !!(await until(async () => (await text(loc)).includes(want), HUNG_MS)), await text(loc))
         await shoot(loc, `${name}-${language}`)
       }
-      await speak(english)
+      await lib.speakLanguage(app, english)
     }
     const repo = await section('jjRepo')
     const refresh = () => repo.locator('[data-action="jj-refresh"]').first().click()
@@ -272,7 +270,7 @@ const onDb = (fn) => {
     // Not back: the processes still naming this run's folders (read only, nothing ended), for what holds the slot.
     if (!back) {
       try {
-        const ps = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.ToLower().Contains('${work.toLowerCase().replace(/'/g, "''")}') } | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name) $($_.CommandLine)" }`], { encoding: 'utf8', windowsHide: true, timeout: 30_000 })
+        const ps = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.ToLower().Contains('${work.toLowerCase().replace(/'/g, "''")}') } | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name) $($_.CommandLine)" }`], { encoding: 'utf8', windowsHide: true, timeout: lib.timing('spawn.hang') })
         for (const l of ps.split(/\r?\n/).filter(Boolean)) console.log(`INFO process: ${l.slice(0, 400)}`)
       } catch (e) {
         console.log(`INFO process listing failed: ${e}`)
@@ -431,7 +429,7 @@ const onDb = (fn) => {
     await askForgot.getByRole('button', { name: 'Remove', exact: true }).click()
     check('…removed: the slot and its folder gone, its commit still in jj’s store', !!(await until(async () => !(await inv('slots:list', shop)).some((s) => s.name === slot4) && !fs.existsSync(w4.folder), HUNG_MS)) && id(shop, forgotCommit) === forgotCommit, JSON.stringify(await inv('slots:list', shop)))
 
-    // HI-3096 (Darren's decision (a), 12 Nov): with the repository's snapshot.auto-track narrowed, a new file jj doesn't
+    // HI-3096 (decision (a)): with the repository's snapshot.auto-track narrowed, a new file jj doesn't
     // track is the slot's work. B1's submission is refused naming the setting; put back, the slot shows it has changes
     // and the pool's removal (Changes → Unused worktrees' Remove for a colocated slot) refuses it, the file kept.
     jj(shop, 'config', 'set', '--repo', 'snapshot.auto-track', 'none()')
@@ -495,8 +493,8 @@ const onDb = (fn) => {
       if (!(await inv('slots:list', shop)).some((s) => s.name === slot6) && !fs.existsSync(w6.folder)) return true
       if ((await row6.locator('[data-action="remove-forgotten"]').count()) === 1 && (await page.locator('.dialog').count()) === 0) {
         // The row may go as it is clicked (the removal under way): a short try, never a wait.
-        await row6.locator('[data-action="remove-forgotten"]').click({ timeout: 2000 }).catch(() => undefined)
-        await page.locator('.dialog').filter({ hasText: `Remove ${slot6}?` }).getByRole('button', { name: 'Remove', exact: true }).click({ timeout: 2000 }).catch(() => undefined)
+        await row6.locator('[data-action="remove-forgotten"]').click({ timeout: lib.timing('poll.clickMs') }).catch(() => undefined)
+        await page.locator('.dialog').filter({ hasText: `Remove ${slot6}?` }).getByRole('button', { name: 'Remove', exact: true }).click({ timeout: lib.timing('poll.clickMs') }).catch(() => undefined)
       }
       return null
     }, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
@@ -582,7 +580,7 @@ const onDb = (fn) => {
     check('…card 2 not started: still To Do, no Started since, not placed in the project folder', (await card(n2))?.column === 'todo' && !(work7?.folder && work7.folder.toLowerCase() === shop.toLowerCase()), JSON.stringify({ column: (await card(n2))?.column, work7, last: facts7.slice(-3) }))
     check('…its kept work still in the slot, still kept for it', JSON.stringify(fs.readdirSync(kept7.folder).filter((f) => f !== '.jj' && f !== '.git').sort()) === JSON.stringify(keptFiles7) && (await inv('slots:list', shop)).some((s) => s.name === kept7.name && s.keptFor === n2), JSON.stringify(await inv('slots:list', shop)))
 
-    // HI-3129 (Darren's decision (a), 13 Nov): the project's target changed to a new bookmark `next` while card 2's work
+    // HI-3129 (decision (a)): the project's target changed to a new bookmark `next` while card 2's work
     // is kept in its slot on main. Its dialog's Merges into lists the repository's bookmarks (`release-x`, in no Other
     // branches), and its start carries on in the kept slot on main, never refused for the target.
     onDb((db) => db.prepare('UPDATE slots SET writer_run = NULL, writer_lease = NULL, writer_agent = NULL, writer_pid = NULL, writer_started = NULL WHERE name = ?').run(kept7.name))
@@ -616,13 +614,12 @@ const onDb = (fn) => {
       await form8.locator('[data-action="save"]').click()
       await save8.waitFor({ timeout: HUNG_MS })
     }
-    const de8 = catalogue('de')
+    const de8 = await lib.speakLanguage(app, english, 'de')
     const deKept8 = (/\bkept \{([^}]*)\{from\}/.exec(de8['workflow.form.retargetKeep'] ?? '') ?? [])[1]?.trim() ?? ''
-    await speak({ ...english, code: 'de', locale: 'de', messages: de8 })
     await reopen8()
     check('de: Save…\'s Retarget, card 2 and its slot staying, in German', !!deKept8 && !!(await until(async () => (await text(keptCard8)).includes(deKept8) && (await text(keptSlot8)).includes(deKept8), HUNG_MS)), await text(retarget8))
     await shoot(retarget8, 'retarget-kept-de')
-    await speak(english)
+    await lib.speakLanguage(app, english)
     await reopen8()
     check('…in English again', !!(await until(async () => /its work is kept on main/.test(await text(keptCard8)), HUNG_MS)), await text(retarget8))
     await save8.getByRole('button', { name: 'Save', exact: true }).click()

@@ -18,9 +18,10 @@ import type { WatchCondition } from '../src/shared/watch'
 import { tempDir } from './tempDir'
 import { putStoreDocs, storeDocs, storeMeta } from './storeDocs'
 import { follow, toldOf } from './followDoorbell'
+import { timing } from './timing.cjs'
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 const at = (m: number): string => new Date(Date.UTC(2026, 9, 3, 12, m)).toISOString()
 const cardOf = (over: Partial<TaskCard> = {}): TaskCard => ({ number: 7, title: 'T', description: '', project: 'alpha', agent: 'a1', column: 'doing', order: 1, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: at(0), createdBy: 'You', updatedAt: at(0), ...over })
 
@@ -1087,7 +1088,7 @@ describe('watches (main/watches.ts)', async () => {
     // Already in Review: only a fresh move into it waits (#434).
     const r = await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'], column: 'review', moveInto: true, fresh: true })
     expect('watching' in r).toBe(true)
-    await new Promise((res) => setTimeout(res, 5))
+    await new Promise((res) => setTimeout(res, timing('pace.tick')))
     await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'doing' }, user))
     await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'review' }, user))
     await evaluated(w)
@@ -1150,7 +1151,7 @@ describe('watches (main/watches.ts)', async () => {
     await evaluated(w)
     expect(st.typed).toEqual([])
     expect('watching' in (await watches.registerWatch(w, alpha, 'a1', back))).toBe(true)
-    await new Promise((res) => setTimeout(res, 5))
+    await new Promise((res) => setTimeout(res, timing('pace.tick')))
     // A move in place by anyone else, or a comment: no wake.
     await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'review' }, { kind: 'assistant' }))
     await inWorkspace(w, () => tasks.commentTask(c.number, 'Working on it', builder))
@@ -1181,7 +1182,7 @@ describe('watches (main/watches.ts)', async () => {
       const { w, alpha } = await open()
       const st = fake(alpha)
       const [a, b] = await twoInReview(w)
-      const SETTLE_MS = 400
+      const SETTLE_MS = 400 // timing-ok: simulated time (fake timers): the settle value under test
       watches.testHooks.settleMs = SETTLE_MS
       // The clock stands still while both changes land, so the second is inside the first's settle however long a loaded
       // machine takes to make it; then it moves past the settle, and the line goes.
@@ -1215,7 +1216,7 @@ describe('watches (main/watches.ts)', async () => {
       expect(st.typed).toHaveLength(1)
       expect(st.told[0]).toContain(`#${a} is in Review: Reviewer (alpha) passed it`)
       // #b fails a moment after the wake, before the builder watches again (what deadlocked #119/#217).
-      await new Promise((r) => setTimeout(r, 5))
+      await new Promise((r) => setTimeout(r, timing('pace.tick')))
       await verdict(w, b, 'failed')
       st.status = 'watching'
       const r = await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })
@@ -1332,7 +1333,7 @@ describe('watches (main/watches.ts)', async () => {
       await verdict(w, a, 'passed')
       await evaluated(w)
       expect(st.typed).toHaveLength(1)
-      await new Promise((r) => setTimeout(r, 5))
+      await new Promise((r) => setTimeout(r, timing('pace.tick')))
       await inWorkspace(w, () => tasks.updateTask(b, { agent: 'a2' }, user))
       st.status = 'watching'
       await watches.registerWatch(w, alpha, 'a1', { cards: [b], changes: ['agent'] })
@@ -2260,7 +2261,7 @@ describe('watches (main/watches.ts)', async () => {
     expect(watches.watchFor(alpha, 'a1')).not.toBeNull()
     await disposeWorkspaceService(w)
     // The locked file is tried 20 times with a growing pause (about 2.2 s): more than the default 5 s on a loaded machine.
-  }, 20_000)
+  }, timing('test.hang'))
 
   it("a watches file that can't be read is an error, not \"no watches\"; one too big is set aside", async () => {
     const { w, path, alpha } = await open()
@@ -2532,5 +2533,16 @@ describe("a card's history read by its lines' messages, not their words (dialect
   it('a line from before #845 is still read by its English', () => {
     expect(movedIntoSince(cardOf({ history: [{ at: at(10), by: 'B', what: 'Returned for review, round 2' }] }), 'review', at(9))).toBe(true)
     expect(handoffsSince(cardOf({ history: [{ at: at(3), by: 'B', what: 'Recorded a decision: "x"' }] }), at(2), { changes: ['verdict'] })).toEqual(['decision'])
+  })
+})
+
+describe("a loop wake beside the agent's own card watch (HI-3211, decision (b))", () => {
+  it("says it is the loop's handoff and the watch is still on only when told so; otherwise as before", () => {
+    const c = { ...cardChange(7, cardOf({ column: 'doing' }), ['comment']), about: { owner: null, verdict: null } }
+    const plain = loopWakeLine(c, 'stepAnswer', 'OK for d1')
+    const on = loopWakeLine(c, 'stepAnswer', 'OK for d1', undefined, true)
+    expect(on).toBe(`${plain} This is your card loop's handoff (Wake reviewers and builders), not your card watch, which is still on.`)
+    expect(plain).not.toMatch(/still on/)
+    expect(Buffer.byteLength(JSON.stringify(on))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
   })
 })

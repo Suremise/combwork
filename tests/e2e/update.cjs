@@ -16,7 +16,7 @@ const cacheName = lane ? `combwork-test-updater-${lane}` : 'combwork-test-update
 const cache = path.join(process.env.LOCALAPPDATA, cacheName)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 
@@ -49,7 +49,8 @@ const server = http.createServer(async (req, res) => {
         holdDownload = null
       }
       res.write(release.file.subarray(i, i + 256 * 1024))
-      await sleep(130)
+      // A pace, not a wait: each chunk this far apart, so the download's progress is seen.
+      await sleep(lib.timing('pace.downloadChunkMs'))
     }
     return res.end()
   }
@@ -66,7 +67,7 @@ async function launch(profile, extraEnv = {}) {
   await page.keyboard.press('Escape') // first-run setup dialog, if any
   return { app, page, inv: (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a]) }
 }
-const waitFor = async (fn, ms = 20000) => { const t = Date.now(); while (Date.now() - t < ms) { if (await fn()) return true; await sleep(250) } return false }
+const waitFor = async (fn, ms = lib.timing('hang.ui')) => !!(await lib.until(fn, ms))
 const statusText = (page) => page.locator('.statusbar .status-item').last().innerText()
 /** Whether the app's process has exited, waited for (#1647): set up before what makes it quit. */
 const exits = (a) => {
@@ -116,19 +117,23 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   check('status bar: restart to update', await waitFor(async () => /Restart to update to 9.1.1/.test(await statusText(page)), HUNG_MS), await statusText(page))
   check('toast offers Restart and Update', await waitFor(async () => (await page.locator('.toast', { hasText: 'Combwork 9.1.1 is ready' }).count()) === 1, HUNG_MS))
   check('install mode auto logged', /install auto/.test(log('upd-a')))
-  await page.locator('.statusbar .update-item').click(); await sleep(500)
+  await page.locator('.statusbar .update-item').click()
   const dlg = page.locator('.dialog', { hasText: 'Update Ready' })
+  await waitFor(async () => (await dlg.locator('.update-notes strong').count()) === 1)
   check('dialog shows version and notes', (await dlg.innerText()).includes('Combwork 9.1.1 is ready to install') && (await dlg.locator('.update-notes strong').innerText()) === 'everything')
   check('dialog has Restart and Update', await dlg.locator('button', { hasText: 'Restart and Update' }).count() === 1)
   await page.screenshot({ path: path.join(scratch, 'upd-2-ready.png') })
-  await dlg.locator('button', { hasText: 'Later' }).click(); await sleep(300)
+  await dlg.locator('button', { hasText: 'Later' }).click()
+  await waitFor(async () => (await dlg.count()) === 0)
   // Tray and palette commands exist
   // About shows the status row
   await page.evaluate(() => window.combwork.invoke('app:info'))
   // Restart and Update goes through the quit flow; test mode quits without installing.
   const closed = new Promise((r) => app.process().once('exit', r))
   await inv('update:install')
-  await Promise.race([closed, sleep(10000)])
+  // It quits within the close bound, or the suite stops here: that copy ended by its own handle, never a next launch
+  // beside it, nor a pass on the log line alone (HR1's round 1).
+  await lib.exitWithin(app.process(), closed, lib.timing('app.closeMs'), 'Restart and Update')
   // HI-3167: asks nothing more (no agent working), and the installer would be shown, never silent.
   check('Restart and Update quits (test mode: no install), the installer shown', /Test mode: would install 9.1.1 \(Restart and Update\), the installer shown/.test(log('upd-a')))
 
@@ -138,14 +143,15 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   fs.rmSync(cache, { recursive: true, force: true }); downloads = 0
   ;({ app, page, inv } = await launch('upd-b', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '1500' }))
   await waitFor(async () => (await inv('update:state')).status === 'available')
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing downloads by itself (the feed answers after 1.5 s), which no condition can show.
+  await lib.sleep(lib.timing('quiet.noAutoDownloadMs')) // A quiet window on purpose: this checks that nothing downloads by itself (the feed answers after 1.5 s).
   check('not downloaded automatically', (await inv('update:state')).status === 'available' && downloads === 0)
   check('status bar: available', /Combwork 9.1.1 available/.test(await statusText(page)), await statusText(page))
   check('install mode manual logged', /download manual, install manual/.test(log('upd-b')))
-  await page.locator('.statusbar .update-item').click(); await sleep(400)
+  await page.locator('.statusbar .update-item').click()
+  await waitFor(async () => (await page.locator('.dialog button', { hasText: 'Download' }).count()) === 1)
   await page.screenshot({ path: path.join(scratch, 'upd-3-available.png') })
   await page.locator('.dialog button', { hasText: 'Download' }).click()
-  check('Download from the dialog', await waitFor(async () => (await inv('update:state')).status === 'ready', 30000) && downloads === 1)
+  check('Download from the dialog', await waitFor(async () => (await inv('update:state')).status === 'ready', lib.timing('hang.ui')) && downloads === 1)
   await page.keyboard.press('Escape')
   // Skip: a newer version, found by a manual check, skipped; the next automatic check ignores it.
   release = { ...release, version: '9.1.2', notes: '- Even more' }
@@ -173,17 +179,19 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   fs.mkdirSync(path.join(scratch, 'upd-c'), { recursive: true })
   fs.writeFileSync(path.join(scratch, 'upd-c', 'config.json'), JSON.stringify({ version: 1, settings: { updates: { checkAutomatically: false } } }))
   ;({ app, page, inv } = await launch('upd-c', { CW_UPDATE_FEED: feed, CW_UPDATE_DELAY: '1000' }))
-  await lib.sleep(3000) // A fixed wait on purpose: this checks that no check starts by itself, which no condition can show.
+  await lib.sleep(lib.timing('quiet.noAutoCheckMs')) // A quiet window on purpose: this checks that no check starts by itself (one would start 1 s in).
   check('no automatic check when off', (await inv('update:state')).status === 'idle')
   // Settings → Updates renders
-  await page.keyboard.press('Control+,'); await sleep(600)
-  await page.locator('.settings-nav .row', { hasText: 'Updates' }).click(); await sleep(400)
+  await page.keyboard.press('Control+,')
+  await waitFor(async () => (await page.locator('.settings-nav .row', { hasText: 'Updates' }).count()) >= 1)
+  await page.locator('.settings-nav .row', { hasText: 'Updates' }).click()
+  await waitFor(async () => (await page.locator('.settings').innerText().catch(() => '')).includes('Check for updates automatically'))
   const settingsText = await page.locator('.settings').innerText()
   check('Settings → Updates has the four options', ['Check for updates automatically', 'Download updates automatically', 'Install updates', 'Include pre-releases'].every((t) => settingsText.includes(t)))
   await page.screenshot({ path: path.join(scratch, 'upd-4-settings.png') })
   // 4. Errors: no release published (404).
   release = null
-  await page.locator('.settings button', { hasText: 'Check Now' }).click(); await lib.until(async () => (await inv('update:state')).status === 'error', 10000)
+  await page.locator('.settings button', { hasText: 'Check Now' }).click(); await lib.until(async () => (await inv('update:state')).status === 'error', lib.timing('hang.ui'))
   st = await inv('update:state')
   check('404 → "no release published yet"', st.status === 'error' && /No release of Combwork has been published yet/.test(st.error), st.error)
   check('error dialog shown', await page.locator('.dialog', { hasText: 'No release of Combwork has been published yet' }).count() === 1)
@@ -194,7 +202,8 @@ const log = (profile) => { try { return fs.readFileSync(path.join(scratch, profi
   ;({ app, page, inv } = await launch('upd-d'))
   st = await inv('update:state')
   check('dev build: disabled', st.status === 'disabled' && /installed app/.test(st.error))
-  await page.keyboard.press('F1'); await sleep(400)
+  await page.keyboard.press('F1')
+  await waitFor(async () => (await page.locator('.split-list .row', { hasText: 'About Combwork' }).count()) >= 1)
   await page.locator('.split-list .row', { hasText: 'About Combwork' }).click()
   check('About shows the update status', await waitFor(async () => /installed app/.test(await page.locator('.about-update').innerText().catch(() => '')), HUNG_MS))
   await page.screenshot({ path: path.join(scratch, 'upd-6-about.png') })

@@ -7,18 +7,20 @@
 // Windows only where real processes run; tempDir() only.
 import { spawn, type ChildProcess } from 'child_process'
 import { randomBytes } from 'crypto'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { msysBinFor } from '../src/main/gitWorker'
 import { boundedOutput, endTreeAsync, findMsysMarked, msysMatches, MSYS_FIND_SCRIPT, RUN_MARK_VAR, treesToEnd, type ListedProcess } from '../src/main/processTree'
+import { markedNow, sleeperEnv, SLEEPER_MARK_VAR, startSleeper } from './msysSleeper'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 type Ids = { pid: number; started: number }[]
-const { identify, endExactly } = req('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Ids; endExactly: (targets: Ids) => number }
+const { identify, endExactly, stillSame } = req('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Ids; endExactly: (targets: Ids) => number; stillSame: (ids: Ids) => number[] }
 
 const isWin = process.platform === 'win32'
 const alive = (pid: number): boolean => {
@@ -38,11 +40,6 @@ afterEach(() => {
 
 const p = (pid: number, started: number, parent = 0): ListedProcess => ({ pid, parent, started })
 
-/**
- * Git Bash: `sleep 30` in the background, its winpid written to `$1` once it is sleep (until MSYS's exec, `$!` names the
- * forked sh.exe, another Windows process), then the shell exits, leaving the sleep's Windows parent gone.
- */
-const SLEEPER = 'sleep 30 & while :; do read -r e < /proc/$!/exename; case "$e" in */sleep*) break;; esac; done; read -r w < /proc/$!/winpid; echo "$w" > "$1"; exit 0'
 /** The `t` line for `ms` (Unix ms), as $EPOCHREALTIME prints it. */
 const at = (ms: number): string => `t ${Math.floor(ms / 1000)}.${String(ms % 1000).padStart(3, '0')}000`
 /** A search's output: its time taken before any read (`t`), its lines, `end`. */
@@ -113,17 +110,17 @@ describe('the MSYS search script starts nothing (HI-3047)', () => {
 
 describe.skipIf(!isWin)('bounded: the search ended at its limits, nothing left (HI-3047)', () => {
   it('past its time limit: an error, and its process gone', async () => {
-    const r = await boundedOutput(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { timeoutMs: 500, maxBuffer: 1024, env: baseEnv() })
+    const r = await boundedOutput(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { timeoutMs: 500, maxBuffer: 1024, env: baseEnv() }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(r).toMatchObject({ error: 'it ran past its time limit' })
     const pid = 'pid' in r ? r.pid! : 0
     expect(pid).toBeGreaterThan(0)
-    await vi.waitFor(() => expect(alive(pid)).toBe(false), { timeout: 10_000 })
+    await vi.waitFor(() => expect(alive(pid)).toBe(false), { timeout: timing('wait.hang') })
   })
   it('output past its cap: an error, and its process gone', async () => {
-    const r = await boundedOutput(process.execPath, ['-e', "setInterval(() => process.stdout.write('x'.repeat(4096)), 1)"], { timeoutMs: 20_000, maxBuffer: 64 * 1024, env: baseEnv() })
+    const r = await boundedOutput(process.execPath, ['-e', "setInterval(() => process.stdout.write('x'.repeat(4096)), 1)"], { timeoutMs: timing('spawn.hang'), maxBuffer: 64 * 1024, env: baseEnv() })
     expect(r).toMatchObject({ error: 'its output passed the cap' })
     const pid = 'pid' in r ? r.pid! : 0
-    await vi.waitFor(() => expect(alive(pid)).toBe(false), { timeout: 10_000 })
+    await vi.waitFor(() => expect(alive(pid)).toBe(false), { timeout: timing('wait.hang') })
   })
   it("a shell that isn't there: an error", async () => {
     expect(await findMsysMarked({ mark: 'ab', bin: join(tempDir('msys-none-'), 'usr', 'bin') })).toMatchObject({ error: expect.stringMatching(/couldn't run/) })
@@ -169,7 +166,7 @@ describe.skipIf(!isWin)('endTreeAsync with an MsysMark (HI-3047)', () => {
     const file = join(tempDir('msys-tree-'), 'child.pid')
     const top = spawn(process.execPath, ['-e', `const c = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' }); require('fs').writeFileSync(${JSON.stringify(file)}, String(c.pid)); setInterval(() => {}, 1000)`], { stdio: 'ignore', windowsHide: true, env: baseEnv() })
     own(top.pid!)
-    await vi.waitFor(() => expect(existsSync(file) && readFileSync(file, 'utf8').length > 0).toBe(true), { timeout: 20_000 })
+    await vi.waitFor(() => expect(existsSync(file) && readFileSync(file, 'utf8').length > 0).toBe(true), { timeout: timing('wait.hang') })
     const child = Number(readFileSync(file, 'utf8'))
     own(child)
     return { top, child }
@@ -185,10 +182,10 @@ describe.skipIf(!isWin)('endTreeAsync with an MsysMark (HI-3047)', () => {
       const { top, child } = await tree()
       const why: string[] = []
       await endTreeAsync(top, 'win32', { mark: 'ab', bin: 'x', onIncomplete: (w) => why.push(w), discover: async () => answer })
-      await vi.waitFor(() => expect([alive(top.pid!), alive(child)]).toEqual([false, false]), { timeout: 10_000 })
+      await vi.waitFor(() => expect([alive(top.pid!), alive(child)]).toEqual([false, false]), { timeout: timing('wait.hang') })
       expect(why).toEqual(['error' in answer ? answer.error : 'its answer was malformed'])
     }
-  }, 60_000)
+  }, timing('test.hang'))
 
   it('a match outside the tree is ended with it; an unrelated process, and one the answer names but started after the search began, are not', async () => {
     const { top, child } = await tree()
@@ -201,35 +198,31 @@ describe.skipIf(!isWin)('endTreeAsync with an MsysMark (HI-3047)', () => {
     const out = said(began, 'a 5 ' + marked, 'a 6 ' + late, 'm 5 ' + marked, 'm 6 ' + late, 'b 5 ' + marked, 'b 6 ' + late)
     const why: string[] = []
     await endTreeAsync(top, 'win32', { mark: 'ab', bin: 'x', onIncomplete: (w) => why.push(w), discover: async () => ({ out }) })
-    await vi.waitFor(() => expect([alive(top.pid!), alive(child), alive(marked)]).toEqual([false, false, false]), { timeout: 10_000 })
+    await vi.waitFor(() => expect([alive(top.pid!), alive(child), alive(marked)]).toEqual([false, false, false]), { timeout: timing('wait.hang') })
     expect([alive(unrelated), alive(late)]).toEqual([true, true])
     expect(why).toEqual([])
-  }, 60_000)
+  }, timing('test.hang'))
 })
 
 describe.skipIf(!isWin)("Git's own sh finds exactly the marker's entry (HI-3047)", () => {
   const bin = isWin ? msysBinFor({ env: process.env }) : null
   it.skipIf(!bin)('exact: found; a longer value either side, the marker inside another variable, none: not; nothing but ids printed', async () => {
     const mark = randomBytes(16).toString('hex')
-    const dir = tempDir('msys-marked-')
     /**
      * A Git Bash shell that starts a background sleep, writes its winpid and exits (the sleep outlives it, its parent
-     * gone). Its winpid once it is sleep: until MSYS's exec, `$!` is the forked sh.exe, another Windows process.
+     * gone): tests/msysSleeper.ts. `vars`: added to its environment.
      */
-    const sleeper = async (name: string, vars: Record<string, string>): Promise<number> => {
-      const file = join(dir, name)
-      spawn(join(bin!, 'sh.exe'), ['-c', SLEEPER, 'sh', file.replace(/\\/g, '/')], { stdio: 'ignore', windowsHide: true, env: { ...baseEnv(), ...vars } })
-      await vi.waitFor(() => expect(existsSync(file) && /\d/.test(readFileSync(file, 'utf8'))).toBe(true), { timeout: 20_000 })
-      const pid = Number(readFileSync(file, 'utf8').trim())
+    const sleeper = async (vars: Record<string, string>): Promise<number> => {
+      const pid = await startSleeper({ bin: bin!, env: { ...baseEnv(), ...vars } })
       own(pid)
       return pid
     }
-    const exact = await sleeper('exact', { [RUN_MARK_VAR]: mark })
+    const exact = await sleeper({ [RUN_MARK_VAR]: mark })
     const others = [
-      await sleeper('suffix', { [RUN_MARK_VAR]: `${mark}0` }),
-      await sleeper('prefix', { [RUN_MARK_VAR]: `0${mark}` }),
-      await sleeper('embedded', { OTHER: `${RUN_MARK_VAR}=${mark}` }),
-      await sleeper('none', {})
+      await sleeper({ [RUN_MARK_VAR]: `${mark}0` }),
+      await sleeper({ [RUN_MARK_VAR]: `0${mark}` }),
+      await sleeper({ OTHER: `${RUN_MARK_VAR}=${mark}` }),
+      await sleeper({})
     ]
     const r = await findMsysMarked({ mark, bin: bin! })
     expect(r).toHaveProperty('out')
@@ -250,7 +243,87 @@ describe.skipIf(!isWin)("Git's own sh finds exactly the marker's entry (HI-3047)
     expect(out2.trim().split(/\r?\n/).at(-1)).toBe('end')
     expect(out2).not.toMatch(new RegExp(`^(x|m) ${msysPid}( |$)`, 'm'))
     expect(out2).toMatch(new RegExp(`^a ${msysPid} `, 'm'))
-  }, 60_000)
+  }, timing('test.hang'))
+
+  // HI-3421: a sleep that didn't start left the shell looking for it in /proc forever, writing nothing: the test's wait ran
+  // out, no reason given, and the shell spun on. Now the shell exits, saying why, and that is the error.
+  it.skipIf(!bin)("a sleeper whose sleep doesn't start: its shell exits, and the error says why", async () => {
+    const err = await startSleeper({ bin: bin!, env: baseEnv(), sleep: 'cw-no-such-sleep' }).catch((e: Error) => e)
+    expect(err).toBeInstanceOf(Error)
+    expect((err as Error).message).toMatch(/^Git Bash's sleep didn't start: exited 1, winpids \[\], stderr: .*cw-no-such-sleep: command not found.*the background sleep \(\d+\) ended before it was seen as sleep$/s)
+  }, timing('test.hang'))
+
+  // HI-3455: rc.15's failure. A run started from PowerShell has Git's `cmd` folder on its PATH, not `usr\bin`, and MSYS's
+  // /usr/bin went with it: `sleep: command not found`, every time. The sleeper's shell has `bin` first on its PATH, under
+  // whichever spelling the caller's environment has.
+  it.skipIf(!bin)("a caller's PATH without Git's usr\\bin (PowerShell's, under either spelling): the sleep still starts", async () => {
+    const cmdOnly = `${process.env.SystemRoot ?? 'C:\\Windows'}\\System32;${join(bin!, '..', '..', 'cmd')}`
+    const plain = Object.fromEntries(Object.entries(baseEnv()).filter(([k]) => k.toUpperCase() !== 'PATH'))
+    for (const name of ['Path', 'PATH']) {
+      const pid = await startSleeper({ bin: bin!, env: { ...plain, [name]: cmdOnly } })
+      own(pid)
+      expect(pid).toBeGreaterThan(0)
+    }
+    const env = sleeperEnv({ ...plain, Path: cmdOnly }, bin!, 'm')
+    expect(Object.keys(env).filter((k) => k.toUpperCase() === 'PATH')).toEqual(['PATH'])
+    expect(env.PATH).toBe(`${bin};${cmdOnly}`)
+    expect(env[SLEEPER_MARK_VAR]).toBe('m')
+  }, timing('test.hang'))
+
+  // HI-3421 (HR1's rounds 1 and 2): a shell that doesn't exit within the wait is ended, and whatever carries its try's
+  // marker, before the starter throws: nothing of the try is left for a caller that never got a winpid, and nothing else is
+  // touched. Never by a pid read from the winpid file: one written there by then may name another process.
+  it.skipIf(!bin)("the starter's wait runs out at once: the shell ended, nothing of the try left; pids in its winpid file (another sleeper's, a native process's) left alone", async () => {
+    const control = await startSleeper({ bin: bin!, env: baseEnv() })
+    own(control)
+    const native = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true, env: baseEnv() })
+    const unrelated = native.pid!
+    own(unrelated)
+    let mark = ''
+    const err = await startSleeper({
+      bin: bin!,
+      env: baseEnv(),
+      waitExit: async (_check, t) => {
+        mark = t.mark
+        // As if the file named them: a stale winpid given out again since.
+        writeFileSync(t.file, `${control}
+${unrelated}
+`)
+        throw new Error('the wait ran out')
+      }
+    }).catch((e: Error) => e)
+    expect(err).toBeInstanceOf(Error)
+    const msg = (err as Error).message
+    expect(msg).toMatch(/^the wait ran out; the shell \(pid \d+\) was still running, ended \(exited [^)]+\), .*nothing carries its marker( now)?; stderr: /)
+    expect(alive(Number(/the shell \(pid (\d+)\)/.exec(msg)![1]))).toBe(false)
+    expect(await markedNow(mark, bin!)).toEqual([])
+    expect([alive(control), alive(unrelated)]).toEqual([true, true])
+  }, timing('test.hang'))
+
+  it.skipIf(!bin)("the starter's wait runs out before the winpid is written: everything carrying the try's marker ended, verified by a search that finds none", async () => {
+    let mark = ''
+    let found: Ids = []
+    const err = await startSleeper({
+      bin: bin!,
+      env: baseEnv(),
+      // timeout's exename isn't sleep: the shell looks on, never writing a winpid, while timeout and its sleep run.
+      sleep: 'timeout 60 sleep',
+      waitExit: async (_check, t) => {
+        mark = t.mark
+        await vi.waitFor(async () => {
+          const now = await markedNow(t.mark, bin!)
+          expect(Array.isArray(now) ? now.length : now).toBeGreaterThanOrEqual(2)
+          found = (now as Ids).map((m) => ({ pid: m.pid, started: m.started }))
+        }, { timeout: timing('wait.hang') })
+        throw new Error('the wait ran out')
+      }
+    }).catch((e: Error) => e)
+    expect(err).toBeInstanceOf(Error)
+    const msg = (err as Error).message
+    expect(msg).toMatch(/the shell \(pid \d+\) was still running, ended \(exited [^)]+\), ended what carried its marker: winpids [\d ]+, .*nothing carries its marker now; stderr: /)
+    expect(await markedNow(mark, bin!)).toEqual([])
+    expect(stillSame(found)).toEqual([])
+  }, timing('test.hang'))
 })
 
 describe('msysBinFor: the MSYS folder of the git started (HI-3047)', () => {

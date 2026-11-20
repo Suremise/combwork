@@ -343,6 +343,11 @@
     "note": "A notification's title: after its CLI's safety classifier stopped a response, the agent runs on another model. {agent} is the agent, {model} the model's name.",
     "audience": "both"
   },
+  "session.notice.startContextTitle": {
+    "text": "{agent} started without Combwork's start context",
+    "note": "A notification's title (HI-3375): an agent ({agent}, its name) started, or went on after compacting its conversation, without the start context Combwork puts into its session (Combwork's view of the board, its guidance and its state).",
+    "audience": "both"
+  },
   "session.notice.untakenTitle": {
     "text": "{agent} hasn't taken a line Combwork typed",
     "note": "A notification's title: an agent's CLI didn't take a line Combwork typed into it (a wake, a message). {agent} is the agent.",
@@ -475,6 +480,11 @@
   "session.start.beingOpened": {
     "text": "This conversation is already being opened in another agent.",
     "note": "Resuming a conversation is refused: another agent is starting on it now.",
+    "audience": "both"
+  },
+  "session.start.cantResume": {
+    "text": "{provider} can't resume a conversation: start a new one instead.",
+    "note": "Starting an agent on a conversation failed (HI-3196): its CLI runs from a description that has no way to resume. {provider} is its name.",
     "audience": "both"
   },
   "session.start.cleaning": {

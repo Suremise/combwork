@@ -1,4 +1,4 @@
-// The branches Combwork makes for worktree agents (#703, Darren's decision on #702): cw/<workspace>/<project>/<agent>,
+// The branches Combwork makes for worktree agents (#703, decided on #702): cw/<workspace>/<project>/<agent>,
 // e.g. cw/Work/ambrosia/amb1, always in full, so several workspaces can share a repository, even with projects of the
 // same name, and never take each other's branches. Every branch and ref Combwork names starts with `cw/` (HI-2593):
 // branches under the name it had before 1.1 are no longer its own, and nothing here recognises them.
@@ -105,7 +105,7 @@ function fullForm(branch: string): [string, string, string] | null {
 }
 
 /**
- * The name an agent's branch takes here (#1305, Darren's decision on #1303: renamed at Repair, never offered): a branch
+ * The name an agent's branch takes here (#1305, decided on #1303: renamed at Repair, never offered): a branch
  * in the full form whose workspace part isn't one naming this place now (`currentSpaces`) or whose project part isn't this
  * project's, named after where the workspace or project was, moves to `home`: its workspace part becomes `home.space`
  * (the one its new branches take, `chooseSpace`) when it was another, its project part this project's; its agent part,

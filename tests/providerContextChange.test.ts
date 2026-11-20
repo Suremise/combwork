@@ -14,13 +14,13 @@ describe('a host change during a refresh', () => {
   it('the paused refresh resumes after the change and publishes none of the old hosts’ catalogues', async () => {
     const copilot = provider('copilot')
     const located: AgentInstallInfo = { provider: 'copilot', found: true, path: 'C:\\bin\\copilot.exe', version: '1.0.106', source: 'PATH', latestVersion: null, updateAvailable: false, loggedIn: true, authMethod: 'Copilot login', account: 'octo', hostCatalogs: { 'github.com|github.com|env|c:\\h': old }, hostRouteOf: { 'd:\\ws': 'github.com|github.com|env|c:\\h' } }
-    vi.spyOn(copilot, 'locate').mockResolvedValue(located)
-    vi.spyOn(copilot, 'listModels').mockResolvedValue(null)
+    vi.spyOn(copilot.install, 'locate').mockResolvedValue(located)
+    vi.spyOn(copilot.models!, 'listModels').mockResolvedValue(null)
     // Paused after locate, in the latest version lookup (checkLatest), until released.
     let release: (v: string | null) => void = () => {}
     let paused: () => void = () => {}
     const reachedPause = new Promise<void>((r) => (paused = r))
-    vi.spyOn(copilot, 'latestVersion').mockImplementation(() => {
+    vi.spyOn(copilot.install, 'latestVersion').mockImplementation(() => {
       paused()
       return new Promise((r) => (release = r))
     })

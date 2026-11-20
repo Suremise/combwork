@@ -1,5 +1,5 @@
 // A jj slot holding a file jj doesn't track (HI-3096, from HI-3058's hunt): with the user's `snapshot.auto-track`
-// narrowed (`none()`), a new file is in no commit and jj's snapshot says nothing of it. Darren's decision (12 Nov, (a)):
+// narrowed (`none()`), a new file is in no commit and jj's snapshot says nothing of it. Decision (a):
 // it is the slot's uncommitted work. So the record lists it (`jj status`'s "Untracked paths"), and through the pool a
 // slot holding one settles dirty, is never lent to the next card and isn't removed with it, as with auto-track all().
 // A submission under such a setting is refused naming it (`autoTrack`), and goes through once it is all() again.
@@ -19,6 +19,7 @@ import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
 import { B1, moved, refusedBy } from './workflow/harness'
 import { closers as cardClosers, started, world as cardWorld } from './jjCardsWorld'
+import { timing } from './timing.cjs'
 
 const closers: (() => void | Promise<void>)[] = []
 afterEach(async () => {
@@ -61,7 +62,7 @@ function world(colocated: boolean, track: string) {
   return { h, repo, port, pool, store, main: () => h.id(repo, 'main') }
 }
 
-describe.skipIf(!jjExe)('a jj slot holding an untracked file (HI-3096)', { timeout: 180_000 }, () => {
+describe.skipIf(!jjExe)('a jj slot holding an untracked file (HI-3096)', { timeout: timing('test.hangReal') }, () => {
   for (const colocated of [true, false]) {
     for (const track of ['all()', 'none()']) {
       it(`auto-track ${track} (colocated: ${colocated}): card 1's new file keeps the slot from card 2 and from removal`, async () => {
@@ -95,7 +96,7 @@ describe.skipIf(!jjExe)('a jj slot holding an untracked file (HI-3096)', { timeo
   }
 })
 
-describe.skipIf(!jjExe)('a submission with snapshot.auto-track narrowed (HI-3096)', { timeout: 90_000 }, () => {
+describe.skipIf(!jjExe)('a submission with snapshot.auto-track narrowed (HI-3096)', { timeout: timing('test.hang') }, () => {
   it.each([true, false])('refused naming the setting; set back to all() and committed, it goes through (colocated: %s)', async (colocated) => {
     const w = await cardWorld(colocated)
     const a = w.slots['slot-a']

@@ -12,7 +12,7 @@ fs.mkdirSync(path.join(ws, 'alpha'), { recursive: true })
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 ;(async () => {
   lib.enableProviders(userData)
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData }) })
@@ -71,7 +71,7 @@ const HUNG_MS = 10000
       await page.keyboard.press('Tab')
       const focused = await lib.until(() => descs.nth(i).evaluate((e) => e.contains(document.activeElement) && document.activeElement !== e && document.activeElement.matches(':focus-visible')), HUNG_MS)
       check(`${l.name}: Tab from the row reaches its cut description`, !!focused, await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 120)))
-      const tipText = () => page.locator('.tip:visible').last().innerText({ timeout: 1000 }).catch(() => '')
+      const tipText = () => page.locator('.tip:visible').last().innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')
       check(`${l.name}: …and its full text shows in the tooltip`, !!(await lib.until(async () => (await tipText()) === full, HUNG_MS)), await tipText())
       if (l.name === 'Modes') await page.screenshot({ path: path.join(scratch, 'onelinedesc-keyboard-tip.png') })
       await page.keyboard.press('Escape')
@@ -87,7 +87,7 @@ const HUNG_MS = 10000
         await page.mouse.move(5, 5)
         await descs.nth(j).hover()
         // A tip would show after its delay: wait until one does or the bound passes, then say none came.
-        const came = await lib.until(async () => (await page.locator('.tip:visible').count()) > 0, 1500)
+        const came = await lib.until(async () => (await page.locator('.tip:visible').count()) > 0, lib.timing('quiet.tipMs'))
         check(`${l.name}: one that fits shows no tooltip`, !came)
       }
     }

@@ -34,6 +34,7 @@ import {
 } from '../src/main/platform/jjIntegration'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjIntegrationReal.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -43,7 +44,7 @@ const token = (): string => `t${Date.now().toString(36)}${(++tokens).toString(36
 // A hung test's bound (HI-2921), not a time budget: each test runs tens of real jj and Git processes, up to 15.8 s alone on
 // jj 0.47.1 and up to 39.4 s (candidate credit, colocated) beside the other real-jj files and 2 spinner workers, where
 // Vitest's 20 s default for unit tests timed out the strict-update replay test. About twice the worst seen.
-const REAL_JJ_MS = 90_000
+const REAL_JJ_MS = timing('wait.hangReal')
 
 describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.version})`, { timeout: REAL_JJ_MS }, () => {
   const h = harness()
@@ -53,12 +54,12 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
     (store: string) =>
     (args: readonly string[]): Promise<RunResult> =>
       new Promise((done) => {
-        execFile('git', ['--git-dir', store, ...args], { env, windowsHide: true, encoding: 'buffer', timeout: 60_000 }, (e, out, err) => {
+        execFile('git', ['--git-dir', store, ...args], { env, windowsHide: true, encoding: 'buffer', timeout: timing('spawn.hang') }, (e, out, err) => {
           const code = e ? (typeof (e as { code?: unknown }).code === 'number' ? (e as { code: number }).code : -1) : 0
           done({ ok: !e, out: out.toString('utf8'), buf: out, err: err.toString('utf8'), code })
         })
       })
-  const plainGit = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: 60_000 })
+  const plainGit = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang') })
 
   /** A repository with main at base+f, the target moved on (t.txt), the builder's card (k.txt) on f, a control workspace, a bare remote. */
   async function world(colocated: boolean, o: { card?: Record<string, string> } = {}) {
@@ -289,7 +290,7 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       if (isInterrupted(cut)) expect(proved(await jjContains(w.deps(), w.req({ change: { base: w.fBase, revision: R2 }, candidates: [cut.record] }))).provenance?.via).not.toBe('candidate')
       await w.git(['update-ref', fresh.pins.find((x) => x.ref.endsWith('/candidate'))!.ref, w.fBase])
       expect(proved(await jjContains(w.deps(), w.req({ change: { base: w.fBase, revision: R2 }, candidates: [fresh] }))).provenance?.via).not.toBe('candidate')
-    }, 120_000)
+    }, timing('test.hang'))
 
     it('a manual squash, the original reviewed line abandoned, the target reset and both GCs run: the stored endpoints and the proof still resolve and prove again', async () => {
       const w = await world(colocated)
@@ -315,7 +316,7 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
         expect((await w.git(['cat-file', '-e', `${oid}^{commit}`])).ok).toBe(true)
       }
       expect(await gitHistory.contains(w.store, 'main', { base: w.fBase, revision: w.R }, head)).toMatchObject({ method: 'squash' })
-    }, 120_000)
+    }, timing('test.hang'))
 
     it('bundles: a proof at A then (no fact) the target moved to B gets a new bundle, A kept; a retry at the same head reuses it; a consumed bundle is never reused', async () => {
       const w = await world(colocated)
@@ -689,7 +690,7 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
     })
   })
 
-  describe('a settled record keeps its evidence and is re-checked (HI-2873, Darren\'s B; design HI-2873/s7, s11, s14)', () => {
+  describe('a settled record keeps its evidence and is re-checked (HI-2873, option B; design HI-2873/s7, s11, s14)', () => {
     const push = (w: World, rev: string): void => {
       w.setMain(rev)
       w.jj('git', 'push', '--bookmark', 'main')

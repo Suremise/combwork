@@ -8,6 +8,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-sessionlisting-')
 // The CLIs' homes are the test's (never ~/.claude or ~/.codex).
@@ -26,7 +27,7 @@ let n = 0
 const newId = (): string => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`
 const old = new Date(Date.now() - 3600_000)
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 15000
+const HUNG_MS = timing('wait.hang')
 const transcript = (sid: string): string =>
   [
     { type: 'user', sessionId: sid, timestamp: old.toISOString(), message: { role: 'user', content: 'Task' } },
@@ -127,7 +128,7 @@ describe('a session list (HI-1681)', () => {
     const ext = all.find((i) => i.id === outside)
     expect(ext?.source).toBe('external')
     expect(ext?.transcriptBytes).toBe(statSync(join(dir, `${outside}.jsonl`)).size)
-    const listed = vi.spyOn(claude, 'listSessions')
+    const listed = vi.spyOn(claude.transcript!, 'listSessions')
     const mine = await run(() => sessions.list(p, { own: true }))
     expect(mine.map((i) => i.id).sort()).toEqual([...own].sort())
     expect(listed).not.toHaveBeenCalled()
@@ -136,8 +137,8 @@ describe('a session list (HI-1681)', () => {
   it("never looks at Combwork's own sessions' files in the CLIs' folders", async () => {
     // What each folder's listing is told to leave out, as it is asked.
     const skipped: { own: boolean; outside: boolean }[] = []
-    const real = claude.listSessions.bind(claude)
-    vi.spyOn(claude, 'listSessions').mockImplementation((folder, skip) => {
+    const real = claude.transcript!.listSessions.bind(claude)
+    vi.spyOn(claude.transcript!, 'listSessions').mockImplementation((folder, skip) => {
       skipped.push({ own: own.every((id) => !!skip?.(id)), outside: !!skip?.(outside) })
       return real(folder, skip)
     })
@@ -147,10 +148,10 @@ describe('a session list (HI-1681)', () => {
   })
 
   it("lists asked for while one runs share its reading of the other sessions; Combwork's alone joins its records' listing", async () => {
-    const real = claude.listSessions.bind(claude)
+    const real = claude.transcript!.listSessions.bind(claude)
     let release: () => void = () => undefined
     const gate = new Promise<void>((r) => (release = r))
-    const folders = vi.spyOn(claude, 'listSessions').mockImplementation(async (folder, skip) => {
+    const folders = vi.spyOn(claude.transcript!, 'listSessions').mockImplementation(async (folder, skip) => {
       await gate
       return real(folder, skip)
     })

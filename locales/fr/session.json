@@ -21,6 +21,7 @@
   "session.compact.userTyped": "Tu as tapé dans le terminal de l’agent pendant que Combwork envoyait Compact, il n’a donc pas été envoyé : ce que tu as tapé reste.",
   "session.compact.waiting": "L’agent attend ta réponse. Compacte une fois qu’il a terminé.",
   "session.connection.fallback": "{why, select, missing {La connexion choisie pour lui a été supprimée} other {Sa connexion {wanted} est désactivée dans cet espace de travail}}, il a donc démarré avec {name}, la première connexion utilisable de sa CLI ici. Choisis-en une autre dans les Paramètres de l’agent.",
+  "session.connection.offMatched": "Sa connexion {wanted} est sur un compte désactivé dans cet espace de travail, il a donc démarré avec {name} ({account}) : {by, select, tag {la connexion de ce compte avec la même étiquette, {tag}} name {la connexion de ce compte avec le même nom} other {la première connexion de ce compte, aucune n’y ayant son étiquette ni son nom}}. Choisis-en une autre dans les Paramètres de l’agent.",
   "session.connection.fallbackTitle": "{agent} fonctionne avec une autre connexion",
   "session.error.agentGone": "Cet agent n’existe plus.",
   "session.error.inUseElsewhere": "Un autre programme a ouvert sa transcription. Ferme-le, puis réessaie.",
@@ -129,6 +130,8 @@
   "session.notice.untakenTitle": "{agent} n’a pas pris une ligne tapée par Combwork",
   "session.notice.waitingForInput": "En attente de ta réponse",
   "session.orphan.body": "Processus {pid} : le shell qui l’a lancé s’est terminé. Activité le liste, avec L’arrêter ; l’agent est prévenu aussi.",
+  "session.orphan.bodyRunEnded": "Le processus {pid} tourne encore après la fin de son exécution cw-progress « {run} », le shell qui l’a lancé n’étant plus là. Activité le liste, avec L’arrêter ; l’agent est prévenu aussi.",
+  "session.orphan.bodyRunUnconfirmed": "Processus {pid} : son exécution cw-progress « {run} » n’est plus vue en cours, et le shell qui l’a lancé s’est terminé. Activité le liste, avec L’arrêter ; l’agent est prévenu aussi.",
   "session.orphan.title": "{agent} a laissé {command} en cours depuis {time}",
   "session.plan.asking": "L’agent te pose une question. Réponds-lui d’abord.",
   "session.plan.noToggle": "{provider} n’a pas de bascule pour le mode Plan.",
@@ -163,6 +166,7 @@
   "session.start.archived": "Cette session est archivée. Désarchive-la avant de la reprendre.",
   "session.start.args": "{problem} Corrige-le dans sa connexion, {connection}, dans Paramètres → Comptes et connexions.",
   "session.start.beingOpened": "Cette conversation est déjà en cours d’ouverture dans un autre agent.",
+  "session.start.cantResume": "{provider} ne peut pas reprendre une conversation : démarre-en une nouvelle.",
   "session.start.cleaning": "Combwork archive, supprime ou nettoie les fichiers de cette session. Réessaie dans un instant.",
   "session.start.cliRequired": "{provider} est nécessaire pour exécuter des sessions.",
   "session.start.closing": "Combwork arrête les agents de cet espace de travail : aucun ne peut démarrer maintenant.",
@@ -227,5 +231,7 @@
   "session.tracker.stopped": "Le suivi des processus de Combwork s’est arrêté ({why})",
   "session.tracker.title": "Combwork ne peut pas suivre les processus des agents",
   "session.tracker.unavailable": "Le suivi des processus n’est pas disponible",
-  "session.tracker.windowsOnly": "Le suivi des processus nécessite Windows"
+  "session.tracker.windowsOnly": "Le suivi des processus nécessite Windows",
+  "session.notice.startContextTitle": "{agent} a démarré sans le contexte de démarrage de Combwork",
+  "session.notice.startContextBody": "Combwork n’a pas pu {why, select, slow {le préparer à temps} failed {le préparer} other {le placer dans la session}}, donc {agent} travaille pour l’instant sans la vue du tableau de Combwork ni ses consignes. Arrêtez-le et redémarrez-le pour réessayer."
 }

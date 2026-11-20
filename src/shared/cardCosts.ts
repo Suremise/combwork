@@ -8,7 +8,7 @@ import { TOKENS_SPREAD, TOKENS_UNKNOWN, chargeShares, rowModel, type UsageRow, t
 import type { Fact, FactData, StageId } from './workflow/facts'
 
 /**
- * Cost per card and per lane (#602, Darren's decision of 11 Oct). Usage is the card's while an agent held it: its
+ * Cost per card and per lane (#602). Usage is the card's while an agent held it: its
  * builder while it is in Doing, its reviewer from its review's start to its verdict (TaskCard.held). What a lane's agents
  * used while holding no card is the lane's overhead (merges, watching, compactions). Each provider's usage is as it
  * reported it: Combwork's estimates marked ≈, and what isn't known is unknown, never $0.

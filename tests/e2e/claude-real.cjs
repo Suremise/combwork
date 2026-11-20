@@ -47,7 +47,7 @@ const check = (name, ok, extra = '') => {
   const ready = (host, id, ms = 60000) => lib.until(async () => (await live(host, id))?.status === 'ready', ms, 400)
   const stop = async (host, id) => {
     await inv('session:stop', host, id)
-    await lib.until(async () => !(await live(host, id)), 20000)
+    await lib.until(async () => !(await live(host, id)), lib.timing('hang.ui'))
   }
   /** Combwork's last launch line for a session key (its log marks the key and ids as the user's text: found by their parts). */
   const launchLine = (key) => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n').filter((l) => / spawn \W?session:/.test(l) && l.toLowerCase().includes(key)).pop() ?? ''
@@ -80,7 +80,7 @@ const check = (name, ok, extra = '') => {
   await lib.setLaunch(inv, proj, agent.id, { effort: 'low' })
   await inv('workspace:refresh')
   const restart = page.getByRole('button', { name: 'Restart session' })
-  check('a new effort offers Restart session', !!(await lib.until(async () => (await restart.count()) > 0, 10000)))
+  check('a new effort offers Restart session', !!(await lib.until(async () => (await restart.count()) > 0, lib.timing('hang.step'))))
   const launched = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n').filter((line) => / spawn \W?session:/.test(line) && line.toLowerCase().includes(`#${agent.id.toLowerCase()}`)).length
   const before = launched()
   await restart.first().click()
@@ -88,7 +88,7 @@ const check = (name, ok, extra = '') => {
     // A relaunch soon after the first start can be asked to trust the folder again (its "Yes" not saved yet, #283):
     // answered once the relaunch's own process runs (until then the terminal holds the first session's screen).
     // A relaunch that never spawns fails here, with nothing read or typed in the old terminal (#341).
-    const spawned = !!(await lib.until(async () => launched() > before, 20000))
+    const spawned = !!(await lib.until(async () => launched() > before, lib.timing('hang.step')))
     check('the restart starts a new Claude Code process', spawned, `launches: ${launched()}, before: ${before}`)
     if (!spawned) return
     // One wait for the relaunch to be ready, answering the trust question whenever its process asks (#323): it could
@@ -100,13 +100,13 @@ const check = (name, ok, extra = '') => {
     const relaunched = !!(await lib.until(
       async () => {
         if ((await restart.count()) === 0 && (await live(proj, agent.id))?.status === 'ready') return true
-        if (!trusted && /trust this folder/i.test(lib.plainText(await inv('pty:buffer', key).catch(() => '')))) {
+        if (!trusted && lib.CLAUDE_TRUST.test(lib.plainText(await inv('pty:buffer', key).catch(() => '')))) {
           trusted = await lib.acceptClaudeTrust(inv, proj, agent.id, 30000)
           if (trusted) console.log('(the relaunch asked to trust the folder again: answered yes)')
         }
         return false
       },
-      90000,
+      lib.timing('hang.step'),
       400
     ))
     check('Claude Code takes the relaunch', relaunched, (await live(proj, agent.id))?.status)
@@ -141,7 +141,7 @@ const check = (name, ok, extra = '') => {
   })
   // The warning matches what this Claude Code says for the connection's account (HI-2852: its own models, read in its
   // folder): there exactly when Auto isn't offered (a guess when it doesn't say).
-  const [caveatRight, caveat] = await lib.haikuAutoCaveat(page, { timeoutMs: 30000 }) // its read starts the real CLI
+  const [caveatRight, caveat] = await lib.haikuAutoCaveat(page, { timeoutMs: lib.timing('hang.ui') }) // its read starts the real CLI
   check("the connection dialog warns about Auto with Haiku exactly when Claude Code says it isn't offered", caveatRight, caveat)
   await stop(home, 'assistant')
 

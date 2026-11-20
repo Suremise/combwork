@@ -11,6 +11,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-settings-read-')
 process.env.CW_USER_DATA = join(base, 'profile')
@@ -22,7 +23,7 @@ const moves = await import('../src/main/connectionMoves')
 const { CARD_ATTACHMENT_FOLDERS_ID } = await import('../src/shared/advanced')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const OWN = { workflow: { git: { loopRounds: 7 } }, connections: { 'claude-code': { on: ['acc-own'] } } }
 const services = new Set<ReturnType<typeof createWorkspaceService>>()
 let n = 0

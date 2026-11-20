@@ -10,6 +10,8 @@
 // - `lagMs`: how long the screen keeps showing its last drawing after the input changes (a CLI whose redraw is late);
 // - `shows`: what the screen shows until it first draws (a stale box), the input as it is otherwise;
 // - `input.answers`: how many keys it reads before it stops reading (a busy CLI), raised to read again;
+// - `input.dialog`: a dialog of its own drawn in the box's place while set (HI-3411), which takes every key, Enter
+//   answering it (set to null);
 // - `ascii`: drawn as where the terminal doesn't say it shows Unicode (no TERM or WT_SESSION): ">" its prompt mark, and
 //   the session's name in its top rule.
 
@@ -35,21 +37,22 @@ function rows(text: string): string[] {
 }
 
 export interface ClaudeInput {
-  input: { text: string; sent: string[]; keys: number; ctrlU: number; answers: number }
+  input: { text: string; sent: string[]; keys: number; ctrlU: number; answers: number; dialog: string | null }
   /** What Combwork wrote, as the CLI reads it. */
   feed(data: string): void
   /** Reads `writes` (its new entries) before each look at the screen. */
   from(writes: () => readonly string[]): void
   /** A session's `screen`, as SessionManager reads it. */
-  screen: { text(): string; textWithoutDim(): string; bracketedPaste(): boolean }
+  screen: { text(): string; textWithoutDim(): string; textToCursor(): string; bracketedPaste(): boolean }
 }
 
 export function claudeInput(opts: { draft?: string; viewport?: number; lagMs?: number; shows?: string; paste?: boolean; ascii?: boolean } = {}): ClaudeInput {
-  const input = { text: opts.draft ?? '', sent: [] as string[], keys: 0, ctrlU: 0, answers: Infinity }
+  const input = { text: opts.draft ?? '', sent: [] as string[], keys: 0, ctrlU: 0, answers: Infinity, dialog: null as string | null }
   let inPaste = false
   let source: (() => readonly string[]) | null = null
   let read = 0
   const draw = (): string => {
+    if (input.dialog !== null) return input.dialog
     const lines = claudeBox(input.text, opts.ascii).split('\n')
     return lines.slice(-(opts.viewport ?? 1000)).join('\n')
   }
@@ -63,7 +66,9 @@ export function claudeInput(opts: { draft?: string; viewport?: number; lagMs?: n
         for (const ch of part) {
           if (input.keys >= input.answers) return
           input.keys++
-          if (ch === '\x15') {
+          if (input.dialog !== null) {
+            if (ch === '\r') input.dialog = null
+          } else if (ch === '\x15') {
             input.ctrlU++
             const last = rows(input.text).at(-1) ?? ''
             input.text = last ? [...input.text].slice(0, -[...last].length).join('') : input.text.slice(0, -1)
@@ -84,6 +89,13 @@ export function claudeInput(opts: { draft?: string; viewport?: number; lagMs?: n
     if (Date.now() - changedAt >= (opts.lagMs ?? 0)) shown = draw()
     return shown
   }
+  // What shows up to its cursor (HI-3345's drawnLine reads it): the cursor stands after the input's text, so the drawing up
+  // to the box's bottom rule (all of it, for a `shows` without one).
+  const textToCursor = (): string => {
+    const now = look()
+    const bottom = now.lastIndexOf(`\n${RULE}\n`)
+    return bottom < 0 ? now : now.slice(0, bottom)
+  }
   return {
     input,
     feed,
@@ -91,6 +103,6 @@ export function claudeInput(opts: { draft?: string; viewport?: number; lagMs?: n
       source = writes
       read = writes().length
     },
-    screen: { text: look, textWithoutDim: look, bracketedPaste: () => opts.paste ?? true }
+    screen: { text: look, textWithoutDim: look, textToCursor, bracketedPaste: () => opts.paste ?? true }
   }
 }

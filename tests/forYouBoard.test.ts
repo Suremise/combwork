@@ -10,6 +10,7 @@ import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-foryou-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -351,7 +352,7 @@ describe('For you on the board (#1269)', () => {
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     const wf = (await workflowFor(w, join(w.path!, 'p')))!
-    // HB1's HI-1624: asked how to close it, then Darren moved it to Done himself, with a reason.
+    // HB1's HI-1624: asked how to close it, then the user moved it to Done themselves, with a reason.
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Already done by #1277: how do I close it?' }))
     expect(forYou(w).count).toBe(1)
     await inWorkspace(w, () => tasks.moveTask(card, 'done', { confirm: true, reason: 'already done by #1277' }))
@@ -378,7 +379,7 @@ describe('For you on the board (#1269)', () => {
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     const wf = (await workflowFor(w, join(w.path!, 'p')))!
-    // HB5's HI-1630: Darren answered "go" in its pane, and it went on.
+    // HB5's HI-1630: the user answered "go" in its pane, and it went on.
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'OK to build it this way?' }))
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a2', { kind: 'decide', text: 'Should the review cover the docs?' }))
     expect(forYou(w).count).toBe(2)
@@ -592,7 +593,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     await update(w, card, { review: 'start' }, r1)
     expect((await update(w, card, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' })).column).toBe('passed')
     const wf = (await workflowFor(w, join(w.path!, 'p')))!
-    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Darren agreed to move it to Done?' }))
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Sam agreed to move it to Done?' }))
     const req = forYou(w).items.find((i) => i.asker === 'a1')!
     await answer(w, card, req.request, { outcome: 'answered', reply: 'Checks-only card, nothing to merge.' })
     expect(relayed(w).map((r) => r.body)).toEqual([expect.stringMatching(/^This needs you: .*Builder \(p\) can't move it to Done by itself/)])
@@ -632,7 +633,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Nothing to merge: Done?', actions: [{ kind: 'done' }] }))
     await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply: 'Yes' })
     expect(relayed(w)).toEqual([])
-    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("Builder (p) can't move this card to Done by itself, and the Assistant couldn't be told of your answer: do it yourself if you agreed to it"), { timeout: 10_000 })
+    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("Builder (p) can't move this card to Done by itself, and the Assistant couldn't be told of your answer: do it yourself if you agreed to it"), { timeout: timing('wait.hang') })
     // Allowed when the answer is given, turned down before the Assistant takes it.
     assistant().control = 'projects'
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Which database?' }))
@@ -641,8 +642,8 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     assistant().control = 'look'
     // The Assistant reads its inbox: checked as it is handed out, it isn't given, and is cancelled.
     expect((await deliveries.readInbox(w.assistantHome, 'assistant')).items).toEqual([])
-    await vi.waitFor(() => expect(relayed(w).map((r) => r.state)).toEqual(['cancelled']), { timeout: 10_000 })
-    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("The Assistant couldn't be told of your answer to Builder (p)'s question: only Builder (p) has it"), { timeout: 10_000 })
+    await vi.waitFor(() => expect(relayed(w).map((r) => r.state)).toEqual(['cancelled']), { timeout: timing('wait.hang') })
+    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("The Assistant couldn't be told of your answer to Builder (p)'s question: only Builder (p) has it"), { timeout: timing('wait.hang') })
   })
 
   it("a bare Approve or Decline of a no-action, no-proposal question on a Doing card reaches the Assistant too, saying which, with nothing written (HR1's round 1 finding 1)", async () => {
@@ -860,5 +861,75 @@ describe("a decision that answers a card's open requests (HI-1932)", () => {
     expect(await decisionsOf(w, card)).toEqual([])
     expect(approvals(w, card).map((a) => [a.request, !!a.byDecision])).toEqual([[ids[1], false]])
     expect(forYou(w).items.map((i) => i.request)).toEqual([ids[0], ids[2]])
+  })
+})
+
+describe("an option answer is recorded with what it chose (HI-3356)", () => {
+  const assistant = { kind: 'assistant' } as const
+  const QUESTION = 'Which way?\nA (recommended): extend the card. Map each headless row\nto its card.\nB: submit it as is.'
+  const CHOSEN = 'A: extend the card. Map each headless row\nto its card.'
+  async function asking(kind: 'decide' | 'approve', ...texts: string[]): Promise<{ w: WS; card: number; ids: string[] }> {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    for (const text of texts) await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind, text }))
+    return { w, card, ids: forYou(w).items.map((i) => i.request) }
+  }
+
+  it("a Decide answer 'A' is the chosen option's text with the request, the user's, and stays whole once the question leaves For you; free text is as typed", async () => {
+    const { w, card, ids } = await asking('decide', QUESTION, 'Shall I go with plan 2?', 'Which database?')
+    const after = await answer(w, card, ids[0], { outcome: 'answered', decision: 'A' })
+    expect(after.decisions?.map((d) => [d.text, d.recordedBy])).toEqual([[`${CHOSEN} (${ids[0]})`, 'You']])
+    expect(forYou(w).items.map((i) => i.request)).not.toContain(ids[0])
+    expect((await inWorkspace(w, () => tasks.getTask(card))).decisions?.[0].text).toBe(`${CHOSEN} (${ids[0]})`)
+    // No options in the question: the whole question with the label.
+    const second = await answer(w, card, ids[1], { outcome: 'answered', decision: '(2)' })
+    expect(second.decisions?.at(-1)?.text).toBe(`(2) (${ids[1]}: “Shall I go with plan 2?”)`)
+    // Free text: exactly as typed.
+    const third = await answer(w, card, ids[2], { outcome: 'answered', decision: 'Use SQLite in memory' })
+    expect(third.decisions?.at(-1)?.text).toBe('Use SQLite in memory')
+  })
+
+  it("an agent's Approve question approved with the note 'a' (HI-2286): the decision has the option, the comment and the relayed reply stay as typed", async () => {
+    const { w, card, ids } = await asking('approve', QUESTION)
+    const after = await answer(w, card, ids[0], { outcome: 'approved', reply: 'a' })
+    expect(after.comments.at(-1)).toMatchObject({ by: 'You', text: 'a' })
+    expect(after.decisions?.map((d) => [d.text, d.recordedBy])).toEqual([[`A: extend the card. Map each headless row\nto its card. (${ids[0]})`, 'You']])
+    expect(facts(w, card).filter((f) => f.kind === 'Approval')).toMatchObject([{ data: { request: ids[0], answer: 'approved', note: 'a' } }])
+  })
+
+  it("the Assistant's decision 'B' answering one request has the option; answering two it is kept as written", async () => {
+    const { w, card, ids } = await asking('decide', QUESTION, QUESTION, QUESTION)
+    const one = await update(w, card, { decision: 'B', answers: [ids[0]] }, assistant)
+    expect(one.decisions?.map((d) => [d.text, d.recordedBy])).toEqual([[`B: submit it as is. (${ids[0]})`, 'Assistant']])
+    const two = await update(w, card, { decision: 'B', answers: [ids[1], ids[2]] }, assistant)
+    expect(two.decisions?.at(-1)?.text).toBe('B')
+    expect(forYou(w).count).toBe(0)
+  })
+
+  it('past the 4000-character cap: the chosen option or the question is kept whole on every path; a raw decision past it is still refused, nothing written', async () => {
+    const tail = ' and never drop this last condition.'
+    const longOption = 'A: ' + 'x'.repeat(4500) + tail
+    const longQuestion = `Which way?\n${longOption}\nB: the other way.`
+    const plain = 'Go on? ' + 'y'.repeat(4500) + tail
+    const { w, card, ids } = await asking('decide', longQuestion, plain, longQuestion, 'Which database?')
+    const decide = await answer(w, card, ids[0], { outcome: 'answered', decision: 'A' })
+    expect(decide.decisions?.at(-1)?.text).toBe(`${longOption} (${ids[0]})`)
+    const quoted = await answer(w, card, ids[1], { outcome: 'answered', decision: 'a' })
+    expect(quoted.decisions?.at(-1)?.text).toBe(`a (${ids[1]}: “${plain}”)`)
+    const byAssistant = await update(w, card, { decision: 'A', answers: [ids[2]] }, assistant)
+    expect(byAssistant.decisions?.at(-1)?.text).toBe(`${longOption} (${ids[2]})`)
+    // A raw decision past the cap is refused as before: no decision, the question still open.
+    await expect(answer(w, card, ids[3], { outcome: 'answered', decision: 'z'.repeat(4001) })).rejects.toThrow(/too long/)
+    await expect(update(w, card, { decision: 'z'.repeat(4001), answers: [ids[3]] }, assistant)).rejects.toThrow(/too long/)
+    await expect(update(w, card, { decision: 'z'.repeat(4001) })).rejects.toThrow(/too long/)
+    expect((await inWorkspace(w, () => tasks.getTask(card))).decisions).toHaveLength(3)
+    expect(forYou(w).items.map((i) => i.request)).toEqual([ids[3]])
+    // An agent's Approve question approved with the note 'A' (HI-2286): whole too.
+    const approve = await asking('approve', longQuestion)
+    const approved = await answer(approve.w, approve.card, approve.ids[0], { outcome: 'approved', reply: 'A' })
+    expect(approved.decisions?.map((d) => d.text)).toEqual([`${longOption} (${approve.ids[0]})`])
+    expect(approved.comments.at(-1)?.text).toBe('A')
   })
 })

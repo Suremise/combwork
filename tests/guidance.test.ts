@@ -125,7 +125,7 @@ describe('the session contract', () => {
     // about 280 (and 160 for the Assistant's), #817's long-documents line about 110 (both), #1129's Done in the project
     // folder about 35. #1529 (P8) held the agent's at its 1.0.0 size (2,656 characters, 2,787 with a handover): the
     // board rules became the intents and Combwork's refusals, and #903's act-then-ack line came in within it; the
-    // Assistant's grew by that line, about 140. HI-686's route to the generalist skill (Darren's design: the contract
+    // Assistant's grew by that line, about 140. HI-686's route to the generalist skill (the design: the contract
     // points to it) added 15 ("; for other work, use generalist", the shortest that reads). HI-2865's never-by-name rule in the stop-what-you-start line added 121 (an agent of another
     // project ended every lane's cw-progress runs by a `ps | grep` pattern).
     expect(agent.length).toBeLessThanOrEqual(2792)
@@ -299,7 +299,7 @@ describe('the bundled skills', () => {
     }
   })
 
-  // HI-2011 (Darren, 29 Oct: one rule for every skill, so it scales): a CLI loads SKILL.md whenever the skill is used
+  // HI-2011 (one rule for every skill, so it scales): a CLI loads SKILL.md whenever the skill is used
   // and its other files only when needed, deeper links being skimmed. So SKILL.md stays a short contents page, and
   // what is needed only sometimes is in reference files it links, one level deep.
   it('keep SKILL.md to 4,000 characters, with reference files beside it, each linked from SKILL.md and linking none', () => {
@@ -522,9 +522,12 @@ describe('the skills follow the gates (#1524)', () => {
   it('stay smaller than before P8 (work-on-card 8,991 and card-loop 15,776 characters), reference files and all (LF)', () => {
     // Round 2: each list also says where its files are (beside SKILL.md), as a model looked in its working folder.
     // HI-2870 (J9d): jj's clauses (a jj card's commit; a passed one waits for the user to integrate it): 9850 before.
-    expect(catalog.get('work-on-card')!.text.replace(/\r/g, '').length).toBeLessThan(9950)
+    // HI-3324: a long job Combwork can't see, marked waiting (while-working.md, the rule's one owner): 9950 before.
+    expect(catalog.get('work-on-card')!.text.replace(/\r/g, '').length).toBeLessThan(10400)
     // HI-2870 (J9d): its commit clauses scoped to a code card "in Git or jj": 11850 before.
-    expect(catalog.get('card-loop')!.text.replace(/\r/g, '').length).toBeLessThan(11900)
+    // HI-3188 (Q6): the builder's pointer to the reviewer's simplify rule: 11900 before.
+    // HI-3324: a long job Combwork can't see among a turn's waits, pointing at work-on-card's rule (Codex polled one): 12100 before.
+    expect(catalog.get('card-loop')!.text.replace(/\r/g, '').length).toBeLessThan(12200)
   })
 })
 
@@ -614,7 +617,8 @@ describe('the review and merge skills follow the gates (#1525)', () => {
   it('stay smaller than before P8 (review-agent-work 7,475 and merge-ready 5,291 characters, LF)', () => {
     // HI-2011's split added each reference file's heading and SKILL.md's list of them (7,475 and 5,291 before it).
     // HI-2870 (J9d): a jj copy's change read from its base, a jj card's missing commit asked for: 8150 before.
-    expect(review().replace(/\r/g, '').length).toBeLessThan(8200)
+    // HI-3188 (Q6): the simplify rule, its one owner (verdict.md): 8200 before.
+    expect(review().replace(/\r/g, '').length).toBeLessThan(8700)
     // Round 2: merging back in SKILL.md, what is rarer in who-merges.md under headings of its own.
     expect(merge().replace(/\r/g, '').length).toBeLessThan(5800)
   })
@@ -908,7 +912,9 @@ describe("the repository's AGENTS.md", () => {
       /\*\*Docs or text, or a test-expectation fix\*\*, \*\*5–15 min\*\*/,
       /\*\*Shared storage, concurrency, launch or workflow-safety change\*\*, \*\*30–60 min\*\*, its reason named on the card/,
       /\*\*A merge into the integration branch\*\*, \*\*10–20 min\*\*/,
-      /\*\*Preparing a release\*\* applies only when a release card or an RC is in hand[^\n]*\*\*first RC\*\*, about \*\*2–3 hours\*\*[^\n]*\*\*RC fix round\*\*, \*\*15–45 min\*\*[^\n]*\*\*release of the tested candidate\*\*, \*\*15–30 min\*\*/,
+      // HI-3359: a version's two full passes, the CI rehearsal before a push and recurring CI reds: RELEASING.md owns them,
+      // and this file only points there.
+      /\*\*Preparing a release\*\* applies only when a release card, a version's full pass or an RC is in hand[^\n]*\*\*version's full pass\*\*, about \*\*2–3 hours\*\* \(RELEASING\.md, stage 1, says when and what\)[^\n]*\*\*first RC\*\*, about \*\*2–3 hours\*\*[^\n]*\*\*RC fix round\*\*, \*\*15–45 min\*\*[^\n]*\*\*release of the tested candidate\*\*, \*\*15–30 min\*\*[^\n]*after the CI rehearsal \(RELEASING\.md, Steps, step 2\), and a CI red that recurs is handled as RELEASING\.md, stage 1, says\./,
       /It never asks for a full unit run or other wide re-runs\./,
       /\*\*Flake work:\*\* at most 2 spinner workers and 3 repeats per repro \(`--repeat 3`; the `investigate-flake` skill\)\. A flake seen only under a full run's load waits for the release window, unless it blocks merges\./,
       /never open the main checkout .* with one until the 1\.0 baseline is installed \(#1288\)/,
@@ -985,6 +991,8 @@ describe("RELEASING.md's release path", () => {
     expect(checks).toMatch(/### The coverage ledger/)
     expect(checks).toMatch(/\*\*A fix round reruns the invalidated slices and nothing else\.\*\*/)
     expect(checks).toMatch(/A path in no class invalidates everything, as for a first RC\./)
+    // HI-3320: CI config and check-only scripts have a class of their own; a script build, dist or release reaches stays a build input.
+    expect(checks).toMatch(/\*\*CI and check-only tooling\*\* \(HI-3320\)[^]*?A script reached that way is a build input, whatever its name or folder[^]*?what they invalidate: check:repo, CI on the next push, and the unit tests that run or test the changed files/)
     expect(checks).toMatch(/installer's \*\*SHA-256\*\*/)
     expect(checks).toMatch(/\*\*The installer the user installs, and the one `npm run release` uploads, always get rows of their own bytes:\*\*/)
     expect(checks).toMatch(/Without one, or where it is uncertain, the full affected set runs: that is the fallback/)

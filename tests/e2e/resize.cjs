@@ -9,8 +9,7 @@ for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
 fs.mkdirSync(path.join(ws, 'demo'), { recursive: true })
 fs.writeFileSync(path.join(ws, 'demo', 'README.md'), '# Demo\n\nSome text.\n')
 require('child_process').execSync('git init -q', { cwd: path.join(ws, 'demo'), env: lib.gitEnv() })
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 ;(async () => {
@@ -20,19 +19,22 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-  await inv('workspace:open', ws); await sleep(800)
+  await lib.openWorkspace(inv, page, ws)
   // "How do you work?" answered (#1423), as a user does once: its step, shown once the form is read, moves what is dragged.
   await inv('workflow:presetNotNow', path.join(ws, 'demo'), 'git')
   // …and the window has the answer (the refresh it makes), before anything is measured.
-  await lib.until(async () => (await page.evaluate(() => window.combwork.invoke('workspace:refresh')))?.projects.find((p) => p.name === 'demo')?.config.workflow?.presetAsked === 'notNow', 10000)
-  await page.getByText('demo', { exact: true }).first().click(); await sleep(400)
+  await lib.until(async () => (await page.evaluate(() => window.combwork.invoke('workspace:refresh')))?.projects.find((p) => p.name === 'demo')?.config.workflow?.presetAsked === 'notNow', lib.timing('hang.ui'))
+  await page.getByText('demo', { exact: true }).first().click()
+  await lib.until(async () => (await page.locator('.project-row.selected', { hasText: 'demo' }).count()) === 1, HUNG_MS)
 
   const drag = async (handle, dx) => {
     const b = await handle.boundingBox()
     const x = b.x + b.width / 2, y = b.y + b.height / 2
     await page.mouse.move(x, y); await page.mouse.down()
     await page.mouse.move(x + dx / 2, y, { steps: 4 }); await page.mouse.move(x + dx, y, { steps: 4 })
-    await page.mouse.up(); await sleep(300)
+    await page.mouse.up()
+    // What the drag left drawn (a width is set as it moves; its save follows: read by a wait where checked).
+    await lib.framesDrawn(page)
   }
   const width = (sel) => page.locator(sel).first().evaluate((e) => Math.round(e.getBoundingClientRect().width))
 
@@ -40,44 +42,44 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
     if (tab === 'Memory') await lib.openMoreTab(page, tab)
     else await page.locator('.tabs .tab', { hasText: tab }).first().click()
     const list = '.tab-body:visible .split-list'
-    await lib.until(async () => (await page.locator('.tabs .tab.active .tab-label').innerText().catch(() => '')).trim() === tab && (await page.locator(list).count()) > 0, 10000)
+    await lib.until(async () => (await page.locator('.tabs .tab.active .tab-label').innerText().catch(() => '')).trim() === tab && (await page.locator(list).count()) > 0, lib.timing('hang.ui'))
     // Version Control's header finishes once its workflow form is read (its link): measured after, not while it lays out.
-    if (tab === 'Version Control') await lib.until(async () => (await page.locator('[data-action="vc-workflow"]').count()) === 1, 10000)
+    if (tab === 'Version Control') await lib.until(async () => (await page.locator('[data-action="vc-workflow"]').count()) === 1, lib.timing('hang.ui'))
     const w0 = await width(list)
     check(`${tab} default width`, Math.abs(w0 - def) <= 1, `(${w0})`)
     await drag(page.locator(`${list} > .pane-resizer`).first(), 120)
     const w1 = await width(list)
     check(`${tab} drag widens`, Math.abs(w1 - (def + 120)) <= 3, `(${w1})`)
-    const saved = (await inv('ui:get')).panes?.[key]
-    check(`${tab} saved`, Math.abs(saved - w1) <= 1, `(${saved})`)
+    const saved = await lib.until(async () => { const s = (await inv('ui:get')).panes?.[key]; return typeof s === 'number' && Math.abs(s - w1) <= 1 ? s : null }, HUNG_MS)
+    check(`${tab} saved`, saved !== null && saved !== false, `(${(await inv('ui:get')).panes?.[key]})`)
     await drag(page.locator(`${list} > .pane-resizer`).first(), -900)
     check(`${tab} min 200`, (await width(list)) === 200)
-    await page.locator(`${list} > .pane-resizer`).first().dblclick(); await sleep(300)
-    check(`${tab} dblclick resets`, Math.abs((await width(list)) - def) <= 1 && (await inv('ui:get')).panes?.[key] === undefined)
+    await page.locator(`${list} > .pane-resizer`).first().dblclick()
+    check(`${tab} dblclick resets`, !!(await lib.until(async () => Math.abs((await width(list)) - def) <= 1 && (await inv('ui:get')).panes?.[key] === undefined, HUNG_MS)))
     if (tab === 'Files') {
       await drag(page.locator(`${list} > .pane-resizer`).first(), 5000)
       const main = await width('.tab-body:visible .split-main')
       check('Files max keeps main >= 320', main >= 318, `(main ${main})`)
-      await page.locator(`${list} > .pane-resizer`).first().dblclick(); await sleep(300)
+      await page.locator(`${list} > .pane-resizer`).first().dblclick()
+      await lib.until(async () => Math.abs((await width(list)) - def) <= 1, HUNG_MS)
       // Markdown split view
-      await page.getByText('README.md', { exact: true }).first().click(); await lib.until(async () => (await page.locator('.tab-body:visible .segmented button', { hasText: 'Split' }).count()) > 0, 10000)
-      await page.locator('.segmented button', { hasText: 'Split' }).first().click(); await lib.until(async () => (await page.locator('.tab-body:visible .split-half').count()) === 2, 10000)
+      await page.getByText('README.md', { exact: true }).first().click(); await lib.until(async () => (await page.locator('.tab-body:visible .segmented button', { hasText: 'Split' }).count()) > 0, lib.timing('hang.ui'))
+      await page.locator('.segmented button', { hasText: 'Split' }).first().click(); await lib.until(async () => (await page.locator('.tab-body:visible .split-half').count()) === 2, lib.timing('hang.ui'))
       const halves = page.locator('.tab-body:visible .split-half')
       const host = await width('.tab-body:visible .editor-host')
       const h0 = await halves.first().evaluate((e) => e.getBoundingClientRect().width)
       check('split default 50%', Math.abs(h0 / host - 0.5) < 0.02, `(${(h0 / host).toFixed(3)})`)
       await drag(halves.first().locator('.pane-resizer'), -150)
       const h1 = await halves.first().evaluate((e) => e.getBoundingClientRect().width)
-      const r = (await inv('ui:get')).panes?.fileSplit
+      const r = (await lib.until(async () => { const s = (await inv('ui:get')).panes?.fileSplit; return typeof s === 'number' && Math.abs(s - h1 / host) < 0.01 ? s : null }, HUNG_MS)) || (await inv('ui:get')).panes?.fileSplit
       check('split drag narrows editor', Math.abs(h1 - (h0 - 150)) <= 4, `(${Math.round(h1)} vs ${Math.round(h0 - 150)})`)
       check('split ratio saved', Math.abs(r - h1 / host) < 0.01, `(${r})`)
       await page.screenshot({ path: path.join(scratch, 'resize-split.png') })
       await drag(halves.first().locator('.pane-resizer'), -3000)
       const h2 = await halves.first().evaluate((e) => e.getBoundingClientRect().width)
       check('split min 20%', Math.abs(h2 / host - 0.2) < 0.01, `(${(h2 / host).toFixed(3)})`)
-      await halves.first().locator('.pane-resizer').dblclick(); await sleep(300)
-      const h3 = await halves.first().evaluate((e) => e.getBoundingClientRect().width)
-      check('split dblclick resets', Math.abs(h3 / host - 0.5) < 0.02)
+      await halves.first().locator('.pane-resizer').dblclick()
+      check('split dblclick resets', !!(await lib.until(async () => Math.abs((await halves.first().evaluate((e) => e.getBoundingClientRect().width)) / host - 0.5) < 0.02, HUNG_MS)))
     }
   }
   // Persistence across a reload (#717: under load it failed once, with nothing to say why). Each step waits for what the
@@ -96,7 +98,9 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('width kept after reload', !!kept, `(${kept ?? await gitWidth()})`)
   await page.screenshot({ path: path.join(scratch, 'resize-changes.png') })
   // Docs view
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.activity-btn')].find((e) => /Documentation/.test(e.getAttribute('aria-label') || '')); b?.click() }); await sleep(800)
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.activity-btn')].find((e) => /Documentation/.test(e.getAttribute('aria-label') || '')); b?.click() })
+  await lib.until(async () => (await page.locator('.activity-btn.active[aria-label*="Documentation"]').count()) === 1 && (await page.locator('.split-list:visible').count()) > 0, HUNG_MS)
+  await lib.framesDrawn(page)
   const d0 = await width('.split-list:visible')
   await drag(page.locator('.split-list:visible > .pane-resizer').first(), 80)
   check('Docs list resizes', Math.abs((await width('.split-list:visible')) - (d0 + 80)) <= 3, `(${d0} → ${await width('.split-list:visible')})`); await page.screenshot({ path: path.join(scratch, 'resize-docs.png') })

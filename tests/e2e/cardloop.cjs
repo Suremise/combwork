@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'cardloop-profile')
 const ws = path.join(lib.WORK, 'cardloop-ws')
@@ -55,12 +55,7 @@ const check = (name, ok, extra = '') => {
     return { status: r.status, body: await r.json().catch(() => null) }
   }
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-  const until = async (fn, ms = 30000) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  const until = lib.until
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
   const wakes = (agent) => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
@@ -118,7 +113,7 @@ const check = (name, ok, extra = '') => {
   const st = await live(reviewer.id)
   check('the reviewer is watching: status watching, with what for', !!watching && st?.watch?.label === `Waiting for ${first.key} → Review`, JSON.stringify({ status: st?.status, watch: st?.watch }))
   // The window words the watch itself (HI-1679): the card by its key, where the Agent API's label above has its number.
-  check('its header says so', !!(await until(async () => (await page.locator('.pane-status.watching', { hasText: `Waiting for ${first.key} → Review` }).count()) >= 1, 5000)))
+  check('its header says so', !!(await until(async () => (await page.locator('.pane-status.watching', { hasText: `Waiting for ${first.key} → Review` }).count()) >= 1, lib.timing('hang.ui'))))
   await page.screenshot({ path: path.join(lib.WORK, 'cardloop-watching.png') })
   /** Whether the watching header's ⋯ (Cancel Card Watch is in its menu, #977) is on screen where a click lands on it (not clipped or covered). */
   const cancelHit = (agentName) =>
@@ -138,7 +133,7 @@ const check = (name, ok, extra = '') => {
   check('at 900 px in two panes, ⋯ is where a click lands on it', narrow.clickable, JSON.stringify(narrow))
   await page.screenshot({ path: path.join(lib.WORK, 'cardloop-watching-narrow.png') })
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
-  await lib.sleep(500)
+  await until(() => page.evaluate(() => innerWidth === 1500), HUNG_MS)
   const activity = await api('GET', `/v1/projects/alpha/agents/Reviewer/activity`)
   check('the Agent API reports it watching, with the cards', activity.body?.status === 'watching' && activity.body?.watching?.cards?.[0] === c1 && activity.body?.statusMessage === `Waiting for ${first.key} → Review`, JSON.stringify(activity.body).slice(0, 200))
   // Every status reply says what it waits for: project status, the project list and its short rows.
@@ -155,19 +150,19 @@ const check = (name, ok, extra = '') => {
   await inv('settings:update', { general: { confirmOnQuit: 'working' } })
   const quitDialog = async () => {
     await inv('app:quit')
-    await until(async () => (await page.locator('.quit-row').count()) > 0, 5000)
+    await until(async () => (await page.locator('.quit-row').count()) > 0, lib.timing('hang.ui'))
     const r = { rows: (await page.locator('.quit-row').allInnerTexts()).join(' | '), waitOffered: (await page.locator('.dialog button', { hasText: 'Quit when' }).count()) === 1 }
     await page.locator('.dialog button', { hasText: /^\s*Cancel\s*$/ }).click()
-    await until(async () => (await page.locator('.quit-row').count()) === 0, 5000)
+    await until(async () => (await page.locator('.quit-row').count()) === 0, lib.timing('hang.ui'))
     return r
   }
   const dormant = await quitDialog()
   check('quit dialog: the watcher names its card; no waiting for a card nobody works on', dormant.rows.includes(`${first.key}`) && !dormant.waitOffered, JSON.stringify(dormant))
   await inv('tasks:update', c1, { column: 'doing', agent: builder.id })
-  check('a card with another agent in Doing keeps quitting waiting', !!(await until(async () => (await quitDialog()).waitOffered, 8000)))
+  check('a card with another agent in Doing keeps quitting waiting', !!(await until(async () => (await quitDialog()).waitOffered, lib.timing('hang.ui'))))
   let closed = false
   const closing = inv('workspace:close').then(() => (closed = true))
-  const asked = await until(async () => !!(await inv('app:quitState'))?.request, 5000)
+  const asked = await until(async () => !!(await inv('app:quitState'))?.request, lib.timing('hang.ui'))
   check('closing the workspace asks before stopping a watcher', !!asked && !closed)
   await page.locator('.dialog button', { hasText: /^\s*Cancel\s*$/ }).click()
   await closing
@@ -181,7 +176,7 @@ const check = (name, ok, extra = '') => {
   check('…and nothing was typed into it (still watching)', (await live(reviewer.id))?.status === 'watching')
   const t0 = Date.now()
   const waited = await api('POST', '/v1/agents/wait', { agents: [{ project: 'alpha', agent: 'Reviewer' }], timeoutSeconds: 20 })
-  check('cw_wait_for_agents doesn’t wait on a watcher: it reports watching at once, with what for', waited.body?.agents?.[0]?.status === 'watching' && waited.body?.agents?.[0]?.statusMessage === label && waited.body?.agents?.[0]?.watching?.cards?.[0] === c1 && Date.now() - t0 < 5000 && waited.body?.timedOut === false, JSON.stringify(waited.body))
+  check('cw_wait_for_agents doesn’t wait on a watcher: it reports watching at once, with what for', waited.body?.agents?.[0]?.status === 'watching' && waited.body?.agents?.[0]?.statusMessage === label && waited.body?.agents?.[0]?.watching?.cards?.[0] === c1 && Date.now() - t0 < lib.timing('budget.watcherReportMs') && waited.body?.timedOut === false, JSON.stringify(waited.body))
 
   const joined = (await api('GET', '/v1/lanes')).body?.[0]
   check('the reviewer joining made the lane (#483): the builder, the reviewer, the cards in order', joined?.builder?.name === 'Builder' && joined?.reviewer?.name === 'Reviewer' && joined?.cards?.map((c) => c.number).join() === `${c1},${c2}` && joined?.state === 'active' && joined?.current === c1, JSON.stringify(joined))
@@ -194,9 +189,9 @@ const check = (name, ok, extra = '') => {
   await say(builder.id, `${lane({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', rounds: 3, waitMinutes: 240, name: 'two cards' })} then ${built(c1)}`)
   const registered = await until(async () => (await api('GET', '/v1/lanes')).body?.find((l) => l.rounds === 3), HUNG_MS)
   check("the builder's start updated that lane: one lane, its rounds, wait and name", (await api('GET', '/v1/lanes')).body?.length === 1 && registered?.id === joined?.id && registered?.waitMinutes === 240 && registered?.name === 'two cards' && registered?.startedBy === 'Reviewer (alpha)', JSON.stringify(registered))
-  const done = await until(async () => (await card(c1))?.column === 'done' && (await card(c2))?.column === 'passed', 90000)
+  const done = await until(async () => (await card(c1))?.column === 'done' && (await card(c2))?.column === 'passed', lib.timing('hang.step'))
   check('c1 ends in Done (reported merged before c2 began), c2 in Passed (#170)', !!done, JSON.stringify({ c1: (await card(c1))?.column, c2: (await card(c2))?.column }))
-  await until(async () => wakes('Builder').length >= 3 && (await live(builder.id))?.status === 'finished', 20000)
+  await until(async () => wakes('Builder').length >= 3 && (await live(builder.id))?.status === 'finished', lib.timing('hang.step'))
   const bw = wakes('Builder').map((w) => w.text)
   const rw = wakes('Reviewer').map((w) => w.text)
   check('the builder was woken once per verdict: c1 passed, c2 failed, c2 passed', bw.length === 3 && bw[0].includes(`#${c1}`) && bw[1].includes(`#${c2}`) && bw[2].includes(`#${c2}`), JSON.stringify(bw))
@@ -223,7 +218,7 @@ const check = (name, ok, extra = '') => {
   const passedAt = (await card(c1)).history.find((h) => h.what === 'Review passed')?.at ?? ''
   const c2Doing = (await card(c2)).history.find((h) => h.what.startsWith('Moved to Doing'))?.at ?? ''
   check('in order: c1 passed before c2 was begun', !!passedAt && !!c2Doing && passedAt < c2Doing, JSON.stringify({ passedAt, c2Doing }))
-  const end = await until(async () => (await live(builder.id))?.status === 'finished' && (await live(reviewer.id))?.status === 'finished', 15000)
+  const end = await until(async () => (await live(builder.id))?.status === 'finished' && (await live(reviewer.id))?.status === 'finished', lib.timing('hang.step'))
   check('at the end neither is watching', !!end, JSON.stringify({ b: (await live(builder.id))?.status, r: (await live(reviewer.id))?.status }))
   // The lane as the window has it: c1 Done, c2 passed in two rounds, still running until it is merged.
   const passedLane = (await inv('lanes:list')).find((l) => l.id === joined?.id)
@@ -244,9 +239,9 @@ const check = (name, ok, extra = '') => {
   // The user types (no Enter) in its terminal, then the card changes: no wake while the user may still be typing.
   await inv('pty:write', lib.ptyKey(alpha, third.id), 'half a thought')
   await inv('tasks:comment', c3, 'First change')
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.wakeTypedOnceMs')) // A quiet window on purpose: this checks that no wake comes while the user may still be typing.
   check('no wake while the user is typing there', wakes('Third').length === 0, JSON.stringify(wakes('Third')))
-  const afterPause = await until(async () => wakes('Third').length === 1, 15000)
+  const afterPause = await until(async () => wakes('Third').length === 1, lib.timing('hang.ui'))
   check('…and one wake once the typing pause has passed', !!afterPause && wakes('Third').length === 1)
   await until(async () => (await live(third.id))?.status === 'finished', HUNG_MS)
   // A watch, then the agent busy (a turn the user started): the change waits for its turn to end.
@@ -255,9 +250,9 @@ const check = (name, ok, extra = '') => {
   await say(third.id, 'work 4')
   await until(async () => (await live(third.id))?.status === 'working', HUNG_MS)
   await inv('tasks:comment', c3, 'Second change')
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.wakeHeldMs')) // A quiet window on purpose: this checks that no wake comes while it works.
   check('no wake while the agent is working', wakes('Third').length === 1)
-  check('…and one wake when its turn ends', !!(await until(async () => wakes('Third').length === 2, 15000)))
+  check('…and one wake when its turn ends', !!(await until(async () => wakes('Third').length === 2, lib.timing('hang.step'))))
   await until(async () => (await live(third.id))?.status === 'finished', HUNG_MS)
   // A watch survives a stop and a resume: a change while it is stopped wakes it once it is back.
   await say(third.id, wait(c3, { changes: ['comment'] }))
@@ -266,16 +261,16 @@ const check = (name, ok, extra = '') => {
   await inv('session:stop', alpha, third.id)
   await until(async () => !(await live(third.id)), HUNG_MS)
   await inv('tasks:comment', c3, 'Third change')
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.wakeHeldMs')) // A quiet window on purpose: this checks that no wake comes while it is stopped.
   check('no wake while it is stopped', wakes('Third').length === 2)
   await inv('session:start', alpha, { agentId: third.id, resumeId: sid })
-  check('…and one wake after it is resumed', !!(await until(async () => wakes('Third').length === 3, 30000)))
+  check('…and one wake after it is resumed', !!(await until(async () => wakes('Third').length === 3, lib.timing('hang.step'))))
   await until(async () => (await live(third.id))?.status === 'finished', HUNG_MS)
   // Compact while watching: allowed (the watch is kept); a change during the compaction wakes it only once that has ended.
   await say(third.id, wait(c3, { changes: ['comment'] }))
   await until(async () => (await live(third.id))?.status === 'watching', HUNG_MS)
   await page.keyboard.press('Control+3')
-  await lib.sleep(500)
+  await until(() => page.locator('.pane-header-bar', { hasText: 'Third' }).first().isVisible(), HUNG_MS)
   // Compact… in its ⋯ (#977).
   await page.locator('.pane-header-bar', { hasText: 'Third' }).getByLabel('More').first().click()
   const compactItem = page.locator('.menu .menu-item', { hasText: 'Compact…' })
@@ -284,12 +279,12 @@ const check = (name, ok, extra = '') => {
   await compactItem.click()
   await page.locator('.compact-focus textarea').fill('hold 4')
   await page.locator('.dialog button', { hasText: /^\s*Compact\s*$/ }).click()
-  const compactingNow = await until(async () => (await live(third.id))?.status === 'working', 8000)
+  const compactingNow = await until(async () => (await live(third.id))?.status === 'working', lib.timing('hang.step'))
   check('…it compacts, its watch kept', !!compactingNow && !!(await live(third.id))?.watch, JSON.stringify(await live(third.id)))
   await inv('tasks:comment', c3, 'During the compaction')
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.wakeHeldMs')) // A quiet window on purpose: this checks that no wake comes while it compacts.
   check('no wake while it compacts', wakes('Third').length === 3, JSON.stringify(wakes('Third')))
-  check('…and one wake once the compaction has ended', !!(await until(async () => wakes('Third').length === 4, 20000)))
+  check('…and one wake once the compaction has ended', !!(await until(async () => wakes('Third').length === 4, lib.timing('hang.ui'))))
   await until(async () => (await live(third.id))?.status === 'finished', HUNG_MS)
   // Cancel Card Watch in its ⋯ (#977): the watch ends, the status is finished again, and a change wakes nothing. A longer
   // label (three cards) in a narrow pane (three panes, under 340 px each): ⋯ stays clickable, and Cancel is chosen there.
@@ -298,7 +293,7 @@ const check = (name, ok, extra = '') => {
   await say(third.id, wait([c3, ...open], { changes: ['comment'] }))
   check('Third watches three cards', !!(await until(async () => (await live(third.id))?.watch?.cards?.length === 3 && (await live(third.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(third.id)))
   await page.keyboard.press('Control+3')
-  await lib.sleep(500)
+  await until(() => page.locator('.pane-header-bar', { hasText: 'Third' }).first().isVisible(), HUNG_MS)
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(1))
   await lib.fitWindow(app, page, { width: 1100, height: 750 })
   const tight = await cancelHitWhenSettled('Third')
@@ -307,11 +302,11 @@ const check = (name, ok, extra = '') => {
   await page.locator('.pane-header-bar', { hasText: 'Third' }).getByLabel('More').first().click()
   check('the agent menu offers Cancel Card Watch', !!(await until(async () => (await page.getByText('Cancel Card Watch').count()) >= 1, HUNG_MS)))
   await page.getByText('Cancel Card Watch').first().click()
-  check('Cancel ends the watch', !!(await until(async () => (await live(third.id))?.status === 'finished' && !(await live(third.id))?.watch, 5000)))
+  check('Cancel ends the watch', !!(await until(async () => (await live(third.id))?.status === 'finished' && !(await live(third.id))?.watch, lib.timing('hang.step'))))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
-  await lib.sleep(500)
+  await until(() => page.evaluate(() => innerWidth === 1500), HUNG_MS)
   await inv('tasks:comment', c3, 'Fourth change')
-  await lib.sleep(2500) // A fixed wait on purpose: this checks that something does NOT happen, which no condition can show.
+  await lib.sleep(lib.timing('quiet.cancelledWatchMs')) // A quiet window on purpose: this checks that a cancelled watch wakes nothing.
   check('…and a later change wakes nothing', wakes('Third').length === 4)
 
   // --- A watch on another agent's card (a dependency, #143): the wake says whose card it is, and that Passed isn't merged.
@@ -321,7 +316,7 @@ const check = (name, ok, extra = '') => {
   const depWatched = await until(async () => (await live(third.id))?.watch?.cards?.includes(dep), HUNG_MS)
   check('Third watches the dependency before it moves', !!depWatched, JSON.stringify(await live(third.id)))
   await inv('tasks:update', dep, { column: 'passed' })
-  check("a dependency's wake names its agent and says Passed isn't merged", !!(await until(async () => wakes('Third').length === 5, 15000)) && wakes('Third')[4].text.includes(`#${dep} (Builder's card) is in Passed (Passed isn't merged)`), JSON.stringify(wakes('Third').slice(4)))
+  check("a dependency's wake names its agent and says Passed isn't merged", !!(await until(async () => wakes('Third').length === 5, lib.timing('hang.step'))) && wakes('Third')[4].text.includes(`#${dep} (Builder's card) is in Passed (Passed isn't merged)`), JSON.stringify(wakes('Third').slice(4)))
   await until(async () => (await live(third.id))?.status === 'finished', HUNG_MS)
 
   // --- A bounded wait (no wake): it returns on a comment, a move and a verdict; times out; since misses nothing.
@@ -353,24 +348,21 @@ const check = (name, ok, extra = '') => {
   const byVerdict = await onChange(() => say(reviewer.id, `boardreview ${c4} start then boardreview ${c4} failed`), { changes: ['verdict'] })
   check('it returns on a review verdict', byVerdict.r?.changes?.[0]?.changes?.includes('verdict'), JSON.stringify(byVerdict.r))
   // Per caller: at most two at a time.
-  const a1 = api('POST', '/v1/tasks/wait', { cards: [c4], timeoutSeconds: 3 })
-  const a2 = api('POST', '/v1/tasks/wait', { cards: [c4], timeoutSeconds: 3 })
-  await lib.sleep(300)
-  const a3 = await api('POST', '/v1/tasks/wait', { cards: [c4], timeoutSeconds: 3 })
-  check('a third wait at once from the same caller is refused (429)', a3.status === 429, JSON.stringify(a3))
-  await Promise.all([a1, a2])
+  // Three sent together (no wait for the first two to arrive): the two that arrive first wait their 3 s, and whichever
+  // arrives third is refused, while they still run.
+  const three = await Promise.all([1, 2, 3].map(() => api('POST', '/v1/tasks/wait', { cards: [c4], timeoutSeconds: 3 })))
+  const statuses = three.map((x) => x.status).sort()
+  check('a third wait at once from the same caller is refused (429)', JSON.stringify(statuses) === '[200,200,429]', JSON.stringify(three))
   // Scope: a project agent's token waits only on its own project's cards.
   fs.mkdirSync(path.join(ws, 'beta'), { recursive: true })
   await inv('workspace:refresh')
   const c5 = (await inv('tasks:create', { title: 'Beta card', project: 'beta' })).number
-  // Every agent here is alpha's: its newest token (the files don't name the project) is an alpha agent's.
-  const tokenDir = path.join(userData, 'agent-api')
-  const newest = fs.readdirSync(tokenDir).map((f) => ({ f, t: fs.statSync(path.join(tokenDir, f)).mtimeMs })).sort((x, y) => y.t - x.t)[0]
-  const agentToken = newest ? JSON.parse(fs.readFileSync(path.join(tokenDir, newest.f), 'utf8')).token : null
+  // Every agent here is alpha's: its newest launch's token (HI-3195: each launch's own file) is an alpha agent's.
+  const agentToken = lib.launchTokens(userData)[0]?.token ?? null
   if (agentToken) {
     const r = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/wait`, { method: 'POST', headers: { Authorization: `Bearer ${agentToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ cards: [c5], timeoutSeconds: 1 }) })
     check("an alpha agent can't wait on beta's card (unknown to it)", r.status === 404, String(r.status))
-  } else check('an agent token was found to test scope with', false, fs.readdirSync(path.join(userData, 'agent-api')).join(','))
+  } else check('an agent token was found to test scope with', false, JSON.stringify(lib.launchTokens(userData).map((t) => t.file)))
 
   await page.screenshot({ path: path.join(lib.WORK, 'cardloop.png') })
 
@@ -383,13 +375,13 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await live(reviewer.id))?.status === 'watching', HUNG_MS)
   await inv('app:quit')
   const quitWhen = page.locator('.dialog button', { hasText: 'Quit when' })
-  await until(async () => (await quitWhen.count()) === 1, 5000)
+  await until(async () => (await quitWhen.count()) === 1, lib.timing('hang.ui'))
   await quitWhen.click()
-  const pendingNow = await until(async () => (await inv('app:quitState'))?.pending === true, 5000)
+  const pendingNow = await until(async () => (await inv('app:quitState'))?.pending === true, lib.timing('hang.ui'))
   check('a quit is pending, waiting on the watcher', !!pendingNow && (await inv('app:quitState')).working === 1, JSON.stringify(await inv('app:quitState')))
   const quitting = await lib.quitWatch(app)
   await inv('tasks:update', q1, { column: 'done' })
-  await lib.sleep(2500) // A fixed wait on purpose: this checks that Combwork does NOT quit yet, which no condition can show.
+  await lib.sleep(lib.timing('quiet.quitHeldMs')) // A quiet window on purpose: this checks that Combwork does NOT quit yet.
   const still = await inv('app:quitState')
   check('…still waiting while the other card it watches is in Doing with the builder', still?.pending === true && still?.working === 1, JSON.stringify(still))
   const moved = Date.now()

@@ -78,6 +78,23 @@ export class TerminalScreen {
   }
 
   /**
+   * What the screen shows up to its cursor (HI-3345): the cursor's row up to it, after the rows over it that `chars`
+   * characters wrap onto and one more (a CLI's indent), top to bottom. A CLI's cursor stands after what is typed in its
+   * input, so this ends with that, wherever its conversation has scrolled.
+   */
+  textToCursor(chars: number): string {
+    const term = this.term
+    const buf = term?.buffer.active
+    if (!term || !buf) return ''
+    const row = buf.baseY + buf.cursorY
+    const above = Math.ceil(Math.max(0, chars) / term.cols) + 1
+    const lines: string[] = []
+    for (let y = Math.max(buf.baseY, row - above); y < row; y++) lines.push(buf.getLine(y)?.translateToString(true) ?? '')
+    lines.push(buf.getLine(row)?.translateToString(true, 0, buf.cursorX) ?? '')
+    return lines.join('\n')
+  }
+
+  /**
    * The visible lines with dim cells blanked (HI-1959): what the user or Combwork typed, without a CLI's dim hint where
    * nothing is typed (Claude Code 2.1.312's empty input shows `Try "how does <filepath> work?"`, dim). The hint's first
    * letter under the CLI's own cursor (inverse, not dim, followed by the dim rest: Claude Code while its terminal

@@ -1,4 +1,4 @@
-// 0.9's agent templates at the upgrade to 1.0 (#1436; Darren's 19 Oct decision on #1123, and the Assistant's 23 Oct scope
+// 0.9's agent templates at the upgrade to 1.0 (#1436; the decision on #1123, and the Assistant's 23 Oct scope
 // call: copy only): nothing is copied while the upgrade waits; once upgraded, each 0.9 template of the workspace and of
 // each project is copied into the 0.9 backup's folder (by the project's id), the originals left byte for byte as they
 // were (a 1.0 template, a damaged file and a .bak not copied); 1.0 never lists, loads or deletes a 0.9 file; it is done
@@ -14,6 +14,7 @@ import { as09 } from './boardDb'
 import { TEMPLATE_VERSION } from '../src/shared/templates'
 import type { CombworkEvent } from '../src/shared/types'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-upgrade-templates-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -25,7 +26,7 @@ const step = await import('../src/main/templateUpgrade')
 const templates = await import('../src/main/templates')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 15000
+const HUNG_MS = timing('wait.hang')
 let n = 0
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []

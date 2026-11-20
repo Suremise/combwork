@@ -84,7 +84,7 @@ describe('mergeWorktree (#1347)', () => {
     })
   }
 
-  // HI-3030 (Darren's decision): a merge into a branch checked out nowhere is made as every other merge is, by git merge
+  // HI-3030: a merge into a branch checked out nowhere is made as every other merge is, by git merge
   // in a temporary worktree: signed as the repository says or refused with git's reason (never made unsigned, as git
   // commit-tree made it), and the repository's commit hooks run. The temporary folder goes either way.
   const worktrees = (project: string): string[] => run(project, 'worktree', 'list', '--porcelain').split(/\r?\n/).filter((l) => l.startsWith('worktree '))

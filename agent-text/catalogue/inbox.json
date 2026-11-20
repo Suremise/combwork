@@ -43,6 +43,10 @@
     "text": "Your earlier conversation read {n, plural, one {a message} other {# messages}} it never acked ({ids}). cw_inbox shows {n, plural, one {it} other {them}} again now: act on {n, plural, one {it} other {them}}, then ack {n, plural, one {it} other {them}}.",
     "note": "HI-2463: a conversation from before the rename started fresh; what the earlier one had received and not acked is shown again in the new one. After \"[CW] \". n: how many; ids: their delivery ids (\"m3, m7\")."
   },
+  "inbox.churn.simplify": {
+    "text": "{key} reached its simplify check: {churn} rounds of back-and-forth (failed reviews, designs, requests, questions). Its loop is paused, and the user has the question ({request}) under For you. If it's clear, answer it yourself with cw_answer_simplify: carry on (what still comes up is worth handling) or simplify (drop what isn't). Cutting scope is the user's: otherwise leave it to them.",
+    "note": "HI-3188: Combwork's line to the Assistant when a card reaches its simplify check (Workflow → Card loops). {key}: the card's key; {churn}: its count (a number); {request}: the question's id (AM-12/r40). cw_answer_simplify is a tool's name."
+  },
   "inbox.create.badKey": {
     "text": "Not a delivery Combwork can keep: its source or key is too long.",
     "note": "Why a delivery isn't made: what names its producer is too long to keep."
@@ -258,6 +262,10 @@
   "inbox.refused.noInbox": {
     "text": "{name} has no inbox: turn on the Agent API",
     "note": "Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. name: the agent's name."
+  },
+  "inbox.refused.noTools": {
+    "text": "{name}'s CLI takes none of Combwork's tools (it runs from a description), so it has no inbox: start it on a task, or the user types to it in its pane",
+    "note": "Why an agent on a CLI that runs from a description (HI-3196) is given no delivery, as its sender sees it: its CLI takes no MCP server or skills from Combwork. A task can still be its launch's prompt. name: the agent's name."
   },
   "inbox.refused.plain": {
     "text": "{name} runs as if started from a terminal, without Combwork's tools or typing, so it has no inbox until it restarts",

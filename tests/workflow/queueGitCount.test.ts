@@ -1,5 +1,5 @@
 // HI-2050: the git processes one card's queue step runs, counted, each style bounded at what it runs now (a merge 27 to
-// 26): the identity in one git. git answers every read (Darren's decision: no reads from the `.git` files beside it). What
+// 26): the identity in one git. git answers every read (decided: no reads from the `.git` files beside it). What
 // each step checks still runs: the checks' bracket (status before and after), where the target is checked out (outside the lock
 // and again under it), the conditions under the lock, and the branch read after the swap. The second card of two is
 // counted (the queue's folder reused, as it is from then on), with the target moved meanwhile in the project.

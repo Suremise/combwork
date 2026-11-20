@@ -11,7 +11,6 @@ const userData = path.join(scratch, 'cxcw-profile')
 const ws = path.join(scratch, 'cxcw-ws')
 const proj = path.join(ws, 'demo')
 const codexHome = lib.CODEX_HOME
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const results = []
 const check = (name, ok, extra = '') => {
   lib.checked(ok)
@@ -39,7 +38,7 @@ function prepare() {
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
-  const waitFor = async (fn, ms) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(500) } return null }
+  const waitFor = async (fn, ms) => (await lib.until(fn, ms)) || null
 
   const info = await waitFor(async () => { const i = (await inv('provider:info')).codex; return i && !i.checking ? i : null }, 30000)
   check('Codex found', !!info?.found, JSON.stringify(info))
@@ -50,7 +49,7 @@ function prepare() {
   const def = await lib.addAgent(inv, proj, { name: 'Codex', provider: 'codex', location: 'project', model: 'gpt-6-luna', effort: 'low' })
   check('agent added with provider codex', def.provider === 'codex')
   await page.getByText('demo', { exact: true }).first().click()
-  await sleep(500)
+  await lib.projectShown(page)
   const live = async () => (await inv('session:live')).find((l) => l.agentId === def.id)
   await inv('session:start', proj, { agentId: def.id })
   const started = await live()
@@ -81,7 +80,7 @@ function prepare() {
   const rec = recs.find((r) => r.id === sessionId)
   check('session recorded as Codex with its transcript path', rec?.agent === 'codex' && /rollout-.*\.jsonl$/.test(rec?.transcriptPath ?? ''), JSON.stringify(rec))
   // The backup tick reads the transcript for live details.
-  await lib.until(async () => (await live())?.modelName === 'gpt-6-luna', 30000)
+  await lib.until(async () => (await live())?.modelName === 'gpt-6-luna', lib.timing('hang.ui'))
   const after = await live()
   check('live details: model from the transcript', after?.modelName === 'gpt-6-luna', after?.modelName)
   const plan = (await inv('app:planUsage')).codex
@@ -150,10 +149,12 @@ function prepare() {
   fs.writeFileSync(path.join(scratch, 'cxh-fullaccess-after-answer.txt'), lib.plainText(await inv('pty:buffer', key)).slice(-4000))
   await page.screenshot({ path: path.join(scratch, 'cxh-6-fullaccess.png') })
 
+  const pid = (await live())?.pid
   await inv('session:stop', proj, def.id)
   const stopped = await waitFor(async () => (!(await live()) ? true : null), 20000)
   check('stops', !!stopped)
-  await sleep(1500) // A fixed wait on purpose: no condition Combwork exposes says Codex's process has fully exited before the same thread is resumed.
+  // Its process gone (by its pid, as live gave it) before the same thread is resumed.
+  check('…its process has ended', !pid || !!(await lib.until(async () => !lib.processRunning(pid), lib.timing('hang.ui'))), String(pid))
   await inv('session:start', proj, { agentId: def.id, resumeId: sessionId })
   const resumed = await waitFor(async () => { const l = await live(); return l?.status === 'ready' ? l : null }, 60000)
   check('resumes the same conversation', resumed?.sessionId === sessionId, JSON.stringify(resumed && { s: resumed.sessionId, st: resumed.status }))

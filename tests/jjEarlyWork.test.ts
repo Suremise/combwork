@@ -1,4 +1,4 @@
-// HI-3115 (Darren's decision B, design HI-3115/s42): a jj lane's next card whose builder worked in the slot before it was
+// HI-3115 (decision B, design HI-3115/s42): a jj lane's next card whose builder worked in the slot before it was
 // prepared. The protection of that work stays: the preparation waits (a retry with the evidence, never an error or
 // SlotPrepareFailed), nothing there is changed, and the advice's commands, built from full ids frozen at the inspected
 // operation, are run exactly as printed (through PowerShell): `jj new <base>` sets the work aside, the next pass prepares
@@ -17,6 +17,7 @@ import { heldTold } from '../src/main/slotCards'
 import { admitted } from './admitted'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const closers: (() => void | Promise<void>)[] = []
 afterEach(async () => {
@@ -98,7 +99,7 @@ function printed(held: HeldWork, reason = JJ_REFUSED.unintegrated): { aside: str
   return { aside, bring, squash, inspect }
 }
 
-describe.skipIf(!jjExe)("a jj lane's next card, its builder at work before its slot is prepared (HI-3115, decision B)", { timeout: 300_000 }, () => {
+describe.skipIf(!jjExe)("a jj lane's next card, its builder at work before its slot is prepared (HI-3115, decision B)", { timeout: timing('test.hangReal') }, () => {
   it.each([true, false])('colocated %s: nothing early → prepared (the control)', async (colocated) => {
     const w = world(colocated)
     const c = await card1(w, 'move')

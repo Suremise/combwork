@@ -10,6 +10,7 @@ import { connect } from 'net'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { childEnv } = require('./e2e/runContext.cjs') as { childEnv: (vars?: Record<string, string>) => Record<string, string> }
@@ -73,13 +74,13 @@ function alive(pid: number): boolean {
 }
 
 /** Polls until fn gives something truthy (a bound for a hung run, never how long it should take). */
-async function until<T>(fn: () => T | Promise<T>, what: string, ms = 30000): Promise<NonNullable<T>> {
+async function until<T>(fn: () => T | Promise<T>, what: string, ms = timing('wait.hang')): Promise<NonNullable<T>> {
   const end = Date.now() + ms
   for (;;) {
     const v = await fn()
     if (v) return v as NonNullable<T>
     if (Date.now() > end) throw new Error(`timed out waiting for ${what}`)
-    await new Promise((r) => setTimeout(r, 50))
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
 }
 const portFree = (port: number): Promise<boolean> =>
@@ -199,7 +200,7 @@ describe.runIf(windows)('the launcher owns the server (design s13: a kill-on-clo
     l.child.kill()
     await l.exit
     await allGone(s)
-  }, 60000)
+  }, timing('test.hang'))
 
   it('forced dead before the server answers: nothing it started is left', async () => {
     const r = setUp({ delay: 60000 })
@@ -209,7 +210,7 @@ describe.runIf(windows)('the launcher owns the server (design s13: a kill-on-clo
     l.child.kill()
     await l.exit
     await allGone(s)
-  }, 60000)
+  }, timing('test.hang'))
 
   it('the Combwork that launched it dies while the launcher lives: the server and its child still end', async () => {
     const r2 = setUp()
@@ -221,7 +222,7 @@ describe.runIf(windows)('the launcher owns the server (design s13: a kill-on-clo
     await allGone(s)
     await until(() => !alive(o.launcherPid), 'the launcher to end')
     expect(readFileSync(serverLogPath(r2.priv), 'utf8')).toContain('Combwork ended')
-  }, 90000)
+  }, timing('test.hang'))
 
   it('the Combwork that launched it dies before its server answers, the launcher alive: it stops at once, the server and its child end, nothing is created', async () => {
     // As the test above, with a server that would take a minute to answer: the launcher must not wait it out.
@@ -232,13 +233,13 @@ describe.runIf(windows)('the launcher owns the server (design s13: a kill-on-clo
     const killed = Date.now()
     o.main.kill()
     // Bounded well below the server's 60 s and the launch's 30 s wait: the launcher sees its owner go within a poll.
-    await until(() => !alive(o.launcherPid) && !alive(s.serve) && !alive(s.kid), 'the launcher, server and child to end', 15000)
-    expect(Date.now() - killed).toBeLessThan(15000)
+    await until(() => !alive(o.launcherPid) && !alive(s.serve) && !alive(s.kid), 'the launcher, server and child to end', timing('budget.promptEndMs'))
+    expect(Date.now() - killed).toBeLessThan(timing('budget.promptEndMs'))
     await until(() => portFree(s.port), "the server's port to be free")
     expect(infoOf(r2)).toBeNull()
     expect(existsSync(r2.rec + '.tui')).toBe(false)
     expect(readFileSync(serverLogPath(r2.priv), 'utf8')).toContain('Combwork ended while')
-  }, 90000)
+  }, timing('test.hang'))
 
   it("a .cmd opencode in a folder with a space and an ampersand, a project folder with them too, and arguments with cmd.exe's characters: each passed whole", async () => {
     const odd = ['--log-level', 'a & b | c > d < e ^ f', '100%PATH%', 'q"uote', '(x);y=z!']
@@ -251,7 +252,7 @@ describe.runIf(windows)('the launcher owns the server (design s13: a kill-on-clo
     l.child.kill()
     await l.exit
     await allGone(s)
-  }, 60000)
+  }, timing('test.hang'))
 
   it('an owner that is not that exact process is refused, and no server starts: a creation time a tick off, or an old one', async () => {
     const real = await until(() => processToken(process.pid), 'this process\'s identity')
@@ -263,7 +264,7 @@ describe.runIf(windows)('the launcher owns the server (design s13: a kill-on-clo
       expect(standin(r), owner).toBeNull()
       expect(l.output()).toContain("OpenCode didn't start")
     }
-  }, 60000)
+  }, timing('test.hang'))
 
   it('this process as its owner, exactly: it starts', async () => {
     const r = setUp({ owner: await until(() => processToken(process.pid), "this process's identity") })
@@ -273,7 +274,7 @@ describe.runIf(windows)('the launcher owns the server (design s13: a kill-on-clo
     l.child.kill()
     await l.exit
     await allGone(s)
-  }, 60000)
+  }, timing('test.hang'))
 })
 
 describe.runIf(windows)('the session protocol (design s10)', () => {
@@ -284,7 +285,7 @@ describe.runIf(windows)('the session protocol (design s10)', () => {
     expect(await l.exit).toBe(LAUNCHER_EXIT.sessionClash)
     await allGone(standin(r)!)
     expect(existsSync(r.rec + '.tui')).toBe(false)
-  }, 60000)
+  }, timing('test.hang'))
 
   it('resume of a session the account lacks: fails as missing, creating nothing; of one in another folder: refused', async () => {
     const r = setUp({ intent: 'resume' })
@@ -297,7 +298,7 @@ describe.runIf(windows)('the session protocol (design s10)', () => {
     other.env.CW_STANDIN_DIR = join(other.dir, 'elsewhere')
     const o = launch(other)
     expect(await o.exit).toBe(LAUNCHER_EXIT.sessionMismatch)
-  }, 60000)
+  }, timing('test.hang'))
 
   it('with the fake opencode 2.2.6: a new session, then resumed by GET alone in the same account', async () => {
     const first = setUp({ exe: 'fake' })
@@ -317,7 +318,7 @@ describe.runIf(windows)('the session protocol (design s10)', () => {
     b.child.kill()
     await b.exit
     await until(() => !alive(again.serverPid), 'the resumed server to end')
-  }, 90000)
+  }, timing('test.hang'))
 })
 
 describe.runIf(windows)("the session's model and effort, set at each start and resume (HI-2767), with the fake opencode 2.2.6", () => {
@@ -357,7 +358,7 @@ describe.runIf(windows)("the session's model and effort, set at each start and r
     // Each update in the body 2.2.6 takes, {model: {providerID, id, variant?}}: no variant when none is chosen.
     const sets = fakeLog(first).filter((e) => e.kind === 'model-set').map((e) => e.model)
     expect(sets).toEqual([{ providerID: 'cwtest', id: 'qwen3:8b', variant: 'high' }, { providerID: 'cwtest', id: 'qwen3:8b' }, { providerID: 'cwtest', id: 'qwen3:14b', variant: 'medium' }])
-  }, 180000)
+  }, timing('test.hangReal'))
 
   it("an update refused, taken but not kept (an old model with the same variant), or never answered: the launch fails before the TUI, its server ends, and no session is created", async () => {
     const first = setUp({ exe: 'fake', model: 'cwtest/qwen3:8b', variant: 'low' })
@@ -378,7 +379,7 @@ describe.runIf(windows)("the session's model and effort, set at each start and r
     }
     // Only the first launch created a session: a failed update never becomes a new one.
     expect(fakeLog(first).filter((e) => e.kind === 'session').length).toBe(1)
-  }, 180000)
+  }, timing('test.hangReal'))
 
   it('a new session created without the model asked for (its reply says another): the launch fails before the TUI', async () => {
     const r = setUp({ exe: 'fake', model: 'cwtest/qwen3:8b', variant: 'low' })
@@ -387,7 +388,7 @@ describe.runIf(windows)("the session's model and effort, set at each start and r
     expect(await l.exit).toBe(LAUNCHER_EXIT.modelSet)
     expect(l.output()).toMatch(/OpenCode created the session without the connection's model and effort \(cwtest\/qwen3:8b, low\)/)
     expect(infoOf(r)).toBeNull()
-  }, 60000)
+  }, timing('test.hang'))
 })
 
 describe.runIf(windows)("Combwork's folder rule on the session's agent before the TUI (HI-2775), with the fake opencode 2.2.6", async () => {
@@ -414,7 +415,7 @@ describe.runIf(windows)("Combwork's folder rule on the session's agent before th
     l.child.kill()
     await l.exit
     if (info) await until(() => !alive(info.serverPid), 'the server to end')
-  }, 60000)
+  }, timing('test.hang'))
 
   it("never shown, refused or unreadable within the server's wait: the launch fails before the TUI, saying what turns the rule off, and its server ends", async () => {
     for (const [knob, value] of [['FAKE_OPENCODE_RULES_NEVER', '1'], ['FAKE_OPENCODE_AGENT_READ', 'refuse'], ['FAKE_OPENCODE_AGENT_READ', 'garbage']]) {
@@ -430,7 +431,7 @@ describe.runIf(windows)("Combwork's folder rule on the session's agent before th
       const serve = log.find((e) => e.kind === 'launch' && JSON.stringify(e.args ?? []).includes('"serve"'))!.pid!
       await until(() => !alive(serve), `the server to end (${value})`)
     }
-  }, 120000)
+  }, timing('test.hang'))
 
   it("a resume in Plan, the project's config let in with a later allow for every folder: waits on the plan agent until Combwork's rule shows (the project's after it), then starts", async () => {
     const first = setUp({ exe: 'fake', rules, permissions: ask })
@@ -458,7 +459,7 @@ describe.runIf(windows)("Combwork's folder rule on the session's agent before th
     l.child.kill()
     await l.exit
     await until(() => !alive(info.serverPid), 'the server to end')
-  }, 120000)
+  }, timing('test.hang'))
 
   it('with no rule asked for (the switch off, the terminal preset): the agent is never read and the TUI starts', async () => {
     const off = setUp({ exe: 'fake', permissions: ask })
@@ -470,5 +471,5 @@ describe.runIf(windows)("Combwork's folder rule on the session's agent before th
     o.child.kill()
     await o.exit
     if (info) await until(() => !alive(info.serverPid), 'the server to end')
-  }, 60000)
+  }, timing('test.hang'))
 })

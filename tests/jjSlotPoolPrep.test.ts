@@ -25,6 +25,7 @@ import { TESTED_JJ } from '../src/shared/jjTool'
 import { admitted } from './admitted'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // Each world's teardown, in reverse order of what it made (HR1 on HI-2906): its pool closed and awaited (its retries and
 // any running settle ended) before its database and admission go.
@@ -134,7 +135,7 @@ function world(colocated: boolean, o: { queued?: boolean } = {}) {
   const pool = makePool()
   const git: GitRun = async (cwd, args) => {
     try {
-      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: 60_000, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+      const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: timing('spawn.hang'), maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
       return { ok: true, out: buf.toString('utf8'), buf, err: '' }
     } catch (e) {
       const err = e as { stderr?: Buffer; stdout?: Buffer }
@@ -175,19 +176,20 @@ async function until(fn: () => boolean, ms = HUNG_MS): Promise<boolean> {
   const deadline = Date.now() + ms
   while (!fn()) {
     if (Date.now() > deadline) return false
-    await new Promise((r) => setTimeout(r, 50))
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
   return true
 }
 // The longest a wait here waits: a bound for a hung run (the retries' pauses grow to 30 s), never how long it takes.
-const HUNG_MS = 45_000
+const HUNG_MS = timing('wait.hang')
 // The HI-2906 tests' own bound: the jj runs of their several settles, under a loaded run (their wakes are the test's own).
-const RETRY_TEST_MS = 90_000
+const RETRY_TEST_MS = timing('wait.hangReal')
 // Every other test's bound, for a hung test, not a time budget (HI-2965): each prepares, settles or recovers a real slot
 // through the port's guarded steps, tens to ~150 jj runs (HI-2924's lane test: 20 to lend, 42 to prepare and integrate by
 // hand, 20, 18 and 8 for its three refusals, 42 for the next card). At ~40 ms a jj run (a quiet whole-file run, jj 0.47.1)
-// they take 4–10 s; with the machine busy a run takes 60–160 ms and the same tests took 14–23 s, past Vitest's 20 s.
-const REAL_JJ_MS = 60_000
+// they take 4–10 s; with the machine busy a run takes 60–160 ms and the same tests took 14–23 s, past Vitest's 20 s. A
+// full unit run on a loaded machine took HI-2924's lane test 31 s (HI-3349).
+const REAL_JJ_MS = timing('wait.hangReal')
 
 describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED_JJ.version}), HI-2866`, { timeout: REAL_JJ_MS }, () => {
   for (const colocated of [true, false]) {
@@ -594,7 +596,7 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         w.h.jj(row.folder, 'commit', '-m', 'card 2, too early')
         const key2 = jjLineKey(row.identity!.workspace, 2, 2)
         const r1 = await w.pool.prepare(lent.lease.id, { line: key2, base: w.main(), install: false, target: 'main' })
-        // Refused, the work kept (HI-2923); since HI-3115 (Darren's decision B) as the cycle's wait, never a failure, with
+        // Refused, the work kept (HI-2923); since HI-3115 (decision B) as the cycle's wait, never a failure, with
         // what is there: the early commit alone, never card 1's.
         expect(r1, JSON.stringify(r1)).toMatchObject({ retry: expect.stringMatching(/isn't its last card's integrated work/), heldWork: { why: 'extra', commits: [expect.any(String)] } })
         expect(r1).not.toHaveProperty('error')

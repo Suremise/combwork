@@ -22,6 +22,7 @@ const { workflowFor } = await import('../src/main/workflow/service')
 const { allOff } = await import('../src/shared/workflow/options')
 const { idleOwnWatchOf } = await import('../src/main/idleWatch')
 const { giveUnseen } = await import('../src/main/cardFreshness')
+const { setStallRuns } = await import('../src/main/cardStall')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -37,8 +38,8 @@ const b1 = { kind: 'agent', name: 'Builder (p)', self: { project: 'p', agentId: 
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()
 
 /** A workspace with Git project `p` (its builder a1 in a worktree on `card`, its reviewer a2), reviewed by an agent. */
-async function workspace(): Promise<{ w: WS; wt: string }> {
-  const ws = join(base, 'ws')
+async function workspace(name = 'ws'): Promise<{ w: WS; wt: string }> {
+  const ws = join(base, name)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
   mkdirSync(join(repo, '.combwork'), { recursive: true })
@@ -86,5 +87,31 @@ describe("the card watch's nudge on the board (HI-2285)", () => {
     git(wt, 'commit', '-qm', 'b')
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'review' }, b1))
     expect(await idleOwnWatchOf(w, 'a1', [card])).toBeNull()
+  })
+})
+
+describe('a live cw-progress run on the card waits on it too (HI-3206)', () => {
+  it('no nudge while its builder’s run on the card runs, nor for 5 min after it ends; another card’s, another project’s, a stale one past the limit: nudged', async () => {
+    const { w } = await workspace('ws-runs')
+    const create = async (): Promise<number> => inWorkspace(w, async () => (await tasks.createTask({ title: 'Work', project: 'p' }, user)).number)
+    const card = await create()
+    const other = await create()
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card, other], rounds: 3, by: 'Builder (p)' })
+    const now = Date.now()
+    const run = (over: Record<string, unknown>) => ({ id: 'r', agentId: 'a1', projectPath: join(w.path!, 'p'), card, state: 'running', staleReason: null, startedAt: now - 60_000, finishedAt: null, ...over }) as never
+    const nudged = async (runs: unknown[]) => {
+      setStallRuns(() => runs as never)
+      return idleOwnWatchOf(w, 'a1', [card])
+    }
+    expect(await nudged([])).toBe(card)
+    expect(await nudged([run({})])).toBeNull()
+    expect(await nudged([run({ state: 'passed', finishedAt: now - 60_000 })])).toBeNull()
+    expect(await nudged([run({ state: 'passed', finishedAt: now - 6 * 60_000 })])).toBe(card)
+    // Quiet but held past the background task limit (60 min): no longer the builder's job.
+    expect(await nudged([run({ state: 'stale', staleReason: 'quiet', startedAt: now - 2 * 3_600_000 })])).toBe(card)
+    expect(await nudged([run({ card: other })])).toBe(card)
+    expect(await nudged([run({ projectPath: join(w.path!, 'q') })])).toBe(card)
+    setStallRuns(null)
   })
 })

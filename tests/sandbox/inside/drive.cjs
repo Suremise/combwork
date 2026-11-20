@@ -70,8 +70,8 @@ const TRUST_FOLDERS = Object.keys(TRUST_JSON.projects)
 /** A connection home's files an upgrade must keep by content (kept.cjs connectionSnapshot): their texts, null when missing. */
 const connectionFiles = (home) => Object.fromEntries(['fake-account.json', '.claude.json'].map((n) => [n, (() => { try { return fs.readFileSync(path.join(home, n), 'utf8') } catch { return null } })()]))
 const MARK = { userName: 'Sandbox Check', theme: 'light' }
-// The providers Combwork knows, by their descriptors' ids (src/shared/providers.ts PROVIDERS; a unit test holds them equal).
-const PROVIDER_IDS = ['claude-code', 'codex', 'copilot', 'antigravity', 'opencode']
+// The providers Combwork knows, by their descriptors' ids (src/shared/providers' PROVIDERS, from its registry; a unit test holds them equal).
+const PROVIDER_IDS = ['claude-code', 'codex', 'copilot', 'antigravity', 'opencode', 'muse']
 // Scenario 4's workspace, made before the upgrade and opened after it (HI-2506), and its card.
 const KEPT_WS = path.join(process.env.USERPROFILE, 'Workspaces', 'Kept')
 const KEPT_CARD = 'Made before the upgrade'
@@ -107,12 +107,15 @@ const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.strin
 // Each check has a stable id ("<scenario>.<what>"): the host's report requires the ids each step must produce.
 const check = (id, name, ok, detail) => { res.checks.push({ id, scenario: Number(String(id).split('.')[0]) || 0, name, ok: !!ok, detail: ok ? undefined : String(detail ?? '').slice(0, 1500) }); save() }
 // When what it reads is ready: conditions Combwork says are met, each bounded (ready.cjs, unit-tested in Combwork's npm test).
-const { until, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted } = require(path.join(__dirname, 'ready.cjs'))
+const { until, within, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted } = require(path.join(__dirname, 'ready.cjs'))
+// Each bound by name (HI-3393), from the tests' timing file: Combwork's tests folder is mapped whole into the Sandbox, so
+// tests	iming.cjs and tests	iming.json are there, at their defaults (the host's CW_TEST_TIMING doesn't reach inside).
+const { timing } = require(path.join(__dirname, '..', '..', 'timing.cjs'))
 // What an upgrade must keep of the seeded data, compared by content (kept.cjs, unit-tested with tampered data).
 const { connectionSnapshot, connectionDiffers, copyDiffers } = require(path.join(__dirname, 'kept.cjs'))
 // The names upgrade's record's version (src/main/nameUpgrade.ts NAMES_VERSION; a unit test holds them equal).
 const NAMES_VERSION = 4
-const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: 60_000 }).trim()
+const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: timing('spawn.hang') }).trim()
 const readConfig = () => { try { return JSON.parse(fs.readFileSync(path.join(PROFILE, 'config.json'), 'utf8')) } catch { return null } }
 
 let app
@@ -131,26 +134,76 @@ function closeRunningApp() {
 
 async function launch(opts = {}) {
   const t0 = Date.now()
-  app = await _electron.launch({ executablePath: CW_EXE, args: [], timeout: 90_000, ...opts })
-  page = await app.firstWindow({ timeout: 90_000 })
+  app = await _electron.launch({ executablePath: CW_EXE, args: [], timeout: timing('app.readyMs'), ...opts })
+  page = await app.firstWindow({ timeout: timing('app.readyMs') })
   page.on('pageerror', e => { (res.facts.pageErrors ||= []).push(String(e.message).slice(0, 300)) })
-  await page.waitForSelector('.app .workbench', { timeout: 90_000 })
+  await page.waitForSelector('.app .workbench', { timeout: timing('app.readyMs') })
   bridge = pickBridge(BRIDGES, await page.evaluate((names) => names.filter((n) => typeof window[n]?.invoke === 'function'), BRIDGES))
   res.facts.bridge = bridge
   if (!bridge) throw new Error(`the window has no preload bridge the ${step} step uses (window.${BRIDGES.join(' or window.')})`)
   res.facts.launchMs = Date.now() - t0
   // Ready once every provider check has finished (as Combwork's e2e lib does).
-  await until(async () => Object.values(await inv('provider:info')).every(i => !i.checking), 60_000)
+  await until(async () => Object.values(await inv('provider:info')).every(i => !i.checking), timing('hang.step'))
   res.facts.readyMs = Date.now() - t0
 }
 
-/** The window has painted what it has and runs no finite animation (a dialog's or a theme's fade; a spinner's never ends), within 5 s. */
-const painted = () => until(() => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(document.getAnimations().every(a => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity)))))), 5000)
+// A fault the checks can inject (checks.cjs --shot-fault, tests only): "minimise" minimises the window before each
+// screenshot, the state that stalled rc.15's (HI-3459), to prove shot() recovers from it.
+const SHOT_FAULT = process.env.CW_SANDBOX_SHOT_FAULT || ''
+
+/** What the window is doing, for a record: shown, minimised, its page's visibility and whether a frame comes (rAF). */
+async function windowState(bw) {
+  const win = await within(bw.evaluate((w) => ({ visible: w.isVisible(), minimised: w.isMinimized(), focused: w.isFocused(), bounds: w.getBounds() })).catch((e) => String(e)), timing('hang.ui'))
+  const pg = await within(page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r({ visibility: document.visibilityState, running: document.getAnimations().filter((a) => a.playState === 'running').length })))).catch((e) => String(e)), timing('hang.ui'))
+  return { win, page: pg ?? 'no frame (rAF) within hang.ui' }
+}
+
+/**
+ * The window has painted what it has and runs no finite animation (a dialog's or a theme's fade; a spinner's never
+ * ends), within hang.ui; else it throws, saying what the window was doing. Each look is bounded too: a window that
+ * draws no frame never runs its rAF.
+ */
+async function painted(bw) {
+  const settled = () => within(page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(document.getAnimations().every(a => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity)))))), timing('hang.ui'))
+  if (!(await until(settled, timing('hang.ui')))) throw new Error(`the window didn't settle within hang.ui: ${JSON.stringify(await windowState(bw))}`)
+}
+
+/**
+ * Shown and drawn before its screenshot (HI-3459): a minimised or hidden window draws no frames, so Chromium's capture
+ * waits for one that never comes ("taking page screenshot … fonts loaded", then the bound), while its rAF still runs.
+ * rc.15's upgrade Sandbox stalled every screenshot so, and a minimised window reproduces it exactly. The window is
+ * restored or shown (without activating it) until Electron says it's shown, and what was done is kept in the step's
+ * facts (shotsFixed); painted() and the capture then fail saying what the window was doing, never a bare timeout.
+ */
+async function drawable(bw, name) {
+  if (SHOT_FAULT === 'minimise') {
+    await bw.evaluate((w) => w.minimize())
+    if (!(await until(() => bw.evaluate((w) => w.isMinimized()), timing('hang.ui')))) throw new Error('--shot-fault minimise: the window never minimised')
+  }
+  const fixed = await bw.evaluate((w) => {
+    const did = []
+    if (w.isMinimized()) { w.restore(); did.push('restored') }
+    if (!w.isVisible()) { w.showInactive(); did.push('shown') }
+    return did
+  })
+  if (!fixed.length) return
+  ;(res.facts.shotsFixed ||= {})[name] = fixed
+  save()
+  if (!(await until(() => bw.evaluate((w) => w.isVisible() && !w.isMinimized()), timing('hang.ui')))) throw new Error(`the window wasn't shown within hang.ui after ${fixed.join(' and ')}: ${JSON.stringify(await windowState(bw))}`)
+}
 
 async function shot(name) {
   const file = `${prefix}-${name}.png`
-  await painted()
-  await page.screenshot({ path: path.join(OUT, file) })
+  const bw = await app.browserWindow(page)
+  await drawable(bw, name)
+  await painted(bw)
+  const t0 = Date.now()
+  try {
+    await page.screenshot({ path: path.join(OUT, file), timeout: timing('sandbox.windowShotMs') })
+  } catch (e) {
+    throw new Error(`${String(e.message).split('\n')[0]} (sandbox.windowShotMs); the window: ${JSON.stringify(await windowState(bw))}`, { cause: e })
+  }
+  ;(res.facts.shotMs ||= {})[name] = Date.now() - t0
   res.shots.push(file)
   save()
 }
@@ -158,14 +211,14 @@ async function shot(name) {
 /** Sets the theme, and waits until the window shows it and Combwork has saved it (it saves 300 ms after a change). */
 async function theme(t) {
   await inv('settings:update', { appearance: { theme: t } })
-  await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === t && readConfig()?.settings?.appearance?.theme === t, 5000)
+  await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === t && readConfig()?.settings?.appearance?.theme === t, timing('hang.ui'))
 }
 
 /** The Agent API with the user's token: GET by default, or `method` with a JSON `body`. */
 async function api(route, method = 'GET', body) {
   const token = JSON.parse(fs.readFileSync(path.join(PROFILE, 'agent-api.json'), 'utf8')).token
   const port = readConfig()?.settings?.agentApi?.port || 47821
-  const r = await fetch(`http://127.0.0.1:${port}${route}`, { method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(30_000) })
+  const r = await fetch(`http://127.0.0.1:${port}${route}`, { method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(timing('hang.ui')) })
   return r.json()
 }
 
@@ -192,7 +245,7 @@ function userEnv() {
 
 /** Git in the seeded project, as this machine's mapped Git runs it; its output, or why it failed. */
 function git(cwd, ...args) {
-  try { return { ok: true, out: execFileSync(path.join(GIT_CMD, 'git.exe'), ['-c', 'user.name=Sandbox Check', '-c', 'user.email=sandbox-check@example.invalid', ...args], { cwd, encoding: 'utf8', timeout: 60_000 }).trim() } } catch (e) { return { ok: false, out: String(e.message).slice(0, 400) } }
+  try { return { ok: true, out: execFileSync(path.join(GIT_CMD, 'git.exe'), ['-c', 'user.name=Sandbox Check', '-c', 'user.email=sandbox-check@example.invalid', ...args], { cwd, encoding: 'utf8', timeout: timing('spawn.hang') }).trim() } } catch (e) { return { ok: false, out: String(e.message).slice(0, 400) } }
 }
 
 /** The worktrees git lists for the seeded project: their folders, lower-cased, with \ separators. */
@@ -215,7 +268,7 @@ async function laneView(id) {
 async function providerSetup() {
   const dialog = page.locator('.dialog', { hasText: 'Provider Setup' })
   if (!(await dialog.count())) await paletteCommand('help.agentSetup', 'Provider Setup')
-  return (await until(async () => (await dialog.count()) === 1, 10_000)) ? dialog : null
+  return (await until(async () => (await dialog.count()) === 1, timing('hang.ui'))) ? dialog : null
 }
 
 /** HKCU's Run values that start 1.0's exe or Combwork.exe (Launch at login): [{ name, command }]. */
@@ -265,12 +318,12 @@ async function paletteCommand(id, typed) {
   // dialog. Escape each time one is still open (a palette's first Escape clears its box, the next closes it).
   await page.keyboard.press('Escape')
   const clear = async () => (await page.locator('.dialog, .palette').count()) === 0 || (await page.keyboard.press('Escape'), false)
-  if (!(await until(clear, 10_000))) return failed("the previous step's dialog or palette to close")
+  if (!(await until(clear, timing('hang.ui')))) return failed("the previous step's dialog or palette to close")
   await page.keyboard.press('Control+Shift+P')
-  if (!(await until(async () => page.evaluate(() => !!document.activeElement?.closest('.palette') && document.activeElement.value === ''), 10_000))) return failed('the palette to have the focus, its box empty')
+  if (!(await until(async () => page.evaluate(() => !!document.activeElement?.closest('.palette') && document.activeElement.value === ''), timing('hang.ui')))) return failed('the palette to have the focus, its box empty')
   await page.keyboard.type(typed)
-  if (!(await until(async () => (await page.locator('.palette input').inputValue().catch(() => null)) === typed, 10_000))) return failed(`the box to hold "${typed}"`)
-  if (!(await until(async () => (await page.locator(`.palette-item.active[data-command="${id}"]`).count()) === 1, 10_000))) return failed(`${id} to be the chosen row`)
+  if (!(await until(async () => (await page.locator('.palette input').inputValue().catch(() => null)) === typed, timing('hang.ui')))) return failed(`the box to hold "${typed}"`)
+  if (!(await until(async () => (await page.locator(`.palette-item.active[data-command="${id}"]`).count()) === 1, timing('hang.ui')))) return failed(`${id} to be the chosen row`)
   await page.keyboard.press('Enter')
   return true
 }
@@ -328,23 +381,23 @@ async function markCombwork() {
   res.facts.version = (await api('/v1/health')).version
   // Quit never asks (the lane's agent runs at the end); Claude Code on, the fake its CLI.
   await inv('settings:update', { general: { userName: MARK.userName, launchAtLogin: true, confirmOnQuit: 'never' }, appearance: { theme: MARK.theme }, providers: { 'claude-code': { enabled: true, executablePath: path.join(FAKE_BIN, 'claude.cmd'), checkUpdatesOnLaunch: false } } })
-  const saved = await until(async () => { const c = readConfig(); return c?.settings?.general?.userName === MARK.userName && c.settings.general.launchAtLogin === true && c.settings.appearance?.theme === MARK.theme && c }, 10_000)
+  const saved = await until(async () => { const c = readConfig(); return c?.settings?.general?.userName === MARK.userName && c.settings.general.launchAtLogin === true && c.settings.appearance?.theme === MARK.theme && c }, timing('hang.ui'))
   check('4.settings-saved', `Before the upgrade: user name "${MARK.userName}", the ${MARK.theme} theme and Launch at login saved`, saved, JSON.stringify(readConfig()?.settings?.general))
-  const runs = await until(async () => startsCombworkOnly(runValues()), 15_000)
+  const runs = await until(async () => startsCombworkOnly(runValues()), timing('hang.ui'))
   res.facts.runBefore = runs || runValues()
   check('4.login-registered', 'Before the upgrade: Launch at login starts Combwork.exe', !!runs, JSON.stringify(res.facts.runBefore))
   // Something in the local profile folder (where accounts live), for the upgrade to leave where it is.
   const local = path.join(process.env.LOCALAPPDATA, 'Combwork')
   fs.mkdirSync(local, { recursive: true })
   fs.writeFileSync(path.join(local, LOCAL_MARK), 'kept across the upgrade')
-  const found = await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, 30_000)
+  const found = await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, timing('hang.ui'))
   res.facts.provider = found || (await inv('provider:info'))['claude-code']
 
   // A connection: the fake Claude Code's account, signed in (the fake signs in to nothing).
   const account = await inv('connections:add', 'claude-code', SEED.connection).catch((e) => ({ error: String(e) }))
   const home = account?.id ? path.join(local, 'accounts', account.id) : null
   if (account?.id) await inv('connections:signIn', account.id).catch((e) => { res.facts.signInError = String(e) })
-  const signedIn = !!home && (await until(async () => fs.existsSync(path.join(home, 'fake-account.json')) && !!readJson(path.join(home, '.claude.json'))?.oauthAccount, 30_000))
+  const signedIn = !!home && (await until(async () => fs.existsSync(path.join(home, 'fake-account.json')) && !!readJson(path.join(home, '.claude.json'))?.oauthAccount, timing('hang.ui')))
   // Its CLI's trust answers in its home, as Claude Code records a user's (one folder trusted, one answered no), beside
   // the account its sign-in wrote there, for the upgrade to keep as they are.
   if (signedIn) {
@@ -362,7 +415,7 @@ async function markCombwork() {
   fs.writeFileSync(path.join(KEPT_PROJECT, '.gitignore'), '.combwork/\n')
   res.facts.gitInit = [git(KEPT_PROJECT, 'init', '-b', 'main'), git(KEPT_PROJECT, 'add', '-A'), git(KEPT_PROJECT, 'commit', '-m', 'First commit')]
   await inv('workspace:open', KEPT_WS)
-  const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, DB_BEFORE)) && fs.existsSync(path.join(KEPT_PROJECT, TREE_BEFORE, 'project.json')), 30_000)
+  const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, DB_BEFORE)) && fs.existsSync(path.join(KEPT_PROJECT, TREE_BEFORE, 'project.json')), timing('hang.ui'))
   if (account?.id) res.facts.connectionOn = await inv('connections:setOn', account.id, true).then(() => true, (e) => String(e))
   // Git, on the Pair (agent merges) preset, as the window's Version Control tab saves it: the preset named and its
   // options (as the form offers them for this project) the project's own. Only the name, the options stay inherited (no slots).
@@ -371,7 +424,7 @@ async function markCombwork() {
   const offered = form?.presets?.find?.((x) => x.id === SEED.preset)?.options ?? null
   const savedForm = offered ? await inv('workflow:setOptions', KEPT_PROJECT, { preset: SEED.preset, options: offered }).catch((e) => ({ error: String(e) })) : { error: `no ${SEED.preset} preset offered: ${JSON.stringify(form?.presets?.map?.((x) => x.id) ?? form).slice(0, 300)}` }
   res.facts.workflowSet = { platform, preset: savedForm?.preset ?? savedForm, folder: savedForm?.options?.folder ?? null, invalid: savedForm?.invalid ?? null, enforced: savedForm?.enforced ?? null }
-  const workflow = await until(async () => { const w = readJson(path.join(KEPT_PROJECT, TREE_BEFORE, 'project.json'))?.workflow; return w?.preset === SEED.preset && w?.options?.folder === 'slots' && w }, 15_000)
+  const workflow = await until(async () => { const w = readJson(path.join(KEPT_PROJECT, TREE_BEFORE, 'project.json'))?.workflow; return w?.preset === SEED.preset && w?.options?.folder === 'slots' && w }, timing('hang.ui'))
   // Two cards, the first labelled, linked to the second and commented on; both code cards (the lane's needs a slot).
   const create = (title, description) => inv('tasks:create', { title, project: 'demo', description }).catch((e) => ({ error: String(e) }))
   const card = made ? await create(KEPT_CARD, `The plan: ${path.join(KEPT_WS, '.combwork', 'shared', 'plan.md')}`) : null
@@ -392,7 +445,7 @@ async function markCombwork() {
   // Advanced overrides under their cw.* ids, one at each level: Combwork's own (advanced.json) and the workspace's own.
   const setAdv = (id, value, scope) => inv('advanced:set', id, value, scope).then(() => null, (e) => String(e))
   res.facts.advancedSet = { app: await setAdv(ADV.app.now, ADV.app.value), workspace: made ? await setAdv(ADV.ws.now, ADV.ws.value, 'workspace') : 'no workspace' }
-  const advSaved = await until(async () => readJson(path.join(PROFILE, 'advanced.json'))?.values?.[ADV.app.now] === ADV.app.value && readJson(path.join(KEPT_WS, '.combwork', 'workspace.json'))?.advanced?.[ADV.ws.now] === ADV.ws.value, 10_000)
+  const advSaved = await until(async () => readJson(path.join(PROFILE, 'advanced.json'))?.values?.[ADV.app.now] === ADV.app.value && readJson(path.join(KEPT_WS, '.combwork', 'workspace.json'))?.advanced?.[ADV.ws.now] === ADV.ws.value, timing('hang.ui'))
   check('4.advanced-saved', `Before the upgrade: ${ADV.app.now} = ${ADV.app.value} in advanced.json and the workspace's own ${ADV.ws.now} = ${ADV.ws.value}`, advSaved, JSON.stringify({ set: res.facts.advancedSet, file: readJson(path.join(PROFILE, 'advanced.json'))?.values, ws: readJson(path.join(KEPT_WS, '.combwork', 'workspace.json'))?.advanced }))
 
   // An agent, and a lane over it recorded through the Agent API (as a script does): in slots, its start lends the
@@ -400,7 +453,7 @@ async function markCombwork() {
   const agent = made ? await inv('agents:add', KEPT_PROJECT, { provider: 'claude-code', name: SEED.builder }).catch((e) => ({ error: String(e) })) : null
   const started = agent?.id && card?.number ? await api('/v1/lanes', 'POST', { project: 'demo', builder: agent.id, cards: [card.number], name: SEED.lane }).catch((e) => ({ error: String(e) })) : null
   const laneId = started?.lane?.id ?? null
-  const lane = laneId ? await until(async () => { const l = await laneView(laneId); return l.slot && l }, 90_000) : null
+  const lane = laneId ? await until(async () => { const l = await laneView(laneId); return l.slot && l }, timing('hang.step')) : null
   const slotDir = lane?.slot ? path.join(`${KEPT_WS}.worktrees`, 'demo', lane.slot) : null
   const listed = slotDir && worktreesOf(KEPT_PROJECT).includes(path.resolve(slotDir).toLowerCase())
   res.facts.lane = { agent: agent?.id ?? agent, started: started && { did: started.did, note: started.note, error: started.error }, lane: lane || (laneId ? await laneView(laneId) : null), slotDir, listed }
@@ -433,7 +486,7 @@ async function afterCombwork() {
   const local = path.join(process.env.LOCALAPPDATA, 'Combwork')
   const oldMade = [process.env.LOCALAPPDATA, process.env.APPDATA].filter((d) => fs.existsSync(path.join(d, OLD_NAME)))
   check('4.local-kept', "The local folder kept where it was, with its data: %LOCALAPPDATA%\\Combwork; no folder of 1.0's made", fs.existsSync(path.join(local, LOCAL_MARK)) && !oldMade.length, JSON.stringify({ mark: fs.existsSync(path.join(local, LOCAL_MARK)), oldMade }))
-  const runs = await until(async () => startsCombworkOnly(runValues()), 15_000)
+  const runs = await until(async () => startsCombworkOnly(runValues()), timing('hang.ui'))
   res.facts.runAfter = runs || runValues()
   check('4.login-kept', 'Launch at login still starts Combwork.exe, and only it', !!runs, JSON.stringify(res.facts.runAfter))
   const fallback = await page.locator('.toast', { hasText: OLD_FALLBACK_NOTICE }).count()
@@ -449,7 +502,7 @@ async function afterCombwork() {
 
   // The workspace: its .combwork as it was, nothing of 1.0's made.
   const oldTrees = [path.join(KEPT_WS, OLD_DIR), path.join(KEPT_PROJECT, OLD_DIR)].filter((d) => fs.existsSync(d))
-  const kept = await until(async () => fs.existsSync(path.join(KEPT_WS, '.combwork', 'combwork.db')) && fs.existsSync(path.join(KEPT_PROJECT, '.combwork', 'project.json')), 30_000)
+  const kept = await until(async () => fs.existsSync(path.join(KEPT_WS, '.combwork', 'combwork.db')) && fs.existsSync(path.join(KEPT_PROJECT, '.combwork', 'project.json')), timing('hang.ui'))
   check('4.workspace-kept', 'The workspace from before opens from its own .combwork (the workspace\'s and the project\'s), none of 1.0\'s made', !!kept && !oldTrees.length, JSON.stringify({ kept, oldTrees, ws: fs.existsSync(KEPT_WS) ? fs.readdirSync(KEPT_WS) : null }))
 
   // The cards: each as it was (title, description, kind, labels, links), its comments kept; the second, which nothing
@@ -503,7 +556,7 @@ const steps = {
     const providers = await api('/v1/providers')
     res.facts.providers = providers
     const list = providers.providers || providers
-    // By the descriptors' ids (HI-2727; a unit test holds PROVIDER_IDS to src/shared/providers.ts), not a count.
+    // By the descriptors' ids (HI-2727; a unit test holds PROVIDER_IDS to src/shared/providers' PROVIDERS), not a count.
     const ids = Array.isArray(list) ? list.map(p => p.id) : []
     check('2.api-providers', `Agent API: every provider known (${PROVIDER_IDS.join(', ')}), none on, none installed`, Array.isArray(list) && JSON.stringify([...ids].sort()) === JSON.stringify([...PROVIDER_IDS].sort()) && list.every(p => !p.enabled && !p.installed), JSON.stringify(list.map?.(p => ({ id: p.id, enabled: p.enabled, installed: p.installed })) ?? list))
 
@@ -527,10 +580,10 @@ const steps = {
     await launch()
     const pid = app.process().pid
     // Turn Claude Code on, as a user does: the banner's "Choose providers", then its switch.
-    await page.locator('.providers-banner button', { hasText: 'Choose providers' }).click({ timeout: 10_000 }).catch(() => {})
+    await page.locator('.providers-banner button', { hasText: 'Choose providers' }).click({ timeout: timing('hang.ui') }).catch(() => {})
     const sw = page.locator('[role="switch"][aria-label="Use Claude Code"]')
-    await sw.click({ timeout: 10_000 })
-    const on = await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i }, 30_000)
+    await sw.click({ timeout: timing('hang.ui') })
+    const on = await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i }, timing('hang.ui'))
     res.facts.before = on
     check('3.on-not-found', 'Claude Code turned on, not found yet', on && !on.found, JSON.stringify(on))
     const banner = (await page.locator('.providers-banner').allInnerTexts()).join(' | ')
@@ -548,7 +601,7 @@ const steps = {
     const appPath = await app.evaluate(() => process.env.PATH || process.env.Path || '')
     check('3.user-path', 'The new folder is on the user PATH, not on Combwork\'s own PATH yet', !appPath.toLowerCase().includes('fakeclaude'), appPath.slice(0, 300))
     if (dialog) await dialog.locator('button', { hasText: 'Check again' }).click()
-    const found = dialog && await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, 30_000)
+    const found = dialog && await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, timing('hang.ui'))
     res.facts.after = found || (await inv('provider:info'))['claude-code']
     check('3.check-again-finds', '"Check again" finds it, without restarting Combwork', found && found.source === 'PATH' && found.version === '2.1.999' && /claude\.cmd$/i.test(found.path || '') && app.process().pid === pid, dialog ? JSON.stringify(res.facts.after) : `${NO_DIALOG}, so "Check again" was never pressed; ${JSON.stringify(res.facts.after)}`)
     check('3.setup-found', 'Provider Setup shows "Claude Code 2.1.999 — found via …"', dialog && /Claude Code 2\.1\.999 — found via/.test(await dialogText()), await dialogText())
@@ -572,7 +625,7 @@ const steps = {
     fs.mkdirSync(path.join(ws, 'demo'), { recursive: true })
     fs.writeFileSync(path.join(ws, 'demo', 'README.md'), '# demo\n')
     await inv('workspace:open', ws)
-    const opened = await until(async () => (await page.locator('.welcome').count()) === 0 && fs.existsSync(path.join(ws, '.combwork')), 30_000)
+    const opened = await until(async () => (await page.locator('.welcome').count()) === 0 && fs.existsSync(path.join(ws, '.combwork')), timing('hang.ui'))
     check('6.workspace-opens', 'A new workspace opens (an empty folder with one project folder)', opened, 'still on the welcome screen')
     const tree = (dir, depth) => {
       if (!fs.existsSync(dir)) return null
@@ -596,7 +649,7 @@ const steps = {
     for (const view of VIEWS) {
       const { name, slug } = view
       try {
-        await page.getByRole('button', { name, exact: true }).first().click({ timeout: 5000 })
+        await page.getByRole('button', { name, exact: true }).first().click({ timeout: timing('hang.ui') })
         // Read once the view shows its loaded data (ready.cjs VIEWS); not loaded within the bound, it isn't counted.
         if (!(await viewReady(view, sel => page.locator(sel).count()))) throw new Error(`the ${name} view didn't show its loaded content within 20 s (${view.ready.join(', ')})`)
         res.facts.views[name] = (await page.evaluate(() => (document.querySelector('.workbench') || document.body).innerText)).slice(0, 1500)
@@ -615,7 +668,7 @@ const steps = {
     res.facts.version = (await api('/v1/health')).version
     // Launch at login on too (HI-2460): 1.0 registers its own exe, which the upgrade replaces with Combwork.exe.
     await inv('settings:update', { general: { userName: MARK.userName, launchAtLogin: true }, appearance: { theme: MARK.theme } })
-    const saved = await until(async () => { const c = readConfig(); return c?.settings?.general?.userName === MARK.userName && c.settings.general.launchAtLogin === true && c.settings.appearance?.theme === MARK.theme && c }, 10_000)
+    const saved = await until(async () => { const c = readConfig(); return c?.settings?.general?.userName === MARK.userName && c.settings.general.launchAtLogin === true && c.settings.appearance?.theme === MARK.theme && c }, timing('hang.ui'))
     check('4.settings-saved', `Before the upgrade: user name "${MARK.userName}", the ${MARK.theme} theme and Launch at login saved`, saved, JSON.stringify(readConfig()?.settings?.general))
     // 1.0's own folders and its Launch at login (HI-2460, HI-2461): an RC has moved them already.
     if (!FROM_RC) {
@@ -633,7 +686,7 @@ const steps = {
     fs.mkdirSync(path.join(KEPT_WS, 'demo'), { recursive: true })
     fs.writeFileSync(path.join(KEPT_WS, 'demo', 'README.md'), '# demo\n')
     await inv('workspace:open', KEPT_WS)
-    const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, OLD_DB)) && fs.existsSync(path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')), 30_000)
+    const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, OLD_DB)) && fs.existsSync(path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')), timing('hang.ui'))
     let card = null
     if (made) card = await inv('tasks:create', { title: KEPT_CARD, project: 'demo', description: `The plan: ${path.join(KEPT_WS, TREE_BEFORE, 'shared', 'plan.md')}` }).catch((e) => ({ error: String(e) }))
     // A skill copy as the release before marks it (HI-2587), for the upgrade to rename its marker.
@@ -647,7 +700,7 @@ const steps = {
     // in the profile) and the workspace's own (its workspace.json), for the upgrade to bring back under cw.*.
     const setAdv = (id, value, scope) => inv('advanced:set', id, value, scope).then(() => null, (e) => String(e))
     res.facts.advancedSet = { app: await setAdv(ADV.app.old, ADV.app.value), workspace: made ? await setAdv(ADV.ws.old, ADV.ws.value, 'workspace') : 'no workspace' }
-    const advSaved = await until(async () => readJson(path.join(PROFILE, 'advanced.json'))?.values?.[ADV.app.old] === ADV.app.value && readJson(path.join(KEPT_WS, OLD_DIR, 'workspace.json'))?.advanced?.[ADV.ws.old] === ADV.ws.value, 10_000)
+    const advSaved = await until(async () => readJson(path.join(PROFILE, 'advanced.json'))?.values?.[ADV.app.old] === ADV.app.value && readJson(path.join(KEPT_WS, OLD_DIR, 'workspace.json'))?.advanced?.[ADV.ws.old] === ADV.ws.value, timing('hang.ui'))
     check('4.advanced-saved', `Before the upgrade: ${ADV.app.old} = ${ADV.app.value} in advanced.json and the workspace's own ${ADV.ws.old} = ${ADV.ws.value}`, advSaved, JSON.stringify({ set: res.facts.advancedSet, file: readJson(path.join(PROFILE, 'advanced.json'))?.values, ws: readJson(path.join(KEPT_WS, OLD_DIR, 'workspace.json'))?.advanced }))
     await beforeUpgrade(made)
   },
@@ -665,7 +718,7 @@ const steps = {
       return true
     })
     const key = `HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Notifications\\Settings\\${aumid}`
-    const known = await until(async () => ps(`Test-Path '${key}'`) === 'True', 20_000)
+    const known = await until(async () => ps(`Test-Path '${key}'`) === 'True', timing('hang.ui'))
     // Its scenario: the prefix's (s4-notify → 4), else 8.
     const sc = /^s(\d+)/.exec(prefix)?.[1] || '8'
     check(`${sc}.notification`, `A notification shows under the app ID ${aumid} (Windows lists it in Notifications)`, res.facts.shown && known, `shown ${res.facts.shown}; ${key} ${known ? 'there' : 'missing'}`)
@@ -702,10 +755,10 @@ const steps = {
     await shot('start')
 
     // Claude Code turned on as a user does (the banner's "Choose providers", its switch): the fake is found on the PATH.
-    await page.locator('.providers-banner button', { hasText: 'Choose providers' }).click({ timeout: 10_000 }).catch(() => {})
+    await page.locator('.providers-banner button', { hasText: 'Choose providers' }).click({ timeout: timing('hang.ui') }).catch(() => {})
     await keep('Provider Setup')
-    await page.locator('[role="switch"][aria-label="Use Claude Code"]').click({ timeout: 10_000 }).catch(() => {})
-    const found = await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, 30_000)
+    await page.locator('[role="switch"][aria-label="Use Claude Code"]').click({ timeout: timing('hang.ui') }).catch(() => {})
+    const found = await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, timing('hang.ui'))
     check('9.provider-on', 'Claude Code turned on and found (the fake, 2.1.999)', found && found.version === '2.1.999', JSON.stringify((await inv('provider:info'))['claude-code']))
     await keep('Provider Setup, Claude Code on')
     await page.keyboard.press('Escape')
@@ -714,7 +767,7 @@ const steps = {
     const account = await inv('connections:add', 'claude-code', 'Sandbox').catch((e) => ({ error: String(e) }))
     const home = account?.id ? path.join(process.env.LOCALAPPDATA, 'Combwork', 'accounts', account.id) : null
     if (account?.id) await inv('connections:signIn', account.id).catch((e) => { res.facts.signInError = String(e) })
-    const signedIn = !!home && (await until(async () => fs.existsSync(path.join(home, 'fake-account.json')), 30_000))
+    const signedIn = !!home && (await until(async () => fs.existsSync(path.join(home, 'fake-account.json')), timing('hang.ui')))
     res.facts.account = { id: account?.id, error: account?.error, home }
     check('9.account', 'A Claude Code account added and signed in', signedIn, JSON.stringify(res.facts.account))
 
@@ -724,7 +777,7 @@ const steps = {
     res.facts.workspace = ws
     fs.mkdirSync(proj, { recursive: true })
     fs.writeFileSync(path.join(proj, 'README.md'), '# demo\n')
-    try { res.facts.gitInit = execFileSync(path.join(gitCmd, 'git.exe'), ['init'], { cwd: proj, encoding: 'utf8', env, timeout: 60_000 }).trim() } catch (e) { res.facts.gitInit = String(e.message) }
+    try { res.facts.gitInit = execFileSync(path.join(gitCmd, 'git.exe'), ['init'], { cwd: proj, encoding: 'utf8', env, timeout: timing('spawn.hang') }).trim() } catch (e) { res.facts.gitInit = String(e.message) }
     check('9.git-project', 'The project is a git repository (git init)', fs.existsSync(path.join(proj, '.git', 'HEAD')), res.facts.gitInit)
     await inv('workspace:open', ws)
     const status = await workspaceSetUp(() => api('/v1/status'), ws)
@@ -732,7 +785,7 @@ const steps = {
     await keep('workspace')
     for (const view of VIEWS) {
       try {
-        await page.getByRole('button', { name: view.name, exact: true }).first().click({ timeout: 5000 })
+        await page.getByRole('button', { name: view.name, exact: true }).first().click({ timeout: timing('hang.ui') })
         await viewReady(view, (sel) => page.locator(sel).count())
         await keep(`view: ${view.name}`)
       } catch (e) {
@@ -742,16 +795,16 @@ const steps = {
 
     // The account turned on in this workspace as a user does (HI-2650): nothing is turned on by itself, so the project,
     // with no agent yet, says the account is off here and offers Turn On Here on its empty card, which the user clicks.
-    await page.locator('.activity-btn[aria-label="Projects"]').click({ timeout: 5000 }).catch(() => {})
-    await page.getByText('demo', { exact: true }).first().click({ timeout: 10_000 }).catch(() => {})
+    await page.locator('.activity-btn[aria-label="Projects"]').click({ timeout: timing('hang.ui') }).catch(() => {})
+    await page.getByText('demo', { exact: true }).first().click({ timeout: timing('hang.ui') }).catch(() => {})
     const offHere = page.locator('.session-empty-card [data-connection-setup="empty"][data-off-here="one"]')
-    const offered = await until(async () => (await offHere.count()) > 0 && /Sandbox, your Claude Code account, is off in this workspace/.test(await offHere.innerText()), 20_000)
+    const offered = await until(async () => (await offHere.count()) > 0 && /Sandbox, your Claude Code account, is off in this workspace/.test(await offHere.innerText()), timing('hang.ui'))
     res.facts.offHere = await offHere.innerText().catch((e) => String(e.message))
     check('9.account-off-here', "The empty project says the account is off here and offers Turn On Here (nothing on by itself)", !!offered, res.facts.offHere)
     await keep('project, account off here')
     await shot('off-here')
-    if (account?.id) await offHere.locator(`[data-turn-on-here="${account.id}"]`).click({ timeout: 10_000 }).catch((e) => { res.facts.turnOnError = String(e.message) })
-    res.facts.accountOn = !!account?.id && !!(await until(async () => ((await inv('connections:list')).workspace['claude-code']?.on ?? []).includes(account.id), 20_000))
+    if (account?.id) await offHere.locator(`[data-turn-on-here="${account.id}"]`).click({ timeout: timing('hang.ui') }).catch((e) => { res.facts.turnOnError = String(e.message) })
+    res.facts.accountOn = !!account?.id && !!(await until(async () => ((await inv('connections:list')).workspace['claude-code']?.on ?? []).includes(account.id), timing('hang.ui')))
     check('9.account-on', 'Turn On Here turns the account on in this workspace', res.facts.accountOn, res.facts.turnOnError || '')
 
     // An agent, started briefly: its first task is `set`, which the fake runs in the session's shell (fake-shell.jsonl).
@@ -767,7 +820,7 @@ const steps = {
     const ran = started && (await until(async () => {
       if (!trusted && /trust this folder/i.test(await inv('pty:buffer', key).catch(() => ''))) { trusted = true; await inv('pty:write', key, '\r') }
       return setRun()
-    }, 60_000))
+    }, timing('hang.step')))
     check('9.agent-started', 'An agent starts in the project (the fake Claude Code)', started && !!(await inv('pty:buffer', key).catch(() => '')), JSON.stringify(res.facts.agent) + (res.facts.startError || ''))
     if (ran) fs.writeFileSync(path.join(OUT, `${prefix}-agent-env.txt`), ran.stdout)
     check('9.agent-env', "The agent's environment captured (`set` in its session)", !!ran && /^PATH=/im.test(ran.stdout), ran ? ran.stdout.slice(0, 300) : 'set never ran')
@@ -777,8 +830,8 @@ const steps = {
 
     // A card, and the board showing it.
     const card = await inv('tasks:create', { title: 'A first card', project: 'demo', description: 'Made on a clean install.' }).catch((e) => ({ error: String(e) }))
-    await page.getByRole('button', { name: 'Task Board', exact: true }).first().click({ timeout: 5000 }).catch(() => {})
-    const shown = await until(async () => (await page.locator('.board-view', { hasText: 'A first card' }).count()) > 0, 20_000)
+    await page.getByRole('button', { name: 'Task Board', exact: true }).first().click({ timeout: timing('hang.ui') }).catch(() => {})
+    const shown = await until(async () => (await page.locator('.board-view', { hasText: 'A first card' }).count()) > 0, timing('hang.ui'))
     check('9.card', 'A card made, on the board', typeof card?.number === 'number' && shown, JSON.stringify(card))
     await keep('board')
     await shot('board')
@@ -787,13 +840,13 @@ const steps = {
     await page.keyboard.press('Escape')
     await page.keyboard.press('Control+,')
     const rows = page.locator('.settings-nav .row[data-section]')
-    const opened = await until(async () => (await rows.count()) > 0, 10_000)
+    const opened = await until(async () => (await rows.count()) > 0, timing('hang.ui'))
     const sections = opened ? await rows.evaluateAll((els) => els.map((e) => e.getAttribute('data-section'))) : []
     res.facts.settingsSections = sections
     let seen = 0
     for (const s of sections) {
       try {
-        await page.locator(`.settings-nav .row[data-section="${s}"]`).click({ timeout: 5000 })
+        await page.locator(`.settings-nav .row[data-section="${s}"]`).click({ timeout: timing('hang.ui') })
         await painted()
         await keep(`Settings: ${s}`)
         if (!seen) await shot('settings')
@@ -809,10 +862,10 @@ const steps = {
     await app.evaluate(({ clipboard }) => clipboard.clear())
     const diagOpen = await paletteCommand('help.diagnostics', 'Copy Diagnostics')
     const copy = page.locator('.dialog', { hasText: 'Copy Diagnostics' }).locator('button.btn.primary')
-    const ready = diagOpen && (await until(async () => (await copy.count()) === 1 && (await copy.isEnabled()), 30_000))
+    const ready = diagOpen && (await until(async () => (await copy.count()) === 1 && (await copy.isEnabled()), timing('hang.ui')))
     await keep('Copy Diagnostics')
     if (ready) await copy.click()
-    const diag = ready && (await until(async () => (await app.evaluate(({ clipboard }) => clipboard.readText())) || false, 10_000))
+    const diag = ready && (await until(async () => (await app.evaluate(({ clipboard }) => clipboard.readText())) || false, timing('hang.ui')))
     if (diag) fs.writeFileSync(path.join(OUT, `${prefix}-diagnostics.txt`), diag)
     check('9.diagnostics', 'Copy Diagnostics copies its text', !!diag, diagOpen ? 'nothing copied' : paletteFailure('help.diagnostics', 'Copy Diagnostics'))
 
@@ -822,14 +875,14 @@ const steps = {
     res.facts.exportDir = exportDir
     await app.evaluate(({ dialog }, dir) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] }) }, exportDir)
     const exportRan = await paletteCommand('task.exportBoard', 'Export Board')
-    const exported = exportRan && (await until(async () => fs.readdirSync(exportDir).some((d) => fs.statSync(path.join(exportDir, d)).isDirectory() && fs.readdirSync(path.join(exportDir, d)).length > 0), 20_000))
+    const exported = exportRan && (await until(async () => fs.readdirSync(exportDir).some((d) => fs.statSync(path.join(exportDir, d)).isDirectory() && fs.readdirSync(path.join(exportDir, d)).length > 0), timing('hang.ui')))
     check('9.export', 'Export Board to JSON writes the board', !!exported, exportRan ? JSON.stringify(fs.readdirSync(exportDir)) : paletteFailure('task.exportBoard', 'Export Board'))
     await keep('after the export')
 
     // Quit, as a user does (the app's own quit), and wait for it to end.
     const proc = app.process()
     await app.evaluate(({ app: a }) => a.quit()).catch(() => {})
-    const quit = await until(async () => proc.exitCode !== null, 60_000)
+    const quit = await until(async () => proc.exitCode !== null, timing('hang.step'))
     check('9.quit', 'Combwork quits', quit, `still running (pid ${proc.pid})`)
     if (quit) app = null
   },
@@ -861,7 +914,7 @@ const steps = {
       res.facts.record = rec
       check('4.record', "The installer's record arrived with the local folder (v 1, by installer)", rec?.v === 1 && rec.by === 'installer' && String(rec.from).toLowerCase().endsWith(`\\${OLD_NAME}`.toLowerCase()), JSON.stringify(rec))
       // Its Launch at login: written for Combwork.exe at start (loginItem.ts), the 1.0 app's removed by the installer.
-      const runs = await until(async () => { const v = runValues(); return v.some((x) => /\\Combwork\.exe/i.test(x.command)) && v }, 15_000)
+      const runs = await until(async () => { const v = runValues(); return v.some((x) => /\\Combwork\.exe/i.test(x.command)) && v }, timing('hang.ui'))
       res.facts.runAfter = runs || runValues()
       check('4.login-moved', "Launch at login starts Combwork.exe, and nothing starts 1.0's exe", !!runs && !runs.some((x) => startsOld(x.command)), JSON.stringify(res.facts.runAfter))
       const fallback = await page.locator('.toast', { hasText: OLD_FALLBACK_NOTICE }).count()
@@ -878,7 +931,7 @@ const steps = {
       card = typeof seeded === 'number' ? { number: seeded } : null
     } else {
       const movedNow = () => fs.existsSync(path.join(KEPT_WS, '.combwork', 'combwork.db')) && !fs.existsSync(path.join(KEPT_WS, OLD_DIR)) && fs.existsSync(path.join(KEPT_WS, 'demo', '.combwork', 'project.json')) && !fs.existsSync(path.join(KEPT_WS, 'demo', OLD_DIR))
-      const moved = await until(async () => movedNow(), 30_000)
+      const moved = await until(async () => movedNow(), timing('hang.ui'))
       res.facts.keptWorkspaceAfter = fs.existsSync(KEPT_WS) ? fs.readdirSync(KEPT_WS) : null
       check('4.workspace-moved', "The workspace from before opens with its 1.0 folders moved to .combwork (the workspace's and the project's)", !!moved, JSON.stringify(res.facts.keptWorkspaceAfter))
       const cards = await inv('tasks:list').catch((e) => ({ error: String(e) }))
@@ -888,7 +941,7 @@ const steps = {
       // HI-2598: the stored values converted once: the project's kept Git options, and the card's facts' actors.
       // Waited for (HI-2645): the open converts it in its own time, and a read as it is renamed into place reads nothing.
       const converted = (o) => o?.finish === 'combworkMerges' && o?.commitMessage === 'combwork'
-      const keptGit = (await until(async () => { const o = keptGitOptions('.combwork'); return converted(o) && o }, 15_000)) || keptGitOptions('.combwork')
+      const keptGit = (await until(async () => { const o = keptGitOptions('.combwork'); return converted(o) && o }, timing('hang.ui'))) || keptGitOptions('.combwork')
       check('4.values-options', "The project's kept Git options say Combwork's (combworkMerges, Combwork's commit message), no old value left", converted(keptGit), JSON.stringify(keptGit ?? readJson(path.join(KEPT_WS, 'demo', '.combwork', 'project.json'))?.workflow ?? null))
     }
     const facts = card ? await inv('tasks:facts', card.number).catch(() => null) : null
@@ -920,7 +973,7 @@ const steps = {
       // API's settings read) and on disk (advanced.json rewritten at once; workspace.json at its next save, so not checked),
       // with nothing left under the old id; and an agent naming the old id told the new one.
       const fileNow = () => readJson(path.join(PROFILE, 'advanced.json'))?.values ?? null
-      const rewritten = await until(async () => { const v = fileNow(); return v && v[ADV.app.now] === ADV.app.value && !(ADV.app.old in v) && v }, 15_000)
+      const rewritten = await until(async () => { const v = fileNow(); return v && v[ADV.app.now] === ADV.app.value && !(ADV.app.old in v) && v }, timing('hang.ui'))
       const state = await inv('advanced:state').catch((e) => ({ error: String(e) }))
       const viaApi = await api(`/v1/settings/${encodeURIComponent(`advanced.${ADV.app.now}`)}`).catch((e) => ({ error: String(e) }))
       const wsApi = await api(`/v1/settings/${encodeURIComponent(`workspace.advanced.${ADV.ws.now}`)}`).catch((e) => ({ error: String(e) }))

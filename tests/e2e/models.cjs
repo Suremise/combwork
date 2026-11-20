@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'models-profile')
 const ws = path.join(lib.WORK, 'models-ws')
@@ -169,13 +169,13 @@ const check = (name, ok, extra = '') => {
   await lib.addAgent(inv, alpha, { name: 'Sol', provider: 'codex', model: 'gpt-6-sol', permissionMode: 'approve-for-me' })
   const footer = page.locator('.pane-footer-bar').first()
   const footerText = async () => (await footer.innerText().catch(() => '')) + (await footer.locator('[title]').evaluateAll((es) => es.map((e) => e.getAttribute('title')).join(' ')).catch(() => ''))
-  const shown = await lib.until(async () => /Medium \(default\)/.test(await footerText()), 8000)
+  const shown = await lib.until(async () => /Medium \(default\)/.test(await footerText()), lib.timing('hang.ui'))
   check("the footer shows the model's default effort: Medium (default)", !!shown, await footer.innerText().catch(() => ''))
   // Effort levels renamed in Settings name the footer's effort too, as they do the pickers' (#230); Reset gives Combwork's.
   await inv('settings:setProviderFallback', 'codex', 'efforts', [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Mid' }, { value: 'high', label: 'High' }])
-  check('a renamed effort level names the footer’s effort: Mid (default)', !!(await lib.until(async () => /Mid \(default\)/.test(await footerText()), 8000)), await footer.innerText().catch(() => ''))
+  check('a renamed effort level names the footer’s effort: Mid (default)', !!(await lib.until(async () => /Mid \(default\)/.test(await footerText()), lib.timing('hang.ui'))), await footer.innerText().catch(() => ''))
   await inv('settings:setProviderFallback', 'codex', 'efforts', null)
-  check('…and after Reset to defaults, Medium (default) again', !!(await lib.until(async () => /Medium \(default\)/.test(await footerText()), 8000)), await footer.innerText().catch(() => ''))
+  check('…and after Reset to defaults, Medium (default) again', !!(await lib.until(async () => /Medium \(default\)/.test(await footerText()), lib.timing('hang.ui'))), await footer.innerText().catch(() => ''))
 
   // --- The model that runs (#248): an agent and the Assistant on "Opus", and an agent on the default, all show Opus 5.5.
   await lib.addAgent(inv, alpha, { name: 'Writer', model: 'opus' })
@@ -183,7 +183,7 @@ const check = (name, ok, extra = '') => {
   await page.locator('.layout-switch button[aria-label="Three columns"]').click()
   const modelOf = (name) => page.locator('.agent-pane', { has: page.locator('.pane-header-bar', { hasText: name }) }).locator('.foot-model')
   const modelText = async (name) => (await modelOf(name).innerText().catch(() => '')).split(' · ')[0].trim()
-  check('an agent set to Opus shows the model it runs: Opus 5.5', !!(await lib.until(async () => (await modelText('Writer')) === 'Opus 5.5', 8000)), await modelText('Writer'))
+  check('an agent set to Opus shows the model it runs: Opus 5.5', !!(await lib.until(async () => (await modelText('Writer')) === 'Opus 5.5', lib.timing('hang.ui'))), await modelText('Writer'))
   check('an agent on the default shows Opus 5.5 (default)', (await modelText('Plain')) === 'Opus 5.5 (default)', await modelText('Plain'))
   await modelOf('Writer').hover()
   check('…and the tooltip says it was chosen as Opus', !!(await lib.until(async () => (await page.locator('.tip', { hasText: 'Opus 5.5 · chosen as Opus' }).count()) > 0, HUNG_MS)))
@@ -192,17 +192,17 @@ const check = (name, ok, extra = '') => {
   await lib.setLaunch(inv, assistantHome, 'assistant', { model: 'opus' })
   if ((await page.locator('.assistant-panel').count()) === 0) await page.locator('.assistant-rail').click()
   const assistantModel = async () => (await page.locator('.assistant-footer .foot-model').innerText().catch(() => '')).split(' · ')[0].trim()
-  check('the Assistant set to Opus shows Opus 5.5 too', !!(await lib.until(async () => (await assistantModel()) === 'Opus 5.5', 8000)), await assistantModel())
+  check('the Assistant set to Opus shows Opus 5.5 too', !!(await lib.until(async () => (await assistantModel()) === 'Opus 5.5', lib.timing('hang.ui'))), await assistantModel())
   await page.screenshot({ path: path.join(lib.WORK, 'models-alias-footers.png') })
   await light('models-alias-footers-light.png')
   // Claude Code's own default given as an alias (the test home's settings.json "model"): resolved too, still "(default)".
   fs.writeFileSync(path.join(claudeHome, 'settings.json'), JSON.stringify({ model: 'opus' }))
   await inv('provider:refresh', 'claude-code')
-  check("Claude Code's default is now its settings' alias", !!(await lib.until(async () => (await info('claude-code')).defaultModel === 'opus', 15000)), (await info('claude-code')).defaultModel)
-  check('…and an agent on the default still shows Opus 5.5 (default)', !!(await lib.until(async () => (await modelText('Plain')) === 'Opus 5.5 (default)', 8000)), await modelText('Plain'))
+  check("Claude Code's default is now its settings' alias", !!(await lib.until(async () => (await info('claude-code')).defaultModel === 'opus', lib.timing('hang.ui'))), (await info('claude-code')).defaultModel)
+  check('…and an agent on the default still shows Opus 5.5 (default)', !!(await lib.until(async () => (await modelText('Plain')) === 'Opus 5.5 (default)', lib.timing('hang.ui'))), await modelText('Plain'))
   fs.rmSync(path.join(claudeHome, 'settings.json'), { force: true })
   await inv('provider:refresh', 'claude-code')
-  await lib.until(async () => (await info('claude-code')).defaultModel === 'claude-opus-5-5', 15000)
+  await lib.until(async () => (await info('claude-code')).defaultModel === 'claude-opus-5-5', lib.timing('hang.ui'))
   await lib.setLaunch(inv, assistantHome, 'assistant', { model: '' })
   // Hidden from the header's ⋯ (#979: the header's own Hide button went into it).
   await page.locator('.assistant-header button[aria-label="More"]').click()
@@ -227,7 +227,7 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(broken, ['@echo off', 'if "%1"=="--version" (', '  echo 2.1.998 ^(Claude Code^)', '  exit /b 0', ')', 'exit /b 1', ''].join('\r\n'))
   await update({ providers: { 'claude-code': { executablePath: broken } } })
   await inv('provider:refresh', 'claude-code')
-  await lib.until(async () => { const i = await info('claude-code'); return !i.checking && i.version === '2.1.998' && !i.catalog }, 20000)
+  await lib.until(async () => { const i = await info('claude-code'); return !i.checking && i.version === '2.1.998' && !i.catalog }, lib.timing('hang.ui'))
   check('the broken CLI is the one Combwork uses, and it gave no models', (await info('claude-code')).version === '2.1.998' && !(await info('claude-code')).catalog, JSON.stringify((await info('claude-code')).version))
   // The picker: a connection's (Claude Code has no default model of its own, HI-1774); the list's source on its page.
   await editConnection(claudeAccount)
@@ -281,12 +281,12 @@ const check = (name, ok, extra = '') => {
   // The CLI back: its models again.
   await update({ providers: { 'claude-code': { executablePath: FAKE_CLAUDE } } })
   await inv('provider:refresh', 'claude-code')
-  await lib.until(async () => (await info('claude-code')).catalog?.source === 'cli', 15000)
+  await lib.until(async () => (await info('claude-code')).catalog?.source === 'cli', lib.timing('hang.ui'))
   check('with the CLI back, its models again', (await info('claude-code')).catalog?.source === 'cli')
 
   // --- Price tables follow the CLI's list (#436).
   const row = (m) => prices.locator('tr', { hasText: m })
-  check("a priced model Claude Code doesn't list (Haiku 5.5 in this reply) is kept, greyed", !!(await lib.until(async () => (await row('claude-haiku-5-5').getAttribute('class'))?.includes('unlisted'), 5000)) && (await row('claude-haiku-5-5').locator('.badge', { hasText: "not in Claude Code's list" }).count()) === 1)
+  check("a priced model Claude Code doesn't list (Haiku 5.5 in this reply) is kept, greyed", !!(await lib.until(async () => (await row('claude-haiku-5-5').getAttribute('class'))?.includes('unlisted'), lib.timing('hang.ui'))) && (await row('claude-haiku-5-5').locator('.badge', { hasText: "not in Claude Code's list" }).count()) === 1)
   check('…and a listed one is not', (await row('claude-opus-5-5').locator('.badge').count()) === 0 && !(await row('claude-opus-5-5').getAttribute('class'))?.includes('unlisted'))
   // A listed model with no price (its shipped price removed): a row asking for one, with no Remove.
   await row('claude-opus-4-6').getByRole('button', { name: 'Remove from the table' }).click()

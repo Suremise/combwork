@@ -13,7 +13,7 @@ const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'versioncontrol-profile')
 const ws = path.join(lib.WORK, 'versioncontrol-ws')
@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => {
 
 /** Writes to the workspace's board from outside Combwork, as the upgrade would have (its marks). */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
   try {
     db.prepare(sql).run(...args)
   } finally {
@@ -135,7 +135,13 @@ function board(sql, ...args) {
     const plainSaved = () => (fs.existsSync(path.join(plain, '.combwork', 'project.json')) ? fs.readFileSync(path.join(plain, '.combwork', 'project.json'), 'utf8') : null)
     const savedBefore = plainSaved()
     const linkBefore = (await text(link)).trim()
-    await head.locator('[data-platform="git"]').click()
+    // Git's choice opens its page only once the tab has read the folder's git (`data-vc-preview`, HI-3436, as gitinit's
+    // HI-3429): before that answer the click is the switch, refused with no repository.
+    const showGitPage = async (name) => {
+      if (!(await lib.until(async () => (await head.locator('[data-platform="git"][data-vc-preview]').count()) === 1, HUNG_MS))) check(`${name}: Git's page offered (the tab read its git)`, false, await text(page.locator('.vc-view')))
+      await head.locator('[data-platform="git"][data-vc-preview]').click()
+    }
+    await showGitPage('plain')
     check("Git: its page says the folder isn't a repository yet, with Initialise repository… and what it does", !!(await lib.until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && (await text(preview)).startsWith("This folder isn't a Git repository yet.") && (await preview.locator('[data-git-init]').count()) === 1 && /on a branch called main/.test(await text(preview)), HUNG_MS)), await text(page.locator('.vc-view')))
     check("…and nothing else of Git's: no sections, no preset step", (await page.locator('.git-sections').count()) === 0 && (await page.locator('[data-preset-step]').count()) === 0 && (await page.locator('.git-body').count()) === 0)
     check('…the workflow link and the fact line still None’s', (await text(link)).trim() === linkBefore && (await text(fact)) === 'This folder has no version control.', await text(link))
@@ -143,7 +149,7 @@ function board(sql, ...args) {
     await shots('none-git-preview', page.locator('.vc-view'))
     await head.locator('[data-platform="none"]').click()
     check('None again: its page', !!(await lib.until(async () => (await preview.count()) === 0 && JSON.stringify(await sections()) === '["workflow"]', HUNG_MS)))
-    await head.locator('[data-platform="git"]').click()
+    await showGitPage('plain again')
     await lib.until(async () => (await preview.count()) === 1, HUNG_MS)
     await page.locator('.tabs .tab', { hasText: 'Tasks' }).first().click()
     await vcTab.click()
@@ -151,17 +157,16 @@ function board(sql, ...args) {
 
     // --- German: the header and the sections as they wrap.
     const base = (await inv('app:info')).language
-    const dir = path.join(lib.ROOT, 'locales', 'de')
-    const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
-    await speak({ ...base, code: 'de', locale: 'de', messages })
+    // Main reads German's catalogue, not sent through app.evaluate (HI-3434).
+    const speak = (code) => lib.speakLanguage(app, base, code)
+    await speak('de')
     check('the tab and the fact line in German', !!(await lib.until(async () => (await page.locator('.tabs .tab', { hasText: 'Versionsverwaltung' }).count()) === 1 && (await text(fact)) === 'Dieser Ordner hat keine Versionsverwaltung.', HUNG_MS)), await text(fact))
     await shots('none-de', page.locator('.vc-view'))
     await page.getByText('alpha', { exact: true }).first().click()
     await page.locator('.git-sections [data-section="changes"]').click()
     check('the Git header in German', !!(await lib.until(async () => (await text(link)).trim() === 'Workflow: Git · Benutzerdefiniert (aus Solo)', HUNG_MS)), await text(link))
     await shots('git-de', page.locator('.vc-view'))
-    await speak(base)
+    await speak()
     check('back in English', !!(await lib.until(async () => (await vcTab.count()) === 1, HUNG_MS)))
 
     // --- The presets notice (after an upgrade from 0.9): Choose… opens the first named project's tab at Workflow.
@@ -367,12 +372,12 @@ function board(sql, ...args) {
     check("a folded section's tooltip names it", histTip === 'History', histTip)
     await page.locator('.git-sections [data-section="branches"]').click()
     await shots('sections-narrow', page.locator('.vc-view'))
-    await speak({ ...base, code: 'de', locale: 'de', messages })
+    await speak('de')
     check('the sections in German', !!(await lib.until(async () => (await page.locator('.tabs .tab', { hasText: 'Versionsverwaltung' }).count()) === 1, HUNG_MS)))
     await everySection('de')
     await page.locator('.git-sections [data-section="branches"]').click()
     await shots('sections-narrow-de', page.locator('.vc-view'))
-    await speak(base)
+    await speak()
   } finally {
     await app.close()
   }

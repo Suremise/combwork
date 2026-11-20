@@ -136,6 +136,68 @@ export interface LaneRecord {
    * `sent`. Kept with the lane (its row's `extra`), changed only under the lanes' lock.
    */
   depEpisode?: DepEpisode
+  /**
+   * HI-3323: its queued list (`pending`) puts first a card (`first`) that its builder's card in flight (`card`, in Doing)
+   * waits on: once the builder is out of a turn, laneYields.ts puts `card` back (to Todo, its line kept) and applies the
+   * list in one board change, so the lane starts `first` next. `id` is new at each list change that makes one (any other
+   * change drops it), `attempt` is `card`'s attempt then, and `told` says its builder was told. Kept only with `pending`
+   * (its row's `extra`), changed only under the lanes' lock.
+   */
+  yieldFor?: LaneYield
+}
+
+/** A lane's queued yield to a card its card in flight waits on (HI-3323, LaneRecord.yieldFor). */
+export interface LaneYield {
+  id: string
+  card: number
+  first: number
+  attempt: { id: number; generation: number }
+  by: string
+  told?: true
+}
+
+/**
+ * HI-3323: whether a card waits on `first` (its number and key, if its project has keys): `first` is in its blockedBy, or
+ * its waitingFor reason names it, by its key or as `#<number>`, as a whole word, in any case.
+ */
+export function waitsOnCard(c: { blockedBy: readonly number[]; waitingFor?: { reason: string } | null }, first: number, key?: string | null): boolean {
+  if (c.blockedBy.includes(first)) return true
+  const reason = c.waitingFor?.reason
+  if (!reason) return false
+  return [key, `#${first}`].some((k) => !!k && new RegExp(`(^|[^A-Za-z0-9-])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z0-9])`, 'i').test(reason))
+}
+
+/** What laneYieldFirst reads of a card (the board's, or the window's copy of it). */
+export interface YieldCard {
+  column: string
+  archived?: boolean
+  /** Why it is blocked (HI-3368: a blocked first card can't start, so the lane never yields to it). */
+  blocked?: string | null
+  agent?: string | null
+  blockedBy: readonly number[]
+  waitingFor?: { reason: string } | null
+  key?: string | null
+}
+
+/**
+ * HI-3323: the card a new list (`list`) makes its lane yield to, or null: the list keeps the builder's card in flight
+ * `behind` (in Doing, its own or nobody's), and its first own open card (not Done or archived, the builder's or nobody's)
+ * is another, in Todo, that `behind` waits on (waitsOnCard), and that can start (HI-3368): not blocked, and not waiting on
+ * its own dependencies (`depsWait`: where its rules start it only once they are Done). A first card that can't start would
+ * put `behind` back for nothing, its builder idle: the list then waits as any queued change. One rule for the lanes' save
+ * (yieldOf), a reorder applied now and Start Lane's hint, so what the window says is what a start does.
+ */
+export function laneYieldFirst(list: readonly number[], behind: number, cardOf: (n: number) => YieldCard | null | undefined, builder: string, depsWait: (n: number) => boolean = () => false): number | null {
+  if (!list.includes(behind)) return null
+  const c = cardOf(behind)
+  if (!c || c.archived || c.column !== 'doing' || (c.agent && c.agent !== builder)) return null
+  const first = list.find((n) => {
+    const x = cardOf(n)
+    return !!x && !x.archived && x.column !== 'done' && (!x.agent || x.agent === builder)
+  })
+  if (first === undefined || first === behind) return null
+  const f = cardOf(first)
+  return f && f.column === 'todo' && !f.blocked && waitsOnCard(c, first, f.key) && !depsWait(first) ? first : null
 }
 
 /** A lane's due card's dependency wait (HI-2618, LaneRecord.depEpisode). */
@@ -265,7 +327,7 @@ export interface LaneSlotHeld {
  * A held slot as a refused start's status carries it (HI-2468): the slot, what holds it, and the agent whose session
  * is in it as `heldBy` (the status's `agent` is the builder there), with the broker seen in it, if any.
  */
-const heldStatus = (h: LaneSlotHeld): Pick<LaneStatus, 'slot' | 'held' | 'heldBy' | 'broker' | 'idle' | 'program' | 'more'> => ({ slot: h.slot, held: h.held, ...(h.agent ? { heldBy: h.agent } : {}), ...(h.broker ? { broker: h.broker } : {}), ...(h.idle !== undefined ? { idle: h.idle } : {}), ...(h.program ? { program: h.program } : {}), ...(h.more ? { more: h.more } : {}) })
+const heldStatus = (h: LaneSlotHeld): Pick<LaneStatus, 'slot' | 'held' | 'heldBy' | 'heldFor' | 'broker' | 'idle' | 'program' | 'more'> => ({ slot: h.slot, held: h.held, ...(h.agent ? { heldBy: h.agent } : {}), ...(h.card !== undefined ? { heldFor: h.card } : {}), ...(h.broker ? { broker: h.broker } : {}), ...(h.idle !== undefined ? { idle: h.idle } : {}), ...(h.program ? { program: h.program } : {}), ...(h.more ? { more: h.more } : {}) })
 
 /** Whether a lane reads its cards as it left them (ended or abandoned, with its snapshot) rather than from the board. */
 export const isFrozen = (rec: Pick<LaneRecord, 'state' | 'frozen'>): boolean => !running(rec) && !!rec.frozen
@@ -403,7 +465,7 @@ const USERS: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'r
  * at a time), its pass gone stale, a card in Review nobody reviews, a list change queued. `facts` (the cards' fold) only
  * while workflow rules are enforced: without them, only a blocked or held card says why, as before 1.0.
  */
-export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: readonly LaneCard[], current: number | null, waiting: boolean, facts: ReadonlyMap<number, LaneCardFacts> | null): LaneStatus | null {
+export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending' | 'yieldFor'> & { builder?: LaneAgent }, cards: readonly LaneCard[], current: number | null, waiting: boolean, facts: ReadonlyMap<number, LaneCardFacts> | null): LaneStatus | null {
   // Another agent's card isn't the lane's to wait on (HI-1821).
   const open = cards.filter(ownOpen)
   if (!open.length) return null
@@ -431,6 +493,8 @@ export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: r
   // A queued change waits for its own card in flight, through Review and Approved until it is Done (HI-1821), never
   // for the card the lane would be on next.
   const anchor = open.find((c) => c.column === 'doing' || c.column === 'review' || c.column === 'passed')
+  // HI-3323: a queued list putting first a card the card in flight waits on switches to it at its builder's turn end.
+  if (rec.pending && anchor && anchor.column === 'doing' && rec.yieldFor?.card === anchor.number) return { reason: 'listChanges', card: anchor.number, first: rec.yieldFor.first, ...(rec.builder ? { agent: rec.builder.name } : {}) }
   if (rec.pending && anchor) return { reason: 'listChanges', card: anchor.number }
   return null
 }
@@ -480,6 +544,7 @@ const L = {
   reviewer: agentMsg({ id: 'lane.status.reviewer', text: 'waiting for a reviewer on {card}', note: 'A lane waits: its card is in Review, or its design waits, and nobody reviews it yet.' }),
   lineUpdate: agentMsg({ id: 'lane.status.lineUpdate', text: "waiting: bringing the builder's branch up to date before {card}", note: "A lane's next card waits while its builder's branch is brought up to date (§16.19.2)." }),
   listChanges: agentMsg({ id: 'lane.status.listChanges', text: 'list changes after {card}', note: "A change of the lane's card list is queued: it applies once {card}, the card in flight, is Done." }),
+  yieldNext: agentMsg({ id: 'lane.status.yieldNext', text: '{first} next, once {agent} ends its turn with {card} committed: {card} waits on it, and goes back to Todo meanwhile', note: "HI-3323: a lane's queued list puts first {first}, a card its card in Doing ({card}) waits on; once its builder {agent} is out of a turn and {card}'s folder is clean, Combwork puts {card} back (its work kept) and starts {first}." }),
   independent: agentMsg({ id: 'lane.status.independent', text: "paused: {agent} is Independent now (its connection launches it without Combwork's tools, or its role was changed): give the lane another agent, or end it", note: "A lane pauses while its builder or reviewer is Independent (HI-2670): Combwork gives that agent nothing. The user gives the lane another agent or ends it." }),
   offSide: agentMsg({ id: 'lane.status.offSide', text: "paused: {agent} isn't a {part, select, builder {builder} other {reviewer}} by its role, so it has no {part, select, builder {builder's} other {reviewer's}} tools: give the lane another {part, select, builder {builder} other {reviewer}}, or make {agent} a {part, select, builder {builder} other {reviewer}} or either-role agent", note: "A lane pauses while its builder or reviewer has a role that doesn't do its part (HI-2664: an agent's Combwork tools follow its role): nothing new is given to it for the lane; its work in flight stays." }),
   hooks: agentMsg({ id: 'lane.status.hooks', text: "paused: {agent}'s hooks aren't arriving", note: "A lane pauses while its builder's or reviewer's hooks aren't arriving (#1336): nothing is typed into that agent." }),
@@ -578,7 +643,7 @@ export function laneStatusText(s: LaneStatus): string {
     case 'lineUpdate':
       return say(L.lineUpdate, { card })
     case 'listChanges':
-      return say(L.listChanges, { card })
+      return s.first ? say(L.yieldNext, { card, first: cardRef(s.first), agent: s.agent ?? say(L.anAgent) }) : say(L.listChanges, { card })
     case 'hooks':
       return say(L.hooks, { agent: s.agent ?? say(L.anAgent) })
     case 'independent':
@@ -604,6 +669,8 @@ export function laneStatusText(s: LaneStatus): string {
         return s.freshWhy !== undefined ? say(L.freshFailed, { agent, why: s.freshWhy }) : say(L.freshFailedBare, { agent })
       }
       if (s.why === 'dependencies') return say(L.startDependencies, { card, waitsFor: s.waitingOn?.length ? s.waitingOn.join(', ') : (s.waitsFor ?? say(L.aDependency)) })
+      // Its builder's one slot lent to a card (HI-3353): said as a lane waiting for a slot says it (HI-3168).
+      if (s.why === 'refused' && s.slot && s.held === 'card' && s.heldFor !== undefined) return say(L.slotCard, { agent: s.heldBy ?? s.agent ?? say(L.anAgent), slot: s.slot, card: cardRef(s.heldFor) })
       if (s.why === 'refused' && s.slot && s.held) return say(L.startRefusedHeld, { card, slot: s.slot, held: s.held, heldBy: s.heldBy ?? say(L.anAgent), broker: s.broker ?? '', idle: idleKey(s.idle), program: s.program ?? '', more: s.more ?? 0 })
       if (s.why === 'refused') return say(L.startRefused, { card })
       const agent = s.agent ?? say(L.itsBuilder)
@@ -694,7 +761,9 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(v.pool === true && !reviewer ? { pool: true as const } : {}),
     ...(whole(v.listRev, Number.MAX_SAFE_INTEGER) ? { listRev: v.listRev as number } : {}),
     ...(fresh ? { freshStart: fresh } : {}),
-    ...(v.state === 'active' && isObj(v.depEpisode) && whole(v.depEpisode.card, 1e9) && text(v.depEpisode.id, 64) && ['waiting', 'pending', 'sent'].includes(v.depEpisode.state as string) && time(v.depEpisode.at) ? { depEpisode: { card: v.depEpisode.card as number, id: v.depEpisode.id as string, state: v.depEpisode.state as DepEpisode['state'], at: v.depEpisode.at as string } } : {})
+    ...(v.state === 'active' && isObj(v.depEpisode) && whole(v.depEpisode.card, 1e9) && text(v.depEpisode.id, 64) && ['waiting', 'pending', 'sent'].includes(v.depEpisode.state as string) && time(v.depEpisode.at) ? { depEpisode: { card: v.depEpisode.card as number, id: v.depEpisode.id as string, state: v.depEpisode.state as DepEpisode['state'], at: v.depEpisode.at as string } } : {}),
+    // HI-3323: only with its queued list, and naming two cards of it.
+    ...(v.state === 'active' && pending && isObj(v.yieldFor) && text(v.yieldFor.id, 64) && whole(v.yieldFor.card, 1e9) && whole(v.yieldFor.first, 1e9) && isObj(v.yieldFor.attempt) && Number.isInteger(v.yieldFor.attempt.id) && Number.isInteger(v.yieldFor.attempt.generation) && text(v.yieldFor.by, 200) && pending.includes(v.yieldFor.first) && pending.includes(v.yieldFor.card) ? { yieldFor: { id: v.yieldFor.id as string, card: v.yieldFor.card as number, first: v.yieldFor.first as number, attempt: { id: v.yieldFor.attempt.id as number, generation: v.yieldFor.attempt.generation as number }, by: v.yieldFor.by as string, ...(v.yieldFor.told === true ? { told: true as const } : {}) } } : {})
   }
 }
 

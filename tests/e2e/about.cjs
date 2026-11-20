@@ -17,11 +17,10 @@ fs.writeFileSync(path.join(userData, 'logs', 'combwork.log'), [
   `2026-10-02T09:00:01.000Z [INFO] [test] token=SECRETVALUE123 at ${path.join(require('os').homedir(), 'x')}`,
   ''
 ].join('\n'))
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 ;(async () => {
@@ -40,14 +39,14 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   }
   check('Electron bundles Node 24.22.1 or later (CVE-2026-111497)', atLeast(node, '24.22.1'), node)
   // Setup dialog may show on a fresh profile; close any modal first.
-  await page.keyboard.press('Escape'); await sleep(300)
+  await page.keyboard.press('Escape'); await lib.noDialog(page)
   await page.evaluate(() => window.combwork.invoke('app:info')) // warm
   await page.keyboard.press('F1')
   await page.locator('.split-list .row', { hasText: 'About Combwork' }).click()
   check('About shows MIT link', await becomes(() => page.locator('.about-licence a', { hasText: 'MIT License' }).isVisible()))
   await page.screenshot({ path: path.join(scratch, 'about-1.png') })
   await page.locator('.about-licence a', { hasText: 'MIT License' }).click()
-  const pageText = () => page.locator('.scroll-page').innerText({ timeout: 1000 }).catch(() => '')
+  const pageText = () => page.locator('.scroll-page').innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')
   check('License page opens', await becomes(async () => (await pageText()).includes('Permission is hereby granted')))
   await page.locator('.scroll-page a', { hasText: 'third-party notices' }).click()
   const notices = (t) => t.includes('Third-party notices') && t.includes('monaco-editor') && t.includes('@xterm/xterm')
@@ -56,15 +55,15 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   // Not clicked: it would open the file in the real browser. The file it opens is next to electron.exe.
   check('Chromium licence file exists next to the exe', fs.existsSync(path.join(lib.ROOT, 'node_modules/electron/dist/LICENSES.chromium.html')))
   // --- Help → Copy Diagnostics: a redacted preview, copied as shown (a fake clipboard in the page).
-  await page.keyboard.press('Escape'); await sleep(300)
+  await page.keyboard.press('Escape'); await lib.noDialog(page)
   await page.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText: async () => '', writeText: async (t) => { window.__copied = t } } }) })
   await page.locator('.menubar .menubar-item', { hasText: 'Help' }).click()
-  await sleep(300)
+  // Playwright's click waits for the menu's entry to show.
   await page.getByText('Copy Diagnostics…', { exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Copy Diagnostics' })
   const preview = dialog.locator('.diagnostics-preview')
-  let shown = ''
-  for (let i = 0; i < 50 && !/### Log/.test(shown); i++) { await sleep(200); shown = await preview.innerText().catch(() => '') }
+  const previewText = () => preview.innerText().catch(() => '')
+  const shown = (await lib.until(async () => { const t = await previewText(); return /### Log/.test(t) && t }, HUNG_MS)) || (await previewText())
   check('Copy Diagnostics shows a preview', /## Combwork diagnostics/.test(shown) && /### Coding agents/.test(shown) && /### Counts/.test(shown) && /### Log \(last 50 lines\)/.test(shown), shown.slice(0, 200))
   // old-name: begin old-log-label
   check('headed Combwork, with the running version labelled Combwork', /^## Combwork diagnostics\n\n- \*\*Combwork\*\* \d+\.\d+\.\d+\S* \(/.test(shown) && !/\*\*Hive\*\*/.test(shown), shown.slice(0, 200))
@@ -84,7 +83,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   for (const d of [secretWs, otherWs]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(path.join(secretWs, 'PrivateProject'))
   fs.mkdirSync(path.join(otherWs, 'demo'), { recursive: true })
-  const openWs = async (ws) => { await inv('workspace:open', ws); await lib.until(async () => page.evaluate((n) => document.title.includes(n), path.basename(ws)), 20000) }
+  const openWs = async (ws) => { await inv('workspace:open', ws); await lib.until(async () => page.evaluate((n) => document.title.includes(n), path.basename(ws)), lib.timing('hang.ui')) }
   // The other workspace opened once first: a workspace's first open logs its setting up (its board's schema steps, the
   // bundled skills and modes added), which pushed the card's line out of the report's last 50 (HI-1815).
   await openWs(otherWs)

@@ -2,6 +2,7 @@
 // cw_wait_for_tasks's reply says so. Agent-facing.
 
 import { nothingWaitsOn } from '../shared/idleWatch'
+import { cardJobOf, jobHoldsIdleWatch } from './cardStall'
 import { listLanes } from './lanes'
 import { getTask } from './tasks'
 import { forYouOfCards } from './workflow/cardWork'
@@ -18,6 +19,8 @@ export async function idleOwnWatchOf(ws: WorkspaceService, agentId: string, card
   try {
     const card = await getTask(n, ws)
     if (!card.project || !nothingWaitsOn(card, agentId, false)) return null
+    // HI-3206: its job on the card (a live cw-progress run) is something that waits on it, as the stall check counts it.
+    if (jobHoldsIdleWatch(cardJobOf(card, ws.path, null))) return null
     const lane = (await listLanes(ws, { project: card.project })).find((l) => l.state === 'active' && l.builder.id === agentId && l.cards.some((c) => c.number === n))
     if (!lane) return null
     return nothingWaitsOn(card, agentId, (forYouOfCards(ws, [n]).get(n) ?? []).length > 0) ? n : null

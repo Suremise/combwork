@@ -287,6 +287,11 @@
       "model": "plain"
     }
   },
+  "session.notice.startContextTitle": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
   "session.notice.untakenTitle": {
     "placeholders": {
       "agent": "plain"
@@ -388,6 +393,11 @@
   },
   "session.start.beingOpened": {
     "placeholders": {}
+  },
+  "session.start.cantResume": {
+    "placeholders": {
+      "provider": "plain"
+    }
   },
   "session.start.cleaning": {
     "placeholders": {}

@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'async_hooks'
+import { INDEX_BUSY as INDEX_BOUNDS, retryWhile } from './retryBounds'
 import { join, resolve, sep } from 'path'
 import { SHARE_ENV, Worker } from 'worker_threads'
 import { lstat, readFile, readlink, realpath, stat } from 'original-fs/promises'
@@ -8,17 +9,18 @@ import type { GitDiff, GitStatus } from '../shared/types'
 import { gitlinkOf, parseRawRows, parseSubprojectPatch, subprojectLine, type GitlinkChange, type GitlinkSide } from '../shared/gitlink'
 import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
-import { msg, tr } from '../shared/i18n'
+import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
-import { runGit, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
+import { CANCELLED, runGit, type CancelRequest, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
 import type { RunResult } from './platform/repoContext'
 
 const log = createLogger('git')
 
-export const MAX_DIFF_BYTES = 2 * 1024 * 1024
+import { MAX_DIFF_BYTES, isBinary, tooLargeDiff } from './diffSides'
+export { MAX_DIFF_BYTES, isBinary, tooLargeDiff } from './diffSides'
 
 /** What a git command answered: the repository context port's RunResult (SPEC §16.3.6), as git() gives it. */
 export type GitResult = RunResult
@@ -36,6 +38,12 @@ export const GIT_PREFIX = ['--no-optional-locks', '-c', 'diff.autoRefreshIndex=f
 export interface GitRunOptions {
   env?: NodeJS.ProcessEnv
   timeout?: number
+  /**
+   * HI-3372: the user's Cancel. Aborted before it starts, nothing runs; while it runs, its whole tree is ended as its time
+   * limit ends it, and it answers `cancelled` once that has gone. Exited first, its own outcome stands. A route's scope
+   * (HI-2078: another process runs it) takes it only before the start.
+   */
+  signal?: AbortSignal
   /** HI-2137: gitTool's own check of git: this git rather than gitExe()'s, and what it does is not noted as git's state. */
   exe?: string
 }
@@ -44,7 +52,7 @@ export interface GitRunOptions {
  * A seam for unit tests: told of each git command as it starts on git's worker thread (#732 counts a template plan's
  * and load's), and as it ends there (HI-2322: worktree changes never overlap), not of one a route runs (HI-2078).
  */
-export const gitTestHooks: { started?: (cwd: string, args: readonly string[]) => void; ended?: (cwd: string, args: readonly string[]) => void } = {}
+export const gitTestHooks: { started?: (cwd: string, args: readonly string[], timeout?: number) => void; ended?: (cwd: string, args: readonly string[]) => void } = {}
 
 /** HI-2078: where a scope's git runs instead of the worker: the request as the worker gets it, its outcome as execFile's. */
 export type GitRoute = (m: Omit<GitRequest, 'id'>) => Promise<GitOutcome>
@@ -210,15 +218,19 @@ export const worktreeChangesPending = (): number => worktreeChanges.size
 
 /** git() with the git it starts (`use`). */
 async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number, input: string | undefined, opts: GitRunOptions): Promise<GitResult> {
-  const m = { cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(use.exe !== 'git' ? { exe: use.exe } : {}), ...(use.launcherEnv ? { launcherEnv: use.launcherEnv } : {}), ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) }
+  const m = { cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(use.exe !== 'git' ? { exe: use.exe } : {}), ...(use.launcherEnv ? { launcherEnv: use.launcherEnv } : {}), ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}), ...(opts.signal ? { cancellable: true } : {}) }
   const scope = routes.getStore()
   // HI-2078: a route's scope runs it there; else it starts off main's thread (HI-1783): gitWorker.ts runs it as this
   // always did. Either way its outcome is read here.
-  if (!scope?.active) gitTestHooks.started?.(cwd, args)
-  const o = scope?.active ? await scope.route(m) : await thread.run(m)
+  // HI-3372: cancelled before it starts: nothing runs, wherever it would have.
+  if (opts.signal?.aborted) return { out: '', ok: false, buf: Buffer.alloc(0), err: `git ${args[0]} was cancelled`, code: -1, notRun: CANCELLED, cancelled: true } // i18n-ignore: git's side of an error, in English as git's messages are
+  // HI-3372: with its bound, so a test sees what a setting gives a command at its real call site.
+  if (!scope?.active) gitTestHooks.started?.(cwd, args, opts.timeout)
+  const o = scope?.active ? await scope.route(m) : await thread.run(m, opts.signal)
   if (!scope?.active) gitTestHooks.ended?.(cwd, args)
   if (o.held) log.warn(`git ${args[0]}'s output stayed open after it exited, held by another process (HI-1854): taken as read`)
   if (o.msysIncomplete) log.warn(`git ${args[0]} was ended at its time limit, but its Git Bash programs couldn't be looked for (${userText(o.msysIncomplete)}): only its process tree was ended (HI-3047)`)
+  if (o.lateLeft) log.warn(`git ${args[0]} was ended at its time limit, but some of what it started may be left running: ${o.lateLeft} (HI-3358)`)
   const buf = Buffer.from(o.stdout.buffer, o.stdout.byteOffset, o.stdout.byteLength)
   const err = o.error
   const errCode = err?.code
@@ -242,7 +254,8 @@ async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number
   }
   const stderr = Buffer.from(o.stderr.buffer, o.stderr.byteOffset, o.stderr.byteLength).toString('utf8').trim()
   const said = stderr || (notRun ? `git ${args[0]} didn't run to an exit (${notRun})` : '') // i18n-ignore: git's side of an error, in English as git's messages are
-  return { out: buf.toString('utf8'), ok: !err, buf, err: said, code, ...(missing ? { missing } : {}), ...(notRun ? { notRun } : {}), ...(err?.killed && opts.timeout ? { timedOut: true } : {}) }
+  const cancelled = errCode === CANCELLED
+  return { out: buf.toString('utf8'), ok: !err, buf, err: said, code, ...(missing ? { missing } : {}), ...(notRun ? { notRun } : {}), ...(cancelled ? { cancelled: true } : err?.killed && opts.timeout ? { timedOut: true } : {}) }
 }
 
 /**
@@ -258,13 +271,20 @@ class GitThread {
   /** Why the worker last ended. */
   private lost = ''
 
-  run(m: Omit<GitRequest, 'id'>): Promise<GitOutcome> {
+  run(m: Omit<GitRequest, 'id'>, signal?: AbortSignal): Promise<GitOutcome> {
     const w = this.ensure()
-    if (!w) return runGit(m)
+    if (!w) return runGit(m, undefined, signal)
     const id = ++this.next
+    // HI-3372: a Cancel while it runs asks the worker to end it (by its id); the listener goes as the call settles,
+    // answered or lost with the worker.
+    const onCancel = (): void => w.postMessage({ id, kind: 'cancel' } satisfies CancelRequest)
     return new Promise((done) => {
-      this.calls.set(id, (r) => done(r && 'outcome' in r ? r.outcome : lostOutcome(this.lost)))
+      this.calls.set(id, (r) => {
+        signal?.removeEventListener('abort', onCancel)
+        done(r && 'outcome' in r ? r.outcome : lostOutcome(this.lost))
+      })
       w.postMessage({ ...m, id } satisfies GitRequest)
+      signal?.addEventListener('abort', onCancel, { once: true })
     })
   }
 
@@ -331,17 +351,13 @@ export function useGitWorker(file: string | null): void {
 
 /** Git couldn't read the index for a moment (another git command, a user's `git add`, is rewriting it): worth trying again (#222). */
 export const INDEX_BUSY = /index file open failed|unable to (open|read|create).*index|could not read.*index|index\.lock|index file smaller than expected|bad index file/i
-const BUSY_TRIES = 4
-const BUSY_RETRY_MS = 50
 
-/** git(), tried again briefly while the index is busy (`INDEX_BUSY`): a read that fails only for that moment isn't a failure. */
+/**
+ * git(), tried again while the index is busy (`INDEX_BUSY`): a read that fails only for that moment isn't a failure.
+ * HI-3374: for INDEX_BOUNDS.read (waits of 50 ms doubling to 1.6 s, 3.2 s in all; it was 4 tries 50 ms apart).
+ */
 export async function gitReading(cwd: string, args: string[]): Promise<GitResult> {
-  let r = await git(cwd, args)
-  for (let t = 1; t < BUSY_TRIES && !r.ok && INDEX_BUSY.test(r.err); t++) {
-    await new Promise((res) => setTimeout(res, BUSY_RETRY_MS))
-    r = await git(cwd, args)
-  }
-  return r
+  return retryWhile(() => git(cwd, args), (r) => !r.ok && INDEX_BUSY.test(r.err), { bound: INDEX_BOUNDS.read })
 }
 
 /** The Changes tab's refusals and notes, in the window's language (#850): only the window reads them. */
@@ -349,12 +365,8 @@ const M = {
   failed: msg({ id: 'service.git.failed', defaultMessage: '{command} failed: {why}', description: "An error in the Changes tab: a git command ({command}, as it is: \"git status\") failed; {why} is git's own first line, or why git can't run." }),
   exitCode: msg({ id: 'service.git.exitCode', defaultMessage: 'exit code {code}', description: 'Why a git command failed when git said nothing: the number it exited with.' }),
   outside: msg({ id: 'service.git.outside', defaultMessage: 'Path is outside the project', description: "An error showing a file's changes: its path leads out of the project." }),
-  gitlinkUnread: msg({ id: 'service.git.gitlinkUnread', defaultMessage: "Couldn't read which commit submodule {path} is at.", description: "An error in the Changes tab (HI-2864): git's output about a submodule's commit ({path}, its folder) couldn't be read, so its change isn't shown. Glossary: submodule." }),
-  tooLarge: msg({ id: 'service.git.tooLarge', defaultMessage: 'File is too large to diff ({kb, number} KB).', description: "Shown in place of a file's changes in the Changes tab: the file is too large ({kb} KB) to compare." })
+  gitlinkUnread: msg({ id: 'service.git.gitlinkUnread', defaultMessage: "Couldn't read which commit submodule {path} is at.", description: "An error in the Changes tab (HI-2864): git's output about a submodule's commit ({path}, its folder) couldn't be read, so its change isn't shown. Glossary: submodule." })
 }
-
-/** Shown in place of a file's diff when it is over MAX_DIFF_BYTES. */
-export const tooLargeDiff = (path: string, bytes: number): GitDiff => ({ path, original: '', modified: tr(M.tooLarge, { kb: Math.round(bytes / 1024) }), binary: true })
 
 /** Why a git command failed, for an error the window shows: git missing, else git's own first line. `command` is the git command, as it is. */
 export function failure(command: string, r: GitResult): Error {
@@ -445,12 +457,6 @@ async function workingStatus(projectPath: string): Promise<{ status: GitStatus; 
     status.files.push({ path: file, status: code, staged: x !== ' ' && x !== '?' })
   }
   return { status, inWorktree }
-}
-
-export function isBinary(buf: Buffer): boolean {
-  const n = Math.min(buf.length, 8000)
-  for (let i = 0; i < n; i++) if (buf[i] === 0) return true
-  return false
 }
 
 /**

@@ -11,7 +11,7 @@ const fs = require('fs')
 const path = require('path')
 
 const PORT = Number(lib.port(47907))
-const HUNG_MS = 10000 // The existing stream wait limit, stated explicitly as a bound for a hung run.
+const HUNG_MS = lib.timing('hang.ui') // The existing stream wait limit, stated explicitly as a bound for a hung run.
 const userData = path.join(lib.WORK, 'boardscope-profile')
 const ws = path.join(lib.WORK, 'boardscope-ws')
 const claudeHome = path.join(lib.WORK, 'boardscope-claude-home')
@@ -22,12 +22,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 10000) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+const until = lib.until
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
@@ -56,7 +51,8 @@ const until = async (fn, ms = 10000) => {
   const other = await lib.addAgent(inv, beta, { name: 'Betty' })
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
-  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', 20000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
 
   // Cards: two of alpha's, two of beta's, one of the workspace's; alpha's #2 links to beta's #3.
   const make = async (title, project, column = 'todo') => (await inv('tasks:create', { title, project, column })).number
@@ -79,9 +75,8 @@ const until = async (fn, ms = 10000) => {
       }
     })
   }
-  // How long its launch line may take to appear once Combwork shows it ready: generous, for a loaded machine.
-  const LAUNCH_RECORD_MS = 20000
-  const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), LAUNCH_RECORD_MS)
+  // Its launch line, once Combwork shows it ready: a bound for a hung run, never how long it takes.
+  const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), lib.timing('hang.ui'))
   const mcpServers = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers : {}
   check('the agent launched with the Combwork MCP server', !!mcpServers.combwork, JSON.stringify({ sessionId, launch: !!launch, servers: Object.keys(mcpServers), api: await inv('api:info').then((i) => ({ enabled: i.enabled, running: i.running, url: i.url, error: i.error })) }))
   if (!mcpServers.combwork) throw new Error('no Combwork MCP server in the launch: the rest needs its token')
@@ -184,17 +179,15 @@ const until = async (fn, ms = 10000) => {
 
   // --- Its Combwork tools (the fake's "boardmove") use the same token: its own card moves, beta's doesn't.
   const before = fs.existsSync(path.join(claudeHome, 'fake-calls.jsonl')) ? fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length : 0
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), `boardmove ${n.A2} doing boardmove ${n.B2} doing`)
-  await lib.sleep(100)
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), '\r')
-  await until(async () => (await live())?.status === 'finished', 15000)
+  await lib.typeThenEnter(inv, lib.ptyKey(alpha, agent.id), `boardmove ${n.A2} doing boardmove ${n.B2} doing`)
+  // Its call made and its turn over (the status alone is still the last turn's "finished" until it takes the prompt).
+  const callsMade = () => (fs.existsSync(path.join(claudeHome, 'fake-calls.jsonl')) ? fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length : 0)
+  await until(async () => callsMade() > before && (await live())?.status === 'finished', lib.timing('hang.step'))
   const calls = fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).slice(before).map((l) => JSON.parse(l))
   // The fake makes one call per prompt (the first boardmove); a second prompt tries beta's.
   check("through its Combwork tools' path: its card moves", calls[0]?.status === 200 && (await inv('tasks:list')).find((c) => c.number === n.A2).column === 'doing', JSON.stringify(calls))
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), `boardmove ${n.B2} doing`)
-  await lib.sleep(100)
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), '\r')
-  await until(async () => fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length > before + 1, 15000)
+  await lib.typeThenEnter(inv, lib.ptyKey(alpha, agent.id), `boardmove ${n.B2} doing`)
+  await until(async () => fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length > before + 1, lib.timing('hang.ui'))
   const last = JSON.parse(fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').trim().split('\n').at(-1))
   check("…and beta's card is not found", last.status === 404 && (await inv('tasks:list')).find((c) => c.number === n.B2).column === 'todo', JSON.stringify(last))
 
@@ -221,12 +214,13 @@ const until = async (fn, ms = 10000) => {
   }
   const agentStream = listen(agentToken)
   const scriptStream = listen(workspaceToken)
-  await lib.sleep(500)
+  // Both streams answered (their headers come once Combwork has them listening) before anything happens on them.
+  await until(() => agentStream.status && scriptStream.status, lib.timing('hang.ui'))
   const secret = await make('PRIVATE BETA TITLE', 'beta')
   await inv('tasks:update', secret, { description: 'PRIVATE BETA DESCRIPTION' })
   await inv('tasks:start', secret, { kind: 'agent', agentId: other.id })
   const betaLive = async () => (await inv('session:live')).find((s) => s.agentId === other.id)
-  await until(async () => (await betaLive())?.status === 'finished', 20000)
+  await until(async () => (await betaLive())?.status === 'finished', lib.timing('hang.step'))
   const activityPath = `/v1/projects/beta/agents/${other.id}/activity`
   r = await call(workspaceToken, 'GET', activityPath)
   check("the workspace token reads beta's activity (the card is its prompt)", r.status === 200 && /PRIVATE BETA DESCRIPTION/.test(r.body?.currentTask ?? ''), JSON.stringify(r.body?.currentTask))
@@ -250,7 +244,7 @@ const until = async (fn, ms = 10000) => {
   check("…nor stop it", r.status === 403, JSON.stringify(r))
   check('…and it runs on as it was, given nothing', (await betaLive())?.runId === betaRun && (await betaLive())?.status === 'finished', JSON.stringify(await betaLive()))
   await inv('session:stop', beta, other.id).catch(() => undefined)
-  await until(async () => !(await betaLive()), 10000)
+  await until(async () => !(await betaLive()), lib.timing('hang.ui'))
   r = await as('POST', '/v1/projects/beta/sessions', { agent: other.id })
   check("…nor start it", r.status === 403 && !(await betaLive()), JSON.stringify(r))
   // Nor turn beta off or on (HI-2330): with no session running there, a deactivate would otherwise go through.
@@ -262,15 +256,15 @@ const until = async (fn, ms = 10000) => {
   r = await as('POST', '/v1/projects/alpha/activate')
   check('its own project it may activate', r.status === 200 && r.body?.active === true, JSON.stringify(r).slice(0, 300))
   // Something of alpha's own, so its stream has something to show.
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), 'hello')
-  await lib.sleep(100)
-  await inv('pty:write', lib.ptyKey(alpha, agent.id), '\r')
-  await until(async () => (await live())?.status === 'finished', 15000)
-  await lib.sleep(800)
-  agentStream.stop()
-  scriptStream.stop()
+  await lib.typeThenEnter(inv, lib.ptyKey(alpha, agent.id), 'hello')
+  await until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))
   const betaPath = JSON.stringify(beta).slice(1, -1)
   const alphaPath = JSON.stringify(alpha).slice(1, -1)
+  // What each stream should carry has come: alpha's session (its latest events) on both, beta's on the workspace token's.
+  // A stream sends in order, so beta's, from before alpha's last, would have reached the agent's by then.
+  await until(() => agentStream.text.includes(alphaPath) && scriptStream.text.includes(alphaPath) && scriptStream.text.includes(betaPath), lib.timing('hang.ui'))
+  agentStream.stop()
+  scriptStream.stop()
   check('the event stream is open to the agent', agentStream.status === 200 && agentStream.text.includes(alphaPath), `${agentStream.status} ${agentStream.text.slice(0, 200)}`)
   check("…and carries nothing of beta's sessions", !agentStream.text.includes(betaPath) && !agentStream.text.includes('PRIVATE'), agentStream.text.slice(0, 400))
   check("the workspace token's stream has beta's sessions too", scriptStream.text.includes(betaPath) && scriptStream.text.includes(alphaPath), scriptStream.text.slice(0, 200))
@@ -306,9 +300,9 @@ const until = async (fn, ms = 10000) => {
   const almaLive = async () => (await inv('session:live')).find((s) => s.agentId === alma.id)
   r = await as('POST', '/v1/projects/alpha/sessions', { agent: alma.id })
   check("it starts its own project's agent", r.status === 200 && r.body?.agentId === alma.id && !!(await almaLive()), JSON.stringify(r).slice(0, 300))
-  await until(async () => ['ready', 'finished'].includes((await almaLive())?.status), 20000)
+  await until(async () => ['ready', 'finished'].includes((await almaLive())?.status), lib.timing('hang.ui'))
   r = await as('POST', `/v1/projects/alpha/stop?agent=${encodeURIComponent(alma.id)}`)
-  check('…and stops it', r.status === 200 && !!(await until(async () => !(await almaLive()), 10000)), JSON.stringify(r))
+  check('…and stops it', r.status === 200 && !!(await until(async () => !(await almaLive()), lib.timing('hang.ui'))), JSON.stringify(r))
 
   // --- Once the agent stops, its token stops working, and an event stream it opened ends (HI-2416), as a revoked
   // viewer's does; one with the workspace token stays open.
@@ -317,7 +311,7 @@ const until = async (fn, ms = 10000) => {
   check('a stream opened with its token before it stops is open', !!(await until(async () => endsWith.status === 200 && endsWith.text.includes(': connected'), HUNG_MS)), `${endsWith.status}`)
   await until(async () => staysOpen.status === 200, HUNG_MS)
   await inv('session:stop', alpha, agent.id).catch(() => undefined)
-  await until(async () => !(await live()), 10000)
+  await until(async () => !(await live()), lib.timing('hang.ui'))
   r = await as('GET', '/v1/tasks')
   check('its token ends with it', r.status === 401, JSON.stringify(r))
   check('…and so does the stream it opened (HI-2416)', !!(await until(async () => endsWith.done, HUNG_MS)), endsWith.text.slice(-200))

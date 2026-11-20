@@ -30,6 +30,8 @@ const { workflowFor } = await import('../src/main/workflow/service')
 const { preset } = await import('../src/shared/workflow/options')
 const { forwardOf } = await import('../src/shared/workflow/compile')
 const { MergeQueue } = await import('../src/main/workflow/mergeQueue')
+const { platformLimits } = await import('../src/main/platform/limits')
+const { gitTestHooks } = await import('../src/main/git')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -45,7 +47,7 @@ const agent = { kind: 'agent', name: 'B1 (p)', self: { project: 'p', agentId: 'b
 let n = 0
 
 /** A Pair project merging into main, listing 1.2.0 (made from main), main then `ahead` commits ahead. */
-async function project(ahead = 1, targets: { target: string; otherTargets: string[] } = { target: 'main', otherTargets: ['1.2.0'] }): Promise<{ w: WS; repo: string }> {
+async function project(ahead = 1, targets: { target: string; otherTargets: string[] } = { target: 'main', otherTargets: ['1.2.0'] }, extra: Record<string, unknown> = {}, before?: (repo: string) => void): Promise<{ w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   mkdirSync(join(repo, '.combwork'), { recursive: true })
@@ -62,7 +64,8 @@ async function project(ahead = 1, targets: { target: string; otherTargets: strin
     git(repo, 'commit', '-qm', `fix ${i}`)
   }
   const { platform: _p, ...pair } = preset('git', 'pair')
-  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: 'pair', options: { ...pair, ...targets } } }))
+  before?.(repo)
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: 'pair', options: { ...pair, ...targets, ...extra } } }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -70,6 +73,30 @@ async function project(ahead = 1, targets: { target: string; otherTargets: strin
 }
 
 describe('the forward request (HI-2679)', () => {
+  // HI-3372: a project whose targets follow their remote fetches each branch's remote head, bounded by cw.queue.networkMinutes
+  // as main sets it (a value of the test's own, seen as git starts the fetch).
+  it('following the remote, each fetch is bounded by the merge queue network setting', async () => {
+    const remote = (repo: string): void => {
+      const bare = join(base, `remote-${n}.git`)
+      git(repo, 'init', '-q', '--bare', '-b', 'main', bare)
+      git(repo, 'remote', 'add', 'origin', bare)
+      git(repo, 'push', '-q', '-u', 'origin', 'main', '1.2.0')
+    }
+    const { w, repo } = await project(1, undefined, { finish: 'combworkMerges', followRemote: true }, remote)
+    const fetches: (number | undefined)[] = []
+    const was = platformLimits.queueNetworkMs
+    platformLimits.queueNetworkMs = () => 1_234_000
+    gitTestHooks.started = (_cwd, args, timeout) => void (args.includes('fetch') && fetches.push(timeout))
+    try {
+      await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', user))
+    } finally {
+      platformLimits.queueNetworkMs = was
+      gitTestHooks.started = undefined
+    }
+    expect(fetches.length).toBeGreaterThan(0)
+    expect(fetches.every((t) => t === 1_234_000)).toBe(true)
+  })
+
   it("is the user's or the Assistant's, for two of the project's existing targets", async () => {
     const { w, repo } = await project()
     const ask = (from: string, to: string, actor: Parameters<typeof controls.forwardMerge>[4] = user) => inWorkspace(w, () => controls.forwardMerge(w, repo, from, to, actor))
@@ -993,8 +1020,6 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
 
   it('a confirmed branch made a target while the purge waits for the board refuses the whole list, nothing written (HR1’s round 1)', async () => {
     const { purgedKey, pauseLogKey } = await import('../src/main/workflow/queueLogs')
-    const { writesAt } = await import('../src/main/dbWrites')
-    const { placeKey } = await import('../src/main/fsutil')
     const { w, repo } = await pastTwo()
     const wf = (await workflowFor(w, repo))!
     // 1.2.0 gets a pause log, so "nothing written" covers its logs too.
@@ -1002,8 +1027,19 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
     await inWorkspace(w, () => wf.locked(() => wf.store.setQueuePause('1.2.0', null)))
     const log = wf.store.meta(pauseLogKey('1.2.0'))
     expect(log).not.toBeNull()
-    // The board held; once the purge waits for it (a second write counted), 1.1.0 becomes one of the project's targets
-    // in the held write, which then lets go.
+    // The purge's own write, known as it asks for the board (counted and queued at once: boardWrite), never by how many
+    // writers wait (HI-3297: another one, a reconcile run or the actions worker, can wait for the board too).
+    let purgeWaits!: () => void
+    const waiting = new Promise<void>((r) => (purgeWaits = r))
+    const locked = wf.locked.bind(wf)
+    const spy = vi.spyOn(wf, 'locked').mockImplementation(((fn: () => unknown) => {
+      const out = locked(fn)
+      // By the function's own name, so a rename keeps it (the purge, blocked behind the held write, would never end).
+      if (new Error().stack?.includes(controls.purgeQueueHistory.name)) purgeWaits()
+      return out
+    }) as typeof wf.locked)
+    // The board held; once the purge waits for it, 1.1.0 becomes one of the project's targets in the held write, which
+    // then lets go. Another write waits beside it, as a background one may.
     let release!: () => void
     const gate = new Promise<void>((r) => (release = r))
     const held = inWorkspace(w, () =>
@@ -1012,10 +1048,16 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
         await w.mutateProjectConfig(repo, (now) => ({ workflow: { ...now.workflow!, options: { ...now.workflow!.options, otherTargets: ['1.4.0', 'next', '1.1.0'] } } }))
       })
     )
+    const other = inWorkspace(w, () => store.boardWrite(w, async () => undefined))
     const purging = purge(w, repo, ['1.2.0', '1.1.0'])
-    await vi.waitFor(() => expect(writesAt(placeKey(dirname(repo)), dirname(repo))).toBe(2))
+    try {
+      // A purge that ended without asking for the board fails here, rather than at the test's time limit.
+      await Promise.race([waiting, purging.then(() => Promise.reject(new Error('the purge ended before it waited for the board')))])
+    } finally {
+      spy.mockRestore()
+    }
     release()
-    await held
+    await Promise.all([held, other])
     await expect(purging).rejects.toThrow('Nothing was purged: 1.1.0 is a branch work merges into now.')
     expect([wf.store.meta(purgedKey('1.1.0')), wf.store.meta(purgedKey('1.2.0')), wf.store.meta(pauseLogKey('1.2.0'))]).toEqual([null, null, log])
   })

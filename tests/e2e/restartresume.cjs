@@ -6,7 +6,8 @@
 //    reported before the next one starts; a request left from the earlier process is removed, never acted on.
 // 2. Combwork ended from outside while an agent is starting: the next start resumes it once, and nothing else twice.
 // 3. An ordinary quit: the next start offers to resume, and nothing resumes until Resume is chosen.
-// 4. An offer left unanswered, then another quit with another agent working: one offer of both; Don't Resume resumes none.
+// 4. An offer left unanswered, then another quit with another agent working: one offer of both, told once, leaving out
+//    an agent offered before and started in a new conversation since (HI-3214); Don't Resume resumes none.
 // 5. Settings → Advanced → Resume agents after an update off: an install offers instead of resuming.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -14,7 +15,7 @@ const { spawnSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 
 const userData = path.join(lib.WORK, 'restartresume-profile')
 const claudeHome = path.join(lib.WORK, 'restartresume-claude-home')
@@ -133,6 +134,50 @@ async function notes(c, id, project = alpha) {
   if (!s?.sessionId) return []
   const t = await c.inv('transcript:read', project, s.sessionId).catch(() => null)
   return (t?.items ?? []).filter((x) => x.kind === 'user' && /^\[CW\] Combwork (restarted|was quit)/.test(x.text ?? '')).map((x) => x.text)
+}
+/**
+ * Why an alpha agent isn't quiet now, or '' once it is (HI-3452): idle (after its note's turn a fake is `finished`, not
+ * `ready`), its composer free, and nothing of Combwork's waiting to be typed into it: a just-started Watcher takes an inbox
+ * line it had (the install's) as a turn of its own. lib.agentQuiet's checks, its deliveries read through c.api: with two
+ * workspaces open, the Agent API needs the workspace said (X-Combwork-Workspace), which lib.inboxPending doesn't send.
+ */
+async function notQuiet(c, a) {
+  const s = (await c.inv('session:live')).find((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === a.id)
+  if (!s || !['ready', 'finished'].includes(s.status) || s.turn?.state === 'running') return `status ${s?.status ?? 'none'}${s?.turn?.state ? `, turn ${s.turn.state}` : ''}`
+  if (s.runtime?.composer !== 'free') return `composer ${s.runtime?.composer ?? 'unknown'}`
+  const r = await c.api('GET', `/v1/projects/alpha/agents/${encodeURIComponent(s.agentName ?? a.name)}/deliveries?limit=200`)
+  if (r.status !== 200) return `deliveries: HTTP ${r.status}`
+  const waiting = (r.body?.deliveries ?? []).filter((d) => d.state === 'queued' || d.state === 'uncertain')
+  return waiting.length ? `deliveries waiting: ${waiting.map((d) => `${d.id} ${d.state}`).join(', ')}` : ''
+}
+/**
+ * Waits until an alpha agent is quiet (notQuiet), within the step's bound. Not quiet: a failed check saying why, and the
+ * suite stops (a prompt typed into a busy agent is dropped, and what the next quit records would no longer be the test's).
+ */
+async function whenQuiet(c, a) {
+  if (await lib.until(async () => (await notQuiet(c, a)) === '', HUNG_MS, 250)) return
+  const why = await notQuiet(c, a)
+  check(`${a.name} is quiet before its prompt`, false, why)
+  throw new Error(`${a.name} not quiet within the step's bound: ${why}`)
+}
+/**
+ * Sets an alpha agent working on a "holduntil" prompt (HI-3452). Typed once it is quiet, and taken only once its
+ * conversation has the prompt and it works: a just-resumed agent works on its resume note first, and the CLI drops a prompt
+ * sent while it is busy, so "working" alone was the note's turn and the agent idle at the next quit, so not recorded.
+ */
+async function promptWorking(c, a, text) {
+  const taken = async () => {
+    const live = (await c.inv('session:live')).find((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === a.id)
+    if (live?.status !== 'working' || !live.sessionId) return false
+    const t = await c.inv('transcript:read', alpha, live.sessionId).catch(() => null)
+    return (t?.items ?? []).some((x) => x.kind === 'user' && (x.text ?? '').includes(text))
+  }
+  await whenQuiet(c, a)
+  // sendPrompt returns 0, not throwing, when no attempt was taken: a failed check and the suite stops, or a turn of
+  // something else's would decide what the next quit records.
+  if (await lib.sendPrompt(c.inv, lib.ptyKey(alpha, a.id), text, { submitted: taken })) return
+  check(`${a.name} takes "${text}" and works on it`, false, `its conversation lacks the prompt, or it isn't working: status ${(await c.live(a.id))?.status ?? 'none'}`)
+  throw new Error(`${a.name} never took "${text}"`)
 }
 /** A notice's text in whichever window shows it (a notice goes to one window of several), and that window. */
 async function anyToast(c, re) {
@@ -266,7 +311,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     // Resumes have long enough again: Worker, held below, is still starting when Combwork is ended.
     await c.inv('advanced:set', 'cw.restart.resumeReadySeconds', 90)
     // Worker working again; a close for an install records it (and the lane's two); then it is held at its next resume.
-    await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-2', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
+    await promptWorking(c, agents.Worker, 'holduntil go-worker-2')
     writeRequest(c.pid, '8b3e0d4c-2c65-4f80-9d7c-5e4f3a2b1c09')
     check('Combwork quits by itself for the install', !!(await gone(c.pid)))
     c = null
@@ -299,7 +344,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     // The second workspace's window stops Other (a window's calls are its own workspace's).
     for (const p of c.app.windows()) await p.evaluate(([x, id]) => window.combwork.invoke('session:stop', x, id), [beta, agents.Other.id]).catch(() => undefined)
     check('Watcher, Builder, Reviewer and Other are stopped', !!(await lib.until(async () => (await Promise.all([...others.map((n) => c.live(agents[n].id)), liveAny(beta, agents.Other.id)])).every((s) => !s), HUNG_MS, 300)))
-    await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-3', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
+    await promptWorking(c, agents.Worker, 'holduntil go-worker-3')
     check('Combwork quits', await quit(c))
     c = null
     check('the quit recorded Worker alone, and the record is a quit', record()?.reason === 'quit' && record()?.entries?.length === 1 && record()?.entries?.[0]?.agentName === 'Worker' && record()?.entries?.[0]?.state === 'pending', JSON.stringify(record()))
@@ -311,19 +356,41 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     check('Resume resumes it, its note saying Combwork was quit', !!(await lib.until(async () => ((await notes(c, agents.Worker.id)).at(-1) ?? '').startsWith('[CW] Combwork was quit and started again'), HUNG_MS)))
 
     // --- 4. An offer left unanswered, then another quit with Builder working too: one offer of both; Don't Resume.
-    await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-4', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
+    // HI-3214: Watcher, offered too, is started in a new conversation meanwhile (as HB6 was): not offered again.
+    await c.inv('session:start', alpha, { agentId: agents.Watcher.id }).catch(() => undefined)
+    await lib.until(async () => (await c.live(agents.Watcher.id))?.status === 'ready', HUNG_MS, 300)
+    // Both quiet before either is prompted: a held turn ends by itself after two minutes (the fake's bound), so a long
+    // wait for Watcher after Worker's prompt left Worker idle at the quit.
+    for (const n of ['Worker', 'Watcher']) await whenQuiet(c, agents[n])
+    for (const n of ['Worker', 'Watcher']) await promptWorking(c, agents[n], `holduntil go-${n.toLowerCase()}-4`)
     check('Combwork quits again', await quit(c))
     c = null
     c = await start()
-    await lib.until(async () => (await anyToast(c, /Resume the agent that was working\?/))?.text, HUNG_MS)
+    const first = await lib.until(async () => (await anyToast(c, /Resume the 2 agents that were working\?/))?.text, HUNG_MS)
+    check('the start after that quit offers Worker and Watcher', !!first && first.includes('Worker (alpha)') && first.includes('Watcher (alpha)'), first ?? `no offer of 2; the record: ${JSON.stringify(record()?.entries?.map((e) => [e.agentName, e.state]))}`)
+    const watcherWas = record()?.entries?.find((e) => e.agentName === 'Watcher')?.sessionId
+    await c.inv('session:start', alpha, { agentId: agents.Watcher.id }).catch(() => undefined)
+    const watcherNew = await lib.until(async () => {
+      const s = await c.live(agents.Watcher.id)
+      return s?.status === 'ready' && s.sessionId && s.sessionId !== watcherWas ? s.sessionId : null
+    }, HUNG_MS, 300)
+    check('Watcher, offered, starts in a new conversation instead', !!watcherWas && !!watcherNew, JSON.stringify({ watcherWas, watcherNew }))
+    await c.inv('session:stop', alpha, agents.Watcher.id)
+    await lib.until(async () => !(await c.live(agents.Watcher.id)), HUNG_MS, 300)
     await c.inv('session:start', alpha, { agentId: agents.Builder.id }).catch(() => undefined)
     await lib.until(async () => (await c.live(agents.Builder.id))?.status === 'ready', HUNG_MS, 300)
-    await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Builder.id), 'holduntil go-builder', { submitted: async () => (await c.live(agents.Builder.id))?.status === 'working' })
+    await promptWorking(c, agents.Builder, 'holduntil go-builder')
     check('Combwork quits with the offer unanswered', await quit(c))
     c = null
+    const startedAt = logLines().length
     c = await start()
     const both = await lib.until(async () => (await anyToast(c, /Resume the 2 agents that were working\?/))?.text, HUNG_MS)
-    check('the next start offers both: the earlier offer kept, Builder added', !!both && both.includes('Worker (alpha)') && both.includes('Builder (alpha)'), both)
+    check('the next start offers both: the earlier offer kept, Builder added', !!both && both.includes('Worker (alpha)') && both.includes('Builder (alpha)'), both ?? `no offer of 2; the record: ${JSON.stringify(record()?.entries?.map((e) => [e.agentName, e.state]))}`)
+    // HI-3214: told once, though the queue and the window's start notices both run; Watcher, in a newer conversation, left out.
+    check('…once the start notices have run', !!(await lib.until(() => logLines().slice(startedAt).some((l) => l.includes('profile: start notices done')), HUNG_MS)))
+    const offers = async () => (await Promise.all(c.app.windows().map((p) => p.evaluate(() => [...document.querySelectorAll('.toast')].filter((t) => /Resume the .*that were working\?|Resume the agent that was working\?/.test(t.innerText)).length).catch(() => 0)))).reduce((x, y) => x + y, 0)
+    check('…in one notice, not two', (await offers()) === 1, String(await offers()))
+    check("…not naming Watcher, whose earlier offer is for a conversation it has left", !!both && !both.includes('Watcher') && record()?.entries?.find((e) => e.agentName === 'Watcher')?.state === 'skipped', JSON.stringify(record()?.entries?.map((e) => [e.agentName, e.state, e.why])))
     await clickToast(c, 'Resume the 2 agents that were working?', "Don't Resume")
     check("Don't Resume resumes neither, and the record is gone", !!(await lib.until(() => !fs.existsSync(recordFile), HUNG_MS)) && !(await c.live(agents.Worker.id)) && !(await c.live(agents.Builder.id)))
 
@@ -331,7 +398,7 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     await c.inv('advanced:set', 'cw.restart.resumeAfterUpdate', false)
     await c.inv('session:start', alpha, { agentId: agents.Worker.id })
     await lib.until(async () => (await c.live(agents.Worker.id))?.status === 'ready', HUNG_MS, 300)
-    await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-5', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
+    await promptWorking(c, agents.Worker, 'holduntil go-worker-5')
     writeRequest(c.pid, '9c4f1e5d-3d76-4091-8e8d-6f5a4b3c2d10')
     check('Combwork quits by itself for the install (the switch off)', !!(await gone(c.pid)))
     c = null

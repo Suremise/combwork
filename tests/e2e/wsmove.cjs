@@ -52,7 +52,7 @@ const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8'))
  */
 const sessionsWritable = (host, writable) => {
   const { ws, scope } = deliveriesPlace(host)
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
   try {
     for (const op of ['INSERT', 'UPDATE', 'DELETE']) {
       const name = `test_sessions_readonly_${op.toLowerCase()}`
@@ -117,16 +117,17 @@ async function launch() {
     for (const agent of [builder, third]) {
       await inv('session:start', alpha1, { agentId: agent.id })
       const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
-      await lib.until(async () => (await live())?.status === 'ready', 15000)
+      // before any turn (HI-2688): its start, restart or resume
+      await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))
       await lib.sendPrompt(inv, lib.ptyKey(alpha1, agent.id), 'hello', { submitted: async () => ['working', 'finished'].includes((await live())?.status) })
-      await lib.until(async () => (await live())?.status === 'finished', 15000)
+      await lib.until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))
       await inv('session:stop', alpha1, agent.id)
-      await lib.until(async () => !(await live()), 10000)
+      await lib.until(async () => !(await live()), lib.timing('hang.ui'))
     }
     // Claude Code's auto memory for the project's folder.
     fs.mkdirSync(path.join(home, 'projects', enc(alpha1), 'memory'), { recursive: true })
     fs.writeFileSync(path.join(home, 'projects', enc(alpha1), 'memory', 'MEMORY.md'), '- [A fact](fact.md) — remembered before the move\n')
-    const recorded = await lib.until(() => readJson(path.join(ws1, '.combwork', 'workspace.json')).lastPath && readJson(path.join(alpha1, '.combwork', 'project.json')).lastPath, 10000)
+    const recorded = await lib.until(() => readJson(path.join(ws1, '.combwork', 'workspace.json')).lastPath && readJson(path.join(alpha1, '.combwork', 'project.json')).lastPath, lib.timing('hang.ui'))
     check('Combwork records where the workspace and its projects are', !!recorded && same(readJson(path.join(ws1, '.combwork', 'workspace.json')).lastPath, ws1) && same(readJson(path.join(alpha1, '.combwork', 'project.json')).lastPath, alpha1))
     const sessions = sessionsOf(alpha1).sessions
     check('the sessions ran in the worktrees (their cwd)', sessions.some((s) => same(s.cwd, wt1)) && sessions.some((s) => same(s.cwd, third1)), JSON.stringify(sessions.map((s) => s.cwd)))
@@ -148,7 +149,7 @@ async function launch() {
     const { app, page, inv } = await launch()
     await lib.openWorkspace(inv, page, ws2)
     const banner = page.locator('.moved-banner')
-    check('reopened at its new folder: the banner says where it was moved from', !!(await lib.until(async () => (await banner.count()) === 1 && (await banner.innerText()).includes(ws1), 15000)), await banner.innerText().catch(() => ''))
+    check('reopened at its new folder: the banner says where it was moved from', !!(await lib.until(async () => (await banner.count()) === 1 && (await banner.innerText()).includes(ws1), lib.timing('hang.ui'))), await banner.innerText().catch(() => ''))
     await page.screenshot({ path: path.join(lib.WORK, 'wsmove-1-banner.png') })
     const recent0 = await inv('workspace:recent')
     check('Open Recent still has the old folder, not found', recent0.some((r) => same(r.path, ws1) && !r.exists), JSON.stringify(recent0))
@@ -169,30 +170,31 @@ async function launch() {
     // Repair refuses while an agent of the workspace runs.
     const coder = (await inv('workspace:refresh')).projects.find((p) => p.name === 'alpha').agents.find((a) => a.name === 'Coder')
     await inv('session:start', alpha2, { agentId: coder.id })
-    await lib.until(async () => (await inv('session:live')).some((s) => s.agentId === coder.id && s.status === 'ready'), 15000)
+    // before any turn (HI-2688): its start, restart or resume
+    await lib.until(async () => (await inv('session:live')).some((s) => s.agentId === coder.id && s.status === 'ready'), lib.timing('hang.step'))
     const refused = await inv('workspace:moveRepair').then(() => '', (e) => String(e.message ?? e))
     check('Repair refuses while an agent runs, naming it', /Stop the running agents first: alpha · Coder/.test(refused), refused)
     await page.locator('.moved-banner button', { hasText: 'Repair…' }).click()
     const dialog = page.locator('.dialog', { has: page.locator('.move-repair') })
-    check('the dialog says to stop the agent, Repair disabled', !!(await lib.until(async () => /Stop the running agents first/.test(await dialog.innerText().catch(() => '')), 10000)) && (await dialog.locator('button', { hasText: /^Repair$/ }).isDisabled()))
+    check('the dialog says to stop the agent, Repair disabled', !!(await lib.until(async () => /Stop the running agents first/.test(await dialog.innerText().catch(() => '')), lib.timing('hang.ui'))) && (await dialog.locator('button', { hasText: /^Repair$/ }).isDisabled()))
     await inv('session:stop', alpha2, coder.id)
-    await lib.until(async () => !(await inv('session:live')).some((s) => s.agentId === coder.id), 10000)
+    await lib.until(async () => !(await inv('session:live')).some((s) => s.agentId === coder.id), lib.timing('hang.step'))
     await page.keyboard.press('Escape')
-    await lib.until(async () => (await dialog.count()) === 0, 5000)
+    await lib.until(async () => (await dialog.count()) === 0, lib.timing('hang.ui'))
 
     // Repair from the dialog, Third recreated: everything but the worktree it couldn't find, and the copy that fails.
     await page.locator('.moved-banner button', { hasText: 'Repair…' }).click()
     const text = async () => (await dialog.innerText().catch(() => '')).replace(/\s+/g, ' ')
     // A table (#1305): each row read as one sentence (its first cell's, for screen readers): What · Was · Now · Will do.
-    check('the dialog shows what Repair will do', !!(await lib.until(async () => /Builder.s worktree: was [^;]*, now [^;]*; will git worktree repair/.test(await text()) && /Second.s worktree: was [^;]*; will recreate, locate or remove its link/.test(await text()) && /Sessions: was [^;]*, now [^;]*; will point 1 session/.test(await text()) && /Claude Code.s conversations and memory: was 2 folders; will copy \d+ files?; the old ones stay/.test(await text()), 10000)), await text())
+    check('the dialog shows what Repair will do', !!(await lib.until(async () => /Builder.s worktree: was [^;]*, now [^;]*; will git worktree repair/.test(await text()) && /Second.s worktree: was [^;]*; will recreate, locate or remove its link/.test(await text()) && /Sessions: was [^;]*, now [^;]*; will point 1 session/.test(await text()) && /Claude Code.s conversations and memory: was 2 folders; will copy \d+ files?; the old ones stay/.test(await text()), lib.timing('hang.step'))), await text())
     check('…as a table, What · Was · Now · Will do', (await dialog.locator('.repair-plan thead th').allInnerTexts()).slice(0, 4).join('|') === 'WHAT|WAS|NOW|WILL DO', JSON.stringify(await dialog.locator('.repair-plan thead th').allInnerTexts()))
     check('…the paths as their part that differs, the full path on hover', (await dialog.locator('.repair-plan tr', { hasText: 'Builder’s worktree' }).or(dialog.locator('.repair-plan tr', { hasText: "Builder's worktree" })).locator('.short-path[data-path]').first().getAttribute('data-path')).toLowerCase() === wt1.toLowerCase())
     const thirdLine = dialog.locator('.repair-plan tr', { hasText: "Third's worktree" })
     await thirdLine.getByRole('button', { name: 'Recreate worktree' }).click()
-    check('…Recreate worktree: the plan says it is made again on its branch', !!(await lib.until(async () => /Third.s worktree: was [^;]*; will recreate on cw\/ws\/alpha\/third/.test(await text()), 10000)), await text())
+    check('…Recreate worktree: the plan says it is made again on its branch', !!(await lib.until(async () => /Third.s worktree: was [^;]*; will recreate on cw\/ws\/alpha\/third/.test(await text()), lib.timing('hang.step'))), await text())
     await page.screenshot({ path: path.join(lib.WORK, 'wsmove-2-plan.png') })
     await dialog.locator('button', { hasText: /^Repair$/ }).click()
-    check('…then what it did, with problems: the copy that failed, and the worktree still to locate', !!(await lib.until(async () => /with problems/.test(await text()) && /for Builder.s worktree couldn.t be copied/.test(await text()) && /Second.s worktree wasn.t found/.test(await text()), 20000)), await text())
+    check('…then what it did, with problems: the copy that failed, and the worktree still to locate', !!(await lib.until(async () => /with problems/.test(await text()) && /for Builder.s worktree couldn.t be copied/.test(await text()) && /Second.s worktree wasn.t found/.test(await text()), lib.timing('hang.step'))), await text())
     // Recreating prunes git's stale entries, which would drop the link Second still needs to be repaired: refused.
     check('…Recreate refused while Second (missing too) still needs its git link', /Third.s worktree couldn.t be recreated: Recreating runs git worktree prune, which would also drop git.s link to .*second/.test(await text()), await text())
     check('…and Second’s link is still there', gitOut(alpha2, ['worktree', 'list', '--porcelain']).toLowerCase().includes(second1.toLowerCase().replace(/\\/g, '/')) || gitOut(alpha2, ['worktree', 'list', '--porcelain']).toLowerCase().includes(second1.toLowerCase()))
@@ -205,10 +207,10 @@ async function launch() {
     const thirdResult = (await dialog.locator('.repair-report tr', { hasText: "Third's worktree" }).first().locator('td').nth(3).innerText()).replace(/\s+/g, ' ').trim()
     check('…Third’s result: Second’s worktree in the way, by name, no path', /another worktree is missing too \(Second's worktree\)/.test(thirdResult) && !/[A-Z]:\\/.test(thirdResult), thirdResult)
     await inv('settings:update', { appearance: { theme: 'light' } })
-    await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'light'), 10000)
+    await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'light'), lib.timing('hang.ui'))
     await page.screenshot({ path: path.join(lib.WORK, 'wsmove-3-report-light.png') })
     await inv('settings:update', { appearance: { theme: 'dark' } })
-    await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'dark'), 10000)
+    await lib.until(() => page.evaluate(() => document.documentElement.dataset.theme === 'dark'), lib.timing('hang.ui'))
     await dialog.locator('button', { hasText: 'Close' }).click()
     check('the banner stays while something is left', (await banner.count()) === 1)
     const pending = readJson(path.join(alpha2, '.combwork', 'project.json')).pendingCopies ?? []
@@ -221,7 +223,7 @@ async function launch() {
     const { app, page, inv } = await launch()
     await lib.openWorkspace(inv, page, ws2)
     const banner = page.locator('.moved-banner')
-    check('after a restart, the banner is still there', !!(await lib.until(async () => (await banner.count()) === 1, 15000)))
+    check('after a restart, the banner is still there', !!(await lib.until(async () => (await banner.count()) === 1, lib.timing('hang.step'))))
     const plan = await inv('workspace:movePlan')
     const host = plan?.hosts.find((h) => h.name === 'alpha')
     check('…its plan: Builder’s data still to copy, Builder’s worktree not repaired again, no session to rewrite', !host?.worktrees.some((x) => x.agentName === 'Builder') && host?.folders.some((f) => f.of === "Builder's worktree" && f.copy >= 1) && host?.sessions === 0, JSON.stringify(host))
@@ -256,7 +258,7 @@ async function launch() {
     const { app, page, inv } = await launch()
     await lib.openWorkspace(inv, page, ws2)
     const banner = page.locator('.moved-banner')
-    check('after the failed write and a restart, the banner is still there', !!(await lib.until(async () => (await banner.count()) === 1, 15000)))
+    check('after the failed write and a restart, the banner is still there', !!(await lib.until(async () => (await banner.count()) === 1, lib.timing('hang.step'))))
     const plan = await inv('workspace:movePlan')
     const host = plan?.hosts.find((h) => h.name === 'alpha')
     check('…its plan: no worktree to repair or make again, Third’s session to follow it, its data already there', host?.worktrees.length === 0 && host?.sessions === 1 && host?.folders.some((f) => f.of === "Third's worktree" && f.copy === 0 && f.kept.length === 0), JSON.stringify(host))
@@ -265,7 +267,7 @@ async function launch() {
     check('…rewriting the session, nothing repeated (no git step, no copy)', report.done.length === 1 && /1 session now points/.test(report.done[0]), JSON.stringify(report.done))
     check('Third’s session points to its new folder', sessionsOf(alpha2).sessions.some((s) => same(s.cwd, third2)) && !sessionsOf(alpha2).sessions.some((s) => same(s.cwd, third1)))
     check('…its Claude data copied, the old folder kept', fs.readdirSync(path.join(home, 'projects', enc(third2))).some((f) => f.endsWith('.jsonl')) && fs.readdirSync(path.join(home, 'projects', enc(third1))).some((f) => f.endsWith('.jsonl')))
-    check('the banner is gone', !!(await lib.until(async () => (await banner.count()) === 0, 10000)))
+    check('the banner is gone', !!(await lib.until(async () => (await banner.count()) === 0, lib.timing('hang.ui'))))
     check('nothing is left to do in project.json', !readJson(path.join(alpha2, '.combwork', 'project.json')).pendingCopies)
 
     // What it did.
@@ -310,14 +312,14 @@ async function launch() {
     const mine = fs.readFileSync(memory2, 'utf8')
     const r2 = await launch()
     await lib.openWorkspace(r2.inv, r2.page, ws2)
-    check('found again with only a conflicting file: the banner shows', !!(await lib.until(async () => (await r2.page.locator('.moved-banner').count()) === 1, 15000)))
+    check('found again with only a conflicting file: the banner shows', !!(await lib.until(async () => (await r2.page.locator('.moved-banner').count()) === 1, lib.timing('hang.ui'))))
     const conflictPlan = await r2.inv('workspace:movePlan')
     const ch = conflictPlan?.hosts.find((h) => h.name === 'alpha')
     check('…the plan has nothing to copy, only the file kept', ch?.folders.some((f) => f.copy === 0 && f.kept.some((k) => k.endsWith('MEMORY.md'))) && ch.worktrees.length === 0 && ch.sessions === 0, JSON.stringify(ch))
     const conflict = await r2.inv('workspace:moveRepair')
     check('…Repair lists it as not overwritten, and finishes', conflict.complete && conflict.skipped.some((l) => /not overwritten: memory.MEMORY\.md/.test(l)) && conflict.failed.length === 0, JSON.stringify(conflict))
     check('…the file is as it was', fs.readFileSync(memory2, 'utf8') === mine)
-    check('…and the banner is gone', !!(await lib.until(async () => (await r2.page.locator('.moved-banner').count()) === 0, 10000)))
+    check('…and the banner is gone', !!(await lib.until(async () => (await r2.page.locator('.moved-banner').count()) === 0, lib.timing('hang.ui'))))
     await r2.app.close()
   }
 
@@ -333,13 +335,13 @@ async function launch() {
     let r = await launch()
     await lib.openWorkspace(r.inv, r.page, wsB1)
     await r.inv('agents:testLegacy', betaB1, { location: 'new-worktree', name: 'Stay' })
-    await lib.until(() => readJson(path.join(betaB1, '.combwork', 'project.json')).lastPath, 10000)
+    await lib.until(() => readJson(path.join(betaB1, '.combwork', 'project.json')).lastPath, lib.timing('hang.ui'))
     await r.app.close()
     fs.mkdirSync(path.dirname(wsB2), { recursive: true })
     fs.renameSync(wsB1, wsB2)
     r = await launch()
     await lib.openWorkspace(r.inv, r.page, wsB2)
-    check('worktrees left behind: the banner shows', !!(await lib.until(async () => (await r.page.locator('.moved-banner').count()) === 1, 15000)))
+    check('worktrees left behind: the banner shows', !!(await lib.until(async () => (await r.page.locator('.moved-banner').count()) === 1, lib.timing('hang.step'))))
     const plan = await r.inv('workspace:movePlan')
     // Stay's worktree is still git's at its place, so the slots' migration adopted it at this opening (#1441): Repair plans
     // it as its carried slot (#1447), linked where it is, as it planned the agent's worktree before.

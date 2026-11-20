@@ -10,6 +10,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-servers-')
 const home = join(base, 'claude-home')
@@ -46,7 +47,7 @@ const { legacyLaunchSettings: agentLaunchSettings } = await import('../src/share
 // Dummy keys shaped so no other masking rule catches them: only the key matcher can.
 const KEY = 'Zq!7#mP2&vL9^tR4~wX8'
 const KEY2 = 'Hn%3*bQ6(kD1)yU5+eW2'
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const outcome = (p: Promise<unknown>): Promise<string> => p.then(() => 'ok', (e: Error) => e.message)
 const keyFile = join(profile, 'connection-keys.json')
 
@@ -62,7 +63,7 @@ beforeAll(async () => {
   writeFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
-  vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
+  vi.spyOn(provider('claude-code').accounts!, 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
   w = createWorkspaceService()
   await w.open(wsPath)
 })
@@ -298,7 +299,7 @@ describe('launching on a server connection', () => {
       })
       // What this PC's environment had of its own goes first, any spelling.
       const inherited = { PATH: 'x', anthropic_api_key: 'machine-key-000000', ANTHROPIC_BASE_URL: 'https://elsewhere', CLAUDE_CODE_USE_BEDROCK: '1', CLAUDE_CODE_OAUTH_TOKEN: 'oauth-000000000000' }
-      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code'), inherited))
+      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code').accounts ?? null, inherited))
       expect(env).toEqual({ PATH: 'x', ...conn.server!.env })
       expect(maskKeys(`token ${KEY}`)).toBe('token <key>')
     } finally {
@@ -313,7 +314,7 @@ describe('launching on a server connection', () => {
     const conn = (await launch(local.id))!
     try {
       expect(conn.server!.env).toMatchObject({ ANTHROPIC_BASE_URL: 'http://localhost:11434', ANTHROPIC_AUTH_TOKEN: 'none', ANTHROPIC_MODEL: 'qwen3:8b' })
-      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code'), { ANTHROPIC_API_KEY: 'machine-key-000000', ANTHROPIC_AUTH_TOKEN: 'machine-token-0000' }))
+      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code').accounts ?? null, { ANTHROPIC_API_KEY: 'machine-key-000000', ANTHROPIC_AUTH_TOKEN: 'machine-token-0000' }))
       expect(env.ANTHROPIC_API_KEY).toBeUndefined()
       expect(env.ANTHROPIC_AUTH_TOKEN).toBe('none')
     } finally {
@@ -326,7 +327,7 @@ describe('launching on a server connection', () => {
     const local = await serverOn({ name: 'Ollama', preset: 'ollama', baseUrl: 'http://localhost:11434', models: [{ id: 'qwen3:8b', as: ['opus'] }] })
     const conn = (await launch(local.id))!
     try {
-      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code'), { PATH: 'x', ...inherited }))
+      const env = withServerEnv(conn.server!.env, withoutAccountEnv(provider('claude-code').accounts ?? null, { PATH: 'x', ...inherited }))
       expect(env).toEqual({ PATH: 'x', ...conn.server!.env })
     } finally {
       conn.release()
@@ -617,7 +618,7 @@ describe("reading a server's models (when asked)", () => {
   }, HUNG_MS * 2)
 })
 
-describe('Ollama cloud models: on this PC, but not local (HI-1773, Darren 27 Oct)', () => {
+describe('Ollama cloud models: on this PC, but not local (HI-1773)', () => {
   let srv: Server
   let port = 0
   let tags: unknown = { models: [] }
@@ -779,5 +780,41 @@ describe("a local model's output budget and context on the connection (HI-2682)"
     // Sent back by an edit: never saved.
     await servers.editServerConnection(a.id, { models: shown })
     expect(saved(a.id).some((m) => 'unsupported' in m)).toBe(false)
+  })
+})
+
+describe("a CLI's description removed while its server connection is kept (HI-3238)", () => {
+  it('Accounts still shows the rest, its connection can be removed, and it is back with its description', async () => {
+    const { applyClis } = await import('../src/main/clis')
+    const { checkCliDescription } = await import('../src/shared/providers/cliDescription')
+    const r = checkCliDescription({ id: 'gone-cli', name: 'Gone CLI', binary: { names: ['gonecli'] }, launch: { prompt: 'typed' }, status: { ready: '^> ' }, server: { api: 'openai', env: { OPENAI_BASE_URL: '{baseUrl}', OPENAI_API_KEY: '{key}' } } })
+    if (!r.ok) throw new Error('the description was refused')
+    const described = (clis: (typeof r.cli)[]) => applyClis({ generation: 0, folder: join(base, 'clis'), clis, problems: [] })
+    config.settings.providers['gone-cli'] = { enabled: true } as never
+    described([r.cli])
+    try {
+      const kept = await serverOn({ cli: 'gone-cli' as never, name: 'Local', preset: 'ollama', baseUrl: 'http://localhost:11434', models: [{ id: 'qwen3:8b', as: ['opus'] }] })
+      const other = await serverOn()
+      described([])
+      // Its description gone: the view lists every connection still, its own included, and nothing throws.
+      expect(view().connections.map((c) => c.id)).toEqual(expect.arrayContaining([kept.id, other.id]))
+      expect(here(() => accounts.accountsView(true)).connections.map((c) => c.id)).toContain(kept.id)
+      // Marked so the window lists it with Remove alone (HI-3270); the others aren't.
+      expect(view().connections.find((c) => c.id === kept.id)?.gone).toBe(true)
+      expect(view().connections.find((c) => c.id === other.id)?.gone).toBeUndefined()
+      await accounts.readSetUp(kept.id)
+      // Restored: the same connection, as it was.
+      described([r.cli])
+      expect(view().connections.find((c) => c.id === kept.id)).toMatchObject({ name: 'Local', provider: 'gone-cli' })
+      expect(view().connections.find((c) => c.id === kept.id)?.gone).toBeUndefined()
+      // Gone again, it can be removed.
+      described([])
+      await accounts.removeAccount(kept.id)
+      expect(view().connections.map((c) => c.id)).not.toContain(kept.id)
+      expect(view().connections.map((c) => c.id)).toContain(other.id)
+    } finally {
+      described([])
+      delete config.settings.providers['gone-cli']
+    }
   })
 })

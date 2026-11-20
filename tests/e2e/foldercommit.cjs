@@ -1,6 +1,6 @@
 // A change left uncommitted where the target is checked out (HI-2944): a project set to "Combwork merges" into `main`,
 // checked out in the project folder, fake Claude Code agents acting by their own tokens (queueFixture's), the Assistant
-// off. Darren's case, end to end:
+// off. The user's case, end to end:
 // - Files → Exclude from Git on a folder, shared: .gitignore changed, left uncommitted; the menu says which choice needs a
 //   commit, and the notification offers Commit It.
 // - A lane started for a card that also changes .gitignore: the window is told before work starts (Commit, Set Aside,
@@ -19,7 +19,7 @@ const q = require('./queueFixture.cjs')
 
 const PORT = Number(lib.port(47849))
 const fx = q.queueProject('foldercommit')
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -70,7 +70,7 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     const excluded = toast('Added /reference/ to .gitignore')
     check('…its notification offers Commit It, and says Commit It commits .gitignore as it is now', !!(await waitHung(async () => (await excluded.getByRole('button', { name: 'Commit It' }).count()) === 1)) && /as it is now/.test(await excluded.innerText()), await excluded.innerText().catch(() => ''))
     await f.themes(page, excluded, 'foldercommit-exclude-toast')
-    // Left uncommitted, as Darren's was: the notification closed.
+    // Left uncommitted, as the user's was: the notification closed.
     await excluded.locator('.popup-close').first().click().catch(() => undefined)
 
     // --- A lane for a card that also changes .gitignore: told before work starts.
@@ -106,6 +106,37 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     check('the Merges tab: the paused merge names .gitignore, with Commit and Set Aside', !!(await waitHung(async () => (await commitBtn.count()) === 1)) && (await m.card('main').locator('[data-action="set-aside-changes"]').count()) === 1 && /\.gitignore/.test(await m.text('main')), await m.text('main'))
     await f.themes(page, m.card('main'), 'foldercommit-merges-paused')
     const before = git('rev-parse', 'HEAD')
+    // HI-3372: Commit held by a pre-commit hook of the test's own: Cancel beside the buttons while it runs; pressed, git and
+    // the hook are ended, the notice says so (nothing committed), and the paused merge's buttons are back.
+    const hold = path.join(lib.probeDir('foldercommit-hold'), 'started')
+    const pidFile = `${hold}.pid`
+    const fwd = (file) => file.replace(/\\/g, '/')
+    fs.mkdirSync(path.join(fx.alpha, '.git', 'hooks'), { recursive: true })
+    fs.writeFileSync(path.join(fx.alpha, '.git', 'hooks', 'pre-commit'), `#!/bin/sh\n: > "${fwd(hold)}"\n"${fwd(process.execPath)}" -e 'require("fs").writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 120000)' "${fwd(pidFile)}"\n`)
+    await commitBtn.click()
+    const cancelBtn = m.card('main').locator('[data-action="cancel-git-run"]')
+    const seen = new Set()
+    // The reviewer may still be working in the folder just after its verdict, which Commit refuses (R1 is working in…):
+    // that refusal dismissed and Commit clicked again until it runs (the hook's own word) with its Cancel shown.
+    const busyRefusal = page.locator('.toast', { hasText: 'is working in' })
+    const heldOk = !!(await waitHung(async () => {
+      for (const t of await page.locator('.toast').allInnerTexts().catch(() => [])) seen.add(t.replace(/\s+/g, ' '))
+      if ((await busyRefusal.count()) > 0) {
+        await busyRefusal.first().getByRole('button', { name: 'Dismiss' }).click().catch(() => undefined)
+        await commitBtn.click().catch(() => undefined)
+        return null
+      }
+      // Held once the hook's own process (node) has started and said its pid (HR2's round 1).
+      return fs.existsSync(hold) && fs.existsSync(pidFile) && (await cancelBtn.count()) === 1
+    }))
+    const held = heldOk ? lib.identify([Number(fs.readFileSync(pidFile, 'utf8'))]) : []
+    if (!heldOk) await page.screenshot({ path: path.join(lib.WORK, 'foldercommit-held-failed.png') })
+    check('Commit held by its hook: Cancel beside the buttons while it runs', heldOk, `${await m.text('main')} | hook ran: ${fs.existsSync(hold)} | notices: ${[...seen].join(' / ')}`)
+    await f.themes(page, m.card('main'), 'foldercommit-commit-running')
+    await cancelBtn.click()
+    const stopped = page.locator('.toast', { hasText: 'You cancelled the commit' })
+    check('…Cancel: said Stopped, nothing committed; the hook ended; the buttons back', !!(await waitHung(async () => (await stopped.count()) >= 1 && (await cancelBtn.count()) === 0 && (await commitBtn.count()) === 1)) && /Nothing was committed/.test(await stopped.first().innerText()) && git('rev-parse', 'HEAD') === before && !!(await waitHung(() => lib.stillSame(held).length === 0)), `${await m.text('main')} | still running: ${JSON.stringify(lib.stillSame(held))}`)
+    fs.rmSync(path.join(fx.alpha, '.git', 'hooks', 'pre-commit'))
     await commitBtn.click()
     const ours = () => git('log', '--format=%H', '--grep=Commit changes before merging', `${before}..HEAD`)
     check('Commit: .gitignore alone committed in the project folder, its message naming the card', !!(await waitHung(() => ours() || null)) && git('show', '--no-renames', '--name-only', '--format=', ours().split(/\s+/)[0]) === '.gitignore', git('log', '--format=%h %s', `${before}..HEAD`))
@@ -130,7 +161,7 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     await aside.click()
     const keyB = (await h.card(b.n))?.key
     // Both at once: git moves the stash ref before Combwork takes its entries into the index (HI-3056: and refreshes them).
-    check('Set Aside: keep.txt kept in a stash named after the card, the index clean', !!(await waitHung(() => (new RegExp(`Combwork: set aside before merging ${keyB}`).test(git('stash', 'list', '--format=%s')) && git('diff', '--cached', '--name-only') === '') || null)), `${git('stash', 'list', '--format=%s')} | staged: ${git('diff', '--cached', '--name-only')}`)
+    check('Set Aside: keep.txt kept in a stash named after the card, the index clean', !!(await waitHung(() => (new RegExp(`Combwork: set aside before merging ${keyB}`).test(git('stash', 'list', '--format=%s')) && git('diff', '--cached', '--name-only') === '') || null)), `${git('stash', 'list', '--format=%s')} | staged: ${git('diff', '--cached', '--name-only')} | notices: ${(await page.locator('.toast').allInnerTexts().catch(() => [])).join(' / ')}`)
     check('…and the merge goes on: Done, keep.txt as the card made it', !!(await waitHung(async () => (await h.card(b.n))?.column === 'done')) && f.text('keep.txt') === 'kept\nby the card\n', JSON.stringify(f.text('keep.txt')))
     check('…the user\'s staged change is in the stash', git('show', 'stash@{0}:keep.txt') === 'kept, and the user staged this', git('show', 'stash@{0}:keep.txt'))
     await page.keyboard.press('Escape')
@@ -156,12 +187,16 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     const hookLog = `${hook}.log`
     fs.mkdirSync(path.dirname(hook), { recursive: true })
     fs.writeFileSync(hook, `#!/bin/sh\nunset GIT_INDEX_FILE\nprintf "/staged-meanwhile/\\n" >> .gitignore\ngit add .gitignore 2>> "${hookLog.replace(/\\/g, '/')}"\necho "add: $?" >> "${hookLog.replace(/\\/g, '/')}"\n`)
+    // The notifications already up are marked, so only Commit It's own is read: the window is unfocused (HI-3404), so the
+    // pop-ups' clocks don't run and the first merge's "Committed 1 file on main" is still up (HI-3415).
+    await page.locator('.toast').evaluateAll((els) => els.forEach((el) => el.setAttribute('data-e2e-before', '')))
     await second.getByRole('button', { name: 'Commit It' }).click()
     // Combwork's notification first, once its commit, the hook and its index step are all done: git writes HEAD before
     // the post-commit hook runs, and a git status from here meanwhile may take the index's lock (to refresh it), failing
     // the hook's git add.
-    const madeWarned = toast('Committed 1 file on main, with a warning')
-    const anyCommitted = page.locator('.toast').filter({ hasText: /Committed 1 file on main/ })
+    const fresh = page.locator('.toast:not([data-e2e-before])')
+    const madeWarned = fresh.filter({ hasText: 'Committed 1 file on main, with a warning' })
+    const anyCommitted = fresh.filter({ hasText: /Committed 1 file on main/ })
     await waitHung(async () => (await anyCommitted.count()) > 0)
     const hookSaid = () => (fs.existsSync(hookLog) ? fs.readFileSync(hookLog, 'utf8').trim() : 'no hook log')
     check('Commit It: .gitignore alone committed, keep.txt still changed', git('rev-parse', 'HEAD') !== at && JSON.stringify(lastCommitFiles()) === '[".gitignore"]' && git('log', '-1', '--format=%s') === 'Update .gitignore' && /M keep\.txt/.test(git('status', '--porcelain')), `${JSON.stringify(lastCommitFiles())} ${git('status', '--porcelain')}`)
@@ -183,7 +218,7 @@ const lastCommitFiles = () => git('show', '--no-renames', '--name-only', '--form
     await h.app.close()
     fs.writeFileSync(path.join(fx.alpha, 'keep.txt'), 'the user is editing this\n')
     const { DatabaseSync } = require('node:sqlite')
-    const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
     const scope = db.prepare("SELECT project FROM cards WHERE number = ?").get(b.n)?.project ?? 'alpha'
     const now = git('rev-parse', 'HEAD')
     db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(`workflow:${scope.toLowerCase()}:queue.catchUp:main`, JSON.stringify({ from: now, to: now, card: keyB, entry: 'seeded' }))

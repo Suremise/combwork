@@ -23,6 +23,6 @@ and the offer itself (its view is named rate-limit-switch-prompt; `{}` is the mo
   Keep current model
   Keep current model (never show again)     Hide future rate limit reminders about switching models
 
-"Keep current model (never show again)" ("Hide future rate limit reminders…") is, going by its words and Darren's own
-config.toml (which has hide_rate_limit_model_nudge = true after he chose it once), the choice that saves the key there;
+"Keep current model (never show again)" ("Hide future rate limit reminders…") is, going by its words and the maintainer's own
+config.toml (which has hide_rate_limit_model_nudge = true after they chose it once), the choice that saves the key there;
 not tried here. Combwork passes it for the launch instead and writes nothing.

@@ -16,7 +16,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47938))
 const userData = path.join(lib.WORK, 'hookshealth-profile')
@@ -79,8 +79,11 @@ const hooksOff = (agent, off) => {
     const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
     const reviewer = await lib.addAgent(inv, alpha, { name: 'Reviewer' })
     const live = async (a) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === a.id)
+    // Before the agents start, so their output is all recorded (raw, below).
+    await lib.recordPtyOutput(page)
     for (const a of [builder, reviewer]) await inv('session:start', alpha, { agentId: a.id })
-    check('the agents start', !!(await until(async () => (await live(builder))?.status === 'ready' && (await live(reviewer))?.status === 'ready', 45000)))
+    // before any turn (HI-2688): its start, restart or resume
+    check('the agents start', !!(await until(async () => (await live(builder))?.status === 'ready' && (await live(reviewer))?.status === 'ready', lib.timing('hang.step'))))
 
     // Whether any agent's state ever said its hooks were missing (sampled throughout the healthy part).
     const ever = new Set()
@@ -91,7 +94,9 @@ const hooksOff = (agent, off) => {
         // The window is closing.
       }
     }, 100)
-    const raw = async (a) => (await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => '')) ?? ''
+    // The output as it came (HI-3311, HI-3312's recorder): what came after a mark is past it. pty:buffer may be the screen
+    // drawn afresh (a resize in its queue), where a turn's lines land above the input box, before the mark.
+    const raw = (a) => lib.ptyOutput(page, lib.ptyKey(alpha, a.id))
     /** Types a prompt and waits until the fake shows it working on it (its screen: hooks may be off). */
     const say = async (a, text) => {
       const mark = (await raw(a)).length
@@ -101,8 +106,13 @@ const hooksOff = (agent, off) => {
 
     // The lane: Builder on a card in Doing, Reviewer reviewing.
     const c = await inv('tasks:create', { title: 'Hooks health', project: 'alpha', column: 'doing', agent: builder.id })
+    const builderBefore = (await live(builder))?.sessionId
     const lane = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', reviewer: 'Reviewer', cards: [c.number] })
     check('the lane starts', lane.status === 200, JSON.stringify(lane))
+    // The lane gives its idle builder a new conversation whose first turn is its brief (HI-2232): done with it before
+    // anything is typed (HI-3416). Typed while the brief was starting, a prompt ran beside it, and the brief's reply,
+    // written after the next prompt, was taken as that prompt's turn, answered by no hook.
+    check("the lane's brief is done in Builder's new conversation", !!(await until(async () => lib.laneBriefDone(PORT, 'alpha', await live(builder), builderBefore, apiToken), HUNG_MS)), JSON.stringify(await live(builder)))
     const laneNow = async () => (await inv('lanes:list')).find((l) => l.builder.id === builder.id)
 
     // --- Healthy: a long silent think (its prompt's hook came, then nothing for 10 s: over three bounds), and idle.
@@ -173,10 +183,11 @@ const hooksOff = (agent, off) => {
     // task is watched from its start, though it is still starting then.
     const cx = await lib.addAgent(inv, alpha, { name: 'Cx', provider: 'codex', permissionMode: 'full-access' })
     fs.writeFileSync(path.join(codexHome, 'fake-nohooks-Cx'), '')
-    // What it does with the card it is started on: work held until the test types "g", its Working line on screen.
-    fs.writeFileSync(path.join(codexHome, 'fake-wakes-Cx.txt'), 'hold\n')
-    // Started on a card (Start on Card, as from the board), whose title is the fake's step: 12 s of work.
-    const cxCard = await inv('tasks:create', { title: 'Hold on', project: 'alpha', column: 'todo' })
+    // Started on a card (Start on Card, as from the board), whose title is the fake's step: the card read from its inbox
+    // is new work, its brief the turn's text (HI-2747), so "work 60" in it is a minute's work, its Working line on screen
+    // for longer than the check waits (HI-3415: a fake-wakes line answers no new work; the turn ended at once, and only
+    // the fake's Working line left up after the turn made it look at work).
+    const cxCard = await inv('tasks:create', { title: 'work 60', project: 'alpha', column: 'todo' })
     const startedCx = await inv('tasks:start', cxCard.number, { kind: 'agent', agentId: cx.id })
     check('the Codex agent starts on its card', startedCx?.agentId === cx.id, JSON.stringify(startedCx))
     const deafCx = await until(async () => (await live(cx))?.hooksMissing, HUNG_MS)
@@ -188,7 +199,8 @@ const hooksOff = (agent, off) => {
     // the turn that line starts works, though nothing came since.
     const cy = await lib.addAgent(inv, alpha, { name: 'Cy', provider: 'codex', permissionMode: 'full-access' })
     await inv('session:start', alpha, { agentId: cy.id })
-    check('a second Codex agent starts', !!(await until(async () => (await live(cy))?.status === 'ready', 45000)))
+    // before any turn (HI-2688): its start, restart or resume
+    check('a second Codex agent starts', !!(await until(async () => (await live(cy))?.status === 'ready', lib.timing('hang.step'))))
     check('…and takes a turn with its hooks working', (await say(cy, 'hh-cy healthy')) > 0 && !!(await until(async () => (await live(cy))?.status === 'finished', HUNG_MS)) && !(await live(cy))?.hooksMissing, JSON.stringify(await live(cy)))
     fs.writeFileSync(path.join(codexHome, 'fake-nohooks-Cy'), '')
     const cyCard = await inv('tasks:create', { title: 'Hooks gone', project: 'alpha', column: 'todo' })
@@ -206,7 +218,7 @@ const hooksOff = (agent, off) => {
     const back = await until(async () => {
       const s = await live(builder)
       return s && s.runId !== runBefore && s.status === 'ready' && !s.hooksMissing && s
-    }, 45000)
+    }, lib.timing('hang.step'))
     check('a restart with working hooks clears it', !!back)
     check('the banner goes', !!(await until(async () => (await banner.count()) === 0, HUNG_MS)))
     const resumed = await until(async () => {

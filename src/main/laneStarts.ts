@@ -1,6 +1,6 @@
 import { join } from 'path'
 import type { TaskCard } from '../shared/types'
-import { laneStartDue, type LaneSlotHeld, type LaneStartWait, type LaneStartWhy } from '../shared/lanes'
+import { laneStartDue, ownOpen, type LaneSlotHeld, type LaneStartWait, type LaneStartWhy } from '../shared/lanes'
 import { cardRef } from '../shared/projectKeys'
 import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { agentNowOf } from './cardStall'
@@ -10,7 +10,7 @@ import { LANES_FRESH_START_WAIT_MINUTES, withValues } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { advanced } from './advanced'
 import { launchFresh } from './laneStart'
-import { changeFreshStart, freshStartsNow, laneNow, lanesEnforced, laneStartHeld, laneViewsChanged, laneWaitsForSlot, listLanes, rawLanes, setLaneStartWaits } from './lanes'
+import { changeFreshStart, freshStartsNow, laneNow, lanesEnforced, laneStartHeld, laneViewsChanged, laneWaitsForSlot, listLanes, rawLanes, runLaneYields, setLaneStartWaits } from './lanes'
 import { createLogger, userText } from './logger'
 import { withCardNames } from './projectKeys'
 import { offerNow, onDeliveriesChanged, waitingForRun } from './deliveries'
@@ -19,17 +19,18 @@ import { sessions } from './sessions'
 import { startTask } from './taskStart'
 import { CW_LANE_START, WorkflowRefusedError } from './tasks'
 import { teamPauseOf } from './teamPause'
-import { endOwnLaneWatch } from './watches'
+import { endOwnLaneWatch, type LaneCardsNow } from './watches'
 import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
+import type { Workflow } from './workflow/runtime'
 
 /**
- * Combwork starts a lane's next card (HI-1990, Darren's decision of 29 Oct 2026: plumbing, not guidance). With workflow
+ * Combwork starts a lane's next card (HI-1990: plumbing, not guidance). With workflow
  * rules on, once the card before it is Done, a running lane's next card (its own, in Todo, not blocked, every card
  * before it Done or another lane's) is started on the lane's builder as the Assistant's Start gives one (`startTask`,
  * through the start's rules): its slot lent and the builder placed there, typed into it idle, or started with it when
  * it isn't running. A builder in a turn (reading the Done wake, finishing a follow-up) is waited for until its turn
  * ends; one waiting on a watch, or whose last start failed, is left to the lane-next stall (HI-1741), except a watch on
- * its own lane alone, which the start ends (HI-2889, endOwnLaneWatch). LE-250's builder
+ * its own lane alone or on its cards not started yet alone, which the start ends (HI-2889, HI-3300, endOwnLaneWatch). LE-250's builder
  * read its Done and went idle, and the lane sat until the Assistant started LE-246 by hand. The lane's first card too
  * (HI-2029), once the lane's own start has launched its agents (holdLaneStart) and its builder is free: a lane started
  * over a running builder sat "active" for hours with its first card in Todo.
@@ -132,10 +133,17 @@ setLaneStartWaits(laneStartWait)
  */
 async function dependencyWait(ws: WorkspaceService, projectPath: string, n: number): Promise<string[] | null> {
   const wf = await (await import('./workflow/service')).workflowFor(ws, projectPath).catch(() => null)
-  if (!wf) return null
+  return wf ? dependencyWaitIn(wf, n) : null
+}
+
+/** dependencyWait on a workflow already read (HI-3368: a lane's yield asks it of its first card, synchronously). */
+export function dependencyWaitIn(wf: Workflow, n: number): string[] | null {
   try {
     const card = wf.store.card(n)
     if (!card.blockedBy.length || !wf.rulesetOf(card).guards.start.includes('start.dependenciesIntegrated')) return null
+    // HI-3194: ready as written with its last blocker's Done, in that same write: nothing waited for here (its start still
+    // checks each blocker's change is in its target). Not written yet (a card from before), or waiting: worked out.
+    if (wf.state(card.id).ready === true) return null
     // Every one not Done (HI-2618: "waiting on HI-2610, HI-2611 and HI-2612"), in its blockedBy order.
     const open = card.blockedBy.filter((id) => !wf.laneDone(id)).map((id) => wf.store.card(id).key)
     return open.length ? open : null
@@ -200,7 +208,17 @@ export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
       await freshPass(ws, path)
       await laneStartsTestHooks.midPass?.()
       const enforced = await lanesEnforced()
-      if (enforced) await lookAt(ws, path, found, fence)
+      // HI-3323: a lane's queued yield to a card its card in flight waits on, run once its builder is out of a turn. A lane
+      // it switched gets its first card from the next look, once the put back's slot release has run; a builder whose
+      // yield still waits is looked at again as its status changes, as one whose next card waits.
+      let switched: ReadonlySet<string> = new Set()
+      if (enforced && fence.current()) {
+        const y = await runLaneYields(ws)
+        for (const w of y.waiting) found.waiting.set(builderKey(path, w.project, w.builder), w.first)
+        switched = new Set(y.switched)
+        if (y.switched.length) soon(ws)
+      }
+      if (enforced) await lookAt(ws, path, found, fence, switched)
       // Its due cards' dependency waits (HI-2618), the rules on or off: an episode each, and with the rules off one
       // readiness wake once the last of them lands.
       await (await import('./laneDeps')).settleDepEpisodes(ws, enforced, fence)
@@ -249,9 +267,10 @@ function publish(path: string, found: PassFound, ws: WorkspaceService): void {
 /** Whether a lane's builder is owed its new conversation (HI-2034), as kept now: its cards wait for it, never the old one. */
 const builderOwed = (ws: WorkspaceService, id: string): boolean => freshStartsNow(ws, id).some((f) => f.role === 'builder')
 
-async function lookAt(ws: WorkspaceService, path: string, found: PassFound, fence: PassFence): Promise<void> {
+async function lookAt(ws: WorkspaceService, path: string, found: PassFound, fence: PassFence, switched: ReadonlySet<string> = new Set()): Promise<void> {
   for (const lane of await listLanes(ws)) {
     if (!fence.current()) return
+    if (switched.has(lane.id)) continue
     const next = laneStartDue(lane)
     // A lane waiting for a slot (none was free as it started) has its stopped agents started once one is lent (slotCards'
     // pass), which keeps the wait until they are launched (HR1 on HI-2029: a `stoppedOnly` one too): its status says it
@@ -276,11 +295,17 @@ async function lookAt(ws: WorkspaceService, path: string, found: PassFound, fenc
     // Its turn over, watching its own lane alone (HI-2889: HB2 after each Done, the lane's card waiting 15 min for the
     // lane-next stall): that watch waits for what this start is, so it ends and the card starts. A watch on anything
     // else (another card, an agent, usage, other lanes) is the builder's own wait, still left to the stall.
+    // A watch on its lane's cards not started yet alone is the same wait (HI-3300: CB1 watched CL-305, waiting for the user,
+    // when CL-310 was put ahead of it): the lane reaches them after this card.
     // Decided again under the watch's lock, just before it is removed (HR1 on HI-2889): this look still current, the card
     // still due on the same builder, still watching, and the lane's cards as they are then.
-    const watchingOwnLane = (): readonly number[] | null => {
+    const watchingOwnLane = (): LaneCardsNow | null => {
       if (!fence.current() || !stillDue(ws, path, lane, next.number) || sessions.liveFor(projectPath, lane.builder.id)?.status !== 'watching') return null
-      return laneNow(ws, { lane: lane.id })?.cards.map((c) => c.number) ?? null
+      const v = laneNow(ws, { lane: lane.id })
+      if (!v) return null
+      const due = v.cards.findIndex((c) => c.number === next.number)
+      if (due < 0) return null
+      return { cards: v.cards.map((c) => c.number), unstarted: v.cards.slice(due).filter((c) => ownOpen(c) && (c.column === 'todo' || c.column === 'hold')).map((c) => c.number) }
     }
     if (holds === 'watching' && watchingOwnLane() && (await endOwnLaneWatch(projectPath, lane.builder.id, lane.id, watchingOwnLane)) !== null) holds = await builderWait(projectPath, lane.builder)
     if (holds) {

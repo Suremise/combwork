@@ -3,7 +3,7 @@
 // closed ("No workspace is open"). Window 1 has workspace A (alpha: B1 in slot-a, S1 in slot-b), window 2 workspace B
 // (beta: C1 in slot-a), each lent through `slots:test`, as a card's start does:
 // 1. S1 leaves a process running (a real survivor) and is stopped; it's kept running.
-// 2. B is closed (Close Workspace, as Darren did) and reopened with no quit: C1's release was written while B was still
+// 2. B is closed (Close Workspace, as the user did) and reopened with no quit: C1's release was written while B was still
 //    open (no "wasn't released"), and its slot-a is free. C1 runs there again, and window 2 (not the last) is closed
 //    first: the same.
 // 3. Combwork quits; the next start opens A: B1's slot-a comes back free, S1's slot-b stays held (its process still runs).
@@ -14,7 +14,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 45000
+const HUNG_MS = lib.timing('hang.step')
 
 const at = (x) => path.join(lib.WORK, `slotwindows-${x}`)
 const userData = at('profile')

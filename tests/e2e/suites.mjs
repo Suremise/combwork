@@ -2,7 +2,7 @@
 // needs: claude = starts the real Claude Code; codex = the signed-in test Codex home; packaged = dist/win-unpacked;
 // copilot = the installed Copilot CLI, offline against the scripted stand-in model (fake-copilot-api.cjs: no sign-in, no
 // cost), so it stays in the fake tier (the full set) and is skipped where Copilot isn't installed; agy = the installed
-// Antigravity CLI on the PC's own sign-in, in a test copy's profiles, one tiny prompt a run (Darren's (b) on HI-2548): the
+// Antigravity CLI on the PC's own sign-in, in a test copy's profiles, one tiny prompt a run (HI-2548's (b)): the
 // real tier, skipped where agy isn't installed or signed in, or no onboarded probe profile is there.
 // claudeHome: 'own' = its Claude Code runs in a home of its own with a made-up API key (no sign-in: the runner asks about none);
 // 'test' = in the signed-in Claude Code test home (CLAUDE_TEST_HOME, never the user's own), for suites that send prompts.
@@ -90,6 +90,7 @@ export const SUITES = [
   { name: 'changesleftovers' },
   { name: 'changespicker' },
   { name: 'chooseconnections' },
+  { name: 'churn' },
   { name: 'claude-real', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudehome', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudemanaged' },
@@ -139,6 +140,8 @@ export const SUITES = [
   { name: 'copyquiet' },
   { name: 'crashdumps' },
   { name: 'ctxpercent' },
+  { name: 'datacli' },
+  { name: 'dataserver' },
   { name: 'decisions' },
   { name: 'decisionwake' },
   { name: 'defaultprovider' },
@@ -184,6 +187,7 @@ export const SUITES = [
   { name: 'i18nshots' },
   { name: 'icons' },
   { name: 'idlequestion' },
+  { name: 'idleresume' },
   { name: 'idlestatus' },
   { name: 'image' },
   { name: 'inbox', serial: 'window focus' },
@@ -194,6 +198,7 @@ export const SUITES = [
   { name: 'intents' },
   { name: 'isolatedcheck' },
   { name: 'isolation', everything: "the run context (runContext.cjs) and testQuiet.ts: what every test copy and its children are given" },
+  { name: 'jjadvance' },
   { name: 'jjafterpush' },
   { name: 'jjcandidate' },
   { name: 'jjcandidatenc' },
@@ -247,6 +252,7 @@ export const SUITES = [
   { name: 'mergeslot' },
   { name: 'mode', needs: ['claude'], claudeHome: 'own' },
   { name: 'models' },
+  { name: 'muse' },
   { name: 'narrowmain' },
   { name: 'nocode' },
   { name: 'notifyonce' },
@@ -314,6 +320,7 @@ export const SUITES = [
   { name: 'queuecard' },
   { name: 'queuecontrols' },
   { name: 'queuefocused' },
+  { name: 'queueguards' },
   { name: 'queuelease' },
   { name: 'queueupgrade' },
   { name: 'quit' },
@@ -403,6 +410,7 @@ export const SUITES = [
   { name: 'templatesv2' },
   { name: 'templateworkflow' },
   { name: 'terminalinput' },
+  { name: 'terminalreplay' },
   { name: 'termsize' },
   { name: 'testedclis' },
   { name: 'tilestrip' },

@@ -134,6 +134,16 @@
       "card": "plain"
     }
   },
+  "tasks.error.followUpArchived": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.followUpOtherProject": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
   "tasks.error.holdCard": {
     "placeholders": {
       "card": "plain"
@@ -594,7 +604,7 @@
   },
   "tasks.history.followUpSubmitted": {
     "placeholders": {
-      "revision": "plain"
+      "revision": "select"
     }
   },
   "tasks.history.forwardResolving": {
@@ -724,6 +734,33 @@
     "placeholders": {
       "place": "plural",
       "column": "select"
+    }
+  },
+  "tasks.history.queueGuarded": {
+    "placeholders": {
+      "count": "plural",
+      "guards": "plain",
+      "others": "plural"
+    }
+  },
+  "tasks.history.queueGuardedIncomplete": {
+    "placeholders": {
+      "why": "select",
+      "guard": "plain"
+    }
+  },
+  "tasks.history.queueGuardedJoin": {
+    "placeholders": {
+      "first": "plain",
+      "rest": "plain"
+    }
+  },
+  "tasks.history.queueGuardedOne": {
+    "placeholders": {
+      "guard": "plain",
+      "count": "plural",
+      "where": "plain",
+      "message": "plain"
     }
   },
   "tasks.history.queueReturned": {

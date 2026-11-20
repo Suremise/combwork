@@ -12,9 +12,10 @@ import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { putStoreDocs } from './storeDocs'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 const at = '2026-10-12T03:00:00.000Z'
 const rec = (over: Partial<DeliveryRecord> = {}): DeliveryRecord => ({ id: 'm1', seq: 1, agentId: 'b1', conversation: null, kind: 'rebrief', from: { kind: 'assistant', name: 'the Assistant', workspace: 'C:/ws', launch: 'a1' }, body: 'Rebase first.', state: 'queued', created: at, expires: '2026-10-13T03:00:00.000Z', ...over })
@@ -242,6 +243,24 @@ describe('the delivery service (#647)', async () => {
     }
   })
 
+  it("a burst of transactions lets the event loop turn between them, in their order (HI-3298: a keystroke waits for one, never all)", async () => {
+    // A keystroke's stand-in, queued once the first is made: before HI-3298 it ran only once every transaction had.
+    const seen: string[] = []
+    const made = await Promise.all(
+      Array.from({ length: 5 }, (_, i) =>
+        make({ from: combwork, kind: 'card-event', card: i + 1, body: `[CW] #${i + 1} is in Review.`, ref: `r${i}` }).then((r) => {
+          seen.push(r.id)
+          if (r.id === 'm1') setImmediate(() => seen.push('turn'))
+          return r
+        })
+      )
+    )
+    expect(seen.indexOf('turn')).toBeGreaterThan(-1)
+    expect(seen.indexOf('turn')).toBeLessThan(seen.indexOf('m5'))
+    expect(seen.filter((s) => s !== 'turn')).toEqual(['m1', 'm2', 'm3', 'm4', 'm5'])
+    expect(made.map((r) => r.id)).toEqual(['m1', 'm2', 'm3', 'm4', 'm5'])
+  })
+
   it('saved as made, with short ids that go on across a restart', async () => {
     expect((await make()).id).toBe('m1')
     expect((await make({ body: 'Then #520.' })).id).toBe('m2')
@@ -424,7 +443,7 @@ describe('the delivery service (#647)', async () => {
       let settled = false
       const given = task(`Card task ${fail ? 'after a failed pull' : 'after a switch'}`).finally(() => (settled = true))
       // Held, not cancelled: it waits, untyped, while git runs.
-      await vi.waitFor(async () => expect((await states()).at(-1)).toMatch(/ queued$/), { timeout: 15_000 })
+      await vi.waitFor(async () => expect((await states()).at(-1)).toMatch(/ queued$/), { timeout: timing('wait.hang') })
       await new Promise<void>((r) => setImmediate(r))
       expect(settled).toBe(false)
       expect(st.typed.length).toBe(typedBefore + (fail ? 1 : 0))
@@ -586,7 +605,7 @@ describe('the delivery service (#647)', async () => {
     }
   })
 
-  it("no inbox (#650, Darren's decision: the Agent API or the agent's combwork server off): every delivery of every kind is refused with the reason its sender sees, and never typed instead; one already waiting is refused when next looked at; only the user's own task (Start) is typed as their input, with no delivery or receipt; a historical typed receipt still reads back", async () => {
+  it("no inbox (#650: the Agent API or the agent's combwork server off): every delivery of every kind is refused with the reason its sender sees, and never typed instead; one already waiting is refused when next looked at; only the user's own task (Start) is typed as their input, with no delivery or receipt; a historical typed receipt still reads back", async () => {
     const off = (_h: string, agentId: string): boolean => agentId === 'assistant'
     const REASON = 'B1 has no inbox: turn on the Agent API'
     const launched: string[] = []
@@ -683,6 +702,50 @@ describe('the delivery service (#647)', async () => {
     expect(await deliveries.ackDeliveries(alpha, 'b1', ['m1'])).toEqual({ acked: ['m1'], unknown: [], unread: [] })
     expect((await deliveries.deliveriesOf(alpha, 'b1')).map((r) => `${r.id} ${r.state} ${r.receivedVia}`)).toEqual(['m1 acked inbox', 'm2 acked inbox', 'm3 received inbox'])
     expect(ackText([], ['m9'], ['m4'])).toBe('Nothing acked. Not read yet: m4: read it with cw_inbox first. Not in your inbox: m9.')
+  })
+  it("HI-3195: a read, an ack and ack-then-read from a launch replaced before their save commits keep nothing; the current launch's go through", async () => {
+    st.status = 'working'
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'task', from: combwork, body: 'First.' })
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'task', from: combwork, body: 'Second.' })
+    // The agent's current launch, as the fence reads it (servers.ts: currentAgentRun), and a fence for launch `run`.
+    let current = 'r1'
+    const fenceOf = (run: string) => () => {
+      if (current !== run) throw new Error(`launch ${run} was replaced`)
+    }
+    // Replaced after the plan, before its save commits.
+    const renewAtSave = () => deliveries.setBeforeSaveForTests(() => void (current = 'r2'))
+    renewAtSave()
+    try {
+      await expect(deliveries.readInbox(alpha, 'b1', undefined, { fence: fenceOf('r1') })).rejects.toThrow(/r1 was replaced/)
+    } finally {
+      deliveries.setBeforeSaveForTests(null)
+    }
+    expect(await states()).toEqual(['m1 queued', 'm2 queued'])
+    // Already replaced when it asks: refused at once, nothing read.
+    await expect(deliveries.readInbox(alpha, 'b1', undefined, { fence: fenceOf('r1') })).rejects.toThrow(/r1 was replaced/)
+    // The current launch reads: received.
+    expect((await deliveries.readInbox(alpha, 'b1', undefined, { fence: fenceOf('r2') })).items.flatMap((i) => i.ids)).toEqual(['m1', 'm2'])
+    // Its ack, the launch replaced before the ack's save: not acked.
+    deliveries.setBeforeSaveForTests(() => void (current = 'r3'))
+    try {
+      await expect(deliveries.ackDeliveries(alpha, 'b1', ['m1'], fenceOf('r2'))).rejects.toThrow(/r2 was replaced/)
+    } finally {
+      deliveries.setBeforeSaveForTests(null)
+    }
+    expect(await states()).toEqual(['m1 received', 'm2 received'])
+    // Ack-then-read, one save: the launch replaced before it commits keeps neither the ack nor a receipt.
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'task', from: combwork, body: 'Third.' })
+    deliveries.setBeforeSaveForTests(() => void (current = 'r4'))
+    try {
+      await expect(deliveries.ackThenRead(alpha, 'b1', ['m1'], undefined, fenceOf('r3'))).rejects.toThrow(/r3 was replaced/)
+    } finally {
+      deliveries.setBeforeSaveForTests(null)
+    }
+    expect(await states()).toEqual(['m1 received', 'm2 received', 'm3 queued'])
+    // The current launch's ack-then-read: both, in one call.
+    const both = await deliveries.ackThenRead(alpha, 'b1', ['m1'], undefined, fenceOf('r4'))
+    expect([both.acked, both.items.flatMap((i) => i.ids)]).toEqual([['m1'], ['m3']])
+    expect(await states()).toEqual(['m1 acked', 'm2 received', 'm3 received'])
   })
   it("a launch's task is saved as offered before anything is launched (#649 round 2): not saved, nothing starts; while it starts, never offered by the scheduler; its run's save failing after the launch, it is still followed, and a restart finds it uncertain", async () => {
     const task = (body: string) => ({ agentId: 'b1', agentName: 'B1', kind: 'task' as const, from: combwork, body })
@@ -903,7 +966,7 @@ describe('the delivery service (#647)', async () => {
     expect(await states()).toEqual([`${m.id} offered`])
     st.status = 'working'
     await deliveries.readInbox(alpha, 'b1')
-    await vi.waitFor(() => expect(taken).toHaveBeenCalledWith(alpha, 'b1', 'r1', m.id, `${m.id}, which it rang for, was read`), { timeout: 5000 })
+    await vi.waitFor(() => expect(taken).toHaveBeenCalledWith(alpha, 'b1', 'r1', m.id, `${m.id}, which it rang for, was read`), { timeout: timing('wait.hang') })
     // Two lines in the launch, each offering its own delivery, read together later: each read names its own delivery, so
     // only the line that rang for it is cleared (round 1 finding: never another line's mark).
     taken.mockClear()
@@ -916,7 +979,7 @@ describe('the delivery service (#647)', async () => {
     expect(await states()).toEqual(expect.arrayContaining([`${a.id} offered`, `${b.id} offered`]))
     st.status = 'working'
     await deliveries.readInbox(alpha, 'b1')
-    await vi.waitFor(() => expect(taken).toHaveBeenCalledTimes(2), { timeout: 5000 })
+    await vi.waitFor(() => expect(taken).toHaveBeenCalledTimes(2), { timeout: timing('wait.hang') })
     expect(taken.mock.calls.map((c) => c[3]).sort()).toEqual([a.id, b.id].sort())
     // Read without having been offered (queued): no line rang for it, nothing to clear.
     taken.mockClear()
@@ -1039,6 +1102,18 @@ describe('the delivery service (#647)', async () => {
     await deliveries.readInbox(alpha, 'b1')
     now.control = false
     expect(await deliveries.ackDeliveries(alpha, 'b1', ['m4'])).toEqual({ acked: ['m4'], unknown: [], unread: [] })
+  })
+
+  it("HI-3290: a save's size, from each record's bytes kept, is the whole text's to the byte", () => {
+    const sizes = (records: DeliveryRecord[], next: number, invalid: unknown[] = []) => deliveries.fileBytesForTests(records, next, invalid)
+    const one = rec({ body: 'Rebase first — then «#7»\nand 🐝.', meta: { queueReturn: true } })
+    const many = [one, rec({ id: 'm2', seq: 2, state: 'acked', received: at, acked: at, ended: at, from: combwork, kind: 'card-event', card: 7 }), rec({ id: 'm3', seq: 3, body: '' })]
+    for (const [records, next, invalid] of [[[], 1, []], [[], 4, [{ id: 'nope' }]], [[one], 2, []], [many, 4, []], [many, 12, [{ id: 'nope', x: [1, { y: 'é' }] }]]] as [DeliveryRecord[], number, unknown[]][]) {
+      const got = sizes(records, next, invalid)
+      expect(got.bytes).toBe(got.text)
+    }
+    // The same records again (their bytes kept): the same total.
+    expect(sizes(many, 4).bytes).toBe(sizes(many, 4).text)
   })
 
   it('within its byte budget: refused when full (history makes room first), and a file it wrote always reads back whole', async () => {

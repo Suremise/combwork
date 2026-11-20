@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47868))
 const userData = path.join(lib.WORK, 'progressstates-profile')
@@ -25,7 +25,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = (fn, ms = 30000) => lib.until(fn, ms, 150)
+const until = (fn, ms) => lib.until(fn, ms, 150)
 
 ;(async () => {
   for (const d of [userData, ws, shots, ctl]) fs.rmSync(d, { recursive: true, force: true })
@@ -72,7 +72,7 @@ const until = (fn, ms = 30000) => lib.until(fn, ms, 150)
     }
   }
   const runs = () => inv('progress:list')
-  const newRun = async (known, match) => until(async () => (await runs()).find((r) => !known.includes(r.id) && match(r)), 60000)
+  const newRun = async (known, match) => until(async () => (await runs()).find((r) => !known.includes(r.id) && match(r)), lib.timing('hang.step'))
   const shoot = async (name) => {
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
@@ -85,7 +85,8 @@ const until = (fn, ms = 30000) => lib.until(fn, ms, 150)
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
   await inv('session:start', alpha, { agentId: builder.id })
-  check('the agent starts', !!(await until(async () => (await live(builder.id))?.status === 'ready', 45000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the agent starts', !!(await until(async () => (await live(builder.id))?.status === 'ready', lib.timing('hang.step'))))
   await page.locator('.xterm').first().click().catch(() => undefined)
   await page.keyboard.press('Control+Alt+P')
   const panel = page.locator('.progress-panel')
@@ -116,16 +117,16 @@ const t = setInterval(() => {
   const queued = await startShell(builder.id, `cw-progress --title "Affected e2e" -- node "${js}"`)
   const q = await newRun(known, (r) => r.title === 'Affected e2e')
   check('a waiting run is reported waiting, with no estimate', !!q && q.waiting === 'waiting for a test slot: e2e: 137 suites in hb4' && q.estimateMs === null && q.state === 'running', JSON.stringify(q))
-  check('its row says what it waits for and how long, never a time left', !!(await until(async () => /waiting for a test slot: e2e: 137 suites in hb4/.test(await textOf(q?.id)) && /waiting \d+ s/.test(await textOf(q?.id)), 10000)) && !/left/.test(await textOf(q?.id)), await textOf(q?.id))
+  check('its row says what it waits for and how long, never a time left', !!(await until(async () => /waiting for a test slot: e2e: 137 suites in hb4/.test(await textOf(q?.id)) && /waiting \d+ s/.test(await textOf(q?.id)), lib.timing('hang.step'))) && !/left/.test(await textOf(q?.id)), await textOf(q?.id))
   const bar = await rowOf(q?.id).locator('.progress-bar').evaluate((e) => ({ waiting: e.classList.contains('waiting'), moving: e.classList.contains('indeterminate'), value: e.getAttribute('aria-valuenow'), text: e.getAttribute('aria-valuetext') }))
   check('its bar looks waiting: hatched and still, no value', bar.waiting && !bar.moving && bar.value === null && bar.text === 'waiting', JSON.stringify(bar))
   await shoot('waiting')
   fs.writeFileSync(release, '')
-  check('the wait ends: it goes on with its steps', !!(await until(async () => /1 of 2: first suite/.test(await textOf(q?.id)) && !/waiting/.test(await textOf(q?.id)), 15000)), await textOf(q?.id))
-  check('…and Combwork has it waiting no more', !!(await until(async () => (await runs()).find((r) => r.id === q?.id)?.waiting === null, 5000)))
+  check('the wait ends: it goes on with its steps', !!(await until(async () => /1 of 2: first suite/.test(await textOf(q?.id)) && !/waiting/.test(await textOf(q?.id)), lib.timing('hang.ui'))), await textOf(q?.id))
+  check('…and Combwork has it waiting no more', !!(await until(async () => (await runs()).find((r) => r.id === q?.id)?.waiting === null, lib.timing('hang.ui'))))
   fs.writeFileSync(end, '')
   const qEnd = await queued()
-  check('…then it passes', qEnd?.code === 0 && !!(await until(async () => (await runs()).find((r) => r.id === q?.id)?.state === 'passed', 10000)), JSON.stringify(qEnd))
+  check('…then it passes', qEnd?.code === 0 && !!(await until(async () => (await runs()).find((r) => r.id === q?.id)?.state === 'passed', lib.timing('hang.ui'))), JSON.stringify(qEnd))
 
   // --- Past its estimate: "finishing", never "0 s left" (a script's run through the API, 2 s expected).
   const late = await api('POST', '/v1/progress', { title: 'Almost there', estimateMs: 2000 })
@@ -135,7 +136,7 @@ const t = setInterval(() => {
     const t = await textOf(late.body?.id)
     seen.push(t)
     return /finishing/.test(t)
-  }, 15000)
+  }, lib.timing('hang.step'))
   check('past its estimate it says finishing', !!finishing, seen.at(-1))
   check('…and never "0 s left" on the way', seen.every((t) => !/\b0 s left/.test(t)), JSON.stringify(seen.filter((t) => /0 s left/.test(t))))
   await api('POST', `/v1/progress/${late.body?.id}/finish`, { ok: true })
@@ -145,9 +146,9 @@ const t = setInterval(() => {
   // an answer this shell never gives, as cmd does for any batch file.
   known = (await runs()).map((r) => r.id)
   const ctrlcShell = await startShell(builder.id, `cw-progress --title "Interrupted build" -- node -e "process.exit(130)"`)
-  const stopped = await until(async () => (await runs()).find((r) => !known.includes(r.id) && r.title === 'Interrupted build' && r.finishedAt !== null), 30000)
+  const stopped = await until(async () => (await runs()).find((r) => !known.includes(r.id) && r.title === 'Interrupted build' && r.finishedAt !== null), lib.timing('hang.step'))
   check('a command ended by Ctrl+C shows as stopped, not failed', stopped?.state === 'stopped' && stopped.stopReason === 'interrupted', JSON.stringify(stopped))
-  check('…its row says Stopped, with no warning or error mark', !!(await until(async () => /Stopped after/.test(await textOf(stopped?.id)), 5000)) && (await rowOf(stopped?.id).locator('.progress-fail, .progress-stale').count()) === 0, await textOf(stopped?.id))
+  check('…its row says Stopped, with no warning or error mark', !!(await until(async () => /Stopped after/.test(await textOf(stopped?.id)), lib.timing('hang.ui'))) && (await rowOf(stopped?.id).locator('.progress-fail, .progress-stale').count()) === 0, await textOf(stopped?.id))
   const ctrlc = await ctrlcShell()
   check('…its exit code passed through', ctrlc?.code === 130, JSON.stringify(ctrlc ?? null))
 
@@ -180,18 +181,18 @@ const t = setInterval(() => {
   }
   check('its process tree is ended (as an agent stopping it does)', !!serverId && ended >= 1 && lib.stillSame([serverId]).length === 0, `${ended} ended`)
   await server()
-  const gone = await until(async () => (await runs()).find((r) => r.id === srv?.id && r.finishedAt !== null), 45000)
+  const gone = await until(async () => (await runs()).find((r) => r.id === srv?.id && r.finishedAt !== null), lib.timing('hang.step'))
   check('Combwork sees its process gone: ended without a report', gone?.state === 'stopped' && gone.stopReason === 'gone', JSON.stringify(gone))
   check('…never "stopped reporting" meanwhile, nor failed', gone?.staleReason === null && gone?.summary === null)
-  check('…its row says so', !!(await until(async () => /Ended without a report after/.test(await textOf(srv?.id)), 5000)) && !/Stopped reporting/i.test(await textOf(srv?.id)), await textOf(srv?.id))
+  check('…its row says so', !!(await until(async () => /Ended without a report after/.test(await textOf(srv?.id)), lib.timing('hang.ui'))) && !/Stopped reporting/i.test(await textOf(srv?.id)), await textOf(srv?.id))
   await shoot('ended')
   // In the Runs tab (#1309), the stopped one is marked stopped (muted), not with a warning; a group of retries opened.
   await panel.locator('.progress-tab[data-tab="runs"]').click()
-  await until(async () => (await panel.locator('.progress-tab-runs').count()) === 1, 5000)
+  await until(async () => (await panel.locator('.progress-tab-runs').count()) === 1, lib.timing('hang.ui'))
   // Its card's runs (HI-1701) opened, then its group of retries.
   for (const head of await panel.locator('.progress-card-toggle[aria-expanded="false"]').all()) await head.click()
   for (const head of await panel.locator('.progress-group-head[aria-expanded="false"]').all()) await head.click()
-  const recentIcon = await until(async () => (await panel.locator(`.progress-recent-item[data-run="${stopped?.id}"] .progress-recent .codicon`).first().getAttribute('class', { timeout: 500 }).catch(() => '')) || '', 5000)
+  const recentIcon = await until(async () => (await panel.locator(`.progress-recent-item[data-run="${stopped?.id}"] .progress-recent .codicon`).first().getAttribute('class', { timeout: lib.timing('poll.readMs') }).catch(() => '')) || '', lib.timing('hang.ui'))
   check('in the Runs tab, the interrupted run is marked stopped, not with a warning', /codicon-circle-slash/.test(recentIcon ?? ''), recentIcon)
 
   await app.close()

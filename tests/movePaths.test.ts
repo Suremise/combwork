@@ -106,7 +106,7 @@ describe('copyMissing', () => {
     await expect(stat(dest)).rejects.toThrow()
     expect(await copyMissing(src, dest, true)).toEqual({ copy: 2, kept: [], failed: [] })
     expect(await readFile(join(dest, 'memory', 'MEMORY.md'), 'utf8')).toBe('- [Fact](fact.md)')
-    expect(Math.abs((await stat(join(dest, 'a.jsonl'))).mtimeMs - (await stat(join(src, 'a.jsonl'))).mtimeMs)).toBeLessThan(2)
+    expect(Math.abs((await stat(join(dest, 'a.jsonl'))).mtimeMs - (await stat(join(src, 'a.jsonl'))).mtimeMs)).toBeLessThan(2) // timing-ok: data, not a wait
     expect(await copyMissing(src, dest, true)).toEqual({ copy: 0, kept: [], failed: [] })
     expect(await readFile(join(src, 'a.jsonl'), 'utf8')).toBe('one')
   })

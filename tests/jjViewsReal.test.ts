@@ -18,6 +18,7 @@ import { assessJj } from '../src/main/platform/jjCompat'
 import { isJjViewUnknown } from '../src/shared/jjViews'
 import { PLATFORMS } from '../src/shared/platform/descriptors'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const require = createRequire(import.meta.url)
 const { portableJj } = require('./jjPortable.cjs') as { portableJj: () => string | null }
@@ -37,7 +38,7 @@ function isolated(): NodeJS.ProcessEnv {
 describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2799)', () => {
   const env = isolated()
   const runner = createJjRunner({ exe: exe!, env })
-  const jj = (cwd: string, ...args: string[]): string => execFileSync(exe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+  const jj = (cwd: string, ...args: string[]): string => execFileSync(exe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
   const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, env, windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
   // The assessment's git: no system config or attributes, an empty global config (the machine's own would decide it).
   const cleanHome = tempDir('jjv-git-')

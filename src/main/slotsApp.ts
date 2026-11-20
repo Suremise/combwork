@@ -306,9 +306,9 @@ export function jjPort(): JjWorkspacePort {
       const ws = workspaceFor(repo)
       return ws ? new SlotStore(boardConn(ws), basename(repo)).journal(`jj_gitlink:${folder.toLowerCase()}`) : { read: () => ({ unreadable: true }), write: async () => undefined, clear: async () => undefined }
     },
-    // HI-2887 (Darren's r9: automatic): the project folder held against agent launches while its control is made.
+    // HI-2887 (r9: automatic): the project folder held against agent launches while its control is made.
     projectHold: (repo) => holdLaunches(repo),
-    // Darren's (a) on HI-2887: a lost control is made again automatically, under the same hold.
+    // (a) on HI-2887: a lost control is made again automatically, under the same hold.
     remakeAllowed: () => true,
     made: (repo, ws) => log.info(`Made jj's control workspace for ${userText(basename(repo))} at ${userText(ws)}: the project folder's working copy recorded once`),
     lock: storeLock,
@@ -318,7 +318,7 @@ export function jjPort(): JjWorkspacePort {
       return ws ? boardPrepStore(boardConn(ws)) : null
     },
     contains: (store, target, change, at) => historyFor('git').contains(store, target, change, at),
-    // HI-2924 (Darren's decision): the user's own Done on exactly that card cycle, its integration not proved.
+    // HI-2924: the user's own Done on exactly that card cycle, its integration not proved.
     doneByUser: async (store, b) => {
       const ws = workspaceFor(store)
       if (!ws || b.card === null || !b.key) return false

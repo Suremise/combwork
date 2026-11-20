@@ -65,9 +65,11 @@ export interface OpenOptions {
   whileGroupLocked?: () => void
   /**
    * Takes the WAL's checkpoints out of the writer's commits (#1633, walCheckpoint.ts: checkpointed when it is idle):
-   * called once the file is open and writable, with its writer; returns what stops it, called first when it closes.
+   * called once the file is open and writable, with its writer; returns what stops it, called first when it closes, which
+   * says (true) when the file's write lock is held off main's thread (HI-3289: the checkpoints' worker restarting the WAL),
+   * so the close writes nothing that would wait for it.
    */
-  checkpointer?: (file: string, writer: DatabaseSync) => () => void
+  checkpointer?: (file: string, writer: DatabaseSync) => () => boolean | void
   /**
    * Told once the steps that ran as the file opened are committed (HI-1694): each one's time, and the copy's made before
    * them (null: none), so a slow upgrade says which step took it.
@@ -88,7 +90,7 @@ export const OPEN_IO_RETRY_MS = [50, 100, 200, 400, 800]
 export const isIoError = (e: unknown): boolean => ((e as { errcode?: unknown } | null)?.errcode as number) % 256 === 10
 
 /** How long a file left by a Combwork that ended without quitting is waited for, before it is opened anyway (HI-2199). */
-export const OPENABLE_WAIT_MS = 20_000
+export const OPENABLE_WAIT_MS = 120_000
 const OPENABLE_POLL_MS = 100
 
 /**
@@ -194,10 +196,23 @@ function keepStatements(db: DatabaseSync): void {
   }) as DatabaseSync['prepare']
 }
 
+/**
+ * HI-3374: how long a connection opened by openDb waits for another connection's or process's write lock before its
+ * write is refused ("database is locked"): Settings → Advanced's cw.db.busySeconds (15 s by default), set by main at its
+ * start before any database opens (setDbBusyMs), and given to the usage history's worker as it starts. On main's
+ * thread the wait blocks that thread while it lasts: a bound on a wait, never a speed.
+ */
+export const dbLimits = { busyMs: 15_000 }
+
+/** Sets dbLimits.busyMs (main's start, from the setting; a worker, from what main gave it): connections opened after use it. */
+export function setDbBusyMs(ms: number): void {
+  if (Number.isFinite(ms) && ms >= 0) dbLimits.busyMs = Math.round(ms)
+}
+
 function configure(db: DatabaseSync): void {
   db.exec('PRAGMA journal_mode = WAL')
   db.exec('PRAGMA synchronous = NORMAL')
-  db.exec('PRAGMA busy_timeout = 5000')
+  db.exec(`PRAGMA busy_timeout = ${dbLimits.busyMs}`)
   db.exec('PRAGMA foreign_keys = ON')
   db.exec('PRAGMA cache_size = -8192')
   db.exec('PRAGMA mmap_size = 67108864')
@@ -262,11 +277,28 @@ export function backupTo(db: DatabaseSync, dir: string, family: string, version:
   return file
 }
 
+/**
+ * What a write transaction on a connection checks first (HI-3289): walCheckpoint.ts installs one on each writer it
+ * checkpoints, refusing a BEGIN while its worker holds the file's write lock to restart the WAL (it would wait for that
+ * sync on main's thread). Kept here, so db.ts imports nothing of walCheckpoint (the usage worker loads db.ts).
+ */
+export const beginGuards = new WeakMap<DatabaseSync, () => void>()
+
+/**
+ * Begins a write transaction on `db` (IMMEDIATE: the write lock at once), its guard checked first. Every write transaction
+ * main begins on a checkpointed database begins here (tests/beginTransaction.test.ts); the group's and the copy's
+ * EXCLUSIVE locks are taken before any checkpointer starts, or on a connection of their own.
+ */
+export function beginTransaction(db: DatabaseSync): void {
+  beginGuards.get(db)?.()
+  db.exec('BEGIN IMMEDIATE')
+}
+
 /** Runs `fn` in a transaction on `db` (BEGIN IMMEDIATE: the write lock at once), committed when it returns, undone when it throws. */
 export function transaction<T>(db: DatabaseSync, fn: () => T): T {
   // Marked (HI-1692): a busy wait for the write lock, or a commit held by the disk, names it in a stall's warning.
   return timedStep(`db transaction ${fileNames.get(db) ?? 'a database'}`, () => {
-    db.exec('BEGIN IMMEDIATE')
+    beginTransaction(db)
     try {
       const out = fn()
       db.exec('COMMIT')
@@ -282,7 +314,7 @@ export function transaction<T>(db: DatabaseSync, fn: () => T): T {
 const fileNames = new WeakMap<DatabaseSync, string>()
 
 /** How long a group waits for another connection to let go of the file before it says the file is in use. */
-const GROUP_LOCK_WAIT_MS = 1000
+const GROUP_LOCK_WAIT_MS = 10_000
 
 /**
  * Runs the steps the file hasn't had, each in its own transaction, after a copy of a file with data in it. A group's
@@ -364,7 +396,7 @@ function runGroup(db: DatabaseSync, file: string, opts: OpenOptions, pending: Pe
       if (/locked|busy/i.test(e instanceof Error ? e.message : '')) throw new DbInUseError(file)
       throw e
     } finally {
-      db.exec('PRAGMA busy_timeout = 5000')
+      db.exec(`PRAGMA busy_timeout = ${dbLimits.busyMs}`)
     }
     opts.beforeGroup?.(pending)
     if (opts.backupDir) copy(() => backupTo(db, opts.backupDir!, keptFamily ?? family, pending.from, new Date(), !!keptFamily))
@@ -463,7 +495,7 @@ export function renameVersionColumn(db: DatabaseSync): void {
 
 function openDbNow(file: string, opts: OpenOptions): Db {
   mkdirSync(dirname(file), { recursive: true })
-  const writer = new DatabaseSync(file, { timeout: 5000 })
+  const writer = new DatabaseSync(file, { timeout: dbLimits.busyMs })
   let reader: DatabaseSync | null = null
   try {
     configure(writer)
@@ -475,7 +507,7 @@ function openDbNow(file: string, opts: OpenOptions): Db {
     if (newer === null) renameVersionColumn(writer)
     const pending = newer === null ? migrate(writer, file, opts) : null
     if (newer !== null || pending) writer.exec('PRAGMA query_only = ON')
-    reader = new DatabaseSync(file, { timeout: 5000 })
+    reader = new DatabaseSync(file, { timeout: dbLimits.busyMs })
     keepStatements(writer)
     keepStatements(reader)
     fileNames.set(writer, basename(file))
@@ -492,7 +524,9 @@ function openDbNow(file: string, opts: OpenOptions): Db {
       newer,
       pending,
       close: () => {
-        stopCheckpoints?.()
+        // HI-3289: the worker holding the write lock, the close's optional writes (PRAGMA optimize may write its statistics)
+        // are skipped rather than waited for on main; the PASSIVE checkpoint takes no write lock and never waits.
+        const lockedElsewhere = stopCheckpoints?.() === true
         // The reader first (#1324): while it has the file mapped, Windows refuses the checkpoint's truncation of a file
         // that shrank (incremental vacuum), silently, and the close after it has nothing left to copy, so the file kept
         // its biggest size for good.
@@ -500,7 +534,7 @@ function openDbNow(file: string, opts: OpenOptions): Db {
         try {
           if (writer.isTransaction) writer.exec('ROLLBACK')
           if (newer === null && !pending) {
-            writer.exec('PRAGMA optimize')
+            if (!lockedElsewhere) writer.exec('PRAGMA optimize')
             writer.exec('PRAGMA wal_checkpoint(PASSIVE)')
           }
         } catch {

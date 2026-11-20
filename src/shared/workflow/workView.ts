@@ -6,8 +6,9 @@
 // descriptor (`revisionShort`), never by switching on a platform's id.
 
 import type { ConflictsRecord } from './conflicts'
-import { askedQuestion, foldCard, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type LoopAsk, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
+import { askedQuestion, foldCard, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type LoopAsk, type FileChange, type ForYouKind, type QueueEntry, type PauseChoice, type StageId, churnTotal, type Churn } from './facts'
 import type { StoredText } from '../types'
+import { foldLineComments, type LineCommentView } from './lineComments'
 import { baseRulesetId, REVIEW_SKIPPED, rulesBaseId } from './compile'
 
 /** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
@@ -41,8 +42,10 @@ export interface ForYouItem {
   shown?: StoredText
   /** When it was asked. */
   since: string
-  /** The agent who asked; null: Combwork. */
+  /** The agent who asked; null: Combwork, or the Assistant (`byAssistant`). */
   asker: string | null
+  /** HI-3211: the Assistant asked it (the request's fact's actor). */
+  byAssistant?: true
   /** Whom it waits on: the user (a person later, #439). */
   for: 'user'
   /** A Test request's checklist: what to try (#1267). */
@@ -59,13 +62,13 @@ export interface ForYouSummary {
 
 /**
  * The user's answer to a request (IPC `tasks:answer`): approve or decline it, or answer it with a reply, a decision (a
- * Decide request: recorded on the card) or, at the round limit, a choice (a carry on with the rounds it adds).
+ * Decide request: recorded on the card) or, at the round limit or a churn question (HI-3188), a choice (a carry on with what it adds).
  */
 export interface ForYouAnswer {
   outcome: 'approved' | 'declined' | 'answered'
   reply?: string
   decision?: string
-  choice?: RoundChoice
+  choice?: PauseChoice
   rounds?: number
   /** An action the question offers (#1630), done as the user with `reason`. */
   action?: AskActionKind
@@ -109,6 +112,7 @@ export function forYouItems(card: { card: number; project: string; stage: StageI
     ...(r.requestText ? { shown: r.requestText } : {}),
     since: r.at,
     asker: r.asker ?? null,
+    ...(r.byAssistant ? { byAssistant: true as const } : {}),
     for: r.for ?? 'user',
     ...(r.checklist?.length ? { checklist: r.checklist } : {}),
     ...(r.actions?.length ? { actions: r.actions } : {})
@@ -256,6 +260,8 @@ export interface WorkQueueEntry {
 export interface WorkView {
   card: number
   stage: StageId
+  /** HI-3188: its churn (CardState.churn), its total, and the card it continues (SplitFrom), if any. */
+  churn: { total: number; parts: Churn; splitFrom: number | null }
   /** A card from before 1.0: no facts are invented for it (§16.4.1). */
   preWorkflow: boolean
   /** Started by the upgrade from what could be read (an `Adopted` fact), and the column it was in. */
@@ -300,6 +306,8 @@ export interface WorkView {
   /** This cycle's submissions, oldest first. */
   revisions: WorkRevision[]
   verdicts: WorkVerdict[]
+  /** HI-3219: the card's line comments on its revisions' diffs, oldest first (lineComments.ts). */
+  lineComments: LineCommentView[]
   checks: WorkCheck[]
   marks: WorkMarks
   integration: WorkIntegration | null
@@ -422,7 +430,7 @@ export function inTargetNow(s: CardState): FactData['InTarget'] | null {
 }
 
 /**
- * HI-2924 (Darren's decision, 11 Nov): a jj card the user moved to Done themselves while its integration wasn't proved
+ * HI-2924: a jj card the user moved to Done themselves while its integration wasn't proved
  * (a hand-resolved conflict changes the change's diff, so J5's proofs don't hold). Their Done is their word that it's
  * integrated: shown as "Done by you, integration not proved", and its slot's binding may be released without
  * containment (jjWorkspacePort's reuse and detach). Only the user's own move into Done this cycle (never the Assistant's,
@@ -503,7 +511,9 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   return {
     card: c.card,
     stage: s.stage,
+    churn: { total: churnTotal(s), parts: s.churn, splitFrom: s.splitFrom },
     preWorkflow: c.preWorkflow,
+    lineComments: foldLineComments(facts),
     adopted: !!started?.adopted,
     ...(started?.adoptedFrom ? { adoptedFrom: started.adoptedFrom } : {}),
     // The card's kind now, not the one its cycle started with: a change after its start shows at once (HR3's #1277 round 1).
@@ -579,6 +589,8 @@ export const checksOn = (v: WorkView, revision: string): WorkCheck[] => v.checks
 export interface WorkBadge {
   card: number
   stage: StageId
+  /** HI-3188: its churn, once past 0 (its count, by kind, and the card it continues), else null. */
+  churn?: WorkView['churn'] | null
   preWorkflow: boolean
   adopted: boolean
   /** The revision under review or approved (`currentRevision`). */
@@ -693,6 +705,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
   return {
     card: v.card,
     stage: v.stage,
+    churn: v.churn.total > 0 ? v.churn : null,
     preWorkflow: v.preWorkflow,
     adopted: v.adopted,
     revision,

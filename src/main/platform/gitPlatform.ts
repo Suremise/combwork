@@ -16,7 +16,7 @@ import { attributeFolder, reconcileHistory, sharesFolder, type ReconcileHooks } 
 import { snapshot } from '../workflow/checks'
 import { lineName, type Workflow } from '../workflow/runtime'
 import { keptLineTarget } from '../workflow/keptLine'
-import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan, Unsubmitted } from './adapter'
+import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan, Unmerged, Unsubmitted } from './adapter'
 import * as G from './git'
 import { listWorktreesOrNull } from '../worktrees'
 import type { Disposable, ObserveEvent } from './history'
@@ -29,9 +29,10 @@ import { destinationOf, fetchHeadOf, projectHost, REMOTE_PLACEHOLDER, upstreamRe
 import { CW_DIR } from '../../shared/defaults'
 import type { TargetChanges } from '../../shared/types'
 import { shellLine } from '../../shared/workflow/queue'
+import type { DiffRead } from './types'
+// How long a slotted card's start waits on fetching the remote its target follows (HI-1183): cw.queue.networkMinutes (HI-3372).
+import { platformLimits } from './limits'
 
-/** How long a slotted card's start waits on fetching the remote its target follows (HI-1183). */
-const SLOT_FETCH_MS = 60_000
 
 /** A file's or folder's size and time, for a fingerprint ("gone" when it isn't there). */
 function statLine(p: string): string {
@@ -45,6 +46,9 @@ function statLine(p: string): string {
 
 /** The most commits an unsubmitted read counts (HI-2245): past it, a lower bound. */
 export const UNSUBMITTED_MAX = 100
+
+/** The most commits a no-code card's unmerged line names (HI-3410): the rest are counted. */
+const UNMERGED_SHOWN = 5
 
 const unknownRefusal =(card: CardRecord, what: Unknown, rule: string): GuardRefusal => ({ rule: 'platform.unknown', values: { card: card.key, what: what.whatText ?? what.what, rule } })
 
@@ -284,7 +288,7 @@ export class GitPlatform implements PlatformAdapter {
     if ('pause' in d && d.pause === 'noUpstream' && (await this.untracked(target))) return this.noUpstreamRefusal(target)
     if ('pause' in d) return withDetail(unknown(UNREADABLE.remoteSetup, { target }), d.files?.join(', '))
     const branch = d.snapshot.ref.replace(/^refs\/heads\//, '')
-    const f = await fetchHeadOf(h, d.snapshot, `refs/cw/fetch/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`, SLOT_FETCH_MS)
+    const f = await fetchHeadOf(h, d.snapshot, `refs/cw/fetch/${target.replace(/[^A-Za-z0-9._-]/g, '-')}`, platformLimits.queueNetworkMs())
     if ('failed' in f) return withDetail(unknown(UNREADABLE.remoteHead, { branch, endpoint: d.snapshot.display, target }), f.failed)
     const local = await G.lineHead(this.project, target)
     if (isUnknown(local)) return local
@@ -729,10 +733,46 @@ export class GitPlatform implements PlatformAdapter {
   }
 
   async finishInputs(card: CardRecord, s: CardState, o: WorkflowOptions, revision: string | null | undefined): Promise<FinishInputs> {
-    if (card.kind === 'no-code' || !revision || o.finish !== 'committed' || !s.started?.line) return {}
+    if (card.kind === 'no-code') return { unmerged: await this.unmergedLine(card, s) }
+    if (!revision || o.finish !== 'committed' || !s.started?.line) return {}
     const lh = await G.lineHead(this.project, s.started.line)
     if (isUnknown(lh)) return { contained: lh }
     return { contained: lh ? await G.isAncestor(this.project, revision, lh) : false }
+  }
+
+  /**
+   * HI-3410: a no-code card's own line (`cw/<project>/<its key>…`, made by a start of it while it was code, as MC-1559's
+   * was before its kind changed) with commits its target lacks. A no-code card finishes with nothing merged, so those
+   * would stay on the line alone. Null when it has no such line, the line is gone, or all of it is in the target; unknown
+   * when a head or the commits can't be read (never taken for none).
+   */
+  private async unmergedLine(card: CardRecord, s: CardState): Promise<Maybe<Unmerged | null>> {
+    const target = s.started?.target
+    if (!target) return null
+    const own = `cw/${this.wf.cfg.projectKey}/${card.key}`
+    let th: string | null = null
+    for (const line of new Set([s.started?.line, ...[...s.lines].reverse()])) {
+      if (!line || (line !== own && !line.startsWith(`${own}-`))) continue
+      const h = await G.lineHead(this.project, line)
+      if (isUnknown(h)) return h
+      if (!h) continue
+      if (th === null) {
+        const t = await G.lineHead(this.project, target)
+        if (isUnknown(t)) return t
+        if (!t) return unknown(UNREADABLE.head, { where: target })
+        th = t
+      }
+      if (h === th) continue
+      const list = await G.commits(this.project, `${th}..${h}`)
+      if (isUnknown(list)) return list
+      if (list.length) return { line, target, count: list.length, commits: list.slice(0, UNMERGED_SHOWN).map((c) => `${c.commit.slice(0, 7)} ${c.subject}`) }
+    }
+    return null
+  }
+
+  /** HI-3284: what `head` adds to `base`, for the merge guards (the history port's pinned diff). */
+  addedDiff(base: string, head: string): Promise<DiffRead> {
+    return this.history.addedDiff(this.project, base, head)
   }
 
   async headMoved(_card: CardRecord, s: CardState, o: WorkflowOptions, from: { base: string | null; revision: string; key?: string | null }): Promise<HeadMove | null> {

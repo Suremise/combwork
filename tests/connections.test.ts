@@ -21,6 +21,7 @@ import { cliReadyOf, connectionCli, connectionOf, connectionSwitchDue, firstRead
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-connections-')
 const home = join(base, 'claude-home')
@@ -51,10 +52,13 @@ const { fileLockDepth, withFileLock } = await import('../src/main/fsutil')
 const { listSkills, invalidateSkillCache, machineSkillCacheSize } = await import('../src/main/skills')
 const { encodeProjectPath } = await import('../src/main/providers/claude/usage')
 
+// A bound for a hung test (HI-3349): a full unit run on a loaded machine took one 10.9 s of Vitest's 20 s default.
+vi.setConfig({ testTimeout: timing('test.hang') })
+
 const status = new Map<string, () => Promise<{ ok: true; loggedIn: boolean; email?: string; orgId?: string } | { ok: false; error: string }>>()
 const signedIn = (email: string) => async () => ({ ok: true as const, loggedIn: true, email, orgId: 'org-1' })
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const outcome = (p: Promise<unknown>): Promise<string> => p.then(() => 'ok', (e: Error) => e.message)
 
 const wsPath = join(base, 'ws')
@@ -74,6 +78,9 @@ beforeAll(async () => {
   // A project whose agents change connection (HI-1771).
   mkdirSync(join(wsPath, 'api1', '.combwork'), { recursive: true })
   writeFileSync(join(wsPath, 'api1', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'k', name: 'Api K', provider: 'claude-code', model: 'opus', effort: 'high', use200kContext: true, lastSessionId: 's-1' }] }))
+  // A project whose running agents are on an account turned off (HI-3213), one in each state.
+  mkdirSync(join(wsPath, 'off1', '.combwork'), { recursive: true })
+  writeFileSync(join(wsPath, 'off1', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: ['working', 'watching', 'idle', 'lane'].map((id) => ({ id, name: `Off ${id}`, provider: 'claude-code' })) }))
   for (const name of ['mv1', 'mv2', 'mv3', 'mv4', 'mv5', 'mv6', 'mv7', 'mv8', 'mv9']) {
     mkdirSync(join(wsPath, name, '.combwork'), { recursive: true })
     writeFileSync(join(wsPath, name, '.combwork', 'project.json'), JSON.stringify({ version: 2, providers: { 'claude-code': { model: 'haiku', effort: 'high', permissionMode: 'inherit', extraArgs: '', use200kContext: 'on' }, codex: { model: 'gpt-5', effort: 'low', permissionMode: 'inherit', extraArgs: '', use200kContext: 'inherit' } }, agents: [{ id: 'own', name: `${name} Own`, provider: 'claude-code', model: 'opus', use200kContext: false }, { id: 'none', name: `${name} None`, provider: 'claude-code' }, { id: 'cx', name: `${name} Codex`, provider: 'codex' }] }))
@@ -81,14 +88,14 @@ beforeAll(async () => {
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
   // No CLI starts here: an account's models read (HI-2852, at its sign-in) answers nothing.
-  vi.spyOn(provider('claude-code'), 'listModels').mockResolvedValue(null)
-  vi.spyOn(provider('codex'), 'listModels').mockResolvedValue(null)
-  vi.spyOn(provider('claude-code'), 'accountStatus').mockImplementation(async (_exe, env) => {
+  vi.spyOn(provider('claude-code').models!, 'listModels').mockResolvedValue(null)
+  vi.spyOn(provider('codex').models!, 'listModels').mockResolvedValue(null)
+  vi.spyOn(provider('claude-code').accounts!, 'accountStatus').mockImplementation(async (_exe, env) => {
     const s = [...status].find(([k]) => k.toLowerCase() === env.CLAUDE_CONFIG_DIR!.toLowerCase())?.[1]
     return s ? s() : { ok: true, loggedIn: false }
   })
   // Codex's accounts (HI-2106's tests add some): signed out, never its CLI run.
-  vi.spyOn(provider('codex'), 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
+  vi.spyOn(provider('codex').accounts!, 'accountStatus').mockImplementation(async () => ({ ok: true, loggedIn: false }))
   w = createWorkspaceService()
   await w.open(wsPath)
 })
@@ -344,7 +351,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
       expect(c.id).toBe(b.id)
       c.release()
       await opened
-      // Nothing is turned on by itself (Darren, 6 Nov): the new workspace has no connections on.
+      // Nothing is turned on by itself: the new workspace has no connections on.
       expect(JSON.parse(readFileSync(join(fresh, '.combwork', 'workspace.json'), 'utf8')).connections).toBeUndefined()
       expect(accounts.combworkAccounts().map((x) => x.id)).toEqual([b.id, a.id])
     } finally {
@@ -377,7 +384,7 @@ describe('what is read from a connection’s home', () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const homes = here(() => accounts.connectionHomes('claude-code', w.config))!
     expect(homes.map((h) => h.home)).toEqual([accounts.accountFolder(a.id)])
-    const sources = await provider('claude-code').memorySources(wsPath, homes)
+    const sources = await provider('claude-code').projectFiles!.memorySources(wsPath, homes)
     const users = sources.filter((s) => s.id.startsWith('user'))
     expect(users.map((s) => s.path)).toEqual([join(accounts.accountFolder(a.id), 'CLAUDE.md')])
     expect(users[0].label).toContain('Personal')
@@ -389,7 +396,7 @@ describe('what is read from a connection’s home', () => {
   it('files: a connection’s memory and skills allowed, never its login or settings, never another home', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const f = accounts.accountFolder(a.id)
-    const allowed = (p: string, write = false) => provider('claude-code').fileAllowed(p, write, [f])
+    const allowed = (p: string, write = false) => provider('claude-code').projectFiles?.fileAllowed(p, write, [f])
     expect(allowed(join(f, 'CLAUDE.md'))).toBe(true)
     expect(allowed(join(f, '.credentials.json'))).toBe(false)
     expect(allowed(join(f, 'settings.json'), true)).toBe(false)
@@ -406,9 +413,9 @@ describe('what is read from a connection’s home', () => {
     mkdirSync(join(home, 'projects', key, 'memory', 'sub'), { recursive: true })
     for (const name of ['MEMORY.md', 'note.md']) writeFileSync(join(home, 'projects', key, 'memory', name), '# memory\n')
     const homes = here(() => accounts.connectionHomes('claude-code', w.config))!
-    const autos = (await provider('claude-code').memorySources(project, homes)).filter((s) => s.kind === 'auto-memory')
+    const autos = (await provider('claude-code').projectFiles!.memorySources(project, homes)).filter((s) => s.kind === 'auto-memory')
     expect(autos.map((s) => s.label)).toEqual(['MEMORY.md', 'note.md'])
-    const allowed = (p: string, write = false) => provider('claude-code').fileAllowed(p, write, homes.map((h) => h.home))
+    const allowed = (p: string, write = false) => provider('claude-code').projectFiles?.fileAllowed(p, write, homes.map((h) => h.home))
     for (const s of autos) {
       expect(allowed(s.path)).toBe(true)
       expect(allowed(s.path, true)).toBe(true)
@@ -428,7 +435,7 @@ describe('what is read from a connection’s home', () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     writeFileSync(join(accounts.accountFolder(a.id), 'settings.json'), JSON.stringify({ model: 'claude-own-model' }))
     writeFileSync(join(home, 'settings.json'), JSON.stringify({ model: 'claude-home-model' }))
-    expect(provider('claude-code').configuredDefaultModel(accounts.accountFolder(a.id))).toBe('claude-own-model')
+    expect(provider('claude-code').models?.configuredDefaultModel(accounts.accountFolder(a.id))).toBe('claude-own-model')
   })
 })
 
@@ -1410,8 +1417,16 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
     const p = join(wsPath, 'cr1')
     mkdirSync(join(p, '.combwork'), { recursive: true })
     writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [{ id: 'u1', name: 'Builder', provider: 'claude-code', connection: c.id }] }))
+    // HI-3448: the new folder's project id is written (the root watch's id check, 250 ms on) while this refresh reads it,
+    // as under load: the refresh then reports what it had before (#999), and the refresh that write schedules reports cr1.
+    const idGiven = () => /"id":\s*"p-/.test(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
+    configTestHooks.afterConfigSeen = async (at) => {
+      if (at.toLowerCase() === p.toLowerCase()) await vi.waitFor(() => expect(idGiven()).toBe(true), { timeout: HUNG_MS })
+    }
     try {
       await w.refresh()
+      delete configTestHooks.afterConfigSeen
+      await w.refreshesSettled()
       expect(accounts.connectionUsers().get(c.id)).toEqual([{ projectPath: expect.any(String), project: 'cr1', agentId: 'u1', agent: 'Builder' }])
       const row = here(() => accounts.accountsView()).connectionRows.find((r) => r.id === c.id)
       expect(row?.users.map((u) => u.agent)).toEqual(['Builder'])
@@ -1421,6 +1436,7 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
       await accounts.removeConnection(c.id)
       expect(accounts.getConnection(c.id)).toBeUndefined()
     } finally {
+      delete configTestHooks.afterConfigSeen
       writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     }
     // One order for every CLI (decision A): a Codex account moved above Claude Code's.
@@ -1647,5 +1663,78 @@ describe('HI-2670 (HR3 on s46): lock order, and what a change affects read as th
       renameSync(aside, file)
     }
     await expect(launchSettings.setConnectionLaunch(conn, { tools: false })).rejects.toThrow(/One \(.*doing\).*confirm: [0-9a-f]+/)
+  })
+})
+
+describe('an account turned off moves every running agent on it, whatever its state (HI-3213)', () => {
+  const off1 = join(wsPath, 'off1')
+  const liveKey = (id: string): string => `${off1.toLowerCase()}#${id}`
+
+  it('working, watching, idle and in a lane: each switched at its safe point, to the connection with its tag', async () => {
+    const { userDraftShown } = await import('../src/main/sessions')
+    const a1 = await signedInConnection('Anthropic-1', 'one@example.com')
+    const a2 = await signedInConnection('Anthropic-2', 'two@example.com')
+    accounts.updateConnection(baseOf(a1.id), { tag: 'Builders' })
+    accounts.updateConnection(baseOf(a2.id), { tag: 'Builders' })
+    const assist1 = accounts.addConnection(a1.id, { name: 'Anthropic-1 · Assistant', tag: 'Assistant' })
+    const assist2 = accounts.addConnection(a2.id, { name: 'Anthropic-2 · Assistant', tag: 'Assistant' })
+    // The idle one is on the Assistant-tagged connection: it must land on its tag's match, not Anthropic-2's first.
+    const own: Record<string, string> = { working: baseOf(a1.id), watching: baseOf(a1.id), idle: assist1.id, lane: baseOf(a1.id) }
+    for (const [id, c] of Object.entries(own)) await here(() => updateAgent(off1, id, { connection: c }))
+
+    // Running on Anthropic-1, as launches leave them: working (in a turn), watching (a card watch, between turns), idle
+    // (finished; the user's last key Esc, its prompt empty) and a lane's builder in its slot (its last key Shift+Tab,
+    // a draft left in its prompt until the user clears it).
+    const s = sessions as unknown as { live: Map<string, any>; userInput: Map<string, { at: number; enter: boolean }> }
+    const prompt: Record<string, string | null> = { working: '', watching: '', idle: '', lane: 'half a line' }
+    const state = (id: string, now: string) => ({ provider: 'claude-code', runId: `r-${id}`, sessionId: `s-${id}`, projectPath: off1, agentId: id, agentName: `Off ${id}`, cwd: id === 'lane' ? join(base, 'slots', 'slot-a') : off1, status: now, launchedConnection: { id: a1.id, name: 'Anthropic-1', connection: { id: own[id], name: accounts.getConnection(own[id])!.name } } })
+    for (const [id, now] of [['working', 'working'], ['watching', 'watching'], ['idle', 'finished'], ['lane', 'finished']]) s.live.set(liveKey(id), { state: state(id, now), adapter: Object.assign(Object.create(provider('claude-code')), { promptText: () => prompt[id] }), screen: { textWithoutDim: () => '' } })
+    // Keys the user pressed long before (outside the typing pause), none of them Enter.
+    for (const id of ['idle', 'lane']) s.userInput.set(sessions.key(off1, id), { at: Date.now() - 60_000, enter: false })
+    // In a turn as main's own rule reads it (setAgentBusy's statuses); the rest of the lane-end checks have nothing here.
+    const wasHeld = sessions.safePointHeld
+    sessions.safePointHeld = (_p, id) => (s.live.get(liveKey(id))?.state.status === 'working' ? 'it is in a turn' : null)
+    const quits: string[] = []
+    const resumed: { agentId: string; resumeId?: string }[] = []
+    // Its exit typed, its run ends (it leaves the live sessions), and it is resumed: the switch's own steps run for real.
+    const quit = vi.spyOn(sessions, 'quit').mockImplementation(async (_p, id) => {
+      quits.push(id)
+      s.live.delete(liveKey(id))
+      return 'sent'
+    })
+    const start = vi.spyOn(sessions, 'start').mockImplementation(async (_p, o) => {
+      resumed.push({ agentId: o.agentId!, resumeId: o.resumeId })
+      return {} as never
+    })
+    try {
+      // Anthropic-1 off: Settings' banner offers the switch, which every running agent on it takes.
+      await here(() => accounts.setAccountOn(a1.id, false))
+      const queued = await here(() => sessions.switchAffected(wsPath))
+      expect(queued.filter((q) => q.projectPath.toLowerCase() === off1.toLowerCase()).map((q) => [q.agentId, q.result]).sort()).toEqual([['idle', 'queued'], ['lane', 'queued'], ['watching', 'queued'], ['working', 'queued']])
+      // Watching and idle (an Esc left in an empty prompt is no draft) switch at once.
+      await vi.waitFor(() => expect([...quits].sort()).toEqual(['idle', 'watching']), { timeout: HUNG_MS })
+      expect(userDraftShown('')).toBe(false)
+      expect(userDraftShown('half a line')).toBe(true)
+      expect(userDraftShown(null)).toBe(true)
+      // Its turn ends and its draft is cleared with no event of the agent's own: the switch's own look finds each.
+      s.live.get(liveKey('working'))!.state.status = 'finished'
+      prompt.lane = ''
+      await vi.waitFor(() => expect([...quits].sort()).toEqual(['idle', 'lane', 'watching', 'working']), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(resumed.map((r) => r.agentId).sort()).toEqual(['idle', 'lane', 'watching', 'working']), { timeout: HUNG_MS })
+      expect(resumed.every((r) => r.resumeId === `s-${r.agentId}`)).toBe(true)
+      // Each resumes on Anthropic-2, on the connection with its own tag.
+      for (const id of Object.keys(own)) {
+        const eff = await here(async () => sessions.effective(off1, (await w.savedAgent(off1, id))!))
+        expect([id, eff.connection, eff.connectionId]).toEqual([id, a2.id, id === 'idle' ? assist2.id : baseOf(a2.id)])
+      }
+    } finally {
+      quit.mockRestore()
+      start.mockRestore()
+      sessions.safePointHeld = wasHeld
+      for (const id of Object.keys(own)) {
+        s.live.delete(liveKey(id))
+        s.userInput.delete(sessions.key(off1, id))
+      }
+    }
   })
 })

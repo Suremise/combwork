@@ -6,9 +6,11 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
+import { inDialectOf, setChainResolver } from '../src/shared/agentText'
 import { inboxNotice, noticeCounts } from '../src/shared/doorbell'
 import { tempDir } from './tempDir'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-inbox-notices-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -24,6 +26,10 @@ const deliveries = await import('../src/main/deliveries')
 const { initInboxNotices } = await import('../src/main/inboxNotices')
 const tasks = await import('../src/main/tasks')
 const { projectAgents } = await import('../src/shared/defaults')
+const { keyProjects, scopeOfHost, withCardNames } = await import('../src/main/projectKeys')
+const { workspaceFor } = await import('../src/main/workspace')
+const { offerLine } = await import('../src/shared/deliveries')
+const { cardRef } = await import('../src/shared/projectKeys')
 
 describe("Combwork's notice wording (#650)", () => {
   it('names counts by kind, the cards and the ids, never what a delivery says or who sent it', () => {
@@ -111,11 +117,31 @@ describe('notices in the hook replies (#650)', () => {
     s.notify = () => {}
     s.setInbox = () => {}
     initInboxNotices()
+    // Each session record write followed, to be awaited (HI-3338): a Stop's turn end writes its record unawaited (so a
+    // prompt meanwhile isn't overwritten), and under load the last test's landed after the file had closed the workspace
+    // and its temp folder had gone: on a lease, opening a new board there, its logs reached vitest after teardown
+    // ("Closing rpc while onUserConsoleLog was pending"), as HI-3330's did.
+    const upsert = bound(w, w.upsertSession)
+    vi.spyOn(w, 'upsertSession').mockImplementation((...a) => {
+      const write = upsert(...a)
+      recordWrites.add(write)
+      void write.catch(() => undefined).finally(() => recordWrites.delete(write))
+      return write
+    })
   })
-  afterEach(() => deliveries.settledForTests())
+  const recordWrites = new Set<Promise<unknown>>()
+  /** The session record writes started so far have ended, those they lead to too. */
+  const recordsWritten = async (): Promise<void> => {
+    while (recordWrites.size) await Promise.allSettled([...recordWrites])
+  }
+  afterEach(async () => {
+    await recordsWritten()
+    await deliveries.settledForTests()
+  })
   afterAll(async () => {
     sessions.inboxNotice = null
     s.live.clear()
+    await recordsWritten()
     await disposeWorkspaceService(w)
   })
 
@@ -132,6 +158,53 @@ describe('notices in the hook replies (#650)', () => {
     const e = await leave(st, { kind: 'card-event', card: 607 })
     expect(context(await hook(st, tool('p1', 'c4')))).toBe(`[CW] New in your inbox: 1 message and 1 card event (#607) (${m.id}, ${e.id}). Call cw_inbox now to read them; act on them and ack them, then carry on.`)
     expect(st.status).toBe('working')
+  })
+
+  it("HI-3226: names its cards by key, as the doorbell typed as the prompt does, though the hook server's work has no workspace", async () => {
+    const st = agent()
+    await run(() => keyProjects(w))
+    const made = await run(() => tasks.createTask({ title: 'Named by key', project: 'alpha' }, { kind: 'user' }))
+    // Its key as the window names it (in the workspace's work).
+    const card = { number: made.number, key: await run(() => cardRef(made.number)) }
+    expect(card.key).toMatch(/^[A-Z]+-\d+$/)
+    const e = await leave(st, { kind: 'card-event', card: card.number })
+    // As the hook server calls it: outside any workspace's work, so only the project's own names can name the card.
+    const outside = async (body: Record<string, unknown>) => {
+      const full = { session_id: st.sessionId, cwd: p, ...body }
+      const reply = sessions.hookReply(st.runId, full)
+      await sessions.handleHook(st.runId, full, reply)
+      return reply
+    }
+    await outside({ hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
+    const told = context(await outside(tool('p1', 'c1')))
+    expect(told).toContain(`1 card event (${card.key}) (${e.id})`)
+    expect(told).not.toContain(`#${card.number}`)
+    // The doorbell typed as the prompt (deliveries.ts, offerLine in its host's names) names the same card the same way.
+    const rec = (await run(() => deliveries.deliveriesOf(p, st.agentId))).find((r) => r.id === e.id)!
+    const bell = withCardNames(workspaceFor(p), () => offerLine([rec], null), scopeOfHost(p))
+    expect(bell).toContain(`1 card event (${card.key}) (${e.id})`)
+  })
+
+  // The hook route's own dialect scope (sessions.inLaunchDialect, HI-2443) and inboxNotices.ts's both say it; this holds
+  // the result whichever one does (unwatchedLanes.test.ts calls the notice outside a hook, where only inboxNotices.ts's can).
+  it("HI-3230: said in the agent's dialect at its checkpoint and drain, as the doorbell typed as its prompt is; another agent's stays the Default", async () => {
+    const st = agent()
+    const other = agent()
+    const texts = { 'doorbell.notice.checkpoint': 'Unread now: {what}.', 'doorbell.notice.drain': 'Unread at the end: {what}.', 'doorbell.notice.doorbell': 'Unread: {what}.', 'doorbell.count.message': '{n, plural, one {{count} note} other {{count} notes}}{cards}' }
+    setChainResolver((scope) => (scope.kind === 'session' && scope.session.agentId === st.agentId ? { texts, files: ['test.json'], hash: 'test' } : null))
+    try {
+      for (const a of [st, other]) await hook(a, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
+      const m = await leave(st)
+      const o = await leave(other)
+      expect(context(await hook(st, tool('p1', 'c1')))).toBe(`[CW] New in your inbox: Unread now: 1 note (${m.id}).`)
+      expect(context(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1' }))).toBe(`[CW] Unread at the end: 1 note (${m.id}).`)
+      expect(context(await hook(other, tool('p1', 'c1')))).toBe(`[CW] New in your inbox: 1 message (${o.id}). Call cw_inbox now to read it; act on it and ack it, then carry on.`)
+      // The doorbell typed as its prompt (deliveries.ts: offerLine in the agent's dialect) says it in the same dialect.
+      const rec = (await run(() => deliveries.deliveriesOf(p, st.agentId))).find((r) => r.id === m.id)!
+      expect(inDialectOf({ projectPath: p, agentId: st.agentId }, () => offerLine([rec], null))).toBe(`[CW] New in your inbox: Unread: 1 note (${m.id}).`)
+    } finally {
+      setChainResolver(null)
+    }
   })
 
   it("HI-2670: an agent made Independent while it runs gets no notice in its hooks, which still report its status; back in the workflow, its launch's own switches allowing, it is told again, without a restart", async () => {
@@ -283,7 +356,7 @@ describe('notices in the hook replies (#650)', () => {
       hold()
       const first = send(stop('p1'))
       const second = send(stop('p1'))
-      await vi.waitFor(() => expect(asked).toBe(1), { timeout: 5000 })
+      await vi.waitFor(() => expect(asked).toBe(1), { timeout: timing('wait.hang') })
       release()
       const replies = await Promise.all([first, second])
       expect(replies.map(context)).toEqual([expect.stringMatching(/^\[CW\] Before you finish: /), undefined])
@@ -298,7 +371,7 @@ describe('notices in the hook replies (#650)', () => {
       await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p3', prompt: 'more' })
       hold()
       const atStop = send(stop('p3'))
-      await vi.waitFor(() => expect(asked).toBe(1), { timeout: 5000 })
+      await vi.waitFor(() => expect(asked).toBe(1), { timeout: timing('wait.hang') })
       const next = send(full({ hook_event_name: 'UserPromptSubmit', prompt_id: 'p4', prompt: 'and more' }))
       release()
       expect(context(await atStop)).toMatch(/^\[CW\] Before you finish: /)
@@ -341,7 +414,7 @@ describe('notices in the hook replies (#650)', () => {
           await sessions.handleHook(st.runId, body, reply)
           return reply
         })
-        await vi.waitFor(() => expect(asked).toBe(1), { timeout: 5000 })
+        await vi.waitFor(() => expect(asked).toBe(1), { timeout: timing('wait.hang') })
         // Stopped (gone), or started again as a new launch at work, while the notice is held.
         if (how === 'stop') s.live.delete(key)
         else s.live.set(key, { ...old, state: { ...old.state, runId: `${st.runId}-new`, status: 'working' }, ledger: newLedger() })
@@ -417,7 +490,7 @@ describe('notices in the hook replies (#650)', () => {
         emitted.length = 0
         recorded.length = 0
         const step = c.step(st)
-        await vi.waitFor(() => expect(h.at.reached, c.name).toBe(true), { timeout: 5000 })
+        await vi.waitFor(() => expect(h.at.reached, c.name).toBe(true), { timeout: timing('wait.hang') })
         const old = restart(st)
         h.release()
         const out = await step
@@ -471,7 +544,7 @@ describe('notices in the hook replies (#650)', () => {
       const h = where === 'config' ? holdNext('ensureProject') : holdNext('mutateSessions', 1)
       try {
         const recording = run(() => s3.recordSession.call(sessions, p, { id: st.agentId, name: `Rec ${where}` }, old))
-        await vi.waitFor(() => expect(h.at.reached, where).toBe(true), { timeout: 5000 })
+        await vi.waitFor(() => expect(h.at.reached, where).toBe(true), { timeout: timing('wait.hang') })
         // Started again: the new launch records its own session to resume.
         s.live.set(key, { ...old, state: { ...old.state, runId: `${st.runId}-new` }, ledger: newLedger() })
         if (where === 'cards') h.spy.mockRestore()
@@ -583,7 +656,7 @@ describe('notices in the hook replies (#650)', () => {
     }
     try {
       const atStop = send(stop)
-      await vi.waitFor(() => expect(asked).toBe(1), { timeout: 5000 })
+      await vi.waitFor(() => expect(asked).toBe(1), { timeout: timing('wait.hang') })
       const second = send(full({ hook_event_name: 'UserPromptSubmit', prompt: 'second' }))
       release()
       const drain = (await atStop) as { decision: string; reason: string }

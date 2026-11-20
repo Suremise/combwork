@@ -11,7 +11,7 @@ const { createHash } = require('crypto')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47856))
 const userData = path.join(lib.WORK, 'stagenames-profile')
@@ -166,15 +166,14 @@ function projectJson(dir, platform, workflow) {
     await header('doing').waitFor({ timeout: HUNG_MS })
     await boardShot('en')
     const base = (await inv('app:info')).language
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     const words = { de: ['In Arbeit', 'Genehmigt'], pl: ['Aktywne', 'Zatwierdzone'], 'zh-CN': ['进行中', '已批准'] }
     for (const [code, [active, approved]] of Object.entries(words)) {
-      const dir = path.join(lib.ROOT, 'locales', code)
-      await speak({ ...base, code, locale: code, messages: Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')))) })
+      // Main reads the language's catalogue, not sent through app.evaluate (HI-3434).
+      await lib.speakLanguage(app, base, code)
       check(`the columns read ${active} and ${approved} (${code})`, !!(await lib.until(async () => (await headerText('doing')).includes(active) && (await headerText('passed')).includes(approved), HUNG_MS)), `${await headerText('doing')} / ${await headerText('passed')}`)
       await boardShot(code)
     }
-    await speak(base)
+    await lib.speakLanguage(app, base)
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
     // What the window showed then, for whoever reads the failure.

@@ -12,6 +12,7 @@ import { tempDir } from './tempDir'
 import { moveFolder } from './moveFolder'
 import type { SessionRecord } from '../src/shared/types'
 import { bound } from './keepType'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-session-store-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
@@ -328,7 +329,7 @@ describe('following the project', () => {
     fileHooks.afterWrite = (path) => {
       if (!path.endsWith('sessions.json')) return
       fileHooks.afterWrite = null
-      const db = new DatabaseSync(join(wsPath, '.combwork', 'combwork.db'), { timeout: 0 })
+      const db = new DatabaseSync(join(wsPath, '.combwork', 'combwork.db'), { timeout: 0 }) // timing-ok: no busy wait: a lock refused at once is what the test checks
       try {
         db.prepare("UPDATE sessions SET name = 'committed elsewhere' WHERE host = ? AND id = 'one'").run(idOf(p))
         wrote = 'committed'
@@ -351,7 +352,7 @@ describe('following the project', () => {
     else expect(name).toBe('before')
   })
 
-  it('Remove from Combwork with refreshes on the way leaves the file in the folder; another workspace takes them in; Restore here brings them back with what came meanwhile', { timeout: 60_000 }, async () => {
+  it('Remove from Combwork with refreshes on the way leaves the file in the folder; another workspace takes them in; Restore here brings them back with what came meanwhile', { timeout: timing('test.hang') }, async () => {
     const p = project('travels')
     await run(() => workspace.ensureProject(p))
     await run(() => workspace.projectIds({ fresh: true }))

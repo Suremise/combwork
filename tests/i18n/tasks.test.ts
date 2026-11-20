@@ -79,8 +79,11 @@ beforeEach(async () => {
   w = createWorkspaceService()
   await w.open(path)
 })
-afterEach(() => {
-  disposeWorkspaceService(w)
+// Awaited (HI-3330): the close waits for the refresh opening scheduled (reading each project, its branch with git) and
+// closes the board. Left running, the last test's close outlived the file under load: its logs reached vitest after
+// teardown ("Closing rpc while onUserConsoleLog was pending") and its open files kept the temp folder (EPERM).
+afterEach(async () => {
+  await disposeWorkspaceService(w)
   setLanguage('en', {})
 })
 
@@ -189,6 +192,9 @@ describe("a card's history: English as stored, its line as data for the window",
       [storedText(HISTORY.movedBefore, { column: 'doing', before: 'HI-12' }), 'Moved to Doing, before HI-12'],
       [storedText(HISTORY.movedBeforeIn, { column: 'todo', before: 'AM-3' }), 'Moved before AM-3 in Todo'],
       [storedText(HISTORY.returned, { round: 3 }), 'Returned for review, round 3'],
+      // A follow-up's line names its commit; a no-code card's records none, so the line leaves out "at" (HI-3409).
+      [storedText(HISTORY.followUpSubmitted, { revision: '5045b46' }), 'Follow-up submitted for review at 5045b46'],
+      [storedText(HISTORY.followUpSubmitted, { revision: 'none' }), 'Follow-up submitted for review'],
       [storedText(HISTORY.toProject, { project: 'beta' }), 'Moved to beta'],
       [storedText(HISTORY.toWorkspace), 'Moved to the workspace'],
       [storedText(HISTORY.takenFromOf, { agent: 'Agent 2', project: 'alpha' }), 'Taken from Agent 2 of alpha'],
@@ -325,7 +331,7 @@ describe("the board's refusals: English for agents as before, the window's langu
       [await caught(run(() => tasks.createTask({ title: ' ' }, user))), 'A task needs a title.', 'A card needs a title.', 400, 'Eine Aufgabe braucht einen Titel.'],
       [await caught(run(() => tasks.createTask({ title: 'x', agent: 'a1' }, user))), 'Choose a project before giving the task to an agent.', 'Choose a project before giving the card to an agent.', 400],
       [agentBusyError('B1', 'working'), "B1 is working. Start the task once it's idle, or give it to another agent.", "B1 is working. Start the card once it's idle, or give it to another agent.", 409],
-      [agentBusyError('B1', 'watching'), "B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the task once it's idle, or give it to another agent.", "B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the card once it's idle, or give it to another agent.", 409]
+      [agentBusyError('B1', 'watching'), "B1 is waiting on cards (a card watch): it takes no other work until it is woken. If it builds a lane, put the card in that lane where it should go (cw_lane start), and Combwork starts it on B1 in turn; otherwise give it to another agent, or leave B1 a message for the work it waits on (cw_message_agent), which wakes it and keeps its watch.", "B1 is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header). Start the card once it's idle, or give it to another agent.", 409]
     ]
     for (const lang of ['en', 'de'] as const) {
       setLanguage(lang, lang === 'de' ? GERMAN : {})

@@ -14,6 +14,7 @@ import { journalBuildDetail, journalSummary } from '../src/renderer/src/componen
 import { JOURNAL_BUILDS } from '../src/shared/advanced'
 // @ts-expect-error: a plain .mjs module without types
 import * as script from '../scripts/buildFact.mjs'
+import { timing } from './timing.cjs'
 
 // A marker's read held until the test lets it go (#1534 round 1, finding 1: a workspace switch while a pickup reads).
 const held: { gate: Promise<void> | null; reached: boolean } = { gate: null, reached: false }
@@ -38,9 +39,9 @@ const service = await import('../src/main/journalService')
 const builds = await import('../src/main/buildFacts')
 const { advanced } = await import('../src/main/advanced')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 const fact = { kind: 'baseline', version: '1.0.0-rc.1', commit: '1fef5341a2b3c4d5e6f708192a3b4c5d6e7f8091', branch: '1.0.0', installer: 'D:\\Work\\demo\\dist\\Combwork-Setup-1.0.0-rc.1.exe', builtAt: '2026-10-24T11:00:00.000Z', by: 'dist' }
 
@@ -74,7 +75,7 @@ describe('a build fact', () => {
     expect(parseBuildSummary(buildFactSummary(f))).toEqual({ by: 'dist', version: '1.0.0-rc.1', kind: 'baseline', commit: '1fef5341', branch: '1.0.0' })
     expect(parseBuildSummary(buildFactSummary({ ...f, kind: 'rc', branch: null, by: 'release' }))).toEqual({ by: 'release', version: '1.0.0-rc.1', kind: 'rc', commit: '1fef5341', branch: null })
     expect(parseBuildSummary('#12 "Ship it" is Done (merged), moved there by B1')).toBeNull()
-    // HI-2581, Darren's decision: a one-way rename. An old entry's line under the old name is history, shown as written.
+    // HI-2581: a one-way rename. An old entry's line under the old name is history, shown as written.
     // old-name: begin old-build-line
     expect(parseBuildSummary('Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0')).toBeNull()
     // old-name: end old-build-line
@@ -89,7 +90,7 @@ describe('a build fact', () => {
     const e = { source: 'combwork' as const, summary: buildFactSummary(f), detail: buildFactDetail(f) }
     // Stored in English as agents read it; the window says it in the user's language (here English: the same line).
     expect(journalSummary(e)).toBe(e.summary)
-    // An old entry's "Built Combwork …" (before HI-2581) is shown as written (Darren's decision: one name, no reading of two).
+    // An old entry's "Built Combwork …" (before HI-2581) is shown as written (decided: one name, no reading of two).
     // old-name: begin old-build-summary
     const old = e.summary.replace(' Combwork ', ' Hive ')
     // old-name: end old-build-summary
@@ -254,36 +255,36 @@ describe('Combwork records a build in the journal', () => {
     await disposeWorkspaceService(w)
   })
 
-  it('as its own fact, from the API', () => {
-    expect(builds.recordBuild(w, buildFactOf(fact) as never)).toEqual({ recorded: true })
+  it('as its own fact, from the API', async () => {
+    expect(await builds.recordBuild(w, buildFactOf(fact) as never)).toEqual({ recorded: true })
     expect(facts().map((f) => f.summary)).toEqual(['Built Combwork 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0'])
     // The same build again (a reply cut off, then its marker): one entry.
-    expect(builds.recordBuild(w, buildFactOf(fact) as never)).toEqual({ recorded: true })
+    expect(await builds.recordBuild(w, buildFactOf(fact) as never)).toEqual({ recorded: true })
     expect(facts()).toHaveLength(1)
   })
 
   // #1534 round 2: the check found only the newest 50 builds of a commit, so an older one replayed after 51 more was
   // written again. It is exact now, in the write's own transaction, however many entries share the commit.
-  it('records a build once however many later builds share its commit', () => {
+  it('records a build once however many later builds share its commit', async () => {
     const entries = (): number => journal.journalSize(w.assistantHome)?.entries ?? 0
     const before = entries()
     const first = { ...fact, version: '1.0.0-rc.8', builtAt: '2026-10-24T08:00:00.000Z' }
-    expect(builds.recordBuild(w, buildFactOf(first) as never)).toEqual({ recorded: true })
-    for (let i = 1; i <= 51; i++) expect(builds.recordBuild(w, buildFactOf({ ...first, builtAt: new Date(Date.parse(first.builtAt) + i * 60_000).toISOString() }) as never)).toEqual({ recorded: true })
+    expect(await builds.recordBuild(w, buildFactOf(first) as never)).toEqual({ recorded: true })
+    for (let i = 1; i <= 51; i++) expect(await builds.recordBuild(w, buildFactOf({ ...first, builtAt: new Date(Date.parse(first.builtAt) + i * 60_000).toISOString() }) as never)).toEqual({ recorded: true })
     expect(entries()).toBe(before + 52)
     // The first again, past 50 later builds of the same commit: still 52.
-    expect(builds.recordBuild(w, buildFactOf(first) as never)).toEqual({ recorded: true })
+    expect(await builds.recordBuild(w, buildFactOf(first) as never)).toEqual({ recorded: true })
     expect(entries()).toBe(before + 52)
   })
 
-  it("keeps a long detail's entry once too (kept compressed)", () => {
+  it("keeps a long detail's entry once too (kept compressed)", async () => {
     const long = { kind: 'event', summary: 'A fact with a long detail', detail: 'x'.repeat(5000), links: [{ type: 'commit', ref: 'abcdef1' }] }
     const settings = service.journalSettingsOf(w)
-    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'combwork', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
-    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'combwork', { type: 'commit', ref: 'abcdef1' })).toBeNull()
+    expect(await journal.writeEntryOnce(w.assistantHome, settings, long, 'combwork', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
+    expect(await journal.writeEntryOnce(w.assistantHome, settings, long, 'combwork', { type: 'commit', ref: 'abcdef1' })).toBeNull()
     // Another detail, or by the Assistant, is another entry.
-    expect(journal.writeEntryOnce(w.assistantHome, settings, { ...long, detail: 'y'.repeat(5000) }, 'combwork', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
-    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'assistant', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
+    expect(await journal.writeEntryOnce(w.assistantHome, settings, { ...long, detail: 'y'.repeat(5000) }, 'combwork', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
+    expect(await journal.writeEntryOnce(w.assistantHome, settings, long, 'assistant', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
   })
 
   // #1534 round 1, finding 3: two pickups at once (a workspace reopened while the last one's runs) took the same marker.
@@ -311,7 +312,7 @@ describe('Combwork records a build in the journal', () => {
   it('writes nothing with the switch off, and drops what was left meanwhile', async () => {
     await advanced.set(JOURNAL_BUILDS, false)
     const n = facts().length
-    expect(builds.recordBuild(w, buildFactOf({ ...fact, version: '1.0.0-rc.3' }) as never)).toEqual({ recorded: false, reason: 'Settings → Advanced → Record builds in the journal is off.' })
+    expect(await builds.recordBuild(w, buildFactOf({ ...fact, version: '1.0.0-rc.3' }) as never)).toEqual({ recorded: false, reason: 'Settings → Advanced → Record builds in the journal is off.' })
     leave('2026-10-24T11-05-00-000Z-ee.json', { ...fact, version: '1.0.0-rc.4' })
     expect(await builds.pickUpBuilds(w)).toBe(0)
     expect(existsSync(join(dir, '2026-10-24T11-05-00-000Z-ee.json'))).toBe(false)
@@ -323,11 +324,11 @@ describe('Combwork records a build in the journal', () => {
 
   it('writes nothing while the journal is off, or its scope has no events', async () => {
     await service.setJournalSettings(w, { enabled: false })
-    expect(builds.recordBuild(w, buildFactOf(fact) as never)).toEqual({ recorded: false, reason: expect.stringMatching(/^The journal is off, or its scope/) })
+    expect(await builds.recordBuild(w, buildFactOf(fact) as never)).toEqual({ recorded: false, reason: expect.stringMatching(/^The journal is off, or its scope/) })
     await service.setJournalSettings(w, { enabled: true, scope: ['decision'] })
-    expect(builds.recordBuild(w, buildFactOf(fact) as never).recorded).toBe(false)
+    expect((await builds.recordBuild(w, buildFactOf(fact) as never)).recorded).toBe(false)
     await service.setJournalSettings(w, { scope: ['decision', 'plan', 'event', 'incident', 'insight'] })
-    expect(builds.recordBuild(w, buildFactOf({ ...fact, version: '1.0.0-rc.9' }) as never).recorded).toBe(true)
+    expect((await builds.recordBuild(w, buildFactOf({ ...fact, version: '1.0.0-rc.9' }) as never)).recorded).toBe(true)
     expect(facts().filter((f) => f.summary.includes('1.0.0-rc.9'))).toHaveLength(1)
   })
 

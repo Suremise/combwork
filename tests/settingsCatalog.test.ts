@@ -79,7 +79,7 @@ describe('the settings catalog', () => {
           // A setting the provider's capabilities don't give it has no row (Codex has no 200K switch, nor a cost source: it reports no cost).
           // How a CLI launches is on connections (HI-2107, decision F): its old model, effort, mode, arguments and context
           // are kept only as migration input, with no rows.
-          const lacks = new Set([...(p.capabilities.backgroundSessions ? [] : ['allowBackgroundSessions']), ...(p.capabilities.reportsCost ? [] : ['costSource']), ...LAUNCH_FIELDS])
+          const lacks = new Set([...(p.capabilities.background?.backgroundSessions ? [] : ['allowBackgroundSessions']), ...(p.capabilities.usage?.reportsCost ? [] : ['costSource']), ...LAUNCH_FIELDS])
           for (const k of LAUNCH_FIELDS) expect(ids.has(`${p.id}.${k}`), `${p.id}.${k}`).toBe(false)
           for (const key of Object.keys(defaultProviderSettings(p))) if (!PROVIDER_INTERNAL.has(key) && !lacks.has(key) && !ids.has(`${p.id}.${key}`)) missing.push(`${p.id}.${key}`)
         }
@@ -274,7 +274,7 @@ describe('the settings catalog', () => {
     expect(rows).not.toMatch(/^\s+(title|desc|tip): ['"]/m)
     for (const m of rows.matchAll(/rowText\((?:'([\w.]+)'|`project\.\$\{id\}\.(\w+)`)\)/g)) {
       if (m[1]) expect(ids.has(m[1]), m[1]).toBe(true)
-      else for (const p of PROVIDERS) if ((m[2] !== 'use200kContext' || p.capabilities.contextLimit) && !(p.capabilities.connections && ['model', 'effort', 'use200kContext'].includes(m[2]))) expect(ids.has(`project.${p.id}.${m[2]}`), `project.${p.id}.${m[2]}`).toBe(true)
+      else for (const p of PROVIDERS) if ((m[2] !== 'use200kContext' || p.capabilities.compaction?.contextLimit) && !(p.capabilities.connections && ['model', 'effort', 'use200kContext'].includes(m[2]))) expect(ids.has(`project.${p.id}.${m[2]}`), `project.${p.id}.${m[2]}`).toBe(true)
     }
     expect(PROJECT_SETTINGS_CATALOG.length).toBeGreaterThan(10)
   })

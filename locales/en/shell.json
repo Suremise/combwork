@@ -227,6 +227,10 @@
     "defaultMessage": "Show Uncommitted Changes",
     "description": "HI-2944: a command, in the Project category. It isn't in the menus or the palette: the warning that a branch's folder has uncommitted changes runs it from its Show Changes button (the project's Version Control tab)."
   },
+  "shell.command.git.cancelRun": {
+    "defaultMessage": "Cancel Git Action",
+    "description": "HI-3372: a command, in the Project category. It isn't in the menus or the palette: a commit's, set aside's, fetch's, pull's or push's notification runs it from its Cancel button while that action runs."
+  },
   "shell.command.help.about": {
     "defaultMessage": "About {app}",
     "description": "A command (the Help menu, the command palette), in the Help category. {app} is Combwork's name."
@@ -1315,6 +1319,10 @@
     "defaultMessage": "{cli} signs in per account, and none is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here.",
     "description": "Provider Setup (HI-2650), for a coding agent CLI ({cli}: \"Claude Code\") that signs in per account, when it has accounts but none is on in the open workspace. {names}: their names, joined (\"Work and Personal\"); {n}: how many. On here is the switch on each account's row in Settings → Accounts & Connections, which the button beside it opens."
   },
+  "shell.setup.connectionsSignedOut": {
+    "defaultMessage": "{cli} signs in per account, and {n, plural, one {the one on in this workspace is not signed in: sign it in.} other {none of the # on in this workspace is signed in: sign one in.}}",
+    "description": "Provider Setup (HI-3278), for a coding agent CLI ({cli}: \"Codex\") that signs in per account (Settings → Accounts & Connections), when every account of it on in the open workspace is signed out, so its agents can't start. {n}: how many are on. The button beside it opens Settings → Accounts & Connections."
+  },
   "shell.setup.docs": {
     "defaultMessage": "{provider} docs",
     "description": "Provider Setup's button: opens the coding agent's own documentation. {provider} is its name."
@@ -1400,8 +1408,8 @@
     "description": "Provider Setup → GitHub Copilot (HI-2779): which token variables Copilot uses, and where the switch keeping two of them out is (its name as Settings shows it). Keep the variable names."
   },
   "shell.setup.host.unknown": {
-    "defaultMessage": "Couldn’t reach the host to check",
-    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): a check timed out or answered nothing readable."
+    "defaultMessage": "The check didn’t answer in time",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779, HI-3438): the check (the GitHub CLI’s, or Copilot’s own) gave no usable answer in time, as on a busy PC; the row names which below. The host itself wasn’t asked."
   },
   "shell.setup.host.unverified": {
     "defaultMessage": "Couldn’t confirm the sign-in",

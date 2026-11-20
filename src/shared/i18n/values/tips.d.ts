@@ -87,6 +87,8 @@ interface CombworkMessageValues {
   'tips.assistantUndo.title': undefined
   'tips.assistantWaits.text': undefined
   'tips.assistantWaits.title': undefined
+  'tips.assistantWakes.text': undefined
+  'tips.assistantWakes.title': undefined
   'tips.attachFiles.text': undefined
   'tips.attachFiles.title': undefined
   'tips.attachmentsTabs.text': undefined
@@ -141,14 +143,24 @@ interface CombworkMessageValues {
   'tips.cardCostRounds.title': undefined
   'tips.cardDecisions.text': undefined
   'tips.cardDecisions.title': undefined
+  'tips.cardLineComments.text': undefined
+  'tips.cardLineComments.title': undefined
   'tips.cardLinks.text': undefined
   'tips.cardLinks.title': undefined
   'tips.cardLoop.text': undefined
   'tips.cardLoop.title': undefined
+  'tips.cardLoopChurn.text': undefined
+  'tips.cardLoopChurn.title': undefined
+  'tips.cardLoopYield.text': undefined
+  'tips.cardLoopYield.title': undefined
   'tips.cardMove.text': undefined
   'tips.cardMove.title': undefined
   'tips.cardReadFirst.text': undefined
   'tips.cardReadFirst.title': undefined
+  'tips.cardRevisionChanges.text': undefined
+  'tips.cardRevisionChanges.title': undefined
+  'tips.cardSendComments.text': undefined
+  'tips.cardSendComments.title': undefined
   'tips.cardSummaries.text': undefined
   'tips.cardSummaries.title': undefined
   'tips.cardWork.text': undefined
@@ -286,12 +298,16 @@ interface CombworkMessageValues {
   'tips.inboxNotices.title': undefined
   'tips.isolatedChecks.text': undefined
   'tips.isolatedChecks.title': undefined
+  'tips.jjAdvance.text': undefined
+  'tips.jjAdvance.title': undefined
   'tips.jjCandidates.text': undefined
   'tips.jjCandidates.title': undefined
   'tips.jjCards.text': undefined
   'tips.jjCards.title': undefined
   'tips.jjOperations.text': undefined
   'tips.jjOperations.title': undefined
+  'tips.jjPreview.text': undefined
+  'tips.jjPreview.title': undefined
   'tips.keepAwake.text': undefined
   'tips.keepAwake.title': undefined
   'tips.laneApplyNow.text': undefined
@@ -354,6 +370,8 @@ interface CombworkMessageValues {
   'tips.mergeBranch.title': undefined
   'tips.mergeFollowRemote.text': undefined
   'tips.mergeFollowRemote.title': undefined
+  'tips.mergeGuards.text': undefined
+  'tips.mergeGuards.title': undefined
   'tips.mergeMessage.text': undefined
   'tips.mergeMessage.title': undefined
   'tips.mergePush.text': undefined
@@ -386,6 +404,8 @@ interface CombworkMessageValues {
   'tips.moreAgents.title': { usual: number }
   'tips.moveAnyway.text': undefined
   'tips.moveAnyway.title': undefined
+  'tips.muse.text': undefined
+  'tips.muse.title': undefined
   'tips.myPrices.text': undefined
   'tips.myPrices.title': undefined
   'tips.newCard.text': { key: string | number }
@@ -482,6 +502,8 @@ interface CombworkMessageValues {
   'tips.resumeAfterUpdate.title': undefined
   'tips.resumeAll.text': undefined
   'tips.resumeAll.title': undefined
+  'tips.resumeLongIdle.text': undefined
+  'tips.resumeLongIdle.title': undefined
   'tips.retargetRelease.text': undefined
   'tips.retargetRelease.title': undefined
   'tips.retryWait.text': undefined
@@ -615,4 +637,8 @@ interface CombworkMessageValues {
   'tips.workspaceMovedDefender.title': undefined
   'tips.workspaceNotes.text': undefined
   'tips.workspaceNotes.title': undefined
+  'tips.yourOwnCliServer.text': undefined
+  'tips.yourOwnCliServer.title': undefined
+  'tips.yourOwnClis.text': undefined
+  'tips.yourOwnClis.title': undefined
 }

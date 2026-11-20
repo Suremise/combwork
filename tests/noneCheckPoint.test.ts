@@ -19,9 +19,10 @@ import { checkPoint } from '../src/main/noneBaselineWorker'
 import { snapshot } from '../src/main/workflow/checks'
 import { checkEnd, checkStart, type CheckRunFor, type WriteLog } from '../src/main/workflow/runChecks'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30_000
+const HUNG_MS = timing('wait.hang')
 
 const tmp = tempDir('cw-none-point-')
 const bundle = join(tmp, 'none-baseline-worker.cjs')
@@ -30,14 +31,14 @@ let t: BaselineThread
 beforeAll(async () => {
   await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'noneBaselineWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
   t = useBaselineWorker(bundle)
-}, 60_000)
+}, timing('hook.hang'))
 afterAll(() => void useBaselineWorker(null))
 
-async function until(ok: () => boolean): Promise<void> {
-  const end = Date.now() + HUNG_MS
+async function until(ok: () => boolean, ms: number): Promise<void> {
+  const end = Date.now() + ms
   while (!ok()) {
-    if (Date.now() > end) throw new Error('still not so after HUNG_MS')
-    await new Promise((r) => setTimeout(r, 5))
+    if (Date.now() > end) throw new Error(`still not so after ${ms} ms`)
+    await new Promise((r) => setTimeout(r, timing('wait.interval')))
   }
 }
 
@@ -88,7 +89,7 @@ describe("a None check's points, off main's thread (HI-2358)", () => {
     t.hold()
     let started = false
     const s = checkStart(forNone(p), logOf([])).then((x) => ((started = true), x))
-    await until(() => t.pending === 1)
+    await until(() => t.pending === 1, HUNG_MS)
     expect(started).toBe(false)
     t.release()
     expect((await s).revision).toMatch(/^[0-9a-f]{64}$/)
@@ -121,7 +122,7 @@ describe("a None check's points, off main's thread (HI-2358)", () => {
   })
 
   it('no answer at its start, or at its end, never counts: no two empty reads matching', async () => {
-    const bounded = useBaselineWorker(bundle, { timeoutMs: 150 })
+    const bounded = useBaselineWorker(bundle, { timeoutMs: 150 }) // timing-ok: the timeout under test (its expiry is what the test checks)
     try {
       const p = project()
       const r = forNone(p)
@@ -150,20 +151,23 @@ describe("a None check's points, off main's thread (HI-2358)", () => {
     t.hold()
     const a = checkStart(forNone(p), logOf([]))
     const b = checkStart(forNone(q, ['src']), logOf([]))
-    await until(() => t.pending === 2)
+    await until(() => t.pending === 2, HUNG_MS)
     t.release()
     const [x, y] = await Promise.all([a, b])
     expect(x.revision).not.toBe(y.revision)
     expect(x.snapshot).toContain('doc.md:')
     expect(y.snapshot).toContain('src/deep/b.ts:')
-    const bounded = useBaselineWorker(bundle, { timeoutMs: 150 })
+    const bounded = useBaselineWorker(bundle, { timeoutMs: 150 }) // timing-ok: the timeout under test (its expiry is what the test checks)
+    // The held one is sent with its 150 ms bound; the next, sent to a new worker once it times out, has room under load.
+    // Each read's bound is read as it is sent, so the first send gets 150 ms and every later one HUNG_MS (HI-3349): the
+    // bound raised by the test once both were queued raced the held one's 150 ms on a slow runner, and the next went with
+    // 150 ms too.
+    let sends = 0
+    Object.defineProperty(bounded, 'timeoutMs', { configurable: true, get: () => (sends++ === 0 ? 150 : HUNG_MS) })
     try {
       bounded.hold()
       const late = checkStart(forNone(p), logOf([]))
       const next = checkStart(forNone(q, ['src']), logOf([]))
-      // The held one is sent with its 150 ms bound; the next, sent to a new worker once it times out, has room under load.
-      await until(() => bounded.pending === 2)
-      bounded.timeoutMs = HUNG_MS
       expect((await late).revision).toBeNull()
       // The next check's point went to a new worker: its own answer, q's.
       expect((await next).revision).toBe(y.revision)
@@ -224,5 +228,5 @@ describe("a None check's points, off main's thread (HI-2358)", () => {
     })
     console.info(`HI-2358 benchmark, the whole start (its link's revision, then the check's start), 5,000 x 1 KB: main's longest gap ${Math.round(fullBefore)} ms before, ${Math.round(fullAfter)} ms after`)
     expect(inWorker).toBeGreaterThanOrEqual(0)
-  }, 120_000)
+  }, timing('test.hang'))
 })

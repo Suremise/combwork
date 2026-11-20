@@ -1,4 +1,4 @@
-// Tools by a project agent's side of the workflow (HI-2664, Darren's approval with role filtering): a builder is never
+// Tools by a project agent's side of the workflow (HI-2664, approved with role filtering): a builder is never
 // offered a reviewer's moves, nor a reviewer a builder's; either side or neither gets both; the Assistant none of a
 // worker's. Every tool a side's own skills tell it to use is offered to that side, so no skill sends an agent to a tool it
 // lacks (card-loop is one skill for both sides: its builder.md and reviewer.md are each their side's).

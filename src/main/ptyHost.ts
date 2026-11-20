@@ -8,9 +8,9 @@ import { envWithCliFolders } from './freshPath'
 import { advanced } from './advanced'
 import { TERMINAL_TYPE } from '../shared/advanced'
 import { KindedError } from '../shared/kindedError'
+import { TerminalHistory } from './terminalHistory'
 
 const log = createLogger('pty')
-const MAX_BUFFER = 512 * 1024
 /** A terminal's size until the window sets it. */
 export const PTY_COLS = 120
 export const PTY_ROWS = 32
@@ -20,8 +20,8 @@ const REFRESH_MS = 80
 interface PtyEntry {
   proc: IPty
   onResize?: (cols: number, rows: number) => void
-  buffer: string[]
-  size: number
+  /** Its output, for a view made while it runs (ptyBuffer). */
+  history: TerminalHistory
   /** Asked to stop: until it exits, nothing more is sent to it, nor another kill (killPty). */
   killed?: boolean
   /** A size refresh is under way (refreshPty). */
@@ -123,7 +123,7 @@ const PID_WAIT_MS = 15_000
 const PID_POLL_MS = 10
 
 /** Output of processes that exited quietly, for the process that continues in their terminal. */
-const carried = new Map<string, string[]>()
+const carried = new Map<string, TerminalHistory>()
 
 /**
  * CW_ variables a session keeps on purpose when Combwork's others are dropped: none today. Only named ones, for a setting
@@ -146,7 +146,7 @@ export function childEnv(extra: Record<string, string> = {}): Record<string, str
   for (const k of CHILD_ENV_STRIP) delete env[k]
   // If Combwork itself was started from inside an agent's session, don't leak that session's identity
   // (each provider lists its variables), nor Combwork's own CW_ variables. User configuration is kept.
-  const sessionVars = new Set(allProviders().flatMap((p) => p.envToStrip))
+  const sessionVars = new Set(allProviders().flatMap((p) => p.install.envToStrip))
   for (const k of Object.keys(env)) if (sessionVars.has(k) || (k.startsWith('CW_') && !SESSION_SETTINGS.has(k))) delete env[k]
   env.TERM_PROGRAM = 'Combwork' // i18n-ignore: an environment variable's value, which programs in the terminal read
   env.COLORTERM = 'truecolor'
@@ -205,14 +205,14 @@ export function spawnPty(key: string, opts: SpawnOptions): IPty {
     gate?.close()
     throw e
   }
-  const prior = opts.continueBuffer ? carried.get(key) ?? [] : []
+  const prior = opts.continueBuffer ? carried.get(key) : undefined
   carried.delete(key)
-  const entry: PtyEntry = { proc, onResize: opts.onResize, buffer: [...prior], size: prior.reduce((n, s) => n + s.length, 0), ...(gate ? { gate } : {}) }
+  const history = prior ?? new TerminalHistory(proc.cols, proc.rows)
+  if (prior) history.resized(proc.cols, proc.rows)
+  const entry: PtyEntry = { proc, onResize: opts.onResize, history, ...(gate ? { gate } : {}) }
   entries.set(key, entry)
   proc.onData((data) => {
-    entry.buffer.push(data)
-    entry.size += data.length
-    while (entry.size > MAX_BUFFER && entry.buffer.length > 1) entry.size -= entry.buffer.shift()!.length
+    history.push(data)
     sendPty('pty:data', key, data)
     opts.onData?.(data)
   })
@@ -231,12 +231,12 @@ export function spawnPty(key: string, opts: SpawnOptions): IPty {
     // No code: its terminal closed while its process (pid) may still run (#551).
     log.info(`exit ${userText(key)}: ${exitCode}${exitCode === undefined ? ` (process ${proc.pid}${processRunning(proc.pid) ? ' still running' : ' gone'}${entry.killed ? '' : ', not killed by Combwork'})` : ''}`)
     if (entries.get(key)?.proc === proc) entries.delete(key)
-    if (opts.quietExit) remember(carried, key, entry.buffer, MAX_CARRIED)
+    if (opts.quietExit) remember(carried, key, history, MAX_CARRIED)
     else sendPty('pty:exit', key, exitCode)
     // No longer running: its kept size and output count toward the bounds now.
     trim(paneSizes, MAX_PANE_SIZES)
     trim(carried, MAX_CARRIED)
-    opts.onExit?.(exitCode, entry.buffer.join('').slice(-8000))
+    opts.onExit?.(exitCode, history.raw().slice(-8000))
   })
   return proc
 }
@@ -280,6 +280,7 @@ export function resizePty(key: string, cols: number, rows: number): void {
 function setSize(key: string, e: PtyEntry, cols: number, rows: number): void {
   try {
     e.proc.resize(cols, rows)
+    e.history.resized(cols, rows)
     e.onResize?.(cols, rows)
   } catch (err) {
     log.warn(`resize ${userText(key)} failed`, err)
@@ -300,7 +301,7 @@ export function ptySize(key: string): { cols: number; rows: number } {
 /**
  * Makes a terminal's process redraw its screen at the size it has, as resizing the window by hand does: one row
  * shorter for a moment, then its size again. For a CLI whose full-screen interface a resize while it started can leave
- * drawn at the wrong width (capabilities.startupSizeRefresh, #486). A resize meanwhile is the size it ends at.
+ * drawn at the wrong width (capabilities.terminal.startupSizeRefresh, #486). A resize meanwhile is the size it ends at.
  */
 export function refreshPty(key: string): void {
   const e = entries.get(key)
@@ -317,8 +318,9 @@ export function refreshPty(key: string): void {
   }, REFRESH_MS)
 }
 
-export function ptyBuffer(key: string): string {
-  return entries.get(key)?.buffer.join('') ?? ''
+/** What a new view of the terminal replays: its state where its kept output starts, then that output (TerminalHistory). */
+export function ptyBuffer(key: string): Promise<string> {
+  return entries.get(key)?.history.replay() ?? Promise.resolve('')
 }
 
 export function hasPty(key: string): boolean {

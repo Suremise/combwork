@@ -58,6 +58,20 @@ export function setStallRuns(fn: typeof runsOf): void {
   runsOf = fn
 }
 
+/**
+ * HI-3206: the card's builder's job, as builderJobOf has it (its cw-progress run on this card, in its project, running or
+ * quiet within the background task limit, never agent-stopped; or its background tasks), from the runs main knows. Null:
+ * none, or no runs known.
+ */
+export function cardJobOf(c: TaskCard, wsPath: string, builder: { backgroundTasks?: number; backgroundEndedAt?: string } | null): ReturnType<typeof builderJobOf> {
+  return runsOf ? builderJobOf(c, runsOf(wsPath), builder, backgroundTaskMinutes(config.settings.agents.backgroundTaskMinutes) * 60_000) : null
+}
+
+/** HI-3206: whether the builder's job on the card holds off an idle watch's stall: running, or ended under IDLE_WATCH_STALL_MS ago. */
+export function jobHoldsIdleWatch(job: ReturnType<typeof builderJobOf>, now = Date.now()): boolean {
+  return !!job && (job.running || (job.endedAt !== null && now - job.endedAt < IDLE_WATCH_STALL_MS))
+}
+
 /** How long a card the merge queue returned waits in Doing, its builder idle or watching, before it is stalled (HI-1721). */
 export const RETURN_STALL_MS = 15 * 60_000
 
@@ -303,6 +317,9 @@ export function cardStallCause(c: TaskCard, agentNow: StallAgent | null, wsPath:
 function idleWatch(c: TaskCard, lane: LaneOrderView | null | undefined, live: ReturnType<typeof liveOf>, wsPath: string | null): string | null {
   if (!lane || !wsPath || !c.project || !nothingWaitsOn(c, lane.builder, false)) return null
   const watcher = live.find((a) => a.agentId === lane.builder && a.project.toLowerCase() === c.project.toLowerCase())
+  // HI-3206: its builder's job on the card (a live cw-progress run) waits on it: no stall while it runs, and the stall's
+  // five minutes count from its end.
+  if (jobHoldsIdleWatch(cardJobOf(c, wsPath, live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project.toLowerCase()) ?? null))) return null
   const why = idleWatchReason(c, lane, watcher)
   return why && !forYouOpen(wsPath, c) ? why : null
 }

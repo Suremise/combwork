@@ -12,7 +12,7 @@ const fs = require('fs')
 const path = require('path')
 const { sessionsOf } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'assistantmode-profile')
 const ws = path.join(lib.WORK, 'assistantmode-ws')
@@ -70,7 +70,11 @@ const check = (name, ok, extra = '') => {
     return all.length > asked ? all[all.length - 1][1] : '(no answer)'
   }
   const record = (id) => sessionsOf(home).sessions.find((s) => s.id === id) ?? {}
+  // The panel loads the workspace's modes as it opens (modes:list), and its menu lists those it has when clicked (HI-3418, as
+  // HI-3417 in assistant.cjs), so it is clicked once the header shows its mode's icon (every bundled mode has one): the list
+  // loaded. "Manage Modes…" alone would satisfy a wait for any item.
   const modeMenu = async () => {
+    if (!(await lib.until(async () => (await panel.locator('.assistant-mode .assistant-mode-icon').count()) === 1, HUNG_MS))) throw new Error(`the Assistant's header shows no mode icon (its modes not loaded) within ${HUNG_MS / 1000} s: ${JSON.stringify(await panel.locator('.assistant-mode').innerText().catch(() => '(no header)'))}`)
     await panel.locator('.assistant-mode').click()
     await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, HUNG_MS)
   }
@@ -82,10 +86,11 @@ const check = (name, ok, extra = '') => {
   // --- The Assistant runs, in Coordinator mode (the default).
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+I')
-  await lib.until(async () => (await panel.locator('.assistant-header').count()) === 1, 5000)
-  check('the header shows Coordinator, the default mode', !!(await lib.until(async () => (await panel.locator('.assistant-mode').innerText()).includes('Coordinator'), 5000)), await panel.locator('.assistant-mode').innerText())
+  await lib.until(async () => (await panel.locator('.assistant-header').count()) === 1, lib.timing('hang.ui'))
+  check('the header shows Coordinator, the default mode', !!(await lib.until(async () => (await panel.locator('.assistant-mode').innerText()).includes('Coordinator'), lib.timing('hang.ui'))), await panel.locator('.assistant-mode').innerText())
   await panel.locator('.assistant-header').getByRole('button', { name: 'Start', exact: true }).click()
-  check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', 20000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the Assistant runs', !!(await lib.until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
   const session = (await live()).sessionId
   const given = fs.readFileSync(path.join(home, '.combwork', 'launch-assistant', 'instructions.md'), 'utf8')
   check('its instructions are the mode, and say it may suggest another', given.includes('# Your mode: Coordinator') && /suggest switching in one short line; never switch or insist/.test(given), given.slice(-400))
@@ -99,7 +104,7 @@ const check = (name, ok, extra = '') => {
   check('…with Restart in This Mode… and Manage Modes…', items.some((t) => t.startsWith('Restart in This Mode')) && items.some((t) => t.startsWith('Manage Modes')), JSON.stringify(items))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
-    await lib.sleep(300) // on purpose: the theme's colours settle
+    await lib.themeSettled(page, theme)
     await page.screenshot({ path: path.join(lib.WORK, `assistantmode-menu-${theme}.png`) })
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -110,16 +115,16 @@ const check = (name, ok, extra = '') => {
   // it is waited for, bounded for a hung run.
   await pick('Planner')
   check('switching to Planner tells it at once, in its conversation', !!(await lib.until(async () => (await buffer()).includes('[CW] Mode: Planner (chosen by the user). Lead with the open design questions'), lib.TURN_HUNG_MS)), (await buffer()).slice(-400))
-  check('…ending with Combwork\'s own sentence', !!(await lib.until(async () => (await buffer()).includes('Your tools and permissions are unchanged.'), 10000)), JSON.stringify((await buffer()).slice(-600)))
+  check('…ending with Combwork\'s own sentence', !!(await lib.until(async () => (await buffer()).includes('Your tools and permissions are unchanged.'), lib.timing('hang.ui'))), JSON.stringify((await buffer()).slice(-600)))
   check('…without a restart: the same session', (await live())?.sessionId === session, `${session} → ${(await live())?.sessionId}`)
-  check('…saved for the workspace, and the header shows it', !!(await lib.until(async () => agentFile().mode === 'planner' && (await panel.locator('.assistant-mode').innerText()).includes('Planner'), 10000)), `${JSON.stringify(agentFile())}; header: ${await panel.locator('.assistant-mode').innerText()}`)
-  check('…and recorded as the mode its conversation was last given', !!(await lib.until(async () => record(session).mode === 'planner', 5000)), JSON.stringify(record(session)))
+  check('…saved for the workspace, and the header shows it', !!(await lib.until(async () => agentFile().mode === 'planner' && (await panel.locator('.assistant-mode').innerText()).includes('Planner'), lib.timing('hang.ui'))), `${JSON.stringify(agentFile())}; header: ${await panel.locator('.assistant-mode').innerText()}`)
+  check('…and recorded as the mode its conversation was last given', !!(await lib.until(async () => record(session).mode === 'planner', lib.timing('hang.step'))), JSON.stringify(record(session)))
 
   // --- Working: told once it has finished.
   const working = await prompts.type('work 6')
   check('it works on something', !!(await lib.until(async () => (await live())?.turn?.id !== working.before && (await live())?.status === 'working', lib.TURN_HUNG_MS)), JSON.stringify((await live())?.turn))
   await pick('QA triager')
-  await lib.sleep(1000) // on purpose: nothing is typed into a working Assistant
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // on purpose: nothing is typed into a working Assistant
   check('switching while it works types nothing yet', !(await buffer()).includes('[CW] Mode: QA triager'))
   check('…and is saved at once', agentFile().mode === 'qa-triager', JSON.stringify(agentFile()))
   check('…then told once it has finished', !!(await lib.until(async () => (await buffer()).includes('[CW] Mode: QA triager (chosen by the user). Take a report'), lib.TURN_HUNG_MS)))
@@ -131,9 +136,10 @@ const check = (name, ok, extra = '') => {
   await modeMenu()
   await page.locator('.menu .menu-item', { hasText: 'Restart in This Mode' }).click()
   const ask = page.locator('.dialog', { hasText: 'Restart in QA triager mode?' })
-  check('Restart in This Mode asks first, saying it re-caches the conversation', !!(await lib.until(async () => (await ask.count()) === 1, 5000)) && /cached again/.test(await ask.innerText()))
+  check('Restart in This Mode asks first, saying it re-caches the conversation', !!(await lib.until(async () => (await ask.count()) === 1, lib.timing('hang.step'))) && /cached again/.test(await ask.innerText()))
   await ask.getByRole('button', { name: 'Restart', exact: true }).click()
-  check('…and resumes the same conversation', !!(await lib.until(async () => (await live())?.status === 'ready' && (await live())?.sessionId === session, 30000)), `${session} → ${(await live())?.sessionId}`)
+  // before any turn (HI-2688): its start, restart or resume
+  check('…and resumes the same conversation', !!(await lib.until(async () => (await live())?.status === 'ready' && (await live())?.sessionId === session, lib.timing('hang.step'))), `${session} → ${(await live())?.sessionId}`)
   const retold = fs.readFileSync(path.join(home, '.combwork', 'launch-assistant', 'instructions.md'), 'utf8')
   check('…with the QA triager mode in its instructions', retold.includes('# Your mode: QA triager'))
   await idle()
@@ -142,9 +148,9 @@ const check = (name, ok, extra = '') => {
 
   // --- Not running: saved, told nothing (its next launch is in the mode).
   await inv('session:stop', home, 'assistant')
-  await lib.until(async () => !(await live()), 15000)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   await pick('Release manager')
-  check('switching while it is stopped saves the mode for its next launch', !!(await lib.until(async () => agentFile().mode === 'release-manager', 5000)), JSON.stringify(agentFile()))
+  check('switching while it is stopped saves the mode for its next launch', !!(await lib.until(async () => agentFile().mode === 'release-manager', lib.timing('hang.step'))), JSON.stringify(agentFile()))
   check('…and tells nothing yet', told(session, 'Release manager') === 0)
 
   // --- Resumed after a switch while it was stopped: told the mode once it is idle, once (#334). The fake loses Enter
@@ -159,13 +165,13 @@ const check = (name, ok, extra = '') => {
   check("…and its system prompt is the mode's", resumedMode === 'Release manager', resumedMode)
   check('…recorded as the mode it was last given', record(session).mode === 'release-manager', JSON.stringify(record(session)))
   await inv('session:stop', home, 'assistant')
-  await lib.until(async () => !(await live()), 15000)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   await inv('session:start', home, { resumeId: session, agentId: 'assistant' })
   await idle()
-  await lib.sleep(2000) // on purpose: a second message would be typed by now
+  await lib.sleep(lib.timing('quiet.noLineTypedMs')) // on purpose: a second message would be typed by now
   check("resumed again in the same mode, it isn't told again", told(session, 'Release manager') === 1, String(told(session, 'Release manager')))
   await inv('session:stop', home, 'assistant')
-  await lib.until(async () => !(await live()), 15000)
+  await lib.until(async () => !(await live()), lib.timing('hang.ui'))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

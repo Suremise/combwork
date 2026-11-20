@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest'
 import { recordJson, recordMarkdown } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { resultLines } from './e2e/runner.mjs'
+import { timing } from './timing.cjs'
 
 const { ntstatus, describeExit, exitText, windowsCodesIn } = createRequire(import.meta.url)('./e2e/windowsExits.cjs')
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
@@ -40,7 +41,7 @@ describe('what a Windows exit code means', () => {
   // status a process that can't initialise ends with, so nothing unsigned runs and no dialog can show; its parent sees
   // that code as it ends, and it reads as the startup failure.
   it.runIf(process.platform === 'win32')("a child ending with STATUS_DLL_INIT_FAILED: its parent sees the code, and it reads as a startup failure", () => {
-    const r = spawnSync(process.execPath, ['-e', 'process.exit(-1073741502)'], { stdio: 'ignore', windowsHide: true, timeout: 30000, env: childEnv() })
+    const r = spawnSync(process.execPath, ['-e', 'process.exit(-1073741502)'], { stdio: 'ignore', windowsHide: true, timeout: timing('spawn.hang'), env: childEnv() })
     expect(r.error).toBeUndefined()
     expect(r.status).toBe(0xc0000142)
     expect(describeExit(r.status)).toMatch(/^0xc0000142: a DLL failed to initialise/)

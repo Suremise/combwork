@@ -1,4 +1,4 @@
-// A jj project's target change (HI-3152, after HI-3129; Darren's decision (a), 13 Nov: a card keeps the bookmark it
+// A jj project's target change (HI-3152, after HI-3129; decision (a): a card keeps the bookmark it
 // started on). Through production on the real jj, colocated and not: a workspace whose project is the jj repository, its
 // rules on, jj's card work and port registered as the app registers them, and a slot pool on the same repository.
 // - `tasks.setTarget` of a waiting card reads its work as its kept slot, never Git's lines: kept on main, refused naming
@@ -17,6 +17,7 @@ import * as electron from 'electron'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjRetarget.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -41,7 +42,7 @@ const { setWorkflowOptions } = await import('../src/main/workflow/optionsForm')
 const tasks = await import('../src/main/tasks')
 const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 
-const REAL_JJ_MS = 180_000
+const REAL_JJ_MS = timing('wait.hangReal')
 const cleanups: (() => Promise<void> | void)[] = []
 afterEach(async () => {
   for (const c of cleanups.splice(0).reverse()) await c()

@@ -359,6 +359,16 @@
     "note": "HI-2944: an error from Commit or Set aside: a file shown is no longer changed in the folder ({folder}, a path), or none was shown; nothing was done.",
     "audience": "both"
   },
+  "service.folderChanges.commitCancelled": {
+    "text": "You cancelled the commit: Combwork ended git and everything it had started. Nothing was committed, and the files and the index are as they were.",
+    "note": "HI-3372: after the user cancelled Commit (a paused merge, a start's warning) or Files' Commit it before git made the commit: git and its hook were ended; nothing was committed, and the files and git's index (staging area) are unchanged. Keep git as it is.",
+    "audience": "both"
+  },
+  "service.folderChanges.commitCancelledMoved": {
+    "text": "You cancelled the commit: Combwork ended git and everything it had started. {head, select, none {Combwork couldn't read the branch's commit afterwards} other {The branch moved meanwhile, to {head}, and Combwork can't tell that it is this commit}}, so it left the index as it was. Check git log and git status before going on.",
+    "note": "HI-3372: after the user cancelled Commit or Files' Commit it: git was ended, but the branch's commit changed meanwhile ({head}, a commit id; none when it couldn't be read), which may or may not be this commit; git's index (staging area) wasn't updated. Keep git log and git status as they are: commands.",
+    "audience": "both"
+  },
   "service.folderChanges.commitFailed": {
     "text": "Git did not commit: {why}",
     "note": "HI-2944: an error from Commit: git (or a hook, or signing) refused the commit; {why} is its own message (English). The files are as they were.",
@@ -422,6 +432,11 @@
   "service.folderChanges.removedForFolder": {
     "text": "{file} was removed from Git, and a folder of that name is in its place: setting the removal aside would take the folder's files too. Commit the removal instead, or use git stash yourself.",
     "note": "HI-3024: an error from Set aside (a paused merge, a start's warning): the file {file} (a path) was removed from Git and a folder of the same name is now there; git's stash would take the folder's files with the removal, so nothing was done. Keep git stash as it is: a command.",
+    "audience": "both"
+  },
+  "service.folderChanges.stashCancelled": {
+    "text": "You cancelled setting the changes aside: Combwork ended git and everything it had started.{made, select, yes { Git had made a stash ({stash}) by then: look at it (git stash list) and at the files before going on.} other { No stash was made: check the files before going on.}}",
+    "note": "HI-3372: after the user cancelled Set aside (a paused merge, a start's warning): git stash was ended. {made} is yes when git had made a stash ({stash}, its id) by then. Keep git stash list as it is: a command.",
     "audience": "both"
   },
   "service.folderChanges.stashFailed": {
@@ -602,6 +617,11 @@
   "service.git.outside": {
     "text": "Path is outside the project",
     "note": "An error showing a file's changes: its path leads out of the project.",
+    "audience": "both"
+  },
+  "service.gitCancel.taken": {
+    "text": "That action is already running.",
+    "note": "HI-3372: an error when the window starts an action (a commit, a fetch, a push) under an id another one still runs under: it isn't started again.",
     "audience": "both"
   },
   "service.gitCompare.noBranch": {
@@ -804,6 +824,11 @@
     "note": "HI-2807: an error creating a branch from a branch: {ref} points at another commit ({now}, a short hash) than the one the dialog showed.",
     "audience": "both"
   },
+  "service.gitRepo.stopped": {
+    "text": "{kind, select, fetch {Stopped the fetch here.} pull {Stopped the pull here: it may have fetched or brought commits in already, so look at the branch and its changes.} push {Stopped the push here.} tag {Stopped the push of the tag here.} other {Stopped deleting the remote branches here.}} What reached the remote before it stopped may have been applied: refresh to see where things stand.",
+    "note": "HI-3372: after the user cancelled a fetch, pull, push, the push of a tag, or deleting remote branches in the Git view: only the local git was stopped, and part of it may already have reached the remote (select: translate each; keep the keys).",
+    "audience": "both"
+  },
   "service.gitRepo.switchFailed": {
     "text": "Couldn't switch to {branch}: {why}",
     "note": "An error switching the project folder to the branch {branch}; {why} is git's own words.",
@@ -902,6 +927,16 @@
   "service.intent.queueNotAgents": {
     "text": "Only the user, or the Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",
     "note": "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Combwork Assistant (within its Control setting, a setting name: use it as Combwork shows it) can do.",
+    "audience": "both"
+  },
+  "service.jj.revisionNoRepo": {
+    "text": "No jj repository was found for this project.",
+    "note": "A card's revision diff couldn't be read: the project's folder is no longer in a jj repository.",
+    "audience": "both"
+  },
+  "service.jj.revisionUnreadable": {
+    "text": "Couldn't read {path} at {commit}: {error}",
+    "note": "A card's revision diff couldn't be read from a jj repository: the file's path, the commit's short id and jj's error.",
     "audience": "both"
   },
   "service.keys.closed": {
@@ -1187,6 +1222,11 @@
   "service.providers.noSetup": {
     "text": "{cli} has no setup task.",
     "note": "An error: the coding agent CLI {cli} (\"Codex\") has no setup task for Combwork to run.",
+    "audience": "both"
+  },
+  "service.providers.noTask": {
+    "text": "{cli} has no {task, select, install {install} update {update} login {sign-in} other {setup}} task in Combwork.",
+    "note": "An error: a task was asked of a coding agent CLI that has none (HI-3196: a CLI that runs from a description has no install, update or sign-in task in Combwork). {cli} is its name.",
     "audience": "both"
   },
   "service.providers.notInstalled": {

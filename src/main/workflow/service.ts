@@ -9,11 +9,14 @@
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
 // (`cw.workflow.enforce`), read at each use: off, Combwork is as P3 left it (facts recorded, nothing refused or moved).
 
+import { PREFERENCE_DEFAULTS } from '../../shared/workflow/preferences'
+import { createLogger, userText } from '../logger'
+import { SIMPLIFY_GATE } from '../../shared/workflow/facts'
 import type { JjCardDeps } from '../platform/jjPlatform'
 import { basename, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
-import { FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
+import { FOCUSED_PICK_DEFAULT_S, FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
 import { childEnv } from '../ptyHost'
 import { boardSavepoint, boardWrite } from '../boardStore'
 import { samePlace } from '../fsutil'
@@ -40,6 +43,7 @@ import { NOT_RUN_HERE, type QueueLive } from './queueState'
 import { noticeTargetChanges } from '../targetChangesNotice'
 import { readTable } from '../storeTables'
 import { readLanes } from '../../shared/lanes'
+import { guardLimits } from './mergeGuardLimits'
 
 /** The Advanced switch every gate answers to at once (#1120's table): off, nothing is refused and reconciliation records only. */
 export const ENFORCE = WORKFLOW_ENFORCE
@@ -144,7 +148,32 @@ interface Instance {
   sync: Promise<void>
 }
 
+const log = createLogger('workflowService')
 const instances = new WeakMap<WorkspaceService, Map<string, Instance>>()
+
+/**
+ * HI-3188: a project's churn questions that no longer hold, closed (Runtime.closeStaleChurn): after its options or a level
+ * above them is saved, and when the rules are turned on or off. Never throws.
+ */
+export async function closeStaleChurn(ws: WorkspaceService, projectPath: string): Promise<void> {
+  try {
+    const wf = await workflowFor(ws, projectPath)
+    if (wf) await wf.closeStaleChurn()
+  } catch (e) {
+    log.warn(`closing the churn questions that no longer hold in ${userText(projectPath)}`, e)
+  }
+}
+
+/** HI-3188: the rules turned on or off: every open workspace's projects' churn questions looked at again. */
+let enforcedWas: boolean | null = null
+advanced.onChange(() => {
+  const now = advanced.get<boolean>(ENFORCE) !== false
+  if (enforcedWas === null || enforcedWas === now) return void (enforcedWas = now)
+  enforcedWas = now
+  void import('../workspace').then((m) => {
+    for (const ws of m.openWorkspaces()) for (const p of ws.info()?.projects ?? []) void closeStaleChurn(ws, p.path)
+  })
+})
 const keyOf = (path: string): string => path.toLowerCase()
 
 /** The project of a workspace a path names, with its platform: null for one it doesn't have (or the Assistant's home). */
@@ -180,7 +209,7 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
   // Another lifetime's (closed, or another workspace in this window), or the project's platform changed: a new one.
   if (!inst || inst.life !== life || inst.wsPath !== wsPath || inst.resolved.options.platform !== resolved.options.platform) {
     const made: Omit<Instance, 'wf'> & { wf?: Workflow } = { life, wsPath, resolved, syncedAt: Date.now(), sync: Promise.resolve() }
-    made.wf = make(ws, project, life, wsPath, () => made.resolved.options)
+    made.wf = make(ws, project, life, wsPath, () => made.resolved.options, () => made.resolved.origins.finish === 'platform')
     inst = made as Instance
     byProject.set(key, inst)
   }
@@ -226,7 +255,7 @@ export async function optionsFor(ws: WorkspaceService, projectPath: string): Pro
   return wf ? (instances.get(ws)?.get(keyOf(wf.cfg.project))?.resolved ?? null) : null
 }
 
-function make(ws: WorkspaceService, project: { path: string; name: string }, life: AbortSignal, wsPath: string, options: () => WorkflowOptions): Workflow {
+function make(ws: WorkspaceService, project: { path: string; name: string }, life: AbortSignal, wsPath: string, options: () => WorkflowOptions, finishInherited: () => boolean): Workflow {
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === wsPath
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name, projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? null })
   let jjDeps: JjCardDeps | undefined
@@ -240,6 +269,9 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
       return store.projectKey()
     },
     options,
+    finishInherited,
+    // HI-3284: the merge guards' limits for submit's early warning, as Settings → Advanced says.
+    guardLimits: () => guardLimits(),
     // Slots (#1438, SPEC §16.10): the card's builder's slot, lent by slotCards.ts (none set: no slots).
     slotFor: (card, builder, o) => slotStarts?.leaseFor(ws, project.path, card, builder, o) ?? Promise.resolve(null),
     slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
@@ -270,7 +302,29 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
       // The reconciler imports this module: loaded when needed. It follows the service holding the project (workspaceOf),
       // never a window's proxy of it, which this workflow may have been made from.
       // HI-2950: and one put back or Done, so an ended cycle's candidate is cleaned up soon (JjPlatform's sweep).
-      if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => m.reconcileCard(w.workspaceOf(project.path), card.id, project.name)).catch(() => undefined)
+      // HI-3366: a card into Done reconciles each project it blocks a card of, too: a jj card held for it (HI-3265) has no
+      // merge-queue entry for kickDependents to run again, and nothing else reconciles its project when it is another one.
+      if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) {
+        const elsewhere = to === 'done' ? store.dependents(card.id).flatMap((dep) => {
+          const p = store.projectOf(dep)
+          return p && p.toLowerCase() !== project.name.toLowerCase() ? [{ dep, p }] : []
+        }) : []
+        void Promise.all([import('./reconciler'), import('../workspace')]).then(([m, w]) => {
+          const at = w.workspaceOf(project.path)
+          m.reconcileCard(at, card.id, project.name)
+          for (const { dep, p } of elsewhere) m.reconcileCard(at, dep, p)
+        }).catch(() => undefined)
+      }
+    },
+    // HI-3188: the churn's levels as the project's preferences say now, and a simplify check told to the Assistant first.
+    // The resolved options (read afresh by each workflowFor) carry the preferences, the defaults filled in.
+    churnLevels: () => {
+      const o = options()
+      return { simplifyAt: o.simplifyAt ?? PREFERENCE_DEFAULTS.simplifyAt, churnStopAt: o.churnStopAt ?? PREFERENCE_DEFAULTS.churnStopAt }
+    },
+    churnAsked: (card, request, gate, churn) => {
+      if (gate !== SIMPLIFY_GATE || !alive()) return
+      void import('../churnAssistant').then((m) => m.tellAssistantSimplify(ws, { card: card.id, key: card.key, project: project.name, request, churn })).catch(() => undefined)
     },
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
     // HI-2487: the project's agents whose sessions run, who may have a review in progress that another's start waits for.
@@ -284,7 +338,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // #1651: a check run that has finished is in its card's facts before a submit reads them.
     checksSettled: () => checksSettled(ws, project.path),
     // G20 (HI-1367): a submission's pick runs as a check does (a session command's environment), within its limit.
-    focused: { env: () => childEnv(), timeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || 180) * 1000, life },
+    focused: { env: () => childEnv(), timeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || FOCUSED_PICK_DEFAULT_S) * 1000, life },
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
     // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.

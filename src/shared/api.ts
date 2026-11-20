@@ -1,3 +1,4 @@
+import type { FeedbackExpect, LineCommentView } from './workflow/lineComments'
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
 import type { SigningInfo } from './gitSigning'
@@ -6,11 +7,11 @@ import type { IgnoreTarget } from './gitIgnoreRules'
 import type { DialectCatalogue, DialectFile, DialectFileView, DialectRefusal, DialectRow, DialectUsage } from './dialects'
 import type { ActivityCardAgent, ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
 import type { SessionHooks } from './hooks'
-import type { ClaudeSnippetFacts } from './claudeHookHandlers'
+import type { AdminSnippetFacts } from './hooks'
 import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
-import type { ConnectionPatch, ConnectionsView } from './accounts'
+import type { ConnectionPatch, ConnectionsView, ConnectionTrust } from './accounts'
 import type { LaunchImpact } from './launchPolicy'
 import type { ServerModelsRead } from './serverConnection'
 import type { ContextCheck, LastCheck, ToolTest } from './serverDiagnostics'
@@ -33,6 +34,7 @@ import type {
   ArchiveRequest,
   ArchiveResult,
   CloseCommandRun,
+  ClosingAgentsState,
   CommandRef,
   CommandsCombwork,
   CommandsWorkspace,
@@ -195,6 +197,7 @@ import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflo
 import type { BranchQueueCard, QueueRecent, QueueResumed, QueueView } from './workflow/queue'
 import type { LongTask, WindowWhere } from './windowHealth'
 import type { MainStalls } from './mainStalls'
+import type { GuardPreview, MergeGuard } from './workflow/mergeGuards'
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 export type SettingsPatch = DeepPartial<AppSettings>
@@ -216,6 +219,10 @@ export interface CombworkRequests {
   'app:cancelPendingQuit': () => void
   /** This window's close command (HI-1368), for a window that reloads while its panel is up; null: none. */
   'closeCommand:state': () => CloseCommandRun | null
+  /** HI-3376: this window's wait for agents to close, for a window that reloads while its panel is up. */
+  'closingAgents:state': () => ClosingAgentsState | null
+  /** HI-3376: its Don't wait: Combwork stops waiting for those agents to close and goes on (what is left is the quit's leftovers). */
+  'closingAgents:dontWait': (id: string) => void
   /** The panel's Don't wait: Combwork stops waiting for this window's close command and goes on; the command carries on. */
   'closeCommand:dontWait': (id: string) => void
   /** The panel's Close, on a failed close command: Combwork goes on. */
@@ -293,6 +300,8 @@ export interface CombworkRequests {
   /** Always on Top for this window, remembered for its workspace (pin.ts). Returns the window's state now. */
   'window:setAlwaysOnTop': (on: boolean) => boolean
   'window:getAlwaysOnTop': () => boolean
+  /** This window's state now, as a `window-state` event gives it: asked as the page starts, since a window opened without the focus gets no event until it is first focused or blurred (HI-3404). */
+  'window:state': () => { maximized: boolean; focused: boolean; alwaysOnTop: boolean }
   /** The project this window's page shows (null: none), for banners shown for "This project". */
   'window:showing': (projectPath: string | null) => void
   /** A banner was clicked: brings up the window showing its project, and the project (as a Windows notification's click). */
@@ -400,6 +409,10 @@ export interface CombworkRequests {
   'project:updateConfig': (projectPath: string, patch: Partial<ProjectConfig>) => ProjectConfig
   /** The project's workflow options as Project Settings → Workflow shows them (#1278): its own, what they inherit, the presets. */
   'workflow:form': (projectPath: string) => WorkflowForm
+  /** HI-3284: what a merge guard being edited already matches in the project (how many lines, the first few). */
+  'workflow:guardPreview': (projectPath: string, guard: MergeGuard, slot?: string) => GuardPreview
+  /** HI-3284: a guard row closed or changed: its preview (by the slot it asked with) cancelled. */
+  'workflow:guardPreviewCancel': (slot: string) => void
   /** What saving a change to the project's workflow options would do (§16.6.5's warning): its problems, what changes, what keeps the old rules. */
   'workflow:check': (projectPath: string, change: WorkflowChange) => WorkflowCheck
   /** Saves the project's workflow options, checked again (refused, with every reason); `applyTo`: cards in flight to work under them from now (OP-38). */
@@ -512,7 +525,7 @@ export interface CombworkRequests {
    * refused unless that pause is still current, and the queue resumed only if it still is and its condition is gone), or
    * a start's warning's (`folder`, with `pause` null).
    */
-  'queue:settleChanges': (projectPath: string, target: string, action: FolderChangeAction, shown: string[], pause: QueuePauseRef | null, folder?: string | null) => QueueChangesSettled
+  'queue:settleChanges': (projectPath: string, target: string, action: FolderChangeAction, shown: string[], pause: QueuePauseRef | null, folder?: string | null, op?: string) => QueueChangesSettled
   /** Remove from queue (the user's override): the card back to Approved, never merged; refused once its merge has begun. */
   'queue:remove': (n: number, reason?: string) => TaskCard
   /** Retry merge (the user's override): requeues a returned card's unchanged revision, once. */
@@ -620,6 +633,16 @@ export interface CombworkRequests {
   'tasks:start': (n: number, target: TaskStartTarget, opts?: { confirm?: boolean; reason?: string; released?: string }) => { agentId: string; agentName: string; added: boolean } | { ask: string[]; released?: string }
   /** A card's work (#1223): its facts folded into its line, revisions, verdicts, checks, marks and integration; null with no such card, or on a board not upgraded to 1.0. */
   'tasks:work': (n: number) => WorkView | null
+  /** HI-3218: one file of a card's submission (its fact's number, WorkRevision.submission), from its base to its revision. */
+  'tasks:revisionDiff': (n: number, submission: number, file: string) => GitDiff
+  /** HI-3219: the user's comment on lines of a card's submission's file (its side, 1-based lines); the comment's id. Read back in tasks:work's lineComments. */
+  'tasks:lineCommentAdd': (n: number, comment: { submission: number; path: string; side: 'new' | 'old'; from: number; to: number; body: string }) => string
+  /** HI-3219: a change to one of a card's line comments: its text (from the version shown), resolved, reopened or deleted. */
+  'tasks:lineCommentChange': (n: number, id: string, change: { edit: { body: string; version: number } } | 'resolve' | 'reopen' | 'delete') => void
+  /** HI-3220: a send's preview: its batch id, what it saw of the card, its builder, an open review, and the open comments (each edited since sent or not). */
+  'tasks:feedbackPreview': (n: number) => { batch: string; expect: FeedbackExpect | null; builder: string | null; review: { reviewer: string; submission: number } | null; items: (LineCommentView & { edited: boolean })[] }
+  /** HI-3220: sends the preview's comments to the card's builder as one fix round; refused as Workflow.feedback refuses. */
+  'tasks:feedbackSend': (n: number, send: { batch: string; items: { id: string; version: number }[]; expect: FeedbackExpect; replaces?: { reviewer: string; submission: number } | null }) => void
   /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */
   'tasks:workBadges': () => WorkBadge[]
 
@@ -846,6 +869,7 @@ export interface CombworkRequests {
 
   'pty:write': (key: string, data: string) => void
   'pty:resize': (key: string, cols: number, rows: number) => void
+  /** What a new view of a running terminal replays: its state where the kept output starts (screen, modes), then that output (HI-3252). */
   'pty:buffer': (key: string) => string
   /** Its process's size now, or the size the next one starts at without one (HI-2250): a terminal shown before the window has fitted it draws at that size. */
   'pty:size': (key: string) => { cols: number; rows: number }
@@ -933,11 +957,13 @@ export interface CombworkRequests {
   'mcp:pickFile': () => string | null
   /** What adding the file would add: its name, what it runs, whether the name is taken. Adds nothing. */
   'mcp:previewFile': (file: string) => McpFileServer
+  /** HI-3371: whether `name` is taken for a server being added (`folder`: one that brings a folder, a .zip), as the add would refuse it. */
+  'mcp:nameTaken': (name: string, folder: boolean) => boolean
   /**
    * Adds it as `name`, off in the workspace and in every project (#1093); a name in use is refused unless `replace` (the
    * old one goes to the Recycle Bin).
    */
-  'mcp:addFromFile': (file: string, name: string, replace: boolean) => McpServerInfo
+  'mcp:addFromFile': (file: string, name: string, replace: boolean, places?: { projects: string[]; assistant: boolean }) => McpServerInfo
   /**
    * The MCP catalogues' pages (HI-545): each listed source's rows for a search and a filter. `refresh` reads the
    * catalogues and this PC again (the view opening, ↻); `source` and `offset`: that source's next page.
@@ -946,11 +972,13 @@ export interface CombworkRequests {
   /** The one-time note for a source Combwork doesn't check was shown (HI-545). */
   'mcp:catalogNoted': (url: string) => void
   /** Downloads and checks a catalogue server for Install or Update (HI-545): what it would run, held for the answer. */
-  'mcp:catalogPrepare': (source: string, name: string) => McpCatalogPrepared
+  /** `op`: the window's id for this preparation, which `mcp:catalogCancel` names (HI-3377); cancelled, null. */
+  'mcp:catalogPrepare': (source: string, name: string, op?: string) => McpCatalogPrepared | null
+  'mcp:catalogCancel': (op: string) => void
   /** Drops a prepared download the user cancelled. */
   'mcp:catalogDrop': (id: string) => void
   /** Installs a prepared catalogue server as `name` (added nowhere); `replace` over a server of the name. */
-  'mcp:catalogInstall': (id: string, name: string, replace: boolean) => void
+  'mcp:catalogInstall': (id: string, name: string, replace: boolean, places?: { projects: string[]; assistant: boolean }) => void
   /** Updates an installed catalogue server, refused if its definition or the places shown changed meanwhile (HI-545/s17). */
   'mcp:catalogUpdate': (id: string, shown: McpShown, places: { projects: string[]; assistant: boolean }) => { stale?: string }
   /** The catalogue sources (Settings → MCP Catalogues), and saving them. */
@@ -1004,6 +1032,8 @@ export interface CombworkRequests {
   'lanes:start': (projectPath: string, req: LaneStartRequest) => LaneStartResult
   /** What Start Lane… offers for a project (#1443): the reviewer pool's agents when its rules have G17 a shared pool, else null. */
   'lanes:startInfo': (projectPath: string) => LaneStartInfo
+  /** HI-3368: the card the builder's running lane would yield to for this list now (its card in flight `behind`, `to`), or the card it waits on that can't start (`cantStart`: queued for its Done, Apply now too), or null: Start Lane's hint, by the start's own rule. */
+  'lanes:yieldTo': (projectPath: string, builder: string, cards: number[], behind: number) => { to: number } | { cantStart: number } | null
   /**
    * HI-3148: whether Start lane… for this builder on `target` (null: the project's Work merges into) would be refused for
    * its line being released or unreadable: the line and the refusal, for Start Anyway; null, it wouldn't.
@@ -1112,7 +1142,7 @@ export interface CombworkRequests {
   /** Include again: removes the plain line that ignores the item. */
   'files:gitInclude': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
   /** HI-2944: Commit it, after a shared exclude: the top .gitignore as it is now, committed alone on the project folder's branch. */
-  'files:gitCommitIgnore': (projectPath: string) => FolderChangesDone
+  'files:gitCommitIgnore': (projectPath: string, op?: string) => FolderChangesDone
   /** Why is this ignored?: the file of the rule that ignores the item, its text and line, for Combwork's viewer (a rule outside the Files tab's tree). */
   'files:gitRuleText': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitRuleText
 
@@ -1165,7 +1195,7 @@ export interface CombworkRequests {
   /** HI-1185: how the project's commits are signed, and whether its signer could sign just now with nobody there (null: a platform without signing). */
   'git:signing': (projectPath: string, force?: boolean) => SigningInfo | null
   'git:deleteBranches': (projectPath: string, branches: BranchAt[], unmerged?: boolean) => string
-  'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[]) => string
+  'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[], op?: string) => string
   'git:branchDrops': (projectPath: string, branch: string) => BranchDrops
   'git:history': (projectPath: string, ref?: string | null, page?: number) => GitHistory
   /** Each action replies with what it did, in a sentence. Switching (and creating a branch to switch to) or pulling is refused while an agent works in the folder or its merge slot is held (`folderBusy`). */
@@ -1185,20 +1215,23 @@ export interface CombworkRequests {
   'git:missingBranches': (projectPath: string, names: string[]) => string[]
   'git:addRemote': (projectPath: string, name: string, url: string) => string
   'git:setRemoteUrl': (projectPath: string, name: string, url: string) => string
-  'git:fetch': (projectPath: string) => string
-  'git:pull': (projectPath: string) => string
+  /** HI-3372: `op`, the window's id for this run, which `git:cancel` names (Fetch, Pull, Push and the rest). */
+  'git:fetch': (projectPath: string, op?: string) => string
+  'git:pull': (projectPath: string, op?: string) => string
   /** To the upstream, or to `remote` (setting it as the upstream) when the branch has none. Never forced. */
-  'git:push': (projectPath: string, remote?: string) => string
+  'git:push': (projectPath: string, remote?: string, op?: string) => string
   /** Push to… (#1385): the branch checked out, or every branch and tag, to any remote; never changes what a branch tracks. */
-  'git:pushTo': (projectPath: string, remote: string, scope: PushScope, branch?: string) => string
+  'git:pushTo': (projectPath: string, remote: string, scope: PushScope, branch?: string, op?: string) => string
+  /** HI-3372: the user's Cancel of their run `op`, in the project they started it in; anyone else's, or an id not running, changes nothing. */
+  'git:cancel': (op: string, projectPath: string) => void
   /** The local branches tracking a remote, all of them: what Remove's confirmation lists (#1385). */
   'git:remoteTracking': (projectPath: string, remote: string) => string[]
   /** `expected`: the branches the confirmation listed; refused when those tracking it now differ. */
   'git:removeRemote': (projectPath: string, name: string, expected?: string[]) => string
   'git:renameRemote': (projectPath: string, from: string, to: string) => string
   /** What a local branch tracks (#1385): `remote`'s `remoteBranch`, or nothing (`remote` null); `pushFirst` makes it there first. */
-  'git:setUpstream': (projectPath: string, branch: string, remote: string | null, remoteBranch?: string, pushFirst?: boolean) => string
-  'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string) => string
+  'git:setUpstream': (projectPath: string, branch: string, remote: string | null, remoteBranch?: string, pushFirst?: boolean, op?: string) => string
+  'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string, op?: string) => string
   /** This repository's own user.name and user.email; empty removes it (the global one applies). */
   'git:setIdentity': (projectPath: string, name: string, email: string) => string
   /** Initialise repository (#701): whether it can be done, and what the dialog asks; then git init on main, .combwork excluded first, a starter .gitignore, the first commit. */
@@ -1252,7 +1285,7 @@ export interface CombworkRequests {
   'connections:setModelOutput': (id: string, model: string, tokens: number | null) => void
   /** Opens the CLI on a connection (a server one, or a sign-in one: HI-1826), for its first-run screens; returns the terminal's key. */
   /** Its terminal's key, and where it opened (HI-1871: a workspace folder or a project's; absent, its own folder). */
-  'connections:setUp': (id: string) => { key: string; in?: { folder: string; project?: string; workspace?: true } }
+  'connections:setUp': (id: string) => { key: string; in?: ConnectionTrust['setUpIn'] }
   /** Reset Masking Data (the user confirmed it): fingerprints made again from the keys saved now; masking strict for good after. */
   'connections:resetMasking': () => void
   /** Takes on the login an account is now signed in as (its change answered). */
@@ -1295,7 +1328,12 @@ export interface CombworkRequests {
 
   'api:info': () => AgentApiInfo
   /** What the Claude Code admin snippet is made from (HI-2777): ports and the hooks' timeouts. */
-  'api:claudeSnippet': () => ClaudeSnippetFacts
+  'api:adminSnippet': (provider: ProviderId) => AdminSnippetFacts
+  /** The user's own CLIs as main read them (HI-3196): registered by a window before its first render. */
+  'clis:snapshot': () => import('./providers/cliSnapshot').CliSnapshotView
+  /** Reads the clis folder again and applies it (Settings → Coding agents → Reload). */
+  'clis:reload': () => import('./providers/cliSnapshot').CliSnapshotView
+  'clis:openFolder': () => void
   'api:regenerateToken': () => AgentApiInfo
   /** A new read-only viewer token with this name (#620). */
   'api:createViewer': (name: string) => AgentApiInfo

@@ -8,6 +8,7 @@ import { pathToFileURL } from 'url'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-agy-transcript-')
 process.env.CW_USER_DATA = join(base, 'userdata')
@@ -15,7 +16,7 @@ process.env.CW_USER_DATA = join(base, 'userdata')
 
 const { AntigravityConversationParser, AntigravityUsageParser, annotationTitle, parseAgyTranscript, stepOutput, userRequestText } = await import('../src/main/providers/antigravity/transcript')
 const { TRANSCRIPT_FILE, knownTitle, learnTitle, listConversations, mediaData, profileOf, profileTranscript, transcriptIn, trustedTranscript } = await import('../src/main/providers/antigravity/conversations')
-const { formatToolInput } = await import('../src/main/providers/claude/conversation')
+const { formatToolInput } = await import('../src/main/providers/conversation')
 const { antigravity, profileFolder } = await import('../src/main/providers/antigravity/adapter')
 const { profilesRoot } = await import('../src/main/providers/antigravity/home')
 const { advanced } = await import('../src/main/advanced')
@@ -23,7 +24,7 @@ const { newUsageParser } = await import('../src/main/usageParsers')
 
 const FIX = join(__dirname, 'fixtures', 'antigravity')
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
-const HUNG_MS = 20000
+const HUNG_MS = timing('wait.hang')
 /** Waits for a condition, at most `ms`. */
 async function until(ok: () => boolean, ms: number): Promise<void> {
   const end = Date.now() + ms

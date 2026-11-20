@@ -41,9 +41,9 @@ function age(h: string, id: number, at: string): void {
 }
 
 describe('the schema', () => {
-  it('is its own file, migrated once (recorded with the version), WAL and incremental auto-vacuum', () => {
+  it('is its own file, migrated once (recorded with the version), WAL and incremental auto-vacuum', async () => {
     const h = home()
-    write(h, { summary: 'First' })
+    await write(h, { summary: 'First' })
     j.closeJournal(h)
     const db = new DatabaseSync(j.journalFile(h), { readOnly: true })
     try {
@@ -61,14 +61,14 @@ describe('the schema', () => {
     }
   })
 
-  it('refuses what is not an entry, saying why', () => {
+  it('refuses what is not an entry, saying why', async () => {
     const h = home()
-    expect(() => write(h, { summary: '' })).toThrow(/summary is required/)
-    expect(() => write(h, { summary: 'x', kind: 'gossip' })).toThrow(/kind is one of/)
-    expect(() => write(h, { summary: 'x', importance: 4 })).toThrow(/importance must be 0, 1, 2 or 3/)
-    expect(() => write(h, { summary: 'x', links: [{ type: 'url', ref: 'x' }] })).toThrow(/link's type is one of/)
-    expect(() => write(h, { summary: 'x', links: [{ type: 'entry', ref: '999' }] })).toThrow(/no entry 999/)
-    expect(() => write(h, { summary: 'x'.repeat(301) })).toThrow(/longer than 300/)
+    await expect(write(h, { summary: '' })).rejects.toThrow(/summary is required/)
+    await expect(write(h, { summary: 'x', kind: 'gossip' })).rejects.toThrow(/kind is one of/)
+    await expect(write(h, { summary: 'x', importance: 4 })).rejects.toThrow(/importance must be 0, 1, 2 or 3/)
+    await expect(write(h, { summary: 'x', links: [{ type: 'url', ref: 'x' }] })).rejects.toThrow(/link's type is one of/)
+    await expect(write(h, { summary: 'x', links: [{ type: 'entry', ref: '999' }] })).rejects.toThrow(/no entry 999/)
+    await expect(write(h, { summary: 'x'.repeat(301) })).rejects.toThrow(/longer than 300/)
     expect(j.recall(h, {})).toEqual([])
   })
 })
@@ -85,23 +85,23 @@ describe("a summary's message", () => {
     }
   }
 
-  it("is kept with Combwork's facts, none with the Assistant's own entries, and goes once the summary is edited", () => {
+  it("is kept with Combwork's facts, none with the Assistant's own entries, and goes once the summary is edited", async () => {
     const h = home()
     const text = { id: 'finish.journal.done', values: { card: 'AM-1', title: 'Fix it', how: 'queue', byUser: 'no', by: 'combwork' } }
-    const fact = j.writeEntry(h, all, { kind: 'event', summary: 'AM-1 "Fix it" is Done', summaryText: text }, 'combwork')
-    const own = write(h, { summary: 'Darren chose the greeting' })
+    const fact = await j.writeEntry(h, all, { kind: 'event', summary: 'AM-1 "Fix it" is Done', summaryText: text }, 'combwork')
+    const own = await write(h, { summary: 'Sam chose the greeting' })
     expect(JSON.parse(stored(h, fact)!)).toEqual(text)
     expect(stored(h, own)).toBeNull()
-    j.updateEntry(h, all, fact, { importance: 3 })
+    await j.updateEntry(h, all, fact, { importance: 3 })
     expect(JSON.parse(stored(h, fact)!)).toEqual(text)
-    j.updateEntry(h, all, fact, { summary: 'AM-1 is Done, and shipped' })
+    await j.updateEntry(h, all, fact, { summary: 'AM-1 is Done, and shipped' })
     expect(stored(h, fact)).toBeNull()
   })
 
   // HI-2451: a journal from before the column (version 1) gains it once opened; its entries read as before, with no message.
-  it('is added to a journal written before it, whose entries still read as they were', () => {
+  it('is added to a journal written before it, whose entries still read as they were', async () => {
     const h = home()
-    const old = j.writeEntry(h, all, { kind: 'event', summary: 'AM-2 "Old" is Done', detail: 'finish queue', links: [{ type: 'card', ref: '2' }], tags: ['done'] }, 'combwork')
+    const old = await j.writeEntry(h, all, { kind: 'event', summary: 'AM-2 "Old" is Done', detail: 'finish queue', links: [{ type: 'card', ref: '2' }], tags: ['done'] }, 'combwork')
     const before = j.readEntry(h, old)
     j.closeJournal(h)
     const raw = new DatabaseSync(j.journalFile(h))
@@ -114,20 +114,20 @@ describe("a summary's message", () => {
     expect(stored(h, old)).toBeNull()
     expect(j.recall(h, { query: 'Old' }).map((r) => r.id)).toEqual([old])
     const text = { id: 'lane.journal.fact', values: { named: 'no', name: '', state: 'started', commit: '', who: 'B1 / R1', cards: 'AM-2' } }
-    const fact = j.writeEntry(h, all, { kind: 'event', summary: 'Lane B1 / R1 started: AM-2', summaryText: text }, 'combwork')
+    const fact = await j.writeEntry(h, all, { kind: 'event', summary: 'Lane B1 / R1 started: AM-2', summaryText: text }, 'combwork')
     expect(JSON.parse(stored(h, fact)!)).toEqual(text)
   })
 })
 
 describe('the scope', () => {
-  it('stores only the kinds the user allows (a digest always), and says which are allowed', () => {
+  it('stores only the kinds the user allows (a digest always), and says which are allowed', async () => {
     const h = home()
     const work = journalSettings({})
     expect(work.scope).toEqual(['decision', 'plan', 'event', 'incident', 'insight'])
-    expect(() => write(h, { summary: 'Darren likes short replies', kind: 'preference' }, work)).toThrow(/scope doesn't include preference entries .*allows: decision, plan, event, incident, insight/)
-    expect(() => write(h, { summary: 'A good moment', kind: 'moment' }, work)).toThrow(/moment/)
-    expect(write(h, { summary: 'Week 42', kind: 'digest' }, { ...work, scope: [] })).toBeGreaterThan(0)
-    expect(write(h, { summary: 'Darren likes short replies', kind: 'preference' })).toBeGreaterThan(0)
+    await expect(write(h, { summary: 'Sam likes short replies', kind: 'preference' }, work)).rejects.toThrow(/scope doesn't include preference entries .*allows: decision, plan, event, incident, insight/)
+    await expect(write(h, { summary: 'A good moment', kind: 'moment' }, work)).rejects.toThrow(/moment/)
+    expect(await write(h, { summary: 'Week 42', kind: 'digest' }, { ...work, scope: [] })).toBeGreaterThan(0)
+    expect(await write(h, { summary: 'Sam likes short replies', kind: 'preference' })).toBeGreaterThan(0)
   })
 
   it('settings as saved are made safe', () => {
@@ -138,11 +138,11 @@ describe('the scope', () => {
 })
 
 describe('the full-text index, kept by triggers', () => {
-  it('finds words in a summary, a why and a long detail kept compressed; follows a correction and a delete', () => {
+  it('finds words in a summary, a why and a long detail kept compressed; follows a correction and a delete', async () => {
     const h = home()
     const long = `${'Background. '.repeat(200)}The zebra crossing was the cause.`
-    const a = write(h, { summary: 'Merged the board work', why: 'Darren wanted the giraffe fixed' })
-    const b = write(h, { summary: 'A long incident', kind: 'incident', detail: long })
+    const a = await write(h, { summary: 'Merged the board work', why: 'Sam wanted the giraffe fixed' })
+    const b = await write(h, { summary: 'A long incident', kind: 'incident', detail: long })
     // Kept compressed, read back whole.
     j.closeJournal(h)
     const raw = new DatabaseSync(j.journalFile(h), { readOnly: true })
@@ -156,23 +156,23 @@ describe('the full-text index, kept by triggers', () => {
     // A prefix finds it too.
     expect(j.recall(h, { query: 'giraf' }).map((r) => r.id)).toEqual([a])
     // Corrected: the old words go from the index, the new ones come.
-    j.updateEntry(h, all, a, { why: 'Darren wanted the okapi fixed' })
+    await j.updateEntry(h, all, a, { why: 'Sam wanted the okapi fixed' })
     expect(j.recall(h, { query: 'giraffe' })).toEqual([])
     expect(j.recall(h, { query: 'okapi' }).map((r) => r.id)).toEqual([a])
-    j.updateEntry(h, all, b, { detail: 'Short now: a lion' })
+    await j.updateEntry(h, all, b, { detail: 'Short now: a lion' })
     expect(j.recall(h, { query: 'zebra' })).toEqual([])
     expect(j.recall(h, { query: 'lion' }).map((r) => r.id)).toEqual([b])
-    expect(j.deleteEntry(h, b)).toBe(true)
+    expect(await j.deleteEntry(h, b)).toBe(true)
     expect(j.recall(h, { query: 'lion' })).toEqual([])
-    expect(j.deleteEntry(h, b)).toBe(false)
+    expect(await j.deleteEntry(h, b)).toBe(false)
   })
 })
 
 describe('recall', () => {
-  it('gives one-line rows, newest first, at most the limit (10 by default); filters by time, kind, project, link and tag', () => {
+  it('gives one-line rows, newest first, at most the limit (10 by default); filters by time, kind, project, link and tag', async () => {
     const h = home()
     const ids: number[] = []
-    for (let i = 0; i < 12; i++) ids.push(write(h, { summary: `Entry ${i}`, kind: i % 2 ? 'event' : 'decision', project: i < 6 ? 'alpha' : 'website', links: i === 3 ? [{ type: 'card', ref: '#1017' }] : [], tags: i === 4 ? ['SQLite'] : [] }))
+    for (let i = 0; i < 12; i++) ids.push(await write(h, { summary: `Entry ${i}`, kind: i % 2 ? 'event' : 'decision', project: i < 6 ? 'alpha' : 'website', links: i === 3 ? [{ type: 'card', ref: '#1017' }] : [], tags: i === 4 ? ['SQLite'] : [] }))
     const rows = j.recall(h, {})
     expect(rows).toHaveLength(10)
     expect(rows[0]).toEqual({ id: ids[11], at: expect.any(String), kind: 'event', project: 'website', summary: 'Entry 11', importance: 1, source: 'assistant', supersededBy: null, hasDetail: false })
@@ -187,83 +187,83 @@ describe('recall', () => {
     expect(() => j.recall(h, { since: 'last tuesday' })).toThrow(/must be a date/)
   })
 
-  it('ranks matches by relevance nudged by importance and recency; leaves superseded entries out unless asked', () => {
+  it('ranks matches by relevance nudged by importance and recency; leaves superseded entries out unless asked', async () => {
     const h = home()
     // A journal of some size: words in a few entries of many weigh (bm25 gives nought to words in most entries).
-    for (let i = 0; i < 20; i++) write(h, { summary: `Other work ${i} on the board`, kind: 'event' })
-    const old = write(h, { summary: 'Release plan for the installer, first', kind: 'plan' })
-    const recent = write(h, { summary: 'Release plan for the installer, again', kind: 'plan' })
+    for (let i = 0; i < 20; i++) await write(h, { summary: `Other work ${i} on the board`, kind: 'event' })
+    const old = await write(h, { summary: 'Release plan for the installer, first', kind: 'plan' })
+    const recent = await write(h, { summary: 'Release plan for the installer, again', kind: 'plan' })
     age(h, old, new Date(Date.now() - 200 * 86_400_000).toISOString())
     expect(j.recall(h, { query: 'release installer' }).map((r) => r.id)).toEqual([recent, old])
     // Essential, the old one still comes second to an everyday one from today; first to a trivial one.
-    j.updateEntry(h, all, old, { importance: 3 })
-    const important = write(h, { summary: 'Unrelated', kind: 'plan' })
+    await j.updateEntry(h, all, old, { importance: 3 })
+    const important = await write(h, { summary: 'Unrelated', kind: 'plan' })
     expect(j.recall(h, { query: 'release installer' }).map((r) => r.id)[0]).toBe(recent)
-    j.updateEntry(h, all, recent, { importance: 0 })
+    await j.updateEntry(h, all, recent, { importance: 0 })
     expect(j.recall(h, { query: 'release installer' }).map((r) => r.id)).toEqual([old, recent])
     // Superseded: out by default, in when asked; the newer one says what it supersedes.
-    j.updateEntry(h, all, old, { supersededBy: important })
+    await j.updateEntry(h, all, old, { supersededBy: important })
     expect(j.recall(h, { query: 'release installer' }).map((r) => r.id)).toEqual([recent])
     expect(j.recall(h, { query: 'release installer', superseded: true }).map((r) => r.id)).toContain(old)
     expect(j.readEntry(h, important)!.supersedes).toEqual([old])
-    expect(() => j.updateEntry(h, all, old, { supersededBy: 999 })).toThrow(/no entry 999/)
+    await expect(j.updateEntry(h, all, old, { supersededBy: 999 })).rejects.toThrow(/no entry 999/)
     // Deleting the newer one makes the old current again.
-    j.deleteEntry(h, important)
+    await j.deleteEntry(h, important)
     expect(j.readEntry(h, old)!.supersededBy).toBeNull()
   })
 
-  it("ranks an original lower once its week has a digest (#1032: the digest keeps its gist)", () => {
+  it("ranks an original lower once its week has a digest (#1032: the digest keeps its gist)", async () => {
     const h = home()
-    for (let i = 0; i < 20; i++) write(h, { summary: `Other work ${i} on the board`, kind: 'event' })
-    const digested = write(h, { summary: 'Picked the merge order for the lanes', kind: 'plan' })
-    const earlier = write(h, { summary: 'Picked the merge order for the lanes, earlier', kind: 'plan' })
+    for (let i = 0; i < 20; i++) await write(h, { summary: `Other work ${i} on the board`, kind: 'event' })
+    const digested = await write(h, { summary: 'Picked the merge order for the lanes', kind: 'plan' })
+    const earlier = await write(h, { summary: 'Picked the merge order for the lanes, earlier', kind: 'plan' })
     const week = weekStart(new Date(Date.now() - 14 * 86_400_000))
     age(h, digested, new Date(week.getTime() + 86_400_000).toISOString())
     age(h, earlier, new Date(week.getTime() - 3 * 86_400_000).toISOString())
     expect(j.recall(h, { query: 'merge order lanes' }).map((r) => r.id)).toEqual([digested, earlier])
-    const digest = write(h, { summary: 'The week in brief', kind: 'digest', digestOf: isoWeek(week) })
+    const digest = await write(h, { summary: 'The week in brief', kind: 'digest', digestOf: isoWeek(week) })
     expect(j.recall(h, { query: 'merge order lanes' }).map((r) => r.id)).toEqual([earlier, digested])
     // Newest first (no query) is by time alone.
     expect(j.recall(h, { limit: 3 }).map((r) => r.id)[0]).toBe(digest)
   })
 
-  it('an entry in full: detail, why, links, tags; updates add links and tags', () => {
+  it('an entry in full: detail, why, links, tags; updates add links and tags', async () => {
     const h = home()
-    const a = write(h, { summary: 'Chose node:sqlite', why: 'No native module', detail: 'Over better-sqlite3.', links: [{ type: 'card', ref: '990' }], tags: ['storage'], importance: 2 })
-    j.updateEntry(h, all, a, { addLinks: [{ type: 'commit', ref: '2f95998d' }], addTags: ['Storage', 'db'] })
+    const a = await write(h, { summary: 'Chose node:sqlite', why: 'No native module', detail: 'Over better-sqlite3.', links: [{ type: 'card', ref: '990' }], tags: ['storage'], importance: 2 })
+    await j.updateEntry(h, all, a, { addLinks: [{ type: 'commit', ref: '2f95998d' }], addTags: ['Storage', 'db'] })
     expect(j.readEntry(h, a)).toMatchObject({ id: a, summary: 'Chose node:sqlite', why: 'No native module', detail: 'Over better-sqlite3.', importance: 2, links: [{ type: 'card', ref: '990' }, { type: 'commit', ref: '2f95998d' }], tags: ['db', 'storage'], updatedAt: expect.any(String) })
     expect(j.readEntry(h, 999)).toBeNull()
-    expect(j.updateEntry(h, all, 999, { importance: 1 })).toBe(false)
-    expect(() => j.updateEntry(h, all, a, {})).toThrow(/Nothing to change/)
+    expect(await j.updateEntry(h, all, 999, { importance: 1 })).toBe(false)
+    await expect(j.updateEntry(h, all, a, {})).rejects.toThrow(/Nothing to change/)
   })
 })
 
 describe('retention and the size cap', () => {
-  it('everyday entries go after the retention; digests and important entries stay', () => {
+  it('everyday entries go after the retention; digests and important entries stay', async () => {
     const h = home()
     const old = new Date(Date.now() - 100 * 86_400_000).toISOString()
-    const everyday = write(h, { summary: 'Old everyday' })
-    const important = write(h, { summary: 'Old important', importance: 2 })
-    const digest = write(h, { summary: 'Old digest', kind: 'digest', digestOf: '2026-W30' })
-    const fresh = write(h, { summary: 'Fresh everyday' })
+    const everyday = await write(h, { summary: 'Old everyday' })
+    const important = await write(h, { summary: 'Old important', importance: 2 })
+    const digest = await write(h, { summary: 'Old digest', kind: 'digest', digestOf: '2026-W30' })
+    const fresh = await write(h, { summary: 'Fresh everyday' })
     for (const id of [everyday, important, digest]) age(h, id, old)
-    expect(j.pruneJournal(h, all)).toBe(1)
+    expect(await j.pruneJournal(h, all)).toBe(1)
     expect(j.recall(h, { limit: 50 }).map((r) => r.id).sort()).toEqual([important, digest, fresh].sort())
-    expect(j.pruneJournal(h, { ...all, retentionDays: 365 })).toBe(0)
+    expect(await j.pruneJournal(h, { ...all, retentionDays: 365 })).toBe(0)
   })
 
-  it('past the cap, the oldest everyday entries go first until it fits; important ones never; space goes back to the file', () => {
+  it('past the cap, the oldest everyday entries go first until it fits; important ones never; space goes back to the file', async () => {
     const h = home()
     const settings = { ...all, capMB: null }
     // Details that don't compress, so the file grows: about 1.7 MB with their index, of everyday entries and one
     // important; past a 1 MB cap about half go (#1324: a tenth of the 16 MB it once wrote, which took 6 s a run).
     const MB = 1024 * 1024
     const noise = (): string => randomBytes(6_000).toString('base64')
-    const keep = write(h, { summary: 'Keep me', importance: 3, detail: noise() }, settings)
+    const keep = await write(h, { summary: 'Keep me', importance: 3, detail: noise() }, settings)
     const ids: number[] = []
-    for (let i = 1; i <= 100; i++) ids.push(write(h, { summary: `Everyday ${i}`, detail: noise() }, settings))
+    for (let i = 1; i <= 100; i++) ids.push(await write(h, { summary: `Everyday ${i}`, detail: noise() }, settings))
     expect(j.journalSize(h)!.bytes).toBeGreaterThan(1.5 * MB)
-    const gone = j.pruneJournal(h, { ...settings, capMB: 1 })
+    const gone = await j.pruneJournal(h, { ...settings, capMB: 1 })
     expect(gone).toBeGreaterThan(0)
     expect(j.journalSize(h)!.bytes).toBeLessThanOrEqual(MB)
     expect(j.readEntry(h, keep)).not.toBeNull()
@@ -285,14 +285,14 @@ describe('retention and the size cap', () => {
 
 describe('the size cap, as little as it takes (#1031 round 1)', () => {
   const noise = (bytes: number): string => randomBytes(bytes).toString('base64')
-  it('a little over the cap: only the oldest few everyday entries go, the newer ones stay', () => {
+  it('a little over the cap: only the oldest few everyday entries go, the newer ones stay', async () => {
     const h = home()
     const ids: number[] = []
-    for (let i = 0; i < 100; i++) ids.push(write(h, { summary: `Everyday ${i}`, detail: noise(60_000) }, { ...all, capMB: null }))
+    for (let i = 0; i < 100; i++) ids.push(await write(h, { summary: `Everyday ${i}`, detail: noise(60_000) }, { ...all, capMB: null }))
     const used = j.journalSize(h)!.bytes
     // A cap a little under its size: about two entries' worth over.
     const capMB = (used - 150_000) / (1024 * 1024)
-    const gone = j.pruneJournal(h, { ...all, capMB: Math.floor(capMB * 1000) / 1000 })
+    const gone = await j.pruneJournal(h, { ...all, capMB: Math.floor(capMB * 1000) / 1000 })
     expect(gone).toBeGreaterThan(0)
     expect(gone).toBeLessThanOrEqual(6)
     // The newest 90 are all there.
@@ -300,17 +300,17 @@ describe('the size cap, as little as it takes (#1031 round 1)', () => {
     expect(j.readEntry(h, ids[0])).toBeNull()
   })
 
-  it('mixed sizes: when the oldest large entry is enough, it is the only one to go; important ones never (#1031 round 2)', () => {
+  it('mixed sizes: when the oldest large entry is enough, it is the only one to go; important ones never (#1031 round 2)', async () => {
     const h = home()
     const free = { ...all, capMB: null }
-    for (let i = 0; i < 3000; i++) write(h, { summary: `Important ${i}`, importance: 2 }, free)
-    const big = write(h, { summary: 'Oldest and large', detail: noise(60_000) }, free)
+    for (let i = 0; i < 3000; i++) await write(h, { summary: `Important ${i}`, importance: 2 }, free)
+    const big = await write(h, { summary: 'Oldest and large', detail: noise(60_000) }, free)
     const small: number[] = []
-    for (let i = 0; i < 99; i++) small.push(write(h, { summary: `Small ${i}` }, free))
+    for (let i = 0; i < 99; i++) small.push(await write(h, { summary: `Small ${i}` }, free))
     age(h, big, new Date(Date.now() - 30 * 86_400_000).toISOString())
     // A few kilobytes over: the large entry alone frees far more.
     const cap = (j.journalSize(h)!.bytes - 4096) / (1024 * 1024)
-    expect(j.pruneJournal(h, { ...all, capMB: cap })).toBe(1)
+    expect(await j.pruneJournal(h, { ...all, capMB: cap })).toBe(1)
     expect(j.readEntry(h, big)).toBeNull()
     for (const id of small) expect(j.readEntry(h, id)).not.toBeNull()
     expect(j.journalSize(h)!.bytes).toBeLessThanOrEqual(cap * 1024 * 1024)
@@ -318,34 +318,34 @@ describe('the size cap, as little as it takes (#1031 round 1)', () => {
     expect(j.journalSize(h)!.entries).toBe(3099)
   })
 
-  it('what an entry frees is measured, not guessed: a short entry with many long links that frees enough is the only one to go (#1031 round 3)', () => {
+  it('what an entry frees is measured, not guessed: a short entry with many long links that frees enough is the only one to go (#1031 round 3)', async () => {
     const h = home()
     const free = { ...all, capMB: null }
-    for (let i = 0; i < 3000; i++) write(h, { summary: `Important ${i}`, importance: 2 }, free)
-    const linked = write(h, { summary: 'Oldest linked', links: Array.from({ length: 40 }, (_, i) => ({ type: 'artifact', ref: `${i}-${'x'.repeat(296)}` })) }, free)
+    for (let i = 0; i < 3000; i++) await write(h, { summary: `Important ${i}`, importance: 2 }, free)
+    const linked = await write(h, { summary: 'Oldest linked', links: Array.from({ length: 40 }, (_, i) => ({ type: 'artifact', ref: `${i}-${'x'.repeat(296)}` })) }, free)
     const newer: number[] = []
-    for (let i = 0; i < 99; i++) newer.push(write(h, { summary: `Newer ${i}` }, free))
+    for (let i = 0; i < 99; i++) newer.push(await write(h, { summary: `Newer ${i}` }, free))
     age(h, linked, new Date(Date.now() - 30 * 86_400_000).toISOString())
     const cap = (j.journalSize(h)!.bytes - 4096) / (1024 * 1024)
-    expect(j.pruneJournal(h, { ...all, capMB: cap })).toBe(1)
+    expect(await j.pruneJournal(h, { ...all, capMB: cap })).toBe(1)
     expect(j.readEntry(h, linked)).toBeNull()
     for (const id of newer) expect(j.readEntry(h, id)).not.toBeNull()
     expect(j.journalSize(h)!.bytes).toBeLessThanOrEqual(cap * 1024 * 1024)
   })
 
-  it('an entry made bigger by an update is held to the cap too; its retention applies once its importance drops', () => {
+  it('an entry made bigger by an update is held to the cap too; its retention applies once its importance drops', async () => {
     const h = home()
     const settings = { ...all, capMB: 5 }
     const ids: number[] = []
-    for (let i = 0; i < 100; i++) ids.push(write(h, { summary: `Short ${i}` }, settings))
-    for (const id of ids) j.updateEntry(h, settings, id, { detail: noise(70_000) })
+    for (let i = 0; i < 100; i++) ids.push(await write(h, { summary: `Short ${i}` }, settings))
+    for (const id of ids) await j.updateEntry(h, settings, id, { detail: noise(70_000) })
     expect(j.journalSize(h)!.bytes).toBeLessThanOrEqual(5 * 1024 * 1024)
     // The newest stay, with their new detail.
     expect(j.readEntry(h, ids.at(-1)!)!.detail!.length).toBeGreaterThan(90_000)
     // An important old entry made everyday again goes with the retention.
-    const old = write(h, { summary: 'Was important', importance: 2 }, settings)
+    const old = await write(h, { summary: 'Was important', importance: 2 }, settings)
     age(h, old, new Date(Date.now() - 200 * 86_400_000).toISOString())
-    j.updateEntry(h, settings, old, { importance: 1 })
+    await j.updateEntry(h, settings, old, { importance: 1 })
     expect(j.readEntry(h, old)).toBeNull()
   })
 })
@@ -360,28 +360,28 @@ describe('deleting the journal', () => {
   })
   it('closes it and moves its files to the Recycle Bin; a new one starts empty', async () => {
     const h = home()
-    write(h, { summary: 'Something' })
+    await write(h, { summary: 'Something' })
     await j.deleteJournal(h)
     expect(existsSync(j.journalFile(h))).toBe(false)
     const moved = readFileSync(join(trashDir, 'trash.jsonl'), 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l).from as string)
     expect(moved).toContain(j.journalFile(h))
     expect(moved.every((f) => f.startsWith(h + sep))).toBe(true)
     expect(j.journalSize(h)).toBeNull()
-    write(h, { summary: 'After' })
+    await write(h, { summary: 'After' })
     expect(j.recall(h, {}).map((r) => r.summary)).toEqual(['After'])
   })
 
   it('nothing opens it while it is being deleted: a write or a recall is refused, its size unknown, until its files have gone (#1031 round 1)', async () => {
     const h = home()
-    write(h, { summary: 'Before' })
+    await write(h, { summary: 'Before' })
     const deleting = j.deleteJournal(h)
-    expect(() => write(h, { summary: 'Meanwhile' })).toThrow(j.JournalBusy)
+    await expect(write(h, { summary: 'Meanwhile' })).rejects.toThrow(j.JournalBusy)
     expect(() => j.recall(h, {})).toThrow(/being deleted/)
     expect(j.journalSize(h)).toBeNull()
     await expect(j.deleteJournal(h)).rejects.toThrow(/already being deleted/)
     await deleting
     expect(existsSync(j.journalFile(h))).toBe(false)
-    write(h, { summary: 'After' })
+    await write(h, { summary: 'After' })
     expect(j.recall(h, {}).map((r) => r.summary)).toEqual(['After'])
   })
 })

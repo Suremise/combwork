@@ -27,7 +27,7 @@ const pty = require('@lydell/node-pty')
 const { Terminal } = require('@xterm/headless')
 const { endChildTree } = require('./folderProcesses.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 90000
+const HUNG_MS = lib.timing('hang.step')
 
 const work = path.join(lib.WORK, 'codex-appserver-ws')
 let failed = 0
@@ -96,7 +96,7 @@ function tui(args) {
   const type = async (s) => {
     for (let i = 0; i < s.length; i += 8) {
       t.write(s.slice(i, i + 8))
-      await lib.sleep(10) // on purpose: typed in pieces, as Combwork types
+      await lib.sleep(lib.timing('pace.typedPieceMs')) // on purpose: typed in pieces, as Combwork types
     }
   }
   /** The end of `s` (spaces left out, as the TUI wraps it) shows on the screen. */
@@ -104,7 +104,7 @@ function tui(args) {
   /** `s` typed, and shown in the prompt: a step that needs it there fails, saying what the screen showed. */
   const typeShown = async (s) => {
     await type(s)
-    if (!(await lib.until(() => shows(s), 20000, 100))) throw new Error(`"${s}" didn't show in the TUI's prompt: ${tail(screen())}`)
+    if (!(await lib.until(() => shows(s), lib.timing('hang.ui')))) throw new Error(`"${s}" didn't show in the TUI's prompt: ${tail(screen())}`)
   }
   /** A line typed and sent once it shows in the prompt. */
   const say = async (s) => {
@@ -124,7 +124,7 @@ const methods = (events) => events.map((e) => e.method).filter((m) => !/delta|to
 const notices = new Set()
 
 /** How long Combwork's client waits for the app server to open its connection or answer a call. */
-const CALL_MS = 60000
+const CALL_MS = lib.timing('hang.step')
 
 /**
  * Combwork's side: a JSON-RPC client on the app server's WebSocket. Its connection and every call are bounded (CALL_MS),
@@ -223,7 +223,7 @@ async function client(port) {
     fs.writeFileSync(authFile, 'Authorization: Bearer e2e')
     const command = `curl.exe -s -m 5 -X POST -H "@${authFile.split('\\').join('/')}" -H "Content-Type: application/json" --data-binary "@-" "http://127.0.0.1:${hooks.address().port}/hook"`
     const sortDeep = (v) => (Array.isArray(v) ? v.map(sortDeep) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortDeep(v[k])])) : v)
-    const hash = (label) => 'sha256:' + createHash('sha256').update(JSON.stringify(sortDeep({ event_name: label, hooks: [{ type: 'command', command, timeout: 5, async: false }] }))).digest('hex')
+    const hash = (label) => 'sha256:' + createHash('sha256').update(JSON.stringify(sortDeep({ event_name: label, hooks: [{ type: 'command', command, timeout: 5, async: false }] }))).digest('hex') // timing-ok: the hook's own timeout in seconds, data hashed as Codex hashes it for its trust
     const flags = 'C:\\<session-flags>\\config.toml'
     const hookArgs = []
     for (const [event] of [['UserPromptSubmit'], ['Stop']]) hookArgs.push('-c', `hooks.${event}=[{hooks=[{type="command",command='${command}',timeout=5}]}]`)
@@ -259,7 +259,7 @@ async function client(port) {
       check('the typed turn ends (the thread shows idle)', !!(await lib.until(() => c.seen('thread/status/changed', (e) => e.params.threadId === threadId && e.params.status.type === 'idle'), HUNG_MS)))
       const joined = await c.call('thread/resume', { threadId })
       check('Combwork joins the thread once its first turn is written', !joined.error, JSON.stringify(joined.error))
-      check("Combwork's hooks given to the app server run for a typed turn (UserPromptSubmit, Stop)", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h0).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h0)))
+      check("Combwork's hooks given to the app server run for a typed turn (UserPromptSubmit, Stop)", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h0).includes(h)), lib.timing('hang.step'))), JSON.stringify(seenHooks.slice(h0)))
     })
 
     await step('typed and Combwork turns, identified', async () => {
@@ -279,8 +279,8 @@ async function client(port) {
       const own = c.events.slice(m).find((e) => e.method === 'item/completed' && e.params?.item?.type === 'userMessage')
       check('a turn Combwork starts comes as identified turn events too, with the id turn/start answered', !!combworkDone && combworkDone.params.turn.status === 'completed', JSON.stringify(started.error ?? combworkDone?.params?.turn?.status))
       check("…its user message has Combwork's clientUserMessageId", own?.params?.item?.clientId === 'cw-m1', JSON.stringify(own?.params?.item?.clientId))
-      check('…the TUI shows it, and the draft the user is typing stays in its prompt', !!(await lib.until(() => /New in your inbox: 1 message \(m1\)/.test(ui.screen()) && /DRAFT kept/.test(ui.screen()), 15000)), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
-      check("…and Combwork's hooks run for it too", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h1).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h1)))
+      check('…the TUI shows it, and the draft the user is typing stays in its prompt', !!(await lib.until(() => /New in your inbox: 1 message \(m1\)/.test(ui.screen()) && /DRAFT kept/.test(ui.screen()), lib.timing('hang.ui'))), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
+      check("…and Combwork's hooks run for it too", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h1).includes(h)), lib.timing('hang.ui'))), JSON.stringify(seenHooks.slice(h1)))
       // Clear the draft (Ctrl+U), as the user would.
       ui.t.write('\x15')
     })
@@ -302,16 +302,16 @@ async function client(port) {
       await c.call('turn/start', { threadId, clientUserMessageId: 'cw-approve', input: text('Create a file named approved.txt containing hi in the current folder with a shell command.') })
       const asked = await lib.until(() => c.events.slice(n).find((e) => e.id !== undefined && /requestApproval/.test(e.method)), HUNG_MS)
       check("an approval request reaches Combwork's client", !!asked, JSON.stringify(c.events.slice(n).map((e) => e.method)))
-      check('…and the TUI asks it', !!(await lib.until(() => /Would you like to run|Yes, proceed/.test(ui.screen()), 20000)), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
+      check('…and the TUI asks it', !!(await lib.until(() => /Would you like to run|Yes, proceed/.test(ui.screen()), lib.timing('hang.ui'))), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
       ui.t.write('\r')
-      check("answered in the TUI, Combwork's client sees it resolved", !!(await lib.until(() => c.seen('serverRequest/resolved', () => true, n), 20000)))
+      check("answered in the TUI, Combwork's client sees it resolved", !!(await lib.until(() => c.seen('serverRequest/resolved', () => true, n), lib.timing('hang.ui'))))
       const done = await lib.until(() => c.seen('turn/completed', () => true, n), HUNG_MS)
       check('…and the turn goes on and ends', done?.params?.turn?.status === 'completed' && fs.existsSync(path.join(work, 'approved.txt')), JSON.stringify(done?.params?.turn?.status))
     })
 
     await step("Combwork's client drops and rejoins", async () => {
       c.close()
-      await lib.until(() => c.closed(), 10000)
+      await lib.until(() => c.closed(), lib.timing('hang.ui'))
       c = await client(port)
       const again = await c.call('thread/resume', { threadId })
       console.log(`(rejoining: the thread is ${JSON.stringify(again.result?.thread?.status ?? again.error)})`)

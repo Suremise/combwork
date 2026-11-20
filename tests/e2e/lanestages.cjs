@@ -17,7 +17,7 @@ const q = require('./queueFixture.cjs')
 const PORT = Number(lib.port(47814))
 const fx = q.queueProject('lanestages')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -115,9 +115,10 @@ const beta = path.join(fx.ws, 'beta')
       let other = null
       const shown = await waitHung(async () => {
         await page.mouse.move(5, 5)
-        if (!(await lib.until(async () => (await tips().count()) === 0, 5000))) return false
+        // A try: the tip gone once the mouse has left, else the hover is tried again.
+        if (!(await lib.until(async () => (await tips().count()) === 0, lib.timing('pace.tipGoneMs')))) return false
         await target.hover()
-        const t = await lib.until(async () => (await tips().count()) > 0 && (await tipText()), 5000)
+        const t = await lib.until(async () => (await tips().count()) > 0 && (await tipText()), lib.timing('hang.ui'))
         if (t && want(t)) return true
         if (t && other === null) other = { tip: t, rows: await order() }
         return false
@@ -227,6 +228,27 @@ const beta = path.join(fx.ws, 'beta')
     check("the Merging card's hover keeps Ready | Merging, its own marked", !!(await hover(seg(m.n), (t) => t.includes('Merging card') && t.includes('Ready'))) && (await page.locator('.tip .lane-seg-stage.own').innerText()) === 'Merging' && (await page.locator('.tip .lane-stage-divider').count()) === 1, await tipText())
     check('…and the legend keeps Ready and Merging (an old-rules lane has them)', !!(await hover(bar, (t) => t.includes('Each colour is a category'))) && JSON.stringify(await legendRow('passed').locator('.lanes-legend-stage').allInnerTexts()) === '["Ready","Merging"]', await tipText())
     await shoot('3b-old-rules-solo', () => hover(seg(m.n), (t) => t.includes('Merging card')))
+    // A crowded header (HI-3209): old rules, "into integration", the card and the count beside the pair and its slot. The
+    // project's link keeps a few letters, there to be seen and clicked (it was squeezed to nothing), and the header fits its
+    // row: in this narrow panel (its least width) the tags show as icons.
+    await page.mouse.move(5, 5)
+    for (const id of [l1, l2]) {
+      const crowded = row(id)
+      const link = crowded.locator('.progress-lane-project')
+      const shown = await waitHung(async () => {
+        if ((await crowded.locator('.lane-target').count()) !== 1) return null
+        return link.evaluate((el) => {
+          const b = el.getBoundingClientRect()
+          const top = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)
+          const header = el.parentElement.getBoundingClientRect()
+          // …and the header still fits its row: the count, its last part, inside it.
+          const count = el.parentElement.querySelector('.progress-lane-count')?.getBoundingClientRect()
+          return b.width >= 20 && !!top && el.contains(top) && !!count && count.right <= header.right + 0.5 ? { width: b.width } : null
+        })
+      })
+      const parts = async () => JSON.stringify(await crowded.locator('.progress-lane-top').evaluate((top) => [Math.round(top.getBoundingClientRect().width), ...[...top.children].map((c) => `${c.className.replace(/\s+/g, '.')}=${Math.round(c.getBoundingClientRect().width)}`)]))
+      check(`a crowded lane header (into integration) keeps its project's link visible and clickable (${id === l1 ? 'l1' : 'l2'})`, !!shown, await parts())
+    }
 
     // The lane ends: its mark goes. A new lane uses the new options.
     const ended = await api('POST', `/v1/lanes/${l1}/end`, { abandoned: true })
@@ -314,7 +336,8 @@ const beta = path.join(fx.ws, 'beta')
     const rowJa = await waitHung(async () => (await panelJa.locator(`.progress-lane[data-lane="${l2}"]`).count()) === 1)
     if (!rowJa) await page.screenshot({ path: path.join(fx.shots, 'ja-no-lane.png') })
     const tagJa = panelJa.locator(`.progress-lane[data-lane="${l2}"] .progress-lane-state.old-rules`)
-    check('ja: the old rules mark in Japanese', !!(await waitHung(async () => (await tagJa.innerText().catch(() => '')) === '旧ルール')), await panelJa.innerText().catch(() => ''))
+    // Its words (a narrow panel shows its icon instead, HI-3209: the words are still its text).
+    check('ja: the old rules mark in Japanese', !!(await waitHung(async () => ((await tagJa.textContent().catch(() => '')) ?? '').trim() === '旧ルール')), await panelJa.innerText().catch(() => ''))
     const barJa = panelJa.locator('.progress-lanes-bar')
     check('ja: the legend in Japanese', !!(await hover(barJa, (t) => t.includes('各色はカテゴリ'))), await tipText())
     const shootJa = async (name, show) => {
@@ -329,10 +352,8 @@ const beta = path.join(fx.ws, 'beta')
     await shootJa('5-ja-old-rules', () => hover(tagJa, (t) => t.includes('旧ルール')))
 
     // --- pt-BR (#1496): its Todo column is "A\u00a0fazer", its stage "A fazer"; the legend names it once, no stage under it.
-    const ptDir = path.join(lib.ROOT, 'locales', 'pt-BR')
-    const pt = Object.assign({}, ...fs.readdirSync(ptDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(ptDir, f), 'utf8'))))
-    const base = (await h.inv('app:info')).language
-    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: { ...base, code: 'pt-BR', locale: 'pt-BR', messages: pt } })
+    // Main reads pt-BR's catalogue; Japanese's, which app:info's language has here, isn't sent (lib.speakLanguage, HI-3434).
+    const pt = await lib.speakLanguage(h.app, (await h.inv('app:info')).language, 'pt-BR')
     const ptTitle = pt['board.lanes.legendTitle']
     check('pt-BR: the legend in Portuguese', !!(await hover(barJa, (t) => t.includes(ptTitle))), await tipText())
     const todoRow = page.locator('.tip .lanes-legend-row[data-category="todo"]')

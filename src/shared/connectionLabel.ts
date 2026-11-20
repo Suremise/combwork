@@ -67,7 +67,7 @@ export function offeredConnections(view: ConnectionsView | null, settings: Param
 }
 
 /**
- * What to offer where nothing can start here for want of a connection (HI-2650, Darren 6 Nov: nothing is turned on by
+ * What to offer where nothing can start here for want of a connection (HI-2650: nothing is turned on by
  * itself): the accounts that are off in this workspace, never turned on until the user clicks.
  * - Eligible: Combwork's accounts (not a CLI's own home) whose CLI the view lists (on in Settings, with connections), not
  *   a test copy's CLI on its test home, and not on here. `cli`: that CLI's only (a project's agents' CLI).
@@ -84,6 +84,17 @@ export function offHereChoice(view: Pick<ConnectionsView, 'connections' | 'homes
   if (offer.length === 1) return { kind: 'one', id: offer[0].id, name: offer[0].name, cli: offer[0].provider }
   const clis = [...new Set(offer.map((a) => a.provider))]
   return { kind: 'several', names: offer.map((a) => a.name), ...(clis.length === 1 ? { cli: clis[0] } : {}) }
+}
+
+/**
+ * Whether every account of `cli` on in the workspace is known to be signed out (HI-3278): each a sign-in account whose
+ * latest check said not signed in. One signed in, a server account (no sign-in), or one not checked yet (unknown) says no,
+ * as does none on (Provider Setup says that its own way). From the checks Combwork already keeps: no CLI is run for it.
+ */
+export function noneSignedInHere(view: Pick<ConnectionsView, 'connections' | 'workspace'>, cli: ProviderId): boolean {
+  const on = view.workspace[cli]?.on ?? []
+  const accounts = on.map((id) => view.connections.find((a) => a.id === id))
+  return !!accounts.length && accounts.every((a) => !!a && a.kind !== 'server' && a.observed?.loggedIn === false)
 }
 
 /**

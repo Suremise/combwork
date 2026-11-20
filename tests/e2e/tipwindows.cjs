@@ -19,8 +19,11 @@ const check = (name, ok, extra = '') => {
 }
 
 // The tips in the order they show, and the second agent's tip, from the source, with any spacing between an entry's
-// fields (one written `'language',group` was missed, so never marked seen, and showed instead: #1337).
-const src = fs.readFileSync(path.join(lib.ROOT, 'src', 'shared', 'tips.ts'), 'utf8')
+// fields (one written `'language',group` was missed, so never marked seen, and showed instead: #1337). Each provider's
+// tips are in its shared half (HI-3201: src/shared/providers/<id>/tips.ts), listed with Combwork's own.
+const providersDir = path.join(lib.ROOT, 'src', 'shared', 'providers')
+const tipFiles = [path.join(lib.ROOT, 'src', 'shared', 'tips.ts'), ...fs.readdirSync(providersDir).map((p) => path.join(providersDir, p, 'tips.ts')).filter((f) => fs.existsSync(f))]
+const src = tipFiles.map((f) => fs.readFileSync(f, 'utf8')).join('\n')
 const ORDER = [...src.matchAll(/\{\s*id: '([^']+)',\s*group: '[^']+',\s*order: (\d+)/g)].sort((a, b) => Number(a[2]) - Number(b[2])).map((m) => m[1])
 const MOMENT = /'second-agent': '([^']+)'/.exec(src)?.[1]
 // A title in English, or a message's English (#767): `title: msg({ id: '…', defaultMessage: '…'`.
@@ -48,6 +51,8 @@ const TITLE = (id) =>
 
   let { app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
+  // Window 1 focused (a tip waits for a focused window, and a test copy never has the focus: HI-3404); window 2 isn't.
+  await lib.stubFocus(app)
   await lib.openWorkspace(inv, page, wsA)
   // The second window starts before either change, so its copy of the state has neither.
   const next = app.waitForEvent('window')
@@ -64,9 +69,9 @@ const TITLE = (id) =>
   await lib.addAgent(inv, alpha, { name: 'One' })
   await lib.addAgent(inv, alpha, { name: 'Two' })
   const card = page.locator('.tip-card')
-  check("window 1 shows the second agent's tip", !!(await lib.until(async () => (await card.count()) === 1 && (await card.locator('.tip-title').innerText()) === TITLE(MOMENT), 8000)), await card.locator('.tip-title').innerText().catch(() => 'no card'))
+  check("window 1 shows the second agent's tip", !!(await lib.until(async () => (await card.count()) === 1 && (await card.locator('.tip-title').innerText()) === TITLE(MOMENT), lib.timing('hang.ui'))), await card.locator('.tip-title').innerText().catch(() => 'no card'))
   await card.getByRole('button', { name: 'Close' }).click()
-  const seen = await lib.until(async () => ((await inv('ui:get')).tips?.seen ?? []).includes(MOMENT), 5000)
+  const seen = await lib.until(async () => ((await inv('ui:get')).tips?.seen ?? []).includes(MOMENT), lib.timing('hang.ui'))
   check('…and it is saved as seen', !!seen)
 
   // Window 2, whose copy has neither, runs a command (every command run is noted for the tips).
@@ -74,7 +79,7 @@ const TITLE = (id) =>
   const both = await lib.until(async () => {
     const t = (await inv('ui:get')).tips ?? {}
     return t.used?.length && t.seen?.includes(MOMENT) && t.moments?.includes('second-agent') ? t : null
-  }, 5000)
+  }, lib.timing('hang.ui'))
   const t = both ?? (await inv('ui:get')).tips
   check("window 2's command keeps what window 1 saw: the tip, its moment and the command are all saved", !!both, JSON.stringify({ used: t?.used, seenMoment: t?.seen?.includes(MOMENT), moments: t?.moments }))
 
@@ -91,13 +96,14 @@ const TITLE = (id) =>
   ;({ app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } }))
   page.on('pageerror', (e) => check('no page errors (restarted)', false, e.message))
   for (const w of app.windows().slice(1)) await w.close().catch(() => undefined)
+  await lib.stubFocus(app)
   const kept = (await inv('ui:get')).tips
   check('restarted: the tip seen in window 1 is still seen', kept?.seen?.includes(MOMENT) && kept.used?.length > 0, JSON.stringify(kept))
   await inv('ui:changeTips', { shownOn: '2000-01-01' })
   await page.reload()
   await lib.appReady(page)
   const card2 = page.locator('.tip-card')
-  const shown = await lib.until(async () => ((await card2.count()) === 1 ? await card2.locator('.tip-title').innerText() : null), 10000)
+  const shown = await lib.until(async () => ((await card2.count()) === 1 ? await card2.locator('.tip-title').innerText() : null), lib.timing('hang.ui'))
   check("restarted, the next day: the tip shown is the one not yet seen, not window 1's again", shown === TITLE(last), String(shown))
   await page.screenshot({ path: path.join(lib.WORK, 'tipwindows-restarted.png') })
 

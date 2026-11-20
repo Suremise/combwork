@@ -17,7 +17,7 @@ const { createHash } = require('crypto')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'carryingon-profile')
 const ws = path.join(lib.WORK, 'carryingon-ws')
@@ -74,7 +74,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       // log: typed, then a pause before its Enter on purpose (it reads a typed line before its Enter, as a CLI does).
       if (id !== codex.id) return lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
       await inv('pty:write', lib.ptyKey(alpha, id), text)
-      await lib.sleep(300)
+      await lib.sleep(lib.timing('pace.keysThenEnterMs'))
       await inv('pty:write', lib.ptyKey(alpha, id), '\r')
     }
     const homeOf = (a) => (a.provider === 'codex' ? codexHome : claudeHome)
@@ -109,7 +109,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
         input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
         env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }),
-        timeout: 60000
+        timeout: lib.timing('spawn.hang')
       }).toString()
       const r = JSON.parse(out.split('\n')[0]).result
       return { text: r.content[0].text, isError: !!r.isError }
@@ -127,12 +127,12 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     let k = 0
     const heldTurn = (a) => {
       const n = ++k
+      const go = (f) => fs.writeFileSync(path.join(homeOf(a), f), '')
       if (a.provider === 'codex') {
-        // "hold" waits for a "g" typed into it; its turn ends once its tool has (a second hold could miss its key while
-        // the checkpoint reads the inbox).
-        return { start: () => say(a.id, 'hold then checkpoint'), tool: () => inv('pty:write', lib.ptyKey(alpha, a.id), 'g'), end: async () => undefined, holdsEnd: false }
+        // Its tool waits for a file, never a key typed into its pane (HI-3403: a key is the user typing, whose pause holds
+        // the idle wake 15 s); its turn ends once its tool has.
+        return { start: () => say(a.id, `waitfile carry-tool${n} then checkpoint`), tool: () => go(`carry-tool${n}`), end: async () => undefined, holdsEnd: false }
       }
-      const go = (f) => fs.writeFileSync(path.join(claudeHome, f), '')
       return { start: () => say(a.id, `waitfile carry-tool${n} then checkpoint then holduntil carry-end${n}`), tool: () => go(`carry-tool${n}`), end: () => go(`carry-end${n}`), holdsEnd: true }
     }
 

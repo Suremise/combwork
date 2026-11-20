@@ -115,20 +115,20 @@ describe("forAgents: agents' own words as agent messages", () => {
     expect(apiErrorReply(e)).toEqual({ status: 404, body: { error: 'Unknown task #4096' } })
   })
 
-  it('agentBusyError says what the Agent API always said, for each status and one it has no words for', () => {
+  it('agentBusyError says what the Agent API always said, for each status and one it has no words for; a watch its ways on (HI-3361)', () => {
     const tail = ". Start the task once it's idle, or give it to another agent."
     const want: Record<string, string> = {
-      working: 'is working',
-      starting: 'is starting',
-      waiting: 'is waiting for the user',
-      background: 'is waiting on background tasks it started',
-      watching: 'is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header)',
-      constructor: 'is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header)'
+      working: `is working${tail}`,
+      starting: `is starting${tail}`,
+      waiting: `is waiting for the user${tail}`,
+      background: `is waiting on background tasks it started${tail}`,
+      watching: 'is waiting on cards (a card watch): it takes no other work until it is woken. If it builds a lane, put the card in that lane where it should go (cw_lane start), and Combwork starts it on HB1 in turn; otherwise give it to another agent, or leave HB1 a message for the work it waits on (cw_message_agent), which wakes it and keeps its watch.',
+      constructor: 'is waiting on cards (a card watch): it takes no other work until it is woken. If it builds a lane, put the card in that lane where it should go (cw_lane start), and Combwork starts it on HB1 in turn; otherwise give it to another agent, or leave HB1 a message for the work it waits on (cw_message_agent), which wakes it and keeps its watch.'
     }
     for (const [status, words] of Object.entries(want)) {
       const e = agentBusyError('HB1', status)
-      expect(e.message, status).toBe(`HB1 ${words}${tail}`)
-      expect(asAgent(() => apiErrorReply(e)).body.error, status).toBe(`HB1 ${words}${tail}`)
+      expect(e.message, status).toBe(`HB1 ${words}`)
+      expect(asAgent(() => apiErrorReply(e)).body.error, status).toBe(`HB1 ${words}`)
     }
   })
 

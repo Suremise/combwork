@@ -31,6 +31,7 @@ const M = {
   env: msg({ id: 'content.mcp.env', defaultMessage: 'Environment: {items}', description: "An MCP server's environment variables, shown before it is turned on: {items} lists them, each NAME=${VAR} (a reference, as it is) or \"NAME (set)\"." }),
   headers: msg({ id: 'content.mcp.headers', defaultMessage: 'Headers: {items}', description: "An MCP server's HTTP headers, shown before it is turned on: {items} lists them, each Name=${VAR} (a reference, as it is) or \"Name (set)\"." }),
   set: msg({ id: 'content.mcp.set', defaultMessage: '{name} (set)', description: "An environment variable or header ({name}) an MCP server's definition gives a value of its own, not shown (it may be a secret)." }),
+  placesChanged: msg({ id: 'mcp.error.placesChanged', defaultMessage: 'Where {name} is added changed while you were replacing it, so nothing was changed: look again.', description: 'An error replacing an MCP server (HI-3327): a project (or the Combwork Assistant) gained or lost the server after the Replace question showed where it is added (those places keep it), so nothing was written. {name} is the server.' }),
   zipLarge: msg({ id: 'content.mcp.zipLarge', defaultMessage: 'The .zip is too large for an MCP server (over {mb} MB unpacked).', description: 'An error adding an MCP server from a .zip: its files take more than {mb} MB unpacked.' })
 }
 
@@ -586,6 +587,15 @@ export async function previewMcpFile(file: string): Promise<McpFileServer> {
   return { name: r.name, def, runs: mcpRuns(def), secretWarnings: findSecretWarnings(def), files: r.files?.size ?? 0, exists: serverExists(r.name, !!r.files) }
 }
 
+/**
+ * HI-3371: whether a name chosen for a server being added is taken, as an add would refuse it (writeServerNow): by a
+ * definition, or for one that brings a folder (a .zip) by a folder of that name, even one left without its definition
+ * (which lists no server). A name that isn't a server's name takes nothing.
+ */
+export function mcpNameTaken(name: string, folder: boolean): boolean {
+  return validMcpName(name) && serverExists(name, folder)
+}
+
 /** A server named so: its definition, or (for a .zip) its folder. */
 function serverExists(name: string, folder: boolean): boolean {
   return existsSync(join(workspace.mcpDir, `${name}.json`)) || (folder && existsSync(join(workspace.mcpDir, name)))
@@ -594,34 +604,50 @@ function serverExists(name: string, folder: boolean): boolean {
 /**
  * Adds a server from a .json or .zip as `name`, added nowhere (HI-2059): it runs nothing until it is added to a project
  * or the Assistant, which shows what it runs first. A name in use is refused unless `replace`, which moves the
- * old definition (and its folder) to the Recycle Bin. Everything is read and checked before anything is written, and
- * the change is one turn with Adds (inTurn): an Add waiting meanwhile was for the old definition, so it is refused
- * (addMcpTo's expected).
+ * old definition (and its folder) to the Recycle Bin and keeps its places, those shown (`places`, HI-3327). Everything
+ * is read and checked before anything is written, and the change is one turn with Adds (inTurn): an Add waiting
+ * meanwhile was for the old definition, so it is refused (addMcpTo's expected).
  */
-export async function addMcpFromFile(file: string, name: string, replace = false): Promise<McpServerInfo> {
+export async function addMcpFromFile(file: string, name: string, replace = false, places?: McpPlaces): Promise<McpServerInfo> {
   if (!validMcpName(name)) throw combworkError(M.badName, undefined, { kind: 'invalid' })
   const r = await readServerFile(file)
   const def = r.folder ? retarget(r.def, r.folder, name) : r.def
-  return inTurn(() => writeServerNow(name, def, r.files, replace))
+  return inTurn(() => writeServerNow(name, def, r.files, replace, places))
+}
+
+/** Where a server is added, as a Replace or an Update showed it (HI-3327): those places keep it. */
+export type McpPlaces = { projects: string[]; assistant: boolean }
+
+/** Whether the places a server is added now are those shown (paths compared without case, in any order). */
+export function samePlaces(now: McpPlaces, shown: McpPlaces): boolean {
+  const key = (l: string[]): string => JSON.stringify(l.map((x) => x.toLowerCase()).sort())
+  return key(now.projects) === key(shown.projects) && now.assistant === shown.assistant
 }
 
 /**
  * Writes a server's definition (and a .zip's folder) as `name`, in a turn (the caller's). A name in use is refused
  * unless `replace`, which moves the old definition (and, when this one brings a folder, the old folder) to the Recycle
- * Bin. Without `keepPlaces` it is removed everywhere first (HI-2059: added nowhere, refused while a project can't be
- * read); with it (a catalogue update whose places were just checked, HI-545), the places keep it. Returns the server
- * as listed.
+ * Bin. Replacing a definition that is there keeps its places (HI-3327: an upgrade, from a file or a catalogue, leaves
+ * it added where it was): they are read strictly now (placesNow: a project that can't be read refuses it, HI-2059
+ * round 1) and must be those the user was shown (`places`), or nothing is written. With no definition there (a new
+ * name, or one deleted by hand) it is removed everywhere first, so an old choice never adds it (HI-2059). Returns the
+ * server as listed.
  */
-export async function writeServerNow(name: string, def: McpServerDef, files: Map<string, Uint8Array> | null, replace: boolean, keepPlaces = false): Promise<McpServerInfo> {
+export async function writeServerNow(name: string, def: McpServerDef, files: Map<string, Uint8Array> | null, replace: boolean, places?: McpPlaces): Promise<McpServerInfo> {
   const taken = (): Error => combworkError(msg({ id: 'content.mcp.taken', defaultMessage: 'A server named "{name}" already exists: choose another name, or replace it.', description: 'An error adding an MCP server from a file under the name {name}, which a server of the workspace has.' }), { name }, { kind: 'conflict' })
   const dir = workspace.mcpDir
   const json = join(dir, `${name}.json`)
   const folder = join(dir, name)
   if (serverExists(name, !!files) && !replace) throw taken()
   await mkdir(dir, { recursive: true })
-  // Removed everywhere before it exists: a name added earlier (the old server, or a definition deleted by hand) mustn't
-  // add it anywhere.
-  if (!keepPlaces) await removeEverywhere(name)
+  if (replace && existsSync(json)) {
+    // An upgrade: its places keep it, if they are still those shown.
+    const now = await placesNow(name)
+    if (!samePlaces(now, places ?? { projects: [], assistant: false })) throw combworkError(M.placesChanged, { name }, { kind: 'conflict' })
+  } else {
+    // Removed everywhere before it exists: a name added earlier (a definition deleted by hand) mustn't add it anywhere.
+    await removeEverywhere(name)
+  }
   if (replace) {
     // A .zip brings its own folder; a .json keeps the one there (its definition may run what is in it).
     if (files && existsSync(folder)) await trash(folder)
@@ -657,7 +683,7 @@ export async function writeServerNow(name: string, def: McpServerDef, files: Map
 async function projectDefs(projectPath: string): Promise<Record<string, McpServerDef>> {
   const defs: Record<string, McpServerDef> = {}
   for (const p of allProviders()) {
-    for (const [n, d] of Object.entries(await p.projectMcpServers(projectPath).catch(() => ({})))) defs[n] ??= d
+    for (const [n, d] of Object.entries((await p.projectFiles?.projectMcpServers(projectPath).catch((): Record<string, McpServerDef> => ({}))) ?? {})) defs[n] ??= d
   }
   return defs
 }

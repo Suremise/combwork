@@ -1,4 +1,4 @@
-// The real OpenCode (the pinned 2.2.6) through Combwork (HI-2763), under Darren's HI-2758 option A: no account, key, sign-in
+// The real OpenCode (the pinned 2.2.6) through Combwork (HI-2763), under HI-2758's option A: no account, key, sign-in
 // or cloud call; model turns only to the PC's local Ollama qwen3:8b, through a logging proxy here, so every request the
 // model got is on record. The pinned build (opencode-windows-x64.zip of v2.2.6, its opencode.exe's SHA-256 checked) as
 // Combwork selects it, run in this test copy's own profile (its account's roots and launch config in the test data; the
@@ -18,9 +18,9 @@ const http = require('http')
 const crypto = require('crypto')
 const { processes } = require('./folderProcesses.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 // A real model turn on a local model: bounded, never how long it should take.
-const TURN_MS = 240000
+const TURN_MS = lib.timing('turn.realMs')
 
 const PINNED = path.join(process.env.LOCALAPPDATA || '', 'combwork-test', 'opencode-2.2.6', 'opencode.exe')
 const PINNED_SHA256 = '98cb0aa854c7c015cf6febafa7afb872c359bfe5a823a526f3b4fd347a9e9677'
@@ -73,7 +73,7 @@ const portOpen = (port) => new Promise((resolve) => {
 })
 /** The local Ollama's models, or null when it doesn't answer. */
 const ollamaModels = () => new Promise((resolve) => {
-  const req = http.get({ ...OLLAMA, path: '/api/tags', timeout: 5000 }, (res) => {
+  const req = http.get({ ...OLLAMA, path: '/api/tags', timeout: lib.timing('hang.ui') }, (res) => {
     let b = ''
     res.on('data', (d) => (b += d))
     res.on('end', () => {
@@ -141,7 +141,7 @@ function proxy() {
   }
   const models = await ollamaModels()
   if (!models?.includes(MODEL)) {
-    console.log(`SKIP environment: no local Ollama with ${MODEL} at ${OLLAMA.host}:${OLLAMA.port} (${models ? models.join(', ') || 'no models' : 'not answering'}): Darren pulls it by hand`)
+    console.log(`SKIP environment: no local Ollama with ${MODEL} at ${OLLAMA.host}:${OLLAMA.port} (${models ? models.join(', ') || 'no models' : 'not answering'}): the user pulls it by hand`)
     process.exit(0)
   }
   const before = snapshot()

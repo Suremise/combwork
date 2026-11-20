@@ -26,13 +26,15 @@ import { admitted } from './admitted'
 import { harness } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
 import { B1, moved } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 export const closers: (() => void)[] = []
 afterEach(() => {
   for (const c of closers.splice(0)) c()
 })
 
-export const opts = { ...preset('jj', 'pair', { quick: [], tests: [], target: 'main' }), preChecks: [], mergeChecks: [] }
+// The user integrating (HI-2868's tests' premise); HI-3235's Combwork advance is asked for with `world(…, { advance: true })`.
+export const opts = { ...preset('jj', 'pair', { quick: [], tests: [], target: 'main' }), preChecks: [], mergeChecks: [], finish: 'userIntegrates' as const }
 export const OPEN = (slot: string) => ({ held: true, print: `lease:open:${slot}:-:-:-` })
 export const ENDED = (slot: string) => ({ held: false, print: `lease:ended:${slot}:-:-:-` })
 export const BUSY = (slot: string) => ({ held: false, print: `lease:open:${slot}:op-1:-:-` })
@@ -40,7 +42,8 @@ export const BUSY = (slot: string) => ({ held: false, print: `lease:open:${slot}
 /** A jj project with a workspace database, two slots, J9a's port on its bindings, and a Workflow composed with jj's deps. */
 /** `candidates`: HI-2871's candidate step on (its attempts journalled in the database, as the app's). */
 /** `oneSlot`: slot-a only, for a file whose cards are all B1's (HI-3018: a slot is a dozen jj runs a test never uses). */
-export async function world(colocated: boolean, o: { hook?: (point: JjIntegrationPoint) => Promise<void> | void; candidates?: boolean; oneSlot?: boolean } = {}) {
+/** `advance` (HI-3235): the finish is Combwork's advance ('preview', HI-3236: preview and click), its hook placed at `advanceHook`. */
+export async function world(colocated: boolean, o: { hook?: (point: JjIntegrationPoint) => Promise<void> | void; candidates?: boolean; oneSlot?: boolean; advance?: boolean | 'preview'; advanceHook?: JjCardDeps['advanceHook']; advanceTestStop?: boolean } = {}) {
   const h = harness()
   const { repo, root } = h.repo(`cards${colocated ? 'c' : 'n'}`, colocated)
   const home = tempDir('jjcards-')
@@ -80,7 +83,7 @@ export async function world(colocated: boolean, o: { hook?: (point: JjIntegratio
   const bundles = new Map<string, JjBundle[]>()
   const gitOn = (gitDir: string, args: readonly string[]) => {
     try {
-      const buf = execFileSync('git', ['--git-dir', gitDir, ...args], { env: h.env, windowsHide: true, timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+      const buf = execFileSync('git', ['--git-dir', gitDir, ...args], { env: h.env, windowsHide: true, timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
       return Promise.resolve({ ok: true, out: buf.toString('utf8'), err: '', buf, code: 0 })
     } catch (e) {
       const x = e as { stdout?: Buffer; stderr?: Buffer; status?: number }
@@ -110,6 +113,8 @@ export async function world(colocated: boolean, o: { hook?: (point: JjIntegratio
           }
         : {})
     },
+    ...(o.advanceHook ? { advanceHook: o.advanceHook } : {}),
+    ...(o.advanceTestStop ? { advanceTestStop: true } : {}),
     slotHold: (lease) => holds.get(lease) ?? null,
     pins: { read: (ref) => pins.get(ref) ?? null, write: async (ref, rec) => void pins.set(ref, rec) }
   }
@@ -118,7 +123,7 @@ export async function world(colocated: boolean, o: { hook?: (point: JjIntegratio
       store: s,
       project: repo,
       projectKey: 'AM',
-      options: () => opts,
+      options: () => (o.advance ? { ...opts, finish: o.advance === 'preview' ? ('previewAdvance' as const) : ('combworkAdvances' as const) } : opts),
       slotFor: async (_card, builder) => ({ slot: builder === 'B2' ? 'slot-b' : 'slot-a', folder: slotOf(builder).folder, lease: slotOf(builder).lease, fresh: true }),
       slotUnused: async () => undefined,
       autoRun: false,

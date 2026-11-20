@@ -52,6 +52,7 @@ import type {
   ToastMessage,
   OpenProgress,
   CloseCommandRun,
+  ClosingAgentsState,
   WorkspaceInfo
 } from '@shared/types'
 import type { QueueView } from '@shared/workflow/queue'
@@ -216,6 +217,8 @@ interface State {
   advanced: AdvancedState | null
   /** Moves on each time main says Combwork's accounts changed (HI-980): Settings → Accounts reads them again. */
   connectionsChanged: number
+  /** The user's own CLIs as main read them last (HI-3196): its generation moves views that list providers on. */
+  clis: import('@shared/providers/cliSnapshot').CliSnapshotView | null
   workspace: WorkspaceInfo | null
   /** The recent workspaces as this window sees them (#144). */
   recent: RecentWorkspace[]
@@ -223,6 +226,8 @@ interface State {
   openProgress: OpenProgress | null
   /** This window's close command (HI-1368) while it runs or after it failed: CloseCommandPanel; null: none. */
   closeCommand: CloseCommandRun | null
+  /** HI-3376: this window waiting for agents to close (its workspace closing or switching, or Combwork quitting): ClosingAgentsPanel; null: none. */
+  closingAgents: ClosingAgentsState | null
   /** Each provider's installed CLI (install state, version, sign-in, readiness). */
   providers: Record<ProviderId, AgentInstallInfo>
   /** Whether git itself runs (#346); null until asked. */
@@ -313,6 +318,8 @@ interface State {
   mcpPick: McpCatalogRow | null
   /** Bumped to read the catalogues again (the view's ↻, an install or update). */
   mcpCatalogVersion: number
+  /** HI-3377: the catalogue server being downloaded for Install or Update now, and its preparation's id (its Cancel names it). */
+  catalogPreparing: { source: string; name: string; op: string } | null
   /** The mode open in the Modes view (its file). */
   selectedMode: string | null
   /** What the Assistant view's main area shows: its conversations or the selected mode. */
@@ -571,10 +578,12 @@ export const useStore = create<State>(() => ({
   settings: null,
   advanced: null,
   connectionsChanged: 0,
+  clis: null,
   workspace: null,
   recent: [],
   openProgress: null,
   closeCommand: null,
+  closingAgents: null,
   providers: {},
   gitTool: null,
   planUsage: {},
@@ -626,6 +635,7 @@ export const useStore = create<State>(() => ({
   mcpTab: 'installed',
   mcpPick: null,
   mcpCatalogVersion: 0,
+  catalogPreparing: null,
   selectedMode: null,
   assistantSection: 'conversations',
   journalVersion: 0,
@@ -742,7 +752,9 @@ export const useStore = create<State>(() => ({
   taskDoing: null,
   removeProjectFor: null,
 
-  windowFocused: true,
+  // Not focused until main says so (HI-3404): the page asks as it starts, and until the answer nothing on screen counts
+  // as seen and no pop-up's clock runs.
+  windowFocused: false,
   maximized: false,
   alwaysOnTop: false,
   notesVersion: 0,

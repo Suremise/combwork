@@ -14,7 +14,7 @@ const fs = require('fs')
 const http = require('http')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'servers-profile')
 const home = path.join(lib.WORK, 'servers-claude-home')
@@ -145,7 +145,7 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     check('an agent on it launches with its base URL and the placeholder, no key', local?.env.ANTHROPIC_BASE_URL === `http://127.0.0.1:${port}` && local?.env.ANTHROPIC_AUTH_TOKEN === 'none' && local?.env.ANTHROPIC_MODEL === 'qwen3:8b', JSON.stringify(local?.env))
     check('HI-2682: …with no limits set, the default output budget, effort auto and no thinking, and no context (Claude Code assumes 200K)', local?.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS === '8192' && local?.env.CLAUDE_CODE_EFFORT_LEVEL === 'auto' && local?.env.MAX_THINKING_TOKENS === '0' && !('CLAUDE_CODE_MAX_CONTEXT_TOKENS' in (local?.env ?? {})), JSON.stringify(local?.env))
     check('HI-2684: …its /model lineup is the connection’s models by their exact IDs, the built-in rows replaced (no Claude model among them)', JSON.stringify(local?.picker) === JSON.stringify({ options: [{ model: 'qwen3:8b', description: 'Ollama' }, { model: 'devstral:24b', description: 'Ollama' }], replaceBuiltInOptions: true }), JSON.stringify(local?.picker))
-    // Its conversation runs only on a server on this PC: free (Darren, 27 Oct), whatever the CLI reports.
+    // Its conversation runs only on a server on this PC: free, whatever the CLI reports.
     await lib.until(async () => ['idle', 'ready'].includes((await live('a-two'))?.status), HUNG_MS)
     await lib.sendPrompt(inv, lib.ptyKey(alpha, 'a-two'), 'hello', { submitted: async () => !!(await live('a-two'))?.costFree })
     const twoPane = page.locator('.agent-pane', { has: page.locator('.pane-header-bar', { hasText: 'Two' }) })
@@ -281,7 +281,7 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     await page.keyboard.press('Escape')
     await lib.until(async () => (await page.locator('#conn-preset').count()) === 0, HUNG_MS)
 
-    // --- A cloud model Ollama lists (HI-1773, Darren 27 Oct): marked cloud, and the connection no longer free (local).
+    // --- A cloud model Ollama lists (HI-1773): marked cloud, and the connection no longer free (local).
     tags = [{ name: 'qwen3:8b' }, { name: 'devstral:24b' }, { name: 'mine', model: 'mine', remote_model: 'glm-4.6', remote_host: 'https://ollama.com:443' }]
     await inv('session:stop', alpha, 'a-two')
     await row('Ollama').locator('[data-read-models]').click()

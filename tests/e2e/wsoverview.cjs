@@ -6,7 +6,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'wsoverview-profile')
 const ws = path.join(lib.WORK, 'wsoverview-ws')
@@ -49,12 +49,7 @@ const check = (name, ok, extra = '') => {
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 950 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
-  const until = async (fn, ms = 10000) => {
-    const t = Date.now()
-    let v
-    while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
-    return v
-  }
+  const until = lib.until
   // delta is hidden: left out, with a note.
   await inv('project:remove', path.join(ws, 'delta'), 'hide')
   await inv('tasks:create', { title: 'Plan', project: 'alpha' })
@@ -142,13 +137,13 @@ const check = (name, ok, extra = '') => {
   await lib.fitWindow(app, page, { width: 1400, height: 950 })
 
   await rows.filter({ hasText: 'beta' }).click()
-  const opened = await until(async () => (await page.locator('.tab.active', { hasText: 'Overview' }).count()) === 1 && (await page.locator('.project-header, .project-title').first().innerText().catch(() => '')).includes('beta'), 5000)
+  const opened = await until(async () => (await page.locator('.tab.active', { hasText: 'Overview' }).count()) === 1 && (await page.locator('.project-header, .project-title').first().innerText().catch(() => '')).includes('beta'), lib.timing('hang.ui'))
   check("a project's row opens its Overview", !!opened)
   await page.screenshot({ path: path.join(lib.WORK, 'wsoverview-project.png') })
 
   // The project Overview at the same extremes (#307): beta's most recent session has data, and its details table
   // (model, version, started, last activity) scrolls inside itself, so the page doesn't widen; scrolled, it shows all.
-  check("the project Overview shows the session's details", !!(await until(async () => (await page.locator('.session-meta td', { hasText: 'Last activity' }).count()) === 1, 5000)))
+  check("the project Overview shows the session's details", !!(await until(async () => (await page.locator('.session-meta td', { hasText: 'Last activity' }).count()) === 1, lib.timing('hang.step'))))
   const projectFits = () =>
     page.evaluate(() => {
       const meta = document.querySelector('.session-meta')

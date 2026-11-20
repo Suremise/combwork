@@ -323,7 +323,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mode, view.agents, view.cards, view.hideFinished, view.tab, input]
   )
-  // One agent of the selection shown alone (HI-3180, Darren's decision): the strip's click. The selection, its tabs and
+  // One agent of the selection shown alone (HI-3180): the strip's click. The selection, its tabs and
   // the strip stay; a click on another switches, on that one (or Escape) shows them all again. The agent shown alone is
   // always the current tab's (HI-3186): one shown agent, so the tab and the strip mark the same one.
   const [showAlone, setShowAlone] = useState(false)
@@ -721,7 +721,7 @@ export function Details({ project, node, onClose }: { project: ProjectInfo; node
     case 'process': {
       const started = filetimeMs(node.process.created)
       rows.push([tr(M.pidLabel), String(node.process.pid)])
-      if (node.process.orphan) rows.push([tr(M.orphanLabel), tr(M.orphanFact)], [tr(M.cpuLabel), durationText(node.process.orphan.cpuMs, tr)])
+      if (node.process.orphan) rows.push([tr(M.orphanLabel), node.process.orphan.host ? tr(M.orphanHost) : node.process.orphan.run !== undefined ? tr(M.orphanHeld, { run: node.process.orphan.run }) : tr(M.orphanFact)], [tr(M.cpuLabel), durationText(node.process.orphan.cpuMs, tr)])
       if (node.process.parent) rows.push([tr(M.parentLabel), String(node.process.parent)])
       if (started) rows.push([tr(M.started), fmt.relative(started - Date.now())])
       input = node.process.command ?? node.process.label
@@ -851,7 +851,9 @@ const M = {
   openSession: msg({ id: 'activity.openSession', defaultMessage: 'Open in Sessions Tab', description: "A button in the Activity tab's details: opens the session's transcript in the Sessions tab." }),
   orphanFor: msg({ id: 'activity.orphanFor', defaultMessage: 'Left running · process {pid} · running {time} · CPU {cpu}', description: "A process node's second line in the Activity tab when the agent's command left it running, the shell that started it gone (HI-2111): its process id ({pid}), how long it has run ({time}: \"12 min\") and the processor time it has used ({cpu}: \"3 min\")." }),
   orphanLabel: msg({ id: 'activity.orphanLabel', defaultMessage: 'Left running', description: "A label in the Activity tab's details (HI-2111): the process was left running by the agent's command." }),
-  orphanFact: msg({ id: 'activity.orphanFact', defaultMessage: 'The process that started it has exited, and it has run for over ten minutes. The agent is told; Combwork doesn’t end it.', description: "The value beside Left running in the Activity tab's details (HI-2111): why this process counts as left running." }),
+  orphanFact: msg({ id: 'activity.orphanFact', defaultMessage: 'The process that started it has exited, and it has run for longer than Settings → Advanced allows. The agent is told; Combwork doesn’t end it.', description: "The value beside Left running in the Activity tab's details (HI-2111): why this process counts as left running (its wait is an advanced setting, “Processes left running: minutes before telling”)." }),
+  orphanHeld: msg({ id: 'activity.orphanHeld', defaultMessage: 'The process that started it has exited, but it belongs to the cw-progress run “{run}”, which is still running: nobody is told unless it outlives the run.', description: "The value beside Left running in the Activity tab's details (HI-3206): the process is part of a cw-progress run ({run}, its title) that is still running, so no notice goes out yet. Keep cw-progress as it is (a command)." }),
+  orphanHost: msg({ id: 'activity.orphanHost', defaultMessage: 'The process that started it has exited, but it is a known host that keeps running on purpose (Settings → Advanced): nobody is told.', description: "The value beside Left running in the Activity tab's details (HI-3206): the process is a known long-lived host (the Windows Sandbox guest's, an advanced setting), so no notice goes out for it." }),
   cpuLabel: msg({ id: 'activity.cpuLabel', defaultMessage: 'CPU time', description: "A label in the Activity tab's details (HI-2111): the processor time a process has used." }),
   endIt: msg({ id: 'activity.endIt', defaultMessage: 'End It…', description: "A button in the Activity tab's details for a process the agent's command left running (HI-2111): ends it, after a confirmation (…)." }),
   endButton: msg({ id: 'activity.endButton', defaultMessage: 'End Process…', description: "A button in the Activity tab's details: ends this one process of the agent's, after a confirmation (…)." }),

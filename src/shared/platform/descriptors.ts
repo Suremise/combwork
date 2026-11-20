@@ -3,6 +3,8 @@
 // platform comes to the window in ProjectInfo (`ProjectPlatform`), which formats revisions through `revisionShort`,
 // never by switching on an id.
 
+import type { Finisher } from '../workflow/options'
+
 export type PlatformId = 'none' | 'git' | 'jj'
 
 /**
@@ -57,7 +59,8 @@ export const OPERATIONS: readonly Operation[] = ['switchLine', 'createLine', 'de
 /**
  * How a platform's integration combines approved work (SPEC §16.3.1, HI-2822): merged from the card's line into a target
  * line (Git: targets, the merging finishers, the merge queue and its options), accepted where it is (None), or integrated
- * by the user once it passes (jj, HI-2799: option A, no automatic advance; Combwork merges nothing).
+ * on its candidate once it passes, never by the merge queue (jj: Combwork's advance by default, HI-3235, or the user's own
+ * move, HI-2799's option A).
  */
 export type Integration = 'merge' | 'accept' | 'user'
 
@@ -73,6 +76,14 @@ export interface PlatformDescriptor {
   integration: Integration
   /** What a code card delivers: commits, or declared paths (a submission's paths, their pre-fill and exclusions). */
   deliverables: Deliverables
+  /**
+   * HI-2840: the ways a card can finish on this platform (its integration modes), in the options form's order. The form
+   * offers these, a saved finish outside them is a contradiction, and nothing outside the descriptor lists them: a new
+   * mode is the descriptor's entry and its adapter's work, never a platform check in the workflow or the window.
+   */
+  finishes: readonly Finisher[]
+  /** HI-2840: the finish its projects get with every check off (allOff, a new project's options): one of `finishes`. */
+  defaultFinish: Finisher
   /**
    * Whether the platform needs its repository found in the project's folder (Git; §16.3.5): switching to it is refused
    * without one, and a project using it whose repository is gone is offered a switch. None works in any folder.
@@ -137,13 +148,14 @@ const short12 = (id: string): string => id.slice(0, 12)
 
 export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Git answers everything: worktrees for isolation, merges for integration, replay for sameness.
-  git: { id: 'git', name: 'Git', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe', 'retarget'], integration: 'merge', deliverables: 'commits', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] }, // i18n-ignore: a product name, the same in every language
+  git: { id: 'git', name: 'Git', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe', 'retarget'], integration: 'merge', deliverables: 'commits', finishes: ['combworkMerges', 'agentMerges', 'committed', 'notChecked'], defaultFinish: 'notChecked', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] }, // i18n-ignore: a product name, the same in every language
   // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
-  none: { id: 'none', name: 'None', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', repository: false, defaultTarget: false, operations: [], revisionShort: short, gates: [] }, // i18n-ignore: a product name, the same in every language
-  // jj (HI-2799, J6; SPEC §16.3.6): workspaces for isolation (J2), pinned history and attribution (J3). No integration, ever,
-  // under Darren's option A (HI-2794: no automatic advance, the user integrates), and no operation in the window (R5.2):
-  // jj itself changes bookmarks. Every gate is closed until its J card's evidence opens it.
+  none: { id: 'none', name: 'None', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', finishes: ['accept'], defaultFinish: 'accept', repository: false, defaultTarget: false, operations: [], revisionShort: short, gates: [] }, // i18n-ignore: a product name, the same in every language
+  // jj (HI-2799, J6; SPEC §16.3.6): workspaces for isolation (J2), pinned history and attribution (J3). No merge queue:
+  // a passed card's candidate is integrated by the adapter's advance (HI-3235, its residual
+  // races documented) or by the user, and no operation in the window (R5.2). Every other gate stays closed until its J
+  // card's evidence opens it.
   // Its workspaces are its own commands' records (HI-2795, HI-2866), and its agents get the jj rule (HI-2800): `jj`, or
   // `jj-separate` for a repository with no Git working copy beside it (HI-2896).
   jj: {
@@ -152,12 +164,17 @@ export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
     capabilities: ['revisions', 'isolation', 'containment', 'sameness', 'authorship', 'observe'],
     integration: 'user',
     deliverables: 'commits',
+    // HI-2840/HI-3235/HI-3236: Combwork's advance after the merge checks (its adapter's `advance` port), the default; the
+    // same advance once the user clicks Integrate on its preview (`advancePreview`); or the user integrating by hand.
+    finishes: ['combworkAdvances', 'previewAdvance', 'userIntegrates'],
+    defaultFinish: 'combworkAdvances',
     repository: true,
     defaultTarget: false,
     operations: [],
     revisionShort: short12,
     changeShort: short12,
-    gates: GATES,
+    // HI-3235: `advance` is open since Combwork's advance (HI-2840/s30's protocol, its residual races accepted).
+    gates: GATES.filter((g) => g !== 'advance'),
     ownedWorkspaces: true,
     guidance: { keys: ['jj', 'jj-separate'], key: (d) => (d?.jj && !d.jj.colocated ? 'jj-separate' : 'jj') },
     detectionSteady: true

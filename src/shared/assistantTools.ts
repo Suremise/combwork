@@ -87,6 +87,12 @@ export const ASSISTANT_TEMPLATE_TOOLS = ['cw_template']
 export const ASSISTANT_UNDO_TOOLS = ['cw_undo']
 
 /**
+ * HI-3188: a card's simplify check, told to the Assistant first: it answers carry on or simplify (the Agent API refuses
+ * the rest, the user's). At the control level that runs agents.
+ */
+export const ASSISTANT_ANSWER_TOOLS = ['cw_answer_simplify']
+
+/**
  * Connections (HI-2108): every Assistant lists them (a read: which one cw_add_agent names); making or changing one
  * needs Settings → Assistant → Control → Change settings, which the Agent API checks, and the tool's description says.
  * Project agents don't get it.
@@ -109,15 +115,15 @@ export const JOURNAL_TOOLS = ['cw_journal_write', 'cw_journal_recall', 'cw_journ
 export const AGENT_ONLY_TOOLS = ['cw_merge_slot', 'cw_start_card', 'cw_ask_assistant']
 
 /**
- * Worker-only tools (HI-2664, Darren's approval of s13): a builder's or reviewer's moves on a card it works on, which the
+ * Worker-only tools (HI-2664, s13 approved): a builder's or reviewer's moves on a card it works on, which the
  * Assistant (it coordinates cards, never builds, reviews or merges them) is never offered. Its own way to move a card
  * past its rules on the user's answer is cw_update_task, which stays; cw_ask_user, an intent it uses, stays too.
  */
 export const WORKER_ONLY_TOOLS: readonly string[] = [...INTENT_TOOLS.filter((t) => t !== 'cw_ask_user'), 'cw_focused_skip']
 
 /**
- * A project agent's tools by its side of the workflow (HI-2664, Darren 7 Nov: "Approve HI-2664 … role filtering in this
- * card"): a builder is never offered a reviewer's moves, nor a reviewer a builder's; an agent on both sides (`either`)
+ * A project agent's tools by its side of the workflow (HI-2664: role filtering): a builder is never offered a
+ * reviewer's moves, nor a reviewer a builder's; an agent on both sides (`either`)
  * or neither (a generalist, an Independent agent) gets both. The side is its saved role's alone (HR3's round 1: a lane
  * never narrows an either-role agent, nor gives a role the other side's tools; a lane's builder builds and its reviewer
  * reviews, as lanes.ts checks), fixed for the session: a role change restarts it (sessions.ts).
@@ -150,8 +156,8 @@ export interface WorkflowToolOptions {
 }
 
 /**
- * A project agent's tools its project's workflow makes unusable (HI-2694, Darren 7 Nov: launch-only, "agents shouldn't see
- * tools they can never use"): each with when it can be used, read off its handler's own refusals (runtime.ts), so a tool
+ * A project agent's tools its project's workflow makes unusable (HI-2694: launch-only, so agents
+ * never see tools they can never use): each with when it can be used, read off its handler's own refusals (runtime.ts), so a tool
  * is hidden only where every operation of it is refused. A tool not listed is never hidden for the workflow: one of its
  * operations works under any options (cw_queue's list, cw_loop_step with a lane's reviewer, cw_request_builder,
  * cw_declare_paths, cw_merge_slot, cw_lane, the builder's moves).
@@ -222,7 +228,7 @@ export function workflowAllows(launchedHidden: readonly string[], hiddenNow: rea
 }
 
 /** Tools only the Assistant has (project agents don't get them). cw_wait_for_agents isn't one: an agent waits on its project's agents too (#416). */
-export const ASSISTANT_ONLY_TOOLS = ['cw_agent_activity', 'cw_list_providers', 'cw_list_settings', 'cw_read_setting', ...ASSISTANT_AGENT_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...ASSISTANT_TEAM_TOOLS, ...ASSISTANT_BRANCH_TOOLS, ...ASSISTANT_TEMPLATE_TOOLS, ...ASSISTANT_CONNECTION_TOOLS, ...ASSISTANT_UNDO_TOOLS, ...ASSISTANT_PROJECT_TOOLS, ...ASSISTANT_SETTINGS_TOOLS, ...JOURNAL_TOOLS]
+export const ASSISTANT_ONLY_TOOLS = ['cw_agent_activity', 'cw_list_providers', 'cw_list_settings', 'cw_read_setting', ...ASSISTANT_AGENT_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...ASSISTANT_TEAM_TOOLS, ...ASSISTANT_BRANCH_TOOLS, ...ASSISTANT_TEMPLATE_TOOLS, ...ASSISTANT_CONNECTION_TOOLS, ...ASSISTANT_UNDO_TOOLS, ...ASSISTANT_ANSWER_TOOLS, ...ASSISTANT_PROJECT_TOOLS, ...ASSISTANT_SETTINGS_TOOLS, ...JOURNAL_TOOLS]
 
 const RANK: Record<AssistantControlLevel, number> = { look: 0, agents: 1, projects: 2 }
 
@@ -233,11 +239,11 @@ export function controlAllows(level: AssistantControlLevel | string | undefined,
 
 /** The tools an Assistant with this control level (and Change settings, its journal, on or off) may use without asking. */
 export function assistantTools(level: AssistantControlLevel | string | undefined, changeSettings = false, journal = false): string[] {
-  return [...(journal ? JOURNAL_TOOLS : []), ...ASSISTANT_READ_TOOLS, ...ASSISTANT_LANE_TOOLS, ...ASSISTANT_QUEUE_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...ASSISTANT_TEAM_TOOLS, ...ASSISTANT_TEMPLATE_TOOLS, ...ASSISTANT_CONNECTION_TOOLS, ...(controlAllows(level, 'agents') ? [...ASSISTANT_AGENT_TOOLS, ...TASK_TOOLS, ...INTENT_TOOLS.filter((t) => !WORKER_ONLY_TOOLS.includes(t)), ...ASSISTANT_UNDO_TOOLS, ...ASSISTANT_BRANCH_TOOLS] : []), ...(controlAllows(level, 'projects') ? ASSISTANT_PROJECT_TOOLS : []), ...(changeSettings ? ASSISTANT_SETTINGS_TOOLS : [])]
+  return [...(journal ? JOURNAL_TOOLS : []), ...ASSISTANT_READ_TOOLS, ...ASSISTANT_LANE_TOOLS, ...ASSISTANT_QUEUE_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...ASSISTANT_TEAM_TOOLS, ...ASSISTANT_TEMPLATE_TOOLS, ...ASSISTANT_CONNECTION_TOOLS, ...(controlAllows(level, 'agents') ? [...ASSISTANT_AGENT_TOOLS, ...TASK_TOOLS, ...INTENT_TOOLS.filter((t) => !WORKER_ONLY_TOOLS.includes(t)), ...ASSISTANT_UNDO_TOOLS, ...ASSISTANT_ANSWER_TOOLS, ...ASSISTANT_BRANCH_TOOLS] : []), ...(controlAllows(level, 'projects') ? ASSISTANT_PROJECT_TOOLS : []), ...(changeSettings ? ASSISTANT_SETTINGS_TOOLS : [])]
 }
 
 /**
- * The name agents see Combwork's own MCP server by (HI-2463, Darren's decision): `mcp__combwork__cw_inbox` in Claude
+ * The name agents see Combwork's own MCP server by (HI-2463): `mcp__combwork__cw_inbox` in Claude
  * Code, `combwork-cw_inbox` in Copilot, `[mcp_servers.combwork]` in Codex. Reserved: no workspace server may take it.
  */
 export const TOOLS_SERVER = 'combwork'
@@ -253,5 +259,5 @@ export const CW_TOOLS: readonly string[] = [
   'cw_message_agent', 'cw_hand_over', 'cw_list_tasks', 'cw_read_task', 'cw_read_attachment', 'cw_create_task', 'cw_update_task', 'cw_update_tasks', 'cw_reorder_tasks', 'cw_start_task', 'cw_list_skills', 'cw_wait_for_tasks',
   'cw_list_settings', 'cw_read_setting', 'cw_update_setting', 'cw_merge_slot', 'cw_lane', 'cw_queue', 'cw_release_slot', 'cw_team', 'cw_branch', 'cw_template', 'cw_connection', 'cw_inbox', 'cw_console',
   'cw_journal_write', 'cw_journal_recall', 'cw_journal_entry', 'cw_journal_update',
-  'cw_start_card', ...INTENT_TOOLS, 'cw_focused_skip', 'cw_ask_assistant', 'cw_undo'
+  'cw_start_card', ...INTENT_TOOLS, 'cw_focused_skip', 'cw_ask_assistant', 'cw_undo', 'cw_answer_simplify'
 ]

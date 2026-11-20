@@ -17,6 +17,7 @@ import type { PlatformId } from '../../src/shared/platform/descriptors'
 import { agentActor, agentOf, type Actor, type FactKind } from '../../src/shared/workflow/facts'
 import type { Refusal } from '../../src/shared/workflow/refusals'
 import type { StoredText } from '../../src/shared/types'
+import { timing } from '../timing.cjs'
 
 export const B1 = agentActor('B1')
 export const B2 = agentActor('B2')
@@ -28,14 +29,14 @@ const ID = ['-c', 'user.name=Combwork Test', '-c', 'user.email=test@example.inva
 const runContext = createRequire(import.meta.url)('../e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 
 /**
- * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Combwork's own git per
+ * HI-2025: the bound of a merge-queue test whose work is 65 to 110 git processes (Combwork's own git per
  * queue step, about 95% of its time; nothing in it waits for time). Alone they take 2 to 11 s. 15 such tests passed 20 s
  * (the run's limit, vitest.config.ts) in HI-2025's runs of the workflow files under load: 5 in the baseline run, 13 in
  * the run beside three other lanes' full unit runs (CPU at 80%), after git was made cheaper, and 1 in the first final
  * set (some in more than one). A bound for a hung run, as that limit is, never a wait: three times it. Each test that
  * takes it says why beside it; only those take it, and S27's second case, which shares its test.
  */
-export const GIT_HEAVY_MS = 60_000
+export const GIT_HEAVY_MS = timing('test.hang')
 
 /** git in a folder, as a person in a terminal would run it; its output. */
 export function sh(cwd: string, ...args: string[]): string {
@@ -101,6 +102,8 @@ export interface Env {
   queue: (cfg?: Partial<QueueConfig>) => MergeQueue
   /** Another Combwork on the same workspace: its own store connection and Workflow (§16.17). */
   another: () => Workflow
+  /** HI-3233: another project on the same board, with a repository of its own: its Workflow, store and folder. */
+  sibling: (name: string, key: string) => { wf: Workflow; store: FactStore; project: string }
   /** A store on a connection of its own to the workspace's combwork.db, as a restarted Combwork opens it (closed with the rest). */
   reopen: () => FactStore
   /** Facts of a card, by kind. */
@@ -109,7 +112,7 @@ export interface Env {
 }
 
 /** A scenario's world: Git (a repository) or None (a folder), with these options. */
-export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId }, extra: { releaseGrant?: (lane: string) => string | null; runsOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean; queueLive?: (target: string) => QueueLive; checksSettled?: () => Promise<void>; focused?: WorkflowConfig['focused']; hooks?: WorkflowConfig['hooks']; reviewersPresent?: WorkflowConfig['reviewersPresent'] } = {}): Env {
+export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId }, extra: { releaseGrant?: (lane: string) => string | null; runsOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean; queueLive?: (target: string) => QueueLive; checksSettled?: () => Promise<void>; focused?: WorkflowConfig['focused']; hooks?: WorkflowConfig['hooks']; reviewersPresent?: WorkflowConfig['reviewersPresent']; releaseReads?: WorkflowConfig['releaseReads']; guardLimits?: WorkflowConfig['guardLimits'] } = {}): Env {
   const home = tempDir('wf-')
   const project = join(home, 'project')
   if (options.platform === 'git') gitRepo(project)
@@ -126,11 +129,11 @@ export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId
   const wakes: Env['wakes'] = []
   const notes: Env['notes'] = []
   const stores: FactStore[] = [store]
-  const make = (s: FactStore) =>
+  const make = (s: FactStore, dir = project, key = 'AM') =>
     new Workflow({
       store: s,
-      project,
-      projectKey: 'AM',
+      project: dir,
+      projectKey: key,
       options: () => o,
       slots: join(home, 'slots'),
       runsOf: extra.runsOf,
@@ -142,6 +145,8 @@ export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId
       hooks: extra.hooks,
       reviewersPresent: extra.reviewersPresent,
       releaseGrant: extra.releaseGrant,
+      ...(extra.releaseReads ? { releaseReads: extra.releaseReads } : {}),
+      ...(extra.guardLimits ? { guardLimits: extra.guardLimits } : {}),
       // The P2 scenarios run the P4 runtime: reconciliation acts on what it observes (#1217: the app's P3 records only).
       reconcileActs: true,
       effects: { wake: (agent, card, why) => wakes.push({ agent, card: card.key, why }), notify: (card, text, shown) => notes.push({ card: card.key, text, ...(shown ? { shown } : {}) }) }
@@ -161,6 +166,12 @@ export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId
       const s = FactStore.open(boardFile(home), scope)
       stores.push(s)
       return make(s)
+    },
+    sibling: (name, key) => {
+      const dir = gitRepo(join(home, name))
+      const s = FactStore.open(boardFile(home), { project: name, key })
+      stores.push(s)
+      return { wf: make(s, dir, key), store: s, project: dir }
     },
     reopen: () => {
       const s = FactStore.open(boardFile(home), scope)

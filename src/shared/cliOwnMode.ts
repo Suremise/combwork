@@ -4,7 +4,7 @@ import type { ModeOption } from './providers'
 import type { PermissionMode } from './types'
 
 /**
- * "The CLI's own setting" (#1284, #966 row 1, Darren's decision on #1120 point 3): a permission choice every provider
+ * "The CLI's own setting" (#1284, #966 row 1, #1120 point 3): a permission choice every provider
  * offers beside its own modes. Combwork passes no mode flag, so the CLI starts in whatever its own config (or its default)
  * says. Combwork doesn't know which mode that is, so it shows this choice, never a guessed mode, and switches no mode live in
  * such a session (a switch restarts it in the mode chosen). The Combwork Assistant isn't offered it: Control relies on its

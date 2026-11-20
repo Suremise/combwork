@@ -1,5 +1,5 @@
 import type { AgentInstallInfo, AppSettings, CatalogModel, Account, Connection, EffortLevel, EffortOption, FallbackModel, ModelAlias, ModelCatalog, ModelSwitch, ProviderId } from './types'
-import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
+import { EFFORT_TEXT, OLDER_VERSIONS } from './providers/common'
 import { fmt } from './i18n'
 import { msg } from './i18n/msg'
 import { serverDefaultModel } from './serverConnection'
@@ -365,7 +365,7 @@ const aliasKey = (m: string): string => m.trim().toLowerCase().replace(/\[[^\]]*
 export function isUnresolvedAlias(provider: ProviderId, info: Info, model: string): boolean {
   const k = aliasKey(model)
   if (!k) return false
-  const known = (providerDescriptor(provider).capabilities.modelAliases ?? []).some((a) => aliasKey(a) === k) || !!info?.catalog?.models.some((m) => m.resolved && aliasKey(m.value) === k)
+  const known = (providerDescriptor(provider).capabilities.session?.modelAliases ?? []).some((a) => aliasKey(a) === k) || !!info?.catalog?.models.some((m) => m.resolved && aliasKey(m.value) === k)
   if (!known) return false
   const m = catalogModel(info, model)
   return !(m?.resolved && aliasKey(m.value) === k)
@@ -428,7 +428,7 @@ export interface DialectModel {
 }
 
 /**
- * The model a dialect file claims for what was typed in its dialog (HI-2523; Darren's decision: free text first). Only
+ * The model a dialect file claims for what was typed in its dialog (HI-2523: free text first). Only
  * what the CLI recognises is normalised, by the matcher's rules: an alias its catalogue resolves becomes that ID, and an
  * ID its catalogue or its descriptor's models list (matched without case, a "[…]" suffix or a snapshot date) becomes
  * that entry's ID without the suffix or date. Anything else is kept exactly as typed, apart from surrounding
@@ -447,7 +447,7 @@ export function dialectModelOf(provider: ProviderId, info: Info, typed: string):
       const k = modelKey(t)
       const fallback = providerDescriptor(provider)
         .modelGroups.flatMap((g) => g.models)
-        .find((o) => modelKey(o.value) === k && !(providerDescriptor(provider).capabilities.modelAliases ?? []).some((a) => aliasKey(a) === aliasKey(o.value)))
+        .find((o) => modelKey(o.value) === k && !(providerDescriptor(provider).capabilities.session?.modelAliases ?? []).some((a) => aliasKey(a) === aliasKey(o.value)))
       if (fallback) model = strip(fallback.value)
     }
   }

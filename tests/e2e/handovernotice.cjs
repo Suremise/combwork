@@ -1,4 +1,4 @@
-// The long-conversation notice's Hand Over (#1057, Darren's choice for 0.9.0), on fake Claude Code agents. Past
+// The long-conversation notice's Hand Over (#1057, chosen for 0.9.0), on fake Claude Code agents. Past
 // Settings → Sessions → Warn when a transcript is over, the notice informs, and offers Hand Over to… only while the agent
 // may end its conversation now:
 // - Idle, on no lane: Hand Over to…, which opens the dialog with the agent itself chosen.
@@ -17,7 +17,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 
 const userData = path.join(lib.WORK, 'handovernotice-profile')
 const ws = path.join(lib.WORK, 'handovernotice-ws')
@@ -148,7 +148,7 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Escape')
     await lib.until(async () => (await dialog.count()) === 0, HUNG_MS, 200)
 
-    // --- Working (HI-1695, Darren's option 1): no notice until its turn ends; meanwhile the footer says it can hand over
+    // --- Working (HI-1695's option 1): no notice until its turn ends; meanwhile the footer says it can hand over
     // when it has finished and opens nothing, and the Agent API refuses. Its turn over: the notice, with Hand Over to….
     await say(busy, 'pad 1200 holduntil go-busy')
     const busyToast = toastOf('Busy')
@@ -210,7 +210,10 @@ const check = (name, ok, extra = '') => {
     const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
     const token = launches().find((l) => l.sessionId === idleSession)?.token
     const slotRun = handOverSelf(idle)
-    check('Combwork asks Idle for a handover', !!(await asked(idle)) && (await writing('Idle').count()) > 0)
+    // Its notice is looked for as it shows, not once the ask's turn is over: a pop-up closes by itself after its seconds,
+    // shorter than that turn (HI-3403).
+    const writingShown = !!(await lib.until(async () => (await writing('Idle').count()) > 0, HUNG_MS, 200))
+    check('Combwork asks Idle for a handover', writingShown && !!(await asked(idle)), JSON.stringify({ writingShown }))
     const claim = await api(token, 'POST', '/v1/projects/alpha/merge-slot/claim', { cards: [], timeoutSeconds: 0 })
     check('…it takes the merge slot meanwhile', !!(await lib.until(async () => !!(await live(idle.id))?.mergeSlot, HUNG_MS, 200)), JSON.stringify(claim))
     writeHandover('Idle', idleSession)

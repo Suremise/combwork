@@ -1342,6 +1342,9 @@
       "watch": "plain"
     }
   },
+  "reply.wait.follows": {
+    "placeholders": {}
+  },
   "reply.wait.gone": {
     "placeholders": {
       "card": "plain",

@@ -15,10 +15,10 @@ const { DatabaseSync } = require('node:sqlite')
 const { jjDir, portableJj } = require('../jjPortable.cjs')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 // The repository watch's own re-arm and rescan run each minute: an observation written well before it came from the
 // operation (or the reopen), not from that timer.
-const PROMPT_MS = 20000
+const PROMPT_MS = lib.timing('budget.jjObservedMs')
 const exe = portableJj()
 if (!exe) {
   console.log("SKIP jjreopen: the pinned jj isn't fetched (npm run jj:fetch)")
@@ -52,7 +52,7 @@ const toolEnv = () => ({ ...lib.gitEnv({ GIT_CONFIG_GLOBAL: gitConfig, GIT_ATTR_
 const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 const dbFile = path.join(ws, '.combwork', 'combwork.db')
 const onDb = (fn) => {
-  const db = new DatabaseSync(dbFile, { timeout: 5000 })
+  const db = new DatabaseSync(dbFile, { timeout: lib.timing('db.busyMs') })
   try {
     return fn(db)
   } finally {
@@ -167,7 +167,7 @@ const onDb = (fn) => {
       return r ? JSON.parse(r.value) : null
     })
     // Any observation the pass itself asked for is written first (so the one after the move is the move's).
-    await until(async () => (await card(n))?.column === 'passed' && !!record(), 5000)
+    await until(async () => (await card(n))?.column === 'passed' && !!record(), lib.timing('hang.ui'))
     const before = record()?.gen ?? 0
     jj(shop, 'new', 'main', '-m', 'the user moves on')
     fs.writeFileSync(path.join(shop, 'user.txt'), 'the user\n')

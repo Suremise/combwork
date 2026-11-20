@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { aheadBehindText, folderBusy, gitStatusText, identityProblem, identityWarnings, isNoReplyEmail, parsePushPorcelain, redactRemoteUrl, redactUrlsIn, scrubSecrets, urlSecrets, remoteNameProblem, remoteUrlProblem, type GitRepoSummary } from '../src/shared/gitRepo'
 import type { MergeSlotInfo } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 /** This test's folders: the project, its bare remote, another clone of it, and a project inside another repository. */
 let proj = ''
@@ -71,11 +72,14 @@ let gitDoor: { entered: () => void; open: Promise<void> } | null = null
 let refDoor: { entered: () => void; open: Promise<void> } | null = null
 /** While set, a git command it matches fails as git would, without running (HI-1180: a worktree that can't be removed). */
 let gitFails: ((args: string[]) => boolean) | null = null
+/** While set, runs before each git command (HI-3453: a branch moved by a git outside Combwork between two of a read's commands). */
+let gitBefore: ((args: string[]) => void) | null = null
 vi.mock('../src/main/git', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/main/git')>()
   return {
     ...real,
     git: async (...args: Parameters<typeof real.git>) => {
+      gitBefore?.(args[1])
       const door = gitDoor
       if (door && (args[1][0] === 'checkout' || args[1][0] === 'merge')) {
         gitDoor = null
@@ -95,11 +99,13 @@ vi.mock('../src/main/git', async (importOriginal) => {
 })
 
 const repo = await import('../src/main/gitRepo')
+const { platformLimits } = await import('../src/main/platform/limits')
+const { cancellableGit } = await import('../src/main/gitCancel')
 const fence = await import('../src/main/folderFence')
 const { gitTestHooks: gitHooks } = await import('../src/main/git')
 
 // Real git work, not a wait: each test runs a few dozen git commands, slow under a full unit run's load.
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const git = (cwd: string, ...a: string[]): string => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd, encoding: 'utf8' }).trim()
 const commit = (cwd: string, file: string): void => {
@@ -140,9 +146,128 @@ beforeEach(() => {
   lockDoor = null
   refDoor = null
   gitFails = null
+  gitBefore = null
   asUser.mockClear()
   workTarget = ''
   cardLines = []
+})
+
+// HI-3372: Fetch, Pull and Push cancellable by the user (gitCancel.ts runs them inside cancellableNet), bounded by
+// cw.git.networkMinutes as a last resort. A remote held at a boundary of the test's own: a waiting upload-pack (nothing
+// has arrived), and a post-receive hook (the push already applied there). What is said is only what is true.
+describe('Fetch, Pull and Push: cancelled, or at their bound (HI-3372)', () => {
+  const fwd = (p: string): string => p.replace(/\\/g, '/')
+  const alive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+  /**
+   * A shell script running a node that writes its pid, then marks `started`, and waits a minute (ended with git's tree).
+   * `started` means the node has registered (HR2's round 2): a Cancel after it always has a pid to see ended.
+   */
+  const holdScript = (dir: string): { script: string; started: string; pid: () => number | null } => {
+    const started = join(dir, 'started')
+    const pidFile = join(dir, 'pid')
+    const script = join(dir, 'hold.sh')
+    writeFileSync(script, `#!/bin/sh\n"${fwd(process.execPath)}" -e 'const fs = require("fs"); fs.writeFileSync(process.argv[1], String(process.pid)); fs.writeFileSync(process.argv[2], ""); setTimeout(() => {}, 60000)' "${fwd(pidFile)}" "${fwd(started)}"\n`)
+    return { script, started, pid: () => (existsSync(pidFile) ? Number(readFileSync(pidFile, 'utf8')) : null) }
+  }
+  /** The remote's upload-pack (what a fetch talks to) held: the script runs in its place, so nothing arrives. */
+  const heldFetch = (): ReturnType<typeof holdScript> => {
+    const h = holdScript(tempDir('cw-gitrepo-hold-'))
+    // The path git gives upload-pack is left to the comment: the script alone runs.
+    git(proj, 'config', 'remote.origin.uploadpack', `sh "${fwd(h.script)}" #`)
+    return h
+  }
+  /** Runs `fn` cancellable, cancels it once `started` is there, and gives its outcome (its error's text). */
+  const cancelAt = async (started: string, fn: () => Promise<unknown>): Promise<string> => {
+    const ac = new AbortController()
+    const done = cancellableGit(ac.signal, fn).then(
+      () => 'done',
+      (e: Error) => e.message
+    )
+    await vi.waitFor(() => expect(existsSync(started)).toBe(true), { timeout: timing('wait.hang') })
+    ac.abort()
+    return done
+  }
+
+  it('Fetch cancelled while the remote holds it: stopped, said with what may be true; git and what it started ended', async () => {
+    const h = heldFetch()
+    const said = await cancelAt(h.started, () => repo.fetchAll(proj))
+    expect(said).toMatch(/^Stopped the fetch here\. What reached the remote before it stopped may have been applied: refresh/)
+    await vi.waitFor(() => expect(h.pid() !== null && !alive(h.pid()!)).toBe(true), { timeout: timing('wait.hang') })
+  })
+
+  it('Pull cancelled during its fetch: the merge never starts; the branch where it was', async () => {
+    theyPush('theirs.txt')
+    const before = git(proj, 'rev-parse', 'HEAD')
+    const h = heldFetch()
+    const said = await cancelAt(h.started, () => repo.pull(proj))
+    expect(said).toMatch(/^Stopped the pull here: it may have fetched or brought commits in already/)
+    expect(git(proj, 'rev-parse', 'HEAD')).toBe(before)
+  })
+
+  it('Push cancelled after the remote took it (its post-receive hook running): said as maybe applied, and it was', async () => {
+    const h = holdScript(tempDir('cw-gitrepo-hold-'))
+    mkdirSync(join(remote, 'hooks'), { recursive: true })
+    writeFileSync(join(remote, 'hooks', 'post-receive'), `#!/bin/sh\nsh "${fwd(h.script)}"\n`)
+    commit(proj, 'mine.txt')
+    const mine = git(proj, 'rev-parse', 'HEAD')
+    const said = await cancelAt(h.started, () => repo.push(proj))
+    expect(said).toMatch(/^Stopped the push here\. What reached the remote before it stopped may have been applied: refresh to see where things stand\./)
+    // The remote's ref was written before its post-receive ran: applied, as the message allows.
+    expect(git(remote, 'rev-parse', 'refs/heads/main')).toBe(mine)
+    await vi.waitFor(() => expect(h.pid() !== null && !alive(h.pid()!)).toBe(true), { timeout: timing('wait.hang') })
+  })
+
+  // HR2's round 1: the merge is the pull's forward step. Cancelled while it waits for the merge lock: no merge starts, the
+  // branch where it was. Cancelled while git merges (its post-merge hook held, the fast-forward written): ended, said as
+  // maybe brought in, and it was.
+  it('Pull cancelled while it waits for the merge lock: no merge starts; HEAD where it was', async () => {
+    theyPush('theirs.txt')
+    const before = git(proj, 'rev-parse', 'HEAD')
+    let entered!: () => void
+    let open!: () => void
+    const atDoor = new Promise<void>((r) => (entered = r))
+    lockDoor = { entered, open: new Promise<void>((r) => (open = r)) }
+    const ac = new AbortController()
+    const done = cancellableGit(ac.signal, () => repo.pull(proj)).then(
+      () => 'done',
+      (e: Error) => e.message
+    )
+    await atDoor
+    ac.abort()
+    open()
+    expect(await done).toMatch(/^Stopped the pull here/)
+    expect(git(proj, 'rev-parse', 'HEAD')).toBe(before)
+  })
+
+  it('Pull cancelled while git merges (its post-merge hook held): ended, said as maybe brought in; the hook ended', async () => {
+    theyPush('theirs.txt')
+    const h = holdScript(tempDir('cw-gitrepo-hold-'))
+    mkdirSync(join(proj, '.git', 'hooks'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'hooks', 'post-merge'), `#!/bin/sh\nsh "${fwd(h.script)}"\n`)
+    const said = await cancelAt(h.started, () => repo.pull(proj))
+    expect(said).toMatch(/^Stopped the pull here: it may have fetched or brought commits in already/)
+    // The fast-forward was written before its post-merge hook ran: brought in, as the message allows.
+    expect(git(proj, 'rev-parse', 'HEAD')).toBe(git(proj, 'rev-parse', 'origin/main'))
+    await vi.waitFor(() => expect(h.pid() !== null && !alive(h.pid()!)).toBe(true), { timeout: timing('wait.hang') })
+  })
+
+  it('its bound is cw.git.networkMinutes as main sets it: past it, git gave up, said in minutes', async () => {
+    heldFetch()
+    const was = platformLimits.gitNetworkMs
+    platformLimits.gitNetworkMs = () => 2000
+    try {
+      await expect(repo.fetchAll(proj)).rejects.toThrow(/git gave up after 0 minutes/)
+    } finally {
+      platformLimits.gitNetworkMs = was
+    }
+  })
 })
 
 describe('the summary', () => {
@@ -398,7 +523,7 @@ describe('pull and push', () => {
 })
 
 describe('Push to…, remotes and tracking (#1385)', () => {
-  /** A second bare remote, `backup`, as Darren's NAS. */
+  /** A second bare remote, `backup`, as the maintainer's NAS. */
   const addBackup = (): string => {
     const backup = join(outer, 'backup.git')
     execFileSync('git', ['init', '-q', '--bare', '-b', 'main', backup])
@@ -916,6 +1041,31 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect([left.merged.length, left.unmerged.map((b) => b.name)]).toEqual([2 + 205 + 1, ['spike/x']])
   })
 
+  it('measures each branch at the commit it was read at: one moved meanwhile shows its count there, and deletes there (HI-3453)', async () => {
+    const at = setUp()
+    // A git outside Combwork moves spike/x (one commit of its own) and cw/hb2 (merged) on by a commit each, after the
+    // read's for-each-ref and before their counts: their rows stay as read, each count with its commit.
+    const moved: Record<string, string> = {}
+    gitBefore = (args) => {
+      if (args[0] !== 'for-each-ref' || !args.some((a) => a.startsWith('--merged='))) return
+      gitBefore = null
+      for (const b of ['spike/x', 'cw/hb2']) {
+        moved[b] = git(proj, 'commit-tree', `${b}^{tree}`, '-p', `refs/heads/${b}`, '-m', 'later')
+        git(proj, 'update-ref', `refs/heads/${b}`, moved[b])
+      }
+    }
+    const all = await repo.leftoverInfo(proj, workTarget)
+    expect(Object.keys(moved)).toHaveLength(2)
+    const row = (b: string) => all.branches.find((x) => x.name === b)
+    expect([row('spike/x')?.sha, row('spike/x')?.toTarget]).toEqual([at['spike/x'], 1])
+    expect([row('cw/hb2')?.sha, row('cw/hb2')?.toTarget]).toEqual([at['cw/hb2'], 0])
+    // Read again: at their new commits, counted there.
+    const again = await repo.leftoverInfo(proj, workTarget)
+    expect(['spike/x', 'cw/hb2'].map((b) => again.branches.find((x) => x.name === b)).map((r) => [r?.sha, r?.toTarget])).toEqual([[moved['spike/x'], 2], [moved['cw/hb2'], 1]])
+    // The read's row and its count agree, so deleting at the row's commit goes.
+    expect(await repo.deleteBranches(proj, [{ name: 'spike/x', sha: again.branches.find((x) => x.name === 'spike/x')!.sha! }], true)).toMatch(/Deleted spike\/x\./)
+  })
+
   it("never deletes an open card's earlier line: one back from Done that started again elsewhere (HI-1823)", async () => {
     const at = setUp()
     // Card 2 started on cw/hb1, went to Done, and is open again, started this time in the project folder (on main).
@@ -958,7 +1108,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(await repo.deleteBranches(proj, [{ name: 'cw/hb1', sha: at['cw/hb1'] }, { name: 'cw/hb2', sha: at['cw/hb2'] }])).toContain('cw/hb1 is checked out in the project folder')
     const has = (cwd: string, b: string): boolean => git(cwd, 'for-each-ref', '--format=%(refname)', `refs/heads/${b}`) !== ''
     expect([has(proj, 'cw/hb1'), has(remote, 'cw/hb1'), has(proj, 'cw/hb2')]).toEqual([true, true, false])
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('deletes only what it was shown, merged and unused, and says why each other one is kept', async () => {
     const at = setUp()
@@ -975,7 +1125,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     for (const why of ['cw/hb2 has moved since you were shown it', 'cw/slot is checked out in a worktree or slot', 'An open card works on cw/card', "spike/x has commits that aren't in 1.0.0", 'main is the default branch', '1.0.0 is the branch work merges into', "--force isn't a valid branch name", "There's no branch nope"]) expect(said).toContain(why)
     // Nothing to delete: refused, saying why.
     await expect(repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }])).rejects.toThrow(/spike\/x has commits that aren't in 1\.0\.0/)
-  }, 120_000)
+  }, timing('test.hang'))
 
   /** A door that stops an action where `set` puts it, and the promises to wait at it and let it through. */
   const door = (): { at: Promise<void>; door: { entered: () => void; open: Promise<void> }; open: () => void } => {
@@ -1012,7 +1162,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(said).toContain('An open card works on cw/hb2')
     expect(branchNames(proj)).toEqual(expect.arrayContaining(['cw/hb2']))
     expect(branchNames(proj)).not.toContain('cw/hb1')
-  }, 120_000)
+  }, timing('test.hang'))
 
   /** A slot taking `branch` as slot preparation does: under the repository's lock. Says whether it got it. */
   const slotTakes = async (branch: string, folder: string): Promise<string> => {
@@ -1051,7 +1201,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(await claimed).toBe('no such branch')
     await retarget
     expect(retargeted).toBe(true)
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('deletes only at the commit it checked: a branch moved at the last moment by git outside Combwork stays, with its commit (round 4)', async () => {
     const at = setUp()
@@ -1067,7 +1217,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(said).toContain('cw/hb1 has moved since you were shown it: kept.')
     expect(said).toMatch(/Deleted cw\/hb2\./)
     expect(git(proj, 'rev-parse', 'cw/hb1')).toBe(unseen)
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('leaves no checked-out branch deleted: one checked out at the last moment is put back and kept, said in use (round 3)', async () => {
     const at = setUp()
@@ -1082,7 +1232,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(said).toContain('cw/hb1 is checked out in a worktree or slot: kept.')
     expect(said).toMatch(/Deleted cw\/hb2\./)
     expect(branchNames(proj)).toContain('cw/hb1')
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('a second Combwork changing the target, with a turn of workflow writes of its own, waits for the delete on the shared repository lock (round 5)', async () => {
     const at = setUp()
@@ -1108,7 +1258,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(await deleting).toMatch(/Deleted cw\/hb1\./)
     await retarget
     expect(retargeted).toBe(true)
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('holds the lock through a remote’s push: a slot taking the branch waits until it is deleted there (round 3)', async () => {
     const at = setUp()
@@ -1124,7 +1274,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     expect(branchNames(remote)).not.toContain('cw/hb1')
     // The local branch was never the remote's to delete: the slot takes it once the push is done.
     expect(await claimed).toBe('took it')
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('checks a remote branch under the repository lock with its use read then (round 2)', async () => {
     const at = setUp()
@@ -1137,7 +1287,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     await expect(queued).rejects.toThrow(/An open card works on origin\/cw\/hb1/)
     lockDoor = null
     expect(branchNames(remote)).toContain('cw/hb1')
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('deletes an unmerged branch only alone, at the commit shown, after listing the commits it drops', async () => {
     const at = setUp()
@@ -1148,7 +1298,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     await expect(repo.deleteBranches(proj, [{ name: 'cw/card', sha: at['cw/card'] }], true)).rejects.toThrow(/An open card works on cw\/card/)
     expect(await repo.deleteBranches(proj, [{ name: 'spike/x', sha: at['spike/x'] }], true)).toMatch(/Deleted spike\/x/)
     expect(branchNames(proj)).not.toContain('spike/x')
-  }, 120_000)
+  }, timing('test.hang'))
 
   it('deletes merged branches on the remote only at the commit shown, never one in use or unmerged', async () => {
     const at = setUp()
@@ -1165,7 +1315,7 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     git(other, 'push', '-q', '-f', 'origin', 'HEAD:refs/heads/cw/hb2')
     await expect(repo.deleteRemoteBranches(proj, 'origin', [r('cw/hb2')])).rejects.toThrow(/origin refused to delete cw\/hb2/)
     expect(branchNames(remote)).toContain('cw/hb2')
-  }, 120_000)
+  }, timing('test.hang'))
 })
 
 describe('Update from <target> (HI-1180)', () => {

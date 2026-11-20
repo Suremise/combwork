@@ -1,4 +1,4 @@
-// The Combwork tools a project's workflow makes unusable (HI-2694, Darren 7 Nov: launch-only): each hidden only where its
+// The Combwork tools a project's workflow makes unusable (HI-2694: launch-only): each hidden only where its
 // handler refuses every operation (HR1's s15 check), by preset; kept while any card in flight or running lane still works
 // under rules that use it, or sits in a stage that takes it; a session launched without a tool is given no work needing it
 // until it has relaunched; and the project's list read from the board, kept until anything it is made of changes.

@@ -6,6 +6,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-lane-endq-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -17,8 +18,9 @@ const { advanced } = await import('../src/main/advanced')
 const { ENFORCE } = await import('../src/main/workflow/service')
 const { laneNextText } = await import('../src/shared/lanes')
 const { workspaceDb } = await import('../src/main/boardStore')
+const { coalescing } = await import('../src/main/coalesce')
 
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 afterEach(async () => {
   await advanced.set(ENFORCE, true)
 })
@@ -55,18 +57,27 @@ describe('a lane ended or asked for its next card with a list change queued (HI-
 
   it('end first: its card Done, the look not run yet: next is the queued card, and the end is refused naming it, the queue kept', async () => {
     expect(await lanes.lanesEnforced()).toBe(true)
-    const { a, q, id } = await queuedLane('b1')
-    await move(a, 'done')
-    expect((await lanes.laneNext(w, 'alpha', 'b1')).next?.card).toBe(q)
-    await expect(lanes.endLane(w, id, { project: 'alpha', agent: 'b1' })).rejects.toThrow(ref(q))
-    const now = await lanes.getLane(w, id)
-    expect([now.state, now.queued]).toEqual(['active', [a, q]])
-    // The look then applies it, as it would have.
-    await lanes.refresh(w)
-    const after = await lanes.getLane(w, id)
-    expect([after.state, after.cards.map((c) => c.number)]).toEqual(['active', [a, q]])
-    expect((await lanes.laneNext(w, 'alpha', 'b1')).next?.card).toBe(q)
-    await lanes.endLane(w, id, { abandoned: true })
+    // The look not run yet (HI-3425): held, and none still running, else its timer (every lane write arms it) can apply
+    // the queue first under load.
+    const release = lanes.holdLanesLook(w)
+    try {
+      await vi.waitFor(() => expect(coalescing(`lanes:${w.path!.toLowerCase()}`)).toBe(false), { timeout: timing('wait.hang') })
+      const { a, q, id } = await queuedLane('b1')
+      await move(a, 'done')
+      expect((await lanes.laneNext(w, 'alpha', 'b1')).next?.card).toBe(q)
+      await expect(lanes.endLane(w, id, { project: 'alpha', agent: 'b1' })).rejects.toThrow(ref(q))
+      const now = await lanes.getLane(w, id)
+      expect([now.state, now.queued]).toEqual(['active', [a, q]])
+      // The look then applies it, as it would have.
+      release()
+      await lanes.refresh(w)
+      const after = await lanes.getLane(w, id)
+      expect([after.state, after.cards.map((c) => c.number)]).toEqual(['active', [a, q]])
+      expect((await lanes.laneNext(w, 'alpha', 'b1')).next?.card).toBe(q)
+      await lanes.endLane(w, id, { abandoned: true })
+    } finally {
+      release()
+    }
   })
 
   it('look first: the same next card, and the same refusal', async () => {

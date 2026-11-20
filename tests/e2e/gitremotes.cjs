@@ -1,4 +1,4 @@
-// Remotes in the Git view (#1385, Darren's backup remote on his NAS): a project with origin and a second remote, backup.
+// Remotes in the Git view (#1385, the user's backup remote on a NAS): a project with origin and a second remote, backup.
 // Push to… backup, all branches and tags: everything goes there, and what main tracks is unchanged (Push still goes to
 // origin). Track… main to backup/main: Push then goes to backup. Track… a branch to a remote branch not there yet: the
 // form says it pushes it there first, and does. Stop tracking clears it. Rename backup to nas: the branches tracking it
@@ -11,7 +11,7 @@ const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'gitremotes-profile')
 const ws = path.join(lib.WORK, 'gitremotes-ws')
@@ -70,6 +70,30 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
       const theme = async (t) => {
         await inv('settings:update', { appearance: { theme: t } })
         await lib.until(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t), HUNG_MS)
+      }
+
+      // --- HI-3372: Fetch held by the remote (an upload-pack of the test's own that waits): Cancel beside it while it runs;
+      // pressed, git and what it started are ended, and the notice says only what is true.
+      {
+        const dir = lib.probeDir('gitremotes-hold')
+        const started = path.join(dir, 'started')
+        const pidFile = path.join(dir, 'pid')
+        const fwd = (p) => p.replace(/\\/g, '/')
+        const script = path.join(dir, 'hold.sh')
+        fs.writeFileSync(script, `#!/bin/sh\n: > "${fwd(started)}"\n"${fwd(process.execPath)}" -e 'require("fs").writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 120000)' "${fwd(pidFile)}"\n`)
+        g(alpha, 'config', 'remote.origin.uploadpack', `sh "${fwd(script)}" #`)
+        await branches.locator('[data-action="fetch"]').click()
+        const cancelFetch = branches.locator('[data-action="cancel-git-run"]')
+        // Held once the remote's own process (node) has started and said its pid: its identity taken then, while it is
+        // known to be the test's (HR2's round 1: never a pid read after the cancel, which may never have been written).
+        check('Fetch held by the remote: Cancel beside it while it runs', !!(await lib.until(async () => fs.existsSync(started) && fs.existsSync(pidFile) && (await cancelFetch.count()) === 1, HUNG_MS)), await text(branches))
+        const held = lib.identify([Number(fs.readFileSync(pidFile, 'utf8'))])
+        await shot(page, 'fetch-running')
+        await cancelFetch.click()
+        const stopped = page.locator('.toast', { hasText: 'Stopped the fetch here' })
+        check('…Cancel: said Stopped, with what may have reached the remote; git and its upload-pack ended', !!(await lib.until(async () => (await stopped.count()) >= 1 && (await cancelFetch.count()) === 0, HUNG_MS)) && /refresh to see where things stand/.test(await text(stopped.first())) && !!(await lib.until(() => lib.stillSame(held).length === 0, HUNG_MS)), `${await text(stopped.first())} | still running: ${JSON.stringify(lib.stillSame(held))}`)
+        await shot(page, 'fetch-stopped')
+        g(alpha, 'config', '--unset', 'remote.origin.uploadpack')
       }
 
       // --- Push to… this branch (main), the folder switched to feature/x in a terminal before Push is clicked: main goes,

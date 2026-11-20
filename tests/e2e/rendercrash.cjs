@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'rendercrash-profile')
 const ws = path.join(lib.WORK, 'rendercrash-ws')
@@ -19,12 +19,8 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 10000) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn().catch(() => null)) && Date.now() - t < ms) await lib.sleep(250)
-  return v
-}
+// A look that fails (the page reloading) counts as not yet.
+const until = (fn, ms) => lib.until(() => fn().catch(() => null), ms)
 
 // Playwright gives up on a page whose renderer crashed (it throws "Target crashed" from its connection), so once the
 // page has crashed every look at it goes through the main process (executeJavaScript), which isn't affected.
@@ -58,11 +54,10 @@ process.on('uncaughtException', (e) => {
   const key = lib.ptyKey(alpha, agent.id)
   const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id)
   await inv('session:start', alpha, { agentId: agent.id })
-  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', 20000)))
-  await inv('pty:write', key, 'remember this line')
-  await lib.sleep(200)
-  await inv('pty:write', key, '\r')
-  check('it answers', !!(await until(async () => (await live())?.status === 'finished', 10000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the agent starts', !!(await until(async () => (await live())?.status === 'ready', lib.timing('hang.step'))))
+  await lib.typeThenEnter(inv, key, 'remember this line')
+  check('it answers', !!(await until(async () => (await live())?.status === 'finished', lib.timing('hang.step'))))
 
   // Native dialogs: recorded, answered as the test says (a pending answer leaves the box open).
   await app.evaluate(({ dialog }) => {
@@ -90,24 +85,28 @@ process.on('uncaughtException', (e) => {
   const boxes = () => app.evaluate(() => globalThis.__boxes.map((b) => ({ message: b.message, buttons: b.buttons.join(','), aborted: !!b.signal?.aborted })))
   const crash = async () => {
     console.log('(crashing the page)')
+    const before = await js('performance.timeOrigin').catch(() => null)
     await app.evaluate(({ BrowserWindow }) => void BrowserWindow.getAllWindows()[0].webContents.forcefullyCrashRenderer())
-    await lib.sleep(1000) // A fixed wait on purpose: the crash has to take the page down first, so what follows sees the reloaded page, not the old one.
+    // The old page taken down first (its renderer gone, or a new page there already), so what follows sees the reloaded
+    // page, not the old one.
+    const down = await until(async () => (await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.isCrashed())) || ((await js('performance.timeOrigin').catch(() => null)) ?? before) !== before, lib.timing('hang.ui'))
+    if (!down) throw new Error(`the page wasn't taken down within ${lib.timing('hang.ui') / 1000} s of its crash`)
   }
-  const pageBack = () => until(() => js("!!window.combwork && !!document.querySelector('.menubar')"), 20000)
+  const pageBack = () => until(() => js("!!window.combwork && !!document.querySelector('.menubar')"), lib.timing('hang.ui'))
   const toastText = () => js(`[...document.querySelectorAll('.toast')].map((t) => t.innerText).find((t) => t.includes("Combwork's window stopped and was reloaded")) ?? ''`)
 
   // --- A crash: reloaded, with a note, the agent still running and its terminal attached.
   await crash()
   check('the page comes back by itself', !!(await pageBack()))
-  check('a note says it was reloaded and the agents kept running', !!(await until(async () => /Your agents kept running/.test(await toastText()), 10000)))
+  check('a note says it was reloaded and the agents kept running', !!(await until(async () => /Your agents kept running/.test(await toastText()), lib.timing('hang.ui'))))
   check('no question was asked', (await boxes()).length === 0)
   check('the agent is still running', (await liveMain())?.status === 'finished')
-  check("its terminal shows what it printed before", !!(await until(() => js(`window.__cwTerminalTextAt?.(${JSON.stringify(key)}, 'remember this line') ?? null`), 10000)))
+  check("its terminal shows what it printed before", !!(await until(() => js(`window.__cwTerminalTextAt?.(${JSON.stringify(key)}, 'remember this line') ?? null`), lib.timing('hang.ui'))))
   await shot('rendercrash-1-reloaded.png')
 
   // --- Again within a minute: it asks instead of reloading in a loop.
   await crash()
-  check('a second crash asks', !!(await until(async () => (await boxes()).some((b) => /stopped working/.test(b.message)), 10000)))
+  check('a second crash asks', !!(await until(async () => (await boxes()).some((b) => /stopped working/.test(b.message)), lib.timing('hang.ui'))))
   const asked = (await boxes()).find((b) => /stopped working/.test(b.message))
   check('with Reload, Open Logs and Quit Combwork', asked?.buttons === 'Reload,Open Logs,Quit Combwork', asked?.buttons)
   check('Reload brings the page back', !!(await pageBack()))
@@ -119,7 +118,7 @@ process.on('uncaughtException', (e) => {
     globalThis.__answer = 'pending'
   })
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].emit('unresponsive'))
-  check('a hang offers Wait and Reload after a few seconds', !!(await until(async () => (await boxes()).some((b) => /isn't responding/.test(b.message) && b.buttons === 'Wait,Reload'), 9000)))
+  check('a hang offers Wait and Reload after a few seconds', !!(await until(async () => (await boxes()).some((b) => /isn't responding/.test(b.message) && b.buttons === 'Wait,Reload'), lib.timing('hang.ui'))))
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].emit('responsive'))
   check('it goes away when the page responds again', !!(await until(async () => (await boxes())[0]?.aborted, HUNG_MS)))
 
@@ -130,8 +129,8 @@ process.on('uncaughtException', (e) => {
   })
   const before = await js('performance.timeOrigin')
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].emit('unresponsive'))
-  check('Reload reloads the page', !!(await until(async () => (await js('performance.timeOrigin')) !== before && (await pageBack()), 20000)))
-  await lib.sleep(2500) // A fixed wait on purpose: this checks that no crash note or second question appears.
+  check('Reload reloads the page', !!(await until(async () => (await js('performance.timeOrigin')) !== before && (await pageBack()), lib.timing('hang.ui'))))
+  await lib.sleep(lib.timing('quiet.reloadNoteMs')) // A quiet window on purpose: this checks that no crash note or second question appears.
   check('without a crash note or another question', (await toastText()) === '' && (await boxes()).length === 1)
   check('and the agent is still running', (await liveMain())?.status === 'finished')
 

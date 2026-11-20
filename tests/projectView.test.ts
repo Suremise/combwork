@@ -1,13 +1,15 @@
-// A project's view out of project.json (HI-1749, Darren's decision): the Session tab's Panes or Tiles, layout and pane
+// A project's view out of project.json (HI-1749): the Session tab's Panes or Tiles, layout and pane
 // placement are this user's UI state (config.ui.projectViews), so a view switch writes no project file, and another program
 // holding project.json can't make it fail; the config is still written at once. A replace that gives up on a held file is
 // in combwork.log, with the processes Windows says have it open, those lookups bounded; any IPC failure that isn't Combwork's own
 // refusal is logged too. Each case has a project, workspace and UI state of its own.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { RENAME_RETRY } from '../src/main/retryBounds'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // Each replace of a project.json, and how many of the next ones fail as a file held open does (EPERM).
 const fs = vi.hoisted(() => ({ renames: 0, failNext: 0 }))
@@ -46,7 +48,7 @@ const { config } = await import('../src/main/config')
 const { renameDiagnostics, renameRetrying, holderLookupsRunning } = await import('../src/main/fsutil')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const ID = 'p-0a1b2c3d'
 let n = 0
 let w: ReturnType<typeof createWorkspaceService>
@@ -110,10 +112,17 @@ describe("a project's view (HI-1749)", () => {
   it('a replace that gives up on a held file is in combwork.log, with what had it open', async () => {
     renameDiagnostics.holders = async () => ['4242 Some Indexer']
     fs.failNext = 1000
-    await expect(run(() => w.updateProjectConfig(alpha, { chime: 'off' }))).rejects.toThrow(/EPERM/)
+    // HI-3374: a held rename is retried for RENAME_RETRY's bound (15 s); a short one here, as giving up is what is tested.
+    const bound = RENAME_RETRY.boundMs
+    RENAME_RETRY.boundMs = 300
+    try {
+      await expect(run(() => w.updateProjectConfig(alpha, { chime: 'off' }))).rejects.toThrow(/EPERM/)
+    } finally {
+      RENAME_RETRY.boundMs = bound
+    }
     await vi.waitFor(() => expect(warned.some((l) => l.includes('was open in'))).toBe(true), { timeout: HUNG_MS })
     const gaveUp = warned.find((l) => l.includes('replacing'))!
-    expect(gaveUp).toMatch(/^\[files\] replacing .*project\.json.* failed with EPERM after 21 tries over \d+ ms: another process had it open$/)
+    expect(gaveUp).toMatch(/^\[files\] replacing .*project\.json.* failed with EPERM after \d+ tries over \d+ ms: another process had it open$/)
     expect(warned.find((l) => l.includes('was open in'))).toMatch(/project\.json.* was open in .*4242 Some Indexer/)
     // The config as it was: the failed change isn't kept.
     fs.failNext = 0
@@ -125,7 +134,7 @@ describe('looking up what held a file (HI-1749)', () => {
   const held = async (): Promise<never> => {
     throw Object.assign(new Error('EPERM'), { code: 'EPERM' })
   }
-  const giveUp = (path: string) => renameRetrying(`${path}.tmp`, path, 0, undefined, held).catch(() => undefined)
+  const giveUp = (path: string) => renameRetrying(`${path}.tmp`, path, { ...RENAME_RETRY, boundMs: 0 }, undefined, held).catch(() => undefined)
   const deferred = () => {
     let resolve!: (v: string[]) => void
     return { promise: new Promise<string[]>((r) => (resolve = r)), resolve }

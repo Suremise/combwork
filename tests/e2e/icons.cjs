@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const ws = path.join(lib.WORK, 'icons-ws')
 const demo = path.join(ws, 'demo')
@@ -18,12 +18,8 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 15000) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(150)
-  return v
-}
+// HI-3396: lib's until (its bound required, the file's interval).
+const until = (fn, ms) => lib.until(fn, ms)
 
 /** Shell icons with a size of their own (app.css), and the size each should have. */
 const SHELL = [
@@ -45,7 +41,8 @@ async function launch(name) {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
-  await lib.sleep(500)
+  // HI-3396: its project shown (its row selected, its tabs drawn).
+  await lib.readyWithin('its project shown', async () => (await page.locator('.project-row.selected', { hasText: 'demo' }).count()) === 1 && (await page.locator('.tabs .tab').count()) > 0, lib.timing('hang.ui'))
   return { app, page, inv }
 }
 
@@ -74,8 +71,10 @@ function same(name, before, after) {
 }
 
 async function away(page) {
-  await page.locator('.tabs .tab', { hasText: /^\s*Session\s*$/ }).click()
-  await lib.sleep(400)
+  const tab = page.locator('.tabs .tab', { hasText: /^\s*Session\s*$/ })
+  await tab.click()
+  // HI-3396: its tab shown as chosen.
+  await lib.readyWithin('its tab chosen', () => tab.evaluate((e) => e.classList.contains('active') || e.getAttribute('aria-selected') === 'true'), lib.timing('hang.ui'))
 }
 
 ;(async () => {
@@ -125,7 +124,7 @@ async function away(page) {
       await page.locator('.split-main .monaco-editor .view-lines').click()
       await page.keyboard.press('Control+F')
       const findIcon = page.locator('.monaco-editor .find-widget .codicon').first()
-      const findSize = (await until(async () => (await findIcon.count()) > 0, 5000)) ? await findIcon.evaluate((i) => getComputedStyle(i).fontSize) : null
+      const findSize = (await until(async () => (await findIcon.count()) > 0, lib.timing('hang.ui'))) ? await findIcon.evaluate((i) => getComputedStyle(i).fontSize) : null
       check("Monaco's find widget icons stay 16px", findSize === '16px', String(findSize))
       await page.screenshot({ path: path.join(lib.WORK, 'icons-editor-find.png') })
       await page.keyboard.press('Escape')
@@ -146,8 +145,7 @@ async function away(page) {
       await inv('settings:update', { appearance: { theme: 'dark' } })
       // UI zoom: the same CSS size, drawn larger in proportion.
       const at = async (z) => {
-        await app.evaluate(({ BrowserWindow }, f) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(f), z)
-        await lib.sleep(400)
+        await lib.zoomTo(app, page, z)
         return (await sizes(page))[SHELL[0][0]]
       }
       const [one, big] = [await at(1), await at(1.5)]

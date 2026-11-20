@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { claudeBackgroundTasks } from '../src/main/providers/claude/background'
 import { codexBackgroundMemo, codexBackgroundTasks } from '../src/main/providers/codex/background'
@@ -17,8 +19,8 @@ describe('Claude Code background tasks', () => {
       lines(
         { type: 'user', timestamp: t, toolUseResult: { stdout: '', stderr: '', interrupted: false, backgroundTaskId: 'bkqkq2vgh' } },
         { type: 'user', timestamp: t, toolUseResult: { stdout: '', backgroundTaskId: 'bum6823gu', timedOutAfterMs: 120000 } },
-        { type: 'user', timestamp: t, toolUseResult: { taskId: 'bi9giyn5m', timeoutMs: 1800000, persistent: false } },
-        { type: 'user', timestamp: t, toolUseResult: { taskId: 'bpersist1', timeoutMs: 1800000, persistent: true } }
+        { type: 'user', timestamp: t, toolUseResult: { taskId: 'bi9giyn5m', timeoutMs: 1800000, persistent: false } }, // timing-ok: data, not a wait
+        { type: 'user', timestamp: t, toolUseResult: { taskId: 'bpersist1', timeoutMs: 1800000, persistent: true } } // timing-ok: data, not a wait
       )
     )
     expect(out).toEqual([
@@ -27,6 +29,20 @@ describe('Claude Code background tasks', () => {
       { kind: 'start', id: 'bi9giyn5m', at: at(t), type: 'monitor', expiresAt: at(t) + 1800000 },
       { kind: 'start', id: 'bpersist1', at: at(t), type: 'monitor' }
     ])
+  })
+
+  // HI-3406: a command moved to the background (or one run there) is written only once it is; its start says when the
+  // Bash call was made, so a cw-progress run it began before then is its own.
+  it("a background command's start says when its call was made, read in an earlier read too", () => {
+    const call = '2026-11-18T03:29:00.000Z'
+    const moved = '2026-11-18T03:31:00.000Z'
+    const memo = {}
+    const use = { type: 'assistant', timestamp: call, message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_019N', name: 'Bash', input: { command: 'cw-progress -- npm test' } }] } }
+    expect(claudeBackgroundTasks(lines(use), memo)).toEqual([])
+    const result = { type: 'user', timestamp: moved, message: { role: 'user', content: [{ tool_use_id: 'toolu_019N', type: 'tool_result', content: 'Command running in background with ID: b47etvkcc.' }] }, toolUseResult: { stdout: '', backgroundTaskId: 'b47etvkcc', timedOutAfterMs: 120000 } }
+    expect(claudeBackgroundTasks(lines(result), memo)).toEqual([{ kind: 'start', id: 'b47etvkcc', at: at(moved), began: at(call), type: 'command' }])
+    // A result whose call wasn't read: no `began`, its start only.
+    expect(claudeBackgroundTasks(lines({ ...result, message: { role: 'user', content: [{ tool_use_id: 'toolu_other', type: 'tool_result', content: '' }] } }), memo)).toEqual([{ kind: 'start', id: 'b47etvkcc', at: at(moved), type: 'command' }])
   })
 
   it('ends a task on its notification, wherever it is written, and on TaskStop', () => {
@@ -50,6 +66,24 @@ describe('Claude Code background tasks', () => {
 
   it("doesn't end a Monitor on one of its events", () => {
     expect(claudeBackgroundTasks(lines({ type: 'user', timestamp: '2026-10-01T04:00:00.000Z', message: { role: 'user', content: notification('bi9giyn5m', 'running') } }))).toEqual([])
+  })
+
+  // HI-3423: HB1's Monitors on HI-3357 (Claude Code 2.1.326), as its transcript wrote them, with a stream that ended and a
+  // script that failed from other sessions. An event has no status, and neither has the expiry: its text tells them apart.
+  it("a Monitor runs on through its events, and ends when it expires, its stream ends or its script fails", () => {
+    const recorded = readFileSync(join(__dirname, 'fixtures', 'advanced', 'monitor-claude-2.1.326.jsonl'), 'utf8')
+    const [armed, expired, rearmed, event, ended, failed] = recorded.split(/\r?\n/).filter(Boolean).map((l) => l + '\n')
+    const memo = {}
+    expect(claudeBackgroundTasks(armed, memo)).toEqual([{ kind: 'start', id: 'bncri2uo6', at: at('2026-11-19T10:06:41.719Z'), type: 'monitor', expiresAt: at('2026-11-19T10:36:41.719Z') }])
+    expect(claudeBackgroundTasks(expired, memo)).toEqual([{ kind: 'end', id: 'bncri2uo6', at: at('2026-11-19T10:36:41.641Z') }])
+    expect(claudeBackgroundTasks(rearmed, memo)).toEqual([{ kind: 'start', id: 'bmrnz1tfk', at: at('2026-11-19T10:37:10.651Z'), type: 'monitor', expiresAt: at('2026-11-19T11:07:10.651Z') }])
+    // Its first event ("unit exit=1"): it still waited for the e2e run, so it isn't an end.
+    expect(claudeBackgroundTasks(event, memo)).toEqual([])
+    // The same event as delivered in the turn it started (a user message's text).
+    const delivered = JSON.parse(event).content as string
+    expect(claudeBackgroundTasks(lines({ type: 'user', timestamp: '2026-11-19T10:59:16.000Z', message: { role: 'user', content: [{ type: 'text', text: delivered }] } }), memo)).toEqual([])
+    expect(claudeBackgroundTasks(ended, memo)).toEqual([{ kind: 'end', id: 'bi9eba166', at: at('2026-11-19T05:39:22.107Z') }])
+    expect(claudeBackgroundTasks(failed, memo)).toEqual([{ kind: 'end', id: 'bvgoqbkk8', at: at('2026-11-11T06:06:19.109Z') }])
   })
 
   it('ignores ordinary lines', () => {
@@ -170,6 +204,15 @@ describe('Codex background terminals', () => {
     expect(codexBackgroundTasks(lines(older))).toEqual([{ kind: 'start', id: '42', at: at(t) }])
   })
 
+  // HI-3406: exec_command returns a session only after its wait; the start says when the call was made.
+  it("a command's start says when its exec_command call was made", () => {
+    const call = '2026-10-01T09:40:22.000Z'
+    const t1 = '2026-10-01T09:40:52.798Z'
+    const fn = { timestamp: call, type: 'response_item', payload: { type: 'function_call', name: 'exec_command', arguments: '{"cmd":"cw-progress -- npm test","yield_time_ms":30000}', call_id: 'call_9' } }
+    const out = { timestamp: t1, type: 'response_item', payload: { type: 'function_call_output', call_id: 'call_9', output: 'Process running with session ID 42\nOutput:\n' } }
+    expect(codexBackgroundTasks(lines(fn, out))).toEqual([{ kind: 'start', id: '42', at: at(t1), began: at(call) }])
+  })
+
   it('ignores commands that finished within the call', () => {
     expect(codexBackgroundTasks(lines(output('2026-10-01T09:00:00.000Z', { chunk_id: 'a', wall_time_seconds: 0.2, exit_code: 0, output: 'ok' })))).toEqual([])
   })
@@ -199,7 +242,7 @@ describe('Codex background terminals in code mode', () => {
   it('takes the id a script printed on its own (text(r.session_id)), read by read, and ends it by its process_id', () => {
     const memo = codexBackgroundMemo()
     expect(codexBackgroundTasks(lines(script(t1, 'call_W7', execOf(SLEEP, 'text(r.session_id);'))), memo)).toEqual([])
-    expect(codexBackgroundTasks(lines(scriptOutput(t2, 'call_W7', 'Script completed', '96600')), memo)).toEqual([{ kind: 'start', id: '96600', at: at(t2) }])
+    expect(codexBackgroundTasks(lines(scriptOutput(t2, 'call_W7', 'Script completed', '96600')), memo)).toEqual([{ kind: 'start', id: '96600', at: at(t2), began: at(t1) }])
     expect(codexBackgroundTasks(lines(commandEnded(t3, '96600', SLEEP)), memo)).toEqual([{ kind: 'end', id: '96600', at: at(t3) }])
     expect(memo.known.size + memo.open.size + memo.unnamed.size).toBe(0)
   })
@@ -207,7 +250,7 @@ describe('Codex background terminals in code mode', () => {
   it('takes the id when the script prints the whole result as JSON', () => {
     const out = codexBackgroundTasks(lines(script(t1, 'c1', execOf(SLEEP, 'text(JSON.stringify(r));')), scriptOutput(t2, 'c1', 'Script completed', JSON.stringify({ chunk_id: 'd2', wall_time_seconds: 1, session_id: 96600, output: '' })), commandEnded(t3, '96600', SLEEP)))
     expect(out).toEqual([
-      { kind: 'start', id: '96600', at: at(t2) },
+      { kind: 'start', id: '96600', at: at(t2), began: at(t1) },
       { kind: 'end', id: '96600', at: at(t3) }
     ])
   })
@@ -216,7 +259,7 @@ describe('Codex background terminals in code mode', () => {
     const memo = codexBackgroundMemo()
     const out = codexBackgroundTasks(lines(script(t1, 'c2', execOf(SLEEP, 'text("started");')), scriptOutput(t2, 'c2', 'Script completed', 'started'), commandEnded(t3, '96600', SLEEP)), memo)
     expect(out).toEqual([
-      { kind: 'start', id: 'c2#0', at: at(t2) },
+      { kind: 'start', id: 'c2#0', at: at(t2), began: at(t1) },
       { kind: 'end', id: '96600', at: at(t3) },
       { kind: 'end', id: 'c2#0', at: at(t3) }
     ])
@@ -226,8 +269,8 @@ describe('Codex background terminals in code mode', () => {
   it('a loop: takes the ids it printed, and counts nothing when it printed none (no guess from the source)', () => {
     const loop = 'for (const cmd of ["Start-Sleep -Seconds 20", "Start-Sleep -Seconds 25"]) {\n  const r = await tools.exec_command({cmd, yield_time_ms: 500});\n  text(r.session_id);\n}\n'
     expect(codexBackgroundTasks(lines(script(t1, 'c3', loop), scriptOutput(t2, 'c3', 'Script completed', '2648', '72961')))).toEqual([
-      { kind: 'start', id: '2648', at: at(t2) },
-      { kind: 'start', id: '72961', at: at(t2) }
+      { kind: 'start', id: '2648', at: at(t2), began: at(t1) },
+      { kind: 'start', id: '72961', at: at(t2), began: at(t1) }
     ])
     const silent = loop.replace('  text(r.session_id);\n', '')
     expect(codexBackgroundTasks(lines(script(t1, 'c4', silent), scriptOutput(t2, 'c4', 'Script completed')))).toEqual([])
@@ -256,17 +299,17 @@ describe('Codex background terminals in code mode', () => {
   it('text(r.session_id ?? r.output) (#178): the id while it runs, nothing once it ended within the script', () => {
     const memo = codexBackgroundMemo()
     const running = codexBackgroundTasks(lines(script(t1, 'q1', execOf(SLEEP, 'text(r.session_id ?? r.output);')), scriptOutput(t2, 'q1', 'Script completed', '7135')), memo)
-    expect(running).toEqual([{ kind: 'start', id: '7135', at: at(t2) }])
+    expect(running).toEqual([{ kind: 'start', id: '7135', at: at(t2), began: at(t1) }])
     const cmd = 'Write-Output 42'
     const finished = codexBackgroundTasks(lines(script(t1, 'q2', execOf(cmd, 'text(r.session_id ?? r.output);')), commandEnded(t1, '777', cmd), scriptOutput(t2, 'q2', 'Script completed', '42')), memo)
     expect(finished).toEqual([{ kind: 'end', id: '777', at: at(t1) }])
     // Silent, with ?? and ?. in it, and still running: a simple script.
-    expect(codexBackgroundTasks(lines(script(t1, 'q3', execOf(SLEEP, 'const s = r?.session_id ?? 0;')), scriptOutput(t2, 'q3', 'Script completed')))).toEqual([{ kind: 'start', id: 'q3#0', at: at(t2) }])
+    expect(codexBackgroundTasks(lines(script(t1, 'q3', execOf(SLEEP, 'const s = r?.session_id ?? 0;')), scriptOutput(t2, 'q3', 'Script completed')))).toEqual([{ kind: 'start', id: 'q3#0', at: at(t2), began: at(t1) }])
   })
 
   it("counts a script whose command's text holds && or a ? (inside its string) as simple", () => {
     const cmd = 'npm test && echo done?'
-    expect(codexBackgroundTasks(lines(script(t1, 'c5', execOf(cmd, '')), scriptOutput(t2, 'c5', 'Script completed')))).toEqual([{ kind: 'start', id: 'c5#0', at: at(t2) }])
+    expect(codexBackgroundTasks(lines(script(t1, 'c5', execOf(cmd, '')), scriptOutput(t2, 'c5', 'Script completed')))).toEqual([{ kind: 'start', id: 'c5#0', at: at(t2), began: at(t1) }])
   })
 
   it('starts nothing for a script whose command ended within it, even when what it printed quotes a session_id', () => {
@@ -295,8 +338,8 @@ describe('Codex background terminals in code mode', () => {
       memo
     )
     expect(started).toEqual([
-      { kind: 'start', id: 'a#0', at: at(t1) },
-      { kind: 'start', id: '222', at: at(t2) }
+      { kind: 'start', id: 'a#0', at: at(t1), began: at(t1) },
+      { kind: 'start', id: '222', at: at(t2), began: at(t2) }
     ])
     expect(codexBackgroundTasks(lines(commandEnded(t3, '222', b)), memo)).toEqual([{ kind: 'end', id: '222', at: at(t3) }])
     expect(codexBackgroundTasks(lines(commandEnded(t3, '111', a)), memo)).toEqual([

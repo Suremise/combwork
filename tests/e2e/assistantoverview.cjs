@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'assistantoverview-profile')
 const ws = path.join(lib.WORK, 'assistantoverview-ws')
@@ -42,6 +42,8 @@ const check = (name, ok, extra = '') => {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1500, height: 900 })
     await lib.appReady(page)
+    // Focused, so its agent's pane on screen counts as seen: a test copy never has the focus (HI-3404).
+    await lib.stubFocus(app)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     for (const p of [alpha, beta, long]) await inv('project:setActive', p, true)
@@ -52,7 +54,8 @@ const check = (name, ok, extra = '') => {
     await lib.addAgent(inv, beta, { name: 'Resting' })
     for (const n of ['Coder', 'Worker']) await inv('session:start', alpha, { agentId: a[n].id })
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-    check('two agents start', !!(await lib.until(async () => (await live(a.Coder.id))?.status === 'ready' && (await live(a.Worker.id))?.status === 'ready', 45000)))
+    // before any turn (HI-2688): its start, restart or resume
+    check('two agents start', !!(await lib.until(async () => (await live(a.Coder.id))?.status === 'ready' && (await live(a.Worker.id))?.status === 'ready', lib.timing('hang.step'))))
     check('Worker works', (await lib.sendPrompt(inv, lib.ptyKey(alpha, a.Worker.id), 'work 600', { submitted: async () => (await live(a.Worker.id))?.status === 'working' })) > 0)
     await inv('tasks:create', { title: 'Parked work', project: 'alpha', column: 'doing', agent: a.Parked.id })
     if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')

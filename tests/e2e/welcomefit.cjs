@@ -23,7 +23,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   for (const w of workspaces) await lib.openWorkspace(inv, page, w)
   await inv('workspace:close')
-  await lib.until(async () => (await page.locator('.welcome .recent-item').count()) === 3, 10000)
+  await lib.until(async () => (await page.locator('.welcome .recent-item').count()) === 3, lib.timing('hang.ui'))
   // The sidebar open, as the review found it.
   const sidebarOpen = async () => (await page.locator('.sidebar').count()) === 1 && (await page.locator('.sidebar').isVisible())
   if (!(await sidebarOpen())) await page.keyboard.press('Control+B')
@@ -54,9 +54,10 @@ const check = (name, ok, extra = '') => {
 
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
+    await lib.themeShown(page, theme)
     for (const zoom of [1, 1.25]) {
-      await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
-      await lib.sleep(300) // Layout after a zoom change.
+      // Drawn at the zoom and settled (its layout after the change).
+      await lib.zoomTo(app, page, zoom)
       const label = `${theme}, ${zoom * 100}%`
       const m = await measure()
       check(`${label}: the page is no wider than its area`, m.scrollWidth <= m.clientWidth, JSON.stringify({ scrollWidth: m.scrollWidth, clientWidth: m.clientWidth }))
@@ -84,7 +85,7 @@ const check = (name, ok, extra = '') => {
   // Enter on the entry still opens it.
   await page.locator('.welcome .recent-item').first().focus()
   await page.keyboard.press('Enter')
-  check('Enter on an entry still opens it', !!(await lib.until(async () => (await inv('workspace:get'))?.path === workspaces[2], 10000)))
+  check('Enter on an entry still opens it', !!(await lib.until(async () => (await inv('workspace:get'))?.path === workspaces[2], lib.timing('hang.ui'))))
 
   await app.close()
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nALL PASSED')

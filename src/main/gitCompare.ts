@@ -145,11 +145,21 @@ export async function compareBranches(root: string, baseName: string, headName: 
   return { base: baseName, head: headName, baseCommit: base, headCommit: head, mergeBase: mb, ahead, behind, aheadCommits, behindCommits, page: p, pages, files: files.slice(0, COMPARE_FILES), filesTotal: files.length }
 }
 
-/** A file at a commit, or empty when it isn't there (added or deleted); its size first, so a large one is never read. */
+/**
+ * A file at a commit, or empty when it isn't there (added or deleted); its size first, so a large one is never read.
+ * A size that can't be read is empty only once the commit's tree is read and doesn't list the path; a path it lists whose
+ * blob can't be read (a store missing the object) is an error, never an empty side (HI-3218's round 1; Compare's too,
+ * HI-3227).
+ */
 async function fileAt(root: string, rev: string, file: string): Promise<{ buf: Buffer } | { size: number }> {
   const spec = `${rev}:${file}`
   const size = await git(root, ['cat-file', '-s', spec])
-  if (!size.ok) return { buf: Buffer.alloc(0) }
+  if (!size.ok) {
+    const listed = await git(root, ['--literal-pathspecs', 'ls-tree', '--full-tree', '-z', rev, '--', file])
+    if (!listed.ok) throw commandFailed('git ls-tree', listed) // i18n-ignore: a git command, as it is
+    if (listed.out.length) throw commandFailed('git cat-file', size) // i18n-ignore: a git command, as it is
+    return { buf: Buffer.alloc(0) }
+  }
   const n = Number(size.out.trim()) || 0
   if (n > MAX_DIFF_BYTES) return { size: n }
   const r = await git(root, ['cat-file', 'blob', spec], MAX_DIFF_BYTES * 2)
@@ -167,6 +177,18 @@ export async function compareDiff(root: string, baseName: string, headName: stri
   const [pb, ph] = await Promise.all([pinnedCommit(root, pinned?.base), pinnedCommit(root, pinned?.head)])
   const [base, head] = pb && ph ? [pb, ph] : await Promise.all([branchTip(root, baseName), branchTip(root, headName)])
   const from = (await mergeBaseOf(root, base, head)) ?? base
+  return commitDiff(root, from, head, path)
+}
+
+/**
+ * One file as it was at commit `from` against commit `to` (HI-3218: a card's submission, its base to its revision; a
+ * comparison, where head left base to head). Commits only, never the working tree; a side the file isn't on is empty
+ * (added or deleted), a large side is said, never read, and a binary one is said as binary. A side whose blob can't be
+ * read is an error, never empty (fileAt).
+ */
+export async function commitDiff(root: string, from: string, to: string, file: string): Promise<GitDiff> {
+  const path = String(file ?? '').replace(/\\/g, '/')
+  const head = to
   // HI-2864: a side that is a gitlink (by its mode, even when its commit is in this store) is git's own line, never read.
   const link = await gitlinkChange(root, [from, head], path)
   const side = (s: GitlinkSide | undefined, rev: string): Promise<{ buf: Buffer } | { size: number }> =>

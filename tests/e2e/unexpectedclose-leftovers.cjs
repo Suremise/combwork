@@ -1,6 +1,6 @@
 // What the agents had started, after Combwork closed unexpectedly (#987): while an agent runs, the running marker keeps what
 // its launch started (its process job's members, each by id and start time). The fake Claude Code's "linger 1" leaves a
-// node running, as a test run under cw-progress was left (Darren, 17 Oct). The test copy is ended from outside (by its
+// node running, as a test run under cw-progress was left. The test copy is ended from outside (by its
 // own pid and start time, lib.identify, never by name): the node keeps running, and the next start's "Combwork closed
 // unexpectedly" notice says one process the agents started is still running, with Stop Them. Nothing is stopped on its
 // own; Stop Them ends exactly that node. A kept record whose pid names another process by then (a stranger's, with
@@ -17,8 +17,9 @@ const fs = require('fs')
 const net = require('net')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
-const START_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
+// An agent's or a copy's start after an unexpected close: a bound for a hung run.
+const START_MS = lib.timing('hang.step')
 
 const base = path.join(lib.WORK, 'unexpectedclose-leftovers')
 const userData = path.join(base, 'profile')
@@ -86,9 +87,15 @@ async function endFromOutside(app, outlives) {
   let top = byPid.get(outlives)
   for (let up = top && byPid.get(top.parent); up && up.started <= top.started && /cw-progress/i.test(up.commandLine); up = byPid.get(up.parent)) top = up
   const kept = new Set(top ? [top.pid, ...descendantsIn(list, top.pid).map((d) => d.pid)] : [])
-  const ended = root && !kept.has(root.pid) ? endAsCrash(list, { pid: root.pid, started: root.started }, descendantsIn(list, root.pid).filter((p) => !kept.has(p.pid))) : 0
+  const rest = root ? descendantsIn(list, root.pid).filter((p) => !kept.has(p.pid)) : []
+  const ended = root && !kept.has(root.pid) ? endAsCrash(list, { pid: root.pid, started: root.started }, rest) : 0
+  // HI-3454: `proc` is the cmd.exe Playwright starts Electron through, and a kill returns before its process has ended:
+  // the shell's exit can come while Combwork's own process still holds its profile's singleton lock, and the next start
+  // leaves as "already running". So each ended process is waited for until it has left the process list.
+  const tree = root ? [{ pid: root.pid, started: root.started }, ...rest] : []
   const exited = await Promise.race([gone, new Promise((r) => setTimeout(() => r(false), HUNG_MS))])
-  return ended > 0 && exited
+  const treeGone = exited && !!(await lib.until(() => lib.stillSame(tree).length === 0, HUNG_MS))
+  return ended > 0 && treeGone
 }
 
 /** Whether nothing listens on the Agent API port (on 127.0.0.1, where Combwork listens), told as lanes.mjs portFree tells it. */

@@ -22,7 +22,7 @@ const q = require('./queueFixture.cjs')
 const PORT = Number(lib.port(47863))
 const fx = q.queueProject('changesleftovers')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -91,7 +91,7 @@ const heads = () => git(fx.alpha, 'for-each-ref', '--format=%(refname)', 'refs/h
     await doneByUser(B.n, 'Merged by hand')
     await doneByUser(E.n, 'Set aside')
     // Their slots, free now, keep each line checked out (so in use: a worktree's) until the pool lends them again; the
-    // next card's start moves each off it, as here (Darren's leftovers had no worktree left).
+    // next card's start moves each off it, as here (the user's leftovers had no worktree left).
     for (const x of [A, B, E]) git(x.folder, 'checkout', '-q', '--detach')
     q.mergeOn(fx, 'integration', git(fx.alpha, 'rev-parse', `refs/heads/${B.line}`), 'Merge B by hand')
     // A tag named as B's line (HR1's round 1: never `heads/…`).
@@ -178,7 +178,10 @@ const heads = () => git(fx.alpha, 'for-each-ref', '--format=%(refname)', 'refs/h
     await pageEl.locator(`[data-leftover="${A.line}"] [data-action="delete-leftover"]`).click()
     await lib.until(async () => (await a3Dialog.count()) === 1, HUNG_MS)
     await a3Dialog.getByRole('button', { name: 'Delete Branch', exact: true }).click()
-    check('…read again, its 3 commits listed, Delete Branch removes it', !!(await lib.until(async () => !heads().includes(A.line) && (await pageEl.locator(`[data-leftover="${A.line}"]`).count()) === 0, HUNG_MS)), JSON.stringify(heads()))
+    // The row's count and its commit come from one read (HI-3453): a count of 3 means the delete asks at the new commit.
+    const aGone = !!(await lib.until(async () => !heads().includes(A.line) && (await pageEl.locator(`[data-leftover="${A.line}"]`).count()) === 0, HUNG_MS))
+    // The dialog's words only on a failure, and only while it is there (closed on success: innerText would wait for it).
+    check('…read again, its 3 commits listed, Delete Branch removes it', aGone, aGone ? '' : `${JSON.stringify(heads())}; the dialog: ${(await a3Dialog.count()) ? await text(a3Dialog) : '(closed)'}`)
     check('the open card’s, the blocked card’s and the reopened card’s lines untouched', heads().includes(C.line) && heads().includes(D.line) && heads().includes(E.line) && heads().includes(B.line))
   } finally {
     await h.app.close()

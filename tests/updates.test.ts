@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { compareVersions, installDecision, readBuildIdentity, updateDecision, type BuildIdentity } from '../src/shared/updates'
 import { asarPackageVersion, installedCopy, runningIdentity } from '../src/main/buildIdentity'
+import { timing } from './timing.cjs'
 // oxlint-disable-next-line typescript/no-require-imports -- the e2e suites' CommonJS helper, shared with them
 const { fakeInstall } = require('./e2e/fakeInstall.cjs') as { fakeInstall: (dir: string, o?: { version?: string; identity?: unknown }) => string }
 
@@ -73,7 +74,7 @@ describe('the copy installed on disk (#1647)', () => {
     await asar.createPackage(src, real)
     // createPackage resolves on its write stream's end() (@electron/asar 3.4.1), before the last file (package.json) is
     // written: under load the archive is read cut short (HI-1975), so wait for it to be whole. The timeout bounds a hung run.
-    await vi.waitFor(() => expect(asarPackageVersion(real)).toBe('1.0.0-rc.2'), { timeout: 10_000 })
+    await vi.waitFor(() => expect(asarPackageVersion(real)).toBe('1.0.0-rc.2'), { timeout: timing('wait.hang') })
   })
 
   it('known when its identity and app agree; a legacy release without one; unreadable otherwise, never the running version', () => {

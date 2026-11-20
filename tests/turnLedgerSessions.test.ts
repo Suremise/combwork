@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-turn-ledger-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -19,7 +20,7 @@ const { newLedger, openCalls } = await import('../src/main/turnLedger')
 const { agentRuntime, runtimeLabel } = await import('../src/shared/runtime')
 
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 const wsPath = join(base, 'ws')
 const p = join(wsPath, 'alpha')
 type State = { runId: string; agentId: string; sessionId: string; status: string; turn?: { state: string; silentSince?: string } }
@@ -144,7 +145,7 @@ describe('the turn ledger in a session', () => {
     s.checkSilence(p, st.agentId)
     await settled(st)
     expect([st.status, st.turn?.state]).toEqual(['working', 'running'])
-    expect(Date.now() - l.ledger.heard).toBeLessThan(5000)
+    expect(Date.now() - l.ledger.heard).toBeLessThan(5000) // timing-ok: a freshness check against the ledger's own heard time
     // A screen that shows neither (a draft in its input): unknown.
     l.ledger.heard = Date.now() - 5000
     l.screen = { text: () => '• Done.\n\n› half a sentence the user typed' }

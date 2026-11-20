@@ -762,7 +762,7 @@ async function listJob(runId: string, withCommands = false): Promise<{ processes
 }
 
 /**
- * The one rule for whether what a run still has running holds its slot (HI-2304, HI-2309: Darren's decision, one rule in
+ * The one rule for whether what a run still has running holds its slot (HI-2304, HI-2309: one rule in
  * one place, whichever path found the processes): nothing does, and neither do Windows' own brokers while none of what
  * they serve runs (systemBrokers.ts). True when `processes` (all of them, `more` none beyond) is empty, or each still
  * runs as the same process (id and start time) with a known broker's executable, none of their active processes
@@ -962,8 +962,8 @@ export async function settleLeftovers(projectPath: string, agentId: string, how:
 }
 
 /**
- * A notice's End Them / Keep Running (HI-2320, Darren: "End Them must confirm the exact processes (PID and start
- * time), never just the PID"): the launches it lists, each with its processes by id and start time, as shown.
+ * A notice's End Them / Keep Running (HI-2320: End Them must confirm the exact processes (PID and start
+ * time), never just the PID): the launches it lists, each with its processes by id and start time, as shown.
  */
 interface ShownLaunch {
   run: string
@@ -1020,8 +1020,8 @@ async function listedNow(l: { runId: string; processes: AgentProcess[]; restored
 }
 
 /**
- * End Them or Keep Running, from a notice (HI-2320, Darren: "End Them must confirm the exact processes (PID and start
- * time), never just the PID"; HR2's round 1). Checked first against what runs now, read again from the job (never the
+ * End Them or Keep Running, from a notice (HI-2320: End Them must confirm the exact processes (PID and start
+ * time), never just the PID; HR2's round 1). Checked first against what runs now, read again from the job (never the
  * list kept since the last look): each launch the notice listed must still have exactly the processes it showed, by id
  * and start time, and none beyond them. End Them then ends exactly those processes (each only while it is still that
  * process), never the whole job, so a process started since the notice is never touched; what the launch has left
@@ -1471,7 +1471,15 @@ export async function recordEndedLaunches(): Promise<void> {
       if (l.restored || outcomes.has(l.runId) || host.instance !== helper) continue
       const list = await listJob(l.runId).catch(() => null)
       if (host.instance !== helper || !left.has(l.runId) || outcomes.has(l.runId)) continue
-      if (list && (await nothingHolds(list.processes, list.more, l.agentName))) ended.push(l.runId)
+      if (list && (await nothingHolds(list.processes, list.more, l.agentName))) {
+        // HI-3402: settled here as the leftovers' own look settles it (refresh), so its writer is released before the
+        // workspaces close: the quit waits for the writers of this Combwork's runs (HI-3376), and this one's release
+        // would otherwise never come, holding the quit until Don't wait.
+        left.delete(l.runId)
+        void host.request('forget', l.runId)
+        settleRun(l.runId, 'ended')
+        ended.push(l.runId)
+      }
     }
     scan: while (pending.size) {
       for (const run of [...pending]) {

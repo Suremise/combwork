@@ -2,12 +2,14 @@
 // its own, and none loads Electron, which a worker thread can't (the usage worker reached it through fsutil.ts's
 // logger, so in an installed Combwork it would have ended as it started). tests/e2e/packaged-workers.cjs checks the threads
 // run in a packaged build.
-import { readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { build } from 'esbuild'
 import { describe, expect, it } from 'vitest'
 import { bundledScriptExists } from '../src/main/workerThreads'
+import { esbuildEagerGlob } from './esbuildGlob'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const root = join(__dirname, '..')
 /** The build's entries (electron.vite.config.ts) other than main's own: each runs where Electron can't be loaded. */
@@ -20,13 +22,25 @@ describe('worker threads load no Electron (HI-1880)', () => {
     expect(entries.map((e) => e.name)).toEqual(expect.arrayContaining(['usage-worker', 'repo-lock-worker', 'git-worker', 'stall-watchdog', 'log-writer', 'wal-checkpoint-worker']))
   })
 
+  // With import.meta.glob expanded as Vite builds it (HI-3259): plain esbuild leaves it be, so nothing behind the providers'
+  // worker.ts glob was checked, and Muse's parser reached the logger through its names.
+  const inputs = async (file: string): Promise<Record<string, { imports: { path: string }[] }>> =>
+    (await build({ entryPoints: [join(root, file)], bundle: true, platform: 'node', format: 'cjs', write: false, metafile: true, packages: 'external', external: ['original-fs', 'original-fs/promises'], plugins: [esbuildEagerGlob()], logLevel: 'silent' })).metafile.inputs
+
   it.each(entries)('$name imports nothing from Electron', async ({ file }) => {
-    const r = await build({ entryPoints: [join(root, file)], bundle: true, platform: 'node', format: 'cjs', write: false, metafile: true, packages: 'external', external: ['original-fs', 'original-fs/promises'], logLevel: 'silent' })
-    const importers = Object.entries(r.metafile.inputs)
+    const importers = Object.entries(await inputs(file))
       .filter(([, i]) => i.imports.some((x) => x.path === 'electron'))
       .map(([p]) => p)
     expect(importers).toEqual([])
-  }, 60_000)
+  }, timing('test.hang'))
+
+  it("sees every provider's worker-safe parts behind the usage worker's glob", async () => {
+    const usage = entries.find((e) => e.name === 'usage-worker')!
+    const seen = Object.keys(await inputs(usage.file)).filter((p) => /^src\/main\/providers\/[^/]+\/worker\.ts$/.test(p))
+    const folders = readdirSync(join(root, 'src', 'main', 'providers'), { withFileTypes: true }).filter((d) => d.isDirectory() && existsSync(join(root, 'src', 'main', 'providers', d.name, 'worker.ts')))
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.sort()).toEqual(folders.map((d) => `src/main/providers/${d.name}/worker.ts`).sort())
+  }, timing('test.hang'))
 })
 
 describe('bundledScriptExists (HI-1880)', () => {

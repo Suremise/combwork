@@ -70,7 +70,12 @@
       "9699fd9cb16fb4cf",
       "7d4ed2343a8fb81a",
       "9b7ba02dd2e680af",
-      "228b146d3e14bd58"
+      "228b146d3e14bd58",
+      "07c9f5f308368e30",
+      "3665cb9b7a1ab9e8",
+      "edf56136df6b2640",
+      "7e6f98ba8bbbbe98",
+      "d6e503e9787dcb04"
     ],
     "coordinate-agents": [
       "148fcb5639058ac2",
@@ -123,7 +128,8 @@
       "83fa33cc271e548d",
       "e67a6db92725c63c",
       "7e9438761eb44397",
-      "cfae75dda271182b"
+      "cfae75dda271182b",
+      "aef3eac50db2b92a"
     ],
     "generalist": [
       "f985d471d38d2ad3",
@@ -146,7 +152,8 @@
       "12049ff66579193d",
       "1b95a13e5695d92c",
       "5330da8d664b833b",
-      "e4baf3a5c7dc731d"
+      "e4baf3a5c7dc731d",
+      "4314f3784f17ac8e"
     ],
     "licence-audit": [
       "fbeedbd277f91f4c"
@@ -212,7 +219,9 @@
       "e3233ecca9df1696",
       "e085e91f7e2f614f",
       "fe3069ac7b327462",
-      "04769d3afb34089b"
+      "04769d3afb34089b",
+      "dd0c25a05118c5e4",
+      "94c6f1e8af88f68e"
     ],
     "run-lanes": [
       "b42f313edbb95eca",
@@ -245,7 +254,9 @@
       "0c9784fe6d51c097",
       "e862cf20fb3efff8",
       "22c1355165c8396f",
-      "83042acbe411f69a"
+      "83042acbe411f69a",
+      "fb4c2acebdb1022c",
+      "4543d34948bdd3ce"
     ],
     "split-work": [
       "9f3b17bc4a73bdd1",
@@ -266,7 +277,8 @@
       "40332ddcbf85451a",
       "fb25c931eab39484",
       "9ce6f9f5debc7bc1",
-      "2f5377bba1d15ea6"
+      "2f5377bba1d15ea6",
+      "f590a18a06ed95a8"
     ],
     "use-cw-api": [
       "d306d59457643720",
@@ -278,7 +290,10 @@
       "71be14edebf4bd4d",
       "08a02689fe91db08",
       "d1fe5f9e19922642",
-      "5b06a0288da13e1d"
+      "5b06a0288da13e1d",
+      "c92b352eefead9b4",
+      "7e73a0d78c729aae",
+      "cc7eda68f8c4993b"
     ],
     "use-hive-api": [
       "c0281b780bf4d213",
@@ -336,7 +351,10 @@
       "7777f637f09d3a31",
       "353a6cfb4491802f",
       "c712d0b671b034ad",
-      "3d8f47f4a37ab3ae"
+      "3d8f47f4a37ab3ae",
+      "87c433a40f1c96ba",
+      "4ca8a21d05efbc4d",
+      "97d8d53db6d415a2"
     ],
     "workspace-note": [
       "5ecc6339b89ba668",
@@ -420,6 +438,9 @@
     ],
     "copilot/cli": [
       "2a428b5ff9d211fc"
+    ],
+    "muse/cli": [
+      "680e73bc76cd6e1e"
     ],
     "opencode/cli": [
       "4473053fbe5a4980"

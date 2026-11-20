@@ -36,6 +36,8 @@ interface CombworkMessageValues {
   'tasks.error.emptyComment': undefined
   'tasks.error.emptyDecision': undefined
   'tasks.error.failedToDoing': { card: string | number }
+  'tasks.error.followUpArchived': { card: string | number }
+  'tasks.error.followUpOtherProject': { card: string | number }
   'tasks.error.holdCard': { card: string | number }
   'tasks.error.holdNew': undefined
   'tasks.error.inDoingWith': { card: string | number; active: string | number; agent: string | number; stage: string | number; review: string | number }
@@ -129,7 +131,7 @@ interface CombworkMessageValues {
   'tasks.history.decisionsTold': { agent: string | number; count: number }
   'tasks.history.dependsOn': { cards: string | number }
   'tasks.history.description': undefined
-  'tasks.history.followUpSubmitted': { revision: string | number }
+  'tasks.history.followUpSubmitted': { revision: string }
   'tasks.history.forwardResolving': { card: string | number; from: string | number; source: string | number; to: string | number }
   'tasks.history.fromOlder': { was: string | number }
   'tasks.history.given': { agent: string | number }
@@ -154,6 +156,10 @@ interface CombworkMessageValues {
   'tasks.history.notWaiting': undefined
   'tasks.history.notified': { event: string; lane: string | number; hasWhy: string; why: string | number }
   'tasks.history.placed': { place: number; column: string }
+  'tasks.history.queueGuarded': { count: number; guards: string | number; others: number }
+  'tasks.history.queueGuardedIncomplete': { why: string; guard: string | number }
+  'tasks.history.queueGuardedJoin': { first: string | number; rest: string | number }
+  'tasks.history.queueGuardedOne': { guard: string | number; count: number; where: string | number; message: string | number }
   'tasks.history.queueReturned': { reason: string; target: string | number; check: string | number; files: string }
   'tasks.history.renamed': { title: string | number }
   'tasks.history.repaired': { from: string | number; to: string | number }

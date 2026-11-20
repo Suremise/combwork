@@ -16,6 +16,7 @@ import { laneCards, laneChangeText, laneEndText, laneLine, laneNextText, laneNum
 import { tempDir } from './tempDir'
 // @ts-expect-error: a plain .mjs module without types
 import { readCatalogue } from '../scripts/agentTextExtract.mjs'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-agenttext-lanes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -26,7 +27,7 @@ const lanes = await import('../src/main/lanes')
 const journal = await import('../src/main/journalService')
 const journalStore = await import('../src/main/journal')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const ROOT = join(__dirname, '..')
 const catalogue = readCatalogue(ROOT) as Record<string, { text: string }>
@@ -72,6 +73,9 @@ function sharedTexts(): { name: string; text: string }[] {
     status({ reason: 'blocked', blocked: 'Asked the user' }),
     status({ reason: 'blocked', card: null }),
     ...(['hold', 'you', 'roundLimit', 'notMerged', 'merging', 'stale', 'reviewer', 'lineUpdate', 'listChanges', 'checkCopy', 'slot', 'teamPause'] as const).map((reason) => status({ reason })),
+    // HI-3323: a queued yield to a card the card in flight waits on.
+    status({ reason: 'listChanges', first: 3, agent: 'B1' }),
+    status({ reason: 'listChanges', first: 3 }),
     status({ reason: 'hooks', agent: 'R1' }),
     status({ reason: 'hooks' }),
     status({ reason: 'independent', agent: 'R1' }),
@@ -88,6 +92,7 @@ function sharedTexts(): { name: string; text: string }[] {
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'session', heldBy: 'CB1' }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'session' }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'process' }),
+    status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'card', heldBy: 'B1', heldFor: 7 }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'left', heldBy: 'B1', program: 'node' }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'left', heldBy: 'B1', program: 'node', more: 3 }),
     status({ reason: 'startWait', why: 'refused', agent: 'B1', slot: 'slot-b', held: 'lastRun', heldBy: 'B1' }),
@@ -204,7 +209,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
   it("say cw_lane's refusals and notes through the catalogue; a lane's journal fact stays the Default", async () => {
     const facts: string[] = []
     const kept: Parameters<typeof journal.journalFact>[1][] = []
-    const spy = vi.spyOn(journal, 'journalFact').mockImplementation((_ws, f) => {
+    const spy = vi.spyOn(journal, 'journalFact').mockImplementation(async (_ws, f) => {
       facts.push(f.summary)
       kept.push(f)
       return true
@@ -251,7 +256,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       await run(() => tasks.updateTask(c2.number, { column: 'done' }, user))
       // B3's lane (its one card Done now) ends as the lanes follow the board.
       const t = Date.now()
-      while (!(await lanes.listLanes(w, { all: true })).some((l) => l.builder.id === 'b3' && l.state === 'ended') && Date.now() - t < 10_000) await new Promise((r) => setTimeout(r, 50))
+      while (!(await lanes.listLanes(w, { all: true })).some((l) => l.builder.id === 'b3' && l.state === 'ended') && Date.now() - t < timing('wait.hang')) await new Promise((r) => setTimeout(r, timing('wait.interval')))
       outputs.nextEnded = await said(lanes.laneNext(w, 'alpha', 'b3'))
 
       const seen = new Set<string>()
@@ -286,7 +291,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       const h = join(base, 'journal-ws', '.combwork', 'assistant')
       const out = admitted(join(base, 'journal-ws'))
       try {
-        const id = journalStore.writeEntry(h, journalSettings({ enabled: true }), { kind: 'event', ...started, tags: ['combwork', ...(started.tags ?? [])] }, 'combwork')
+        const id = await journalStore.writeEntry(h, journalSettings({ enabled: true }), { kind: 'event', ...started, tags: ['combwork', ...(started.tags ?? [])] }, 'combwork')
         journalStore.closeJournal(h)
         const raw = new DatabaseSync(journalStore.journalFile(h), { readOnly: true })
         try {

@@ -66,15 +66,14 @@ fs.writeFileSync(
   ] })
 )
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const results = []
 const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra ? ` (${extra})` : ''}`)
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 /** Whether fn() comes true (checked until it does, up to HUNG_MS); a throw (an element not there yet) counts as not yet. */
 const becomes = async (fn) => !!(await lib.until(() => Promise.resolve().then(fn).catch(() => false), HUNG_MS))
 /** An element's text, or '' while it isn't there. */
-const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? '').catch(() => '')
+const text = (loc) => loc.textContent({ timeout: lib.timing('poll.readMs') }).then((got) => got ?? '').catch(() => '')
 
 ;(async () => {
   const env = lib.combworkEnv({ CW_USER_DATA: userData })
@@ -87,7 +86,7 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Sessions' }).click()
-  await lib.until(async () => (await page.locator('.session-row').count()) > 0, 10000)
+  await lib.until(async () => (await page.locator('.session-row').count()) > 0, lib.timing('hang.step'))
 
   const rows = page.locator('.session-row')
   check('two sessions listed', (await rows.count()) === 2, String(await rows.count()))
@@ -96,7 +95,7 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   check('a session is selected by default', !!sel, sel)
   const t0 = Date.now()
   await page.locator('.session-row', { hasText: 'Long session' }).click()
-  await page.locator('.tx-compaction').first().waitFor({ timeout: 15000 })
+  await page.locator('.tx-compaction').first().waitFor({ timeout: lib.timing('hang.ui') })
   check('long transcript renders', true, `${Date.now() - t0} ms`)
   check('opens at the latest message', await becomes(() => page.locator('.transcript').evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight < 80)))
   // Only the latest items load at first; earlier ones load as you scroll up.
@@ -105,7 +104,7 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   check('the viewer offers the earlier items', (await page.locator('.transcript-earlier').count()) === 1)
   const firstBefore = await page.locator('.transcript-body [id^="tx-"]').first().getAttribute('id')
   await page.locator('.transcript').evaluate((el) => { el.scrollTop = 0; el.dispatchEvent(new Event('scroll')) })
-  await lib.until(async () => (await page.locator('.transcript-body [id^="tx-"]').first().getAttribute('id')) !== firstBefore, 10000)
+  await lib.until(async () => (await page.locator('.transcript-body [id^="tx-"]').first().getAttribute('id')) !== firstBefore, lib.timing('hang.ui'))
   const firstAfter = await page.locator('.transcript-body [id^="tx-"]').first().getAttribute('id')
   check('scrolling up loads earlier items', firstAfter !== firstBefore && Number(firstAfter?.slice(3)) < Number(firstBefore?.slice(3)), `${firstBefore} → ${firstAfter}`)
   await page.screenshot({ path: path.join(shots, '2-long.png') })
@@ -130,7 +129,7 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   check('Show all loads the full result', await becomes(async () => (await text(result)).length > 6000))
   await page.locator('.tx-compaction-line').click()
   check('compaction summary expands', await becomes(async () => (await text(page.locator('.tx-compaction-summary'))).includes('waiting longer')))
-  const imgSrc = () => page.locator('.tx-user .thumb img').getAttribute('src', { timeout: 1000 }).catch(() => null)
+  const imgSrc = () => page.locator('.tx-user .thumb img').getAttribute('src', { timeout: lib.timing('poll.readMs') }).catch(() => null)
   check('image thumbnail loads', await becomes(async () => (await imgSrc())?.startsWith('data:image/png;base64,')), String(await imgSrc()).slice(0, 40))
   await page.screenshot({ path: path.join(shots, '3-synthetic.png') })
   await page.locator('.tx-user .thumb').click()
@@ -149,7 +148,7 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
 
   // Search: the tree keeps the sessions that match, with each one's matches under it.
   await page.locator('.sessions-list input.input').fill('zebra')
-  await lib.until(async () => (await page.locator('.search-hit').count()) >= 4, 10000)
+  await lib.until(async () => (await page.locator('.search-hit').count()) >= 4, lib.timing('hang.ui'))
   const hits = await page.locator('.search-hit').count()
   check('search lists the matches under their session', hits >= 4, String(hits))
   await page.locator('.search-hit', { hasText: 'timed out' }).click()
@@ -160,11 +159,11 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
 
   // Search every session: only the one whose transcript has it stays.
   await page.locator('.sessions-list input.input').fill('transcript viewer')
-  await lib.until(async () => (await page.locator('.search-hit').count()) > 0, 10000)
+  await lib.until(async () => (await page.locator('.search-hit').count()) > 0, lib.timing('hang.ui'))
   const groups = await page.locator('.sessions-tree .session-row strong').allTextContents()
   check('search keeps the sessions that match', groups.length === 1 && groups[0].includes('Long session'), JSON.stringify(groups))
   await page.locator('.search-hit').first().click()
-  await lib.until(async () => (await page.locator('.transcript-toolbar strong').first().textContent()) === 'Long session', 10000)
+  await lib.until(async () => (await page.locator('.transcript-toolbar strong').first().textContent()) === 'Long session', lib.timing('hang.step'))
   check('hit opens the other session', (await page.locator('.transcript-toolbar strong').first().textContent()) === 'Long session')
   const flashVisible = await page.locator('.flash').evaluate((el) => {
     const r = el.getBoundingClientRect()
@@ -173,7 +172,7 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   check('jumped item is on screen', flashVisible)
   await page.screenshot({ path: path.join(shots, '6-search-all.png') })
   await page.locator('.sessions-list input.input').fill('')
-  await sleep(300)
+  await lib.framesDrawn(page)
 
   // Incremental read: unchanged returns null, appended lines are picked up, a partial line waits.
   const r1 = await inv('transcript:read', proj, A)
@@ -188,7 +187,8 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
 
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
   await page.locator('.session-row', { hasText: 'Zebra test fix' }).click()
-  await sleep(700)
+  await lib.readyWithin('its session shown', async () => (await page.locator('.session-row.selected', { hasText: 'Zebra test fix' }).count()) === 1, lib.timing('hang.ui'))
+  await lib.themeSettled(page, 'light')
   await page.screenshot({ path: path.join(shots, '7-light.png') })
 
   await app.close()

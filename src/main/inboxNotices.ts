@@ -1,4 +1,5 @@
 import { LANES_UNWATCHED_NOTICE } from '../shared/advanced'
+import { inDialectOf } from '../shared/agentText'
 import { isUnread, type DeliveryRecord } from '../shared/deliveries'
 import { inboxNotice, unwatchedLanesNotice, type NoticeItem } from '../shared/doorbell'
 import { running } from '../shared/lanes'
@@ -7,6 +8,7 @@ import { advanced } from './advanced'
 import { allows } from './assistantControl'
 import { agentReadsInbox, countable, inboxSwitch } from './deliveries'
 import { orphanDraftFor } from './orphanProcesses'
+import { scopeOfHost, withCardNames } from './projectKeys'
 import { sessions, type NoticeDraft } from './sessions'
 import { workspaceFor } from './workspace'
 import { pausedFor } from './teamPause'
@@ -71,13 +73,22 @@ async function inboxNoticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'):
   // Its switch off (#1432): no notice there, so the turn goes on (or ends) as the CLI would; what is unread stays in the
   // inbox for the drain, the doorbell or cw_inbox. The checkpoint's not told isn't counted as told.
   if (!(await inboxSwitch(st.projectPath, at === 'checkpoint' ? 'checkpoints' : 'stopContinuation'))) return null
-  const lanes = at === 'drain' ? await unwatchedLanes(st) : ''
+  const builders = at === 'drain' ? await unwatchedLanes(st) : null
+  // Said as the doorbell typed as its prompt is (deliveries.ts): in the agent's dialect, which the hook route opens already
+  // (sessions.inLaunchDialect, HI-2443) and this says itself, as the orphan line does, whoever asks (HI-3230); its cards by
+  // their keys (HI-3226: a hook's work has no workspace of its own, so without its project's names they fell back to the
+  // workspace-wide number, which finds another card).
+  const said = (fn: () => string): string => withCardNames(workspaceFor(st.projectPath), () => inDialectOf({ projectPath: st.projectPath, agentId: st.agentId }, fn), scopeOfHost(st.projectPath))
+  const lanes = (): string => (builders ? unwatchedLanesNotice(builders) : '')
   const unread = await unreadFor(st)
-  if (!unread.length) return lanes ? { text: lanes, commit: () => undefined } : null
+  if (!unread.length) {
+    const text = builders ? said(lanes) : ''
+    return text ? { text, commit: () => undefined } : null
+  }
   const seen = told.get(st) ?? new Set<string>()
   told.set(st, seen)
   if (at === 'checkpoint' && unread.every((r) => seen.has(r.id))) return null
-  const text = [inboxNotice(at, unread.map(item)), lanes].filter(Boolean).join(' ')
+  const text = said(() => [inboxNotice(at, unread.map(item)), lanes()].filter(Boolean).join(' '))
   return text ? { text, commit: () => unread.forEach((r) => seen.add(r.id)) } : null
 }
 
@@ -86,22 +97,23 @@ async function inboxNoticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'):
  * with no lane running, with a lane watch on all of them (`lanes: ["all"]`, or each by id), with its switch off
  * (Settings → Advanced, LANES_UNWATCHED_NOTICE), or when its control level doesn't let it control agents (HI-2187: at
  * Look and advise the lanes are the user's to run, and a watch it starts on its own is still its choice). Once a turn,
- * as the drain is.
+ * as the drain is. Their builders' names, said by the caller in the agent's dialect; null for none.
  */
-async function unwatchedLanes(st: LiveSessionState): Promise<string> {
-  if (!advanced.get<boolean>(LANES_UNWATCHED_NOTICE)) return ''
+async function unwatchedLanes(st: LiveSessionState): Promise<string[] | null> {
+  if (!advanced.get<boolean>(LANES_UNWATCHED_NOTICE)) return null
   const ws = workspaceFor(st.projectPath)
-  if (!ws?.path || !ws.isAssistantHome(st.projectPath)) return ''
-  if (!allows('agents')) return ''
+  if (!ws?.path || !ws.isAssistantHome(st.projectPath)) return null
+  if (!allows('agents')) return null
   // Its team paused (HI-2081): nothing is due from the lanes, which wait for the resume.
-  if (pausedFor(st.projectPath)) return ''
+  if (pausedFor(st.projectPath)) return null
   // Loaded here, for the Assistant only: the lanes and watches services aren't every notice's to start.
   const [{ rawLanes }, { loadedWatchFor }] = await Promise.all([import('./lanes'), import('./watches')])
   const lanes = (await rawLanes(ws).catch(() => [])).filter(running)
-  if (!lanes.length) return ''
+  if (!lanes.length) return null
   const watched = (await loadedWatchFor(ws, st.projectPath, st.agentId).catch(() => null))?.lanes ?? []
-  if (watched.includes('all')) return ''
-  return unwatchedLanesNotice(lanes.filter((l) => !watched.includes(l.id)).map((l) => l.builder.name))
+  if (watched.includes('all')) return null
+  const builders = lanes.filter((l) => !watched.includes(l.id)).map((l) => l.builder.name)
+  return builders.length ? builders : null
 }
 
 /** The notice as noticeDraftFor makes it, counted as told at once (the text only). */

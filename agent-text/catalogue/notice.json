@@ -28,8 +28,8 @@
     "note": "Typed into a running Assistant when the user switches its mode: name is the mode's name, summary its habits from the mode's file. The last sentence is always Combwork's: a mode can't change what the Assistant may do."
   },
   "notice.orphan.process": {
-    "text": "pid {pid} {known, select, yes {`{command}`} other {(its command line could not be read)}} (running {min} min)",
-    "note": "One process an agent's command left running, in the orphan notice's list (HI-2111). pid: its process id; known: yes when its command line was read; command: that command line, cut to 200 characters; min: how many minutes it has run."
+    "text": "pid {pid} {known, select, yes {`{command}`} other {(its command line could not be read)}} (running {min} min){run, select, ended {, still running after its cw-progress run \"{title}\" (run {runId}) ended} unconfirmed {; its cw-progress run \"{title}\" (run {runId}) is no longer seen running} other {}}",
+    "note": "One process an agent's command left running, in the orphan notice's list (HI-2111). pid: its process id; known: yes when its command line was read; command: that command line, cut to 200 characters; min: how many minutes it has run. run (HI-3206): ended when the cw-progress run whose process tree it was in has finished, unconfirmed when that run is no longer seen running (stale, its process gone), none when it was in no run; title and runId name that run. Keep the select keys."
   },
   "notice.orphan.running": {
     "text": "{n, plural, one {A process your command started is} other {{count} processes your commands started are}} still running with the shell that started {n, plural, one {it} other {them}} gone: {list}. End {n, plural, one {it} other {them}} if not needed; Combwork won't.",

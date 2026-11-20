@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'lockask-profile')
 const ws = path.join(lib.WORK, 'lockask-ws')
@@ -71,33 +71,33 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const holder = await lib.addAgent(inv, alpha, { name: 'Holder', provider: 'codex', permissionMode: 'full-access' })
     const asker = await lib.addAgent(inv, alpha, { name: 'Asker', provider: 'codex', permissionMode: 'full-access' })
     for (const a of [holder, asker]) await inv('session:start', alpha, { agentId: a.id })
-    for (const a of [holder, asker]) check(`${a.name} starts`, !!(await until(idle(a.id))))
+    for (const a of [holder, asker]) check(`${a.name} starts`, !!(await until(idle(a.id), HUNG_MS)))
 
     // --- Holder edits x.txt and holds it: its turn waits ("hold") until the test lets it go.
     await say(holder.id, 'patch x.txt then hold')
-    check('Holder edits x.txt and holds it', !!(await until(async () => edits('Holder').some((e) => e.allowed) && ((await live(holder.id))?.lockedFiles ?? []).some((f) => /x\.txt$/i.test(f)))), JSON.stringify({ edits: edits('Holder'), live: (await live(holder.id))?.lockedFiles }))
+    check('Holder edits x.txt and holds it', !!(await until(async () => edits('Holder').some((e) => e.allowed) && ((await live(holder.id))?.lockedFiles ?? []).some((f) => /x\.txt$/i.test(f)), HUNG_MS)), JSON.stringify({ edits: edits('Holder'), live: (await live(holder.id))?.lockedFiles }))
 
     // --- Asker's edit is refused, Combwork asks, and Asker ends its turn to wait (as Codex does, within seconds).
     const since = await say(asker.id, 'patch x.txt')
     check("Asker's edit is held back: it is told Combwork has asked the user", !!(await until(() => edits('Asker').some((e) => !e.allowed && /Combwork has asked the user/.test(e.reason ?? '')), HUNG_MS)), JSON.stringify(edits('Asker')))
-    check("…and Asker's blocked turn ends", !!(await until(turnOver(asker.id, since))), JSON.stringify(await live(asker.id)))
+    check("…and Asker's blocked turn ends", !!(await until(turnOver(asker.id, since), HUNG_MS)), JSON.stringify(await live(asker.id)))
     const asking = page.locator('.toast', { hasText: 'wants to edit x.txt' })
     // Exactly Allow: the entry's own text is a button too (it opens the agent), and says "Allow Asker to edit it too?".
     const allow = asking.getByRole('button', { name: 'Allow', exact: true })
-    check('after that turn ended, the notice still offers Allow (the ask stays open)', !!(await until(async () => (await allow.count()) > 0)), JSON.stringify(await page.locator('.toast').allInnerTexts()))
+    check('after that turn ended, the notice still offers Allow (the ask stays open)', !!(await until(async () => (await allow.count()) > 0, HUNG_MS)), JSON.stringify(await page.locator('.toast').allInnerTexts()))
     check("x.txt has no edit of Asker's yet", !/edited by Asker/.test(fs.readFileSync(path.join(alpha, 'x.txt'), 'utf8')))
 
     // --- Allow, after the blocked turn's end: the go-ahead is typed, Asker reads it and edits the file.
     await allow.first().click()
     const combworkLog = () => (fs.existsSync(path.join(userData, 'logs', 'combwork.log')) ? fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8') : '')
-    check('Allow is answered: Asker is allowed to edit x.txt', !!(await until(() => /Lock: .*Asker.* allowed to edit .*x\.txt/.test(combworkLog()))), JSON.stringify({ log: combworkLog().match(/.*Lock: .*/g), toasts: await page.locator('.toast').allInnerTexts() }))
+    check('Allow is answered: Asker is allowed to edit x.txt', !!(await until(() => /Lock: .*Asker.* allowed to edit .*x\.txt/.test(combworkLog()), HUNG_MS)), JSON.stringify({ log: combworkLog().match(/.*Lock: .*/g), toasts: await page.locator('.toast').allInnerTexts() }))
     const wakes = () => lines(path.join(codexHome, 'fake-wakes.jsonl')).filter((w) => w.agent === 'Asker')
-    check('the go-ahead is typed into Asker, which reads it in its inbox', !!(await until(() => wakes().some((w) => /allowed you to edit x\.txt/.test(w.text)))), JSON.stringify(wakes()))
-    check("…and Asker's retry edits x.txt", !!(await until(() => edits('Asker').some((e) => e.allowed))) && /edited by Asker/.test(fs.readFileSync(path.join(alpha, 'x.txt'), 'utf8')), JSON.stringify(edits('Asker')))
+    check('the go-ahead is typed into Asker, which reads it in its inbox', !!(await until(() => wakes().some((w) => /allowed you to edit x\.txt/.test(w.text)), HUNG_MS)), JSON.stringify(wakes()))
+    check("…and Asker's retry edits x.txt", !!(await until(() => edits('Asker').some((e) => e.allowed), HUNG_MS)) && /edited by Asker/.test(fs.readFileSync(path.join(alpha, 'x.txt'), 'utf8')), JSON.stringify(edits('Asker')))
 
     // Holder's turn let go.
     await inv('pty:write', lib.ptyKey(alpha, holder.id), 'g')
-    check("Holder's turn ends", !!(await until(idle(holder.id))))
+    check("Holder's turn ends", !!(await until(idle(holder.id), HUNG_MS)))
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
   } finally {

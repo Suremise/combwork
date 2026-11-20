@@ -72,7 +72,7 @@ export function publicSessionState(s: LiveSessionState): Record<string, unknown>
   })
 }
 
-/** What a run whose title was made from its command line is called outside Combwork (Darren's rule for #620). */
+/** What a run whose title was made from its command line is called outside Combwork (#620). */
 export const COMMAND_TITLE = 'a command'
 
 /**

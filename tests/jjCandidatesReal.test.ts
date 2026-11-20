@@ -39,6 +39,7 @@ import {
 import { admitted } from './admitted'
 import { harness, jjExe } from './jjWorkspaceHarness'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 if (!jjExe) console.warn(`jjCandidatesReal.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
@@ -52,8 +53,8 @@ const token = (): string => `t${Date.now().toString(36)}${(++attempts).toString(
 
 // A hung test's bound (HI-2921), not a time budget: each test runs real jj and Git processes, and Vitest's 20 s default for
 // unit tests timed out the drop test beside the other real-jj files and 2 spinner workers, where its tests took up to
-// 22.2 s. Over twice the worst seen, as jjSlotPrepReal's.
-const REAL_JJ_MS = 60_000
+// 22.2 s. Alone, one file at a time, the longest later took 26.8 s, so at least 3 times that for a loaded full run (HI-3350).
+const REAL_JJ_MS = timing('wait.hangReal')
 
 describe.skipIf(!jjExe)(`jj merge-queue candidates on the real jj (${TESTED_JJ.version})`, { timeout: REAL_JJ_MS }, () => {
   const h = harness()
@@ -63,7 +64,7 @@ describe.skipIf(!jjExe)(`jj merge-queue candidates on the real jj (${TESTED_JJ.v
     (store: string) =>
     (args: readonly string[]): Promise<RunResult> =>
       new Promise((done) => {
-        execFile('git', ['--git-dir', store, ...args], { env: h.env, windowsHide: true, encoding: 'buffer', timeout: 60_000 }, (e, out, err) => {
+        execFile('git', ['--git-dir', store, ...args], { env: h.env, windowsHide: true, encoding: 'buffer', timeout: timing('spawn.hang') }, (e, out, err) => {
           const code = e ? (typeof (e as { code?: unknown }).code === 'number' ? ((e as { code: number }).code) : -1) : 0
           done({ ok: !e, out: out.toString('utf8'), buf: out, err: err.toString('utf8'), code })
         })

@@ -17,7 +17,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'antigravity-profile')
 const ws = path.join(lib.WORK, 'antigravity-ws')
@@ -134,7 +134,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await page.keyboard.press('Escape')
   await page.getByText('alpha', { exact: true }).first().click()
 
-  // --- agy's first-run screens (HI-2547, Darren's (a)): Provider Setup says they are needed; Set up runs agy in a terminal
+  // --- agy's first-run screens (HI-2547's (a)): Provider Setup says they are needed; Set up runs agy in a terminal
   // in Combwork's check profile, where the user completes them (here the fake's "accept"); Combwork closes it once done,
   // and each agent's profile then starts past them.
   const setupShown = async () => JSON.stringify(await inv('provider:refresh', 'antigravity'))
@@ -360,7 +360,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   void ada
   check('the sentinel was never started, all along', !fs.existsSync(marker))
 
-  // --- Roles (HI-2731, Darren's 7 Nov decisions: "Independent behaves as if connection level switches are off"): what
+  // --- Roles (HI-2731: Independent behaves as if connection level switches are off): what
   // each launch gives agy for the agent's role, one agent Either → Independent → Either (a new session each time), beside a
   // fresh agent only ever Independent; then removed, its profile to the Recycle Bin (the suite's trash folder).
   const profileOf = (id) => path.join(userData, 'antigravity', 'profiles', id)

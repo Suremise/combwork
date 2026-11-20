@@ -7,11 +7,11 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 180000
+const HUNG_MS = lib.timing('hang.slow')
 const COMMITS = 2000
 const FILLER = 300
 /** Main's longest stall allowed while it takes them in (18 s before HI-2379; about 100 ms after). */
-const STALL_MS = 1000
+const STALL_MS = lib.timing('budget.mainStallMs')
 
 const userData = path.join(lib.WORK, 'mergeburst-profile')
 const ws = path.join(lib.WORK, 'mergeburst-ws')

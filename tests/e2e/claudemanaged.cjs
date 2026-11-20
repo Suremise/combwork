@@ -20,7 +20,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'claudemanaged-profile')
 const ws = path.join(lib.WORK, 'claudemanaged-ws')
@@ -63,7 +63,11 @@ const until = lib.until
     await lib.setOwnOptions(inv, alpha, { fileLocks: 'block' })
     const agent = await lib.addAgent(inv, alpha, { name: 'Ann' })
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === agent.id)
-    const raw = async () => (await inv('pty:buffer', lib.ptyKey(alpha, agent.id)).catch(() => '')) ?? ''
+    // The output as it came (HI-3311, HI-3312's recorder): what came after a mark is past it. pty:buffer may be the screen
+    // drawn afresh (a resize in its queue), where a turn's lines land above the input box, before the mark: the prompt
+    // was sent again, and every turn event of that step came twice.
+    await lib.recordPtyOutput(page)
+    const raw = () => lib.ptyOutput(page, lib.ptyKey(alpha, agent.id))
     const say = async (text) => {
       const mark = (await raw()).length
       return lib.sendPrompt(inv, lib.ptyKey(alpha, agent.id), text, { submitted: async () => /esc to interrupt|Worked for/.test(lib.plainText((await raw()).slice(mark))) })
@@ -169,7 +173,7 @@ const until = lib.until
     await stop()
     await inv('advanced:set', 'claude-code.hooks.timeoutSeconds', 5)
 
-    // ---- 5. No managed settings at all (Darren's PC, HI-2850): a busy turn is never taken for hooks arriving twice.
+    // ---- 5. No managed settings at all (the maintainer's PC, HI-2850): a busy turn is never taken for hooks arriving twice.
     fs.rmSync(path.join(managedDir, 'managed-settings.json'), { force: true })
     // Ready before any turn: a fresh start.
     check('5: the agent starts', (await start()) && !!(await until(async () => (await live())?.status === 'ready', HUNG_MS)))

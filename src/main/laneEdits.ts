@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { withValues } from '../shared/advanced'
 import { msg } from '../shared/i18n'
-import { LANE_MAX_CARDS, running, type LaneRecord } from '../shared/lanes'
+import { LANE_MAX_CARDS, running, waitsOnCard, type LaneRecord } from '../shared/lanes'
 import { cardRef } from '../shared/projectKeys'
 import { foldCard } from '../shared/workflow/facts'
 import { otherThanOwn } from '../shared/workflow/compile'
@@ -10,7 +10,7 @@ import { boardRead, cardOwnersNow, cardPlacesNow } from './boardStore'
 import { combworkError } from './combworkError'
 import { laneTarget } from './laneTarget'
 import { applyLaneList, laneDefaultTarget, LaneError, lanesEnforced, mutateInBoard, refuseOtherTargets, refuseWhileTeamPaused } from './lanes'
-import { resumeLaneBuilder } from './laneStart'
+import { laneByUser, resumeLaneBuilder } from './laneStart'
 import { createLogger, userText } from './logger'
 import { progress } from './progressService'
 import { withCardNames } from './projectKeys'
@@ -165,10 +165,32 @@ function fixedLength(ws: WorkspaceService, l: LaneRecord, list: readonly number[
   return fixed
 }
 
-/** Refused when `next` doesn't keep the start of `was` that keeps its places; `card` is the card the edit moves or adds. */
-function keepsFixed(ws: WorkspaceService, l: LaneRecord, was: readonly number[], next: readonly number[], card: number | null): void {
+/**
+ * Refused when `next` doesn't keep the start of `was` that keeps its places; `card` is the card the edit moves or adds.
+ * `yields` (HI-3323, yieldMove): `card` goes just before the lane's card in Doing that waits on it, which keeps its place
+ * otherwise; the lane switches to `card` at its builder's turn end.
+ */
+function keepsFixed(ws: WorkspaceService, l: LaneRecord, was: readonly number[], next: readonly number[], card: number | null, yields = false): void {
   const fixed = fixedLength(ws, l, was)
-  if (!sameList(was.slice(0, fixed), next.slice(0, fixed))) refuse(ws, 409, M.fixedPlace, { card: cardRef(card ?? next.find((n, i) => n !== was[i]) ?? was[0]) })
+  if (sameList(was.slice(0, fixed), next.slice(0, fixed))) return
+  if (yields && card !== null) {
+    const kept = was.slice(0, fixed).filter((n) => n !== card)
+    if (sameList(kept, next.filter((n) => n !== card).slice(0, kept.length))) return
+  }
+  refuse(ws, 409, M.fixedPlace, { card: cardRef(card ?? next.find((n, i) => n !== was[i]) ?? was[0]) })
+}
+
+/**
+ * HI-3323: whether an edit puts `card` (queued: in Todo, the builder's or nobody's) directly before the lane's own card in
+ * Doing that waits on it (waitsOnCard), as the board has them in this change.
+ */
+async function yieldMove(ws: WorkspaceService, l: LaneRecord, next: readonly number[], card: number): Promise<boolean> {
+  const at = next.indexOf(card)
+  const after = at >= 0 ? next[at + 1] : undefined
+  if (after === undefined) return false
+  const [f, c] = await Promise.all([getTask(card, ws), getTask(after, ws)])
+  const own = (t: TaskCard): boolean => !t.archived && t.project.toLowerCase() === l.project.toLowerCase() && (!t.agent || t.agent === l.builder.id)
+  return own(f) && own(c) && f.column === 'todo' && c.column === 'doing' && waitsOnCard(c, card, f.key)
 }
 
 /** Each card's cards it depends on (blockedBy), as its project's records have them. */
@@ -362,7 +384,7 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
   let before: LaneListState[] = []
   let cardUndo: LaneEditUndo['card'] = null
   let back: LaneEditUndo['back'] = []
-  let queued: { lane: string; queuedAfter: number | null }[] = []
+  let queued: { lane: string; queuedAfter: number | null; first?: number }[] = []
   let leftOut: number[] = []
   const done = await mutateInBoard(
     ws,
@@ -398,18 +420,18 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
         if (x.next.length > LANE_MAX_CARDS) refuse(ws, 409, M.full, { max: LANE_MAX_CARDS, lane: pairOf(x.lane) })
         if (p.op === 'move' || p.op === 'remove') queuedHere(ws, x.lane, p.card!)
         if (p.op === 'transfer' && x.lane === p.brings?.leaving) queuedHere(ws, x.lane, p.card!, { applied: true })
-        // A lane keeps a card to do (HI-3066, Darren's decision A): taking off, or moving away, its last one not Done is
+        // A lane keeps a card to do (HI-3066, decision A): taking off, or moving away, its last one not Done is
         // refused here, nothing saved. A list of none can't be read back (the lane vanished), and one of Done cards only
         // ends the lane at once; ending it is End Lane's or Abandon Lane's.
         if ((p.op === 'remove' || (p.op === 'transfer' && x.lane === p.brings?.leaving)) && !hasWork(ws, x.next)) refuse(ws, 409, M.lastCard, { card: cardRef(p.card!), lane: pairOf(x.lane) })
-        // A card not started can be taken off wherever it is (HI-3067, Darren's decision): off its lane, or Move here's
+        // A card not started can be taken off wherever it is (HI-3067): off its lane, or Move here's
         // from its source, even inside the fixed start (before a card on hold or another agent's), which keeps its order;
         // queuedHere checked the card is waiting. Moves and cards brought in keep the fixed start's places.
         const takenOff = p.op === 'remove' || (p.op === 'transfer' && x.lane === p.brings?.leaving)
         // An undo's cards brought back go back where they were, the lane as the edit left it (its revision): the fixed
         // start is checked without them (one taken off from inside it comes back there), each checked by its token below.
         const kept = (list: readonly number[], from: readonly number[]): number[] => (x.restore ? list.filter((n) => from.includes(n)) : [...list])
-        if (!takenOff) keepsFixed(ws, x.lane, was, kept(x.next, was), p.card)
+        if (!takenOff) keepsFixed(ws, x.lane, was, kept(x.next, was), p.card, (p.op === 'move' || p.op === 'add' || p.op === 'transfer') && p.card != null && (await inWorkspace(ws, () => yieldMove(ws, x.lane, x.next, p.card!))))
         // An undo sets the applied list back too: its fixed start kept there as well.
         if (x.restore) keepsFixed(ws, x.lane, x.lane.cards, kept(x.restore.cards, x.lane.cards), p.card)
         keepsDependencies(ws, x.lane, was, x.next)
@@ -466,6 +488,8 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
       for (const x of p.lanes) {
         const l = x.lane
         if (x.restore) {
+          // A yield is for the list it came with (HI-3323): an undo's never keeps one.
+          delete l.yieldFor
           l.cards = [...x.restore.cards]
           if (x.restore.pending) l.pending = [...x.restore.pending]
           else delete l.pending
@@ -475,9 +499,12 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
           // in flight, so there is no boundary to wait for.
           l.cards = [...x.next]
           delete l.pending
+          delete l.yieldFor
           queued.push({ lane: l.id, queuedAfter: null })
         } else {
-          queued.push({ lane: l.id, queuedAfter: await applyLaneList(ws, l, x.next, on, checks) })
+          queued.push({ lane: l.id, queuedAfter: await applyLaneList(ws, l, x.next, on, checks, laneByUser()) })
+          // HI-3323: queued as a yield to a card its card in flight waits on: the window says it switches at the turn end.
+          if (l.yieldFor) queued[queued.length - 1].first = l.yieldFor.first
           // Move here's card leaves its source at once (HI-3063, as HI-1821's): out of the applied list too while that
           // lane's queued list waits, so no lane but the one it moved to has it. A card waiting in To do (queuedHere),
           // never one in flight: the applied list keeps its card in flight.
@@ -486,7 +513,9 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
             // Its queued list then no change at all (it only took that card off): none left waiting.
             if (sameList(l.pending, l.cards)) {
               delete l.pending
+              delete l.yieldFor
               queued[queued.length - 1].queuedAfter = null
+              delete queued[queued.length - 1].first
             }
           }
         }

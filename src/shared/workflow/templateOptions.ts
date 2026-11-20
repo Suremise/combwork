@@ -1,4 +1,4 @@
-// A template's workflow (HI-1910, Darren's decisions of 28 Oct): a section per version control, None and Git, holding the
+// A template's workflow (HI-1910): a section per version control, None and Git, holding the
 // rules a project's workflow options set, never the project's own facts. Each option is on one side of the split
 // (`TEMPLATE_CARRIED`, `TEMPLATE_NOT_CARRIED`; a unit test fails on a new option on neither). Every boundary goes
 // through a whitelist: saving (`templateWorkflowOf`), reading a file or an edit (`readTemplateWorkflows`), and loading
@@ -9,11 +9,12 @@ import { allOff, contradictions, FOCUSED_RUN, FORM_GROUPS, identityShown, OPTION
 import { stageNameProblems } from './stages'
 
 /**
- * The options a template carries (Darren, 28 Oct ~01:25): the rules of review, checks (by name), carrying a pass over,
+ * The options a template carries: the rules of review, checks (by name), carrying a pass over,
  * merging, your OK, where cards are built, the identity's on/off, agents' runs, dependencies, card loops and the stage
  * names; and G16 and file locks, how agents share a folder (HR5's OK on the design). G20, each card's focused tests
  * (HI-1367), is a rule too: its runner and picker are commands, the loading project's own (HR4's OK, HI-1949). Maximum
- * agents (HI-2001): the team the template is for.
+ * agents (HI-2001): the team the template is for. The churn levels (HI-3188, Simplify check after, Hard stop after):
+ * how far a card's loop work goes before Combwork asks, rules like the loops' rounds (HI-3305).
  */
 export const TEMPLATE_CARRIED = [
   'review',
@@ -40,6 +41,9 @@ export const TEMPLATE_CARRIED = [
   'loopRounds',
   'loopWaitHours',
   'loopStepWaitMinutes',
+  'simplifyAt',
+  'churnStopAt',
+  'assistantWakes',
   'stageNames',
   'maxAgents'
 ] as const satisfies readonly OptionKey[]
@@ -48,9 +52,10 @@ export const TEMPLATE_CARRIED = [
  * The project's own facts, never carried: the branch its work merges into, the other branches it can (HI-2556), and
  * pushing it, the checks' commands, the merge commit's message (set per workspace) and None's excluded folders. The
  * identity's name and email aren't carried either: `identity` is, as on or off only, made from the loading project's own
- * git identity.
+ * git identity. Merge guards (HI-3284) aren't carried (HI-3305): the patterns a project keeps out
+ * of its code are its own, one of them (the one-click guard) the user's own name.
  */
-export const TEMPLATE_NOT_CARRIED = ['target', 'targetOwn', 'otherTargets', 'pushTarget', 'followRemote', 'commands', 'commitMessage', 'excluded'] as const satisfies readonly OptionKey[]
+export const TEMPLATE_NOT_CARRIED = ['target', 'targetOwn', 'otherTargets', 'pushTarget', 'followRemote', 'commands', 'commitMessage', 'excluded', 'mergeGuards'] as const satisfies readonly OptionKey[]
 
 export type CarriedKey = (typeof TEMPLATE_CARRIED)[number]
 
@@ -153,7 +158,7 @@ export interface TemplateWorkflowOverlay {
 }
 
 /**
- * The Maximum agents the user's load of a template saves with its agents (HI-2058, Darren's decision: the template
+ * The Maximum agents the user's load of a template saves with its agents (HI-2058: the template
  * raises it by itself), its workflow applied: the section's own (`m`, read as the option takes it) when it has one, never
  * under the `n` agents loaded; one with none, or none it can take, raises the project's (`now`) to `n` and never lowers
  * it. Null: none saved, the project's own as it is. A load past AGENT_LIMIT_MAX is refused before this is asked.

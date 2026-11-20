@@ -122,6 +122,9 @@ const A = {
   })
 }
 
+/** Who a window's lane change is by, as the lane records it (HI-3323: a yield's `by`), in the Default. */
+export const laneByUser = (): string => inDefaultDialect(() => say(A.byUser))
+
 /** Builders whose lane is being started (a second Start meanwhile is refused). */
 const starting = new Set<string>()
 
@@ -207,7 +210,7 @@ async function builderWhere(projectPath: string, builder: AgentDef, options: Wor
 }
 
 /**
- * A lane whose cards still to do are all no-code (HI-2338, Darren's decision): none of them changes anything, so the
+ * A lane whose cards still to do are all no-code (HI-2338): none of them changes anything, so the
  * lane takes no slot as it starts and its agents start where they are (the project folder by default). A code card
  * coming up later in it (added, or made code) is lent the lane's slot as it starts (slotCards' leaseForStart), as a lane
  * an agent registers is at its first card. False with no card to do, or on a board with no kinds (waiting for its 1.0
@@ -242,6 +245,20 @@ export async function checkLanePool(ws: WorkspaceService, projectPath: string, b
   const pool = poolOf(cfg, options)
   if (!pool) throw combworkError(M.poolNotOffered, { project }, { kind: 'invalid' })
   if (!pool.some((a) => a.id !== builderId)) throw combworkError(M.poolEmpty, { project }, { kind: 'invalid' })
+}
+
+/**
+ * HI-3424: a lane the Assistant or a script starts naming neither a reviewer nor `pool`, in a project whose rules review by
+ * a pool (a lane with no reviewer there is never reviewed: nobody joins a pool project's lane): a new one is the pool's,
+ * or refused as `checkLanePool` refuses it (`refusal`). Null where the rules have no pool (or are off): no reviewer, as before.
+ */
+export async function poolUnlessNamed(ws: WorkspaceService, projectPath: string, builderId: string): Promise<{ refusal: Error | null } | null> {
+  const cfg = await ws.projectConfig(projectPath)
+  const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
+  const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
+  if (!poolOf(cfg, options)) return null
+  const refusal = await checkLanePool(ws, projectPath, builderId).then(() => null, (e: unknown) => (e instanceof Error ? e : new Error(String(e))))
+  return { refusal }
 }
 
 /** What Start Lane… offers for a project (#1443): Pool in its reviewer list, with the pool's agents, where the rules have one. */
@@ -497,9 +514,9 @@ export interface RecordedLaneLaunch {
 /**
  * A new lane the Assistant or a script recorded (HI-1900, `POST /v1/lanes` naming its builder): its stopped agents
  * started as Start Lane… starts them, so a lane over stopped agents never sits active with nobody working it. A running
- * agent is left as it is (HI-1934, Darren's option (a)): never refused nor given a new conversation, the lane recorded
+ * agent is left as it is (HI-1934, option (a)): never refused nor given a new conversation, the lane recorded
  * for it as before HI-1900, and the caller told to tell it; except an idle builder outside slots, given the lane in a
- * new conversation as Start Lane… gives it (HI-2232, Darren's decision (a); owed if it isn't free at its launch). With its builder stopped, its slot is lent
+ * new conversation as Start Lane… gives it (HI-2232, decision (a); owed if it isn't free at its launch). With its builder stopped, its slot is lent
  * first where the builder works in slots (none free: the lane waits for one, shown so, and slotCards' pass starts its
  * stopped agents once one is); then each stopped agent starts with the lane's brief. Null when the lane isn't running,
  * or its builder is no agent of the project.
@@ -520,7 +537,7 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, lane.cards))
   // Running now: left out of this start whatever they do meanwhile (its slot is decided from it), and named to the caller.
   const left = [builder, reviewer].filter((a): a is AgentDef => !!a && !!sessions.liveFor(projectPath, a.id))
-  // An idle builder outside slots (HI-2232, Darren's decision (a)): given the lane in a new conversation, as Start Lane…
+  // An idle builder outside slots (HI-2232, decision (a)): given the lane in a new conversation, as Start Lane…
   // gives it (its last stays in the Sessions history); in slots its card's start gives it one there. Never one in a turn
   // or on a watch: left as it is. One restarting (its exit typed for a switch, HI-2739: a workflow change just restarted
   // it for its tools) has no turn to keep: owed its new conversation, given once it has resumed.

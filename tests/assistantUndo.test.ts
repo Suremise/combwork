@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { editCard } from './boardDb'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-assistant-undo-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -33,7 +34,7 @@ const { ENFORCE } = await import('../src/main/workflow/service')
 type WS = ReturnType<typeof createWorkspaceService>
 
 // Hundreds of cards are written: under a full run's load, the default 5 s is too short (a bound, not a wait).
-vi.setConfig({ testTimeout: 60_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const user = { kind: 'user' } as const
 const assistant = { kind: 'assistant' } as const
@@ -157,7 +158,7 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     expect(r.undone).toEqual(['waitingFor'])
     expect((await card(c.number)).waitingFor).toBeUndefined()
     // The user's own mark, changed by the Assistant and then cleared: each undone puts back the mark as it was, who and when.
-    await run(() => tasks.updateTask(c.number, { waitingFor: 'Darren holds it' }, user))
+    await run(() => tasks.updateTask(c.number, { waitingFor: 'Sam holds it' }, user))
     const mine = (await card(c.number)).waitingFor!
     group = newMessage()
     await asAssistant(`reword #${c.number}'s hold`, () => tasks.updateTask(c.number, { waitingFor: 'The Assistant holds it' }, assistant))
@@ -212,7 +213,7 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     expect((await card(c.number)).waitingFor).toEqual(request)
     // So the request's ack takes it off.
     await acked(asked.id)
-    await vi.waitFor(async () => expect((await card(c.number)).waitingFor).toBeUndefined(), { timeout: 10_000 })
+    await vi.waitFor(async () => expect((await card(c.number)).waitingFor).toBeUndefined(), { timeout: timing('wait.hang') })
     // Asked again, the Assistant's mark over it, and that request acked meanwhile (its take-off leaves the Assistant's
     // mark): the undo puts back an ended request's mark, which goes at once.
     const again = await run(() => askAssistant(w, c.number, agentA1, 'May I have it after CB1?'))
@@ -220,7 +221,7 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     await asAssistant(`hold #${c.number} again`, () => tasks.updateTask(c.number, { waitingFor: 'After CB1' }, assistant))
     ;[change] = groupOf(group)!.changes
     await acked(again.id)
-    await vi.waitFor(() => expect(deliveries.deliveryNow(w.assistantHome, again.id)?.state).toBe('acked'), { timeout: 10_000 })
+    await vi.waitFor(() => expect(deliveries.deliveryNow(w.assistantHome, again.id)?.state).toBe('acked'), { timeout: timing('wait.hang') })
     expect((await card(c.number)).waitingFor?.reason).toBe('After CB1')
     ;[r] = await userUndo(w, { change: change.id })
     expect(r.undone).toEqual(['waitingFor'])

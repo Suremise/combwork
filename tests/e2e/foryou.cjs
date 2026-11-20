@@ -18,7 +18,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'foryou-profile')
 const ws = path.join(lib.WORK, 'foryou-ws')
@@ -280,15 +280,12 @@ const check = (name, ok, extra = '') => {
     await rDialog.waitFor({ timeout: HUNG_MS })
     const rSection = rDialog.locator('[data-section="for-you"]')
     check('approved, the ui card waits for your OK before merging', !!(await lib.until(async () => (await rSection.innerText().catch(() => '')).includes(`${rKey} is approved: OK to merge?`), HUNG_MS)) && (await card(r))?.column === 'passed', await rSection.innerText().catch(() => ''))
-    // In Polish (as main sends a change of language, with Polish's own catalogue).
+    // In Polish (as main sends a change of language, with Polish's own catalogue, which main reads: HI-3434).
     const base = (await inv('app:info')).language
-    const dir = path.join(lib.ROOT, 'locales', 'pl')
-    const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
-    await speak({ ...base, code: 'pl', locale: 'pl', messages })
+    await lib.speakLanguage(app, base, 'pl')
     check('the section in Polish', !!(await lib.until(async () => /dla ciebie/i.test(await rSection.innerText().catch(() => '')) && (await rSection.innerText().catch(() => '')).includes('Zatwierdź'), HUNG_MS)), await rSection.innerText().catch(() => ''))
     await rSection.screenshot({ path: path.join(lib.WORK, 'foryou-dialog-pl.png') })
-    await speak(base)
+    await lib.speakLanguage(app, base)
     await lib.until(async () => (await rSection.innerText().catch(() => '')).includes('Approve'), HUNG_MS)
     // HI-2286: on Combwork's own OK the note is a comment only.
     check("Approve's note on Combwork's OK says it is your comment", ((await rSection.locator('.for-you-approve-note').getAttribute('placeholder')) ?? '').includes('added as your comment'), await rSection.locator('.for-you-approve-note').getAttribute('placeholder'))
@@ -384,6 +381,13 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     await more.click()
     check('…Show all shows it whole', !!(await lib.until(async () => (await question.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)) && (await more.innerText()).trim() === 'Show less', HUNG_MS)), await more.innerText().catch(() => ''))
+    // HI-3356: answered with just an option's number, Record as Decision records what it chose, with the request.
+    const mRequest = ((await inv('tasks:forYou')).items ?? []).find((i) => i.card === m)?.request
+    await mDialog.locator('[data-section="for-you"] textarea.for-you-reply').fill('2')
+    await mDialog.locator('[data-section="for-you"]').getByRole('button', { name: 'Record as Decision' }).click()
+    const chosen = `2: **For you:** each action shows as a button with its reason, which you can edit. (${mRequest})`
+    check('an option answered "2" is recorded with the option chosen and its request, whole (HI-3356)', !!mRequest && !!(await lib.until(async () => ((await card(m))?.decisions ?? []).some((d) => d.text === chosen), HUNG_MS)), JSON.stringify({ request: mRequest, decisions: (await card(m))?.decisions }))
+    check('…and still once its question has left For you', ((await inv('tasks:forYou')).items ?? []).every((i) => i.card !== m) && ((await card(m))?.decisions ?? []).some((d) => d.text === chosen), JSON.stringify((await card(m))?.decisions))
     await page.keyboard.press('Escape')
 
     // HR5's round 1 (#1637): a question that fits, then wraps past the fold once the window is zoomed in, is folded

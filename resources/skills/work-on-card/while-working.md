@@ -8,6 +8,7 @@
 - **Tests you write or change wait for what they expect to see, never for a length of time**: poll the condition (with a generous bound for a hung run) rather than sleep and then check, or read state once just after an action. Raising a timeout isn't a fix. Each test cleans up its own state, and passes under load, not only alone. Follow the project's test notes where it has them.
 - Work you find but weren't asked to do goes on a new card (`cw_create_task`, described well enough to start from cold), not into this one.
 - **Wait with a watch, not a timer, and only on someone else's move**: the user, another card (doing first what doesn't need it) or a while. End your turn on a card watch (`cw_wait_for_tasks` with `wake`, and `limitMinutes` for the time), never a sleep or a background timer.
+- **A long job Combwork can't see** (not run through cw-progress: a VM or Sandbox run, a remote build): before you end your turn, mark your card waiting (`cw_update_task`'s `waitingFor`: the job and its expected end), or it shows as stalled, and watch it with `limitMinutes` up to that end. Woken, check the job: still running, update the end and watch again; ended, clear the mark (`waitingFor: ""`) and carry on.
 
 ## Priorities
 

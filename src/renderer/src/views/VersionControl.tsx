@@ -200,7 +200,7 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
             ) : section === 'queue' ? (
               <GitQueueSection project={project} />
             ) : section === 'jjRepo' ? (
-              <JjRepoSection project={project} />
+              <JjRepoSection project={project} finish={form?.platform === platform ? form.options.finish : null} />
             ) : section === 'jjHistory' ? (
               <JjHistorySection project={project} />
             ) : section === 'jjCompare' ? (

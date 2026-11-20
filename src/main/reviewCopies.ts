@@ -117,6 +117,7 @@ const T = {
   ended: agentMsg({ id: 'copy.review.ended', text: 'the review ended', note: 'Why a reviewer gets no review copy: its review ended while the copy was set up. The end of copy.review.none.' }),
   leaseFailed: agentMsg({ id: 'copy.review.leaseFailed', text: "it couldn't be leased: {error}", note: 'Why a reviewer gets no review copy: leasing it failed. The end of copy.review.none.' }),
   stalled: agentMsg({ id: 'copy.review.stalled', text: "{card}'s review by {agent} has waited {minutes} min for a review copy: {why}.", note: "Why a card in Review is stalled (HI-1764), in a lane watch and the Agent API's stalled: its reviewer is kept from reviewing. {minutes} is whole minutes." }),
+  untrusted: agentMsg({ id: 'copy.review.untrusted', text: "your CLI doesn't trust {folder} yet; ask the user to trust it with Set Up in Settings → Accounts & Connections", note: 'Why a reviewer gets no review copy (HI-3337): its CLI (Claude Code 2.1.326) asks about the review-copies folder at each start until its connection trusts the workspace\'s worktrees folder ({folder}), so Combwork withheld it. The end of copy.review.none.' }),
   workflowOff: agentMsg({ id: 'copy.review.workflowOff', text: "workflow rules aren't enforced (Settings → Advanced, Workflow rules are enforced)", note: 'Why a reviewer gets no review copy: the advanced setting is off. Names the setting as the window shows it.' })
 }
 
@@ -377,7 +378,10 @@ export function reviewCopiesFor(ws: WorkspaceService, projectPath: string): Revi
 export async function reviewCopyOnStart(ws: WorkspaceService, projectPath: string, card: number, agent: Reviewer): Promise<string | null> {
   if (reviewCopiesOff()) return null
   const folder = copiesDirOf(ws.worktreesRoot, projectPath)
-  if (!sessions.grantedDirs(projectPath, agent.id).some((d) => samePlace(d, folder))) return null
+  if (!sessions.grantedDirs(projectPath, agent.id).some((d) => samePlace(d, folder))) {
+    // HI-3337: withheld at its launch because its CLI doesn't trust the folder yet: said once, here, so it can tell the user.
+    return sessions.withheldDirs(projectPath, agent.id).some((d) => samePlace(d, folder)) ? reviewCopyText({ is: 'none', why: say(T.untrusted, { folder: ws.worktreesRoot }) }) : null
+  }
   const a = await reviewCopiesFor(ws, projectPath)
     .start(card, agent)
     .catch((e: Error): ReviewCopyAnswer => ({ is: 'none', why: say(T.leaseFailed, { error: e.message }) }))

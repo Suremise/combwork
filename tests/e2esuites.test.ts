@@ -14,7 +14,7 @@ import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, REASONS_PER_SUITE, UNIT_ONLY, 
 // @ts-expect-error: plain .mjs modules without types
 import { fingerprint } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { DEV_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keepLimits, noCombworkProblems, needsDevBuild, packagedPlan, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteDevOnly, suiteFiles as filesOfSuite, suiteLimitMs, suiteOutcome, suiteSource, suiteStartsCombwork } from './e2e/runner.mjs'
+import { DEV_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, defaultJobs, devBuildOnly, isRealCli, keepLimits, noCombworkProblems, needsDevBuild, packagedPlan, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteDevOnly, suiteFiles as filesOfSuite, suiteLimitMs, suiteOutcome, suiteSource, suiteStartsCombwork } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { recordJson, recordMarkdown, selectionLine, selectionOf } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -34,8 +34,12 @@ import { FAILED_KEEP_MS, FAILED_MAX, KEEP_HOURS, KEEP_MB, KEEP_RUNS, finishRunDi
 import { createRequire } from 'module'
 import { ProgressStore } from '../src/main/progress'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
+// A bound for a hung test (HI-3349): the typing cases retry on real timers, and a full unit run on a loaded machine took
+// one 13.3 s of Vitest's 20 s default. Those that state their own keep it.
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 type Suite = { name: string; needs?: string[]; serial?: string; noCombwork?: string }
 type Area = { paths: string[]; suites: string[] }
@@ -282,7 +286,7 @@ describe('the suites a change needs (affected.mjs)', () => {
   it('maps runtime resources and every user of a shared test helper (review round 1)', () => {
     expect(affectedSuites(['resources/skills/card-loop/SKILL.md'], names).suites).toEqual(expect.arrayContaining(['skills', 'skillaudience', 'skilldelivery', 'cardloop']))
     expect(affectedSuites(['resources/modes/planner.md'], names).suites).toEqual(expect.arrayContaining(['assistant', 'assistant-control']))
-    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['accounts', 'agenttemp', 'assistantcodex', 'attachread', 'attention', 'carryingon', 'codexfolder', 'codexnewline', 'codexnudge', 'codexqueued', 'connectionfirst', 'connections-codex', 'defaultprovider', 'dialectlaunch', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'hookstranscript', 'hooksview', 'independentlaunch', 'lockask', 'models', 'p7lane', 'providerdetect', 'reviewcopies', 'sessiontree', 'skilldelivery', 'slotguidance', 'termsize', 'turnledger', 'wakeputoff', 'workspacenotes'])
+    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['accounts', 'agenttemp', 'assistantcodex', 'attachread', 'attention', 'carryingon', 'codexfolder', 'codexnewline', 'codexnudge', 'codexqueued', 'connectionfirst', 'connections-codex', 'defaultprovider', 'dialectlaunch', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'hookstranscript', 'hooksview', 'idleresume', 'independentlaunch', 'lockask', 'models', 'p7lane', 'providerdetect', 'reviewcopies', 'sessiontree', 'skilldelivery', 'slotguidance', 'termsize', 'turnledger', 'wakeputoff', 'workspacenotes'])
     // The shared tab strip selects every suite driving one, its keyboard and attachment users too (HI-1902).
     for (const f of ['src/renderer/src/components/Tabs.tsx', 'src/shared/tabs.ts']) expect(affectedSuites([f], names).suites, f).toEqual(expect.arrayContaining(['keys', 'cardattach', 'image', 'vcswitch', 'versioncontrol', 'workflowdefaults', 'advanced']))
     expect(affectedSuites(['tests/e2e/fake-bridge.cjs'], names).all).toBe(true)
@@ -398,7 +402,7 @@ describe('the suites a change needs (affected.mjs)', () => {
     const pick = (...files: string[]) => affectedSuites(files, names, realNames)
     for (const p of REAL_TIER as string[]) expect(existsSync(join(root, p.replace(/\/$/, ''))), p).toBe(true)
     // Combwork's side of every CLI: every real suite, with every fake one.
-    for (const f of ['src/main/sessions.ts', 'src/main/providers/types.ts', 'tests/e2e/lib.cjs', 'src/shared/providers.ts']) expect(pick(f), f).toMatchObject({ all: true, real: realNames })
+    for (const f of ['src/main/sessions.ts', 'src/main/providers/types.ts', 'tests/e2e/lib.cjs', 'src/shared/providers/index.ts']) expect(pick(f), f).toMatchObject({ all: true, real: realNames })
     // Not shared by every part of Combwork, but still every CLI's: every real suite and the area's fakes.
     expect(pick('src/main/transcripts.ts').suites).toEqual(expect.arrayContaining([...realNames, 'transcript']))
     // A provider's own adapter: only its area's real suites.
@@ -510,7 +514,7 @@ describe('the real tier and environment failures (card #191)', () => {
   it("lib.cjs knows the CLIs' environment failures from their output, and nothing else", () => {
     const { environmentProblem } = createRequire(import.meta.url)('./e2e/lib.cjs') as { environmentProblem: (t: string) => string | null }
     const env = {
-      'usage or rate limit': ['\x1b[31m  ⎿  API Error: 429 {"type":"error","error":{"type":"rate_limit_error"}}', 'Claude usage limit reached. Your limit will reset at 3pm', "You've hit your limit · resets 5pm (Europe/London)", "■ You've hit your usage limit. Upgrade to Pro or try again in 2 hours."],
+      'usage or rate limit': ['\x1b[31m  ⎿  API Error: 429 {"type":"error","error":{"type":"rate_limit_error"}}', 'Claude usage limit reached. Your limit will reset at 3pm', "You've hit your limit · resets 5pm (Europe/London)", "■ You've hit your usage limit. Upgrade to Pro or try again in 2 hours.", "You've hit your weekly limit · resets Nov 18, 9am (Europe/London)", "You've hit your session limit · resets 2pm (Europe/London)", "You've hit your 5-hour limit · resets 2pm (Europe/London)"],
       'the API is overloaded': ['API Error: 529 {"type":"error","error":{"type":"overloaded_error"}}'],
       'not signed in': ['Invalid API key · Please run /login', 'Select login method:', 'OAuth token has expired. Please obtain a new token or refresh your existing token.', 'Sign in with ChatGPT'],
       network: ['API Error: Connection error.', 'Unable to connect to Anthropic API', 'stream error: stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses)', 'getaddrinfo ENOTFOUND api.anthropic.com']
@@ -1068,11 +1072,16 @@ describe("each run's own log folder (logs.mjs)", () => {
     expect(keepLimits('board', ['pl'])).toEqual({})
   })
 
-  it("a --lang run's time limit grows with its languages; every other suite keeps 10 minutes (HI-2159)", () => {
-    expect(suiteLimitMs('i18nshots', [])).toBe(10 * 60_000)
-    expect(suiteLimitMs('i18nshots', ['en-XA'])).toBe(10 * 60_000)
-    expect(suiteLimitMs('i18nshots', ['en-XA', 'pl', 'de', 'es', 'fr', 'ja', 'pt-BR'])).toBe(42 * 60_000)
-    expect(suiteLimitMs('board', ['pl', 'de', 'es'])).toBe(10 * 60_000)
+  it("a --lang run's time limit grows with its languages; every other suite keeps the timing file's suite.limitMs (HI-2159, HI-3378)", async () => {
+    const limit = timing('suite.limitMs')
+    expect(suiteLimitMs('i18nshots', [])).toBe(limit)
+    expect(suiteLimitMs('i18nshots', ['en-XA'])).toBe(limit)
+    expect(suiteLimitMs('i18nshots', ['en-XA', 'pl', 'de', 'es', 'fr', 'ja', 'pt-BR'])).toBe(Math.max(limit, 42 * 60_000))
+    expect(suiteLimitMs('board', ['pl', 'de', 'es'])).toBe(limit)
+  })
+
+  it('runs a quarter of the cores at once by default, one to four (HI-3378)', () => {
+    expect([defaultJobs(2), defaultJobs(4), defaultJobs(8), defaultJobs(16), defaultJobs(64)]).toEqual([1, 1, 2, 4, 4])
   })
 
   it('a failed run survives ten newer passing runs for a day, with its failed suites’ screenshots, then goes (#223)', () => {
@@ -1556,15 +1565,15 @@ describe("answering Claude Code's trust question (lib.acceptClaudeTrust, #188)",
   const { acceptClaudeTrust } = createRequire(import.meta.url)('./e2e/lib.cjs') as { acceptClaudeTrust: Accept }
   /**
    * A session whose terminal shows `screen` (or what screen(writes so far) gives: a menu that redraws as keys arrive)
-   * and whose Combwork status is `status`.
+   * and whose Combwork status is `status`, ready once Enter was pressed (an answer taken, its start goes on).
    */
   const session = (screen: string | ((writes: string[]) => string), status = 'starting') => {
     const writes: string[] = []
     const inv = async (ch: string, ...a: unknown[]) => {
       if (ch === 'pty:buffer') return typeof screen === 'function' ? screen(writes) : screen
-      if (ch === 'session:live') return [{ projectPath: 'C:\\P', agentId: 'a1', status }]
-      writes.push(String(a[1]))
-      return undefined
+      if (ch === 'session:live') return [{ projectPath: 'C:\\P', agentId: 'a1', status: writes.includes('\r') ? 'ready' : status }]
+      if (ch === 'pty:write') writes.push(String(a[1]))
+      return null
     }
     return { writes, run: async () => { const t = Date.now(); const r = await acceptClaudeTrust(inv, 'c:\\p', 'a1', 4000); return { r, ms: Date.now() - t } } }
   }
@@ -1596,12 +1605,120 @@ describe("answering Claude Code's trust question (lib.acceptClaudeTrust, #188)",
     expect(stuck.writes.includes('\r')).toBe(false)
   })
 
+  /** Claude Code 2.1.326's added folder's question (HI-3335): "No, exit" first, then "Yes, add it". */
+  const addedMenu = (on: 'No' | 'Yes') => ` Adding a new directory: C:\\work\\alpha\\.combwork\\launch-a\\plugin This session hasn't worked here before. ${on === 'No' ? '❯' : ' '} No, exit ${on === 'Yes' ? '❯' : ' '} Yes, add it Esc to exit `
+
+  it("answers an added folder's question (2.1.326, HI-3335): Down to \"Yes, add it\", then Enter", async () => {
+    const s = session((writes) => addedMenu(writes.includes('\x1b[B') ? 'Yes' : 'No'))
+    expect((await s.run()).r).toBe(true)
+    expect(s.writes).toEqual(['\x1b[B', '\r'])
+  })
+
+  it("answers each question a start asks (its folder's, then an added folder's), in output that only grows", async () => {
+    const writes: string[] = []
+    // The terminal's output only grows: the folder's menu, once answered the added folder's, once answered the prompt.
+    const buffer = () => {
+      const enters = writes.filter((w) => w === '\r').length
+      const downs = writes.filter((w) => w === '\x1b[B').length
+      let out = trustMenu(() => Math.min(downs, 1))([])
+      if (enters >= 1) out += addedMenu(downs >= 2 ? 'Yes' : 'No')
+      if (enters >= 2) out += ' > ? for shortcuts'
+      return out
+    }
+    const inv = async (ch: string, ...a: unknown[]) => {
+      if (ch === 'pty:buffer') return buffer()
+      if (ch === 'session:live') return [{ projectPath: 'C:\\P', agentId: 'a1', status: 'starting' }]
+      if (ch === 'pty:write') writes.push(String(a[1]))
+      return null
+    }
+    expect(await acceptClaudeTrust(inv, 'c:\\p', 'a1', 4500)).toBe(true)
+    // Each answered once: no Enter on the first menu's old "Yes" after it was taken, none on "No, exit".
+    expect(writes).toEqual(['\x1b[B', '\r', '\x1b[B', '\r'])
+  })
+
+  it("reads each question from its screen as it shows now (HI-3335): a replay redrawn after a resize, a menu that takes no keys at first, an Enter it drops", async () => {
+    const { TerminalHistory } = await import('../src/main/terminalHistory')
+    // 2.1.326's added folder's menu as it wrote it: no pointer and its choices grey while it takes no keys, then
+    // "❯ No, exit", then after a Down "❯ Yes, add it" (a probe in its own test home).
+    const added = JSON.parse(readFileSync(join('tests', 'fixtures', 'advanced', 'trust-added-raw-claude-2.1.326.json'), 'utf8')) as { unarmed: string; armed: string; down: string }
+    // Its folder's question as Combwork's real replay keeps it (TerminalHistory, what pty:buffer returns).
+    const history = new TerminalHistory(120, 40, 100_000)
+    let size = { cols: 120, rows: 40 }
+    const folder = (on: 'No' | 'Yes') => `\x1b[2J\x1b[H\r\n──────\x1b[3;2HAccessing workspace:\x1b[5;2HC:\\work\\alpha\x1b[7;2HQuick safety check: Is this a project you created or one you trust?\x1b[16;2H${on === 'No' ? '❯' : ' '} No, exit\x1b[17;2H${on === 'Yes' ? '❯' : ' '} Yes, I trust this folder\x1b[19;2HEnter to confirm · Esc to cancel`
+    let state: 'folder' | 'added' | 'done' = 'folder'
+    let on: 'No' | 'Yes' = 'No'
+    let armed = false
+    let dropped = 0
+    const notOnYes: string[] = []
+    const writes: string[] = []
+    const replays: string[] = []
+    history.push(folder('No'))
+    // Claude Code: each key as its menu takes it (none before it is armed); the first Enter on "Yes, add it" is lost.
+    const key = (k: string) => {
+      writes.push(k)
+      if (state === 'done') return
+      if (k === '\r' && (on !== 'Yes' || (state === 'added' && !armed))) notOnYes.push(`${state} ${on} armed=${armed}`)
+      if (state === 'folder' && k === '\x1b[B') history.push(folder((on = 'Yes')))
+      else if (state === 'folder' && k === '\r' && on === 'Yes') {
+        // Answered: the window is resized as the next question comes, so the replay is the screen rebuilt, not the output.
+        state = 'added'
+        on = 'No'
+        size = { cols: 132, rows: 40 }
+        history.resized(size.cols, size.rows)
+        history.push(added.unarmed)
+        setTimeout(() => {
+          armed = true
+          history.push(added.armed)
+        }, 500)
+      } else if (state === 'added' && armed && k === '\x1b[B') history.push(((on = 'Yes'), added.down))
+      else if (state === 'added' && armed && k === '\r' && on === 'Yes' && dropped++ > 0) {
+        state = 'done'
+        history.push('\x1b[2J\x1b[H\x1b[2;2HClaude Code v2.1.326\x1b[20;1H❯ \x1b[22;3H⏸ manual mode on · ? for shortcuts')
+      }
+    }
+    const inv = async (ch: string, ...a: unknown[]) => {
+      if (ch === 'pty:buffer') {
+        const r = await history.replay()
+        replays.push(r)
+        return r
+      }
+      if (ch === 'pty:size') return size
+      if (ch === 'session:live') return [{ projectPath: 'C:\\P', agentId: 'a1', status: 'waiting' }]
+      if (ch === 'pty:write') key(String(a[1]))
+      return null
+    }
+    try {
+      expect(await acceptClaudeTrust(inv, 'c:\\p', 'a1', 20000)).toBe(true)
+    } finally {
+      history.dispose()
+    }
+    expect(state).toBe('done')
+    // Down and Enter for its folder; for the added folder nothing until it took keys, then Down, Enter (lost) and Enter.
+    expect(writes).toEqual(['\x1b[B', '\r', '\x1b[B', '\r', '\r'])
+    expect(notOnYes).toEqual([])
+    // The replay was rebuilt: a later one isn't the earlier one with more after it (what offsets into it relied on).
+    expect(replays.some((r, i) => i > 0 && !r.startsWith(replays[i - 1]))).toBe(true)
+  }, timing('test.hang'))
+
+  it("trustQuestion reads 2.1.326's recorded added-folder menu: no choice while it takes no keys, then No, then Yes", async () => {
+    const { trustQuestion } = createRequire(import.meta.url)('./e2e/lib.cjs') as { trustQuestion: (screen: string) => { id: string; choice: string | null } | null }
+    const { renderScreen } = createRequire(import.meta.url)('./e2e/drawnScreen.cjs') as { renderScreen: (raw: string, cols: number, rows: number, o?: { unwrap?: boolean }) => Promise<string> }
+    const added = JSON.parse(readFileSync(join('tests', 'fixtures', 'advanced', 'trust-added-raw-claude-2.1.326.json'), 'utf8')) as { unarmed: string; armed: string; down: string }
+    const read = async (raw: string) => trustQuestion(await renderScreen(raw, 120, 40, { unwrap: true }))
+    const id = 'Adding a new directory: C:\\work\\beta This session hasn\'t worked here before. Is this a directory you created or one you trust? Claude Code\'ll be able to read, edit, and execute files here. Its skills, commands, and agents load and can run commands, and so can the git settings of its repository. Your answer holds for this session. Starting Claude Code in this directory and trusting it there lasts, and covers its whole repository or everything below it. Security guide'
+    expect(await read(added.unarmed)).toEqual({ id, choice: null })
+    expect(await read(added.unarmed + added.armed)).toEqual({ id, choice: 'No, exit' })
+    expect(await read(added.unarmed + added.armed + added.down)).toEqual({ id, choice: 'Yes, add it' })
+    // Its prompt drawn after it: no question.
+    expect(await read(`${added.unarmed}${added.armed}\x1b[2J\x1b[H❯ \x1b[3;3H⏸ manual mode on`)).toBeNull()
+  })
+
   it("in a trusted folder it returns at once: Claude Code 2.1.289's mode footer, the old one, or Combwork's ready status", async () => {
     for (const screen of ['> \x1b[2m⏵⏵ auto mode on (shift+tab to cycle)\x1b[0m', '>  ⏸ manual mode on', '> ? for shortcuts']) {
       const s = session(screen)
       const { r, ms } = await s.run()
       expect(r, screen).toBe(false)
-      expect(ms, screen).toBeLessThan(1000)
+      expect(ms, screen).toBeLessThan(timing('budget.screenMs'))
       expect(s.writes).toEqual([])
     }
     const ready = session('Claude Code v2.1.290', 'ready')
@@ -1627,17 +1744,18 @@ describe("a restart's trust question (lib.acceptRelaunchTrust, #341)", () => {
     const writes: string[] = []
     const inv = async (ch: string, ...a: unknown[]) => {
       calls.push(ch)
-      if (ch === 'pty:buffer') return `Is this a project you trust? ${writes.length ? ' ' : '>'} No, exit ${writes.length ? '>' : ' '} Yes, I trust this folder`
+      // Once Enter is taken, its prompt (the question's answer is seen by its screen moving on, HI-3335).
+      if (ch === 'pty:buffer') return writes.includes('\r') ? '> ? for shortcuts' : `Is this a project you trust? ${writes.length ? ' ' : '>'} No, exit ${writes.length ? '>' : ' '} Yes, I trust this folder`
       if (ch === 'session:live') return []
-      writes.push(String(a[1]))
-      return undefined
+      if (ch === 'pty:write') writes.push(String(a[1]))
+      return null
     }
     return { calls, writes, inv }
   }
 
   it('a restart that never spawns: not spawned, and nothing is read from or typed into the old terminal', async () => {
     const t = terminal()
-    expect(await acceptRelaunchTrust(t.inv, 'c:\\p', 'a1', () => false, { spawnMs: 300, timeoutMs: 2000 })).toEqual({ spawned: false, trusted: false })
+    expect(await acceptRelaunchTrust(t.inv, 'c:\\p', 'a1', () => false, { spawnMs: 300, timeoutMs: 2000 })).toEqual({ spawned: false, trusted: false }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(t.calls).toEqual([])
     expect(t.writes).toEqual([])
   })
@@ -1645,7 +1763,7 @@ describe("a restart's trust question (lib.acceptRelaunchTrust, #341)", () => {
   it("once the new process is seen, its trust question is answered", async () => {
     const t = terminal()
     let polls = 0
-    expect(await acceptRelaunchTrust(t.inv, 'c:\\p', 'a1', () => ++polls > 2, { spawnMs: 5000, timeoutMs: 4000 })).toEqual({ spawned: true, trusted: true })
+    expect(await acceptRelaunchTrust(t.inv, 'c:\\p', 'a1', () => ++polls > 2, { spawnMs: 5000, timeoutMs: 4000 })).toEqual({ spawned: true, trusted: true }) // timing-ok: the timeout under test (its expiry is what the test checks)
     expect(t.writes).toEqual(['\x1b[B', '\r'])
   })
 })
@@ -1964,6 +2082,8 @@ describe('sending a prompt to a CLI until it takes it (lib.sendPrompt, #190)', (
     let drawn = 0
     const inv = async (ch: string, _key: unknown, data?: unknown) => {
       if (ch === 'pty:buffer') return t.screen
+      // Its size, for the screen as drawn (HI-3210: sendPrompt reads what the CLI drew, not the raw output's text).
+      if (ch === 'pty:size') return { cols: 200, rows: 30 }
       const d = String(data)
       t.writes.push(d)
       if (d === '\x15') t.input = ''
@@ -2019,7 +2139,9 @@ describe('sending a prompt to a CLI until it takes it (lib.sendPrompt, #190)', (
     expect(await run()).toBe(2)
     expect(t.writes).toEqual([...attempt(text, true), ...attempt(text, true)])
     expect(t.taken).toEqual([text])
-    expect(String(log.mock.calls[0][0])).toMatch(/^INFO sendPrompt attempt 1 not taken: pasted, echoed yes, its text not on the last input line/)
+    // HI-3210: each paste's own line says when it was drawn; the attempt not taken says so after it.
+    const notTaken = log.mock.calls.map((c) => String(c[0])).find((l) => l.includes('not taken'))
+    expect(notTaken).toMatch(/^INFO sendPrompt attempt 1 not taken: pasted, drawn yes, its end not on the last input line/)
   })
 
   it('with bracketed paste on, a dropped prompt goes again as a paste after a Ctrl+U of its own (#1547)', async () => {
@@ -2102,7 +2224,8 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
       // This runner holds the lock (mid-change: it has read the file and not yet written it back).
       mkdirSync(join(home, 'config.toml.lock'))
       const other = trustIn(home, 'C:/lane1/codex-ws/demo')
-      await new Promise((r) => setTimeout(r, 1500))
+      // A quiet window (no change to the file in it is the point): the other runner, waiting on the lock, shows nothing.
+      await new Promise((r) => setTimeout(r, timing('quiet.unitMs')))
       // The other runner is waiting: the file is as this one read it.
       expect(entries(home)).toEqual([])
       writeFileSync(join(home, 'config.toml'), `${readFileSync(join(home, 'config.toml'), 'utf8')}\n[projects.'C:/lane0/codex-ws/demo']\ntrust_level = "trusted"\n`)
@@ -2115,7 +2238,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
     } finally {
       rmSync(home, { recursive: true, force: true })
     }
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('several runners at once: every folder trusted once', async () => {
     const home = tempDir('cw-codex-home-')
@@ -2130,7 +2253,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
     } finally {
       rmSync(home, { recursive: true, force: true })
     }
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('breaks a lock left by a runner that crashed while holding it', () => {
     const home = tempDir('cw-codex-home-')
@@ -2177,7 +2300,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
       expect(existsSync(lock)).toBe(false)
       // A permission problem that doesn't pass still ends, at the timeout, naming its error.
       refusals = Array(10_000).fill('EPERM')
-      expect(() => withFileLock(file, () => ++ran, { timeoutMs: 200 })).toThrow(/is still held \(EPERM\)/)
+      expect(() => withFileLock(file, () => ++ran, { timeoutMs: 200 })).toThrow(/is still held \(EPERM\)/) // timing-ok: the timeout under test (its expiry is what the test checks)
       // Anything else is a failure at once (its parent folder missing, say).
       refusals = []
       expect(() => withFileLock(join(home, 'no', 'such', 'config.toml'), () => ++ran)).toThrow(/ENOENT/)
@@ -2200,7 +2323,7 @@ describe('the shared Codex test home: changes to its config.toml under a lock (l
       expect(Date.now() - t0).toBeGreaterThanOrEqual(3 * 20)
       tries = 0
       refusals = Array(100_000).fill('EPERM')
-      expect(() => withFileLock(file, () => ++ran, { timeoutMs: 200 })).toThrow(/is still held \(EPERM\)/)
+      expect(() => withFileLock(file, () => ++ran, { timeoutMs: 200 })).toThrow(/is still held \(EPERM\)/) // timing-ok: the timeout under test (its expiry is what the test checks)
       expect(tries).toBeGreaterThan(2)
       expect(tries).toBeLessThan(20)
       spyStat.mockRestore()
@@ -2755,17 +2878,17 @@ describe('the build lock: runners started together in one worktree build it once
     expect(buildStamp(a)).not.toBeNull()
     // Nothing left held.
     expect(readdirSync(locks)).toEqual([])
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('a runner that only checks waits while another builds, so it never looks at half a build', async () => {
     const c = worktree('c')
     const building = runner(c, { ms: 2000 })
     const t0 = Date.now()
-    while (!readdirSync(locks).length && Date.now() - t0 < 10_000) await new Promise((r) => setTimeout(r, 20))
+    while (!readdirSync(locks).length && Date.now() - t0 < timing('wait.hang')) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     const r = ensureBuild({ root: c, build: false, runBuild: () => undefined, lock: { dir: locks, pollMs: 50 } })
     expect(r).toMatchObject({ stale: false, waited: true })
     expect((await building).built).toBe(true)
-  }, 30_000)
+  }, timing('test.hang'))
 
   it('a failed build lets go of the lock (the next runner builds); a lock whose runner is gone is broken', async () => {
     const d = worktree('d')
@@ -2786,7 +2909,7 @@ describe('the build lock: runners started together in one worktree build it once
     expect(held.take()).toBe(false)
     held.release()
     expect(readdirSync(locks)).toEqual([])
-  }, 30_000)
+  }, timing('test.hang'))
 })
 
 describe('heavy runs: at most a few at once on the machine, the rest queue in order (slots.mjs, #204)', () => {
@@ -2984,7 +3107,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     const seen: number[] = []
     const second = waitForSlot(dir2, { slots: 1, owner: 102, alive, now, ...offline, pollMs: 30, onWait: (r: { holders: { pid: number }[] }) => seen.push(r.holders[0].pid) })
     // At least two looks while the slot is held, however slow the machine is.
-    await vi.waitFor(() => expect(seen.length).toBeGreaterThan(1), { timeout: 10000 })
+    await vi.waitFor(() => expect(seen.length).toBeGreaterThan(1), { timeout: timing('wait.hang') })
     expect(new Set(seen)).toEqual(new Set([101]))
     first.release()
     const got = await second
@@ -3415,13 +3538,13 @@ describe("a suite's git waits out the Combwork under test's own (lib.git, #199)"
   it('a lock that stays is an error after the timeout; any other failure throws at once', () => {
     takeLock()
     try {
-      expect(() => git(repo, 'add -A', { timeoutMs: 300 })).toThrow(/index\.lock/)
+      expect(() => git(repo, 'add -A', { timeoutMs: 300 })).toThrow(/index\.lock/) // timing-ok: the timeout under test (its expiry is what the test checks)
     } finally {
       rmSync(lock, { force: true })
     }
     const t0 = Date.now()
     expect(() => git(repo, 'no-such-command')).toThrow(/not a git command/)
-    expect(Date.now() - t0).toBeLessThan(5000)
+    expect(Date.now() - t0).toBeLessThan(timing('budget.promptEndMs'))
   })
 
   it('the suites that write to a repository while their Combwork runs use it', () => {

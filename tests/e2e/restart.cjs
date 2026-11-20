@@ -44,18 +44,18 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
   const st = await inv('session:start', proj, { name: 'restart test', agentId: agent.id })
   await lib.acceptClaudeTrust(inv, proj, agent.id)
   // Up and ready (SessionStart arrived).
-  check('the session starts', !!(await lib.until(async () => (await inv('session:live')).some((l) => l.status === 'ready'), 30000)))
+  check('the session starts', !!(await lib.until(async () => (await inv('session:live')).some((l) => l.status === 'ready'), lib.timing('hang.step'))))
   await page.screenshot({ path: path.join(shots, '1-started.png') })
 
   // The agent's own effort (a project's isn't read for a CLI with connections, HI-1774).
   await lib.setLaunch(inv, proj, agent.id, { effort: 'low' })
   await inv('workspace:refresh')
-  check('a changed effort offers Restart session', !!(await lib.until(async () => (await page.getByRole('button', { name: 'Restart session' }).count()) > 0, 10000)))
+  check('a changed effort offers Restart session', !!(await lib.until(async () => (await page.getByRole('button', { name: 'Restart session' }).count()) > 0, lib.timing('hang.step'))))
   await page.screenshot({ path: path.join(shots, '2-banner.png') })
   await page.getByRole('button', { name: 'Restart session' }).click()
   // Restarted: the banner gone and the session ready again.
   // Ready again from the relaunch: the fake launched a second time.
-  const restarted = !!(await lib.until(async () => launches().length === 2 && (await page.getByRole('button', { name: 'Restart session' }).count()) === 0 && (await inv('session:live')).some((l) => l.status === 'ready'), 30000))
+  const restarted = !!(await lib.until(async () => launches().length === 2 && (await page.getByRole('button', { name: 'Restart session' }).count()) === 0 && (await inv('session:live')).some((l) => l.status === 'ready'), lib.timing('hang.step')))
   check('after Restart session it is ready again, the offer gone', restarted)
   // What happened instead (#218): the fake's launches, the sessions and Combwork's log of them.
   if (!restarted) {
@@ -82,23 +82,24 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
   // The agent's own effort (a project's isn't read for a CLI with connections, HI-1774).
   await lib.setLaunch(inv, proj, agent.id, { effort: 'high' })
   await inv('workspace:refresh')
-  check('another changed effort offers Restart session', !!(await lib.until(async () => (await page.getByRole('button', { name: 'Restart session' }).count()) > 0, 10000)))
+  check('another changed effort offers Restart session', !!(await lib.until(async () => (await page.getByRole('button', { name: 'Restart session' }).count()) > 0, lib.timing('hang.step'))))
   const dbFile = path.join(ws, '.combwork', 'combwork.db')
   const hold = `const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(${JSON.stringify(dbFile)}, { timeout: 5000 }); db.exec('BEGIN IMMEDIATE'); console.log('held'); setTimeout(() => { db.exec('COMMIT'); db.close() }, 3000)`
   const holder = require('child_process').spawn(process.execPath, ['-e', hold], { env: lib.baseEnv() })
   const released = new Promise((r) => holder.once('exit', r))
   let heldOut = ''
   holder.stdout.on('data', (d) => (heldOut += d))
-  check('(the database is held)', !!(await lib.until(() => heldOut.includes('held'), 15000)))
+  check('(the database is held)', !!(await lib.until(() => heldOut.includes('held'), lib.timing('hang.ui'))))
   await page.getByRole('button', { name: 'Restart session' }).click()
-  const again = !!(await lib.until(async () => launches().length === 3 && (await inv('session:live')).some((l) => l.status === 'ready'), 30000))
+  // before any turn (HI-2688): its start, restart or resume
+  const again = !!(await lib.until(async () => launches().length === 3 && (await inv('session:live')).some((l) => l.status === 'ready'), lib.timing('hang.step')))
   const asked = await page.locator('.dialog').allInnerTexts()
   check('Restart session relaunches while the stopped session is still being saved, asking nothing', again && !asked.length, JSON.stringify({ launches: launches().length, dialogs: asked }))
   check('…with the newer effort, the same conversation', launches()[2]?.opts['--effort'] === 'high' && launches()[2]?.opts['--resume'] === st.sessionId, JSON.stringify(launches()[2]?.opts))
-  await Promise.race([released, lib.sleep(10000)])
+  await Promise.race([released, lib.sleep(lib.timing('hang.ui'))])
 
   await inv('session:stop', proj)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   process.exit(failed ? 1 : 0)
 })().catch((e) => {

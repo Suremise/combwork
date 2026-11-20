@@ -18,6 +18,7 @@ import { gitWorkspacePort } from '../src/main/platform/gitWorkspacePort'
 import { fileSlotConn, SlotPool, SlotStore, type OpHolder, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { queueChecks } from '../src/main/workflow/queueChecks'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -58,7 +59,7 @@ function runner(runs: Runs, ctl: { fail?: boolean } = {}) {
   return async (r: SlotRun): Promise<SlotRunEnd> => {
     let end: SlotRunEnd = { ok: true, exitCode: 0, logPath: null, settled: true }
     if (r.files) {
-      const x = r.files.tool.exec({ spawn, env: { ...RUN_ENV, ...r.env }, log: { write: () => undefined }, timeoutMs: 120_000 })
+      const x = r.files.tool.exec({ spawn, env: { ...RUN_ENV, ...r.env }, log: { write: () => undefined }, timeoutMs: timing('spawn.hang') })
       try {
         const o = ctl.fail ? { ok: false as const, error: 'git submodule update: failed on purpose' } : await r.files.tool.prepare(x, r.files.step)
         ctl.fail = false
@@ -117,7 +118,7 @@ function copies(ws: string, p: string, runs: Runs, opts: { setup: string; archiv
 
 const v = (folder: string): string => readFileSync(join(folder, 'libs', 's', 'v.txt'), 'utf8')
 
-describe('slots', { timeout: 120_000 }, () => {
+describe('slots', { timeout: timing('test.hang') }, () => {
   it("a new slot's submodules are set up before its setup; a card's line at another gitlink gets that one", async () => {
     const { ws, p, sub } = project()
     const runs: Runs = []
@@ -193,7 +194,7 @@ describe('slots', { timeout: 120_000 }, () => {
   })
 })
 
-describe('review and check copies', { timeout: 120_000 }, () => {
+describe('review and check copies', { timeout: timing('test.hang') }, () => {
   it('are set up at their revision before their setup; reset to a changed gitlink, then to none, the removed one goes', async () => {
     const { ws, p, sub } = project()
     const at1 = sh(p, 'rev-parse', 'HEAD')
@@ -226,7 +227,7 @@ describe('review and check copies', { timeout: 120_000 }, () => {
   })
 })
 
-describe('review and check copies: a doubtful leftover (HR2’s round 1)', { timeout: 120_000 }, () => {
+describe('review and check copies: a doubtful leftover (HR2’s round 1)', { timeout: timing('test.hang') }, () => {
   /** A project whose submodule a later commit removes, a copy leased at the first and returned: [pool, copy folder, the later revision]. */
   async function returnedCopy() {
     const { ws, p } = project()
@@ -274,7 +275,7 @@ describe('review and check copies: a doubtful leftover (HR2’s round 1)', { tim
   })
 })
 
-describe("the merge queue's folder", { timeout: 120_000 }, () => {
+describe("the merge queue's folder", { timeout: timing('test.hang') }, () => {
   it('gets its submodules as one of the queue’s runs before its checks; off, or with neither, no run', async () => {
     const { p } = project()
     const folder = join(tempDir('gitmodules-queue-'), 'q')

@@ -45,7 +45,7 @@
   },
   "performance.card.guidanceTools": {
     "defaultMessage": "Tool list {tools} a start, ≈ {upfront} if deferred",
-    "description": "A second line under the Guidance per launch card (HI-2553): the Combwork tools' definitions each session's CLI got, on average, and Combwork's estimate (≈) of what a CLI that defers tools (Claude Code) gets at the start if it does. {tools} and {upfront} are sizes such as \"24 KB\"."
+    "description": "A second line under the Guidance per launch card (HI-2553): the Combwork tools' definitions each session's CLI got, on average, and Combwork's estimate (≈) of what a CLI that defers tools (Claude Code, Codex) gets at the start if it does. {tools} and {upfront} are sizes such as \"24 KB\"."
   },
   "performance.card.guidanceToolsAll": {
     "defaultMessage": "Tool list {tools} a start",
@@ -1627,6 +1627,50 @@
     "defaultMessage": "Main process stalls",
     "description": "Heading of the Performance page's table of the times Combwork's main process was busy long enough to be felt."
   },
+  "performance.stalls.hours.causes": {
+    "defaultMessage": "Named first",
+    "description": "Column header of the Performance page's Delays by hour table: for the hour's stalls, the work each named first, with how many times."
+  },
+  "performance.stalls.hours.d100": {
+    "defaultMessage": "100–250 ms",
+    "description": "Column header of the Performance page's Delays by hour table: how many delays of 100 ms up to 250 ms. Keep the numbers."
+  },
+  "performance.stalls.hours.d50": {
+    "defaultMessage": "50–100 ms",
+    "description": "Column header of the Performance page's Delays by hour table: how many delays of 50 ms up to 100 ms. Keep the numbers."
+  },
+  "performance.stalls.hours.empty": {
+    "defaultMessage": "No delays of 50 ms or more since Combwork started.",
+    "description": "The Performance page's Delays by hour table when there were none."
+  },
+  "performance.stalls.hours.heading": {
+    "defaultMessage": "Delays by hour",
+    "description": "Heading of the Performance page's table counting, hour by hour, the times Combwork's main process was held up, short ones included."
+  },
+  "performance.stalls.hours.hour": {
+    "defaultMessage": "Hour",
+    "description": "Column header of the Performance page's Delays by hour table: the hour counted (its start, a date and time)."
+  },
+  "performance.stalls.hours.stalls": {
+    "defaultMessage": "Stalls",
+    "description": "Column header of the Performance page's Delays by hour table: how many stalls (over 250 ms) in the hour."
+  },
+  "performance.stalls.hours.times": {
+    "defaultMessage": "×{n, number}",
+    "description": "After a work's name, or after nothing marked, in the Performance page's Delays by hour table: how many stalls named it first."
+  },
+  "performance.stalls.hours.tip": {
+    "defaultMessage": "How often Combwork's main process was held up, by the hour, short delays included: from 50 ms they can be felt while typing. A short delay is counted once per half second, the longest in it. Stalls are those over 250 ms, every one, with the work each names first, where combwork.log names at most one a minute; it notes each hour in a line too. The last {kept, number} hours with any, since Combwork started, kept in memory only.",
+    "description": "Info tip beside the Delays by hour heading of the Performance page. combwork.log is a file name."
+  },
+  "performance.stalls.hours.unlogged": {
+    "defaultMessage": "{n, number} not logged",
+    "description": "Under an hour's stall count in the Performance page's Delays by hour table: how many of them combwork.log didn't name. Lower case."
+  },
+  "performance.stalls.hours.unnamed": {
+    "defaultMessage": "nothing marked",
+    "description": "A line of an hour's Named first cell in the Performance page's Delays by hour table: stalls with no work known to Combwork under way. Lower case."
+  },
   "performance.stalls.length": {
     "defaultMessage": "Length",
     "description": "Column header of the Performance page's Main process stalls table: how long the main process was busy."
@@ -1712,8 +1756,8 @@
     "description": "Column header of the Combwork tool list table: how many session starts were given the list."
   },
   "performance.toolList.tip": {
-    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, by provider (Unknown: starts from before Combwork recorded it). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. If deferred is an estimate, not a measurement: what Claude Code puts in its prompt at the start when it defers MCP tools (their names, and in full only the few Combwork marks). Whether a launch deferred them isn’t observable. Codex and Copilot get the whole list. The list sits at the start of the prompt, where a provider’s prompt cache can keep it after the first turn; whether it did isn’t measured here. A dash: not measured (sessions from before Combwork measured it).",
-    "description": "Tooltip of the Combwork tool list table on the Performance page (HI-2063, HI-2553). Descriptions, Parameters, Schemas and If deferred are its columns: name them as there. Keep Combwork, Claude Code, Codex and Copilot (names)."
+    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, by provider (Unknown: starts from before Combwork recorded it). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. If deferred is an estimate, not a measurement: what Claude Code puts in its prompt at the start when it defers MCP tools (their names, and in full only the few Combwork marks). Whether a launch deferred them isn’t observable. Codex defers every one, the marked ones too, so it gets none of the list up front (0), only the server’s name. Copilot gets the whole list. The list sits at the start of the prompt, where a provider’s prompt cache can keep it after the first turn; whether it did isn’t measured here. A dash: not measured (sessions from before Combwork measured it).",
+    "description": "Tooltip of the Combwork tool list table on the Performance page (HI-2063, HI-2553, HI-3225). Descriptions, Parameters, Schemas and If deferred are its columns: name them as there. Keep Combwork, Claude Code, Codex and Copilot (names)."
   },
   "performance.toolList.tools": {
     "defaultMessage": "Tools",
@@ -1728,8 +1772,8 @@
     "description": "Column header of the Combwork tool list table (HI-2553): Combwork's estimate of the bytes a CLI that defers MCP tools (Claude Code) puts in its prompt at the start, if it does, a start, on average. Shown with ≈."
   },
   "performance.toolList.upfrontTip": {
-    "defaultMessage": "Combwork’s estimate, not a measurement: what a CLI that defers MCP tools gets at the start if it does, the tools Combwork marks to be sent in full and the others’ names. Claude Code defers them unless its tool search is off (a setting, a model or a gateway can turn it off); whether a launch did, and how the CLI words the list, aren’t observable. A dash: a CLI that doesn’t defer (Codex and Copilot get the whole list: Bytes), or not known.",
-    "description": "Info tip of the If deferred column of the Combwork tool list table (HI-2553). Keep Combwork, Claude Code, Codex and Copilot (names); Bytes is a column: name it as there."
+    "defaultMessage": "Combwork’s estimate, not a measurement: what a CLI that defers MCP tools gets at the start if it does, the tools Combwork marks to be sent in full and the others’ names. Claude Code defers them unless its tool search is off (a setting, a model or a gateway can turn it off). Codex defers every one, the marked ones too, so it gets none of the list up front (0), only the server’s name. Whether a launch did, and how the CLI words the list, aren’t observable. A dash: a CLI that doesn’t defer (Copilot gets the whole list: Bytes), or not known.",
+    "description": "Info tip of the If deferred column of the Combwork tool list table (HI-2553, HI-3225). Keep Combwork, Claude Code, Codex and Copilot (names); Bytes is a column: name it as there."
   },
   "performance.tools.calls": {
     "defaultMessage": "Calls",

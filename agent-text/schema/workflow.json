@@ -1,4 +1,33 @@
 {
+  "workflow.advance.note": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "workflow.advance.previewClosed": {
+    "placeholders": {
+      "clicked": "select",
+      "card": "plain",
+      "why": "select",
+      "cards": "plain"
+    }
+  },
+  "workflow.advance.refused": {
+    "placeholders": {
+      "target": "plain",
+      "card": "plain",
+      "next": "select",
+      "why": "plain",
+      "detail": "plain",
+      "mode": "select"
+    }
+  },
+  "workflow.advance.superseded": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
+    }
+  },
   "workflow.contradiction.combworkMergesNeedsGit": {
     "placeholders": {}
   },
@@ -46,6 +75,74 @@
   "workflow.focused.resultsUnread": {
     "placeholders": {
       "why": "plain"
+    }
+  },
+  "workflow.forYou.advanceNote": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "workflow.forYou.advancePreview": {
+    "placeholders": {
+      "again": "select",
+      "card": "plain",
+      "target": "plain",
+      "expected": "plain",
+      "result": "plain",
+      "style": "select",
+      "commits": "plain",
+      "more": "plural"
+    }
+  },
+  "workflow.forYou.advancePreviewClosed": {
+    "placeholders": {
+      "clicked": "select",
+      "card": "plain",
+      "why": "select",
+      "cards": "plain"
+    }
+  },
+  "workflow.forYou.advanceRefused": {
+    "placeholders": {
+      "target": "plain",
+      "result": "plain",
+      "card": "plain",
+      "why": "select",
+      "detail": "plain",
+      "next": "select",
+      "mode": "select"
+    }
+  },
+  "workflow.forYou.advanceStopped": {
+    "placeholders": {
+      "again": "select",
+      "target": "plain",
+      "result": "plain",
+      "card": "plain",
+      "why": "select",
+      "detail": "plain"
+    }
+  },
+  "workflow.forYou.advanceSuperseded": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.forYou.advanceUncertain": {
+    "placeholders": {
+      "again": "select",
+      "target": "plain",
+      "result": "plain",
+      "card": "plain",
+      "detail": "plain",
+      "op": "select"
+    }
+  },
+  "workflow.forYou.churnLimit": {
+    "placeholders": {
+      "card": "plain",
+      "churn": "plural"
     }
   },
   "workflow.forYou.decidedAfterMerge": {
@@ -157,6 +254,12 @@
       "rounds": "plural"
     }
   },
+  "workflow.forYou.simplify": {
+    "placeholders": {
+      "card": "plain",
+      "churn": "plural"
+    }
+  },
   "workflow.forYou.slotDirty": {
     "placeholders": {
       "card": "plain",
@@ -199,6 +302,66 @@
   "workflow.jj.start.target": {
     "placeholders": {}
   },
+  "workflow.mergeGuards.problem.empty": {
+    "placeholders": {
+      "n": "number",
+      "field": "select"
+    }
+  },
+  "workflow.mergeGuards.problem.glob": {
+    "placeholders": {
+      "n": "number",
+      "detail": "plain",
+      "braces": "plain"
+    }
+  },
+  "workflow.mergeGuards.problem.invalid": {
+    "placeholders": {
+      "n": "number",
+      "detail": "plain"
+    }
+  },
+  "workflow.mergeGuards.problem.matchesEmpty": {
+    "placeholders": {
+      "n": "number"
+    }
+  },
+  "workflow.mergeGuards.problem.notGuard": {
+    "placeholders": {
+      "n": "number"
+    }
+  },
+  "workflow.mergeGuards.problem.notList": {
+    "placeholders": {}
+  },
+  "workflow.mergeGuards.problem.timedOut": {
+    "placeholders": {
+      "n": "number"
+    }
+  },
+  "workflow.mergeGuards.problem.tooLong": {
+    "placeholders": {
+      "field": "select",
+      "n": "number",
+      "max": "number"
+    }
+  },
+  "workflow.mergeGuards.problem.tooMany": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "workflow.mergeGuards.problem.tooManyGlobs": {
+    "placeholders": {
+      "n": "number",
+      "max": "number"
+    }
+  },
+  "workflow.mergeGuards.problem.unchecked": {
+    "placeholders": {
+      "n": "number"
+    }
+  },
   "workflow.move.answer": {
     "placeholders": {}
   },
@@ -238,6 +401,18 @@
   "workflow.move.verdict": {
     "placeholders": {}
   },
+  "workflow.option.assistantWakes.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.assistantWakes.title": {
+    "placeholders": {}
+  },
+  "workflow.option.churnStopAt.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.churnStopAt.title": {
+    "placeholders": {}
+  },
   "workflow.option.commands.desc": {
     "placeholders": {}
   },
@@ -272,6 +447,12 @@
     "placeholders": {}
   },
   "workflow.option.finish.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.finish.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.finish.jjTitle": {
     "placeholders": {}
   },
   "workflow.option.finish.title": {
@@ -341,6 +522,18 @@
     "placeholders": {}
   },
   "workflow.option.mergeChecks.title": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeGuards.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeGuards.jjDesc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeGuards.jjTitle": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeGuards.title": {
     "placeholders": {}
   },
   "workflow.option.mergeInstall.desc": {
@@ -421,6 +614,12 @@
   "workflow.option.sharedFolderWarning.title": {
     "placeholders": {}
   },
+  "workflow.option.simplifyAt.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.simplifyAt.title": {
+    "placeholders": {}
+  },
   "workflow.option.slotsUpToDate.desc": {
     "placeholders": {}
   },
@@ -480,6 +679,35 @@
   "workflow.refused.approval.given.next": {
     "placeholders": {}
   },
+  "workflow.refused.attempt.moved.message": {
+    "placeholders": {
+      "card": "plain",
+      "attempt": "plain",
+      "generation": "plain"
+    }
+  },
+  "workflow.refused.attempt.moved.next": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.attempt.notAssignee.message": {
+    "placeholders": {
+      "card": "plain",
+      "assignee": "select"
+    }
+  },
+  "workflow.refused.attempt.notAssignee.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.attempt.staleLaunch.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.attempt.staleLaunch.next": {
+    "placeholders": {}
+  },
   "workflow.refused.card.plainNumber.message": {
     "placeholders": {}
   },
@@ -514,6 +742,21 @@
     "placeholders": {
       "revision": "plain",
       "target": "plain"
+    }
+  },
+  "workflow.refused.done.noCodeUnmerged.message": {
+    "placeholders": {
+      "card": "plain",
+      "line": "plain",
+      "count": "plural",
+      "target": "plain",
+      "commits": "plain",
+      "more": "plural"
+    }
+  },
+  "workflow.refused.done.noCodeUnmerged.next": {
+    "placeholders": {
+      "reader": "select"
     }
   },
   "workflow.refused.evidence.changed.message": {
@@ -627,6 +870,15 @@
       "card": "plain"
     }
   },
+  "workflow.refused.loop.churnPending.message": {
+    "placeholders": {
+      "card": "plain",
+      "request": "plain"
+    }
+  },
+  "workflow.refused.loop.churnPending.next": {
+    "placeholders": {}
+  },
   "workflow.refused.loop.followUpChecked.message": {
     "placeholders": {
       "card": "plain"
@@ -636,6 +888,14 @@
     "placeholders": {
       "reader": "select"
     }
+  },
+  "workflow.refused.loop.followUpInReview.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.loop.followUpInReview.next": {
+    "placeholders": {}
   },
   "workflow.refused.loop.followUpMerging.message": {
     "placeholders": {
@@ -712,6 +972,15 @@
     }
   },
   "workflow.refused.loop.tooEarly.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.loop.usersChoice.message": {
+    "placeholders": {
+      "card": "plain",
+      "request": "plain"
+    }
+  },
+  "workflow.refused.loop.usersChoice.next": {
     "placeholders": {}
   },
   "workflow.refused.merge.combworkMerges.change": {
@@ -1239,7 +1508,7 @@
   "workflow.refused.submit.notDuplicate.message": {
     "placeholders": {
       "card": "plain",
-      "revision": "plain"
+      "revision": "select"
     }
   },
   "workflow.refused.submit.notDuplicate.next": {
@@ -1343,6 +1612,9 @@
       "choice": "select"
     }
   },
+  "workflow.rule.advance.verified": {
+    "placeholders": {}
+  },
   "workflow.rule.approval.given": {
     "placeholders": {}
   },
@@ -1350,6 +1622,9 @@
     "placeholders": {}
   },
   "workflow.rule.done.contained": {
+    "placeholders": {}
+  },
+  "workflow.rule.done.noCodeUnmerged": {
     "placeholders": {}
   },
   "workflow.rule.forward.resolutionSource": {
@@ -1467,6 +1742,12 @@
     "placeholders": {
       "stage": "plain",
       "max": "number"
+    }
+  },
+  "workflow.unreadable.blockerWork": {
+    "placeholders": {
+      "card": "plain",
+      "what": "plain"
     }
   },
   "workflow.unreadable.branch": {
@@ -1667,6 +1948,9 @@
   "workflow.value.finish.agentMerges": {
     "placeholders": {}
   },
+  "workflow.value.finish.combworkAdvances": {
+    "placeholders": {}
+  },
   "workflow.value.finish.combworkMerges": {
     "placeholders": {}
   },
@@ -1674,6 +1958,9 @@
     "placeholders": {}
   },
   "workflow.value.finish.notChecked": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.previewAdvance": {
     "placeholders": {}
   },
   "workflow.value.finish.userIntegrates": {

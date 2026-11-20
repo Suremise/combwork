@@ -44,7 +44,7 @@ const post = (url, token, body) =>
   await inv('project:updateConfig', proj, { layout: 'columns2' })
   await lib.setOwnOptions(inv, proj, { fileLocks: 'ask' })
   await page.getByText('demo', { exact: true }).first().click()
-  await sleep(500)
+  await lib.projectShown(page)
   const agents = () => inv('workspace:get').then((w) => w.projects.find((p) => p.name === 'demo').agents)
   for (const name of ['Codex', 'Codex 2']) await lib.addAgent(inv, proj, { name, provider: 'codex', model: 'gpt-6-luna', effort: 'low' })
   const codex = (await agents()).filter((a) => a.provider === 'codex')
@@ -57,7 +57,7 @@ const post = (url, token, body) =>
       const l = await live(id)
       if (test(l)) return l
       if (Date.now() - t > ms) return l
-      await sleep(700)
+      await sleep(lib.timing('poll.intervalMs'))
     }
   }
   const text = async (id) => (await inv('pty:buffer', `session:${proj.toLowerCase()}#${id}`).catch(() => '')).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, ' ').replace(/\s+/g, ' ')
@@ -66,7 +66,7 @@ const post = (url, token, body) =>
   await inv('session:start', proj, { agentId: a1.id })
   await waitFor(a1.id, (l) => l?.status === 'ready', 60000)
   await inv('project:updateConfig', proj, { allowSessionInput: true }).catch(() => undefined)
-  await lib.until(async () => (await inv('workspace:refresh')).projects.find((p) => p.path.toLowerCase() === proj.toLowerCase())?.config.allowSessionInput === true, 10000)
+  await lib.until(async () => (await inv('workspace:refresh')).projects.find((p) => p.path.toLowerCase() === proj.toLowerCase())?.config.allowSessionInput === true, lib.timing('hang.ui'))
   // A first turn, so there is something to compact.
   const key1 = `session:${proj.toLowerCase()}#${a1.id}`
   // Codex answering is the CLI's part (a usage limit or the network there is the environment's: lib.cliStep).
@@ -84,7 +84,7 @@ const post = (url, token, body) =>
   check('status shows Compacting', /Compacting/i.test(sawCompacting?.statusMessage ?? ''), sawCompacting?.statusMessage)
   l = await waitFor(a1.id, (x) => !/Compacting/i.test(x?.statusMessage ?? '') && (x?.status === 'ready' || x?.status === 'finished'), 180000)
   check('compaction ends', !/Compacting/i.test(l?.statusMessage ?? ''), `${l?.status} ${l?.statusMessage ?? ''}`)
-  await lib.until(async () => ((await inv('session:usage', proj, l.sessionId).catch(() => null))?.compactions?.length ?? 0) > (before?.compactions?.length ?? 0), 15000)
+  await lib.until(async () => ((await inv('session:usage', proj, l.sessionId).catch(() => null))?.compactions?.length ?? 0) > (before?.compactions?.length ?? 0), lib.timing('hang.step'))
   const after = await inv('session:usage', proj, l.sessionId).catch(() => null)
   check('usage records the compaction', (after?.compactions?.length ?? 0) > (before?.compactions?.length ?? 0), JSON.stringify(after?.compactions))
   await page.screenshot({ path: path.join(scratch, 'cxe-1-compact.png') })
@@ -98,9 +98,9 @@ const post = (url, token, body) =>
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText: async () => '', writeText: async () => undefined } }))
   // The first Codex agent's pane is the left-hand column.
   await page.mouse.click(600, 650)
-  await sleep(300)
+  await lib.until(async () => page.evaluate(() => !!document.activeElement?.closest('.terminal-host')), lib.timing('hang.ui'))
   await page.keyboard.press('Control+V')
-  await lib.until(async () => { const d = path.join(proj, '.combwork', 'attachments', l.sessionId); return fs.existsSync(d) && fs.readdirSync(d).length > 0 && /\[Image|image #|\.png/i.test((await text(a1.id)).slice(-600)) }, 15000) // the pasted image saved, and shown by Codex
+  await lib.until(async () => { const d = path.join(proj, '.combwork', 'attachments', l.sessionId); return fs.existsSync(d) && fs.readdirSync(d).length > 0 && /\[Image|image #|\.png/i.test((await text(a1.id)).slice(-600)) }, lib.timing('hang.ui')) // the pasted image saved, and shown by Codex
   const t1 = await text(a1.id)
   const imgDir = path.join(proj, '.combwork', 'attachments', l.sessionId)
   const saved = fs.existsSync(imgDir) ? fs.readdirSync(imgDir) : []
@@ -108,7 +108,8 @@ const post = (url, token, body) =>
   check('Codex shows the pasted image', /\[Image|image #|\.png/i.test(t1.slice(-600)), t1.slice(-300))
   await page.screenshot({ path: path.join(scratch, 'cxe-2-image.png') })
   await inv('pty:write', key1, '\x15')
-  await sleep(500)
+  // Ctrl+U taken: the pasted image gone from the prompt (the screen's end) before the next part.
+  await lib.until(async () => !/\[Image|image #/i.test((await text(a1.id)).slice(-300)), lib.timing('hang.ui'))
 
   // --- "Ask me" lock: agent 2 holds notes.txt (a claim made through the hook server), agent 1 edits it.
   await inv('session:start', proj, { agentId: a2.id })
@@ -125,7 +126,7 @@ const post = (url, token, body) =>
     tool_input: { command: '*** Begin Patch\n*** Update File: notes.txt\n@@\n+claimed\n*** End Patch' }
   })
   check('agent 2 claims notes.txt', claim.status === 200, `${claim.status} ${claim.body}`)
-  await sleep(800)
+  await lib.until(async () => ((await live(a2.id))?.lockedFiles ?? []).some((f) => /notes\.txt$/i.test(f)), lib.timing('hang.ui'))
   const held = (await live(a2.id))?.lockedFiles ?? []
   check('lock shows on agent 2', held.some((f) => /notes\.txt$/i.test(f)), JSON.stringify(held))
   const asking = page.locator('.toast', { hasText: 'wants to edit notes.txt' })
@@ -135,7 +136,7 @@ const post = (url, token, body) =>
   const turn = async (prompt) => {
     const since = (await live(a1.id))?.statusSince
     await lib.sendPrompt(inv, key1, prompt, { submitted: async () => (await live(a1.id))?.statusSince !== since })
-    await lib.until(async () => (await asking.count()) > 0 || /from agent 1/.test(notes()) || ['finished', 'waiting'].includes((await live(a1.id))?.status), 120000, 300)
+    await lib.until(async () => (await asking.count()) > 0 || /from agent 1/.test(notes()) || ['finished', 'waiting'].includes((await live(a1.id))?.status), lib.timing('hang.step'), 300)
     return live(a1.id)
   }
   let w
@@ -145,7 +146,7 @@ const post = (url, token, body) =>
   await lib.cliStep('the locked edit', { session: key1 }, async () => {
     for (let attempt = 0; attempt < 3; attempt++) {
       w = await turn(attempt ? 'Edit notes.txt now: call the apply_patch tool to append the line "from agent 1". Do not answer in text.' : 'Use apply_patch to add the line "from agent 1" at the end of notes.txt. Do nothing else.')
-      if (await lib.until(async () => (await asking.count()) > 0, 5000)) break
+      if (await lib.until(async () => (await asking.count()) > 0, lib.timing('pace.approvalAskedMs'))) break
       if (/from agent 1/.test(notes())) break
       console.log(`Codex didn't try the edit (attempt ${attempt + 1}): asking again`)
       await waitFor(a1.id, (x) => x?.status === 'finished' || x?.status === 'waiting', 60000)
@@ -162,7 +163,7 @@ const post = (url, token, body) =>
   await asking.getByRole('button', { name: 'Allow', exact: true }).first().click().catch(() => undefined)
   // The edit is Codex's retry. Waiting for the edit itself: a working-then-finished wait could see the blocked turn's end.
   await lib.cliStep('the edit after Allow', { session: key1 }, async () => {
-    const edited = await lib.until(async () => /from agent 1/.test(notes()), 180000, 1000)
+    const edited = await lib.until(async () => /from agent 1/.test(notes()), lib.timing('hang.slow'), 1000)
     check('after Allow, Codex makes the edit', edited, `${(await live(a1.id))?.status}`)
   })
   console.log('TERMINAL TAIL:', (await text(a1.id)).slice(-400))
@@ -180,7 +181,7 @@ const post = (url, token, body) =>
     tool_input: { command: '*** Begin Patch\n*** Update File: shell.txt\n@@\n+claimed\n*** End Patch' }
   })
   check('agent 2 claims shell.txt', shellClaim.status === 200, `${shellClaim.status} ${shellClaim.body}`)
-  await lib.until(async () => ((await live(a2.id))?.lockedFiles ?? []).some((f) => /shell\.txt$/i.test(f)), 10000)
+  await lib.until(async () => ((await live(a2.id))?.lockedFiles ?? []).some((f) => /shell\.txt$/i.test(f)), lib.timing('hang.ui'))
   const askingShell = page.locator('.toast', { hasText: 'wants to edit shell.txt' })
   const shellText = () => fs.readFileSync(path.join(proj, 'shell.txt'), 'utf8')
   const shellPrompt = 'Run exactly this command with your exec_command tool (shell "bash"), not the apply_patch tool, and do nothing else: apply_patch <<\'PATCH\' then the lines *** Begin Patch / *** Update File: shell.txt / @@ / " hi" / +from agent 1 / *** End Patch, each on its own line, then PATCH.'
@@ -188,8 +189,8 @@ const post = (url, token, body) =>
     for (let attempt = 0; attempt < 3; attempt++) {
       const since = (await live(a1.id))?.statusSince
       await lib.sendPrompt(inv, key1, shellPrompt, { submitted: async () => (await live(a1.id))?.statusSince !== since })
-      await lib.until(async () => (await askingShell.count()) > 0 || /from agent 1/.test(shellText()) || ['finished', 'waiting'].includes((await live(a1.id))?.status), 120000, 300)
-      if (await lib.until(async () => (await askingShell.count()) > 0, 5000)) break
+      await lib.until(async () => (await askingShell.count()) > 0 || /from agent 1/.test(shellText()) || ['finished', 'waiting'].includes((await live(a1.id))?.status), lib.timing('hang.step'), 300)
+      if (await lib.until(async () => (await askingShell.count()) > 0, lib.timing('pace.approvalAskedMs'))) break
       if (/from agent 1/.test(shellText())) break
       console.log(`Codex didn't try the shell edit (attempt ${attempt + 1}): asking again`)
       await waitFor(a1.id, (x) => x?.status === 'finished' || x?.status === 'waiting', 60000)
@@ -199,10 +200,10 @@ const post = (url, token, body) =>
   })
   // Decline: Esc interrupts.
   await inv('pty:write', key1, '\x1b')
-  await lib.until(async () => ['ready', 'finished'].includes((await inv('session:live')).find((x) => x.agentId === a1.id)?.status), 15000) // the interrupt landed
+  await lib.until(async () => ['ready', 'finished'].includes((await inv('session:live')).find((x) => x.agentId === a1.id)?.status), lib.timing('hang.step')) // the interrupt landed
 
   await inv('session:stop', proj)
-  await lib.until(async () => (await inv('session:live')).length === 0, 15000)
+  await lib.until(async () => (await inv('session:live')).length === 0, lib.timing('hang.step'))
   await app.close()
   console.log(`${results.filter(Boolean).length}/${results.length}`)
 })().catch((e) => {

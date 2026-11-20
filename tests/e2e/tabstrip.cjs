@@ -11,7 +11,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'tabstrip-profile')
 const ws = path.join(lib.WORK, 'tabstrip-ws')
@@ -92,13 +92,14 @@ const check = (name, ok, extra = '') => {
       if (w === target) return true
       viewport = Math.max(200, viewport + target - w)
       await page.setViewportSize({ width: viewport, height: HEIGHT })
-      await lib.sleep(120)
+      await lib.until(async () => (await page.evaluate(() => window.innerWidth)) === viewport, HUNG_MS)
     }
     return (await inspect()).width === target
   }
   const expectFit = async (what, fit) => {
-    await lib.sleep(150)
-    const r = await inspect()
+    // The strip says its fit once it has measured its new width (its resize observer, then a render).
+    let r = await inspect()
+    await lib.until(async () => ((r = await inspect()), r.fit === fit && !r.bad.length), HUNG_MS)
     check(`${what}: ${fit}, nothing cut off`, r.fit === fit && !r.bad.length, `${r.fit} at ${r.width}px; ${r.bad.join('; ')}`)
     return r
   }
@@ -134,7 +135,7 @@ const check = (name, ok, extra = '') => {
   check('an icon-only tab\'s tooltip names it', !!(await lib.until(async () => ((await tip.textContent().catch(() => '')) ?? '').startsWith('Version Control'), HUNG_MS)), await tip.textContent().catch(() => ''))
   await page.mouse.move(5, 500)
   await inv('settings:update', { appearance: { theme: 'light' } })
-  await lib.sleep(300)
+  await lib.themeShown(page, 'light')
   await shot('tabstrip-3-icons-light.png')
   await inv('settings:update', { appearance: { theme: 'dark' } })
 
@@ -191,7 +192,8 @@ const check = (name, ok, extra = '') => {
   // --- Dragging files over the (icon-only) Session tab switches to it while an agent runs.
   await lib.addAgent(inv, alpha, { name: 'One' })
   await inv('session:start', alpha, {})
-  check('the agent starts', !!(await lib.until(async () => (await inv('session:live')).some((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.status === 'ready'), 20000)))
+  // before any turn (HI-2688): its start, restart or resume
+  check('the agent starts', !!(await lib.until(async () => (await inv('session:live')).some((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.status === 'ready'), lib.timing('hang.step'))))
   await page.locator('.tabs .tab', { hasText: 'Files' }).click()
   await expectFit('Files active', 'icons')
   await page.locator('.tabs .tab').first().evaluate((t) => {

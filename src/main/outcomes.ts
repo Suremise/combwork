@@ -1,8 +1,8 @@
 import { msg } from '../shared/i18n'
 
 /**
- * What a notification says once its buttons' action is done or no longer applies (HI-2320, Darren: "once the action is
- * done or no longer needed it goes, and the entry says what happened"): shown in place of its buttons, in its pop-up and
+ * What a notification says once its buttons' action is done or no longer applies (HI-2320: once the action is
+ * done or no longer needed it goes, and the entry says what happened): shown in place of its buttons, in its pop-up and
  * its row under the bell. Short, in the language Combwork shows.
  */
 export const OUTCOME = {
@@ -10,6 +10,7 @@ export const OUTCOME = {
   conversationMoved: msg({ id: 'main.outcome.conversationMoved', defaultMessage: 'It has a new conversation now', description: "What the long-conversation notification says once the agent has moved to a new conversation (handed over, or the CLI started one; HI-2320), in place of its Hand Over to… button." }),
   openHereAgain: msg({ id: 'main.outcome.openHereAgain', defaultMessage: 'The conversation is open here again', description: "What the notice that a conversation runs as a background job says once it is open in Combwork again (HI-2320), in place of its Stop It and Resume button." }),
   runsAnother: msg({ id: 'main.outcome.runsAnother', defaultMessage: 'It runs another conversation here now', description: "What the notice that a conversation runs as a background job says once the agent runs another conversation in Combwork (HI-2320), in place of its Stop It and Resume button." }),
+  stillInBackground: msg({ id: 'main.outcome.stillInBackground', defaultMessage: "Stopped, but it hasn't confirmed it has ended: resume it once it has", description: "What the notice that a conversation runs as a background job says after Stop It and Resume (HI-2320, HI-3376), in place of its button, when the background job was told to stop but Combwork couldn't see it end within 30 s, so the conversation wasn't resumed. Keep it short." }),
   stoppedAndResumed: msg({ id: 'main.outcome.stoppedAndResumed', defaultMessage: 'Stopped and resumed here', description: "What the notice that a conversation runs as a background job says after Stop It and Resume (HI-2320), in place of its button." }),
   allowed: msg({ id: 'main.outcome.allowed', defaultMessage: 'Allowed', description: "What the notice that an agent wants to edit a file another agent is editing says after Allow (HI-2320), in place of its button. Keep it short." }),
   noLongerAsked: msg({ id: 'main.outcome.noLongerAsked', defaultMessage: 'No longer asked', description: "What the notice that an agent wants to edit a locked file says once the agent no longer asks (its edit went ahead, its session ended, or it was allowed elsewhere; HI-2320, HI-2386), in place of its Allow button." }),
@@ -23,5 +24,6 @@ export const OUTCOME = {
   installing: msg({ id: 'main.outcome.updateInstalling', defaultMessage: 'Installing: Combwork restarts', description: "What the notice that a Combwork update is ready says after Restart and Update (HI-2320), in place of its button, as Combwork restarts to install it." }),
   notResumed: msg({ id: 'main.outcome.notResumed', defaultMessage: 'Not resumed', description: "What the notice offering to resume the agents that were working before Combwork restarted says after Don't Resume (HI-2320), in place of its buttons." }),
   resuming: msg({ id: 'main.outcome.resuming', defaultMessage: 'Resuming, one at a time', description: "What the notice offering to resume the agents that were working before Combwork restarted says after Resume, in place of its buttons, until it says how the resumes went (HI-2356)." }),
+  nothingToResume: msg({ id: 'main.outcome.nothingToResume', defaultMessage: 'Nothing left to resume', description: "What the notice offering to resume the agents that were working before Combwork restarted says, in place of its buttons, once none of the agents it named can be resumed any more (HI-3214: each was removed, is running already or has a newer conversation)." }),
   offerReplaced: msg({ id: 'main.outcome.offerReplaced', defaultMessage: 'Replaced by a newer offer', description: "What the notice offering to resume the agents that were working before Combwork restarted says once a newer such notice replaces it, listing every agent offered (another workspace got ready later; HI-2356), in place of its buttons." })
 }

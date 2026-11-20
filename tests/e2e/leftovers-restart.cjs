@@ -61,21 +61,21 @@ const readKept = () => (fs.existsSync(kept) ? JSON.parse(fs.readFileSync(kept, '
     const key = lib.ptyKey(proj, agent.id)
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === agent.id)
     await inv('session:start', proj, { agentId: agent.id })
-    await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 30000)
+    await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), lib.timing('hang.ui'))
     const devFile = path.join(home, 'fake-devapp.jsonl')
     const lingerFile = path.join(home, 'fake-linger.jsonl')
     await lib.sendPrompt(inv, key, 'devapp then linger 1', { submitted: async () => (await live())?.status === 'working' || pidsIn(lingerFile).length > 0 })
     // The dev copy writes its pid once its window is made.
-    await lib.until(async () => pidsIn(devFile).length === 1 && pidsIn(lingerFile).length === 1 && (await live())?.status === 'finished', 60000)
+    await lib.until(async () => pidsIn(devFile).length === 1 && pidsIn(lingerFile).length === 1 && (await live())?.status === 'finished', lib.timing('hang.step'))
     const [dev] = pidsIn(devFile)
     const [node] = pidsIn(lingerFile)
     await inv('session:stop', proj, agent.id)
-    await lib.until(async () => !(await live()), 15000)
+    await lib.until(async () => !(await live()), lib.timing('hang.ui'))
     const listed = async (call = inv) => (await call('session:leftovers')).find((l) => l.agentId === agent.id)
     const before = await lib.until(async () => {
       const l = await listed()
       return l?.processes.some((p) => p.pid === dev) && l.processes.some((p) => p.pid === node) && l
-    }, 15000)
+    }, lib.timing('hang.ui'))
     const devRow = before ? before.processes.find((p) => p.pid === dev) : null
     console.log(`Listed as the agent stopped: ${before ? before.processes.map((p) => p.label).join(' | ') : 'nothing'}`)
     check('the dev copy the agent started is listed as it stops, as Electron with Playwright\'s arguments', !!devRow && devRow.label.startsWith('electron --inspect=0 --remote-debugging-port=0 '), JSON.stringify(before))
@@ -85,7 +85,7 @@ const readKept = () => (fs.existsSync(kept) ? JSON.parse(fs.readFileSync(kept, '
       const k = readKept()
       const a = k?.launches?.find((x) => x.agentId === agent.id)
       return a && all.every((pid) => a.processes.some((p) => p.pid === pid && /^\d+$/.test(p.created))) && k
-    }, 10000)
+    }, lib.timing('hang.step'))
     check("Combwork keeps the list in its profile, each process with its start time", !!saved, JSON.stringify(readKept()))
 
     // Closed without asking (a quiet test copy, as a quit to install an update): left running, still listed.
@@ -105,17 +105,17 @@ const readKept = () => (fs.existsSync(kept) ? JSON.parse(fs.readFileSync(kept, '
     const again = await lib.until(async () => {
       const l = await listed(second.inv)
       return l?.processes.some((p) => p.pid === dev) && l.processes.some((p) => p.pid === node) && l
-    }, 30000)
+    }, lib.timing('hang.ui'))
     check('the next start lists them again', !!again, JSON.stringify(await listed(second.inv)))
     check("a kept pid that names another process by now (the stranger's) isn't listed", !!again && !again.processes.some((p) => p.pid === stranger.pid))
     const offer = second.page.locator('.toast', { hasText: /Website left \d+ process(es)? running/ })
-    const shown = await offer.first().waitFor({ timeout: 15000 }).then(() => true, () => false)
+    const shown = await offer.first().waitFor({ timeout: lib.timing('hang.ui') }).then(() => true, () => false)
     check('and a notification offers to end them', shown && (await offer.first().locator('button', { hasText: 'End Them' }).count()) > 0)
     if (shown) await offer.first().locator('button', { hasText: 'End Them' }).click()
     else await second.inv('session:settleLeftovers', proj, agent.id, 'end')
-    check('End Them ends the dev copy and the node', await lib.until(() => !lib.processRunning(dev) && !lib.processRunning(node), 15000))
-    check("and every process listed for them", await lib.until(() => (again ? again.processes : []).every((p) => !lib.processRunning(p.pid)), 15000), JSON.stringify(again?.processes.filter((p) => lib.processRunning(p.pid))))
-    check('nothing is listed or kept any more', !!(await lib.until(async () => !(await listed(second.inv))?.processes.length && !readKept()?.launches?.length, 10000)), JSON.stringify(readKept()))
+    check('End Them ends the dev copy and the node', await lib.until(() => !lib.processRunning(dev) && !lib.processRunning(node), lib.timing('hang.ui')))
+    check("and every process listed for them", await lib.until(() => (again ? again.processes : []).every((p) => !lib.processRunning(p.pid)), lib.timing('hang.ui')), JSON.stringify(again?.processes.filter((p) => lib.processRunning(p.pid))))
+    check('nothing is listed or kept any more', !!(await lib.until(async () => !(await listed(second.inv))?.processes.length && !readKept()?.launches?.length, lib.timing('hang.step'))), JSON.stringify(readKept()))
     check("the stranger's process still runs", lib.processRunning(stranger.pid))
   } finally {
     await app?.close().catch(() => undefined)

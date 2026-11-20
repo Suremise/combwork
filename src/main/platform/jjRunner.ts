@@ -19,6 +19,7 @@ import type { JjWorkerMessage, JjWorkerReply } from './jjWorker'
 import { previewOf, type OpPreviewInput } from './jjOpView'
 import type { PrintSources } from './jjSourcesPrint'
 import { previewTask, printTask, type OpFence, type OpPreviewAnswer } from './jjPreviewTask'
+import { platformLimits } from './limits'
 
 const log = createLogger('jj')
 
@@ -50,8 +51,12 @@ export const JJ_PREFIX = [
  */
 export const JJ_READ = ['--ignore-working-copy', '--config=snapshot.auto-update-stale=false'] as const
 
-/** A command's bounds, unset: 16 MB of output (git()'s), a minute. */
-export const JJ_DEFAULTS = { maxOutput: 16 * 1024 * 1024, timeout: 60_000, versionTimeout: 10_000 }
+/**
+ * A command's bounds, unset: 16 MB of output (git()'s); its time is `cw.jj.commandSeconds` (HI-3372: platformLimits, 300 s by
+ * default; a minute passed a first snapshot of a large working copy); `jj --version` 30 s (HI-3375: its first start under
+ * antivirus).
+ */
+export const JJ_DEFAULTS = { maxOutput: 16 * 1024 * 1024, versionTimeout: 30_000 }
 
 /** A jj command's options: port 1's, plus cancellation and whether it may write. */
 export interface JjRunOptions extends RunOptions {
@@ -495,7 +500,7 @@ export function createJjRunner(o: { exe?: string; env?: NodeJS.ProcessEnv; here?
         if (ac.signal.aborted) return stopped(what, 'cancelled')
         if (!jjRunnable(t) || !t.path) return refused(t, what)
         const full = [...(o.before ?? []), ...JJ_PREFIX, ...(opts.write ? [] : JJ_READ), ...args]
-        const request: JjRequest = { exe: t.path, cwd: folder, args: full, env: jjEnv(base(), opts.env), maxOutput: opts.maxOutput ?? JJ_DEFAULTS.maxOutput, timeout: opts.timeout ?? JJ_DEFAULTS.timeout, ...(opts.input !== undefined ? { input: opts.input } : {}) }
+        const request: JjRequest = { exe: t.path, cwd: folder, args: full, env: jjEnv(base(), opts.env), maxOutput: opts.maxOutput ?? JJ_DEFAULTS.maxOutput, timeout: opts.timeout ?? platformLimits.jjCommandMs(), ...(opts.input !== undefined ? { input: opts.input } : {}) }
         if (!opts.write) {
           const r = resultOf(await exec(request, ac.signal), what)
           // The tool went (uninstalled, moved): checked again, so the next command and Copy Diagnostics say so.

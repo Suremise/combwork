@@ -19,7 +19,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 45000
+const HUNG_MS = lib.timing('hang.step')
 
 const userData = path.join(lib.WORK, 'slotsessions-profile')
 const ws = path.join(lib.WORK, 'slotsessions-ws')
@@ -59,9 +59,12 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
   const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
   const stopped = async (id) => !(await live(id))
   const say = async (id, text) => {
-    await inv('pty:write', lib.ptyKey(alpha, id), text)
-    await lib.sleep(300)
-    await inv('pty:write', lib.ptyKey(alpha, id), '\r')
+    const key = lib.ptyKey(alpha, id)
+    const mark = String((await inv('pty:buffer', key)) ?? '').length
+    await inv('pty:write', key, text)
+    // HI-3385: Enter once the fake has drawn the text on its line (its input echoed), not after a fixed pause.
+    await until(async () => lib.plainText(String((await inv('pty:buffer', key)) ?? '').slice(mark)).includes(text), lib.timing('hang.ui'))
+    await inv('pty:write', key, '\r')
   }
   const op = (o) => inv('slots:test', alpha, o)
   const slotList = () => inv('slots:list', alpha)

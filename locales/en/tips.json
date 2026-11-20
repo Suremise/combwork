@@ -343,6 +343,14 @@
     "defaultMessage": "Have the Assistant tell you when an agent is done",
     "description": "A tip's title."
   },
+  "tips.assistantWakes.text": {
+    "defaultMessage": "Wake the Assistant for, under Card loops in Version Control → Workflow, sets which events in a project’s lanes wake the Assistant: Everything, Standard, Important only, Quiet or your own list. Each wake costs it tokens.",
+    "description": "A tip (HI-3211). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Wake the Assistant for is a workflow option; Everything, Standard, Important only and Quiet its levels)."
+  },
+  "tips.assistantWakes.title": {
+    "defaultMessage": "Choose what wakes the Assistant",
+    "description": "A tip's title (HI-3211)."
+  },
   "tips.attachFiles.text": {
     "defaultMessage": "Drop a PDF, a log or any file onto an agent's terminal: Combwork keeps a copy with the session and pastes its path. A chip shows what's attached, and says when the agent's CLI doesn't read that kind of file itself, so the agent opens it by its path.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -559,6 +567,14 @@
     "defaultMessage": "Put what you decide on the card",
     "description": "A tip's title."
   },
+  "tips.cardLineComments.text": {
+    "defaultMessage": "In a revision’s Changes, hover a line and press + to comment on it, or select lines first. Comments stay on the card, where you can edit, resolve or reopen them.",
+    "description": "A tip (HI-3219). Names of Combwork's views and commands (Changes): keep them as Combwork shows them. Glossary: revision."
+  },
+  "tips.cardLineComments.title": {
+    "defaultMessage": "Comment on the lines of a card’s work",
+    "description": "A tip's title (HI-3219). Glossary: work."
+  },
   "tips.cardLinks.text": {
     "defaultMessage": "Card numbers an agent or the Assistant prints, like #12, are links: hover one for its title and column, and Ctrl+click it to open the card.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -575,6 +591,22 @@
     "defaultMessage": "Let two agents build and review in turn",
     "description": "A tip's title."
   },
+  "tips.cardLoopChurn.text": {
+    "defaultMessage": "With a reviewer agent, Combwork counts each card’s back-and-forth and asks you whether to simplify at 12, and how to go on at 30. Set both under Card loops in Version Control → Workflow.",
+    "description": "A tip (HI-3188): a card's back-and-forth is its failed reviews, designs, requests and questions. Names of Combwork's menus, views, settings and commands (Card loops, Version Control, Workflow): keep them as Combwork shows them."
+  },
+  "tips.cardLoopChurn.title": {
+    "defaultMessage": "A card that goes round in circles stops",
+    "description": "A tip's title (HI-3188)."
+  },
+  "tips.cardLoopYield.text": {
+    "defaultMessage": "A lane’s card in progress needs another card first? Mark it as a dependency and put that card first in the lane: at the builder’s turn end the lane switches to it, puts the card in progress back in Todo with its work kept, and returns to it after.",
+    "description": "A tip (HI-3323). A lane is a builder and its reviewer working through cards in order. Depends on and waiting for are a card's fields as the board names them; Todo is a board column. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.cardLoopYield.title": {
+    "defaultMessage": "Put a needed fix ahead of the card being worked",
+    "description": "A tip's title (HI-3323)."
+  },
   "tips.cardMove.text": {
     "defaultMessage": "Drag any dialog by its header (a card, Add Agent, Agent Settings…) to see what's behind it; Escape while dragging puts it back.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -590,6 +622,22 @@
   "tips.cardReadFirst.title": {
     "defaultMessage": "Point a card at the docs it needs",
     "description": "A tip's title."
+  },
+  "tips.cardRevisionChanges.text": {
+    "defaultMessage": "In a card’s Work section, Changes on a revision shows each of its files from where the work started to that revision, as it was submitted, even after the folder has moved on.",
+    "description": "A tip (HI-3218). Names of Combwork's menus, views, settings and commands (Work, Changes): keep them as Combwork shows them. Glossary: work, revision."
+  },
+  "tips.cardRevisionChanges.title": {
+    "defaultMessage": "See exactly what a revision changed",
+    "description": "A tip's title (HI-3218). Glossary: revision."
+  },
+  "tips.cardSendComments.text": {
+    "defaultMessage": "Once you’ve commented on a card’s lines, Send in its Work section gives every open comment to its builder as one fix round, from Review or Approved. A comment left open goes again with the next send.",
+    "description": "A tip (HI-3220). Names of Combwork's views and commands (Work, Send, Review, Approved): keep them as Combwork shows them. Glossary: builder, round."
+  },
+  "tips.cardSendComments.title": {
+    "defaultMessage": "Send your comments to the builder in one go",
+    "description": "A tip's title (HI-3220). Glossary: builder."
   },
   "tips.cardSummaries.text": {
     "defaultMessage": "Agents start a card's report or review verdict with one line saying what is ready or what was found, the details below; they and the Assistant read just those lines when that's enough.",
@@ -1139,17 +1187,25 @@
     "defaultMessage": "A check nobody else can spoil",
     "description": "A tip's title."
   },
+  "tips.jjAdvance.text": {
+    "defaultMessage": "In a jj project, Combwork moves the target bookmark to a card’s candidate once its merge checks pass, and asks you in For you if anything else changed. To do it yourself, choose You integrate it yourself in Version Control → Workflow.",
+    "description": "A tip (HI-3235). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. “Who integrates” and “You integrate it yourself” are a workflow option and its value, as translated there. Keep jj. A candidate is the commit Combwork builds for the card; a bookmark is jj's name for a branch."
+  },
+  "tips.jjAdvance.title": {
+    "defaultMessage": "Combwork integrates jj cards",
+    "description": "A tip's title (HI-3235). Keep jj."
+  },
   "tips.jjCandidates.text": {
-    "defaultMessage": "Once a jj card passes, Combwork builds a candidate from it on the target bookmark and checks it for conflicts. Version Control → Repository shows it with the jj bookmark set command that integrates it: you run it; Combwork never moves the bookmark.",
-    "description": "A tip (HI-2871). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj and jj bookmark set (a command). A candidate is the commit Combwork builds for the user to integrate; a bookmark is jj's name for a branch."
+    "defaultMessage": "Once a jj card passes, Combwork builds a candidate from it on the target bookmark and checks it for conflicts. With You integrate it yourself, Version Control → Repository shows it with the jj bookmark set command that integrates it, for you to run.",
+    "description": "A tip (HI-2871, HI-3235). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj and jj bookmark set (a command). “You integrate it yourself” is a value of the workflow option Who integrates, as translated there. A candidate is the commit Combwork builds for the card; a bookmark is jj's name for a branch."
   },
   "tips.jjCandidates.title": {
     "defaultMessage": "Integrate a jj card’s candidate",
     "description": "A tip's title (HI-2871). Keep jj. A candidate is the commit Combwork builds for the user to integrate."
   },
   "tips.jjCards.text": {
-    "defaultMessage": "In a jj project, each card works in a slot of its own. Once one passes review, you integrate it yourself: Version Control → Repository lists what waits for you, and Combwork moves the card to Done once its work is in the target.",
-    "description": "A tip (HI-2874). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. A slot is a working folder Combwork lends to a card (glossary 2.5: slot). Keep jj."
+    "defaultMessage": "In a jj project, each card works in a slot of its own. Once one passes review, Combwork integrates it, or you do (You integrate it yourself), and the card moves to Done once its work is in the target.",
+    "description": "A tip (HI-2874, HI-3235). “You integrate it yourself” is a value of the workflow option Who integrates, as translated there. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. A slot is a working folder Combwork lends to a card (glossary 2.5: slot). Keep jj."
   },
   "tips.jjCards.title": {
     "defaultMessage": "Cards in a jj project",
@@ -1162,6 +1218,14 @@
   "tips.jjOperations.title": {
     "defaultMessage": "Preview undoing a jj operation",
     "description": "A tip's title (HI-2800). Keep jj."
+  },
+  "tips.jjPreview.text": {
+    "defaultMessage": "In a jj project, choose Combwork integrates when you click under Version Control → Workflow → Who integrates: For you then previews each move, and Combwork makes it only when you click Integrate.",
+    "description": "A tip (HI-3236). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. “Who integrates” and “Combwork integrates when you click” are a workflow option and its value, “Integrate” a button, as translated there. Keep jj."
+  },
+  "tips.jjPreview.title": {
+    "defaultMessage": "Integrate a jj card with one click",
+    "description": "A tip's title (HI-3236). Keep jj."
   },
   "tips.keepAwake.text": {
     "defaultMessage": "While an agent works, Combwork stops Windows from sleeping (the screen can still lock), and lets it sleep once they're done. Choose when in Settings → General.",
@@ -1260,7 +1324,7 @@
     "description": "A tip's title (HI-2670): a connection whose sessions start with none of Combwork's additions."
   },
   "tips.leftRunning.text": {
-    "defaultMessage": "A process an agent's command started that keeps running after its shell has gone shows in Activity as Left running, with its CPU time and End It. Past ten minutes, a notice says so once, and the agent is told too.",
+    "defaultMessage": "A process an agent's command started that keeps running after its shell is gone shows in Activity as Left running, with End It. Past the minutes set in Settings → Advanced, you and the agent are told once, unless it belongs to a live cw-progress run.",
     "description": "A tip (HI-2111). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Left running is a row's label; End It a button)."
   },
   "tips.leftRunning.title": {
@@ -1411,6 +1475,14 @@
     "defaultMessage": "Merge against your team’s remote",
     "description": "A tip's title (G21, HI-1183): the workflow option that has Combwork's merge queue fetch the target's remote branch before each test merge and publish there first."
   },
+  "tips.mergeGuards.text": {
+    "defaultMessage": "Version Control → Workflow → Merge guards refuses a merge that adds a line matching your pattern (an old name, a debugging call), sending the card back with your message. Only added lines count, so sweeping out what is already there stays separate work.",
+    "description": "A tip (HI-3284). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. A merge guard is a pattern (regular expression) Combwork refuses in the lines a merge adds."
+  },
+  "tips.mergeGuards.title": {
+    "defaultMessage": "Keep things out of what merges",
+    "description": "A tip's title (HI-3284): merge guards, patterns Combwork refuses in the lines a merge adds."
+  },
   "tips.mergeMessage.text": {
     "defaultMessage": "With Combwork merging, Version Control → Workflow sets the merge’s commit message: Combwork’s names the card, the branch’s own keeps card keys out of your history. With Squash, each card then lands as one commit with its builder’s message.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Squash is a merge style's name: use the word Combwork shows for it."
@@ -1538,6 +1610,14 @@
   "tips.moveAnyway.title": {
     "defaultMessage": "Move a card past its rules, with a reason",
     "description": "A tip's title (glossary: rule)."
+  },
+  "tips.muse.text": {
+    "defaultMessage": "Agents can use Meta’s Muse Code. Install it with Meta’s installer, add a Muse Code account in Settings → Accounts & Connections and sign it in there. Each account keeps its own sign-in, settings and sessions, apart from your own Muse.",
+    "description": "A tip. Muse Code and Meta are names. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.muse.title": {
+    "defaultMessage": "Run agents on Muse Code",
+    "description": "A tip's title. Muse Code is a product name."
   },
   "tips.myPrices.text": {
     "defaultMessage": "Claude Code's cost is its own figure, from its price table. On other rates (a discount, another tier)? Set Session costs to My prices, and Combwork prices every session from your table instead.",
@@ -1922,6 +2002,14 @@
   "tips.resumeAll.title": {
     "defaultMessage": "Resume all agents at once",
     "description": "A tip's title."
+  },
+  "tips.resumeLongIdle.text": {
+    "defaultMessage": "A conversation idle for over an hour has most likely lost its prompt cache, so resuming it may cost many tokens. Resume says how long it has been idle and how big it is, and offers Archive and Start Fresh instead.",
+    "description": "A tip. A prompt cache is what a CLI keeps of a conversation so a resumed one is read cheaply. Names of Combwork's buttons: keep them as Combwork shows them."
+  },
+  "tips.resumeLongIdle.title": {
+    "defaultMessage": "A long-idle conversation asks before it resumes",
+    "description": "A tip's title (HI-3360)."
   },
   "tips.retargetRelease.text": {
     "defaultMessage": "Changing Work merges into from 1.1.0 to 1.2.0? Save… lists the Todo cards and free slots still on 1.1.0 that can follow 1.2.0, and what stays, with why. Leave Also retarget what can move ticked to move them.",
@@ -2368,8 +2456,8 @@
     "description": "A tip's title (HI-2195): an account's agents move to another account when its plan's usage reaches a share."
   },
   "tips.versionControlJj.text": {
-    "defaultMessage": "In a jj repository, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. You integrate reviewed work yourself.",
-    "description": "A tip (HI-2799, HI-2896: colocated with Git or not). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj."
+    "defaultMessage": "In a jj repository, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. Combwork integrates reviewed work, or you do.",
+    "description": "A tip (HI-2799, HI-2896: colocated with Git or not; HI-3235). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj."
   },
   "tips.versionControlJj.title": {
     "defaultMessage": "See a jj repository",
@@ -2454,5 +2542,21 @@
   "tips.workspaceNotes.title": {
     "defaultMessage": "Notes about this machine for every agent",
     "description": "A tip's title."
+  },
+  "tips.yourOwnCliServer.text": {
+    "defaultMessage": "A CLI that runs from a description can run on Ollama, LM Studio, llama.cpp or vLLM on this PC: its description says how to give it the server, and you add the server in Settings → Accounts & Connections, then give an agent a connection on it.",
+    "description": "A tip (HI-3197). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them; Ollama, LM Studio, llama.cpp and vLLM are products' names."
+  },
+  "tips.yourOwnCliServer.title": {
+    "defaultMessage": "Your own CLI on a model server of yours",
+    "description": "A tip's title (HI-3197)."
+  },
+  "tips.yourOwnClis.text": {
+    "defaultMessage": "A JSON file describing a CLI, in the clis folder of your Combwork profile, lets your agents run it: how to start it, how its first prompt goes in, and how to read its screen. Settings → Providers → Your own CLIs opens the folder and reloads it.",
+    "description": "A tip (HI-3196). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. clis is a folder's name: keep it."
+  },
+  "tips.yourOwnClis.title": {
+    "defaultMessage": "Run a CLI Combwork has no provider for",
+    "description": "A tip's title (HI-3196)."
   }
 }

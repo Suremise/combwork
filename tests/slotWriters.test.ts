@@ -11,6 +11,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
+import { timing } from './timing.cjs'
 
 /** What spawnPty was asked to start (the worktree setup's terminal): no process is started. */
 const spawned: { key: string; onExit?: (code: number) => void }[] = []
@@ -235,7 +236,7 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
     hostOn()
     launchFails = true
     await expect(start()).rejects.toThrow(/launch failed/)
-    await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: 15000 })
+    await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: timing('wait.hang') })
     expect(live.size).toBe(0)
     expect(manager.writers.size).toBe(0)
   })
@@ -254,10 +255,10 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
       expect(live.has(run)).toBe(true)
       settleRunForTests(run, outcome)
       if (outcome === 'ended') {
-        await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: 15000 })
+        await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: timing('wait.hang') })
         expect(live.has(run)).toBe(false)
       } else {
-        await vi.waitFor(() => expect(live.has(run)).toBe(false), { timeout: 15000 })
+        await vi.waitFor(() => expect(live.has(run)).toBe(false), { timeout: timing('wait.hang') })
         // Held: not cleared by a refresh, not claimed by another start.
         await pool.refresh()
         expect(writer()?.run).toBe(run)
@@ -282,10 +283,10 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
       if (how === 'cancelled') sessions.stop(project, 'b1')
       spawned[0].onExit?.(how === 'fails' ? 1 : 0)
       // Its setup ran (a process of the run): released once the tracker shows what it started has ended.
-      await vi.waitFor(() => expect(manager.writers.size).toBe(0), { timeout: 15000 })
+      await vi.waitFor(() => expect(manager.writers.size).toBe(0), { timeout: timing('wait.hang') })
       expect(writer()?.run).toBe(state.runId)
       settleRunForTests(state.runId, 'ended')
-      await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: 15000 })
+      await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: timing('wait.hang') })
       expect(live.size).toBe(0)
     }
   })
@@ -299,7 +300,7 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
     } finally {
       spawnThrows.on = false
     }
-    await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: 15000 })
+    await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: timing('wait.hang') })
     expect(live.size).toBe(0)
     expect(manager.writers.size).toBe(0)
   })
@@ -312,11 +313,11 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
     launchFails = true
     spawned[0].onExit?.(0)
     // The setup succeeded, the CLI's launch failed: the run's setup processes still owe their settlement.
-    await vi.waitFor(() => expect(manager.writers.size).toBe(0), { timeout: 15000 })
+    await vi.waitFor(() => expect(manager.writers.size).toBe(0), { timeout: timing('wait.hang') })
     expect(writer()?.run).toBe(state.runId)
     expect(live.has(state.runId)).toBe(true)
     settleRunForTests(state.runId, 'ended')
-    await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: 15000 })
+    await vi.waitFor(() => expect(writer()).toBeNull(), { timeout: timing('wait.hang') })
     expect(live.size).toBe(0)
   })
 
@@ -336,7 +337,7 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
     try {
       const next = start()
       // At the wait, with the old run's writer still on the slot: nothing claimed, nothing launched, not refused.
-      await vi.waitFor(() => expect(waiting).toHaveBeenCalled(), { timeout: 15000 })
+      await vi.waitFor(() => expect(waiting).toHaveBeenCalled(), { timeout: timing('wait.hang') })
       expect(writer()?.run).toBe(old)
       expect(launched).toBe(1)
       settleRunForTests(old, 'ended')
@@ -375,7 +376,7 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
       try {
         const going = restart()
         // At the wait, the old run's writer still on the slot: nothing claimed or launched, nothing refused.
-        await vi.waitFor(() => expect(waiting).toHaveBeenCalled(), { timeout: 15000 })
+        await vi.waitFor(() => expect(waiting).toHaveBeenCalled(), { timeout: timing('wait.hang') })
         expect(writer()?.run).toBe(old)
         expect(launched).toBe(1)
         settleRunForTests(old, 'ended')
@@ -436,7 +437,7 @@ describe("a slot's writer through sessions.start (#1434 round 3)", () => {
     const waiting = vi.spyOn(manager as unknown as { earlierWritersSettled: (...a: unknown[]) => Promise<void> }, 'earlierWritersSettled')
     try {
       const next = start()
-      await vi.waitFor(() => expect(waiting).toHaveBeenCalled(), { timeout: 15000 })
+      await vi.waitFor(() => expect(waiting).toHaveBeenCalled(), { timeout: timing('wait.hang') })
       settleRunForTests(old, 'kept')
       await expect(next).rejects.toThrow(/still has another session/)
       expect(writer()?.run).toBe(old)
@@ -471,7 +472,7 @@ describe('Release Slot… on a held writer (#1506)', () => {
     const run = (await start()).runId
     ;(manager.settleWriterOf as (run: string) => void).call(manager, run)
     settleRunForTests(run, 'kept')
-    await vi.waitFor(() => expect(live.has(run)).toBe(false), { timeout: 15000 })
+    await vi.waitFor(() => expect(live.has(run)).toBe(false), { timeout: timing('wait.hang') })
     manager.live.clear()
     manager.runs.clear()
     return run
@@ -705,7 +706,7 @@ describe("a gone Combwork's writer settled by itself after a restart (HI-1886)",
       expect(tracker.endedExactly).toEqual([])
     })
 
-    // HI-2309 (Darren's decision, 1 Nov ~23:25): a keeper's "live" is a snapshot, never proof, so a slot it lists only the
+    // HI-2309: a keeper's "live" is a snapshot, never proof, so a slot it lists only the
     // idle broker for stays held (HR1's round 2 repro: a writer joined after that receipt, its next sweep failing); the
     // user is told once, naming it, that releasing is safe, and Release Slot… says so. Nothing ended.
     it('"live" with only Windows Sandbox\'s idle broker: held at the sweep and at its own start, told once that releasing is safe; with anything else, held and not told', async () => {
@@ -1153,7 +1154,7 @@ describe("a switch's resume in flight across its lease's end and its cancel (HI-
     })
     expect(await s.end).toBe('cancelled')
     // The resume's start, already begun, gives up before its claim.
-    await vi.waitFor(() => expect(sessions.startingFor(project, 'b1')).toBe(false), { timeout: 15000 })
+    await vi.waitFor(() => expect(sessions.startingFor(project, 'b1')).toBe(false), { timeout: timing('wait.hang') })
     expect(manager.writers.size).toBe(0)
     expect(s.claims()).toBe(0)
     expect(writer()).toBeNull()

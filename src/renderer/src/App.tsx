@@ -15,7 +15,7 @@ import { AddAgentDialog, AgentSettingsDialog, askWorkflowToolsRestart, HandOverD
 import { BranchMergeDialog } from './components/BranchMerge'
 import { BoardUpgradeAsk, BoardUpgradeBanner } from './components/BoardUpgrade'
 import { WorkspaceOpening } from './components/WorkspaceOpening'
-import { CloseCommandPanel } from './components/CloseCommandPanel'
+import { CloseCommandPanel, ClosingAgentsPanel } from './components/CloseCommandPanel'
 import { ArchiveAllDialog, BoardView, MoveToDoingDialog, TaskDialog, TaskStartDialog } from './components/Board'
 import { LaneStartDialog } from './components/LaneStartDialog'
 import { WorkspaceOverviewView } from './views/WorkspaceOverview'
@@ -251,6 +251,9 @@ function handleEvent(e: CombworkEvent): void {
     case 'close-command':
       set({ closeCommand: e.run })
       break
+    case 'closing-agents':
+      set({ closingAgents: e.state })
+      break
     case 'keep-awake':
       set({ keepAwake: e.working })
       break
@@ -431,6 +434,13 @@ export function App() {
       handleEvent(e)
       early.note(e)
     })
+    // The window's state from the start (HI-3404): main sends it only when it changes, so the store starts unfocused and
+    // asks. The answer is applied as it comes: a window-state event handled before it was sent before it, and one sent
+    // after it is handled after it. Asked before the workspace loads; one restored on top (its workspace was left
+    // pinned) shows its pin lit.
+    void call('window:state').then((st) => {
+      if (early.active()) set({ maximized: st.maximized, windowFocused: st.focused, alwaysOnTop: st.alwaysOnTop })
+    }).catch(() => undefined)
     void (async () => {
       const [s, ui, snap, recent, ag, api, info, live] = await Promise.all([
         call('settings:get'),
@@ -448,10 +458,6 @@ export function App() {
       set({ settings: s, sidebarWidth: ui.sidebarWidth, sidebarVisible: ui.sidebarVisible, sidebarCompact: !!ui.sidebarCompact, panes: ui.panes ?? {}, skillsProvider: ui.skillsProvider ?? {}, skillsFold: ui.skillsFold ?? {}, sessionsTree: ui.sessionsTree ?? {}, combworkVcsNotice: ui.combworkVcsNotice ?? {}, assistantFold: ui.assistantFold ?? {}, boardFold: ui.boardFold ?? {}, progressFilter: ui.progressFilter ?? {}, tabs: ui.tabs ?? {}, laneOrder: ui.laneOrder ?? {}, tips: tipsState(ui.tips), workspace: ws, recent, providers: ag, api, appInfo: info })
       early.settle()
       set({ assistantOpen: assistantWasOpen(ws?.path) })
-      // A window restored on top (its workspace was left pinned) shows its pin lit from the start.
-      void call('window:getAlwaysOnTop').then((on) => {
-        if (early.active()) set({ alwaysOnTop: on })
-      }).catch(() => undefined)
       if (ws) set({ selectedProject: (ws.projects.find((p) => p.active) ?? ws.projects[0])?.path ?? null })
       for (const l of live) applyLiveState(l)
       void loadLeftovers()
@@ -474,6 +480,10 @@ export function App() {
       const closing = await call('closeCommand:state')
       if (!early.active()) return
       set({ closeCommand: closing })
+      // And its wait for agents to close (HI-3376).
+      const agentsClosing = await call('closingAgents:state')
+      if (!early.active()) return
+      set({ closingAgents: agentsClosing })
       applyTheme()
       noticeUnmanagedMcp()
       // The day's tip, once the window has settled.
@@ -617,6 +627,7 @@ export function App() {
       <SetAsideDialog />
       <BoardUpgradeAsk />
       <WorkspaceOpening />
+      <ClosingAgentsPanel />
       <CloseCommandPanel />
       <AddAgentDialog />
       <AgentSettingsDialog />

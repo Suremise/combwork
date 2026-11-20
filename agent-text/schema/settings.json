@@ -236,6 +236,18 @@
   "settings.advanced.claude-code.autoModeSetup.offer.title": {
     "placeholders": {}
   },
+  "settings.advanced.claude-code.background.idField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.background.idField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.background.pidField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.background.pidField.title": {
+    "placeholders": {}
+  },
   "settings.advanced.claude-code.connections.remoteModels.desc": {
     "placeholders": {}
   },
@@ -302,6 +314,12 @@
     "placeholders": {}
   },
   "settings.advanced.claude-code.memory.setting.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.monitor.expired.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.monitor.expired.title": {
     "placeholders": {}
   },
   "settings.advanced.claude-code.mouse.rightClickToCli.desc": {
@@ -709,10 +727,28 @@
   "settings.advanced.codex.rateLimitNudge.hide.title": {
     "placeholders": {}
   },
+  "settings.advanced.codex.rateLimits.defaultLimitId.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.defaultLimitId.title": {
+    "placeholders": {}
+  },
   "settings.advanced.codex.rateLimits.field.desc": {
     "placeholders": {}
   },
   "settings.advanced.codex.rateLimits.field.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitId.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitId.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitName.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.codex.rateLimits.limitName.title": {
     "placeholders": {}
   },
   "settings.advanced.codex.rateLimits.usedPercent.desc": {
@@ -1109,6 +1145,12 @@
   "settings.advanced.cw.cards.titleNudgeChars.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.cli.probeSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.cli.probeSeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.console.showText.desc": {
     "placeholders": {}
   },
@@ -1127,6 +1169,12 @@
   "settings.advanced.cw.copies.review.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.db.busySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.db.busySeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.disableHardwareAcceleration.desc": {
     "placeholders": {}
   },
@@ -1137,6 +1185,18 @@
     "placeholders": {}
   },
   "settings.advanced.cw.focused.pickSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.commitMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.commitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.networkMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.networkMinutes.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.guidance.desc": {
@@ -1173,6 +1233,18 @@
     "placeholders": {}
   },
   "settings.advanced.cw.inbox.stopContinuation.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.input.hiddenSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.input.hiddenSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.jj.commandSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.jj.commandSeconds.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.journal.builds.desc": {
@@ -1259,6 +1331,18 @@
   "settings.advanced.cw.merge.lockWaitSeconds.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.mergeGuards.maxLines.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mergeGuards.maxLines.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mergeGuards.seconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.mergeGuards.seconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.none.baselineSeconds.desc": {
     "placeholders": {}
   },
@@ -1329,6 +1413,18 @@
     "placeholders": {}
   },
   "settings.advanced.cw.outage.waitMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.knownHosts.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.knownHosts.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.orphanMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.processes.orphanMinutes.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.processes.orphanNotice.desc": {
@@ -1403,6 +1499,12 @@
   "settings.advanced.cw.queue.networkCodes.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.queue.networkMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.queue.networkMinutes.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.queue.signSeconds.desc": {
     "placeholders": {}
   },
@@ -1469,10 +1571,28 @@
   "settings.advanced.cw.restart.resumeReadySeconds.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.resume.idleAsk.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.resume.idleAsk.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.resume.idleMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.resume.idleMinutes.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.desc": {
     "placeholders": {}
   },
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.server.checkInferSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.server.checkInferSeconds.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.sessions.signFailFast.desc": {
@@ -1563,6 +1683,12 @@
     "placeholders": {}
   },
   "settings.advanced.cw.terminal.osc52.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.typed.takeSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.typed.takeSeconds.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.usage.timelineDetailDays.desc": {
@@ -1677,6 +1803,18 @@
       "title": "plain"
     }
   },
+  "settings.advanced.error.roles": {
+    "placeholders": {
+      "title": "plain",
+      "roles": "plain"
+    }
+  },
+  "settings.advanced.error.rolesTwice": {
+    "placeholders": {
+      "title": "plain",
+      "name": "plain"
+    }
+  },
   "settings.advanced.error.text": {
     "placeholders": {
       "title": "plain"
@@ -1713,6 +1851,90 @@
       "version": "plain",
       "shown": "plain"
     }
+  },
+  "settings.advanced.muse.guidance.maxBytes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.guidance.maxBytes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.editTools.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.editTools.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.pathField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.pathField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.timeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.hooks.timeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.configKeys.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.configKeys.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookEvents.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookEvents.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookFields.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.hookFields.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.sessionLog.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.names.sessionLog.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepPersonalOut.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepPersonalOut.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepProjectConfigOut.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.keepProjectConfigOut.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.stripAccountVars.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.override.stripAccountVars.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.ready.input.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.ready.input.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupRequired.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupRequired.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupScreen.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.muse.sandbox.setupScreen.title": {
+    "placeholders": {}
   },
   "settings.advanced.opencode.ambient.integrations.desc": {
     "placeholders": {}
@@ -1855,6 +2077,11 @@
   "settings.advanced.takes.patternFlags": {
     "placeholders": {
       "flags": "plain"
+    }
+  },
+  "settings.advanced.takes.roles": {
+    "placeholders": {
+      "roles": "plain"
     }
   },
   "settings.advanced.takes.text": {
@@ -2038,6 +2265,9 @@
   "settings.agent.helps.assistant.panelSide": {
     "placeholders": {}
   },
+  "settings.agent.helps.assistantWakes": {
+    "placeholders": {}
+  },
   "settings.agent.helps.board.archiveDoneDays": {
     "placeholders": {}
   },
@@ -2193,6 +2423,12 @@
   "settings.agent.takes.aValue": {
     "placeholders": {}
   },
+  "settings.agent.takes.assistantWakes": {
+    "placeholders": {
+      "shape": "plain",
+      "events": "plain"
+    }
+  },
   "settings.agent.takes.branch": {
     "placeholders": {}
   },
@@ -2225,6 +2461,11 @@
   },
   "settings.agent.takes.mergeChecks": {
     "placeholders": {}
+  },
+  "settings.agent.takes.mergeGuards": {
+    "placeholders": {
+      "shape": "plain"
+    }
   },
   "settings.agent.takes.okBefore": {
     "placeholders": {

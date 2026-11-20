@@ -1,5 +1,7 @@
 // First: the thread pool's size is set before anything uses it (HI-1702).
+import { applyAdvancedLimits } from './limitsApp'
 import './threadPool'
+import { setDbBusyMs } from './db'
 import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watches'
 import { initLoopWakes } from './loopWakes'
 import { migrateAgentsPerProject } from './workflow/preferences'
@@ -11,11 +13,13 @@ import { initSkillCopies } from './skillCopies'
 import { initLaunchFolders } from './launchFolders'
 import { offNames } from '../shared/skillDelivery'
 import { initInboxNotices } from './inboxNotices'
-import { startOrphanWatch, stopOrphanWatch } from './orphanProcesses'
+import { setOrphanRuns, startOrphanWatch, stopOrphanWatch } from './orphanProcesses'
 import { initDecisionWakes } from './decisionWakes'
 // The user's answers given to the Assistant too (HI-1734): its delivery source, registered at start.
 import './answerRelay'
 import './assistantAsk'
+// A card's simplify check told to the Assistant first (HI-3188): its delivery source, registered at start.
+import './churnAssistant'
 import { initWorkflowNotices } from './workflowNotices'
 import { initDevConsole } from './devConsoleSources'
 import { flightRecorder } from './flightRecorder'
@@ -77,7 +81,6 @@ import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { startReleaseOffers, stopReleaseOffers } from './workflow/releaseOffer'
 import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
 import { endAllOwnedWork, endOwnedWork, endOwnedWorkNow } from './platform/ownedWork'
-import { stopCodexChecks } from './codexChecks'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
@@ -105,7 +108,8 @@ import { apiEnv, assistantApiUrl, startApiServer, startHookServer } from './serv
 import { clearDiscovery, clearDiscoveryNow } from './apiDiscovery'
 import { clearHookAuth } from './hookTokens'
 import { assistantHome, assistantTokenFile, endAssistant, newAssistantToken, newTurn } from './assistantControl'
-import { sessions } from './sessions'
+import { CLOSE_WRITERS_MS, sessions } from './sessions'
+import { waitForAgentsClosed, type ClosingPending } from './closingAgents'
 import { forgetPicks } from './dialects/view'
 import { usageHistory } from './usageHistory'
 import { notificationIcon } from './paths'
@@ -128,10 +132,9 @@ import { journalSettingsOf } from './journalService'
 import { assistantStartView } from './startView'
 import { combworkWindows, lastFocused, TITLE_BAR_OVERLAY, registerWindow, unregisterWindow, windowForPath, type CombworkWindow } from './windows'
 import { abandonWindowStorage } from './storage'
-import { agentTokenFile } from './agentTokens'
+import { agentTokenFile, clearOldTokenFiles } from './agentTokens'
 import { progress, setTaskbarTestHook, startProgress } from './progressService'
 import { startMergeSlots } from './mergeSlotHost'
-import { startOpencodeHistory, stopOpencodeHistory } from './opencodeHistoryHost'
 import { startLanes } from './lanes'
 import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
@@ -148,6 +151,9 @@ import { chooseStartLanguage, languageInfo, startI18n, switchLanguage } from './
 import { fmt, msg, tr } from '../shared/i18n'
 import { clearSavedPauses } from './teamPause'
 import { followMovedLink } from './combworkMove'
+import { allProviders } from './providers'
+import { startClis } from './clis'
+import { LOCK_RELEASE_WAIT_MS, lockOnceReleased, profileLockHeld } from './singleInstance'
 
 const log = createLogger('main')
 let quitting = false
@@ -240,7 +246,22 @@ if (testQuiet()) app.commandLine.appendSwitch('disable-features', 'CalculateNati
 // Chromium takes its language only at start (#767): --lang or CW_LANG, the setting, or Windows' languages.
 chooseStartLanguage(config.savedLanguage())
 
-if (!app.requestSingleInstanceLock()) {
+/**
+ * A refused lock on Windows (HI-3454): a copy still ending (crashed, or ended from outside) may hold the profile's lock
+ * with no window left to tell. Waits for it within LOCK_RELEASE_WAIT_MS, then asks once more: true once this start has it.
+ */
+function lockAfterEndingCopy(): boolean {
+  if (process.platform !== 'win32') return false
+  const profile = app.getPath('userData')
+  log.info(`The single-instance lock was refused: waiting up to ${LOCK_RELEASE_WAIT_MS} ms for the profile's lock to be released, as a copy still ending holds it; a running copy holds it throughout`)
+  const r = lockOnceReleased(() => app.requestSingleInstanceLock(), () => profileLockHeld(profile))
+  if (r.taken) log.info(`The profile's lock was released after ${r.waitedMs} ms: this start carries on`)
+  else if (r.released) log.info(`The profile's lock was released after ${r.waitedMs} ms, and another start took it`)
+  else log.info(`The profile's lock was still held after ${r.waitedMs} ms: a copy is running`)
+  return r.taken
+}
+
+if (!app.requestSingleInstanceLock() && !lockAfterEndingCopy()) {
   exitBy('process.exit', 'Combwork is already running: this start brings it forward', () => {
     app.quit()
     process.exit(0)
@@ -643,6 +664,22 @@ function askBeforeStopping(mine: QuitSession[]): boolean {
 }
 
 /**
+ * HI-3376: waits for what of `which`'s projects is closing (`parts` of it) to have closed, shown in `wins` past a second,
+ * said there as still closing past `deadlineMs`, until it has or the user's Don't wait (closingAgents.ts). Logged unless
+ * it closed.
+ */
+async function agentsClosed(what: string, which: ((projectPath: string) => boolean) | undefined, parts: (keyof ClosingPending)[], deadlineMs: number, wins: () => BrowserWindow[]): Promise<void> {
+  const pending = (): ClosingPending => {
+    const p = sessions.closingPending(which)
+    return { running: parts.includes('running') ? p.running : 0, starting: parts.includes('starting') ? p.starting : 0, writers: parts.includes('writers') ? p.writers : 0 }
+  }
+  const how = await waitForAgentsClosed({ pending, deadlineMs, windows: wins, send: (w, state) => emitTo(w as BrowserWindow, { type: 'closing-agents', state }), quiet: testQuiet() })
+  if (how === 'settled') return
+  const p = pending()
+  log.warn(`${what}: ${how === 'skipped' ? "Don't wait pressed" : 'no window to wait in'} with ${p.running} runs, ${p.starting} starts and ${p.writers} slot writers still closing after ${Math.round(deadlineMs / 1000)} s; going on`) // i18n-ignore: for the log
+}
+
+/**
  * Closing a window's workspace, or switching the window to another one: its agents are stopped, after asking as
  * closing the window does. False when the user cancels. Unsaved files were already dealt with by the page.
  */
@@ -658,10 +695,13 @@ async function stopWorkspaceAgents(from: BrowserWindow, scope: 'workspace' | 'sw
   // Also cancels agents still starting (not listed: they have no session yet). No new one starts until the
   // workspace has closed or switched (ipc clears the flag).
   e.ws.closing = true
-  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
-  // Their slot writers released while the workspace is open (HI-2299: released after it closed, they failed). Each
-  // waits for its run's job to be seen empty (about 2 s), so a bound of 5 s, as the quit's look has.
-  await sessions.writersSettled(5000, (p) => workspaceFor(p) === e.ws)
+  // HI-3376: until they have closed, each run through its exit work and its slot writer released while the workspace is
+  // open (HI-2299: released after it closed, they failed), however long their CLIs' exits take; said in the window past a
+  // second, with Don't wait. The stop's own wait isn't taken for their end.
+  const mineOf = (p: string): boolean => workspaceFor(p) === e.ws
+  const deadline = sessions.closeDeadlineMs(mineOf)
+  void sessions.stopWhereAndWait((s) => mineOf(s.projectPath), 0, 'closed')
+  await agentsClosed("closing a window's workspace", mineOf, ['running', 'starting', 'writers'], deadline, () => [e.win]) // i18n-ignore: for the log
   return true
 }
 
@@ -682,10 +722,13 @@ async function requestCloseWindow(e: CombworkWindow, done: AlreadyAsked = {}): P
     if (choice === 'cancel') return
   }
   e.ws.closing = true
-  await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
-  // Their slot writers released while the workspace is open (HI-2299: released after it closed, they failed). Each
-  // waits for its run's job to be seen empty (about 2 s), so a bound of 5 s, as the quit's look has.
-  await sessions.writersSettled(5000, (p) => workspaceFor(p) === e.ws)
+  // HI-3376: until they have closed, each run through its exit work and its slot writer released while the workspace is
+  // open (HI-2299: released after it closed, they failed), however long their CLIs' exits take; said in the window past a
+  // second, with Don't wait. The stop's own wait isn't taken for their end.
+  const mineOf = (p: string): boolean => workspaceFor(p) === e.ws
+  const deadline = sessions.closeDeadlineMs(mineOf)
+  void sessions.stopWhereAndWait((s) => mineOf(s.projectPath), 0, 'closed')
+  await agentsClosed("closing a window's workspace", mineOf, ['running', 'starting', 'writers'], deadline, () => [e.win]) // i18n-ignore: for the log
   saveWindowsWithout(e)
   // Its workspace closed here, its close command run in it while it is still shown (HI-1368), then the window goes.
   await closeWithCommand(e.ws, 'window', e.win).catch((err) => log.warn("closing the window's workspace", err))
@@ -798,18 +841,23 @@ async function quitNow(tellUser: boolean): Promise<void> {
   // A plain quit that installs on its way out is a quit (HI-3167): the user quit, and Combwork doesn't restart itself.
   const reason: RestartReason = quitReason ?? closeReason(installConsent()?.kind ?? null, relaunchOnQuit)
   await recordClosing(reason).catch((e) => log.warn('recording the agents as Combwork closes', e))
-  await sessions.stopAllAndWait(3000)
+  // HI-3376: every run through its exit work (its last transcript backup, its session list) however long its CLI's exit
+  // takes, said in the windows past a second (a hidden one shown), with Don't wait; the stop's own wait isn't taken for it.
+  const runsDeadline = sessions.closeDeadlineMs() - CLOSE_WRITERS_MS
+  void sessions.stopAllAndWait(0)
+  const allWindows = (): BrowserWindow[] => combworkWindows().map((x) => x.win)
+  await agentsClosed('quitting', undefined, ['running', 'starting'], runsDeadline, allWindows)
   await quitLeftovers()
   // The stopped runs' slot writers released before the workspaces close (HI-1801): their outcomes are known by now.
-  await sessions.writersSettled(3000)
+  await agentsClosed('quitting', undefined, ['writers'], CLOSE_WRITERS_MS, allWindows)
   // The merge queues' runners: their processes ended and their leases given up, so another Combwork can run them at once.
   await releaseQueueRunners()
   // HI-1185: platforms' owned work (the Git view's signing checks): no new one admitted from here, and those running
   // ended and waited for, their signers and temp folders gone, before the app exits (HR1's round 2).
   await endAllOwnedWork().catch((e) => log.warn("ending the platforms' owned work as Combwork closes", e))
-  // Codex's checks (HI-1757): those under way settled, each held one's end tried once more (bounded); what is left ends
-  // with its job (kill on close) as Combwork exits.
-  await stopCodexChecks().catch((e) => log.warn("ending Codex's checks as Combwork closes", e))
+  // The providers' own work as Combwork closes (HI-3201: Codex's checks, HI-1757: those under way settled, each held one's
+  // end tried once more, bounded; what is left ends with its job, kill on close, as Combwork exits).
+  await Promise.all(allProviders().map((p) => p.lifecycle?.closing?.().catch((e) => log.warn(`ending ${p.descriptor.name}'s own work as Combwork closes`, e))))
   await slotsQuiet
   await usageHistory.stop()
   await progress.saveNow().catch(() => undefined)
@@ -840,7 +888,7 @@ async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
   const global = config.settings.commands
   if (!quitRunsAny(entries.map((e) => e.ws), global)) return
   // When Combwork quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
-  // No timer: each window's saving step shows, and its Don't wait is the user's (Darren's decision, 28 Oct ~14:15).
+  // No timer: each window's saving step shows, and its Don't wait is the user's.
   const drain = quitCommandPlanned(global, reason)
   const outcomes = await Promise.all(entries.map((e) => closeWithCommand(e.ws, reason, e.win, { drain }).catch((err): RunOutcome => (log.warn("closing a window's workspace as Combwork quits", err), 'notDrained'))))
   const last = lastFocused() ?? entries[0]
@@ -1044,6 +1092,12 @@ app.whenReady().then(async () => {
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
+  // HI-3372: the version-control ports' bounds (a commit, a fetch or push, the queue's network, jj) from those settings.
+  applyAdvancedLimits()
+  // HI-3374: the databases' wait for another program's lock, before any of them opens (it applies from here on).
+  setDbBusyMs(advanced.get<number>('cw.db.busySeconds') * 1000)
+  // The user's own CLIs (HI-3196): their descriptions read and registered before anything looks for a provider.
+  await startClis()
   // Connections' launch settings (HI-2670): the app-wide switches they replaced copied onto them once, and agents on a
   // connection without Combwork's tools read as Independent from here on.
   migrateLaunchPolicy()
@@ -1302,6 +1356,8 @@ app.whenReady().then(async () => {
 
   // Hook auth files of an earlier run of Combwork: their tokens died with it (#345).
   await clearHookAuth()
+  // HI-3195: tokens are per launch now: the per-agent files an earlier version wrote go.
+  await clearOldTokenFiles()
   // A launch's side of the workflow for its metrics (HI-2049): before the Agent API or a window can start an agent.
   startLaunchSides()
   // The tools a project's workflow leaves out of its agents' launches, and the restarts when it changes (HI-2694).
@@ -1375,6 +1431,16 @@ app.whenReady().then(async () => {
 
   // A review waiting on its builder's Progress run for the card isn't stalled (HI-1993).
   setStallRuns((wsPath) => progress.list(wsPath))
+  // HI-3206: a left-running process in a live cw-progress run's tree isn't told while the run is live.
+  setOrphanRuns((projectPath) => {
+    try {
+      const ws = workspaceOf(projectPath).path
+      return ws ? progress.list(ws) : []
+    } catch {
+      // No workspace for it (closed meanwhile): no runs, so nothing is held back.
+      return []
+    }
+  })
 
   // The usage history (#1106): its tick for running sessions; each workspace's import starts as it opens.
   usageHistory.start()
@@ -1408,8 +1474,8 @@ app.whenReady().then(async () => {
   // Long runs agents report (the Progress panel): stale runs, and the setting.
   startProgress()
   startMergeSlots()
-  // OpenCode agents' history, usage and plan limits, read from their servers (HI-2762).
-  startOpencodeHistory()
+  // The providers' own work (HI-3201): OpenCode agents' history, usage and plan limits, read from their servers (HI-2762).
+  for (const p of allProviders()) p.lifecycle?.start?.()
   startLanes()
   // A lane's next card, started on its builder once the card before it is Done (HI-1990).
   startLaneStarts()
@@ -1493,7 +1559,7 @@ app.on('will-quit', () => {
   killAll()
   // The fallback when the quit couldn't wait (an updater's install, a crash's quit): synchronous, best effort.
   endOwnedWorkNow()
-  stopOpencodeHistory()
+  for (const p of allProviders()) p.lifecycle?.quitting?.()
   stopOrphanWatch()
   closeProcessTracking()
   unwatchAll()

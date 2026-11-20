@@ -47,7 +47,7 @@ const RICH_V = `string extends Id ? Record<string, ${RICH_NODE} | ${DYNAMIC} | $
 export const PATCHES = [
   ['src/shared/i18n/msg.ts', 'export type MessageArgs<Id extends string> = string extends Id ? [values?: Values] :', `export type MessageArgs<Id extends string> = string extends Id ? [values?: Record<string, string | boolean | Date | null | undefined | ${DYNAMIC}>] :`],
   ['src/shared/i18n/index.ts', 'export function tr<Id extends string>(m: Msg<Id>, ...values: MessageArgs<Id>): string {', 'export function tr<Id extends string>(m: Msg<Id>, ...values: NoInfer<MessageArgs<Id>>): string {'],
-  ['src/shared/advanced.ts', 'export const withValues = (m: Msg, values: TextValues): Text => ({ m, values })', `${AUDIT_V}export const withValues = <Id extends string>(m: Msg<Id>, values: NoInfer<AuditV<Id>>): Text => ({ m, values: values as TextValues })`],
+  ['src/shared/advancedDef.ts', 'export const withValues = (m: Msg, values: TextValues): Text => ({ m, values })', `${AUDIT_V}export const withValues = <Id extends string>(m: Msg<Id>, values: NoInfer<AuditV<Id>>): Text => ({ m, values: values as TextValues })`],
   // combworkError() is typed by the message already: in the copy a plain placeholder there takes text (a Text too), not a number.
   ['src/main/combworkError.ts', 'type ErrorArgs<Id extends string> = string extends Id', `type ErrorArgs<Id extends string> = string extends Id ? [values?: Record<string, string | Text | ${DYNAMIC}>, options?: { kind?: CombworkErrorKind; cause?: unknown }] : string extends Id`],
   ['src/main/combworkError.ts', '(m: Msg<Id>, ...[values, options]: ErrorArgs<Id>): CombworkError {', '(m: Msg<Id>, ...[values, options]: NoInfer<ErrorArgs<Id>>): CombworkError {'],

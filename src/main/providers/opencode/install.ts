@@ -4,15 +4,15 @@ import { existsSync, mkdirSync, writeFileSync } from 'original-fs'
 import { mkdir } from 'original-fs/promises'
 import { msg } from '../../../shared/i18n'
 import type { AgentInstallInfo, ReadinessIssue } from '../../../shared/types'
-import { OPENCODE, OPENCODE_DESCRIPTOR } from '../../../shared/opencode'
+import { OPENCODE, OPENCODE_DESCRIPTOR } from '../../../shared/providers/opencode'
 import { providerSettings } from '../../../shared/providers'
 import { config } from '../../config'
 import { advanced } from '../../advanced'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
-import { compareVersions, EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, toSpawnable } from '../common'
+import { compareVersions, EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, toSpawnable, WHERE_MS, cliProbeMs } from '../common'
 import type { CommandSpec } from '../types'
-import { localDataRoot } from '../antigravity/home'
+import { localDataRoot } from '../localData'
 import { ambientIntegrations, noAutoUpdate, opencodeEnv, stripCredentials } from './home'
 import { app } from 'electron'
 import { checkConfig, loginConfig, parseAuthList, testProviderOf, withTestProvider, writeConfigDir, type SavedCredentials, type TestProvider } from './config'
@@ -36,7 +36,7 @@ async function candidates(env: Record<string, string>): Promise<{ path: string; 
   const out: { path: string; source: string }[] = []
   const custom = providerSettings(config.settings, OPENCODE).executablePath.trim()
   if (custom) out.push({ path: custom, source: 'settings' })
-  const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['opencode'], 5000, env)
+  const where = await run(process.platform === 'win32' ? 'where.exe' : 'which', ['opencode'], WHERE_MS, env)
   for (const line of where.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
     if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
   }
@@ -138,7 +138,7 @@ export async function locateOpencode(): Promise<AgentInstallInfo> {
       continue
     }
     const s = toSpawnable(c.path, ['--version'])
-    const r = await run(s.file, s.args, 15000, env)
+    const r = await run(s.file, s.args, cliProbeMs(), env)
     const version = parseOpencodeVersion(`${r.stdout}\n${r.stderr}`)
     if (!version || !isSupportedVersion(version)) {
       // The path and what it printed are the user's: left out of Copy Diagnostics.

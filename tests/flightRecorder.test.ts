@@ -6,6 +6,7 @@ import { FLIGHT_PATTERN_OFF, knownIds, unknownIn } from '../src/shared/flightRec
 import { parseRecording } from '../src/shared/consoleFixtures.mts'
 import { sessionSourceId, combworkSourceId } from '../src/shared/devConsole'
 import { setLanguage } from '../src/shared/i18n'
+import { timing } from './timing.cjs'
 
 // The developer console's flight recorder (#698): the events and fields each CLI is known to send (advanced values; every
 // recorded fixture's are known), the console keeping agents' events while a trigger is on (and nothing while none is),
@@ -163,7 +164,7 @@ describe('captures and triggers', async () => {
   const captures = () => readdirSync(recordingsDir()).filter((f) => f.endsWith('-capture.jsonl'))
   const fileOf = (name: string) => parseRecording(readFileSync(join(recordingsDir(), name), 'utf8'))
   /** Lets every capture waiting be saved, or dropped: waits until none is. */
-  const settled = () => vi.waitFor(() => expect(flightRecorder.sizes().pending).toBe(0), { timeout: 10_000 })
+  const settled = () => vi.waitFor(() => expect(flightRecorder.sizes().pending).toBe(0), { timeout: timing('wait.hang') })
   beforeEach(() => {
     toasts.list = []
   })
@@ -198,7 +199,7 @@ describe('captures and triggers', async () => {
     const before = captures().length
     flightRecorder.safeguard(who, () => 'proj · A', { kind: 'stop', model: 'opus' })
     flightRecorder.safeguard(who, () => 'proj · A', { kind: 'stop', model: 'opus' })
-    await vi.waitFor(() => expect(toasts.list.length).toBe(1), { timeout: 10_000 })
+    await vi.waitFor(() => expect(toasts.list.length).toBe(1), { timeout: timing('wait.hang') })
     const t = toasts.list[0]
     expect(t.title).toBe('Captured a safeguard stop on proj · A')
     expect(t.actions?.[0]).toMatchObject({ command: 'console.showCapture' })
@@ -211,7 +212,7 @@ describe('captures and triggers', async () => {
     // Within the period: nothing more for that agent and trigger; another agent still fires.
     flightRecorder.safeguard(who, () => 'proj · A', { kind: 'switch', from: 'opus', to: 'sonnet' })
     flightRecorder.safeguard(agent(), () => 'proj · B', { kind: 'switch', from: 'opus', to: 'sonnet' })
-    await vi.waitFor(() => expect(toasts.list.length).toBe(2), { timeout: 10_000 })
+    await vi.waitFor(() => expect(toasts.list.length).toBe(2), { timeout: timing('wait.hang') })
     expect(toasts.list[1].title).toBe('Captured a safeguard stop on proj · B')
   })
 
@@ -229,7 +230,7 @@ describe('captures and triggers', async () => {
     flightRecorder.stalled(who, label, 300_000)
     const watched = run(agent())
     devConsole.capture([sessionSourceId(watched.projectPath, watched.agentId)], () => ({ kind: 'terminal', name: 'title', summary: 'found the needle' }))
-    await vi.waitFor(() => expect(toasts.list.length).toBe(5), { timeout: 10_000 })
+    await vi.waitFor(() => expect(toasts.list.length).toBe(5), { timeout: timing('wait.hang') })
     const whats = toasts.list.map((t) => t.message ?? '')
     expect(whats.some((w) => /hook Stop with fields Combwork doesn't know: brand_new_field/.test(w))).toBe(true)
     expect(whats.some((w) => /hook FutureHookEvent, an event Combwork doesn't know/.test(w))).toBe(true)
@@ -246,7 +247,7 @@ describe('captures and triggers', async () => {
     try {
       flightRecorder.safeguard(agent(), () => 'proj · P', { kind: 'stop', model: 'opus' })
       flightRecorder.arrived(agent(), () => 'proj · Q', 'hook', { hook_event_name: 'Stop', session_id: 's', brand_new: 1 })
-      await vi.waitFor(() => expect(toasts.list.length).toBe(2), { timeout: 10_000 })
+      await vi.waitFor(() => expect(toasts.list.length).toBe(2), { timeout: timing('wait.hang') })
       for (const t of toasts.list) expect(`${t.title} ${t.message}`).not.toMatch(/Captured|saved|safeguards stopped|doesn't know/)
       expect(toasts.list.map((t) => t.message).join()).toMatch(/opus/)
       // The two saves finish in either order: the safeguard's notice is the one naming its model.
@@ -264,7 +265,7 @@ describe('captures and triggers', async () => {
     set({ 'cw.recorder.unknown': true, 'cw.recorder.safeguard': true })
     flightRecorder.arrived(agent(), () => 'proj · D', 'hook', { hook_event_name: SECRET, unexpected: 1 })
     flightRecorder.safeguard(agent(), () => 'proj · E', { kind: 'switch', from: SECRET, to: 'sonnet' })
-    await vi.waitFor(() => expect(toasts.list.length).toBe(2), { timeout: 10_000 })
+    await vi.waitFor(() => expect(toasts.list.length).toBe(2), { timeout: timing('wait.hang') })
     for (const t of toasts.list) {
       expect(`${t.title} ${t.message}`).not.toContain(SECRET)
       expect(readFileSync(join(recordingsDir(), String(t.actions![0].args![0])), 'utf8')).not.toContain(SECRET)
@@ -281,7 +282,7 @@ describe('captures and triggers', async () => {
     for (const w of many) devConsole.capture([sessionSourceId(w.projectPath, w.agentId)], () => ({ kind: 'terminal', name: 'title', summary: 'needle' }))
     expect(flightRecorder.sizes().pending).toBe(FLIGHT_MAX_PENDING)
     // A stuck disk: their writes began and hang; they still hold their slots, and nothing more is taken on.
-    await vi.waitFor(() => expect(disk.writes).toBe(FLIGHT_MAX_PENDING), { timeout: 10_000 })
+    await vi.waitFor(() => expect(disk.writes).toBe(FLIGHT_MAX_PENDING), { timeout: timing('wait.hang') })
     for (const w of Array.from({ length: 20 }, () => run(agent()))) devConsole.capture([sessionSourceId(w.projectPath, w.agentId)], () => ({ kind: 'terminal', name: 'title', summary: 'needle' }))
     expect([flightRecorder.sizes().pending, disk.writes]).toEqual([FLIGHT_MAX_PENDING, FLIGHT_MAX_PENDING])
     // The disk recovers: each write settles and frees its slot.
@@ -301,13 +302,13 @@ describe('captures and triggers', async () => {
     expect(toasts.list).toEqual([])
     set({ 'cw.recorder.pattern': 'needle' })
     needle()
-    await vi.waitFor(() => expect(toasts.list.length).toBe(1), { timeout: 10_000 })
+    await vi.waitFor(() => expect(toasts.list.length).toBe(1), { timeout: timing('wait.hang') })
     expect(toasts.list[0].title).toBe('Captured an event matching your pattern on proj · S')
     await settled()
     set({})
     set({ 'cw.recorder.pattern': 'needle' })
     needle()
-    await vi.waitFor(() => expect(toasts.list.length).toBe(2), { timeout: 10_000 })
+    await vi.waitFor(() => expect(toasts.list.length).toBe(2), { timeout: timing('wait.hang') })
     // An agent no longer running: nothing to say it is, so nothing captured.
     running.delete(sessionSourceId(w.projectPath, w.agentId))
     await settled()
@@ -328,7 +329,7 @@ describe('captures and triggers', async () => {
       expect(flightRecorder.sizes().pending).toBe(2)
       set({ 'cw.recorder.stalled': true, 'cw.recorder.keep': 200 })
       expect(flightRecorder.sizes().pending).toBe(1)
-      await vi.waitFor(() => expect(toasts.list.length).toBe(1), { timeout: 10_000 })
+      await vi.waitFor(() => expect(toasts.list.length).toBe(1), { timeout: timing('wait.hang') })
       expect(toasts.list[0].title).toBe('Captured a silence past its limit on proj · G')
       // And off altogether before its wait ends: nothing is written.
       flightRecorder.stalled(agent(), () => 'proj · H', 1000)
@@ -353,9 +354,9 @@ describe('captures and triggers', async () => {
     try {
       fresh.start()
       fresh.launched(agent(), () => 'proj · I', '3.0.0')
-      await vi.waitFor(() => expect(JSON.parse(readFileSync(join(profile.dir, 'flight-recorder.json'), 'utf8')).versions['claude-code']).toBe('3.0.0'), { timeout: 10_000 })
+      await vi.waitFor(() => expect(JSON.parse(readFileSync(join(profile.dir, 'flight-recorder.json'), 'utf8')).versions['claude-code']).toBe('3.0.0'), { timeout: timing('wait.hang') })
       fresh.launched(agent(), () => 'proj · I', '3.1.0')
-      await vi.waitFor(() => expect(toasts.list.some((t) => /3\.0\.0 → 3\.1\.0/.test(t.message ?? ''))).toBe(true), { timeout: 10_000 })
+      await vi.waitFor(() => expect(toasts.list.some((t) => /3\.0\.0 → 3\.1\.0/.test(t.message ?? ''))).toBe(true), { timeout: timing('wait.hang') })
       expect(rejected).toEqual([])
     } finally {
       process.off('unhandledRejection', onRejection)

@@ -1,10 +1,13 @@
-import { parentPort } from 'worker_threads'
+import { parentPort, workerData } from 'worker_threads'
 import { createHash } from 'crypto'
 import { open, stat } from 'original-fs/promises'
 import { dirname, join } from 'path'
 import type { AppSettings, ProviderId, SessionUsage } from '../shared/types'
 import { baselineOfRows, baselineOfUsage, baselineAsFree, baselineWithoutReports, dominates, ledgerRows, mergeBaselines, reshareRows, rowsAsFree, rowsWithoutReports, sessionRows, summaryOf, unknownOnCards, type LedgerRow, type SessionHold } from '../shared/usageLedger'
-import { OPENABLE_WAIT_MS, openableNow, openDb, untilOpenable, type Db } from './db'
+import { OPENABLE_WAIT_MS, openableNow, openDb, setDbBusyMs, untilOpenable, type Db } from './db'
+// HI-3374: main's wait for another program's database lock (cw.db.busySeconds), given as this worker starts, before it opens one.
+const givenBusyMs = (workerData as { dbBusyMs?: unknown } | null)?.dbBusyMs
+if (typeof givenBusyMs === 'number') setDbBusyMs(givenBusyMs)
 import { advancedValues, readAdvancedFrom, valuesReader } from './advancedValues'
 import type { DatabaseSync } from 'node:sqlite'
 import { baselineOf, cardRows, cursorOf, fileSpace, getMeta, giveSpaceBack, markLocality, replaceRows, rollUpCandidates, rollUpSession, sessionIds, setMeta, storedSession, storedSessions, storedTimelines, updateMeta, USAGE_MIGRATIONS, writeSession, type SessionMeta, type SessionWrite } from './usageDb'
@@ -59,9 +62,9 @@ export type WorkerRequest = { id: number } & (
   | { type: 'config'; advanced: Record<string, unknown>; providers: AppSettings['providers']; appVersion: string; cacheSize?: number }
   | { type: 'ingest'; file: string; job: IngestJob }
   | { type: 'kept'; file: string; job: KeptJob }
-  | { type: 'sessions'; file: string; scopes: string[] | null }
+  | { type: 'sessions'; file: string; scopes: string[] | null; sessions?: { scope: string; sessions: string[] } }
   | { type: 'cards'; file: string; cards: number[] }
-  | { type: 'timelines'; file: string; scope: string; sessions?: string[] }
+  | { type: 'timelines'; file: string; scope: string; sessions?: string[]; agents?: string[] }
   | { type: 'ids'; file: string; scope: string }
   | { type: 'meta'; file: string; scope: string; key: string; value?: string }
   | { type: 'forgetStates'; file: string; before: string }
@@ -600,7 +603,7 @@ const ROLL_UP_BATCH_MS = 50
 const ROLL_UP_LIMIT = 500
 
 /**
- * A batch of ended sessions' timelines merged into 1-hour steps (HI-1648, Darren 27 Oct): those last active before
+ * A batch of ended sessions' timelines merged into 1-hour steps (HI-1648): those last active before
  * Settings → Advanced's days of full detail, oldest first, each in a transaction of its own, for ROLL_UP_BATCH_MS at
  * most, but always one (review round 1: a slow lookup used the time up, and the batch that tried none read as the end);
  * never one running (`live`: their ids). Main sends batches until one tries none or none are left.
@@ -666,11 +669,15 @@ export async function handleRequest(m: WorkerRequest): Promise<unknown> {
       return run
     }
     case 'sessions':
-      return storedSessions(dbOf(m.file).reader, m.scopes)
+      return storedSessions(dbOf(m.file).reader, m.scopes, m.sessions)
     case 'cards':
       return cardRows(dbOf(m.file).reader, m.cards)
-    case 'timelines':
-      return storedTimelines(dbOf(m.file).reader, m.scope, m.sessions)
+    case 'timelines': {
+      const db = dbOf(m.file).reader
+      // Only these agents' sessions (HI-3294: a lane's, not every session of its project), among `sessions` when both.
+      const sessions = m.agents ? sessionIds(db, m.scope).filter((s) => !!s.agentId && m.agents!.includes(s.agentId) && (!m.sessions || m.sessions.includes(s.session))).map((s) => s.session) : m.sessions
+      return storedTimelines(db, m.scope, sessions)
+    }
     case 'ids':
       return sessionIds(dbOf(m.file).reader, m.scope)
     case 'meta': {

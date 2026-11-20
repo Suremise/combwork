@@ -36,7 +36,7 @@
 // run code is on the allowlist; a test's closure only when every file in it is known; a worker entry's closure, the
 // same (else every starter counts); the global object only as `G.name`.
 //
-// The review bar (Darren, 7 Nov, HI-2677/r96: "(a)"): the gate covers the ways this repository's code and tests load
+// The review bar (HI-2677/r96's (a)): the gate covers the ways this repository's code and tests load
 // modules, or would plausibly write. A loader deliberately hidden (eval or Function reached through globals or built
 // keys, a loader or its path chosen through an environment variable, code assembled from strings to evade a token) is
 // the documented boundary, not a gap to close here: the gate still catches the forms it names (any eval, Function or
@@ -716,15 +716,20 @@ export function setupFilesOf(configText) {
 /**
  * The build's worker and script entries, from electron.vite.config.ts's text: the main build's rollup input, each
  * `name: resolve(__dirname, '<path>')`, the app's own `index` aside (no starter in src starts the app). Null when the
- * input isn't in that form, entry for entry (a line it can't read): then every starter counts (narrowRelated).
+ * input isn't in that form, entry for entry (a line it can't read): then every starter counts (narrowRelated). Its
+ * `...providerThreads()` line is each provider's own threads (HI-3201): those of `files` in src/main/providers/<folder>/threads.
  */
-export function workerEntriesOf(configText) {
+export function workerEntriesOf(configText, files = []) {
   const m = /\binput\s*:\s*\{([^{}]*)\}/.exec(configText ?? '')
   if (!m) return null
   const entries = []
   for (const raw of m[1].split(/\r?\n/)) {
     const l = raw.replace(/\/\/.*$/, '').trim()
     if (!l) continue
+    if (/^\.\.\.providerThreads\(\)\s*,?$/.test(l)) {
+      entries.push(...files.filter((f) => /^src\/main\/providers\/[^/]+\/threads\/[^/]+\.ts$/.test(f)))
+      continue
+    }
     const e = /^(['"]?)([\w-]+)\1\s*:\s*resolve\(\s*__dirname\s*,\s*(['"])([^'"]+)\3\s*\)\s*,?$/.exec(l)
     if (!e) return null
     if (e[2] !== 'index') entries.push(e[4].replace(/^\.\//, ''))
@@ -753,7 +758,7 @@ export function narrowRelatedInTree({ cwd, base, paths, related }) {
         changes[file] = { all: `${file}: its changed parts couldn't be worked out (${e.message}), so every test that loads it` }
       }
     }
-    return narrowRelated({ related, changes, graph: importGraph(files, (f) => revs.head.read(f)), read: (f) => revs.head.read(f), setupFiles, workers: workerEntriesOf(revs.head.read('electron.vite.config.ts')) })
+    return narrowRelated({ related, changes, graph: importGraph(files, (f) => revs.head.read(f)), read: (f) => revs.head.read(f), setupFiles, workers: workerEntriesOf(revs.head.read('electron.vite.config.ts'), files) })
   } catch (e) {
     return { keep: [...related], dropped: [], why: [`the related unit tests couldn't be narrowed (${e.message}), so every one`] }
   }

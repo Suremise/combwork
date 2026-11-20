@@ -6,7 +6,7 @@ import { enabledProviders, providerDescriptor, providerName, providersInUse, pro
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { notify, set, setActivity, useStore } from '../store'
-import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, offHereChoice, orderedAccounts, type AssistantNeed, type ConnectionShown } from '@shared/connectionLabel'
+import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, noneSignedInHere, offHereChoice, orderedAccounts, type AssistantNeed, type ConnectionShown } from '@shared/connectionLabel'
 
 export { cliReadyOf, connectionCli, firstReadyConnection, firstUsableConnection, offeredConnections }
 import { Icon, Tooltip } from './ui'
@@ -169,7 +169,7 @@ export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew,
 
 const MARK = {
   own: msg({ id: 'connections.mark.own', defaultMessage: '{name}: its own choice', description: "The hover of an agent's connection in its row (HI-1769): the connection ({name}) was chosen for it in its Agent Settings." }),
-  offFallback: msg({ id: 'connections.mark.offHere', defaultMessage: "{wanted} is on an account that's off in this workspace: {name}, its CLI's first usable connection, runs it", description: "The hover of an agent's connection in its row (HI-2108): its own connection ({wanted}) is on an account turned off in this workspace, so its CLI's first usable connection ({name}) runs it." }),
+  offFallback: msg({ id: 'connections.mark.offHere', defaultMessage: "{wanted} is on an account that's off in this workspace: {name}, matched on the first account on here, runs it", description: "The hover of an agent's connection in its row (HI-2108, HI-3213): its own connection ({wanted}) is on an account turned off in this workspace, so {name} runs it: the connection on the first account on here with the same tag, else the same name, else that account's first." }),
   missing: msg({ id: 'connections.mark.removed', defaultMessage: "The connection chosen for it was removed: {name}, its CLI's first usable connection, runs it until you choose another in its Agent Settings", description: "The hover of an agent's connection in its row (HI-2108): its connection was removed, so its CLI's first usable connection ({name}) runs it. Agent Settings names a dialog." }),
   offNoDefault: msg({ id: 'connections.mark.offNoDefault', defaultMessage: '{wanted} is off here', description: "An agent's row, in place of its connection (HI-1769): its own connection ({wanted}) is off in this workspace and no other is on to run it. Short." }),
   offNoDefaultTip: msg({ id: 'connections.mark.offNoDefaultUsable', defaultMessage: "{wanted} is off in this workspace, and no other {cli} account is on: it can't start until one is (Settings → Accounts & Connections).", description: "The hover of an agent's row (HI-2108): its own connection ({wanted}) is on an account off here and no other account of its CLI ({cli}) is on in this workspace. Settings → Accounts & Connections names a section." }),
@@ -231,6 +231,7 @@ const SETUP = {
   add: msg({ id: 'project.banner.connectionSetupAdd', defaultMessage: 'Add an Account', description: 'Button on the banner asking for an account (HI-2108): opens Settings → Accounts & Connections.' }),
   setupLine: msg({ id: 'shell.setup.connections', defaultMessage: '{n, plural, =0 {{cli} signs in per account, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per account: # is on in this workspace.} other {{cli} signs in per account: # are on in this workspace.}}', description: 'Provider Setup, for a coding agent CLI ({cli}: "Claude Code") that signs in per account (Settings → Accounts & Connections) rather than here (HI-1774; HI-2108). {n} is how many of its accounts are on in the open workspace.' }),
   setupLineOff: msg({ id: 'shell.setup.connectionsOff', defaultMessage: '{cli} signs in per account, and none is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here.', description: 'Provider Setup (HI-2650), for a coding agent CLI ({cli}: "Claude Code") that signs in per account, when it has accounts but none is on in the open workspace. {names}: their names, joined ("Work and Personal"); {n}: how many. On here is the switch on each account\'s row in Settings → Accounts & Connections, which the button beside it opens.' }),
+  setupLineSignedOut: msg({ id: 'shell.setup.connectionsSignedOut', defaultMessage: '{cli} signs in per account, and {n, plural, one {the one on in this workspace is not signed in: sign it in.} other {none of the # on in this workspace is signed in: sign one in.}}', description: 'Provider Setup (HI-3278), for a coding agent CLI ({cli}: "Codex") that signs in per account (Settings → Accounts & Connections), when every account of it on in the open workspace is signed out, so its agents can\'t start. {n}: how many are on. The button beside it opens Settings → Accounts & Connections.' }),
   open: msg({ id: 'shell.setup.openConnections', defaultMessage: 'Open Accounts & Connections', description: "Provider Setup's button (HI-2108): opens Settings → Accounts & Connections, where a coding agent CLI's accounts are added and signed in." })
 }
 
@@ -244,7 +245,7 @@ const OFF = {
 }
 
 /**
- * Asks for a connection (HI-1755, Darren's 1a): where a CLI with connections has none on in the workspace, nothing of it
+ * Asks for a connection (HI-1755, 1a): where a CLI with connections has none on in the workspace, nothing of it
  * starts (never on the CLI's own login). What it offers (HI-2650, offHereChoice; nothing turned on until clicked): one
  * account off here, Turn On Here (this window's workspace only); several, Choose in Settings; none, Add an Account.
  * `where`: a project's agents (`cli`: theirs), the Assistant (HI-1774), or a project with no agents yet (`empty`, any CLI).
@@ -374,10 +375,12 @@ export function ConnectionSetupLine({ cli, onOpen }: { cli: ProviderId; onOpen: 
   // None on, but some added (HI-2650): they are off here, never "add one".
   const off = n ? null : offHereChoice(view, cliReadyOf(providers), cli)
   const offNames = off?.kind === 'one' ? [off.name] : off?.kind === 'several' ? off.names : []
+  // Some on, but each signed out (HI-3278): its agents can't start, so it warns, as none on does.
+  const signedOut = !!n && noneSignedInHere(view, cli)
   return (
-    <div className={['banner', n ? 'info' : 'warn'].join(' ')} data-connection-setup-line={n} style={{ borderRadius: 6, marginBottom: 10 }}>
+    <div className={['banner', n && !signedOut ? 'info' : 'warn'].join(' ')} data-connection-setup-line={n} data-signed-out={signedOut || undefined} style={{ borderRadius: 6, marginBottom: 10 }}>
       <Icon name="plug" />
-      <span className="grow">{offNames.length ? tr(SETUP.setupLineOff, { cli: providerDescriptor(cli).name, n: offNames.length, names: fmt.list(offNames) }) : tr(SETUP.setupLine, { cli: providerDescriptor(cli).name, n })}</span>
+      <span className="grow">{offNames.length ? tr(SETUP.setupLineOff, { cli: providerDescriptor(cli).name, n: offNames.length, names: fmt.list(offNames) }) : signedOut ? tr(SETUP.setupLineSignedOut, { cli: providerDescriptor(cli).name, n }) : tr(SETUP.setupLine, { cli: providerDescriptor(cli).name, n })}</span>
       <button className="btn small primary" data-open-connections onClick={() => {
           onOpen()
           openConnections()

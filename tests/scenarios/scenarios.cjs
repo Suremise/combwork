@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 136
+const FIXTURES_VERSION = 141
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -177,6 +177,16 @@ const questionsToUser = (o) => [
   ...(o.tools ?? []).filter((t) => /AskUserQuestion|request_user_input/i.test(String(t.name ?? '')) && !t.isError).flatMap((t) => askingSentences(t.input)),
   ...askingSentences(o.finalReply)
 ]
+/**
+ * Whether a text asks for (or offers) an agent's turn to end (HI-3361, assistant-reorder-busy): a sentence naming ending,
+ * finishing, stopping or wrapping up a turn, with no negation before it in that sentence ("do not end your turn", "no need
+ * to stop its turn" never count).
+ */
+function asksToEndTurn(text) {
+  return String(text ?? '')
+    .split(/(?<=[.!?])\s+|\n+/)
+    .some((s) => /\b(end|ends|ending|finish|finishes|stop|stops|stopping|wrap up|close)\b[^.]*\bturn\b/i.test(s) && !/\b(don'?t|doesn'?t|do not|does not|need not|needn'?t|isn'?t|never|no need to|not to|shouldn'?t|won'?t|keep working)\b[^.]*\b(end|finish|stop|wrap|close)/i.test(s))
+}
 /** Whether it asked the user whether to commit: one of its questions, itself, is about committing. */
 const askedToCommit = (o) => questionsToUser(o).some((q) => /\bcommit/i.test(q))
 /**
@@ -230,7 +240,7 @@ async function coderTask(c, task, agent = c.agents.coder) {
   // Reused when Combwork started it first (HI-2094: a lane's builder is started with its card by Combwork's lane start, which
   // may land before or during this start), then waited for until it is ready as one started here.
   if (!(await coderLive(c, agent))) await c.inv('session:start', c.alpha, { agentId: agent.id }).catch(async (e) => { if (!(await coderLive(c, agent))) throw e })
-  for (let t = Date.now(); Date.now() - t < 90000 && !['ready', 'finished'].includes((await coderLive(c, agent))?.status); ) {
+  for (let t = Date.now(); Date.now() - t < timing('hang.step') && !['ready', 'finished'].includes((await coderLive(c, agent))?.status); ) {
     // Terminal UIs draw spaces as cursor moves: matched as plain text.
     const lib = require('../e2e/lib.cjs')
     const screen = lib.plainText(String(await c.inv('pty:buffer', key).catch(() => '')))
@@ -240,7 +250,7 @@ async function coderTask(c, task, agent = c.agents.coder) {
     else if (lib.trustChoice(screen)) await lib.acceptClaudeTrust(c.inv, c.alpha, agent.id, 20000)
     // Codex's: Yes first.
     else if (/trust this folder/i.test(screen)) await c.inv('pty:write', key, '\r')
-    await sleep(500)
+    await sleep(timing('scenario.startLookMs'))
   }
   if (!['ready', 'finished'].includes((await coderLive(c, agent))?.status)) await fail("didn't get ready in 90 s")
   if (!task) return
@@ -283,7 +293,7 @@ async function userMove(c, n, column) {
   const r = await c.inv('tasks:move', n, column)
   const why = r?.refused ?? r?.stopped ?? (r?.ask ? { rules: r.ask } : null)
   if (why) throw new Error(`setup: moving #${n} to ${column}: ${JSON.stringify(why)}`)
-  const there = await require('../e2e/lib.cjs').until(async () => (await c.api('GET', `/v1/tasks/${n}`)).body?.column === column && (column !== 'review' || (await submitted()) > before), 15000)
+  const there = await require('../e2e/lib.cjs').until(async () => (await c.api('GET', `/v1/tasks/${n}`)).body?.column === column && (column !== 'review' || (await submitted()) > before), timing('hang.ui'))
   if (!there) throw new Error(`setup: #${n} isn't in ${column} with its move: ${JSON.stringify(r)}`)
 }
 /**
@@ -298,13 +308,54 @@ async function wakeRead(c, key) {
     // acted on the wake (answered and armed a watch), watching.
     return mine.some((d) => ['received', 'acked'].includes(d.state)) && !mine.some((d) => ['queued', 'offered', 'uncertain'].includes(d.state)) && ['ready', 'finished', 'watching'].includes(await c.subjectStatus())
   }
-  if (!(await require('../e2e/lib.cjs').until(wakeIsRead, 120000))) throw new Error(`setup: Coder's wake for #${c.cards[key]} wasn't read: ${JSON.stringify(await c.deliveries('coder'))}, ${await c.subjectStatus()}`)
+  if (!(await require('../e2e/lib.cjs').until(wakeIsRead, timing('hang.step')))) throw new Error(`setup: Coder's wake for #${c.cards[key]} wasn't read: ${JSON.stringify(await c.deliveries('coder'))}, ${await c.subjectStatus()}`)
 }
 /**
  * The card loop lanes' first card (card-loop-lane, -defaults, -override, -submit-watch): a change asked for plainly, as
  * greet.js says "Hello" (HI-2224: "returns Hi instead of Hello" read as a report on code that was already right).
  */
 const CARD_LOOP_GREETING = 'Change greet.js so it returns "Hi, <name>" instead of "Hello, <name>".'
+/**
+ * card-loop-outside-job's test pass on a pool VM (HI-3324): a job Combwork can't see, acted out by a plain file. `start`
+ * notes the run's start in pool/run.json and returns at once; `status` says running until POOL_RUN_MS have passed, then
+ * passed, and logs each check to pool/checks.log. Nothing runs in the background. `state` is its clock, given the time,
+ * so the setup checks it without waiting. 40 min, as CB2's run: too long to wait out in a shell (the models at the base
+ * polled a 2.5-min one there). The scenario stands in for the time passing by moving the run's start back.
+ */
+const POOL_RUN_MS = 40 * 60_000
+const POOL_RUN_JS = `// The test pass on the pool VM: queued here, run there. Nothing of it runs on this machine.
+const fs = require('fs')
+const path = require('path')
+const RUN_MS = ${POOL_RUN_MS}
+const dir = path.join(__dirname, 'pool')
+const file = path.join(dir, 'run.json')
+const state = (run, now) => (now - run.startedAt >= RUN_MS ? 'passed' : 'running')
+module.exports = { state, RUN_MS }
+if (require.main === module) {
+  const cmd = process.argv[2]
+  if (cmd === 'start') {
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(file, JSON.stringify({ run: 17, startedAt: Date.now() }))
+    console.log('Queued run 17 on the pool VM: the tests take about 40 minutes there. Check it with: node pool-run.js status')
+  } else if (cmd === 'status') {
+    if (!fs.existsSync(file)) {
+      console.log('No run queued.')
+      process.exit(1)
+    }
+    const run = JSON.parse(fs.readFileSync(file, 'utf8'))
+    const now = Date.now()
+    const s = state(run, now)
+    fs.appendFileSync(path.join(dir, 'checks.log'), JSON.stringify({ at: now, state: s }) + '\\n')
+    console.log(s === 'passed' ? 'Run 17: passed, 214 tests.' : 'Run 17: running, about ' + Math.ceil((run.startedAt + RUN_MS - now) / 60000) + ' min left.')
+  } else {
+    console.log('Usage: node pool-run.js start | status')
+    process.exit(1)
+  }
+}
+`
+const POOL_CARD = 'Run the test pass on the pool VM: `node pool-run.js start` queues it there and returns at once, and `node pool-run.js status` says how it is going. Once it has passed, write its result line to RESULTS.md, commit it, and submit. Don\'t submit before the run has ended.'
+/** card-loop-outside-job's fake, woken by its watch's end: it checks the run, clears the mark, records the result and submits. */
+const poolWake = (c) => `cw cw_read_task {"number":${c.cards.a}} then shell: node pool-run.js status then cw cw_update_task ${JSON.stringify({ number: `#${c.cards.a}`, waitingFor: '' })} then shell: node -e "require('fs').writeFileSync('RESULTS.md', 'Run 17: passed, 214 tests.\\n')" then shell: git add -A then shell: git -c user.name=Coder -c user.email=coder@example.com commit -qm "Pool run 17 passed" then cw cw_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: pool run 17 passed (214 tests), in RESULTS.md.' })}`
 /**
  * The fake builder's work on greet.js, committed before its card goes to Review (#1486: a submit needs a change). A step
  * a command, since the fakes' shells differ: cmd (Claude Code's, Codex's) and PowerShell (Copilot's).
@@ -372,6 +423,7 @@ async function inReview(c, pool = false, description = 'greet.js returns "Hello,
 /** card-decision's decision recorded while the agent works (HI-2854: what a refused submit must give in full). */
 const CARD_DECISION_LATER = 'Show each error under its own field, not in a banner at the top.'
 const { refusedWithDecision } = require('./freshnessChecks.cjs')
+const { timing } = require('../timing.cjs')
 const SOLO = { finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true }
 /** HI-2854's A/B task (the card's own: a CSV line parser and 8 node:test cases, run until green). */
 const AB_TASK =
@@ -393,7 +445,7 @@ async function abNoVcs(c) {
 }
 /** node --test in alpha: its output's pass and fail counts. */
 const abTests = (c) => {
-  const r = require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 })
+  const r = require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: timing('spawn.hang') })
   // TAP's "# pass 8", or the spec reporter's "ℹ pass 8".
   return { status: r.status, pass: Number(/^(?:#|ℹ) pass (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0), fail: Number(/^(?:#|ℹ) fail (\d+)/m.exec(r.stdout ?? '')?.[1] ?? 0) }
 }
@@ -411,10 +463,10 @@ const PAIR = { review: 'agent', noSelfReview: true, preChecks: [], finish: 'comb
 async function builderStopped(c, card, key) {
   const lib = require('../e2e/lib.cjs')
   const n = c.cards[card]
-  if (!(await lib.until(async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'BuilderPlaced'), 90000))) throw new Error(`setup: Combwork didn't give #${n} to ${key} in its slot`)
+  if (!(await lib.until(async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'BuilderPlaced'), timing('hang.step')))) throw new Error(`setup: Combwork didn't give #${n} to ${key} in its slot`)
   const id = c.agents[key].id
   await c.inv('session:stop', c.alpha, id).catch(() => undefined)
-  if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(`setup: ${key} didn't stop after Combwork gave it #${n}`)
+  if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), timing('hang.step')))) throw new Error(`setup: ${key} didn't stop after Combwork gave it #${n}`)
 }
 /**
  * Card `key` of agent `who` ('coder' or 'implementer') in Review with a real submission (#1537): started, its work
@@ -452,7 +504,7 @@ async function reviewedWork(c, key, { files = {}, work, after = [], ...card }, w
     c.git('-c', `user.name=${who}`, '-c', `user.email=${who}@example.com`, 'commit', '-qm', card.title)
   }
   await c.inv('tasks:update', n, { column: 'review', agent: c.agents[who].id })
-  if (!(await require('../e2e/lib.cjs').until(() => submittedDiff(c, n), 15000))) await assertDiff(c, n)
+  if (!(await require('../e2e/lib.cjs').until(() => submittedDiff(c, n), timing('hang.ui')))) await assertDiff(c, n)
   for (const text of after) await c.api('POST', `/v1/tasks/${n}/comments`, { text })
   return n
 }
@@ -955,7 +1007,7 @@ const runs = (o, needle) => o.tools.filter((t) => !t.isError && !/^(Write|Edit|M
 
 // jj scenarios (HI-2800): the git commands that move HEAD, the index or a ref (gitMutations.cjs, unit-tested), the jj
 // rule the session contract adds in a jj project, and the pinned jj run in the project with the scenario's own config.
-const { gitMutations, commandText } = require('./gitMutations.cjs')
+const { gitMutations, commandText, SHELL_TOOL } = require('./gitMutations.cjs')
 // The signing-blocker scenario (HI-2867): what gets round a signing failure (signingBypass.cjs, unit-tested).
 const { signingBypasses } = require('./signingBypass.cjs')
 const platformRule = (platform) => require('../../src/shared/combworkGuidance.ts').platformRule(platform)
@@ -966,7 +1018,7 @@ function jjIn(c, ...args) {
   const { portableJj } = require('../jjPortable.cjs')
   const env = { ...require('../e2e/lib.cjs').gitEnv(), JJ_CONFIG: path.join(path.dirname(c.ws), 'jj.toml'), NO_COLOR: '1' }
   try {
-    return require('child_process').execFileSync(portableJj(), ['--no-pager', ...args], { cwd: opts.cwd ?? c.alpha, env, windowsHide: true, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] })
+    return require('child_process').execFileSync(portableJj(), ['--no-pager', ...args], { cwd: opts.cwd ?? c.alpha, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
   } catch (e) {
     if (opts.allowFail) return ''
     throw e
@@ -983,8 +1035,11 @@ const jjOpHeads = (c) => {
 // jj's card scenarios (HI-2870, J9d): what nothing an agent does may do in a jj project, a failed attempt too (moving a
 // bookmark or a tag, pushing, setting up a repository: jjPublishes.cjs, unit-tested).
 const { publishes } = require('./jjPublishes.cjs')
-/** jj's Pair (preset('jj', 'pair') in src/shared/workflow/options.ts, which the harness can't load): a reviewer agent, cards in slots, the user integrating. */
-const JJ_PAIR = { review: 'agent', noSelfReview: true, preChecks: [], folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, commands: {} }
+/**
+ * jj's Pair (preset('jj', 'pair') in src/shared/workflow/options.ts, which the harness can't load): a reviewer agent, cards
+ * in slots, the user integrating (named: since HI-3235 the default finish is Combwork's advance, not these scenarios' premise).
+ */
+const JJ_PAIR = { review: 'agent', noSelfReview: true, preChecks: [], folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, commands: {}, finish: 'userIntegrates' }
 /** The project's bookmarks, local and remote, as jj lists them (no snapshot). */
 const jjBookmarks = (c) => jjIn(c, '--ignore-working-copy', 'bookmark', 'list', '--all-remotes')
 /** A revision's commit as `<commit id> <change id> <empty> <parent commit ids…>`, read without a snapshot, or '' if it can't be read. */
@@ -1035,12 +1090,34 @@ function jjInit(c) {
   jjIn(c, 'bookmark', 'create', target, '-r', '@-')
   if (fs.existsSync(path.join(c.alpha, '.git'))) throw new Error('setup: the non-colocated repository has a .git')
 }
+/**
+ * What the agent said, about `card` (as observed): every reply after the prompt, not only the last (HI-3212), and its
+ * comments on the card (`by` matching their author). A CLI with no Stop hook (OpenCode) gets the doorbell for its unread
+ * inbox as a turn of its own, whose reply ("Done: …") comes after the one that said it.
+ */
+const saidOnCard = (o, card, by) => [...(o.replies ?? [o.finalReply ?? '']), ...(card?.comments ?? []).filter((x) => by.test(x.by)).map((x) => x.text)].join('\n')
 /** Card `key`'s latest submission's jj record (Submitted.platform: `jj` its ids and chain, `jjSlot` the slot it came from), or null. */
 const jjSubmitted = (o, key) => {
   const d = factsOf(o, key, 'Submitted').at(-1)?.data
   return d ? { revision: d.revision, base: d.base, jj: d.platform?.jj ?? null, slot: d.platform?.jjSlot ?? null } : null
 }
 /** The jj checks every jj card scenario makes of the session under test: no git mutation, nothing moved or published, jj consistent. */
+/**
+ * What jj-slot-stale's agent did to its stale slot (`folder`): jj commands that update, snapshot or roll back a working
+ * copy (updates), jj commands that record a change there (recorded), and files written there (written). Commands are
+ * read from shell tools only, as jjSafetyChecks reads them (HI-3339: a question to the user naming
+ * `jj workspace update-stale` as the user's option, in cw_ask_user, was counted as running it).
+ */
+function staleSlotCommands(o, folder) {
+  const norm = (x) => String(x).toLowerCase().replace(/\\+/g, '/')
+  const inSlot = (t) => norm(t.input ?? '').includes(norm(folder)) || (!!t.cwd && norm(t.cwd).startsWith(norm(folder)))
+  const shell = (o.tools ?? []).filter((t) => SHELL_TOOL.test(t.name))
+  return {
+    updates: shell.filter((t) => /jj(\.exe)?\s+(workspace\s+update-stale|util\s+snapshot|op\s+(restore|revert|abandon))/i.test(commandText(t.input ?? ''))),
+    recorded: shell.filter((t) => inSlot(t) && /jj(\.exe)?\s+(commit|new|describe|squash|abandon|restore|edit)\b/i.test(commandText(t.input ?? ''))),
+    written: (o.tools ?? []).filter((t) => /^(Write|Edit|MultiEdit)$/i.test(t.name) && inSlot(t))
+  }
+}
 const jjSafetyChecks = (o, c) => {
   const mutations = gitMutations(o)
   const published = publishes(o)
@@ -1266,7 +1343,7 @@ const wholeSuiteRuns = (o) => testRunsOf(o).filter((r) => r.files.length === 0).
 /** The project's test files' sleeps that a check follows with no reason given (`npm run test:waits`'s own finder). */
 const timedWaits = (c, rel) => require('../../scripts/testWaits.mjs').findWaits(c.read(rel) ?? '').filter((w) => !w.commented)
 /** Whether the project's tests pass (`node --test`), with the run context's environment. */
-const testsPass = (c) => require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 }).status === 0
+const testsPass = (c) => require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: timing('spawn.hang') }).status === 0
 /** The tool calls that ran the test suite. */
 /** A test run through cw-progress with a title of its own (#251), not the command line by default. */
 const titled = (t) => /cw-progress(\.cmd)?\s+--title(\s+|=)\S/.test(t.input)
@@ -1438,8 +1515,8 @@ module.exports.SCENARIOS = [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         handedOnCheck(o, c, 'a'),
         ['the test is there, and passes', !!test && testsPass(c), test ? 'node --test failed' : 'no notify.test.js'],
-        ["it doesn't sleep and then check", !!test && timed.length === 0, `${timed.map((w) => `${w.line}: ${w.code}`).join(' | ')} in: ${test.slice(0, 1500)}`],
-        ['it waits for the line (polls the file, or waits on its change)', /\bwhile\s*\(|\bif\s*\(.*\b(?:break|return)\b|until|waitFor|poll|setInterval|watch/.test(test), test.slice(0, 300)],
+        ["it doesn't sleep and then check", !!test && timed.length === 0, `${timed.map((w) => `${w.line}: ${w.code}`).join(' | ')} in: ${test.slice(0, 1500)}`], // timing-ok: `test` is the agent's test file's text, sliced (no test call, no wait)
+        ['it waits for the line (polls the file, or waits on its change)', /\bwhile\s*\(|\bif\s*\(.*\b(?:break|return)\b|until|waitFor|poll|setInterval|watch/.test(test), test.slice(0, 300)], // timing-ok: `test` is the agent's test file's text, sliced (no test call, no wait),
         ['notify.js unchanged', c.read('notify.js') === NOTIFY['notify.js']]
       ]
     },
@@ -1722,7 +1799,7 @@ module.exports.SCENARIOS = [
     async during(c, status) {
       if (status === 'working' && !c.sentAt) {
         c.sentAt = Date.now()
-        c.sent = await c.assistantMessage('coder', `Darren decided on #${c.cards.a}: the greeting is "Welcome back!", not "Hi there!". Carry on with that.`)
+        c.sent = await c.assistantMessage('coder', `Sam decided on #${c.cards.a}: the greeting is "Welcome back!", not "Hi there!". Carry on with that.`)
       }
       if (c.sentAt) c.got = await c.deliveries('coder')
     },
@@ -1815,7 +1892,7 @@ module.exports.SCENARIOS = [
     async during(c, status) {
       if (!c.sentAt && ['ready', 'finished', 'watching'].includes(status) && (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column === 'review') {
         c.sentAt = Date.now()
-        c.sent = await c.assistantMessage('coder', `Darren decided on #${c.cards.a}: the greeting is "Stale!", not "Hi there!". Change it.`, { card: c.cards.a })
+        c.sent = await c.assistantMessage('coder', `Sam decided on #${c.cards.a}: the greeting is "Stale!", not "Hi there!". Change it.`, { card: c.cards.a })
         c.passed = await c.inv('tasks:update', c.cards.a, { column: 'passed' })
       }
       if (c.sentAt) c.got = await c.deliveries('coder')
@@ -1854,7 +1931,7 @@ module.exports.SCENARIOS = [
     // Until the message is acked or has ended, at most 4 minutes after it was left.
     keepWaiting: async (c) => {
       const msg = sentMessage(c)
-      return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))
+      return !c.sentAt || (Date.now() - c.sentAt < timing('scenario.messageTakenMs') && !(msg && (msg.state === 'acked' || !!msg.ended)))
     },
     // HI-2265: "Nothing else for now" stood against the Assistant's message to work on the card.
     prompt: () => 'Read greeting.txt and tell me what it says.',
@@ -1898,7 +1975,7 @@ module.exports.SCENARIOS = [
     // Until the second is acked or has ended, at most 4 minutes after it was left.
     keepWaiting: async (c) => {
       const second = secondMessage(c)
-      return !c.sent2At || (Date.now() - c.sent2At < 240000 && !(second && (second.state === 'acked' || !!second.ended)))
+      return !c.sent2At || (Date.now() - c.sent2At < timing('scenario.messageTakenMs') && !(second && (second.state === 'acked' || !!second.ended)))
     },
     prompt: (c) => `Work on card #${c.cards.a}.`,
     fake: (c) => `skill work-on-card then ${fakeStart(c.cards.a)} then work 3 then checkpoint then work 4 then checkpoint then ${fakeSubmit(c.cards.a)}`,
@@ -1956,7 +2033,7 @@ module.exports.SCENARIOS = [
       await c.api('POST', `/v1/tasks/${c.cards.r}/comments`, { text: 'Round 1: failed. 1. greet.js says "Helo".' })
       await c.api('POST', `/v1/tasks/${c.cards.r}/comments`, { text: 'Fixed: greet.js says "Hello, <name>" now.' })
       // Deliberate: the decision's time must come after the comments' (the scenario is about a decision made since).
-      await new Promise((r) => setTimeout(r, 20))
+      await new Promise((r) => setTimeout(r, timing('pace.shortMs')))
       await c.inv('tasks:update', c.cards.r, { decision: 'Greet with "Hi, <name>", never "Hello".' })
     },
     // The decision tells Coder (its round 1 reviewer) in its inbox: that wake read first, or on Copilot its doorbell's
@@ -2190,7 +2267,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await c.handover('Old plan', '## Next steps\n1. Create old.txt containing "old".\n')
       // Deliberate: the newer handover's time must be a later second than the old one's (the newest is the one written last).
-      await new Promise((r) => setTimeout(r, 1100))
+      await new Promise((r) => setTimeout(r, timing('pace.nextSecondMs')))
       await c.handover('Notes feature', '## Current state\nnotes.txt holds 1 line.\n\n## Next steps\n1. Create next.txt containing "next".\n')
       c.write('notes.txt', 'one\ntwo\n')
     },
@@ -2209,7 +2286,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await c.handover('Old plan', '## Next steps\n1. Create old.txt containing "old".\n')
       // Deliberate: the newer handover's time must be a later second than the old one's (the newest is the one written last).
-      await new Promise((r) => setTimeout(r, 1100))
+      await new Promise((r) => setTimeout(r, timing('pace.nextSecondMs')))
       await c.handover('Notes feature', '## Next steps\n1. Create next.txt containing "next".\n')
     },
     prompt: 'Continue from the handover titled "Old plan" and do its next step.',
@@ -2512,7 +2589,7 @@ module.exports.SCENARIOS = [
       jjIn(c, 'bookmark', 'set', c.target, '-r', c.sub.revision)
       c.bookmarks = jjBookmarks(c)
       let card = null
-      for (const t = Date.now(); Date.now() - t < 120000; await new Promise((r) => setTimeout(r, 500))) {
+      for (const t = Date.now(); Date.now() - t < timing('hang.step'); await new Promise((r) => setTimeout(r, timing('poll.intervalMs')))) {
         card = (await c.api('GET', `/v1/tasks/${c.cards.p}`)).body
         if (card?.column === 'done') break
       }
@@ -2523,7 +2600,7 @@ module.exports.SCENARIOS = [
       const n = c.cards.p
       const ownMoves = movesOf(o, n).filter((x) => x.ok)
       const merges = o.tools.filter((t) => /(^|\s)(git|jj)(\.exe)?\s+(merge|rebase|squash|new\s+\S+\s+\S+)/i.test(commandText(t.input ?? '')) && !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name))
-      const said = [o.finalReply ?? '', ...(o.cards.p?.comments ?? []).filter((x) => /Coder/.test(x.by)).map((x) => x.text)].join('\n')
+      const said = saidOnCard(o, o.cards.p, /Coder/)
       const [, , empty, ...parents] = jjCommitOf(c, `${c.sub.workspace}@`).split(' ')
       return [
         ['moved the card nowhere (no report of a merge, no move): it stays in Passed', ownMoves.length === 0 && o.cards.p?.column === 'passed', `${o.cards.p?.column}; ${ownMoves.map((x) => x.tool).join(',')}`],
@@ -2558,12 +2635,12 @@ module.exports.SCENARIOS = [
       await c.inv('session:stop', c.alpha, c.agents.implementer.id).catch(() => undefined)
       // Combwork builds the candidate and runs lint on it: it fails, the card goes back to Coder with the wake.
       const lib = require('../e2e/lib.cjs')
-      const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === c.cards.p && /merge check lint failed on the candidate/.test(String(d.body ?? d.text ?? ''))), 240000)
+      const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === c.cards.p && /merge check lint failed on the candidate/.test(String(d.body ?? d.text ?? ''))), timing('hang.slow'))
       const column = (await c.api('GET', `/v1/tasks/${c.cards.p}`)).body?.column
       if (!told || column !== 'doing') throw new Error(`setup: #${c.cards.p} didn't come back from its candidate's lint: ${JSON.stringify({ column, deliveries: (await c.deliveries('coder')).map((d) => String(d.body ?? d.text ?? '').slice(0, 120)) })}`)
       const id = c.agents.coder.id
       await c.inv('session:stop', c.alpha, id).catch(() => undefined)
-      if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error("setup: Coder didn't stop")
+      if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), timing('hang.step')))) throw new Error("setup: Coder didn't stop")
       c.told = String(told.body ?? told.text ?? '')
       c.bookmarks = jjBookmarks(c)
       c.bookmarksBefore = c.bookmarks
@@ -2627,13 +2704,13 @@ module.exports.SCENARIOS = [
       // a goes Done; b started as the user starts it, in the lane's slot: its preparation fails, and Combwork leaves Coder
       // the reason.
       const lib = require('../e2e/lib.cjs')
-      if (!(await lib.until(async () => (await c.api('GET', `/v1/tasks/${a}`)).body?.column === 'done', 120000))) throw new Error(`setup: #${a} didn't go Done after the user's rebase: ${(await c.api('GET', `/v1/tasks/${a}`)).body?.column}`)
+      if (!(await lib.until(async () => (await c.api('GET', `/v1/tasks/${a}`)).body?.column === 'done', timing('hang.step')))) throw new Error(`setup: #${a} didn't go Done after the user's rebase: ${(await c.api('GET', `/v1/tasks/${a}`)).body?.column}`)
       await userMove(c, b, 'doing')
-      const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === b && /couldn.t get .* ready/i.test(String(d.body ?? d.text ?? ''))), 180000)
+      const told = await lib.until(async () => (await c.deliveries('coder')).find((d) => d.card === b && /couldn.t get .* ready/i.test(String(d.body ?? d.text ?? ''))), timing('hang.slow'))
       if (!told) throw new Error(`setup: Coder wasn't told #${b}'s slot couldn't be prepared: ${JSON.stringify({ a: (await c.api('GET', `/v1/tasks/${a}`)).body?.column, b: (await c.api('GET', `/v1/tasks/${b}`)).body?.column, deliveries: await c.deliveries('coder') })}`)
       const id = c.agents.coder.id
       await c.inv('session:stop', c.alpha, id).catch(() => undefined)
-      if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error("setup: Coder didn't stop")
+      if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), timing('hang.step')))) throw new Error("setup: Coder didn't stop")
       c.slot = slot
       c.folder = folder
       c.told = String(told.body ?? told.text ?? '')
@@ -2649,12 +2726,7 @@ module.exports.SCENARIOS = [
     observe: (o, c) => [["what Combwork's wake said (the preparation's reason)", /stale/i.test(c.told ?? ''), String(c.told ?? '').slice(0, 300)]],
     expect: (o, c) => {
       const n = c.cards.b
-      const norm = (x) => String(x).toLowerCase().replace(/\\+/g, '/')
-      const inSlot = (t) => norm(t.input ?? '').includes(norm(c.folder)) || (!!t.cwd && norm(t.cwd).startsWith(norm(c.folder)))
-      const shell = o.tools.filter((t) => !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name))
-      const updates = shell.filter((t) => /jj(\.exe)?\s+(workspace\s+update-stale|util\s+snapshot|op\s+(restore|revert|abandon))/i.test(commandText(t.input ?? '')))
-      const recorded = shell.filter((t) => inSlot(t) && /jj(\.exe)?\s+(commit|new|describe|squash|abandon|restore|edit)\b/i.test(commandText(t.input ?? '')))
-      const written = o.tools.filter((t) => /^(Write|Edit|MultiEdit)$/i.test(t.name) && inSlot(t))
+      const { updates, recorded, written } = staleSlotCommands(o, c.folder)
       const submitted = factsOf(o, 'b', 'Submitted').length
       const said = [
         o.finalReply ?? '',
@@ -3108,7 +3180,7 @@ module.exports.SCENARIOS = [
         const cards = await Promise.all([...new Set(c.atAnswer.asked.map((x) => x.key))].map(async (k) => (await c.api('GET', `/v1/tasks/${c.cards[k]}`)).body))
         return !cards.every((x) => answerToldTo(x, c.answeredAt) >= 1)
       }
-      return Date.now() - c.answeredAt < 240000 && (await c.api('GET', `/v1/tasks/${c.cards.b}`)).body?.column !== 'done'
+      return Date.now() - c.answeredAt < timing('scenario.answerLandsMs') && (await c.api('GET', `/v1/tasks/${c.cards.b}`)).body?.column !== 'done'
     },
     prompt: LANE_END.prompt,
     fake: LANE_END.fake,
@@ -3207,6 +3279,46 @@ module.exports.SCENARIOS = [
       ]
     },
     fakeSkips: ['the verdict says the finding came back']
+  },
+  {
+    id: 'card-loop-edge-cases-review',
+    title: "A card loop reviewer on its third round, each round a different new edge case (HI-3188: verdict.md's simplify rule): asks whether it's worth handling before another failed round",
+    // Two rounds failed, each on a new edge case of its own (an empty last name, a blank name); the work fixes both and has
+    // a third (a first name with spaces around it), which a reviewer would raise as another round.
+    async setup(c) {
+      await reviewedWork(
+        c,
+        'q',
+        {
+          title: 'Display names',
+          description: 'names.js: the display name from a first and a last name, for the member list.',
+          files: { 'names.js': "module.exports = (first, last) => {\n  const name = [first, last].filter((x) => x && x.trim()).join(' ')\n  return name.trim() ? name : 'Unknown'\n}\n" },
+          after: [
+            'Done: names.js joins first and last. Ready for review.',
+            'Review round 1: FAILED. 1. An empty last name leaves a trailing space ("Ann ").',
+            'Fixed: empty parts are left out. Ready for review.',
+            'Review round 2: FAILED. 1. A name of only spaces gives an empty string; the list needs "Unknown".',
+            'Fixed: a blank name is "Unknown". Ready for review.'
+          ]
+        },
+        'implementer'
+      )
+    },
+    prompt: (c) => `Review card #${c.cards.q} as the reviewer of a card loop (rounds: 10). It is back for its third review; the earlier reviews and fixes are in its comments.`,
+    fake: (c) => `skill card-loop then skill review-agent-work then ${fakeStartReview(c.cards.q)} then cw cw_ask_user {"card":"#${c.cards.q}","kind":"decide","text":"Round 3 would be a third new edge case in a row (a first name with spaces around it keeps them: \\"  Ann  Lee\\"). Worth handling, or simplify or cut scope?"}`,
+    expect: (o, c) => {
+      // HR3's round 2: only a question that went through on this card counts: an open Decide request of its own
+      // (cw_ask_user), or a cw_ask_assistant call on it that worked; a refused call, or one about another card, asks nothing.
+      const asked = openAsks(o, c, 'q').length > 0 || ran(o, 'cw_ask_assistant').some((x) => cardIs(o, argsOf(x).card, c.cards.q))
+      // Its two earlier rounds are comments (reviewedWork's), not verdicts: any failed verdict here is the third round.
+      const failedAgain = history(o.cards.q).includes('Review failed')
+      return [
+        ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
+        ['asked whether another edge case is worth handling (cw_ask_assistant or cw_ask_user), or passed it', asked || history(o.cards.q).includes('Review passed'), o.combworkCalls.map((x) => x.tool).join(',')],
+        ["didn't fail it a third time for another new edge case", !failedAgain, history(o.cards.q).join(' | ')],
+        ['changed no files (a review only reads)', o.gitStatus.trim() === '', o.gitStatus]
+      ]
+    }
   },
   {
     id: 'card-loop-return',
@@ -3402,7 +3514,7 @@ module.exports.SCENARIOS = [
       c.verdictAt = Date.now()
     },
     // Its wake comes at once (a watch's settle): at most 40 s, within a fake's minute.
-    keepWaiting: async (c) => !!c.verdictAt && !c.woke && Date.now() - c.verdictAt < 40000,
+    keepWaiting: async (c) => !!c.verdictAt && !c.woke && Date.now() - c.verdictAt < timing('scenario.wakeComesMs'),
     prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Do the card and hand it to your reviewer as your loop says.`,
     fake: (c) => `skill card-loop then ${fakeSubmit(c.cards.a, 'Ready for review: greet.js says Hi.')}`,
     expect: (o, c) => {
@@ -3414,6 +3526,87 @@ module.exports.SCENARIOS = [
         ["the watch is the lane's wait long (6 h)", !!w && Math.abs(Math.round((Date.parse(w.limitAt) - Date.parse(w.since)) / 60000) - 360) <= 1, JSON.stringify(w)],
         ['the verdict woke it', !!c.woke || o.wakeLines.some((l) => l.includes(`#${c.cards.a}`)), JSON.stringify(o.wakeLines)],
         ["the reviewer's failed verdict had Combwork watch the card for its next round", /^Combwork watches .* for its next round in Review/.test(c.reviewerWatch ?? ''), String(c.reviewerWatch)]
+      ]
+    }
+  },
+  {
+    id: 'card-loop-outside-job',
+    title: "A card loop builder waiting on a long job Combwork can't see (HI-3324): it marks its card waiting and watches it until the job's end, so its lane isn't stalled; then checks the job, clears the mark and carries on",
+    // CB2's case (CL-234, 16 Nov): a 40-min test run in a pool VM through an MCP server's tool, its turn ended watching the
+    // card, and the lane called it stalled after 9 min, waking the Assistant. Here the job is a plain file (POOL_RUN_JS).
+    files: { 'pool-run.js': POOL_RUN_JS, '.gitignore': 'pool/\n' },
+    startedByCombwork: true,
+    // Its first turn, the wake that stands in for the job's end, then the rest of the card: a fake's minute and a model's
+    // six aren't enough.
+    runMs: 10 * 60_000,
+    async setup(c) {
+      // The fixture's premise, by its own clock: running before POOL_RUN_MS, passed from then.
+      const lib = require('../e2e/lib.cjs')
+      const probe = require('path').join(lib.probeDir('pool-run'), 'pool-run.js')
+      require('fs').writeFileSync(probe, POOL_RUN_JS)
+      const { state, RUN_MS } = require(probe)
+      if (RUN_MS !== POOL_RUN_MS || state({ startedAt: 0 }, POOL_RUN_MS - 1) !== 'running' || state({ startedAt: 0 }, POOL_RUN_MS) !== 'passed') throw new Error('setup: pool-run.js\'s clock is not what the scenario expects')
+      await pairInProject(c)
+      const a = await c.card('a', { title: 'Run the test pass on the pool VM', description: POOL_CARD, agent: 'coder' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 }, { keepRunning: true })
+    },
+    // Its first turn's end with the card in Doing: the card's mark and its watch then. Then the job's 40 min pass at once
+    // (its start moved back), and the user's comment on the card wakes it, as a watch's end would at the job's end (no
+    // test hook brings a watch's limit forward). It runs on till its card leaves Doing, or 8 min after that end.
+    async during(c, status) {
+      if (c.firstEnd || !['finished', 'ready', 'watching'].includes(status)) return
+      const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
+      if (card?.column !== 'doing' || !c.read('pool/run.json')) return
+      const job = JSON.parse(c.read('pool/run.json'))
+      c.firstEnd = { at: Date.now(), status, waitingFor: card.waitingFor ?? null, watch: (await coderLive(c))?.watch ?? null, jobEnds: job.startedAt + POOL_RUN_MS }
+      // The fake Claude Code's steps for its next wake, given only now: Combwork's start line is a wake too, and would take
+      // them first. A fake only (it has logged a wake: that start line); a real CLI reads no script.
+      const fs = require('fs')
+      const path = require('path')
+      if (fs.existsSync(path.join(c.fakeHome, 'fake-wakes.jsonl'))) fs.writeFileSync(path.join(c.fakeHome, `fake-wakes-${c.agents.coder.name.replace(/[^\w-]/g, '_')}.txt`), poolWake(c) + '\n')
+      fs.writeFileSync(path.join(c.alpha, 'pool', 'run.json'), JSON.stringify({ ...job, startedAt: Date.now() - POOL_RUN_MS - 1000 }))
+      await c.inv('tasks:comment', c.cards.a, 'Any news on this card?')
+      c.wokenAt = Date.now()
+    },
+    keepWaiting: async (c) => !!c.firstEnd && Date.now() - c.firstEnd.at < 8 * 60_000 && (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column === 'doing',
+    prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Do the card and hand it to your reviewer as your loop says.`,
+    fake: (c) => `skill card-loop then skill work-on-card then shell: node pool-run.js start then cw cw_update_task ${JSON.stringify({ number: `#${c.cards.a}`, waitingFor: 'Pool VM run 17: the test pass, ending about 40 min from now' })} then cw cw_wait_for_tasks ${JSON.stringify({ cards: [`#${c.cards.a}`], changes: ['comment'], wake: true, limitMinutes: 45 })}`,
+    expect: (o, c) => {
+      const f = c.firstEnd
+      const run = (() => {
+        try {
+          return JSON.parse(c.read('pool/run.json') ?? 'null')
+        } catch {
+          return null
+        }
+      })()
+      const checks = (c.read('pool/checks.log') ?? '').split('\n').filter(Boolean).map((l) => {
+        try {
+          return JSON.parse(l)
+        } catch {
+          return {}
+        }
+      })
+      // Its check once woken (after the job's end was brought forward), and its first check that saw it passed, whenever.
+      const passedAt = checks.find((x) => x.state === 'passed' && c.wokenAt && x.at >= c.wokenAt)?.at ?? 0
+      const firstPassed = checks.find((x) => x.state === 'passed')?.at ?? 0
+      const marks = ran(o, 'cw_update_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.a) && String(argsOf(x).waitingFor ?? '').trim())
+      const clears = ran(o, 'cw_update_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.a) && 'waitingFor' in argsOf(x) && !String(argsOf(x).waitingFor ?? '').trim())
+      const clearedAt = Math.max(0, ...clears.map((x) => Date.parse(x.at) || 0))
+      const submitted = handedOnAt(o, c, 'a')
+      const w = f?.watch
+      const watchMin = w ? (Date.parse(w.limitAt) - Date.parse(w.since)) / 60000 : null
+      return [
+        ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ['started the job (pool/run.json)', !!run, c.read('pool/run.json')],
+        // Not a wait in its shell: its turn ended while the job still ran.
+        ['ended its first turn while the job still ran, the card in Doing', !!f && f.at < f.jobEnds, JSON.stringify({ firstEnd: f?.at ?? null, jobEnds: f?.jobEnds ?? null })],
+        ['its card marked waiting then, the mark naming the job', !!f?.waitingFor && marks.length > 0 && /pool|VM|run|test/i.test(f.waitingFor.reason ?? ''), JSON.stringify(f?.waitingFor)],
+        ['that turn ended on a card watch up to the job\'s end (1–90 min), not the lane\'s 6 h', !!w?.cards?.includes(c.cards.a) && watchMin !== null && watchMin >= 1 && watchMin <= 90, JSON.stringify({ watch: w, minutes: watchMin })],
+        ['woken, it checked the job and saw it passed', passedAt > 0, JSON.stringify(checks)],
+        ['cleared the mark once the job passed (itself, or by its submission, which leaves Doing)', passedAt > 0 && (clearedAt > passedAt || submitted > passedAt) && !o.cards.a?.waitingFor, JSON.stringify({ clearedAt, submitted, passedAt, left: o.cards.a?.waitingFor ?? null, by: clearedAt > passedAt ? 'its clear' : 'its submission' })],
+        ['wrote the result to RESULTS.md', /214/.test(c.read('RESULTS.md') ?? ''), c.read('RESULTS.md')],
+        ['submitted only after the job passed (Review)', firstPassed > 0 && submitted > firstPassed && o.cards.a?.column === 'review', `${o.cards.a?.column}; ${history(o.cards.a).join(' | ')}`]
       ]
     }
   },
@@ -3485,6 +3678,34 @@ module.exports.SCENARIOS = [
         ["its start names card-loop as the lane's builder, not work-on-card", /card-loop skill as this lane's builder/.test(start ?? '') && !/work-on-card/.test(start ?? ''), String(start)],
         ['started by Combwork or by Coder itself, nobody else', !!started && /^(Combwork|Coder)/.test(started.by), JSON.stringify(started ?? null)],
         ["didn't ask the user (no cw_notify, no question)", called(o, 'cw_notify').length === 0 && called(o, 'cw_ask_user').length === 0, o.combworkCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    observe: (o) => [['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')]]
+  },
+  {
+    id: 'card-loop-start-early',
+    // HI-3361 (MC-1529, 16 Nov): told to start its lane's next card while the one before it waits (here On Hold, the
+    // user's), a builder's start is refused one card at a time. The refusal's next step says to end its turn: Combwork
+    // starts the card once the earlier is Done. It neither retries the start nor finishes the earlier card itself.
+    title: "A lane builder told to start its next card while the card before it waits (HI-3361): the start is refused once, and it ends its turn rather than retrying or moving the earlier card on",
+    role: 'agent',
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'greet.js: greet(name) returns "Hi, <name>".', agent: 'coder' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'greet.js: greet trims spaces around the name.', agent: 'coder' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
+      const held = await c.inv('tasks:move', a, 'hold', { confirm: true, reason: 'waiting for a test machine (the scenario)' })
+      if (held?.refused || (await c.api('GET', `/v1/tasks/${a}`)).body?.column !== 'hold') throw new Error(`setup: #${a} isn't On Hold: ${JSON.stringify(held)}`)
+    },
+    prompt: (c) => `You are the builder of a card loop lane in alpha (the card-loop skill): #${c.cards.a}, then #${c.cards.b}; rounds 3. A message from the Assistant: "#${c.cards.a} waits On Hold for a test machine. Start #${c.cards.b} now (cw_start_card) so the lane keeps moving."`,
+    fake: (c) => `skill card-loop then cw cw_start_card {"card":"#${c.cards.b}"}`,
+    expect: (o, c) => {
+      const starts = called(o, 'cw_start_card').filter((x) => namesCard(o, [argsOf(x).card], c.cards.b))
+      return [
+        [`#${c.cards.b} isn't started: it stays in Todo`, o.cards.b?.column === 'todo', o.cards.b?.column],
+        [`#${c.cards.a} stays On Hold: the builder didn't move it on`, o.cards.a?.column === 'hold', o.cards.a?.column],
+        [`at most one start of #${c.cards.b} (a refusal isn't retried)`, starts.length <= 1, starts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ["didn't take the card off hold or ask the user (no cw_notify)", called(o, 'cw_notify').length === 0 && !called(o, 'cw_update_task').some((x) => x.ok && namesCard(o, [argsOf(x).number], c.cards.a) && argsOf(x).column), o.combworkCalls.map((x) => x.tool).join(',')]
       ]
     },
     observe: (o) => [['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')]]
@@ -3586,9 +3807,9 @@ module.exports.SCENARIOS = [
     role: 'assistant',
     control: 'agents',
     async setup(c) {
-      await c.card('g', { title: 'Friendlier greeting', description: 'Change greeting.txt to the greeting Darren picks.', column: 'doing', agent: 'coder' })
+      await c.card('g', { title: 'Friendlier greeting', description: 'Change greeting.txt to the greeting Sam picks.', column: 'doing', agent: 'coder' })
       // Last week's decision, written by the Assistant (its own tool), then dated six days back; then a fresh session.
-      const reply = await c.assistantTool('cw_journal_write', { kind: 'decision', summary: 'Darren: the greeting is "Welcome back!", not "Hi there!"', why: 'He wants returning users greeted', importance: 2, project: 'alpha', links: [{ type: 'card', ref: String(c.cards.g) }] })
+      const reply = await c.assistantTool('cw_journal_write', { kind: 'decision', summary: 'Sam: the greeting is "Welcome back!", not "Hi there!"', why: 'Sam wants returning users greeted', importance: 2, project: 'alpha', links: [{ type: 'card', ref: String(c.cards.g) }] })
       const id = Number(/Entry #(\d+)/.exec(reply)?.[1])
       if (!id) throw new Error(`setup: the journal entry wasn't written: ${reply}`)
       const { DatabaseSync } = require('node:sqlite')
@@ -3891,7 +4112,7 @@ module.exports.SCENARIOS = [
       await pairRules(c)
       await c.card('s', { title: 'Greeting punctuation', description: 'greet.js returns "Hello, <name>" with a comma.', agent: 'coder' })
       c.head = c.git('rev-parse', 'HEAD').trim()
-      // Files → Exclude from Git, shared, left uncommitted (Darren's case).
+      // Files → Exclude from Git, shared, left uncommitted (the user's case).
       c.dirty = 'node_modules/\n/reference/\n'
       c.write('.gitignore', c.dirty)
     },
@@ -4125,23 +4346,31 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'card-loop-follow-up-check',
-    title: "A card loop reviewer told of a follow-up to check, on a card in Review (#1467): it answers with cw_loop_step naming it, not a verdict",
-    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
-    // and starts it with its line, as review-card's (HI-2046).
-    startedByCombwork: true,
+    title: "A card loop reviewer told of a follow-up to check, on a card that passed (#1467): it answers with cw_loop_step naming it, not a verdict",
+    // HI-3419: a follow-up for a check is a passed card's alone (in Review it is refused, its verdict still due), so the card
+    // passes before it. Nobody reviews while it does (both builders, so no free reviewer is given it: HI-2664), so Combwork
+    // starts nobody; the harness starts Coder, and the follow-up's wake rings first (read before the prompt, as #1613's).
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
-      await pairInProject(c)
+      // Merges reported by the builder, not checked: a pass waits in Passed (pairInProject's committed finish has no Passed).
+      await pairInProject(c, { finish: 'notChecked' })
+      await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'builder' })
+      await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
-      await swapRoles(c)
-      // Implementer's round 1 sent for review, then its lane (the subject, Coder, reviewing), then its follow-up, with its
-      // own token. The moves come before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
-      // builderLane stops it (HI-2029), racing the move to Doing.
+      // Implementer's round 1, passed (the user's pass: no reviewer session gives one in a setup), then its lane (the
+      // subject, Coder, reviewing), then its follow-up, with its own token. The moves come before the lane (HI-2270): over a
+      // card in Todo, Combwork starts it on Implementer itself once builderLane stops it (HI-2029).
       await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
       c.git('add', '-A')
       c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet says Hi')
       await userMove(c, n, 'review')
+      for (const [route, body] of [['start-review'], ['verdict', { pass: true, comment: 'Round 1: PASSED. greet.js says Hi.' }]]) {
+        const r = await c.api('POST', `/v1/tasks/%23${n}/${route}`, body)
+        if (r.status !== 200) throw new Error(`setup: the user's ${route}: ${JSON.stringify(r.body)}`)
+      }
+      if ((await c.api('GET', `/v1/tasks/${n}`)).body?.column !== 'passed') throw new Error('setup: the passed card is not in Passed')
+      await swapRoles(c)
       await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name.trim()\n")
       c.git('add', '-A')
@@ -4151,20 +4380,65 @@ module.exports.SCENARIOS = [
       if (posted.status !== 200) throw new Error(`follow-up: ${JSON.stringify(posted.body)}`)
       c.followUp = posted.body.data.design
     },
-    // HI-2225: as card-loop-design-check, the follow-up's wake waits for the prompt's turn.
-    promptAtLaunch: true,
-    prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). On card #${c.cards.f}, in Review, the user asked for a change for you to check, and Implementer has posted it as a follow-up: check it and answer as your loop says.`,
+    beforePrompt: (c) => wakeRead(c, 'f'),
+    prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). Card #${c.cards.f} passed review; the user then asked for a change for you to check, and Implementer has posted it as a follow-up: check it and answer as your loop says.`,
     fake: (c) =>
       `skill card-loop then cw cw_read_task {"number":${c.cards.f},"latestComment":true} then cw cw_wait_for_tasks {"cards":[${c.cards.f}],"changes":["comment","column"],"wake":true} then cw cw_loop_step ${JSON.stringify({ card: `#${c.cards.f}`, step: 'gaps', text: '1. Add a test for the trimmed name.', design: c.followUp })}`,
     expect: (o, c) => {
       const tools = o.combworkCalls.map((x) => x.tool)
       const answers = ran(o, 'cw_loop_step').filter((x) => ['ok', 'gaps'].includes(argsOf(x).step))
+      // After the follow-up (the setup's pass is the user's, before it).
+      const posted = factsOf(o, 'f', 'LoopStep').find((f) => f.data.design === c.followUp)
+      const mine = (f) => !posted || f.seq > posted.seq
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['answered the follow-up with cw_loop_step (ok or gaps)', answers.length > 0, tools.join(',')],
         ['named the follow-up it was shown', answers.some((x) => argsOf(x).design === c.followUp) && factsOf(o, 'f', 'LoopStep').some((f) => ['ok', 'gaps'].includes(f.data.step) && f.data.design === c.followUp), JSON.stringify(answers.map((x) => argsOf(x)))],
-        ['gave no verdict (a follow-up check is not a review)', !factsOf(o, 'f', 'Verdict').length, (o.facts?.f ?? []).map((f) => f.kind).join(',')],
-        ['the card stays in Review', o.cards.f?.column === 'review', o.cards.f?.column]
+        ['gave no verdict and started no review (a follow-up check is not a review)', !factsOf(o, 'f', 'Verdict').some(mine) && !factsOf(o, 'f', 'ReviewStarted').some(mine), (o.facts?.f ?? []).map((f) => f.kind).join(',')],
+        ['the card stays in Passed', o.cards.f?.column === 'passed', o.cards.f?.column]
+      ]
+    }
+  },
+  {
+    id: 'card-loop-follow-up-review-again',
+    title: "A card loop reviewer whose card's line moved while it reviewed (HI-3419, MC-1568): its builder submits the commit as a follow-up, and the reviewer reviews that and gives its verdict, with no loop step",
+    // HI-2664: Coder reviews, so it is the project's free reviewer: Combwork gives it the card and starts it with its line.
+    // Then the lane, and Implementer's follow-up submission (its own token), whose wake ("follow-up submitted for review …
+    // Start your review again") is what MC-1568's reviewer needed to act on.
+    startedByCombwork: true,
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    async setup(c) {
+      await pairInProject(c)
+      const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>", the name trimmed.', agent: 'implementer' })
+      await swapRoles(c)
+      await userMove(c, n, 'doing')
+      c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet says Hi')
+      await userMove(c, n, 'review')
+      await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
+      c.write('greet.js', "module.exports = (name) => 'Hi, ' + name.trim()\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet trims the name')
+      c.commit = c.git('rev-parse', 'HEAD').trim()
+      await c.startAgent('implementer')
+      const sent = await c.as('implementer', 'POST', `/v1/tasks/%23${n}/submit`, { summary: `Follow-up: greet.js trims the name, at ${c.commit.slice(0, 7)}, as the reviewer asked.`, followUp: true })
+      if (sent.status !== 200) throw new Error(`follow-up: ${JSON.stringify(sent.body)}`)
+    },
+    // Combwork-started (HI-3408): its line is a model's first input; a fake is typed these steps once Combwork is quiet.
+    prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). You were reviewing card #${c.cards.f}; its line moved on with a commit you asked for (greet.js trims the name), and Implementer has submitted it as a follow-up. Carry on as your loop says.`,
+    fake: (c) =>
+      `skill card-loop then cw cw_start_review {"card":"#${c.cards.f}"} then cw cw_verdict {"card":"#${c.cards.f}","pass":true,"comment":"Round 1: PASSED. greet.js says Hi and trims the name."}`,
+    expect: (o, c) => {
+      const tools = o.combworkCalls.map((x) => x.tool)
+      const followUp = factsOf(o, 'f', 'Submitted').find((f) => f.data.followUp === true)
+      const mine = (f) => f.data.reviewer !== 'user'
+      const kinds = (o.facts?.f ?? []).map((f) => `${f.kind}${f.data?.submission ? `@${f.data.submission}` : ''}`).join(',')
+      return [
+        ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ['started its review of the follow-up (a ReviewStarted fact for that submission)', !!followUp && factsOf(o, 'f', 'ReviewStarted').some((f) => mine(f) && f.data.submission === followUp.seq), kinds],
+        ['gave its verdict on the follow-up', !!followUp && factsOf(o, 'f', 'Verdict').some((f) => mine(f) && f.data.submission === followUp.seq && f.data.revision === c.commit), kinds],
+        ['answered no follow-up check (no loop step: a follow-up submitted is reviewed)', !factsOf(o, 'f', 'LoopStep').length && !ran(o, 'cw_loop_step').length, tools.join(',')]
       ]
     }
   },
@@ -4292,7 +4566,7 @@ module.exports.SCENARIOS = [
     // Until the message is acked or has ended, at most 4 minutes after it was left; and before it, until part 1 is in.
     keepWaiting: async (c) => {
       const msg = sentMessage(c)
-      return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))
+      return !c.sentAt || (Date.now() - c.sentAt < timing('scenario.messageTakenMs') && !(msg && (msg.state === 'acked' || !!msg.ended)))
     },
     prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Combwork has started the card for you: do it as its decision says, and hand it to your reviewer as your loop says.`,
     fake: () => `skill card-loop then ${LOOP_COMMIT}`,
@@ -4556,10 +4830,10 @@ module.exports.SCENARIOS = [
     control: 'agents',
     async setup(c) {
       await c.card('r', { title: 'Pick the app icon', description: 'Coder asked the user which icon to use: A (a bee), B (a honeycomb) or C (a hexagon).', agent: 'coder', column: 'doing' })
-      await c.inv('settings:update', { general: { userName: 'Darren' } })
+      await c.inv('settings:update', { general: { userName: 'Sam' } })
     },
-    // What Combwork types into the Assistant's card watch when the user (Settings → General → Your name: Darren) answers Coder in its pane.
-    prompt: (c) => `[CW] Darren replied to Coder on #${c.cards.r}: "C, the hexagon". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).`,
+    // What Combwork types into the Assistant's card watch when the user (Settings → General → Your name: Sam) answers Coder in its pane.
+    prompt: (c) => `[CW] Sam replied to Coder on #${c.cards.r}: "C, the hexagon". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).`,
     fake: (c) => `skill coordinate-agents then cw cw_update_task {"number":${c.cards.r},"decision":"The app icon is C, the hexagon."}`,
     expect: (o, c) => {
       const decided = ran(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, c.cards.r) && /hexagon|\bC\b/i.test(String(argsOf(x).decision ?? '')))
@@ -4722,9 +4996,39 @@ module.exports.SCENARIOS = [
     observe: (o) => [['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')]]
   },
   {
+    id: 'assistant-lane-yield',
+    // HI-3323 (MC-1525, 16 Nov): a lane's card in Doing needs a new card merged first. Putting that card first is one
+    // cw_lane start; the lane switches to it by itself at its builder's turn end (here its builder is stopped, which holds
+    // the switch), so the Assistant neither starts the new card itself nor puts the card in flight back.
+    title: "The Assistant asked to put first a card the lane's card in flight waits on (HI-3323): one cw_lane start with it first, the lane queues the switch; no manual start, no put back, no new lane",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi in every locale', description: 'src/greet.js: greet(name, locale) returns the locale\'s greeting.', agent: 'coder', column: 'doing' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], name: 'greetings' })
+      const fix = await c.card('fix', { title: 'Fix the locale table loader', description: 'src/locales.js: the loader drops the last entry; greet() needs it fixed first.' })
+      await c.inv('tasks:update', a, { blockedBy: [fix] })
+    },
+    prompt: (c) => `In alpha, Coder's lane is working on #${c.cards.a}, but it can't be finished until #${c.cards.fix} is merged (it depends on it). Put #${c.cards.fix} first in Coder's lane so it is done next.`,
+    fake: (c) => `skill run-lanes then cw cw_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.fix, c.cards.a] })}`,
+    expect: (o, c) => {
+      const num = (n) => Number(String(n).replace(/\D/g, ''))
+      const starts = ran(o, 'cw_lane').map((x) => argsOf(x)).filter((x) => x.action === 'start')
+      const lane = (o.lanes ?? []).find((l) => l.builder?.name === 'Coder' && (l.state === 'active' || l.state === 'paused'))
+      const list = lane ? (lane.queued ?? (lane.cards ?? []).map((x) => x.number)) : []
+      return [
+        [`reordered the lane with cw_lane start, #${c.cards.fix} before #${c.cards.a}`, starts.some((x) => { const ns = (x.cards ?? []).map(num); return ns.includes(c.cards.fix) && ns.includes(c.cards.a) && ns.indexOf(c.cards.fix) < ns.indexOf(c.cards.a) }), JSON.stringify(starts)],
+        ['started, put back or moved no card itself, and abandoned or ended no lane', !o.combworkCalls.some((x) => /cw_(start_task|start_card|put_back)/.test(x.tool) || (x.tool === 'cw_lane' && argsOf(x).action === 'end')) && !ran(o, 'cw_update_task').some((x) => /column/.test(String(x.args ?? ''))), o.combworkCalls.map((x) => x.tool).join(',')],
+        [`the lane switches to #${c.cards.fix} (queued as a switch, or already switched)`, !!lane && list[0] === c.cards.fix && ((lane.status?.reason === 'listChanges' && lane.status?.first === c.cards.fix) || o.cards.a?.column === 'todo'), JSON.stringify(lane ? { queued: lane.queued, status: lane.status, a: o.cards.a?.column } : (o.lanes ?? []).map((l) => [l.builder?.name, l.state]))]
+      ]
+    },
+    observe: (o) => [['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')]]
+  },
+  {
     id: 'assistant-new-lane',
     // HI-2222: coordinate-agents' A new lane is cw_lane start, never a prompt to a builder Combwork gives the lane. Combwork gives
-    // an idle running builder outside slots the lane in a new conversation (#437; HI-2232, Darren's decision (a)), its last
+    // an idle running builder outside slots the lane in a new conversation (#437; HI-2232, decision (a)), its last
     // kept in the Sessions history: checked again (HI-2222 had recorded them while that was undecided).
     title: "The Assistant starting an idle agent's next lane (#437, HI-2222, HI-2232): cw_lane start (Coder, the card, rounds and wait), Coder left to Combwork, no prompt (#1169: run-lanes or coordinate-agents read); Coder in a new conversation, its last kept",
     role: 'assistant',
@@ -4733,7 +5037,7 @@ module.exports.SCENARIOS = [
       await c.card('n', { title: 'Add a CONTRIBUTING.md', description: 'Add a CONTRIBUTING.md with one line: "Open an issue before a pull request."' })
       // Coder's last lane: a conversation of its own, finished and idle.
       await coderTask(c, 'Reply "done" and nothing else. (work 1)')
-      for (let t = Date.now(); Date.now() - t < 60000 && !['ready', 'finished'].includes((await coderLive(c))?.status); ) await new Promise((r) => setTimeout(r, 500))
+      for (let t = Date.now(); Date.now() - t < timing('hang.step') && !['ready', 'finished'].includes((await coderLive(c))?.status); ) await new Promise((r) => setTimeout(r, timing('poll.intervalMs')))
       c.before = await coderLive(c)
     },
     prompt: (c) => `Coder has finished its last lane and is idle. Start its next lane: Coder builds card #${c.cards.n} with the card-loop skill (rounds: 3, wait: 1h); there is no reviewer yet. Don't wait for it.`,
@@ -4782,7 +5086,7 @@ module.exports.SCENARIOS = [
       await coderTask(c)
       const watch = await c.as('coder', 'POST', '/v1/tasks/wait', { cards: [c.cards.w], column: 'review', wake: true })
       if (watch.status !== 200 || !watch.body?.watching) throw new Error(`setup: Coder's watch on #${c.cards.w}: ${watch.status} ${JSON.stringify(watch.body)}`)
-      if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', 30000))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)
+      if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', timing('hang.ui')))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)
     },
     prompt: (c) => `I've decided card #${c.cards.w}'s open question: exports are JSON. Coder reviews that card in its card loop and is waiting for it to arrive in Review: tell Coder, so it checks for JSON in its review.`,
     fake: (c) => `skill coordinate-agents then cw cw_message_agent {"project":"alpha","agent":"Coder","text":"The user decided #${c.cards.w}: exports are JSON. Check for JSON when you review it."}`,
@@ -4803,6 +5107,90 @@ module.exports.SCENARIOS = [
         ["Coder's watch carries on", !!c.coderWatch?.includes(c.cards.w), JSON.stringify(c.coderWatch)]
       ]
     }
+  },
+  {
+    id: 'assistant-reorder-busy',
+    // HI-3361 (CL-251/252, HI-2528, CL-219): asked to move a lane's card in flight to the end now while its builder works,
+    // the Assistant's applyNow is refused (a reorder applied now never puts a card back under a turn). The refusal names
+    // the queued change (it applies once the card in flight is Done) and asking the builder to end its turn: it takes one,
+    // never repeating applyNow into the same refusal, abandoning the lane or moving the card itself.
+    title: "The Assistant asked to reorder a lane now while its builder works (HI-3361): after one refused applyNow it queues the change or asks the builder to end its turn; it never repeats applyNow, abandons the lane or moves the card",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'doing' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' }, { keepRunning: true })
+      // Coder in a turn of its own (working), as a lane builder is while it builds: bounded work, its status checked.
+      await busyCoder(c, 20, 300, c.agents.coder, `For #${a} of your lane, first: `)
+    },
+    prompt: (c) => `In alpha, Coder's lane is working on #${c.cards.a}, but the user wants #${c.cards.b} done first. Move #${c.cards.a} to the end of the lane now, not after it is finished.`,
+    fake: (c) => `skill run-lanes then cw cw_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.b, c.cards.a], applyNow: true })} then cw cw_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.b, c.cards.a] })}`,
+    // Coder's status while the Assistant works: it must still be in its turn for the refusal to be the one under test.
+    during: async (c) => {
+      const s = await coderLive(c)
+      if (s) (c.coderStatuses ||= []).push(s.status)
+    },
+    expect: (o, c) => {
+      const starts = called(o, 'cw_lane').filter((x) => argsOf(x).action === 'start')
+      const now = starts.filter((x) => argsOf(x).applyNow === true)
+      // The fixture held (any applyNow tried was refused because Coder was in a turn: lane.refused.applyNow.inATurn).
+      const turnRefused = now.filter((x) => !x.ok && /never puts its card back under it/.test(String(x.error ?? '')))
+      const fixture = ['Coder was working while the Assistant ran, and any applyNow was refused for its turn', (c.coderStatuses ?? []).includes('working') && now.every((x) => x.ok === false) && turnRefused.length === now.length, `${(c.coderStatuses ?? []).join(',')} / ${now.map((x) => String(x.error ?? 'ok').slice(0, 80)).join(' | ')}`]
+      const order = (x) => JSON.stringify((argsOf(x).cards ?? []).map((n) => Number(String(n).replace(/\D/g, ''))))
+      const queued = starts.some((x) => x.ok && argsOf(x).applyNow !== true && order(x) === JSON.stringify([c.cards.b, c.cards.a]))
+      // A message that went to this fixture's Coder (by its name or id, in alpha) asking it to end its turn, not the
+      // opposite (HR2's round 1: "Keep working … Do not end your turn" counted).
+      const toCoder = (x) => [c.agents.coder.id, 'coder'].includes(String(argsOf(x).agent ?? '').toLowerCase()) && [undefined, 'alpha'].includes(argsOf(x).project)
+      const asked = called(o, 'cw_message_agent').some((x) => x.ok && toCoder(x) && asksToEndTurn(argsOf(x).text ?? argsOf(x).message))
+      // The user said "now, not after it is finished", so the queued change alone doesn't do what was asked: asking the user
+      // to choose, naming both ways the refusal gives (Coder's turn ended first, or the order after #a's Done), is right too.
+      const reply = String(o.finalReply ?? '')
+      const offered = asksToEndTurn(reply) && (/\b(after|once)\b[^.]*\b(done|finish\w*|#\d+|[A-Z]{2}-\d+)/i.test(reply) || /\bqueue/i.test(reply))
+      return [
+        fixture,
+        ['queued the new order (cw_lane start without applyNow), asked Coder to end its turn, or asked the user naming both ways', queued || asked || offered, starts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['at most one applyNow refused (not repeated into the same refusal)', now.filter((x) => !x.ok).length <= 1, now.map((x) => `${x.ok ? 'ok' : 'refused'}`).join(',')],
+        ['abandoned or ended no lane', !called(o, 'cw_lane').some((x) => argsOf(x).action === 'end'), o.combworkCalls.map((x) => x.tool).join(',')],
+        [`#${c.cards.a} stays Coder's, in Doing (not put back or moved by the Assistant)`, o.cards.a?.column === 'doing' && !called(o, 'cw_put_back').length && !called(o, 'cw_update_task').some((x) => x.ok && namesCard(o, [argsOf(x).number], c.cards.a) && argsOf(x).column), `${o.cards.a?.column}`],
+        ['no stop or prompt of Coder', called(o, 'cw_stop_agent').length === 0 && called(o, 'cw_prompt_agent').length === 0, o.combworkCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    observe: (o) => [['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')]]
+  },
+  {
+    id: 'assistant-start-watching',
+    // HI-3361 (CL-350, 18 Nov): asked to start a card on a lane builder that is waiting on a watch, the Assistant's
+    // cw_start_task is refused (the agent takes no new task until woken; only the user cancels a watch). The refusal's
+    // next step names the ways on: the agent's lane, another agent or a message. Never an override, a cancel or a stop.
+    title: "The Assistant asked to start a card on a lane builder waiting on a watch (HI-3361): puts the card in its lane or gives it to another agent, after at most one refused start; no override, cancel or stop",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await reviewedPair(c)
+      await c.card('w', { title: 'Export the report', description: 'Add an export of the report as JSON.', agent: 'coder' })
+      await c.card('n', { title: 'Add a LICENSE', description: 'Add an MIT LICENSE file at the root.' })
+      // Coder builds a lane of #w and waits for it (a card watch on its own card): it takes no new task meanwhile.
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.w], name: 'reports' }, { keepRunning: true })
+      await coderTask(c)
+      const watch = await c.as('coder', 'POST', '/v1/tasks/wait', { cards: [c.cards.w], column: 'review', wake: true })
+      if (watch.status !== 200 || !watch.body?.watching) throw new Error(`setup: Coder's watch on #${c.cards.w}: ${watch.status} ${JSON.stringify(watch.body)}`)
+      if (!(await require('../e2e/lib.cjs').until(async () => (await coderLive(c))?.status === 'watching', timing('hang.ui')))) throw new Error(`setup: Coder isn't watching #${c.cards.w} (status ${(await coderLive(c))?.status})`)
+    },
+    prompt: (c) => `In alpha, start card #${c.cards.n} with Coder: the user wants it built next.`,
+    fake: (c) => `skill run-lanes then cw cw_start_task {"number":"#${c.cards.n}","agent":"Coder"} then cw cw_lane {"action":"start","project":"alpha","builder":"Coder","reviewer":"Implementer","cards":[${c.cards.w},${c.cards.n}]}`,
+    expect: (o, c) => {
+      const toCoder = called(o, 'cw_start_task').filter((x) => /coder/i.test(String(argsOf(x).agent ?? '')))
+      const laned = ran(o, 'cw_lane').some((x) => argsOf(x).action === 'start' && (argsOf(x).cards ?? []).some((n) => namesCard(o, [n], c.cards.n)))
+      const other = ran(o, 'cw_start_task').some((x) => namesCard(o, [argsOf(x).number ?? argsOf(x).card], c.cards.n) && !/coder/i.test(String(argsOf(x).agent ?? '')))
+      return [
+        [`put #${c.cards.n} in Coder's lane or gave it to another agent`, laned || other, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['at most one start refused on Coder (not retried)', toCoder.filter((x) => !x.ok).length <= 1, toCoder.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['no override, no stop, no prompt over its watch', !toCoder.some((x) => argsOf(x).override) && called(o, 'cw_stop_agent').length === 0 && called(o, 'cw_prompt_agent').length === 0, o.combworkCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    observe: (o) => [['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')]]
   },
   {
     id: 'card-loop-released',
@@ -4855,7 +5243,7 @@ module.exports.SCENARIOS = [
         c.blockedAt = Date.now()
         return
       }
-      if (Date.now() - c.blockedAt < 15000) return
+      if (Date.now() - c.blockedAt < timing('pace.userAnswersMs')) return
       // The fix, committed: its submission is a commit after the card's base (HI-2223).
       c.write('upload.js', "module.exports = async function upload(send) {\n  const r = await send()\n  if (r.ok) return r\n  const wait = Math.min(Number(r.headers?.['retry-after'] ?? 0), 60)\n  await new Promise((done) => setTimeout(done, wait * 1000))\n  return send()\n}\n")
       c.git('add', '-A')
@@ -4864,7 +5252,7 @@ module.exports.SCENARIOS = [
       await c.inv('tasks:update', c.cards.a, { blocked: '' })
       await c.inv('tasks:update', c.cards.a, { column: 'review' })
       c.returnedAt = Date.now()
-      c.returnDiff = await require('../e2e/lib.cjs').until(() => submittedDiff(c, c.cards.a), 15000)
+      c.returnDiff = await require('../e2e/lib.cjs').until(() => submittedDiff(c, c.cards.a), timing('hang.ui'))
     },
     // Through the block, then the wake and the review it starts: until a verdict on the card (at most 4 minutes after
     // its return).
@@ -4955,6 +5343,39 @@ module.exports.SCENARIOS = [
     ]
   },
   {
+    // HI-3372: the git and jj limits' settings (their descriptions reach the Assistant through its settings tools): asked
+    // about cut-off commits, fetches and pushes and jj commands, it finds them, names them and changes none.
+    id: 'assistant-settings-git-limits',
+    title: 'The Assistant asked about git and jj work cut off on a big repository: names the limits’ settings, changes none (HI-3372)',
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    prompt: "Combwork keeps cutting things off on our big repository: committing from Combwork stops after two minutes because our pre-commit hook runs the tests, fetching and pushing over the VPN (ours and the merge queue's) gets cut off, and jj commands time out. Which Combwork settings would help? Don't change anything, just tell me.",
+    // Settings → Advanced's entries are named advanced.<id> to the settings tools.
+    fake: 'skill tune-settings then cw cw_read_setting {"id":"advanced.cw.git.commitMinutes"} then cw cw_read_setting {"id":"advanced.cw.git.networkMinutes"} then cw cw_read_setting {"id":"advanced.cw.queue.networkMinutes"} then cw cw_read_setting {"id":"advanced.cw.jj.commandSeconds"}',
+    expect: (o, c) => {
+      // Each setting, and words only its description has (src/shared/advanced.ts).
+      const LIMITS = [
+        ['cw.git.commitMinutes', /pre-commit|hook/i],
+        ['cw.git.networkMinutes', /fetch|pull|push/i],
+        ['cw.queue.networkMinutes', /merge queue/i],
+        ['cw.jj.commandSeconds', /snapshot|jj command/i]
+      ]
+      const looked = [...ran(o, 'cw_list_settings'), ...ran(o, 'cw_read_setting')]
+      const said = looked.map((x) => String(x.reply ?? '')).join('\n')
+      return [
+        ['read the tune-settings skill', read(o, 'tune-settings'), o.skillsRead.join(',')],
+        ['looked the settings up (cw_list_settings or cw_read_setting)', looked.length >= 1, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        // Each of the four new settings, its id and its description's own words, in a reply it got (HR2's s14).
+        ...LIMITS.map(([id, words]) => [`a settings reply carried ${id} and its description`, looked.some((x) => String(x.reply ?? '').includes(id) && words.test(String(x.reply ?? ''))), said.slice(0, 600)]),
+        ['changed no setting: it only suggested', ran(o, 'cw_update_setting').length === 0],
+        ...(c.fake
+          ? []
+          : [["its answer names the commit limit's setting and a network one", /cw\.git\.commitMinutes|longest a commit/i.test(o.finalReply ?? '') && /cw\.(git|queue)\.networkMinutes|fetch, pull or push|fetch or push/i.test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 600)]])
+      ]
+    }
+  },
+  {
     id: 'assistant-settings-change',
     title: 'The Assistant asked to change a setting, with Change settings on: changes it (#186)',
     role: 'assistant',
@@ -5031,12 +5452,12 @@ module.exports.SCENARIOS = [
       c.git('branch', '1.5.0')
       await pairInProject(c, { target: '1.4.0', otherTargets: ['1.5.0'] })
       // The offer read before the session starts (a condition, never a time); before HI-3155 there is none to wait for.
-      const end = Date.now() + 120_000
+      const end = Date.now() + timing('hang.step')
       for (;;) {
         const offers = await c.inv('workflow:releaseOffers').catch(() => null)
         if (!offers || offers.some((o) => o.move?.moveTo === '1.5.0')) break
         if (Date.now() > end) throw new Error('setup: no release offer for alpha')
-        await new Promise((r) => setTimeout(r, 200))
+        await new Promise((r) => setTimeout(r, timing('poll.intervalMs')))
       }
     },
     prompt: "alpha's 1.4.0 has shipped. Move its work on to the next version: I've checked, go ahead.",
@@ -5286,7 +5707,7 @@ async function builderLane(c, key, body, { keepRunning = false } = {}) {
   if (keepRunning) return r
   await c.inv('session:stop', c.alpha, id)
   const lib = require('../e2e/lib.cjs')
-  if (!(await lib.until(async () => !(await live()), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
+  if (!(await lib.until(async () => !(await live()), timing('hang.step')))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
   return r
 }
 /**
@@ -5385,11 +5806,11 @@ async function combworkStartedLaneCard(c, key, n) {
       if (/Do you trust the files in this folder/i.test(tail) || (/trust this folder/i.test(tail) && c.provider === 'codex')) {
         await c.inv('pty:write', ptyKey, '\r')
         trusted.add(live.runId)
-      } else if (/trust this folder/i.test(tail) && (await lib.acceptClaudeTrust(c.inv, c.alpha, agent.id, 10000))) trusted.add(live.runId)
+      } else if (lib.CLAUDE_TRUST.test(tail) && (await lib.acceptClaudeTrust(c.inv, c.alpha, agent.id, 10000))) trusted.add(live.runId)
     }
     return laneStartLanded({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, live, deliveries: await c.deliveries(key), shown }, n)
   }
-  if (!(await lib.until(landed, 90000))) throw new Error(`setup: Combwork's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}; its screen ends: ${(await screen()).trim().slice(-400)}`)
+  if (!(await lib.until(landed, timing('hang.step')))) throw new Error(`setup: Combwork's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}; its screen ends: ${(await screen()).trim().slice(-400)}`)
 }
 /**
  * Two running lanes: Coder and Implementer on greet.js (#a, #b), Builder2 and Reviewer2 on the README (#c, and #d if
@@ -5492,7 +5913,7 @@ const DEPLOY_FACTS = /staging\.example\.com|deploy:staging|ALPHA_ENV=staging/
 /** And only its card's description says this: in a listing's reply, the card was in it, in full. */
 const DEPLOY_CARD_FACT = 'docs/DEPLOY.md, its Staging section'
 /**
- * HI-2239's read policy (Darren's decision, 31 Oct: simplify). A file was read when Claude Code's `Read` worked on its
+ * HI-2239's read policy (decided: simplify). A file was read when Claude Code's `Read` worked on its
  * exact absolute path and gave back its facts; Combwork's own reads are the Combwork calls' (cw_read_section, cw_list_tasks,
  * each paired with its own reply: callsWithReplies). A shell command (or a Codex script) that may have read it is
  * unobservable: never credited, and never blamed (shellLookups: the check is left out, and the run records it).
@@ -5907,7 +6328,7 @@ module.exports.SCENARIOS.push(
       const n = await submittedCard(c, 'r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', files: { 'src/greet.js': 'module.exports = (name) => `Hi, ${name}`\n', 'test/greet.test.js': "require('assert').strictEqual(require('../src/greet')('Ada'), 'Hi, Ada')\n" }, after: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
       // HI-2046: a loose card in Review is Combwork's to give out; the Assistant is woken once it has.
       const given = async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'ReviewerAssigned' && f.data?.reviewer === c.agents.implementer.id)
-      if (!(await require('../e2e/lib.cjs').until(given, 30000))) throw new Error(`setup: Combwork didn't give #${n} to Implementer`)
+      if (!(await require('../e2e/lib.cjs').until(given, timing('hang.ui')))) throw new Error(`setup: Combwork didn't give #${n} to Implementer`)
     },
     prompt: (c) => `[CW] #${c.cards.r} (Coder's card) is in Review; latest comment by Coder: "Ready: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then cw cw_read_task {"number":${c.cards.r},"latestComment":true}`,
@@ -6059,7 +6480,7 @@ module.exports.SCENARIOS.push(
     fake: (c) => `skill coordinate-agents then cw cw_read_task {"number":${c.cards.p}} then cw cw_read_section {"project":"alpha","path":"docs/DEPLOY.md","heading":"Staging"}`,
     expect: (o, c) => {
       const p = c.cards.p
-      // Darren's decision (HI-2239, 31 Oct): only Combwork's recorded reads (cw_read_task of the card; cw_read_section of
+      // Decided (HI-2239): only Combwork's recorded reads (cw_read_task of the card; cw_read_section of
       // alpha's docs/DEPLOY.md and alpha's detailed cw_list_tasks, each paired with its own reply) and a Read of the
       // doc's exact absolute path count. A shell command or Codex script that may have read the doc is unobservable: with
       // no lookup credited, it leaves the check out (never blamed) and is recorded (observe).
@@ -6108,7 +6529,7 @@ module.exports.SCENARIOS.push(
 )
 
 // A natural break (#1082, #1080 gaps 1 and 3): every lane has ended, or a solo agent's card is done with nothing else
-// running. Since HI-2226 (Darren, 31 Oct) Combwork's own nudge (#1437) owns suggesting that the project's agents start fresh,
+// running. Since HI-2226 Combwork's own nudge (#1437) owns suggesting that the project's agents start fresh,
 // so the Assistant isn't checked for suggesting it; it never suggests it while work, a question or a watch remains, saves
 // what is open to its journal first, and restarts nothing itself.
 /** A reply that suggests starting fresh conversations or sessions. */
@@ -6120,6 +6541,24 @@ const restartedNothing = (o) => !ran(o, 'cw_prompt_agent').some((x) => argsOf(x)
  * The cards' work, committed (greet.js with its test, the README's Usage), so git backs the board when the Assistant
  * checks a merge (run-lanes, Verify): a board saying merged over an empty repository is a problem, not a natural break.
  */
+/**
+ * HI-3360: `agent`'s last conversation, idle two days: its record in the workspace's database and Combwork's backup of
+ * its transcript (one exchange, a 60K-token context), as the window and the Agent API read them.
+ */
+function idleConversation(c, agent) {
+  const fs = require('fs')
+  const path = require('path')
+  const id = '33600000-0000-4000-8000-00000000c0de'
+  const at = new Date(Date.now() - 2 * 86_400_000).toISOString()
+  require('../e2e/storeDocs.cjs').putSessions(c.alpha, { version: 1, sessions: [{ id, agent: 'claude-code', agentId: agent.id, cwd: c.alpha, name: 'Greeting work', createdAt: at, lastActiveAt: at, archived: false, names: 2 }] })
+  const file = path.join(c.alpha, '.combwork', 'sessions', `${id}.jsonl`)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  const lines = [
+    { type: 'user', sessionId: id, timestamp: at, message: { role: 'user', content: 'Make greet() trim the name' } },
+    { type: 'assistant', sessionId: id, requestId: `${id}-1`, timestamp: at, message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'Done: greet() trims the name.' }], usage: { input_tokens: 5, cache_read_input_tokens: 60000, cache_creation_input_tokens: 100, output_tokens: 50 } } }
+  ]
+  fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+}
 function landWork(c, readme = true) {
   c.git('config', 'user.email', 'agent@example.com')
   c.git('config', 'user.name', 'Agent')
@@ -6237,6 +6676,27 @@ module.exports.SCENARIOS.push(
     expect: (o) => [['restarted and stopped nothing itself', restartedNothing(o), o.combworkCalls.map((x) => x.tool).join(',')]]
   },
   {
+    id: 'assistant-idle-resume',
+    title: "The Assistant asked to resume Coder's last conversation, idle two days (HI-3360): the resume is refused with its age and size, and the Assistant chooses informed: a new conversation, or resuming it anyway (resumeIdle) with the user told its age and cost",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      landWork(c)
+      idleConversation(c, c.agents.coder)
+    },
+    prompt: () => "Resume Coder's last conversation so it carries on with greet(): it should add a test for an empty name.",
+    fake: () => 'cw cw_start_agent {"project":"alpha","agent":"Coder","resume":true}',
+    expect: (o) => {
+      const tries = called(o, 'cw_start_agent')
+      return [
+        ['asked to resume it, and was told it is long idle (its age)', tries.some((x) => argsOf(x).resume && /last active/.test(String(x.error ?? ''))), tries.map((x) => `${JSON.stringify(argsOf(x))} -> ${x.ok ? 'ok' : String(x.error ?? '').slice(0, 120)}`).join(' | ')],
+        // The user asked for the resume: resuming anyway is the Assistant's informed choice (the design: it is told and
+        // chooses), so long as the user hears what it costs; never a silent cold resume.
+        ['resumed it anyway only with the user told its age or cost', !ran(o, 'cw_start_agent').some((x) => argsOf(x).resumeIdle === true) || /last active|idle|ago|cache|tokens/i.test(String(o.finalReply ?? '')), `${tries.map((x) => JSON.stringify(argsOf(x))).join(' | ')} :: ${String(o.finalReply ?? '').slice(0, 200)}`]
+      ]
+    }
+  },
+  {
     id: 'fresh-start-saves-first',
     title: 'Coordinator mode, the lanes done, told of a half-formed idea that is in no card (#1082, journal): writes it to its journal, the end of a block, and restarts nothing',
     role: 'assistant',
@@ -6248,7 +6708,7 @@ module.exports.SCENARIOS.push(
       await endLanes(c, ['Coder', 'Builder2'])
     },
     prompt: "Both lanes in alpha are done, thanks. Next I'm thinking about a dark mode for alpha, but I haven't decided whether it follows Windows or gets its own switch, so no card for it yet. That's all from me for this block.",
-    fake: 'skill journal then cw cw_journal_write {"kind":"plan","summary":"Darren: dark mode for alpha next; open: follows Windows or its own switch","project":"alpha","importance":1}',
+    fake: 'skill journal then cw cw_journal_write {"kind":"plan","summary":"Sam: dark mode for alpha next; open: follows Windows or its own switch","project":"alpha","importance":1}',
     expect: (o) => {
       const writes = ran(o, 'cw_journal_write')
       const saved = writes.some((x) => /dark/i.test(String(x.args)))
@@ -6306,7 +6766,7 @@ for (const [id, name] of MODES) {
 }
 
 // The QA triager's procedure (#408, triage-report): a report becomes a card with its cause and evidence, or new evidence
-// on the card that already covers it (Passed included: Darren's decision after #730 duplicated #717's unmerged fix).
+// on the card that already covers it (Passed included: decided after #730 duplicated #717's unmerged fix).
 const BANNER_JS = "// The banner shown after Save.\nconst plural = (n) => (n > 1 ? 's' : '')\nmodule.exports = (n) => `Saved ${n} card${plural(n)}`\n"
 const BANNER_REPORT = 'I saved an empty board and the banner said "Saved 0 card". Screenshot: a green banner at the top of the board, reading exactly "Saved 0 card". Can you look into it?'
 module.exports.SCENARIOS.push(
@@ -6577,4 +7037,4 @@ module.exports.SCENARIOS.push({
     })
 })
 
-module.exports.helpers = { launchedIn, laneStartLanded,readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { asksToEndTurn, staleSlotCommands, launchedIn, saidOnCard, laneStartLanded,readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }

@@ -736,8 +736,9 @@ kbd {
   font-weight: 400;
   text-transform: none;
 }
+/* A header's count sits beside its title (HI-3287), as a skill group's does: the right edge is its buttons' (a margin
+   here split the free space with them, floating the count mid-row). */
 .section-header .count {
-  margin-left: auto;
   font-weight: 500;
   color: var(--fg-muted);
 }
@@ -5007,7 +5008,7 @@ h2.section#unused-worktrees {
   border-bottom: 1px solid var(--border);
   border-radius: 6px 6px 0 0;
 }
-/* An account's card (HI-2528, Darren's approved mockup v2): the same fields in the same place on every card. */
+/* An account's card (HI-2528, approved mockup v2): the same fields in the same place on every card. */
 .account-facts {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -5102,7 +5103,7 @@ h2.section#unused-worktrees {
     margin-top: -2px;
   }
 }
-/* Its connections, a small table inside the card (HI-2528; Darren 21:40: kept where they are, broken up as a table). */
+/* Its connections, a small table inside the card (HI-2528: kept where they are, broken up as a table). */
 .connection-list {
   container: connection-list / inline-size;
   display: flex;
@@ -5302,7 +5303,7 @@ h2.section#unused-worktrees {
   color: var(--warning);
   margin-left: 4px;
 }
-/* More room under it than before (HI-2528, Darren 21:40). */
+/* More room under it than before (HI-2528). */
 .connection-add {
   align-self: flex-start;
   margin: 10px 0 2px;
@@ -8436,7 +8437,7 @@ button.agent-place:hover {
     border-left: 1px solid var(--border-subtle);
   }
 }
-/* The map (HI-3179, Darren's decision): the graph and its agents' strip, Last actions always under them at full width.
+/* The map (HI-3179): the graph and its agents' strip, Last actions always under them at full width.
    Under the list (a narrow view) it is as tall as its graph allows; beside it (a wide view) its width is the split's,
    dragged at its right edge and kept, and the graph fills what Last actions leaves. */
 .activity-map {
@@ -10629,7 +10630,7 @@ body.pane-resizing-v .monaco-editor {
   flex: 0 0 auto;
 }
 /* Its heading is a line over its columns in the 10 px gap above them, its name on the line as a fieldset's legend
-   (HI-1682, Darren's decision): it takes no row of its own, so every column's top is the same with a group or without
+   (HI-1682): it takes no row of its own, so every column's top is the same with a group or without
    one. The name, on the view's background, may reach a pixel into the columns' tops. */
 .board-category-head {
   position: absolute;
@@ -11660,6 +11661,117 @@ textarea.input.task-blocked-input {
 }
 .card-work-marks li {
   color: var(--warning);
+}
+/* A revision's own changes (HI-3218): its files, then the chosen one's diff at a height of its own in the dialog. */
+.card-work-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-work-changes-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.card-work-changes-files .link.chosen {
+  font-weight: 600;
+}
+.card-work-changes-diff {
+  flex: none;
+  height: min(420px, 55vh);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+.card-work-comment-count {
+  margin-inline-start: 8px;
+}
+/* Sending a card's comments to its builder (HI-3220): the button beside the count, the preview's comments. */
+.card-work-send {
+  margin-inline-start: 8px;
+}
+.cw-send-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.cw-send-replace {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+/* Line comments over a revision's diff (HI-3219): the + in the glyph margin, then each line's threads and draft. */
+.monaco-editor .cw-comment-add {
+  cursor: pointer;
+  border-radius: 3px;
+  background: var(--accent-soft);
+}
+.monaco-editor .cw-comment-add::before {
+  content: '+';
+  display: block;
+  text-align: center;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-strong);
+}
+.cw-comment-zone {
+  z-index: 5;
+  padding: 2px 12px 2px 4px;
+  box-sizing: border-box;
+}
+.cw-comment-spot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-ui, inherit);
+  font-size: 12px;
+  white-space: normal;
+}
+.cw-comment,
+.cw-comment-composer {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cw-comment.resolved {
+  border-inline-start-color: var(--border);
+  opacity: 0.75;
+}
+.cw-comment-head,
+.cw-comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.cw-comment-body p {
+  margin: 0;
+}
+.cw-comment-composer textarea {
+  width: 100%;
+  min-height: 56px;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+}
+.cw-comments-elsewhere {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
 }
 .card-work-sub {
   color: var(--fg-muted);
@@ -13495,13 +13607,19 @@ button.progress-run-show:focus-visible {
   max-height: 180px;
   overflow-y: auto;
 }
+/* Each result a little card of its own (HI-3217): a thin line between them. */
+.progress-lane-picker-list > li + li {
+  border-top: 1px solid var(--border);
+}
+/* Two rows: the key and the title on the first, the title given the width; the lane that has it under them. */
 .progress-lane-picker-card {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
   width: 100%;
   min-width: 0;
-  padding: 2px 4px;
+  padding: 4px 6px;
   border: 0;
   border-radius: 3px;
   background: none;
@@ -13514,6 +13632,17 @@ button.progress-run-show:focus-visible {
 .progress-lane-picker-card:hover,
 .progress-lane-picker-card:focus-visible {
   background: var(--bg-hover);
+}
+.progress-lane-picker-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+/* Wrapped when long (a long translation in a narrow panel): the builder's name is what it says. */
+.progress-lane-picker-status {
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 .progress-lane-picker-none {
   flex: 1 1 100%;
@@ -14733,11 +14862,14 @@ button.progress-lane-why:focus-visible,
   color: var(--warning);
   font-size: 11px;
 }
-/* A lane's project after its pair (#1421): a link to its Version Control tab's Workflow section, cut short before the rest. */
+/* A lane's project after its pair (#1421): a link to its Version Control tab's Workflow section, cut short before the rest.
+   It keeps a few letters (HI-3209: a crowded header, "into <branch>" among its parts, squeezed it to nothing, a link no
+   one could see or click); its title names it whole. */
 .progress-lane-project {
   flex: 0 1 auto;
-  min-width: 0;
+  min-width: 3em;
   max-width: 30%;
+  text-align: start;
   padding: 0;
   border: 0;
   background: none;
@@ -14768,6 +14900,46 @@ button.progress-lane-why:focus-visible,
 /* Its tooltip's wrap keeps the tag whole beside a long "why it waits". */
 .progress-lane-top > .tip-wrap:has(> .progress-lane-state) {
   flex-shrink: 0;
+}
+/* Its target ("into <branch>", HI-3113) gives way before the project's link does (HI-3209): a branch name can be long, and
+   its tooltip names it whole. It keeps a few letters. */
+.progress-lane-top > .tip-wrap:has(> .progress-lane-state.lane-target) {
+  flex-shrink: 1;
+  min-width: 3em;
+}
+.progress-lane-state.lane-target {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Its tags' icons, shown instead of their words in a narrow panel (below). */
+.progress-lane-tag-icon {
+  display: none;
+}
+/* A narrow panel (its least width is 240px): a lane's pair, slot, project, old rules, "into <branch>", card and count
+   are more than its header holds (HI-3209). The two tags show as their icons, their tooltips and accessible names the
+   same, and the parts sit closer: the project's link and the card stay in view. */
+@container progress (max-width: 359px) {
+  .progress-lane-top {
+    gap: 4px;
+  }
+  .progress-lane-top .progress-lane-tag-icon {
+    display: inline-block;
+    font-size: 12px;
+    vertical-align: middle;
+  }
+  .progress-lane-top .progress-lane-tag-text {
+    display: none;
+  }
+  .progress-lane-top > .tip-wrap:has(> .progress-lane-state.lane-target) {
+    flex-shrink: 0;
+    min-width: 0;
+  }
+  .progress-lane-state.lane-target {
+    overflow: visible;
+  }
 }
 /* Retry an agent's new conversation (HI-2034): the reason's own place, kept whole (short: "⟳ Retry B1"); the project's name gives way. */
 button.progress-lane-retry {
@@ -15678,6 +15850,33 @@ button.progress-lane-retry {
 }
 .workflow-check .input:first-child {
   flex: 0 0 35%;
+}
+.workflow-guard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.workflow-guard-head {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.workflow-guard-head .input {
+  flex: 1;
+  min-width: 0;
+}
+.workflow-guard-matches.warn {
+  color: var(--warning);
+}
+.workflow-guard-matches .mono {
+  overflow-wrap: anywhere;
+}
+.workflow-guards > .flex {
+  gap: 6px;
+  flex-wrap: wrap;
 }
 .workflow-problems {
   color: var(--error);

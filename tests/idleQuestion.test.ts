@@ -16,11 +16,12 @@ import * as writer from '../src/main/lineWriter'
 import { advanced } from '../src/main/advanced'
 import { ADVANCED_DEFS } from '../src/shared/advanced'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const fixture = (name: string): string => readFileSync(join(__dirname, 'fixtures', name), 'utf8').replace(/\r\n/g, '\n')
 const QUESTION = 'Teach auto mode about your environment?'
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const RULE = '─'.repeat(60)
 
 describe("Claude Code's question by itself and its input box, on its screen (2.1.312)", () => {
@@ -324,7 +325,7 @@ describe('a held line the screen took (HI-1959, the 12:47 comment)', () => {
     // The dialog took the line and closed before the line was marked: its empty input is all there is, and stays so.
     await draw(e, EMPTY_INPUT)
     held(e)
-    await vi.waitFor(() => expect(e.lostSeen).toBeTruthy(), { timeout: 10_000 })
+    await vi.waitFor(() => expect(e.lostSeen).toBeTruthy(), { timeout: timing('wait.hang') })
     secondLook(e)
     expect(e.state.untakenLine).toBeUndefined()
   })
@@ -355,7 +356,7 @@ describe('a held line the screen took (HI-1959, the 12:47 comment)', () => {
     held(e)
     await draw(e, EMPTY_INPUT)
     look(e)
-    await vi.waitFor(() => expect(e.state.untakenLine).toBeUndefined(), { timeout: 10_000 })
+    await vi.waitFor(() => expect(e.state.untakenLine).toBeUndefined(), { timeout: timing('wait.hang') })
   })
 })
 describe("a Claude Code launch's settings: the offer turned off (HI-1959)", () => {

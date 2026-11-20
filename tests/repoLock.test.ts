@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { openLockDb } from '../src/main/db'
 import { REPO_LOCK_FILE, repoLockHolder, takeRepoLock } from '../src/main/repoLockCore'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
 const tmp = tempDir('cw-repo-lock-')
@@ -34,7 +35,7 @@ beforeAll(async () => {
   const entry = join(tmp, 'child-entry.cjs')
   writeFileSync(entry, CHILD)
   await build({ entryPoints: [entry], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
-}, 60_000)
+}, timing('hook.hang'))
 afterAll(() => rmSync(tmp, { recursive: true, force: true }))
 
 const children: ChildProcess[] = []
@@ -63,7 +64,7 @@ function contender(dir: string, profile: string, opts: { barrier?: string; waitM
   }
 }
 
-const WAIT = { timeout: 30_000, interval: 25 }
+const WAIT = { timeout: timing('wait.hang'), interval: 25 }
 
 describe('the repository lock across processes (#1347)', () => {
   it('two processes take it in turn: the second waits, naming the first, until it is released', async () => {

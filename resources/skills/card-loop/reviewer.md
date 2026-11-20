@@ -16,9 +16,9 @@ Woken with your card back, read it with `comments: 1`: its decisions, listed fir
 For each card, in order:
 1. Wait for it to arrive in Review (above).
 2. Review it with the **review-agent-work** skill: `cw_start_review` names what to review (a revision, or a no-code card's summary). For a code card in Git or jj, work that revision doesn't hold (uncommitted, or no commit named) isn't a failed round on that alone: start the watch for the builder's reply, ask with `cw_request_builder` (it wakes the builder), and end your turn.
-3. **Blocking findings**: `cw_verdict` with `pass: false` and them numbered, each with what to fix (`failKind: "explanation"` when only how the work was explained falls short), and end your turn (SKILL.md, Waiting). Points that aren't blocking become follow-up cards.
+3. **Blocking findings**: `cw_verdict` with `pass: false` and them numbered, each with what to fix (`failKind: "explanation"` when only how the work was explained falls short), and end your turn (SKILL.md, Waiting). Points that aren't blocking become follow-up cards. Each round a different new edge case: ask first (review-agent-work, verdict.md).
 4. **No blocking findings**: `cw_verdict` with `pass: true`, and take the next card.
 
 A finding the builder **disputes**: stop and ask (rounds.md).
 
-**A design or follow-up to check** (woken with "The builder: design HI-12/s40 posted…" or "follow-up HI-12/s41 ready…"): read its latest comment (and what a follow-up names as changed), start your watch again (while a follow-up is due, `changes: ["comment", "column"]`: it doesn't move the card), then answer with `cw_loop_step`, `step: "ok"` or `"gaps"` (what's missing, numbered) and `design`, its id, and end your turn. Not a review: no verdict, no round. Told the builder went ahead unchecked: nothing to answer.
+**A design or follow-up to check** (woken with "The builder: design HI-12/s40 posted…" or "follow-up HI-12/s41 ready…"; a follow-up *submitted*: step 2): read its latest comment (and what a follow-up names as changed), start your watch again (while a follow-up is due, `changes: ["comment", "column"]`: it doesn't move the card), then answer with `cw_loop_step`, `step: "ok"` or `"gaps"` (what's missing, numbered) and `design`, its id, and end your turn. Not a review: no verdict, no round. Told the builder went ahead unchecked: nothing to answer.

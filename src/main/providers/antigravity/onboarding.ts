@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'original-fs'
 import { mkdir, readFile, writeFile } from 'original-fs/promises'
 import { dirname, join } from 'path'
 
-// agy's first-run screens (HI-2547, Darren's decision (a) on r11): a fresh profile shows a colour scheme and agy's Terms
+// agy's first-run screens (HI-2547, decision (a) on r11): a fresh profile shows a colour scheme and agy's Terms
 // of Service & Data Use at its first interactive start, which Combwork never answers for the user. The user completes
 // them once, in Provider Setup's "Set up" (agy in a visible terminal, in Combwork's check profile); Combwork then copies
 // only what says they are done into each agent's profile, so agents start straight to work. Seen with 1.5.0: the screens'

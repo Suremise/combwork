@@ -6,6 +6,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined, onCombworkEvent: () => () => undefined }))
 /**
@@ -88,7 +89,7 @@ vi.mock('electron', async (importOriginal) => {
 })
 profile.dir = tempDir('cw-runrecords-profile-')
 /** A hung run's bound: the records' writes follow each other, so this is never reached by a working one. */
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 const file = join(profile.dir, 'leftovers.json')
 const saved = () => JSON.parse(readFileSync(file, 'utf8')) as { launches: unknown[]; ended?: string[] }
 
@@ -247,7 +248,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       await m.recordEndedLaunches()
       await m.leftoversSaved()
       expect(await (await restarted()).endedEarlier('c-stays')).toBe(false)
-    }, 20_000)
+    }, timing('test.hang'))
 
     it.runIf(process.platform === 'win32')('its helper lost during the look, and the next one lists it empty: not kept', async () => {
       const m = await endedAtQuit('c-lost')

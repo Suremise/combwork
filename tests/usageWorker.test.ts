@@ -6,6 +6,7 @@ import { spawn, type ChildProcess } from 'child_process'
 import { dirname, join } from 'path'
 import { Worker } from 'worker_threads'
 import { build } from 'esbuild'
+import { esbuildEagerGlob } from './esbuildGlob'
 import { describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { handleRequest, logInProcess, openableWaits, openFiles, type IngestJob, type IngestResult, type WorkerReply, type WorkerRequest } from '../src/main/usageWorker'
@@ -17,7 +18,8 @@ import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { estimateCost } from '../src/shared/prices'
 import type { AppSettings, ProviderId, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
-import { leftByAKill, refusedNow, whileMapped } from './mappedShm'
+import { leftByAKill, MAPPED_SHM_REFUSED, refusedNow, whileMapped } from './mappedShm'
+import { timing } from './timing.cjs'
 
 const T0 = Date.parse('2026-10-12T10:00:00.000Z')
 const line = (i: number, output = 100): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'claude-opus-5-5', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: output } } }) + '\n'
@@ -25,7 +27,7 @@ const prompt = (i: number): string => JSON.stringify({ type: 'user', timestamp: 
 
 let id = 0
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
-const HUNG_MS = 10_000
+const HUNG_MS = timing('wait.hang')
 
 /** Holds a file open the way an editor or a virus scanner can: no sharing, so it can't be read (as sessionInUse.test.ts does). */
 async function hold(file: string): Promise<ChildProcess> {
@@ -495,7 +497,7 @@ describe('the usage worker reading a transcript for main', () => {
     await t.close()
   })
 
-  it('free (HI-1772, Darren 27 Oct): only on servers on this PC, a known $0 whatever prices are set; a run anywhere else ends it for good', async () => {
+  it('free (HI-1772): only on servers on this PC, a known $0 whatever prices are set; a run anywhere else ends it for good', async () => {
     const t = await setup()
     // A local model, priced by the user (a price local-only sessions never use), and Claude Code's report beside it.
     const local = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'qwen3:8b', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
@@ -554,7 +556,7 @@ describe('the usage worker reading a transcript for main', () => {
     await h.close()
   })
 
-  it("an Ollama cloud model (HI-1773, Darren 27 Oct): a conversation free while local only, then run on a connection with a cloud model: Combwork's price for that id, never the CLI's report", async () => {
+  it("an Ollama cloud model (HI-1773): a conversation free while local only, then run on a connection with a cloud model: Combwork's price for that id, never the CLI's report", async () => {
     const t = await setup()
     // Claude Code's own $5 for it, priced as a Claude model, beside the requests.
     const cloud = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'glm-4.6:cloud', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
@@ -592,7 +594,7 @@ describe('the usage worker as main starts it (HI-1729)', () => {
     const stub = join(base, 'electron-in-worker.cjs')
     writeFileSync(stub, "module.exports = 'C:\\\\electron\\\\electron.exe'\n")
     const script = join(base, 'usage-worker.cjs')
-    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'usageWorker.ts')], outfile: script, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs', electron: stub }, logLevel: 'silent' })
+    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'usageWorker.ts')], outfile: script, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs', electron: stub }, plugins: [esbuildEagerGlob()], logLevel: 'silent' })
     const w = new Worker(script)
     try {
       const reply = await new Promise<WorkerReply>((resolve, reject) => {
@@ -610,7 +612,8 @@ describe('the usage worker as main starts it (HI-1729)', () => {
   })
 })
 
-describe.runIf(process.platform === 'win32')('a usage history whose -shm another process still maps (HI-2200)', () => {
+// Only where this SQLite refuses it (HI-3426: 3.54's opens it, nothing to wait for; MAPPED_SHM_REFUSED).
+describe.runIf(process.platform === 'win32' && MAPPED_SHM_REFUSED)('a usage history whose -shm another process still maps (HI-2200)', () => {
   const logged: string[] = []
   const capture = (m: WorkerReply): void => {
     if ('log' in m) logged.push(m.text)

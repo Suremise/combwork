@@ -13,7 +13,10 @@
 
 import { statSync } from 'original-fs'
 import { join } from 'path'
-import { foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
+import { ADVANCE_PREVIEW_GATE, advanceUnresolved, approvedByUser, foldCard, openEntry, passingReviewers, type CardState, type Fact, type FactData, type StageId } from '../../shared/workflow/facts'
+import { finishAdvances, finishPreviews } from '../../shared/workflow/options'
+import { okBeforeApplies } from '../../shared/workflow/guards'
+import { advanceHostOf } from './advanceHost'
 import { awaitsAgentMerge, hasStage, type Ruleset } from '../../shared/workflow/compile'
 import { notApproved } from '../../shared/workflow/guards'
 import type { HistoryPort } from '../platform/history'
@@ -29,6 +32,7 @@ import { sameFingerprint, type JjCandidateFingerprint, type JjCandidateOffer, ty
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { StoredText } from '../../shared/types'
 import { asCardCounts } from './containment'
+import { guardsOf, type GuardReport, type MergeGuard } from '../../shared/workflow/mergeGuards'
 
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
@@ -91,7 +95,7 @@ async function attributeOnce(wf: Workflow, hooks: ReconcileHooks, H: HistoryPort
     for (const b of bases.slice(1)) if ((await H.isAncestor(project, b, from)) === true) from = b
   }
   if (from === head) return 'done'
-  // The line's own commits (HI-2382, Darren): a branch merged in keeps its commits on their own cards; the merge is
+  // The line's own commits (HI-2382): a branch merged in keeps its commits on their own cards; the merge is
   // attributed like any commit of the line.
   const list = await H.commits(project, `${from}..${head}`, { firstParent: true })
   if (isUnknown(list)) return 'done'
@@ -266,7 +270,43 @@ export async function reconcile(wf: Workflow, card: CardRecord, hooks: Reconcile
   const c = wf.store.card(card.id)
   const s = wf.state(c)
   if (!s.started) return
-  return wf.platformOf(c, s).reconcile(c, hooks)
+  await wf.platformOf(c, s).reconcile(c, hooks)
+  await advanceStep(wf, c)
+}
+
+/**
+ * HI-3235 (HI-3235/s10 §D): a card whose finish is its platform's advance (`finishAdvances`, the descriptor's), in
+ * Approved, its pass holding and its OK given where G10 applies (bound to its latest submission and generation): its
+ * adapter's `advance` port, which settles the card's earlier attempts first and integrates it once its platform finds it
+ * ready. Generic: no platform is named, and a platform without the port is never asked. The actions its records left run
+ * here, after the adapter has let its locks go.
+ */
+export async function advanceStep(wf: Workflow, card0: CardRecord): Promise<void> {
+  const card = wf.store.card(card0.id)
+  const s = wf.state(card)
+  if (!wf.cfg.reconcileActs || card.stage !== 'approved' || !s.started || s.integrated || s.stale) return
+  const p = wf.platformOf(card, s)
+  if (!p.advance && !p.advancePreview) return
+  const r = wf.rulesetOf(card, s)
+  const advances = finishAdvances(r.options.finish)
+  // HI-3390: an open preview whose consent no longer holds (the finish changed, or a blocker added since it was asked)
+  // is closed, saying why on the card, so its Integrate can't be clicked to no effect. One closed for its blockers is
+  // asked again once they are Done (advancePreview).
+  if (s.requests.some((q) => q.gate === ADVANCE_PREVIEW_GATE)) {
+    const waits = wf.queueWaitingOn(card.id)
+    const why = !finishPreviews(r.options.finish) ? 'finish' : waits.length ? 'blocked' : null
+    if (why && (await advanceHostOf(wf).previewClosed(card, s.cycle, why, waits, null)) === 'recorded' && wf.cfg.autoRun !== false) await wf.runActions()
+  }
+  // HI-3236: a finish that previews asks the adapter for its preview (never an attempt: only the user's Integrate starts one).
+  if (!advances && !(finishPreviews(r.options.finish) && p.advancePreview)) return
+  if (wf.enforced() && okBeforeApplies(r, card.labels) && !approvedByUser(s, 'okBefore')) return
+  if (advances) {
+    if (!p.advance) return
+    await p.advance(card, s, advanceHostOf(wf))
+  } else await p.advancePreview!(card, s, advanceHostOf(wf))
+  // Its records' actions: the runtime's own runner only where it runs them (a harness); in the app, the actions worker,
+  // which runs a change's actions once it commits (HR1's round 1, finding 1).
+  if (wf.cfg.autoRun !== false) await wf.runActions()
 }
 
 /**
@@ -470,7 +510,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     if (published(wf, card, s)) {
       const behind = await H.isAncestor(project, th, i.result)
       if (isUnknown(behind)) return hooks.unknown?.(behind.what)
-      // HI-3041 (Darren's 2b): unless the remote no longer has the result either (undone there too): then it has left,
+      // HI-3041 (2b): unless the remote no longer has the result either (undone there too): then it has left,
       // as with a push after merging. The remote looked at only here, behind a published result (kept a minute).
       // Already marked: nothing for the remote to decide.
       if (behind && !s.marks.leftTarget) {
@@ -482,7 +522,7 @@ export async function reconcileHistory(wf: Workflow, H: HistoryPort, card0: Card
     const sub = s.latest
     const c = asCardCounts(s, await H.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th))
     if (isUnknown(c)) return hooks.unknown?.(c.what)
-    // HI-3041 (Darren's 3a): merged back by hand (the card's own change in its target again, by the test that marks it
+    // HI-3041 (3a): merged back by hand (the card's own change in its target again, by the test that marks it
     // left), the mark cleared too, not only once the queue's result is back.
     if (c && s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !!w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'BackInTarget', actor: 'outside', source: 'observed', dedupe: `back:${s.cycle}:after:${lastSeq(w, card.id, LEFT)}`, data: { revision: i.revision, target: i.target } }))
     if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && !w.state().marks.leftTarget && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:after:${lastSeq(w, card.id, BACK)}`, data: { revision: i.revision, target: i.target } }))
@@ -542,7 +582,7 @@ async function integratedOutside(wf: Workflow, H: HistoryPort, card: CardRecord,
  * returned card's builder and card are told.
  */
 export interface CandidateWords {
-  checksKey(options: WorkflowOptions, setup: string): string
+  checksKey(options: WorkflowOptions, setup: string, guards?: readonly MergeGuard[]): string
   entry(attempt: string): string
   wake(key: string, f: FactData['IntegrationFailed']): string
   comment(key: string, f: FactData['IntegrationFailed']): { text: string; shown: StoredText }
@@ -698,7 +738,7 @@ export type JjChecksUpdate =
   | { waiting: string; retryMs: number }
   | { stopped: string }
   | { failing: string; retryMs: number }
-  | { red: { check: string; output: string; logPath?: string; expected: string } }
+  | { red: { check: string; output: string; logPath?: string; expected: string; guards?: GuardReport } }
 
 /**
  * Publishes a candidate's checks' progress or outcome (HI-2938/s11 §2), only in a write that finds, in its own
@@ -715,7 +755,8 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
     const now = wf.store.card(card.id)
     const st = w.state()
     if (!sameFingerprint(candidateFingerprint(wf, now, st), at.fp)) return
-    if (words.checksKey(wf.rulesetOf(now, st).options, at.setup) !== at.key) return
+    // HI-3284: with the merge guards as the options are now: a guard changed since makes the key another.
+    if (words.checksKey(wf.rulesetOf(now, st).options, at.setup, guardsOf(wf.cfg.options())) !== at.key) return
     // The setup command still the one the key was made with (finding 3): project.json unchanged since it was read.
     if (at.setupStill && !at.setupStill()) return
     let rec: JjCandidateShown | null = null
@@ -730,7 +771,7 @@ export async function publishCandidateChecks(wf: Workflow, card: CardRecord, pro
     const r = rec as JjCandidateShown | null
     if (!r || r.state !== 'ready' || r.offer?.attempt !== at.attempt || !r.checks || (!('restart' in u) && r.checks.key !== at.key)) return
     if ('red' in u) {
-      const failed: FactData['IntegrationFailed'] = { entry: words.entry(at.attempt), revision: at.fp.revision, target: at.fp.target, reason: 'checks', transient: false, check: u.red.check, ...(u.red.logPath ? { logPath: u.red.logPath } : {}), ...(u.red.output ? { log: u.red.output.slice(-4000) } : {}) } // i18n-ignore: a failure's code, not text
+      const failed: FactData['IntegrationFailed'] = { entry: words.entry(at.attempt), revision: at.fp.revision, target: at.fp.target, reason: 'checks', transient: false, check: u.red.check, ...(u.red.logPath ? { logPath: u.red.logPath } : {}), ...(u.red.output ? { log: u.red.output.slice(-4000) } : {}), ...(u.red.guards ? { guards: u.red.guards } : {}) } // i18n-ignore: a failure's code, not text
       w.fact('IntegrationFailed', failed)
       w.tx.sql((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key)) // i18n-ignore: SQL
       wrote = true
@@ -782,7 +823,9 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
   const fp = candidateFingerprint(wf, card, s)
   if (!fp || !ports.candidate) return
   const project = ports.projectId()
-  const stillIn = (c: CardRecord, st: CardState): boolean => sameFingerprint(candidateFingerprint(wf, c, st), fp)
+  // HI-3321: and no advance of Combwork's unsettled, read in each write's own transaction: reconcileJj's check reads the
+  // card as its pass began, and an attempt (its AdvanceAttempted committed before it moves anything) may start after it.
+  const stillIn = (c: CardRecord, st: CardState): boolean => sameFingerprint(candidateFingerprint(wf, c, st), fp) && !advanceUnresolved(st)
   const still = (): boolean => {
     const c = wf.store.card(card.id)
     return stillIn(c, wf.state(c))
@@ -809,6 +852,9 @@ async function candidateFor(wf: Workflow, card: CardRecord, s: CardState, ports:
   if (had?.state === 'ready' && had.offer && !(ports.offerCurrent && (await ports.offerCurrent(fp.target, had.offer)))) {
     const seen = had
     await wf.write(card, null, 'outside', (w) => {
+      // HI-3321: never under an attempt in flight: between its jj move and its export the offer reads as not current, and
+      // withdrawing it would take the attempt's lease (its plan) and leave a move it made uncertain.
+      if (advanceUnresolved(w.state())) return
       w.tx.sql((db) => {
         const now = prior(db)
         if (now && now.gen === seen.gen && now.offer?.attempt === seen.offer?.attempt) db.prepare('DELETE FROM board_meta WHERE key = ?').run(key) // i18n-ignore: SQL
@@ -996,6 +1042,9 @@ export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: Reconc
   }
   const snap = approvalOf(card, s)
   if (!snap) return
+  // HI-3235: an advance of Combwork's unsettled (in flight, stopped or uncertain): only it and the user settle the card,
+  // so no outside proof (it would record Integrated over a stop) and no new candidate meanwhile.
+  if (advanceUnresolved(s)) return
   const approved = { base: snap.base, revision: snap.revision, key: snap.key }
   if (approved.revision !== s.started!.base) {
     // HI-2869: this observation's generation, reserved before anything is read (the window's containment record is
@@ -1016,7 +1065,8 @@ export async function reconcileJj(wf: Workflow, card0: CardRecord, hooks: Reconc
         // Only while the card is still exactly the approval proved (its cycle, stage, approved submission and its
         // endpoints, its recorded jj ids and its target), and nothing it depends on is undone.
         const now = wf.store.card(card.id)
-        if (!sameCycle(w, s) || !sameApproval(snap, approvalOf(now, w.state())) || wf.closeWaitsFor(w).length) return
+        // HI-3321: nor over an advance of Combwork's that started after this pass read the card (only it and the user settle it).
+        if (!sameCycle(w, s) || !sameApproval(snap, approvalOf(now, w.state())) || advanceUnresolved(w.state()) || wf.closeWaitsFor(w).length) return
         const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision: snap.revision, target: snap.target, result: p.result, method: p.method, by: 'outside', platform: p.platform } }) // i18n-ignore: a fact's kind and codes, not text
         if (!f) return
         w.written.push(f as Fact)

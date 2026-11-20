@@ -85,6 +85,8 @@ interface CombworkMessageValues {
   'service.folderChanges.busy': { folder: string | number; what: string | number }
   'service.folderChanges.caseRename': { from: string | number; to: string | number }
   'service.folderChanges.changed': { folder: string | number }
+  'service.folderChanges.commitCancelled': undefined
+  'service.folderChanges.commitCancelledMoved': { head: string }
   'service.folderChanges.commitFailed': { why: string | number }
   'service.folderChanges.commitTimedOut': { seconds: number }
   'service.folderChanges.commitTimedOutMoved': { seconds: number; head: string }
@@ -100,6 +102,7 @@ interface CombworkMessageValues {
   'service.folderChanges.nothing': { file: string | number }
   'service.folderChanges.readFailed': { why: string | number }
   'service.folderChanges.removedForFolder': { file: string | number }
+  'service.folderChanges.stashCancelled': { made: string; stash: string | number }
   'service.folderChanges.stashFailed': { why: string | number }
   'service.folderChanges.stashPartial': { stash: string | number; why: string | number }
   'service.folderChanges.stashTimedOut': { seconds: number; made: string; stash: string | number }
@@ -143,6 +146,7 @@ interface CombworkMessageValues {
   'service.git.gitlinkUnread': { path: string | number }
   'service.git.outside': undefined
   'service.git.tooLarge': { kb: number }
+  'service.gitCancel.taken': undefined
   'service.gitCompare.noBranch': { branch: string | number }
   'service.gitRepo.addFailed': { remote: string | number; why: string | number }
   'service.gitRepo.added': { remote: string | number }
@@ -202,6 +206,7 @@ interface CombworkMessageValues {
   'service.gitRepo.renameRemoteFailed': { remote: string | number; why: string | number }
   'service.gitRepo.setFailed': { key: string | number; why: string | number }
   'service.gitRepo.startMoved': { ref: string | number; now: string | number }
+  'service.gitRepo.stopped': { kind: string }
   'service.gitRepo.switchFailed': { branch: string | number; why: string | number }
   'service.gitRepo.switched': { branch: string | number }
   'service.gitRepo.switchedTracking': { branch: string | number; remote: string | number }
@@ -235,6 +240,8 @@ interface CombworkMessageValues {
   'service.gitRepo.urlFailed': { remote: string | number; why: string | number }
   'service.intent.noWorkflow': { card: string | number }
   'service.intent.queueNotAgents': undefined
+  'service.jj.revisionNoRepo': undefined
+  'service.jj.revisionUnreadable': { path: string | number; commit: string | number; error: string | number }
   'service.keys.closed': undefined
   'service.keys.form': undefined
   'service.keys.notice': { keys: string | number }
@@ -308,6 +315,7 @@ interface CombworkMessageValues {
   'service.nextVersion.sameName': { from: string | number }
   'service.providers.keysStopped': { task: string | number; why: string | number }
   'service.providers.noSetup': { cli: string | number }
+  'service.providers.noTask': { cli: string | number; task: string }
   'service.providers.notInstalled': { cli: string | number }
   'service.providers.pickNotFound': { task: string | number; item: string | number }
   'service.providers.retryUnavailable': undefined

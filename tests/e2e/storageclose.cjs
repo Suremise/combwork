@@ -79,16 +79,16 @@ function project(p) {
   const started = await lib.until(async () => {
     const r = await reads()
     return r.alpha === 1 && r.beta === 1 ? r : null
-  }, 5000)
+  }, lib.timing('hang.ui'))
   check('both walks start and are held', !!started, JSON.stringify(await reads()))
 
   // Window 2 closes: its walk stops; window 1's, with the same request id, carries on.
   await inv2('window:close').catch(() => undefined) // The page can go before it hears back.
-  check('window 2 closes', !!(await lib.until(async () => (await inv('window:count')) === 1, 10000)))
+  check('window 2 closes', !!(await lib.until(async () => (await inv('window:count')) === 1, lib.timing('hang.ui'))))
   await release()
   const done = await page.evaluate(() => window.__storage)
   check("window 1's measurement gets its whole result", done.attachments === DIRS * 100, JSON.stringify(done))
-  await lib.sleep(500) // A fixed wait on purpose: this checks that beta's walk reads NO further folders, which no condition can show.
+  await lib.sleep(lib.timing('quiet.walkStoppedMs')) // A quiet window on purpose: this checks that beta's walk reads NO further folders.
   const after = await reads()
   check("window 2's walk stopped when it closed: no folder read after its first", after.beta === 1, JSON.stringify(after))
   check("…and window 1's read every folder", after.alpha === DIRS + 1, JSON.stringify(after))
@@ -96,11 +96,11 @@ function project(p) {
   // A reload in window 1 stops its own walk the same way.
   await hold()
   await ask(page, alpha, 'storage-2')
-  check("window 1's next walk is held", !!(await lib.until(async () => (await reads()).alpha === DIRS + 2, 5000)), JSON.stringify(await reads()))
+  check("window 1's next walk is held", !!(await lib.until(async () => (await reads()).alpha === DIRS + 2, lib.timing('hang.ui'))), JSON.stringify(await reads()))
   await page.reload()
   await lib.appReady(page)
   await release()
-  await lib.sleep(500) // A fixed wait on purpose, as above: no further folder read.
+  await lib.sleep(lib.timing('quiet.walkStoppedMs')) // A quiet window on purpose, as above: no further folder read.
   const reloaded = await reads()
   check('reloading the page stopped its walk', reloaded.alpha === DIRS + 2, JSON.stringify(reloaded))
 

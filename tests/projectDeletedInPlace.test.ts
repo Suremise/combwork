@@ -10,6 +10,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 // Git as the tests run it (#369, as combworkVcs.test.ts): the run context's environment, the shell's GIT_* kept out of main's.
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
@@ -23,9 +24,9 @@ const base = tempDir('cw-deleted-in-place-')
 
 const { configTestHooks, createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 /** Bounds a wait for a held read to be reached: only a hung read takes this long. */
-const HUNG_MS = 15_000
+const HUNG_MS = timing('wait.hang')
 
 function project(ws: string, name: string, git = false): string {
   const p = join(ws, name)
@@ -38,7 +39,16 @@ function project(ws: string, name: string, git = false): string {
 const combwork = (p: string): string => join(p, '.combwork')
 const exclude = (p: string): string => join(p, '.git', 'info', 'exclude')
 const excludes = (p: string): boolean => existsSync(exclude(p)) && /\.combwork/.test(readFileSync(exclude(p), 'utf8'))
-const listed = async (w: { refresh: () => Promise<{ projects: { path: string }[] }> }, p: string): Promise<boolean> => (await w.refresh()).projects.some((x) => x.path.toLowerCase() === p.toLowerCase())
+// Whether the workspace lists it once a refresh begun now has been reported (HI-3349). A refresh hands back the list from
+// before when a project.json was written while it read (#999): here the root watcher's id check giving a new folder its
+// id, which a slow runner reaches mid-read. Each such write schedules the refresh that reports it, so the answer is read
+// once those have run, never from the first refresh's reply alone.
+type Lists = { refresh: () => Promise<unknown>; refreshesSettled: () => Promise<void>; info: () => { projects: { path: string }[] } | null }
+const listed = async (w: Lists, p: string): Promise<boolean> => {
+  await w.refresh()
+  await w.refreshesSettled()
+  return (w.info()?.projects ?? []).some((x) => x.path.toLowerCase() === p.toLowerCase())
+}
 
 describe('a project folder deleted in place (HI-2564)', () => {
   it('a Git project emptied in steps between refreshes is never set up again, and its folder goes', async () => {

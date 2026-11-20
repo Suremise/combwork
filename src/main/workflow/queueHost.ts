@@ -33,6 +33,8 @@ import { advanced } from '../advanced'
 import { withRepoLock } from '../repoLock'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import { onAction } from './actionWorker'
+import { advanceHostOf } from './advanceHost'
+import type { AdvanceAnswer } from '../platform/adapter'
 import { withoutWriteFence } from './factStore'
 import { catchUpKey, catchUpOf, MergeQueue, pushOwedKey, pushOwedOf, type QueueConfig, type QueueHook, type QueueHooks, type QueueStepInfo } from './mergeQueue'
 import { changingFolder, inFolder } from '../folderFence'
@@ -44,10 +46,11 @@ import { defaultProbe, type ProcessProbe } from './queueProcs'
 import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import { openEntry, type FactData } from '../../shared/workflow/facts'
-import { FOCUSED_PICK_SECONDS, QUEUE_CHECKED_OUT_TARGET, QUEUE_FOCUSED_JOBS, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
+import { FOCUSED_PICK_DEFAULT_S, FOCUSED_PICK_SECONDS, QUEUE_CHECKED_OUT_TARGET, QUEUE_FOCUSED_JOBS, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
 import { childEnv } from '../ptyHost'
 import { pausedFor } from '../teamPause'
 import { queueTransportStore } from '../queueTransportStore'
+import { guardLimits } from './mergeGuardLimits'
 
 const log = createLogger('queue')
 
@@ -337,7 +340,9 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     // HI-1185: the signing check's signer, in the lease's job as the test merge's commands are.
     // HI-2947: as git starts it (the check quotes its words), its first word given. HI-3208: with no console of its own.
     spawn: (file, args, o) => runner.run('testMerge', file, args, { cwd: o.cwd, env: o.env, timeoutMs: o.timeoutMs, ...(o.input !== undefined ? { input: o.input } : {}), ...(o.argv0 !== undefined ? { argv0: o.argv0 } : {}), ...(o.verbatim ? { windowsVerbatimArguments: true } : {}), ...(o.noConsole ? { noConsole: true } : {}) }),
-    signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 60) * 1000,
+    signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 300) * 1000,
+    // HI-3284: the merge guards' time limit and lines, as Settings → Advanced says at each check.
+    guardLimits: () => guardLimits(),
     lock: (fn) => withRepoLock(h.projectPath, fn, { quiet: true, project: h.projectPath }),
     enforced: () => workflowEnforced(),
     teamPaused: () => !!pausedFor(h.projectPath),
@@ -354,7 +359,7 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     // G20 (HI-1367): the pick at the result runs as a check does; its tests and results files in Combwork's own folder.
     focused: {
       env: () => childEnv(),
-      pickTimeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || 180) * 1000,
+      pickTimeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || FOCUSED_PICK_DEFAULT_S) * 1000,
       jobs: () => Math.max(1, Number(advanced.get(QUEUE_FOCUSED_JOBS)) || 2),
       dir: join(app.getPath('userData'), 'merge-queue', 'focused')
     },
@@ -489,6 +494,26 @@ function projectOfCard(ws: WorkspaceService, card: number): string | null {
 let stopHosts: (() => void) | null = null
 
 /**
+ * HI-3235: the actions worker's handler for the user's answer to an advance's question: to the card's platform adapter
+ * (its optional port: no platform named). Delivered: run again until marked, which the handler allows (it reads the
+ * attempt's journal before anything, so a run after a crash runs nothing twice); a failure marks it failed, and the
+ * attempt's question comes back by the reconciler's recovery once no answer is pending. Registered with the queue hosts.
+ */
+export function registerAdvanceAnswers(): void {
+  onAction(
+    'advanceAnswer',
+    async (a, ws) => {
+      const project = projectOfCard(ws, a.card)
+      const wf = project ? await workflowFor(ws, project) : null
+      if (!wf) throw new Error(`advance answer: card #${a.card} has no project here`) // i18n-ignore: an action's failure, for the log
+      const card = wf.store.card(a.card)
+      await wf.platformOf(card).advanceAnswer?.(card, a.payload as unknown as AdvanceAnswer, advanceHostOf(wf))
+    },
+    'delivered'
+  )
+}
+
+/**
  * Starts the app's merge queue (index.ts, once): `enqueue` runs a target's host; `pin` pins a submission's revision
  * (the runtime wrote it, nothing in the app ran it before the queue); `releaseSlot` is slotCards.ts's (#1438); a
  * workspace opening starts its hosts with open entries; the rules
@@ -514,6 +539,7 @@ export function startQueueHosts(): void {
     const wf = project ? await workflowFor(ws, project) : null
     if (wf) await wf.platformOf(wf.store.card(a.card)).perform('pin', a.payload)
   })
+  registerAdvanceAnswers()
   const seen = new WeakSet<AbortSignal>()
   const off = onCombworkEvent((e) => {
     // The team resuming (HI-2081): its queues go on with what waited, as when the rules are turned on again.

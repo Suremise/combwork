@@ -1,9 +1,11 @@
 // Screenshot cases for the `providers` area (#797): the provider adapters' user text, reached for the i18nshots route
 // (tests/e2e/i18nshots.cjs has the case format) with locale-independent means only: IPC, command ids and structural
 // hooks, never English text. Codex and GitHub Copilot are turned on for these screens (and off again after): their CLIs
-// are looked for with the test copy's empty homes (lib.cjs gives every test Combwork its own), so Provider Setup shows their
-// readiness (not installed, or not signed in, or the sandbox to set up), whatever this machine has.
+// are looked for with the test copy's empty homes (lib.cjs gives every test Combwork its own), so Provider Setup shows Codex's
+// readiness (not installed, or not signed in, or the sandbox to set up), whatever this machine has. Copilot's can be empty
+// (HI-3431): its sign-in is this PC's gh's, which its empty home doesn't hide, or unknown when gh is slow.
 const fs = require('fs')
+const { timing } = require('../../timing.cjs')
 const path = require('path')
 
 const WINDOW = { width: 1400, height: 860 }
@@ -15,12 +17,21 @@ const setProviders = (ctx, on) => ctx.inv('settings:update', { providers: { code
 async function agentSetup(ctx) {
   const { inv, lib, page, app } = ctx
   await setProviders(ctx, true)
+  const t0 = Date.now()
   await inv('provider:refresh')
+  const refreshed = Date.now() - t0
+  let seen = null
+  // HI-3431: both checks settled, and Codex's readiness there (its empty home: never signed in). Copilot's may rightly be
+  // empty: signed in through this PC's gh, or its sign-in unknown when `gh auth status` outruns its bound under load, with
+  // no update to offer; its check has settled all the same, and nothing checks it again.
   const ready = async () => {
     const all = await inv('provider:info')
-    return ['codex', 'copilot'].every((id) => all[id] && !all[id].checking && (all[id].readiness ?? []).length > 0)
+    seen = all
+    return ['codex', 'copilot'].every((id) => all[id] && !all[id].checking) && (all.codex.readiness ?? []).length > 0
   }
-  if (!(await lib.until(ready, ctx.hungMs))) throw new Error("Codex's and Copilot's readiness did not come")
+  const said = () => ['codex', 'copilot'].map((id) => { const i = seen?.[id]; return i ? `${id}: checking ${i.checking}, found ${i.found}, loggedIn ${i.loggedIn}, update ${i.updateAvailable} (${i.version} → ${i.latestVersion}), readiness [${(i.readiness ?? []).map((r) => r.id).join(', ')}]` : `${id}: none` }).join('; ')
+  if (!(await lib.until(ready, ctx.hungMs))) throw new Error(`Codex's readiness, or Copilot's check, did not come (refresh took ${refreshed} ms; ${said()})`)
+  console.log(`providers: checked after ${Date.now() - t0} ms (refresh ${refreshed} ms; ${said()})`)
   await lib.fitWindow(app, page, { width: WINDOW.width, height: TALL })
   return setupTab(ctx, 'codex', 1)
 }
@@ -50,7 +61,7 @@ async function shown(ctx, locator, what) {
 
 async function closeToasts(ctx) {
   const { page, lib } = ctx
-  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: 2000 }).then(() => false, () => false)
+  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
   if (!(await lib.until(async () => (await page.locator('.toasts .toast').count()) === 0 || (await dismiss()), ctx.hungMs))) throw new Error("the notices didn't close")
 }
 

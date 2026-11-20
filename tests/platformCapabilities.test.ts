@@ -41,8 +41,10 @@ function oldFact(p: ProjectPlatform): { id: string; values?: Record<string, stri
 describe('HI-3140: the descriptor, presentation and port answers equal the id switches they replaced', () => {
   it("offers the form's finishes and folders exactly as before, in order", () => {
     expect(formFinishes('git')).toEqual(['combworkMerges', 'agentMerges', 'committed', 'notChecked'])
-    expect(formFinishes('none')).toEqual(['combworkMerges', 'agentMerges', 'committed', 'notChecked'])
-    expect(formFinishes('jj')).toEqual(['userIntegrates'])
+    // HI-2840: None's own finish, its descriptor's (its form has no finish row, so nothing it shows changed).
+    expect(formFinishes('none')).toEqual(['accept'])
+    // HI-3235/HI-3236: Combwork's advance, its preview and click, then the user integrating by hand.
+    expect(formFinishes('jj')).toEqual(['combworkAdvances', 'previewAdvance', 'userIntegrates'])
     expect(formFolders('git')).toEqual(['slots', 'project'])
     expect(formFolders('none')).toEqual(['slots', 'project'])
     expect(formFolders('jj')).toEqual(['slots'])

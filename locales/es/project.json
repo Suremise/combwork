@@ -238,6 +238,7 @@
   "project.limit.counts": "{used, number} de {entitlement, number} usados",
   "project.limit.heading": "{plan, select, none {Límites del plan, de toda la cuenta, actualizados {when}} other {Límites del plan ({plan}), de toda la cuenta, actualizados {when}}}",
   "project.limit.models": "{models, select, gemini {Modelos Gemini} otherModels {Otros modelos} premium {Solicitudes premium} chat {Mensajes de chat} completions {Completados de código} other {{models}}}{window, select, weekly {, semanal} other {}}",
+  "project.limit.scoped": "{name}{window, select, weekly {, semanal} fiveHour {, 5 horas} hours {, {hours, plural, one {# hora} many {# horas} other {# horas}}} other {}}",
   "project.limit.noConnections": "No hay ninguna cuenta de {provider} activada en este espacio de trabajo. Activa una en Configuración → Cuentas y conexiones para ver aquí sus límites de plan.",
   "project.limit.noneConnection": "Sus límites aparecen después del siguiente mensaje en una sesión en {name}.",
   "project.limit.notIncluded": "No incluido en tu plan",

@@ -35,7 +35,8 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS repo_lock (
 ) STRICT`
 
 /** SQLite's own wait for its file lock: a transaction on the lock lasts well under a millisecond. */
-const BUSY_MS = 1000
+/** HI-3374: the repository lock's database's busy wait (in its own worker): 10 s, for a slow disk. */
+const BUSY_MS = 10_000
 /** How often a waiter judges a live holder's identity again (a start time is a PowerShell query, about half a second). */
 const RECHECK_MS = 2000
 

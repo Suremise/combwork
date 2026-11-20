@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-deliveries-closed-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -106,7 +107,7 @@ describe("a closed workspace's deliveries", () => {
       else deliveries.setBeforePlanForTests(held)
       try {
         const reading = deliveries.load(host).catch(() => null)
-        await vi.waitFor(() => expect(held).toHaveBeenCalled(), { timeout: 20000 })
+        await vi.waitFor(() => expect(held).toHaveBeenCalled(), { timeout: timing('wait.hang') })
         await w.open(wsB)
         g.release()
         await reading

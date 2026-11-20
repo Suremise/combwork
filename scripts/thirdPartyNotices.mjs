@@ -10,7 +10,7 @@ import { licenceText } from './licenseText.mjs'
 // Bundled into the renderer by Vite (devDependencies because they are compiled in, not installed).
 export const RENDERER = ['react', 'react-dom', '@xterm/xterm', '@xterm/addon-fit', '@xterm/addon-web-links', '@xterm/addon-webgl', 'monaco-editor', 'dompurify', 'marked', 'zustand', '@vscode/codicons']
 
-// Packages offered under a choice of licences, and the one Combwork takes (Darren's call, #185), said where each is listed.
+// Packages offered under a choice of licences, and the one Combwork takes (#185), said where each is listed.
 const CHOSEN = { dompurify: 'Apache-2.0' }
 // What a package's own licence field leaves out, from its licence files (#185).
 const NOTES = { '@vscode/codicons': 'code MIT (LICENSE-CODE); the Git logo icon CC-BY-3.0 (Jason Long)' }

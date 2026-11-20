@@ -18,6 +18,10 @@
   "api.agent.freshWhySession": {
     "text": "the Assistant's session that asked for it ended meanwhile"
   },
+  "api.agent.idleResume": {
+    "text": "{agent}'s conversation {session} was last active {idle} ago{size, select, tokens {, with about {tokens} tokens of context} bytes {; its transcript is {bytes}} other {}}. It has most likely lost its prompt cache, so resuming it may process that context again; a fresh conversation may save tokens. Leave resume out for a new conversation, or pass resumeIdle: true to resume this one anyway.",
+    "note": "HI-3360: a start that would resume a long-idle conversation is refused until the caller chooses. {idle}: how long, such as 3 h 5 min; size: tokens (the context's, when the CLI says), bytes (only the transcript's size known: never called tokens), other (neither). resume and resumeIdle are the start's arguments."
+  },
   "api.agent.inputDisabled": {
     "text": "Session input is disabled. Enable it in Settings → Agent API."
   },
@@ -267,6 +271,9 @@
   "api.card.lanePosition": {
     "text": "lane's position is last (the default) or next (before its first card still in Todo)"
   },
+  "api.card.lineCommentsState": {
+    "text": "Unknown state \"{state}\": open or all."
+  },
   "api.card.madeKind": {
     "text": "made it {kind}"
   },
@@ -279,6 +286,9 @@
   },
   "api.card.movedToEnd": {
     "text": "moved it to the {position} of {column}"
+  },
+  "api.card.noFeedback": {
+    "text": "{card} has no sent batch \"{batch}\"."
   },
   "api.card.notANumber": {
     "text": "\"{value}\" is not a card number or key (12, #12 or HI-12)"
@@ -367,6 +377,10 @@
   },
   "api.change.addConnection": {
     "text": "make a connection"
+  },
+  "api.change.answerSimplify": {
+    "text": "answer {card}'s simplify check",
+    "note": "HI-3188: the Assistant's answer to a card's simplify check, as its refusals and activity call it."
   },
   "api.change.cancelMessages": {
     "text": "cancel the messages waiting for {agent} in {project}"
@@ -693,6 +707,10 @@
   "api.done.alreadyStopped": {
     "text": "{agent} in {project} had already stopped"
   },
+  "api.done.answerSimplify": {
+    "text": "{card} {title}: answered its simplify check, {choice, select, carryOn {carry on} other {simplify}}",
+    "note": "HI-3188: the Assistant's answer to a card's simplify check, in its activity."
+  },
   "api.done.branchCreated": {
     "text": "Created {name} from {from} ({commit}) in {project}",
     "note": "HI-2807: {commit} is a short hash."
@@ -861,6 +879,18 @@
   "api.http.portInUse": {
     "text": "Port {port} is already in use"
   },
+  "api.http.requestKey": {
+    "text": "X-Combwork-Request must be 16 to 64 letters, digits, - or _.",
+    "note": "HI-3195: a malformed request key header (cw-mcp makes it; X-Combwork-Request is a header name)."
+  },
+  "api.http.requestKeyReused": {
+    "text": "That request key was used for another request: nothing was done. Send a new request without reusing its key.",
+    "note": "HI-3195: an Agent API write sent with a request key that an earlier, different request of the same launch used."
+  },
+  "api.http.requestsBusy": {
+    "text": "Too many writes are in flight right now: nothing was done. Try again in a moment.",
+    "note": "HI-3195: the keyed writes in flight are at their limit; the request may be sent again."
+  },
   "api.http.tokenFileNote": {
     "text": "Bearer token for the Combwork Agent API. Regenerate it in Settings → Agent API."
   },
@@ -875,6 +905,10 @@
   },
   "api.inbox.readArg": {
     "text": "read is true or false"
+  },
+  "api.inbox.staleLaunch": {
+    "text": "This launch of yours was replaced (a restart or a new conversation): nothing was read or acked through it. Your current launch reads its inbox.",
+    "note": "HI-3195: an inbox read or ack from an agent launch that has since been replaced."
   },
   "api.intent.acceptArg": {
     "text": "accept must be a list of at most {max} test ids.",

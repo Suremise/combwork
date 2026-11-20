@@ -11,7 +11,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 20000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'accounts-profile')
 const home = path.join(lib.WORK, 'accounts-claude-home')
@@ -225,7 +225,7 @@ const check = (name, ok, extra = '') => {
     await shots('checking')
     fs.writeFileSync(trustGo, '')
     check('…then Set up by itself: the workspace folder’s trust covers it, no new answer', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
-    // A project with no agent on Claude Code doesn't count (HI-1871, Darren): no read for it, nothing pending.
+    // A project with no agent on Claude Code doesn't count (HI-1871): no read for it, nothing pending.
     fs.mkdirSync(path.join(ws1, 'delta'), { recursive: true })
     await inv('workspace:refresh')
     check('a project with no agent on this CLI isn’t counted', (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1 && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
@@ -276,6 +276,34 @@ const check = (name, ok, extra = '') => {
     fs.rmSync(epsilonGone, { recursive: true, force: true })
     await inv('workspace:refresh')
     check('…removed, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
+
+    // --- A reviewer's review copies (HI-3337): Claude Code 2.1.326 asks about the copies folder at every start until it
+    // trusts the workspace's worktrees folder, so a reviewer on the connection adds that folder: named as review copies,
+    // Set Up opens there with its own hint, and once the fake records the answer it is set up again.
+    const reviewer = await inv('agents:update', path.join(ws1, 'alpha'), 'a-one', { workflowRole: 'reviewer' })
+    const worktreesReal = fs.realpathSync.native(path.dirname(ws1)) + path.sep + `${path.basename(ws1)}.worktrees`
+    // HI-3341: the open window reads it again on the role change alone: the row is read before anything else lists the
+    // connections (the trustOf poll below would ask main for them).
+    check('a reviewer on it: its row, read alone, names the review copies as not trusted', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1 && /Not trusted yet in this workspace: review copies/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)))
+    const copiesTrust = await lib.until(async () => {
+      const t = await trustOf(inv, personal.id)
+      return t && !t.checking && t.pending.length ? t : null
+    }, HUNG_MS)
+    check('a reviewer on it: it needs set up for the worktrees folder, its review copies', !!copiesTrust && JSON.stringify(copiesTrust.pending) === JSON.stringify([{ project: path.basename(worktreesReal), folder: worktreesReal, git: false, copies: true }]), JSON.stringify({ role: reviewer?.workflowRole, trust: copiesTrust ?? (await trustOf(inv, personal.id)) }))
+    await shots('copies-not-trusted')
+    const copiesLaunches = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).length
+    await row('Personal').locator('[data-set-up]').click()
+    check('…its Set Up opens in the worktrees folder, saying it is where review copies are', !!(await lib.until(async () => /worktrees folder.*review copies/.test(await page.locator('.account-signin [data-set-up-in]').innerText().catch(() => '')), HUNG_MS)))
+    await shots('set-up-copies')
+    const copiesRun = await lib.until(async () => {
+      const all = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
+      return all.length > copiesLaunches ? all.at(-1) : null
+    }, HUNG_MS)
+    check('…the CLI run in the workspace’s worktrees folder, on the connection', !!copiesRun && path.resolve(copiesRun.cwd).toLowerCase() === worktreesReal.toLowerCase(), JSON.stringify(copiesRun))
+    await lib.until(async () => JSON.parse(fs.readFileSync(path.join(folder, '.claude.json'), 'utf8')).projects?.[worktreesReal.replace(/\\/g, '/')]?.hasTrustDialogAccepted === true, HUNG_MS)
+    await closeRunning(true)
+    check('…answered once, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
+    await inv('agents:update', path.join(ws1, 'alpha'), 'a-one', { workflowRole: 'builder' })
 
     // --- Rename: the name only.
     await menuOf('Personal', 'Rename…')
@@ -340,7 +368,7 @@ const check = (name, ok, extra = '') => {
     await p2.waitForLoadState('domcontentloaded')
     await lib.appReady(p2)
     await lib.openWorkspace(invOn(p2), p2, ws2)
-    // A new workspace starts with none on (HI-2650, Darren 6 Nov: nothing is turned on by itself); turned on there by hand.
+    // A new workspace starts with none on (HI-2650: nothing is turned on by itself); turned on there by hand.
     check('a new workspace starts with none on (HI-2650)', wsJson(ws2) === undefined, JSON.stringify(wsJson(ws2)))
     await invOn(p2)('connections:setOn', personal.id, true)
     check('…Personal turned on there', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), HUNG_MS)), JSON.stringify(wsJson(ws2)))

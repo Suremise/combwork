@@ -8,6 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { CombworkEvent } from '../src/shared/types'
 import type { ForYouSummary } from '../src/shared/workflow/workView'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-card-work-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -90,10 +91,10 @@ describe("a card's work from the board (#1223)", () => {
     expect(cardWork(w, archived)!.revisions[0].summary).toBe(marker)
   })
 
-  it('reads again only the cards a change touched, on a board shaped like a long-used one (#1629)', { timeout: 120_000 }, async () => {
+  it('reads again only the cards a change touched, on a board shaped like a long-used one (#1629)', { timeout: timing('test.hang') }, async () => {
     const w = await workspace()
     const facts = FactStore.forBoard(w, { project: 'p', key: 'P' })
-    // As Darren's board: 1,277 archived cards from before 1.0, 140 live ones in Todo and Done, and 20 in flight with work.
+    // As the maintainer's board: 1,277 archived cards from before 1.0, 140 live ones in Todo and Done, and 20 in flight with work.
     await store.boardWrite(w, async () => {
       for (let i = 0; i < 1417; i++) facts.createCard({ title: `Card ${i}`, kind: 'code', labels: [], blockedBy: [], preWorkflow: true, stage: i % 2 ? 'done' : 'todo' })
       store.workspaceDb(w.path!).writer.prepare('UPDATE cards SET archived = 1 WHERE number < (SELECT min(number) + 1277 FROM cards)').run()

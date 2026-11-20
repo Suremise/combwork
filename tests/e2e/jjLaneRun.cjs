@@ -31,7 +31,7 @@ const { DatabaseSync } = require('node:sqlite')
 const { jjDir, portableJj } = require('../jjPortable.cjs')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 60000
+const HUNG_MS = lib.timing('hang.step')
 const exe = portableJj()
 if (!exe) {
   console.log("SKIP jjlane: the pinned jj isn't fetched (npm run jj:fetch)")
@@ -222,7 +222,7 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     const pid = JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).id
     const dbFile = path.join(ws, '.combwork', 'combwork.db')
     const metaRead = (sql, ...a) => {
-      const db = new DatabaseSync(dbFile, { readOnly: true, timeout: 5000 })
+      const db = new DatabaseSync(dbFile, { readOnly: true, timeout: lib.timing('db.busyMs') })
       try {
         return db.prepare(sql).all(...a)
       } finally {
@@ -457,7 +457,7 @@ const shared = (edit) => SHARED.map((l, i) => edit[i] ?? l).join('\n') + '\n'
     // The user's own route: Done by hand (an override), recorded apart from the automatic reconciliation above.
     const done5 = await inv('tasks:move', n5, 'done', { confirm: true, reason: 'Integrated by hand after resolving a conflict' }).catch((e) => ({ error: String(e) }))
     check('the user moves card 5 to Done themselves (an override, not a proof)', !!(await until(async () => (await column(n5)) === 'done', HUNG_MS)) && (await integrationOf(n5)) === null, JSON.stringify({ done5, column: await column(n5), integration: await integrationOf(n5) }))
-    // HI-2924 (Darren's decision): the user's own Done is their word that it's integrated. The Work section says so, and
+    // HI-2924: the user's own Done is their word that it's integrated. The Work section says so, and
     // the slot (holding exactly the submitted commits) goes back to the pool without a proof.
     const unproved = await until(async () => (await inv('tasks:work', n5))?.doneUnproved ?? null, HUNG_MS)
     check("card 5's Work section: Done by you, integration not proved", !!unproved?.at && (await integrationOf(n5)) === null, JSON.stringify({ doneUnproved: (await inv('tasks:work', n5))?.doneUnproved, integration: await integrationOf(n5) }))

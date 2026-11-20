@@ -8,11 +8,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import type { CombworkEvent, TaskCard } from '../src/shared/types'
 import { preferencesOf } from '../src/shared/workflow/preferences'
-import { allDone, keptLanes, laneCard, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_NAME_MAX, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
+import { laneYieldFirst, waitsOnCard, allDone, keptLanes, laneCard, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_NAME_MAX, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
+import { timing } from './timing.cjs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = timing('wait.hang')
 
 const base = tempDir('cw-lanes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -31,7 +32,7 @@ afterEach(async () => {
 const { onCombworkEvent } = await import('../src/main/events')
 const { saveTable } = await import('../src/main/storeTables')
 
-vi.setConfig({ testTimeout: 30_000 })
+vi.setConfig({ testTimeout: timing('test.hang') })
 
 const rec = (over: Partial<LaneRecord> = {}): LaneRecord => ({
   id: 'lane-1',
@@ -130,6 +131,10 @@ describe('a lane on slots (#1438)', () => {
     expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }))).toContain("slot-a still in use (B1's last run left node and 2 more running in it); Combwork tries again")
     expect(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }).status).toMatchObject({ held: 'left', heldBy: 'B1', program: 'node', more: 2 })
     expect(laneLine(view({ slot: 'slot-a', held: 'lastRun', agent: 'B1' }))).toContain("slot-a still in use (B1's last run there isn't known to have ended); Combwork tries again")
+    // HI-3353: its builder's one slot lent to a card: that slot and card, as a lane waiting for a slot says it (HI-3168).
+    const byCard = view({ slot: 'slot-b', held: 'card', agent: 'B1', card: 7 })
+    expect(byCard.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1', slot: 'slot-b', held: 'card', heldBy: 'B1', heldFor: 7 })
+    expect(laneLine(byCard)).toContain('waiting for a slot: B1 still builds in slot-b for #7, which keeps it until that card is Done or put back')
     // Refused for another reason, or nothing held any more: as before HI-2468.
     const bare = view()
     expect(bare.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1' })
@@ -153,6 +158,49 @@ describe('a lane on slots (#1438)', () => {
     // Another card's fact isn't this one's; with none, the reply is as before.
     expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [{ ...u[0], card: 3 }] })).toBe('Carry on with #2 Card 2 in slot-b.')
     expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [] })).toBe('Carry on with #2 Card 2 in slot-b.')
+  })
+})
+
+describe('HI-3323: the card a new list makes its lane yield to (laneYieldFirst), one rule for the save and Start Lane', () => {
+  const board = (over: Record<number, Partial<{ column: string; agent: string | null; blockedBy: number[]; waitingFor: { reason: string }; key: string; archived: boolean; blocked: string | null }>> = {}) => {
+    const cardsOf: Record<number, { column: string; agent: string | null; blockedBy: number[]; key: string; archived?: boolean; waitingFor?: { reason: string }; blocked?: string | null }> = {
+      5: { column: 'done', agent: 'b1', blockedBy: [], key: 'AL-5' },
+      6: { column: 'doing', agent: 'b1', blockedBy: [8], key: 'AL-6' },
+      8: { column: 'todo', agent: null, blockedBy: [], key: 'AL-8' },
+      9: { column: 'todo', agent: null, blockedBy: [], key: 'AL-9' }
+    }
+    for (const [n, v] of Object.entries(over)) cardsOf[Number(n)] = { ...cardsOf[Number(n)], ...v } as never
+    return (n: number) => cardsOf[n]
+  }
+  it('yields only to a list that keeps the card in Doing and puts first a card in Todo it waits on', () => {
+    expect(laneYieldFirst([5, 8, 6], 6, board(), 'b1')).toBe(8)
+    // HR1's round 2: Start Lane's list of Todo cards alone (the card in Doing left out) is an ordinary list change.
+    expect(laneYieldFirst([8], 6, board(), 'b1')).toBeNull()
+    // Its card in flight still first, or a first card it doesn't wait on: none.
+    expect(laneYieldFirst([6, 8], 6, board(), 'b1')).toBeNull()
+    expect(laneYieldFirst([9, 8, 6], 6, board(), 'b1')).toBeNull()
+    // The first own open card counts: one given to another agent is passed over; one not in Todo, or a card not in Doing, isn't one.
+    expect(laneYieldFirst([9, 8, 6], 6, board({ 9: { agent: 'b2' } }), 'b1')).toBe(8)
+    expect(laneYieldFirst([8, 6], 6, board({ 8: { column: 'hold' } }), 'b1')).toBeNull()
+    expect(laneYieldFirst([8, 6], 6, board({ 6: { column: 'review' } }), 'b1')).toBeNull()
+    expect(laneYieldFirst([8, 6], 6, board({ 6: { agent: 'b2' } }), 'b1')).toBeNull()
+    // Named by its waiting reason (key or #n, a whole word), in place of blockedBy.
+    expect(laneYieldFirst([8, 6], 6, board({ 6: { blockedBy: [], waitingFor: { reason: 'needs al-8 merged first' } } }), 'b1')).toBe(8)
+    expect(laneYieldFirst([8, 6], 6, board({ 6: { blockedBy: [], waitingFor: { reason: 'needs AL-88 first' } } }), 'b1')).toBeNull()
+    expect(waitsOnCard({ blockedBy: [], waitingFor: { reason: 'after #8 lands' } }, 8, null)).toBe(true)
+  })
+
+  // HI-3368: a first card that can't start never takes the lane: its card in Doing would be put back for nothing, its
+  // builder idle. The list then waits as any queued change.
+  it("HI-3368: never yields to a first card that can't start: blocked, or waiting on its own dependencies where its rules wait", () => {
+    expect(laneYieldFirst([8, 6], 6, board({ 8: { blocked: 'waiting for a licence decision' } }), 'b1')).toBeNull()
+    // Its own dependency not Done, where its rules start it only once they are (the caller's depsWait): none.
+    expect(laneYieldFirst([8, 6], 6, board({ 8: { blockedBy: [9] } }), 'b1', (n) => n === 8)).toBeNull()
+    // The same card with no wait (its rules don't wait for dependencies, or they are Done), and not blocked: yielded to.
+    expect(laneYieldFirst([8, 6], 6, board({ 8: { blockedBy: [9] } }), 'b1', () => false)).toBe(8)
+    expect(laneYieldFirst([8, 6], 6, board({ 8: { blocked: null } }), 'b1')).toBe(8)
+    // The wait is asked of the first card alone, never of the card in Doing (which waits on it by definition).
+    expect(laneYieldFirst([8, 6], 6, board(), 'b1', (n) => n === 6)).toBe(8)
   })
 })
 
@@ -354,9 +402,9 @@ describe('the lanes service', () => {
   })
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
   const make = (title: string) => run(() => tasks.createTask({ title, project: 'alpha' }, user))
-  const until = async (fn: () => boolean | Promise<boolean>, ms = 10_000): Promise<boolean> => {
+  const until = async (fn: () => boolean | Promise<boolean>, ms = timing('wait.hang')): Promise<boolean> => {
     const t = Date.now()
-    while (!(await fn()) && Date.now() - t < ms) await new Promise((r) => setTimeout(r, 50))
+    while (!(await fn()) && Date.now() - t < ms) await new Promise((r) => setTimeout(r, timing('wait.interval')))
     return fn()
   }
 
@@ -530,6 +578,31 @@ describe('the lanes service', () => {
     expect(readLane({ ...rec(), reviewer: null, pool: true })?.pool).toBe(true)
     // A pool beside a reviewer of its own doesn't read back as one.
     expect(readLane({ ...rec(), pool: true })?.pool).toBeUndefined()
+    await lanes.endLane(w, named.lane.id, { abandoned: true })
+  })
+
+  it('HI-3424: a new lane naming no reviewer in a pool project is the pool\'s (or refused); a running lane, or one naming a reviewer, keeps what it has', async () => {
+    const [c1, c2, c3] = [await make('D1'), await make('D2'), await make('D3')]
+    const byDefault = { poolUnlessNamed: { refusal: null } }
+    // Refused where nobody but the builder reviews: nothing recorded.
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number], by: 'the Assistant', poolUnlessNamed: { refusal: new Error('the pool has nobody') } })).rejects.toThrow('the pool has nobody')
+    expect((await lanes.rawLanes(w)).filter((l) => l.builder.id === 'b2' && l.state === 'active')).toEqual([])
+    // A new lane, reviewer left out or null: the pool's, its line saying so.
+    const started = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: null, cards: [c1.number, c2.number], by: 'the Assistant', ...byDefault })
+    expect([started.did, started.lane.pool, started.lane.reviewer]).toEqual(['started', true, null])
+    expect(laneLine(started.lane)).toContain('B2 / the reviewer pool (alpha)')
+    // Its running lane's start keeps the pool, the refusal not asked again.
+    const again = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number, c2.number, c3.number], by: 'the Assistant', poolUnlessNamed: { refusal: new Error('not asked') } })
+    expect([again.did, again.lane.id, again.lane.pool]).toEqual(['updated', started.lane.id, true])
+    await lanes.endLane(w, started.lane.id, { abandoned: true })
+    // A running lane with a reviewer of its own isn't moved to the pool.
+    const own = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'the Assistant' })
+    const kept = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number, c2.number], by: 'the Assistant', ...byDefault })
+    expect([kept.did, kept.lane.id, kept.lane.pool, kept.lane.reviewer?.id]).toEqual(['updated', own.lane.id, undefined, 'r1'])
+    await lanes.endLane(w, own.lane.id, { abandoned: true })
+    // A new lane naming a reviewer is that reviewer's.
+    const named = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'the Assistant', ...byDefault })
+    expect([named.did, named.lane.pool, named.lane.reviewer?.id]).toEqual(['started', undefined, 'r1'])
     await lanes.endLane(w, named.lane.id, { abandoned: true })
   })
 

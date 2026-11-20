@@ -12,7 +12,7 @@ const fs = require('fs')
 const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'journalbrowse-profile')
 const ws = path.join(lib.WORK, 'journalbrowse-ws')
@@ -44,7 +44,7 @@ function seed(cards, secondKey) {
     const link = db.prepare('INSERT INTO links (entry_id, type, ref) VALUES (?, ?, ?)')
     const tag = db.prepare('INSERT INTO tags (entry_id, tag) VALUES (?, ?)')
     const rows = [
-      [today(0.6), 'decision', 'alpha', 'Ship the journal browser under the Assistant view', 'Darren chose a small browser of its own, under the Assistant in the activity bar.\n\n- search and filters\n- edit and delete', 'No need for an external SQLite tool', 2, null, [['card', String(cards[0])], ['commit', '9e52d43e']], ['journal', 'ui']],
+      [today(0.6), 'decision', 'alpha', 'Ship the journal browser under the Assistant view', 'Sam chose a small browser of its own, under the Assistant in the activity bar.\n\n- search and filters\n- edit and delete', 'No need for an external SQLite tool', 2, null, [['card', String(cards[0])], ['commit', '9e52d43e']], ['journal', 'ui']],
       [today(0.3), 'plan', 'alpha', 'Build the timeline first, then the entry pane', null, null, 1, null, [['card', secondKey]], []],
       [day(1, 17), 'incident', null, 'The orange tabby knocked the build over', 'A flaky e2e run while the machine was loaded.', 'Runs under load need conditions, not sleeps', 1, null, [], ['flake']],
       [day(1, 11), 'insight', 'beta', 'Orange markers read better than red in both themes', null, null, 0, null, [], []],

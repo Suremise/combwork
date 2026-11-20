@@ -422,7 +422,7 @@ export async function ensureRetained(deps: JjIntegrationDeps, card: string, cycl
 // Publish: an observation (the user pushes), and an obligation per integration until it is seen (s14 §5′, s17 §2, s20).
 
 /**
- * What a settle was based on (HI-2873, Darren's B on HI-2798): the remote and its URL, what the remote had (null: not
+ * What a settle was based on (HI-2873, B on HI-2798): the remote and its URL, what the remote had (null: not
  * there), the target's head and jj operation, the sources print the final validator checked, and when. Immutable once
  * written; a re-observation compares the remote, the URL and the verdict with it (the print is kept for diagnosis only).
  */

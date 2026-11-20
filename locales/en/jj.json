@@ -103,6 +103,10 @@
     "defaultMessage": "Change {change}\nCommit {commit}",
     "description": "Tooltip of a jj commit’s ids (HI-2799): both in full."
   },
+  "jj.integrate.byCombwork": {
+    "defaultMessage": "Combwork integrates each card itself once its merge checks pass, moving the target bookmark (Who integrates, in Workflow). A card it can’t move stays here, and the card says why.",
+    "description": "A note under jj’s “Waiting to be integrated” while the project’s Who integrates is “Combwork integrates after the checks” (HI-3235, HI-3315), the default. Keep jj; a bookmark is jj’s name for a branch; Who integrates and Workflow are names in Combwork’s window."
+  },
   "jj.integrate.candidate": {
     "defaultMessage": "Candidate ready: commit {commit} ({change}), {style, select, rebase {its commits copied onto} squash {squashed onto} other {merged with}} {target} at {expected}. No conflicts; no merge checks were run on it.",
     "description": "Under a passed jj card (HI-2871): Combwork built a candidate for the user to integrate: the reviewed change brought onto the target bookmark’s current commit ({expected}, short) as a new commit ({commit}, short; {change} its jj change id, short). {style} says how (keep the select keys). It has no conflicts; Combwork ran no merge checks on it."
@@ -156,16 +160,16 @@
     "description": "Under a jj card’s candidate (HI-2938): its merge checks wait until one of the project’s check copies (working folders Combwork keeps for checks) is free."
   },
   "jj.integrate.head": {
-    "defaultMessage": "Waiting for you to integrate",
-    "description": "A heading of the jj Repository section (HI-2799, option A): cards that passed review, which the user brings into their target themselves."
+    "defaultMessage": "Waiting to be integrated",
+    "description": "A heading of the jj Repository section (HI-2799, HI-3315): cards that passed review and aren’t in their target yet. Who brings them in (Combwork or the user) is the project’s Who integrates, said under it."
   },
   "jj.integrate.how": {
     "defaultMessage": "For example, copy its commits onto {target}, then move {target} to the copy jj prints for the reviewed commit, with jj bookmark set. A copy leaves the card’s slot as it is; rebasing the commits would rewrite the slot’s working copy and leave it stale.",
     "description": "Above a jj command suggested to integrate a passed card (HI-2913, HI-3094): copy all of its commits onto its target with jj duplicate (it prints a copy for each), then move the target bookmark to the copy of the reviewed commit (the card’s last). Why a copy: a rebase would rewrite the commits the slot (a jj workspace) works on top of, so the slot goes stale. Keep jj bookmark set (a command)."
   },
   "jj.integrate.noMerge": {
-    "defaultMessage": "Combwork doesn’t merge under jj: integrate the reviewed work with jj yourself.",
-    "description": "A note under jj’s “Waiting for you to integrate” (HI-2799, Darren’s decision A). Keep jj."
+    "defaultMessage": "You integrate the reviewed work yourself, with jj: Combwork doesn’t move the target bookmark (Who integrates, in Workflow).",
+    "description": "A note under jj’s “Waiting to be integrated” while the project’s Who integrates is “You integrate it yourself” (HI-2799, HI-3315). Keep jj; a bookmark is jj’s name for a branch; Who integrates and Workflow are names in Combwork’s window."
   },
   "jj.integrate.none": {
     "defaultMessage": "No card is waiting.",
@@ -178,6 +182,10 @@
   "jj.integrate.notYet": {
     "defaultMessage": "Not in {target} as of {when}.",
     "description": "Under a passed jj card (HI-2869): Combwork last looked and its reviewed work wasn’t in its target bookmark ({target}) yet. {when} is how long ago it looked (already translated, such as “5 minutes ago”)."
+  },
+  "jj.integrate.onClick": {
+    "defaultMessage": "Once a card’s merge checks pass, For you shows what Combwork would move, and Combwork moves the target bookmark when you click Integrate (Who integrates, in Workflow).",
+    "description": "A note under jj’s “Waiting to be integrated” while the project’s Who integrates is “Combwork integrates when you click” (HI-3236, HI-3315). Keep jj; a bookmark is jj’s name for a branch; For you, Integrate, Who integrates and Workflow are names in Combwork’s window."
   },
   "jj.integrate.unknown": {
     "defaultMessage": "Couldn’t check whether it’s in {target} ({when}): {why, select, conflictedTarget {{target} is conflicted} divergentChange {its change is divergent} partialExport {{target} isn’t the same in Git} ambiguousRemote {it isn’t clear which remote {target} follows} notFetched {the remote has a commit Combwork hasn’t fetched} other {jj couldn’t read it}}.",

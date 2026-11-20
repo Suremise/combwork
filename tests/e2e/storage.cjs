@@ -12,7 +12,7 @@ const path = require('path')
 const zlib = require('zlib')
 const { sessionsOf } = require('./storeDocs.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'storage-profile')
 const ws = path.join(lib.WORK, 'storage-ws')
@@ -25,12 +25,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const until = async (fn, ms = 10000) => {
-  const t = Date.now()
-  let v
-  while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(200)
-  return v
-}
+const until = lib.until
 /** A folder's size the way Storage counts it: files only, links not followed. */
 const sizeOf = (p) => {
   const st = fs.lstatSync(p, { throwIfNoEntry: false })
@@ -114,7 +109,7 @@ const write = (file, text) => {
   // (#1441) among it. Tree's worktree, made while that pass ran, was adopted as slot "tree" instead of staying Tree's
   // worktree as this suite counts it (HI-2209). Bounded as a hung run, never how long it takes: it includes the bundled skills.
   const logFile = path.join(userData, 'logs', 'combwork.log')
-  const opened = await until(() => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8') : '').match(/after opening ⁨?storage-ws⁩?: .*adoption, slots/)?.[0], 30000)
+  const opened = await until(() => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8') : '').match(/after opening ⁨?storage-ws⁩?: .*adoption, slots/)?.[0], lib.timing('hang.step'))
   check("the open's background work has ended, its worktree adoption with it", !!opened)
   check("HI-3144: the open's sweep removed a removed agent's launch folder", !!(await until(() => !fs.existsSync(path.join(dataDir, 'launch-a-e2egone')), HUNG_MS)))
 
@@ -122,7 +117,8 @@ const write = (file, text) => {
   const live = await lib.addAgent(inv, alpha, { name: 'Live' })
   await lib.addAgent(inv, alpha, { name: 'Tree', location: 'new-worktree' })
   await inv('session:start', alpha, { agentId: live.id })
-  const state = await until(async () => (await inv('session:live')).find((s) => s.agentId === live.id && s.status === 'ready'), 20000)
+  // before any turn (HI-2688): its start, restart or resume
+  const state = await until(async () => (await inv('session:live')).find((s) => s.agentId === live.id && s.status === 'ready'), lib.timing('hang.step'))
   check('the live agent is running', !!state)
   const runDir = path.join(dataDir, 'attachments', `run-${state?.runId}`)
   write(path.join(runDir, 'pending.png'), lib.samplePng(30, 30))
@@ -194,7 +190,7 @@ const write = (file, text) => {
   const rows = () => dialog.locator('.cleanup-preview tbody [title]').evaluateAll((els) => els.map((e) => e.getAttribute('title')))
   const norm = (list) => list.map((p) => path.relative(dataDir, p).replace(/\\/g, '/')).sort()
   const want = (list) => JSON.stringify([...list].sort())
-  const previewIs = async (list) => (await until(async () => want(norm(await rows())) === want(list), 5000)) || norm(await rows())
+  const previewIs = async (list) => (await until(async () => want(norm(await rows())) === want(list), lib.timing('hang.ui'))) || norm(await rows())
   let got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`, 'launch-a-e2elate'])
   check("by default: old archived sessions' attachments and a removed agent's launch folder", got === true, JSON.stringify(got))
   await dialog.locator('label.choice', { hasText: 'Attachments of deleted sessions' }).locator('input').check()
@@ -221,7 +217,7 @@ const write = (file, text) => {
   const everything = (dir) => fs.readdirSync(dir, { recursive: true }).map((f) => path.join(dir, String(f)))
   const keptBefore = everything(dataDir).filter((p) => !listed.some((l) => p.toLowerCase().startsWith(path.join(dataDir, l).toLowerCase())))
   await button.click()
-  check('the dialog closes', !!(await until(async () => (await dialog.count()) === 0, 15000)))
+  check('the dialog closes', !!(await until(async () => (await dialog.count()) === 0, lib.timing('hang.ui'))))
 
   // Exactly what was listed went; everything else stayed.
   check('the listed files are gone', listed.every((l) => !fs.existsSync(path.join(dataDir, l))), listed.filter((l) => fs.existsSync(path.join(dataDir, l))).join(', '))

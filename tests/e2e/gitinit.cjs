@@ -16,7 +16,7 @@ const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 15000
+const HUNG_MS = lib.timing('hang.ui')
 
 const userData = path.join(lib.WORK, 'gitinit-profile')
 const ws = path.join(lib.WORK, 'gitinit-ws')
@@ -66,8 +66,14 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
     const head = page.locator('[data-vc-head]')
     const notes = page.locator('[data-vc-init]')
     const isGit = async (dir) => (await inv('workflow:form', dir)).platform === 'git'
+    // Git's page from None, once the tab has read the folder's git (HI-3429): before that answer the click is the switch
+    // (its warning, or refused with no repository), which under load came first.
+    const showGitPage = async (name) => {
+      if (!(await lib.until(async () => (await head.locator('[data-platform="git"][data-vc-preview]').count()) === 1, HUNG_MS))) check(`${name}: Git's page offered (the tab read its git)`, false, await text(page.locator('.vc-view')))
+      await head.locator('[data-platform="git"][data-vc-preview]').click()
+    }
     check("the tab says the folder has no version control, and None's page offers no Initialise", !!(await lib.until(async () => /has no version control/.test(await text(page.locator('[data-vc-fact]'))) && (await head.locator('[data-platform="none"][aria-checked="true"]').count()) === 1, HUNG_MS)) && (await notes.count()) === 0, await text(page.locator('.vc-view')))
-    await head.locator('[data-platform="git"]').click()
+    await showGitPage('fresh')
     check("Git chosen: its page has Initialise repository…", !!(await lib.until(async () => (await notes.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
     const dialog = page.locator('.dialog', { hasText: 'Initialise fresh as a git repository' })
     const form = dialog.locator('[data-git-init-form]')
@@ -127,7 +133,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     const blankNotes = page.locator('[data-vc-init]')
     await lib.until(async () => (await head.locator('[data-platform="none"][aria-checked="true"]').count()) === 1, HUNG_MS)
-    await head.locator('[data-platform="git"]').click()
+    await showGitPage('blank')
     check("the empty project's Git page offers Initialise", !!(await lib.until(async () => (await blankNotes.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
     await blankNotes.locator('[data-git-init]').click()
     const blankDialog = page.locator('.dialog', { hasText: 'Initialise blank as a git repository' })
@@ -152,7 +158,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
     const parent = page.locator('[data-git-parent]')
     await lib.until(async () => (await head.locator('[data-platform="none"][aria-checked="true"]').count()) === 1, HUNG_MS)
     check("inside the workspace repository, None's page offers nothing", (await notes.count()) === 0)
-    await head.locator('[data-platform="git"]').click()
+    await showGitPage('late')
     check("Git's page: that repository, or one of its own", !!(await lib.until(async () => (await parent.locator('[data-git-init]').count()) === 1 && (await parent.locator('[data-action="vc-use-parent"]').count()) === 1 && (await text(parent)).includes(`inside the Git repository at ${ws}`) && (await text(parent)).includes('Initialise its own repository… makes this folder a Git repository of its own'), HUNG_MS)), await text(parent))
     await shot(page, '2-parent')
     await parent.locator('[data-action="vc-use-parent"]').click()

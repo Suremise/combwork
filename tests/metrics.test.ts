@@ -12,6 +12,7 @@ import * as electron from 'electron'
 import { LATENCY_BOUNDS_MS, percentile, utf8Bytes, type MetricsPart } from '../src/shared/metrics'
 import { tempDir } from './tempDir'
 import { metricsSaved, putMetrics } from './storeDocs'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-metrics-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -705,7 +706,7 @@ describe('cost', () => {
     expect(perCallUs).toBeLessThan(50)
     expect(size).toBeLessThanOrEqual(metrics.METRICS_LIMITS.storeBytes)
     await disposeWorkspaceService(w)
-  }, 60_000)
+  }, timing('test.hang'))
 })
 
 describe('approved labels', () => {
@@ -848,7 +849,7 @@ describe('round 4: bounded loss owners, unreadable copied headers', () => {
       Object.assign(metrics.METRICS_LIMITS, saved)
       await disposeWorkspaceService(w)
     }
-  }, 60_000)
+  }, timing('test.hang'))
 
   it("a copied SKILL.md whose header can't be read (invalid YAML, a key twice, an unknown audience) is unmeasured", async () => {
     const { deliveredSkillSizes } = await import('../src/main/sessions')
@@ -1684,13 +1685,14 @@ describe('HI-2553: failures by kind, their reasons, and the tool list by provide
     expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { ...list, upfrontBytes: 25000 }, 'codex')).toBe(false)
     const catalog = Object.values(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - HOUR).toISOString() }).projects).flatMap((p) => p.catalog)
     const rows = Object.fromEntries(toolListRows(catalog).map((r) => [r.provider, r]))
-    // An estimate if deferred, for a CLI that can defer (Claude Code) only: never for Codex (it gets the whole list, Bytes),
-    // nor a provider not known (round 1: whether a launch deferred isn't observable, so it is never shown as what it got).
+    // An estimate if deferred, for a CLI that can defer only: Claude Code's from what its starts reported (the marked tools
+    // and the others' names); Codex's none of it (HI-3225: it defers every MCP tool, marked or not, to the server's
+    // namespace); never a provider not known (round 1: whether a launch deferred isn't observable, so it is never shown as what it got).
     expect(rows['claude-code']).toMatchObject({ starts: 2, bytes: 24000, upfront: 3100 })
-    expect(rows.codex).toMatchObject({ starts: 1, bytes: 24000, upfront: null })
+    expect(rows.codex).toMatchObject({ starts: 1, bytes: 24000, upfront: 0 })
     expect(rows.unknown).toMatchObject({ starts: 1, upfront: null })
     const t = totals({ api: [], mcp: [], guidance: [], catalog, providers: [], safeguards: [] })
-    expect([t.toolListStarts, t.avgToolListBytes, t.avgToolListUpfrontBytes]).toEqual([4, 24000, (3000 + 3200) / 2])
+    expect([t.toolListStarts, t.avgToolListBytes, t.avgToolListUpfrontBytes]).toEqual([4, 24000, (3000 + 3200 + 0) / 3])
     // The provider filter offers the tool list's providers, though no launch or usage has them; never `unknown` (round 1).
     const { providersIn } = await import('../src/shared/metricsView')
     const report = { scope: { kind: 'workspace' }, providers: [], projects: {}, workspace: { api: [], mcp: [], guidance: [], catalog: [{ provider: 'codex', starts: 1 }, { provider: 'unknown', starts: 1 }] } } as unknown as Parameters<typeof providersIn>[0]

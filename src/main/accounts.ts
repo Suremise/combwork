@@ -7,14 +7,17 @@ import type { AccountModels, AgentDef, AgentInfo, AppConfig, Account, Connection
 import { CW_DIR } from '../shared/defaults'
 import { readKeptJson, withFileLock } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, homeAccount, pcAccountId, pcWideSignIn, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
-import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
+import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type MatchedBy, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { ASSISTANT_NAME } from '../shared/assistant'
 import { launchesWithoutTools } from '../shared/launchPolicy'
 import { profileFolder } from '../shared/appName'
 import { localProfileInUse } from './profileFolders'
-import { agentProvider, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS } from '../shared/providers'
+import { agentProvider, asksAddedDirs, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS, signInConnections } from '../shared/providers'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { advanced } from './advanced'
+import { realForm } from './agentTemp'
+import { COPIES_REVIEW } from '../shared/advanced'
+import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { localLimitsTest } from './localLimitsTest'
 import { config } from './config'
 import { emit, onCombworkEvent } from './events'
@@ -23,14 +26,15 @@ import { createLogger, userText } from './logger'
 import { connectionLoginChanged, forgetConnectionUsage, usageLogin } from './planUsage'
 import { childEnv, hasPty, killPty, ptyGone } from './ptyHost'
 import { connectionsManaged, testHomeSeam } from './connectionSeam'
-import { provider } from './providers'
-import type { TrustReading, TrustTarget } from './providers/types'
+import { hasProvider, provider } from './providers'
+import type { ProviderAccountsPart, TrustReading, TrustTarget } from './providers/types'
 import { trustRoot } from './platform/repoPorts'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
 import { accountInfo, cachedCatalogFor, modelCaps } from '../shared/models'
 import { openWorkspaces, setConnectionGuard, workspace, workspaceOf } from './workspace'
 import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStore'
+import type { ServerOn } from './serverLaunch'
 import { coverageView } from './keyCoverage'
 import { aliasModels, MODEL_ALIASES, originOf, parseBaseUrl, serverDefaultModel, withRemote } from '../shared/serverConnection'
 import type { ServerCaps } from '../shared/providers'
@@ -141,22 +145,30 @@ function mustGet(id: string): Account {
 
 /**
  * Refuses a sign-in or removal while the CLI's own check of the folder isn't confirmed ended (HI-1757: Codex's app
- * server, held by codexChecks.ts until it is gone, across a restart too).
+ * server, held by providers/codex/checks.ts until it is gone, across a restart too).
  */
 function assertNotHeld(a: Account): void {
-  if (!provider(a.provider).accountHeld?.(accountFolder(a.id))) return
+  if (!accountsPart(a)?.accountHeld?.(accountFolder(a.id))) return
   throw combworkError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Combwork is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
 }
 
+/**
+ * A kept account's adapter part, none for a CLI not registered now (HI-3238: a description removed or renamed keeps its
+ * accounts, shown and removable, until it is back). Launches and sign-ins still refuse it, through support().
+ */
+const accountsPart = (a: Account | undefined): ProviderAccountsPart | undefined => (a && hasProvider(a.provider) ? provider(a.provider).accounts : undefined)
+
 /** Whether the CLI's sign-in names an organisation, which an identity then needs (HI-1757: Codex's names none). */
-const namesOrgs = (id: ProviderId): boolean => providerDescriptor(id).capabilities.connections?.orgs !== false
+const namesOrgs = (id: ProviderId): boolean => signInConnections(providerDescriptor(id))?.orgs !== false
 
 /** The provider's account support, or a refusal: one without it can't have accounts in Combwork. */
-function support(id: ProviderId): { homeEnv: string; shared: readonly string[]; adapter: ReturnType<typeof provider> } {
-  const caps = providerDescriptor(id).capabilities.connections
+function support(id: ProviderId): { homeEnv: string; shared: readonly string[]; adapter: ReturnType<typeof provider>; accounts: ProviderAccountsPart; configHome: () => string } {
+  const caps = signInConnections(providerDescriptor(id))
   const adapter = provider(id)
-  if (!caps || !adapter.accountStatus || !adapter.accountSharedTarget || !adapter.configHome) throw combworkError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have sign-in connections in Combwork yet.", description: 'An error: connections were asked for a coding agent CLI ({cli}: "Codex") that Combwork keeps no connections for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
-  return { homeEnv: caps.homeEnv, shared: caps.shared, adapter }
+  const accounts = adapter.accounts
+  const configHome = adapter.install.configHome?.bind(adapter.install)
+  if (!caps || !accounts || !configHome) throw combworkError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have sign-in connections in Combwork yet.", description: 'An error: connections were asked for a coding agent CLI ({cli}: "Codex") that Combwork keeps no connections for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
+  return { homeEnv: caps.homeEnv, shared: caps.shared, adapter, accounts, configHome }
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +220,9 @@ export function setAccountSessions(fn: (id: string) => boolean): void {
 /** Its sign-in's terminal (a server connection's Set Up, HI-1772): one per connection, refusing removal while open. */
 export const loginKey = (a: Pick<Account, 'id' | 'provider'>): string => `task:${a.provider}:login:${a.id}`
 
+/** Whether an account has a folder of Combwork's (its CLI's home for it): never a server-only CLI's (HI-3197), nor a CLI home's. */
+const hasFolder = (a: Pick<Account, 'provider' | 'home'>): boolean => !a.home && !!signInConnections(providerDescriptor(a.provider))
+
 /** A server connection's (HI-1772): nothing to sign in, check or watch; its key in the key store. */
 export const isServer = (a: Pick<Account, 'kind'> | undefined): boolean => a?.kind === 'server'
 
@@ -248,9 +263,9 @@ async function assertRealFolder(dir: string): Promise<void> {
 
 /** A shared folder's target, checked: absolute, in the CLI's own home, neither the accounts folder nor in it. */
 function sharedTarget(id: ProviderId, name: string): string {
-  const { adapter } = support(id)
-  const target = resolve(adapter.accountSharedTarget!(name))
-  const home = resolve(adapter.configHome!())
+  const { accounts, configHome } = support(id)
+  const target = resolve(accounts.accountSharedTarget(name))
+  const home = resolve(configHome())
   const root = resolve(accountsRoot()).toLowerCase()
   const t = target.toLowerCase()
   if (!samePath(resolve(target, '..'), home) || t === root || t.startsWith(root + '\\') || root.startsWith(t + '\\'))
@@ -282,7 +297,7 @@ async function makeFolder(a: Account): Promise<void> {
     await assertRealFolder(dir)
     for (const name of shared) {
       const target = sharedTarget(a.provider, name)
-      // Missing (the CLI never ran here): the empty folder, its home's only change Combwork ever makes (Darren, 26 Oct). Not
+      // Missing (the CLI never ran here): the empty folder, its home's only change Combwork ever makes. Not
       // its home: refused, rather than made.
       await mkdir(target).catch((e: NodeJS.ErrnoException) => {
         if (e.code === 'EEXIST') return
@@ -352,7 +367,7 @@ async function deleteTree(dir: string): Promise<void> {
 }
 
 /**
- * Removes an account's folder for good (Darren, 26 Oct: its login with it, not to the Recycle Bin): its junctions
+ * Removes an account's folder for good (its login with it, not to the Recycle Bin): its junctions
  * first (each the link alone, checked gone; one already gone is a removal tried again), then, only with no link left in
  * it, the folder. Anything unexpected (a real folder where a junction should be, a link elsewhere, the folder itself a
  * link) stops it before anything is deleted. Throws Unsafe or the file system's error; what is left stays.
@@ -363,7 +378,7 @@ async function removeFolder(a: Account): Promise<void> {
   await finishRemoving(removingFolder(a.id))
   if (!(await exists(dir))) return
   await assertRealFolder(dir)
-  const caps = providerDescriptor(a.provider).capabilities.connections
+  const caps = signInConnections(providerDescriptor(a.provider))
   for (const name of caps?.shared ?? []) {
     const link = join(dir, name)
     const target = sharedTarget(a.provider, name)
@@ -439,7 +454,10 @@ export async function finishLeftoverRemovals(): Promise<void> {
  * connection) or it is ready to use (a server connection, HI-1772: `server` given, checked by serverConnections.ts).
  */
 export async function addAccount(id: ProviderId, name: string, server?: ServerConnection): Promise<Account> {
-  support(id)
+  // A server-only CLI (HI-3197) has server accounts only, with no folder of Combwork's; any other needs account support.
+  const serverOnly = providerDescriptor(id).capabilities.connections?.signIn === false
+  if (serverOnly && !server) throw combworkError(msg({ id: 'main.accounts.serverOnly', defaultMessage: '{cli} reaches a server of yours only: add a server connection.', description: "An error adding a sign-in connection for a coding agent CLI ({cli}) that only takes server connections (a model server such as Ollama), never a sign-in (HI-3197)." }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
+  if (!serverOnly) support(id)
   const n = name.trim()
   if (!n) throw combworkError(NO_NAME, undefined, { kind: 'invalid' })
   // Its base connection (HI-2106) holds what an agent with nothing of its own on it launched with before connections were
@@ -449,7 +467,7 @@ export async function addAccount(id: ProviderId, name: string, server?: ServerCo
   const a: Account = server ? { ...base, kind: 'server', server } : { ...base, kind: 'signIn' }
   return locked(a.id, async () => {
     try {
-      await makeFolder(a)
+      if (!serverOnly) await makeFolder(a)
     } catch (e) {
       log.warn(`account ${a.id} couldn't be made: ${userText(String(e))}`)
       if (e instanceof Unsafe) throw combworkError(msg({ id: 'main.accounts.makeFailed', defaultMessage: "Couldn't make the connection's folder: {error}", description: "An error adding a connection: its folder or link couldn't be made. {error} is the reason, in English." }), { error: e.message })
@@ -480,7 +498,7 @@ export async function addAccount(id: ProviderId, name: string, server?: ServerCo
 export function effortUsable(cli: ProviderId, model: string | null, conn: Pick<Account, 'id' | 'home' | 'kind'> | null, effort: string): boolean {
   // The account's own models and default (HI-2852), never the CLI's own home's.
   const info = accountInfo(providerService.info(cli), conn) ?? providerService.info(cli)
-  const runs = model || (conn && !conn.home ? provider(cli).configuredDefaultModel(accountFolder(conn.id)) : null) || info.defaultModel || null
+  const runs = model || (conn && !conn.home ? provider(cli).models?.configuredDefaultModel(accountFolder(conn.id)) : null) || info.defaultModel || null
   const caps = modelCaps(cli, runs, info, config.settings)
   return !caps.perModel || caps.efforts.some((e) => e.value === effort)
 }
@@ -760,9 +778,11 @@ export function accountHere(cli: ProviderId, cfg: WorkspaceConfig | null): Accou
  * The account a new agent named nothing for goes on (decision A, HI-2106: no default provider): the first in the one
  * order that's usable here (on in the workspace, or the CLI's own home), whose CLI is on and installed.
  */
-export function firstUsableAccount(cfg: WorkspaceConfig | null): Account | null {
+export function firstUsableAccount(cfg: WorkspaceConfig | null, opts: { withTools?: boolean } = {}): Account | null {
   for (const a of allAccounts()) {
     if (!isProviderEnabled(config.settings, a.provider) || !providerService.info(a.provider).path) continue
+    // The Assistant's (withTools): never a CLI that takes none of Combwork's tools (HI-3196: one from a description).
+    if (opts.withTools && providerDescriptor(a.provider).capabilities.session?.combworkTools === false) continue
     if (accountHere(a.provider, cfg)?.id === a.id) return a
   }
   return null
@@ -774,12 +794,12 @@ export function firstUsableAccount(cfg: WorkspaceConfig | null): Account | null 
  * settings and the accounts it uses, so they never disagree.
  */
 export function launchCli(agent: Pick<AgentDef, 'provider' | 'connection'> | null | undefined, cfg: WorkspaceConfig | null, assistant: boolean): ProviderId {
-  return assistant && !agent?.provider && !agent?.connection ? (firstUsableAccount(cfg)?.provider ?? agentProvider(agent, config.settings)) : agentProvider(agent, config.settings)
+  return assistant && !agent?.provider && !agent?.connection ? (firstUsableAccount(cfg, { withTools: true })?.provider ?? agentProvider(agent, config.settings)) : agentProvider(agent, config.settings)
 }
 
 /** Whether a test copy runs a CLI on its CLI test home (connectionSeam.ts). */
 const seamOn = (cli: ProviderId): boolean => {
-  const caps = providerDescriptor(cli).capabilities.connections
+  const caps = signInConnections(providerDescriptor(cli))
   return !!caps && testHomeSeam(caps.homeEnv)
 }
 
@@ -787,6 +807,18 @@ const seamOn = (cli: ProviderId): boolean => {
 export function firstAccountHere(cli: ProviderId, cfg: WorkspaceConfig | null): Account | null {
   const here = accountHere(cli, cfg)
   if (here || !seamOn(cli)) return here
+  return ensureHomeAccount(cli)
+}
+
+/**
+ * A CLI's own home's account (its PC-wide sign-in's, or a test home's) and its base connection, made if missing: a test
+ * home the first time the seam needs it, and a user's own CLI as its description registers (HI-3196, main/clis.ts: it has
+ * no sign-in connections, so its agents run on its PC-wide account).
+ */
+export function ensureHomeAccount(cli: ProviderId): Account | null {
+  const id = pcWideSignIn(cli) ? pcAccountId(cli) : seamAccountId(cli)
+  const found = accountById(id)
+  if (found && baseConnection(found.id, allConnections())) return found
   let a: Account | undefined
   config.update((c) => {
     const store: AccountStore = { accounts: [...(c.accounts ?? [])], connections: [...(c.connections ?? [])], newId: newConnectionId }
@@ -1017,6 +1049,8 @@ const GIT_TRUST_MS = 10_000
 /** A project's folder for the trust check (HI-1870): its name, where Set Up opens, and how the CLIs look it up. */
 interface ProjectTarget extends TrustTarget {
   project: string
+  /** The workspace's worktrees folder, for its reviewers' review copies (HI-3337): a plain folder, never Git. */
+  copies?: true
 }
 
 /**
@@ -1025,7 +1059,7 @@ interface ProjectTarget extends TrustTarget {
  * made from it (probed: Claude Code 2.1.311, Codex 0.164.0; a worktree's own entry covers only itself), or a project
  * without Git's own real path. Read off main's thread (git's worker, async file calls).
  */
-export function trustTargets(projects: readonly { name: string; path: string }[]): Promise<ProjectTarget[]> {
+export function trustTargets(projects: Projects): Promise<ProjectTarget[]> {
   // One resolution per project set at a time, shared by every connection and window asking for it.
   const sig = JSON.stringify(projects)
   const under = targetsInFlight.get(sig)
@@ -1054,7 +1088,13 @@ async function targetSlot<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /** One project's folder for the trust check (trustTargets). */
-async function resolveTarget(p: { name: string; path: string }): Promise<ProjectTarget> {
+async function resolveTarget(p: Projects[number]): Promise<ProjectTarget> {
+  // The worktrees folder (HI-3337): a plain folder, read where it is or would be (its nearest existing parent's real
+  // place), never made by this reading (HI-3395: a check made it beside the workspace); Set Up makes it (setUpPlace).
+  if (p.copies) {
+    const real = await realForm(p.path).catch(() => null)
+    return { project: p.name, root: real, git: false, short: false, folder: real, copies: true }
+  }
   const real = await realpath(p.path).catch(() => null)
   // An 8.3 path (a `~N` part its long form doesn't have): Claude Code doesn't expand it.
   const short = /~\d/.test(p.path) && !!real && real.toLowerCase() !== resolve(p.path).toLowerCase()
@@ -1072,9 +1112,10 @@ async function resolveTarget(p: { name: string; path: string }): Promise<Project
 const trustKey = (id: string, ws: string): string => `${id}|${ws.toLowerCase()}`
 
 /** A folder still to trust: its project, where it is asked, and whether it's a Git root (HI-2520: no inherited trust then). */
-type PendingTrust = { project: string; folder: string; git: boolean }
+type PendingTrust = { project: string; folder: string; git: boolean; copies?: true }
 type TrustAnswer = { pending: PendingTrust[]; unknown: boolean }
-type Projects = { name: string; path: string }[]
+/** The folders a connection would be used in; `copies`: the worktrees folder its reviewers' review copies are in (HI-3337). */
+type Projects = { name: string; path: string; copies?: true }[]
 
 /**
  * A connection's trust of one workspace's projects (HI-1870 round 3), per `<id>|<workspace>`. At most one read runs; a
@@ -1158,17 +1199,19 @@ async function trustTestHold(): Promise<void> {
 async function readTrustOnce(id: string, projects: Projects): Promise<TrustAnswer | null> {
   await trustTestHold()
   const a = getAccount(id)
-  const read = a && provider(a.provider).connectionTrusts
+  // Each part's member is called on its part (HI-3201: a part may be an object of its own, not the adapter).
+  const accounts = accountsPart(a)
+  const read = accounts?.connectionTrusts?.bind(accounts)
   if (!a || !read) return null
   // No folder it would be used in here (HI-1871): nothing to read, nothing pending.
   if (!projects.length) return { pending: [], unknown: false }
   const targets = await trustTargets(projects)
-  const got = await read.call(provider(a.provider), accountFolder(id), targets).catch(() => targets.map(() => null))
+  const got = await read(accountFolder(id), targets).catch(() => targets.map(() => null))
   // Not trusted: asked at its root, or where the CLI's own reading says (Codex: the project's own folder's entry).
   const askAt = (t: ProjectTarget, r: TrustReading): string | null => (r === false ? t.root : r && typeof r === 'object' ? r.at : null)
   return { pending: targets.flatMap((t, i) => {
     const at = askAt(t, got[i])
-    return at ? [{ project: t.project, folder: at, git: t.git }] : []
+    return at ? [{ project: t.project, folder: at, git: t.git, ...(t.copies ? { copies: true as const } : {}) }] : []
   }), unknown: got.some((x) => x === null) }
 }
 
@@ -1220,12 +1263,25 @@ export async function setUpFolder(id: string): Promise<string | undefined> {
  */
 export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']> {
   const a = getAccount(id)
-  if (!a || !workspace.path || !onHere(a)) return undefined
-  const st = requestTrust(id, workspace.path, projectsFor(a), true)
+  const ws = workspace.path
+  if (!a || !ws || !onHere(a)) return undefined
+  const st = requestTrust(id, ws, projectsFor(a), true)
   const answer = await new Promise<TrustAnswer | null | 'cancelled'>((r) => st.waiters.push(r))
   // Removed, or its workspace closed, while Combwork checked: Set Up opens nowhere (never its own folder instead).
-  if (answer === 'cancelled') throw combworkError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.", description: "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Combwork was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
-  return answer ? setUpTarget(a, answer.pending) : undefined
+  const cancelled = (): Error => combworkError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.", description: "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Combwork was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
+  if (answer === 'cancelled') throw cancelled()
+  const place = answer ? setUpTarget(a, answer.pending) : undefined
+  if (!place?.copies) return place
+  // The worktrees folder, made only now (HI-3395): the CLI opens in it, and reading its trust never made it.
+  const gen = st.gen
+  await mkdir(place.folder, { recursive: true })
+  // HR1's round 1: its waiters were told before this wait, so dropTrust can't cancel it. Checked again after it: the
+  // connection removed or made again, its workspace closed or switched, or its state retired cancel as above; its
+  // folders changed (a new generation) ask afresh, for a place from a current answer.
+  const now = getAccount(id)
+  if (st.retired || trustState.get(trustKey(id, ws)) !== st || !now || st.conn !== generation(id) || workspace.path !== ws || !onHere(now)) throw cancelled()
+  if (st.gen !== gen) return setUpPlace(id)
+  return place
 }
 
 /**
@@ -1238,7 +1294,7 @@ export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']
  * (Codex: one per project; a trusted folder above a repository doesn't cover it).
  */
 function setUpTarget(a: Account, pending: TrustAnswer['pending']): ConnectionTrust['setUpIn'] {
-  return chooseSetUpTarget(!!providerDescriptor(a.provider).capabilities.connections?.trustInherits, workspace.path, pending)
+  return chooseSetUpTarget(!!signInConnections(providerDescriptor(a.provider))?.trustInherits, workspace.path, pending)
 }
 
 /** setUpTarget's choice, from whether the CLI's trust is inherited, the workspace's folder and the pending roots. */
@@ -1247,19 +1303,19 @@ export function chooseSetUpTarget(inherits: boolean, ws: string | null | undefin
   const inside = (folder: string): boolean => !!ws && (folder + sep).toLowerCase().startsWith((resolve(ws) + sep).toLowerCase())
   // Only a pending folder without Git: the workspace's trust covers no repository, so asking there again would loop.
   if (ws && inherits && pending.some((p) => !p.git && inside(p.folder))) return { folder: resolve(ws), workspace: true }
-  return { folder: pending[0].folder, project: pending[0].project }
+  return { folder: pending[0].folder, project: pending[0].project, ...(pending[0].copies ? { copies: true as const } : {}) }
 }
 
 /** Whether a connection is on in this window's workspace: its trust of the workspace's folders counts then. */
 const onHere = (a: Account): boolean => !!workspace.path && !!workspaceAccounts(workspace.config, a.provider, list())?.on.includes(a.id)
 
 /**
- * The folders of this window's workspace a connection would be used in (HI-1871, Darren 27 Oct ~22:30): the projects
+ * The folders of this window's workspace a connection would be used in (HI-1871): the projects
  * with an agent whose connection, resolved as its launch would be (its own if on here, else the first in the order
  * that's on), is this one, and the Assistant's home when the Assistant's is. "Needs set up" counts only these.
  * Resolved as sessions.ts launches (HI-2162): an agent names a connection (HI-2108), whose account is the one counted.
  */
-const projectsFor = (a: Account): { name: string; path: string }[] => {
+const projectsFor = (a: Account): Projects => {
   const info = workspace.info()
   const cfg = workspace.config
   const accounts = allAccounts()
@@ -1271,23 +1327,35 @@ const projectsFor = (a: Account): { name: string; path: string }[] => {
       const r = resolveAgentConnection(cfg, cli, ag.connection, accounts, connections)
       return r.ok && r.account.id === a.id
     })
-  const projects = (info?.projects ?? []).filter((p) => usedBy(p, (ag) => agentProvider(ag, config.settings))).map((p) => ({ name: p.name, path: p.path }))
+  const used = (info?.projects ?? []).filter((p) => usedBy(p, (ag) => agentProvider(ag, config.settings)))
+  const projects: Projects = used.map((p) => ({ name: p.name, path: p.path }))
   const home = info?.assistant
   // An Assistant that names no CLI yet: the first usable account's, as its launch (decision A).
   const assistantCli = (ag: AgentInfo): ProviderId => launchCli(ag, cfg, true)
-  return home && usedBy(home, assistantCli) ? [...projects, { name: home.name, path: home.path }] : projects
+  const all = home && usedBy(home, assistantCli) ? [...projects, { name: home.name, path: home.path }] : projects
+  // HI-3337: a CLI that asks about an added folder at every start needs the review copies' folder trusted where it
+  // would be granted (a reviewer of a project, on this connection): one answer at the worktrees folder covers them all.
+  const onThis = (ag: AgentInfo): boolean => {
+    const r = resolveAgentConnection(cfg, a.provider, ag.connection, accounts, connections)
+    return r.ok && r.account.id === a.id
+  }
+  const reviewers = used.some((p) => p.agents.some((ag) => agentProvider(ag, config.settings) === a.provider && reviewsWork(agentWorkflowRole(ag)) && onThis(ag)))
+  // Only a version that asks (HI-3342): before 2.1.326 Claude Code never does, so its connection needs nothing for them.
+  const asks = asksAddedDirs(providerDescriptor(a.provider), providerService.info(a.provider).version) && !!providerDescriptor(a.provider).capabilities.session?.extraDirs
+  return asks && reviewers && advanced.get(COPIES_REVIEW) !== false && workspace.path ? [...all, { name: basename(workspace.worktreesRoot), path: workspace.worktreesRoot, copies: true }] : all
 }
 
 /** Reads a connection's set-up state again, telling the windows when it changed. */
 export async function readSetUp(id: string): Promise<void> {
   const a = getAccount(id)
   if (!a) return
-  const read = provider(a.provider).connectionSetUp
+  const accounts = accountsPart(a)
+  const read = accounts?.connectionSetUp?.bind(accounts)
   if (!read) return
   const gen = generation(id)
   let now: boolean | null
   try {
-    now = await read.call(provider(a.provider), accountFolder(id))
+    now = await read(accountFolder(id))
   } catch {
     now = null
   }
@@ -1308,11 +1376,11 @@ async function checkOnce(id: string): Promise<ConnectionObserved | null> {
   let observed: ConnectionObserved
   try {
     await assertRealFolder(dir)
-    const { homeEnv, adapter } = support(a.provider)
+    const { homeEnv, adapter, accounts } = support(a.provider)
     const exe = providerService.info(a.provider).path
     if (!exe) observed = { ...a.observed, at, loggedIn: null, error: `${adapter.descriptor.name} isn't installed` } // i18n-ignore: for the log
     else {
-      const s = await slot(() => adapter.accountStatus!(exe, withoutAccountEnv(adapter, childEnv({ [homeEnv]: dir }))))
+      const s = await slot(() => accounts.accountStatus(exe, withoutAccountEnv(accounts, childEnv({ [homeEnv]: dir }))))
       observed = s.ok ? { at, loggedIn: s.loggedIn, ...(s.loggedIn ? { email: s.email, orgId: s.orgId, plan: s.plan ?? null, ...(s.loginExpiresAt ? { loginExpiresAt: s.loginExpiresAt } : {}) } : {}) } : { ...keptIdentity(a.observed), at, loggedIn: null, error: s.error }
     }
   } catch (e) {
@@ -1368,13 +1436,13 @@ export const accountModelHooks: { queued?: (id: string) => Promise<void>; starte
 /** Whether an account's models are read in its own folder: a Combwork sign-in folder of a CLI that lists its models. */
 function readsOwnModels(a: Account | undefined): a is Account {
   if (!a || isServer(a) || a.home || removing.has(a.id)) return false
-  return !!providerDescriptor(a.provider).capabilities.connections?.homeEnv && !!provider(a.provider).listModels
+  return !!signInConnections(providerDescriptor(a.provider))?.homeEnv && !!provider(a.provider).models?.listModels
 }
 
 /** An account's models as kept (a catalogue of `version`, undefined: any) with its folder's own default. */
 function keptModels(a: Account, version: string | null | undefined): AccountModels {
   const catalog = cachedCatalogFor(config.get().accountModelCatalogs?.[a.id], version ?? undefined, undefined)
-  return { catalog, defaultModel: provider(a.provider).configuredDefaultModel(accountFolder(a.id)) ?? catalog?.defaultModel ?? null }
+  return { catalog, defaultModel: provider(a.provider).models?.configuredDefaultModel(accountFolder(a.id)) ?? catalog?.defaultModel ?? null }
 }
 
 /**
@@ -1414,7 +1482,12 @@ async function readModelsOnce(id: string, st: { seq: number }, seq: number): Pro
   if (!readsOwnModels(a)) return
   const cli = a.provider
   const adapter = provider(cli)
-  const homeEnv = providerDescriptor(cli).capabilities.connections!.homeEnv
+  // A CLI that can't list its models (no models part, or none of its own) has none to read.
+  const listModels = adapter.models?.listModels?.bind(adapter.models)
+  if (!listModels) return
+  // readsOwnModels said it has home folders (a sign-in CLI's account).
+  const homeEnv = signInConnections(providerDescriptor(cli))?.homeEnv
+  if (!homeEnv) return
   const { path: exe, version } = providerService.info(cli)
   if (!exe) return
   const gen = generation(id)
@@ -1436,7 +1509,7 @@ async function readModelsOnce(id: string, st: { seq: number }, seq: number): Pro
     await accountModelHooks.started?.(id)
     // Checked again after the waits: the folder's check and the hook.
     if (!current()) return undefined
-    return adapter.listModels!(exe, withoutAccountEnv(adapter, childEnv({ [homeEnv]: dir }))).catch(() => null)
+    return listModels(exe, withoutAccountEnv(adapter.accounts ?? null, childEnv({ [homeEnv]: dir }))).catch(() => null)
   })
   if (read === undefined || !current()) return
   let catalog: ModelCatalog | null
@@ -1449,12 +1522,12 @@ async function readModelsOnce(id: string, st: { seq: number }, seq: number): Pro
     catalog = cachedCatalogFor(config.get().accountModelCatalogs?.[id], version, undefined)
     log.warn(`account ${id}: ${adapter.descriptor.name} ${version ?? ''} didn't say which models it has: ${catalog ? 'using its last answer' : 'using the fallback list'}`)
   }
-  providerService.setAccountModels(cli, id, { catalog, defaultModel: adapter.configuredDefaultModel(dir) ?? catalog?.defaultModel ?? null })
+  providerService.setAccountModels(cli, id, { catalog, defaultModel: adapter.models?.configuredDefaultModel(dir) ?? catalog?.defaultModel ?? null })
 }
 
 providerService.setAccountModelSource({
   cached: (cli, version) => {
-    if (!providerDescriptor(cli).capabilities.connections?.homeEnv || !provider(cli).listModels) return undefined
+    if (!signInConnections(providerDescriptor(cli))?.homeEnv || !provider(cli).models?.listModels) return undefined
     return Object.fromEntries(list().filter((a) => a.provider === cli && readsOwnModels(a)).map((a) => [a.id, keptModels(a, version)]))
   },
   refresh: refreshAccountModels
@@ -1542,6 +1615,8 @@ async function openLoginTerminal(id: string, setUp: boolean, folder?: string): P
  */
 async function assertUsable(a: Account): Promise<void> {
   if (a.leftover) throw combworkError(msg({ id: 'main.accounts.leftover', defaultMessage: '{name} is half removed: remove it again first.', description: "An error signing a connection in ({name}): an earlier removal stopped partway, so it can't be used." }), { name: a.name }, { kind: 'conflict' })
+  // A server-only CLI's server account (HI-3197) has no folder of Combwork's to check.
+  if (!hasFolder(a)) return
   try {
     await assertRealFolder(accountFolder(a.id))
   } catch (e) {
@@ -1610,7 +1685,8 @@ function changed(id: string): void {
  */
 async function loginStamp(id: string): Promise<string | null> {
   const a = getAccount(id)
-  const isLogin = a && provider(a.provider).accountLoginFile?.bind(provider(a.provider))
+  const accounts = accountsPart(a)
+  const isLogin = accounts?.accountLoginFile.bind(accounts)
   if (!isLogin) return null
   const dir = accountFolder(id)
   try {
@@ -1662,9 +1738,10 @@ export const accountWatched = (id: string): boolean => !!watched.get(id)?.w
 export function accountFolderEvent(id: string, name: string | Buffer | null): void {
   const a = getAccount(id)
   if (!a) return
-  const isLogin = provider(a.provider).accountLoginFile
+  const accounts = accountsPart(a)
+  const isLogin = accounts?.accountLoginFile.bind(accounts)
   // No name (some changes on Windows, a busy folder's above all): compared like a login file's.
-  if (typeof name !== 'string' || !isLogin || isLogin.call(provider(a.provider), name)) noticed(id)
+  if (typeof name !== 'string' || !isLogin || isLogin(name)) noticed(id)
 }
 
 function attach(id: string): void {
@@ -1782,7 +1859,7 @@ export function accountsView(check = false): ConnectionsView {
   if (check) for (const a of all) void (isServer(a) ? readSetUp(a.id) : checkAccount(a.id))
   // One not read yet (just added): its set-up state read once, a few files, its answer telling the windows (HI-1870).
   else for (const a of all) if (!setUpRead.has(a.id)) void readSetUp(a.id)
-  // Its trust of the folders it would be used in here (HI-1870; HI-1871: only those, Darren), for each connection on
+  // Its trust of the folders it would be used in here (HI-1870; HI-1871: only those), for each connection on
   // here: read as shown, and when that set of projects changed.
   pruneTrust()
   const hereOf = new Map(workspace.path ? all.filter(onHere).map((a) => [a.id, projectsFor(a)] as const) : [])
@@ -1790,7 +1867,7 @@ export function accountsView(check = false): ConnectionsView {
   if (workspace.path) for (const [id, here] of hereOf) if (check || trustState.get(trustKey(id, workspace.path))?.sig !== JSON.stringify(here)) requestTrust(id, workspace.path, here)
   const trustOf = (a: Account): { trust?: ConnectionTrust } => {
     const here = hereOf.get(a.id)
-    if (!workspace.path || !here || !provider(a.provider).connectionTrusts) return {}
+    if (!workspace.path || !here || !accountsPart(a)?.connectionTrusts) return {}
     const t = trustShown(a.id, workspace.path, here)
     const setUpIn = setUpTarget(a, t.pending)
     return { trust: { ...t, ...(setUpIn ? { setUpIn } : {}) } }
@@ -1810,7 +1887,7 @@ export function accountsView(check = false): ConnectionsView {
     return k && k.origin === originOf(a.server?.baseUrl ?? '') ? { key: { last4: k.last4, at: k.at } } : {}
   }
   const intro = !config.get().ui.connectionsIntroShown && !all.length ? providers.filter((p) => !testHome.includes(p)) : []
-  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), defaults: defaultsOf(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a), ...(setUpRead.has(a.id) ? { setUp: setUpRead.get(a.id) } : {}), ...trustOf(a) })), workspace: ws, testHome, masking: coverageView(), order: allAccounts().map((a) => a.id), homes: allAccounts().filter((a) => a.home), connectionRows: connectionRows() }
+  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), ...(hasProvider(a.provider) ? {} : { gone: true as const }), defaults: defaultsOf(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a), ...(setUpRead.has(a.id) ? { setUp: setUpRead.get(a.id) } : {}), ...trustOf(a) })), workspace: ws, testHome, masking: coverageView(), order: allAccounts().map((a) => a.id), homes: allAccounts().filter((a) => a.home), connectionRows: connectionRows() }
 }
 
 /** An account's defaults as today's screens show them (HI-2106, until HI-2107): its base connection's model, effort and context. */
@@ -1918,10 +1995,13 @@ export function agentLaunchView(a: AgentDef, cfg: Pick<ProjectConfig, 'migration
 export interface LaunchConnection {
   id: string
   name: string
-  folder: string
-  homeEnv: string
+  /** Its folder given as the CLI's home in that variable; none for a server-only CLI's server account (HI-3197). */
+  folder?: string
+  homeEnv?: string
   /** Why it isn't exactly what was chosen, or what its check couldn't say: shown on the agent. */
   note?: 'offFallback' | 'missing' | 'unknownLogin' | 'loginChanged'
+  /** With `offFallback` (HI-3213): how its connection was matched on the account it runs on (the same tag, name, or its first). */
+  by?: MatchedBy
   /** Who it launches as, from its fresh check (planUsage.ts usageLogin; a check that failed keeps the last one): its usage's. */
   login?: string
   /** Ends the launch's claim: once its session runs (its live state then keeps it from removal) or it failed. */
@@ -1932,7 +2012,8 @@ export interface LaunchConnection {
    * by whoever holds the launch once its process is gone (or it never started); `local`, it runs only on this PC
    * (runsLocally).
    */
-  server?: { env: Record<string, string>; models: ServerModel[]; local: boolean }
+  /** `on`: its server, key and models for a CLI whose values come from templates (HI-3197), filled at launch from its model. */
+  server?: { env: Record<string, string>; models: ServerModel[]; local: boolean; on?: ServerOn }
   /**
    * Asked at the last moment, with the agent's (or the Assistant's) choice as saved then: whether that choice, resolved
    * again with its workspace's connections as they are now, is still this connection, and it is still there.
@@ -1970,12 +2051,14 @@ const LAUNCH = {
  * for a Claude model it doesn't have.
  */
 export function serverEnv(caps: ServerCaps, server: ServerConnection, key: string | null): Record<string, string> {
+  // A CLI whose values come from templates (HI-3197) has its filled at launch, from its model (serverLaunch.ts).
+  if (!caps.baseUrlEnv || !caps.keyEnv) return {}
   const alias = aliasModels(server.models)
   const env: Record<string, string> = { [caps.baseUrlEnv]: server.baseUrl, [caps.keyEnv]: key ?? caps.keylessToken }
-  for (const a of MODEL_ALIASES) if (alias[a]) env[caps.aliasEnv[a]] = alias[a]!
+  for (const a of MODEL_ALIASES) if (alias[a] && caps.aliasEnv) env[caps.aliasEnv[a]] = alias[a]!
   if (caps.subagentEnv && alias.haiku) env[caps.subagentEnv] = alias.haiku
   const main = serverDefaultModel(server.models)
-  if (main) env[caps.modelEnv] = main
+  if (main && caps.modelEnv) env[caps.modelEnv] = main
   return env
 }
 
@@ -2022,7 +2105,8 @@ async function serverPart(a: Account, caps: ServerCaps, agentName: string): Prom
   if (!a.server || !b.ok) throw combworkError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
   const got = await withKey(a.id, b.origin)
   if (!got && !b.local) throw combworkError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
-  return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models: effectiveModels(caps, a.server), local: runsLocally(caps, a.server, b.local) }, keyV: got?.v ?? null, origin: b.origin }
+  const models = effectiveModels(caps, a.server)
+  return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models, local: runsLocally(caps, a.server, b.local), ...(caps.launch ? { on: { baseUrl: a.server.baseUrl, key: got?.key ?? null, models } } : {}) }, keyV: got?.v ?? null, origin: b.origin }
 }
 
 /**
@@ -2044,7 +2128,7 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
   const sameAs = (now: AgentConnection, id: string): boolean => now.ok && now.account.id === id
   const choice = choose(o.wanted)
   if (!choice.ok) {
-    if (choice.why === 'none' && testHomeSeam(caps.homeEnv)) return null
+    if (choice.why === 'none' && caps.signIn !== false && testHomeSeam(caps.homeEnv)) return null
     const name = choice.wanted ? (getConnection(choice.wanted)?.name ?? choice.wanted) : ''
     // None on here, but the CLI has accounts (HI-2650): they are off here, never "add one".
     const off = choice.why === 'none' ? list().filter((a) => a.provider === o.provider) : []
@@ -2073,9 +2157,10 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
       return {
         id,
         name: a.name,
-        folder: accountFolder(id),
-        homeEnv: caps.homeEnv,
+        // A server-only CLI's server account (HI-3197) has no folder of Combwork's: no home is given.
+        ...(caps.signIn !== false ? { folder: accountFolder(id), homeEnv: caps.homeEnv } : {}),
         ...(choice.note ? { note: choice.note } : {}),
+        ...(choice.by ? { by: choice.by } : {}),
         release,
         server: part,
         stillValid: (wanted) => same() && sameAs(choose(wanted), id)
@@ -2092,8 +2177,9 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
       id,
       name: a.name,
       folder: accountFolder(id),
-      homeEnv: caps.homeEnv,
+      ...(caps.signIn !== false ? { homeEnv: caps.homeEnv } : {}),
       ...(note ? { note } : {}),
+      ...(choice.by ? { by: choice.by } : {}),
       ...(usageLogin(observed) ? { login: usageLogin(observed)! } : {}),
       release,
       stillValid: (wanted) => generation(id) === gen && !!getAccount(id) && sameAs(choose(wanted), id)
@@ -2201,7 +2287,7 @@ export function initConnections(): Promise<void> {
   // No agent is given a connection that is gone or being removed (HI-2107).
   setConnectionGuard(connectionAssignable)
   // The most recent workspace default becomes the top of its CLI's preference order, once (HI-1875); what depends on
-  // the order (a launch on a connection) waits for it. A new workspace starts with none on (HI-2650, Darren 6 Nov).
+  // the order (a launch on a connection) waits for it. A new workspace starts with none on (HI-2650).
   const ready = startConnectionOrder()
   onCombworkEvent((e) => {
     if (e.type !== 'workspace-changed') return

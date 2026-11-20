@@ -21,7 +21,7 @@ const os = require('os')
 const path = require('path')
 const { randomBytes } = require('crypto')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 10000
+const HUNG_MS = lib.timing('hang.ui')
 
 const control = process.argv.includes('--snapshot-on')
 const userData = path.join(lib.WORK, 'assistantresume-profile')
@@ -36,7 +36,7 @@ const check = (name, ok, extra = '') => {
 
 // The test home's sign-in, as Claude Code says it (the runner asks too; this is for running the suite on its own).
 const exe = [path.join(os.homedir(), '.local', 'bin', 'claude.exe')].find((f) => fs.existsSync(f)) ?? 'claude'
-const status = spawnSync(exe, ['auth', 'status', '--json'], { encoding: 'utf8', timeout: 30000, env: lib.childEnv({ CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME }) })
+const status = spawnSync(exe, ['auth', 'status', '--json'], { encoding: 'utf8', timeout: lib.timing('spawn.hang'), env: lib.childEnv({ CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME }) })
 let signedIn = true
 try {
   signedIn = JSON.parse(status.stdout).loggedIn !== false
@@ -72,7 +72,7 @@ const mode = ({ name, word: w }) =>
   const idle = (ms = 90000) => lib.until(async () => ['ready', 'finished'].includes((await live())?.status), ms, 500)
   const stop = async () => {
     await inv('session:stop', home, 'assistant')
-    await lib.until(async () => !(await live()), 20000)
+    await lib.until(async () => !(await live()), lib.timing('hang.ui'))
   }
   // None until its first message is in.
   const items = async (id) => (await inv('transcript:read', home, id).catch(() => null))?.items ?? []
@@ -91,7 +91,7 @@ const mode = ({ name, word: w }) =>
     const ended = await lib.until(async () => {
       const notice = toldAt(await items(id), m).at(-1)
       return notice && turnEnded(await live(), notice)
-    }, 90000, 500)
+    }, lib.timing('hang.step'), 500)
     const state = await live()
     check('…the mode notice’s own turn ends before the question', !!ended, JSON.stringify({ status: state?.status, since: state?.statusSince }))
     return !!ended
@@ -115,7 +115,7 @@ const mode = ({ name, word: w }) =>
       if (!answers.length || !turnEnded(await live(), question)) return false
       reply = answers.map((i) => i.text).join(' ')
       return true
-    }, 90000, 500)
+    }, lib.timing('hang.step'), 500)
     const state = await live()
     check('…the question’s own turn ends with its reply', !!ended, `question ${question.id}; ${JSON.stringify({ status: state?.status, since: state?.statusSince })}`)
     return reply
@@ -123,9 +123,12 @@ const mode = ({ name, word: w }) =>
   // Its answer is the first codeword in the reply (HI-1669: Haiku may go on to name its earlier one, "My earlier reply,
   // ALPHA-…, was wrong."): a wrong first answer, or a codeword from an earlier run, still fails.
   const answers = (reply, m) => /\b(?:ALPHA|BRAVO|CHARLIE)-[0-9A-F]{6}\b/.exec(reply)?.[0] === m.word
-  // The mode menu in the Assistant panel's header.
+  // The mode menu in the Assistant panel's header. The panel loads the workspace's modes as it opens (modes:list), and its menu
+  // lists those it has when clicked (HI-3418, as HI-3417 in assistant.cjs), so it is clicked once the header shows its mode's
+  // icon (every mode here has one): the list loaded. "Manage Modes…" alone would satisfy a wait for any item.
   const panel = page.locator('.assistant-panel')
   const menu = async (label) => {
+    if (!(await lib.until(async () => (await panel.locator('.assistant-mode .assistant-mode-icon').count()) === 1, HUNG_MS))) throw new Error(`the Assistant's header shows no mode icon (its modes not loaded) within ${HUNG_MS / 1000} s: ${JSON.stringify(await panel.locator('.assistant-mode').innerText().catch(() => '(no header)'))}`)
     await panel.locator('.assistant-mode').click()
     await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, HUNG_MS)
     await page.locator('.menu .menu-item', { hasText: label }).first().click()
@@ -135,7 +138,7 @@ const mode = ({ name, word: w }) =>
   await inv('agents:update', home, 'assistant', { mode: 'codeword-alpha' })
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+I')
-  await lib.until(async () => (await panel.locator('.assistant-header').count()) === 1, 5000)
+  await lib.until(async () => (await panel.locator('.assistant-header').count()) === 1, lib.timing('hang.ui'))
   // Combwork's log as each launch starts: ask() types its question once that launch's Combwork tools connected, as Combwork types
   // nothing before (#1148: a question typed into a just-started Claude Code wasn't taken).
   let launchMark = lib.combworkLogLines(userData).length
@@ -152,15 +155,15 @@ const mode = ({ name, word: w }) =>
   // --- Switched while it runs, then Restart in This Mode…: the same conversation, on Bravo's full instructions.
   await menu(modes.bravo.name)
   await lib.cliStep('switched to Bravo while it runs, then restarted in that mode', { session: key }, async () => {
-    check('switching tells it Bravo in its conversation', !!(await lib.until(async () => (await told(session, modes.bravo)) === 1, 60000, 500)))
+    check('switching tells it Bravo in its conversation', !!(await lib.until(async () => (await told(session, modes.bravo)) === 1, lib.timing('hang.step'), 500)))
     if (!(await noticeEnded(session, modes.bravo))) return
     await menu('Restart in This Mode')
     const dialog = page.locator('.dialog', { hasText: `Restart in ${modes.bravo.name} mode?` })
-    check('Restart in This Mode… asks first', !!(await lib.until(async () => (await dialog.count()) === 1, 5000)))
+    check('Restart in This Mode… asks first', !!(await lib.until(async () => (await dialog.count()) === 1, lib.timing('hang.step'))))
     const before = (await live())?.runId
     launchMark = lib.combworkLogLines(userData).length
     await dialog.getByRole('button', { name: 'Restart', exact: true }).click()
-    check('…and resumes the same conversation', !!(await lib.until(async () => { const l = await live(); return !!l && l.runId !== before && l.sessionId === session && ['ready', 'finished'].includes(l.status) }, 90000, 500)), (await live())?.sessionId)
+    check('…and resumes the same conversation', !!(await lib.until(async () => { const l = await live(); return !!l && l.runId !== before && l.sessionId === session && ['ready', 'finished'].includes(l.status) }, lib.timing('hang.step'), 500)), (await live())?.sessionId)
     const reply = await ask(session)
     if (control) check(`with the recorded prompt asked for, it doesn't know Bravo's codeword (${modes.bravo.word}): the probe tells the prompts apart`, !reply.includes(modes.bravo.word), reply)
     else check(`it answers at once with Bravo's codeword (${modes.bravo.word}), not the one its conversation recorded`, answers(reply, modes.bravo), reply)
@@ -170,12 +173,12 @@ const mode = ({ name, word: w }) =>
 
   // --- Switched while it is stopped, then resumed: told the mode once, and on Charlie's instructions.
   await menu(modes.charlie.name)
-  check('switching while it is stopped saves the mode', !!(await lib.until(async () => JSON.parse(fs.readFileSync(path.join(home, '.combwork', 'project.json'), 'utf8')).agents?.[0]?.mode === 'codeword-charlie', 5000)))
+  check('switching while it is stopped saves the mode', !!(await lib.until(async () => JSON.parse(fs.readFileSync(path.join(home, '.combwork', 'project.json'), 'utf8')).agents?.[0]?.mode === 'codeword-charlie', lib.timing('hang.ui'))))
   launchMark = lib.combworkLogLines(userData).length
   await inv('session:start', home, { resumeId: session, agentId: 'assistant' })
   await lib.cliStep('resumed after a switch while stopped', { session: key }, async () => {
     check('Claude Code resumes the conversation', !!(await idle()) && (await live())?.sessionId === session, (await live())?.sessionId)
-    check('…and Combwork tells it Charlie once it is idle', !!(await lib.until(async () => (await told(session, modes.charlie)) === 1, 60000, 500)))
+    check('…and Combwork tells it Charlie once it is idle', !!(await lib.until(async () => (await told(session, modes.charlie)) === 1, lib.timing('hang.step'), 500)))
     if (!(await noticeEnded(session, modes.charlie))) return
     const reply = await ask(session)
     if (control) check(`with the recorded prompt asked for, it doesn't know Charlie's codeword (${modes.charlie.word})`, !reply.includes(modes.charlie.word), reply)
@@ -187,7 +190,7 @@ const mode = ({ name, word: w }) =>
   await inv('session:start', home, { resumeId: session, agentId: 'assistant' })
   await lib.cliStep('resumed again, it is not told the mode again', { session: key }, async () => {
     check('Claude Code resumes it again', !!(await idle()))
-    await lib.sleep(3000) // on purpose: a second mode message would be typed by now
+    await lib.sleep(lib.timing('quiet.noLineTypedMs')) // on purpose: a second mode message would be typed by now
     check('…without a second Charlie message', (await told(session, modes.charlie)) === 1, String(await told(session, modes.charlie)))
   })
   await stop()

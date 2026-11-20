@@ -27,8 +27,8 @@ import { createLogger } from '../logger'
 
 const log = createLogger('queue')
 
-/** How long a job's end waits to see it empty. */
-const END_MS = 15_000
+/** How long a job's end waits to see it empty (HI-3376: each look is a listing that takes seconds on a busy machine). */
+export const END_MS = 60_000
 
 /**
  * Tests only (`linger`): a supervisor that outlives its Combwork, as one whose Combwork's job didn't end it would. A detached

@@ -6,11 +6,13 @@
 // In the app since P3: combwork.db's `card_facts` (main/workflow/factStore.ts), folded wherever a card's state is read.
 
 import type { ConflictsRecord } from './conflicts'
+import type { GuardReport } from './mergeGuards'
 import type { FocusedChoice, FocusedTest } from './focused'
 import type { GitlinkSide } from '../gitlink'
 import type { StoredText, TransientCause } from '../types'
 import { samePath } from '../movePaths'
 import type { ForwardOverride } from './forwardOrder'
+import { CHURN_MAX } from '../loopLimits'
 
 /** Who caused a fact. */
 export type Actor = 'user' | 'assistant' | 'combwork' | 'outside' | `agent:${string}`
@@ -127,6 +129,9 @@ export interface CheckRanData {
   isolated?: boolean
   /** The merge queue's entry it ran for (a merge check or the focused tests, HI-1924): the queue history's time taken. */
   entry?: string
+  /** HI-3284: the merge guards' run: the guards it checked (their key) and the head the result's added lines are read from. */
+  guardsKey?: string
+  base?: string
 }
 
 /** The paths a `CheckRan` keeps of what stopped it counting (#1654). */
@@ -140,6 +145,22 @@ export type RoundChoice = (typeof ROUND_CHOICES)[number]
 
 /** The gate of Combwork's question at a card's round limit (§16.11.4). */
 export const ROUND_LIMIT_GATE = 'roundLimit'
+
+/**
+ * HI-3188: the gates of Combwork's two questions on a card's churn (§16.11.5): the simplify check ("worth handling, or
+ * simplify or cut scope?") and the hard stop (the round limit's question, on the churn). Both pause the card's loop.
+ */
+export const SIMPLIFY_GATE = 'simplify'
+export const CHURN_LIMIT_GATE = 'churnLimit'
+/** The gates that pause a card's loop until answered (§16.11.4, §16.11.5). */
+export const PAUSE_GATES: readonly string[] = [ROUND_LIMIT_GATE, CHURN_LIMIT_GATE, SIMPLIFY_GATE]
+/** HI-3188: the churn's two gates. */
+export const CHURN_GATES: readonly string[] = [CHURN_LIMIT_GATE, SIMPLIFY_GATE]
+/** What the user (or, for carry on and simplify, the Assistant) chose at a simplify check (HI-3188). */
+export const SIMPLIFY_CHOICES = ['carryOn', 'simplify', 'cutScope'] as const
+export type SimplifyChoice = (typeof SIMPLIFY_CHOICES)[number]
+/** A choice at a question that pauses a loop. */
+export type PauseChoice = RoundChoice | SimplifyChoice
 
 /** The gate of Combwork's questions about a builder's line held up between a lane's cards (§16.19.2, #1271). */
 export const LINE_GATE = 'lineUpdate'
@@ -173,6 +194,27 @@ export const SLOT_DIRTY_GATE = 'slotDirty'
  */
 export const QUEUE_PUBLISH_GATE = 'queuePublish'
 
+/**
+ * HI-3235 (HI-2840/s30, s34; HI-3235/s10–s16): Combwork's advance of a target stopped after it moved something, with its
+ * undo offered: Approve undoes the move (a new undo attempt each time), Decline leaves it to the user (then uncertain).
+ * Bound to the attempt (`entry`) and its plan (`result`); asked as the user's alone, answered from the window.
+ */
+export const ADVANCE_STOPPED_GATE = 'advanceStopped'
+/**
+ * HI-3235: an advance whose outcome Combwork couldn't prove (or stopped with no undo): Approve is the user's attestation
+ * that it is integrated (an Override, never `Integrated`), Decline asks to start again (only once the target is known
+ * not to contain the card's work). Bound like ADVANCE_STOPPED_GATE.
+ */
+export const ADVANCE_UNCERTAIN_GATE = 'advanceUncertain'
+/**
+ * HI-3236 (HI-3236/s7, s10, s13): Combwork's preview of an advance, where the finish is preview and click: Approve is
+ * Integrate, bound to the plan shown (`entry` and `result`: its id); Decline dismisses that plan until it changes. Only the
+ * card's newest such request (by its fact's seq) can start an attempt.
+ */
+export const ADVANCE_PREVIEW_GATE = 'advancePreview'
+/** HI-3235/HI-3236: the advance's gates, whose answers only the user gives and whose handling is the platform adapter's. */
+export const ADVANCE_GATES: readonly string[] = [ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, ADVANCE_PREVIEW_GATE]
+
 /** A follow-mode attempt's endpoint as a fact keeps it (HI-1183): never a credential. */
 export interface PublishFact {
   remote: string
@@ -203,7 +245,7 @@ export const ASK_ACTIONS_MAX = 3
  * A request under any other gate is a question someone asked: an agent, the Assistant (`ask`), or a rule it couldn't
  * keep. A question settled another way is closed (#1638); Combwork's own requests stay until met.
  */
-const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, QUEUE_PUBLISH_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, 'decision'])
+const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, CHURN_LIMIT_GATE, SIMPLIFY_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, QUEUE_PUBLISH_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, ADVANCE_STOPPED_GATE, ADVANCE_UNCERTAIN_GATE, ADVANCE_PREVIEW_GATE, 'decision'])
 export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !CW_GATES.has(r.gate)
 
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
@@ -211,7 +253,7 @@ export interface AnswerShape {
   outcome: 'approved' | 'declined' | 'answered'
   reply?: boolean
   decision?: boolean
-  choice?: RoundChoice
+  choice?: PauseChoice
   rounds?: number
   action?: AskActionKind
 }
@@ -223,7 +265,13 @@ export interface AnswerShape {
  * question, answered with a reply or a decision, or with one of the actions it offers (#1630), never both.
  */
 export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'gate' | 'actions'>, a: AnswerShape, maxRounds: number): boolean {
-  if (req.gate === ROUND_LIMIT_GATE) return a.outcome === 'answered' && !!a.choice && ROUND_CHOICES.includes(a.choice) && !a.decision && !a.action && (a.choice !== 'carryOn' || (Number.isInteger(a.rounds) && a.rounds! >= 1 && a.rounds! <= maxRounds))
+  if (req.gate === ROUND_LIMIT_GATE || req.gate === CHURN_LIMIT_GATE) {
+    // HI-3188: a carry on at the hard stop adds counted work, up to CHURN_MAX; at the round limit, rounds.
+    const most = req.gate === CHURN_LIMIT_GATE ? CHURN_MAX : maxRounds
+    return a.outcome === 'answered' && !!a.choice && (ROUND_CHOICES as readonly string[]).includes(a.choice) && !a.decision && !a.action && (a.choice !== 'carryOn' || (Number.isInteger(a.rounds) && a.rounds! >= 1 && a.rounds! <= most))
+  }
+  // HI-3188: a simplify check's answer is a choice alone.
+  if (req.gate === SIMPLIFY_GATE) return a.outcome === 'answered' && !!a.choice && (SIMPLIFY_CHOICES as readonly string[]).includes(a.choice) && !a.decision && !a.action && a.rounds === undefined
   if (a.choice !== undefined) return false
   if (a.action !== undefined) return a.outcome === 'answered' && !a.decision && !!req.actions?.some((x) => x.kind === a.action)
   if (req.kind === 'approve') return (a.outcome === 'approved' || a.outcome === 'declined') && (!a.decision || (a.outcome === 'approved' && !!a.reply && approveNote(req) === 'decision'))
@@ -239,7 +287,7 @@ export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'ga
 export const approveNote = (r: Pick<FactData['ApprovalRequested'], 'gate' | 'actions'>): 'decision' | 'reason' | 'comment' => (r.actions?.length === 1 ? 'reason' : r.gate === 'ask' ? 'decision' : 'comment')
 
 /**
- * Whether a decision the user made may answer a request (HI-1932, Darren's decision: the Assistant records it naming
+ * Whether a decision the user made may answer a request (HI-1932: the Assistant records it naming
  * the requests it answers): a question someone asked (an agent, the Assistant, a rule it couldn't keep), answered with a
  * decision. Never one of Combwork's own gates (a review, the OK before merging, the round limit's choice, the merge queue's),
  * the merge queue's merge choice, or an approval: those are approved, declined or chosen in For you.
@@ -356,13 +404,14 @@ export interface FactData {
    * on itself (`carriedOn`: answered some other way, such as in its pane). It leaves For you as an answer does.
    */
   /** `slotClean` (HI-2014): a finished card's slot asked about (SLOT_DIRTY_GATE) became clean, or another card's. */
-  RequestClosed: { request: string; why: 'done' | 'carriedOn' | 'slotClean' }
+  /** HI-3188 `settingChanged`: a churn question that no longer holds (its setting 0 or raised, no agent reviewer, rules off). */
+  RequestClosed: { request: string; why: 'done' | 'carriedOn' | 'slotClean' | 'advance' | 'settingChanged' }
   /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds; `action`, an action the question offered, done (#1630; `note` its reason). */
   /** `byDecision` (HI-1932): answered by a decision the user made, recorded on the card (its id), by whom (the authenticated recorder), when. */
-  Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind; byDecision?: { decision: string; recordedBy: string; at: string } }
+  Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: PauseChoice; rounds?: number; action?: AskActionKind; byDecision?: { decision: string; recordedBy: string; at: string } }
   IntegrationRequested: { entry: string; revision: string; key: string | null; target: string; style: 'merge' | 'squash' | 'rebase'; requeue?: 'transient' | 'retry' }
   /** `followUp`: a follow-up posted on the queued card (#1623), so the queue can't merge the revision while its line changes. */
-  IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' | 'followUp' }
+  IntegrationCancelled: { entry: string; reason: 'removed' | 'stale' | 'hold' | 'user' | 'decision' | 'integratedOutside' | 'followUp' | 'feedback' }
   /**
    * `publish` (HI-1183, follow mode): the attempt's endpoint as it may be kept (the remote's name, its URL without
    * credentials, the full ref), the remote's head it was tested on (`onto`), and its protected snapshot's id and digest
@@ -378,7 +427,7 @@ export interface FactData {
    * the repository at the card's tested pin (written before this fact); `remote`, that branch as `<remote>/<branch>`
    * (a name, never its address).
    */
-  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string; conflicts?: ConflictsRecord; focused?: FocusedReturn; onto?: string; remote?: string }
+  IntegrationFailed: { entry: string; revision: string; target: string; reason: IntegrationFailReason; files?: string[]; log?: string; transient: boolean; cause?: TransientCause; code?: string; check?: string; logPath?: string; conflicts?: ConflictsRecord; focused?: FocusedReturn; onto?: string; remote?: string; guards?: GuardReport }
   /**
    * G20 (HI-1367): the tests the merge queue picked at a test merge's result for the paths whose change isn't exactly the
    * submission's (`paths`), run with the approved selection there; `tests` empty when the pick needed none.
@@ -405,6 +454,23 @@ export interface FactData {
   /** HI-2988: a Done card marked `LeftTarget` whose result is in its target again: the mark cleared. */
   BackInTarget: { revision: string; target: string }
   Accepted: { revision?: string; submission?: number }
+  /**
+   * HI-3235 (HI-2840/s34 §2): Combwork's advance of the card's target was journaled (`attempt`, its journal file's id) for
+   * the plan the user's workflow consented to (`plan`, the hash of its identity), and read back before anything moved.
+   * Until `AdvanceResolved` or `Integrated` for it, the card takes no other advance.
+   */
+  AdvanceAttempted: { plan: string; attempt: string }
+  /**
+   * HI-3235: the attempt moved something and then saw a difference it stops at (s30 §1's detections, `code`), or Combwork
+   * couldn't prove what happened (`uncertain`). `undo`: whether every condition of s30 §2's undo held when read.
+   */
+  AdvanceStopped: { attempt: string; code: string; detail?: string; undo: boolean; uncertain: boolean }
+  /**
+   * HI-3235: the attempt's end without `Integrated`: nothing moved (refused at base, the lease lost, the fact unconfirmed,
+   * or a pre-mutation crash), a verified undo, the user's attestation (with an `Override` beside it), or the user's start
+   * again (the target known not to contain the work).
+   */
+  AdvanceResolved: { attempt: string; how: 'nothingMoved' | 'undone' | 'attested' | 'startAgain'; detail?: string }
   /** `why`: the agent's own reason, given with a put back (#1267). */
   /** `repair` (HI-1674): a card the board had in Done while its stage wasn't, brought into line when its workspace opens. */
   Moved: { from: StageId; to: StageId; cause: 'intent' | 'user' | 'derived' | 'override' | 'repair'; why?: string }
@@ -496,7 +562,58 @@ export interface FactData {
   Finished: { how: FinishHow; verified: string | null; claimed?: string | null; by?: 'user' | 'assistant'; reason?: string }
   /** A step of a finish done, or left (`superseded`: what it was for is no longer so), once each (HI-2014). */
   FinishStep: { finish: number; step: FinishStepId; outcome: 'done' | 'superseded'; why?: string }
+  /**
+   * HI-3194: the card's attempt moved on without a start: given to another agent (`assignee`, null: nobody) while in an
+   * attempt. Written in the board change that changes its agent; the fold's `attempt.generation` counts it.
+   */
+  AttemptBound: { why: 'reassigned'; assignee: string | null }
+  /**
+   * HI-3194: whether every card it waits for (blockedBy) is Done, written in the write that changed it (a blocker into or
+   * out of Done, its blockedBy edited), so a dependent's readiness and its blocker's Done commit together.
+   */
+  Readiness: { ready: boolean; after: number | null }
+  /**
+   * HI-3188: made as a continuation of card `parent` (`followUpOf`: a split, or follow-ups the user accepted), written in its
+   * creation: its churn starts at the parent's then (`total`, which already counts what the parent inherited), with the
+   * parent's hard-stop and simplify bases, so a chain of cards keeps its count and only an answer gives it more room.
+   */
+  SplitFrom: { parent: number; total: number; stop: ChurnStop | null; simplifyBase: number }
+  /**
+   * HI-3219: a comment on lines `from`..`to` of one submission's file (lineComments.ts): `new` in its revision, `old` (deleted
+   * lines) in its base. `lines`, `before` and `after` are the quote and its context as main read them from the commits,
+   * cut by characters (LINE_COMMENT_LIMITS); `body` is the writer's Markdown. Its id: `lc-<card key>-<this fact's seq>`.
+   */
+  LineComment: { id: string; submission: number; side: 'new' | 'old'; path: string; from: number; to: number; lines: string; before: string; after: string; body: string }
+  /** A comment's Markdown changed: its `version` (1 as written) raised. */
+  LineCommentEdited: { id: string; body: string; version: number }
+  LineCommentResolved: { id: string }
+  LineCommentReopened: { id: string }
+  /** A comment taken back, only while it was never sent to the builder. */
+  LineCommentDeleted: { id: string }
+  /**
+   * HI-3220: the user sent these comments, each at its version then, to the card's builder as one fix round (with the
+   * failed `Verdict` written beside it). `batch`: the send's own id, made when its preview opened (a second send of it is
+   * refused); `items` in the order sent, which the batch read keeps.
+   */
+  FeedbackSent: { batch: string; submission: number; round: number; items: { id: string; version: number }[] }
 }
+
+/**
+ * HI-3194: a card's attempt key: `id` the seq of its cycle's Started or Adopted (0: never started), `generation` moved on by
+ * each reassignment and by the attempt ending (the card leaving Active, Review, Approved or Merging). Never back: each
+ * lifecycle step gives a later key, so a request fenced on one key can't land on another that only looks the same.
+ */
+export interface AttemptKey {
+  id: number
+  generation: number
+}
+
+/** The stages a card is in an attempt in (HI-3194): leaving them for Todo, On Hold or Done ends the attempt. */
+export const ATTEMPT_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging']
+
+export const sameAttempt = (a: AttemptKey, b: AttemptKey): boolean => a.id === b.id && a.generation === b.generation
+/** Whether attempt key `a` is later than `b`. */
+export const laterAttempt = (a: AttemptKey, b: AttemptKey): boolean => a.id > b.id || (a.id === b.id && a.generation > b.generation)
 
 /** How a card reached Done (HI-2014): the queue, a builder's merge report (checked or not), accepted, an override, a board move. */
 export type FinishHow = 'queue' | 'reported' | 'unchecked' | 'accepted' | 'override' | 'board'
@@ -531,8 +648,11 @@ export interface Submission extends SubmittedData {
   by: string | null
 }
 
-/** A request to the user (For you, §16.8.5), with when it was asked (`asker`: the agent whose own question it is). */
-export type Request = FactData['ApprovalRequested'] & { at: string }
+/**
+ * A request to the user (For you, §16.8.5), with when it was asked (`asker`: the agent whose own question it is;
+ * `byAssistant`, HI-3211: the Assistant asked it, by the fact's actor, so its own lane watch isn't woken by its echo).
+ */
+export type Request = FactData['ApprovalRequested'] & { at: string; byAssistant?: true }
 
 export interface QueueEntry {
   id: string
@@ -553,6 +673,10 @@ export interface CardState {
   stage: StageId
   /** The seq of the cycle's Started (or Adopted); 0 before the first start. */
   cycle: number
+  /** HI-3194: the card's attempt key (AttemptKey), `(0, 0)` before the first start. */
+  attempt: AttemptKey
+  /** HI-3194: whether every card it waits for is Done, as last written (`Readiness`); null when never written. */
+  ready: boolean | null
   started: (StartedData & { seq: number; adopted: boolean }) | null
   /**
    * Every line it has started on (Started, Adopted), over its whole history, renames followed (HI-1823): a card back from
@@ -590,10 +714,24 @@ export interface CardState {
   entries: QueueEntry[]
   integrated: FactData['Integrated'] | null
   accepted: FactData['Accepted'] | null
+  /** HI-3235: the cycle's latest Combwork advance of its target, and how far it is settled (null: none attempted). */
+  advance: AdvanceState | null
   /** Rounds: failed verdicts and the user's declines (§16.11.4), over the card's whole history. */
   rounds: number
   /** The rounds the user added at the round limit ("carry on"), over the card's whole history. */
   moreRounds: number
+  /**
+   * HI-3188: the card's churn, its counted loop work over its whole history (§16.11.5), each 1: failed reviews and declines
+   * (as `rounds`), design and follow-up steps, reviewer requests, agents' questions and test asks to the user; and what it
+   * inherited as a continuation (`SplitFrom`). Merge-queue returns and Combwork's own questions aren't counted.
+   */
+  churn: Churn
+  /** HI-3188: the hard stop's base, from its last answer (or inherited); null: none yet (the stop is at its setting). */
+  churnStop: ChurnStop | null
+  /** HI-3188: the churn at the last answer to a churn question (or inherited): the simplify check counts from it. */
+  simplifyBase: number
+  /** HI-3188: the card it continues (`SplitFrom`), or null. */
+  splitFrom: number | null
   /** Every agent recorded working the card (Started, Submitted): no-self-review reads these, never commit authors. */
   builders: string[]
   overrides: FactData['Override'][]
@@ -625,6 +763,24 @@ export interface CardState {
 }
 
 /**
+ * HI-3235: a card's Combwork advance as its facts say: attempted (journaled and confirmed, its outcome not recorded yet),
+ * stopped (its undo offered or not), uncertain (only the user resolves it), or resolved (`Integrated` for it, or
+ * `AdvanceResolved`). Anything but resolved blocks another advance of the card.
+ */
+export interface AdvanceState {
+  attempt: string
+  plan: string
+  state: 'attempted' | 'stopped' | 'uncertain' | 'resolved'
+  code?: string
+  detail?: string
+  undo?: boolean
+  how?: FactData['AdvanceResolved']['how'] | 'integrated'
+}
+
+/** HI-3235: whether a card's advance is unsettled (attempted, stopped or uncertain): it takes no other advance. */
+export const advanceUnresolved = (s: Pick<CardState, 'advance'>): boolean => !!s.advance && s.advance.state !== 'resolved'
+
+/**
  * A card loop's steps (#1382, #1467, SPEC §16.8.1): the builder's `design` (posted for the reviewer's check, in Doing),
  * `followUp` (a follow-up asked of the work, such as a screenshot change, ready for the reviewer's check, in Review or
  * Passed) and `proceed` (no answer to a design within the bound: building as posted); the reviewer's `ok` and `gaps`
@@ -640,6 +796,8 @@ export const loopStepSide = (step: LoopStepId): 'builder' | 'reviewer' => (step 
 export const emptyState = (): CardState => ({
   stage: 'todo',
   cycle: 0,
+  attempt: { id: 0, generation: 0 },
+  ready: null,
   started: null,
   lines: [],
   submissions: [],
@@ -662,8 +820,13 @@ export const emptyState = (): CardState => ({
   entries: [],
   integrated: null,
   accepted: null,
+  advance: null,
   rounds: 0,
   moreRounds: 0,
+  churn: { failed: 0, declined: 0, designs: 0, followUps: 0, requests: 0, asks: 0, inherited: 0 },
+  churnStop: null,
+  simplifyBase: 0,
+  splitFrom: null,
   builders: [],
   overrides: [],
   approvalOverridden: false,
@@ -685,15 +848,75 @@ const addOnce = (list: string[], x: string): string[] => (list.includes(x) ? lis
 /** A request a gate waits on (the user's review, or the OK before merging), bound to its submission, stage and generation. */
 const isGateRequest = (r: FactData['ApprovalRequested']): boolean => r.gate === 'review' || r.gate === 'okBefore'
 
+/** HI-3235: an advance settled: resolved, and the questions bound to its attempt retired (they can't be acted on any more). */
+const settleAdvance = (s: CardState, how: NonNullable<AdvanceState['how']>): void => {
+  if (!s.advance) return
+  const attempt = s.advance.attempt
+  s.advance = { ...s.advance, state: 'resolved', how }
+  s.requests = s.requests.filter((r) => !(ADVANCE_GATES.includes(r.gate) && r.entry === attempt))
+}
+
 /** An entry's outcome retires the merge queue's requests about it (#1351): it can't be updated or stuck any more. */
 const retireEntry = (s: CardState, entry: string): void => {
   s.requests = s.requests.filter((r) => r.entry !== entry)
+}
+
+/** HI-3188: a card's churn by kind (CardState.churn). */
+export interface Churn {
+  failed: number
+  declined: number
+  designs: number
+  followUps: number
+  requests: number
+  asks: number
+  inherited: number
+}
+/** HI-3188: the hard stop's base: the churn at its last answer, and a carry on's amount (null: the setting). */
+export interface ChurnStop {
+  base: number
+  more: number | null
+}
+
+/** HI-3188: a card's churn in all, what it inherited included (once: a continuation's `inherited` is its parent's total). */
+export const churnTotal = (s: Pick<CardState, 'churn'>): number => Object.values(s.churn).reduce((a, b) => a + b, 0)
+
+/** HI-3188: the churn at which the hard stop asks, with `setting` (`churnStopAt`); null when off (0). */
+export function churnStopAt(s: Pick<CardState, 'churnStop'>, setting: number): number | null {
+  if (!(setting > 0)) return null
+  return s.churnStop ? s.churnStop.base + (s.churnStop.more ?? setting) : setting
+}
+/** HI-3188: the churn at which the simplify check asks, with `setting` (`simplifyAt`); null when off (0). */
+export const simplifyAt = (s: Pick<CardState, 'simplifyBase'>, setting: number): number | null => (setting > 0 ? s.simplifyBase + setting : null)
+
+/**
+ * HI-3188: whether churn question `gate` is due on the card by its count and setting (`churnLimit`: `churnStopAt`,
+ * `simplify`: `simplifyAt`). The runtime asks when it is and none is open; an open one holds only while it is, with an
+ * agent reviewer and the rules enforced (runtime's `churnGateHolds`).
+ */
+export function churnDue(s: Pick<CardState, 'churn' | 'churnStop' | 'simplifyBase'>, gate: string, setting: number): boolean {
+  const at = gate === CHURN_LIMIT_GATE ? churnStopAt(s, setting) : gate === SIMPLIFY_GATE ? simplifyAt(s, setting) : null
+  return at !== null && churnTotal(s) >= at
+}
+
+/**
+ * HI-3188: whether a fact a write appended adds to the card's churn (as the fold counts it): a failed verdict, a design or
+ * follow-up step, a reviewer request, an agent's question to the user. A decline is counted by the fold (it needs the
+ * request's gate); the runtime asks after the decline's own write (askAtLimit's), so it isn't needed here.
+ */
+export function countsChurn(f: Pick<Fact, 'kind' | 'data'>): boolean {
+  if (f.kind === 'Verdict') return !(f.data as FactData['Verdict']).pass
+  if (f.kind === 'LoopStep') return (f.data as FactData['LoopStep']).step === 'design' || (f.data as FactData['LoopStep']).step === 'followUp'
+  if (f.kind === 'ReviewerRequest') return true
+  if (f.kind === 'ApprovalRequested') return !!(f.data as FactData['ApprovalRequested']).asker
+  return f.kind === 'Approval' && (f.data as FactData['Approval']).answer === 'declined'
 }
 
 /** Folds a card's facts (in seq order) into its state. Pure: the stage is the last `Moved`'s, never a claim. */
 export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): CardState {
   const s = emptyState()
   s.stage = initial
+  // HI-3263: a cycle's Started (or Adopted) not yet followed by a move: its own move into Active begins its attempt at (S,1).
+  let fresh = false
   for (const f of facts) {
     s.lastSeq = Math.max(s.lastSeq, f.seq)
     const by = agentOf(f.actor)
@@ -704,12 +927,15 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Adopted': {
         const d = f.data as StartedData
         // A new cycle: earlier submissions, verdicts and entries stay in history but don't count (§16.7.4).
-        // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4).
-        const limit = s.requests.filter((r) => r.gate === ROUND_LIMIT_GATE)
-        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines })
+        // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4); so do the churn's
+        // (HI-3188, §16.11.5), and the churn itself, over the card's whole history.
+        const limit = s.requests.filter((r) => PAUSE_GATES.includes(r.gate))
+        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, churn: s.churn, churnStop: s.churnStop, simplifyBase: s.simplifyBase, splitFrom: s.splitFrom, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines, ready: s.ready })
         s.requests = limit
         for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
+        s.attempt = { id: f.seq, generation: 1 }
+        fresh = true
         s.lastHeadFact = f.seq
         s.started = { ...d, seq: f.seq, adopted: f.kind === 'Adopted' }
         if (d.line) s.lines = addOnce(s.lines, d.line)
@@ -739,7 +965,10 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Verdict': {
         const d = f.data as FactData['Verdict']
         s.verdicts.push({ ...d, seq: f.seq })
-        if (!d.pass) s.rounds++
+        if (!d.pass) {
+          s.rounds++
+          s.churn = { ...s.churn, failed: s.churn.failed + 1 }
+        }
         break
       }
       case 'CarriedOver': {
@@ -769,11 +998,24 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         break
       }
       case 'ApprovalRequested': {
-        const d: Request = { ...(f.data as FactData['ApprovalRequested']), at: f.at }
+        const d: Request = { ...(f.data as FactData['ApprovalRequested']), at: f.at, ...(f.actor === 'assistant' ? { byAssistant: true as const } : {}) }
         // The merge queue asks again (the target moved, a new test merge): its earlier request of that gate is retired.
         if (d.entry) s.requests = s.requests.filter((r) => !r.entry || r.gate !== d.gate)
         s.requests.push(d)
         s.made[d.request] = d
+        // HI-3188: an agent's question or test ask to the user is churn; Combwork's own requests have no asker.
+        if (d.asker) s.churn = { ...s.churn, asks: s.churn.asks + 1 }
+        break
+      }
+      case 'ReviewerRequest':
+        s.churn = { ...s.churn, requests: s.churn.requests + 1 }
+        break
+      case 'SplitFrom': {
+        const d = f.data as FactData['SplitFrom']
+        s.churn = { ...s.churn, inherited: d.total }
+        s.churnStop = d.stop
+        s.simplifyBase = d.simplifyBase
+        s.splitFrom = d.parent
         break
       }
       case 'CannotWithinRules':
@@ -783,6 +1025,8 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         // A design or a follow-up (a new one replaces the one waiting); anything else ends the one it names (the runtime
         // refuses others).
         s.step = d.step === 'design' || d.step === 'followUp' ? { step: d.step, id: d.design ?? '', seq: f.seq, at: f.at, until: d.until ?? null, by } : null
+        if (d.step === 'design') s.churn = { ...s.churn, designs: s.churn.designs + 1 }
+        if (d.step === 'followUp') s.churn = { ...s.churn, followUps: s.churn.followUps + 1 }
         break
       }
       case 'RequestClosed':
@@ -794,8 +1038,15 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         s.requests = s.requests.filter((r) => r.request !== d.request)
         // A decline of a gate's request is a reviewed round (§16.11.4); of an agent's own question, only its answer.
         const made = s.made[d.request]
-        if (d.answer === 'declined' && (!made || isGateRequest(made))) s.rounds++
-        if (d.rounds) s.moreRounds += d.rounds
+        if (d.answer === 'declined' && (!made || isGateRequest(made))) {
+          s.rounds++
+          s.churn = { ...s.churn, declined: s.churn.declined + 1 }
+        }
+        // HI-3188: an answer to a churn question moves its bases to the churn now: the hard stop's next is a carry on's
+        // amount past it (else its setting past it), and the simplify check counts again from it. Rounds are the round limit's.
+        if (made?.gate === CHURN_LIMIT_GATE) s.churnStop = { base: churnTotal(s), more: d.choice === 'carryOn' ? d.rounds ?? null : null }
+        else if (d.rounds) s.moreRounds += d.rounds
+        if (made && CHURN_GATES.includes(made.gate)) s.simplifyBase = churnTotal(s)
         break
       }
       case 'ForwardRequested': {
@@ -862,6 +1113,10 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Integrated': {
         const d = f.data as FactData['Integrated']
         s.integrated = d
+        // HI-3236: integrated, however: nothing is left to preview.
+        s.requests = s.requests.filter((r) => r.gate !== ADVANCE_PREVIEW_GATE)
+        // HI-3235: Combwork's verified advance settles its attempt, and retires the attempt's questions.
+        if (s.advance && d.platform?.attempt === s.advance.attempt) settleAdvance(s, 'integrated')
         const e = d.entry ? s.entries.find((x) => x.id === d.entry) : undefined
         if (e) e.state = 'integrated'
         if (d.entry) s.requests = s.requests.filter((r) => r.entry !== d.entry || r.gate === QUEUE_STUCK_GATE)
@@ -884,6 +1139,23 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Accepted':
         s.accepted = f.data as FactData['Accepted']
         break
+      case 'AdvanceAttempted': {
+        const d = f.data as FactData['AdvanceAttempted']
+        s.advance = { attempt: d.attempt, plan: d.plan, state: 'attempted' }
+        // HI-3236: an attempt under way retires the card's preview (its outcome asks whatever follows).
+        s.requests = s.requests.filter((r) => r.gate !== ADVANCE_PREVIEW_GATE)
+        break
+      }
+      case 'AdvanceStopped': {
+        const d = f.data as FactData['AdvanceStopped']
+        if (s.advance?.attempt === d.attempt && s.advance.state !== 'resolved') Object.assign(s.advance, { state: d.uncertain ? 'uncertain' : 'stopped', code: d.code, detail: d.detail, undo: d.undo && !d.uncertain })
+        break
+      }
+      case 'AdvanceResolved': {
+        const d = f.data as FactData['AdvanceResolved']
+        if (s.advance?.attempt === d.attempt) settleAdvance(s, d.how)
+        break
+      }
       case 'Finished':
         s.finished = { ...(f.data as FactData['Finished']), seq: f.seq, steps: [] }
         break
@@ -892,12 +1164,29 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         if (s.finished?.seq === d.finish && !s.finished.steps.includes(d.step)) s.finished.steps.push(d.step)
         break
       }
-      case 'Moved':
+      case 'Moved': {
         // Out of Done, its finish is over: the next move into Done is another (HI-2014).
         if ((f.data as FactData['Moved']).to !== 'done') s.finished = null
-        s.stage = (f.data as FactData['Moved']).to
+        // HI-3194: out of an attempt (put back, done, on hold): the attempt ends, its key moves on.
+        const to = (f.data as FactData['Moved']).to
+        const from = (f.data as FactData['Moved']).from
+        if (ATTEMPT_STAGES.includes(from) && !ATTEMPT_STAGES.includes(to)) s.attempt = { ...s.attempt, generation: s.attempt.generation + 1 }
+        // HI-3263: into an attempt with no Started of its own (resumed from On Hold, a recorded move): a live attempt again,
+        // under a key no launch was handed while the card was out of one (a read on hold, a reassignment there).
+        else if (!ATTEMPT_STAGES.includes(from) && ATTEMPT_STAGES.includes(to) && !fresh && s.attempt.id > 0) s.attempt = { ...s.attempt, generation: s.attempt.generation + 1 }
+        fresh = false
+        s.stage = to
         // A gate's request belongs to the stage it was asked in: the card leaving it retires the request.
         s.requests = s.requests.filter((r) => !isGateRequest(r) || r.stage === undefined || r.stage === s.stage)
+        // HI-3236: a preview is Approved's alone: the card leaving Approved retires it (a new one is asked when it's back).
+        s.requests = s.requests.filter((r) => r.gate !== ADVANCE_PREVIEW_GATE || s.stage === 'approved')
+        break
+      }
+      case 'AttemptBound':
+        s.attempt = { ...s.attempt, generation: s.attempt.generation + 1 }
+        break
+      case 'Readiness':
+        s.ready = (f.data as FactData['Readiness']).ready
         break
       case 'Override': {
         const d = f.data as FactData['Override']

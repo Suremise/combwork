@@ -14,7 +14,7 @@ const path = require('path')
 const { createHash } = require('crypto')
 const { execFileSync } = require('child_process')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-const HUNG_MS = 30000
+const HUNG_MS = lib.timing('hang.ui')
 
 const PORT = Number(lib.port(47860))
 const userData = path.join(lib.WORK, 'agentrole-profile')
@@ -177,7 +177,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check('the Assistant starts, with its token', !!(await until(async () => fs.existsSync(asTokenFile), HUNG_MS)))
     const mcp = (method, params, role) => {
       const extra = role === 'assistant' ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: 'a-hb1' }
-      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n', env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, ...extra }), timeout: 60000 }).toString()
+      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n', env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, ...extra }), timeout: lib.timing('spawn.hang') }).toString()
       return JSON.parse(out.split('\n')[0]).result
     }
     const tool = (name, args, role = 'assistant') => {
@@ -215,11 +215,14 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await gSettings.getByRole('button', { name: 'Cancel' }).click()
     const agentTools = mcp('tools/list', {}, 'agent').tools
     check('a project agent has neither cw_update_agent nor cw_add_agent', agentTools.length > 0 && !agentTools.some((t) => t.name === 'cw_update_agent' || t.name === 'cw_add_agent'), JSON.stringify(agentTools.map((t) => t.name)))
-    // HI-2229: each role's most used tools are marked to be sent in full where a CLI defers tools; the rest aren't.
-    const full = (list) => list.filter((t) => t._meta?.['anthropic/alwaysLoad'] === true).map((t) => t.name).sort().join(',')
-    check("a project agent's cw_inbox, cw_list_tasks and cw_read_task are marked to load in full, no other", full(agentTools) === 'cw_inbox,cw_list_tasks,cw_read_task', full(agentTools))
+    // HI-3361 (the user's decision): no tool is marked to load in full where a CLI defers tools (HI-2229 marked a few).
+    const full = (list) => list.filter((t) => t._meta?.['anthropic/alwaysLoad'] !== undefined).map((t) => t.name).sort().join(',')
+    check("no project agent's tool is marked to load in full", full(agentTools) === '', full(agentTools))
     const assistantTools = mcp('tools/list', {}, 'assistant').tools
-    check("…the Assistant's, and its cw_agent_activity and cw_project_status", full(assistantTools) === 'cw_agent_activity,cw_inbox,cw_list_tasks,cw_project_status,cw_read_task', full(assistantTools))
+    check("…nor any of the Assistant's", assistantTools.length > 0 && full(assistantTools) === '', full(assistantTools))
+    // HI-3361: a card given as `card` to a tool that names it `number` is taken as meant, at the bridge's tools/call.
+    const aliased = tool('cw_read_task', { card: 'AL-1' }, 'agent')
+    check("cw_read_task given `card` (the intents' name) for its `number` reads the card", !aliased.isError && aliased.text.includes('AL-1'), aliased.text.slice(0, 200))
     const guessed = tool('cw_read_task', { key: 'AL-1' }, 'agent')
     check('a call with a guessed argument is refused as before, and told what the tool takes, naming no value', guessed.isError && /is not a card number/.test(guessed.text) && /cw_read_task takes number \(required\).*; missing: number; not: key\./.test(guessed.text) && !guessed.text.includes('AL-1'), guessed.text)
     const noProject = tool('cw_project_status', {})
