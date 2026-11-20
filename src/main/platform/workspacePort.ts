@@ -89,6 +89,8 @@ export interface WorkspaceJournal {
 export interface WorkspaceListing {
   path: string
   line: string | null
+  /** HI-3464: registered, but its platform would prune it (no workspace at its folder: one made by hand in its place). */
+  prunable?: true
 }
 
 /** A folder's checkout read with no process (from its files): its line (null: detached) and its head; null when unreadable. */

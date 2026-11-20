@@ -4,6 +4,8 @@
 //   Progress panel as "Combwork (slot slot-a)" / "Combwork (slot slot-b)" (slot-a's while it runs, screenshot);
 // - slot-a released with an untracked file is dirty and isn't lent again: the next lend gets slot-b;
 // - with one builder left and a day gone by, the idle removal removes only the clean slot (slot-b), never the dirty one.
+// - HI-3464: with one builder, slot-a's folder deleted and a folder with a file made in its place: the next lend gets a
+//   new slot, slot-a stays gone with Remove… in Slots and copies, which forgets it and leaves the folder as it is.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (no agent is started).
 // Dev build only (#1578): its slots are lent and released through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
@@ -94,6 +96,29 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check("…slot-b's folder is gone, and git doesn't list it", !fs.existsSync(next.slot.folder) && !lib.git(fx.alpha, ['worktree', 'list']).toLowerCase().includes('slot-b'))
     check('…the dirty slot-a stays, with its file', (await slot('slot-a'))?.state === 'dirty' && fs.existsSync(path.join(folderA, 'left.txt')))
     check('the pool lists slot-a only', JSON.stringify((await slots()).map((s) => s.name)) === JSON.stringify(['slot-a']))
+
+    // --- HI-3464: a pool of one whose free slot's folder was deleted, a folder with the user's file made in its place.
+    fs.rmSync(folderA, { recursive: true, force: true })
+    fs.mkdirSync(folderA)
+    fs.writeFileSync(path.join(folderA, 'mine.txt'), 'mine\n')
+    const after = await op({ op: 'lend', agent: b1.id, card: 105 })
+    check("the next start isn't blocked: a new slot is lent in slot-a's stead", after.ok && after.slot.name !== 'slot-a', JSON.stringify(after))
+    check("…slot-a stays, gone, offering Remove…; the folder in its place untouched", !!(await until(async () => (await slot('slot-a'))?.goneFree === true, HUNG_MS)) && fs.readFileSync(path.join(folderA, 'mine.txt'), 'utf8') === 'mine\n', JSON.stringify(await slot('slot-a')))
+    await page.getByText('alpha', { exact: true }).first().click()
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await page.locator('.git-sections [data-section="workflow"]').click()
+    const form = page.locator('.workflow-form')
+    await form.waitFor({ timeout: HUNG_MS })
+    await form.locator('.workflow-option[data-option="folder"] select').selectOption('slots')
+    const goneRow = form.locator('.workflow-slots-table tr[data-slot="slot-a"]')
+    check("Slots and copies shows slot-a's Remove…", !!(await until(async () => (await goneRow.locator('[data-action="remove-gone"]').count()) === 1, HUNG_MS)), await goneRow.innerText().catch(() => ''))
+    await goneRow.locator('[data-action="remove-gone"]').click()
+    const ask = page.locator('.dialog', { hasText: 'Remove slot-a?' })
+    await ask.waitFor({ timeout: HUNG_MS })
+    check('…its question says nothing is deleted', (await ask.innerText()).includes('Nothing is deleted'), await ask.innerText())
+    await ask.screenshot({ path: path.join(fx.shots, 'slotpool-3-remove-gone.png') })
+    await ask.getByRole('button', { name: 'Remove', exact: true }).click()
+    check('…removed: the list no longer has it, and the folder and its file are still there', !!(await until(async () => (await goneRow.count()) === 0 && !(await slot('slot-a')), HUNG_MS)) && fs.readFileSync(path.join(folderA, 'mine.txt'), 'utf8') === 'mine\n')
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

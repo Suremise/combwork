@@ -772,6 +772,7 @@
   "workflow.slots.removeKept": "Entfernen…",
   "workflow.slots.removeKeptTitle": "{slot} entfernen?",
   "workflow.slots.removeKeptMessage": "{card} beginnt dann neu von seinem Ziel aus, in einem anderen Slot. Die hier committete Arbeit bleibt in jjs Speicher{commit, select, none {.} other {: ihr letzter Commit ist {commit}.}}",
+  "workflow.slots.removeGoneMessage": "Sein Ordner fehlt oder ist kein Worktree mehr, daher kann er nicht verliehen werden. Combwork vergisst {slot} und legt einen neuen Slot an, wenn eine Karte einen braucht. Nichts wird gelöscht: Was in seinem Ordner liegt, bleibt, wie es ist.",
   "workflow.slots.removedKept": "{slot} ist entfernt.",
   "workflow.slots.notRemovedKept": "{slot} wurde nicht entfernt: {why, select, changed {er hat sich geändert, seit die Liste angezeigt wurde (sein Ordner ist zurück, oder er wurde neu angelegt)} busy {etwas arbeitet gerade darin} other {Combwork hat ihn behalten}}.",
   "workflow.slots.keptForgottenFor": "Für {card} aufbewahrt, aber jj führt seinen Workspace nicht mehr",

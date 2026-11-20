@@ -1007,7 +1007,9 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       const keptGone = record && s.state === 'gone' ? { generation: record.generation, commit: pool.keptCommit(s.name), ...((await folderThere(s.folder)) ? { forgotten: true as const } : {}) } : null
       // HI-3103: kept for no card, its workspace forgotten outside Combwork, its folder there: its generation, for Remove….
       const forgotten = jj && !l && s.identity?.generation && (await pool.forgottenFree(s)) ? { generation: s.identity.generation } : null
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj && s.platform ? { platform: s.platform } : {}), ...(stale ? { stale: true as const, ...(stale === 'abandoned' ? { staleWhy: 'abandoned' as const } : {}) } : {}), ...(keptFor !== null ? { keptFor, ...(record?.edit ? { keptEdit: true as const } : {}) } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}) }
+      // HI-3464: free and gone (its folder missing, or there but not a worktree): Remove… forgets it.
+      const goneFree = !jj && !l && pool.goneRemovable(s)
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj && s.platform ? { platform: s.platform } : {}), ...(stale ? { stale: true as const, ...(stale === 'abandoned' ? { staleWhy: 'abandoned' as const } : {}) } : {}), ...(keptFor !== null ? { keptFor, ...(record?.edit ? { keptEdit: true as const } : {}) } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}), ...(goneFree ? { goneFree: true as const } : {}) }
     })
   )
 }
@@ -1033,6 +1035,18 @@ export async function removeForgottenSlot(ws: WorkspaceService, projectPath: str
   const r = await pool.removeForgotten(name, generation)
   if (r.ok) return r
   log.info(`Slot ${userText(name)}, its workspace forgotten, wasn't removed: ${r.why === 'kept' ? r.kept.why : r.why}`)
+  return { ok: false, why: r.why === 'kept' ? r.kept.why : r.why }
+}
+
+/**
+ * A free slot whose folder is gone or not a worktree, forgotten by the user (HI-3464, Slots and copies' Remove…): checked
+ * again under the removal (SlotPool.removeGone); a folder in its place is left as it is.
+ */
+export async function removeGoneSlot(ws: WorkspaceService, projectPath: string, name: string): Promise<{ ok: true } | { ok: false; why: string }> {
+  const pool = await poolFor(ws, projectPath)
+  const r = await pool.removeGone(name)
+  if (r.ok) return r
+  log.info(`Slot ${userText(name)}, gone, wasn't removed: ${r.why === 'kept' ? r.kept.why : r.why}`)
   return { ok: false, why: r.why === 'kept' ? r.kept.why : r.why }
 }
 

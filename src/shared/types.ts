@@ -2020,6 +2020,8 @@ export interface SlotView {
   keptGone?: { generation: string; commit: string | null; forgotten?: true }
   /** HI-3103: kept for no card, its workspace forgotten outside Combwork, its folder there: its generation, for Remove…. */
   forgotten?: { generation: string }
+  /** HI-3464: free and gone, kept for no card (its folder missing, or there but not a worktree git lists): Remove… forgets it. */
+  goneFree?: true
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */

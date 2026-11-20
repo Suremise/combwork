@@ -5,6 +5,9 @@
 ### Changed
 
 - **The installer names the copy that's still running** (HI-3463). When the installer stops because a copy of Combwork, or of its version before 1.1, won't close, its message now says where that copy runs from and its process ID, or, when Windows won't show where it is (another account's copy, for example), says so with its process ID, and how to end it in Task Manager. A copy left running with no window can be closed without restarting the PC.
+### Fixed
+
+- **A slot whose folder was deleted no longer blocks every start** (HI-3464). When a slot's folder was deleted while no card held it, Combwork never lent it again, yet still counted it, so in a project with one builder every card and lane start was refused for good, and making the folder again by hand didn't help. Now the next start makes the slot again at its folder (removing an empty folder made in its place). If a folder that isn't a worktree is there with something in it, Combwork leaves it alone and makes a new slot instead; **Remove…** beside the old one in Version Control → Slots and copies forgets it, deleting nothing.
 
 ## 1.6.0 — 2026-11-20
 

@@ -7843,7 +7843,16 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   the stored name stays English), each in a job of its own on the process supervisor, logs in Combwork's `logs/slots`,
   bounded by Settings → Advanced, **Slots: longest a setup command runs** (`cw.slots.setupMinutes`, 60 min).
 - **Released:** a slot left with uncommitted or untracked files that aren't ignored is `dirty`, not lent until clean;
-  a free slot gone from disk is recreated when next lent, a leased one marked `gone`. A free slot is looked at again
+  a free slot gone from disk is recreated when next lent, a leased one marked `gone`. A free slot marked `gone` (its
+  folder deleted while it waited or was settled) is lent too, after every ready one, and made again at its folder on the
+  lend's target (HI-3464): a gone slot never fills the pool for good. A folder git doesn't list as a worktree there (git
+  would prune its registration: one made by hand) counts as gone; an empty one is removed first, one with anything in it
+  is never touched: the lend passes the slot over, it no longer counts toward the pool's size, and a new slot is made in
+  its stead. Such a free gone Git slot (kept for no card) shows **Remove…** in Slots and copies, which forgets the slot
+  (Combwork's record, and git's registration of its folder while that is absent), leaving anything at its folder as it
+  is. Nor does a free gone slot keep its recorded target in use (HI-2886): its next lend makes it at its own. Chosen over
+  removing the gone slot and making another as the lend's own step: making it again where it was keeps its name and
+  ports, and only a folder with something in it, which Combwork must never touch, needs the user. A free slot is looked at again
   when it is next lent (changed since, a session or a process in it: marked or passed over, another tried; a slot
   asked for by name is refused once, *busy*).
 - **Operations** (HR1's round 1): warming for a lease and removal own the slot from the write that starts them to the
