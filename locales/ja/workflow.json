@@ -579,6 +579,8 @@
   "workflow.slots.off": "オフ",
   "workflow.slots.on": "オン",
   "workflow.slots.openAdvanced": "詳細を開く",
+  "workflow.slots.operationHint": "フォルダーで完了させるか、そこで {command} を実行して終了してください",
+  "workflow.slots.operationState": "未完了の git {what}",
   "workflow.slots.recover": "復旧…",
   "workflow.slots.recoverMessage": "Combworkは、jjがまだ記録していない変更をまず下のフォルダーにコピーし、その後jjでスロットを最新の状態にします。スロットで何も作業していないときだけ実行されます。",
   "workflow.slots.recoverTitle": "{slot}を復旧しますか？",

@@ -6,6 +6,8 @@
 // - with one builder left and a day gone by, the idle removal removes only the clean slot (slot-b), never the dirty one.
 // - HI-3464: with one builder, slot-a's folder deleted and a folder with a file made in its place: the next lend gets a
 //   new slot, slot-a stays gone with Remove… in Slots and copies, which forgets it and leaves the folder as it is.
+// - HI-3465: that slot released with a revert left under way (nothing uncommitted, git's sequencer left): told once,
+//   shown in Slots and copies with `git revert --abort`, not lent; ended there, it is lent again.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (no agent is started).
 // Dev build only (#1578): its slots are lent and released through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
@@ -119,6 +121,45 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await ask.screenshot({ path: path.join(fx.shots, 'slotpool-3-remove-gone.png') })
     await ask.getByRole('button', { name: 'Remove', exact: true }).click()
     check('…removed: the list no longer has it, and the folder and its file are still there', !!(await until(async () => (await goneRow.count()) === 0 && !(await slot('slot-a')), HUNG_MS)) && fs.readFileSync(path.join(folderA, 'mine.txt'), 'utf8') === 'mine\n')
+
+    // --- HI-3465: B1's card ends with a revert of two commits left under way in its slot (the first's conflict committed
+    // by hand: nothing uncommitted, git's sequencer left), as reported: never detached, told once, shown, freed by --abort.
+    const folderB = after.slot.folder
+    const g = (args, ok = true) => {
+      try {
+        return lib.git(folderB, ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args])
+      } catch (e) {
+        if (ok) throw e
+        return null
+      }
+    }
+    for (const [i, text] of [[1, 'one'], [2, 'two']]) {
+      fs.writeFileSync(path.join(folderB, 'r.txt'), `${text}\n`)
+      g(['add', 'r.txt'])
+      g(['commit', '-qm', `c${i}`])
+    }
+    fs.writeFileSync(path.join(folderB, 's.txt'), 's\n')
+    g(['add', 's.txt'])
+    g(['commit', '-qm', 'c3'])
+    g(['revert', '--no-edit', 'HEAD~2', 'HEAD'], false)
+    g(['rm', '-q', 'r.txt'])
+    g(['commit', '-q', '--no-edit'])
+    check('the slot is left mid-revert with nothing uncommitted', g(['status', '--porcelain']).trim() === '' && fs.existsSync(path.join(g(['rev-parse', '--absolute-git-dir']).trim(), 'sequencer')))
+    check('B1 releases slot-b', (await op({ op: 'release', lease: after.lease.id, why: 'done' })) === true)
+    check('…its unfinished revert recorded, the slot not ready', !!(await until(async () => (await slot('slot-b'))?.operation?.what === 'revert', HUNG_MS)) && (await slot('slot-b'))?.state === 'dirty', JSON.stringify(await slot('slot-b')))
+    const told = page.locator('.toast', { hasText: 'slot-b has an unfinished git revert' })
+    check('…the user is told, naming the way out', !!(await until(async () => (await told.count()) === 1, HUNG_MS)) && (await told.innerText()).includes('git revert --abort'), await told.innerText().catch(() => ''))
+    check('…and it is not lent: the pool of one has no slot', (await op({ op: 'lend', agent: b1.id, card: 106 })).refusal?.why === 'noSlot')
+    await page.locator('.git-sections [data-section="changes"]').click().catch(() => {})
+    await page.locator('.git-sections [data-section="workflow"]').click()
+    await form.waitFor({ timeout: HUNG_MS })
+    await form.locator('.workflow-option[data-option="folder"] select').selectOption('slots')
+    const opRow = form.locator('.workflow-slots-table tr[data-slot="slot-b"]')
+    check('Slots and copies shows slot-b as an unfinished git revert, with the command that ends it', !!(await until(async () => (await opRow.locator('[data-operation="revert"]').count()) === 1, HUNG_MS)) && /Unfinished git revert/.test(await opRow.innerText()) && (await opRow.innerText()).includes('git revert --abort'), await opRow.innerText().catch(() => ''))
+    await opRow.screenshot({ path: path.join(fx.shots, 'slotpool-4-operation.png') })
+    g(['revert', '--abort'])
+    const freed = await op({ op: 'lend', agent: b1.id, card: 106 })
+    check('ended in its folder, slot-b is lent again', freed.ok && freed.slot.name === 'slot-b' && !(await slot('slot-b'))?.operation, JSON.stringify(freed))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

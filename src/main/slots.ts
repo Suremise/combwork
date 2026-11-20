@@ -686,6 +686,11 @@ export class SlotStore {
     return this.conn.read((db) => this.keptRecordIn(db, name))
   }
 
+  /** HI-3465: the operation its last settle found under way in a slot (`operationKey`), or null. */
+  operation(name: string): SlotOperationRecord | null {
+    return this.conn.read((db) => operationOf((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(operationKey(this.project, name)) as { value: string } | undefined)?.value)) // agent-protocol: SQL
+  }
+
   private keptRecordIn(db: DatabaseSync, name: string): SlotKeptFor | null {
     const r = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(heldKey(this.project, name)) as { value: string } | undefined // agent-protocol: SQL
     try {
@@ -1483,6 +1488,8 @@ export interface PoolDeps {
   renamer?: SlotRenamer
   /** A free slot's settle changed its state (HI-2170): what it is now. A finished card's slot question is looked at again. */
   looked?: (slot: string, state: SlotState) => void
+  /** HI-3465: a free slot's settle found an operation under way in it (`what`, as its platform names it), first since none was. */
+  operationFound?: (slot: string, folder: string, what: string) => void
   now?: () => number
 }
 
@@ -1669,6 +1676,29 @@ const OWED_PASS_MAX_MS = 30_000
 /** board_meta: a slot that owes a settle (HI-2906/s101), by its project's id. */
 export const owedKey = (project: string, slot: string): string => `slot_settle_owed:${project}:${slot}`
 
+/**
+ * board_meta: a free slot's platform operation under way (HI-3465: a revert, a merge… left in it), as its last settle
+ * found it: `{ what, since }`. Kept while the operation is, so the user is told once; it goes with the next look that finds none.
+ */
+export const operationKey = (project: string, slot: string): string => `slot_operation:${project}:${slot}`
+
+/** HI-3465: a slot's operation record (`operationKey`). */
+export interface SlotOperationRecord {
+  what: string
+  since: number
+}
+
+/** A stored operation record, or null (none, or not one). */
+export function operationOf(v: string | undefined): SlotOperationRecord | null {
+  if (!v) return null
+  try {
+    const o = JSON.parse(v) as Partial<SlotOperationRecord>
+    return typeof o.what === 'string' && typeof o.since === 'number' ? { what: o.what, since: o.since } : null
+  } catch {
+    return null
+  }
+}
+
 /** The default scheduler of the owed pass's wake: an unref'd timer. */
 const laterBy = (fn: () => void, ms: number): { cancel(): void } => {
   const t = setTimeout(fn, ms)
@@ -1827,6 +1857,7 @@ export class SlotPool {
     db.prepare('DELETE FROM board_meta WHERE key = ?').run(asideKey(this.store.project, s.name))
     db.prepare('DELETE FROM board_meta WHERE key = ?').run(recoverKey(this.store.project, s.name))
     db.prepare('DELETE FROM board_meta WHERE key = ?').run(heldKey(this.store.project, s.name))
+    db.prepare('DELETE FROM board_meta WHERE key = ?').run(operationKey(this.store.project, s.name))
     if (s.identity) port?.forgetIn?.(db, s.identity)
   }
 
@@ -1855,6 +1886,11 @@ export class SlotPool {
   /** A slot's kept record (HI-2995: its card and the generation it was kept at), or null. */
   keptRecord(name: string): SlotKeptFor | null {
     return this.store.keptRecord(name)
+  }
+
+  /** HI-3465: the operation found under way in a slot, as its last settle recorded it, or null. */
+  operation(name: string): SlotOperationRecord | null {
+    return this.store.operation(name)
   }
 
   /** The slot kept for a card (HI-2995), as the board has it now: a start's read of where it goes, never its authority. */
@@ -2210,6 +2246,10 @@ export class SlotPool {
     let held: SlotKeptFor | 'forget' | null = null
     // What the end write does to the slot's owed record: set (busy), cleared (decided), or left (the look couldn't say).
     const end: { owed: 'set' | 'clear' | 'keep' } = { owed: 'keep' }
+    // HI-3465: the operation under way in it (a revert, a merge… left by its card's agent): found (its name), none (null),
+    // or not looked at (undefined: the record left as it is). `told`: first found by this settle, told once it is written.
+    let operation: string | null | undefined
+    let told: string | null = null
     const latch: QuietLatch = { lostQuiet: false }
     try {
       // Tracked (awaited by close, its token live) from before its first wait, so a close never misses it and no look of
@@ -2224,6 +2264,11 @@ export class SlotPool {
         s = this.store.slot(name) ?? seen
         try {
           const now = await this.looks(s, token, latch)
+          // HI-3465: not clean because git is in the middle of something (a merge's or a revert's markers count as
+          // uncommitted): which, read from its files, so the user hears of it once and Slots and copies shows it. Never
+          // detached meanwhile (git refuses to switch then), nor ended by Combwork: it is the agent's or the user's to finish.
+          if (now === 'dirty') operation = this.portOf(s).operation?.(s.folder) ?? null
+          else if (now === 'ready' || now === 'gone') operation = null
           // Clean, it waits for its next card detached at the target's head (HI-2014, HI-1986), before it is ready to lend:
           // its card's line is no longer checked out (committed work stays on that line), so a merged one can be deleted.
           // Not detached (git couldn't read or switch it: an index lock, say): not ready yet either, so the next look tries
@@ -2286,6 +2331,15 @@ export class SlotPool {
               else if (held) db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(heldKey(this.store.project, name), JSON.stringify(held)) // agent-protocol: SQL
               if (end.owed === 'set') db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(owedKey(this.store.project, name), JSON.stringify({ why: latch.why ?? 'busy', since: Date.now() })) // agent-protocol: SQL
               else if (end.owed === 'clear') db.prepare('DELETE FROM board_meta WHERE key = ?').run(owedKey(this.store.project, name)) // agent-protocol: SQL
+              if (operation !== undefined) {
+                const key = operationKey(this.store.project, name)
+                const had = operationOf((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value) // agent-protocol: SQL
+                if (!operation) db.prepare('DELETE FROM board_meta WHERE key = ?').run(key) // agent-protocol: SQL
+                else if (had?.what !== operation) {
+                  db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify({ what: operation, since: Date.now() })) // agent-protocol: SQL
+                  told = operation
+                }
+              }
               wrote = true
             })
             .catch((e) => {
@@ -2300,6 +2354,11 @@ export class SlotPool {
       // After its row's write, only a change: a pass that settles slots asks for itself again, so a slot that stays dirty
       // mustn't loop it.
       if (began && to !== s.state) this.deps.looked?.(name, to)
+      // HI-3465: told once, after the write that recorded it (lost meanwhile: not written, not told).
+      if (told) {
+        log.info(`${userText(name)} has a git ${told} under way: not lent until it is finished or ended (the user is told)`)
+        this.deps.operationFound?.(name, s.folder, told)
+      }
       // Owed now: the pool's owed pass is asked for (after its pause), after this settle's fenced end. While a pass runs,
       // its own end reads the records (with no await since its last settle) and asks, with its pause grown.
       if (end.owed === 'set') {

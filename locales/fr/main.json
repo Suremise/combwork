@@ -364,6 +364,8 @@
   "main.server.url.remoteHttp": "Un serveur sur un autre ordinateur exige https://. Le simple http:// est réservé à un serveur sur ce PC (localhost).",
   "main.server.url.scheme": "L’URL doit commencer par https:// (ou http:// pour un serveur sur ce PC).",
   "main.server.url.userinfo": "L’URL ne peut pas contenir de nom d’utilisateur ni de mot de passe : indique la clé dans son propre champ.",
+  "main.slots.operation.message": "Combwork ne peut pas prêter {slot} à une autre carte tant que ce n’est pas terminé. Termine-le dans {folder}, ou arrête-le là avec {command}. Combwork ne l’arrête jamais lui-même, et prête de nouveau le slot dès que plus rien n’y est en cours.",
+  "main.slots.operation.title": "{slot} a un git {what} inachevé",
   "main.storage.claimed": "Le dossier appartient de nouveau à une session.",
   "main.storage.launchInUse": "son agent appartient de nouveau au projet, ou démarre",
   "main.storage.noLonger": "{path} : ne remplit plus les conditions",

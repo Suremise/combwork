@@ -364,6 +364,8 @@
   "main.server.url.remoteHttp": "Serwer na innym komputerze wymaga https://. Zwykłe http:// jest tylko dla serwera na tym komputerze (localhost).",
   "main.server.url.scheme": "Adres URL musi zaczynać się od https:// (albo http:// dla serwera na tym komputerze).",
   "main.server.url.userinfo": "Adres URL nie może zawierać nazwy użytkownika ani hasła: podaj klucz w osobnym polu.",
+  "main.slots.operation.message": "Combwork nie może wypożyczyć {slot} innej karcie, dopóki to się nie skończy. Dokończ to w {folder} albo zakończ tam poleceniem {command}. Combwork nigdy nie kończy tego sam i wypożycza slot ponownie, gdy nic już w nim nie trwa.",
+  "main.slots.operation.title": "{slot} ma niedokończone git {what}",
   "main.storage.claimed": "Folder znów należy do sesji.",
   "main.storage.launchInUse": "jego agent znów należy do projektu albo właśnie się uruchamia",
   "main.storage.noLonger": "{path}: już się nie kwalifikuje",

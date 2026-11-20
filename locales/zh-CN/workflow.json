@@ -579,6 +579,8 @@
   "workflow.slots.off": "关",
   "workflow.slots.on": "开",
   "workflow.slots.openAdvanced": "打开“高级”",
+  "workflow.slots.operationHint": "请在它的文件夹中完成，或在那里运行 {command} 结束它",
+  "workflow.slots.operationState": "未完成的 git {what}",
   "workflow.slots.recover": "恢复…",
   "workflow.slots.recoverMessage": "Combwork 会先把 jj 尚未记录的编辑复制到下面的文件夹，然后用 jj 将槽位更新到最新。仅在槽位中没有任何工作时运行。",
   "workflow.slots.recoverTitle": "恢复 {slot}？",

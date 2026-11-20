@@ -22,6 +22,7 @@ import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { junction } from './pathAliases'
 import { gitWorkspacePort } from '../src/main/platform/gitWorkspacePort'
+import { operationSync } from '../src/main/platform/git'
 import { JJ_SAYS } from '../src/main/platform/jjWorkspacePort'
 import { unknown } from '../src/main/platform/types'
 import { UNREADABLE } from '../src/shared/workflow/texts'
@@ -83,7 +84,7 @@ interface World {
   pool: SlotPool
   runs: (SlotRun & SlotRunEnd)[]
   opts: { setup: string; archive: string; copy: string }
-  set: { builders: number; removeIdle: boolean; sessions: Map<string, string>; inFlight: Set<number>; ended: string[]; writersOver: Set<string>; looked: string[] }
+  set: { builders: number; removeIdle: boolean; sessions: Map<string, string>; inFlight: Set<number>; ended: string[]; writersOver: Set<string>; looked: string[]; operations: string[] }
   steer: Steer
   clock: { now: number }
   /** Pids of holder processes that have ended. */
@@ -121,7 +122,7 @@ function world(o: { setup?: string; builders?: number; port?: WorkspacePort } = 
   const runs: World['runs'] = []
   const logs = tempDir('slots-logs-')
   const opts = { setup: o.setup ?? '', archive: '', copy: '.env' }
-  const set = { builders: o.builders ?? 2, removeIdle: true, sessions: new Map<string, string>(), inFlight: new Set<number>(), ended: [] as string[], writersOver: new Set<string>(), looked: [] as string[] }
+  const set = { builders: o.builders ?? 2, removeIdle: true, sessions: new Map<string, string>(), inFlight: new Set<number>(), ended: [] as string[], writersOver: new Set<string>(), looked: [] as string[], operations: [] as string[] }
   const steer: Steer = { gates: new Map(), settled: true, noSupervisor: false, settle: true, settledJobs: [] }
   const dead = new Set<number>()
   const root = join(`${ws}.worktrees`, 'project')
@@ -164,6 +165,7 @@ function world(o: { setup?: string; builders?: number; port?: WorkspacePort } = 
       ended: (l, s) => void set.ended.push(`${l.id} ${s.name}`),
       writerOver: (wr) => set.writersOver.has(wr.run),
       looked: (name, state) => void set.looked.push(`${pid} ${name} ${state}`),
+      operationFound: (name, _folder, what) => void set.operations.push(`${name} ${what}`),
       now: () => clock.now,
       ...(o.port ? { workspaces: o.port } : {})
     })
@@ -901,6 +903,68 @@ describe('the pool (#1429)', { timeout: timing('test.hang') }, () => {
     expect(slotOptionsOf({ worktreeSetup: 'x', worktreeCopy: null, slots: { setup: '', copy: '' } }, {})).toEqual({ setup: '', archive: '', copy: '', gitFiles: true })
     // HI-1182: Set up submodules and LFS is on unless turned off.
     expect(slotOptionsOf({ worktreeSetup: '', worktreeCopy: null, slots: { gitFiles: false } }, {}).gitFiles).toBe(false)
+  })
+})
+
+describe('HI-3465: a git operation left under way in a free slot', { timeout: timing('test.hang') }, () => {
+  /**
+   * A card's agent reverting two commits in its slot, the first stopping on a conflict that it commits by hand: git has
+   * no REVERT_HEAD then, nothing is uncommitted, and its sequencer stays, so git refuses to switch the slot's branch.
+   */
+  function revertLeft(folder: string): void {
+    commit(folder, { 'r.txt': 'one\n' }, 'c1')
+    commit(folder, { 'r.txt': 'two\n' }, 'c2')
+    commit(folder, { 's.txt': 's\n' }, 'c3')
+    expect(() => sh(folder, 'revert', '--no-edit', 'HEAD~2', 'HEAD')).toThrow()
+    sh(folder, 'rm', '-q', 'r.txt')
+    sh(folder, 'commit', '-q', '--no-edit')
+    expect(sh(folder, 'status', '--porcelain')).toBe('')
+    expect(existsSync(join(sh(folder, 'rev-parse', '--absolute-git-dir'), 'sequencer'))).toBe(true)
+  }
+
+  it("the reported case: never detached, the user told once, not lent; lent again once it is ended in the folder", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    revertLeft(r.slot.folder)
+    await w.pool.release(r.lease.id, 'done')
+    await w.pool.refresh()
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'dirty', op: null })
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'revert' })
+    expect(w.set.operations).toEqual(['slot-a revert'])
+    // Looked at again and again (each start, each refresh): told only the once, and never lent meanwhile.
+    await w.pool.refresh()
+    expect(await w.pool.lend({ agent: 'a2', card: 2 })).toMatchObject({ ok: false, refusal: { why: 'noSlot' } })
+    expect(w.set.operations).toEqual(['slot-a revert'])
+    // Ended where it is, as the notice says: nothing under way, the slot ready and lent again, its record gone.
+    sh(r.slot.folder, 'revert', '--abort')
+    const again = await lent(w, { agent: 'a2', card: 2 })
+    expect(again.slot.name).toBe('slot-a')
+    expect(w.pool.operation('slot-a')).toBeNull()
+  })
+
+  it('each operation is named as git names it, read from the worktree’s own git dir', async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    const gitDir = sh(r.slot.folder, 'rev-parse', '--absolute-git-dir')
+    const head = sh(r.slot.folder, 'rev-parse', 'HEAD')
+    expect(operationSync(r.slot.folder)).toBeNull()
+    for (const [marker, what] of [['MERGE_HEAD', 'merge'], ['REVERT_HEAD', 'revert'], ['CHERRY_PICK_HEAD', 'cherry-pick'], ['BISECT_LOG', 'bisect']] as const) {
+      writeFileSync(join(gitDir, marker), `${head}\n`)
+      expect(operationSync(r.slot.folder), marker).toBe(what)
+      rmSync(join(gitDir, marker))
+    }
+    mkdirSync(join(gitDir, 'sequencer'))
+    writeFileSync(join(gitDir, 'sequencer', 'todo'), `pick ${head.slice(0, 7)} c\n`)
+    expect(operationSync(r.slot.folder)).toBe('cherry-pick')
+    // The finish's check (submit.clean) and a slot's look both count it as not clean.
+    expect(await gitWorkspacePort.dirty(r.slot.folder)).toContain('(sequencer)')
+    rmSync(join(gitDir, 'sequencer'), { recursive: true })
+    mkdirSync(join(gitDir, 'rebase-apply'))
+    expect(operationSync(r.slot.folder)).toBe('rebase')
+    writeFileSync(join(gitDir, 'rebase-apply', 'applying'), '')
+    expect(operationSync(r.slot.folder)).toBe('am')
+    rmSync(join(gitDir, 'rebase-apply'), { recursive: true })
+    expect(await gitWorkspacePort.dirty(r.slot.folder)).toEqual([])
   })
 })
 

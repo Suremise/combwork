@@ -5,6 +5,7 @@ import { COPIES_REVIEW } from '@shared/advanced'
 import { reviewsWork, agentWorkflowRole } from '@shared/workflow/roles'
 import { fmt, msg, tr } from '@shared/i18n'
 import { revisionShort } from '@shared/platform/descriptors'
+import { gitOperationEnd } from '@shared/gitOperations'
 import * as actions from '../actions'
 import { call } from '../api'
 import { useAdvancedValue } from '../advanced'
@@ -79,6 +80,8 @@ const T = {
   removeKept: msg({ id: 'workflow.slots.removeKept', defaultMessage: 'Remove…', description: 'HI-3032: a button beside a jj slot kept for a card whose folder is missing (workflow.slots.keptGoneFor): asks, then removes the slot so the card can start again.' }),
   removeKeptTitle: msg({ id: 'workflow.slots.removeKeptTitle', defaultMessage: 'Remove {slot}?', description: 'HI-3032: the title of the confirmation before removing a jj slot kept for a card whose folder is missing. {slot} is the slot’s name.' }),
   removeKeptMessage: msg({ id: 'workflow.slots.removeKeptMessage', defaultMessage: '{card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}', description: 'HI-3032: the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose folder is missing. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none.' }),
+  operationState: msg({ id: 'workflow.slots.operationState', defaultMessage: 'Unfinished git {what}', description: "HI-3465: a slot's state in the list under “Slots and copies”, in place of its usual state: a git operation was left under way in its folder, so Combwork doesn't lend it. {what} is git's word for it (merge, rebase, am, cherry-pick, revert or bisect: keep it as it is)." }),
+  operationHint: msg({ id: 'workflow.slots.operationHint', defaultMessage: 'Finish it in its folder, or end it there with {command}', description: "HI-3465: beside workflow.slots.operationState: how to free the slot. {command} is the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is). Combwork never runs it itself." }),
   removeGoneMessage: msg({ id: 'workflow.slots.removeGoneMessage', defaultMessage: 'Its folder is missing, or isn’t a worktree any more, so it can’t be lent. Combwork forgets {slot} and makes a new slot when a card needs one. Nothing is deleted: anything left at its folder stays as it is.', description: 'HI-3464: the confirmation before removing a Git slot no card holds whose folder is missing, or there but not a worktree git lists (made by hand, say). Combwork forgets the slot; a folder at its place is left untouched, never deleted or moved to the Recycle Bin. {slot} is the slot’s name.' }),
   removedKept: msg({ id: 'workflow.slots.removedKept', defaultMessage: '{slot} is removed.', description: 'HI-3032: a notice after a jj slot kept for a card whose folder was missing was removed. {slot} is its name.' }),
   notRemovedKept: msg({ id: 'workflow.slots.notRemovedKept', defaultMessage: '{slot} wasn’t removed: {why, select, changed {it changed after the list was shown (its folder is back, or it was made again)} busy {something works in it now} other {Combwork kept it}}.', description: 'HI-3032: a notice after removing a jj slot kept for a card was refused. {why} picks the reason; keep the select keys.' }),
@@ -255,7 +258,15 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                       <tr key={s.name} data-slot={s.name} data-state={s.state}>
                         <td className="mono">{s.name}</td>
                         <td>
-                          {s.keptFor !== undefined && !s.keptGone ? tr(s.keptEdit ? T.keptEditState : T.keptState) : s.keptGone?.forgotten || s.forgotten ? tr(T.forgottenState) : tr(T.state[s.state])}
+                          {s.keptFor !== undefined && !s.keptGone ? tr(s.keptEdit ? T.keptEditState : T.keptState) : s.keptGone?.forgotten || s.forgotten ? tr(T.forgottenState) : s.operation ? tr(T.operationState, { what: s.operation.what }) : tr(T.state[s.state])}
+                          {s.operation && (
+                            <>
+                              {' · '}
+                              <span className="s-desc" data-operation={s.operation.what}>
+                                {tr(T.operationHint, { command: gitOperationEnd(s.operation.what) ?? s.operation.what })}
+                              </span>
+                            </>
+                          )}
                           {s.stale && (
                             <>
                               {' · '}

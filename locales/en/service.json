@@ -376,8 +376,8 @@
     "description": "HI-3021, HI-3059: the text under a warning notification after Commit or Set aside (a paused merge, a start's warning, Files' Commit it), titled as done: git committed (or stashed) the files ({made}, a commit or stash id), but updating git's index (staging area) for them afterwards failed; {why} is git's own message (English), often another git command holding the index. {action} is commit or setAside. Keep git status and git reset as they are: commands."
   },
   "service.folderChanges.midOperation": {
-    "defaultMessage": "Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} other {a revert}} in {folder}. Finish or abort it first.",
-    "description": "HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done."
+    "defaultMessage": "Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}. Finish or abort it first.",
+    "description": "HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done. HI-3465: bisect, git bisect (ended with git bisect reset)."
   },
   "service.folderChanges.moved": {
     "defaultMessage": "Where {target} is checked out changed meanwhile. Look again.",

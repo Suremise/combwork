@@ -282,6 +282,11 @@ export interface WorkspacePort {
    * `none` (nothing registers it), or why it was left (several name it, it is locked, the folder is back, a read failed).
    */
   dropRegistration?(repo: string, folder: string): Promise<'dropped' | 'none' | { left: string }>
+  /**
+   * HI-3465: the operation of the platform's under way in a workspace that blocks moving it (Git: a merge, rebase, am,
+   * cherry-pick, revert or bisect, as git names it), read from its files; null with none or none readable.
+   */
+  operation?(folder: string): string | null
 
   // Preparation.
   /**

@@ -13,6 +13,9 @@ import { type ChildProcess } from 'child_process'
 import { mkdirSync } from 'original-fs'
 import { basename, join } from 'path'
 import { agentMsg, inDefaultDialect, inDialectOf, say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { gitOperationEnd } from '../shared/gitOperations'
+import { msg, tr } from '../shared/i18n'
+import { tell } from './notify'
 import { app } from 'electron'
 import { advanced } from './advanced'
 import { brokerWorkingIn, processSupervisor } from './agentProcesses'
@@ -141,6 +144,12 @@ export function sweepSealsOf(root: string, o: { once?: boolean } = {}): void {
     .then((n) => n && log.info(`removed ${n} sealed journal(s) whose jobs are gone in ${userText(dir)}`))
     .catch((e) => log.warn(`sweeping the sealed journals of ${userText(dir)}`, e))
     .finally(() => sweeping.delete(key))
+}
+
+/** HI-3465: the notice, told once, of a git operation left under way in a free slot. */
+const OPERATION = {
+  title: msg({ id: 'main.slots.operation.title', defaultMessage: '{slot} has an unfinished git {what}', description: "HI-3465: a notice's title: a git operation was left under way in a slot (a worktree Combwork lends to cards), so Combwork can't lend it. {slot} is the slot's name; {what} is git's word for the operation (merge, rebase, am, cherry-pick, revert or bisect: keep it as it is)." }),
+  message: msg({ id: 'main.slots.operation.message', defaultMessage: "Combwork can't lend {slot} to another card until it's finished. Finish it in {folder}, or end it there with {command}. Combwork never ends it itself, and lends the slot again once nothing is under way in it.", description: "HI-3465: the notice's text below main.slots.operation.title. {slot} is the slot's name, {folder} its folder's path, {command} the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is)." })
 }
 
 /** A slot run's errors (dialects, HI-2447): its end's error, kept on the slot by the pool (said in the Default there). */
@@ -465,6 +474,11 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       },
       // A finished card's slot asked about only once its settle is over (HI-2170): the slots' pass looks again.
       looked: () => slotFreed(ws, projectPath),
+      // HI-3465: a git operation left under way in a free slot, told once (the pool records it); Slots and copies shows it.
+      operationFound: (slot, folder, what) => {
+        const values = { slot, what, folder, command: gitOperationEnd(what) ?? what }
+        tell({ kind: 'warning', level: 'warning', title: tr(OPERATION.title, values), message: tr(OPERATION.message, values), apiTitle: OPERATION.title.defaultMessage, projectPath, id: `slot-operation:${projectPath}:${slot}` })
+      },
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
       renamer: renamerFor(ws, projectPath)
     })
@@ -1009,7 +1023,9 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       const forgotten = jj && !l && s.identity?.generation && (await pool.forgottenFree(s)) ? { generation: s.identity.generation } : null
       // HI-3464: free and gone (its folder missing, or there but not a worktree): Remove… forgets it.
       const goneFree = !jj && !l && pool.goneRemovable(s)
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj && s.platform ? { platform: s.platform } : {}), ...(stale ? { stale: true as const, ...(stale === 'abandoned' ? { staleWhy: 'abandoned' as const } : {}) } : {}), ...(keptFor !== null ? { keptFor, ...(record?.edit ? { keptEdit: true as const } : {}) } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}), ...(goneFree ? { goneFree: true as const } : {}) }
+      // HI-3465: a git operation left under way in it, as its last settle found it (free slots only: a lease's is its agent's).
+      const operation = !l ? pool.operation(s.name) : null
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj && s.platform ? { platform: s.platform } : {}), ...(stale ? { stale: true as const, ...(stale === 'abandoned' ? { staleWhy: 'abandoned' as const } : {}) } : {}), ...(keptFor !== null ? { keptFor, ...(record?.edit ? { keptEdit: true as const } : {}) } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}), ...(goneFree ? { goneFree: true as const } : {}), ...(operation ? { operation: { what: operation.what, since: operation.since } } : {}) }
     })
   )
 }

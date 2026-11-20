@@ -579,6 +579,8 @@
   "workflow.slots.off": "Desactivado",
   "workflow.slots.on": "Activado",
   "workflow.slots.openAdvanced": "Abrir Avanzado",
+  "workflow.slots.operationHint": "Termínalo en su carpeta, o detenlo allí con {command}",
+  "workflow.slots.operationState": "git {what} sin terminar",
   "workflow.slots.recover": "Recuperar…",
   "workflow.slots.recoverMessage": "Combwork copia primero en la carpeta de abajo los cambios que jj no había registrado, y luego actualiza el slot con jj. Solo se ejecuta mientras nada trabaja en el slot.",
   "workflow.slots.recoverTitle": "¿Recuperar {slot}?",

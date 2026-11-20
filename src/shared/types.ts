@@ -2022,6 +2022,8 @@ export interface SlotView {
   forgotten?: { generation: string }
   /** HI-3464: free and gone, kept for no card (its folder missing, or there but not a worktree git lists): Remove… forgets it. */
   goneFree?: true
+  /** HI-3465: free, with a git operation left under way in it (git's word for it), as its last settle found it, and since when. */
+  operation?: { what: string; since: number }
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */
