@@ -201,7 +201,7 @@ async function shot(name) {
   try {
     await page.screenshot({ path: path.join(OUT, file), timeout: timing('sandbox.windowShotMs') })
   } catch (e) {
-    throw new Error(`${String(e.message).split('\n')[0]} (sandbox.windowShotMs); the window: ${JSON.stringify(await windowState(bw))}`)
+    throw new Error(`${String(e.message).split('\n')[0]} (sandbox.windowShotMs); the window: ${JSON.stringify(await windowState(bw))}`, { cause: e })
   }
   ;(res.facts.shotMs ||= {})[name] = Date.now() - t0
   res.shots.push(file)
