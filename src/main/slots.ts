@@ -44,7 +44,7 @@ import { claimOf, recoverClaim, releaseClaim, takeClaim, type QuietTarget } from
 import type { DatabaseSync } from 'node:sqlite'
 import { admitOrThrow } from './platform/fenceAdmit'
 import { existsSync, lstatSync, readdirSync } from 'original-fs'
-import { mkdir, readdir, readFile, rename } from 'original-fs/promises'
+import { mkdir, readdir, readFile, rename, rmdir } from 'original-fs/promises'
 import { basename, dirname, join } from 'path'
 import { BOARD_MIGRATIONS } from './boardStore'
 import { openDb } from './db'
@@ -548,8 +548,9 @@ export class SlotStore {
 
   /**
    * Reserves a slot for a lease in one write, with a warming operation (`token`, held by `holder`) on it: the one
-   * named, else a ready, free one not in `skip` (the builder's last, then the most recently used), else a new one
-   * (`creating`, its name and ports taken) while the project has fewer than `size`. The lease's row is in the same write,
+   * named, else a ready, free one not in `skip` (the builder's last, then the most recently used), else a free gone one
+   * (HI-3464: the lend makes it again), else a new one (`creating`, its name and ports taken) while the project has fewer
+   * than `size`, a gone one this lend passed over (`skip`: its folder can't be made again) not counted. The lease's row is in the same write,
    * so the indexes refuse a second open lease on the slot or for the agent. The same card or lane asking again gets its
    * lease and slot as they are (`again`): the caller checks it is ready.
    */
@@ -594,7 +595,9 @@ export class SlotStore {
           return { ok: true as const, lease, slot: this.slotIn(db, k.name)!, fresh: false, reclaim: kept.held.card }
         }
         // Only a slot of this pool's platform (HI-2795, R2.6): a Git slot finishes under Git, never lent from a jj pool.
-        const usable = (s: Slot): boolean => (s.platform ?? 'git') === (o.platform ?? 'git') && this.freeIn(db, s)
+        // HI-3464: a free slot whose folder is gone is usable too (the lend makes it again, `warm`), after every ready one,
+        // so a gone slot never fills the pool for good. One kept for a card (HI-2995) never is: its card's binding goes with it.
+        const usable = (s: Slot): boolean => (s.platform ?? 'git') === (o.platform ?? 'git') && (this.freeIn(db, s) || this.goneFreeIn(db, s))
         let slot: Slot | undefined
         let fresh = false
         // Names reserved by renames under way (#1441): never made by a lend, asked for by name or not.
@@ -609,13 +612,15 @@ export class SlotStore {
         } else {
           const free = all.filter((s) => usable(s) && !o.skip?.has(s.name))
           const last = (s: Slot): string | null => (db.prepare('SELECT agent FROM slot_leases WHERE project = ? AND slot = ? ORDER BY from_at DESC LIMIT 1').get(this.project, s.name) as { agent: string } | undefined)?.agent ?? null
-          slot = free.find((s) => last(s) === req.agent) ?? free.sort((a, b) => b.usedAt.localeCompare(a.usedAt))[0]
+          const pick = (of: Slot[]): Slot | undefined => of.find((s) => last(s) === req.agent) ?? of.sort((a, b) => b.usedAt.localeCompare(a.usedAt))[0]
+          slot = pick(free.filter((s) => s.state === 'ready')) ?? pick(free.filter((s) => s.state === 'gone'))
         }
         const id = `l-${randomBytes(6).toString('hex')}`
         let name: string
         if (!slot) {
           // HI-2936: the size counts this platform's slots alone: another's left by a switch is never lent, so never fills it.
-          if (all.filter((s) => (s.platform ?? 'git') === (o.platform ?? 'git')).length >= o.size) return { ok: false as const, refusal: { why: 'noSlot' as const, size: o.size } }
+          // HI-3464: nor a gone one this lend passed over (its folder there with something in it): a new one takes its place.
+          if (all.filter((s) => (s.platform ?? 'git') === (o.platform ?? 'git') && !(s.state === 'gone' && o.skip?.has(s.name))).length >= o.size) return { ok: false as const, refusal: { why: 'noSlot' as const, size: o.size } }
           name = req.slot ?? nextSlotName(new Set([...all.map((s) => s.name.toLowerCase()), ...reserved]), o.root)
           db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at, op, op_kind, op_lease, op_pid, op_started) VALUES (?, ?, ?, 'creating', ?, ?, ?, ?, ?, 'warm', ?, ?, ?)").run(this.project, name, join(o.root, name), freePort(all), o.target, at, at, o.token, id, o.holder.pid, o.holder.started)
           // Another platform than Git's (HI-2795): its row says so from the write that reserves it, before anything is made.
@@ -625,7 +630,7 @@ export class SlotStore {
         } else {
           name = slot.name
           // Only from what this write read: free, still the state it had.
-          const took = db.prepare(`UPDATE slots SET op = ?, op_kind = 'warm', op_lease = ?, op_pid = ?, op_started = ?, used_at = ? WHERE project = ? AND name = ? AND state = 'ready' AND ${FREE}`).run(o.token, id, o.holder.pid, o.holder.started, at, this.project, name)
+          const took = db.prepare(`UPDATE slots SET op = ?, op_kind = 'warm', op_lease = ?, op_pid = ?, op_started = ?, used_at = ? WHERE project = ? AND name = ? AND state = ? AND ${FREE}`).run(o.token, id, o.holder.pid, o.holder.started, at, this.project, name, slot.state)
           if (Number(took.changes) !== 1) return { ok: false as const, refusal: { why: 'notReady' as const, slot: name, state: slot.state, error: slot.warmError } }
         }
         const lease = this.insertLease(db, id, name, req.card !== undefined ? 'card' : 'lane', req, at)
@@ -725,11 +730,25 @@ export class SlotStore {
   }
 
   /**
+   * HI-3464: a slot whose folder is gone, free as `freeIn` says otherwise, and kept for no card (HI-2995: one kept is its
+   * card's, never made again for another). A lend makes it again where it was (`warm`), at its own target.
+   */
+  goneFreeIn(db: DatabaseSync, s: Slot): boolean {
+    return s.state === 'gone' && !s.op && !s.job && !s.writer && !openLeaseIn(db, this.project, s.name) && !db.prepare('SELECT 1 FROM board_meta WHERE key = ?').get(asideKey(this.project, s.name)) && !this.keptRecordIn(db, s.name)
+  }
+
+  /** HI-3464: `goneFreeIn` on the board as it is now. */
+  goneFree(s: Slot): boolean {
+    return this.conn.read((db) => this.goneFreeIn(db, s))
+  }
+
+  /**
    * The slots that use the target they record (HI-2886), on one snapshot: every slot recording one but a free one
-   * (`freeIn`), whose recorded target is only the last its lease served. Inside a board write, that write's own state.
+   * (`freeIn`), whose recorded target is only the last its lease served; nor a free gone one (`goneFreeIn`, HI-3464: its
+   * next lend makes it afresh at that lend's target). Inside a board write, that write's own state.
    */
   targetsInUse(): { name: string; target: string }[] {
-    return this.conn.read((db) => this.slotsIn(db).flatMap((s) => (s.target && !this.freeIn(db, s) ? [{ name: s.name, target: s.target }] : [])))
+    return this.conn.read((db) => this.slotsIn(db).flatMap((s) => (s.target && !this.freeIn(db, s) && !this.goneFreeIn(db, s) ? [{ name: s.name, target: s.target }] : [])))
   }
 
   private dispatchOf(db: DatabaseSync, agent: string): SlotLease | null {
@@ -2528,12 +2547,15 @@ export class SlotPool {
     return isUnknown(d) || d.length ? 'dirty' : 'ready'
   }
 
-  /** Whether a slot is there: its folder, and git lists it; null when git's listing fails (#734: never an empty one). */
+  /**
+   * Whether a slot is there: its folder, and git lists it; null when git's listing fails (#734: never an empty one).
+   * HI-3464: a registration git would prune (a folder made by hand where a gone slot's was: no `.git` in it) isn't.
+   */
   private async present(s: Slot): Promise<boolean | null> {
     if (!(await folderThere(s.folder, this.quietTarget(s.name)))) return false
     if (!this.hasPort(s)) return null
     const listed = await this.portOf(s).list(this.deps.project).catch(() => null)
-    return listed ? listed.some((l) => samePlace(l.path, s.folder)) : null
+    return listed ? listed.some((l) => samePlace(l.path, s.folder) && !l.prunable) : null
   }
 
   /** Whether an operation's holder is gone: another process that ended, or this one, no longer running that token. */
@@ -2871,8 +2893,14 @@ export class SlotPool {
           return await pass('gone', 'gone')
         }
         if (!there) {
-          // Gone from disk while free: made again where it was (git's stale entry pruned first).
-          if (await folderThere(slot.folder, this.quietTarget(slot.name))) return await fail(sayFor(this.port, 'notListed'))
+          // Gone from disk while free: made again where it was (git's stale entry pruned first). HI-3464: a folder in its
+          // place that its platform doesn't list (made by hand, say) is removed first when empty (nothing in it to lose);
+          // one with anything in it is never touched: the slot is passed over, gone, and a new one is made in its stead
+          // (`take` no longer counts it), Slots and copies offering its Remove….
+          if ((await folderThere(slot.folder, this.quietTarget(slot.name))) && !(await emptyFolderRemoved(slot.folder))) {
+            log.info(`Slot ${userText(name)}'s folder is there but isn't a workspace ${this.port.platform} lists, and has something in it: passed over (Slots and copies offers Remove…)`)
+            return await pass('gone', 'notListed')
+          }
           await this.store.fenced(name, token, () => undefined)
           await this.port.prune(this.deps.project)
           made = true
@@ -3353,7 +3381,8 @@ export class SlotPool {
       const journalled = (): boolean => !forgotten && !!this.removalJournal(name).read()
       try {
         if (still && !(await still(slot, token))) return await keep({ why: 'busy', state: from })
-        // HI-3069: only Combwork's record of a slot whose folder is gone, of a platform switched from: no journal resumed,
+        // HI-3069: only Combwork's record of a slot whose folder is gone, of a platform switched from (or HI-3464's gone
+        // slot of its own, its folder absent or not a worktree, left as it is: `removeGone`): no journal resumed,
         // no port asked to prune or remove anything. Its session and in-flight guards still apply; `recordOnly` asked
         // again right before the record is forgotten (its folder still absent, this operation still the slot's).
         if (o?.recordOnly) {
@@ -3369,7 +3398,7 @@ export class SlotPool {
           // is when it can't be proved this folder's alone (logged): the slot's record goes all the same.
           const dropped = await this.port.dropRegistration?.(this.deps.project, slot.folder).catch((e: Error) => ({ left: e.message }))
           if (dropped && typeof dropped === 'object') log.info(`Slot ${userText(name)}'s registration left: ${userText(dropped.left)}`)
-          log.info(`Forgot slot ${userText(name)} (${userText(slot.folder)}), its folder gone and its platform switched from`)
+          log.info(`Forgot slot ${userText(name)} (${userText(slot.folder)}): Combwork's record only`)
           return null
         }
         // A removal part done before (HI-2795: its journal says forgotten): its guards passed then, and the workspace
@@ -3558,6 +3587,45 @@ export class SlotPool {
   }
 
   /**
+   * HI-3464: whether a slot shows Slots and copies' Remove… for a gone one: free and gone (`goneFreeIn`: kept for no card),
+   * of the project's own platform, one whose workspaces are git's worktrees (jj's forgotten one has its own, HI-3103).
+   */
+  goneRemovable(s: Slot): boolean {
+    return this.ownPlatform(s) && this.hasPort(s) && !ownsWorkspaces(this.port.platform) && this.store.goneFree(s)
+  }
+
+  /**
+   * HI-3464: a free slot whose folder is gone, or there but not a worktree git lists (a folder with something in it, which
+   * a lend passes over), forgotten by the user's Remove… (Slots and copies): Combwork's record of it, and git's
+   * registration of its folder while that is absent (`recordOnly`: never a repository-wide prune). A folder in its place
+   * is left as it is, never deleted. Checked again under the removal's operation (still `goneRemovable`, git still not
+   * listing it, the platform's fence admitting it): `changed` otherwise, for the user to look again.
+   */
+  async removeGone(name: string): Promise<{ ok: true } | { ok: false; why: 'changed' } | { ok: false; why: 'kept'; kept: SlotKept }> {
+    const seen = this.store.slot(name)
+    if (!seen || !this.goneRemovable(seen) || (await this.present(seen)) !== false) return { ok: false, why: 'changed' }
+    let changed = false
+    const still = async (slot: Slot, token: string): Promise<boolean> => {
+      // `removing` now, by this operation: the row as read before (gone, free but for this operation), git still not
+      // listing its folder, and the fence admitting it.
+      const admits = await this.store
+        .fenced(name, token, (db) => {
+          admitOrThrow(db, this.store.project, this.port.platform)
+          return true
+        })
+        .catch(() => false)
+      const ok = slot.state === 'gone' && this.ownPlatform(slot) && !this.store.keptRecord(name) && (await this.present(slot)) === false && admits
+      changed = !ok
+      return ok
+    }
+    const kept = await this.remove(name, still, { recordOnly: still })
+    if (changed) return { ok: false, why: 'changed' }
+    if (kept) return { ok: false, why: 'kept', kept }
+    log.info(`Forgot slot ${userText(name)}, its folder gone or not a worktree: anything at ${userText(seen.folder)} left as it is`)
+    return { ok: true }
+  }
+
+  /**
    * The guards a removal checks, in order; null when nothing holds the slot. `probe`: also prove no process holds it.
    * `forgotten` (HI-3097, `remove`'s `keptForgotten`): the session, in-flight and process guards only.
    */
@@ -3717,11 +3785,27 @@ const quieting = new Map<string, Promise<boolean>>()
  */
 /**
  * A state a slot whose workspace the user forgot is left in, idle (HI-3103): ready (nothing looks again until a lend
- * tries it), its setup failed then (`creating` with its error: "not listed"), gone, or dirty. Never lent, removing or a
+ * tries it), gone (a lend passed it over, HI-3464; before it, its setup failed: `creating` with its error, "not listed"),
+ * or dirty. Never lent, removing or a
  * `creating` still being made.
  */
 function forgettable(s: Slot): boolean {
   return s.state === 'ready' || s.state === 'gone' || s.state === 'dirty' || (s.state === 'creating' && !!s.warmError)
+}
+
+/**
+ * HI-3464: a slot's folder removed only when it is a plain, empty folder (one made by hand in a gone slot's place):
+ * `rmdir` refuses one with anything in it, and a link (a junction) is never removed. True once it is gone.
+ */
+async function emptyFolderRemoved(folder: string): Promise<boolean> {
+  try {
+    const st = lstatSync(folder)
+    if (!st.isDirectory() || st.isSymbolicLink()) return false
+    await rmdir(folder)
+    return true
+  } catch {
+    return false
+  }
 }
 
 export async function folderThere(folder: string, target?: QuietTarget): Promise<boolean> {

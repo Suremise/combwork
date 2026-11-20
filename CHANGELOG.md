@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixed
+
+- **A slot whose folder was deleted no longer blocks every start** (HI-3464). When a slot's folder was deleted while no card held it, Combwork never lent it again, yet still counted it, so in a project with one builder every card and lane start was refused for good, and making the folder again by hand didn't help. Now the next start makes the slot again at its folder (removing an empty folder made in its place). If a folder that isn't a worktree is there with something in it, Combwork leaves it alone and makes a new slot instead; **Remove…** beside the old one in Version Control → Slots and copies forgets it, deleting nothing.
+
 ## 1.6.0 — 2026-11-20
 
 ### Added

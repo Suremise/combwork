@@ -196,7 +196,7 @@ export async function lineAtBase(folder: string, line: string, base: string, lea
 
 export const gitWorkspacePort: WorkspacePort = {
   platform: 'git',
-  list: async (repo) => (await listWorktreesOrNull(repo))?.map((w) => ({ path: w.path, line: w.branch })) ?? null,
+  list: async (repo) => (await listWorktreesOrNull(repo))?.map((w) => ({ path: w.path, line: w.branch, ...(w.prunable ? { prunable: true as const } : {}) })) ?? null,
   head: (folder) => G.head(folder),
   line: (folder) => G.branch(folder),
   shownLine: async (folder) => {

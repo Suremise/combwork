@@ -498,6 +498,8 @@ export interface CombworkRequests {
   'slots:removeKept': (projectPath: string, slot: string, card: number, generation: string, forgotten: boolean) => { ok: true } | { ok: false; why: string }
   /** HI-3103: a slot kept for no card whose workspace the user forgot, at the generation shown; anything else: `changed`. */
   'slots:removeForgotten': (projectPath: string, slot: string, generation: string) => { ok: true } | { ok: false; why: string }
+  /** HI-3464: a free slot whose folder is gone or not a worktree, forgotten (its folder left as it is); anything else: `changed`. */
+  'slots:removeGone': (projectPath: string, slot: string) => { ok: true } | { ok: false; why: string }
   /** A slot's writer as Release Slot… shows it (#1506): its holder, whether its run is live, what is listed of its processes. Null: none. */
   'slots:heldWriter': (projectPath: string, slot: string) => HeldWriter | null
   /** Release Slot… on a held writer (#1506): `end` ends its listed processes first; refused while its Combwork or run lives, or it changed. */

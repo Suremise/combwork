@@ -2495,6 +2495,10 @@
     "defaultMessage": "Its folder goes to the Recycle Bin as it is, with any changes in it. {card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}",
     "description": "HI-3097: in place of workflow.slots.removeKeptMessage, the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose workspace jj no longer lists, its folder still there: the whole folder, uncommitted edits included, is moved to the Recycle Bin. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none."
   },
+  "workflow.slots.removeGoneMessage": {
+    "defaultMessage": "Its folder is missing, or isn’t a worktree any more, so it can’t be lent. Combwork forgets {slot} and makes a new slot when a card needs one. Nothing is deleted: anything left at its folder stays as it is.",
+    "description": "HI-3464: the confirmation before removing a Git slot no card holds whose folder is missing, or there but not a worktree git lists (made by hand, say). Combwork forgets the slot; a folder at its place is left untouched, never deleted or moved to the Recycle Bin. {slot} is the slot’s name."
+  },
   "workflow.slots.removeKept": {
     "defaultMessage": "Remove…",
     "description": "HI-3032: a button beside a jj slot kept for a card whose folder is missing (workflow.slots.keptGoneFor): asks, then removes the slot so the card can start again."

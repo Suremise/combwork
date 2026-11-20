@@ -623,6 +623,7 @@
   "workflow.slots.release": "Release…",
   "workflow.slots.removeForgottenFree": "jj no longer lists {slot}’s workspace. Its folder goes to the Recycle Bin as it is, with any changes in it.",
   "workflow.slots.removeForgottenMessage": "Its folder goes to the Recycle Bin as it is, with any changes in it. {card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}",
+  "workflow.slots.removeGoneMessage": "Its folder is missing, or isn’t a worktree any more, so it can’t be lent. Combwork forgets {slot} and makes a new slot when a card needs one. Nothing is deleted: anything left at its folder stays as it is.",
   "workflow.slots.removeKept": "Remove…",
   "workflow.slots.removeKeptMessage": "{card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}",
   "workflow.slots.removeKeptTitle": "Remove {slot}?",

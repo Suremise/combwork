@@ -558,13 +558,16 @@ describe.skipIf(!jjExe)('a slot kept for no card whose workspace the user forgot
   })
 })
 
-describe.skipIf(!jjExe)('a slot kept for no card whose workspace the user forgot, its setup failed since (HI-3103)', { timeout: REAL_JJ_MS }, () => {
-  it.each([true, false])('the next lend fails it (not listed); Remove… still trashes it (colocated: %s)', async (colocated) => {
+describe.skipIf(!jjExe)('a slot kept for no card whose workspace the user forgot, a lend passed it over since (HI-3103, HI-3464)', { timeout: REAL_JJ_MS }, () => {
+  it.each([true, false])('the next lend passes it over (not listed, its folder not empty): left gone, another slot lent; Remove… still trashes it (colocated: %s)', async (colocated) => {
     const { w, trashed } = forgetting(colocated)
     const a = await forgottenFree(w)
-    // The next card's lend tries it: jj doesn't list it, so its setup fails and it is left `creating` with its error.
-    await w.pool.lend({ card: 2, agent: 'a-2' }, { target: 'main' })
-    expect(w.store.slot(a.name)).toMatchObject({ state: 'creating', warmError: expect.any(String) })
+    // The next card's lend tries it: jj doesn't list it and its folder has files, so it is left gone, untouched, and
+    // (HI-3464) a new slot is lent in its stead: it no longer fills the pool.
+    const next = await w.pool.lend({ card: 2, agent: 'a-2' }, { target: 'main' })
+    expect(next).toMatchObject({ ok: true })
+    expect(next.ok && next.slot.name).not.toBe(a.name)
+    expect(w.store.slot(a.name)).toMatchObject({ state: 'gone', op: null })
     expect(await w.pool.forgottenFree(w.store.slot(a.name)!)).toBe(true)
     expect(await w.pool.removeForgotten(a.name, a.generation)).toEqual({ ok: true })
     expect(trashed.map((t) => t.from)).toEqual([a.folder])

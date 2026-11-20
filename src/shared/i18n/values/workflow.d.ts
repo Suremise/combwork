@@ -625,6 +625,7 @@ interface CombworkMessageValues {
   'workflow.slots.release': undefined
   'workflow.slots.removeForgottenFree': { slot: string | number }
   'workflow.slots.removeForgottenMessage': { card: string | number; commit: string }
+  'workflow.slots.removeGoneMessage': { slot: string | number }
   'workflow.slots.removeKept': undefined
   'workflow.slots.removeKeptMessage': { card: string | number; commit: string }
   'workflow.slots.removeKeptTitle': { slot: string | number }

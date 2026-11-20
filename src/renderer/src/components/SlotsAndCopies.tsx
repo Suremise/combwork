@@ -79,6 +79,7 @@ const T = {
   removeKept: msg({ id: 'workflow.slots.removeKept', defaultMessage: 'Remove…', description: 'HI-3032: a button beside a jj slot kept for a card whose folder is missing (workflow.slots.keptGoneFor): asks, then removes the slot so the card can start again.' }),
   removeKeptTitle: msg({ id: 'workflow.slots.removeKeptTitle', defaultMessage: 'Remove {slot}?', description: 'HI-3032: the title of the confirmation before removing a jj slot kept for a card whose folder is missing. {slot} is the slot’s name.' }),
   removeKeptMessage: msg({ id: 'workflow.slots.removeKeptMessage', defaultMessage: '{card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}', description: 'HI-3032: the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose folder is missing. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none.' }),
+  removeGoneMessage: msg({ id: 'workflow.slots.removeGoneMessage', defaultMessage: 'Its folder is missing, or isn’t a worktree any more, so it can’t be lent. Combwork forgets {slot} and makes a new slot when a card needs one. Nothing is deleted: anything left at its folder stays as it is.', description: 'HI-3464: the confirmation before removing a Git slot no card holds whose folder is missing, or there but not a worktree git lists (made by hand, say). Combwork forgets the slot; a folder at its place is left untouched, never deleted or moved to the Recycle Bin. {slot} is the slot’s name.' }),
   removedKept: msg({ id: 'workflow.slots.removedKept', defaultMessage: '{slot} is removed.', description: 'HI-3032: a notice after a jj slot kept for a card whose folder was missing was removed. {slot} is its name.' }),
   notRemovedKept: msg({ id: 'workflow.slots.notRemovedKept', defaultMessage: '{slot} wasn’t removed: {why, select, changed {it changed after the list was shown (its folder is back, or it was made again)} busy {something works in it now} other {Combwork kept it}}.', description: 'HI-3032: a notice after removing a jj slot kept for a card was refused. {why} picks the reason; keep the select keys.' }),
   lentCard: msg({ id: 'workflow.slots.lentCard', defaultMessage: '{agent}, for {card}', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12).' }),
@@ -273,6 +274,11 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                           )}
                           {s.keptGone && s.keptFor !== undefined && (
                             <button className="btn subtle small" data-action="remove-kept" onClick={() => void removeKeptSlot(project.path, s, card, reload)}>
+                              {tr(T.removeKept)}
+                            </button>
+                          )}
+                          {s.goneFree && (
+                            <button className="btn subtle small" data-action="remove-gone" onClick={() => void removeGoneSlot(project.path, s, reload)}>
                               {tr(T.removeKept)}
                             </button>
                           )}
@@ -491,6 +497,16 @@ async function removeForgottenSlot(projectPath: string, s: SlotView, reload: () 
   if (!f) return
   if (!(await confirm({ title: tr(T.removeKeptTitle, { slot: s.name }), message: tr(T.removeForgottenFree, { slot: s.name }), confirmLabel: tr(T.removeKept).replace('…', '') }))) return
   const r = await call('slots:removeForgotten', projectPath, s.name, f.generation).catch(() => ({ ok: false as const, why: '' }))
+  reload()
+  if (r.ok) return notify('success', tr(T.removedKept, { slot: s.name }))
+  notify('warning', tr(T.notRemovedKept, { slot: s.name, why: r.why === 'changed' ? 'changed' : ['busy', 'leased', 'session', 'process'].includes(r.why) ? 'busy' : 'other' })) // i18n-ignore: select keys
+}
+
+/** A free slot whose folder is missing or not a worktree, forgotten (HI-3464, `slots:removeGone`): the user's action, after their confirmation. */
+async function removeGoneSlot(projectPath: string, s: SlotView, reload: () => void): Promise<void> {
+  if (!s.goneFree) return
+  if (!(await confirm({ title: tr(T.removeKeptTitle, { slot: s.name }), message: tr(T.removeGoneMessage, { slot: s.name }), confirmLabel: tr(T.removeKept).replace('…', '') }))) return
+  const r = await call('slots:removeGone', projectPath, s.name).catch(() => ({ ok: false as const, why: '' }))
   reload()
   if (r.ok) return notify('success', tr(T.removedKept, { slot: s.name }))
   notify('warning', tr(T.notRemovedKept, { slot: s.name, why: r.why === 'changed' ? 'changed' : ['busy', 'leased', 'session', 'process'].includes(r.why) ? 'busy' : 'other' })) // i18n-ignore: select keys

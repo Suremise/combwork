@@ -352,10 +352,10 @@ describe('a slot counts against a branch in Other branches only while it uses it
   const take = async (w: WS, repo: string, name: string) => (await poolOf(w, repo)).deps.store.take({ card: 8000 + ++slotN, agent: `t-${slotN}`, slot: name }, { size: 99, root: join(base, 'slots'), target: null, token: `tk-${slotN}`, holder: { pid: process.pid, started: 1 } })
   const refusedFor = (name: string) => new RegExp(`1\\.2\\.0 can’t be taken out .*${name}`)
 
-  it('a free slot that last served it (ready, its lease ended) no longer keeps it: both saves take it out', async () => {
+  it.each([['ready'], ['gone']])('a free slot that last served it (%s, its lease ended) no longer keeps it: both saves take it out', async (state) => {
     for (const remove of [removeByForm, removeByTool]) {
       const { w, repo } = await project()
-      const name = await slot(w, repo, '1.2.0')
+      const name = await slot(w, repo, '1.2.0', { state })
       await lease(w, repo, name, 'card', false)
       // Read in the save's own board write, after the pool was opened (HI-2886): never a list read before its locks.
       const pooled = (await poolOf(w, repo)).deps.store
@@ -380,7 +380,8 @@ describe('a slot counts against a branch in Other branches only while it uses it
     const cases: { what: string; set?: Record<string, string | number>; lease?: 'card' | 'carried'; aside?: boolean }[] = [
       { what: 'lent', set: { state: 'lent' }, lease: 'card' },
       { what: 'dirty', set: { state: 'dirty' } },
-      { what: 'gone', set: { state: 'gone' } },
+      // HI-3464: a free gone slot no longer does (its next lend makes it afresh): only one gone while leased.
+      { what: 'gone', set: { state: 'gone' }, lease: 'card' },
       { what: 'set aside', aside: true },
       { what: 'reserved by an operation', set: { op: 'tk-op', op_kind: 'warm', op_pid: 1, op_started: 1 } },
       { what: 'a job', set: { job: 'job-1' } },
