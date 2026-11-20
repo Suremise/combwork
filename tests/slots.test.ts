@@ -863,6 +863,36 @@ describe('the pool (#1429)', { timeout: timing('test.hang') }, () => {
       expect(w.pool.slots().map((s) => s.name)).toEqual(['slot-b'])
       expect(readFileSync(join(folder, 'mine.txt'), 'utf8')).toBe('the user’s')
     })
+
+    it('the size leaves out only a gone slot found unusable and still free in the same write: one another Combwork reserved since still counts', async () => {
+      const w = world({ builders: 1 })
+      await goneFree(w)
+      const ask = (skip: string[], unusable: string[]) => w.store.take({ agent: 'a2', card: 3 }, { size: 1, root: w.root, target: null, token: 'tk-a', holder: { pid: 1, started: 1 }, skip: new Set(skip), unusable: new Set(unusable) })
+      // Passed over without being found unusable: it counts.
+      expect(await ask(['slot-a'], [])).toMatchObject({ ok: false, refusal: { why: 'noSlot' } })
+      // Another Combwork reserves it for its own lend (warming: state still gone, its operation and lease set).
+      const b = w.another(2)
+      expect(await b.store.take({ agent: 'o1', card: 9 }, { size: 1, root: w.root, target: null, token: 'tk-b', holder: { pid: 2, started: 1 } })).toMatchObject({ ok: true, slot: { name: 'slot-a', state: 'gone', op: { token: 'tk-b' } } })
+      // This lend's earlier finding is stale: the slot is held now, so it counts, and nothing new is made.
+      expect(await ask(['slot-a'], ['slot-a'])).toMatchObject({ ok: false, refusal: { why: 'noSlot' } })
+      expect(w.store.slots().map((s) => s.name)).toEqual(['slot-a'])
+    })
+
+    it("a gone slot passed over because git can't list the worktrees still counts: nothing is made in its stead", async () => {
+      const fail = { list: false }
+      const w = world({ builders: 1, port: { ...gitWorkspacePort, list: async (repo: string) => (fail.list ? null : gitWorkspacePort.list(repo)) } })
+      const folder = await goneFree(w)
+      // A folder in its place (a missing one needs no listing): whether git lists it can't be told now.
+      mkdirSync(folder)
+      fail.list = true
+      expect(await w.pool.lend({ agent: 'a2', card: 3 })).toMatchObject({ ok: false, refusal: { why: 'noSlot' } })
+      expect(w.pool.slots().map((s) => s.name)).toEqual(['slot-a'])
+      expect(w.store.slot('slot-a')).toMatchObject({ state: 'gone', op: null })
+      expect(existsSync(folder)).toBe(true)
+      // Listed again: the next start makes it again where it was.
+      fail.list = false
+      expect(await lent(w, { agent: 'a2', card: 3 })).toMatchObject({ slot: { name: 'slot-a', state: 'lent' } })
+    })
   })
 
   it('reads the setup and copy patterns from the worktree settings while the slot options are unset', () => {

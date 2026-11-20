@@ -550,11 +550,11 @@ export class SlotStore {
    * Reserves a slot for a lease in one write, with a warming operation (`token`, held by `holder`) on it: the one
    * named, else a ready, free one not in `skip` (the builder's last, then the most recently used), else a free gone one
    * (HI-3464: the lend makes it again), else a new one (`creating`, its name and ports taken) while the project has fewer
-   * than `size`, a gone one this lend passed over (`skip`: its folder can't be made again) not counted. The lease's row is in the same write,
+   * than `size`, a gone one this lend found can't be made again (`unusable`), still free, not counted. The lease's row is in the same write,
    * so the indexes refuse a second open lease on the slot or for the agent. The same card or lane asking again gets its
    * lease and slot as they are (`again`): the caller checks it is ready.
    */
-  async take(req: LeaseRequest, o: { size: number; root: string; target: string | null; token: string; holder: Holder; skip?: ReadonlySet<string>; platform?: WorkspacePlatform; forgotten?: ReadonlySet<string> }): Promise<{ ok: true; lease: SlotLease; slot: Slot; fresh: boolean; again?: boolean; reclaim?: number } | { ok: false; refusal: SlotRefusal }> {
+  async take(req: LeaseRequest, o: { size: number; root: string; target: string | null; token: string; holder: Holder; skip?: ReadonlySet<string>; unusable?: ReadonlySet<string>; platform?: WorkspacePlatform; forgotten?: ReadonlySet<string> }): Promise<{ ok: true; lease: SlotLease; slot: Slot; fresh: boolean; again?: boolean; reclaim?: number } | { ok: false; refusal: SlotRefusal }> {
     try {
       return await this.conn.write((db) => {
         const at = this.iso()
@@ -619,8 +619,11 @@ export class SlotStore {
         let name: string
         if (!slot) {
           // HI-2936: the size counts this platform's slots alone: another's left by a switch is never lent, so never fills it.
-          // HI-3464: nor a gone one this lend passed over (its folder there with something in it): a new one takes its place.
-          if (all.filter((s) => (s.platform ?? 'git') === (o.platform ?? 'git') && !(s.state === 'gone' && o.skip?.has(s.name))).length >= o.size) return { ok: false as const, refusal: { why: 'noSlot' as const, size: o.size } }
+          // HI-3464: nor a gone one this lend found it can't make again (`unusable`: its folder there, not listed, with
+          // something in it), while it is still free and gone in this write: a new one takes its place. One another lend
+          // holds since, or one passed over for any other reason (git couldn't list the worktrees), still counts.
+          const replaced = (s: Slot): boolean => !!o.unusable?.has(s.name) && this.goneFreeIn(db, s)
+          if (all.filter((s) => (s.platform ?? 'git') === (o.platform ?? 'git') && !replaced(s)).length >= o.size) return { ok: false as const, refusal: { why: 'noSlot' as const, size: o.size } }
           name = req.slot ?? nextSlotName(new Set([...all.map((s) => s.name.toLowerCase()), ...reserved]), o.root)
           db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at, op, op_kind, op_lease, op_pid, op_started) VALUES (?, ?, ?, 'creating', ?, ?, ?, ?, ?, 'warm', ?, ?, ?)").run(this.project, name, join(o.root, name), freePort(all), o.target, at, at, o.token, id, o.holder.pid, o.holder.started)
           // Another platform than Git's (HI-2795): its row says so from the write that reserves it, before anything is made.
@@ -2022,6 +2025,8 @@ export class SlotPool {
     const target = o.target ?? (await this.defaultTarget())
     const holder = await this.deps.holder.self()
     const skip = new Set<string>()
+    // HI-3464: the gone slots this lend found it can't make again (a folder with something in it): a subset of `skip`.
+    const unusable = new Set<string>()
     // A free slot passed over because something holds it (HI-2466): said, rather than "every slot in use", when no
     // other can be lent, so its caller knows the wait ends once that is gone (and looks again).
     let held: SlotRefusal | null = null
@@ -2032,7 +2037,7 @@ export class SlotPool {
       // slot: a refresh meanwhile never takes a reservation just committed for one whose holder is gone.
       const out = await this.op(token, async (): Promise<LendResult | 'skip'> => {
         const forgotten = await this.forgottenKept(req.card ?? req.startsCard)
-        const taken = await this.store.take(req, { size, root: this.deps.root, target, token, holder, skip, forgotten, ...(this.port.platform !== 'git' ? { platform: this.port.platform } : {}) })
+        const taken = await this.store.take(req, { size, root: this.deps.root, target, token, holder, skip, unusable, forgotten, ...(this.port.platform !== 'git' ? { platform: this.port.platform } : {}) })
         if (!taken.ok) return held && taken.refusal.why === 'noSlot' ? { ok: false, refusal: held } : taken
         if (taken.again) {
           // Its lease already: handed over only once the slot is ready (another Combwork may be warming it).
@@ -2041,7 +2046,7 @@ export class SlotPool {
           if (s.state !== 'lent' || s.job || s.warmError) return { ok: false, refusal: { why: 'notReady', slot: s.name, state: s.state, error: s.warmError } }
           return { ok: true, lease: taken.lease, slot: s }
         }
-        const done = await this.warm(taken.slot, taken.lease, token, taken.fresh, target, o.install !== false, taken.reclaim ?? null)
+        const done = await this.warm(taken.slot, taken.lease, token, taken.fresh, target, o.install !== false, taken.reclaim ?? null, unusable)
         // A kept slot taken back (HI-2995): lent, or refused naming it, never another slot instead.
         if (taken.reclaim !== undefined && done !== 'ready') return { ok: false, refusal: done !== 'skip' ? done : { why: 'notReady', slot: taken.slot.name, state: this.store.slot(taken.slot.name)?.state ?? 'dirty', error: say(T.kept, { slot: taken.slot.name, why: say(this.keptWhy.get(taken.slot.name) ?? T.keptBusy) }) } }
         if (done === 'ready') return { ok: true, lease: this.store.lease(taken.lease.id)!, slot: this.store.slot(taken.slot.name)! }
@@ -2855,7 +2860,7 @@ export class SlotPool {
    * `ready` (the slot `lent`, or looked at if the lease ended meanwhile). A failure leaves the slot not ready with why,
    * its lease ended `setupFailed`; an operation taken over meanwhile stops (`warming`).
    */
-  private async warm(slot: Slot, lease: SlotLease, token: string, fresh: boolean, target: string | null, install = true, reclaimFor: number | null = null): Promise<'ready' | 'skip' | SlotRefusal> {
+  private async warm(slot: Slot, lease: SlotLease, token: string, fresh: boolean, target: string | null, install = true, reclaimFor: number | null = null, unusable?: Set<string>): Promise<'ready' | 'skip' | SlotRefusal> {
     const name = slot.name
     // A kept slot's take-back (HI-2995), for this card (a lane's lease has none of its own: the card it was lent for, HI-3032).
     const reclaim = reclaimFor !== null
@@ -2899,7 +2904,9 @@ export class SlotPool {
           // (`take` no longer counts it), Slots and copies offering its Remove….
           if ((await folderThere(slot.folder, this.quietTarget(slot.name))) && !(await emptyFolderRemoved(slot.folder))) {
             log.info(`Slot ${userText(name)}'s folder is there but isn't a workspace ${this.port.platform} lists, and has something in it: passed over (Slots and copies offers Remove…)`)
-            return await pass('gone', 'notListed')
+            const passed = await pass('gone', 'notListed')
+            unusable?.add(name)
+            return passed
           }
           await this.store.fenced(name, token, () => undefined)
           await this.port.prune(this.deps.project)
