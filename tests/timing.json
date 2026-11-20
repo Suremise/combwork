@@ -34,6 +34,7 @@
   "runner.lockRetryMs": { "kind": "interval", "ms": 50, "note": "how often the e2e runner tries the claims lock again while another run holds it, or Windows is still deleting the one just released (lanes.mjs withLock)" },
   "sandbox.otherPollMs": { "kind": "interval", "ms": 30000, "note": "how often the Sandbox checks look again for another run's Sandbox, one at a time on the machine, before theirs" },
   "sandbox.settingsOpenMs": { "kind": "pace", "ms": 6000, "note": "Settings opening inside the Sandbox before its screenshot: nothing there to wait on from the host" },
+  "sandbox.windowShotMs": { "kind": "hang", "ms": 30000, "note": "a screenshot of Combwork's window inside the Sandbox, once the driver has it shown and settled (HI-3459): a hung capture, never a wait for drawing" },
   "sandbox.stopRetryMs": { "kind": "interval", "ms": 3000, "note": "how long the Sandbox checks wait before trying a Sandbox's stop again, until list no longer holds it" },
   "sandbox.museRunMs": { "kind": "hang", "ms": 120000, "note": "a run of the real Muse in the Sandbox (muse-real): an exec's bound, and the time a resumed TUI, which never ends by itself, is given before it is ended" },
   "suite.limitMs": { "kind": "hang", "ms": 1200000, "note": "an e2e suite's whole run" },

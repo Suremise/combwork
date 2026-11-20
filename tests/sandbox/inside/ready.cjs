@@ -20,6 +20,15 @@ async function until(fn, ms, every = 250) {
   }
 }
 
+/**
+ * p's value, or null once ms have passed: for a page call that may never settle (HI-3459: a window that draws no frame
+ * never runs its rAF). Its timer is cleared once settled, or the step's process would stay up until it fired.
+ */
+function within(p, ms) {
+  let t
+  return Promise.race([p, new Promise(r => { t = setTimeout(() => r(null), ms) })]).finally(() => clearTimeout(t))
+}
+
 const sameFolder = (a, b) => typeof a === 'string' && typeof b === 'string' && a.replace(/[\\/]+$/, '').toLowerCase() === b.replace(/[\\/]+$/, '').toLowerCase()
 
 /**
@@ -75,4 +84,4 @@ const pickBridge = (wanted, has) => wanted.find((n) => Array.isArray(has) && has
  */
 const releasesStarted = (log, re) => [...new Set([...String(log ?? '').matchAll(re)].map((m) => `${m[1]} ${m[2]}`))]
 
-module.exports = { sleep, until, sameFolder, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted }
+module.exports = { sleep, until, within, sameFolder, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted }

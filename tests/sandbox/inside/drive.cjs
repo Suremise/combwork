@@ -107,7 +107,7 @@ const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.strin
 // Each check has a stable id ("<scenario>.<what>"): the host's report requires the ids each step must produce.
 const check = (id, name, ok, detail) => { res.checks.push({ id, scenario: Number(String(id).split('.')[0]) || 0, name, ok: !!ok, detail: ok ? undefined : String(detail ?? '').slice(0, 1500) }); save() }
 // When what it reads is ready: conditions Combwork says are met, each bounded (ready.cjs, unit-tested in Combwork's npm test).
-const { until, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted } = require(path.join(__dirname, 'ready.cjs'))
+const { until, within, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted } = require(path.join(__dirname, 'ready.cjs'))
 // Each bound by name (HI-3393), from the tests' timing file: Combwork's tests folder is mapped whole into the Sandbox, so
 // tests	iming.cjs and tests	iming.json are there, at their defaults (the host's CW_TEST_TIMING doesn't reach inside).
 const { timing } = require(path.join(__dirname, '..', '..', 'timing.cjs'))
@@ -147,13 +147,63 @@ async function launch(opts = {}) {
   res.facts.readyMs = Date.now() - t0
 }
 
-/** The window has painted what it has and runs no finite animation (a dialog's or a theme's fade; a spinner's never ends), within hang.ui. */
-const painted = () => until(() => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(document.getAnimations().every(a => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity)))))), timing('hang.ui'))
+// A fault the checks can inject (checks.cjs --shot-fault, tests only): "minimise" minimises the window before each
+// screenshot, the state that stalled rc.15's (HI-3459), to prove shot() recovers from it.
+const SHOT_FAULT = process.env.CW_SANDBOX_SHOT_FAULT || ''
+
+/** What the window is doing, for a record: shown, minimised, its page's visibility and whether a frame comes (rAF). */
+async function windowState(bw) {
+  const win = await within(bw.evaluate((w) => ({ visible: w.isVisible(), minimised: w.isMinimized(), focused: w.isFocused(), bounds: w.getBounds() })).catch((e) => String(e)), timing('hang.ui'))
+  const pg = await within(page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r({ visibility: document.visibilityState, running: document.getAnimations().filter((a) => a.playState === 'running').length })))).catch((e) => String(e)), timing('hang.ui'))
+  return { win, page: pg ?? 'no frame (rAF) within hang.ui' }
+}
+
+/**
+ * The window has painted what it has and runs no finite animation (a dialog's or a theme's fade; a spinner's never
+ * ends), within hang.ui; else it throws, saying what the window was doing. Each look is bounded too: a window that
+ * draws no frame never runs its rAF.
+ */
+async function painted(bw) {
+  const settled = () => within(page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(document.getAnimations().every(a => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity)))))), timing('hang.ui'))
+  if (!(await until(settled, timing('hang.ui')))) throw new Error(`the window didn't settle within hang.ui: ${JSON.stringify(await windowState(bw))}`)
+}
+
+/**
+ * Shown and drawn before its screenshot (HI-3459): a minimised or hidden window draws no frames, so Chromium's capture
+ * waits for one that never comes ("taking page screenshot … fonts loaded", then the bound), while its rAF still runs.
+ * rc.15's upgrade Sandbox stalled every screenshot so, and a minimised window reproduces it exactly. The window is
+ * restored or shown (without activating it) until Electron says it's shown, and what was done is kept in the step's
+ * facts (shotsFixed); painted() and the capture then fail saying what the window was doing, never a bare timeout.
+ */
+async function drawable(bw, name) {
+  if (SHOT_FAULT === 'minimise') {
+    await bw.evaluate((w) => w.minimize())
+    if (!(await until(() => bw.evaluate((w) => w.isMinimized()), timing('hang.ui')))) throw new Error('--shot-fault minimise: the window never minimised')
+  }
+  const fixed = await bw.evaluate((w) => {
+    const did = []
+    if (w.isMinimized()) { w.restore(); did.push('restored') }
+    if (!w.isVisible()) { w.showInactive(); did.push('shown') }
+    return did
+  })
+  if (!fixed.length) return
+  ;(res.facts.shotsFixed ||= {})[name] = fixed
+  save()
+  if (!(await until(() => bw.evaluate((w) => w.isVisible() && !w.isMinimized()), timing('hang.ui')))) throw new Error(`the window wasn't shown within hang.ui after ${fixed.join(' and ')}: ${JSON.stringify(await windowState(bw))}`)
+}
 
 async function shot(name) {
   const file = `${prefix}-${name}.png`
-  await painted()
-  await page.screenshot({ path: path.join(OUT, file) })
+  const bw = await app.browserWindow(page)
+  await drawable(bw, name)
+  await painted(bw)
+  const t0 = Date.now()
+  try {
+    await page.screenshot({ path: path.join(OUT, file), timeout: timing('sandbox.windowShotMs') })
+  } catch (e) {
+    throw new Error(`${String(e.message).split('\n')[0]} (sandbox.windowShotMs); the window: ${JSON.stringify(await windowState(bw))}`, { cause: e })
+  }
+  ;(res.facts.shotMs ||= {})[name] = Date.now() - t0
   res.shots.push(file)
   save()
 }
