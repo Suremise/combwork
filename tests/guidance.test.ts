@@ -523,7 +523,8 @@ describe('the skills follow the gates (#1524)', () => {
     // Round 2: each list also says where its files are (beside SKILL.md), as a model looked in its working folder.
     // HI-2870 (J9d): jj's clauses (a jj card's commit; a passed one waits for the user to integrate it): 9850 before.
     // HI-3324: a long job Combwork can't see, marked waiting (while-working.md, the rule's one owner): 9950 before.
-    expect(catalog.get('work-on-card')!.text.replace(/\r/g, '').length).toBeLessThan(10400)
+    // HI-3462: a test showing something doesn't happen waits for the code's report of the attempt: 10400 before.
+    expect(catalog.get('work-on-card')!.text.replace(/\r/g, '').length).toBeLessThan(10600)
     // HI-2870 (J9d): its commit clauses scoped to a code card "in Git or jj": 11850 before.
     // HI-3188 (Q6): the builder's pointer to the reviewer's simplify rule: 11900 before.
     // HI-3324: a long job Combwork can't see among a turn's waits, pointing at work-on-card's rule (Codex polled one): 12100 before.
