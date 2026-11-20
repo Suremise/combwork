@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **The installer names the copy that's still running** (HI-3463). When the installer stops because Combwork or Hive Desktop won't close, its message now says where that copy runs from and its process ID, or, when Windows won't show where it is (another account's copy, for example), says so with its process ID, and how to end it in Task Manager. A copy left running with no window can be closed without restarting the PC.
+- **The installer names the copy that's still running** (HI-3463). When the installer stops because a copy of Combwork, or of its version before 1.1, won't close, its message now says where that copy runs from and its process ID, or, when Windows won't show where it is (another account's copy, for example), says so with its process ID, and how to end it in Task Manager. A copy left running with no window can be closed without restarting the PC.
 
 ## 1.6.0 — 2026-11-20
 
