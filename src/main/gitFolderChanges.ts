@@ -24,7 +24,7 @@ import { INDEX_BUSY, git, gitErrorLine, type GitResult } from './git'
 import { busyAgentIn } from './gitRepo'
 import { filesRepo } from './filesGit'
 import { createLogger, userText } from './logger'
-import { checkouts, worktreeNow } from './platform/git'
+import { checkouts, operationSync, worktreeNow } from './platform/git'
 import type { SubmoduleChange } from './platform/history'
 import { isUnknown } from './platform/types'
 import { platformLimits } from './platform/limits'
@@ -39,7 +39,7 @@ const M = {
   moved: msg({ id: 'service.folderChanges.moved', defaultMessage: 'Where {target} is checked out changed meanwhile. Look again.', description: 'HI-2944: an error from Commit or Set aside: the folder the branch {target} is checked out in changed while Combwork waited to act; nothing was done.' }),
   wrongBranch: msg({ id: 'service.folderChanges.wrongBranch', defaultMessage: "{folder} isn't on {target} now. Look again.", description: 'HI-2944: an error from Commit or Set aside: the folder ({folder}, a path) is on another branch than {target} now; nothing was done.' }),
   detached: msg({ id: 'service.folderChanges.detached', defaultMessage: "{folder} isn't on a branch, so Combwork doesn't commit there.", description: "HI-2944: an error from Commit it (Files) or Commit: the folder ({folder}, a path) has a detached HEAD (git's term), so nothing is committed." }),
-  midOperation: msg({ id: 'service.folderChanges.midOperation', defaultMessage: 'Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} other {a revert}} in {folder}. Finish or abort it first.', description: 'HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done.' }),
+  midOperation: msg({ id: 'service.folderChanges.midOperation', defaultMessage: 'Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}. Finish or abort it first.', description: 'HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done. HI-3465: bisect, git bisect (ended with git bisect reset).' }),
   agentBusy: msg({ id: 'service.folderChanges.agentBusy', defaultMessage: '{agent} is working in {folder}. Try again once it has finished.', description: 'HI-2944: an error from Commit or Set aside: an agent ({agent}) works in the folder ({folder}, a path); nothing was done.' }),
   busy: msg({ id: 'service.folderChanges.busy', defaultMessage: 'An agent or a run is working in {folder} ({what}). Try again once it has finished.', description: "HI-2944: an error from Commit or Set aside: an agent holds files or a run works in the folder ({folder}, a path); {what} names the first file or run's folder; nothing was done." }),
   changed: msg({ id: 'service.folderChanges.changed', defaultMessage: "The changes in {folder} aren't the ones shown any more. Look again.", description: 'HI-2944: an error from Commit or Set aside: a file shown is no longer changed in the folder ({folder}, a path), or none was shown; nothing was done.' }),
@@ -425,8 +425,9 @@ const pathsIn = (paths: string[]): string => paths.map(literal).join('\0')
 const STASH_PATHS_MAX = 30_000
 const stashPathCost = (rel: string): number => rel.length + 28
 
-/** The markers worktreeNow lists for an operation under way, as the refusal names it. */
-const STATES: Record<string, string> = { '(MERGE_HEAD)': 'merge', '(rebase-merge)': 'rebase', '(rebase-apply)': 'rebase', '(CHERRY_PICK_HEAD)': 'cherryPick', '(REVERT_HEAD)': 'revert' }
+/** The markers worktreeNow lists for an operation under way, as the refusal names it (HI-3465: a sequencer's, by its todo). */
+const STATES: Record<string, string> = { '(MERGE_HEAD)': 'merge', '(rebase-merge)': 'rebase', '(rebase-apply)': 'rebase', '(CHERRY_PICK_HEAD)': 'cherryPick', '(REVERT_HEAD)': 'revert', '(BISECT_LOG)': 'bisect' }
+const stateOf = (marker: string, folder: string): string => (marker === '(sequencer)' ? (operationSync(folder) === 'revert' ? 'revert' : 'cherryPick') : (STATES[marker] ?? 'revert'))
 
 /**
  * One path git reports changed. `untracked`: git lists it as untracked (`??`). `deleted`: its index entry is gone (a
@@ -598,7 +599,7 @@ async function assertQuiet(projectPath: string, folder: string, branch: string |
   // The operations under way, apart from the files (HI-2983: a changed file named `(MERGE_HEAD)` is a file). First
   // (HI-3081): a rebase detaches HEAD, and is what the user should hear about, not a detached HEAD.
   const marker = now.operations?.[0]
-  if (marker) throw combworkError(M.midOperation, { state: STATES[marker] ?? 'revert', folder })
+  if (marker) throw combworkError(M.midOperation, { state: stateOf(marker, folder), folder })
   if (!now.line) throw combworkError(M.detached, { folder })
   if (branch !== null && now.line !== branch) throw combworkError(M.wrongBranch, { folder, target: branch })
   const { folderBuilders } = await import('./workflow/queueHost')

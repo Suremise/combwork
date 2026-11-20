@@ -612,6 +612,8 @@ interface CombworkMessageValues {
   'workflow.slots.off': undefined
   'workflow.slots.on': undefined
   'workflow.slots.openAdvanced': undefined
+  'workflow.slots.operationHint': { command: string | number }
+  'workflow.slots.operationState': { what: string | number }
   'workflow.slots.recover': undefined
   'workflow.slots.recoverMessage': undefined
   'workflow.slots.recoverTitle': { slot: string | number }

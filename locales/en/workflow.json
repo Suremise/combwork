@@ -2443,6 +2443,14 @@
     "defaultMessage": "Open Advanced",
     "description": "A button beside “Reviewers review in review copies”: opens Settings → Advanced."
   },
+  "workflow.slots.operationHint": {
+    "defaultMessage": "Finish it in its folder, or end it there with {command}",
+    "description": "HI-3465: beside workflow.slots.operationState: how to free the slot. {command} is the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is). Combwork never runs it itself."
+  },
+  "workflow.slots.operationState": {
+    "defaultMessage": "Unfinished git {what}",
+    "description": "HI-3465: a slot's state in the list under “Slots and copies”, in place of its usual state: a git operation was left under way in its folder, so Combwork doesn't lend it. {what} is git's word for it (merge, rebase, am, cherry-pick, revert or bisect: keep it as it is)."
+  },
   "workflow.slots.recover": {
     "defaultMessage": "Recover…",
     "description": "A button beside a stale jj slot (HI-2869): brings it up to date, keeping any edits jj hadn’t recorded (asks first)."

@@ -452,8 +452,42 @@ export function submoduleState(xy: string | undefined, sub: string | undefined):
 /** A submodule row's HEAD object (`hH`): null when HEAD has none (an added one: all zeros). */
 const recordedOf = (h: string | undefined): string | null => (h && /^[0-9a-f]{40,64}$/.test(h) && !/^0+$/.test(h) ? h : null)
 
-/** A merge, rebase or cherry-pick under way: these in the git dir (dirty lists them as `(MERGE_HEAD)`…). */
-const MARKERS = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']
+/**
+ * A merge, rebase, cherry-pick, revert or bisect under way: these in the git dir (dirty lists them as `(MERGE_HEAD)`…).
+ * HI-3465: `sequencer` too, a revert or cherry-pick of several commits whose stop was committed by hand (its `*_HEAD` gone,
+ * nothing uncommitted): git still refuses to switch branch ("cannot switch branch while reverting"). And `BISECT_LOG`.
+ */
+const MARKERS = ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply', 'sequencer', 'BISECT_LOG']
+
+/** HI-3465: the git operation under way in a worktree, as git names it, for what Combwork tells the user. */
+export type GitOperation = 'merge' | 'rebase' | 'am' | 'cherry-pick' | 'revert' | 'bisect'
+
+/**
+ * HI-3465: the operation under way in a worktree (MARKERS), read from its own git dir with no git process; null with
+ * none, or when its git dir can't be found from `.git` (then git's own reads say what they can). A sequencer's kind is
+ * its todo list's first command (revert, else a cherry-pick).
+ */
+export function operationSync(folder: string): GitOperation | null {
+  const dir = gitDirSync(folder)
+  if (!dir) return null
+  const has = (m: string): boolean => existsSync(join(dir, m))
+  if (has('rebase-merge')) return 'rebase'
+  if (has('rebase-apply')) return has(join('rebase-apply', 'applying')) ? 'am' : 'rebase'
+  if (has('MERGE_HEAD')) return 'merge'
+  if (has('CHERRY_PICK_HEAD')) return 'cherry-pick'
+  if (has('REVERT_HEAD')) return 'revert'
+  if (has('sequencer')) {
+    let todo = ''
+    try {
+      todo = readFileSync(join(dir, 'sequencer', 'todo'), 'utf8')
+    } catch {
+      /* no todo: said as a cherry-pick's, git's other sequencer */
+    }
+    return /^\s*(revert|r)\s/.test(todo) ? 'revert' : 'cherry-pick'
+  }
+  if (has('BISECT_LOG')) return 'bisect'
+  return null
+}
 
 /**
  * A worktree's branch, head and uncommitted state, and optionally a line's head and some git paths, in two gits run at

@@ -610,6 +610,8 @@
   "workflow.slots.off": "Off",
   "workflow.slots.on": "On",
   "workflow.slots.openAdvanced": "Open Advanced",
+  "workflow.slots.operationHint": "Finish it in its folder, or end it there with {command}",
+  "workflow.slots.operationState": "Unfinished git {what}",
   "workflow.slots.recover": "Recover…",
   "workflow.slots.recoverMessage": "Combwork copies any edits jj hadn’t recorded in it aside first, into the folder below, then brings the slot up to date with jj. It runs only while nothing works in the slot.",
   "workflow.slots.recoverTitle": "Recover {slot}?",

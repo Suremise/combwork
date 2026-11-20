@@ -364,6 +364,8 @@
   "main.server.url.remoteHttp": "A server on another computer needs https://. Plain http:// is only for a server on this PC (localhost).",
   "main.server.url.scheme": "The URL must start with https:// (or http:// for a server on this PC).",
   "main.server.url.userinfo": "The URL can't hold a user name or password: give the key in its own field.",
+  "main.slots.operation.message": "Combwork can't lend {slot} to another card until it's finished. Finish it in {folder}, or end it there with {command}. Combwork never ends it itself, and lends the slot again once nothing is under way in it.",
+  "main.slots.operation.title": "{slot} has an unfinished git {what}",
   "main.storage.claimed": "The folder belongs to a session again.",
   "main.storage.launchInUse": "its agent is the project’s again, or is starting",
   "main.storage.noLonger": "{path}: no longer qualifies",

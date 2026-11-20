@@ -7855,6 +7855,18 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   ports, and only a folder with something in it, which Combwork must never touch, needs the user. A free slot is looked at again
   when it is next lent (changed since, a session or a process in it: marked or passed over, another tried; a slot
   asked for by name is refused once, *busy*).
+- **A git operation left under way** (HI-3465): a merge, rebase, am, cherry-pick, revert or bisect in a free slot's
+  folder (git's markers in its own git dir, a revert's or cherry-pick's `sequencer` included: a stop committed by hand
+  leaves no `REVERT_HEAD` and nothing uncommitted, yet git refuses to switch its branch) counts as uncommitted work: the
+  slot is `dirty`, never detached or lent, and its settle records which (`slot_operation:` in board_meta). The first
+  settle that finds it tells the user once (a notice naming the slot, the operation as git names it, its folder and
+  the command that ends it, `git revert --abort`, `git bisect reset`…), and Slots and copies shows *Unfinished git
+  revert* with that command; the next look that finds none clears it, and the slot is lent again. Combwork never ends
+  the operation itself, even for a card that is Done and merged: what it would lose (a rebase's rewritten commits, a
+  merge's resolution, a sequence's remaining steps) differs by operation and is the agent's or the user's to judge, and
+  the finish's check now stops new cases at their source. That check (`submit.clean`) refuses a submission while one
+  is under way in the card's folder, as it did for a merge's, rebase's, cherry-pick's and revert's markers, now with the
+  sequencer and a bisect too (listed as `(sequencer)`, `(BISECT_LOG)`).
 - **Operations** (HR1's round 1): warming for a lease and removal own the slot from the write that starts them to the
   write that ends them (`op` on its row: a token every one of their writes checks, and the holder's pid and start).
   Nothing lends, adopts or removes a slot meanwhile; the same card asking again is told it is being set up. Another

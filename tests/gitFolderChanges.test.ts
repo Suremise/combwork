@@ -1590,6 +1590,18 @@ describe('the folder and its state, checked under the lock', () => {
     writeFileSync(join(proj, '.git', 'MERGE_HEAD'), `${head()}\n`)
     await expect(settle('commit', ['a.txt'])).rejects.toThrow(/in the middle of a merge/)
     rmSync(join(proj, '.git', 'MERGE_HEAD'))
+    // HI-3465: a revert's sequencer left with no REVERT_HEAD (its stop committed by hand), and a bisect, are said too.
+    mkdirSync(join(proj, '.git', 'sequencer'))
+    writeFileSync(join(proj, '.git', 'sequencer', 'todo'), `revert ${head().slice(0, 7)} c
+`)
+    await expect(settle('commit', ['a.txt'])).rejects.toThrow(/in the middle of a revert/)
+    writeFileSync(join(proj, '.git', 'sequencer', 'todo'), `pick ${head().slice(0, 7)} c
+`)
+    await expect(settle('commit', ['a.txt'])).rejects.toThrow(/in the middle of a cherry-pick/)
+    rmSync(join(proj, '.git', 'sequencer'), { recursive: true })
+    writeFileSync(join(proj, '.git', 'BISECT_LOG'), '')
+    await expect(settle('commit', ['a.txt'])).rejects.toThrow(/in the middle of a bisect/)
+    rmSync(join(proj, '.git', 'BISECT_LOG'))
     expect(status()).toBe('M a.txt')
   })
 

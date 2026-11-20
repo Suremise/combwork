@@ -400,8 +400,8 @@
     "audience": "both"
   },
   "service.folderChanges.midOperation": {
-    "text": "Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} other {a revert}} in {folder}. Finish or abort it first.",
-    "note": "HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done.",
+    "text": "Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}. Finish or abort it first.",
+    "note": "HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done. HI-3465: bisect, git bisect (ended with git bisect reset).",
     "audience": "both"
   },
   "service.folderChanges.moved": {

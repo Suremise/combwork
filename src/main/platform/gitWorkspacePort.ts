@@ -218,6 +218,7 @@ export const gitWorkspacePort: WorkspacePort = {
   files: { title: GIT_FILES_TITLE, needed: (folder, disposable) => gitFilesNeeded(gitReads, folder, disposable), prepare: prepareGitFiles, exec: gitFilesExec, status: (folder) => gitFilesStatus(gitReads, folder) },
   prune: async (repo) => void (await git(repo, ['worktree', 'prune'])),
   dropRegistration,
+  operation: G.operationSync,
   prepare: async (folder, line, base, o) => {
     const cleared = await clearSlotSubmodules(folder, base ?? `refs/heads/${line}`)
     if (cleared) return { ok: false, err: cleared }

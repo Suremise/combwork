@@ -579,6 +579,8 @@
   "workflow.slots.off": "Desativado",
   "workflow.slots.on": "Ativado",
   "workflow.slots.openAdvanced": "Abrir Avançado",
+  "workflow.slots.operationHint": "Conclua na pasta dele, ou encerre ali com {command}",
+  "workflow.slots.operationState": "git {what} inacabado",
   "workflow.slots.recover": "Recuperar…",
   "workflow.slots.recoverMessage": "O Combwork primeiro copia para a pasta abaixo as edições que o jj não registrou e depois atualiza o slot com o jj. Só é executado enquanto nada trabalha no slot.",
   "workflow.slots.recoverTitle": "Recuperar {slot}?",
