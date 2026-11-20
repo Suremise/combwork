@@ -527,6 +527,23 @@ test('--smart-app-control: only "off"; anything else is refused before anything 
   assert.deepStrictEqual(s.read().calls, [], 'wsb or the server was called')
 })
 
+test('--shot-fault (HI-3459): only "minimise", refused otherwise before anything runs; given, every drive step gets it and the report says it is a test of the driver', () => {
+  assert.throws(() => plan(['--shot-fault', 'hide', '--installer', 'x']), /--shot-fault takes only "minimise" .*, not "hide"/)
+  assert.throws(() => plan(['--installer', 'x', '--shot-fault']), /--shot-fault takes only "minimise" .*, not nothing$/)
+  const { r, json, md, guests, log } = runChecks('shot-fault', [], ['--shot-fault', 'minimise'])
+  assert.strictEqual(r.status, 1, r.stdout + r.stderr) // the fake drivers write no results
+  const drives = guests.filter((g) => /drive\.cjs /.test(g))
+  assert.ok(drives.length > 0, guests.join('\n'))
+  for (const g of drives) assert.match(g, /^set "CW_SANDBOX_SHOT_FAULT=minimise" && C:\\tools\\node\\node\.exe /)
+  assert.strictEqual(json.meta.shotFault, 'minimise')
+  assert.match(md, /^- \*\*Shot fault: minimise\*\* \(`--shot-fault`, HI-3459\): .* A test of the driver, not a release check\./m)
+  assert.match(log, /; shot fault: minimise \(a test of the driver, not a release check\)/)
+  // Without it, no drive step carries it.
+  const plain = runChecks('shot-fault-none', [], [])
+  assert.ok(!plain.guests.some((g) => /CW_SANDBOX_SHOT_FAULT/.test(g)), plain.guests.join('\n'))
+  assert.ok(!/Shot fault/.test(plain.md))
+})
+
 const SAC_OFF_NOW = SAC_ON.replace('0x1', '0x0')
 
 test('--smart-app-control off: each Sandbox started with it, the state read back before every install, the report says so (#1092)', () => {
@@ -655,6 +672,18 @@ const scripted = <T>(n: number, before: T, after: T) => {
   let calls = 0
   return { read: async () => (++calls <= n ? before : after), calls: () => calls }
 }
+
+test('within (HI-3459): the value once it settles, null for a call that never does, and no timer left either way, or the step would outlive its work', async () => {
+  const timers = () => process.getActiveResourcesInfo().filter((r) => r === 'Timeout').length
+  const before = timers()
+  assert.strictEqual(await ready.within(Promise.resolve('drawn'), 600_000), 'drawn')
+  assert.strictEqual(timers(), before, 'a settled call left its timer running')
+  assert.strictEqual(await ready.within(new Promise(() => {}), 20), null)
+  assert.strictEqual(timers(), before, 'an expired call left a timer')
+  // A call that rejects rejects through it (the driver catches it where it records the window).
+  await assert.rejects(ready.within(Promise.reject(new Error('target closed')), 600_000), /target closed/)
+  assert.strictEqual(timers(), before, 'a rejected call left its timer running')
+})
 
 test('the new workspace counts as set up only once Combwork\'s status names it with its Combwork skills, however long it stays the same before', async () => {
   const ws = 'C:\\Users\\WDAGUtilityAccount\\Workspaces\\Fresh'
