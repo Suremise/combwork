@@ -87,7 +87,8 @@ The [release notes](CHANGELOG.md) have the full list, and what 1.4 and 1.5 added
 - **Merge guards** — patterns a merge may not add, such as your own name, each with a message saying what to do instead.
 - **jj (Jujutsu)** — a jj repository, colocated with Git or not, can be a project's version control: cards run in jj workspaces, and Combwork integrates a passed card itself after its checks, or when you click **Integrate**, or leaves it to you. Undoing a jj operation can be previewed.
 - **Git, done for you** — **Start the next version…** makes the next version's branch and points work at it; signed merges without waiting, submodules and Git LFS in slots, and merges against your team's remote.
-- **The Activity map** — every agent's tool calls at a glance, as a honeycomb.- **Assistant** — one per workspace, in a panel beside your agents: ask it what they are doing, or let it run the work. Four working modes (Coordinator, Planner, QA triager and Release manager) or your own; you decide how far it may go, and **Undo** takes back what it changed.
+- **The Activity map** — every agent's tool calls at a glance, as a honeycomb.
+- **Assistant** — one per workspace, in a panel beside your agents: ask it what they are doing, or let it run the work. Four working modes (Coordinator, Planner, QA triager and Release manager) or your own; you decide how far it may go, and **Undo** takes back what it changed.
 - **Live status** — every agent shows whether it is working, waiting for you, waiting for a card or done; a chime and a Windows notification tell you when one finishes or needs input, even from the tray.
 - **Tokens and plan usage** — tokens and API-equivalent cost per project and for the workspace, what each card cost, and each connection's plan limits with warnings.
 - **Transcript viewer** — read every session in full, including what came before each compaction, search across sessions, export as Markdown and resume.
