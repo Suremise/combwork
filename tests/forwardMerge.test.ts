@@ -1109,10 +1109,13 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
     const wf = (await workflowFor(w, repo))!
     // No target set and git's default unreadable: the targets are unknown.
     await inWorkspace(w, () => w.mutateProjectConfig(repo, (now) => ({ workflow: { ...now.workflow!, options: { ...now.workflow!.options, target: '' } } })))
+    // HI-3491: the refresh the config write scheduled reads .git's files; Windows can't rename a folder while one is open.
+    await w.refreshesSettled()
     renameSync(join(repo, '.git'), join(repo, '.git-away'))
     try {
       await expect(purge(w, repo, ['1.1.0'])).rejects.toThrow("Nothing was purged: Combwork can't read which branches this project merges into right now.")
     } finally {
+      await w.refreshesSettled()
       renameSync(join(repo, '.git-away'), join(repo, '.git'))
     }
     expect(wf.store.meta(purgedKey('1.1.0'))).toBeNull()

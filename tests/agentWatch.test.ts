@@ -277,6 +277,8 @@ describe('agent watches (main/watches.ts)', async () => {
     const id = JSON.parse(readFileSync(join(alpha, '.combwork', 'project.json'), 'utf8')).id
     expect(savedOf(path)[0].agents.agents[0].projectId).toBe(id)
     const gamma = join(path, 'gamma')
+    // HI-3491: the refresh the steps above scheduled reads alpha's files; Windows can't rename a folder while one is open.
+    await w.refreshesSettled()
     renameSync(alpha, gamma)
     const st2 = fake(gamma)
     st2.agents.set('a2', nowOf())
