@@ -16,6 +16,10 @@ export const CODEX_PRICES: ProviderPrices = {
     // price, to 30 Nov 2026 by that page.
     // Codex's default from 0.160 (Oct 2026): OpenAI's model page (developers.openai.com/api/docs/models/gpt-6.1-sol),
     // checked 5 Oct 2026, with cache writes at $2.50 (Codex reports none today).
+    // Codex's default from 0.169 (Nov 2026, HI-3492): OpenAI's pricing page and model page
+    // (developers.openai.com/api/docs/models/gpt-6.2-sol), checked 21 Nov 2026, standard tier, the same as gpt-6.1-sol's;
+    // its cache write is the 30-minute one.
+    'gpt-6.2-sol': openai(2, 0.1, 10, 2.5),
     'gpt-6.1-sol': openai(2, 0.1, 10, 2.5),
     'gpt-6.1-terra': openai(1, 0.05, 5),
     'gpt-6-astra': openai(10, 1, 50),
