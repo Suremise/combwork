@@ -16,7 +16,6 @@ import { at, GitProblem, GitSetupNotes, HistorySection, useGitRead } from './Git
 import { BranchesSection } from './GitBranches'
 import { switchAfterInit, switchPlatform, useWorkflowForm, VersionControlHeader } from './VersionControlHeader'
 import { PresetStep } from '../components/PresetStep'
-import { JjBookmarksSection, JjCompareSection, JjConflictsSection, JjHistorySection, JjOperationsSection, JjRepoSection } from './JjSections'
 
 /**
  * The project's Version Control tab (#1416, SPEC §16.6; the Git tab before 1.0, its id still `changes`): the header
@@ -48,15 +47,14 @@ const M = {
  * The tab's own read of git (on focus, on a change) finds a repository where the project's detection, read at the last
  * workspace refresh, has none, or none where it has one (#1492: `.git` moved away): the workspace is read again, once
  * for each such answer, so the header's fact, its offer and the notice follow at once (§16.3.5), never a header saying
- * "is a Git repository" over a page saying there's none. Another system found (a jj repository colocated with git) is
- * detection's call, so the two may differ there for good.
+ * "is a Git repository" over a page saying there's none. Another system found is detection's call, so the two may
+ * differ there for good.
  */
 function useDetectionCatchUp(project: ProjectInfo, s: GitRepoSummary | null): void {
   const asked = useRef<string | null>(null)
   const detected = project.platform?.detected
   const readGit = !!s && s.isRepo && !s.gitProblem
-  // A jj repository colocated with Git (HI-2799) is jj's to detect, as another system is: git reads it too (HI-3140: its
-  // descriptor's `detectionSteady`).
+  // A platform whose descriptor says `detectionSteady` (HI-3140) is detection's to decide, as another system is.
   const differ = !!s && !s.gitProblem && !!detected && !detected.other && !PLATFORMS[detected.platform].detectionSteady && readGit !== (detected.platform === 'git')
   const key = `${project.path}:${readGit}`
   useEffect(() => {
@@ -158,7 +156,7 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
     if (switched) void loadTemplate(p.path, waiting.entry, waiting.from)
     else notify('warning', tr(M.templateNotApplied, { project: p.name, template: waiting.entry.name }))
   }
-  // The line's status (its branch, ahead and behind) where work merges between lines (Git's); jj's user integrates (HI-2799).
+  // The line's status (its branch, ahead and behind) where work merges between lines (Git's).
   const status = merges(platform) && !!s?.isRepo
   useDetectionCatchUp(project, s)
   const sectionsShown = VC_SECTIONS.filter((x) => shown.includes(x.id))
@@ -199,18 +197,6 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
               </div>
             ) : section === 'queue' ? (
               <GitQueueSection project={project} />
-            ) : section === 'jjRepo' ? (
-              <JjRepoSection project={project} finish={form?.platform === platform ? form.options.finish : null} />
-            ) : section === 'jjHistory' ? (
-              <JjHistorySection project={project} />
-            ) : section === 'jjCompare' ? (
-              <JjCompareSection project={project} />
-            ) : section === 'jjBookmarks' ? (
-              <JjBookmarksSection project={project} />
-            ) : section === 'jjConflicts' ? (
-              <JjConflictsSection project={project} />
-            ) : section === 'jjOperations' ? (
-              <JjOperationsSection project={project} />
             ) : s && !s.isRepo && !s.gitProblem ? (
               <GitSetupNotes project={project} />
             ) : section === 'changes' ? (

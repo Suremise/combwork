@@ -148,9 +148,6 @@ import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
-import { jjBookmarks, jjCompare, jjConflicts, jjHistory, jjRepoView } from './platform/jjViews'
-import { jjChecksAgain, jjLeftovers, jjMarkChecked, jjToCheck, jjWaiting } from './jjWindow'
-import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
 import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
@@ -1881,23 +1878,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // The Git view (#607): the project folder only, read and changed by the user from the window (never an agent tool).
     // Its reads go through the repository reads port (HI-2785's R2), its changes are gitRepo.ts' until R3.
     'git:summary': (p) => lineRepoReads().summary(workspace.assertProject(p)),
-    // A jj project's views (HI-2799): read-only, pinned, off main (jj's worker); only a project the window shows.
-    'jj:repo': (p) => jjRepoView(workspace.assertProject(p)),
-    'jj:history': (p) => jjHistory(workspace.assertProject(p)),
-    'jj:bookmarks': (p) => jjBookmarks(workspace.assertProject(p)),
-    'jj:conflicts': (p) => jjConflicts(workspace.assertProject(p)),
-    'jj:compare': (p, from, to) => jjCompare(workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
     // HI-1185: Branches & remotes' Signing section (bounded, at most once a minute unless asked again).
     'git:signing': async (p, force) => (await lineRepoReads().signing?.(workspace.assertProject(p), force === true)) ?? null,
-    // The Operations section (HI-2800): read only; the preview's command is the user's to run.
-    'jj:operations': (p, from) => jjOperations(workspace.assertProject(p), typeof from === 'string' ? from : null),
-    'jj:operationPreview': (p, op, moment) => jjOperationPreview(workspace.assertProject(p), String(op ?? ''), typeof moment === 'string' ? moment : null),
-    // The window for jj cards (HI-2869): reads, the user's acknowledgement, and what a set-up left.
-    'jj:waiting': (p) => jjWaiting(workspace, workspace.assertProject(p)),
-    'jj:candidateChecksAgain': (p, card) => jjChecksAgain(workspace, workspace.assertProject(p), Number(card)),
-    'jj:toCheck': (p, after) => jjToCheck(workspace, workspace.assertProject(p), after ?? null),
-    'jj:markChecked': (p, row) => jjMarkChecked(workspace, workspace.assertProject(p), row),
-    'jj:leftovers': (p) => jjLeftovers(workspace.assertProject(p)),
     'git:info': async (p) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

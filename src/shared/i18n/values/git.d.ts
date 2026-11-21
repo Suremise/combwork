@@ -277,12 +277,6 @@ interface CombworkMessageValues {
   'git.section.branches': undefined
   'git.section.changes': undefined
   'git.section.history': undefined
-  'git.section.jjBookmarks': undefined
-  'git.section.jjCompare': undefined
-  'git.section.jjConflicts': undefined
-  'git.section.jjHistory': undefined
-  'git.section.jjOperations': undefined
-  'git.section.jjRepo': undefined
   'git.section.queue': undefined
   'git.section.workflow': undefined
   'git.setup.howTo': undefined
