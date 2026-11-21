@@ -181,6 +181,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const toldDetach = page.locator('.toast', { hasText: 'back to' })
     check('…not ready, so not lent', (await op({ op: 'lend', agent: b1.id, card: 107 })).refusal?.why === 'noSlot', JSON.stringify(await slot('slot-b')))
     check('…failing again, the user is told with git’s error and the way out', !!(await until(async () => (await toldDetach.count()) === 1, HUNG_MS)) && /index\.lock/.test(await toldDetach.innerText()) && (await toldDetach.innerText()).includes('git switch --detach'), await toldDetach.innerText().catch(() => ''))
+    await toldDetach.screenshot({ path: path.join(fx.shots, 'slotpool-5-detach-notice.png') }).catch(() => {})
     // The list is read as the section opens: opened again, as HI-3465's step does.
     await page.locator('.git-sections [data-section="changes"]').click().catch(() => {})
     await page.locator('.git-sections [data-section="workflow"]').click()
