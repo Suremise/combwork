@@ -876,6 +876,8 @@ export interface CombworkRequests {
   /** Its process's size now, or the size the next one starts at without one (HI-2250): a terminal shown before the window has fitted it draws at that size. */
   'pty:size': (key: string) => { cols: number; rows: number }
   'pty:kill': (key: string) => void
+  /** Whether its process still runs (HI-3466): a view watching for its exit asks, in case it ended before the view began. */
+  'pty:running': (key: string) => boolean
   /** A terminal refused its program's OSC 52 clipboard request (#736): logged. */
   'pty:clipboardRefused': (key: string, reason: Osc52Refusal) => void
 

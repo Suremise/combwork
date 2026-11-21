@@ -548,6 +548,8 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/Keybindings.tsx'], suites: ['keys'] },
   // A change of language while the window is open: the palette and the shortcut editor's clashes (#795).
   { paths: ['src/renderer/src/components/ui.tsx', 'src/renderer/src/components/Overlays.tsx', 'tests/e2e/setupcopy.cjs'], suites: ['setupcopy', 'setuplayout'] },
+  // Provider Setup's task ending, however it ends, unlocks the dialog (HI-3466).
+  { paths: ['src/renderer/src/components/Overlays.tsx', 'src/main/providerService.ts', 'src/main/ptyHost.ts', 'tests/e2e/fake-muse/', 'tests/e2e/setuplock.cjs'], suites: ['setuplock'] },
   { paths: ['src/renderer/src/keyConflicts.ts', 'src/renderer/src/components/Keybindings.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/renderer/src/commands.ts', 'tests/e2e/i18nlive.cjs'], suites: ['i18nlive', 'keys'] },
   { paths: ['src/renderer/src/components/NumberField.tsx', 'src/shared/numberInput.ts'], suites: ['numbers'] },
   { paths: ['src/renderer/src/components/Overlays.tsx', 'src/shared/folderLabels.ts'], suites: ['about', 'quit', 'carddialog', 'keys', 'closewindow', 'removeall', 'testedclis', 'contrast', 'setuplayout'] },
