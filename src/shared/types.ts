@@ -4009,7 +4009,8 @@ export interface ReadinessIssue {
   message: string
   /** Button: a provider task Combwork runs in a terminal. */
   /** `host`: the GitHub host a sign-in is for (HI-2779), where the CLI signs in per host. */
-  action?: { label: string; task: ProviderTask; host?: string }
+  /** `opens`: the button opens that place instead of running the task (HI-3490: no account to set up on, Accounts & Connections). */
+  action?: { label: string; task: ProviderTask; host?: string; opens?: 'connections' }
   /** Shown in Provider Setup with the button: what the task will ask and how to choose (paragraphs, `code` allowed). */
   detail?: string[]
 }

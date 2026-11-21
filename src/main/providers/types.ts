@@ -918,6 +918,21 @@ export interface ProviderAccountsPart {
   /** The arguments the CLI takes in a connection's Set Up on its folder (`home`), as its launches there do (HI-1893). Absent: none. */
   connectionSetUpArgs?(home: string): string[]
   /**
+   * The CLI's own sandbox as an account's folder (`home`) has it, as its launches run (HI-3490: Codex's Windows sandbox,
+   * its own config's or the fallback): a name, null for none, 'n/a' where the CLI uses none. Absent: no such setup.
+   */
+  accountSandbox?(home: string | null): string | null
+  /**
+   * Provider Setup's sandbox items for the accounts on in a window's workspace (HI-3490), each named with its sandbox
+   * (accountSandbox); `usable`: one of them can be signed in to now, else the button opens Accounts & Connections.
+   */
+  accountSandboxReadiness?(rows: readonly { name?: string; sandbox: string | null }[], usable: boolean): ReadinessIssue[]
+  /**
+   * Provider Setup's `setup` task on an account's folder (HI-3490), in place of the CLI's own home's (install.setupCommand),
+   * which Combwork never signs in. The caller puts the folder under the CLI's home variable.
+   */
+  accountSandboxSetUp?(executable: string, home: string): CommandSpec
+  /**
    * Whether the CLI on a connection's folder (`home`) trusts each of a workspace's folders (HI-1870), as its own files
    * there say, read only: true, false (not trusted, or no record), or null when it can't be told (a file it can't
    * read, a folder Combwork couldn't resolve). Absent: the CLI keeps no trust to tell.

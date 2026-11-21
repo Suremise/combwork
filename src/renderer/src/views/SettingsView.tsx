@@ -23,6 +23,7 @@ import { HiddenProjectsList } from '../components/ProjectRemoval'
 import { WorkspaceStorageList } from '../components/Storage'
 import { AntivirusPanel } from '../components/Antivirus'
 import { AccountsSettings } from '../components/AccountsSettings'
+import { readinessHere, useConnections } from '../components/ConnectionChoice'
 import { AdvancedSettings } from '../components/AdvancedSettings'
 import { listedAdvanced, groupName, shownText, type AdvancedState } from '@shared/advanced'
 import { choose, chooseTab, confirm, get, notify, set, showView, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
@@ -508,13 +509,15 @@ function ProviderToggle({ provider }: { provider: ProviderId }) {
 
 function ProviderStatus({ provider }: { provider: ProviderId }) {
   const info = useStore((s) => s.providers[provider])
+  const view = useConnections()
   if (!info || info.checking)
     return (
       <span className="muted">
         <Icon name="loading" spin /> {tr(msg({ id: 'settings.provider.checking', defaultMessage: 'Checking…', description: "While Combwork looks for a provider's CLI (Settings → <provider> → Installation)." }))}
       </span>
     )
-  const problems = (info.readiness ?? []).filter((r) => r.level !== 'info')
+  // The accounts' own items too (HI-3490: Codex's sandbox, per account on here).
+  const problems = readinessHere(provider, info, view).filter((r) => r.level !== 'info')
   return (
     <div className="flex" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
       {info.found ? (

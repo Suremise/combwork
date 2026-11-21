@@ -21,7 +21,7 @@ import { GitStatusBarItem } from '../views/GitTab'
 import { AGENT_LIMIT_MAX } from '@shared/defaults'
 import { AgentRowsTable, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, WAITING_COLUMN, agentRow, tableText, type AgentTableData, type AgentTableRow } from './AgentsTable'
 import { hasShare, limitName, limitWindow, nameWindow } from '@shared/planLimits'
-import { useConnections, useProviderWarnings } from './ConnectionChoice'
+import { readinessHere, useConnections, useProviderWarnings } from './ConnectionChoice'
 import { connectionsApply, planUsageItems } from '@shared/accounts'
 import { useConnectionsInUse } from '../connectionUsage'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
@@ -353,6 +353,7 @@ function ProviderStatusItems() {
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
   const warn = useProviderWarnings()
+  const view = useConnections()
   return (
     <>
       {enabledProviders(settings).map((p) => {
@@ -384,7 +385,8 @@ function ProviderStatusItems() {
             </Tooltip>
           )
         }
-        const warning = info.readiness?.find((r) => r.level === 'warning')
+        // The accounts' own items too (HI-3490: Codex's sandbox, per account on here).
+        const warning = readinessHere(p.id, info, view).find((r) => r.level === 'warning')
         const tip = tr(M.providerTip, { provider: p.name, version: info.version ?? '', source: installSourceText(info.source, tr), hasWarning: warning ? 'yes' : 'no', warning: warning?.message ?? '', hasUpdate: info.updateAvailable ? 'yes' : 'no', latest: info.latestVersion ?? '' })
         return (
           <Tooltip key={p.id} content={tip}>

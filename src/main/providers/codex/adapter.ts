@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
-import { msg, tr } from '../../../shared/i18n'
+import { msg, tr, type Msg } from '../../../shared/i18n'
+import { listOf } from '../../../shared/advanced'
 import { spawn } from 'child_process'
 import { codexCheckHeld, ownedAppServerRequest, stopCodexChecks, type CheckAnswer } from './checks'
 import { homedir, tmpdir } from 'os'
@@ -36,7 +37,7 @@ import { permissionsMenuLabel, permissionsMenuNumber } from './permissionsMenu'
 import { strayCodexWarning } from './strayFolder'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
-import { connectionsManaged } from '../../connectionSeam'
+import { accountHomes, connectionsManaged } from '../../connectionSeam'
 import { codexListedHooks } from './hookListing'
 import type { HookListing, HookRow } from '../../../shared/hooks'
 import { withoutCombworkAuth } from '../../../shared/hooks'
@@ -81,6 +82,48 @@ const SANDBOX_CHOICE = [
   msg({ id: 'providers.codex.sandbox.default', defaultMessage: '**Set up default sandbox** (recommended): commands run under two local Windows accounts Codex creates for them (`CodexSandboxOffline` and `CodexSandboxOnline`), with a firewall rule that keeps them offline unless you allow it. It isolates commands best. Windows asks for Administrator permission once.', description: "Provider Setup, under Codex's sandbox setup (Windows): its first choice. **Set up default sandbox** is the choice as Codex names it (in English); `…` marks account names: keep them." }),
   msg({ id: 'providers.codex.sandbox.nonAdmin', defaultMessage: '**Use non-admin sandbox**: needs no Administrator permission. Commands run under your own account with restricted rights. It protects your files and blocks internet access in most cases, but Codex warns it carries more risk if the agent is tricked by instructions hidden in a file or web page it reads (prompt injection). You can upgrade to the default sandbox from here later.', description: "Provider Setup, under Codex's sandbox setup (Windows): its second choice. **Use non-admin sandbox** is the choice as Codex names it (in English)." })
 ]
+
+const SANDBOX = {
+  needed: msg({ id: 'providers.codex.sandbox.needed', defaultMessage: 'Codex needs a one-time setup of its Windows sandbox; until then it asks before every command.', description: "Provider Setup and Settings → Providers: Codex's Windows sandbox isn't set up yet." }),
+  neededFor: msg({ id: 'providers.codex.sandbox.neededFor', defaultMessage: '{n, plural, one {Codex needs a one-time setup of its Windows sandbox for {names}; until then its agents ask before every command.} other {Codex needs a one-time setup of its Windows sandbox for {names}; until then their agents ask before every command.}}', description: "Provider Setup and Settings → Providers (HI-3490): Codex's Windows sandbox isn't set up for the Codex accounts named ({names}: the user's names for them, joined, \"Work and Personal\"; {n}: how many), which are on in this workspace." }),
+  setUp: msg({ id: 'providers.codex.sandbox.setUpAction', defaultMessage: 'Set up', description: "Provider Setup's button: opens Codex's sandbox setup in a terminal." }),
+  nonAdmin: msg({ id: 'providers.codex.sandbox.nonAdminUsed', defaultMessage: 'Codex uses its non-admin sandbox.', description: 'Provider Setup and Settings → Providers: Codex runs commands in its non-admin sandbox (Windows), which can be upgraded.' }),
+  nonAdminBy: msg({ id: 'providers.codex.sandbox.nonAdminUsedBy', defaultMessage: "{n, plural, one {{names} uses Codex's non-admin sandbox.} other {{names} use Codex's non-admin sandbox.}}", description: "Provider Setup and Settings → Providers (HI-3490): the Codex accounts named ({names}: the user's names for them, joined; {n}: how many) run commands in Codex's non-admin sandbox (Windows), which can be upgraded." }),
+  upgrade: msg({ id: 'providers.codex.sandbox.upgradeAction', defaultMessage: 'Upgrade', description: "Provider Setup's button: switches Codex to its default sandbox." }),
+  upgradeDetail: msg({ id: 'providers.codex.sandbox.upgrade', defaultMessage: '**Upgrade** switches Codex to its default sandbox, which runs commands under separate Windows accounts instead of your own. Windows asks for Administrator permission once. Codex agents that are running keep their sandbox until they restart.', description: "Provider Setup, under Codex's sandbox setup (Windows): what Upgrade does. **…** marks bold text: keep the marks." }),
+  noAccount: msg({ id: 'providers.codex.sandbox.noAccount', defaultMessage: '**Set up** runs Codex on one of your Codex accounts, and none on in this workspace is signed in. Sign one in, or turn one on here (**On here**), in Settings → Accounts & Connections, then come back to set up the sandbox.', description: "Provider Setup, under Codex's sandbox setup (Windows; HI-3490): why there is no Set up button, but Open Accounts & Connections. **…** marks bold text: keep the marks. On here is the switch on each account's row in Settings → Accounts & Connections." }),
+  openConnections: msg({ id: 'providers.codex.sandbox.openConnections', defaultMessage: 'Open Accounts & Connections', description: "Provider Setup's button (HI-3490), in place of Codex's sandbox Set up when no Codex account on in this workspace is signed in: opens Settings → Accounts & Connections." })
+}
+
+/** A sandbox row for codexSandboxIssues: an account (its name) and its effective sandbox, or Codex's own home (no name). */
+export interface SandboxRow {
+  name?: string
+  sandbox: string | null
+}
+
+/**
+ * The sandbox items of Provider Setup's readiness (HI-3490), for the homes given: Codex's own (a test home: one row, no
+ * name), or the accounts on in a window's workspace, named. Needs set up where any has none; else Upgrade where any uses
+ * the non-admin one; else nothing. `how`: 'task', its button runs Set up; 'connections', none of those accounts is signed
+ * in, so the button opens Accounts & Connections instead and says why. Nothing off Windows.
+ */
+export function codexSandboxIssues(rows: readonly SandboxRow[], how: 'task' | 'connections'): ReadinessIssue[] {
+  if (rows.some((r) => r.sandbox === 'n/a')) return []
+  const named = (of: readonly SandboxRow[]): string[] => of.map((r) => r.name).filter((n): n is string => !!n)
+  const action = (label: Msg): ReadinessIssue['action'] => (how === 'task' ? { label: installText(label), task: 'setup' } : { label: installText(SANDBOX.openConnections), task: 'setup', opens: 'connections' })
+  const why = how === 'connections' ? [installText(SANDBOX.noAccount)] : []
+  const missing = rows.filter((r) => !r.sandbox)
+  if (missing.length) {
+    const names = named(missing)
+    const message = names.length ? installText({ m: SANDBOX.neededFor, values: { n: names.length, names: listOf(names) } }) : installText(SANDBOX.needed)
+    return [{ id: 'sandbox', level: 'warning', message, action: action(SANDBOX.setUp), detail: [...why, ...SANDBOX_CHOICE.map(installText)] }]
+  }
+  const nonAdmin = rows.filter((r) => r.sandbox === 'unelevated')
+  if (!nonAdmin.length) return []
+  const names = named(nonAdmin)
+  const message = names.length ? installText({ m: SANDBOX.nonAdminBy, values: { n: names.length, names: listOf(names) } }) : installText(SANDBOX.nonAdmin)
+  return [{ id: 'sandbox-upgrade', level: 'info', message, action: action(SANDBOX.upgrade), detail: [...why, installText(SANDBOX.upgradeDetail)] }]
+}
 
 /** A value as TOML, for -c overrides: strings, numbers, booleans, arrays and inline tables. */
 export function toToml(v: unknown): string {
@@ -376,9 +419,48 @@ export function launchConnectionArgs(ctx: Pick<LaunchContext, 'connectionHome'>)
  * PC's, from ~/.codex's config. None off Windows.
  */
 function connectionSandboxArgs(home: string): string[] {
-  if (process.platform !== 'win32' || configOf(home).windows?.sandbox) return []
-  const mode = advanced.get<boolean>('codex.accounts.unelevatedSandbox') ? 'unelevated' : userConfig().windows?.sandbox
-  return typeof mode === 'string' && /^[\w-]{1,24}$/.test(mode) ? ['-c', `windows.sandbox=${toToml(mode)}`] : []
+  if (process.platform !== 'win32' || ownSandbox(home)) return []
+  const mode = fallbackSandbox(home)
+  return mode ? ['-c', `windows.sandbox=${toToml(mode)}`] : []
+}
+
+/** A sandbox name as Codex's config takes it, and as it can go on a command line. */
+const sandboxName = (v: unknown): string | null => (typeof v === 'string' && /^[\w-]{1,24}$/.test(v) ? v : null)
+
+/**
+ * The `windows.sandbox` a home's own config.toml names (a connection's, or with no home ~/.codex's), as Codex reads it
+ * there: any text; null when none.
+ */
+export function ownSandbox(home?: string): string | null {
+  const w = configOf(home).windows?.sandbox
+  return typeof w === 'string' && w ? w : null
+}
+
+const samePlace = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase()
+
+/**
+ * The Windows sandbox a Codex home whose own config names none runs in (HI-3490): a home's own setting always wins, and
+ * this is only its fallback. Codex's non-admin one when Advanced turns it on for connections (HI-1893); else ~/.codex's
+ * (a setup done in the user's own terminal); else the first other Codex account's own, in the one order of accounts
+ * (`except`: the home asked about). Null: none anywhere.
+ */
+export function fallbackSandbox(except?: string): string | null {
+  if (advanced.get<boolean>('codex.accounts.unelevatedSandbox')) return 'unelevated'
+  // Only one Codex takes on a command line: a name it wouldn't is passed over.
+  const own = sandboxName(ownSandbox())
+  if (own) return own
+  for (const h of accountHomes(CODEX)) {
+    if (except && samePlace(h, except)) continue
+    const s = sandboxName(ownSandbox(h))
+    if (s) return s
+  }
+  return null
+}
+
+/** The Windows sandbox a connection's Codex runs in (HI-3490): its own config's, else the fallback. 'n/a' off Windows. */
+export function effectiveSandbox(home: string): string | null {
+  if (process.platform !== 'win32') return 'n/a'
+  return ownSandbox(home) ?? fallbackSandbox(home)
 }
 
 /**
@@ -778,9 +860,12 @@ export class CodexAdapter implements ProviderAdapter {
   }
 
   diagnostics(): string[] {
-    const kind = this.sandboxKind()
     const named: Record<string, string> = { elevated: 'default (admin)', unelevated: 'non-admin', 'n/a': 'not used on this system' } // i18n-ignore: Copy Diagnostics' report (the design keeps diagnostics content English)
-    return [`Windows sandbox: ${kind === null ? 'not set up' : (named[kind] ?? (/^[\w-]{1,24}$/.test(kind) ? kind : 'unknown'))}`] // i18n-ignore: Copy Diagnostics' report (the design keeps diagnostics content English)
+    const said = (kind: string | null): string => (kind === null ? 'not set up' : (named[kind] ?? (/^[\w-]{1,24}$/.test(kind) ? kind : 'unknown'))) // i18n-ignore: Copy Diagnostics' report (the design keeps diagnostics content English)
+    if (!connectionsManaged(this.id) || process.platform !== 'win32') return [`Windows sandbox: ${said(this.sandboxKind())}`] // i18n-ignore: Copy Diagnostics' report (the design keeps diagnostics content English)
+    // Per account (HI-3490), by its place in the one order (never its name): its own, else the fallback an account without one gets.
+    const accounts = accountHomes(CODEX).map((h, i) => `Windows sandbox, account ${i + 1}: ${said(effectiveSandbox(h))}${ownSandbox(h) ? '' : ' (fallback)'}`) // i18n-ignore: Copy Diagnostics' report (the design keeps diagnostics content English)
+    return [`Windows sandbox: ${said(fallbackSandbox())}`, ...accounts] // i18n-ignore: Copy Diagnostics' report (the design keeps diagnostics content English)
   }
 
   configHome(): string {
@@ -791,25 +876,12 @@ export class CodexAdapter implements ProviderAdapter {
     const name = this.descriptor.name
     if (!info.found) return [notInstalledIssue(name)]
     const out: ReadinessIssue[] = []
-    const sandbox = this.sandboxKind()
+    // Signed in per account (HI-3490): each account's sandbox is its own, so its items are the window's (accountsView,
+    // sandboxReadiness below, for the accounts on in its workspace). Here only for Codex's own home (a test home).
+    const managed = connectionsManaged(this.id)
+    const sandbox = managed ? (fallbackSandbox() ?? accountHomes(CODEX).map((h) => ownSandbox(h)).find(Boolean) ?? null) : this.sandboxKind()
     if (info.loggedIn === false) out.push(signedOutIssue(name))
-    else if (!sandbox)
-      out.push({
-        id: 'sandbox',
-        level: 'warning',
-        message: installText(msg({ id: 'providers.codex.sandbox.needed', defaultMessage: 'Codex needs a one-time setup of its Windows sandbox; until then it asks before every command.', description: "Provider Setup and Settings → Providers: Codex's Windows sandbox isn't set up yet." })),
-        action: { label: installText(msg({ id: 'providers.codex.sandbox.setUpAction', defaultMessage: 'Set up', description: "Provider Setup's button: opens Codex's sandbox setup in a terminal." })), task: 'setup' },
-        detail: SANDBOX_CHOICE.map(installText)
-      })
-    else if (sandbox === 'unelevated') {
-      out.push({
-        id: 'sandbox-upgrade',
-        level: 'info',
-        message: installText(msg({ id: 'providers.codex.sandbox.nonAdminUsed', defaultMessage: 'Codex uses its non-admin sandbox.', description: 'Provider Setup and Settings → Providers: Codex runs commands in its non-admin sandbox (Windows), which can be upgraded.' })),
-        action: { label: installText(msg({ id: 'providers.codex.sandbox.upgradeAction', defaultMessage: 'Upgrade', description: "Provider Setup's button: switches Codex to its default sandbox." })), task: 'setup' },
-        detail: [installText(msg({ id: 'providers.codex.sandbox.upgrade', defaultMessage: '**Upgrade** switches Codex to its default sandbox, which runs commands under separate Windows accounts instead of your own. Windows asks for Administrator permission once. Codex agents that are running keep their sandbox until they restart.', description: "Provider Setup, under Codex's sandbox setup (Windows): what Upgrade does. **…** marks bold text: keep the marks." }))]
-      })
-    }
+    else if (!managed) out.push(...codexSandboxIssues([{ sandbox }], 'task'))
     // The Store's PowerShell 7 first on PATH, with the sandbox on: its commands fail while one is open (#585). Like the
     // sandbox's own items, once Codex is signed in.
     if (info.loggedIn !== false && sandbox && storePwshFirst()) out.push(storePwshIssue())
@@ -936,19 +1008,50 @@ export class CodexAdapter implements ProviderAdapter {
    * sandbox is on (it upgrades that to the admin one).
    */
   setupCommand(executable: string): CommandSpec {
+    const before = this.sandboxKind()
+    // Codex stays open once the sandbox is set up: the task is done when its config names a new sandbox.
+    return this.sandboxSetup(executable, [], before, () => {
+      const now = this.sandboxKind()
+      return !!now && now !== before
+    })
+  }
+
+  /**
+   * The sandbox setup on an account's folder (HI-3490: Codex's own home is never signed in, so Codex would show its
+   * sign-in there): run as the account's launches run Codex (its login store, its fallback sandbox), the keys chosen by
+   * the sandbox it has now, and done only when that folder's own config.toml names another one: no other home's change
+   * finishes it. The caller gives the folder as CODEX_HOME.
+   */
+  accountSandboxSetUp(executable: string, home: string): CommandSpec {
+    const ownBefore = ownSandbox(home)
+    return this.sandboxSetup(executable, launchConnectionArgs({ connectionHome: home }), effectiveSandbox(home), () => {
+      const now = ownSandbox(home)
+      return !!now && now !== ownBefore
+    })
+  }
+
+  /**
+   * The sandbox state of an account's folder (HI-3490): its effective sandbox ('n/a' off Windows), as its launches have it;
+   * with no folder, an account's with no setting of its own (the fallback).
+   */
+  accountSandbox(home: string | null): string | null {
+    if (home) return effectiveSandbox(home)
+    return process.platform === 'win32' ? fallbackSandbox() : 'n/a'
+  }
+
+  /** Provider Setup's sandbox items for the accounts on in a window's workspace (HI-3490, codexSandboxIssues). */
+  accountSandboxReadiness(rows: readonly SandboxRow[], usable: boolean): ReadinessIssue[] {
+    return codexSandboxIssues(rows, usable ? 'task' : 'connections')
+  }
+
+  private sandboxSetup(executable: string, extra: readonly string[], before: string | null, done: () => boolean): CommandSpec {
     const dir = join(tmpdir(), 'combwork-codex-setup')
     mkdirSync(dir, { recursive: true })
     // The title items are pinned as for sessions: the busy wait below reads the spinner a user's own [tui].terminal_title could drop.
-    const s = toSpawnable(executable, ['--no-daemon', '-C', dir, '-c', `projects=${toToml({ [dir]: { trust_level: 'trusted' } })}`, '-c', `tui.terminal_title=${toToml(titleItems())}`, ...CODEX_MODE_FLAGS['read-only']])
-    const before = this.sandboxKind()
+    const s = toSpawnable(executable, ['--no-daemon', ...extra, '-C', dir, '-c', `projects=${toToml({ [dir]: { trust_level: 'trusted' } })}`, '-c', `tui.terminal_title=${toToml(titleItems())}`, ...CODEX_MODE_FLAGS['read-only']])
     const keys = before === 'unelevated'
       ? [{ keys: '/setup-default-sandbox', waitMs: 300 }, enterOnceShown('/setup-default-sandbox')]
       : this.modeMenuKeys('ask')
-    // Codex stays open once the sandbox is set up: the task is done when its config names a new sandbox.
-    const done = (): boolean => {
-      const now = this.sandboxKind()
-      return !!now && now !== before
-    }
     // Codex puts a spinner in its window title while it works (also as it starts up, once it has loaded).
     return { ...s, keys, readyPattern: CODEX_LOADED, busyTitle: /^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/, busyScreen: codexHoldsInput, done }
   }

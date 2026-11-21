@@ -22,7 +22,7 @@ import { cardLabel } from '@shared/projectKeys'
 import { cardMatches } from '@shared/tasks'
 import type { ConsoleRecordingInfo } from '@shared/devConsole'
 import { ProviderIcon } from './ProviderIcon'
-import { ConnectionSetupLine, ServerSetupLines, useProviderWarnings } from './ConnectionChoice'
+import { ConnectionSetupLine, openConnections, readinessHere, ServerSetupLines, useConnections, useProviderWarnings } from './ConnectionChoice'
 import { AgentsDetail, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, type AgentColumn, type AgentTableGroup, type AgentTableRow } from './AgentsTable'
 import { BusyButton, CodeText, CopyableCode, Icon, IconButton, LoadFailed, Modal, SearchInput, STATUS_TEXT, useBackdrop, useBusy } from './ui'
 import { ProviderGapsNote } from './Clis'
@@ -878,6 +878,8 @@ export function AgentSetupDialog() {
   const open = useStore((s) => s.setupOpen)
   const providers = useStore((s) => s.providers)
   const settings = useStore((s) => s.settings)
+  // The accounts' own items (HI-3490: Codex's sandbox, per account on here) join the CLI's readiness.
+  const view = useConnections()
   const [tab, setTab] = useState<ProviderId>(PROVIDERS[0].id)
   const [task, setTask] = useState<{ key: string; kind: ProviderTask; issues: string[] } | null>(null)
   const [running, setRunning] = useState(false)
@@ -926,7 +928,7 @@ export function AgentSetupDialog() {
   const start = async (kind: ProviderTask, retryUpdate = false, host?: string): Promise<void> => {
     try {
       const key = retryUpdate ? await call('provider:retryUpdate', tab) : await call('provider:task', tab, kind, host)
-      setTask({ key, kind, issues: (info?.readiness ?? []).filter((r) => r.action?.task === kind).map((r) => r.id) })
+      setTask({ key, kind, issues: readinessHere(tab, info, view).filter((r) => r.action?.task === kind).map((r) => r.id) })
       setFinished(null)
       setRunning(true)
     } catch (e) {
@@ -954,7 +956,9 @@ export function AgentSetupDialog() {
     const kind = task?.kind
     const after = next?.[tab]
     if (!kind || !after || after.checking) return
-    const left = kind === 'update' ? after.updateAvailable || !!after.updateRetry : (after.readiness ?? []).some((r) => task.issues.includes(r.id))
+    // The accounts' items read again too (HI-3490): a setup on an account changes its own.
+    const accountsNow = await call('connections:list', false).catch(() => view)
+    const left = kind === 'update' ? after.updateAvailable || !!after.updateRetry : readinessHere(tab, after, accountsNow).some((r) => task.issues.includes(r.id))
     // An install that ended without Combwork finding the CLI: its terminal stays, with what to do next.
     if (left && kind === 'install' && !after.found) setFinished({ ok: false, text: installNotFoundText(p.name) })
     if (left) return
@@ -976,7 +980,7 @@ export function AgentSetupDialog() {
     setFinished(null)
     set({ setupOpen: false })
   }
-  const issues = (info?.readiness ?? []).filter((r) => r.id !== 'not-installed')
+  const issues = readinessHere(tab, info, view).filter((r) => r.id !== 'not-installed')
 
   return (
     <Modal
@@ -1065,7 +1069,13 @@ export function AgentSetupDialog() {
             {issues
               .filter((r) => r.action)
               .map((r) => (
-                <button key={r.id} className="btn primary" disabled={running} data-host={r.action!.host ?? ''} onClick={() => void start(r.action!.task, false, r.action!.host)}>
+                <button key={r.id} className="btn primary" disabled={running} data-host={r.action!.host ?? ''} data-opens={r.action!.opens} onClick={() => {
+                    // In place of a task it can't run here (HI-3490: no account to set up on), the place to fix that.
+                    if (r.action!.opens === 'connections') {
+                      close()
+                      openConnections()
+                    } else void start(r.action!.task, false, r.action!.host)
+                  }}>
                   {r.action!.label}
                 </button>
               ))}

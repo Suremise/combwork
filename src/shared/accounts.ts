@@ -1,4 +1,4 @@
-import type { Account, AppSettings, Connection, ConnectionDefaults, LaunchValues, ProviderId, WorkspaceConnections, WorkspaceConfig } from './types'
+import type { Account, AppSettings, Connection, ConnectionDefaults, LaunchValues, ProviderId, ReadinessIssue, WorkspaceConnections, WorkspaceConfig } from './types'
 import { agentProvider, permissionLabel, providerDescriptor } from './providers'
 import { agentWorkflowRole, reviewsWork, type WorkflowRole } from './workflow/roles'
 
@@ -138,6 +138,11 @@ export interface ConnectionsView {
   workspace: Partial<Record<ProviderId, WorkspaceConnections>>
   /** Providers a test copy runs on its CLI test home where nothing is on (the test seam, HI-1755): no setup is asked for. */
   testHome: ProviderId[]
+  /**
+   * Per provider, Provider Setup's readiness items about the accounts on in this workspace (HI-3490: Codex's sandbox, which
+   * each account has as its own), in the window's language: added to the CLI's own readiness where it is installed.
+   */
+  readiness?: Partial<Record<ProviderId, ReadinessIssue[]>>
   /**
    * The CLIs the one-time notice that agents run on connections names (HI-1774): those with connections, on and not on
    * a test home, while no connection was ever added and it wasn't dismissed. Absent: no notice.

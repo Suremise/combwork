@@ -90,6 +90,8 @@ class ProviderService {
   /** The language Combwork shows changed (#797): the windows are sent each provider's install info in it. */
   relabel(): void {
     for (const [id, info] of this.infos) emit({ type: 'provider-install', provider: id, info: shownInstallInfo(info) })
+    // The accounts' own items (HI-3490: ConnectionsView.readiness) are in the window's language too.
+    emit({ type: 'connections-changed' })
   }
 
   /**
@@ -456,8 +458,22 @@ class ProviderService {
     return key
   }
 
+  /**
+   * Starts the setup task on an account (HI-3490, accounts.ts runSandboxSetUp): `cmd` its accountSandboxSetUp, `env` the
+   * account's launch environment. Its terminal is the setup task's own (one at a time); `onExit` once it ends.
+   */
+  runAccountSetUp(id: ProviderId, cmd: CommandSpec, env: Record<string, string>, onExit: () => void): string {
+    const name = provider(id).descriptor.name
+    const shown = (): string => tr(TASK, { task: 'setup', cli: name })
+    const typed = cmd.keys ? { keys: cmd.keys, ready: cmd.readyPattern, busyTitle: cmd.busyTitle, busyScreen: cmd.busyScreen, done: cmd.done } : undefined
+    return this.runTask(id, 'setup', cmd, `${name} setup`, typed, shown, () => void onExit(), { env: { ...env, ...cmd.env }, cwd: cmd.cwd }) // i18n-ignore: the task's name in the log
+  }
+
+  /** Where a CLI signed in per account runs its setup (HI-3490): accounts.ts's runSandboxSetUp, set as it loads. */
+  sandboxSetUp: ((id: ProviderId) => Promise<string>) | null = null
+
   /** Starts a provider task in a terminal and returns its terminal key. */
-  runProviderTask(id: ProviderId, task: ProviderTask, retryUpdate = false, host?: string): string {
+  runProviderTask(id: ProviderId, task: ProviderTask, retryUpdate = false, host?: string): string | Promise<string> {
     const adapter = provider(id)
     const name = adapter.descriptor.name
     const info = this.info(id)
@@ -496,6 +512,8 @@ class ProviderService {
       const cmd = adapter.launch.loginCommand?.(info.path, host) ?? noTask(name, task)
       return this.runTask(id, task, cmd, `${name} sign-in`, undefined, shown, undefined, cmd.env || host ? { ...(cmd.env ? { env: cmd.env } : {}), ...(host ? { keySuffix: host } : {}) } : undefined) // i18n-ignore: the task's name in the log
     }
+    // Signed in per account (HI-3490): its own home is never signed in, so a setup its accounts can run goes on one of them.
+    if (connectionsManaged(id) && adapter.accounts?.accountSandboxSetUp && this.sandboxSetUp) return this.sandboxSetUp(id)
     if (!adapter.install.setupCommand) throw combworkError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Combwork to run.' }), { cli: name }, { kind: 'invalid' })
     const cmd = adapter.install.setupCommand(info.path)
     return this.runTask(id, task, cmd, `${name} setup`, cmd.keys ? { keys: cmd.keys, ready: cmd.readyPattern, busyTitle: cmd.busyTitle, busyScreen: cmd.busyScreen, done: cmd.done } : undefined, shown, undefined, { env: cmd.env, cwd: cmd.cwd })
