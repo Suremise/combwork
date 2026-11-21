@@ -1930,8 +1930,9 @@ says how the platform would answer, and where it is weaker than Git.
 | authorship | Author field + Combwork's records. | Same. | Same. |
 | observe | `.jj/repo/op_heads` (each operation), read with `--ignore-working-copy`. | `.hg/store`, `.hg/dirstate`, `.hg/bookmarks`. | `.svn/wc.db`. |
 
-**Fits** (1.0's paper check; HI-2781's spike on a real jj corrected its advance row, and §16.3.6 holds what jj
-won't support as gates): jj and hg fit every capability, with two contract points the Git adapter doesn't exercise but the
+**Fits** (1.0's paper check; HI-2781's spike on a real jj corrected its advance row, and 1.5.0's
+gates recorded what jj wouldn't support until 1.7.0 removed jj, §16.3.6, *jj removed*; they're kept at
+`jj-support-final`): jj and hg fit every capability, with two contract points the Git adapter doesn't exercise but the
 interface now carries: **readiness** (jj stores conflicts in commits) and **explicit snapshots** (jj records the
 working copy when read). hg's target advance is not atomic from the command line: a known weakness for when hg is
 built, written down here so it isn't discovered then. Subversion has no local commits, so "submit a revision" means
