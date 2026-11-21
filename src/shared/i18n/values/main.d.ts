@@ -12,10 +12,13 @@ interface CombworkMessageValues {
   'main.accounts.noHome': { cli: string | number; folder: string | number }
   'main.accounts.noName': undefined
   'main.accounts.noProvider': { cli: string | number }
+  'main.accounts.noSandboxSetUp': { cli: string | number }
   'main.accounts.notFound': undefined
   'main.accounts.nothingToKeep': { name: string | number }
   'main.accounts.removeFailed': { name: string | number; error: string | number }
   'main.accounts.running': { name: string | number }
+  'main.accounts.sandboxNoAccount': { cli: string | number }
+  'main.accounts.sandboxSetAlready': { cli: string | number }
   'main.accounts.serverOnly': { cli: string | number }
   'main.accounts.setUpCancelled': { name: string | number }
   'main.accounts.usageMove.bad': undefined

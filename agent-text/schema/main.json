@@ -55,6 +55,11 @@
       "cli": "plain"
     }
   },
+  "main.accounts.noSandboxSetUp": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
   "main.accounts.notFound": {
     "placeholders": {}
   },
@@ -72,6 +77,16 @@
   "main.accounts.running": {
     "placeholders": {
       "name": "plain"
+    }
+  },
+  "main.accounts.sandboxNoAccount": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
+  "main.accounts.sandboxSetAlready": {
+    "placeholders": {
+      "cli": "plain"
     }
   },
   "main.accounts.serverOnly": {

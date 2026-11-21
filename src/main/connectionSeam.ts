@@ -37,6 +37,18 @@ function userHomeOf(homeEnv: string): string {
   return (p && signInConnections(p)?.userHome) ?? '.claude'
 }
 
+/** The folders of a provider's sign-in accounts, in the one order of accounts (accounts.ts sets it as it loads). */
+let homesOf: (id: ProviderId) => readonly string[] = () => []
+export function setAccountHomes(fn: (id: ProviderId) => readonly string[]): void {
+  homesOf = fn
+}
+
+/**
+ * The folders of a provider's sign-in accounts, in the one order (HI-3490: what an adapter reads across them, Codex's
+ * sandbox fallback), without importing the accounts themselves.
+ */
+export const accountHomes = (id: ProviderId): readonly string[] => homesOf(id)
+
 /**
  * Whether the provider's sign-in belongs to its connections (it has them, and the test seam isn't on; since S8, HI-1774,
  * for everyone): its CLI's own home is then never checked or signed in by Combwork, and its settings aren't read for its

@@ -67,8 +67,12 @@ interface CombworkMessageValues {
   'providers.codex.nativeCombwork': { file: string | number }
   'providers.codex.sandbox.default': undefined
   'providers.codex.sandbox.needed': undefined
+  'providers.codex.sandbox.neededFor': { n: number; names: string | number }
+  'providers.codex.sandbox.noAccount': undefined
   'providers.codex.sandbox.nonAdmin': undefined
   'providers.codex.sandbox.nonAdminUsed': undefined
+  'providers.codex.sandbox.nonAdminUsedBy': { n: number; names: string | number }
+  'providers.codex.sandbox.openConnections': undefined
   'providers.codex.sandbox.setUp': undefined
   'providers.codex.sandbox.setUpAction': undefined
   'providers.codex.sandbox.upgrade': undefined

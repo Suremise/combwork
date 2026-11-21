@@ -43,6 +43,10 @@
     "defaultMessage": "{cli} can't have sign-in connections in Combwork yet.",
     "description": "An error: connections were asked for a coding agent CLI ({cli}: \"Codex\") that Combwork keeps no connections for."
   },
+  "main.accounts.noSandboxSetUp": {
+    "defaultMessage": "{cli} has no sandbox setup on its accounts.",
+    "description": "An error (HI-3490): a sandbox setup was asked of a coding agent CLI ({cli}: \"Codex\") that has none to run on an account."
+  },
   "main.accounts.notFound": {
     "defaultMessage": "There is no such connection.",
     "description": "An error: a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile)."
@@ -58,6 +62,14 @@
   "main.accounts.running": {
     "defaultMessage": "{name} has agents running on it: stop them, then remove it.",
     "description": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or one is starting."
+  },
+  "main.accounts.sandboxNoAccount": {
+    "defaultMessage": "{cli} sets up its sandbox on one of your {cli} accounts, and none on in this workspace is signed in. Sign one in, or turn one on here, in Settings → Accounts & Connections.",
+    "description": "An error (HI-3490): Provider Setup's sandbox Set up for a coding agent CLI ({cli}: \"Codex\") found no account of it on in the workspace that is signed in, so it didn't start the CLI (it would only show its sign-in). Settings → Accounts & Connections names a section."
+  },
+  "main.accounts.sandboxSetAlready": {
+    "defaultMessage": "{cli}'s sandbox is already set up for every {cli} account on in this workspace.",
+    "description": "An error (HI-3490): Provider Setup's sandbox Set up for a coding agent CLI ({cli}: \"Codex\") was asked for, but every account of it on in the workspace already has its default sandbox."
   },
   "main.accounts.serverOnly": {
     "defaultMessage": "{cli} reaches a server of yours only: add a server connection.",

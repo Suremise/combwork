@@ -573,6 +573,16 @@ export function shownInstallInfo(info: AgentInstallInfo): AgentInstallInfo {
   })
 }
 
+/** Readiness items as the window shows them (HI-3490: the accounts' own, in the connections view), in the language shown. */
+export const shownIssues = (issues: ReadinessIssue[]): ReadinessIssue[] =>
+  issuesIn(issues, (s) => {
+    const t = INSTALL_TEXT.get(s)
+    return t === undefined ? s : shownText(t)
+  })
+
+const issuesIn = (issues: ReadinessIssue[], shown: (s: string) => string): ReadinessIssue[] =>
+  issues.map((r) => ({ ...r, message: shown(r.message), ...(r.action ? { action: { ...r.action, label: shown(r.action.label) } } : {}), ...(r.detail ? { detail: r.detail.map(shown) } : {}) }))
+
 /** A provider's install info as an agent reads it (the Agent API's status): Combwork's own words in its dialect (dialects, HI-2440). */
 export const agentInstallInfo = (info: AgentInstallInfo): AgentInstallInfo => installInfoIn(info, (s) => agentField(s, INSTALL_TEXT.get(s)))
 
@@ -580,7 +590,7 @@ function installInfoIn(info: AgentInstallInfo, shown: (s: string) => string): Ag
   return {
     ...info,
     ...(info.updateRetry ? { updateRetry: { message: shown(info.updateRetry.message), label: shown(info.updateRetry.label) } } : {}),
-    ...(info.readiness ? { readiness: info.readiness.map((r) => ({ ...r, message: shown(r.message), ...(r.action ? { action: { ...r.action, label: shown(r.action.label) } } : {}), ...(r.detail ? { detail: r.detail.map(shown) } : {}) })) } : {}),
+    ...(info.readiness ? { readiness: issuesIn(info.readiness, shown) } : {}),
     ...(info.notes ? { notes: info.notes.map(shown) } : {})
   }
 }
