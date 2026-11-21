@@ -89,9 +89,29 @@
     "note": "Provider Setup and Settings → Providers: Codex's Windows sandbox isn't set up yet.",
     "audience": "both"
   },
+  "providers.codex.sandbox.neededFor": {
+    "text": "{n, plural, one {Codex needs a one-time setup of its Windows sandbox for {names}; until then its agents ask before every command.} other {Codex needs a one-time setup of its Windows sandbox for {names}; until then their agents ask before every command.}}",
+    "note": "Provider Setup and Settings → Providers (HI-3490): Codex's Windows sandbox isn't set up for the Codex accounts named ({names}: the user's names for them, joined, \"Work and Personal\"; {n}: how many), which are on in this workspace.",
+    "audience": "both"
+  },
+  "providers.codex.sandbox.noAccount": {
+    "text": "**Set up** runs Codex on one of your Codex accounts, and none on in this workspace is signed in. Sign one in, or turn one on here (**On here**), in Settings → Accounts & Connections, then come back to set up the sandbox.",
+    "note": "Provider Setup, under Codex's sandbox setup (Windows; HI-3490): why there is no Set up button, but Open Accounts & Connections. **…** marks bold text: keep the marks. On here is the switch on each account's row in Settings → Accounts & Connections.",
+    "audience": "both"
+  },
   "providers.codex.sandbox.nonAdminUsed": {
     "text": "Codex uses its non-admin sandbox.",
     "note": "Provider Setup and Settings → Providers: Codex runs commands in its non-admin sandbox (Windows), which can be upgraded.",
+    "audience": "both"
+  },
+  "providers.codex.sandbox.nonAdminUsedBy": {
+    "text": "{n, plural, one {{names} uses Codex's non-admin sandbox.} other {{names} use Codex's non-admin sandbox.}}",
+    "note": "Provider Setup and Settings → Providers (HI-3490): the Codex accounts named ({names}: the user's names for them, joined; {n}: how many) run commands in Codex's non-admin sandbox (Windows), which can be upgraded.",
+    "audience": "both"
+  },
+  "providers.codex.sandbox.openConnections": {
+    "text": "Open Accounts & Connections",
+    "note": "Provider Setup's button (HI-3490), in place of Codex's sandbox Set up when no Codex account on in this workspace is signed in: opens Settings → Accounts & Connections.",
     "audience": "both"
   },
   "providers.codex.sandbox.setUpAction": {
