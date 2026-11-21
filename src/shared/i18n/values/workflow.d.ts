@@ -583,6 +583,8 @@ interface CombworkMessageValues {
   'workflow.slots.copy': undefined
   'workflow.slots.copyDesc': undefined
   'workflow.slots.desc': undefined
+  'workflow.slots.detachFailedHint': { said: string; error: string | number; target: string | number; command: string | number }
+  'workflow.slots.detachFailedState': { target: string | number }
   'workflow.slots.divergent': { same: string; folder: string | number; head: string | number }
   'workflow.slots.divergentNext': { folder: string | number; head: string | number }
   'workflow.slots.divergentTitle': { slot: string | number }

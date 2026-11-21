@@ -2022,8 +2022,12 @@ export interface SlotView {
   forgotten?: { generation: string }
   /** HI-3464: free and gone, kept for no card (its folder missing, or there but not a worktree git lists): Remove… forgets it. */
   goneFree?: true
-  /** HI-3465: free, with a git operation left under way in it (git's word for it), as its last settle found it, and since when. */
-  operation?: { what: string; since: number }
+  /**
+   * HI-3465: free, with a git operation left under way in it (git's word for it), as its last settle found it, and since when.
+   * HI-3467: `what` `detach`: its detach at `target` failed in settles in a row (shown once it repeats), `error` git's own
+   * error line (English, never translated; '' when git said none: the target's branch isn't there).
+   */
+  operation?: { what: string; since: number; error?: string; target?: string }
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */

@@ -7867,6 +7867,14 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   the finish's check now stops new cases at their source. That check (`submit.clean`) refuses a submission while one
   is under way in the card's folder, as it did for a merge's, rebase's, cherry-pick's and revert's markers, now with the
   sequencer and a bisect too (listed as `(sequencer)`, `(BISECT_LOG)`).
+- **A detach that keeps failing** (HI-3467): a clean free Git slot whose detach at its target fails for any other reason
+  (an index lock, files in the way, git unable to read its head or the target's, the target's branch gone; not its
+  card's own work, which keeps it) stays not ready, and the same record (`slot_operation:`, `what` `detach`) keeps git's
+  error line, the settles in a row that failed so (`tries`) and the first one's time. The second in a row tells the user
+  once (a notice naming the slot, its target, git's error, its folder and `git switch --detach <target>`, the way to do
+  it by hand), and only from then does Slots and copies show *Can't be moved back to …* with git's error: a failure the
+  next look doesn't repeat (a lock another git held for a moment) is never told. The first look whose detach works, or
+  that finds the slot otherwise ready, gone or dirty, clears it. jj's slots keep their own path (HI-3468 removes jj).
 - **Operations** (HR1's round 1): warming for a lease and removal own the slot from the write that starts them to the
   write that ends them (`op` on its row: a token every one of their writes checks, and the holder's pid and start).
   Nothing lends, adopts or removes a slot meanwhile; the same card asking again is told it is being set up. Another

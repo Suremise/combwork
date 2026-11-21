@@ -366,6 +366,8 @@ interface CombworkMessageValues {
   'main.server.url.remoteHttp': undefined
   'main.server.url.scheme': undefined
   'main.server.url.userinfo': undefined
+  'main.slots.detachFailed.message': { said: string; error: string | number; target: string | number; slot: string | number; folder: string | number; command: string | number }
+  'main.slots.detachFailed.title': { slot: string | number; target: string | number }
   'main.slots.operation.message': { slot: string | number; folder: string | number; command: string | number }
   'main.slots.operation.title': { slot: string | number; what: string | number }
   'main.storage.claimed': undefined

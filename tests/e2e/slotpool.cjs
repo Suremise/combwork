@@ -8,6 +8,8 @@
 //   new slot, slot-a stays gone with Remove… in Slots and copies, which forgets it and leaves the folder as it is.
 // - HI-3465: that slot released with a revert left under way (nothing uncommitted, git's sequencer left): told once,
 //   shown in Slots and copies with `git revert --abort`, not lent; ended there, it is lent again.
+// - HI-3467: then released on its card's line with a stale index.lock: git refuses each detach; told once with git's
+//   error and `git switch --detach`, shown in Slots and copies, not lent; the lock gone, it is lent again.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (no agent is started).
 // Dev build only (#1578): its slots are lent and released through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
@@ -160,6 +162,25 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     g(['revert', '--abort'])
     const freed = await op({ op: 'lend', agent: b1.id, card: 106 })
     check('ended in its folder, slot-b is lent again', freed.ok && freed.slot.name === 'slot-b' && !(await slot('slot-b'))?.operation, JSON.stringify(freed))
+
+    // --- HI-3467: released on its card's line with a stale index.lock (a git that crashed): git refuses each detach. The
+    // first failure is only recorded; the second (the next lend's look) is told once, and shown; the lock gone, it is lent.
+    g(['switch', '-q', '-c', 'cw/card-106'])
+    const lock = path.join(g(['rev-parse', '--absolute-git-dir']).trim(), 'index.lock')
+    fs.writeFileSync(lock, '')
+    check('B1 releases slot-b with a stale index.lock', (await op({ op: 'release', lease: freed.lease.id, why: 'done' })) === true)
+    // The release's own settle is its first look; the lend's (or the app's own pass after the release) the second. That
+    // the first alone is never told is the unit test's (tests/slots.test.ts, HI-3467): here the order isn't the test's.
+    const toldDetach = page.locator('.toast', { hasText: 'back to' })
+    check('…not ready, so not lent', (await op({ op: 'lend', agent: b1.id, card: 107 })).refusal?.why === 'noSlot', JSON.stringify(await slot('slot-b')))
+    check('…failing again, the user is told with git’s error and the way out', !!(await until(async () => (await toldDetach.count()) === 1, HUNG_MS)) && /index\.lock/.test(await toldDetach.innerText()) && (await toldDetach.innerText()).includes('git switch --detach'), await toldDetach.innerText().catch(() => ''))
+    const detachRow = form.locator('.workflow-slots-table tr[data-slot="slot-b"]')
+    check('Slots and copies shows slot-b can’t be moved back, with git’s error', !!(await until(async () => (await detachRow.locator('[data-operation="detach"]').count()) === 1, HUNG_MS)) && /Can.t be moved back to/.test(await detachRow.innerText()) && /index\.lock/.test(await detachRow.innerText()), await detachRow.innerText().catch(() => ''))
+    await detachRow.screenshot({ path: path.join(fx.shots, 'slotpool-5-detach-failed.png') })
+    check('…looked at again, it is told only the once', (await op({ op: 'lend', agent: b1.id, card: 107 })).refusal?.why === 'noSlot' && (await toldDetach.count()) === 1)
+    fs.rmSync(lock)
+    const unlocked = await op({ op: 'lend', agent: b1.id, card: 107 })
+    check('the lock gone, slot-b is detached at its next look and lent again, nothing shown', unlocked.ok && unlocked.slot.name === 'slot-b' && !(await slot('slot-b'))?.operation, JSON.stringify(unlocked))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

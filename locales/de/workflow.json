@@ -553,6 +553,8 @@
   "workflow.slots.copy": "In neue Slots kopierte Dateien",
   "workflow.slots.copyDesc": "Von Git ignorierte Dateien, die aus dem Projektordner in jeden neuen Slot kopiert werden, ein Muster pro Zeile, etwa .env-Dateien.",
   "workflow.slots.desc": "Diese Einstellungen werden gespeichert, sobald du sie änderst, getrennt von den Optionen oben.",
+  "workflow.slots.detachFailedHint": "{said, select, yes {Git meldet: {error}} other {Git findet {target} nicht.}} Beseitige in seinem Ordner, was im Weg ist, oder führe dort {command} aus",
+  "workflow.slots.detachFailedState": "Kann nicht zurück auf {target} gesetzt werden",
   "workflow.slots.fromSetup": "Aus dem Setup-Befehl des Projekts vor 1.0",
   "workflow.slots.gitFiles": "Submodule und LFS einrichten",
   "workflow.slots.gitFilesDesc": "Checkt vor dem Setup-Skript die Submodule aus und holt die Git-LFS-Dateien, in jedem neuen Slot, jeder Review- und Check-Kopie und im Ordner der Merge-Warteschlange. Ohne das haben sie leere Submodul-Ordner und LFS-Zeigerdateien.",

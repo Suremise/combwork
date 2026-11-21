@@ -13,7 +13,7 @@ import { type ChildProcess } from 'child_process'
 import { mkdirSync } from 'original-fs'
 import { basename, join } from 'path'
 import { agentMsg, inDefaultDialect, inDialectOf, say, type AgentMsg, type AgentValues } from '../shared/agentText'
-import { gitOperationEnd } from '../shared/gitOperations'
+import { gitDetachCommand, gitOperationEnd } from '../shared/gitOperations'
 import { msg, tr } from '../shared/i18n'
 import { tell } from './notify'
 import { app } from 'electron'
@@ -30,7 +30,7 @@ import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
 import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
-import { builderCountOf, folderThere, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type RecoverOutcome, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
+import { builderCountOf, DETACH_FAILED, folderThere, operationTold, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type RecoverOutcome, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
 import { onCombworkEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
@@ -150,6 +150,15 @@ export function sweepSealsOf(root: string, o: { once?: boolean } = {}): void {
 const OPERATION = {
   title: msg({ id: 'main.slots.operation.title', defaultMessage: '{slot} has an unfinished git {what}', description: "HI-3465: a notice's title: a git operation was left under way in a slot (a worktree Combwork lends to cards), so Combwork can't lend it. {slot} is the slot's name; {what} is git's word for the operation (merge, rebase, am, cherry-pick, revert or bisect: keep it as it is)." }),
   message: msg({ id: 'main.slots.operation.message', defaultMessage: "Combwork can't lend {slot} to another card until it's finished. Finish it in {folder}, or end it there with {command}. Combwork never ends it itself, and lends the slot again once nothing is under way in it.", description: "HI-3465: the notice's text below main.slots.operation.title. {slot} is the slot's name, {folder} its folder's path, {command} the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is)." })
+}
+
+/**
+ * HI-3467: the notice, told once, of a free slot whose detach at its target failed again (git's error kept in English,
+ * never translated: it is git's own). The way out: put right what git names, or detach it by hand (`detachCommand`).
+ */
+const DETACH = {
+  title: msg({ id: 'main.slots.detachFailed.title', defaultMessage: "Combwork can't move {slot} back to {target}", description: "HI-3467: a notice's title: Combwork tried more than once to put a free slot (a worktree it lends to cards) back at the head of its target branch {target} for its next card, and git refused each time, so the slot isn't lent. {slot} is the slot's name." }),
+  message: msg({ id: 'main.slots.detachFailed.message', defaultMessage: "{said, select, yes {Git said: {error}} other {Git can't find {target}.}} Until it can, Combwork doesn't lend {slot} to another card. Put right what's in the way in {folder}, or run {command} there yourself: Combwork tries again whenever it looks at its slots, and lends {slot} again once that works.", description: "HI-3467: the notice's text below main.slots.detachFailed.title. {error} is git's own error line, in English (keep it as it is); said: yes when git gave one, else no (the branch {target} isn't there): keep the select keys. {slot} is the slot's name, {folder} its folder's path, {command} the git command that does it by hand (git switch --detach main: keep it as it is)." })
 }
 
 /** A slot run's errors (dialects, HI-2447): its end's error, kept on the slot by the pool (said in the Default there). */
@@ -475,7 +484,13 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       // A finished card's slot asked about only once its settle is over (HI-2170): the slots' pass looks again.
       looked: () => slotFreed(ws, projectPath),
       // HI-3465: a git operation left under way in a free slot, told once (the pool records it); Slots and copies shows it.
-      operationFound: (slot, folder, what) => {
+      operationFound: (slot, folder, what, failed) => {
+        // HI-3467: a detach that failed again, with git's own error and the command that does it by hand.
+        if (what === DETACH_FAILED && failed) {
+          const values = { slot, folder, target: failed.target, error: failed.error, said: failed.error ? 'yes' : 'no', command: gitDetachCommand(failed.target) }
+          tell({ kind: 'warning', level: 'warning', title: tr(DETACH.title, values), message: tr(DETACH.message, values), apiTitle: DETACH.title.defaultMessage, projectPath, id: `slot-operation:${projectPath}:${slot}` })
+          return
+        }
         const values = { slot, what, folder, command: gitOperationEnd(what) ?? what }
         tell({ kind: 'warning', level: 'warning', title: tr(OPERATION.title, values), message: tr(OPERATION.message, values), apiTitle: OPERATION.title.defaultMessage, projectPath, id: `slot-operation:${projectPath}:${slot}` })
       },
@@ -1024,8 +1039,10 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       // HI-3464: free and gone (its folder missing, or there but not a worktree): Remove… forgets it.
       const goneFree = !jj && !l && pool.goneRemovable(s)
       // HI-3465: a git operation left under way in it, as its last settle found it (free slots only: a lease's is its agent's).
-      const operation = !l ? pool.operation(s.name) : null
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj && s.platform ? { platform: s.platform } : {}), ...(stale ? { stale: true as const, ...(stale === 'abandoned' ? { staleWhy: 'abandoned' as const } : {}) } : {}), ...(keptFor !== null ? { keptFor, ...(record?.edit ? { keptEdit: true as const } : {}) } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}), ...(goneFree ? { goneFree: true as const } : {}), ...(operation ? { operation: { what: operation.what, since: operation.since } } : {}) }
+      // HI-3467: or its detach at the target failing, once that has repeated (as the user is told).
+      const recorded = !l ? pool.operation(s.name) : null
+      const operation = operationTold(recorded) ? recorded : null
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj && s.platform ? { platform: s.platform } : {}), ...(stale ? { stale: true as const, ...(stale === 'abandoned' ? { staleWhy: 'abandoned' as const } : {}) } : {}), ...(keptFor !== null ? { keptFor, ...(record?.edit ? { keptEdit: true as const } : {}) } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}), ...(goneFree ? { goneFree: true as const } : {}), ...(operation ? { operation: { what: operation.what, since: operation.since, ...(operation.what === DETACH_FAILED ? { error: operation.error ?? '', ...(s.target ? { target: s.target } : {}) } : {}) } } : {}) }
     })
   )
 }

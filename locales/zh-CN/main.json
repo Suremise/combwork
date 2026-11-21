@@ -364,6 +364,8 @@
   "main.server.url.remoteHttp": "其他计算机上的服务器需要使用 https://。普通的 http:// 仅用于此电脑上的服务器（localhost）。",
   "main.server.url.scheme": "URL 必须以 https:// 开头（此电脑上的服务器可用 http://）。",
   "main.server.url.userinfo": "URL 中不能包含用户名或密码：请在单独的字段中填写密钥。",
+  "main.slots.detachFailed.message": "{said, select, yes {Git 报告：{error}} other {Git 找不到 {target}。}}在能移回之前，Combwork 不会把 {slot} 借给其他卡片。请在 {folder} 中清除妨碍它的问题，或自己在那里运行 {command}：Combwork 每次检查槽位时都会重试，一旦成功就会再次借出 {slot}。",
+  "main.slots.detachFailed.title": "Combwork 无法把 {slot} 移回 {target}",
   "main.slots.operation.message": "在它完成之前，Combwork 无法把 {slot} 借给其他卡片。请在 {folder} 中完成它，或在那里运行 {command} 结束它。Combwork 从不自行结束它，一旦其中没有进行中的操作，就会再次借出该槽位。",
   "main.slots.operation.title": "{slot} 有未完成的 git {what}",
   "main.storage.claimed": "该文件夹又属于某个会话了。",

@@ -20,3 +20,12 @@ export function gitOperationEnd(what: string): string | null {
       return null
   }
 }
+
+/** HI-3467: a slot's operation record (and SlotView's `operation`) for a detach at its target that failed, not a git operation. */
+export const DETACH_FAILED = 'detach'
+
+/**
+ * HI-3467: the command that puts a slot's folder at its target branch's head, as Combwork's own detach does (the way out
+ * Combwork names when that keeps failing). A command, never translated.
+ */
+export const gitDetachCommand = (target: string): string => `git switch --detach ${target}` // i18n-ignore: a git command

@@ -553,6 +553,8 @@
   "workflow.slots.copy": "Arquivos copiados para os novos slots",
   "workflow.slots.copyDesc": "Arquivos ignorados pelo Git copiados da pasta do projeto para cada slot novo, um padrão por linha, como arquivos .env.",
   "workflow.slots.desc": "Estas configurações são salvas assim que você as muda, ao contrário das opções acima.",
+  "workflow.slots.detachFailedHint": "{said, select, yes {O Git diz: {error}} other {O Git não encontra {target}.}} Corrija o que está atrapalhando na pasta dele, ou execute {command} ali",
+  "workflow.slots.detachFailedState": "Não é possível voltar para {target}",
   "workflow.slots.fromSetup": "Do comando de preparação do projeto anterior à 1.0",
   "workflow.slots.gitFiles": "Preparar submódulos e LFS",
   "workflow.slots.gitFilesDesc": "Antes do script de preparação, faz o checkout dos submódulos e baixa os arquivos do Git LFS em cada slot novo, em cada cópia de revisão e de verificação e na pasta da fila de merge. Sem isso, eles ficam com pastas de submódulos vazias e arquivos ponteiro do LFS.",

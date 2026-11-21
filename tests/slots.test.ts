@@ -15,7 +15,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
-import { asideKey, fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, NOT_IN_PLACE, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
+import { asideKey, fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, NOT_IN_PLACE, operationTold, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { say } from '../src/shared/agentText'
 import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
@@ -165,7 +165,7 @@ function world(o: { setup?: string; builders?: number; port?: WorkspacePort } = 
       ended: (l, s) => void set.ended.push(`${l.id} ${s.name}`),
       writerOver: (wr) => set.writersOver.has(wr.run),
       looked: (name, state) => void set.looked.push(`${pid} ${name} ${state}`),
-      operationFound: (name, _folder, what) => void set.operations.push(`${name} ${what}`),
+      operationFound: (name, _folder, what, failed) => void set.operations.push(failed ? `${name} ${what} at ${failed.target}: ${failed.error}` : `${name} ${what}`),
       now: () => clock.now,
       ...(o.port ? { workspaces: o.port } : {})
     })
@@ -965,6 +965,64 @@ describe('HI-3465: a git operation left under way in a free slot', { timeout: ti
     expect(operationSync(r.slot.folder)).toBe('am')
     rmSync(join(gitDir, 'rebase-apply'), { recursive: true })
     expect(await gitWorkspacePort.dirty(r.slot.folder)).toEqual([])
+  })
+
+  it("HI-3467: a detach that keeps failing for another reason is told once, with git's error, and cleared once one works", async () => {
+    // Git refusing the switch for as long as `fail.detach` says (a lock, files in the way…), its own words kept.
+    const fail = { detach: true, calls: 0 }
+    const port: WorkspacePort = {
+      ...gitWorkspacePort,
+      detach: async (folder, revision, o) => {
+        fail.calls++
+        return fail.detach ? { ok: false, err: "fatal: Unable to create 'x/index.lock': File exists.\n\nAnother git process seems to be running" } : gitWorkspacePort.detach(folder, revision, o)
+      }
+    }
+    const w = world({ builders: 1, port })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    // On its card's line, as a start leaves it: its settle detaches it at the target.
+    sh(r.slot.folder, 'switch', '-q', '-c', 'cw/card-1')
+    // Its release settles it: the first look.
+    await w.pool.release(r.lease.id, 'done')
+    // The first failure: recorded, not told (it may be gone at the next look), not shown, not lent.
+    expect(fail.calls).toBe(1)
+    expect(w.store.slot('slot-a')?.state).not.toBe('ready')
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'detach', tries: 1, error: "fatal: Unable to create 'x/index.lock': File exists." })
+    expect(operationTold(w.pool.operation('slot-a'))).toBe(false)
+    expect(w.set.operations).toEqual([])
+    // It repeats: told once, naming git's error and the target; shown from then on.
+    await w.pool.refresh()
+    expect(fail.calls).toBe(2)
+    expect(w.set.operations).toEqual(["slot-a detach at main: fatal: Unable to create 'x/index.lock': File exists."])
+    expect(operationTold(w.pool.operation('slot-a'))).toBe(true)
+    const since = w.pool.operation('slot-a')!.since
+    // Again and again (each refresh, a lend's look): never told again, never lent, its first failure's time kept.
+    await w.pool.refresh()
+    expect(await w.pool.lend({ agent: 'a2', card: 2 })).toMatchObject({ ok: false, refusal: { why: 'noSlot' } })
+    expect(fail.calls).toBeGreaterThanOrEqual(3)
+    expect(w.set.operations).toHaveLength(1)
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'detach', since })
+    // Git lets it switch now: the next look detaches it, the record goes, and the slot is lent again.
+    fail.detach = false
+    const again = await lent(w, { agent: 'a2', card: 2 })
+    expect(again.slot.name).toBe('slot-a')
+    expect(w.pool.operation('slot-a')).toBeNull()
+    expect(w.set.operations).toHaveLength(1)
+  })
+
+  it('HI-3467: a detach that failed once and then works is never told', async () => {
+    const fail = { detach: true }
+    const port: WorkspacePort = { ...gitWorkspacePort, detach: async (folder, revision, o) => (fail.detach ? ((fail.detach = false), { ok: false, err: 'fatal: something in the way' }) : gitWorkspacePort.detach(folder, revision, o)) }
+    const w = world({ builders: 1, port })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    // On its card's line, as a start leaves it: its settle detaches it at the target.
+    sh(r.slot.folder, 'switch', '-q', '-c', 'cw/card-1')
+    // Its release settles it: the first look.
+    await w.pool.release(r.lease.id, 'done')
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'detach', tries: 1 })
+    await w.pool.refresh()
+    expect(w.pool.operation('slot-a')).toBeNull()
+    expect(w.store.slot('slot-a')?.state).toBe('ready')
+    expect(w.set.operations).toEqual([])
   })
 })
 
