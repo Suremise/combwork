@@ -1459,6 +1459,14 @@
     "defaultMessage": "The URL can't hold a user name or password: give the key in its own field.",
     "description": "An error saving a server connection's base URL: it has user:password@ in it, which Combwork won't keep."
   },
+  "main.slots.detachFailed.message": {
+    "defaultMessage": "{said, select, yes {Git said: {error}} other {Git can't find {target}.}} Until it can, Combwork doesn't lend {slot} to another card. Put right what's in the way in {folder}, or run {command} there yourself: Combwork tries again whenever it looks at its slots, and lends {slot} again once that works.",
+    "description": "HI-3467: the notice's text below main.slots.detachFailed.title. {error} is git's own error line, in English (keep it as it is); said: yes when git gave one, else no (the branch {target} isn't there): keep the select keys. {slot} is the slot's name, {folder} its folder's path, {command} the git command that does it by hand (git switch --detach main: keep it as it is)."
+  },
+  "main.slots.detachFailed.title": {
+    "defaultMessage": "Combwork can't move {slot} back to {target}",
+    "description": "HI-3467: a notice's title: Combwork tried more than once to put a free slot (a worktree it lends to cards) back at the head of its target branch {target} for its next card, and git refused each time, so the slot isn't lent. {slot} is the slot's name."
+  },
   "main.slots.operation.message": {
     "defaultMessage": "Combwork can't lend {slot} to another card until it's finished. Finish it in {folder}, or end it there with {command}. Combwork never ends it itself, and lends the slot again once nothing is under way in it.",
     "description": "HI-3465: the notice's text below main.slots.operation.title. {slot} is the slot's name, {folder} its folder's path, {command} the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is)."

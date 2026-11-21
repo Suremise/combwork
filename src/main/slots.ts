@@ -58,6 +58,7 @@ import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { isPlatformId, ownsWorkspaces, platformName } from '../shared/platform/descriptors'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { idleKey } from '../shared/laneBar'
+import { DETACH_FAILED } from '../shared/gitOperations'
 import { cardRef } from '../shared/projectKeys'
 import type { AppSettings, ProjectConfig, SlotRecoverDivergent, SlotRecovery, WorkspaceConfig } from '../shared/types'
 
@@ -1488,8 +1489,11 @@ export interface PoolDeps {
   renamer?: SlotRenamer
   /** A free slot's settle changed its state (HI-2170): what it is now. A finished card's slot question is looked at again. */
   looked?: (slot: string, state: SlotState) => void
-  /** HI-3465: a free slot's settle found an operation under way in it (`what`, as its platform names it), first since none was. */
-  operationFound?: (slot: string, folder: string, what: string) => void
+  /**
+   * HI-3465: a free slot's settle found an operation under way in it (`what`, as its platform names it), first since none
+   * was. HI-3467: or (`what` DETACH_FAILED) its detach at `target` failed again, `error` git's own words, first since it last worked.
+   */
+  operationFound?: (slot: string, folder: string, what: string, failed?: { error: string; target: string }) => void
   now?: () => number
 }
 
@@ -1682,22 +1686,41 @@ export const owedKey = (project: string, slot: string): string => `slot_settle_o
  */
 export const operationKey = (project: string, slot: string): string => `slot_operation:${project}:${slot}`
 
-/** HI-3465: a slot's operation record (`operationKey`). */
+/**
+ * HI-3465: a slot's operation record (`operationKey`). HI-3467: `what` is `detach` for a Git slot whose detach at its
+ * target failed (not for its card's own work: that is kept): `error` is git's own error line, `tries` the settles in a
+ * row that failed so (the user is told at the second, the failure then said to repeat), `since` the first of them.
+ */
 export interface SlotOperationRecord {
   what: string
   since: number
+  error?: string
+  tries?: number
 }
+
+/** HI-3467: the record's `what` for a detach that failed (shared/gitOperations). */
+export { DETACH_FAILED }
+
+/** HI-3467: the settles in a row whose detach failed before the user is told (once: the failure repeats). */
+export const DETACH_TELL_AT = 2
+
+/** HI-3467: git's error kept in the record and the notice, at most this long. */
+const DETACH_ERROR_MAX = 300
 
 /** A stored operation record, or null (none, or not one). */
 export function operationOf(v: string | undefined): SlotOperationRecord | null {
   if (!v) return null
   try {
     const o = JSON.parse(v) as Partial<SlotOperationRecord>
-    return typeof o.what === 'string' && typeof o.since === 'number' ? { what: o.what, since: o.since } : null
+    if (typeof o.what !== 'string' || typeof o.since !== 'number') return null
+    return { what: o.what, since: o.since, ...(typeof o.error === 'string' ? { error: o.error } : {}), ...(typeof o.tries === 'number' ? { tries: o.tries } : {}) }
   } catch {
     return null
   }
 }
+
+/** HI-3467: a record that is told and shown: an operation under way, or a detach whose failure repeated. */
+export const operationTold = (r: SlotOperationRecord | null): boolean => !!r && (r.what !== DETACH_FAILED || (r.tries ?? 0) >= DETACH_TELL_AT)
 
 /** The default scheduler of the owed pass's wake: an unref'd timer. */
 const laterBy = (fn: () => void, ms: number): { cancel(): void } => {
@@ -2250,6 +2273,10 @@ export class SlotPool {
     // or not looked at (undefined: the record left as it is). `told`: first found by this settle, told once it is written.
     let operation: string | null | undefined
     let told: string | null = null
+    // HI-3467: its detach at the target failed (a Git slot's, not its card's own work kept): git's error line, recorded
+    // with the settles in a row it failed; told once, when it repeats (DETACH_TELL_AT), till a later look succeeds.
+    let detachFailed: string | null = null
+    let toldDetach: string | null = null
     const latch: QuietLatch = { lostQuiet: false }
     try {
       // Tracked (awaited by close, its token live) from before its first wait, so a close never misses it and no look of
@@ -2275,6 +2302,7 @@ export class SlotPool {
           // again (HR2's HI-2014 round 1, finding 4), never a ready slot left on its card's line.
           // Git couldn't list the worktrees (HI-2810): the slot as it was, the next look tries again.
           const detached = now === 'ready' && s.state !== 'ready' ? await this.detach(s, token, latch) : null
+          if (detached !== null && typeof detached === 'object' && !ownsWorkspaces(this.portOf(s).platform)) detachFailed = detached.failed
           const last = detached === 'kept' ? this.store.lastLease(s.name) : null
           // The card its work is kept for: the last lease's own, else (a lane's lease on a slot taken back for its card,
           // HI-3032) the record already kept for it at this slot's generation, never dropped for a lease of no card.
@@ -2331,7 +2359,15 @@ export class SlotPool {
               else if (held) db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(heldKey(this.store.project, name), JSON.stringify(held)) // agent-protocol: SQL
               if (end.owed === 'set') db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(owedKey(this.store.project, name), JSON.stringify({ why: latch.why ?? 'busy', since: Date.now() })) // agent-protocol: SQL
               else if (end.owed === 'clear') db.prepare('DELETE FROM board_meta WHERE key = ?').run(owedKey(this.store.project, name)) // agent-protocol: SQL
-              if (operation !== undefined) {
+              if (detachFailed !== null) {
+                // HI-3467: one more settle in a row whose detach failed; told at the one that makes it repeat.
+                const key = operationKey(this.store.project, name)
+                const had = operationOf((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value) // agent-protocol: SQL
+                const again = had?.what === DETACH_FAILED
+                const tries = again ? (had.tries ?? 1) + 1 : 1
+                db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify({ what: DETACH_FAILED, since: again ? had.since : Date.now(), error: detachFailed, tries })) // agent-protocol: SQL
+                if (tries === DETACH_TELL_AT) toldDetach = detachFailed
+              } else if (operation !== undefined) {
                 const key = operationKey(this.store.project, name)
                 const had = operationOf((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value) // agent-protocol: SQL
                 if (!operation) db.prepare('DELETE FROM board_meta WHERE key = ?').run(key) // agent-protocol: SQL
@@ -2358,6 +2394,10 @@ export class SlotPool {
       if (told) {
         log.info(`${userText(name)} has a git ${told} under way: not lent until it is finished or ended (the user is told)`)
         this.deps.operationFound?.(name, s.folder, told)
+      }
+      if (toldDetach !== null && s.target) {
+        log.warn(`${userText(name)}'s detach at ${userText(s.target)} failed again: not lent until it succeeds (the user is told)`)
+        this.deps.operationFound?.(name, s.folder, DETACH_FAILED, { error: toldDetach, target: s.target })
       }
       // Owed now: the pool's owed pass is asked for (after its pause), after this settle's fenced end. While a pass runs,
       // its own end reads the records (with no await since its last settle) and asks, with its pause grown.
@@ -2569,21 +2609,23 @@ export class SlotPool {
     return s.identity && port.heldCard ? await port.heldCard(s.folder, s.identity) : null
   }
 
-  private async detach(s: Slot, token?: string, latch?: QuietLatch): Promise<'ok' | 'kept' | 'failed'> {
+  /** HI-3467: `failed` with git's error line (its read's or its switch's, in English), or `''` with none to say. */
+  private async detach(s: Slot, token?: string, latch?: QuietLatch): Promise<'ok' | 'kept' | { failed: string }> {
     const last = this.store.lastLease(s.name)
     if (!s.target || !last || (last.kind !== 'card' && last.kind !== 'lane')) return 'ok'
     const port = this.portOf(s)
     const h = await port.heads(s.folder, s.target)
-    if (isUnknown(h.line)) return 'failed'
+    if (isUnknown(h.line)) return { failed: port.errorLine(h.line.detail ?? h.line.what).slice(0, DETACH_ERROR_MAX) }
     if (!h.line) return 'ok'
-    if (isUnknown(h.target) || !h.target) return 'failed'
+    if (isUnknown(h.target)) return { failed: port.errorLine(h.target.detail ?? h.target.what).slice(0, DETACH_ERROR_MAX) }
+    if (!h.target) return { failed: '' }
     // jj's (HI-2866): an owned write settling exactly the card's binding (the line it answered), fenced by this operation
     // with the folder quiet, the target read again right before it. Git ignores the options.
     const owned = ownsWorkspaces(port.platform) ? { identity: s.identity ?? null, fence: latched(token ? this.ownedFence(s, token, null) : { still: () => false }, latch), settles: h.line, target: s.target } : {}
     const r = await port.detach(s.folder, h.target, owned)
     if (!r.ok) {
       log.warn(`detaching ${userText(s.name)} at ${userText(s.target)}: ${userText(r.err.trim())}`)
-      return r.kept ? 'kept' : 'failed'
+      return r.kept ? 'kept' : { failed: port.errorLine(r.err).slice(0, DETACH_ERROR_MAX) }
     }
     log.info(`${userText(s.name)} detached at ${userText(s.target)} (it was on ${userText(h.line)})`)
     return 'ok'

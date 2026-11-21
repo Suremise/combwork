@@ -364,6 +364,8 @@
   "main.server.url.remoteHttp": "A server on another computer needs https://. Plain http:// is only for a server on this PC (localhost).",
   "main.server.url.scheme": "The URL must start with https:// (or http:// for a server on this PC).",
   "main.server.url.userinfo": "The URL can't hold a user name or password: give the key in its own field.",
+  "main.slots.detachFailed.message": "{said, select, yes {Git said: {error}} other {Git can't find {target}.}} Until it can, Combwork doesn't lend {slot} to another card. Put right what's in the way in {folder}, or run {command} there yourself: Combwork tries again whenever it looks at its slots, and lends {slot} again once that works.",
+  "main.slots.detachFailed.title": "Combwork can't move {slot} back to {target}",
   "main.slots.operation.message": "Combwork can't lend {slot} to another card until it's finished. Finish it in {folder}, or end it there with {command}. Combwork never ends it itself, and lends the slot again once nothing is under way in it.",
   "main.slots.operation.title": "{slot} has an unfinished git {what}",
   "main.storage.claimed": "The folder belongs to a session again.",
