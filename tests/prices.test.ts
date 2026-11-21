@@ -19,6 +19,12 @@ describe('estimated cost', () => {
     // The others keep no cache-write price (input's applies).
     expect(modelPrice('codex', 'gpt-6-sol')?.cacheWrite).toBeUndefined()
   })
+  it("prices GPT-6.2 Sol, Codex's default from 0.169, at OpenAI's published rates (HI-3492)", () => {
+    // OpenAI's pricing and model pages (developers.openai.com, 21 Nov 2026): the same as GPT-6.1 Sol's.
+    expect(modelPrice('codex', 'gpt-6.2-sol')).toEqual({ input: 2, cachedInput: 0.1, cacheWrite: 2.5, output: 10 })
+    expect(unpricedModel('codex', 'gpt-6.2-sol')).toBeNull()
+    expect(estimateCost({ ...usage('codex', 'gpt-6.2-sol'), cacheWriteTokens: 0 })).toBeCloseTo(2 + 0.2 + 1, 6)
+  })
   it('a model without a price has an unknown cost, never $0, and says where to add one', () => {
     expect(estimateCost(usage('codex', 'gpt-9-nova'))).toBeNull()
     expect(unpricedModel('codex', 'gpt-9-nova')).toBe('gpt-9-nova')
