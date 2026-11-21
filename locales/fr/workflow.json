@@ -744,8 +744,6 @@
   "workflow.why.target": "Le travail terminé va dans la branche par défaut du dépôt ; en solo, dans la branche sur laquelle est le projet.",
   "workflow.contradiction.jjNeedsSlots": "Avec jj, chaque carte a besoin de son propre dossier : des agents partageant le dossier du projet ne sont pas encore pris en charge.",
   "workflow.contradiction.jjYouIntegrate": "Ce choix est celui d’un autre gestionnaire de versions : avec jj, Combwork ou toi intégrez le travail en déplaçant le signet cible ; avec Git, il est fusionné.",
-  "workflow.form.levelForJj": "Les valeurs par défaut des projets jj.",
-  "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "{card} ne peut pas démarrer avec ces règles : son projet utilise maintenant {platform}.",
   "workflow.refused.platform.changed.next": "Redémarre-la : elle est alors vérifiée selon les règles de {platform}.",
   "workflow.refused.platform.noTarget.message": "{card} ne peut pas démarrer : son projet n’a pas de bookmark cible choisi, celui dans lequel son travail est fusionné.",

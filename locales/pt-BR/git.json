@@ -474,8 +474,6 @@
   "git.vc.fact.jjGone": "O repositório jj não está mais nesta pasta.",
   "git.vc.fact.jjInGit": "Esta pasta é um repositório jj em {root}, não colocado, dentro do repositório Git em {git}: o Combwork não pode usar o jj aqui.",
   "git.vc.jj": "jj",
-  "git.vc.offer.jjFound": "jj encontrado em {root}: mudar para jj?",
-  "git.vc.offer.jjGone": "O repositório jj sumiu: voltar este projeto para {platform}?",
   "git.vc.offer.switchJj": "Mudar para jj…",
   "git.vc.store.autocrlf": "O Git converte aqui as quebras de linha (core.autocrlf). Se este repositório não precisa disso, desative só para ele: execute {command} nele e depois clique em Verificar de novo.",
   "git.vc.store.card": "{project}: {card} {title}, em andamento",

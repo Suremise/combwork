@@ -1639,14 +1639,6 @@
     "defaultMessage": "Git found at {root}: switch to Git?",
     "description": "An offer atop the Version Control tab of a project without version control, after someone ran git init: {root} is the repository root. Combwork never switches by itself."
   },
-  "git.vc.offer.jjFound": {
-    "defaultMessage": "jj found at {root}: switch to jj?",
-    "description": "An offer atop the Version Control tab (HI-2799, HI-2896): a jj (Jujutsu) repository, colocated with Git or not, was found in the project folder. Combwork never switches by itself. Keep jj."
-  },
-  "git.vc.offer.jjGone": {
-    "defaultMessage": "The jj repository is gone: switch this project back to {platform}?",
-    "description": "An offer atop the Version Control tab of a project using jj (HI-2799) whose .jj folder is gone. {platform} is Git or None. Keep jj."
-  },
   "git.vc.offer.notNow": {
     "defaultMessage": "Not Now",
     "description": "A button of the offer to switch version control (atop the Version Control tab): hides the offer until Combwork starts again."

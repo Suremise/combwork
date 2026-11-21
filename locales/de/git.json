@@ -474,8 +474,6 @@
   "git.vc.fact.jjGone": "Das jj-Repository ist aus diesem Ordner verschwunden.",
   "git.vc.fact.jjInGit": "Dieser Ordner ist ein jj-Repository in {root}, nicht colocated, innerhalb des Git-Repositorys in {git}: Combwork kann jj hier nicht verwenden.",
   "git.vc.jj": "jj",
-  "git.vc.offer.jjFound": "jj in {root} gefunden: zu jj wechseln?",
-  "git.vc.offer.jjGone": "Das jj-Repository ist verschwunden: dieses Projekt zurück auf {platform} stellen?",
   "git.vc.offer.switchJj": "Zu jj wechseln…",
   "git.vc.store.autocrlf": "Git wandelt hier Zeilenenden um (core.autocrlf). Braucht dieses Repository das nicht, schalte es nur dafür ab: Führe darin {command} aus und klicke dann auf „Erneut prüfen“.",
   "git.vc.store.card": "{project}: {card} {title}, in Arbeit",

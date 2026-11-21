@@ -153,17 +153,17 @@ const T = {
   levelGit: msg({ id: 'workflow.form.levelGit', defaultMessage: 'Git', description: 'The choice of the defaults for Git projects (glossary 2.1: keep).' }),
   levelForNone: msg({ id: 'workflow.form.levelForNone', defaultMessage: 'The defaults of projects without version control.', description: 'Beside the None · Git choice above workflow defaults, while None is chosen.' }),
   levelForGit: msg({ id: 'workflow.form.levelForGit', defaultMessage: 'The defaults of Git projects.', description: 'Beside the None · Git choice above workflow defaults, while Git is chosen.' }),
-  levelJj: msg({ id: 'workflow.form.levelJj', defaultMessage: 'jj', description: 'The choice of the defaults for projects using jj (Jujutsu, HI-2799). Keep jj: the tool’s name, lower case.' }),
-  levelForJj: msg({ id: 'workflow.form.levelForJj', defaultMessage: 'The defaults of jj projects.', description: 'Beside the None · Git · jj choice above workflow defaults, while jj (Jujutsu, HI-2799) is chosen. Keep jj.' }),
   offerUnsaved: msg({ id: 'workflow.form.offerUnsaved', defaultMessage: 'Workflow has changes you haven’t saved, so the release offer wasn’t filled in. Save or discard them, then choose Move… again.', description: 'HI-3155: a notification: Move… or Remove… on a release offer (For you) found unsaved edits in the Workflow section, which it doesn’t overwrite. Move… and Remove… are the offer’s buttons: as translated there.' }),
   offerStale: msg({ id: 'workflow.form.offerStale', defaultMessage: 'Work merges into or Other branches work can merge into changed since the release offer was made, so it wasn’t filled in. The offer is read again.', description: 'HI-3155: a notification: a release offer’s Move… or Remove… found the saved options no longer the ones it was made on. Work merges into and Other branches work can merge into are option names: as translated there.' }),
   changedMeanwhile: msg({ id: 'workflow.form.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.', description: 'A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant); the section reloads them.' }),
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
 }
 
-/** The defaults' platform choice (None · Git · jj) and its line beside it: a platform's own words (HI-2822). */
-const LEVEL_NAME: Record<PlatformId, Msg> = { none: T.levelNone, git: T.levelGit, jj: T.levelJj }
-const LEVEL_FOR: Record<PlatformId, Msg> = { none: T.levelForNone, git: T.levelForGit, jj: T.levelForJj }
+/** The defaults' platform choice (None · Git) and its line beside it: a platform's own words (HI-2822). */
+const LEVELS = ['none', 'git'] as const
+type LevelPlatform = (typeof LEVELS)[number]
+const LEVEL_NAME: Record<LevelPlatform, Msg> = { none: T.levelNone, git: T.levelGit }
+const LEVEL_FOR: Record<LevelPlatform, Msg> = { none: T.levelForNone, git: T.levelForGit }
 
 /** A problem's sentence, in the window's language (an English reason when it has no message). */
 const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.kind === 'guard' ? shownText(guardProblemText(p)) : p.why)
@@ -238,7 +238,7 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
  * below (the workspace's from Combwork's, Combwork's from every rule off).
  */
 export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; onDirty?: (dirty: boolean) => void }) {
-  const [platform, setPlatform] = useState<PlatformId>('git')
+  const [platform, setPlatform] = useState<LevelPlatform>('git')
   const workspacePath = useStore((s) => s.workspace?.path ?? '')
   const source = useMemo(
     (): FormSource => ({
@@ -254,7 +254,7 @@ export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; on
     <div className="workflow-level" data-level={level}>
       <div className="workflow-level-head">
         <div className="segmented workflow-level-platform" role="radiogroup" aria-label={tr(T.levelPlatform)}>
-          {(['none', 'git', 'jj'] as const).map((p) => (
+          {LEVELS.map((p) => (
             <button key={p} type="button" role="radio" aria-checked={platform === p} className={cx(platform === p && 'active')} data-platform={p} onClick={() => setPlatform(p)}>
               {tr(LEVEL_NAME[p])}
             </button>

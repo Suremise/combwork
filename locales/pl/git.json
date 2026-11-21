@@ -474,8 +474,6 @@
   "git.vc.fact.jjGone": "Repozytorium jj zniknęło z tego folderu.",
   "git.vc.fact.jjInGit": "Ten folder jest repozytorium jj w {root}, niewspółistniejącym z Gitem, wewnątrz repozytorium Git w {git}: Combwork nie może tu używać jj.",
   "git.vc.jj": "jj",
-  "git.vc.offer.jjFound": "Znaleziono jj w {root}: przełączyć na jj?",
-  "git.vc.offer.jjGone": "Repozytorium jj zniknęło: przełączyć ten projekt z powrotem na {platform}?",
   "git.vc.offer.switchJj": "Przełącz na jj…",
   "git.vc.store.autocrlf": "Git konwertuje tu znaki końca wiersza (core.autocrlf). Jeśli to repozytorium tego nie potrzebuje, wyłącz to tylko dla niego: uruchom w nim {command}, a potem kliknij Sprawdź ponownie.",
   "git.vc.store.card": "{project}: {card} {title}, w toku",

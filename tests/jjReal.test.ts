@@ -205,8 +205,8 @@ describe.skipIf(!exe)(`the real jj (${TESTED_JJ.version})`, () => {
     // jj's own views don't take it as jj's (pinned reads start from the same detection), and Git answers there.
     expect(await pinnedContextOf(inner, runner)).toEqual({ none: true })
     expect(git(inner, 'rev-parse', '--show-toplevel').trim().toLowerCase()).toBe(inner.replace(/\\/g, '/').toLowerCase())
-    // The jj workspace itself is still jj's.
-    expect(detect(outer)).toMatchObject({ platform: 'jj', jj: { colocated: false } })
+    // The jj workspace itself is another version control (HI-3481: jj is no longer supported).
+    expect(detect(outer)).toEqual({ platform: 'none', other: 'Jujutsu' })
   })
 
   it('a missing jj is unknown, never a guess from its files', async () => {

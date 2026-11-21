@@ -474,8 +474,6 @@
   "git.vc.fact.jjGone": "Le dépôt jj a disparu de ce dossier.",
   "git.vc.fact.jjInGit": "Ce dossier est un dépôt jj à {root}, non colocalisé, à l’intérieur du dépôt Git à {git} : Combwork ne peut pas utiliser jj ici.",
   "git.vc.jj": "jj",
-  "git.vc.offer.jjFound": "jj trouvé à {root} : passer à jj ?",
-  "git.vc.offer.jjGone": "Le dépôt jj a disparu : repasser ce projet à {platform} ?",
   "git.vc.offer.switchJj": "Passer à jj…",
   "git.vc.store.autocrlf": "Git convertit ici les fins de ligne (core.autocrlf). Si ce dépôt n’en a pas besoin, désactive-la pour lui seul : exécute {command} dans le dépôt, puis clique sur Vérifier à nouveau.",
   "git.vc.store.card": "{project} : {card} {title}, en cours",
