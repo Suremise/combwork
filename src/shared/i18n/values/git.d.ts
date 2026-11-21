@@ -405,8 +405,6 @@ interface CombworkMessageValues {
   'git.vc.none': undefined
   'git.vc.notRepoYet': undefined
   'git.vc.offer.gitFound': { root: string | number }
-  'git.vc.offer.jjFound': { root: string | number }
-  'git.vc.offer.jjGone': { platform: string | number }
   'git.vc.offer.notNow': undefined
   'git.vc.offer.otherFound': { vcs: string | number }
   'git.vc.offer.repositoryGone': undefined

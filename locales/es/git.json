@@ -468,8 +468,6 @@
   "git.vc.fact.jjGone": "El repositorio jj ya no está en esta carpeta.",
   "git.vc.fact.jjInGit": "Esta carpeta es un repositorio jj en {root}, no colocalizado, dentro del repositorio Git en {git}: Combwork no puede usar jj aquí.",
   "git.vc.jj": "jj",
-  "git.vc.offer.jjFound": "jj encontrado en {root}: ¿cambiar a jj?",
-  "git.vc.offer.jjGone": "El repositorio jj ya no está: ¿volver a poner este proyecto en {platform}?",
   "git.vc.offer.switchJj": "Cambiar a jj…",
   "git.vc.store.autocrlf": "Git convierte aquí los finales de línea (core.autocrlf). Si este repositorio no lo necesita, desactívalo solo para él: ejecuta {command} en él y luego pulsa Comprobar de nuevo.",
   "git.vc.store.card": "{project}: {card} {title}, en curso",

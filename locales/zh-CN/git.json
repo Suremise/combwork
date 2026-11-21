@@ -468,8 +468,6 @@
   "git.vc.fact.jjGone": "此文件夹中的 jj 仓库已不在。",
   "git.vc.fact.jjInGit": "此文件夹是位于 {root} 的 jj 仓库，未与 Git 共存，且位于 {git} 处的 Git 仓库之内：Combwork 无法在此使用 jj。",
   "git.vc.jj": "jj",
-  "git.vc.offer.jjFound": "在 {root} 发现 jj：切换到 jj？",
-  "git.vc.offer.jjGone": "jj 仓库已不在：将此项目切换回 {platform}？",
   "git.vc.offer.switchJj": "切换到 jj…",
   "git.vc.store.autocrlf": "Git 在这里会转换换行符（core.autocrlf）。如果此仓库不需要，请只为它关闭：在仓库中运行 {command}，然后点击“重新检查”。",
   "git.vc.store.card": "{project}：{card} {title}，已开始",

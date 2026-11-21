@@ -746,8 +746,6 @@
   "workflow.why.target": "Fertige Arbeit geht in den Standardbranch des Repositorys; allein in den Branch, auf dem das Projekt steht.",
   "workflow.contradiction.jjNeedsSlots": "Mit jj braucht jede Karte ihren eigenen Ordner: Agenten im gemeinsamen Projektordner werden noch nicht unterstützt.",
   "workflow.contradiction.jjYouIntegrate": "Diese Wahl gehört zu einer anderen Versionsverwaltung: Mit jj integrieren Combwork oder du die Arbeit, indem das Ziel-Bookmark verschoben wird; mit Git wird sie gemergt.",
-  "workflow.form.levelForJj": "Die Standards für jj-Projekte.",
-  "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "{card} kann unter diesen Regeln nicht starten: Das Projekt verwendet jetzt {platform}.",
   "workflow.refused.platform.changed.next": "Starte sie erneut: Dann wird sie nach den Regeln von {platform} geprüft.",
   "workflow.refused.platform.noTarget.message": "{card} kann nicht starten: In seinem Projekt ist kein Ziel-Bookmark gewählt, in das seine Arbeit gemergt wird.",

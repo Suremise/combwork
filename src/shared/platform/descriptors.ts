@@ -254,7 +254,7 @@ export interface Detection {
 /** Why the detected platform differs from the project's: what Combwork offers to switch to (§16.3.5). */
 export interface PlatformOffer {
   offer: PlatformId
-  why: 'gitFound' | 'repositoryGone' | 'otherFound' | 'jjFound' | 'jjGone'
+  why: 'gitFound' | 'repositoryGone' | 'otherFound'
 }
 
 /**

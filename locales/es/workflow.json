@@ -746,8 +746,6 @@
   "workflow.why.target": "El trabajo terminado va a la rama predeterminada del repositorio; trabajando en solitario, a la rama en la que está el proyecto.",
   "workflow.contradiction.jjNeedsSlots": "Con jj, cada tarjeta necesita su propia carpeta: aún no se admite que los agentes compartan la carpeta del proyecto.",
   "workflow.contradiction.jjYouIntegrate": "Esa opción es de otro control de versiones: con jj, Combwork o tú integráis el trabajo moviendo el marcador de destino; con Git, se fusiona.",
-  "workflow.form.levelForJj": "Los valores predeterminados de los proyectos jj.",
-  "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "{card} no puede empezar con estas reglas: su proyecto usa ahora {platform}.",
   "workflow.refused.platform.changed.next": "Vuelve a iniciarla: entonces se comprueba con las reglas de {platform}.",
   "workflow.refused.platform.noTarget.message": "{card} no puede empezar: su proyecto no tiene elegido un bookmark de destino, en el que se fusiona su trabajo.",

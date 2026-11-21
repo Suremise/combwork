@@ -410,8 +410,6 @@
   "git.vc.none": "None",
   "git.vc.notRepoYet": "This folder isn't a Git repository yet.",
   "git.vc.offer.gitFound": "Git found at {root}: switch to Git?",
-  "git.vc.offer.jjFound": "jj found at {root}: switch to jj?",
-  "git.vc.offer.jjGone": "The jj repository is gone: switch this project back to {platform}?",
   "git.vc.offer.notNow": "Not Now",
   "git.vc.offer.otherFound": "{vcs} found: not supported yet, so this project can only use None.",
   "git.vc.offer.repositoryGone": "The Git repository is gone. Git’s rules hold until you switch, because what they check can’t be read.",

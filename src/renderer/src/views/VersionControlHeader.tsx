@@ -33,8 +33,6 @@ export const M = {
 const S = {
   gitFound: msg({ id: 'git.vc.offer.gitFound', defaultMessage: 'Git found at {root}: switch to Git?', description: 'An offer atop the Version Control tab of a project without version control, after someone ran git init: {root} is the repository root. Combwork never switches by itself.' }),
   repositoryGone: msg({ id: 'git.vc.offer.repositoryGone', defaultMessage: 'The Git repository is gone. Git’s rules hold until you switch, because what they check can’t be read.', description: 'An offer atop the Version Control tab of a Git project whose .git folder was removed or moved: its cards are refused until the user switches to None or the repository is back.' }),
-  jjFound: msg({ id: 'git.vc.offer.jjFound', defaultMessage: 'jj found at {root}: switch to jj?', description: 'An offer atop the Version Control tab (HI-2799, HI-2896): a jj (Jujutsu) repository, colocated with Git or not, was found in the project folder. Combwork never switches by itself. Keep jj.' }),
-  jjGone: msg({ id: 'git.vc.offer.jjGone', defaultMessage: 'The jj repository is gone: switch this project back to {platform}?', description: 'An offer atop the Version Control tab of a project using jj (HI-2799) whose .jj folder is gone. {platform} is Git or None. Keep jj.' }),
   otherFound: msg({ id: 'git.vc.offer.otherFound', defaultMessage: '{vcs} found: not supported yet, so this project can only use None.', description: 'An offer atop the Version Control tab of a Git project where another version control ({vcs}: Mercurial, Jujutsu) is found now. None: glossary 2.1.' }),
   notNow: msg({ id: 'git.vc.offer.notNow', defaultMessage: 'Not Now', description: 'A button of the offer to switch version control (atop the Version Control tab): hides the offer until Combwork starts again.' }),
   title: msg({ id: 'git.vc.switch.title', defaultMessage: 'Switch {project} to {platform}?', description: 'Title of the warning before switching a project’s version control. {project} is its name, {platform} None or Git.' }),
@@ -62,7 +60,7 @@ const offerKey = (path: string, o: PlatformOffer): string => `${path.toLowerCase
 /** A platform's name (the board's workflow link, #1420): the names the switch says too. */
 export const PLATFORM_TEXT = PLATFORM_NAME
 
-const CHOICES: PlatformId[] = ['none', 'git', 'jj']
+const CHOICES: PlatformId[] = ['none', 'git']
 
 /**
  * The refusals a switch between Git and jj shows with its lists (HI-2799), rather than as a notice. `memberNoJj`
@@ -205,9 +203,9 @@ function shownOffer(project: ProjectInfo): PlatformOffer | null {
 /** The offer Combwork makes when what it detects differs from the platform in force (§16.3.5), until Not now. */
 function PlatformOfferLine({ project, platform, o, onHide }: { project: ProjectInfo; platform: PlatformId; o: PlatformOffer; onHide: () => void }) {
   const d = project.platform!.detected
-  const text = o.why === 'gitFound' ? tr(S.gitFound, { root: d.root ?? project.path }) : o.why === 'jjFound' ? tr(S.jjFound, { root: d.root ?? project.path }) : o.why === 'jjGone' ? tr(S.jjGone, { platform: tr(PLATFORM_NAME[o.offer]) }) : o.why === 'otherFound' ? tr(S.otherFound, { vcs: d.other ?? tr(PLATFORM_NAME.jj) }) : tr(S.repositoryGone)
+  const text = o.why === 'gitFound' ? tr(S.gitFound, { root: d.root ?? project.path }) : o.why === 'otherFound' ? tr(S.otherFound, { vcs: d.other ?? '' }) : tr(S.repositoryGone)
   return (
-    <div className={cx('banner', o.why === 'gitFound' || o.why === 'jjFound' ? 'info' : 'warn', 'vc-offer')} data-vc-offer={o.why}>
+    <div className={cx('banner', o.why === 'gitFound' ? 'info' : 'warn', 'vc-offer')} data-vc-offer={o.why}>
       <span className="vc-offer-text">{text}</span>
       <span className="vc-offer-actions">
         <button type="button" className="btn small primary" data-action="vc-offer-switch" onClick={() => void switchPlatform(project, platform, o.offer)}>

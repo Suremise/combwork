@@ -468,8 +468,6 @@
   "git.vc.fact.jjGone": "このフォルダーからjjリポジトリがなくなりました。",
   "git.vc.fact.jjInGit": "このフォルダーは{root}にあるjjリポジトリで、Gitと共存しておらず、{git}にあるGitリポジトリの中にあります。Combworkはここでjjを使えません。",
   "git.vc.jj": "jj",
-  "git.vc.offer.jjFound": "{root}にjjが見つかりました。jjに切り替えますか？",
-  "git.vc.offer.jjGone": "jjリポジトリがなくなりました。このプロジェクトを{platform}に戻しますか？",
   "git.vc.offer.switchJj": "jjに切り替え…",
   "git.vc.store.autocrlf": "ここではGitが改行コードを変換しています（core.autocrlf）。このリポジトリで不要なら、このリポジトリだけでオフにしてください。リポジトリ内で{command}を実行してから「再確認」を押します。",
   "git.vc.store.card": "{project}：{card} {title}（作業中）",

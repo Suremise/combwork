@@ -99,10 +99,8 @@ interface CombworkMessageValues {
   'workflow.form.lanes': { n: number }
   'workflow.form.levelConfirm': undefined
   'workflow.form.levelForGit': undefined
-  'workflow.form.levelForJj': undefined
   'workflow.form.levelForNone': undefined
   'workflow.form.levelGit': undefined
-  'workflow.form.levelJj': undefined
   'workflow.form.levelNone': undefined
   'workflow.form.levelPlatform': undefined
   'workflow.form.loadFailed': { error: string | number }

@@ -746,8 +746,6 @@
   "workflow.why.target": "Gotowa praca trafia do domyślnej gałęzi repozytorium; przy pracy solo do gałęzi, na której jest projekt.",
   "workflow.contradiction.jjNeedsSlots": "W jj każda karta potrzebuje własnego folderu: agenci współdzielący folder projektu nie są jeszcze obsługiwani.",
   "workflow.contradiction.jjYouIntegrate": "Ten wybór należy do innego systemu kontroli wersji: w jj pracę włącza Combwork albo Ty, przesuwając docelową zakładkę; w Gicie jest scalana.",
-  "workflow.form.levelForJj": "Ustawienia domyślne projektów jj.",
-  "workflow.form.levelJj": "jj",
   "workflow.refused.platform.changed.message": "Karta {card} nie może wystartować według tych reguł: projekt używa teraz opcji {platform}.",
   "workflow.refused.platform.changed.next": "Uruchom ją ponownie: zostanie wtedy sprawdzona według reguł opcji {platform}.",
   "workflow.refused.platform.noTarget.message": "Karta {card} nie może wystartować: jej projekt nie ma wybranej docelowej zakładki (bookmark), do której scalana jest jego praca.",

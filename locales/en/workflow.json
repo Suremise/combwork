@@ -391,10 +391,6 @@
     "defaultMessage": "The defaults of Git projects.",
     "description": "Beside the None · Git choice above workflow defaults, while Git is chosen."
   },
-  "workflow.form.levelForJj": {
-    "defaultMessage": "The defaults of jj projects.",
-    "description": "Beside the None · Git · jj choice above workflow defaults, while jj (Jujutsu, HI-2799) is chosen. Keep jj."
-  },
   "workflow.form.levelForNone": {
     "defaultMessage": "The defaults of projects without version control.",
     "description": "Beside the None · Git choice above workflow defaults, while None is chosen."
@@ -402,10 +398,6 @@
   "workflow.form.levelGit": {
     "defaultMessage": "Git",
     "description": "The choice of the defaults for Git projects (glossary 2.1: keep)."
-  },
-  "workflow.form.levelJj": {
-    "defaultMessage": "jj",
-    "description": "The choice of the defaults for projects using jj (Jujutsu, HI-2799). Keep jj: the tool’s name, lower case."
   },
   "workflow.form.levelNone": {
     "defaultMessage": "None",

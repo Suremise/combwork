@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Removed
+
+- **jj (Jujutsu) support is removed: Combwork supports Git and None** (HI-3481). A project's Version Control tab and the workflow defaults offer None and Git only, and a folder with a `.jj` repository is reported as another version control, as a Mercurial one is.
+
 ### Changed
 
 - **The installer names the copy that's still running** (HI-3463). When the installer stops because a copy of Combwork, or of its version before 1.1, won't close, its message now says where that copy runs from and its process ID, or, when Windows won't show where it is (another account's copy, for example), says so with its process ID, and how to end it in Task Manager. A copy left running with no window can be closed without restarting the PC.
