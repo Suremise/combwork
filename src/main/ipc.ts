@@ -87,7 +87,7 @@ import { checkMoved, finishPending, movePlan, repairMove } from './workspaceMove
 import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agentWorktree'
 import { CW_DIR, projectAgents as agentsOf } from '../shared/defaults'
 import type { MoveOptions, TaskCard } from '../shared/types'
-import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
+import { hasPty, killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
 import { adminSnippetFacts, apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
 import * as projectAgents from './projectAgents'
 import * as templates from './templates'
@@ -1498,6 +1498,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'pty:kill': (key) => {
       if (key.startsWith('task:')) killPty(key)
     },
+    'pty:running': (key) => hasPty(key),
     'pty:clipboardRefused': (key, reason) => {
       log.info(`terminal ${userText(key)}: OSC 52 clipboard ${reason === 'read' ? 'read' : 'write'} refused (${String(reason).slice(0, 20)})`)
     },

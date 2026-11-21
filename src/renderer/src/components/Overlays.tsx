@@ -886,9 +886,38 @@ export function AgentSetupDialog() {
   useEffect(() => {
     if (typeof open === 'string') setTab(open)
     else if (open) setTab(enabledProviders(settings)[0]?.id ?? PROVIDERS[0].id)
+    // The dialog stays mounted while closed (HI-3466): closed, nothing of its task is left to lock its next opening.
+    else {
+      setRunning(false)
+      setTask(null)
+      setFinished(null)
+    }
     // Only when the dialog opens: a settings change while it is open doesn't move the tab.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+  // The task's end, however its process ends (HI-3466): watched here, not by its terminal's view, which can miss an exit
+  // that came before it subscribed; and one that ended before this watch began is asked of main.
+  const endedRef = useRef<() => void>(() => undefined)
+  const taskKey = task?.key
+  useEffect(() => {
+    if (!running || !taskKey) return
+    let done = false
+    const end = (): void => {
+      if (done) return
+      done = true
+      endedRef.current()
+    }
+    const off = window.combwork.onPtyExit((key) => {
+      if (key === taskKey) end()
+    })
+    void call('pty:running', taskKey).then((alive) => {
+      if (!alive) end()
+    }, () => undefined)
+    return () => {
+      done = true
+      off()
+    }
+  }, [running, taskKey])
 
   if (!open) return null
   const p = providerDescriptor(tab)
@@ -939,8 +968,10 @@ export function AgentSetupDialog() {
     setFinished({ ok: true, text: tr(msg({ id: 'shell.setup.done', defaultMessage: '{what} You can close this window.', description: 'Provider Setup after a task did its job. {what} says what happened.' }), { what: what[kind] }) })
     setTask(null)
   }
+  endedRef.current = () => void taskEnded()
   const close = (): void => {
     if (task && running) void call('pty:kill', task.key)
+    setRunning(false)
     setTask(null)
     setFinished(null)
     set({ setupOpen: false })
@@ -1101,7 +1132,7 @@ export function AgentSetupDialog() {
       )}
       {task && (
         <div className="task-terminal">
-          <TerminalView ptyKey={task.key} visible onExit={() => void taskEnded()} />
+          <TerminalView ptyKey={task.key} visible />
         </div>
       )}
     </Modal>

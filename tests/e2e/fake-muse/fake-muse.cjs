@@ -4,8 +4,8 @@
 // - `muse --version`; `muse [resume <id>] [--model M] [--reasoning-effort E] [--approval-mode X] [--trust-workspace]
 //   [--disable-sandbox] [-c KEY=JSON]... [-- PROMPT]`; an unknown -c key or field refuses the run (exit 2), as Muse does,
 //   and so does a prompt after `resume <id>` (1.4.20: "unknown argument `resume`"). `muse sandbox windows check` (its
-//   status: setup_required while FAKE_MUSE_SANDBOX_FILE exists, else ready) and `muse login` (marks the account signed in:
-//   <XDG_CONFIG_HOME>/muse/auth.json).
+//   status: setup_required while FAKE_MUSE_SANDBOX_FILE exists, else ready), `muse sandbox windows setup` (its screen: y
+//   sets it up, n cancels) and `muse login` (marks the account signed in: <XDG_CONFIG_HOME>/muse/auth.json).
 // - Hooks run as `%COMSPEC% /C <command>` with Node's own argument escaping (a `"` reaches cmd as `\"`, as Rust's does in
 //   1.4.20: a quoted path breaks), Muse's hook environment (Windows' own variables and its ids only) and the event's JSON
 //   on stdin; SessionStart's plain stdout becomes a developer context block, whole when it is at most 16384 bytes, else
@@ -39,6 +39,28 @@ if (argv[0] === 'sandbox' && argv[1] === 'windows' && argv[2] === 'check') {
   log({ kind: 'sandboxCheck', env: accountEnv, setup })
   out(setup ? 'backend=windows_elevated\nstatus=setup_required\nreason=sandbox users are not ready\n' : 'backend=windows_elevated\nstatus=ready\n')
   process.exit(setup ? 1 : 0)
+}
+if (argv[0] === 'sandbox' && argv[1] === 'windows' && argv[2] === 'setup') {
+  // Its setup screen, answered in its terminal (HI-3466): `y` sets it up (FAKE_MUSE_SANDBOX_FILE removed, exit 0), `n`
+  // cancels it (exit 1). With FAKE_MUSE_SETUP_AT_ONCE an existing file, it is cancelled as it starts, before anything
+  // could have watched its terminal.
+  log({ kind: 'sandboxSetup' })
+  if (process.env.FAKE_MUSE_SETUP_AT_ONCE && fs.existsSync(process.env.FAKE_MUSE_SETUP_AT_ONCE)) process.exit(1)
+  out('Set up the Windows sandbox? [y/n] ')
+  process.stdin.setRawMode?.(true)
+  process.stdin.on('data', (d) => {
+    const k = String(d).trim().toLowerCase()
+    if (k === 'y') {
+      if (process.env.FAKE_MUSE_SANDBOX_FILE) fs.rmSync(process.env.FAKE_MUSE_SANDBOX_FILE, { force: true })
+      out('\r\nSandbox set up.\r\n')
+      process.exit(0)
+    }
+    if (k === 'n') {
+      out('\r\nCancelled.\r\n')
+      process.exit(1)
+    }
+  })
+  return
 }
 if (argv[0] === 'login') {
   // Signs the account in as `muse login` would once the user approves its code (here at once): auth.json in its config root.

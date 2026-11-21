@@ -366,6 +366,7 @@ export const SUITES = [
   { name: 'settingstips' },
   { name: 'setupcopy' },
   { name: 'setuplayout' },
+  { name: 'setuplock' },
   { name: 'signin' },
   { name: 'skillaudience' },
   { name: 'skilldelivery' },
