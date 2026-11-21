@@ -589,6 +589,10 @@ async function runScenario(sc, providerKey, opts = {}) {
   // review copies (HI-3337: withheld from a Claude Code whose home doesn't trust it). lib.openWorkspace does this for the
   // e2e suites (HI-3342); this harness opens its workspace itself, so it records it here.
   lib.trustWorktrees(fakeHome, ws)
+  // HI-3493: the real Claude Code runs from its test home (CLAUDE_CONFIG_DIR, below), not the fake's, and the run's reset
+  // (testHomes.mjs) leaves it no per-folder trust: it's recorded there too, as Set Up leaves it, or every Claude Code
+  // trial's reviewer is refused its review copy. No CLI uses the home here: the lease is this run's, its trials one at a time.
+  if (providerKey === 'claude-code') lib.trustWorktrees(CLAUDE_TEST_HOME, ws)
   // A fake that acts out an expired sign-in: each prompt's turn ends with "Login expired · Please run /login".
   if (opts.exitsAtLaunch && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-launch-exit.json'), JSON.stringify({ code: 1 }))
   if (opts.signedOut && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-signin.json'), JSON.stringify({ expired: true, ...(opts.signedOut === 'launch' ? { atLaunch: true } : opts.signedOut === 'late' ? { late: true } : {}) }))
