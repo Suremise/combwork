@@ -25,7 +25,16 @@ export function gitOperationEnd(what: string): string | null {
 export const DETACH_FAILED = 'detach'
 
 /**
- * HI-3467: the command that puts a slot's folder at its target branch's head, as Combwork's own detach does (the way out
- * Combwork names when that keeps failing). A command, never translated.
+ * HI-3467: a branch name as one literal argument where the user pastes it (PowerShell, Windows' shell; HR1's round 1):
+ * as it is when it holds only letters, digits and `._/-`, else single-quoted, a quote inside doubled (PowerShell takes
+ * the typographic quotes as quotes too). Git allows `$`, `&`, `;`, quotes… in branch names, which a shell would read.
  */
-export const gitDetachCommand = (target: string): string => `git switch --detach ${target}` // i18n-ignore: a git command
+export function shellArg(name: string): string {
+  return /^[A-Za-z0-9._/][A-Za-z0-9._/-]*$/.test(name) ? name : `'${name.replace(/['‘’‚‛]/g, (q) => q + q)}'`
+}
+
+/**
+ * HI-3467: the command that puts a slot's folder at its target branch's head, as Combwork's own detach does (the way out
+ * Combwork names when that keeps failing), its branch one literal argument (`shellArg`). A command, never translated.
+ */
+export const gitDetachCommand = (target: string): string => `git switch --detach ${shellArg(target)}` // i18n-ignore: a git command

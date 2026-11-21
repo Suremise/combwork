@@ -7872,7 +7872,8 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   card's own work, which keeps it) stays not ready, and the same record (`slot_operation:`, `what` `detach`) keeps git's
   error line, the settles in a row that failed so (`tries`) and the first one's time. The second in a row tells the user
   once (a notice naming the slot, its target, git's error, its folder and `git switch --detach <target>`, the way to do
-  it by hand), and only from then does Slots and copies show *Can't be moved back to …* with git's error: a failure the
+  it by hand, its target single-quoted for PowerShell when it holds anything but letters, digits and `._/-`: git allows
+  `$`, `&` and quotes in a branch name), and only from then does Slots and copies show *Can't be moved back to …* with git's error: a failure the
   next look doesn't repeat (a lock another git held for a moment) is never told. The first look whose detach works, or
   that finds the slot otherwise ready, gone or dirty, clears it. jj's slots keep their own path (HI-3468 removes jj).
 - **Operations** (HR1's round 1): warming for a lease and removal own the slot from the write that starts them to the
