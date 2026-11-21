@@ -160,7 +160,14 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check('Slots and copies shows slot-b as an unfinished git revert, with the command that ends it', !!(await until(async () => (await opRow.locator('[data-operation="revert"]').count()) === 1, HUNG_MS)) && /Unfinished git revert/.test(await opRow.innerText()) && (await opRow.innerText()).includes('git revert --abort'), await opRow.innerText().catch(() => ''))
     await opRow.screenshot({ path: path.join(fx.shots, 'slotpool-4-operation.png') })
     g(['revert', '--abort'])
-    const freed = await op({ op: 'lend', agent: b1.id, card: 106 })
+    // A lend refused `busy` while a process is still in the folder (git's own background maintenance after the abort, a
+    // process listing not yet caught up): asked again until it isn't, bounded; any other answer is the check's.
+    const lendQuiet = async (card) => {
+      let last
+      await until(async () => (last = await op({ op: 'lend', agent: b1.id, card })).ok || last.refusal?.why !== 'busy', HUNG_MS)
+      return last
+    }
+    const freed = await lendQuiet(106)
     check('ended in its folder, slot-b is lent again', freed.ok && freed.slot.name === 'slot-b' && !(await slot('slot-b'))?.operation, JSON.stringify(freed))
 
     // --- HI-3467: released on its card's line with a stale index.lock (a git that crashed): git refuses each detach. The
@@ -185,7 +192,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // Told once is the unit test's, by count (a notice with the same id replaces the toast, so the window can't tell).
     check('…looked at again, still not lent', (await op({ op: 'lend', agent: b1.id, card: 107 })).refusal?.why === 'noSlot')
     fs.rmSync(lock)
-    const unlocked = await op({ op: 'lend', agent: b1.id, card: 107 })
+    const unlocked = await lendQuiet(107)
     check('the lock gone, slot-b is detached at its next look and lent again, nothing shown', unlocked.ok && unlocked.slot.name === 'slot-b' && !(await slot('slot-b'))?.operation, JSON.stringify(unlocked))
   } catch (e) {
     check('no exception', false, e.stack)
