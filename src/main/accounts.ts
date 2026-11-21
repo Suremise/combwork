@@ -32,7 +32,7 @@ import { trustRoot } from './platform/repoPorts'
 import { shownIssues, withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
 import { accountInfo, cachedCatalogFor, modelCaps } from '../shared/models'
-import { openWorkspaces, setConnectionGuard, workspace, workspaceOf } from './workspace'
+import { contextWorkspace, openWorkspaces, setConnectionGuard, workspace, workspaceOf, type WorkspaceService } from './workspace'
 import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStore'
 import type { ServerOn } from './serverLaunch'
 import { coverageView } from './keyCoverage'
@@ -1910,7 +1910,9 @@ function accountsReadiness(providers: readonly ProviderId[], ws: ConnectionsView
     if (!part?.accountSandbox || !part.accountSandboxReadiness || !providerService.info(p).found) continue
     const on = (ws[p]?.on ?? []).map((id) => all.find((a) => a.id === id)).filter((a): a is Account => signInFolderOf(a, p))
     const rows = on.length ? on.map((a) => ({ name: a.name, sandbox: part.accountSandbox!(accountFolder(a.id)) })) : [{ sandbox: part.accountSandbox(null) }]
-    const issues = part.accountSandboxReadiness(rows, on.some((a) => a.observed?.loggedIn !== false))
+    // Set up is offered only where one it could run on isn't known to be signed out (HI-3490 round 1): the same
+    // candidates runSandboxSetUp tries, never a signed-in account that needs nothing.
+    const issues = part.accountSandboxReadiness(rows, sandboxCandidates(part, p, on).some((a) => a.observed?.loggedIn !== false))
     if (issues.length) out[p] = shownIssues(issues)
   }
   return Object.keys(out).length ? out : undefined
@@ -1930,17 +1932,33 @@ export async function runSandboxSetUp(cli: ProviderId): Promise<string> {
   const { homeEnv, accounts: part } = support(cli)
   const sandboxOf = part.accountSandbox?.bind(part)
   if (!sandboxOf || !part.accountSandboxSetUp) throw combworkError(NO_SANDBOX_SETUP, { cli: providerDescriptor(cli).name }, { kind: 'invalid' })
-  const cfg = workspace.path ? workspace.config : null
-  const all = list()
-  const on = (workspaceAccounts(cfg, cli, all)?.on ?? []).map((id) => all.find((a) => a.id === id)).filter((a): a is Account => signInFolderOf(a, cli))
-  const kinds = new Map(on.map((a) => [a.id, sandboxOf(accountFolder(a.id))]))
-  const order = [...on.filter((a) => !kinds.get(a.id)), ...on.filter((a) => kinds.get(a.id) === 'unelevated')]
-  if (on.length && !order.length) throw combworkError(NOTHING_TO_SET_UP, { cli: providerDescriptor(cli).name }, { kind: 'conflict' })
+  // The asking workspace, kept for the checks after each wait (its accounts read again then: HI-3490 round 1).
+  const asking = contextWorkspace() ?? workspace
+  const candidates = (): Account[] => sandboxCandidates(part, cli, onIn(asking, cli))
+  const order = candidates()
+  if (onIn(asking, cli).length && !order.length) throw combworkError(NOTHING_TO_SET_UP, { cli: providerDescriptor(cli).name }, { kind: 'conflict' })
   for (const a of order) {
     if (!(await signedInNow(a.id))) continue
-    return sandboxSetUpOn(a.id, cli, homeEnv)
+    // Still on there, still needing it, and signed in, as read under its lock just before it starts; else the next.
+    const key = await sandboxSetUpOn(a.id, cli, homeEnv, () => candidates().some((c) => c.id === a.id) && getAccount(a.id)?.observed?.loggedIn !== false)
+    if (key) return key
   }
   throw combworkError(NO_SIGNED_IN, { cli: providerDescriptor(cli).name }, { kind: 'conflict' })
+}
+
+/** The sign-in accounts of a CLI on in a workspace, as they are now (HI-3490), in the one order. */
+function onIn(ws: WorkspaceService, cli: ProviderId): Account[] {
+  const all = list()
+  return (workspaceAccounts(ws.path ? ws.config : null, cli, all)?.on ?? []).map((id) => all.find((a) => a.id === id)).filter((a): a is Account => signInFolderOf(a, cli))
+}
+
+/**
+ * The accounts a CLI's sandbox setup may run on (HI-3490), of those given, in the order it tries them: those with no
+ * sandbox, then those on the non-admin one. Others need nothing.
+ */
+function sandboxCandidates(part: ProviderAccountsPart, cli: ProviderId, on: readonly Account[]): Account[] {
+  const kinds = new Map(on.map((a) => [a.id, part.accountSandbox?.(accountFolder(a.id))]))
+  return [...on.filter((a) => !kinds.get(a.id)), ...on.filter((a) => kinds.get(a.id) === 'unelevated')].filter((a) => a.provider === cli)
 }
 
 /** Whether an account is signed in, by a positive answer only (HI-3490): its last check's, else a check made now. */
@@ -1955,11 +1973,14 @@ async function signedInNow(id: string): Promise<boolean> {
   }
 }
 
-function sandboxSetUpOn(id: string, cli: ProviderId, homeEnv: string): Promise<string> {
+/** Starts the setup on one account, under its lock; null, nothing started, when `eligible` says no once its checks are done. */
+function sandboxSetUpOn(id: string, cli: ProviderId, homeEnv: string, eligible: () => boolean): Promise<string | null> {
   return locked(id, async () => {
     const a = mustGet(id)
     await assertUsable(a)
     assertNotHeld(a)
+    // After the last wait, nothing between this and the claim: turned off there, signed out or set up meanwhile, not started.
+    if (!eligible()) return null
     const exe = providerService.info(cli).path
     const cmd = exe && accountsPart(a)?.accountSandboxSetUp?.(exe, accountFolder(id))
     if (!cmd) throw combworkError(NO_SANDBOX_SETUP, { cli: providerDescriptor(cli).name }, { kind: 'invalid' })

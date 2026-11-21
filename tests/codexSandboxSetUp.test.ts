@@ -9,6 +9,7 @@ import * as electron from 'electron'
 import type { Account } from '../src/shared/types'
 import type { CommandSpec } from '../src/main/providers/types'
 import { tempDir } from './tempDir'
+import { timing } from './timing.cjs'
 
 const base = tempDir('cw-codex-sandbox-setup-')
 const home = join(base, 'codex-home')
@@ -24,9 +25,14 @@ const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
+const HUNG_MS = timing('wait.hang')
+
 /** What the faked status check says, per account folder: signed in, out, or a check that can't tell. */
 type Said = 'in' | 'out' | 'unknown'
 const says = new Map<string, Said>()
+/** A status check held until its gate opens (a slow check), per account folder. */
+const gates = new Map<string, Promise<void>>()
 const asked: string[] = []
 /** Each setup started (never a real terminal): its command, environment and end. */
 const started: { cmd: CommandSpec; env: Record<string, string>; end: () => void }[] = []
@@ -52,6 +58,7 @@ beforeAll(async () => {
   vi.spyOn(provider('codex').accounts!, 'accountStatus').mockImplementation(async (_exe, env) => {
     const folder = env.CODEX_HOME!
     asked.push(folder)
+    await gates.get(folder)
     const s = says.get(folder) ?? 'unknown'
     return s === 'unknown' ? { ok: false, error: "couldn't tell" } : { ok: true, loggedIn: s === 'in', ...(s === 'in' ? { email: 'one@example.com', plan: 'plus' } : {}) }
   })
@@ -83,6 +90,7 @@ beforeEach(async () => {
   for (const end of ends.splice(0)) end()
   for (const a of accounts.allAccounts()) await accounts.removeAccount(a.id)
   says.clear()
+  gates.clear()
   asked.length = 0
 })
 
@@ -173,5 +181,31 @@ describe.skipIf(process.platform !== 'win32')("Codex's sandbox Set up on an acco
     // None on at all: the same, unnamed.
     const [none] = in2(() => accounts.accountsView()).readiness?.codex ?? []
     expect(none).toMatchObject({ id: 'sandbox', action: { opens: 'connections' } })
+  })
+
+  it('offers Set up only where an account it could run on may be signed in: never for one signed out beside one that needs nothing (round 1)', async () => {
+    // A needs an upgrade but is signed out; B is signed in but already on the default sandbox.
+    const a = await account('Alpha', 'out', 'unelevated')
+    const b = await account('Beta', 'in', 'elevated')
+    await accounts.checkAccount(a.id)
+    await accounts.checkAccount(b.id)
+    const [item] = in1(() => accounts.accountsView()).readiness?.codex ?? []
+    expect(item).toMatchObject({ id: 'sandbox-upgrade', action: { opens: 'connections' } })
+    expect(item.message).toContain('Alpha')
+    expect(await outcome(in1(() => accounts.runSandboxSetUp('codex')))).toMatch(/none on in this workspace is signed in/)
+    expect(started).toHaveLength(0)
+  })
+
+  it('starts nothing on an account turned off in the asking workspace while its check ran, even when the check then says signed in (round 1)', async () => {
+    const a = await account('Slow', 'in', null)
+    let open!: () => void
+    gates.set(folderOf(a), new Promise<void>((r) => (open = r)))
+    const asking = in1(() => accounts.runSandboxSetUp('codex'))
+    // Its check under way (asked), then the account turned off there, then the check answers: signed in.
+    await vi.waitFor(() => expect(asked).toContain(folderOf(a)), { timeout: HUNG_MS })
+    await in1(() => accounts.setAccountOn(a.id, false))
+    open()
+    expect(await outcome(asking)).toMatch(/none on in this workspace is signed in/)
+    expect(started).toHaveLength(0)
   })
 })
