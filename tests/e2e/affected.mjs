@@ -148,7 +148,7 @@ export const AREAS = [
   // HI-2916: a jj card started right after another's integration, beside Combwork's own jj operations.
   { paths: ['src/main/platform/jjPlatform.ts', 'src/main/platform/jjIntegration.ts', 'src/main/platform/adapter.ts'], suites: ['jjafterpush'] },
   // HI-2914: a jj card's observation after a restart, and the reconciler's debounce under Waiting's repeated reads.
-  { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/jjRepoWatch.ts', 'src/main/jjWindow.ts'], suites: ['jjreopen'] },
+  { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/jjRepoWatch.ts'], suites: ['jjreopen'] },
   // The real CLIs' background processes (#515): only when what tracks them changes, not with every sessions.ts change.
   { paths: ['src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/launchGate.ts'], suites: ['leftovers-claude', 'leftovers-codex'] },
   // The Agent API for apps that show Combwork (#620): viewer tokens, the discovery file, the event stream's events.
@@ -206,17 +206,17 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/Tabs.tsx', 'src/shared/tabs.ts'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'agentslots', 'gitbranchcards', 'lanesslots', 'lanestages', 'mergedialogslots', 'slotrelease', 'unusedslots', 'p6lane', 'workflowdefaults', 'workflowoptions', 'advanced', 'keys', 'cardattach', 'image', 'i18nshots'] },
   // Where a Version Control or workflow default came from (HI-1837).
   { paths: ['src/renderer/src/components/OriginText.tsx'], suites: ['versioncontrol', 'workflowdefaults', 'workflowoptions'] },
-  { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions', 'jjview'] },
+  { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions'] },
   // jj in the Version Control tab and the switch (HI-2799).
   { paths: ['tests/e2e/jjCandidateChecksRun.cjs', 'src/main/platform/jjCandidateChecks.ts', 'src/main/jjSetupStamp.ts', 'src/main/workflow/jobSpawn.ts', 'src/main/copiesApp.ts', 'src/main/workflow/queueChecks.ts'], suites: ['jjchecks', 'jjchecksnc'] },
   { paths: ['tests/e2e/jjadvance.cjs', 'src/main/platform/jjAdvance.ts', 'src/main/workflow/advanceHost.ts', 'src/renderer/src/components/ForYou.tsx'], suites: ['jjadvance'] },
   { paths: ['tests/e2e/jjCandidateRun.cjs', 'src/main/platform/jjCandidateStep.ts', 'src/main/platform/jjCandidateReturn.ts', 'src/main/platform/jjCandidates.ts'], suites: ['jjcandidate', 'jjcandidatenc'] },
-  { paths: ['tests/e2e/jjslot-claude.cjs', 'src/main/slotStaleView.ts', 'src/main/platform/jjFileGate.ts'], suites: ['jjslot-claude', 'jjwindow', 'jjwindownc', 'slotpool', 'slotrelease', 'jjview'] },
-  { paths: ['src/renderer/src/views/JjSections.tsx', 'src/renderer/src/views/StoreSwitchDetails.tsx', 'src/shared/jjViews.ts', 'src/shared/platform/gateTexts.ts', 'src/main/platform/jjViews.ts', 'src/main/platform/jjCompat.ts', 'src/main/platform/jjPlatform.ts', 'src/main/platform/platformFence.ts', 'src/main/platform/fenceAdmit.ts', 'src/main/workflow/storeSwitch.ts', 'src/main/platform/jjOperations.ts', 'src/main/platform/jjOpView.ts', 'src/main/platform/jjSourcesPrint.ts', 'src/main/platform/jjPreviewTask.ts', 'src/main/jjWindow.ts'], suites: ['jjview', 'jjwindow', 'jjwindownc', 'jjstale', 'jjstalenc', 'jjlane', 'jjlanenc', 'vcswitch', 'jjcandidate', 'jjcandidatenc'] },
+  { paths: ['tests/e2e/jjslot-claude.cjs', 'src/main/slotStaleView.ts', 'src/main/platform/jjFileGate.ts'], suites: ['jjslot-claude', 'slotpool', 'slotrelease'] },
+  { paths: ['src/renderer/src/views/StoreSwitchDetails.tsx', 'src/shared/jjViews.ts', 'src/shared/platform/gateTexts.ts', 'src/main/platform/jjViews.ts', 'src/main/platform/jjCompat.ts', 'src/main/platform/jjPlatform.ts', 'src/main/platform/platformFence.ts', 'src/main/platform/fenceAdmit.ts', 'src/main/workflow/storeSwitch.ts', 'src/main/platform/jjOperations.ts', 'src/main/platform/jjOpView.ts', 'src/main/platform/jjSourcesPrint.ts', 'src/main/platform/jjPreviewTask.ts'], suites: ['jjstale', 'jjstalenc', 'jjlane', 'jjlanenc', 'vcswitch', 'jjcandidate', 'jjcandidatenc'] },
   // "How do you work?" (#1423): the step, its notice, the answer and the adoption on a board made by 1.0.
   { paths: ['src/renderer/src/components/PresetStep.tsx', 'src/shared/workflow/presetStep.ts', 'src/main/workflow/presetStep.ts', 'src/main/workflow/adoption.ts'], suites: ['presetstep', 'vcswitch', 'workflowoptions'] },
   // Switching the version control (#1419): the switch, detection's offers, the shared rules.
-  { paths: ['src/main/workflow/platformSwitch.ts', 'src/main/platform/registry.ts', 'src/shared/platform/switching.ts', 'src/shared/workflow/projectWorkflow.ts'], suites: ['vcswitch', 'versioncontrol', 'workflowoptions', 'jjview'] },
+  { paths: ['src/main/workflow/platformSwitch.ts', 'src/main/platform/registry.ts', 'src/shared/platform/switching.ts', 'src/shared/workflow/projectWorkflow.ts'], suites: ['vcswitch', 'versioncontrol', 'workflowoptions'] },
   { paths: ['src/main/gitInit.ts', 'src/shared/gitInit.ts', 'src/renderer/src/components/InitRepo.tsx'], suites: ['gitinit', 'gitview'] },
   { paths: ['src/main/freshPath.ts', 'src/main/externalTerminal.ts'], suites: ['freshpath', 'gitmissing', 'providers'] },
   // The providers' version checks' GET (#1582): the test copies turn the checks off, so these drive its callers only.

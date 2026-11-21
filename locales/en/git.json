@@ -1103,30 +1103,6 @@
     "defaultMessage": "History",
     "description": "The Git tab's section with the last commits and the tags."
   },
-  "git.section.jjBookmarks": {
-    "defaultMessage": "Bookmarks",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): its bookmarks (jj's named lines, like Git's branches). Use jj's own word for bookmark in your language's jj documentation, else translate it."
-  },
-  "git.section.jjCompare": {
-    "defaultMessage": "Compare",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): what changed between two revisions."
-  },
-  "git.section.jjConflicts": {
-    "defaultMessage": "Conflicts",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): the commits jj stores with unresolved conflicts."
-  },
-  "git.section.jjHistory": {
-    "defaultMessage": "History",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): its commits, each with its change id and commit id."
-  },
-  "git.section.jjOperations": {
-    "defaultMessage": "Operations",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2800): jj's operation log, each operation by its name, and a preview of undoing one. Use jj's own word for operation in your language's jj documentation, else translate it."
-  },
-  "git.section.jjRepo": {
-    "defaultMessage": "Repository",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): its repository, workspaces, operation and what jj doesn't support in Combwork."
-  },
   "git.section.queue": {
     "defaultMessage": "Merge queue",
     "description": "The Git tab's section with the project's merge queues (#1357): each target's queue now, its history, Pause and Resume. Glossary 2.5: merge queue."

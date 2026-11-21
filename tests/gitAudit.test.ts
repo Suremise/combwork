@@ -218,8 +218,8 @@ const r = (platform: string) => platform === 'none'
     expect(run().compat).toEqual([])
     const reconcile = 'src/main/workflow/reconcile.ts'
     expect(run({ [reconcile]: `import { checksKeyOf } from './jjCandidateChecks'\n${text(reconcile)}` }).compat).toEqual(['src/main/workflow/reconcile -> src/main/workflow/jjCandidateChecks'])
-    const win = 'src/main/jjWindow.ts'
-    expect(run({ [win]: `${text(win)}\nconst later = () => import("./workflow/jjCandidateReturn")\n` }).compat).toEqual(['src/main/jjWindow -> src/main/workflow/jjCandidateReturn'])
+    const cards = 'src/main/jjCards.ts'
+    expect(run({ [cards]: `${text(cards)}\nconst later = () => import("./workflow/jjCandidateReturn")\n` }).compat).toEqual(['src/main/jjCards -> src/main/workflow/jjCandidateReturn'])
     const service = 'src/main/workflow/service.ts'
     expect(run({ [service]: `${text(service)}\nconst words = require('./jjCandidateReturn')\n` }).compat).toEqual(['src/main/workflow/service -> src/main/workflow/jjCandidateReturn'])
     // The moved modules themselves, by their new paths: not this check's (the jj edges' below).

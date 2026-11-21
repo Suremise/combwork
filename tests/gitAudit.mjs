@@ -377,8 +377,6 @@ export const JJ_HOMES = {
   'src/main/jjSetupStamp': { class: 'compose', why: "what a jj candidate's checks depend on in project.json (HI-3122), jjCards' helper" },
   'src/main/jjPublish': { class: 'compose', why: "main's host of jj's publish worker (HI-2882)" },
   'src/main/jjPublishWorker': { class: 'compose', why: "jj's publish worker thread, a build entry beside gitWorker and repoLockWorker" },
-  'src/main/jjWindow': { class: 'jjUi', why: "the window's reads and actions for jj cards (HI-2869), behind ipc's jj channels" },
-  'src/renderer/src/views/JjSections': { class: 'jjUi', why: "jj's page in the Version Control tab, as GitTab is Git's" },
   'src/shared/jjViews': { class: 'jjUi', why: "jj's page's view types, as shared/gitRepo is Git's" },
   'src/shared/jjTool': { class: 'jjUi', why: "jj's tool and its tested version, as shared/gitTool is Git's" }
 }
@@ -549,8 +547,6 @@ export function jjEdges(root, over = {}) {
 export const JJ_EDGES = [
   { file: 'src/main/combworkVcs', module: 'src/main/platform/jjKeepOut', class: 'registry', names: ['ensureJjExcluded'], why: "keeping .combwork out of a jj repository: combworkVcs routes to each platform's keep-out (port 1)" },
   { file: 'src/main/diagnostics', module: 'src/main/platform/jjRunner', class: 'jjUi', names: ['jjRunner'], why: "Copy Diagnostics names jj's tool and its readiness (J0)" },
-  { file: 'src/main/ipc', module: 'src/main/platform/jjOperations', class: 'jjUi', names: ['jjOperationPreview', 'jjOperations'], why: "jj's page's Operations section (jj:… channels)" },
-  { file: 'src/main/ipc', module: 'src/main/platform/jjViews', class: 'jjUi', names: ['jjBookmarks', 'jjCompare', 'jjConflicts', 'jjHistory', 'jjRepoView'], why: "jj's page's read-only views (jj:… channels)" },
   { file: 'src/main/slotsApp', module: 'src/main/platform/jjRecovery', class: 'registry', names: ['recoverStale'], why: "jj's stale-slot recovery composed with the app's deps (HI-2866, the user's Recover…)" },
   { file: 'src/main/slotsApp', module: 'src/main/platform/jjRunner', class: 'registry', names: ['storeGitGated'], why: "jj's recovery's git on the store, gated by jj's runner (HI-2866): composition" },
   { file: 'src/main/slotsApp', module: 'src/main/platform/jjSlotPrep', class: 'registry', names: ['boardPrepStore'], why: "jj's port's preparation records in the workspace database (HI-2866): composition" },
