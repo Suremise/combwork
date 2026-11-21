@@ -1939,8 +1939,9 @@ export async function runSandboxSetUp(cli: ProviderId): Promise<string> {
   if (onIn(asking, cli).length && !order.length) throw combworkError(NOTHING_TO_SET_UP, { cli: providerDescriptor(cli).name }, { kind: 'conflict' })
   for (const a of order) {
     if (!(await signedInNow(a.id))) continue
-    // Still on there, still needing it, and signed in, as read under its lock just before it starts; else the next.
-    const key = await sandboxSetUpOn(a.id, cli, homeEnv, () => candidates().some((c) => c.id === a.id) && getAccount(a.id)?.observed?.loggedIn !== false)
+    // Still on there, still needing it, and its latest check positively signed in (round 2: one a check under way left
+    // unknown is passed over too), as read under its lock just before it starts; else the next.
+    const key = await sandboxSetUpOn(a.id, cli, homeEnv, () => candidates().some((c) => c.id === a.id) && getAccount(a.id)?.observed?.loggedIn === true)
     if (key) return key
   }
   throw combworkError(NO_SIGNED_IN, { cli: providerDescriptor(cli).name }, { kind: 'conflict' })

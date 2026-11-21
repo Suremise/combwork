@@ -208,4 +208,25 @@ describe.skipIf(process.platform !== 'win32')("Codex's sandbox Set up on an acco
     expect(await outcome(asking)).toMatch(/none on in this workspace is signed in/)
     expect(started).toHaveLength(0)
   })
+
+  it('starts nothing when a check under way replaces its signed-in answer with one that cannot tell (round 2)', async () => {
+    const a = await account('Cached', 'in', null)
+    await accounts.checkAccount(a.id)
+    expect(accounts.getAccount(a.id)?.observed?.loggedIn).toBe(true)
+    // A fresh check holds the account's lock, its answer gated; Set up, reading the signed-in answer kept, queues behind it.
+    says.set(folderOf(a), 'unknown')
+    let open!: () => void
+    gates.set(folderOf(a), new Promise<void>((r) => (open = r)))
+    const checking = accounts.checkAccount(a.id)
+    await vi.waitFor(() => expect(asked.filter((f) => f === folderOf(a))).toHaveLength(2), { timeout: HUNG_MS })
+    const asking = in1(() => accounts.runSandboxSetUp('codex'))
+    // Set up reads the kept answer and asks for the lock without waiting on anything else: once this turn of the event
+    // loop is over, it is queued behind the check.
+    await new Promise<void>((r) => setImmediate(r))
+    open()
+    await checking
+    expect(accounts.getAccount(a.id)?.observed?.loggedIn).toBeNull()
+    expect(await outcome(asking)).toMatch(/none on in this workspace is signed in/)
+    expect(started).toHaveLength(0)
+  })
 })
