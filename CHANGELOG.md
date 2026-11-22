@@ -23,6 +23,7 @@
 
 ### Fixed
 
+- **A file replaced by a folder shows its diff** (HI-3529). Where a commit turned a file into a folder of the same name (or a folder into a file), the file's diff in a stash's **Show**, Compare in Changes and a card's changes failed with git's *bad file*; it now shows the file deleted (or added), and the folder's files as added.
 - **Stashes lists a long history of stashes** (HI-3531). With hundreds of stashes holding untracked files, Changes' **Stashes** failed to read any of them (Windows' command line was too long); it now lists every one, each with its files counted.
 - **Combwork reads git rightly when git speaks another language** (HI-3534). A git with its translations installed answers in the language your system or `LANGUAGE`, `LC_ALL` or `LANG` names, and Combwork recognises some of git's answers by their words: with a German git, Repository health's Prune Worktrees found nothing to prune, and a folder that isn't a repository was an error instead. Every git Combwork starts now answers in English (`LANGUAGE=en`), so git's errors Combwork shows are in English too; git in your own terminals and in agents' sessions keeps your language.
 - **Drop and Pop in Stashes act on the row you clicked** (HI-3527). When one stash was listed in two rows (a `git stash store` of its commit), **Drop** or **Pop** on the lower row removed the upper one, and the list could keep showing a row that was gone. Each now acts on its own row, and refuses with *look again* when the list changed and it can't tell which you meant.
