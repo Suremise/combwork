@@ -12,12 +12,12 @@ const CONFIRMS = ['git.operation.abort', 'git.operation.skip', 'git.operation.en
 
 const translations = (code: string): Record<string, string> => {
   const all: Record<string, string> = {}
-  for (const f of readdirSync(join(LOCALES, code)).filter((f) => f.endsWith('.json'))) Object.assign(all, JSON.parse(readFileSync(join(LOCALES, code, f), 'utf8')))
+  for (const f of readdirSync(join(LOCALES, code)).filter((name) => name.endsWith('.json'))) Object.assign(all, JSON.parse(readFileSync(join(LOCALES, code, f), 'utf8')))
   return all
 }
 const english = (): Record<string, string> => {
   const all: Record<string, string> = {}
-  for (const f of readdirSync(join(LOCALES, 'en')).filter((f) => f.endsWith('.json'))) for (const [id, m] of Object.entries(JSON.parse(readFileSync(join(LOCALES, 'en', f), 'utf8')) as Record<string, { defaultMessage: string }>)) all[id] = m.defaultMessage
+  for (const f of readdirSync(join(LOCALES, 'en')).filter((name) => name.endsWith('.json'))) for (const [id, m] of Object.entries(JSON.parse(readFileSync(join(LOCALES, 'en', f), 'utf8')) as Record<string, { defaultMessage: string }>)) all[id] = m.defaultMessage
   return all
 }
 const codes = readdirSync(LOCALES).filter((d) => !d.startsWith('.') && d !== 'en' && statSync(join(LOCALES, d)).isDirectory())
