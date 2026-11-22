@@ -132,6 +132,77 @@ describe('a merge', () => {
   })
 })
 
+describe('a path git would read as a glob (HI-3501)', () => {
+  /** Each file changed one way on `side`, another on main, then merged: all in conflict. */
+  function conflicted(files: string[]): void {
+    commit(proj, Object.fromEntries(files.map((f) => [f, 'base\n'])), 'base of each')
+    sh(proj, 'switch', '-q', '-c', 'side')
+    commit(proj, Object.fromEntries(files.map((f) => [f, 'side\n'])), 'side edit')
+    sh(proj, 'switch', '-q', 'main')
+    commit(proj, Object.fromEntries(files.map((f) => [f, 'main\n'])), 'main edit')
+    expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
+  }
+  const unmerged = (): string[] => sh(proj, 'diff', '--name-only', '--diff-filter=U').split('\n').filter(Boolean).sort()
+  // `a[1].txt` as a glob matches `a1.txt`, and `[id].tsx` matches `i.tsx` and `d.tsx`: none of those may move.
+  const FILES = ['a[1].txt', 'a1.txt', 'app/[id].tsx', 'app/i.tsx', 'app/d.tsx']
+
+  it('Use theirs settles the file clicked alone: its siblings stay in conflict, as they were', async () => {
+    conflicted(FILES)
+    await step({ what: 'merge', file: 'a[1].txt', pick: 'theirs' })
+    await step({ what: 'merge', file: 'app/[id].tsx', pick: 'theirs' })
+    expect(read('a[1].txt')).toBe('side\n')
+    expect(read('app/[id].tsx')).toBe('side\n')
+    expect(unmerged()).toEqual(['a1.txt', 'app/d.tsx', 'app/i.tsx'])
+    for (const f of ['a1.txt', 'app/d.tsx', 'app/i.tsx']) expect(read(f)).toContain('<<<<<<<')
+  })
+
+  it('Use mine and Mark resolved stage the file clicked alone, never a sibling with its markers', async () => {
+    conflicted(FILES)
+    await step({ what: 'merge', file: 'a[1].txt', pick: 'mine' })
+    expect(read('a[1].txt')).toBe('main\n')
+    writeFileSync(join(proj, 'app', '[id].tsx'), 'both\n')
+    await step({ what: 'merge', file: 'app/[id].tsx', pick: 'resolved' })
+    expect(unmerged()).toEqual(['a1.txt', 'app/d.tsx', 'app/i.tsx'])
+    expect((await state())?.conflicts.map((c) => c.path)).toEqual(['a1.txt', 'app/d.tsx', 'app/i.tsx'])
+    expect(sh(proj, 'show', ':app/[id].tsx')).toBe('both')
+  })
+
+  it('Mark resolved stages nothing else that matches: not a changed file out of conflict', async () => {
+    commit(proj, { 'b1.txt': 'b1\n' }, 'b1')
+    conflicted(['b[1].txt'])
+    writeFileSync(join(proj, 'b1.txt'), 'changed, not staged\n')
+    writeFileSync(join(proj, 'b[1].txt'), 'done\n')
+    await step({ what: 'merge', file: 'b[1].txt', pick: 'resolved' })
+    expect(sh(proj, 'diff', '--cached', '--name-only')).not.toContain('b1.txt')
+    expect(sh(proj, 'diff', '--name-only')).toBe('b1.txt')
+  })
+
+  it('Use a side that deleted the file deletes that file alone, never a sibling it would match', async () => {
+    commit(proj, { 'd[1].txt': 'base\n', 'd1.txt': 'base\n' }, 'two')
+    sh(proj, 'switch', '-q', '-c', 'side')
+    commit(proj, { 'd[1].txt': 'side\n', 'd1.txt': 'side\n' }, 'side edit')
+    sh(proj, 'switch', '-q', 'main')
+    sh(proj, 'rm', '-q', '--', 'd[1].txt')
+    commit(proj, { 'd1.txt': 'main\n' }, 'one gone on main')
+    expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
+    const c = (await state())!.conflicts.find((x) => x.path === 'd[1].txt')!
+    expect(c).toEqual({ path: 'd[1].txt', mine: false, theirs: true })
+    await step({ what: 'merge', file: 'd[1].txt', pick: 'mine' })
+    expect(existsSync(join(proj, 'd[1].txt'))).toBe(false)
+    expect(existsSync(join(proj, 'd1.txt'))).toBe(true)
+    expect(unmerged()).toEqual(['d1.txt'])
+  })
+
+  it("the tooltip's command names the path literally, quoted for a shell", () => {
+    const both = { mine: true, theirs: true }
+    expect(pickCommand('merge', { path: 'a[1].txt', ...both }, 'resolved')).toBe("git add -A -- ':(literal)a[1].txt'")
+    expect(pickCommand('merge', { path: 'app/[id].tsx', ...both }, 'theirs')).toBe("git checkout --theirs -- ':(literal)app/[id].tsx'; git add -- ':(literal)app/[id].tsx'")
+    expect(pickCommand('merge', { path: 'd[1].txt', mine: false, theirs: true }, 'mine')).toBe("git rm -- ':(literal)d[1].txt'")
+    expect(pickCommand('merge', { path: "it's here.txt", ...both }, 'resolved')).toBe("git add -A -- 'it'\\''s here.txt'")
+    expect(pickCommand('merge', { path: 'src/a-b_c.txt', ...both }, 'resolved')).toBe('git add -A -- src/a-b_c.txt')
+  })
+})
+
 describe('a rebase, its sides swapped', () => {
   it("reads its step; Use mine takes the commit being replayed (git's theirs); Continue finishes it on main", async () => {
     diverged()

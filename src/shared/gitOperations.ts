@@ -82,13 +82,27 @@ export function operationCommand(what: GitOperationName, step: OperationStep): s
   return `git ${what} --${step}` // i18n-ignore: a git command
 }
 
-/** HI-3470: a pick's git command, for its tooltip (a side without the file: git rm). Commands, never translated. */
+/**
+ * HI-3501: a conflicted file's path as the tooltip's command names it, so a pasted command touches that file alone: a
+ * literal pathspec (`:(literal)a[1].txt`) where git would read it as a glob (`*`, `?`, `[`, `]`, `\`) or as magic (a
+ * leading `:`), and single-quoted, as git quotes paths for a shell, where it has anything but plain characters.
+ */
+export function pathArg(path: string): string {
+  const p = /[*?[\]\\]/.test(path) || path.startsWith(':') ? `:(literal)${path}` : path
+  return /^[\w./@+=,-]+$/.test(p) ? p : `'${p.replace(/'/g, "'\\''")}'`
+}
+
+/**
+ * HI-3470: a pick's git command, for its tooltip (a side without the file: git rm). Commands, never translated. The path
+ * is literal (pathArg), as the panel runs it (HI-3501: main's pickArgs, `--literal-pathspecs`).
+ */
 export function pickCommand(what: GitOperationName, c: GitConflict, pick: ConflictPick): string {
-  if (pick === 'resolved') return `git add -A -- ${c.path}` // i18n-ignore: a git command
+  const p = pathArg(c.path)
+  if (pick === 'resolved') return `git add -A -- ${p}` // i18n-ignore: a git command
   const has = pick === 'mine' ? c.mine : c.theirs
-  if (!has) return `git rm -- ${c.path}` // i18n-ignore: a git command
+  if (!has) return `git rm -- ${p}` // i18n-ignore: a git command
   const ours = (pick === 'mine') !== mineIsTheirs(what)
-  return `git checkout --${ours ? 'ours' : 'theirs'} -- ${c.path}; git add -- ${c.path}` // i18n-ignore: git commands
+  return `git checkout --${ours ? 'ours' : 'theirs'} -- ${p}; git add -- ${p}` // i18n-ignore: git commands
 }
 
 /**

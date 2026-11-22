@@ -167,16 +167,17 @@ export function stepArgs(what: GitOperationName, step: 'continue' | 'skip' | 'ab
   return [what, `--${step}`]
 }
 
-/** The git commands that settle a conflicted file, in order. */
+/**
+ * The git commands that settle a conflicted file, in order. HI-3501: each takes its path literally
+ * (`--literal-pathspecs`), so `a[1].txt` never also settles, stages or deletes `a1.txt` as a glob would.
+ */
 export function pickArgs(what: GitOperationName, c: GitConflict, pick: ConflictPick): string[][] {
-  if (pick === 'resolved') return [['add', '-A', '--', c.path]]
+  const literal = (args: string[]): string[] => ['--literal-pathspecs', ...args, '--', c.path]
+  if (pick === 'resolved') return [literal(['add', '-A'])]
   const has = pick === 'mine' ? c.mine : c.theirs
-  if (!has) return [['rm', '-q', '--', c.path]]
+  if (!has) return [literal(['rm', '-q'])]
   const ours = (pick === 'mine') !== mineIsTheirs(what)
-  return [
-    ['checkout', ours ? '--ours' : '--theirs', '--', c.path],
-    ['add', '--', c.path]
-  ]
+  return [literal(['checkout', ours ? '--ours' : '--theirs']), literal(['add'])]
 }
 
 /**
@@ -204,16 +205,17 @@ export async function operationStep(projectPath: string, folder: string, req: Op
         if (agent) throw combworkError(M.agentBusy, { agent, folder })
         await guard?.()
         const run = async (args: string[]): Promise<string> => {
+          const name = args.find((x) => !x.startsWith('--')) ?? '' // the command, past --literal-pathspecs
           log.info(`The user's ${userText(args.join(' '))} in ${userText(folder)}`)
           // A Continue or Skip commits, running the repository's hooks: Commit's own bound (Settings → Advanced,
           // `cw.git.commitMinutes`, HR1's round 1), never one of its own.
           const r = await git(folder, args, undefined, undefined, { env: stepEnv(), timeout: platformLimits.gitCommitMs() })
           if (r.timedOut) {
-            log.warn(`git ${userText(args[0] ?? '')} in ${userText(folder)} ran past its bound and was ended`)
+            log.warn(`git ${userText(name)} in ${userText(folder)} ran past its bound and was ended`)
             throw combworkError(M.timedOut, { seconds: Math.round(platformLimits.gitCommitMs() / 1000), folder })
           }
           if (!r.ok) {
-            log.info(`git ${userText(args[0] ?? '')} in ${userText(folder)} failed: ${userText(gitErrorLine(r.err))}`)
+            log.info(`git ${userText(name)} in ${userText(folder)} failed: ${userText(gitErrorLine(r.err))}`)
             throw combworkError(M.failed, { why: gitErrorLine(`${r.err}\n${r.out}`) || r.err.trim().slice(0, 400) || r.out.trim().slice(0, 400) })
           }
           return `${r.out}\n${r.err}`.trim()
