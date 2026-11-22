@@ -18,6 +18,9 @@ vi.mock('../src/main/workflow/queueHost', () => ({ folderBuilders: () => held })
 /** An agent working in the folder: none unless a test says. */
 let agent: string | null = null
 vi.mock('../src/main/gitRepo', async (original) => ({ ...(await original<typeof import('../src/main/gitRepo')>()), busyAgentIn: async () => agent }))
+/** An open card whose line the branch is: none unless a test says. */
+let card: { number: number; key: string; title: string } | null = null
+vi.mock('../src/main/branchMerge', async (original) => ({ ...(await original<typeof import('../src/main/branchMerge')>()), lineCard: async () => card }))
 
 vi.setConfig({ testTimeout: timing('test.hang') })
 
@@ -58,6 +61,7 @@ beforeEach(() => {
   agent = null
   sessionIn = null
   slotHeld = false
+  card = null
 })
 
 describe('parsing', () => {
@@ -179,6 +183,9 @@ describe('Revert… and Cherry-pick…', () => {
     slotHeld = true
     await expect(act('revert', c)).rejects.toThrow('its merge slot')
     slotHeld = false
+    card = { number: 1, key: 'HI-7', title: 'x' }
+    await expect(act('revert', c)).rejects.toThrow('the branch of HI-7')
+    card = null
     expect(head()).toBe(at)
     sh(proj, 'switch', '-q', '--detach')
     expect((await detail(c)).revert).toContain('detached HEAD')

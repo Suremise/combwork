@@ -6021,8 +6021,8 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
     repository lock and the folder's fence: the project folder on a detached HEAD, or no longer on the branch and commit
     the dialog read; uncommitted changes to tracked files (untracked ones don't count); and HI-3469's checks
     (`projectFolderBusy`, `branchBusy`): a live session, a Combwork run or an agent's file lock, a working agent, an
-    operation under way or a file in conflict there, a card the merge queue is testing into the branch, its merge slot
-    held or waited for.
+    operation under way or a file in conflict there, the branch an open card's line, a card the merge queue is testing
+    into it, its merge slot held or waited for.
   - **Branch from here…** opens New branch… with Starts at set to the commit (switching to it unticked, as for any start
     away from the folder's commit); **Tag here…** opens Create tag… for the commit (`createTag`'s `at`, a full commit id
     git must have; Create tag… itself still tags the commit checked out). Each keeps its form's own checks.

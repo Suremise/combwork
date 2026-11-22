@@ -2344,7 +2344,7 @@ Branches outlive their work: a card that was superseded or archived keeps its br
 Click a commit in History (or a move's commit in **Moves**) to open it: its hash (**Copy hash** copies it whole), author, date, whole message and the card it names (click the key to open the card), and the files it changed, each file's changes beside them.
 
 - **Revert…** makes a new commit that undoes it, and **Cherry-pick…** copies it as a new commit, both on the branch the project folder has checked out, after asking. For a merge, they take what the merge brought in. Revert is greyed out for a commit your branch doesn't have, and Cherry-pick for one it has: to pick onto another branch, switch to it first. If git stops on a conflict, a notice says so: **Open in Changes**, where the panel above the diff finishes or aborts it.
-- Both are greyed out, saying why, while the project folder has uncommitted changes to tracked files, is on a detached HEAD, or an agent, its session, a run or a merge works there.
+- Both are greyed out, saying why, while the project folder has uncommitted changes to tracked files, is on a detached HEAD, or an agent, its session, a run or a merge works there, and when its branch is an open card's (its builder moves it).
 - **Branch from here…** opens **New branch…** starting at this commit, and **Tag here…** opens **Create tag…** for it.
 
 #### Moves <a id="moves"></a>

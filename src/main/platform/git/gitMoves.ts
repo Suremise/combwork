@@ -186,8 +186,6 @@ async function planOf(projectPath: string, req: RestoreRequest): Promise<{ plan:
   if (from === to) refuse(combworkError(M.same, { branch }))
   if (place.where === 'slot') refuse(combworkError(M.inSlot, { branch, slot: place.slot ?? '' }, { kind: 'conflict' }))
   else if (place.where === 'worktree') refuse(combworkError(M.inWorktree, { branch, folder: place.folder ?? '' }, { kind: 'conflict' }))
-  const card = await lineCard(projectPath, branch)
-  if (card) refuse(combworkError(M.card, { branch, card: card.key }, { kind: 'conflict' }))
   const busy = await branchBusy(projectPath, branch)
   if (busy) refuse(busy)
   if (where === 'project') {
@@ -204,10 +202,13 @@ async function planOf(projectPath: string, req: RestoreRequest): Promise<{ plan:
 }
 
 /**
- * What keeps a branch from being moved by the user now (HI-3469; HI-3471's Revert and Cherry-pick too): a card the merge
- * queue is testing into it, or its merge slot held or waited for by an agent or the queue. Null: nothing.
+ * What keeps a branch from being moved by the user now (HI-3469; HI-3471's Revert and Cherry-pick too): an open card's
+ * line (its builder moves it), a card the merge queue is testing into it, or its merge slot held or waited for by an
+ * agent or the queue. Null: nothing.
  */
 export async function branchBusy(projectPath: string, branch: string): Promise<CombworkError | null> {
+  const card = await lineCard(projectPath, branch)
+  if (card) return combworkError(M.card, { branch, card: card.key }, { kind: 'conflict' })
   const testing = await queueTesting(projectPath, branch)
   if (testing) return combworkError(M.queue, { branch, card: testing }, { kind: 'conflict' })
   const slot = mergeSlots.list(projectPath).find((s) => s.branch === branch && ((s.holder && s.holder.kind !== 'user') || s.waiting.length))
