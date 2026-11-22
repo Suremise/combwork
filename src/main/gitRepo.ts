@@ -1528,8 +1528,8 @@ const UPDATE = {
   missed: msg({ id: 'service.gitRepo.update.missed', defaultMessage: '{branch} was changed, but it still lacks commits of {target}: check it in History before going on.', description: "An error after Update from <target> (HI-1180): git said it succeeded, but the branch {branch} still doesn't contain the target {target}'s head." })
 }
 
-/** The sessions' statuses that keep a folder busy, as folderBusyData's. */
-const FOLDER_BUSY = new Set(['starting', 'working', 'waiting', 'background', 'watching', 'signin'])
+/** The sessions' statuses that keep a folder busy, as folderBusyData's (HI-3473: Repository health's too). */
+export const FOLDER_BUSY = new Set(['starting', 'working', 'waiting', 'background', 'watching', 'signin'])
 
 /** The first of the project's agents working in `folder` now (HI-2944: Commit or Set aside there is refused), or null. */
 export async function busyAgentIn(projectPath: string, folder: string): Promise<string | null> {

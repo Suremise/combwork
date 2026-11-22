@@ -148,6 +148,22 @@ interface CombworkMessageValues {
   'service.git.tooLarge': { kb: number }
   'service.gitCancel.taken': undefined
   'service.gitCompare.noBranch': { branch: string | number }
+  'service.gitHealth.agentBusy': { agent: string | number; folder: string | number }
+  'service.gitHealth.busy': { folder: string | number; what: string | number }
+  'service.gitHealth.combworkRun': { what: string | number; folder: string | number }
+  'service.gitHealth.fetchFailed': { remote: string | number; why: string | number }
+  'service.gitHealth.fetchedPruned': { remotes: string | number; n: number; branches: string | number }
+  'service.gitHealth.gaveUp': { minutes: number }
+  'service.gitHealth.invalid': undefined
+  'service.gitHealth.kept.changed': undefined
+  'service.gitHealth.kept.folder': undefined
+  'service.gitHealth.kept.held': undefined
+  'service.gitHealth.kept.refused': undefined
+  'service.gitHealth.noProcesses': undefined
+  'service.gitHealth.pruned': { n: number; kept: number; keptList: string | number }
+  'service.gitHealth.removed': { n: number; kept: number; keptList: string | number }
+  'service.gitHealth.slotBusy': { slot: string | number; state: string }
+  'service.gitHealth.stopped': undefined
   'service.gitOperation.agentBusy': { agent: string | number; folder: string | number }
   'service.gitOperation.busy': { folder: string | number; what: string | number }
   'service.gitOperation.changed': { was: string; folder: string | number }

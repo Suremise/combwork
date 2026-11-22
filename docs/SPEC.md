@@ -3315,7 +3315,7 @@ The Version Control tab documents each preset's choices and why (P6, from this t
 - **Off is really off.** Cards move freely, as today. Combwork still records facts (commits, who did what), so the card
   shows them, but it gates nothing.
 - **What never turns off** (data safety): file locks (their own setting; Off there is the user's), never deleting
-  `index.lock`, no destructive git (checkout, reset, branch switch, pull) while an agent works in the folder (§8's
+  `index.lock` by itself (only Repository health's Remove Stale Locks, on the user's confirm, HI-3473), no destructive git (checkout, reset, branch switch, pull) while an agent works in the folder (§8's
   fence, #646), and the merge queue's compare-and-swap on the target (§16.9) [note "What all off means"].
 - **Several agents in one folder.** File locks stop two agents editing one file. The remaining risks and helpers:
   commits sweeping in another agent's half-done files (G16 warns, from file-lock records: the paths each agent locks
@@ -5858,6 +5858,46 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   again once the step is done, so one with nothing under way any more is lent again. The project folder can't be
   renamed aside while an editor has it open, so there only sessions and Combwork's own runs count; a terminal of the
   user's own is theirs. Agents have no tool for any of it, as for the rest of Version Control.
+- **Repository health** (HI-3473, the design agreed on the card, request r11): Version Control → Branches & remotes
+  ends with three of git's own repairs, for what a git or a folder left behind, each listing what it finds and done only
+  on the user's confirm, never by Combwork itself (no agent tool, no Agent API route, no count in `cw_project_status`).
+  Git's work is a Git port operation (`repoHealth`: RepoOps' `health`, `pruneWorktrees`, `removeLocks`,
+  `remotePrunePreview`, `fetchPrune`; `platform/git/gitHealth.ts`): None lists none of it. What Combwork already does
+  by itself is unchanged: slots and copies prune when they make or drop one, Recreate prunes only what it recreates, and
+  Combwork's own git never leaves a lock (its runs end their whole tree, its commits take a private index).
+  - **Worktree entries**: what `git worktree prune --dry-run --verbose` lists (an entry whose folder is gone), each
+    with its folder (its `gitdir`'s, or none where git's entry doesn't say) and git's reason, and whose it was: a
+    slot's (Combwork makes a slot again by itself) or an agent's 1.0-era worktree (Repair can still find a moved one by
+    its entry, which pruning drops: not ticked for you). **Prune Worktrees…** drops the ticked entries one at a time,
+    each only while git's dry run still lists it with the same folder and that folder is still gone, on HI-3069's
+    owned-entry proof (`dropRegistration`: moved aside out of `worktrees` and proved again before it is removed); an
+    entry naming no folder by its own proof (its file id, not `locked`, its `gitdir` as read). Never a whole-repository
+    `git worktree prune`, which would also drop an entry gone since the user looked.
+  - **Lock files**: git's in the repository's common git folder: at its top (`index.lock`, `HEAD.lock`,
+    `packed-refs.lock`, `config.lock`, `shallow.lock`, git's upper-case refs' such as `ORIG_HEAD.lock`), in each
+    `worktrees/<id>/`, and under `refs/` (at most 50,000 entries looked at); never Combwork's (`cw-merge.lock`). A lock
+    is **stale** only when (a) it is at least `cw.git.staleLockSeconds` old (Settings → Advanced, 60 by default), (b)
+    no process whose name `cw.git.processNames` finds (by default `git.exe` and `git-remote-*.exe`) started before it
+    was last written (with 2 seconds allowed for the clocks): Windows can't say a process's folder, and a git started
+    after a lock was made fails on it, so only an older one can hold it. A lock's time is the later of its creation and
+    last write, since Windows can carry an old file's creation time over to one made again under its name; a process
+    list that can't be read whole rules nothing out. And (c) nothing works on the repository (below). **Remove Stale
+    Locks…** lists every lock, its age and, for one kept, why (*less than 60 seconds old*, *git.exe (process 4812)
+    started 5 minutes ago, before this lock, and still runs*); the stale ones are ticked. On the confirm, under the
+    repository's lock and with a new process list, each is removed only while it is the file the user saw (its file id,
+    times and size) and still stale: renamed aside in the git folder (a file a live git has open can't be), proved
+    again, then removed; anything else is kept, back under its name if free, and said. No process is ever ended.
+  - **Remote-tracking branches**: **Fetch with Prune…** asks each remote which of its branches are gone (`git remote
+    prune --dry-run`, reaching the remote as Fetch does: `cw.git.networkMinutes`, a Cancel in its notice), lists them by
+    remote with the local branches that track each (they stay, their upstream shown as gone) and any remote that
+    couldn't be asked, then fetches the reachable ones with `git fetch --prune` and says what was dropped (a branch
+    deleted on the remote since the check included). Nothing changes on the remote.
+  - **Refused while anything works on the repository**, checked on the confirm under the repository's lock (Fetch with
+    prune takes it for the check only): an agent's session working in a folder of the repository (the project folder or
+    any worktree git lists: `sessions.liveStates()`, and `busyAgentIn` for each), a run or an agent's file lock there
+    (`folderBuilders`), one of Combwork's own runs there (a merge check, a slot's setup), or a slot being made or
+    removed. A merge holding the repository's lock (the merge queue's or the user's) is waited for, as other changes to
+    the repository wait, with the notice of who holds it: none of these runs beside it.
 - **A detach that keeps failing** (HI-3467): a clean free Git slot whose detach at its target fails for any other reason
   (an index lock, files in the way, git unable to read its head or the target's, the target's branch gone; not its
   card's own work, which keeps it) stays not ready, and the same record (`slot_operation:`, `what` `detach`) keeps git's

@@ -118,6 +118,36 @@ export async function listProcesses(timeoutMs = TREE_END_BOUNDS.listMs): Promise
   return completeListing(LIST_PS, timeoutMs)
 }
 
+/** HI-3473: a process with its program's file name (Windows' `Name`: `git.exe`), as listNamedProcesses lists it. */
+export type NamedProcess = { pid: number; started: number; name: string }
+
+// The pid, start (Unix ms) and name, a line each; a process gone mid-listing (no start any more) is left out, never an error.
+const NAMED_PS = "Get-CimInstance Win32_Process -Filter 'ProcessId != 0' | ForEach-Object { if ($_.CreationDate) { '{0} {1} {2}' -f $_.ProcessId, ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds(), $_.Name } }"
+
+/** NAMED_PS' output read (`ok`: its PowerShell exited by itself with 0, nothing on its standard error): the processes, or null unless whole. */
+export function namedProcessList(out: string, ok: boolean): NamedProcess[] | null {
+  if (!ok) return null
+  const lines = out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  if (lines.at(-1) !== 'end') return null
+  const rows = lines.slice(0, -1)
+  const list: NamedProcess[] = []
+  for (const row of rows) {
+    const m = /^(\d+) (-?\d+) (.+)$/.exec(row)
+    if (!m) return null
+    list.push({ pid: Number(m[1]), started: Number(m[2]), name: m[3] })
+  }
+  return list.length ? list : null
+}
+
+/**
+ * HI-3473: every process with its program's name and start, listed without blocking, or null unless the listing is
+ * known complete (as listProcesses: `end` printed last, exit 0, nothing on standard error).
+ */
+export async function listNamedProcesses(timeoutMs = TREE_END_BOUNDS.listMs): Promise<NamedProcess[] | null> {
+  const r = await powershellRun(`$ErrorActionPreference = 'Stop'; ${NAMED_PS}; 'end'`, timeoutMs)
+  return namedProcessList(r.out, r.ok && !r.err)
+}
+
 /**
  * HI-3376 (HR3's round 2): `command`'s listing, complete or null. Any error ends it (`$ErrorActionPreference = 'Stop'`:
  * a row's failure, or the pipeline's, is a terminating error, so `end` isn't printed and its exit isn't 0), and any

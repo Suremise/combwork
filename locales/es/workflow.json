@@ -95,7 +95,7 @@
   "workflow.form.minutesValue": "{n, plural, one {# minuto} many {# minutos} other {# minutos}}",
   "workflow.form.neverOff.fileLocks": "Bloqueos de archivos, mientras su propio ajuste los tenga activados.",
   "workflow.form.neverOff.folderGit": "Ningún cambio de rama, pull u otra operación de git que cambie la carpeta mientras un agente trabaja en ella.",
-  "workflow.form.neverOff.indexLock": "Combwork nunca borra el index.lock de git.",
+  "workflow.form.neverOff.indexLock": "Combwork nunca elimina por sí mismo el index.lock de git: solo lo hace Quitar bloqueos obsoletos, cuando lo confirmas.",
   "workflow.form.neverOff.queue": "La cola de fusión mueve una rama de destino solo si nada más la ha movido mientras tanto.",
   "workflow.form.neverOffHead": "Lo que nunca se desactiva, para mantener tu trabajo a salvo:",
   "workflow.form.noChanges": "Ninguna opción cambia: solo el ajuste predefinido del que partían.",

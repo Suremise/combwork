@@ -490,6 +490,8 @@ interface CombworkMessageValues {
   'tips.releaseOffer.title': undefined
   'tips.removeAll.text': undefined
   'tips.removeAll.title': undefined
+  'tips.repositoryHealth.text': undefined
+  'tips.repositoryHealth.title': undefined
   'tips.resolveOnBuilder.text': undefined
   'tips.resolveOnBuilder.title': undefined
   'tips.resumeAfterUpdate.text': undefined

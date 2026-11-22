@@ -384,8 +384,8 @@
     "description": "A protection that stays on with every rule off."
   },
   "workflow.form.neverOff.indexLock": {
-    "defaultMessage": "Combwork never deletes git’s index.lock.",
-    "description": "A protection that stays on with every rule off. Keep index.lock (a file name)."
+    "defaultMessage": "Combwork never deletes git’s index.lock by itself: only Remove Stale Locks does, when you confirm it.",
+    "description": "A protection that stays on with every rule off. Keep index.lock (a file name). Remove Stale Locks: a button in Version Control → Branches & remotes → Repository health (HI-3473): use its name as translated there."
   },
   "workflow.form.neverOff.queue": {
     "defaultMessage": "The merge queue moves a target branch only if nothing else moved it meanwhile.",

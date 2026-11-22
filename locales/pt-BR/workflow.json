@@ -95,7 +95,7 @@
   "workflow.form.minutesValue": "{n, plural, one {# minuto} other {# minutos}}",
   "workflow.form.neverOff.fileLocks": "Bloqueios de arquivo, enquanto a configuração própria deles os mantiver ativados.",
   "workflow.form.neverOff.folderGit": "Nenhuma troca de branch, pull ou outro comando git que altere a pasta enquanto um agente trabalha nela.",
-  "workflow.form.neverOff.indexLock": "O Combwork nunca exclui o index.lock do git.",
+  "workflow.form.neverOff.indexLock": "O Combwork nunca exclui o index.lock do git por conta própria: só Remover bloqueios obsoletos faz isso, quando você confirma.",
   "workflow.form.neverOff.queue": "A fila de merge só avança um branch de destino se nada mais o tiver movido nesse meio-tempo.",
   "workflow.form.neverOffHead": "O que nunca é desativado, para manter o seu trabalho seguro:",
   "workflow.form.noChanges": "Nenhuma opção muda: só a predefinição de onde partiram.",

@@ -2027,6 +2027,22 @@
     "defaultMessage": "Git: longest a fetch, pull or push takes",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the Fetch, Pull and Push actions in Version Control (HI-3372)."
   },
+  "settings.advanced.cw.git.processNames.desc": {
+    "defaultMessage": "The program names (as Task Manager's Details tab shows them) this regular expression finds count as a git that may hold a lock: while one that started before a lock file still runs, Repository health won't remove that lock. The default finds git.exe and git's remote helpers (git-remote-https.exe and the like). Add another program only if it writes git's lock files itself.",
+    "description": "What the advanced setting \"Git: the programs that may hold a lock\" does (Settings → Advanced, HI-3473). git.exe and git-remote-https.exe are program names: keep them. Task Manager's Details tab: as Windows names it."
+  },
+  "settings.advanced.cw.git.processNames.title": {
+    "defaultMessage": "Git: the programs that may hold a lock",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a regular expression: Repository health's Remove stale lock (HI-3473)."
+  },
+  "settings.advanced.cw.git.staleLockSeconds.desc": {
+    "defaultMessage": "Repository health offers to remove a lock file of git's (such as index.lock) only once it is at least this old, and only while no git that started before it still runs. A git working normally holds a lock for moments; raise this if a long git command of yours (a large commit, a repack) holds one longer.",
+    "description": "What the advanced setting \"Git: how old a lock must be to be stale\" does (Settings → Advanced, HI-3473). index.lock is a file name: keep it."
+  },
+  "settings.advanced.cw.git.staleLockSeconds.title": {
+    "defaultMessage": "Git: how old a lock must be to be stale",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: Repository health's Remove stale lock in Version Control → Branches & remotes (HI-3473)."
+  },
   "settings.advanced.cw.guidance.desc": {
     "defaultMessage": "With Combwork's tools, each project agent gets Combwork's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the combwork server's instructions, Codex after your own developer_instructions. Turned off, agents still get Combwork's tools, without the guidance, from their next session. The Assistant always gets its own: they are its role.",
     "description": "What the advanced setting \"Combwork's guidance for agents\" does (Settings → Advanced, under Combwork). Claude Code, Copilot and Codex are CLIs' names, combwork the name of Combwork's MCP server and developer_instructions a Codex setting: keep them."

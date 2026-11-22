@@ -631,6 +631,8 @@
   "tips.activityMap.title": "エージェントの動きのマップ",
   "tips.activityMapPanels.title": "ステーションの中身を見る",
   "tips.activityMapShowCall.title": "マップからリストへ",
+  "tips.repositoryHealth.text": "gitが「index.lock: File exists」と表示したり、フォルダーを削除したワークツリーを拒否したりするときは、「バージョン管理」→「ブランチとリモート」→「リポジトリの状態」で、残っているものを一覧し、チェックしたものを片付けられます。",
+  "tips.repositoryHealth.title": "古いgitのロックやワークツリーのエントリを片付ける",
   "tips.resumeLongIdle.title": "長くアイドル状態の会話は再開の前に確認します",
   "tips.resumeLongIdle.text": "1時間を超えてアイドル状態の会話は、プロンプトキャッシュをおそらく失っているため、再開に多くのトークンがかかることがあります。「再開」はアイドルの長さとサイズを示し、代わりに「アーカイブして新規開始」を提案します。"
 }

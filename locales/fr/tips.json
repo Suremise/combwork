@@ -631,6 +631,8 @@
   "tips.activityMap.title": "Une carte de ce que font tes agents",
   "tips.activityMapPanels.title": "Voir ce qu’il y a derrière une station",
   "tips.activityMapShowCall.title": "De la carte à la liste",
+  "tips.repositoryHealth.text": "Quand git dit \"index.lock: File exists\", ou refuse un worktree dont le dossier a été supprimé, Gestion de versions → Branches et dépôts distants → Santé du dépôt liste ce qui a été laissé derrière et nettoie ce que tu coches.",
+  "tips.repositoryHealth.title": "Supprimer un verrou git ou une entrée de worktree obsolète",
   "tips.resumeLongIdle.title": "Une conversation inactive depuis longtemps demande avant de reprendre",
   "tips.resumeLongIdle.text": "Une conversation inactive depuis plus d’une heure a très probablement perdu son cache des prompts, donc la reprendre peut coûter beaucoup de jetons. Reprendre indique depuis combien de temps elle est inactive et sa taille, et propose plutôt Archiver et repartir de zéro."
 }

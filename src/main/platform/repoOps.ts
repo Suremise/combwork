@@ -18,6 +18,7 @@ import type { BranchStart, ResolvedStart } from '../../shared/nextVersion'
 import type { FileGitDone, FolderChangeAction, FolderChangesDone, MergeResult } from '../../shared/types'
 import type { Operation } from '../../shared/platform/descriptors'
 import type { OperationRequest } from '../../shared/gitOperations'
+import type { RemotePrune, RepoHealth } from '../../shared/gitHealth'
 
 /**
  * Which members each operation may call (HR3's s15): the port is handed out for one operation, typed down to its own
@@ -46,6 +47,7 @@ export interface OpMembers {
   ignoreRules: 'exclude' | 'untrack' | 'include'
   folderChanges: 'settleChanges' | 'commitIgnore'
   operationSteps: 'operationStep'
+  repoHealth: 'health' | 'pruneWorktrees' | 'removeLocks' | 'remotePrunePreview' | 'fetchPrune'
 }
 
 /** The port as handed out for one operation: its own members only. */
@@ -112,4 +114,15 @@ export interface RepoOps {
    * `guard` runs there before git does and refuses by throwing. Git's own output.
    */
   operationStep(projectPath: string, folder: string, req: OperationRequest, guard?: () => Promise<void> | void): Promise<string>
+  // HI-3473: Repository health, the user's click at a time; each refused while anything works on the repository.
+  /** The worktree entries a prune would drop and the repository's lock files, each judged stale or not: no remote reached. */
+  health(projectPath: string): Promise<RepoHealth>
+  /** The entries the window showed (as sent, checked), each dropped only while git still lists it so. A summary. */
+  pruneWorktrees(projectPath: string, entries: unknown): Promise<string>
+  /** The lock files the window showed (as sent, checked), each removed only while it is that file and still stale. A summary. */
+  removeLocks(projectPath: string, locks: unknown): Promise<string>
+  /** Per remote, the remote-tracking branches deleted on it (it reaches each remote). */
+  remotePrunePreview(projectPath: string): Promise<RemotePrune[]>
+  /** The remotes (as sent, checked) fetched with prune: what was dropped. */
+  fetchPrune(projectPath: string, remotes: unknown): Promise<string>
 }

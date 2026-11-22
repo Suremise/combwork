@@ -1199,6 +1199,18 @@
   "settings.advanced.cw.git.networkMinutes.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.git.processNames.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.processNames.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.staleLockSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.staleLockSeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.guidance.desc": {
     "placeholders": {}
   },

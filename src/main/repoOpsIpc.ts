@@ -59,5 +59,11 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
     const ops = opsAt('git:operationStep')
     const { stepOperation } = await import('./operationPanel')
     return stepOperation(workspace, root, req, ops)
-  }
+  },
+  // HI-3473: Repository health (the two that reach a remote are ipc.ts', under the window's Cancel).
+  'git:health': (p) => opsAt('git:health').health(workspace.assertProject(p)),
+  'git:pruneWorktrees': (p, entries) => opsAt('git:pruneWorktrees').pruneWorktrees(workspace.assertProject(p), entries),
+  'git:removeLocks': (p, locks) => opsAt('git:removeLocks').removeLocks(workspace.assertProject(p), locks),
+  'git:remotePrunePreview': (p) => opsAt('git:remotePrunePreview').remotePrunePreview(workspace.assertProject(p)),
+  'git:fetchPrune': (p, remotes) => opsAt('git:fetchPrune').fetchPrune(workspace.assertProject(p), remotes)
 }

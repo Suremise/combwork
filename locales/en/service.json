@@ -587,6 +587,70 @@
     "defaultMessage": "There's no branch {branch} here any more.",
     "description": "An error comparing two branches in the Changes tab: the branch {branch} was deleted or renamed since the list was read."
   },
+  "service.gitHealth.agentBusy": {
+    "defaultMessage": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",
+    "description": "HI-3473: an error from Repository health: an agent ({agent}, its name) works in a folder of the repository ({folder}, a path)."
+  },
+  "service.gitHealth.busy": {
+    "defaultMessage": "A run or an agent is working in {folder} ({what}): nothing was done. Try again once it has finished.",
+    "description": "HI-3473: an error from Repository health: a run (a test, a build) or an agent's file lock is in a folder of the repository ({folder}, a path); {what} names the first one's folder or file."
+  },
+  "service.gitHealth.combworkRun": {
+    "defaultMessage": "Combwork is running “{what}” in {folder}: nothing was done. Try again once it has finished.",
+    "description": "HI-3473: an error from Repository health: one of Combwork's own runs (a merge check, a slot's setup; {what} is its title) works in a folder of the repository ({folder}, a path)."
+  },
+  "service.gitHealth.fetchFailed": {
+    "defaultMessage": "Fetching {remote} failed: {why}",
+    "description": "HI-3473: an error from Fetch with prune: git's fetch from the remote {remote} failed; {why} is git's error line, in English."
+  },
+  "service.gitHealth.fetchedPruned": {
+    "defaultMessage": "Fetched {remotes}. {n, plural, =0 {No remote-tracking branch was dropped.} one {Dropped # remote-tracking branch: {branches}.} other {Dropped # remote-tracking branches: {branches}.}}",
+    "description": "HI-3473: after Fetch with prune: the remotes fetched from ({remotes}, a list of names) and the remote-tracking branches dropped because they were deleted on the remote ({n}; {branches} lists them, such as origin/old)."
+  },
+  "service.gitHealth.gaveUp": {
+    "defaultMessage": "git gave up after {minutes, number} minutes (no answer from the remote, or a sign-in left open).",
+    "description": "HI-3473: why the check or fetch of a remote failed: git waited {minutes} minutes (Settings → Advanced, the longest a fetch takes) and was ended."
+  },
+  "service.gitHealth.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was done.",
+    "description": "HI-3473: an error from Repository health (Version Control → Branches & remotes): the request was malformed (not reached from the window)."
+  },
+  "service.gitHealth.kept.changed": {
+    "defaultMessage": "it changed since you looked",
+    "description": "HI-3473: why Repository health kept a worktree entry or a lock file the user ticked: it is gone, or not the one they were shown any more. A phrase in a list."
+  },
+  "service.gitHealth.kept.folder": {
+    "defaultMessage": "its folder is there",
+    "description": "HI-3473: why Prune worktrees kept an entry: the worktree's folder exists again. A phrase in a list."
+  },
+  "service.gitHealth.kept.held": {
+    "defaultMessage": "it isn't stale now",
+    "description": "HI-3473: why Remove stale lock kept a lock: by the time the user confirmed, a git that may hold it is running, or it was written again. A phrase in a list."
+  },
+  "service.gitHealth.kept.refused": {
+    "defaultMessage": "it couldn't be proved to be the one you saw",
+    "description": "HI-3473: why Prune worktrees or Remove stale lock kept something: Combwork couldn't prove, as it moved it aside, that it was what the user was shown (a file in use, a link, something replaced). A phrase in a list."
+  },
+  "service.gitHealth.noProcesses": {
+    "defaultMessage": "Windows' list of processes couldn't be read, so no lock can be called stale: nothing was removed. Try again.",
+    "description": "HI-3473: an error from Remove stale lock: the list of running processes (used to rule out a git holding the lock) could not be read whole."
+  },
+  "service.gitHealth.pruned": {
+    "defaultMessage": "{n, plural, =0 {No worktree entry was dropped.} one {Dropped # worktree entry.} other {Dropped # worktree entries.}}{kept, plural, =0 {} one { # was kept: {keptList}.} other { # were kept: {keptList}.}}",
+    "description": "HI-3473: after Prune worktrees: how many of git's entries for missing worktrees were dropped ({n}), and how many were kept ({kept}) with each one's name and why ({keptList}, a list of 'name (why)')."
+  },
+  "service.gitHealth.removed": {
+    "defaultMessage": "{n, plural, =0 {No lock file was removed.} one {Removed # lock file.} other {Removed # lock files.}}{kept, plural, =0 {} one { # was kept: {keptList}.} other { # were kept: {keptList}.}}",
+    "description": "HI-3473: after Remove stale lock: how many of git's lock files were removed ({n}), and how many kept ({kept}) with each one's path and why ({keptList}, a list of 'path (why)')."
+  },
+  "service.gitHealth.slotBusy": {
+    "defaultMessage": "{slot} is being {state, select, creating {made} other {removed}}: nothing was done. Try again in a moment.",
+    "description": "HI-3473: an error from Repository health: the slot {slot} (such as slot-a; glossary: slot) is being made or removed now. Keep the select keys."
+  },
+  "service.gitHealth.stopped": {
+    "defaultMessage": "Stopped here. What git fetched or dropped before it stopped stays: look again to see where things stand.",
+    "description": "HI-3473: after the user cancelled Fetch with prune or its check of a remote."
+  },
   "service.gitOperation.agentBusy": {
     "defaultMessage": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",
     "description": "HI-3470: an error from the panel: an agent ({agent}) works in the folder ({folder}, a path)."
