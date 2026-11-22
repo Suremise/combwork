@@ -95,7 +95,7 @@
   "workflow.form.minutesValue": "{n, plural, one {# minute} other {# minutes}}",
   "workflow.form.neverOff.fileLocks": "File locks, while their own setting has them on.",
   "workflow.form.neverOff.folderGit": "No branch switch, pull or other git that changes the folder while an agent works there.",
-  "workflow.form.neverOff.indexLock": "Combwork never deletes git’s index.lock.",
+  "workflow.form.neverOff.indexLock": "Combwork never deletes git’s index.lock by itself: only Remove Stale Locks does, when you confirm it.",
   "workflow.form.neverOff.queue": "The merge queue moves a target branch only if nothing else moved it meanwhile.",
   "workflow.form.neverOffHead": "What never turns off, to keep your work safe:",
   "workflow.form.noChanges": "No option changes: only the preset they started from.",

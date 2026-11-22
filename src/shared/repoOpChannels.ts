@@ -34,7 +34,13 @@ export const REPO_OP_CHANNELS = {
   'files:gitCommitIgnore': 'folderChanges',
   'queue:settleChanges': 'folderChanges',
   // HI-3470: Changes' panel for an operation left under way.
-  'git:operationStep': 'operationSteps'
+  'git:operationStep': 'operationSteps',
+  // HI-3473: Branches & remotes' Repository health (its reads too: offered only where the platform has it).
+  'git:health': 'repoHealth',
+  'git:pruneWorktrees': 'repoHealth',
+  'git:removeLocks': 'repoHealth',
+  'git:remotePrunePreview': 'repoHealth',
+  'git:fetchPrune': 'repoHealth'
 } as const satisfies Partial<Record<CombworkChannel, Operation>>
 
 export type RepoOpChannel = keyof typeof REPO_OP_CHANNELS

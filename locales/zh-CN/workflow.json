@@ -95,7 +95,7 @@
   "workflow.form.minutesValue": "{n, plural, other {# 分钟}}",
   "workflow.form.neverOff.fileLocks": "文件锁（只要其自身的设置已开启）。",
   "workflow.form.neverOff.folderGit": "智能体在某个文件夹中工作时，不切换分支、不拉取，也不执行其他会更改该文件夹的 git 操作。",
-  "workflow.form.neverOff.indexLock": "Combwork 从不删除 git 的 index.lock。",
+  "workflow.form.neverOff.indexLock": "Combwork 绝不会自行删除 git 的 index.lock：只有“移除过期的锁”会在你确认后这样做。",
   "workflow.form.neverOff.queue": "只有在此期间没有其他操作移动目标分支时，合并队列才会推进它。",
   "workflow.form.neverOffHead": "为保护你的工作，以下各项始终开启：",
   "workflow.form.noChanges": "没有选项更改：只有它们所基于的预设不同。",

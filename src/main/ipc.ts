@@ -542,6 +542,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst, op) => netRun(p, op, () => repoOpHandlers['git:setUpstream'](p, branch, remote, remoteBranch, pushFirst)),
     'git:createTag': (p, name, message, pushTo, op) => netRun(p, op, () => repoOpHandlers['git:createTag'](p, name, message, pushTo)),
     'git:deleteRemoteBranches': (p, remote, items, op) => netRun(p, op, () => repoOpHandlers['git:deleteRemoteBranches'](p, remote, items)),
+    // HI-3473: Repository health's checks and fetches of the remotes.
+    'git:remotePrunePreview': (p, op) => netRun(p, op, () => repoOpHandlers['git:remotePrunePreview'](p)),
+    'git:fetchPrune': (p, remotes, op) => netRun(p, op, () => repoOpHandlers['git:fetchPrune'](p, remotes)),
     'files:gitCommitIgnore': (p, op) => actRun(p, op, () => repoOpHandlers['files:gitCommitIgnore'](p)),
     // The owner's Cancel of its run `op` (the project it recorded with it): another window's, workspace's or project's changes nothing.
     'git:cancel': (op, p) => cancelGitRun(op, cancelOwner(String(p ?? ''))),

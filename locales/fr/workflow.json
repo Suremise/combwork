@@ -95,7 +95,7 @@
   "workflow.form.minutesValue": "{n, plural, one {# minute} many {# minutes} other {# minutes}}",
   "workflow.form.neverOff.fileLocks": "Les verrous de fichiers, tant que leur propre réglage les active.",
   "workflow.form.neverOff.folderGit": "Aucun changement de branche, pull ou autre commande git qui modifie le dossier pendant qu’un agent y travaille.",
-  "workflow.form.neverOff.indexLock": "Combwork ne supprime jamais le fichier index.lock de git.",
+  "workflow.form.neverOff.indexLock": "Combwork ne supprime jamais de lui-même le index.lock de git : seul Supprimer les verrous obsolètes le fait, quand tu le confirmes.",
   "workflow.form.neverOff.queue": "La file de fusion n’avance une branche cible que si rien d’autre ne l’a fait avancer entre-temps.",
   "workflow.form.neverOffHead": "Ce qui ne se désactive jamais, pour protéger ton travail :",
   "workflow.form.noChanges": "Aucune option ne change : seulement le préréglage dont elles sont parties.",

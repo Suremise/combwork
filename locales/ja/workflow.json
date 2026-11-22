@@ -95,7 +95,7 @@
   "workflow.form.minutesValue": "{n, plural, other {#分}}",
   "workflow.form.neverOff.fileLocks": "ファイルロック（専用の設定でオンになっている間）。",
   "workflow.form.neverOff.folderGit": "エージェントが作業中のフォルダーでは、ブランチの切り替えやpullなど、フォルダーを変更するGit操作は行いません。",
-  "workflow.form.neverOff.indexLock": "CombworkはGitのindex.lockを決して削除しません。",
+  "workflow.form.neverOff.indexLock": "CombworkがGitのindex.lockを自動で削除することはありません。削除するのは、確認したときの「古いロックを削除」だけです。",
   "workflow.form.neverOff.queue": "マージキューは、その間に他の何かがマージ先ブランチを進めていない場合にだけ、それを進めます。",
   "workflow.form.neverOffHead": "作業を守るために常にオンのもの：",
   "workflow.form.noChanges": "変更されるオプションはありません。変わるのは元にしたプリセットだけです。",

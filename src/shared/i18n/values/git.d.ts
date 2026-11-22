@@ -88,6 +88,45 @@ interface CombworkMessageValues {
   'git.gitlink.summary': { change: string; path: string | number; from: string | number; to: string | number }
   'git.head.detachedAt': { commit: string | number }
   'git.head.noCommits': undefined
+  'git.health.about': undefined
+  'git.health.fetch.busy': undefined
+  'git.health.fetch.button': undefined
+  'git.health.fetch.checkFailed': undefined
+  'git.health.fetch.checking': undefined
+  'git.health.fetch.confirm': undefined
+  'git.health.fetch.fetching': { remotes: string | number }
+  'git.health.fetch.head': undefined
+  'git.health.fetch.message': { n: number }
+  'git.health.fetch.remote': { remote: string | number; n: number }
+  'git.health.fetch.remoteError': { remote: string | number; why: string | number }
+  'git.health.fetch.state': { n: number }
+  'git.health.fetch.title': undefined
+  'git.health.fetch.trackedBy': { branches: string | number; n: number }
+  'git.health.locks.age': { when: string | number }
+  'git.health.locks.busy': undefined
+  'git.health.locks.button': undefined
+  'git.health.locks.confirm': undefined
+  'git.health.locks.failed': undefined
+  'git.health.locks.head': undefined
+  'git.health.locks.held': { why: string; seconds: number; name: string | number; pid: number; when: string | number }
+  'git.health.locks.message': { seconds: number }
+  'git.health.locks.state': { n: number; stale: number }
+  'git.health.locks.title': undefined
+  'git.health.prune.busy': undefined
+  'git.health.prune.button': undefined
+  'git.health.prune.confirm': undefined
+  'git.health.prune.failed': undefined
+  'git.health.prune.head': undefined
+  'git.health.prune.message': undefined
+  'git.health.prune.noFolder': { id: string | number }
+  'git.health.prune.ownerAgent': { name: string | number }
+  'git.health.prune.ownerSlot': { name: string | number }
+  'git.health.prune.state': { n: number }
+  'git.health.prune.title': undefined
+  'git.health.readAgain': undefined
+  'git.health.readFailed': { error: string | number }
+  'git.health.reading': undefined
+  'git.health.title': undefined
   'git.history.branch': undefined
   'git.history.heading': undefined
   'git.history.headingOf': { head: string | number }

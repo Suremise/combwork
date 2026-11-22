@@ -631,6 +631,8 @@
   "tips.activityMap.title": "Mapa tego, co robią Twoi agenci",
   "tips.activityMapPanels.title": "Zobacz, co kryje się za stacją",
   "tips.activityMapShowCall.title": "Z mapy do listy",
+  "tips.repositoryHealth.text": "Gdy git mówi „index.lock: File exists” albo odmawia utworzenia worktree, którego folder usunięto, Kontrola wersji → Gałęzie i zdalne repozytoria → Kondycja repozytorium pokazuje, co zostało, i czyści to, co zaznaczysz.",
+  "tips.repositoryHealth.title": "Usuń nieaktualną blokadę gita lub wpis worktree",
   "tips.resumeLongIdle.title": "Długo bezczynna rozmowa pyta przed wznowieniem",
   "tips.resumeLongIdle.text": "Rozmowa bezczynna dłużej niż godzinę najprawdopodobniej straciła pamięć podręczną promptu, więc jej wznowienie może kosztować wiele tokenów. Wznów mówi, jak długo jest bezczynna i jak duża jest, i proponuje zamiast tego Zarchiwizuj i zacznij nową."
 }

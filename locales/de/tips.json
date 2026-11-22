@@ -631,6 +631,8 @@
   "tips.activityMap.title": "Eine Karte dessen, was deine Agenten tun",
   "tips.activityMapPanels.title": "Sehen, was hinter einer Station steckt",
   "tips.activityMapShowCall.title": "Von der Karte zur Liste",
+  "tips.repositoryHealth.text": "Wenn git „index.lock: File exists“ meldet oder einen Worktree verweigert, dessen Ordner gelöscht wurde, listet Versionsverwaltung → Branches & Remotes → Repository-Zustand auf, was zurückgeblieben ist, und räumt weg, was du anhakst.",
+  "tips.repositoryHealth.title": "Eine veraltete git-Sperre oder einen veralteten Worktree-Eintrag beseitigen",
   "tips.resumeLongIdle.title": "Eine lange ruhende Unterhaltung fragt vor dem Fortsetzen",
   "tips.resumeLongIdle.text": "Eine Unterhaltung, die über eine Stunde ruht, hat ihren Prompt-Cache höchstwahrscheinlich verloren, daher kann ihr Fortsetzen viele Tokens kosten. „Fortsetzen“ sagt, wie lange sie ruht und wie groß sie ist, und bietet stattdessen „Archivieren und neu beginnen“ an."
 }

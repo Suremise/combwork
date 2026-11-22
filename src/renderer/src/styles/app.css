@@ -16180,6 +16180,27 @@ button.progress-lane-retry {
 .git-setup h2 .codicon {
   margin-right: 4px;
 }
+/* HI-3473: Repository health at the foot of Branches & remotes: a row a repair (its name, what it finds, its button),
+   and its dialogs' lists, each entry's note (git's reason, whose it was, why a lock is kept) under it. */
+.git-health {
+  margin-bottom: 18px;
+}
+.git-health td {
+  padding-right: 24px;
+  vertical-align: middle;
+}
+.git-health td:first-child,
+.git-health td:last-child {
+  white-space: nowrap;
+}
+.git-health-list > li + li {
+  margin-top: 6px;
+}
+.git-health-note {
+  margin-left: 24px;
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+}
 
 /* ==========================================================================
    Japanese and Chinese (#893): line breaking and type for CJK text, scoped by the window's language (<html lang>).

@@ -186,6 +186,7 @@ import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
 import type { OperationPanelState, OperationRequest } from './gitOperations'
+import type { LockAsk, PruneAsk, RemotePrune, RepoHealth } from './gitHealth'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1192,6 +1193,16 @@ export interface CombworkRequests {
   'git:setRemoteUrl': (projectPath: string, name: string, url: string) => string
   /** HI-3372: `op`, the window's id for this run, which `git:cancel` names (Fetch, Pull, Push and the rest). */
   'git:fetch': (projectPath: string, op?: string) => string
+  /** HI-3473: Repository health's local finds: worktree entries whose folder is gone, and git's lock files (each judged stale or not). */
+  'git:health': (projectPath: string) => RepoHealth
+  /** HI-3473: Prune worktrees: the entries as listed; a summary. Refused while anything works on the repository. */
+  'git:pruneWorktrees': (projectPath: string, entries: PruneAsk[]) => string
+  /** HI-3473: Remove stale lock: the locks as listed; a summary. Refused while anything works on the repository. */
+  'git:removeLocks': (projectPath: string, locks: LockAsk[]) => string
+  /** HI-3473: Fetch with prune's check: per remote, what a prune would drop (reaches each remote; `op` its Cancel). */
+  'git:remotePrunePreview': (projectPath: string, op?: string) => RemotePrune[]
+  /** HI-3473: Fetch with prune of these remotes; a summary of what was dropped. */
+  'git:fetchPrune': (projectPath: string, remotes: string[], op?: string) => string
   'git:pull': (projectPath: string, op?: string) => string
   /** To the upstream, or to `remote` (setting it as the upstream) when the branch has none. Never forced. */
   'git:push': (projectPath: string, remote?: string, op?: string) => string

@@ -59,7 +59,7 @@ const T = {
   neverOffHead: msg({ id: 'workflow.form.neverOffHead', defaultMessage: 'What never turns off, to keep your work safe:', description: 'Above the list of protections that stay on with every rule off (SPEC §16.6.4), in the Workflow section.' }),
   neverOff: {
     fileLocks: msg({ id: 'workflow.form.neverOff.fileLocks', defaultMessage: 'File locks, while their own setting has them on.', description: 'A protection that stays on with every rule off: agents can’t edit one file at once (its own setting decides).' }),
-    indexLock: msg({ id: 'workflow.form.neverOff.indexLock', defaultMessage: 'Combwork never deletes git’s index.lock.', description: 'A protection that stays on with every rule off. Keep index.lock (a file name).' }),
+    indexLock: msg({ id: 'workflow.form.neverOff.indexLock', defaultMessage: 'Combwork never deletes git’s index.lock by itself: only Remove Stale Locks does, when you confirm it.', description: 'A protection that stays on with every rule off. Keep index.lock (a file name). Remove Stale Locks: a button in Version Control → Branches & remotes → Repository health (HI-3473): use its name as translated there.' }),
     folderGit: msg({ id: 'workflow.form.neverOff.folderGit', defaultMessage: 'No branch switch, pull or other git that changes the folder while an agent works there.', description: 'A protection that stays on with every rule off.' }),
     queue: msg({ id: 'workflow.form.neverOff.queue', defaultMessage: 'The merge queue moves a target branch only if nothing else moved it meanwhile.', description: 'A protection that stays on with every rule off (glossary 2.1: merge queue).' })
   },

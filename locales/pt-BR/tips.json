@@ -631,6 +631,8 @@
   "tips.activityMap.title": "Um mapa do que seus agentes estão fazendo",
   "tips.activityMapPanels.title": "Veja o que há por trás de uma estação",
   "tips.activityMapShowCall.title": "Do mapa para a lista",
+  "tips.repositoryHealth.text": "Quando o git diz \"index.lock: File exists\", ou recusa um worktree cuja pasta foi excluída, Controle de versão → Branches e remotes → Saúde do repositório lista o que foi deixado para trás e limpa o que você marcar.",
+  "tips.repositoryHealth.title": "Limpe um bloqueio obsoleto do git ou uma entrada de worktree obsoleta",
   "tips.resumeLongIdle.title": "Uma conversa ociosa há muito tempo pergunta antes de ser retomada",
   "tips.resumeLongIdle.text": "Uma conversa ociosa há mais de uma hora muito provavelmente perdeu o cache de prompt, então retomá-la pode custar muitos tokens. Retomar diz há quanto tempo ela está ociosa e qual é o tamanho, e oferece Arquivar e começar do zero em vez disso."
 }

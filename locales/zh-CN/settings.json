@@ -1718,6 +1718,10 @@
   "settings.advanced.cw.resume.idleMinutes.desc": "自对话最后一次活动（其记录文件的最后一条，否则为 Combwork 最后一次看到它的时间）起经过多久，恢复前就先询问。默认值是各 CLI 保留提示词缓存的最长时间：一小时。",
   "settings.advanced.cw.cli.probeSeconds.title": "查找 CLI：版本检查超时",
   "settings.advanced.cw.cli.probeSeconds.desc": "Combwork 查找各编程智能体的 CLI 时（启动时、“重新检查”时、安装之后），给 CLI 输出其版本的时间。超过这个时间的 CLI 会被跳过，并显示为未安装：在慢速磁盘上被杀毒软件扫描时，CLI 的首次启动可能需要几十秒。",
+  "settings.advanced.cw.git.processNames.desc": "此正则表达式匹配到的程序名（如任务管理器的“详细信息”选项卡中显示的）会被视为可能持有锁的 git：只要有在某个锁文件之前启动的此类程序仍在运行，仓库健康就不会移除该锁。默认值匹配 git.exe 和 git 的远程助手（git-remote-https.exe 等）。只有当另一个程序自己会写入 git 的锁文件时，才需要添加它。",
+  "settings.advanced.cw.git.processNames.title": "Git：可能持有锁的程序",
+  "settings.advanced.cw.git.staleLockSeconds.desc": "仓库健康只会在 git 的锁文件（如 index.lock）至少达到这个时长，且没有在它之前启动的 git 仍在运行时，才提供移除它的选项。正常工作的 git 只会短暂持有锁；如果你的某个耗时较长的 git 命令（大型提交、repack）持有锁更久，请调大此值。",
+  "settings.advanced.cw.git.staleLockSeconds.title": "Git：锁多久算过期",
   "settings.advanced.cw.server.checkInferSeconds.title": "检查服务器：测试请求超时",
   "settings.advanced.cw.server.checkInferSeconds.desc": "“检查服务器”等待模型服务器回应其测试请求的时间。尚未加载的本地模型会先加载，在配置一般的硬件上可能需要几分钟；超过这个时间，检查会报告超时。"
 }

@@ -95,7 +95,7 @@
   "workflow.form.minutesValue": "{n, plural, one {# Minute} other {# Minuten}}",
   "workflow.form.neverOff.fileLocks": "Dateisperren, solange sie in ihrer eigenen Einstellung an sind.",
   "workflow.form.neverOff.folderGit": "Kein Branchwechsel, kein Pull und kein anderer Git-Befehl, der den Ordner ändert, während ein Agent darin arbeitet.",
-  "workflow.form.neverOff.indexLock": "Combwork löscht die index.lock von Git nie.",
+  "workflow.form.neverOff.indexLock": "Combwork löscht gits index.lock nie von selbst: Nur „Veraltete Sperren entfernen“ tut das, wenn du es bestätigst.",
   "workflow.form.neverOff.queue": "Die Merge-Warteschlange bewegt einen Zielbranch nur, wenn ihn inzwischen nichts anderes bewegt hat.",
   "workflow.form.neverOffHead": "Was nie ausgeschaltet wird, damit deine Arbeit sicher bleibt:",
   "workflow.form.noChanges": "Keine Option ändert sich, nur die Voreinstellung, von der sie ausgingen.",

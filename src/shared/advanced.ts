@@ -143,6 +143,10 @@ export const QUEUE_SIGN_SECONDS = 'cw.queue.signSeconds'
 export const GIT_COMMIT_MINUTES = 'cw.git.commitMinutes'
 /** HI-3372: the last resort for the user's Fetch, Pull and Push (cancellable from the window). */
 export const GIT_NETWORK_MINUTES = 'cw.git.networkMinutes'
+/** HI-3473: how old a lock file of git's must be before Repository health calls it stale. */
+export const GIT_STALE_LOCK_SECONDS = 'cw.git.staleLockSeconds'
+/** HI-3473: the programs that count as a git that may hold a lock (Windows' process names). */
+export const GIT_PROCESS_NAMES = 'cw.git.processNames'
 /** HI-3372: the merge queue's own fetches and pushes. */
 export const QUEUE_NETWORK_MINUTES = 'cw.queue.networkMinutes'
 /** HI-3284: the longest the merge guards' matching runs before the check ends incomplete (never a pass). */
@@ -1030,6 +1034,30 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 240,
     unit: 'min',
+    applies: 'now'
+  },
+  // HI-3473: Repository health's Remove stale lock: a lock is stale only when it is at least this old and no git that
+  // could hold it (a process of these names started before it) runs.
+  {
+    id: GIT_STALE_LOCK_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.staleLockSeconds.title', defaultMessage: 'Git: how old a lock must be to be stale', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: Repository health's Remove stale lock in Version Control → Branches & remotes (HI-3473)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.staleLockSeconds.desc', defaultMessage: "Repository health offers to remove a lock file of git's (such as index.lock) only once it is at least this old, and only while no git that started before it still runs. A git working normally holds a lock for moments; raise this if a long git command of yours (a large commit, a repack) holds one longer.", description: 'What the advanced setting "Git: how old a lock must be to be stale" does (Settings → Advanced, HI-3473). index.lock is a file name: keep it.' }),
+    kind: 'number',
+    default: 60,
+    min: 10,
+    max: 3600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: GIT_PROCESS_NAMES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.processNames.title', defaultMessage: 'Git: the programs that may hold a lock', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a regular expression: Repository health's Remove stale lock (HI-3473)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.processNames.desc', defaultMessage: "The program names (as Task Manager's Details tab shows them) this regular expression finds count as a git that may hold a lock: while one that started before a lock file still runs, Repository health won't remove that lock. The default finds git.exe and git's remote helpers (git-remote-https.exe and the like). Add another program only if it writes git's lock files itself.", description: 'What the advanced setting "Git: the programs that may hold a lock" does (Settings → Advanced, HI-3473). git.exe and git-remote-https.exe are program names: keep them. Task Manager\'s Details tab: as Windows names it.' }),
+    kind: 'pattern',
+    default: String.raw`^git(?:-remote-[a-z0-9.+-]+)?\.exe$`,
+    flags: 'i',
     applies: 'now'
   },
   {

@@ -592,6 +592,55 @@
       "branch": "plain"
     }
   },
+  "service.gitHealth.agentBusy": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitHealth.busy": {
+    "placeholders": {
+      "folder": "plain",
+      "what": "plain"
+    }
+  },
+  "service.gitHealth.combworkRun": {
+    "placeholders": {
+      "what": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitHealth.fetchFailed": {
+    "placeholders": {
+      "remote": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitHealth.invalid": {
+    "placeholders": {}
+  },
+  "service.gitHealth.noProcesses": {
+    "placeholders": {}
+  },
+  "service.gitHealth.notStandard": {
+    "placeholders": {
+      "remote": "plain"
+    }
+  },
+  "service.gitHealth.slotBusy": {
+    "placeholders": {
+      "slot": "plain",
+      "state": "select"
+    }
+  },
+  "service.gitHealth.stopped": {
+    "placeholders": {}
+  },
+  "service.gitHealth.unlisted": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
   "service.gitOperation.agentBusy": {
     "placeholders": {
       "agent": "plain",

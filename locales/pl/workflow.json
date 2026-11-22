@@ -95,7 +95,7 @@
   "workflow.form.minutesValue": "{n, plural, one {# minuta} few {# minuty} many {# minut} other {# minuty}}",
   "workflow.form.neverOff.fileLocks": "Blokady plików, dopóki ich własne ustawienie je włącza.",
   "workflow.form.neverOff.folderGit": "Żadnego przełączania gałęzi, pull ani innej operacji git, która zmienia folder, gdy pracuje w nim agent.",
-  "workflow.form.neverOff.indexLock": "Combwork nigdy nie usuwa pliku index.lock gita.",
+  "workflow.form.neverOff.indexLock": "Combwork nigdy sam nie usuwa pliku index.lock gita: robi to tylko Usuń nieaktualne blokady, gdy to potwierdzisz.",
   "workflow.form.neverOff.queue": "Kolejka scalania przesuwa gałąź docelową tylko wtedy, gdy w międzyczasie nic innego jej nie przesunęło.",
   "workflow.form.neverOffHead": "Co nigdy się nie wyłącza, by Twoja praca była bezpieczna:",
   "workflow.form.noChanges": "Żadna opcja się nie zmienia: tylko ustawienie wstępne, od którego wyszły.",

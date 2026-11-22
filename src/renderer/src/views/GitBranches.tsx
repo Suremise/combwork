@@ -40,6 +40,7 @@ import { at, GIT_TEXT, GitForm, gitAction, Loading, rich, useFolderBusy, useGitR
 import { awayFromProject } from '../agentPlace'
 import { NewBranchForm, type NewBranchDraft } from '../components/NewBranchForm'
 import { GitSigning } from '../components/GitSigning'
+import { RepoHealth } from '../components/RepoHealth'
 
 /**
  * Version Control → Branches & remotes (#607, #1385; its own file since #1416): the project folder's branch or detached
@@ -841,6 +842,8 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
             </div>
             {/* HI-1185: how commits are signed, and whether they can be signed with nobody there. */}
             <GitSigning project={project} />
+            {/* HI-3473: git's own repairs (worktree entries, stale locks, fetch with prune), each listed first. */}
+            <RepoHealth project={project} off={off} remotes={s.remotes} />
             {form && <GitForm make={form.make} onClose={() => setForm(null)} />}
           </div>
         )
