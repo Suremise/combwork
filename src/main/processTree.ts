@@ -1,5 +1,5 @@
-// Ending a process and everything it started, by identity (#549, #655): moved here from cw-progress's wrapper (HI-2793)
-// so jj's runner ends a jj command's tree as cw-progress ends its command's. Node built-ins only: cw-progress, which runs
+// Ending a process and everything it started, by identity (#549, #655): moved here from cw-progress's wrapper (HI-2793).
+// Node built-ins only: cw-progress, which runs
 // outside the asar, loads it as a chunk (AGENTS.md, cw-mcp.js and cw-progress.js).
 
 import { execFile, spawn, spawnSync, type ChildProcess } from 'node:child_process'
@@ -510,7 +510,7 @@ export interface TreeEnding {
 }
 
 /**
- * How a caller on main's thread ends a command's tree (HI-3009, after HI-2997's jj runner): endTreeAsync, never endTree's
+ * How a caller on main's thread ends a command's tree (HI-3009, after HI-2997): endTreeAsync, never endTree's
  * spawnSync (about 2.4 s of the thread for PowerShell's listing and ending), and whatever waited on the tree having ended
  * (an outcome, a time-out's grace) waits on the teardown instead. Never rejects.
  */

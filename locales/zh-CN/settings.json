@@ -520,8 +520,6 @@
   "settings.advanced.cw.inbox.idleWakes.title": "唤醒空闲的智能体",
   "settings.advanced.cw.inbox.stopContinuation.desc": "当智能体要结束回合而收件箱中还有未读项时，Combwork 会让它继续，先去读取，每个回合一次：对 Codex 和 Copilot 是暂缓它们的停止，对 Claude Code 是在它的停止中加一行。关闭后，回合按 CLI 的方式结束，未读项留在收件箱中，等待空闲唤醒。项目可以在“项目设置”→“会话”中单独设置。",
   "settings.advanced.cw.inbox.stopContinuation.title": "智能体带着未读项停止时让它继续",
-  "settings.advanced.cw.jj.commandSeconds.desc": "Combwork 运行的单个 jj 命令可用多久（包括对大型工作副本的快照 snapshot），超过后 Combwork 会结束它：此时读取视为未知，合并期间所做的更改留待你处理。仓库非常大或磁盘较慢时请调高此值。",
-  "settings.advanced.cw.jj.commandSeconds.title": "jj：命令的最长时间",
   "settings.advanced.cw.journal.builds.desc": "从源代码构建 Combwork 自己的安装程序时（npm run dist 或 npm run release），Combwork 会把这次构建作为它自己的条目写入助手的日志：版本、提交、构建类型以及安装程序所在位置。只写入成功的构建，并且只在日志开启且其范围包含事件时写入。关闭后不写入构建；Combwork 关闭期间留给它的构建会在打开工作区时丢弃。",
   "settings.advanced.cw.journal.builds.title": "在日志中记录构建",
   "settings.advanced.cw.lanes.endWaitMinutes.desc": "从通道结束起，Combwork 等待其构建者结束回合并读到通道已完成的时长。超过后，Combwork 仍会结束构建者的 CLI：用它的退出命令，或在无法输入（你的草稿在其输入框中）或无法结束它时强制结束。",

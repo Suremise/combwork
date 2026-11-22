@@ -145,8 +145,6 @@ export const GIT_COMMIT_MINUTES = 'cw.git.commitMinutes'
 export const GIT_NETWORK_MINUTES = 'cw.git.networkMinutes'
 /** HI-3372: the merge queue's own fetches and pushes. */
 export const QUEUE_NETWORK_MINUTES = 'cw.queue.networkMinutes'
-/** HI-3372: one jj command's bound (its `--version` keeps its own). */
-export const JJ_COMMAND_SECONDS = 'cw.jj.commandSeconds'
 /** HI-3284: the longest the merge guards' matching runs before the check ends incomplete (never a pass). */
 export const MERGE_GUARDS_SECONDS = 'cw.mergeGuards.seconds'
 /** HI-3284: the most lines a merge may add for its guards to check them (past it, incomplete, never a pass). */
@@ -1009,7 +1007,7 @@ const SOURCES: readonly AdvancedSource[] = [
     ]
   },
   // HI-3372: the user's own git work and Combwork's network steps, bounded only as a last resort (a commit or a fetch, pull
-  // or push can be cancelled from the window), and jj's commands, whose first snapshot of a large working copy passed a minute.
+  // or push can be cancelled from the window).
   {
     id: GIT_COMMIT_MINUTES,
     group: 'cw',
@@ -1044,18 +1042,6 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 240,
     unit: 'min',
-    applies: 'now'
-  },
-  {
-    id: JJ_COMMAND_SECONDS,
-    group: 'cw',
-    title: msg({ id: 'settings.advanced.cw.jj.commandSeconds.title', defaultMessage: 'jj: longest a command takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. jj is the Jujutsu version control tool: keep its name (HI-3372)." }),
-    desc: msg({ id: 'settings.advanced.cw.jj.commandSeconds.desc', defaultMessage: "How long one jj command Combwork runs may take, a snapshot of a large working copy included, before Combwork ends it: a read then counts as unknown, and a change made during a merge is left for you to settle. Raise it for a very large repository or a slow disk.", description: 'What the advanced setting "jj: longest a command takes" does, and when to change it (Settings → Advanced, HI-3372). jj is the Jujutsu version control tool.' }),
-    kind: 'number',
-    default: 300,
-    min: 30,
-    max: 3600,
-    unit: 's',
     applies: 'now'
   },
   // How long the merge queue's own commit may take when the repository signs its commits (#1350, SPEC §16.9.1 step 4):

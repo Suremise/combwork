@@ -140,8 +140,8 @@ const namingCopies = () => {
     const started = async (a) => {
       // HI-3342: Claude Code 2.1.326 and later asks about the copies folder at every start until its home trusts the
       // workspace's worktrees folder, so Combwork withholds it till then (HI-3337). Recorded as Set Up leaves it, just
-      // before RC starts: a Claude Code another lane starts in the shared test home writes its file back and may drop it
-      // (as jjslot-claude's slot entry). It names the worktrees folder, not the copies folder, so the check below holds.
+      // before RC starts: a Claude Code another lane starts in the shared test home writes its file back and may drop it.
+      // It names the worktrees folder, not the copies folder, so the check below holds.
       if (a.key === 'claude') console.log(`INFO ${CLAUDE_TEST_HOME} trusts ${lib.trustWorktrees(CLAUDE_TEST_HOME, ws)} (Set Up's answer)`)
       await inv('session:start', alpha, { agentId: a.def?.id ?? a.id })
       const id = a.def?.id ?? a.id

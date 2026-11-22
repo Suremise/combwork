@@ -1,7 +1,6 @@
 // HI-3160: the observer's read of a repository's working folders (repoRefs' foldersOf) resolves a worktree's relative
 // gitdir against its entry in .git/worktrees, as Git does, never against the process's own working folder. Git writes a
-// relative one with worktree.useRelativePaths (2.48+); jj writes one for a colocated workspace (`../../../../slot-a/.git`,
-// its real form is in tests/jjIgnoredWrite.test.ts).
+// relative one with worktree.useRelativePaths (2.48+), or a registration may be written by hand (`../../../../slot-a/.git`).
 import { execFileSync } from 'child_process'
 import { createRequire } from 'module'
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'fs'
@@ -36,9 +35,9 @@ describe("HI-3160: a worktree's relative gitdir", () => {
     expect(listed(project)).toEqual([project, wt].map((p) => resolve(p).toLowerCase()))
   })
 
-  it("jj's (a colocated workspace's registration): the slot is listed, at its own folder", () => {
+  it('a hand-written registration beside the project: the slot is listed, at its own folder', () => {
     const { parent, project } = repo()
-    // As `jj workspace add --colocate` registers a slot beside the project: an entry whose gitdir is relative to it.
+    // A slot beside the project: an entry whose gitdir is relative to it.
     const slot = join(parent, 'slot-a')
     mkdirSync(slot)
     const entry = join(project, '.git', 'worktrees', 'slot-a')

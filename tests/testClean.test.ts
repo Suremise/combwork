@@ -288,7 +288,6 @@ describe('the clean-up (clean.mjs)', () => {
     const m = machine()
     tree(m.root, {
       'agy-probe/User/settings.json': 30,
-      'tools/jj/jj.exe': 30,
       'copilot-1.0.106/bin/copilot.exe': 30,
       'copilot-1.0.107/bin/copilot.exe': 30,
       'opencode-2.2.6/opencode.exe': 30,
@@ -300,7 +299,7 @@ describe('the clean-up (clean.mjs)', () => {
     })
     const items = plan({ root: m.root, days: 0, ev: rules(m.root, m.cards) })
     const item = (rel: string) => items.find((i: { rel: string }) => i.rel === rel)
-    for (const rel of ['agy-probe', 'tools', 'copilot-1.0.106', 'copilot-1.0.107', 'opencode-2.2.6', 'codex-home-locks', 'codex', 'claude', 'config.json']) {
+    for (const rel of ['agy-probe', 'copilot-1.0.106', 'copilot-1.0.107', 'opencode-2.2.6', 'codex-home-locks', 'codex', 'claude', 'config.json']) {
       expect(item(rel)?.remove, rel).toBe(false)
       expect(item(rel)?.why, rel).toBe(keptWhy(rel))
     }
@@ -310,7 +309,7 @@ describe('the clean-up (clean.mjs)', () => {
     for (const rel of ['agy-probe-work', 'copilot-probe', 'opencode-2.2.6.zip']) expect(item(rel)?.remove, rel).toBe(true)
     // And clean() leaves them, even at --days 0.
     const r = await run(m, { days: 0 })
-    for (const p of ['agy-probe/User/settings.json', 'tools/jj/jj.exe', 'copilot-1.0.106/bin/copilot.exe', 'copilot-1.0.107/bin/copilot.exe', 'opencode-2.2.6/opencode.exe', 'codex-home-locks']) expect(there(m.root, p), p).toBe(true)
+    for (const p of ['agy-probe/User/settings.json', 'copilot-1.0.106/bin/copilot.exe', 'copilot-1.0.107/bin/copilot.exe', 'opencode-2.2.6/opencode.exe', 'codex-home-locks']) expect(there(m.root, p), p).toBe(true)
     expect(r.removed.map((x: { rel: string }) => x.rel)).toEqual(expect.arrayContaining(['agy-probe-work', 'copilot-probe', 'opencode-2.2.6.zip']))
   })
 

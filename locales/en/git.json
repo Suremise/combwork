@@ -979,10 +979,6 @@
     "defaultMessage": "Another Combwork is merging into this repository ({profile}). Nothing was changed: try again once it has finished.",
     "description": "An error: a merge or another change to a repository didn't start, because another Combwork (its profile folder's name, {profile}) still held the repository's merge lock after Combwork had waited for it."
   },
-  "git.repoLock.jjFolder": {
-    "defaultMessage": "{folder} is in a jj repository that isn't colocated with Git, so Combwork didn't run git there: nothing was changed.",
-    "description": "An error (HI-2896): a change that needs a Git repository was asked of a folder a jj (Jujutsu) repository with no Git working copy holds; git there would reach another repository or none. Keep jj and Git."
-  },
   "git.repoLock.noGitDir": {
     "defaultMessage": "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}",
     "description": "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Combwork's merge lock lives). {why} is git's message."
@@ -990,10 +986,6 @@
   "git.repoLock.order": {
     "defaultMessage": "This repository is busy with another change. Nothing was changed: try again in a moment.",
     "description": "An error (HI-2896): a change needed a repository's lock while holding another repository's, and the lock was held by another change; Combwork refuses rather than waiting, so the two can't wait on each other."
-  },
-  "git.repoLock.unknownRepo": {
-    "defaultMessage": "Combwork couldn't read the jj repository at {root} ({why}), so nothing was changed.",
-    "description": "An error (HI-2896): a change needed the lock of a project's repository, and the jj (Jujutsu) repository holding the folder couldn't be read ({why}: a short code, kept in English). Keep jj."
   },
   "git.repoLock.waiting": {
     "defaultMessage": "Another Combwork is merging into this repository ({profile})",

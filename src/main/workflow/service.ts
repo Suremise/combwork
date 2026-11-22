@@ -255,13 +255,12 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     targetChanges: (changes) => noticeTargetChanges(ws, project.path, changes),
     // Actions run by the actions worker after the commit, never here.
     autoRun: false,
-    // HI-2938: a card that passed is reconciled soon (a jj card's candidate is built then; its pass changes no jj
-    // operation or ref that would schedule it otherwise).
+    // HI-2938: a card that passed is reconciled soon (its pass may change no ref that would schedule it otherwise).
     moved: (card, _from, to) => {
       // The reconciler imports this module: loaded when needed. It follows the service holding the project (workspaceOf),
       // never a window's proxy of it, which this workflow may have been made from.
-      // HI-2950: and one put back or Done, so an ended cycle's candidate is cleaned up soon (JjPlatform's sweep).
-      // HI-3366: a card into Done reconciles each project it blocks a card of, too: a jj card held for it (HI-3265) has no
+      // HI-2950: and one put back or Done, so an ended cycle is settled soon.
+      // HI-3366: a card into Done reconciles each project it blocks a card of, too: a card held for it (HI-3265) may have no
       // merge-queue entry for kickDependents to run again, and nothing else reconciles its project when it is another one.
       if ((to === 'approved' || to === 'todo' || to === 'done') && alive()) {
         const elsewhere = to === 'done' ? store.dependents(card.id).flatMap((dep) => {

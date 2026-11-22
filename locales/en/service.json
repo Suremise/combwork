@@ -955,14 +955,6 @@
     "defaultMessage": "Only the user, or the Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",
     "description": "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Combwork Assistant (within its Control setting, a setting name: use it as Combwork shows it) can do."
   },
-  "service.jj.revisionNoRepo": {
-    "defaultMessage": "No jj repository was found for this project.",
-    "description": "A card's revision diff couldn't be read: the project's folder is no longer in a jj repository."
-  },
-  "service.jj.revisionUnreadable": {
-    "defaultMessage": "Couldn't read {path} at {commit}: {error}",
-    "description": "A card's revision diff couldn't be read from a jj repository: the file's path, the commit's short id and jj's error."
-  },
   "service.keys.closed": {
     "defaultMessage": "The workspace was closed, or the window opened another, before the key was changed: nothing changed.",
     "description": "An error changing a project's key: its workspace closed (or the window switched to another workspace) while the change waited; nothing was changed."

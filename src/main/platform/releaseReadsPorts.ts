@@ -4,11 +4,10 @@
 
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { gitReleaseReads } from './gitReleaseReads'
-import { jjReleaseReads } from './jjReleaseReads'
 import type { ReleaseReads } from './releaseReads'
 
 /** Each platform's release reads; absent for a platform with none (None). */
-const PORTS: Partial<Record<PlatformId, ReleaseReads>> = { git: gitReleaseReads, jj: jjReleaseReads }
+const PORTS: Partial<Record<PlatformId, ReleaseReads>> = { git: gitReleaseReads }
 
 /** A platform's release reads, or null for one with no repository (None: nothing is ever released). */
 export const releaseReadsOf = (platform: PlatformId): ReleaseReads | null => PORTS[platform] ?? null

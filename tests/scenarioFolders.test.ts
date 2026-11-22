@@ -1,5 +1,5 @@
-// A scenario's work folder is named by its id and a short tag of its provider (HI-3212: the provider's whole key made the
-// jj scenarios' folders pass Windows' path limit), each provider its own tag.
+// A scenario's work folder is named by its id and a short tag of its provider (HI-3212: the provider's whole key made some
+// scenarios' folders pass Windows' path limit), each provider its own tag.
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: plain CommonJS modules without types
 import { PROVIDERS, PROVIDER_TAGS, scenarioFolder } from './scenarios/harness.cjs'

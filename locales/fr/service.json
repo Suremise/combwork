@@ -238,8 +238,6 @@
   "service.gitRepo.tagTaken": "Il y a un tag {name} : une branche du même nom rendrait ce nom ambigu pour git.",
   "service.intent.noWorkflow": "La carte {card} n’a pas de flux de travail : c’est une carte de l’espace de travail, ou son projet n’a pas encore de gestion de versions choisie. Déplace-la plutôt sur le tableau.",
   "service.intent.queueNotAgents": "Seul l’utilisateur, ou l’Assistant dans les limites de Paramètres → Assistant → Contrôle, retire une carte de la file de fusion ou réessaie sa fusion.",
-  "service.jj.revisionNoRepo": "Aucun dépôt jj trouvé pour ce projet.",
-  "service.jj.revisionUnreadable": "Impossible de lire {path} à {commit} : {error}",
   "service.keys.closed": "L’espace de travail a été fermé, ou la fenêtre en a ouvert un autre, avant que la clé ne soit changée : rien n’a changé.",
   "service.keys.form": "Une clé du projet compte de 2 à 4 lettres, de A à Z.",
   "service.keys.notice": "Les cartes sont nommées d’après la clé de leur projet : {keys}. Change une clé dans les Paramètres du projet ; l’ancienne continue de fonctionner.",

@@ -246,10 +246,8 @@ interface CombworkMessageValues {
   'git.remotes.pushesTo': { url: string | number }
   'git.remotes.url': undefined
   'git.repoLock.busy': { profile: string | number }
-  'git.repoLock.jjFolder': { folder: string | number }
   'git.repoLock.noGitDir': { folder: string | number; why: string | number }
   'git.repoLock.order': undefined
-  'git.repoLock.unknownRepo': { root: string | number; why: string | number }
   'git.repoLock.waiting': { profile: string | number }
   'git.repoLock.waitingFor': { seconds: number }
   'git.repoOp.notOffered': undefined

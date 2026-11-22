@@ -167,5 +167,5 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
     // Once under four unit suites at once (#560), never since: if it comes back, what git answered says whether it's git
     // or Combwork (#222's handling).
     expect(undimmed, `listings showing dist undimmed; git's answers without it: ${JSON.stringify(unnamed.slice(0, 5))}`).toEqual([])
-  }, timing('test.hangRealJj'))
+  }, timing('test.hangRealLong'))
 })
