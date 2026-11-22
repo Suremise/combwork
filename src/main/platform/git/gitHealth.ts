@@ -444,8 +444,16 @@ async function trackingNames(projectPath: string, remote: string): Promise<Set<s
 export async function remotePrunePreview(projectPath: string): Promise<RemotePrune[]> {
   return oneAtATime(projectPath, async () => {
     const remotes = await remotesOf(projectPath)
-    const tracks = await git(projectPath, ['for-each-ref', '--format=%(refname:short)%00%(upstream:short)', 'refs/heads'])
-    const rows = tracks.ok ? tracks.out.split(/\r?\n/).map((l) => l.split('\0')).filter((f) => f.length === 2 && f[1]) : []
+    // Full ref names on both sides (HI-3530): git's short names are made unambiguous against every ref, so a tag
+    // `origin/old` turns an upstream's short name into `remotes/origin/old` (and a tag `work`, a branch's into `heads/work`).
+    const tracks = await git(projectPath, ['for-each-ref', '--format=%(refname)%00%(upstream)', 'refs/heads/'])
+    const rows = tracks.ok
+      ? tracks.out
+          .split(/\r?\n/)
+          .map((l) => l.split('\0'))
+          .filter((f) => f.length === 2 && f[0].startsWith('refs/heads/') && f[1])
+          .map((f) => [f[0].slice('refs/heads/'.length), f[1].trim()])
+      : []
     const out: RemotePrune[] = []
     for (const remote of remotes) {
       if (!(await standardRemote(projectPath, remote))) {
@@ -459,7 +467,7 @@ export async function remotePrunePreview(projectPath: string): Promise<RemotePru
       }
       const there = parseLsRemoteHeads(r.out)
       const gone = [...(await trackingNames(projectPath, remote))].filter((b) => !there.has(b)).sort((a, b) => a.localeCompare(b, 'en'))
-      out.push({ remote, branches: gone.map((b) => `${remote}/${b}`).map((name) => ({ name, trackedBy: rows.filter((f) => f[1] === name).map((f) => f[0]) })) })
+      out.push({ remote, branches: gone.map((b) => ({ name: `${remote}/${b}`, trackedBy: rows.filter((f) => f[1] === `refs/remotes/${remote}/${b}`).map((f) => f[0]) })) })
     }
     return out
   })

@@ -302,6 +302,28 @@ describe('Fetch with prune', () => {
     agent = 'HB1'
     await expect(inWs(() => H.fetchPrune(proj, ['origin']))).rejects.toThrow(/HB1 is working in/)
   })
+
+  it('HI-3530: names the local branch tracking a deleted branch though tags make both short names ambiguous', async () => {
+    const remote = join(w.path!, `remote${n}.git`)
+    sh(w.path!, 'clone', '-q', '--bare', proj, remote)
+    sh(proj, 'remote', 'add', 'origin', remote)
+    sh(remote, 'branch', 'old', 'main')
+    sh(proj, 'fetch', '-q', 'origin')
+    sh(proj, 'branch', '--track', 'work', 'origin/old')
+    // A local branch whose upstream is a local branch of the same short name tracks nothing on the remote.
+    sh(proj, 'branch', 'origin/old', 'main')
+    sh(proj, 'branch', '--track', 'local', 'refs/heads/origin/old')
+    // Tags that git's short names have to step around: the upstream's becomes remotes/origin/old, the branch's heads/work.
+    sh(proj, 'tag', 'origin/old', 'HEAD')
+    sh(proj, 'tag', 'work', 'HEAD')
+    expect(sh(proj, 'for-each-ref', '--format=%(refname:short) %(upstream:short)', 'refs/heads/work').trim()).toBe('heads/work remotes/origin/old')
+    sh(remote, 'branch', '-D', 'old')
+    expect(await inWs(() => H.remotePrunePreview(proj))).toEqual([{ remote: 'origin', branches: [{ name: 'origin/old', trackedBy: ['work'] }] }])
+    expect(await inWs(() => H.fetchPrune(proj, ['origin']))).toBe('Fetched origin. Dropped 1 remote-tracking branch: origin/old.')
+    expect(sh(proj, 'for-each-ref', '--format=%(refname)', 'refs/remotes/origin/')).not.toContain('refs/remotes/origin/old')
+    // The local branch and the tags that shared its short name stay.
+    expect(sh(proj, 'for-each-ref', '--format=%(refname)', 'refs/heads/origin/old', 'refs/tags/origin/old').trim().split(/\r?\n/)).toEqual(['refs/heads/origin/old', 'refs/tags/origin/old'])
+  })
 })
 
 describe("HR1's round 1", () => {
