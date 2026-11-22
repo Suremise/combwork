@@ -693,6 +693,7 @@
   "assistant.undo.askTitle": "{n, plural, one {Cofnąć # zmianę?} few {Cofnąć # zmiany?} many {Cofnąć # zmian?} other {Cofnąć # zmiany?}}",
   "assistant.undo.card": "{card}: {fields}",
   "assistant.undo.changed": "{fields}: zmienione od tego czasu",
+  "assistant.undo.confirm": "Cofnij",
   "assistant.undo.dismiss": "Zamknij wynik cofania",
   "assistant.undo.ended": "tor się zakończył",
   "assistant.undo.error": "niepowodzenie: {error}",

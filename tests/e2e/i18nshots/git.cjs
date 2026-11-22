@@ -1,7 +1,7 @@
 // Screenshot cases for the `git` area (#804): the Git tab without a repository and its Initialise dialog, History
 // (commits and tags), Branches & remotes (upstream, branches, remotes, worktrees, commit identity), its forms (each
-// checked to follow a change of language while it is open), the failed-load and failed-refresh notes, the status
-// bar's tooltip and the .combwork notice with its Untrack dialog, reached for the i18nshots route (#756's design, section
+// checked to follow a change of language while it is open), the failed-load and failed-refresh notes, the operation
+// panel of a merge left in conflict and its Abort dialog (HI-3504), the status bar's tooltip and the .combwork notice with its Untrack dialog, reached for the i18nshots route (#756's design, section
 // 4) with locale-independent means only: git run on the project, IPC failures (CW_TEST_FAIL_IPC), the
 // language-changed event, command ids and structural hooks (data-section, data-action, data-git-*, classes), never
 // English text. See tests/e2e/i18nshots.cjs for ctx.
@@ -286,6 +286,53 @@ const addRemote = (ctx) => formFollowsLanguage(ctx, 'add-remote', 'the Add a rem
 /** Commit identity's form, following a change of language. */
 const identityForm = (ctx) => formFollowsLanguage(ctx, 'set-identity', 'the commit identity form')
 
+/**
+ * HI-3470's operation panel in Changes: the project folder mid-merge, one file in conflict (a branch and main each
+ * changing it). Made from the seeded repository; abortClose ends the merge and drops the branch.
+ */
+async function operationPanel(ctx) {
+  seedRepo(ctx)
+  const file = path.join(ctx.project, 'CONFLICT.md')
+  fs.writeFileSync(file, 'base\n')
+  git(ctx, 'add', 'CONFLICT.md')
+  git(ctx, 'commit', '-qm', 'Add a file both sides change')
+  const branch = git(ctx, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
+  git(ctx, 'switch', '-q', '-c', 'i18n-side')
+  fs.writeFileSync(file, 'side\n')
+  git(ctx, 'commit', '-qam', 'Side change')
+  git(ctx, 'switch', '-q', branch)
+  fs.writeFileSync(file, 'main\n')
+  git(ctx, 'commit', '-qam', 'Main change')
+  try {
+    git(ctx, 'merge', '--no-edit', 'i18n-side')
+  } catch {
+    // The conflict stops it, as wanted: checked below.
+  }
+  if (!fs.existsSync(path.join(ctx.project, '.git', 'MERGE_HEAD'))) throw new Error("the project folder isn't mid-merge")
+  await ctx.page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await section(ctx, 'changes', '.operation-panel[data-operation="merge"] [data-conflict]', 'the operation panel with its conflict')
+  return gitView(ctx)
+}
+
+/** Its Abort asks first (HI-3504: the confirm button reads differently from the dialog's Cancel in every language). */
+async function abortDialog(ctx) {
+  await ctx.page.locator('.operation-panel [data-step="abort"]').first().click()
+  return shown(ctx, ctx.page.locator('.dialog').last(), 'the Abort dialog')
+}
+
+/** Its Cancel, then the merge ended in git and the branch dropped, the panel gone. */
+async function abortClose(ctx) {
+  await cancelDialog(ctx)
+  if (fs.existsSync(path.join(ctx.project, '.git', 'MERGE_HEAD'))) git(ctx, 'merge', '--abort')
+  try {
+    git(ctx, 'branch', '-D', 'i18n-side')
+  } catch {
+    // Not made (operation-panel stopped before it).
+  }
+  await ctx.page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await gone(ctx, ctx.page.locator('.operation-panel'), 'the operation panel')
+}
+
 /** The status bar's git item, with its tooltip. */
 async function statusBar(ctx) {
   const item = await shown(ctx, ctx.page.locator('[data-git-status]').first(), "the status bar's git item")
@@ -333,6 +380,8 @@ module.exports = {
     { name: 'new-branch-form', open: newBranch, close: cancelDialog },
     { name: 'add-remote-form', open: addRemote, close: cancelDialog },
     { name: 'identity-form', open: identityForm, close: cancelDialog },
+    { name: 'operation-panel', open: operationPanel },
+    { name: 'abort-dialog', open: abortDialog, close: abortClose },
     { name: 'status-bar', open: statusBar },
     { name: 'combwork-notice', open: combworkNotice },
     { name: 'untrack-dialog', open: untrackDialog, close: closeLast }

@@ -809,7 +809,7 @@
   },
   "git.operation.abort": {
     "defaultMessage": "Abort",
-    "description": "HI-3470: the panel's button: git ends the operation and puts the folder back as it was (git <op> --abort)."
+    "description": "HI-3470: the panel's button: git ends the operation and puts the folder back as it was (git <op> --abort). It is also the confirm button of the dialog that asks first, beside the dialog's Cancel (shell.dialog.cancel): it must read differently from it (HI-3504)."
   },
   "git.operation.abortMessage": {
     "defaultMessage": "{what, select, rebase {The branch goes back to where it was before the rebase: the commits replayed so far and every conflict settled are dropped.} am {The branch goes back to where it was before the patches: those applied so far and every conflict settled are dropped.} bisect {Git checks out again the commit the bisect started from.} other {Git puts the folder back as it was before the {what} began: every conflict settled so far is dropped. Commits you made yourself since stay.}}",
@@ -837,7 +837,7 @@
   },
   "git.operation.endBisect": {
     "defaultMessage": "End bisect",
-    "description": "HI-3470: the panel's button for a bisect: git bisect reset (good and bad stay the user's, in a terminal)."
+    "description": "HI-3470: the panel's button for a bisect: git bisect reset (good and bad stay the user's, in a terminal). It is also the confirm button of the dialog that asks first, beside the dialog's Cancel (shell.dialog.cancel): it must read differently from it (HI-3504)."
   },
   "git.operation.failed": {
     "defaultMessage": "Git couldn't do that",
@@ -889,7 +889,7 @@
   },
   "git.operation.skip": {
     "defaultMessage": "Skip",
-    "description": "HI-3470: the panel's button: git drops the commit it stopped at and goes on (git <op> --skip)."
+    "description": "HI-3470: the panel's button: git drops the commit it stopped at and goes on (git <op> --skip). It is also the confirm button of the dialog that asks first, beside the dialog's Cancel (shell.dialog.cancel): it must read differently from it (HI-3504)."
   },
   "git.operation.skipMessage": {
     "defaultMessage": "Its changes are left out, with every conflict settled in it, and git goes on with the next one.",
