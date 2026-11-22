@@ -87,6 +87,10 @@
     "defaultMessage": "Ended",
     "description": "A node's second line in the Activity tab, live, once its process or session ended: it fades out, then leaves."
   },
+  "activity.fromMapHeading": {
+    "defaultMessage": "From the map",
+    "description": "A heading in the Activity tab (HI-3499) over a call chosen on the Activity map's feed or a station's panel that isn't among the rows above (an earlier turn's): it shows that call, selected, with its details."
+  },
   "activity.heading": {
     "defaultMessage": "Activity",
     "description": "The Activity tab's heading: what the project's agents are running now, a tab per agent."
@@ -127,6 +131,10 @@
     "defaultMessage": "{agents, plural, one {# agent} other {# agents}} · {working, number} working",
     "description": "In the centre of the Activity map's shared view: how many agents it shows, and how many of them work."
   },
+  "activity.map.callGone": {
+    "defaultMessage": "That call isn’t in what Activity has read now",
+    "description": "A notice when a call chosen on the Activity map (HI-3499) can't be shown in the list: its agent's session restarted since, or its turn is no longer among those read."
+  },
   "activity.map.cardRole": {
     "defaultMessage": "{card} · {role, select, builder {builder} other {reviewer}}",
     "description": "In the centre of the Activity map: the agent's card ({card}, its key) and its role on it. Lower case role."
@@ -150,6 +158,10 @@
   "activity.map.feedHeading": {
     "defaultMessage": "Last actions",
     "description": "The heading of the Activity map's feed: the agents' latest tool calls."
+  },
+  "activity.map.focusAgent": {
+    "defaultMessage": "Show {name}’s map alone",
+    "description": "Hover and screen-reader name of an agent's coloured dot on a station of the Activity map's shared view (HI-3499): a click shows that agent's map alone. {name} is the agent."
   },
   "activity.map.label": {
     "defaultMessage": "Activity map",
@@ -246,6 +258,10 @@
   "activity.map.show": {
     "defaultMessage": "Show",
     "description": "Before the Activity tab's toggles for its map: Map, Feed, Context."
+  },
+  "activity.map.showInList": {
+    "defaultMessage": "Show in the list",
+    "description": "Hover of a call in the Activity map's feed or a station's panel (HI-3499): a click shows that call in the Activity list beside the map, selected, with its details."
   },
   "activity.map.state": {
     "defaultMessage": "{state, select, working {Working} waiting {Waiting for you} failed {Failed or stalled} done {Done} other {Idle}}",

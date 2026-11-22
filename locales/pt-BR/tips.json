@@ -627,8 +627,10 @@
   "tips.opencodeHistory.title": "O histórico, os tokens e o custo de um agente do OpenCode",
   "tips.activityMap.text": "Atividade desenha seus agentes como um favo de mel: cada chamada de ferramenta vai até sua estação (Ler, Editar, Shell, Agentes, Ferramentas, Você), com um anel de contexto por agente. Escolha um agente em Agentes ▾ para ver o mapa dele; Mostrar desliga o mapa, seu registro e os anéis.",
   "tips.activityMapPanels.text": "Clique em uma estação no mapa de Atividade para ver o que há por trás dela: os programas em execução no Shell e há quanto tempo rodam, os arquivos que Ler e Editar tocaram (cada um abre em Arquivos), subagentes e os servidores MCP e ferramentas usados. Clique de novo ou pressione Esc para fechar.",
+  "tips.activityMapShowCall.text": "Clique em uma linha de Últimas ações do mapa de Atividade, ou em uma chamada no painel de uma estação, para mostrá-la na lista ao lado do mapa, selecionada com seus detalhes. No mapa compartilhado, clique no ponto de um agente em uma estação para ver só o mapa dele.",
   "tips.activityMap.title": "Um mapa do que seus agentes estão fazendo",
   "tips.activityMapPanels.title": "Veja o que há por trás de uma estação",
+  "tips.activityMapShowCall.title": "Do mapa para a lista",
   "tips.resumeLongIdle.title": "Uma conversa ociosa há muito tempo pergunta antes de ser retomada",
   "tips.resumeLongIdle.text": "Uma conversa ociosa há mais de uma hora muito provavelmente perdeu o cache de prompt, então retomá-la pode custar muitos tokens. Retomar diz há quanto tempo ela está ociosa e qual é o tamanho, e oferece Arquivar e começar do zero em vez disso."
 }

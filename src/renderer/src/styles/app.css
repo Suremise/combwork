@@ -9066,6 +9066,109 @@ button.activity-map-panel-row:focus-visible {
   padding: 2px 6px;
   font-size: 11px;
 }
+/* HI-3499: a feed row, a panel's call or a file's time shows its call in the list; a station's agent dot focuses it. */
+button.activity-map-feed-row {
+  width: 100%;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 2px 4px;
+  margin: 0 -4px;
+  cursor: pointer;
+}
+button.activity-map-feed-row:hover,
+button.activity-map-feed-row:focus-visible,
+.activity-map-panel-main:hover,
+.activity-map-panel-main:focus-visible,
+.activity-map-panel-time.link:hover,
+.activity-map-panel-time.link:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+button.activity-map-feed-row:focus-visible,
+button.activity-map-panel-row:focus-visible,
+.activity-map-panel-main:focus-visible,
+.activity-map-panel-time.link:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.activity-map-panel-row.activity-map-panel-file {
+  padding: 0;
+  gap: 2px;
+}
+.activity-map-panel-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px 6px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.activity-map-panel-time.link {
+  border: none;
+  border-radius: 4px;
+  background: none;
+  padding: 3px 6px;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.activity-map-here {
+  cursor: pointer;
+  stroke: var(--bg);
+  stroke-width: 1.5;
+  outline: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: activity-map-arrive 260ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.activity-map-here:hover,
+.activity-map-here:focus-visible {
+  stroke: var(--fg-strong);
+  stroke-width: 2;
+}
+/* An agent arriving in the strip, and one leaving it (HI-3499): eased in, faded out, then gone. */
+.activity-map-ring.arriving {
+  animation: activity-map-arrive 260ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.activity-map-ring.leaving {
+  pointer-events: none;
+  animation: activity-map-leave 260ms ease-in forwards;
+}
+@keyframes activity-map-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes activity-map-leave {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.activity-map.still .activity-map-here,
+.activity-map.still .activity-map-ring {
+  animation: none;
+}
+.activity-group[data-group='fromMap'] {
+  color: var(--accent);
+}
 .activity-map-partial {
   margin-top: 6px;
   font-size: 11px;

@@ -3,7 +3,7 @@
 // last calls and a context ring. Nothing new is collected: the stations come from the turns the tab reads (each call's
 // tool name), the agents' live state, their processes and background tasks, and the pane footer's context number.
 // Names only, never content (mapLabel): a summary is shown only where it is recognised as a path or a URL's host.
-import type { ActivityState, ActivityTurns } from './activity'
+import type { ActivityInput, ActivityNode, ActivityState, ActivityTurns } from './activity'
 import { msg, tr } from './i18n'
 import type { BackgroundTaskType, LaunchedLimits } from './types'
 
@@ -236,6 +236,11 @@ export interface MapCall {
   path?: string
   /** An MCP tool's server (HI-3498: the Tools panel groups by it). */
   server?: string
+  /**
+   * Where it is in its session's transcript (HI-3499: shown in the list): its turn's item and its own (a script's call,
+   * its script's; a prompt, its turn's). With `sessionKey`, which session of which host.
+   */
+  ref?: { turn: number; item: number }
 }
 
 /** What a station shows: unsupported (no shown agent's provider reports it), loading (nothing read yet), or counted. */
@@ -414,13 +419,13 @@ export function agentCalls(a: MapAgentInput, budget = MAP_CALLS): { calls: MapCa
     capped = true
     return true
   }
-  const one = (name: string, summary: () => string, key: string, tool: { at: string | null; failed: boolean; done: boolean }, last: boolean): boolean => {
+  const one = (name: string, summary: () => string, key: string, tool: { itemId: number; at: string | null; failed: boolean; done: boolean }, turnId: number, last: boolean): boolean => {
     const st = stationOf(name)
     const text = summary()
     const label = mapLabel({ name, summary: text })
     const path = callPath(name, text, label)
     const server = st.group === 'mcp' || st.group === 'combwork' ? mcpParts(name)?.server : undefined
-    return take({ key, station: st.station, ...(st.group ? { group: st.group } : {}), label, at: tool.at, failed: tool.failed, done: tool.done, ...(path ? { path } : {}), ...(server ? { server } : {}) }, last)
+    return take({ key, station: st.station, ...(st.group ? { group: st.group } : {}), label, at: tool.at, failed: tool.failed, done: tool.done, ref: { turn: turnId, item: tool.itemId }, ...(path ? { path } : {}), ...(server ? { server } : {}) }, last)
   }
   walk: for (let ti = turns.length - 1; ti >= 0; ti--) {
     const turn = turns[ti]
@@ -433,16 +438,16 @@ export function agentCalls(a: MapAgentInput, budget = MAP_CALLS): { calls: MapCa
           if (full()) break walk
           // Keyed by the call's place in the whole script (the calls left out before the kept ones, then j): the same call
           // keeps its key as the kept tail moves on (HR2's round 2).
-          one(tool.calls[j], () => '', `${sk}\n${tool.itemId}.${(tool.callsMore ?? 0) + j}`, tool, last)
+          one(tool.calls[j], () => '', `${sk}\n${tool.itemId}.${(tool.callsMore ?? 0) + j}`, tool, turn.itemId, last)
         }
         if (tool.callsMore) capped = true
       } else {
         if (full()) break walk
-        one(tool.name, () => tool.summary, `${sk}\n${tool.itemId}`, tool, last)
+        one(tool.name, () => tool.summary, `${sk}\n${tool.itemId}`, tool, turn.itemId, last)
       }
     }
     // The turn's prompt: You, by a word of its own (its text is content).
-    if (!take({ key: `${sk}\nprompt:${turn.itemId}`, kind: 'prompt', station: 'you', label: '', at: turn.at, failed: false, done: true }, last)) break
+    if (!take({ key: `${sk}\nprompt:${turn.itemId}`, kind: 'prompt', station: 'you', label: '', at: turn.at, failed: false, done: true, ref: { turn: turn.itemId, item: turn.itemId } }, last)) break
   }
   return { calls: out.reverse(), capped, lastTurn }
 }
@@ -603,6 +608,8 @@ export interface MapPanelRow {
   open?: boolean
   /** file: its path to open in Files (`MapCall.path`). */
   path?: string
+  /** call and file: its (newest) call, to show in the list (HI-3499). */
+  call?: Pick<MapCall, 'agentKey' | 'sessionKey' | 'ref' | 'kind'>
   /** file and group: how many calls it had; group: its tools' names (an MCP server's), newest first. */
   count?: number
   tools?: string[]
@@ -615,6 +622,9 @@ export interface MapPanel {
   station: MapStation
   sections: { id: MapPanelSection; rows: MapPanelRow[]; more: number }[]
 }
+
+/** A call as the list finds it (HI-3499): its agent, its session and its place in the transcript. */
+const callOf = (c: MapCall): NonNullable<MapPanelRow['call']> => ({ agentKey: c.agentKey, sessionKey: c.sessionKey, ref: c.ref, ...(c.kind ? { kind: c.kind } : {}) })
 
 /** Between a file row's agent and label in its key: neither holds it. */
 const SEP = '\u0001'
@@ -638,7 +648,7 @@ function grouped(calls: readonly MapCall[], keyOf: (c: MapCall) => string, kind:
       if (name && row.tools && !row.tools.includes(name(c))) row.tools.push(name(c))
       continue
     }
-    rows.set(k, { key: `${kind}:${k}`, kind, agentKey: c.agentKey, label: labelOf(c, k), at: c.at, failed: c.failed, open: !c.done, count: 1, ...(c.path ? { path: c.path } : {}), ...(name ? { tools: [name(c)] } : {}) })
+    rows.set(k, { key: `${kind}:${k}`, kind, agentKey: c.agentKey, label: labelOf(c, k), at: c.at, failed: c.failed, open: !c.done, count: 1, call: callOf(c), ...(c.path ? { path: c.path } : {}), ...(name ? { tools: [name(c)] } : {}) })
   }
   return [...rows.values()]
 }
@@ -651,7 +661,7 @@ function grouped(calls: readonly MapCall[], keyOf: (c: MapCall) => string, kind:
  */
 export function stationPanel(model: Pick<MapModel, 'calls' | 'running'>, station: MapStation): MapPanel {
   const calls = model.calls.filter((c) => c.station === station)
-  const thisTurn = newestFirst(calls.filter((c) => c.thisTurn)).map((c): MapPanelRow => ({ key: `call:${c.key}`, kind: 'call', agentKey: c.agentKey, label: c.label, at: c.at, failed: c.failed, open: !c.done, ...(c.kind === 'prompt' ? { prompt: true } : {}) }))
+  const thisTurn = newestFirst(calls.filter((c) => c.thisTurn)).map((c): MapPanelRow => ({ key: `call:${c.key}`, kind: 'call', agentKey: c.agentKey, label: c.label, at: c.at, failed: c.failed, open: !c.done, call: callOf(c), ...(c.kind === 'prompt' ? { prompt: true } : {}) }))
   const running = (kind?: MapRunning['kind']): MapPanelRow[] =>
     model.running
       .filter((r) => r.station === station && (!kind || r.kind === kind))
@@ -682,4 +692,29 @@ export function stationPanel(model: Pick<MapModel, 'calls' | 'running'>, station
     section('other', grouped(of(['other']), (c) => c.label, 'group'))
   } else section('thisTurn', thisTurn)
   return { station, sections: out.filter((x) => x.rows.length > 0) }
+}
+
+/** A call the map shows, as the list finds it (HI-3499): a feed row's or a panel row's. */
+export type MapCallRef = NonNullable<MapPanelRow['call']>
+
+/** A map session's key: its host's path (any case) and its id, as the map keys a call's session. */
+export const mapSessionKey = (path: string, id: string): string => `${path.toLowerCase()}\n${id}`
+
+/**
+ * The list's node for a call the map shows (HI-3499): its turn (a prompt) or its tool call (a script's call: its
+ * script's), keyed as the list keys them, from the turns the tab read. Found only by the call's own agent, host,
+ * session and transcript items (HR1's design check): a session restarted since, a tab's agent with another session, or
+ * an item no longer in the turns read is null, never another row.
+ */
+export function mapCallNode(entries: readonly { key: string; path: string; agentId: string; input: Pick<ActivityInput, 'agents' | 'turns'> }[], call: MapCallRef): { entryKey: string; agentId: string; path: string; node: Extract<ActivityNode, { kind: 'turn' | 'tool' }> } | null {
+  const e = entries.find((x) => x.key === call.agentKey)
+  const sid = e?.input.agents.find((a) => a.id === e.agentId)?.live?.sessionId
+  if (!e || !sid || !call.ref || mapSessionKey(e.path, sid) !== call.sessionKey) return null
+  const turn = e.input.turns.get(sid)?.turns.find((t) => t.itemId === call.ref!.turn)
+  if (!turn) return null
+  const at = { entryKey: e.key, agentId: e.agentId, path: e.path }
+  if (call.kind === 'prompt') return { ...at, node: { kind: 'turn', key: `turn:${sid}:${turn.itemId}`, sessionId: sid, turn, state: turn.tools.some((x) => x.failed) ? 'failed' : 'done' } }
+  const tool = turn.tools.find((x) => x.itemId === call.ref!.item)
+  if (!tool) return null
+  return { ...at, node: { kind: 'tool', key: `tool:${sid}:${tool.itemId}`, sessionId: sid, tool, state: tool.failed ? 'failed' : tool.done ? 'done' : 'working' } }
 }

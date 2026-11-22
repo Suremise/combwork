@@ -3,7 +3,7 @@
 // reads as the list (frozen or live), animates only while shown, live and on, and reads nothing of its own while hidden.
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { activityTabs, buildActivityView, filetimeMs, type ActivityFilter, type ActivityInput, type ActivityTabInfo } from '@shared/activity'
-import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, mapReadKeys, stationLastShown, stationLoad, stationPanel, stationTitle, type MapPanelRow, type TextFits, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
+import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, mapReadKeys, stationLastShown, stationLoad, stationPanel, stationTitle, mapCallNode, mapSessionKey, type MapCallRef, type MapPanelRow, type TextFits, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
 import { ACTIVITY_MAP_MOTION } from '@shared/advanced'
 import { boundedQueue } from '@shared/coalesce'
 import { formatTime } from '@shared/dates'
@@ -51,8 +51,18 @@ export function openMapFile(entries: readonly MapEntry[], key: string, path: str
   })
 }
 
+/**
+ * Shows a call the map shows in the list (HI-3499): its node from the turns read, or a notice where it isn't there now
+ * (its session restarted, its item no longer read), never another row. `show` gets the node to select.
+ */
+export function showMapCall(entries: readonly MapEntry[], ref: MapCallRef, show: (found: NonNullable<ReturnType<typeof mapCallNode>>) => void): void {
+  const found = mapCallNode(entries, ref)
+  if (found) show(found)
+  else notify('info', tr(M.callGone))
+}
+
 /** A session's key in the map: its host's path (lower-cased) and its id, as the workspace level keys its reads. */
-const sessionKey = (path: string, id: string): string => `${path.toLowerCase()}\n${id}`
+const sessionKey = mapSessionKey
 const NO_TURNS = { sessionId: '', version: '', total: 0, turns: [] }
 
 /**
@@ -172,7 +182,7 @@ function useMotion(): boolean {
  * The map's model and its pulses. Pulses only while `animate` (shown, live and the map on): each new scope (an opening,
  * Refresh, a filter change, going live, shown again) starts from a baseline that sends none (diffPulses).
  */
-export function useActivityMap(o: { active: boolean; animate: boolean; scope: string; entries: readonly MapEntry[]; contexts: ReadonlyMap<string, MapContext | null>; mode: 'single' | 'shared'; at: number }): { model: MapModel; pulses: MapPulse[]; endPulse: (id: string) => void } {
+export function useActivityMap(o: { active: boolean; animate: boolean; scope: string; entries: readonly MapEntry[]; contexts: ReadonlyMap<string, MapContext | null>; mode: 'single' | 'shared'; at: number }): { model: MapModel; pulses: MapPulse[]; endPulse: (id: string) => void; animate: boolean } {
   // Hidden, the model is held as it was: nothing of the store's changes is built or drawn meanwhile.
   const held = useRef<MapModel | null>(null)
   const model = useMemo(() => (o.active || !held.current ? buildMapModel(mapInputs(o.entries, o.contexts, o.mode), o.at) : held.current), [o.active, o.entries, o.contexts, o.mode, o.at])
@@ -201,7 +211,7 @@ export function useActivityMap(o: { active: boolean; animate: boolean; scope: st
     }
   }, [o.animate, o.scope, model.calls, model.sessions])
   const endPulse = useCallback((id: string) => setPulses((p) => p.filter((x) => x.id !== id)), [])
-  return { model, pulses, endPulse }
+  return { model, pulses, endPulse, animate: o.animate }
 }
 
 // --- Drawing: a 480 × 500 board, the agent's hex in the centre and the six stations around it, clockwise from the top.
@@ -317,6 +327,10 @@ export interface ActivityMapProps {
   picked?: string | null
   /** A file a Read or Edit panel lists, opened in Files (HI-3498): its agent's key and its path as the agent named it. */
   onOpenFile?: (agentKey: string, path: string) => void
+  /** A feed row's or a panel row's call, shown in the list (HI-3499). */
+  onShowCall?: (call: MapCallRef) => void
+  /** Animating (shown, live and on: `useActivityMap`'s): agents arriving and leaving are eased only then (HI-3499). */
+  live?: boolean
 }
 
 /** An agent in the strip: its ring, its name and its context. */
@@ -336,7 +350,7 @@ export function mapStrip(entries: readonly MapEntry[], contexts: ReadonlyMap<str
 }
 
 /** The map: stations, spokes, pulses, the centre, the feed and (shared) the agents' context rings. */
-export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulses, endPulse, show, onPick, strip, picked = null, onOpenFile }: ActivityMapProps) {
+export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulses, endPulse, show, onPick, strip, picked = null, onOpenFile, onShowCall, live = false }: ActivityMapProps) {
   const motion = useMotion()
   const ids = useMapIds()
   // The station whose panel is open (HI-3498): docked over the feed; its station again, its ✕ or Escape closes it.
@@ -356,6 +370,9 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
   const width = usePaneSize(MAP_PANE.key, MAP_PANE.width)
   // The strip: the selection's agents while one is shown alone (HI-3180), else the shared map's.
   const ringAgents: readonly MapStripAgent[] = strip ?? (mode === 'shared' ? model.agents : [])
+  // Agents arriving in the strip and leaving it (HI-3499), eased only while the map moves.
+  const comings = useComings(ringAgents, live && motion)
+  const names = useMemo(() => new Map(model.agents.map((a) => [a.key, a.name])), [model.agents])
   return (
     <div
       className={cx('activity-map', mode === 'shared' && 'shared', !motion && 'still')}
@@ -421,7 +438,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
               )
             })}
           {MAP_STATIONS.map((s, i) => (
-            <Station key={s} index={i} view={model.stations[s]} name={stationName(s)} colours={colours} ids={ids} open={panel === s} onToggle={togglePanel} />
+            <Station key={s} index={i} view={model.stations[s]} name={stationName(s)} colours={colours} ids={ids} open={panel === s} onToggle={togglePanel} names={names} onPick={onPick} />
           ))}
           {!motion &&
             pulses.map((pl) => {
@@ -437,7 +454,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
               <button
                 key={a.key}
                 role="listitem"
-                className={cx('activity-map-ring', a.key === picked && 'picked')}
+                className={cx('activity-map-ring', a.key === picked && 'picked', comings.arriving.has(a.key) && 'arriving')}
                 data-agent={a.key}
                 data-load={a.load}
                 aria-current={a.key === picked ? 'true' : undefined}
@@ -449,26 +466,43 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
                 <span className="faint">{a.load === 'notLoaded' ? tr(M.notLoaded) : a.context?.pct != null ? tr(M.pct, { pct: a.context.pct }) : '—'}</span>
               </button>
             ))}
+            {/* An agent that left (HI-3499): its ring fades out where the strip ends, then goes. */}
+            {comings.leaving.map(({ item: a, index }) => (
+              <span key={`leaving:${a.key}`} className="activity-map-ring leaving" data-agent={a.key} aria-hidden="true" onAnimationEnd={() => comings.gone(a.key)}>
+                <Ring pct={a.context?.pct ?? null} colour={colourOf(index)} hatched={a.load !== 'loaded'} />
+                <span className="activity-map-ring-name">{a.name}</span>
+              </span>
+            ))}
           </div>
         )}
       </div>
-      {panel && <StationPanel station={panel} view={model.stations[panel]} model={model} name={stationName(panel)} colourOf={mode === 'shared' ? (k) => colourOf(colours.get(k)) : null} onClose={() => setPanel(null)} onOpenFile={onOpenFile} />}
+      {panel && <StationPanel station={panel} view={model.stations[panel]} model={model} name={stationName(panel)} colourOf={mode === 'shared' ? (k) => colourOf(colours.get(k)) : null} onClose={() => setPanel(null)} onOpenFile={onOpenFile} onShowCall={onShowCall} />}
       {show.feed && !panel && (
         <div className="activity-map-feed" aria-label={tr(M.feedHeading)}>
           <h4>{tr(M.feedHeading)}</h4>
           {model.feed.length === 0 ? (
             <div className="faint">{model.agents.some((a) => a.load === 'loading') ? tr(M.loading) : tr(M.noCalls)}</div>
           ) : (
-            model.feed.map((c) => (
-              <div key={c.key} className={cx('activity-map-feed-row', c.failed && 'failed')} data-station={c.station}>
-                <span className="activity-map-feed-time">{c.at ? formatTime(c.at) : ''}</span>
-                {mode === 'shared' && <span className="activity-map-dot" style={{ background: colourOf(colours.get(c.agentKey)) }} />}
-                <span className="activity-map-feed-station">{stationName(c.station)}</span>
-                <span className="activity-map-feed-name" title={c.kind === 'prompt' ? tr(M.prompt) : c.label}>
-                  {c.kind === 'prompt' ? tr(M.prompt) : c.label}
-                </span>
-              </div>
-            ))
+            model.feed.map((c) => {
+              const body = (
+                <>
+                  <span className="activity-map-feed-time">{c.at ? formatTime(c.at) : ''}</span>
+                  {mode === 'shared' && <span className="activity-map-dot" style={{ background: colourOf(colours.get(c.agentKey)) }} />}
+                  <span className="activity-map-feed-station">{stationName(c.station)}</span>
+                  <span className="activity-map-feed-name">{c.kind === 'prompt' ? tr(M.prompt) : c.label}</span>
+                </>
+              )
+              // A click shows the call in the list (HI-3499).
+              return onShowCall && c.ref ? (
+                <button key={c.key} className={cx('activity-map-feed-row', c.failed && 'failed')} data-station={c.station} title={tr(M.showInList)} onClick={() => onShowCall({ agentKey: c.agentKey, sessionKey: c.sessionKey, ref: c.ref, ...(c.kind ? { kind: c.kind } : {}) })}>
+                  {body}
+                </button>
+              ) : (
+                <div key={c.key} className={cx('activity-map-feed-row', c.failed && 'failed')} data-station={c.station} title={c.kind === 'prompt' ? tr(M.prompt) : c.label}>
+                  {body}
+                </div>
+              )
+            })
           )}
           {Object.values(model.stations).some((s) => s.partial) && <div className="faint activity-map-partial">{tr(M.partial)}</div>}
         </div>
@@ -476,6 +510,33 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
     </div>
   )
 })
+
+/**
+ * Agents arriving in a list and leaving it (HI-3499): those new since the last change, and those gone with their place,
+ * kept until their fade-out ends (`gone`). Only while `moving` (shown, live, motion on): otherwise, and on the next
+ * change, what was kept is dropped at once, so nothing waits on an animation that never ends (hidden, frozen). Bounded:
+ * the last change's, at most MAP_AGENTS.
+ */
+function useComings<T extends { key: string }>(items: readonly T[], moving: boolean): { arriving: ReadonlySet<string>; leaving: { item: T; index: number }[]; gone: (key: string) => void } {
+  const prev = useRef<readonly T[] | null>(null)
+  const [state, setState] = useState<{ arriving: ReadonlySet<string>; leaving: { item: T; index: number }[] }>(NO_COMINGS)
+  useLayoutEffect(() => {
+    const was = prev.current
+    prev.current = items
+    if (!moving || !was) {
+      setState((s) => (s.arriving.size || s.leaving.length ? NO_COMINGS : s))
+      return
+    }
+    const now = new Set(items.map((i) => i.key))
+    const before = new Set(was.map((i) => i.key))
+    const arriving = new Set(items.filter((i) => !before.has(i.key)).map((i) => i.key))
+    const leaving = was.flatMap((item, index) => (now.has(item.key) ? [] : [{ item, index }])).slice(0, MAP_AGENTS)
+    if (arriving.size || leaving.length) setState({ arriving, leaving })
+  }, [items, moving])
+  const gone = useCallback((key: string) => setState((s) => ({ ...s, leaving: s.leaving.filter((x) => x.item.key !== key) })), [])
+  return { ...(state as { arriving: ReadonlySet<string>; leaving: { item: T; index: number }[] }), gone }
+}
+const NO_COMINGS = { arriving: new Set<string>(), leaving: [] }
 
 /** The ids of one map's gradients, filters and clips (HI-3479): unique, as a window can show more than one map. */
 type MapIds = ReturnType<typeof useMapIds>
@@ -538,7 +599,7 @@ function Defs({ ids }: { ids: MapIds }) {
  * A station's panel (HI-3498), docked where the feed is: what is behind it, from the map's own model (`stationPanel`),
  * names only. Read and Edit's files open in Files; how long something has run is said as of this drawing (no timer).
  */
-function StationPanel({ station, view, model, name, colourOf: dot, onClose, onOpenFile }: { station: MapStation; view: MapStationView; model: MapModel; name: string; colourOf: ((agentKey: string) => string) | null; onClose: () => void; onOpenFile?: (agentKey: string, path: string) => void }) {
+function StationPanel({ station, view, model, name, colourOf: dot, onClose, onOpenFile, onShowCall }: { station: MapStation; view: MapStationView; model: MapModel; name: string; colourOf: ((agentKey: string) => string) | null; onClose: () => void; onOpenFile?: (agentKey: string, path: string) => void; onShowCall?: (call: MapCallRef) => void }) {
   const panel = useMemo(() => stationPanel(model, station), [model, station])
   const now = Date.now()
   const time = (r: MapPanelRow): string => {
@@ -574,6 +635,7 @@ function StationPanel({ station, view, model, name, colourOf: dot, onClose, onOp
             <h5>{tr(M.panelSection, { section: sec.id })}</h5>
             {sec.rows.map((r) => {
               const opens = !!(r.path && onOpenFile)
+              const shows = !!(onShowCall && r.call?.ref)
               const body = (
                 <>
                   {dot && <span className="activity-map-dot" style={{ background: dot(r.agentKey) }} />}
@@ -592,12 +654,27 @@ function StationPanel({ station, view, model, name, colourOf: dot, onClose, onOp
                     </span>
                   )}
                   <span className="faint activity-map-panel-detail">{detail(r)}</span>
-                  <span className="activity-map-panel-time">{time(r)}</span>
+                  {!(shows && opens) && <span className="activity-map-panel-time">{time(r)}</span>}
                   {opens && <span className="activity-map-panel-open">{tr(M.panelOpen)}</span>}
                 </>
               )
-              return opens ? (
-                <button key={r.key} className={cx('activity-map-panel-row', r.failed && 'failed')} data-kind={r.kind} title={tr(M.panelOpenTip, { path: r.path! })} onClick={() => onOpenFile!(r.agentKey, r.path!)}>
+              // A file: the row opens it in Files, its time shows its newest call in the list (HI-3499).
+              if (opens)
+                return (
+                  <div key={r.key} className={cx('activity-map-panel-row', 'activity-map-panel-file', r.failed && 'failed')} data-kind={r.kind}>
+                    <button className="activity-map-panel-main" title={tr(M.panelOpenTip, { path: r.path! })} onClick={() => onOpenFile!(r.agentKey, r.path!)}>
+                      {body}
+                    </button>
+                    {shows && (
+                      <button className="activity-map-panel-time link" title={tr(M.showInList)} onClick={() => onShowCall!(r.call!)}>
+                        {time(r)}
+                      </button>
+                    )}
+                  </div>
+                )
+              // A call: the row shows it in the list (HI-3499).
+              return shows ? (
+                <button key={r.key} className={cx('activity-map-panel-row', r.failed && 'failed')} data-kind={r.kind} title={tr(M.showInList)} onClick={() => onShowCall!(r.call!)}>
                   {body}
                 </button>
               ) : (
@@ -614,7 +691,7 @@ function StationPanel({ station, view, model, name, colourOf: dot, onClose, onOp
   )
 }
 
-function Station({ index, view: st, name, colours, ids, open, onToggle }: { index: number; view: MapStationView; name: string; colours: ReadonlyMap<string, number | undefined>; ids: MapIds; open: boolean; onToggle: (s: MapStation) => void }) {
+function Station({ index, view: st, name, colours, ids, open, onToggle, names, onPick }: { index: number; view: MapStationView; name: string; colours: ReadonlyMap<string, number | undefined>; ids: MapIds; open: boolean; onToggle: (s: MapStation) => void; names: ReadonlyMap<string, string>; onPick?: (key: string) => void }) {
   const p = POS[st.station]
   const active = st.here.length > 0
   const waitingHere = st.station === 'you' && active
@@ -668,8 +745,41 @@ function Station({ index, view: st, name, colours, ids, open, onToggle }: { inde
           {stationLastShown(last, st.station, lastFits() ?? undefined)}
         </text>
       )}
+      {/* The agents with a call open here (shared map): a click shows that agent's map alone (HI-3499), as its ring does. */}
       {colours.size > 1 &&
-        st.here.slice(0, 6).map((k, i, all) => <circle key={k} cx={p.x - (all.length - 1) * 6 + i * 12} cy={p.y + 34} r={4} style={{ fill: colourOf(colours.get(k)) }} />)}
+        st.here.slice(0, 6).map((k, i, all) => {
+          const label = tr(M.focusAgent, { name: names.get(k) ?? k })
+          const pick = (e: React.SyntheticEvent): void => {
+            e.stopPropagation()
+            onPick?.(k)
+          }
+          return (
+            <circle
+              key={k}
+              className="activity-map-here"
+              data-agent={k}
+              cx={p.x - (all.length - 1) * 6 + i * 12}
+              cy={p.y + 34}
+              r={4}
+              style={{ fill: colourOf(colours.get(k)) }}
+              {...(onPick
+                ? {
+                    role: 'button',
+                    tabIndex: 0,
+                    'aria-label': label,
+                    onClick: pick,
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.key !== 'Enter' && e.key !== ' ') return
+                      e.preventDefault()
+                      pick(e)
+                    }
+                  }
+                : {})}
+            >
+              {onPick && <title>{label}</title>}
+            </circle>
+          )
+        })}
       {/* What runs there now (HI-3479): a small lit cell each, outside the hex (its count and hover say how many). */}
       {pips > 0 && (
         <g className="activity-map-pips" aria-hidden="true">
@@ -807,5 +917,8 @@ const M = {
   panelOpen: msg({ id: 'activity.map.panelOpen', defaultMessage: 'Open', description: "At the end of a file's row in the Read or Edit panel of the Activity map (HI-3498): opens the file in the Files tab." }),
   panelOpenTip: msg({ id: 'activity.map.panelOpenTip', defaultMessage: 'Open {path} in Files', description: "Hover of a file's row in the Read or Edit panel of the Activity map (HI-3498). {path} is the file's path; Files is the tab's name: use it as the tab is named." }),
   panelNoFile: msg({ id: 'activity.map.panelNoFile', defaultMessage: '{path} isn’t a file in the project now', description: "A notice when a file chosen in the Activity map's Read or Edit panel (HI-3498) can't be opened in Files: it was moved or deleted since, or is outside the workspace's projects. {path} is its path as the agent named it." }),
+  showInList: msg({ id: 'activity.map.showInList', defaultMessage: 'Show in the list', description: "Hover of a call in the Activity map's feed or a station's panel (HI-3499): a click shows that call in the Activity list beside the map, selected, with its details." }),
+  callGone: msg({ id: 'activity.map.callGone', defaultMessage: 'That call isn’t in what Activity has read now', description: "A notice when a call chosen on the Activity map (HI-3499) can't be shown in the list: its agent's session restarted since, or its turn is no longer among those read." }),
+  focusAgent: msg({ id: 'activity.map.focusAgent', defaultMessage: 'Show {name}’s map alone', description: "Hover and screen-reader name of an agent's coloured dot on a station of the Activity map's shared view (HI-3499): a click shows that agent's map alone. {name} is the agent." }),
   toggleContext: msg({ id: 'activity.map.toggleContext', defaultMessage: 'Context', description: "A toggle above the Activity tab: show the agents' context rings on the map." })
 }

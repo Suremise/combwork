@@ -627,8 +627,10 @@
   "tips.opencodeHistory.title": "OpenCode 代理的历史记录、令牌和费用",
   "tips.activityMap.text": "“活动”把智能体画成蜂巢：每次工具调用都会去往它的站点（读取、编辑、命令行、智能体、工具、你），每个智能体都有一个上下文环。在“智能体 ▾”中选一个智能体即可看到它自己的地图；“显示”可关闭地图、动态和环。",
   "tips.activityMapPanels.text": "在活动地图上点击一个站点，查看它背后的内容：命令行中正在运行的程序及其运行时长、读取和编辑涉及的文件（每个都可在文件中打开）、子智能体，以及用到的 MCP 服务器和工具。再次点击或按 Esc 关闭。",
+  "tips.activityMapShowCall.text": "点击活动地图“最近操作”中的一行，或站点面板中的一次调用，即可在地图旁的列表中显示它，选中并显示详情。在共享地图中，点击站点上某个智能体的圆点，只显示它的地图。",
   "tips.activityMap.title": "智能体在做什么的地图",
   "tips.activityMapPanels.title": "查看站点背后的内容",
+  "tips.activityMapShowCall.title": "从地图到列表",
   "tips.resumeLongIdle.title": "长时间空闲的对话在恢复前会先询问",
   "tips.resumeLongIdle.text": "空闲超过一小时的对话很可能已失去提示词缓存，因此恢复它可能花费大量 Token。“恢复”会说明它已空闲多久、有多大，并提供“归档并新建会话”作为替代。"
 }

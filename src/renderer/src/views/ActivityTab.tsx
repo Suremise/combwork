@@ -11,8 +11,8 @@ import { confirm, isAssistantPath, notify, openInSessionsTab, revealAgent, set, 
 import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
-import { ActivityMap, MapToggles, mapSessions, openMapFile, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
-import { mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapContext } from '@shared/activityMap'
+import { ActivityMap, MapToggles, mapSessions, openMapFile, showMapCall, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapCallRef, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { boundedQueue, latestOnly } from '@shared/coalesce'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -89,6 +89,11 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const [nowRead, setNowRead] = useState(false)
   const [turns, setTurns] = useState<ReadonlyMap<string, ActivityTurns>>(new Map())
   const [selected, setSelected] = useState<string | null>(null)
+  // A call the map showed (HI-3499): its node and agent, kept while it is the one selected.
+  const [mapPick, setMapPick] = useState<{ agentId: string; node: ActivityNode } | null>(null)
+  useEffect(() => {
+    if (mapPick && selected !== mapPick.node.key) setMapPick(null)
+  }, [selected, mapPick])
   // Live (HI-1743): a choice, never the default; each opening is frozen.
   const [live, setLive] = useState(false)
   // The agents as last taken in: live state changes often, the tab follows once a tick, and only when it changed.
@@ -345,6 +350,16 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const entriesNow = useRef(entries)
   entriesNow.current = entries
   const openFile = useCallback((key: string, path: string) => openMapFile(entriesNow.current, key, path), [])
+  // A call shown in the list (HI-3499): its agent's tab, the call selected there (its own row, or one from the map).
+  const showCall = useCallback(
+    (c: MapCallRef) =>
+      showMapCall(entriesNow.current, c, (found) => {
+        setView({ tab: found.entryKey })
+        setMapPick({ agentId: found.agentId, node: found.node })
+        setSelected(found.node.key)
+      }),
+    [setView]
+  )
   // Animated once live and the snapshot released (HI-2939): its first pulses' baseline is then the live reads, never the
   // held ones (from those, what came while frozen was sent as a burst).
   const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at: input.at })
@@ -390,8 +405,9 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const byKey = useMemo(() => {
     const m = new Map<string, ActivityNode>()
     for (const p of parts) for (const n of [p.session, p.turn, p.doing?.kind === 'tool' ? p.doing.tool : null, ...p.subagents, ...p.processes]) if (n) m.set(n.key, n)
+    if (mapPick && !m.has(mapPick.node.key) && parts.some((p) => p.agentId === mapPick.agentId)) m.set(mapPick.node.key, mapPick.node)
     return m
-  }, [parts])
+  }, [parts, mapPick])
   const chosen = selected ? (byKey.get(selected) ?? null) : null
   const filtered = !!view.agents?.length || !!view.cards?.length
 
@@ -471,7 +487,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
           </div>
         )}
         <div className={cx('activity-body', mapOn && entries.length > 0 && 'with-map')}>
-          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={project.name} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} onOpenFile={openFile} />}
+          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={project.name} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} onOpenFile={openFile} onShowCall={showCall} live={map.animate} />}
         {!parts.length ? (
           <div className="pane-empty">{reading ? null : tr(filtered ? M.emptyFiltered : M.empty)}</div>
         ) : (
@@ -502,7 +518,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
               </div>
             ) : null}
             {parts.map((p) => (
-              <PartView key={p.agentId} project={project} part={p} many={parts.length > 1} selected={selected} onSelect={setSelected} showOwn={!!view.showOwn} onShowOwn={(v) => setView({ showOwn: v })} />
+              <PartView key={p.agentId} project={project} part={p} many={parts.length > 1} selected={selected} onSelect={setSelected} showOwn={!!view.showOwn} onShowOwn={(v) => setView({ showOwn: v })} picked={mapPick?.agentId === p.agentId ? mapPick.node : null} />
             ))}
           </div>
         )}
@@ -515,8 +531,10 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
 }
 
 /** One agent's work (HI-1743): Now (its prompt, then what it does), its subagents and background tasks, its processes. */
-export function PartView({ project, part: p, many, selected, onSelect, showOwn, onShowOwn }: { project: ProjectInfo; part: ActivityPart; many: boolean; selected: string | null; onSelect: (key: string) => void; showOwn: boolean; onShowOwn: (v: boolean) => void }) {
+export function PartView({ project, part: p, many, selected, onSelect, showOwn, onShowOwn, picked = null }: { project: ProjectInfo; part: ActivityPart; many: boolean; selected: string | null; onSelect: (key: string) => void; showOwn: boolean; onShowOwn: (v: boolean) => void; picked?: ActivityNode | null }) {
   const row = (n: ActivityNode) => <Row key={n.key} node={n} selected={selected === n.key} onSelect={onSelect} />
+  // A call the map showed (HI-3499) that isn't a row here already (the latest prompt, the tool under way): its own row.
+  const fromMap = picked && picked.key !== p.turn?.key && picked.key !== (p.doing?.kind === 'tool' ? p.doing.tool.key : null) ? picked : null
   return (
     <section className="activity-part" data-part={p.agentId}>
       {many && (
@@ -549,6 +567,14 @@ export function PartView({ project, part: p, many, selected, onSelect, showOwn, 
             <div className="activity-row-title">{p.session ? p.line || tr(M.state, { state: p.state }) : tr(M.notRunning)}</div>
           </div>
         </div>
+      )}
+      {fromMap && (
+        <>
+          <h3 className="activity-group" data-group="fromMap">
+            {tr(M.fromMapHeading)}
+          </h3>
+          {row(fromMap)}
+        </>
       )}
       {p.blocks.map((b) => (
         // A lock block standing now (HI-982): live only, gone once its decision ends; the Hooks dialog keeps the history.
@@ -604,8 +630,14 @@ function showActivityAgent(project: ProjectInfo, agentId: string): void {
 function Row({ node, selected, onSelect }: { node: ActivityNode; selected: boolean; onSelect: (key: string) => void }) {
   const { icon, title, sub: line, state } = describe(node)
   const sub = node.gone ? tr(M.endedNode) : line
+  // Selected from elsewhere (HI-3499: the map shows a call here), it comes into view; a click on it moves nothing.
+  const el = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (selected) el.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [selected])
   return (
     <div
+      ref={el}
       className={cx('activity-row', `act-${node.kind}`, state && `act-${state}`, node.kind === 'process' && node.process.orphan && 'act-orphan', node.gone && 'act-gone', selected && 'selected')}
       role="button"
       tabIndex={0}
@@ -805,6 +837,7 @@ const M = {
   empty: msg({ id: 'activity.empty', defaultMessage: 'Nothing is running. Start an agent to see what it runs here.', description: 'The Activity tab when no agent of the project runs anything (with Hide finished on, idle agents have no tab).' }),
   emptyFiltered: msg({ id: 'activity.emptyFiltered', defaultMessage: 'Nothing is running for this filter.', description: 'The Activity tab, filtered to agents or cards, when none of them runs anything.' }),
   tabsLabel: msg({ id: 'activity.tabsLabel', defaultMessage: 'Agents', description: "The Activity tab's row of agent tabs (one per running agent), for screen readers." }),
+  fromMapHeading: msg({ id: 'activity.fromMapHeading', defaultMessage: 'From the map', description: "A heading in the Activity tab (HI-3499) over a call chosen on the Activity map's feed or a station's panel that isn't among the rows above (an earlier turn's): it shows that call, selected, with its details." }),
   nowHeading: msg({ id: 'activity.nowHeading', defaultMessage: 'Now', description: "A heading in the Activity tab, over what an agent is doing in its turn now: its prompt, then the tool call under way (or thinking, or writing)." }),
   subagentsHeading: msg({ id: 'activity.subagentsHeading', defaultMessage: 'Subagents and background tasks', description: "A heading in the Activity tab, over an agent's subagents and the background tasks it left running (a command, a monitor)." }),
   processesHeading: msg({ id: 'activity.processesHeading', defaultMessage: 'Processes', description: "A heading in the Activity tab, over the processes an agent started (test runs, servers, scripts)." }),

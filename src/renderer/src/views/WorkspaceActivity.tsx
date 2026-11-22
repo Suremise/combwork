@@ -10,8 +10,8 @@ import { NO_PROJECTS, activityAgentKey, cardActivityAgents, openActivity, set, u
 import { Icon, IconButton, InfoTip, statusText, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
-import { ActivityMap, MapToggles, mapSessions, openMapFile, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
-import { liveIn, mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapContext } from '@shared/activityMap'
+import { ActivityMap, MapToggles, mapSessions, openMapFile, showMapCall, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { liveIn, mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapCallRef, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { ACTIVITY_M, Details, FADE_MS, LIST_EVERY, markOf, NO_NOW, PartView, TICK_MS, TURNS_AT_ONCE, usePageVisible } from './ActivityTab'
 
@@ -108,6 +108,11 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const [nowRead, setNowRead] = useState(false)
   const [turns, setTurns] = useState<ReadonlyMap<string, ActivityTurns>>(new Map())
   const [selected, setSelected] = useState<string | null>(null)
+  // A call the map showed (HI-3499): its host, agent and node, kept while it is the one selected.
+  const [mapPick, setMapPick] = useState<{ path: string; agentId: string; node: ActivityNode } | null>(null)
+  useEffect(() => {
+    if (mapPick && selected !== mapPick.node.key) setMapPick(null)
+  }, [selected, mapPick])
   const [live, setLive] = useState(false)
   // Drawn again when an agent's live state changed (its status, its line); `members` only when an agent started, stopped
   // or began another session: what the session lists and a card's agents depend on (HR5's HI-1664 round 1).
@@ -433,6 +438,16 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const entriesNow = useRef(entries)
   entriesNow.current = entries
   const openFile = useCallback((key: string, path: string) => openMapFile(entriesNow.current, key, path), [])
+  // A call shown in the list (HI-3499): its agent's tab (by host and id), the call selected there.
+  const showCall = useCallback(
+    (c: MapCallRef) =>
+      showMapCall(entriesNow.current, c, (found) => {
+        setView({ tab: found.entryKey })
+        setMapPick({ path: found.path, agentId: found.agentId, node: found.node })
+        setSelected(found.node.key)
+      }),
+    [setView]
+  )
   // Animated once live and the snapshot released (HI-2939): see the project's tab.
   const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at })
   const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts, readEntries) : undefined), [alone, entries, drawn.contexts, readEntries])
@@ -476,11 +491,14 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, unreadKey, readTurns])
 
+  // The map's call belongs to the host shown and one of its parts (HI-3499: the same agent id in another project is another agent).
+  const pickHere = !!mapPick && !!current && current.host.path.toLowerCase() === mapPick.path.toLowerCase() && parts.some((p) => p.agentId === mapPick.agentId)
   const byKey = useMemo(() => {
     const m = new Map<string, ActivityNode>()
     for (const p of parts) for (const n of [p.session, p.turn, p.doing?.kind === 'tool' ? p.doing.tool : null, ...p.subagents, ...p.processes]) if (n) m.set(n.key, n)
+    if (mapPick && pickHere && !m.has(mapPick.node.key)) m.set(mapPick.node.key, mapPick.node)
     return m
-  }, [parts])
+  }, [parts, mapPick, pickHere])
   const chosen = selected ? (byKey.get(selected) ?? null) : null
 
   // The Agents ▾ and Cards ▾ menus: the workspace's agents (by project) and its cards in progress.
@@ -581,7 +599,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
           </div>
         )}
         <div className={cx('activity-body', mapOn && entries.length > 0 && 'with-map')}>
-          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={workspaceName} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} onOpenFile={openFile} />}
+          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={workspaceName} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} onOpenFile={openFile} onShowCall={showCall} live={map.animate} />}
         {!parts.length || !current ? (
           <div className="pane-empty">{reading ? null : forCardLabel ? tr(M.cardNobody, { card: forCardLabel }) : tr(filtered ? ACTIVITY_M.emptyFiltered : M.empty)}</div>
         ) : (
@@ -604,7 +622,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
               </div>
             ) : null}
             {parts.map((p) => (
-              <PartView key={p.agentId} project={current.host} part={p} many={parts.length > 1} selected={selected} onSelect={setSelected} showOwn={!!view.showOwn} onShowOwn={(v) => setView({ showOwn: v })} />
+              <PartView key={p.agentId} project={current.host} part={p} many={parts.length > 1} selected={selected} onSelect={setSelected} showOwn={!!view.showOwn} onShowOwn={(v) => setView({ showOwn: v })} picked={pickHere && mapPick?.agentId === p.agentId ? mapPick.node : null} />
             ))}
           </div>
         )}
