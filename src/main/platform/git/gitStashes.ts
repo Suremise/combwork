@@ -272,13 +272,13 @@ async function dropAt(root: string, ref: StashRef): Promise<{ ok: true } | { ok:
   // The row chosen is what git dropped only if git dropped its commit and one fewer row has its commit and message now
   // (HR1's round 1: another row of the same commit, stored meanwhile, can be what moved onto its place).
   const after = await listed(root)
-  const count = (list: Listed[], commit: string, subject: string): number => list.filter((x) => x.commit === commit && x.subject === subject).length
+  const count = (list: Listed[], c: string, subj: string): number => list.filter((x) => x.commit === c && x.subject === subj).length
   if (gone === s.commit && count(after, s.commit, s.subject) < count(rows, s.commit, s.subject)) return { ok: true }
   // Another row was dropped. Its message: that of a row of its commit the list had and has one fewer of now; else (a
   // row made meanwhile, whose message only git's dropped entry held) its commit's own subject, which git stash push
   // makes the same.
   const subjects = [...new Set(rows.filter((x) => x.commit === gone).map((x) => x.subject))]
-  const known = subjects.find((subject) => count(after, gone, subject) < count(rows, gone, subject))
+  const known = subjects.find((subj) => count(after, gone, subj) < count(rows, gone, subj))
   const own = known ?? (await git(root, ['log', '-1', '--format=%s', gone, '--'])).out.trim()
   const back = await git(root, ['stash', 'store', '-m', own || 'restored', gone])
   log.warn(`Another git moved the stashes while the user dropped ${s.commit.slice(0, 12)}: git dropped ${gone.slice(0, 12)}, ${back.ok ? 'put back' : `not put back (${userText(gitErrorLine(back.err))})`}`)
