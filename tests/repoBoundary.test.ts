@@ -37,7 +37,6 @@ vi.mock('../src/main/advanced', async (original) => {
 const { boundaryOf, gitVeto } = await import('../src/main/platform/repoBoundary')
 const { commonGitDir, withRepoLock } = await import('../src/main/repoLock')
 const { repoContext, withFolderRepoLocks, excludeFile, mainTree, trustRoot } = await import('../src/main/platform/repoPorts')
-const { storeLock } = await import('../src/main/slotsApp')
 const { gitCantRead } = await import('../src/main/platform/workspacePorts')
 const { fileLockDepth } = await import('../src/main/fsutil')
 const { REPO_LOCK_FILE } = await import('../src/main/repoLockCore')
@@ -217,13 +216,6 @@ describe('one lock owner, whatever platform names the store (s13 §2, s16 §1)',
     expect(lockTrace.filter((l) => l.startsWith('take'))).toHaveLength(1)
   })
 
-  it('a nested take of a store a live owner holds runs through (an outer project lock, jj’s storeLock inside it)', async () => {
-    const w = outerWithJj()
-    const inner = await withFolderRepoLocks([w.jj], () => storeLock(w.store, () => withRepoLock(w.store, async () => 'inner')))
-    expect(inner).toBe('inner')
-    expect(lockTrace.filter((l) => l.startsWith('take'))).toHaveLength(1)
-  })
-
   it('two takers asking for two stores in opposite orders both finish', async () => {
     const { lo, hi } = twoStores()
     const g = gate()
@@ -245,38 +237,6 @@ describe('one lock owner, whatever platform names the store (s13 §2, s16 §1)',
     g.open()
     await holder
     expect(await withRepoLock(hi, () => withRepoLock(lo, async () => 'free'))).toBe('free')
-  })
-
-  it('a continuation outliving its take takes the lock again: it waits behind another holder, never runs through it', async () => {
-    const w = outerWithJj()
-    const order: string[] = []
-    const resume = gate()
-    let child: Promise<void> | null = null
-    await storeLock(w.store, async () => {
-      // A deferred child: its context inherited inside A, run after A released.
-      child = (async () => {
-        await resume.wait
-        await storeLock(w.store, async () => void order.push('child'))
-      })()
-    })
-    const bHeld = gate()
-    const bGo = gate()
-    const b = storeLock(w.store, async () => {
-      order.push('B in')
-      bHeld.open()
-      await bGo.wait
-      order.push('B out')
-    })
-    await bHeld.wait
-    resume.open()
-    // The child asks while B holds: queued behind B's hold on the store's lock file (B's and its own), not run.
-    const file = join(realpathSync(w.store), REPO_LOCK_FILE)
-    await vi.waitUntil(() => fileLockDepth(file) >= 2 || order.includes('child'))
-    expect(order).toEqual(['B in'])
-    bGo.open()
-    await b
-    await child
-    expect(order).toEqual(['B in', 'B out', 'child'])
   })
 
   it('an inherited claim that expires while the take waits for its other store: taken again, never run while another holds it (HR1’s round 1)', async () => {

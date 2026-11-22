@@ -82,10 +82,8 @@ export function setQueueLive(fn: ((ws: WorkspaceService, project: string, target
  * written (slotCards.ts's). Given by the app as it starts (none in unit tests: no slots, a card starts where its agent is).
  */
 export interface SlotStarts {
-  leaseFor: (ws: WorkspaceService, project: string, card: CardRecord, builder: string, o: { dry: boolean; target: string | null; kept?: { slot: string; generation: string; target: string } }) => Promise<SlotForStart>
+  leaseFor: (ws: WorkspaceService, project: string, card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
   unused: (ws: WorkspaceService, project: string, lease: string) => Promise<void>
-  /** HI-3132: a card's kept slot of the project's own version control (SlotPool.keptHere), else null. */
-  keptHere?: (ws: WorkspaceService, project: string, card: number) => Promise<{ slot: string; folder: string } | null>
   /**
    * After #1441's migration: an agent's adopted worktree (its carried slot) while what it is kept for (the lane running at
    * the upgrade, or its card then in flight) goes on, so those finish where they started (the stand-in path).
@@ -246,7 +244,6 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
     // HI-3118: a submit from a slot asks whether its lease still holds it for the card, of the pool that lent it.
     slotHeld: (lease, slot, folder, card) => (slotStarts?.held ? slotStarts.held(ws, project.path, lease, slot, folder, card) : true),
-    keptHere: (card) => slotStarts?.keptHere?.(ws, project.path, card.id) ?? Promise.resolve(null),
     // HI-3148: a running lane's grant to start on a released line (its record's, given with its start), for its cards' starts.
     // Read from the lanes as stored, synchronously (inside the start's write too): an ended or replaced lane grants nothing.
     releaseGrant: (lane) => {

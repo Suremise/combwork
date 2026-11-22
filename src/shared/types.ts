@@ -1959,30 +1959,6 @@ export interface ProjectConfig {
   loopStepWaitMinutes?: number | null
 }
 
-/**
- * HI-3134: a stale jj slot's recovery refused `divergent`: the commit its folder holds (`folder`) is still in jj beside
- * the commit jj's latest operation gives the slot (`head`); `same`: one change, divergent. Full commit ids.
- */
-export interface SlotRecoverDivergent {
-  folder: string
-  head: string
-  same: boolean
-}
-
-/**
- * What a stale jj slot's recovery did (HI-2996, the window's Recover…): how many files it put back as they were, each copy
- * it wrote beside a file that changed meanwhile (relative to the slot, with `/`), the files deleted there that it kept
- * (changed or back meanwhile), and the commit jj made of the folder that it kept (divergent), if any.
- */
-export interface SlotRecovery {
-  restored: number
-  copies: { path: string; copy: string }[]
-  /** Files it moved aside and left there, the version before the recovery: their path was created again meanwhile. */
-  asides: { path: string; copy: string }[]
-  keptDeleted: string[]
-  divergent: string | null
-}
-
 /** One of a project's slots as the window reads it (#1429, slots.ts): its state and its open lease, if any. */
 export interface SlotView {
   name: string
@@ -1998,27 +1974,7 @@ export interface SlotView {
    * frees it.
    */
   writer: { agent: string; lease: string; held: boolean } | null
-  /**
-   * HI-2869: the platform that made it, when its workspaces are its own commands' records (jj's; HI-3140: `ownedWorkspaces`),
-   * and, for such a slot, stale (another workspace rewrote it).
-   */
-  platform?: PlatformId
-  stale?: true
-  /** HI-3135: a stale jj slot whose checkout's operation the user's `jj op abandon` discarded (absent: another workspace rewrote it). */
-  staleWhy?: 'abandoned'
-  /** HI-2995: a jj slot kept for a card put back with committed work not in its target yet: that card's number. */
-  keptFor?: number
-  /** HI-3143: kept for that card's uncommitted edit (or files jj doesn't track), not commits. */
-  keptEdit?: true
-  /**
-   * HI-3032: a kept slot whose folder is gone (state `gone`): the generation it was kept at (Remove… sends it back, so only
-   * that slot is removed) and its work's last commit, as recorded when its card's lease ended (null: none recorded).
-   * HI-3097 `forgotten`: its folder is there, jj no longer listing its workspace (forgotten outside Combwork).
-   */
-  keptGone?: { generation: string; commit: string | null; forgotten?: true }
-  /** HI-3103: kept for no card, its workspace forgotten outside Combwork, its folder there: its generation, for Remove…. */
-  forgotten?: { generation: string }
-  /** HI-3464: free and gone, kept for no card (its folder missing, or there but not a worktree git lists): Remove… forgets it. */
+  /** HI-3464: free and gone (its folder missing, or there but not a worktree git lists): Remove… forgets it. */
   goneFree?: true
   /**
    * HI-3465: free, with a git operation left under way in it (git's word for it), as its last settle found it, and since when.

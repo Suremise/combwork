@@ -26,8 +26,6 @@ import type {
   SlotOptions,
   GitFilesStatus,
   SlotView,
-  SlotRecoverDivergent,
-  SlotRecovery,
   HeldWriter,
   BoardState,
   SetAsideCard,
@@ -486,13 +484,6 @@ export interface CombworkRequests {
   'slots:setLevelDefault': (level: WorkflowLevel, key: 'copy', value: string | null) => SlotLevelForm
   /** Ends an agent's carried lease (#1441, Release Slot… in its menu): its adopted worktree stops being its own. Whether it did. */
   'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
-  /** A stale jj slot recovered (HI-2866): the user's explicit action, with what it did (HI-2996); a protocol code when refused. */
-  'slots:recoverStale': (projectPath: string, slot: string) => { ok: true; recovered?: SlotRecovery } | { ok: false; why: string; divergent?: SlotRecoverDivergent }
-  /** HI-3032: a slot kept for a card with its folder gone, removed (Remove…): only that card's record at that generation. */
-  /** `forgotten` (HI-3097): the mode the user confirmed, its folder there (true) or missing (false); another now: `changed`. */
-  'slots:removeKept': (projectPath: string, slot: string, card: number, generation: string, forgotten: boolean) => { ok: true } | { ok: false; why: string }
-  /** HI-3103: a slot kept for no card whose workspace the user forgot, at the generation shown; anything else: `changed`. */
-  'slots:removeForgotten': (projectPath: string, slot: string, generation: string) => { ok: true } | { ok: false; why: string }
   /** HI-3464: a free slot whose folder is gone or not a worktree, forgotten (its folder left as it is); anything else: `changed`. */
   'slots:removeGone': (projectPath: string, slot: string) => { ok: true } | { ok: false; why: string }
   /** A slot's writer as Release Slot… shows it (#1506): its holder, whether its run is live, what is listed of its processes. Null: none. */

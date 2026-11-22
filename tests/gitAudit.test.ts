@@ -108,7 +108,7 @@ describe('the Git/None cutover audit', () => {
     // field of that name holding no mode (a count, another word) is not one.
     const runtime = 'src/main/workflow/runtime.ts'
     const form = 'src/renderer/src/components/WorkflowOptions.tsx'
-    const adapter = 'src/main/platform/jjPlatform.ts'
+    const adapter = 'src/main/platform/gitPlatform.ts'
     const over: Record<string, string> = {
       [runtime]: `${text(runtime)}
 const modes = { finishes: ['committed'] as const }
@@ -122,7 +122,7 @@ class Modes { 'finishes' = ['agentMerges'] }
 `
     }
     const lines = (f: string): number => over[f].split(/\n/).length - 1
-    expect(modeDeclarations(root, over)).toEqual([`src/main/platform/jjPlatform.ts:${lines(adapter)} finishes`, `src/main/workflow/runtime.ts:${lines(runtime)} finishes`, `src/renderer/src/components/WorkflowOptions.tsx:${lines(form)} defaultFinish`])
+    expect(modeDeclarations(root, over)).toEqual([`src/main/platform/gitPlatform.ts:${lines(adapter)} finishes`, `src/main/workflow/runtime.ts:${lines(runtime)} finishes`, `src/renderer/src/components/WorkflowOptions.tsx:${lines(form)} defaultFinish`])
   })
 
   it("fails a switch on a platform's id outside the descriptors, adapters and registry, and one more in a justified file (HI-2822)", () => {
@@ -221,10 +221,10 @@ const r = (platform: string) => platform === 'none'
     // A new edge from the workflow, a name beyond its list, one gone.
     const reconcile = 'src/main/workflow/reconcile.ts'
     expect(run({ [reconcile]: `import { jjRunner } from '../platform/jjRunner'\n${text(reconcile)}` }).jj).toEqual(['src/main/workflow/reconcile -> src/main/platform/jjRunner: unlisted'])
-    const runtime = 'src/main/workflow/runtime.ts'
-    const t = text(runtime)
-    expect(t).toContain('import type { JjCardDeps } from')
-    expect(run({ [runtime]: t.replace('import type { JjCardDeps } from', 'import type { JjCardDeps, JjSubmittedSlot } from') }).jj).toEqual(['src/main/workflow/runtime -> src/main/platform/jjPlatform: JjSubmittedSlot'])
+    const vcs = 'src/main/combworkVcs.ts'
+    const t = text(vcs)
+    expect(t).toContain('import { ensureJjExcluded } from')
+    expect(run({ [vcs]: t.replace('import { ensureJjExcluded } from', 'import { ensureJjExcluded, jjKeepOutFor } from') }).jj).toEqual(['src/main/combworkVcs -> src/main/platform/jjKeepOut: jjKeepOutFor'])
     const diag = 'src/main/diagnostics.ts'
     expect(run({ [diag]: text(diag).replace(/^import \{ jjRunner \} from '\.\/platform\/jjRunner'\r?\n/m, '') }).jj).toEqual(['src/main/diagnostics -> src/main/platform/jjRunner: stale'])
     // jj's homes and the platform layer itself are not edges.

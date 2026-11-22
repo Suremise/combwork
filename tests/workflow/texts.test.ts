@@ -85,7 +85,7 @@ const SAMPLE: RefusalValues = {
   // platform.detachedFolder (HI-3104): the branch to check out, found ('no', none it could name, is rendered on its own below).
   has: 'yes',
   branch: 'main',
-  // platform.keptAcross, platform.keptElsewhere (HI-3069): the kept slot, the version control now, its folder there.
+  // A slot's name, the version control now, a folder there: values other refusals' tests share.
   slot: 'slot-b',
   now: 'Git',
   gone: 'no',

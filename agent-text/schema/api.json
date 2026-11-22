@@ -787,9 +787,6 @@
   "api.check.leaseArgs": {
     "placeholders": {}
   },
-  "api.check.noCopies": {
-    "placeholders": {}
-  },
   "api.check.noVcs": {
     "placeholders": {}
   },

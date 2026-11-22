@@ -415,8 +415,6 @@ interface CombworkMessageValues {
   'workflow.refused.platform.detachedFolder.next': { has: string; branch: string | number }
   'workflow.refused.platform.jjRefused.message': { why: string; card: string | number; count: number; files: string | number; setting: string | number; base: string | number; commit: string | number; other: string | number; max: number; state: string }
   'workflow.refused.platform.jjRefused.next': { why: string; state: string; told: string | number }
-  'workflow.refused.platform.keptElsewhere.message': { card: string | number; slot: string | number }
-  'workflow.refused.platform.keptElsewhere.next': { slot: string | number; card: string | number }
   'workflow.refused.platform.keptLine.message': { card: string | number; kept: string | number; target: string | number }
   'workflow.refused.platform.keptLine.next': { kept: string | number; target: string | number }
   'workflow.refused.platform.keptOnTarget.message': { why: string; card: string | number; slot: string | number; target: string | number; now: string | number }
@@ -550,9 +548,6 @@ interface CombworkMessageValues {
   'workflow.slots.desc': undefined
   'workflow.slots.detachFailedHint': { said: string; error: string | number; target: string | number; command: string | number }
   'workflow.slots.detachFailedState': { target: string | number }
-  'workflow.slots.divergent': { same: string; folder: string | number; head: string | number }
-  'workflow.slots.divergentNext': { folder: string | number; head: string | number }
-  'workflow.slots.divergentTitle': { slot: string | number }
   'workflow.slots.fromSetup': undefined
   'workflow.slots.gitFiles': undefined
   'workflow.slots.gitFilesDesc': undefined
@@ -564,39 +559,21 @@ interface CombworkMessageValues {
   'workflow.slots.held': { agent: string | number }
   'workflow.slots.inUse': undefined
   'workflow.slots.inherit': undefined
-  'workflow.slots.keptEditFor': { card: string | number }
-  'workflow.slots.keptFor': { card: string | number }
-  'workflow.slots.keptForgottenFor': { card: string | number }
-  'workflow.slots.keptGoneFor': { card: string | number }
   'workflow.slots.lentCard': { agent: string | number; card: string | number }
   'workflow.slots.lentLane': { agent: string | number }
   'workflow.slots.levelInherit': undefined
   'workflow.slots.levelNone': undefined
   'workflow.slots.noSlots': undefined
   'workflow.slots.none': undefined
-  'workflow.slots.notRecovered': { slot: string | number; why: string }
   'workflow.slots.notRemovedKept': { slot: string | number; why: string }
   'workflow.slots.off': undefined
   'workflow.slots.on': undefined
   'workflow.slots.openAdvanced': undefined
   'workflow.slots.operationHint': { command: string | number }
   'workflow.slots.operationState': { what: string | number }
-  'workflow.slots.recover': undefined
-  'workflow.slots.recoverMessage': undefined
-  'workflow.slots.recoverTitle': { slot: string | number }
-  'workflow.slots.recovered': { slot: string | number }
-  'workflow.slots.recoveredAsides': { n: number; files: string | number }
-  'workflow.slots.recoveredCopies': { n: number }
-  'workflow.slots.recoveredDivergent': { commit: string | number }
-  'workflow.slots.recoveredKeptDeleted': { n: number; files: string | number }
-  'workflow.slots.recoveredPutBack': { n: number }
-  'workflow.slots.recoveredTitle': { slot: string | number }
   'workflow.slots.release': undefined
-  'workflow.slots.removeForgottenFree': { slot: string | number }
-  'workflow.slots.removeForgottenMessage': { card: string | number; commit: string }
   'workflow.slots.removeGoneMessage': { slot: string | number }
   'workflow.slots.removeKept': undefined
-  'workflow.slots.removeKeptMessage': { card: string | number; commit: string }
   'workflow.slots.removeKeptTitle': { slot: string | number }
   'workflow.slots.removedKept': { slot: string | number }
   'workflow.slots.reviewCopies': undefined
@@ -606,14 +583,9 @@ interface CombworkMessageValues {
   'workflow.slots.setNone': undefined
   'workflow.slots.setup': undefined
   'workflow.slots.setupDesc': undefined
-  'workflow.slots.stale': undefined
-  'workflow.slots.staleAbandoned': undefined
   'workflow.slots.state.creating': undefined
   'workflow.slots.state.dirty': undefined
-  'workflow.slots.state.forgotten': undefined
   'workflow.slots.state.gone': undefined
-  'workflow.slots.state.kept': undefined
-  'workflow.slots.state.keptEdit': undefined
   'workflow.slots.state.lent': undefined
   'workflow.slots.state.ready': undefined
   'workflow.slots.state.removing': undefined

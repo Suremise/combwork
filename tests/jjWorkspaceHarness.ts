@@ -1,14 +1,11 @@
-// The real-jj harness for jj's workspace port (HI-2795's J2): the pinned portable jj (npm run jj:fetch), jj's and git's
-// config isolated, repositories in tempDir() only, an in-memory journal per key, and a test Recycle Bin (a folder the
-// trashed items are moved into). Used by tests/jjWorkspaces.test.ts and tests/jjRecovery.test.ts.
+// The real-jj harness: the pinned portable jj (npm run jj:fetch), jj's and git's config isolated, repositories in
+// tempDir() only.
 import { execFileSync } from 'child_process'
 import { createRequire } from 'module'
-import { mkdirSync, realpathSync, renameSync, writeFileSync } from 'fs'
-import { basename, join, resolve } from 'path'
+import { mkdirSync, realpathSync, writeFileSync } from 'fs'
+import { join, resolve } from 'path'
 import { TESTED_JJ } from '../src/shared/jjTool'
 import { createJjRunner, type JjRunner } from '../src/main/platform/jjRunner'
-import { createJjWorkspacePort, type JjPortDeps, type JjWorkspacePort } from '../src/main/platform/jjWorkspacePort'
-import type { WorkspaceJournal } from '../src/main/platform/workspacePort'
 import { tempDir } from './tempDir'
 import { timing } from './timing.cjs'
 
@@ -29,35 +26,9 @@ export function isolatedEnv(): NodeJS.ProcessEnv {
 
 export const real = (p: string): string => resolve(realpathSync.native(p))
 
-/** A map of journals by key, as board_meta keeps them. */
-export class Journals {
-  readonly rows = new Map<string, unknown>()
-  /** Awaited at the start of each `update`, as the board's write waits for its lock (a test sets it to hold one). */
-  gate: ((key: string) => Promise<void> | void) | null = null
-  of(key: string): WorkspaceJournal {
-    return {
-      read: () => (this.rows.has(key) ? structuredClone(this.rows.get(key)) : null),
-      write: async (v) => void this.rows.set(key, structuredClone(v)),
-      clear: async () => void this.rows.delete(key),
-      update: async (fn) => {
-        // A test's gate on the write (HR2's round 1: the wait for the board's lock), then the compare-and-set, synchronously.
-        await this.gate?.(key)
-        const next = fn(this.rows.has(key) ? structuredClone(this.rows.get(key)) : null)
-        if (next === undefined) return false
-        this.rows.set(key, structuredClone(next))
-        return true
-      }
-    }
-  }
-}
-
 export interface Harness {
   env: NodeJS.ProcessEnv
   runner: JjRunner
-  port: JjWorkspacePort
-  journals: Journals
-  trashed: string[]
-  trashDir: string
   /** The plain jj, in a folder (writes, as an agent's would). */
   jj: (cwd: string, ...args: string[]) => string
   git: (cwd: string, ...args: string[]) => string
@@ -65,41 +36,17 @@ export interface Harness {
   repo: (name: string, colocated: boolean) => { repo: string; root: string; base: string }
   /** The commit id of a revset, read without a snapshot. */
   id: (cwd: string, rev: string) => string
-  /** A port with other deps (a fresh process, as after a restart, shares the journals and the trash). */
-  portWith: (more?: Partial<JjPortDeps>) => JjWorkspacePort
 }
 
-export function harness(o: { busy?: string } = {}): Harness {
+export function harness(): Harness {
   const env = isolatedEnv()
   const runner = createJjRunner({ exe: jjExe!, env })
-  const journals = new Journals()
-  const trashed: string[] = []
-  const trashDir = tempDir('jj-trash-')
-  let n = 0
-  const deps = (more: Partial<JjPortDeps> = {}): JjPortDeps => ({
-    runner,
-    control: (repo) => ({ folder: join(resolve(repo, '..'), 'slots', '.cw-jj-control'), journal: journals.of(`jj_control:${repo.toLowerCase()}`) }),
-    gitLink: (_repo, folder) => journals.of(`jj_gitlink:${folder.toLowerCase()}`),
-    projectHold: () => (o.busy ? { busy: o.busy } : { release: () => undefined }),
-    lock: (_store, fn) => fn(),
-    trash: async (p) => {
-      const to = join(trashDir, `${++n}-${basename(p)}`)
-      renameSync(p, to)
-      trashed.push(p)
-    },
-    ...more
-  })
   const jj = (cwd: string, ...args: string[]): string => execFileSync(jjExe!, args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang'), stdio: ['ignore', 'pipe', 'pipe'] })
   const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, env, windowsHide: true, encoding: 'utf8', timeout: timing('spawn.hang') })
   const id = (cwd: string, rev: string): string => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', rev, '-T', 'commit_id').trim()
   return {
     env,
     runner,
-    port: createJjWorkspacePort(deps()),
-    portWith: (more) => createJjWorkspacePort(deps(more)),
-    journals,
-    trashed,
-    trashDir,
     jj,
     git,
     id,

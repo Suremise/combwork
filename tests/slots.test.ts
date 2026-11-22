@@ -23,7 +23,6 @@ import { commit, gitRepo, sh } from './workflow/harness'
 import { junction } from './pathAliases'
 import { gitWorkspacePort } from '../src/main/platform/gitWorkspacePort'
 import { operationSync } from '../src/main/platform/git'
-import { JJ_SAYS } from '../src/main/platform/jjWorkspacePort'
 import { unknown } from '../src/main/platform/types'
 import { UNREADABLE } from '../src/shared/workflow/texts'
 import type { WorkspacePort } from '../src/main/platform/workspacePort'
@@ -466,38 +465,6 @@ describe('lending and releasing (#1429)', { timeout: timing('test.hang') }, () =
     // A lend that nothing serves leaves the one recorded.
     const again = await lent(w, { agent: 'a1', card: 3 })
     expect(again.slot.target).toBe('1.0.0')
-  })
-
-  it("HI-2936: after a switch from jj, a leftover jj slot neither fails a Git lending nor fills the pool; removed by its own port once it has one", async () => {
-    const w = world({ builders: 1 })
-    const first = await lent(w, { agent: 'a1', card: 1 })
-    await w.pool.release(first.lease.id, 'done')
-    // slot-a as jj left it (HI-2906's busy detach): lent with no lease, its folder there; jj's port not registered here.
-    await w.store.conn.write((db) => void db.prepare("UPDATE slots SET platform = 'jj', state = 'lent' WHERE project = ? AND name = 'slot-a'").run(w.store.project))
-    await w.pool.refresh()
-    expect(w.store.slot('slot-a')).toMatchObject({ platform: 'jj', state: 'lent' })
-    // A Git card starts in a new slot: the pool's size (1) counts Git's slots alone.
-    const second = await lent(w, { agent: 'a2', card: 2 })
-    expect(second.slot).toMatchObject({ name: 'slot-b' })
-    expect(w.store.slot('slot-b')?.platform ?? 'git').toBe('git')
-    // Idle, it is kept while it has no port; never a Git slot removed in its place.
-    w.clock.now += IDLE_MS
-    expect(await w.pool.tidy()).toEqual([])
-    expect(w.store.slot('slot-a')).toBeTruthy()
-    // With jj's port (the app registers it while a jj row is left; a Git worktree's stands in), it settles, and the
-    // idle tidy removes it by that port; the Git slot stays.
-    const { registerWorkspacePort } = await import('../src/main/platform/workspacePorts')
-    registerWorkspacePort('jj', { ...gitWorkspacePort, platform: 'jj' })
-    try {
-      await w.pool.refresh()
-      expect(w.store.slot('slot-a')?.state).toBe('ready')
-      expect(await w.pool.tidy()).toEqual(['slot-a'])
-      expect(w.store.slot('slot-a')).toBeNull()
-      expect(existsSync(first.slot.folder)).toBe(false)
-      expect(w.store.slot('slot-b')?.state).toBe('lent')
-    } finally {
-      registerWorkspacePort('jj', undefined as unknown as Parameters<typeof registerWorkspacePort>[1])
-    }
   })
 
   it("HI-2928: a free slot whose own target was deleted is checked against the default target: freed when its head is there, kept unmerged when not", async () => {
@@ -1627,11 +1594,10 @@ describe("an operation is its pool's from before its reservation (HR1 round 2)",
   })
 })
 
-describe("HI-3003: a slot's failures in its platform's words", { timeout: timing('test.hang') }, () => {
-  // Git's port with its reads or its switch failing: said in the pool's words (Git's, unchanged), or in jj's (JJ_SAYS).
-  const failing = (what: 'line' | 'files' | 'lineHead' | 'switch', says?: WorkspacePort['says']): WorkspacePort => ({
+describe("HI-3003: a slot's failures in the pool's words", { timeout: timing('test.hang') }, () => {
+  // Git's port with its reads or its switch failing: said in the pool's words (Git's, unchanged).
+  const failing = (what: 'line' | 'files' | 'lineHead' | 'switch'): WorkspacePort => ({
     ...gitWorkspacePort,
-    ...(says ? { says } : {}),
     ...(what === 'line' ? { line: async () => unknown(UNREADABLE.branchedOffTarget) } : {}),
     ...(what === 'files' ? { dirty: async () => unknown(UNREADABLE.branchedOffTarget) } : {}),
     ...(what === 'lineHead' ? { lineHead: async (repo: string, line: string) => (line === 'cw/AM/AM-1-one' ? unknown(UNREADABLE.branchedOffTarget) : gitWorkspacePort.lineHead(repo, line)) } : {}),
@@ -1653,24 +1619,9 @@ describe("HI-3003: a slot's failures in its platform's words", { timeout: timing
     expect(await errorOf(failing('switch'))).toBe('git switch: refused (test)')
   })
 
-  it("a port with jj's words: each failed preparation names no git, branch or switch", async () => {
-    const said = [await errorOf(failing('line', JJ_SAYS)), await errorOf(failing('files', JJ_SAYS)), await errorOf(failing('lineHead', JJ_SAYS)), await errorOf(failing('switch', JJ_SAYS))]
-    expect(said).toEqual(["jj couldn't read slot-a's workspace", "jj couldn't read slot-a's files", "jj couldn't read cw/AM/AM-1-one", "jj couldn't prepare slot-a for the card: refused (test)"])
-    for (const s of said) expect(s).not.toMatch(/\bgit\b|branch|switch/i)
-  })
-
-  it("a slot's setup that can't read its target: Git's words as before, jj's naming no git", async () => {
-    const setupError = async (says?: WorkspacePort['says']): Promise<unknown> => {
-      const w = world({ builders: 1, port: { ...gitWorkspacePort, ...(says ? { says } : {}), lineHead: async () => unknown(UNREADABLE.branchedOffTarget) } })
-      return w.pool.lend({ agent: 'a1', card: 1 }, { target: 'main' })
-    }
-    expect(await setupError()).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: "git couldn't read main" } })
-    expect(await setupError(JJ_SAYS)).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: "jj couldn't read main" } })
-  })
-
-  it("jj's words cover every word a port may give, and none names git, a branch, a switch or a worktree", () => {
-    expect(Object.keys(JJ_SAYS).sort()).toEqual(['branchUnread', 'createFailed', 'filesUnread', 'lineUnread', 'noTarget', 'notListed', 'removeFailed', 'switchFailed'])
-    for (const m of Object.values(JJ_SAYS)) expect(m!.text).not.toMatch(/\bgit\b|branch|switch|worktree/i)
+  it("a slot's setup that can't read its target: Git's words as before", async () => {
+    const w = world({ builders: 1, port: { ...gitWorkspacePort, lineHead: async () => unknown(UNREADABLE.branchedOffTarget) } })
+    expect(await w.pool.lend({ agent: 'a1', card: 1 }, { target: 'main' })).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: "git couldn't read main" } })
   })
 })
 

@@ -198,8 +198,6 @@ export const EDGES = [
   { file: 'src/main/nameUpgradeProjects', module: 'src/main/platform/gitKeepOut', class: 'historic', names: ['gitDirOf'], op: 'the exclude line upgrade (HI-2594)', why: "1.1's name upgrade rewrites git's exclude line" },
   { file: 'src/main/platform/adapters', module: 'src/main/platform/gitPlatform', class: 'registry', names: ['GitPlatform'], why: "the workflow adapters' map (HI-2792)" },
   { file: 'src/main/platform/historyPorts', module: 'src/main/platform/gitHistory', class: 'registry', names: ['gitHistory'], why: "the history port's map (R6)" },
-  { file: 'src/main/slotsApp', module: 'src/main/repoLock', class: 'common', names: ['takeStores'], why: "jj's store lock for its workspace port's writes (HI-2866): the repository lock's one owner (HI-2896), keyed by the store, every platform's" },
-  { file: 'src/main/slotsApp', module: 'src/main/git', class: 'registry', names: ['git'], why: "jj's stale-slot recovery composed with the app's deps (HI-2866): J2's recoverStale reads the workspace's files through git, read-only" },
   { file: 'src/main/platform/integrationPorts', module: 'src/main/platform/gitIntegration', class: 'registry', names: ['gitIntegration'], why: "the integration port's map (R7, R8)" },
   { file: 'src/main/platform/observe', module: 'src/main/git', class: 'impl', names: ['readRefsOffMain'], why: "the watcher's Git reads (refs off main's thread, git's reflog): ObservePort's Git half, kept with the common watcher (R6)" },
   { file: 'src/main/platform/observe', module: 'src/main/platform/gitIgnoredByKind', class: 'impl', names: ['gitIgnoredByKind', 'EntryKind', 'RecordedKinds'], why: "a Git folder's write record leaves out what Git ignores, each path by every kind it had (HI-3173): ObservePort's Git half, read-only check-ignore" },
@@ -463,8 +461,6 @@ export function switchCounts(root, over = {}, used = new Set(), files = new Set(
  * data read by a one-time step. Counted like the seams: a new switch, or one gone, fails tests/gitAudit.test.ts.
  */
 export const SWITCHES = {
-  'src/main/copies': { n: 2, class: 'data', why: "a copy's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data, written and passed on" },
-  'src/main/slots': { n: 2, class: 'data', why: "a slot's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data, written and passed on" },
   'src/main/combworkMove': { n: 2, class: 'historic', why: "1.1's .hive → .combwork move fixes git's exclude lines in a Git repository (HI-2462): its boundary read as Git's" }, // old-name: the 1.1 folder move's input, named as it was
   'src/main/nameUpgradeProjects': { n: 2, class: 'historic', why: "1.1's name upgrade moves a Git repository's refs and exclude line (HI-2594): its boundary read as Git's" },
   'src/main/ipc': { n: 1, class: 'gitUi', why: "the Files tab's Git menu reads only a Git repository's boundary (git:…)" },
@@ -506,19 +502,12 @@ export function jjEdges(root, over = {}) {
 }
 
 /**
- * The jj edges left outside the platform layer (HI-3140), each with the names it may take and why: composition of jj's
- * port with the app's services, the workflow's candidate pass's fingerprint, and what jj's runner and tool tell the
- * diagnostics. A new edge, a name beyond its list, or a listed edge gone fails tests/gitAudit.test.ts.
+ * The jj edges left outside the platform layer (HI-3140), each with the names it may take and why: keeping .combwork out
+ * of a jj repository, and what jj's runner tells the diagnostics. A new edge, a name beyond its list, or a listed edge gone fails tests/gitAudit.test.ts.
  */
 export const JJ_EDGES = [
   { file: 'src/main/combworkVcs', module: 'src/main/platform/jjKeepOut', class: 'registry', names: ['ensureJjExcluded'], why: "keeping .combwork out of a jj repository: combworkVcs routes to each platform's keep-out (port 1)" },
   { file: 'src/main/diagnostics', module: 'src/main/platform/jjRunner', class: 'jjUi', names: ['jjRunner'], why: "Copy Diagnostics names jj's tool and its readiness (J0)" },
-  { file: 'src/main/slotsApp', module: 'src/main/platform/jjRecovery', class: 'registry', names: ['recoverStale'], why: "jj's stale-slot recovery composed with the app's deps (HI-2866, the user's Recover…)" },
-  { file: 'src/main/slotsApp', module: 'src/main/platform/jjRunner', class: 'registry', names: ['storeGitGated'], why: "jj's recovery's git on the store, gated by jj's runner (HI-2866): composition" },
-  { file: 'src/main/slotsApp', module: 'src/main/platform/jjSlotPrep', class: 'registry', names: ['boardPrepStore'], why: "jj's port's preparation records in the workspace database (HI-2866): composition" },
-  { file: 'src/main/slotsApp', module: 'src/main/platform/jjWorkspacePort', class: 'registry', names: ['JjWorkspacePort', 'createJjWorkspacePort', 'generationOf'], why: "jj's workspace port made with the app's dependencies (APP_PORTS' maker) and a slot's generation for Remove…" },
-  { file: 'src/main/slotStaleView', module: 'src/main/platform/jjWorkspacePort', class: 'registry', names: ['StaleWhy'], why: "a stale jj slot's reason's type, for the Slots view's read of jj's port (HI-2912)" },
-  { file: 'src/main/workflow/runtime', module: 'src/main/platform/jjPlatform', class: 'registry', names: ['JjCardDeps'], why: "the type of jj's card work's dependencies, which the app gives each project's workflow (setJjCards, HI-2868)" },
 ]
 
 /** The descriptor fields that declare a platform's integration modes (HI-2840): its finishes and its default one. */
