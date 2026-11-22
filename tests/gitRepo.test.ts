@@ -41,7 +41,10 @@ vi.mock('../src/main/workspace', () => ({
     // The folder contract (#1451) reads no slots here: no Assistant home, no board.
     isAssistantHome: () => false
   },
-  workspaceOf: () => ({ refresh: async () => ({}), path: 'ws', worktreesRoot: `${proj}.worktrees`, info: () => ({ projects: [{ path: proj, name: 'proj', platform: { id: 'git' } }] }), projectConfig: async () => ({ version: 2, agents }) })
+  workspaceOf: () => ({ refresh: async () => ({}), path: 'ws', worktreesRoot: `${proj}.worktrees`, info: () => ({ projects: [{ path: proj, name: 'proj', platform: { id: 'git' } }] }), projectConfig: async () => ({ version: 2, agents }) }),
+  // HI-3520: windows.ts sets it at load: gitRepo reaches it through branchMerge → projectAgents → the repository ops
+  // port → gitHealth (HI-3473) → progressService
+  setWorkspaceFallback: () => {}
 }))
 /** The project's workflow target (#1642: '' for none, the default branch), and the board's open cards' lines. */
 let workTarget = ''

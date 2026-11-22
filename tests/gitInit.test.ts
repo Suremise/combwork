@@ -23,7 +23,9 @@ vi.mock('../src/main/workspace', () => ({
       return p
     }
   },
-  workspaceOf: () => ({ refresh })
+  workspaceOf: () => ({ refresh }),
+  // HI-3520: windows.ts sets it at load: gitInit reaches it through gitRepo (see gitRepo.test.ts)
+  setWorkspaceFallback: () => {}
 }))
 // gitRepo's own neighbours (its one-at-a-time queue is used): nothing of them runs here.
 vi.mock('../src/main/sessions', () => ({ sessions: {} }))
