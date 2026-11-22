@@ -464,5 +464,7 @@
   "service.gitRepo.tagDeleted": "{onRemote, select, yes {Tag {name} supprimé, ici et sur {remote}.} other {Tag {name} supprimé.}}",
   "service.gitRepo.tagPushed": "{result, select, upToDate {{remote} a déjà le tag {name}.} other {Tag {name} envoyé vers {remote}.}}",
   "service.gitRepo.tagPushRefused": "{remote} a un autre tag {name}, donc le push a été refusé (Combwork ne force jamais un push).",
-  "service.gitRepo.tagPushOnlyFailed": "Impossible de faire un push du tag {name} vers {remote} : {why}"
+  "service.gitRepo.tagPushOnlyFailed": "Impossible de faire un push du tag {name} vers {remote} : {why}",
+  "service.gitRepo.renameStopped": "{step, select, push {{from} renommée en {to} ici, mais le push de {to} vers {remote} a été arrêté : il a peut-être atteint {remote}. {to} suit toujours {upstream}.} other {{from} renommée en {to} et envoyée vers {remote}, où elle suit maintenant {to}, mais la suppression de {old} là-bas a été arrêtée : elle y est peut-être encore.}} Actualise pour voir où en sont les choses.",
+  "service.gitRepo.renameTrackFailed": "{from} renommée en {to} et envoyée vers {remote}, mais impossible de lui faire suivre {remote}/{to} : {why} Elle suit toujours {upstream}, et {old} est toujours sur {remote}."
 }

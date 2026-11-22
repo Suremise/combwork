@@ -994,6 +994,16 @@
     "note": "HI-3474: an error renaming a branch to {to} with Also rename on the remote: the remote {remote} has a branch of that name.",
     "audience": "both"
   },
+  "service.gitRepo.renameStopped": {
+    "text": "{step, select, push {Renamed {from} to {to} here, but the push of {to} to {remote} was stopped: it may have reached {remote}. {to} still tracks {upstream}.} other {Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but deleting {old} there was stopped: it may still be there.}} Refresh to see where things stand.",
+    "note": "HI-3474 (round 1): after the user cancelled renaming a branch on its remote too, once {from} was renamed {to} here: during the push of the new name to the remote {remote} (it still follows {upstream}), or during the deletion of the old name {old} there. Keep the select keys.",
+    "audience": "both"
+  },
+  "service.gitRepo.renameTrackFailed": {
+    "text": "Renamed {from} to {to} and pushed it to {remote}, but couldn't make it track {remote}/{to}: {why} It still tracks {upstream}, and {old} is still on {remote}.",
+    "note": "HI-3474 (round 1): an error renaming a branch here and on a remote: {from} was renamed {to} and pushed to the remote {remote}, but setting it to follow its new name there failed ({why}, git's words); it still follows {upstream}, and the old name {old} wasn't deleted there.",
+    "audience": "both"
+  },
   "service.gitRepo.renameUpstreamKept": {
     "text": "{upstream} is the remote's default branch, the branch work merges into or the default branch: Combwork won't delete it there, so nothing was renamed.",
     "note": "HI-3474: an error renaming a branch with Also rename on the remote: the remote branch it tracks ({upstream}, such as origin/main) is one Combwork never deletes.",

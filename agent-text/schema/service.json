@@ -971,6 +971,26 @@
       "to": "plain"
     }
   },
+  "service.gitRepo.renameStopped": {
+    "placeholders": {
+      "step": "select",
+      "from": "plain",
+      "to": "plain",
+      "remote": "plain",
+      "upstream": "plain",
+      "old": "plain"
+    }
+  },
+  "service.gitRepo.renameTrackFailed": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "remote": "plain",
+      "why": "plain",
+      "upstream": "plain",
+      "old": "plain"
+    }
+  },
   "service.gitRepo.renameUpstreamKept": {
     "placeholders": {
       "upstream": "plain"

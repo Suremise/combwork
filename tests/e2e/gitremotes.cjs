@@ -217,7 +217,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
       check('…its form: the name, and On origin keeping its name there until asked', (await renameBranch.locator('#git-form-name').inputValue()) === 'topic' && (await renameBranch.locator('#git-form-there').inputValue()) === '' && /It tracks origin\/topic/.test(await text(renameBranch)), await text(renameBranch))
       await renameBranch.locator('#git-form-name').fill('topic2')
       await renameBranch.locator('#git-form-there').selectOption('yes')
-      await shot(page, '6-rename-branch-dark')
+      await shot(page, '5b-rename-branch-dark')
       await renameBranch.getByRole('button', { name: 'Rename', exact: true }).click()
       check('…renames it here and on origin, tracking its new name there', !!(await lib.until(async () => (await renameBranch.count()) === 0 && (await branches.locator('[data-branch="topic2"]').count()) === 1, HUNG_MS)) && !has(alpha, 'refs/heads/topic') && !has(origin, 'refs/heads/topic') && !!has(origin, 'refs/heads/topic2') && upstreamOf('topic2') === 'origin/topic2', JSON.stringify({ up: upstreamOf('topic2'), old: has(origin, 'refs/heads/topic') }))
 
@@ -230,6 +230,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
       const pushTag = page.locator('.dialog', { hasText: 'Push the tag v1' })
       await lib.until(async () => (await pushTag.count()) === 1, HUNG_MS)
       await pushTag.locator('#git-form-remote').selectOption('origin')
+      await shot(page, '6-push-tag-dark')
       await pushTag.getByRole('button', { name: 'Push', exact: true }).click()
       check('Push… sends the tag to origin', !!(await lib.until(async () => (await pushTag.count()) === 0 && has(origin, 'refs/tags/v1') === has(alpha, 'refs/tags/v1'), HUNG_MS)))
       await v1.locator('[data-action="delete-tag"]').click()

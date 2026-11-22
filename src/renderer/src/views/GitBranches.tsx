@@ -440,8 +440,9 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         // Update from <target> (HI-1180): a branch that lacks some of the target's commits (never the target), with work of
         // its own, or in use (HR4's round 1: a card's new line behind its target, fast-forwarded); a merged branch nothing
         // uses is Clean Up's, not to update.
-        // HI-3474: any branch nothing uses, or the folder's own (main refuses it while an agent works there).
-        const renamable = (b: GitBranchRow): boolean => [null, 'current'].includes(localUse(b, info, busyBranches))
+        // HI-3474: any branch nothing uses, or the folder's own unless an open card works on it (HR1's round 1); main
+        // refuses the folder's own while an agent works there.
+        const renamable = (b: GitBranchRow): boolean => !busyBranches.has(b.name) && [null, 'current'].includes(localUse(b, info, busyBranches))
         const updatable = (b: GitBranchRow): boolean => !!target && b.name !== target && !!b.fromTarget && (!!b.toTarget || !!localUse(b, info, busyBranches))
         const updateFrom = async (b: GitBranchRow): Promise<void> => {
           const plan = await attempt(tr(U.planFailed, { branch: b.name }), () => call('git:updatePlan', project.path, b.name))

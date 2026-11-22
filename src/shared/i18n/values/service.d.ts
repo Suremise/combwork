@@ -251,6 +251,8 @@ interface CombworkMessageValues {
   'service.gitRepo.renamePushFailed': { from: string | number; to: string | number; remote: string | number; why: string | number; upstream: string | number }
   'service.gitRepo.renameRemoteFailed': { remote: string | number; why: string | number }
   'service.gitRepo.renameRemoteTaken': { remote: string | number; to: string | number }
+  'service.gitRepo.renameStopped': { step: string; from: string | number; to: string | number; remote: string | number; upstream: string | number; old: string | number }
+  'service.gitRepo.renameTrackFailed': { from: string | number; to: string | number; remote: string | number; why: string | number; upstream: string | number; old: string | number }
   'service.gitRepo.renameUpstreamKept': { upstream: string | number }
   'service.gitRepo.setFailed': { key: string | number; why: string | number }
   'service.gitRepo.startMoved': { ref: string | number; now: string | number }

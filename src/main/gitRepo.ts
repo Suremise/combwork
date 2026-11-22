@@ -1270,6 +1270,8 @@ const R = {
   remoteTaken: msg({ id: 'service.gitRepo.renameRemoteTaken', defaultMessage: '{remote} already has a branch {to} (as of the last fetch): nothing was renamed.', description: 'HI-3474: an error renaming a branch to {to} with Also rename on the remote: the remote {remote} has a branch of that name.' }),
   pushFailed: msg({ id: 'service.gitRepo.renamePushFailed', defaultMessage: "Renamed {from} to {to} here, but couldn't push {to} to {remote}: {why} It still tracks {upstream}.", description: "HI-3474: an error after renaming the branch {from} to {to} locally: pushing it to the remote {remote} failed or was refused ({why}, git's words or why), so it still follows {upstream}." }),
   oldKept: msg({ id: 'service.gitRepo.renameOldKept', defaultMessage: "Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but {remote} refused to delete {old}: it has commits there you haven't fetched, or it doesn't allow deleting branches. Look at it before you delete it.", description: "HI-3474: an error after renaming a branch here and on a remote: the remote {remote} refused to delete the old branch {old} (Combwork deletes it only at the commit last fetched)." }),
+  stopped: msg({ id: 'service.gitRepo.renameStopped', defaultMessage: '{step, select, push {Renamed {from} to {to} here, but the push of {to} to {remote} was stopped: it may have reached {remote}. {to} still tracks {upstream}.} other {Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but deleting {old} there was stopped: it may still be there.}} Refresh to see where things stand.', description: 'HI-3474 (round 1): after the user cancelled renaming a branch on its remote too, once {from} was renamed {to} here: during the push of the new name to the remote {remote} (it still follows {upstream}), or during the deletion of the old name {old} there. Keep the select keys.' }),
+  trackFailed: msg({ id: 'service.gitRepo.renameTrackFailed', defaultMessage: "Renamed {from} to {to} and pushed it to {remote}, but couldn't make it track {remote}/{to}: {why} It still tracks {upstream}, and {old} is still on {remote}.", description: "HI-3474 (round 1): an error renaming a branch here and on a remote: {from} was renamed {to} and pushed to the remote {remote}, but setting it to follow its new name there failed ({why}, git's words); it still follows {upstream}, and the old name {old} wasn't deleted there." }),
   renamedBoth: msg({ id: 'service.gitRepo.branchRenamedBoth', defaultMessage: 'Renamed {from} to {to}, here and on {remote}.', description: 'HI-3474: after renaming the branch {from} to {to} in the repository and on the remote {remote} (pushed by its new name, the old one deleted there).' }),
   noTag: msg({ id: 'service.gitRepo.noTag', defaultMessage: "There's no tag {name}.", description: 'HI-3474: an error deleting or pushing a tag in Version Control → History: the repository has no tag called {name}.' }),
   tagMoved: msg({ id: 'service.gitRepo.tagMoved', defaultMessage: 'The tag {name} has changed since you were shown it: nothing was deleted. Look at it again.', description: 'HI-3474: an error deleting the tag {name}: it points at something else than the window showed.' }),
@@ -1308,6 +1310,8 @@ export async function renameBranch(projectPath: string, branch: BranchAt, to: st
       if (problem) throw problem
       const now = await branchUseNow(projectPath, from)
       if (now.why && now.why !== 'current') throw refusal(R.inUse, { why: now.why, branch: from })
+      // An open card's line is kept whatever folder has it checked out (HR1's round 1): `localUse` says the folder's own first.
+      if (now.why === 'current' && cardLines(projectPath).has(from)) throw refusal(R.inUse, { why: 'card', branch: from })
       if (now.why === 'current') {
         const busy = (await folderAgents(projectPath)).find((a) => a.status && FOLDER_BUSY.has(a.status))
         if (busy) throw refusal(R.agentHere, { agent: busy.name, branch: from })
@@ -1334,15 +1338,17 @@ export async function renameBranch(projectPath: string, branch: BranchAt, to: st
       void checkProject(projectPath)
       if (!onRemote) return tr(R.renamed, { from, to, tracks: upstream ? 'yes' : 'no', upstream })
       const p = await net(projectPath, ['push', '--porcelain', '--', remote, `refs/heads/${to}:refs/heads/${to}`])
-      if (p.cancelled) throw stopped('push')
+      // Stopped or failed from here on, what was done is said (HR1's round 1): the rename here stays.
+      if (p.cancelled) throw refusal(R.stopped, { step: 'push', from, to, remote, upstream, old })
       if (!p.ok || parsePushPorcelain(p.out).some((x) => x.result === 'refused')) throw refusal(R.pushFailed, { from, to, remote, upstream, why: gitSaid(p) })
       // Tracks its new name there: set as git would (`--set-upstream-to` needs the remote-tracking branch, which a remote
       // fetched by other settings may not have).
       const set = await git(projectPath, ['config', `branch.${to}.merge`, `refs/heads/${to}`])
-      if (!set.ok) throw commandFailed('git config', set) // i18n-ignore: a git command, as it is
-      stopIfCancelled('push')
+      if (!set.ok) throw failed(R.trackFailed, { from, to, remote, upstream, old }, set)
+      const deleteStopped = (): CombworkError => refusal(R.stopped, { step: 'delete', from, to, remote, upstream, old })
+      if (gitRunSignal()?.aborted) throw deleteStopped()
       const d = await net(projectPath, ['push', '--porcelain', `--force-with-lease=refs/heads/${old}:${lease}`, '--', remote, `:refs/heads/${old}`])
-      if (d.cancelled) throw stopped('push')
+      if (d.cancelled) throw deleteStopped()
       const gone = parsePushPorcelain(d.out).some((x) => x.kind === 'branch' && x.name === old && x.result === 'pushed')
       if (!gone) throw refusal(R.oldKept, { from, to, remote, old })
       log.info(`Renamed ${userText(remote)}'s ${userText(old)} to ${userText(to)} for ${userText(projectPath)}`)

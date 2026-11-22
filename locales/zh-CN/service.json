@@ -464,5 +464,7 @@
   "service.gitRepo.tagDeleted": "{onRemote, select, yes {已删除标签 {name}，这里和 {remote} 上都已删除。} other {已删除标签 {name}。}}",
   "service.gitRepo.tagPushed": "{result, select, upToDate {{remote} 已有标签 {name}。} other {已将标签 {name} 推送到 {remote}。}}",
   "service.gitRepo.tagPushRefused": "{remote} 有另一个标签 {name}，因此推送被拒绝（Combwork 从不强制推送）。",
-  "service.gitRepo.tagPushOnlyFailed": "无法将标签 {name} 推送到 {remote}：{why}"
+  "service.gitRepo.tagPushOnlyFailed": "无法将标签 {name} 推送到 {remote}：{why}",
+  "service.gitRepo.renameStopped": "{step, select, push {已在这里将 {from} 重命名为 {to}，但 {to} 推送到 {remote} 的操作已停止：它可能已到达 {remote}。{to} 仍跟踪 {upstream}。} other {已将 {from} 重命名为 {to} 并推送到 {remote}，现在跟踪 {to}，但删除那里的 {old} 的操作已停止：它可能仍在那里。}} 请刷新查看当前状态。",
+  "service.gitRepo.renameTrackFailed": "已将 {from} 重命名为 {to} 并推送到 {remote}，但无法让它跟踪 {remote}/{to}：{why} 它仍跟踪 {upstream}，且 {old} 仍在 {remote} 上。"
 }

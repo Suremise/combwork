@@ -1568,6 +1568,38 @@ describe('a branch renamed, a tag deleted or pushed (HI-3474)', () => {
     expect(await repo.renameBranch(proj, at('mine'), 'ours')).toBe('Renamed mine to ours.')
     expect(git(proj, 'symbolic-ref', 'HEAD')).toBe('refs/heads/ours')
     expect(asUser).toHaveBeenCalledWith(proj, 'mine', expect.any(Function))
+    // HR1's round 1: an open card's branch checked out in the project folder, no agent working: kept too.
+    cardLines = [{ line: 'ours', stage: 'doing' }]
+    await expect(repo.renameBranch(proj, at('ours'), 'theirs')).rejects.toThrow('An open card works on ours: it keeps its name.')
+    expect(git(proj, 'symbolic-ref', 'HEAD')).toBe('refs/heads/ours')
+  })
+
+  // HR1's round 1: once renamed here, a Cancel or a failure later on says what was done.
+  it('says what was done when the remote rename is stopped at its push or its deletion, or tracking fails', async () => {
+    const stopAt = async (match: (args: string[]) => boolean, fn: () => Promise<unknown>): Promise<string> => {
+      const ac = new AbortController()
+      gitBefore = (args) => {
+        if (match(args)) ac.abort()
+      }
+      return cancellableGit(ac.signal, fn).then(
+        () => 'done',
+        (e: Error) => e.message
+      )
+    }
+    for (const b of ['p1', 'p2', 'p3']) {
+      git(proj, 'branch', b)
+      git(proj, 'push', '-q', '-u', 'origin', b)
+    }
+    const pushing = await stopAt((a) => a[0] === 'push' && a.includes('refs/heads/q1:refs/heads/q1'), () => repo.renameBranch(proj, at('p1'), 'q1', true))
+    expect(pushing).toBe('Renamed p1 to q1 here, but the push of q1 to origin was stopped: it may have reached origin. q1 still tracks origin/p1. Refresh to see where things stand.')
+    expect([has(proj, 'refs/heads/q1'), has(remote, 'refs/heads/p1')]).toEqual([true, true])
+    const deleting = await stopAt((a) => a[0] === 'push' && a.includes(':refs/heads/p2'), () => repo.renameBranch(proj, at('p2'), 'q2', true))
+    expect(deleting).toBe('Renamed p2 to q2 and pushed it to origin, where it tracks q2 now, but deleting p2 there was stopped: it may still be there. Refresh to see where things stand.')
+    expect([has(remote, 'refs/heads/q2'), has(remote, 'refs/heads/p2')]).toEqual([true, true])
+    gitBefore = null
+    gitFails = (a) => a[0] === 'config' && a[1] === 'branch.q3.merge'
+    await expect(repo.renameBranch(proj, at('p3'), 'q3', true)).rejects.toThrow("Renamed p3 to q3 and pushed it to origin, but couldn't make it track origin/q3: failed (a test) It still tracks origin/p3, and p3 is still on origin.")
+    expect([has(remote, 'refs/heads/q3'), has(remote, 'refs/heads/p3')]).toEqual([true, true])
   })
 
   it('renames the remote branch it tracks too: the new name pushed and tracked, the old one deleted only as last fetched', async () => {

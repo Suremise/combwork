@@ -249,6 +249,8 @@
   "service.gitRepo.renamePushFailed": "Renamed {from} to {to} here, but couldn't push {to} to {remote}: {why} It still tracks {upstream}.",
   "service.gitRepo.renameRemoteFailed": "Couldn't rename {remote}: {why}",
   "service.gitRepo.renameRemoteTaken": "{remote} already has a branch {to} (as of the last fetch): nothing was renamed.",
+  "service.gitRepo.renameStopped": "{step, select, push {Renamed {from} to {to} here, but the push of {to} to {remote} was stopped: it may have reached {remote}. {to} still tracks {upstream}.} other {Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but deleting {old} there was stopped: it may still be there.}} Refresh to see where things stand.",
+  "service.gitRepo.renameTrackFailed": "Renamed {from} to {to} and pushed it to {remote}, but couldn't make it track {remote}/{to}: {why} It still tracks {upstream}, and {old} is still on {remote}.",
   "service.gitRepo.renameUpstreamKept": "{upstream} is the remote's default branch, the branch work merges into or the default branch: Combwork won't delete it there, so nothing was renamed.",
   "service.gitRepo.setFailed": "Couldn't set {key}: {why}",
   "service.gitRepo.startMoved": "{ref} has moved since you were shown it (it’s at {now} now), so nothing was created: look at it again.",

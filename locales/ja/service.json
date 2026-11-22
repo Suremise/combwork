@@ -464,5 +464,7 @@
   "service.gitRepo.tagDeleted": "{onRemote, select, yes {タグ{name}を削除しました（ここと{remote}）。} other {タグ{name}を削除しました。}}",
   "service.gitRepo.tagPushed": "{result, select, upToDate {{remote}にはすでにタグ{name}があります。} other {タグ{name}を{remote}にプッシュしました。}}",
   "service.gitRepo.tagPushRefused": "{remote}には別のタグ{name}があるため、プッシュは拒否されました（Combworkは強制プッシュしません）。",
-  "service.gitRepo.tagPushOnlyFailed": "タグ{name}を{remote}にプッシュできませんでした：{why}"
+  "service.gitRepo.tagPushOnlyFailed": "タグ{name}を{remote}にプッシュできませんでした：{why}",
+  "service.gitRepo.renameStopped": "{step, select, push {ここでは{from}の名前を{to}に変更しましたが、{to}の{remote}へのプッシュは停止されました：{remote}に届いている可能性があります。{to}は引き続き{upstream}を追跡します。} other {{from}の名前を{to}に変更して{remote}にプッシュし、今は{to}を追跡していますが、そちらの{old}の削除は停止されました：まだ残っている可能性があります。}} 更新して現在の状態を確認してください。",
+  "service.gitRepo.renameTrackFailed": "{from}の名前を{to}に変更して{remote}にプッシュしましたが、{remote}/{to}を追跡するように設定できませんでした：{why} 引き続き{upstream}を追跡しており、{old}はまだ{remote}にあります。"
 }
