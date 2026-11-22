@@ -626,7 +626,7 @@ const newestFirst = (calls: readonly MapCall[]): MapCall[] =>
     .map((x) => x.c)
 
 /** Calls grouped by a key, newest first: each group's newest call, its count, and the names gathered by `name`. */
-function grouped(calls: readonly MapCall[], keyOf: (c: MapCall) => string, kind: MapPanelRow['kind'], name?: (c: MapCall) => string): MapPanelRow[] {
+function grouped(calls: readonly MapCall[], keyOf: (c: MapCall) => string, kind: MapPanelRow['kind'], name?: (c: MapCall) => string, labelOf: (c: MapCall, key: string) => string = (_c, k) => k): MapPanelRow[] {
   const rows = new Map<string, MapPanelRow>()
   for (const c of newestFirst(calls)) {
     const k = keyOf(c)
@@ -638,7 +638,7 @@ function grouped(calls: readonly MapCall[], keyOf: (c: MapCall) => string, kind:
       if (name && row.tools && !row.tools.includes(name(c))) row.tools.push(name(c))
       continue
     }
-    rows.set(k, { key: `${kind}:${k}`, kind, agentKey: c.agentKey, label: k, at: c.at, failed: c.failed, open: !c.done, count: 1, ...(c.path ? { path: c.path } : {}), ...(name ? { tools: [name(c)] } : {}) })
+    rows.set(k, { key: `${kind}:${k}`, kind, agentKey: c.agentKey, label: labelOf(c, k), at: c.at, failed: c.failed, open: !c.done, count: 1, ...(c.path ? { path: c.path } : {}), ...(name ? { tools: [name(c)] } : {}) })
   }
   return [...rows.values()]
 }
@@ -665,7 +665,10 @@ export function stationPanel(model: Pick<MapModel, 'calls' | 'running'>, station
     section('thisTurn', thisTurn)
   } else if (station === 'read' || station === 'edit') {
     // Each file once per agent: keyed by its agent and label, shown by its path where there is one.
-    const files = grouped(calls.filter((c) => c.kind !== 'prompt'), (c) => `${c.agentKey}${SEP}${c.label}`, 'file').map((r) => ({ ...r, label: r.label.slice(r.label.indexOf(SEP) + 1) }))
+    // A file is known by its whole path (HR1's round 1: two files can share the last two segments the label keeps), as
+    // spelt either way and in any case; a call with no path (a search, a list) by its label, apart from any path.
+    const fileKey = (c: MapCall): string => `${c.agentKey}${SEP}${c.path ? `path:${c.path.replace(/\\/g, '/').toLowerCase()}` : `label:${c.label}`}`
+    const files = grouped(calls.filter((c) => c.kind !== 'prompt'), fileKey, 'file', undefined, (c) => c.label)
     section('files', files)
   } else if (station === 'agents') {
     section('subagents', running('subagent'))

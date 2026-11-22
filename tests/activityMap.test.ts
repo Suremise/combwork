@@ -630,6 +630,16 @@ describe("a station's panel", () => {
     expect(stationPanel(patch, 'edit').sections[0].rows[0].path).toBeUndefined()
   })
 
+  // HR1's round 1: the label keeps a path's last two segments, so two files can share it; each keeps its own row.
+  it('Read and Edit: two files whose last two segments match are two rows, each with its own count and path', () => {
+    const turns = turnsOf('s', [[{ name: 'Read', summary: 'src/foo/a.ts', at: ago(4) }, { name: 'Read', summary: 'tests/foo/a.ts', at: ago(3) }, { name: 'Read', summary: 'src/foo/a.ts', at: ago(2) }, { name: 'Read', summary: 'tests/foo/a.ts', at: ago(1.5) }, { name: 'Read', summary: 'tests\\foo\\A.ts', at: ago(1) }]])
+    const rows = stationPanel(buildMapModel([agent('A', { turns })], AT), 'read').sections[0].rows
+    expect(rows.map((r) => [r.label, r.count, r.path])).toEqual([
+      ['foo/A.ts', 3, 'tests\\foo\\A.ts'],
+      ['foo/a.ts', 2, 'src/foo/a.ts']
+    ])
+  })
+
   it('Agents: subagent sessions with their state, background tasks other than commands, and the calls', () => {
     const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Agent' }]]), subagents: 2, subagentStates: ['working', 'done'], tasks: [{ type: 'subagent', since: 9 }, { type: 'command', since: 8 }] })], AT)
     const p = stationPanel(m, 'agents')
