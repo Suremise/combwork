@@ -4,6 +4,7 @@ import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { GIT_VIEW_GUIDE, HISTORY_COMMITS, folderBusy, gitStatusText, gitStatusTip, headText, type GitFolderAction, type GitHistory, type GitRepoSummary } from '@shared/gitRepo'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import type { CombworkRequests } from '@shared/api'
+import { REPO_OP_CHANNELS } from '@shared/repoOpChannels'
 import { call, errorMessage } from '../api'
 import { offered, repoOp } from '../repoOps'
 import { gitReader, type GitReadState } from '../gitReads'
@@ -87,7 +88,8 @@ export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history' 
   const key = args.length ? JSON.stringify([project.path, ...args]) : project.path
   const [state, setState] = useState<GitReadState<T>>({ for: key, data: null, error: null, loading: true, at: 0 })
   // One read at a time, those asked meanwhile one more after it (#1366, gitReads.ts).
-  const reader = useMemo(() => gitReader<T>((k) => (call as (c: C, ...a: unknown[]) => Promise<T>)(channel, ...(k.startsWith('[') ? (JSON.parse(k) as unknown[]) : [k])), setState, errorMessage), [channel])
+  // A repository operation's read (Repository health's) goes through repoOp too (HI-2788, HI-3538): dispatched only while offered.
+  const reader = useMemo(() => gitReader<T>((k) => ((channel in REPO_OP_CHANNELS ? repoOp : call) as (c: C, ...a: unknown[]) => Promise<T>)(channel,...(k.startsWith('[') ? (JSON.parse(k) as unknown[]) : [k])), setState, errorMessage), [channel])
   const reload = useCallback(() => reader(key), [reader, key])
   useEffect(reload, [reload, version, usage, project.branch])
   // What the user did in a terminal meanwhile (a commit, git init) shows on coming back to the window.

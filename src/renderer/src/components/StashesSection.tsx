@@ -3,7 +3,7 @@ import type { GitDiff, ProjectInfo } from '@shared/types'
 import type { CombworkStash, StashFile, StashList, StashRef, StashRow } from '@shared/gitStashes'
 import { formatDateTime } from '@shared/dates'
 import { msg, tr } from '@shared/i18n'
-import { call, errorMessage } from '../api'
+import { errorMessage } from '../api'
 import { attempt } from '../actions'
 import { cardNumberOf } from '../projectKeys'
 import { offered, repoOp } from '../repoOps'
@@ -103,7 +103,7 @@ export function StashesSection({ project, root, folder, branch, reloadKey, shown
   const read = useCallback(() => {
     if (!offered('git:stashes')) return
     const n = ++reads.current
-    void call('git:stashes', root).then(
+    void repoOp('git:stashes', root).then(
       (list) => n === reads.current && setState({ for: root, list }),
       (e) => n === reads.current && setState({ for: root, list: null, error: errorMessage(e) })
     )
@@ -132,7 +132,7 @@ export function StashesSection({ project, root, folder, branch, reloadKey, shown
       return
     }
     setFiles({ row, files: null })
-    void call('git:stashFiles', root, s.commit).then(
+    void repoOp('git:stashFiles', root, s.commit).then(
       (f) => setFiles((x) => (x?.row === row ? { row, files: f } : x)),
       (e) => setFiles((x) => (x?.row === row ? { row, files: null, error: errorMessage(e) } : x))
     )
@@ -258,7 +258,7 @@ export function StashFileDiff({ shown, onClose }: { shown: StashFileShown; onClo
   const [inline, setInline] = useState(false)
   useEffect(() => {
     let live = true
-    void call('git:stashDiff', shown.root, shown.commit, shown.file.path, shown.file.untracked).then(
+    void repoOp('git:stashDiff', shown.root, shown.commit, shown.file.path, shown.file.untracked).then(
       (diff) => live && setState({ for: key, diff }),
       (e) => live && setState({ for: key, diff: null, error: errorMessage(e) })
     )
