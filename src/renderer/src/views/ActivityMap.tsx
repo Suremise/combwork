@@ -227,7 +227,7 @@ const TAIL = [0, 1, 2, 3]
 /** The honey's wavy surface (HI-3479), drawn across a hex at its centre's height and moved down to the station's level. */
 const honeyPath = (x: number, y: number, r: number): string => {
   const w = r / 2
-  return `M${x - r * 1.2},${y} q${w / 2},-4 ${w},0 t${w},0 t${w},0 t${w},0 t${w},0 V${y + r * 2} H${x - r * 1.2} Z`
+  return `M${x - r * 1.2},${y} q${w / 2},-4 ${w},0 t${w},0 t${w},0 t${w},0 t${w},0 V${y + r * 2} H${x - r * 1.2} Z` // i18n-ignore: an SVG path, never shown
 }
 /** The running pips' place (HI-3479): just outside a station's hex, on its spoke's line. */
 const PIP_R = 6
@@ -363,7 +363,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
               <polygon key={i} points={p} />
             ))}
           </g>
-          {/* The warmth behind the centre (HI-3479): the hive's own light, stronger while an agent works. */}
+          {/* The warmth behind the centre (HI-3479): a warm light, stronger while an agent works. */}
           <circle className={cx('activity-map-halo', working > 0 && 'on')} cx={CX} cy={CY} r={SPOKE + 20} fill={`url(#${ids.halo})`} aria-hidden="true" />
           {MAP_STATIONS.map((s) => {
             const st = model.stations[s]
