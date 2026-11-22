@@ -1990,6 +1990,15 @@ textarea.input {
   flex-wrap: wrap;
   gap: 4px;
 }
+/* A banner pushes its first button right (HI-2148): the panel's buttons stay in rows from the left. */
+.banner.operation-panel .btn {
+  margin-left: 0;
+}
+/* Many files in conflict scroll in the panel, the file list below staying in reach. */
+.operation-panel .operation-conflicts {
+  max-height: 40vh;
+  overflow-y: auto;
+}
 .banner.info {
   background: var(--accent-soft);
   color: var(--fg-strong);
