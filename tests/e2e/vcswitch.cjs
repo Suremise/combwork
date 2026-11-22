@@ -293,8 +293,13 @@ function writeProject(dir, cfg) {
     // Added as another project, not worked on: made active, as the user would, to be read whole (its platform with it).
     await inv('workspace:refresh')
     await inv('project:setActive', eps, true)
+    await toTab('eps')
+    // Read in the bell, which keeps every notice with its buttons: a test window never has the focus, so whether it also
+    // popped up depends on where the notice was routed.
+    const bell = page.locator('.activitybar button[aria-label="Notifications"]')
+    if ((await page.locator('.notif-panel').count()) === 0) await bell.click()
     const epsJson = () => JSON.parse(fs.readFileSync(path.join(eps, '.combwork', 'project.json'), 'utf8'))
-    const epsToast = page.locator('.toast', { hasText: 'Unknown version control setting in eps' })
+    const epsToast = page.locator('.notif-panel .notif-item', { hasText: 'Unknown version control setting in eps' })
     const useNone = epsToast.getByRole('button', { name: 'Use None' })
     check('eps: its notice says project.json names jj, with Use None', !!(await until(async () => (await useNone.count()) === 1, HUNG_MS)) && /names a version control Combwork doesn.t know \(platform: jj\)/.test(await text(epsToast)), await text(epsToast))
     await shoot(epsToast, 'former-jj-notice')
@@ -303,6 +308,8 @@ function writeProject(dir, cfg) {
     check('…and the notice settles, its button gone', !!(await until(async () => (await useNone.count()) === 0, HUNG_MS)), await text(epsToast))
     const epsInfo = (await inv('workspace:refresh'))?.projects?.find((x) => x.name === 'eps')
     check('…read again, eps is None with nothing to say', epsInfo?.platform?.id === 'none' && epsInfo?.platform?.invalid === undefined, JSON.stringify(epsInfo?.platform))
+    if ((await page.locator('.notif-panel').count()) > 0) await page.locator('.notif-panel button[aria-label="Close"]').click()
+    await until(async () => (await page.locator('.notif-panel').count()) === 0, HUNG_MS)
 
     // --- A project inside a larger repository (OP-29).
     await lib.openWorkspace(inv, page, outer)
