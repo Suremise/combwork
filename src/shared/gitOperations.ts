@@ -36,6 +36,11 @@ export interface GitConflict {
   path: string
   mine: boolean
   theirs: boolean
+  /**
+   * HI-3502: a submodule (a gitlink, mode 160000) on a side: that side's commit, by the panel's mine and theirs. Git's
+   * `checkout --ours/--theirs` never moves a submodule, so a pick of that side stages its commit instead (pickArgs).
+   */
+  submodule?: { mine?: string; theirs?: string }
 }
 
 /** HI-3470: the operation under way in a folder, as Changes' panel shows it. */
@@ -88,9 +93,11 @@ export function operationCommand(what: GitOperationName, step: OperationStep): s
  * leading `:`), and single-quoted, as git quotes paths for a shell, where it has anything but plain characters.
  */
 export function pathArg(path: string): string {
-  const p = /[*?[\]\\]/.test(path) || path.startsWith(':') ? `:(literal)${path}` : path
-  return /^[\w./@+=,-]+$/.test(p) ? p : `'${p.replace(/'/g, "'\\''")}'`
+  return shellWord(/[*?[\]\\]/.test(path) || path.startsWith(':') ? `:(literal)${path}` : path)
 }
+
+/** A word as a shell takes it: as it is when plain, else single-quoted as git quotes paths for a shell. */
+const shellWord = (w: string): string => (/^[\w./@+=,-]+$/.test(w) ? w : `'${w.replace(/'/g, "'\\''")}'`)
 
 /**
  * HI-3470: a pick's git command, for its tooltip (a side without the file: git rm). Commands, never translated. The path
@@ -101,6 +108,9 @@ export function pickCommand(what: GitOperationName, c: GitConflict, pick: Confli
   if (pick === 'resolved') return `git add -A -- ${p}` // i18n-ignore: a git command
   const has = pick === 'mine' ? c.mine : c.theirs
   if (!has) return `git rm -- ${p}` // i18n-ignore: a git command
+  // A submodule's side: its commit staged (HI-3502); update-index takes a path, never a pathspec.
+  const link = c.submodule?.[pick]
+  if (link) return `git update-index --cacheinfo 160000 ${link} ${shellWord(c.path)}` // i18n-ignore: a git command
   const ours = (pick === 'mine') !== mineIsTheirs(what)
   return `git checkout --${ours ? 'ours' : 'theirs'} -- ${p}; git add -- ${p}` // i18n-ignore: git commands
 }

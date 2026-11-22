@@ -55,18 +55,26 @@ async function gitFile(dir: string, ...parts: string[]): Promise<string | null> 
 export async function conflictsIn(folder: string, what: GitOperationName): Promise<GitConflict[]> {
   const r = await git(folder, ['ls-files', '-u', '-z'])
   if (!r.ok) throw combworkError(M.failed, { why: gitErrorLine(r.err) || r.err.trim().slice(0, 400) })
-  const stages = new Map<string, Set<string>>()
+  /** Each path's stages: stage → its object, and whether it is a gitlink (a submodule's commit, mode 160000). */
+  const stages = new Map<string, Map<string, { object: string; link: boolean }>>()
   for (const row of r.out.split('\0')) {
     // `<mode> <object> <stage>\t<path>`
     const tab = row.indexOf('\t')
     if (tab < 0) continue
-    const stage = row.slice(0, tab).split(' ')[2]
+    const [mode, object, stage] = row.slice(0, tab).split(' ')
     const path = row.slice(tab + 1)
-    if (!stages.has(path)) stages.set(path, new Set())
-    stages.get(path)!.add(stage)
+    if (!stages.has(path)) stages.set(path, new Map())
+    stages.get(path)!.set(stage, { object, link: mode === '160000' })
   }
   const swap = mineIsTheirs(what)
-  return [...stages].map(([path, s]) => ({ path, mine: s.has(swap ? '3' : '2'), theirs: s.has(swap ? '2' : '3') })).sort((a, b) => a.path.localeCompare(b.path))
+  return [...stages]
+    .map(([path, s]): GitConflict => {
+      const [mine, theirs] = [s.get(swap ? '3' : '2'), s.get(swap ? '2' : '3')]
+      // HI-3502: a side that is a submodule, by its commit (pickArgs stages it: git's checkout never moves one).
+      const link = { ...(mine?.link ? { mine: mine.object } : {}), ...(theirs?.link ? { theirs: theirs.object } : {}) }
+      return { path, mine: !!mine, theirs: !!theirs, ...(link.mine || link.theirs ? { submodule: link } : {}) }
+    })
+    .sort((a, b) => a.path.localeCompare(b.path))
 }
 
 /** The commit an operation stopped at, from git's own files in the folder's git dir. */
@@ -176,6 +184,10 @@ export function pickArgs(what: GitOperationName, c: GitConflict, pick: ConflictP
   if (pick === 'resolved') return [literal(['add', '-A'])]
   const has = pick === 'mine' ? c.mine : c.theirs
   if (!has) return [literal(['rm', '-q'])]
+  // HI-3502: a submodule's side is its commit staged, whatever its folder has checked out: `checkout --theirs` leaves a
+  // submodule as it is, so `add` would stage the folder's own commit, the other side. update-index takes a path as it is.
+  const link = c.submodule?.[pick]
+  if (link) return [['update-index', '--cacheinfo', '160000', link, c.path]]
   const ours = (pick === 'mine') !== mineIsTheirs(what)
   return [literal(['checkout', ours ? '--ours' : '--theirs']), literal(['add'])]
 }

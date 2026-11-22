@@ -29,8 +29,9 @@ const T = {
   mine: msg({ id: 'git.operation.mine', defaultMessage: 'Use mine', description: "HI-3470: a conflicted file's button: takes the folder's own side of it (its tooltip says which that is)." }),
   theirs: msg({ id: 'git.operation.theirs', defaultMessage: 'Use theirs', description: "HI-3470: a conflicted file's button: takes the other side of it." }),
   resolved: msg({ id: 'git.operation.resolved', defaultMessage: 'Mark resolved', description: "HI-3470: a conflicted file's button: marks it settled as it is now in the folder (after editing it by hand: git add)." }),
-  mineTip: msg({ id: 'git.operation.mineTip', defaultMessage: "{swap, select, yes {Your side: the commit being applied (git calls it theirs here).} other {Your side: this folder's branch (git calls it ours).}} {has, select, yes {Takes its version of the file.} other {It deleted the file: deletes it.}} Runs {command}", description: "HI-3470: Use mine's tooltip. swap yes: a rebase, where git's names for the sides are swapped. has no: that side deleted the file. {command} is the git command, as it is." }),
-  theirsTip: msg({ id: 'git.operation.theirsTip', defaultMessage: "{swap, select, yes {The other side: the branch being rebased onto (git calls it ours here).} other {The other side: what is being merged, picked or reverted (git calls it theirs).}} {has, select, yes {Takes its version of the file.} other {It deleted the file: deletes it.}} Runs {command}", description: "HI-3470: Use theirs' tooltip, as git.operation.mineTip." }),
+  mineTip: msg({ id: 'git.operation.mineTip', defaultMessage: "{swap, select, yes {Your side: the commit being applied (git calls it theirs here).} other {Your side: this folder's branch (git calls it ours).}} {has, select, yes {Takes its version of the file.} submodule {Stages its commit of the submodule.} other {It deleted the file: deletes it.}} Runs {command}", description: "HI-3470: Use mine's tooltip. swap yes: a rebase, where git's names for the sides are swapped. has no: that side deleted the file; submodule (HI-3502): the file is a submodule, and that side's commit of it is staged. {command} is the git command, as it is." }),
+  theirsTip: msg({ id: 'git.operation.theirsTip', defaultMessage: "{swap, select, yes {The other side: the branch being rebased onto (git calls it ours here).} other {The other side: what is being merged, picked or reverted (git calls it theirs).}} {has, select, yes {Takes its version of the file.} submodule {Stages its commit of the submodule.} other {It deleted the file: deletes it.}} Runs {command}", description: "HI-3470: Use theirs' tooltip, as git.operation.mineTip." }),
+  submoduleStaged: msg({ id: 'git.operation.submoduleStaged', defaultMessage: "{path} is a submodule: its commit {commit} is staged. Its folder is left as it is: to check that commit out there, run git submodule update -- {path}", description: "HI-3502: a notice after Use mine or Use theirs on a conflicted submodule: that side's commit ({commit}, a short commit id) is staged, and Combwork doesn't check it out in the submodule's own folder. {path} is the submodule's path; 'git submodule update --' is a git command: keep it as it is." }),
   resolvedTip: msg({ id: 'git.operation.resolvedTip', defaultMessage: 'Marks the file settled as it is now, once you have edited it. Runs {command}', description: "HI-3470: Mark resolved's tooltip. {command} is the git command, as it is." }),
   abortTitle: msg({ id: 'git.operation.abortTitle', defaultMessage: '{what, select, bisect {End the bisect in {folder}?} other {Abort the git {what} in {folder}?}}', description: 'HI-3470: the question before Abort (or End bisect). {what} is git\'s word for the operation; {folder} a slot\'s name or git.operation.projectFolder.' }),
   abortMessage: msg({ id: 'git.operation.abortMessage', defaultMessage: "{what, select, rebase {The branch goes back to where it was before the rebase: the commits replayed so far and every conflict settled are dropped.} am {The branch goes back to where it was before the patches: those applied so far and every conflict settled are dropped.} bisect {Git checks out again the commit the bisect started from.} other {Git puts the folder back as it was before the {what} began: every conflict settled so far is dropped. Commits you made yourself since stay.}}", description: "HI-3470: what Abort loses, under git.operation.abortTitle. {what} is git's word for the operation (merge, cherry-pick, revert in other)." }),
@@ -101,8 +102,12 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
     if (id) await act(s, { what: op.what, id, step: s }, tr(T.done, { step: s, what: op.what, folder: where }))
   }
   const pick = async (c: GitConflict, p: ConflictPick): Promise<void> => {
-    if (id) await act(`${p}:${c.path}`, { what: op.what, id, file: c.path, pick: p })
+    // HI-3502: a submodule's side is its commit staged, its folder left as it is: said once it is done.
+    const link = p === 'resolved' ? undefined : c.submodule?.[p]
+    if (id) await act(`${p}:${c.path}`, { what: op.what, id, file: c.path, pick: p }, link ? tr(T.submoduleStaged, { path: c.path, commit: link.slice(0, 7) }) : undefined)
   }
+  /** A side's word for its tooltip: it has the file, it is a submodule's commit, or it deleted it. */
+  const sideHas = (c: GitConflict, side: 'mine' | 'theirs'): string => (c.submodule?.[side] ? 'submodule' : c[side] ? 'yes' : 'no')
   const swap = mineIsTheirs(op.what) ? 'yes' : 'no'
   // Where git stopped can't be read (HR1's round 2): no step is offered, as main would refuse it.
   const id = op.id
@@ -150,12 +155,12 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
                 <button className="btn small" data-pick="open" onClick={() => void attempt(tr(T.failed), () => call('changes:openFile', root, c.path))}>
                   {tr(T.open)}
                 </button>
-                <Tooltip content={tr(T.mineTip, { swap, has: c.mine ? 'yes' : 'no', command: pickCommand(op.what, c, 'mine') })}>
+                <Tooltip content={tr(T.mineTip, { swap, has: sideHas(c, 'mine'), command: pickCommand(op.what, c, 'mine') })}>
                   <button className="btn small" data-pick="mine" disabled={off} onClick={() => void pick(c, 'mine')}>
                     {tr(T.mine)}
                   </button>
                 </Tooltip>
-                <Tooltip content={tr(T.theirsTip, { swap, has: c.theirs ? 'yes' : 'no', command: pickCommand(op.what, c, 'theirs') })}>
+                <Tooltip content={tr(T.theirsTip, { swap, has: sideHas(c, 'theirs'), command: pickCommand(op.what, c, 'theirs') })}>
                   <button className="btn small" data-pick="theirs" disabled={off} onClick={() => void pick(c, 'theirs')}>
                     {tr(T.theirs)}
                   </button>

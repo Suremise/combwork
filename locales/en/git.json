@@ -860,8 +860,8 @@
     "description": "HI-3470: a conflicted file's button: takes the folder's own side of it (its tooltip says which that is)."
   },
   "git.operation.mineTip": {
-    "defaultMessage": "{swap, select, yes {Your side: the commit being applied (git calls it theirs here).} other {Your side: this folder's branch (git calls it ours).}} {has, select, yes {Takes its version of the file.} other {It deleted the file: deletes it.}} Runs {command}",
-    "description": "HI-3470: Use mine's tooltip. swap yes: a rebase, where git's names for the sides are swapped. has no: that side deleted the file. {command} is the git command, as it is."
+    "defaultMessage": "{swap, select, yes {Your side: the commit being applied (git calls it theirs here).} other {Your side: this folder's branch (git calls it ours).}} {has, select, yes {Takes its version of the file.} submodule {Stages its commit of the submodule.} other {It deleted the file: deletes it.}} Runs {command}",
+    "description": "HI-3470: Use mine's tooltip. swap yes: a rebase, where git's names for the sides are swapped. has no: that side deleted the file; submodule (HI-3502): the file is a submodule, and that side's commit of it is staged. {command} is the git command, as it is."
   },
   "git.operation.open": {
     "defaultMessage": "Open",
@@ -903,12 +903,16 @@
     "defaultMessage": "Step {at, number} of {of, number}",
     "description": "HI-3470: under the panel's heading, for a rebase or an am: which commit of the list git stopped at."
   },
+  "git.operation.submoduleStaged": {
+    "defaultMessage": "{path} is a submodule: its commit {commit} is staged. Its folder is left as it is: to check that commit out there, run git submodule update -- {path}",
+    "description": "HI-3502: a notice after Use mine or Use theirs on a conflicted submodule: that side's commit ({commit}, a short commit id) is staged, and Combwork doesn't check it out in the submodule's own folder. {path} is the submodule's path; 'git submodule update --' is a git command: keep it as it is."
+  },
   "git.operation.theirs": {
     "defaultMessage": "Use theirs",
     "description": "HI-3470: a conflicted file's button: takes the other side of it."
   },
   "git.operation.theirsTip": {
-    "defaultMessage": "{swap, select, yes {The other side: the branch being rebased onto (git calls it ours here).} other {The other side: what is being merged, picked or reverted (git calls it theirs).}} {has, select, yes {Takes its version of the file.} other {It deleted the file: deletes it.}} Runs {command}",
+    "defaultMessage": "{swap, select, yes {The other side: the branch being rebased onto (git calls it ours here).} other {The other side: what is being merged, picked or reverted (git calls it theirs).}} {has, select, yes {Takes its version of the file.} submodule {Stages its commit of the submodule.} other {It deleted the file: deletes it.}} Runs {command}",
     "description": "HI-3470: Use theirs' tooltip, as git.operation.mineTip."
   },
   "git.operation.title": {
