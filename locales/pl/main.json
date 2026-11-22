@@ -367,7 +367,7 @@
   "main.server.url.remoteHttp": "Serwer na innym komputerze wymaga https://. Zwykłe http:// jest tylko dla serwera na tym komputerze (localhost).",
   "main.server.url.scheme": "Adres URL musi zaczynać się od https:// (albo http:// dla serwera na tym komputerze).",
   "main.server.url.userinfo": "Adres URL nie może zawierać nazwy użytkownika ani hasła: podaj klucz w osobnym polu.",
-  "main.slots.detachFailed.message": "{said, select, yes {Git zgłasza: {error}} other {Git nie może znaleźć {target}.}} Dopóki to się nie uda, Combwork nie wypożycza {slot} innej karcie. Usuń w {folder} to, co przeszkadza, albo sam uruchom tam {command}: Combwork próbuje ponownie za każdym razem, gdy sprawdza swoje sloty, i wypożycza {slot} ponownie, gdy to się uda.",
+  "main.slots.detachFailed.message": "{said, select, yes {Git zgłasza: {error}} other {Git nie może znaleźć {target}.}} Dopóki to się nie uda, Combwork nie wypożycza {slot} innej karcie. Usuń w {folder} to, co przeszkadza, albo sam uruchom tam {command} w PowerShellu: Combwork próbuje ponownie za każdym razem, gdy sprawdza swoje sloty, i wypożycza {slot} ponownie, gdy to się uda.",
   "main.slots.detachFailed.title": "Combwork nie może przywrócić {slot} na {target}",
   "main.slots.operation.message": "Combwork nie może wypożyczyć {slot} innej karcie, dopóki to się nie skończy. Dokończ to w {folder} albo zakończ tam poleceniem {command}. Combwork nigdy nie kończy tego sam i wypożycza slot ponownie, gdy nic już w nim nie trwa.",
   "main.slots.operation.open": "Otwórz w Zmianach",

@@ -1472,8 +1472,8 @@
     "description": "An error saving a server connection's base URL: it has user:password@ in it, which Combwork won't keep."
   },
   "main.slots.detachFailed.message": {
-    "defaultMessage": "{said, select, yes {Git said: {error}} other {Git can't find {target}.}} Until it can, Combwork doesn't lend {slot} to another card. Put right what's in the way in {folder}, or run {command} there yourself: Combwork tries again whenever it looks at its slots, and lends {slot} again once that works.",
-    "description": "HI-3467: the notice's text below main.slots.detachFailed.title. {error} is git's own error line, in English (keep it as it is); said: yes when git gave one, else no (the branch {target} isn't there): keep the select keys. {slot} is the slot's name, {folder} its folder's path, {command} the git command that does it by hand (git switch --detach main: keep it as it is)."
+    "defaultMessage": "{said, select, yes {Git said: {error}} other {Git can't find {target}.}} Until it can, Combwork doesn't lend {slot} to another card. Put right what's in the way in {folder}, or run {command} there yourself, in PowerShell: Combwork tries again whenever it looks at its slots, and lends {slot} again once that works.",
+    "description": "HI-3467: the notice's text below main.slots.detachFailed.title. {error} is git's own error line, in English (keep it as it is); said: yes when git gave one, else no (the branch {target} isn't there): keep the select keys. {slot} is the slot's name, {folder} its folder's path, {command} the git command that does it by hand (git switch --detach main: keep it as it is), quoted for PowerShell (HI-3516: a branch name with & or ; would run something else in cmd), so keep PowerShell named."
   },
   "main.slots.detachFailed.title": {
     "defaultMessage": "Combwork can't move {slot} back to {target}",

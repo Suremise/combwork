@@ -334,7 +334,8 @@ export async function lineHead(repo: string, line: string): Promise<Maybe<string
   const r = await git(repo, ['rev-parse', '--verify', '-q', `refs/heads/${line}`])
   if (r.ok) return r.out.trim()
   if (r.code === 1) return null
-  return unknown(U.line, { branch: line })
+  // HI-3516: with git's own words, as `branch` keeps them.
+  return withDetail(unknown(U.line, { branch: line }), r.err)
 }
 
 /**

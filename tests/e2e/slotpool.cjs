@@ -206,7 +206,18 @@ const clearPopups = async (page) => !!(await until(async () => {
     const toldDetach = page.locator('.toast', { hasText: 'back to' })
     check('…not ready, so not lent', (await op({ op: 'lend', agent: b1.id, card: 107 })).refusal?.why === 'noSlot', JSON.stringify(await slot('slot-b')))
     check('…failing again, the user is told with git’s error and the way out', !!(await until(async () => (await toldDetach.count()) === 1, HUNG_MS)) && /index\.lock/.test(await toldDetach.innerText()) && (await toldDetach.innerText()).includes('git switch --detach'), await toldDetach.innerText().catch(() => ''))
-    await toldDetach.screenshot({ path: path.join(fx.shots, 'slotpool-5-detach-notice.png') }).catch(() => {})
+    // HI-3516: the command is quoted for PowerShell, and the notice says so.
+    check('…saying to run its command in PowerShell', /there yourself, in PowerShell/.test(await toldDetach.innerText().catch(() => '')), await toldDetach.innerText().catch(() => ''))
+    // HI-3516: both themes (HR1's request).
+    const theme = async (t) => {
+      await inv('settings:update', { appearance: { theme: t } })
+      await until(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t), HUNG_MS)
+    }
+    for (const t of ['dark', 'light']) {
+      await theme(t)
+      await toldDetach.screenshot({ path: path.join(fx.shots, `slotpool-5-detach-notice-${t}.png`) }).catch(() => {})
+    }
+    await theme('dark')
     // The list is read as the section opens: opened again, as HI-3465's step does.
     await page.locator('.git-sections [data-section="changes"]').click().catch(() => {})
     await page.locator('.git-sections [data-section="workflow"]').click()
@@ -214,7 +225,12 @@ const clearPopups = async (page) => !!(await until(async () => {
     await form.locator('.workflow-option[data-option="folder"] select').selectOption('slots')
     const detachRow = form.locator('.workflow-slots-table tr[data-slot="slot-b"]')
     check('Slots and copies shows slot-b can’t be moved back, with git’s error', !!(await until(async () => (await detachRow.locator('[data-operation="detach"]').count()) === 1, HUNG_MS)) && /Can.t be moved back to/.test(await detachRow.innerText()) && /index\.lock/.test(await detachRow.innerText()), await detachRow.innerText().catch(() => ''))
-    await detachRow.screenshot({ path: path.join(fx.shots, 'slotpool-5-detach-failed.png') })
+    check('…its hint says to run its command in PowerShell (HI-3516)', /there in PowerShell/.test(await detachRow.innerText()), await detachRow.innerText().catch(() => ''))
+    for (const t of ['dark', 'light']) {
+      await theme(t)
+      await detachRow.screenshot({ path: path.join(fx.shots, `slotpool-5-detach-failed-${t}.png`) })
+    }
+    await theme('dark')
     // Told once is the unit test's, by count (a notice with the same id replaces the toast, so the window can't tell).
     check('…looked at again, still not lent', (await op({ op: 'lend', agent: b1.id, card: 107 })).refusal?.why === 'noSlot')
     fs.rmSync(lock)

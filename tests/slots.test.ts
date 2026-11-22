@@ -15,7 +15,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
-import { asideKey, fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, NOT_IN_PLACE, operationTold, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
+import { asideKey, operationKey, fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, NOT_IN_PLACE, operationTold, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { say } from '../src/shared/agentText'
 import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
@@ -23,7 +23,7 @@ import { commit, gitRepo, sh } from './workflow/harness'
 import { junction } from './pathAliases'
 import { gitWorkspacePort } from '../src/main/platform/git/gitWorkspacePort'
 import { operationSync } from '../src/main/gitCommands'
-import { unknown } from '../src/main/platform/types'
+import { unknown, withDetail } from '../src/main/platform/types'
 import { UNREADABLE } from '../src/shared/workflow/texts'
 import type { WorkspacePort } from '../src/main/platform/workspacePort'
 import { timing } from './timing.cjs'
@@ -1062,6 +1062,26 @@ describe('HI-3465: a git operation left under way in a free slot', { timeout: ti
     expect(w.set.operations).toHaveLength(1)
   })
 
+  it("HI-3516: a branch read that fails keeps git's own words only, never Combwork's", async () => {
+    // The folder's branch unreadable: first with git's stderr, then with none (git said nothing).
+    const said = { err: 'fatal: bad object refs/heads/main\nmore of it' as string | undefined }
+    const port: WorkspacePort = {
+      ...gitWorkspacePort,
+      heads: async (folder, target) => ({ ...(await gitWorkspacePort.heads(folder, target)), line: withDetail(unknown(UNREADABLE.branch, { folder }), said.err) })
+    }
+    const w = world({ builders: 1, port })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    sh(r.slot.folder, 'switch', '-q', '-c', 'cw/card-1')
+    await w.pool.release(r.lease.id, 'done')
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'detach', tries: 1, error: 'fatal: bad object refs/heads/main' })
+    said.err = undefined
+    await w.pool.refresh()
+    // Told now (its second failure in a row), with no "Git said" words: Combwork's "the branch checked out in …" isn't git's.
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'detach', tries: 2 })
+    expect(w.pool.operation('slot-a')!.error ?? '').toBe('')
+    expect(w.set.operations).toEqual(['slot-a detach at main: '])
+  })
+
   it('HI-3467: a detach that failed once and then works is never told', async () => {
     const fail = { detach: true }
     const port: WorkspacePort = { ...gitWorkspacePort, detach: async (folder, revision, o) => (fail.detach ? ((fail.detach = false), { ok: false, err: 'fatal: something in the way' }) : gitWorkspacePort.detach(folder, revision, o)) }
@@ -2084,6 +2104,20 @@ describe('moving a free slot onto another target (HI-2680)', { timeout: timing('
     await v.pool.refresh()
     expect((await v.pool.lend({ agent: 'a2', card: 2, slot: intent!.toName })).ok).toBe(false)
     expect(await v.pool.carry('a2', { name: intent!.toName, folder: intent!.to, target: b.expect.target })).toBeNull()
+  })
+
+  it('HI-3516: a renamed slot keeps its operation record under its new name, none left under the old', async () => {
+    const v = world({ builders: 1 })
+    const b = await free(v)
+    const intent = await v.store.startRename(b.name, 'ready', 'a-rename', { pid: 12, started: 1012 }, v.root, 'tree')
+    expect(intent).not.toBeNull()
+    // A record as a settle writes it (none is expected on a ready slot: the rename carries one anyway).
+    const rec = JSON.stringify({ what: 'detach', since: 1, error: 'fatal: x', tries: 2 })
+    await v.store.conn.write((db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)').run(operationKey(v.store.project, b.name), rec))
+    sh(v.project, 'worktree', 'move', b.expect.folder, intent!.to)
+    await v.store.finishRename(b.name, 'a-rename', intent!)
+    expect(v.store.operation(b.name)).toBeNull()
+    expect(v.store.operation(intent!.toName)).toMatchObject({ what: 'detach', tries: 2 })
   })
 
   it('a failure part way is never thrown: settled from the folder, or left recorded for the next look (HR1, round 1 finding 3)', async () => {

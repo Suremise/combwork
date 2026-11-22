@@ -808,6 +808,11 @@ export class SlotStore {
       db.prepare('DELETE FROM board_meta WHERE key = ?').run(renameKey(this.project, name))
       // A set-aside (HI-2680) follows the slot to its new name, in the same write (none is renamed: belt and braces).
       db.prepare('UPDATE board_meta SET key = ? WHERE key = ?').run(asideKey(this.project, intent.toName), asideKey(this.project, name))
+      // HI-3516: its operation record (HI-3465, HI-3467) too, so it is told once under its new name and none is left under
+      // the old one, which a later slot could take. Only a ready slot is renamed and its settle clears the record as it
+      // becomes ready, so none is expected: belt and braces, as the set-aside's.
+      db.prepare('DELETE FROM board_meta WHERE key = ?').run(operationKey(this.project, intent.toName))
+      db.prepare('UPDATE board_meta SET key = ? WHERE key = ?').run(operationKey(this.project, intent.toName), operationKey(this.project, name))
     })
   }
 
@@ -1964,9 +1969,12 @@ export class SlotPool {
     if (!s.target || !last || (last.kind !== 'card' && last.kind !== 'lane')) return 'ok'
     const port = this.port
     const h = await port.heads(s.folder, s.target)
-    if (isUnknown(h.line)) return { failed: port.errorLine(h.line.detail ?? h.line.what).slice(0, DETACH_ERROR_MAX) }
+    // HI-3516: only git's own stderr is kept, as the notice says it after "Git said"; a read git said nothing of keeps
+    // none (never Combwork's own words for what it couldn't read).
+    const said = (u: { detail?: string }): string => (u.detail ? port.errorLine(u.detail).slice(0, DETACH_ERROR_MAX) : '')
+    if (isUnknown(h.line)) return { failed: said(h.line) }
     if (!h.line) return 'ok'
-    if (isUnknown(h.target)) return { failed: port.errorLine(h.target.detail ?? h.target.what).slice(0, DETACH_ERROR_MAX) }
+    if (isUnknown(h.target)) return { failed: said(h.target) }
     if (!h.target) return { failed: '' }
     const r = await port.detach(s.folder, h.target)
     if (!r.ok) {

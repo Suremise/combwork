@@ -529,7 +529,7 @@
   "workflow.slots.copy": "新しいスロットにコピーするファイル",
   "workflow.slots.copyDesc": "プロジェクトフォルダーから新しいスロットごとにコピーする、Gitが無視するファイルです（.envファイルなど）。1行に1パターンずつ書きます。",
   "workflow.slots.desc": "これらは上のオプションとは別に、変更するとすぐ保存されます。",
-  "workflow.slots.detachFailedHint": "{said, select, yes {Git のエラー: {error}} other {Git が {target} を見つけられません。}} フォルダーで妨げになっているものを直すか、そこで {command} を実行してください",
+  "workflow.slots.detachFailedHint": "{said, select, yes {Git のエラー: {error}} other {Git が {target} を見つけられません。}} フォルダーで妨げになっているものを直すか、そこで PowerShell から {command} を実行してください",
   "workflow.slots.detachFailedState": "{target} に戻せません",
   "workflow.slots.fromSetup": "1.0より前のプロジェクトのセットアップコマンドから",
   "workflow.slots.gitFiles": "サブモジュールと LFS をセットアップ",
