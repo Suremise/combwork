@@ -1,6 +1,6 @@
 // The evidence and history port (SPEC §16.3.6 port 3, HI-2787's R6): Git's history reads and the watcher, delegating to
 // today's code unchanged. Proved by trace: each member runs the same git commands (argv, folder, order) with the same
-// answer as the code it replaces (platform/git.ts's read, or the inline command a caller ran, kept here as it was), and
+// answer as the code it replaces (gitCommands.ts's read, or the inline command a caller ran, kept here as it was), and
 // the two check brackets keep their own tracked-file reads apart: a run's always runs both gits and takes an unreadable
 // list for none; the queue's reads its git dir from `.git` first and takes an unreadable list for unread (null), never
 // an empty one (HR5's #1386 round 1). The import rule for the callers moved is tests/historyPortsImports.test.ts.
@@ -28,8 +28,8 @@ vi.mock('../src/main/git', async (original) => {
 })
 
 const { git, gitTestHooks } = await import('../src/main/git')
-const G = await import('../src/main/platform/git')
-const { gitHistory } = await import('../src/main/platform/gitHistory')
+const G = await import('../src/main/gitCommands')
+const { gitHistory } = await import('../src/main/platform/git/gitHistory')
 const { hasHistory, historyFor, historyOf, lineHistory, observePort } = await import('../src/main/platform/historyPorts')
 const { observer } = await import('../src/main/platform/observe')
 const { bracketStart } = await import('../src/main/workflow/queueChecks')
@@ -133,7 +133,7 @@ describe('the history port is found by platform', () => {
 })
 
 describe("Git's history reads, through the port", () => {
-  it("run platform/git.ts's reads: the same commands, in the same order, with the same answers", async () => {
+  it("run gitCommands.ts's reads: the same commands, in the same order, with the same answers", async () => {
     const { a, tree, main, work } = repo()
     await same(() => G.head(tree), () => gitHistory.head(tree))
     await same(() => G.branch(tree), () => gitHistory.line(tree))

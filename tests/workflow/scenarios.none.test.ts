@@ -12,7 +12,7 @@ import { reconcile } from '../../src/main/workflow/reconcile'
 import { runCheck } from '../../src/main/workflow/checks'
 import { detect, offer } from '../../src/main/platform/registry'
 import { isRefusal } from '../../src/main/workflow/runtime'
-import { NoneAdapter } from '../../src/main/platform/none'
+import { NoneAdapter } from '../../src/main/platform/none/none'
 import { tempDir } from '../tempDir'
 
 let env: Env | null = null

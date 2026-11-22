@@ -3,7 +3,7 @@
 // has nothing released.
 
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { gitReleaseReads } from './gitReleaseReads'
+import { gitReleaseReads } from './git/gitReleaseReads'
 import type { ReleaseReads } from './releaseReads'
 
 /** Each platform's release reads; absent for a platform with none (None). */

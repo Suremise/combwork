@@ -21,8 +21,8 @@ import { say } from '../src/shared/agentText'
 import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { junction } from './pathAliases'
-import { gitWorkspacePort } from '../src/main/platform/gitWorkspacePort'
-import { operationSync } from '../src/main/platform/git'
+import { gitWorkspacePort } from '../src/main/platform/git/gitWorkspacePort'
+import { operationSync } from '../src/main/gitCommands'
 import { unknown } from '../src/main/platform/types'
 import { UNREADABLE } from '../src/shared/workflow/texts'
 import type { WorkspacePort } from '../src/main/platform/workspacePort'
@@ -44,8 +44,8 @@ vi.mock('fs/promises', async (original) => {
  * a test and cleared after.
  */
 const gitGate = vi.hoisted(() => ({ hold: null as { folder: string; entered: () => void; go: Promise<void> } | null, fail: null as string | null }))
-vi.mock('../src/main/platform/git', async (original) => {
-  const g = await original<typeof import('../src/main/platform/git')>()
+vi.mock('../src/main/gitCommands', async (original) => {
+  const g = await original<typeof import('../src/main/gitCommands')>()
   return {
     ...g,
     dirty: async (folder: string, paths?: string[]) => {

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
 import { commit, gitRepo, sh } from './harness'
-import * as G from '../../src/main/platform/git'
+import * as G from '../../src/main/gitCommands'
 import { isUnknown } from '../../src/main/platform/types'
 import { gitTestHooks } from '../../src/main/git'
 

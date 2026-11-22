@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { B1, B2, moved, put, refusedBy, setup, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { isRefusal } from '../../src/main/workflow/runtime'
-import { baselineThread } from '../../src/main/noneBaseline'
+import { baselineThread } from '../../src/main/platform/none/noneBaseline'
 import { timing } from '../timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).

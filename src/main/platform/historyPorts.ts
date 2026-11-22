@@ -6,7 +6,7 @@
 // (tests/historyPortsImports.test.ts holds them to it).
 
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { gitHistory } from './gitHistory'
+import { gitHistory } from './git/gitHistory'
 import type { HistoryPort, ObservePort } from './history'
 import { observer } from './observe'
 

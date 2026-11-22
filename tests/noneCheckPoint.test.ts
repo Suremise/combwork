@@ -9,13 +9,13 @@ import { join } from 'path'
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { build } from 'esbuild'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { NoneAdapter } from '../src/main/platform/none'
-import { NonePlatform } from '../src/main/platform/nonePlatform'
+import { NoneAdapter } from '../src/main/platform/none/none'
+import { NonePlatform } from '../src/main/platform/none/nonePlatform'
 import type { CardRecord } from '../src/main/workflow/factStore'
 import { isUnknown, unknown } from '../src/main/platform/types'
 import { UNREADABLE } from '../src/shared/workflow/texts'
-import { useBaselineWorker, type BaselineThread } from '../src/main/noneBaseline'
-import { checkPoint } from '../src/main/noneBaselineWorker'
+import { useBaselineWorker, type BaselineThread } from '../src/main/platform/none/noneBaseline'
+import { checkPoint } from '../src/main/platform/none/noneBaselineWorker'
 import { snapshot } from '../src/main/workflow/checks'
 import { checkEnd, checkStart, type CheckRunFor, type WriteLog } from '../src/main/workflow/runChecks'
 import { tempDir } from './tempDir'
@@ -29,7 +29,7 @@ const bundle = join(tmp, 'none-baseline-worker.cjs')
 let t: BaselineThread
 
 beforeAll(async () => {
-  await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'noneBaselineWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
+  await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'platform', 'none', 'noneBaselineWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
   t = useBaselineWorker(bundle)
 }, timing('hook.hang'))
 afterAll(() => void useBaselineWorker(null))

@@ -142,7 +142,7 @@ export const AREAS = [
   { paths: ['tests/scenarios/harness.cjs', 'tests/e2e/folderProcesses.cjs', 'tests/e2e/fake-claude/linger.cjs', 'src/main/progressReporters/'], suites: ['scenarioteardown'] },
   { paths: ['tests/e2e/folderProcesses.cjs', 'tests/e2e/leftCopies.mjs', 'tests/e2e/lanes.mjs'], suites: ['harnessleftovers'] },
   // HI-2379: a shared folder's attribution of a burst of merged commits, and main's stall while it runs.
-  { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/observe.ts'], suites: ['mergeburst'] },
+  { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/observe.ts', 'src/main/gitRefs.ts', 'src/main/gitIgnoredByKind.ts', 'src/main/gitShadowIgnore.ts'], suites: ['mergeburst'] },
   // The real CLIs' background processes (#515): only when what tracks them changes, not with every sessions.ts change.
   { paths: ['src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/launchGate.ts'], suites: ['leftovers-claude', 'leftovers-codex'] },
   // The Agent API for apps that show Combwork (#620): viewer tokens, the discovery file, the event stream's events.
@@ -186,13 +186,13 @@ export const AREAS = [
   { paths: ['src/main/launchSides.ts', 'src/shared/workflow/roles.ts'], suites: ['replysize'] },
   // The Combwork tool list's parts as the bridge measures them (HI-2063): replysize checks a real launch's, bridgereport the bridge's reports.
   { paths: ['src/shared/toolListSize.ts'], suites: ['replysize', 'bridgereport'] },
-  { paths: ['src/main/branchWatch.ts', 'src/main/git.ts', 'src/main/worktrees.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts'], suites: ['unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview'] },
+  { paths: ['src/main/branchWatch.ts', 'src/main/git.ts', 'src/main/worktrees.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/git/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts'], suites: ['unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview'] },
   // git.ts's processes, started off main's thread (HI-1783): git.ts's suites.
   { paths: ['src/main/gitWorker.ts'], suites: ['gitdirect', 'unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview'] },
   // Git missing or too old (#346): Provider Setup's Git row, the status bar and every git-dependent screen.
   { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts', 'src/shared/gitLayout.ts'], suites: ['gitdirect', 'gitmissing', 'providers'] },
   // The Git view (#607): the Git tab's sections and the status bar's item.
-  { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/shared/branchCleanup.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/views/GitBranches.tsx', 'src/renderer/src/components/GitSigning.tsx', 'src/shared/gitSigning.ts', 'src/renderer/src/gitReads.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts', 'src/main/platform/repoOps.ts', 'src/main/platform/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/shared/repoOpChannels.ts', 'src/renderer/src/repoOps.ts', 'src/renderer/src/repoOffers.ts'], suites: ['gitbranchcards', 'gitcleanup', 'gitupdate', 'gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit', 'versioncontrol', 'mergedialogslots'] },
+  { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/shared/branchCleanup.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/views/GitBranches.tsx', 'src/renderer/src/components/GitSigning.tsx', 'src/shared/gitSigning.ts', 'src/renderer/src/gitReads.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/git/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts', 'src/main/platform/repoOps.ts', 'src/main/platform/git/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/shared/repoOpChannels.ts', 'src/renderer/src/repoOps.ts', 'src/renderer/src/repoOffers.ts'], suites: ['gitbranchcards', 'gitcleanup', 'gitupdate', 'gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit', 'versioncontrol', 'mergedialogslots'] },
   // HI-2807: New branch… from a ref, a missing target's offer, Start the next version (gitview drives all three).
   { paths: ['src/renderer/src/components/NewBranchForm.tsx', 'src/renderer/src/components/NextVersion.tsx', 'src/main/workflow/nextVersion.ts', 'src/shared/nextVersion.ts'], suites: ['gitview', 'workflowoptions', 'retarget'] },
   // The shared tab strip (HI-1837, HI-1839) and every suite driving one: Version Control's sections, Settings' workflow
@@ -213,7 +213,7 @@ export const AREAS = [
   // Unused worktrees (#353): the Overview's section, the Changes notice, Storage's line and the hints.
   { paths: ['src/main/unusedWorktrees.ts', 'src/shared/unusedWorktrees.ts', 'src/shared/recentCache.ts', 'src/renderer/src/components/UnusedWorktrees.tsx'], suites: ['unusedwt', 'unusedslots', 'changespicker'] },
   { paths: ['tests/e2e/unusedslots.cjs'], suites: ['unusedslots'] },
-  { paths: ['src/main/branchMerge.ts', 'src/renderer/src/components/BranchMerge.tsx', 'tests/e2e/mergedialogslots.cjs', 'src/main/platform/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts'], suites: ['mergedialogslots'] },
+  { paths: ['src/main/branchMerge.ts', 'src/renderer/src/components/BranchMerge.tsx', 'tests/e2e/mergedialogslots.cjs', 'src/main/platform/git/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/git/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts'], suites: ['mergedialogslots'] },
   { paths: ['src/renderer/src/mergeChoice.ts'], suites: ['mergedialogslots', 'agents-ui'] },
   { paths: ['src/main/combworkMove.ts', 'src/main/combworkFolder.ts', 'src/main/combworkMoveWorker.ts', 'src/main/boardFileMove.ts', 'src/main/nameUpgrade.ts', 'src/main/nameUpgradeFiles.ts', 'src/main/nameUpgradeProjects.ts', 'src/main/nameUpgradeValues.ts', 'src/main/storedNames.ts', 'src/main/fsPresence.ts', 'src/shared/combworkFolderMove.ts', 'tests/e2e/combworkfolder.cjs'], suites: ['combworkfolder', 'combworkvcs', 'wsmove'] },
   { paths: ['src/main/workspaceMove.ts', 'src/main/viewPrefs.ts', 'src/shared/movePaths.ts', 'src/renderer/src/components/MoveRepair.tsx', 'src/main/agentWorktree.ts', 'src/shared/projectIds.ts', 'src/main/beforeIds.ts', 'src/main/leftovers.ts', 'src/main/projectRename.ts', 'src/main/projectNames.ts'], suites: ['wsmove', 'wtrecreate', 'projectrename', 'repairbranches', 'repairdefender'] },
@@ -264,11 +264,11 @@ export const AREAS = [
   { paths: ['src/main/compaction.ts'], suites: ['compact', 'overview', 'paneheader', 'idlestatus'] },
   { paths: ['src/shared/safeguards.ts', 'src/shared/providers/claude/safeguards.ts', 'src/shared/providers/codex/safeguards.ts', 'src/main/providers/claude/safeguards.ts', 'src/main/providers/codex/safeguards.ts', 'src/main/cardSessions.ts'], suites: ['safeguards'] },
   { paths: ['src/main/diagnostics.ts', 'src/shared/redact.ts'], suites: ['about', 'testedclis'] },
-  { paths: ['src/main/files.ts', 'src/main/platform/gitFiles.ts', 'src/shared/platform/metadataDirs.ts', 'src/renderer/src/views/FilesTab.tsx', 'src/renderer/src/components/FileView.tsx', 'src/renderer/src/components/DocEditor.tsx', 'src/renderer/src/components/Editors.tsx', 'src/renderer/src/editorDrafts.ts', 'src/renderer/src/monaco.ts', 'src/renderer/src/monacoLang.ts'], suites: ['files', 'editor', 'drafts', 'unsaved', 'icons', 'image', 'assistantimages', 'asarfiles'] },
+  { paths: ['src/main/files.ts', 'src/main/platform/git/gitFiles.ts', 'src/shared/platform/metadataDirs.ts', 'src/renderer/src/views/FilesTab.tsx', 'src/renderer/src/components/FileView.tsx', 'src/renderer/src/components/DocEditor.tsx', 'src/renderer/src/components/Editors.tsx', 'src/renderer/src/editorDrafts.ts', 'src/renderer/src/monaco.ts', 'src/renderer/src/monacoLang.ts'], suites: ['files', 'editor', 'drafts', 'unsaved', 'icons', 'image', 'assistantimages', 'asarfiles'] },
   // The Files tab's Git menu (HI-2743): only the Files tab uses it.
-  { paths: ['src/main/filesGit.ts', 'src/shared/gitIgnoreRules.ts', 'src/renderer/src/components/FilesGitMenu.ts', 'src/main/platform/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/renderer/src/repoOps.ts', 'src/renderer/src/repoOffers.ts'], suites: ['files', 'foldercommit'] },
+  { paths: ['src/main/filesGit.ts', 'src/shared/gitIgnoreRules.ts', 'src/renderer/src/components/FilesGitMenu.ts', 'src/main/platform/git/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/renderer/src/repoOps.ts', 'src/renderer/src/repoOffers.ts'], suites: ['files', 'foldercommit'] },
   // HI-2944: Commit and Set aside of a target folder's changes, a start's warning of them, Files' Commit it.
-  { paths: ['src/main/gitFolderChanges.ts', 'src/main/targetChangesNotice.ts', 'src/renderer/src/folderChanges.ts', 'src/renderer/src/components/FolderChangeButtons.tsx', 'tests/e2e/foldercommit.cjs'], suites: ['foldercommit', 'mergequeuefolder'] },
+  { paths: ['src/main/platform/git/gitFolderChanges.ts', 'src/main/targetChangesNotice.ts', 'src/renderer/src/folderChanges.ts', 'src/renderer/src/components/FolderChangeButtons.tsx', 'tests/e2e/foldercommit.cjs'], suites: ['foldercommit', 'mergequeuefolder'] },
   // HI-3372: the user's Cancel of a commit, set aside, fetch, pull or push: its owner and run ids, and the window's side.
   { paths: ['src/main/gitCancel.ts', 'src/renderer/src/gitRuns.ts'], suites: ['foldercommit', 'gitremotes', 'gitview'] },
   // HI-3372: the version-control ports' bounds, from Settings → Advanced.
@@ -320,7 +320,7 @@ export const AREAS = [
   // A watch from a builder's previous conversation, and an agent's watch guards (HI-2197).
   { paths: ['tests/e2e/stalewatch.cjs', 'src/main/watchGuards.ts', 'src/main/watches.ts', 'src/main/cardIntents.ts'], suites: ['stalewatch'] },
   { paths: ['src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'tests/e2e/lanestart.cjs'], suites: ['agentrole', 'lanestart'] },
-  { paths: ['src/main/platform/releaseReads.ts', 'src/main/platform/gitReleaseReads.ts', 'src/main/platform/releaseReadsPorts.ts'], suites: ['lanestart', 'releaseoffer'] },
+  { paths: ['src/main/platform/releaseReads.ts', 'src/main/platform/git/gitReleaseReads.ts', 'src/main/platform/releaseReadsPorts.ts'], suites: ['lanestart', 'releaseoffer'] },
   { paths: ['src/main/workflow/releaseOffer.ts', 'src/main/workflow/releaseOfferText.ts', 'src/shared/releaseOffer.ts', 'src/renderer/src/releaseOffers.tsx', 'tests/e2e/releaseoffer.cjs'], suites: ['releaseoffer'] },
   // A lane's brief (HI-1795): given with its cards' placements in slots, delivered outside them.
   { paths: ['src/main/laneBriefs.ts', 'tests/e2e/lanebrief.cjs'], suites: ['lanebrief', 'slotrecovery'] },
@@ -328,7 +328,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/ShowAllList.tsx'], suites: ['assistantpanel', 'assistantundo'] },
   { paths: ['src/main/progressReporters/', 'src/shared/checkReply.ts'], suites: ['progressreport', 'progressstates', 'packaged-progress'] },
   // Agents' signer (HI-2867): the launcher and cw-sign.js, built outside the asar (packaged-sign runs them as installed).
-  { paths: ['src/main/platform/cw-sign.ts', 'src/main/platform/signerRules.ts', 'src/main/platform/signerPick.ts', 'resources/cw-sign/', 'scripts/buildSignLauncher.mjs'], suites: ['packaged-sign'] },
+  { paths: ['src/main/signer/cw-sign.ts', 'src/main/signer/signerRules.ts', 'src/main/signer/signerPick.ts', 'resources/cw-sign/', 'scripts/buildSignLauncher.mjs'], suites: ['packaged-sign'] },
   { paths: ['src/main/projectAgents.ts'], suites: ['agents', 'agents-ui', 'agents24', 'reorder', 'pages', 'unmerged', 'removeall', 'mergeslot', 'placement', 'swap', 'repolock', 'maxagents'] },
   // Maximum agents (HI-2001): the option, its migration, its refusals and the Load dialog's offer.
   { paths: ['tests/e2e/maxagents.cjs', 'src/shared/agentLimits.ts', 'src/renderer/src/components/ManyAgentsNote.tsx', 'src/main/workflow/preferences.ts', 'src/shared/workflow/preferences.ts'], suites: ['maxagents', 'agents24'] },
@@ -338,11 +338,11 @@ export const AREAS = [
   // port (its contract, lookup and Git's implementation, Git's commit stream reading, and `again`): a change there is a
   // change to the queue's test merge, strict's update, the journaled advance, a restart's recovery, the push and the lease's
   // workspace removal.
-  { paths: ['src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts', 'src/main/platform/gitIntegration.ts', 'src/main/platform/gitCommits.ts', 'src/main/platform/gitTransport.ts', 'src/main/workflow/transportSnapshots.ts', 'src/main/platform/gitSigning.ts', 'src/main/platform/signerRules.ts', 'src/main/platform/boundedSpawn.ts', 'src/main/platform/ownedWork.ts', 'src/main/platform/again.ts'], suites: ['mergequeue', 'mergequeuecrash', 'mergequeuefolder', 'queueagents', 'queuecontrols', 'queuelease', 'queueupgrade'] },
+  { paths: ['src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts', 'src/main/platform/git/gitIntegration.ts', 'src/main/platform/git/gitCommits.ts', 'src/main/platform/git/gitTransport.ts', 'src/main/workflow/transportSnapshots.ts', 'src/main/platform/git/gitSigning.ts', 'src/main/signer/signerRules.ts', 'src/main/platform/git/boundedSpawn.ts', 'src/main/platform/ownedWork.ts', 'src/main/platform/again.ts'], suites: ['mergequeue', 'mergequeuecrash', 'mergequeuefolder', 'queueagents', 'queuecontrols', 'queuelease', 'queueupgrade'] },
   // Agents under Combwork merges (#1354): the refusals, the wakes and the card's queue state.
   { paths: ['src/main/workflow/queueState.ts', 'src/shared/workflow/refusals.ts', 'src/main/mergeSlots.ts', 'tests/e2e/queueagents.cjs'], suites: ['queueagents'] },
   // HI-3126: Bring Up to Date… under follow mode: the forward request's remote reads, the window's offer, a forward published.
-  { paths: ['tests/e2e/forwardremote.cjs', 'src/main/workflow/queueControls.ts', 'src/main/platform/gitHistory.ts', 'src/main/platform/gitTransport.ts', 'src/renderer/src/components/ProgressQueue.tsx'], suites: ['forwardremote'] },
+  { paths: ['tests/e2e/forwardremote.cjs', 'src/main/workflow/queueControls.ts', 'src/main/platform/git/gitHistory.ts', 'src/main/platform/git/gitTransport.ts', 'src/renderer/src/components/ProgressQueue.tsx'], suites: ['forwardremote'] },
   // Each card's focused tests (G20, HI-1367): chosen at submit, run by the merge queue; this repository's picker and runner.
   { paths: ['tests/e2e/queuefocused.cjs', 'scripts/focusedTests.mjs'], suites: ['queuefocused'] },
   // Merge guards (HI-3284): the editor, their check in the merge queue, the returned card's words.
@@ -380,10 +380,10 @@ export const AREAS = [
   { paths: ['tests/e2e/p6lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/presetStep.ts', 'src/renderer/src/components/PresetStep.tsx', 'src/main/workflow/platformSwitch.ts', 'src/renderer/src/boardStages.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p6lane'] },
   // P7's acceptance (#1448): Team 6×6 on slots with review copies, two lanes, S42, S43, the pool, Resume All and restart.
   { paths: ['tests/e2e/p7lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/laneStart.ts', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotCards.ts', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/reviewCopies.ts', 'src/main/agentFolders.ts'], suites: ['p7lane'] },
-  { paths: ['tests/e2e/pathsleftout.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/runtime.ts', 'src/main/platform/nonePlatform.ts', 'src/main/tasks.ts'], suites: ['pathsleftout'] },
-  { paths: ['tests/e2e/p6rules.cjs', 'tests/e2e/queueFixture.cjs', 'src/shared/workflow/guards.ts', 'src/shared/workflow/compile.ts', 'src/main/workflow/runtime.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/platform/nonePlatform.ts'], suites: ['p6rules'] },
+  { paths: ['tests/e2e/pathsleftout.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/runtime.ts', 'src/main/platform/none/nonePlatform.ts', 'src/main/tasks.ts'], suites: ['pathsleftout'] },
+  { paths: ['tests/e2e/p6rules.cjs', 'tests/e2e/queueFixture.cjs', 'src/shared/workflow/guards.ts', 'src/shared/workflow/compile.ts', 'src/main/workflow/runtime.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/platform/none/nonePlatform.ts'], suites: ['p6rules'] },
   // HI-2340: a None card's whole-project read, off main's thread: None starts and submits, code and no-code.
-  { paths: ['src/main/noneBaseline.ts', 'src/main/noneBaselineWorker.ts'], suites: ['p6rules', 'nocode'] },
+  { paths: ['src/main/platform/none/noneBaseline.ts', 'src/main/platform/none/noneBaselineWorker.ts', 'src/main/platform/none/noneDeliverables.ts', 'src/main/platform/deliverables.ts', 'src/main/platform/deliverablesPorts.ts'], suites: ['p6rules', 'nocode'] },
   { paths: ['tests/e2e/p5scenarios.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/shared/progressQueue.ts'], suites: ['p5scenarios'] },
   { paths: ['tests/e2e/queuelease.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueHost.ts'], suites: ['queuelease'] },
   { paths: ['tests/e2e/reviewcopies.cjs', 'src/main/reviewCopies.ts', 'src/main/copies.ts', 'src/main/copiesApp.ts'], suites: ['reviewcopies'] },
@@ -394,7 +394,7 @@ export const AREAS = [
   { paths: ['tests/e2e/followupsubmit.cjs'], suites: ['followupsubmit'] },
   { paths: ['tests/e2e/reviewerpool.cjs', 'src/main/reviewerPool.ts', 'src/shared/workflow/reviewerPool.ts', 'src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'src/main/loopReviewer.ts'], suites: ['reviewerpool'] },
   { paths: ['tests/e2e/isolatedcheck.cjs', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/workflow/launcher.ts', 'src/main/progressReporters/wrapper.ts', 'src/main/processTree.ts', 'src/main/progressReporters/report.mts', 'src/main/workflow/runLink.ts', 'src/main/workflow/runChecks.ts'], suites: ['isolatedcheck', 'progressreport'] },
-  { paths: ['tests/e2e/slotcards.cjs', 'tests/e2e/slotrecovery.cjs', 'src/main/slotCards.ts', 'src/main/finishPath.ts', 'src/main/laneStart.ts', 'src/main/platform/gitPlatform.ts', 'src/main/workflow/service.ts'], suites: ['slotcards', 'slotrecovery', 'lanestart'] },
+  { paths: ['tests/e2e/slotcards.cjs', 'tests/e2e/slotrecovery.cjs', 'src/main/slotCards.ts', 'src/main/finishPath.ts', 'src/main/laneStart.ts', 'src/main/platform/git/gitPlatform.ts', 'src/main/workflow/service.ts'], suites: ['slotcards', 'slotrecovery', 'lanestart'] },
   { paths: ['tests/e2e/slotpool.cjs', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/shared/gitOperations.ts', 'src/main/slotJobs.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts'], suites: ['slotpool', 'slotsessions'] },
   { paths: ['tests/e2e/slotwriterhold.cjs', 'src/main/agentFolders.ts', 'src/main/slots.ts', 'src/main/slotsApp.ts'], suites: ['slotwriterhold'] },
   // P7's switches and slot options set in the window and acting in the app (#1563).
@@ -413,7 +413,7 @@ export const AREAS = [
   { paths: ['tests/e2e/slotbroker.cjs', 'src/main/systemBrokers.ts', 'src/main/connectionSwitch.ts', 'src/main/agentProcesses.ts', 'src/main/processSupervisor.ts'], suites: ['slotbroker'] },
   { paths: ['tests/e2e/slotrelease.cjs', 'src/main/agentFolders.ts', 'src/renderer/src/components/SlotsAndCopies.tsx'], suites: ['slotrelease'] },
   // HI-2786: the workspace lifecycle port the slot pool, its card hooks and a 0.9 worktree's recreation act on folders through.
-  { paths: ['src/main/platform/workspacePort.ts', 'src/main/platform/gitWorkspacePort.ts', 'src/main/platform/workspacePorts.ts', 'src/main/platform/gitRelocation.ts'], suites: ['slotpool', 'slotrecovery', 'slotrelease', 'slotcards', 'repairslots', 'wtrecreate', 'legacyworktree', 'agentslots', 'lanesslots'] },
+  { paths: ['src/main/platform/workspacePort.ts', 'src/main/platform/git/gitWorkspacePort.ts', 'src/main/platform/workspacePorts.ts', 'src/main/platform/git/gitRelocation.ts'], suites: ['slotpool', 'slotrecovery', 'slotrelease', 'slotcards', 'repairslots', 'wtrecreate', 'legacyworktree', 'agentslots', 'lanesslots'] },
   { paths: ['tests/e2e/slotwindows.cjs', 'src/main/agentFolders.ts', 'src/main/agentProcesses.ts', 'src/main/index.ts'], suites: ['slotwindows'] },
   { paths: ['tests/e2e/slotreleaseapi.cjs', 'src/main/slotRelease.ts', 'src/main/agentFolders.ts', 'src/main/slotMigration.ts'], suites: ['slotreleaseapi'] },
   // The Agent API's agents on slots (#1451): where each is, and adding none in a worktree.
@@ -424,7 +424,7 @@ export const AREAS = [
   // The workspace database's small stores (#1018): lanes, card watches and deliveries.
   { paths: ['src/main/storeRows.ts'], suites: ['progresslanes', 'cardloop', 'deliveries', 'agentmessage', 'inbox', 'lanewatch', 'agentwatch', 'loopwatch', 'watchrelease', 'unexpectedclose'] },
   { paths: ['src/main/projectKeys.ts', 'src/main/schema/keysStep.ts', 'src/main/schema/namesStep.ts', 'src/main/schema/valuesStep.ts', 'src/shared/projectKeys.ts', 'tests/e2e/projectkeys.cjs'], suites: ['projectkeys', 'keysui', 'replysize', 'combworktools', 'cardloop'] },
-  { paths: ['src/renderer/src/components/CardWork.tsx', 'src/renderer/src/cardWork.ts', 'src/shared/workflow/workView.ts', 'src/main/workflow/cardWork.ts', 'tests/e2e/cardwork.cjs', 'src/renderer/src/components/RevisionChanges.tsx', 'src/main/workflow/revisionDiff.ts', 'src/main/platform/revisionReads.ts', 'src/main/platform/revisionReadsPorts.ts', 'src/main/platform/gitRevisionReads.ts', 'src/main/diffSides.ts', 'src/main/workflow/lineComments.ts', 'src/shared/workflow/lineComments.ts', 'src/renderer/src/components/LineComments.tsx', 'src/renderer/src/lineCommentDrafts.ts', 'src/main/workflow/feedbackText.ts'], suites: ['cardwork', 'board', 'carddialog', 'progressgates', 'progresslanes'] },
+  { paths: ['src/renderer/src/components/CardWork.tsx', 'src/renderer/src/cardWork.ts', 'src/shared/workflow/workView.ts', 'src/main/workflow/cardWork.ts', 'tests/e2e/cardwork.cjs', 'src/renderer/src/components/RevisionChanges.tsx', 'src/main/workflow/revisionDiff.ts', 'src/main/platform/revisionReads.ts', 'src/main/platform/revisionReadsPorts.ts', 'src/main/platform/git/gitRevisionReads.ts', 'src/main/diffSides.ts', 'src/main/workflow/lineComments.ts', 'src/shared/workflow/lineComments.ts', 'src/renderer/src/components/LineComments.tsx', 'src/renderer/src/lineCommentDrafts.ts', 'src/main/workflow/feedbackText.ts'], suites: ['cardwork', 'board', 'carddialog', 'progressgates', 'progresslanes'] },
   { paths: ['src/renderer/src/projectKeys.ts', 'src/shared/cardLinks.ts', 'src/renderer/src/cardLinks.ts', 'tests/e2e/keysui.cjs'], suites: ['keysui', 'cardlinks', 'board', 'boardarchive', 'cardchip', 'progresslanes', 'rail'] },
   { paths: ['src/main/storeTables.ts', 'src/main/storeBackup.ts', 'src/main/schema/storeCodec.ts'], suites: ['progresslanes', 'cardloop', 'lanewatch', 'agentwatch', 'loopwatch', 'watchrelease', 'performance'] },
   { paths: ['src/main/projectRemoval.ts', 'src/renderer/src/components/ProjectRemoval.tsx'], suites: ['board', 'storage'] },
@@ -447,7 +447,7 @@ export const AREAS = [
   { paths: ['src/main/mainStalls.ts', 'src/shared/mainStalls.ts', 'src/renderer/src/views/PerformanceStalls.tsx', 'src/main/threadPool.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/stalls.cjs'], suites: ['stalls'] },
   { paths: ['src/main/exitLog.ts', 'src/main/memory.ts', 'src/main/diagnostics.ts', 'src/main/updater.ts', 'src/main/installDir.ts'], suites: ['crashdumps'] },
   // .combwork kept out of version control, and its notice (#345).
-  { paths: ['src/main/combworkVcs.ts', 'src/main/vcsDetect.ts', 'src/main/platform/gitKeepOut.ts', 'src/shared/combworkVcsText.ts', 'src/renderer/src/components/CombworkVcsNotice.tsx'], suites: ['combworkvcs', 'gitinit'] },
+  { paths: ['src/main/combworkVcs.ts', 'src/main/vcsDetect.ts', 'src/main/gitKeepOut.ts', 'src/shared/combworkVcsText.ts', 'src/renderer/src/components/CombworkVcsNotice.tsx'], suites: ['combworkvcs', 'gitinit'] },
   // Hook tokens per launch (#345): the hook server, and hook commands reading their header from the auth file.
   { paths: ['src/main/hookTokens.ts'], suites: ['agents', 'ctxpercent', 'codex-extra', 'attention', 'claude-real', 'claudehome', 'codex', 'review'] },
   { paths: ['src/main/storage.ts', 'src/shared/storage.ts', 'src/renderer/src/components/Storage.tsx'], suites: ['storage', 'storageclose', 'asarfiles', 'purge'] },
@@ -579,8 +579,8 @@ export const AREAS = [
   { paths: ['src/renderer/src/boardStages.ts', 'src/renderer/src/components/BoardWorkflow.tsx', 'src/renderer/src/components/Board.tsx', 'src/shared/workflow/stages.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/boardstages.cjs'], suites: ['boardstages'] },
   { paths: ['src/shared/workflow/stages.ts', 'src/shared/workflow/projectWorkflow.ts', 'src/shared/workflow/compile.ts', 'src/shared/workflow/options.ts', 'src/shared/tasks.ts', 'src/main/workflow/optionsForm.ts', 'src/main/workflow/rulesets.ts', 'src/shared/settingsCatalog.ts', 'src/main/settingsTools.ts', 'tests/e2e/stagenames.cjs'], suites: ['stagenames'] },
   { paths: ['src/renderer/src/views/ProjectTabs.tsx'], suites: ['overview', 'taskoverview', 'skillaudience', 'numbers', 'storage', 'unpricedcost', 'changes', 'changescompare', 'changespicker', 'unusedwt', 'mcpagents'] },
-  { paths: ['src/shared/gitlink.ts', 'src/renderer/src/components/GitlinkDiff.tsx', 'src/main/gitCompare.ts', 'src/main/git.ts', 'src/main/platform/git.ts', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/ChangesCompare.tsx', 'src/renderer/src/views/ProjectTabs.tsx', 'tests/e2e/submodulediff.cjs'], suites: ['submodulediff'] },
-  { paths: ['src/main/gitCompare.ts', 'src/main/diffSides.ts', 'src/renderer/src/components/ChangesCompare.tsx', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts'], suites: ['changescompare', 'changespicker'] },
+  { paths: ['src/shared/gitlink.ts', 'src/renderer/src/components/GitlinkDiff.tsx', 'src/main/gitCompare.ts', 'src/main/git.ts', 'src/main/gitCommands.ts', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/ChangesCompare.tsx', 'src/renderer/src/views/ProjectTabs.tsx', 'tests/e2e/submodulediff.cjs'], suites: ['submodulediff'] },
+  { paths: ['src/main/gitCompare.ts', 'src/main/diffSides.ts', 'src/renderer/src/components/ChangesCompare.tsx', 'src/main/platform/repoReads.ts', 'src/main/platform/git/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts'], suites: ['changescompare', 'changespicker'] },
   { paths: ['src/renderer/src/components/ChangesLeftovers.tsx', 'src/shared/branchCleanup.ts'], suites: ['changesleftovers', 'gitcleanup'] },
   { paths: ['src/renderer/src/components/DataTable.tsx', 'src/shared/tableView.ts'], suites: ['overview', 'ctxpercent', 'performance', 'perftable', 'boardarchive'] },
   { paths: ['src/renderer/src/views/ProjectView.tsx', 'src/renderer/src/oneAgentMenu.ts', 'src/shared/oneAgent.ts'], suites: ['oneagent', 'agents-ui', 'agentstable', 'resumeall', 'paneheader', 'rail', 'tabstrip', 'startall', 'narrowmain', 'removeall', 'defaultprovider'] },
@@ -678,7 +678,7 @@ export const AREAS = [
   // The installer's copies (npm run dist first).
   { paths: ['electron-builder.yml', 'scripts/dist.mjs', 'scripts/distCopy.mjs'], suites: ['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-sign', 'packaged-transcript', 'packaged-workers'] },
   // Combwork's worker threads in the installed copy, their scripts inside app.asar (HI-1880).
-  { paths: ['src/main/workerThreads.ts', 'src/main/places.ts', 'src/main/usageWorker.ts', 'src/main/gitWorker.ts', 'src/main/repoLockWorker.ts', 'src/main/walCheckpointWorker.ts', 'src/main/noneBaselineWorker.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/packaged-workers.cjs'], suites: ['packaged-workers'] },
+  { paths: ['src/main/workerThreads.ts', 'src/main/places.ts', 'src/main/usageWorker.ts', 'src/main/gitWorker.ts', 'src/main/repoLockWorker.ts', 'src/main/walCheckpointWorker.ts', 'src/main/platform/none/noneBaselineWorker.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/packaged-workers.cjs'], suites: ['packaged-workers'] },
   // Session records in the workspace's database (#1061): the suites that read or write them, Remove from Combwork and Repair.
   { paths: ['src/main/sessionStore.ts', 'tests/e2e/storeDocs.cjs', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'tests/e2e/sessionDeliveryCodec.cjs'], suites: ['agents', 'assistantimages', 'assistantmode', 'cardchip', 'overview', 'providerdetect', 'quit', 'restart', 'resume', 'review', 'safeguards', 'sessionname', 'sessioncleanup', 'sessionorigin', 'sessionsize', 'sessiontree', 'wtrecreate', 'storage', 'transcript', 'wsmove', 'changespicker', 'dialogs', 'files', 'i18nlive', 'performance', 'projectrename', 'wsoverview', 'removeall', 'codex', 'codex-handover'] },
 ]

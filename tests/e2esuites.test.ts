@@ -270,7 +270,7 @@ describe('the suites a change needs (affected.mjs)', () => {
   })
 
   it("HR1's R7 round 1: the queue's candidate moved behind the integration port keeps the queue's suites", () => {
-    for (const f of ['src/main/platform/gitIntegration.ts', 'src/main/platform/gitCommits.ts', 'src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts', 'src/main/platform/again.ts']) {
+    for (const f of ['src/main/platform/git/gitIntegration.ts', 'src/main/platform/git/gitCommits.ts', 'src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts', 'src/main/platform/again.ts']) {
       expect(affectedSuites([f], names).suites, f).toEqual(expect.arrayContaining(['mergequeue', 'mergequeuefolder', 'mergequeuecrash', 'queuelease']))
     }
   })

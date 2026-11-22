@@ -12,7 +12,7 @@ export { otherVcsOf, vcsOf } from './vcsDetect'
 /**
  * Keeping a project's .combwork (sessions, transcript backups, launch settings: this machine's, not the project's) out of
  * version control (#345). The repository platform holding the project keeps it out in its own terms (RepoPorts.keepOut,
- * HI-2792; Git's: info/exclude, never a tracked .gitignore, platform/gitKeepOut.ts), when a project is set up, at every
+ * HI-2792; Git's: info/exclude, never a tracked .gitignore, gitKeepOut.ts), when a project is set up, at every
  * refresh and before every launch, so a repository made later (`git init`) is covered too. Where it can't (another
  * version control system, none, a folder a sync service copies), the project says so.
  */

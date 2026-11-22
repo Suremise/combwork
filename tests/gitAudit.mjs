@@ -3,6 +3,8 @@
 // counted per caller. tests/gitAudit.test.ts (npm run check:repo) fails on an edge or a seam this table doesn't list, on
 // a listed one that is gone (stale), and on a name taken across a constrained edge beyond its list; scripts/gitInventory.mjs
 // prints the audit beside HI-2781's inventory. 1.5.0's J0 starts from it: a second platform with lines routes each seam.
+// HI-3489: and each platform's folder (src/main/platform/git/, none/) is sealed: imported from outside only by the
+// registries (sealBreaks).
 //
 // Classes:
 // - `impl`: Git's implementation, or a part of it kept in a common file (its runner, its route, its 0.9 worktrees).
@@ -19,6 +21,12 @@ import ts from 'typescript-classic'
 /** Git's own modules: an import of one from outside Git's implementation is an edge the audit classifies. */
 const GIT_FILES = new Set([
   'src/main/git',
+  // HI-3489: Combwork's own git library, shared by the Git platform's folder and Combwork's own git use (so outside it).
+  'src/main/gitCommands',
+  'src/main/gitRefs',
+  'src/main/gitKeepOut',
+  'src/main/gitIgnoredByKind',
+  'src/main/gitShadowIgnore',
   'src/main/gitTool',
   'src/main/gitWorker',
   'src/main/gitCompare',
@@ -27,8 +35,6 @@ const GIT_FILES = new Set([
   'src/main/branchWatch',
   'src/main/branchMerge',
   'src/main/filesGit',
-  // HI-2944: Commit and Set aside of a target folder's changes (port 5's folderChanges, Git's implementation).
-  'src/main/gitFolderChanges',
   'src/main/worktrees',
   'src/main/unusedWorktrees',
   'src/main/repoLock',
@@ -36,15 +42,14 @@ const GIT_FILES = new Set([
   'src/main/repoLockWorker',
   'src/main/folderFence',
   'src/main/workflow/gitHost',
-  'src/main/platform/refHold',
   'src/shared/gitTool',
   'src/shared/gitInit',
   'src/shared/gitRepo',
   'src/shared/gitIgnoreRules'
 ])
 
-/** Whether a module (repo path, no extension) is Git's: one of GIT_FILES, or a platform module named git… (platform/git.ts, gitHistory.ts…). */
-export const isGitModule = (m) => GIT_FILES.has(m) || /^src\/main\/platform\/git([A-Z]\w*)?$/.test(m)
+/** Whether a module (repo path, no extension) is Git's: one of GIT_FILES, or one in the Git platform's folder (HI-3489). */
+export const isGitModule = (m) => GIT_FILES.has(m) || m.startsWith('src/main/platform/git/')
 
 /** A file that could name a Git module: only these are parsed (the rest can't import one). */
 const MAY_NAME_GIT = new RegExp(String.raw`git|worktree|repoLock|folderFence|branchWatch|branchMerge|refHold|require\(|import\(\s*[^'"${'`'}\s]`, 'i')
@@ -156,14 +161,17 @@ function fileEdges(root, file, text) {
   return out
 }
 
-/** The "platform with lines" seams (HI-2792): each call of these lookups, counted per file. */
-export const SEAM_CALLS = ['lineHistory', 'lineRepoReads', 'lineRepoOps', 'queueIntegration', 'slotWorkspaces', 'slotRelocation']
+/**
+ * The "platform with lines" seams (HI-2792), and the platform with declared paths' (HI-3489: `pathsDeliverables`): each
+ * call of these lookups, counted per file.
+ */
+export const SEAM_CALLS = ['lineHistory', 'lineRepoReads', 'lineRepoOps', 'queueIntegration', 'slotWorkspaces', 'slotRelocation', 'pathsDeliverables']
 
 /** Each file's count of each seam call (`name(`), outside the port modules that define them. */
 export function seamCounts(root, over = {}) {
   const out = {}
   for (const { file, text } of filesOf(root, over)) {
-    if (/^src\/main\/platform\/(historyPorts|repoReadsPorts|repoOpsPorts|integrationPorts|workspacePorts|releaseReadsPorts)\.ts$/.test(file)) continue
+    if (/^src\/main\/platform\/(historyPorts|repoReadsPorts|repoOpsPorts|integrationPorts|workspacePorts|releaseReadsPorts|deliverablesPorts)\.ts$/.test(file)) continue
     for (const s of SEAM_CALLS) {
       const n = [...text.matchAll(new RegExp(`\\b${s}\\(`, 'g'))].length
       if (n) (out[file.replace(/\.tsx?$/, '')] ??= {})[s] = n
@@ -179,7 +187,7 @@ export function seamCounts(root, over = {}) {
 export const EDGES = [
   { file: 'src/main/agentWorktree', module: 'src/main/worktrees', class: 'impl', names: ['GIT_FAILED', 'uniqueFolder'], why: "a 0.9 worktree's recreation: a free folder's name and the failure message (R4's rule: no git run)" },
   { file: 'src/main/antivirus', module: 'src/main/worktrees', class: 'impl', names: ['worktreesRoot'], why: "the worktrees folder beside the workspace, excluded from scanning (Git's slots and 0.9 worktrees live there)" },
-  { file: 'src/main/combworkMove', module: 'src/main/platform/gitKeepOut', class: 'historic', names: ['excludeLine', 'gitDirOf'], op: 'excludeMoveLock and moveExcludeLine (HI-2462)', why: "1.1's .hive → .combwork move keeps git's exclude lines right" }, // old-name: the 1.1 folder move's input, named as it was
+  { file: 'src/main/combworkMove', module: 'src/main/gitKeepOut', class: 'historic', names: ['excludeLine', 'gitDirOf'], op: 'excludeMoveLock and moveExcludeLine (HI-2462)', why: "1.1's .hive → .combwork move keeps git's exclude lines right" }, // old-name: the 1.1 folder move's input, named as it was
   { file: 'src/main/combworkMove', module: 'src/main/repoLock', class: 'common', names: ['withNamedLock'], why: "the folder move's named lock (a lock file of Combwork's, not git's)" },
   { file: 'src/main/deliveries', module: 'src/main/folderFence', class: 'common', names: ['folderChanging', 'folderSteady', 'inFolder', 'onFolderSteady'], why: "the folder fence: keyed by folder, every platform's (§16.3.6 port 1)" },
   { file: 'src/main/files', module: 'src/shared/gitIgnoreRules', class: 'gitUi', why: "the Files tab's ignore rule type (the Git dimming's tooltip)" },
@@ -192,25 +200,26 @@ export const EDGES = [
   { file: 'src/main/ipc', module: 'src/main/unusedWorktrees', class: 'impl', names: ['combworkWorktreeOf', 'mergeUnused', 'removalPreview', 'removeUnusedWorktree', 'unusedBranchOf', 'unusedBranchStatus', 'unusedWorktrees'], why: "the 0.9 agent worktrees' clean-up view (Git's worktrees)" },
   { file: 'src/main/lineWriter', module: 'src/main/folderFence', class: 'common', names: ['folderChanging', 'folderSteady'], why: "the folder fence: keyed by folder, every platform's" },
   { file: 'src/main/nameUpgradeProjects', module: 'src/main/git', class: 'historic', names: ['git'], op: 'moveRefs (HI-2594)', why: "1.1's name upgrade moves refs/hive/* to refs/cw/*" }, // old-name: the 1.1 name upgrade's input refs, named as they were
-  { file: 'src/main/nameUpgradeProjects', module: 'src/main/platform/gitKeepOut', class: 'historic', names: ['gitDirOf'], op: 'the exclude line upgrade (HI-2594)', why: "1.1's name upgrade rewrites git's exclude line" },
-  { file: 'src/main/platform/adapters', module: 'src/main/platform/gitPlatform', class: 'registry', names: ['GitPlatform'], why: "the workflow adapters' map (HI-2792)" },
-  { file: 'src/main/platform/historyPorts', module: 'src/main/platform/gitHistory', class: 'registry', names: ['gitHistory'], why: "the history port's map (R6)" },
-  { file: 'src/main/platform/integrationPorts', module: 'src/main/platform/gitIntegration', class: 'registry', names: ['gitIntegration'], why: "the integration port's map (R7, R8)" },
+  { file: 'src/main/nameUpgradeProjects', module: 'src/main/gitKeepOut', class: 'historic', names: ['gitDirOf'], op: 'the exclude line upgrade (HI-2594)', why: "1.1's name upgrade rewrites git's exclude line" },
+  { file: 'src/main/platform/adapters', module: 'src/main/platform/git/gitPlatform', class: 'registry', names: ['GitPlatform'], why: "the workflow adapters' map (HI-2792)" },
+  { file: 'src/main/platform/historyPorts', module: 'src/main/platform/git/gitHistory', class: 'registry', names: ['gitHistory'], why: "the history port's map (R6)" },
+  { file: 'src/main/platform/integrationPorts', module: 'src/main/platform/git/gitIntegration', class: 'registry', names: ['gitIntegration'], why: "the integration port's map (R7, R8)" },
   { file: 'src/main/platform/observe', module: 'src/main/git', class: 'impl', names: ['readRefsOffMain'], why: "the watcher's Git reads (refs off main's thread, git's reflog): ObservePort's Git half, kept with the common watcher (R6)" },
-  { file: 'src/main/platform/observe', module: 'src/main/platform/gitIgnoredByKind', class: 'impl', names: ['gitIgnoredByKind', 'EntryKind', 'RecordedKinds'], why: "a Git folder's write record leaves out what Git ignores, each path by every kind it had (HI-3173): ObservePort's Git half, read-only check-ignore" },
+  { file: 'src/main/platform/observe', module: 'src/main/gitRefs', class: 'impl', names: ['Heads', 'RepoRefs', 'isMainGitDir', 'plainRepo', 'readRepoRefs'], why: "the watcher's Git reads (a repository's refs from its files, no git process): ObservePort's Git half, kept with the common watcher (R6)" },
+  { file: 'src/main/platform/observe', module: 'src/main/gitIgnoredByKind', class: 'impl', names: ['gitIgnoredByKind', 'EntryKind', 'RecordedKinds'], why: "a Git folder's write record leaves out what Git ignores, each path by every kind it had (HI-3173): ObservePort's Git half, read-only check-ignore" },
   { file: 'src/main/platform/repoContext', module: 'src/shared/gitIgnoreRules', class: 'impl', names: ['IgnoreRule'], why: "RepoFiles' ignore rule type: the Files tab's rule, Git's syntax" },
   { file: 'src/main/platform/repoOps', module: 'src/shared/gitIgnoreRules', class: 'gitUi', why: "RepoOps' view types keep their Git names (§16.3.6 port 5)" },
   { file: 'src/main/platform/repoOps', module: 'src/shared/gitInit', class: 'gitUi', why: "RepoOps' view types keep their Git names (§16.3.6 port 5)" },
   { file: 'src/main/platform/repoOps', module: 'src/shared/gitRepo', class: 'gitUi', why: "RepoOps' view types keep their Git names (§16.3.6 port 5)" },
-  { file: 'src/main/platform/repoOpsPorts', module: 'src/main/platform/gitRepoOps', class: 'registry', names: ['gitRepoOps'], why: "the repository operations port's map (R3)" },
-  { file: 'src/main/platform/repoPorts', module: 'src/main/platform/gitRepoPorts', class: 'registry', names: ['gitRepoPorts'], why: "the repository context port's map (R1)" },
+  { file: 'src/main/platform/repoOpsPorts', module: 'src/main/platform/git/gitRepoOps', class: 'registry', names: ['gitRepoOps'], why: "the repository operations port's map (R3)" },
+  { file: 'src/main/platform/repoPorts', module: 'src/main/platform/git/gitRepoPorts', class: 'registry', names: ['gitRepoPorts'], why: "the repository context port's map (R1)" },
   { file: 'src/main/platform/repoPorts', module: 'src/shared/gitIgnoreRules', class: 'impl', names: ['IgnoreRule'], why: "ignoredIn's rule type (RepoFiles)" },
   { file: 'src/main/platform/repoPorts', module: 'src/main/repoLock', class: 'common', names: ['withStoreLocks'], why: "every context's store locked by the repository lock's one owner, whatever platform named it (HI-2896, s13 §2)" },
   { file: 'src/main/platform/repoReads', module: 'src/shared/gitRepo', class: 'gitUi', why: "RepoReads' view types keep their Git names (§16.3.6 port 5)" },
-  { file: 'src/main/platform/repoReadsPorts', module: 'src/main/platform/gitRepoReads', class: 'registry', names: ['gitRepoReads'], why: "the repository reads port's map (R2)" },
-  { file: 'src/main/platform/releaseReadsPorts', module: 'src/main/platform/gitReleaseReads', class: 'registry', names: ['gitReleaseReads'], why: "the release reads port's map (HI-3148)" },
-  { file: 'src/main/platform/revisionReadsPorts', module: 'src/main/platform/gitRevisionReads', class: 'registry', names: ['gitRevisionReads'], why: "the revision reads port's map (HI-3218)" },
-  { file: 'src/main/platform/workspacePorts', module: 'src/main/platform/gitWorkspacePort', class: 'registry', names: ['gitWorkspacePort'], why: "the workspace port's map (R4)" },
+  { file: 'src/main/platform/repoReadsPorts', module: 'src/main/platform/git/gitRepoReads', class: 'registry', names: ['gitRepoReads'], why: "the repository reads port's map (R2)" },
+  { file: 'src/main/platform/releaseReadsPorts', module: 'src/main/platform/git/gitReleaseReads', class: 'registry', names: ['gitReleaseReads'], why: "the release reads port's map (HI-3148)" },
+  { file: 'src/main/platform/revisionReadsPorts', module: 'src/main/platform/git/gitRevisionReads', class: 'registry', names: ['gitRevisionReads'], why: "the revision reads port's map (HI-3218)" },
+  { file: 'src/main/platform/workspacePorts', module: 'src/main/platform/git/gitWorkspacePort', class: 'registry', names: ['gitWorkspacePort'], why: "the workspace port's map (R4)" },
   { file: 'src/main/projectAgents', module: 'src/main/branchWatch', class: 'gitUi', why: "an agent's branch card checked again" },
   { file: 'src/main/projectAgents', module: 'src/main/gitTool', class: 'gitUi', why: "Add Agent's 0.9 worktree choice says why git can't run" },
   { file: 'src/main/projectAgents', module: 'src/main/repoLock', class: 'impl', names: ['withRepoLock'], why: "a 0.9 worktree's guarded removal under the repository lock (R5 left it to the audit)" },
@@ -230,7 +239,6 @@ export const EDGES = [
   { file: 'src/main/workflow/mergeQueue', module: 'src/main/git', class: 'impl', names: ['GIT_PREFIX', 'git'], why: "the queue's own git when its config gives no runner (tests; the app passes QueueRunner's)" },
   { file: 'src/main/workflow/mergeQueue', module: 'src/main/gitTool', class: 'impl', names: ['gitExe'], why: "gitTree: the queue's default Git runner's tool" },
   { file: 'src/main/workflow/mergeQueue', module: 'src/main/gitWorker', class: 'impl', names: ['onOutputSettled', 'withLauncherEnv'], why: "gitTree: the queue's default Git runner's launcher" },
-  { file: 'src/main/workflow/mergeQueue', module: 'src/main/platform/gitCommits', class: 'impl', names: ['CommitChild', 'CommitStream', 'commitFailed', 'readCommitStream'], why: "the merge commit's stream (R7 moved it to Git's module; the queue's runner reads it)" },
   { file: 'src/main/workflow/queueHost', module: 'src/main/folderFence', class: 'common', names: ['changingFolder', 'inFolder'], why: "the folder fence around a checked-out target's advance (R4.2)" },
   { file: 'src/main/workflow/queueHost', module: 'src/main/git', class: 'impl', names: ['git', 'withGitRoute'], why: "Git's route into the queue's host (withGitRoute, port 1), and the test-only race hook's outside commit (CW_TEST_QUEUE_RACE)" },
   { file: 'src/main/workflow/queueHost', module: 'src/main/repoLock', class: 'impl', names: ['withRepoLock'], why: 'the advance under the repository lock (R4.2)' },
@@ -287,6 +295,8 @@ export const SEAMS = {
   'src/main/workflow/queueRunner': { calls: { queueIntegration: 2 }, why: "the runner's workspace removal (R8)" },
   'src/main/workflow/reconcile': { calls: { lineHistory: 1 }, why: "a lane's own-work read (R6)" },
   'src/main/workflow/retarget': { calls: { lineHistory: 1 }, why: "the retarget preview (R6)" },
+  'src/main/workflow/runChecks': { calls: { pathsDeliverables: 2 }, why: "a None check's point and its deliverables: reached for a platform without history, the one whose cards declare paths (HI-3489)" },
+  'src/main/workflow/runtime': { calls: { pathsDeliverables: 3 }, why: "every project's deliverables, kept whatever its platform (its watcher's writes invalidate them), and a None card's unclaimed changes (HI-3489)" },
   'src/main/workflow/runLink': { calls: { lineHistory: 2 }, why: "a run's checked-out revision, before its card is known (HI-2792)" },
   'src/main/workflow/targets': { calls: { lineHistory: 3 }, why: "a lane's target and own-work reads, and empty lines dropped (R6)" },
   'src/main/workflow/keptLine': { calls: { lineHistory: 1 }, why: "HI-3112: a put-back card's line read against the target it would follow (R6)" },
@@ -505,6 +515,76 @@ export function modeDeclarations(root, over = {}) {
   return out
 }
 
+/**
+ * HI-3489, each version control in its own folder: `src/main/platform/<vc>/` holds one platform's adapter and port
+ * implementations (git/, none/), and nothing outside that folder imports a file in it (another platform's folder, the
+ * seam beside it, the rest of src/) but the registries below, each the one place naming every platform's
+ * implementation. So a platform is added as a folder, its registry lines and its descriptor, and removed by deleting
+ * them, the build staying green. Only src/ is read: tests (tests/**) import a platform's files directly, as they test them.
+ */
+const PLATFORM_DIR = 'src/main/platform'
+
+/** The registries: the adapters' map and each port's lookup, the only files outside a platform's folder that may import it. */
+export const REGISTRIES = ['adapters', 'deliverablesPorts', 'historyPorts', 'integrationPorts', 'releaseReadsPorts', 'repoOpsPorts', 'repoPorts', 'repoReadsPorts', 'revisionReadsPorts', 'workspacePorts'].map((f) => `${PLATFORM_DIR}/${f}`)
+
+/** The platforms' folders: each folder in src/main/platform, as listed (and any a test's added file is in). */
+export function platformFolders(root, over = {}) {
+  const listed = readdirSync(join(root, PLATFORM_DIR)).filter((e) => statSync(join(root, PLATFORM_DIR, e)).isDirectory())
+  const added = Object.keys(over).flatMap((f) => (f.startsWith(`${PLATFORM_DIR}/`) && f.slice(PLATFORM_DIR.length + 1).includes('/') ? [f.slice(PLATFORM_DIR.length + 1).split('/')[0]] : []))
+  return [...new Set([...listed, ...added])].sort()
+}
+
+/** Every module a file names: imports, re-exports, dynamic imports and requires (repo paths, no extension); HIDDEN for a computed one. */
+function modulesNamed(root, file, text) {
+  const out = new Set()
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+  const add = (spec) => {
+    if (!spec.startsWith('.')) return
+    out.add(relative(root, resolve(root, dirname(file), spec)).replace(/\\/g, '/').replace(/\.(tsx?|js)$/, ''))
+  }
+  const visit = (n) => {
+    if ((ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text)
+    else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text)
+    // A type's `import('./x').T`: a type taken from the folder is as much an import of it.
+    else if (ts.isImportTypeNode(n) && ts.isLiteralTypeNode(n.argument) && ts.isStringLiteral(n.argument.literal)) add(n.argument.literal.text)
+    else if (ts.isCallExpression(n) && (n.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(n.expression) && n.expression.text === 'require')) && n.arguments.length) {
+      if (ts.isStringLiteralLike(n.arguments[0])) add(n.arguments[0].text)
+      else out.add(HIDDEN)
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(sf)
+  return [...out]
+}
+
+/** sealBreaks' answers per file, by its text and the folders. */
+const sealParsed = new Map()
+
+/**
+ * Each import of a platform folder's file from outside that folder, not a registry's: `<file> -> <module>` (and a
+ * computed specifier outside the folders, which could load one). Empty when every folder is sealed.
+ */
+export function sealBreaks(root, over = {}) {
+  const folders = platformFolders(root, over)
+  const folderOf = (m) => folders.find((d) => m === `${PLATFORM_DIR}/${d}` || m.startsWith(`${PLATFORM_DIR}/${d}/`)) ?? null
+  // Only a file that could name a folder (a folder's name is a word: git, none) or load something computed is parsed.
+  const names = new RegExp(String.raw`/(${folders.join('|')})\b|(import|require)\(\s*[^'"${'`'}\s)]`)
+  const out = []
+  for (const { file, text } of filesOf(root, over)) {
+    if (!file.startsWith('src/')) continue
+    const f = file.replace(/\.tsx?$/, '')
+    if (REGISTRIES.includes(f) || !names.test(text)) continue
+    const key = `${root}|${file}|${folders.join(',')}`
+    let kept = sealParsed.get(key)
+    if (kept?.text !== text) sealParsed.set(key, (kept = { text, modules: modulesNamed(root, file, text) }))
+    const own = folderOf(f)
+    for (const m of kept.modules) {
+      if (m === HIDDEN ? !own : folderOf(m) !== null && folderOf(m) !== own) out.push(`${f} -> ${m}`)
+    }
+  }
+  return out.sort()
+}
+
 /** The audit against the source: what isn't listed, what is listed but gone, and names beyond an edge's list. */
 export function audit(root, over = {}) {
   const found = gitEdges(root, over)
@@ -529,5 +609,5 @@ export function audit(root, over = {}) {
   const switches = [...new Set([...Object.keys(switched), ...Object.keys(SWITCHES)])].sort().filter((f) => (switched[f] ?? 0) !== (SWITCHES[f]?.n ?? 0)).map((f) => `${f}: ${switched[f] ?? 0} switches on a platform's id, listed ${SWITCHES[f]?.n ?? 0}`)
   // HI-3140: an exemption nothing uses any more is stale: a NOT_PLATFORM name no comparison has.
   switches.push(...Object.keys(NOT_PLATFORM).filter((n) => !used.has(n)).map((n) => `NOT_PLATFORM ${n}: no comparison uses it (stale)`))
-  return { found, unlisted, stale, extraNames, seams, switches }
+  return { found, unlisted, stale, extraNames, seams, switches, sealed: sealBreaks(root, over) }
 }

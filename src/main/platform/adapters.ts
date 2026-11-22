@@ -5,17 +5,17 @@
 import type { PlatformId } from '../../shared/platform/descriptors'
 import type { Workflow } from '../workflow/runtime'
 import type { PlatformAdapter } from './adapter'
-import { GitPlatform } from './gitPlatform'
-import type { NoneAdapter } from './none'
-import { NonePlatform } from './nonePlatform'
+import { GitPlatform } from './git/gitPlatform'
+import type { Deliverables } from './deliverables'
+import { NonePlatform } from './none/nonePlatform'
 
 /** Each platform's adapter for a project's workflow; None's is given the workflow's content hashing. */
-const ADAPTERS: Record<PlatformId, (wf: Workflow, none: NoneAdapter) => PlatformAdapter> = {
+const ADAPTERS: Record<PlatformId, (wf: Workflow, none: Deliverables) => PlatformAdapter> = {
   git: (wf) => new GitPlatform(wf),
   none: (wf, none) => new NonePlatform(wf, none)
 }
 
 /** Every platform's adapter for one workflow, built in the order the map names them (as the runtime built them before). */
-export function adaptersFor(wf: Workflow, none: NoneAdapter): Record<PlatformId, PlatformAdapter> {
+export function adaptersFor(wf: Workflow, none: Deliverables): Record<PlatformId, PlatformAdapter> {
   return Object.fromEntries(Object.entries(ADAPTERS).map(([id, make]) => [id, make(wf, none)])) as Record<PlatformId, PlatformAdapter>
 }

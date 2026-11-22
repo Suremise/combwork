@@ -77,7 +77,7 @@ export default defineConfig({
           'cw-mcp': resolve(__dirname, 'src/main/mcp/cw-mcp.ts'),
           'cw-progress': resolve(__dirname, 'src/main/progressReporters/cw-progress.ts'),
           // The signer agents' sessions run through cw-sign.exe (HI-2867), as Node outside the asar.
-          'cw-sign': resolve(__dirname, 'src/main/platform/cw-sign.ts'),
+          'cw-sign': resolve(__dirname, 'src/main/signer/cw-sign.ts'),
           // The close commands' runner (HI-1368), run as Node outside the asar.
           'cw-close-runner': resolve(__dirname, 'src/main/closeCommand/cw-close-runner.ts'),
           // The usage history's worker thread (#1106).
@@ -87,7 +87,7 @@ export default defineConfig({
           // The repository lock's worker thread (HI-1680).
           'repo-lock-worker': resolve(__dirname, 'src/main/repoLockWorker.ts'),
           // A None project's whole-project read (HI-2340).
-          'none-baseline-worker': resolve(__dirname, 'src/main/noneBaselineWorker.ts'),
+          'none-baseline-worker': resolve(__dirname, 'src/main/platform/none/noneBaselineWorker.ts'),
           // The merge guards' worker thread (HI-3284): a user's patterns run here, never on main's thread.
           'merge-guards-worker': resolve(__dirname, 'src/main/workflow/mergeGuardsWorker.ts'),
           // Git's worker thread, which starts its processes (HI-1783).

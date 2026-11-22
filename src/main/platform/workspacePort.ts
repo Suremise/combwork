@@ -6,7 +6,7 @@
 // (slots.ts, slotCards.ts, agentWorktree.ts): they ask this port to act on a folder and read its answers, and every
 // refusal (a held lease, a late process, a dirty or unmerged slot, unreadable state, a moved folder) stays theirs, in
 // their words (R2.3). Each platform implements it in its own module (Git: gitWorkspacePort.ts, over worktrees.ts,
-// platform/git.ts and git.ts, delegating to them unchanged); workspacePorts.ts finds it, never by a switch on an id.
+// gitCommands.ts and git.ts, delegating to them unchanged); workspacePorts.ts finds it, never by a switch on an id.
 //
 // 1.4.0 changes no behaviour (§16.3.6's rule 1): Git's implementation runs today's git commands, in the same folders and
 // order (tests/slotTraces.test.ts holds the pool to its traces). Folders here are paths: `repo` is the project's folder
@@ -104,7 +104,7 @@ export interface WorkspaceFilesRunOptions {
 
 /**
  * HI-1182: a platform's step for what a checkout leaves out of its workspaces (Git: submodules and LFS files,
- * platform/gitModules.ts): only Git's port has it.
+ * platform/git/gitModules.ts): only Git's port has it.
  */
 export interface WorkspaceFiles {
   /** The step's run title in the Progress panel (the commands it may run). */

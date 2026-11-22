@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 describe('callers moved to the evidence and history port', () => {
   const root = join(__dirname, '..')
   /** Git's history reads and runner, the watcher's module, and the port's Git implementation. */
-  const GIT_SEAMS = ['src/main/git', 'src/main/gitWorker', 'src/main/platform/git', 'src/main/platform/repoRefs', 'src/main/platform/observe', 'src/main/platform/gitHistory']
+  const GIT_SEAMS = ['src/main/git', 'src/main/gitWorker', 'src/main/gitCommands', 'src/main/gitRefs', 'src/main/platform/observe', 'src/main/platform/git/gitHistory']
   /** The callers moved (HI-2787): each reads history and the write record through historyPorts.ts. */
   const MOVED = ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/workflow/recorder.ts', 'src/main/workflow/targets.ts', 'src/main/workflow/retarget.ts', 'src/main/workflow/runChecks.ts', 'src/main/workflow/focusedRun.ts', 'src/main/workflow/queueChecks.ts']
 
@@ -45,6 +45,6 @@ describe('callers moved to the evidence and history port', () => {
       }
     }
     walk('src')
-    expect(files.filter((f) => importsOf(f).includes('src/main/platform/gitHistory'))).toEqual(['src/main/platform/historyPorts.ts'])
+    expect(files.filter((f) => importsOf(f).includes('src/main/platform/git/gitHistory'))).toEqual(['src/main/platform/historyPorts.ts'])
   })
 })

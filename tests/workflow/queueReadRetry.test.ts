@@ -13,7 +13,7 @@ import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harn
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { gitTree, READ_RETRIES, type QueueConfig, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
 import { git } from '../../src/main/git'
-import * as G from '../../src/main/platform/git'
+import * as G from '../../src/main/gitCommands'
 import { isUnknown } from '../../src/main/platform/types'
 import { gitTool } from '../../src/main/gitTool'
 import type { GitOutcome, GitRequest } from '../../src/main/gitWorker'

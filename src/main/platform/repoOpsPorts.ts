@@ -7,7 +7,7 @@ import { hasOperation, type Operation, type PlatformId } from '../../shared/plat
 import { PLATFORM_NAME } from '../../shared/platform/switching'
 import { msg } from '../../shared/i18n/msg'
 import { combworkError } from '../combworkError'
-import { gitRepoOps } from './gitRepoOps'
+import { gitRepoOps } from './git/gitRepoOps'
 import type { OpsFor, RepoOps } from './repoOps'
 
 /** Each platform's repository operations; absent for a platform with none (None). In the order lineRepoOps looks. */

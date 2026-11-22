@@ -3,7 +3,7 @@
 // has no revision diff to show.
 
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { gitRevisionReads } from './gitRevisionReads'
+import { gitRevisionReads } from './git/gitRevisionReads'
 import type { RevisionReads } from './revisionReads'
 
 /** Each platform's revision reads; absent for a platform with none (None). */

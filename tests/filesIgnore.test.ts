@@ -42,7 +42,7 @@ vi.mock('../src/main/git', async (original) => {
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const files = await import('../src/main/files')
 // Git's check-ignore tries, with Git's Files reads (HI-2792).
-const { IGNORE_TRIES } = await import('../src/main/platform/gitFiles')
+const { IGNORE_TRIES } = await import('../src/main/platform/git/gitFiles')
 const { onCombworkEvent } = await import('../src/main/events')
 
 const BUSY = { err: 'fatal: .git/index: index file open failed: Permission denied' }

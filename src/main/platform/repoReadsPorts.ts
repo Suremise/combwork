@@ -4,7 +4,7 @@
 // never a platform's own modules (tests/repoReadsImports.test.ts holds them to it).
 
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { gitRepoReads } from './gitRepoReads'
+import { gitRepoReads } from './git/gitRepoReads'
 import type { RepoReads } from './repoReads'
 
 /** Each platform's repository reads; absent for a platform with none (None). In the order lineRepoReads looks. */

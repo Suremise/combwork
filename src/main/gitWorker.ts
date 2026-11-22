@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 import { existsSync, statSync } from 'original-fs'
 import { delimiter, dirname, isAbsolute, join } from 'path'
 import { parentPort } from 'worker_threads'
-import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
+import { readRepoRefs, type RepoRefs } from './gitRefs'
 import { RUN_MARK_VAR, treeEnding, type MsysMark } from './processTree'
 
 /**

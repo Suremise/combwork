@@ -4,7 +4,7 @@ import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { gitIgnoredByKind, type EntryKind, type RecordedKinds } from '../src/main/platform/gitIgnoredByKind'
+import { gitIgnoredByKind, type EntryKind, type RecordedKinds } from '../src/main/gitIgnoredByKind'
 import { tempDir } from './tempDir'
 
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()

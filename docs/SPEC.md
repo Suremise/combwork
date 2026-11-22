@@ -2121,7 +2121,7 @@ act on a folder, and never decide a folder's safety themselves.
 
 R4 (HI-2786) built it as `src/main/platform/workspacePort.ts` (the contract, types only), Git's
 `gitWorkspacePort.ts` (worktrees: each member the git command the pool ran itself before, or `worktrees.ts`' and
-`platform/git.ts`' function it called) and `workspacePorts.ts` (found by platform; the pool's by the **isolation**
+`gitCommands.ts`' function it called) and `workspacePorts.ts` (found by platform; the pool's by the **isolation**
 capability, `slotWorkspaces()`, never an id). Refined there: its members take the repository's folder and the
 workspace's folder rather than a `RepoContext` (building a context could add a git call where a trace has none);
 `inspect` is its reads one by one (`head`, `line`, `heads`, `dirty`, `checkout` read from files, `lineHead`,
@@ -2228,7 +2228,7 @@ The **integration** capability's mechanics. The queue's state machine, its facts
   shown): `destination(target)` → the one publication endpoint and its transport snapshot · `noUpstream` ·
   `remoteAmbiguous` · `remoteUnsupported`; `fetchHead(snapshot, pin)` → that fetch's own head, pinned; `prePush(snapshot,
   lease, result)` → `ok` · `refused` · `timedOut`; `publish(snapshot, lease, result)` → `pushed` · `atResult` · `stale` ·
-  `refused` · `unknown`; `redact(text, snapshot)`. Git's are `platform/gitTransport.ts`.
+  `refused` · `unknown`; `redact(text, snapshot)`. Git's are `platform/git/gitTransport.ts`.
 - Further outcomes a later platform reports (the type carries them from R7/R8, each a pause naming it, never success): `divergentChange`, `conflictedTarget`, `staleWorkspace`,
   `partialExport`.
 - None's integration is **acceptance** (§16.3.3): no candidate, no advance; the accepted revision must still be the
@@ -2353,19 +2353,19 @@ becomes the port's Git implementation.
 | Port | Today | Becomes | Card |
 |---|---|---|---|
 | 1 Context | `git.ts` (`git`, `gitRouted`, `withGitRoute`), `gitWorker.ts`, `gitTool.ts`, `workflow/gitHost.ts` | `RepoRunner` (Git: stays) | R1 |
-| 1 Context | `repoLock.ts`, `repoLockCore.ts`, `folderFence.ts`, `platform/refHold.ts` | `RepoLocks` keyed by `RepoContext` (Git: stays) | R1 |
-| 1 Context | `platform/git.ts` `commonDir*`, `gitDirSync`; `combworkVcs.ts` `gitDirOf`, `vcsOf`; `providers/common.ts` `excludeCopies`; `accounts.ts` trust roots | `RepoContext` (store id, workspace id, root) and `metadataDirs` | R1, R5 |
+| 1 Context | `repoLock.ts`, `repoLockCore.ts`, `folderFence.ts`, `platform/git/refHold.ts` | `RepoLocks` keyed by `RepoContext` (Git: stays) | R1 |
+| 1 Context | `gitCommands.ts` `commonDir*`, `gitDirSync`; `combworkVcs.ts` `gitDirOf`, `vcsOf`; `providers/common.ts` `excludeCopies`; `accounts.ts` trust roots | `RepoContext` (store id, workspace id, root) and `metadataDirs` | R1, R5 |
 | 1 Context | `platform/registry.ts` `detect`, `combworkVcs.ts` `otherVcsOf` | `Detection` unchanged in 1.4.0 | R9 |
-| 2 Workspaces | `worktrees.ts` (`createWorktree`, `removeWorktree`, `listWorktrees`, `worktreeCheck`, `workLeft`, `copyIgnored`), `agentWorktree.ts`, `platform/git.ts` `isolate`, `worktreeNow` | `WorkspacePort` (Git: stays) | R4 |
+| 2 Workspaces | `worktrees.ts` (`createWorktree`, `removeWorktree`, `listWorktrees`, `worktreeCheck`, `workLeft`, `copyIgnored`), `agentWorktree.ts`, `gitCommands.ts` `isolate`, `worktreeNow` | `WorkspacePort` (Git: stays) | R4 |
 | 2 Workspaces | `slots.ts`, `slotCards.ts`, `unusedWorktrees.ts`, slot release, migration and jobs | Common orchestration, calling `WorkspacePort` | R4 |
 | 2 Workspaces | `copies.ts`, `agentFolders.ts`, `lanes.ts`, `projectAgents.ts` | Common, calling `WorkspacePort.checkCopy` and `RepoContext` | R5 |
 | 2 Workspaces | `workspaceMove.ts`, `combworkMove.ts`, `nameUpgradeProjects.ts` | `WorkspacePort.relocate` (Git); historic migrations stay Git-only by name | R9 |
-| 3 Evidence | `platform/git.ts` (`head`, `resolve`, `dirty`, `change`, `candidateKey`, `replayTree`, `sameChange`, `contains`, `firstParents`, `commits`, `messages`, `identity`, `pin`), `platform/repoRefs.ts`, `snapshotLine.ts` | `HistoryPort` (Git: stays) | R6 |
+| 3 Evidence | `gitCommands.ts` (`head`, `resolve`, `dirty`, `change`, `candidateKey`, `replayTree`, `sameChange`, `contains`, `firstParents`, `commits`, `messages`, `identity`, `pin`), `gitRefs.ts`, `snapshotLine.ts` | `HistoryPort` (Git: stays) | R6 |
 | 3 Evidence | `platform/observe.ts`, `watching.ts` | `ObservePort` with the write record (Git: stays) | R6 |
 | 3 Evidence | `workflow/reconcile.ts`, `reconciler.ts`, `recorder.ts`, `targets.ts`, `retarget.ts`, `runChecks.ts`, `focusedRun.ts`, `queueChecks.ts` | Common, calling `HistoryPort` / `ObservePort` (moved: HI-2787's R6) | R6 |
 | 3 Evidence | Reached only with lines, their callers not carrying the project's platform yet: `targets.ts` (`branchExists`, `ownWork`, `dropEmptyLines`), `retarget.ts`'s preview, `focusedRun.ts`'s `pathChanges`, `queueChecks.ts`'s brackets | Through the port, by `lineHistory()` (the platform with lines; Git alone in 1.4.0); routed by the project's platform once their callers carry it | R9 |
 | 3 Evidence | `workflow/checks.ts`, `adoption.ts`, `upgrade.ts`, `lineUpdates.ts`, `runLink.ts` (not moved by R6: still import Git) | Common, calling `HistoryPort` / `ObservePort` | R9 |
-| 3 Evidence | `platform/gitPlatform.ts`'s own reads (Git's adapter: its reconciliation, attribution and the watcher go through the ports since R6) | Composed over `HistoryPort` | R9 |
+| 3 Evidence | `platform/git/gitPlatform.ts`'s own reads (Git's adapter: its reconciliation, attribution and the watcher go through the ports since R6) | Composed over `HistoryPort` | R9 |
 | 3 Evidence | `shared/workflow/guards.ts` `submit.trailer`, `submit.identity` commands | The remedy from `HistoryPort` | R9 |
 | 4 Integration | `workflow/mergeQueue.ts` candidate steps (prepare, reset, clean, merge, squash, rebase, conflicts, commit, `refs/cw/queue` pins) | `IntegrationPort.update` (strict's) and `candidate` (the test merge, sameness in it), `mergeBase` (moved: HI-2790's R7) | R7 |
 | 4 Integration | `mergeQueue.ts` advance, journal, rollback, recovery, push; `queueRunner.ts`, `queueHost.ts` | The port's granular steps (moved: HI-2791's R8): `checkouts`, `swap`, `conditions`, `moveFiles`, `edited`, `sides`, `stuck`, `folderLine`, `targetHead`, `recoveryState`, `contains`, `pushDest`, `push`; the host's and runner's `dropQueuePins`, `cardPins`, `dropPin`, `removeWorkspace`, `pruneWorkspaces`; Resume's `pausedCondition` (`queueControls.ts`). The journal, the decisions, the lock, the fence, the lease checks, the crash hooks and the pauses stay common | R8 |
@@ -2387,7 +2387,7 @@ from `historyPorts.ts`, `historyOf(platform)` null for None. R7 built port 4's c
 strict's update its own `update`, both given the queue's side as a `CandidateHost` (its runner in the lease's job, the
 queue's worktree, the identity and a round's reads) and answering `Again`, a result, a `CandidateFail` or a
 `CandidatePause`; the message is a callback read once the workspace is ready, as before; `inspectCandidate` is the
-sameness check inside them; Git's commits' stream reading moved with them to `platform/gitCommits.ts`. R8 built the
+sameness check inside them; Git's commits' stream reading moved with them to `platform/git/gitCommits.ts`. R8 built the
 advance, recovery and publish half as granular steps rather than `advance`/`recover`/`publish` whole: each journal phase
 fact is committed between two of the platform's commands, with the lease checked and the crash hooks run in between, so a
 whole-operation port would have to take the protocol as callbacks. The protocol (the journal, the decision tree, the
@@ -2410,9 +2410,9 @@ R9 (HI-2792) finished the routing and closed 1.4.0's refactor with the audit:
 - **Moved behind ports:**
   - The runtime's adapters (`platform/adapters.ts`, a factory map).
   - The Git tool's readiness: Copy Diagnostics, the startup check and Provider Setup's Check again, through each runner.
-  - Keeping `.combwork` out: port 1's `keepOut`, Git's in `platform/gitKeepOut.ts`. `combworkVcs.ts` routes to it, and detection's markers moved to `vcsDetect.ts`.
+  - Keeping `.combwork` out: port 1's `keepOut`, Git's in `gitKeepOut.ts`. `combworkVcs.ts` routes to it, and detection's markers moved to `vcsDetect.ts`.
   - The Files tab's ignore rules and search list (port 1's `files`), its hidden metadata folders, and ProjectInfo's current line.
-  - Relocation, port 2's capability (`Relocation`, Git's in `platform/gitRelocation.ts`): Repair's worktree move, repair and branch rename, and the 1.1 folder move's worktree repair.
+  - Relocation, port 2's capability (`Relocation`, Git's in `platform/git/gitRelocation.ts`): Repair's worktree move, repair and branch rename, and the 1.1 folder move's worktree repair.
   - Every remaining direct history read (port 3). These include a workflow step's cache (`readStep`), identity, messages, the queue's step reads by the card's platform, and runLink's reads.
   - The Changes tab's status and diff (port 5's reads).
   - The refusals' git commands, now the descriptor's `remedies`.
@@ -2423,7 +2423,7 @@ R9 (HI-2792) finished the routing and closed 1.4.0's refactor with the audit:
   - Git-facing UI (the Git view, Provider Setup's Git row, the view types that keep their Git names);
   - common (the folder fence);
   - historic migration (1.1's refs and exclude-line upgrade, the 1.1 folder move, 1.0's slot migration);
-  - defect with its card: none left. HI-2821 moved HI-2753's move proof behind port 3's optional `ownWork` (Git's in `platform/gitOwnWork.ts`), its hold through port 1's `holdRefs`; a platform without `ownWork` doesn't offer the move (rule 6).
+  - defect with its card: none left. HI-2821 moved HI-2753's move proof behind port 3's optional `ownWork` (Git's in `platform/git/gitOwnWork.ts`), its hold through port 1's `holdRefs`; a platform without `ownWork` doesn't offer the move (rule 6).
 - **The seams:** the remaining "platform with lines" lookups are counted per caller: `lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`, `slotWorkspaces()`, `slotRelocation()`. They resolve to Git alone in 1.4.0; the J card implementing each one's port routes it by the project's platform (J0's section above).
 - **The guard:** `tests/gitAudit.test.ts` (check:repo) fails on a new edge, a new name across a constrained edge, a stale edge, a changed seam count, or a changed count of platform-id switches (HI-2822). `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
 - **The text audit:** shared, UI and agent text that names Git is Git-facing and stays. The platform-id switches older than 1.4.0 over the workflow options' schema, the window and a few main modules are carded as HI-2822, before J0.
@@ -5572,7 +5572,7 @@ Seen in the real app at 295e8e59a (HG1, hunt 7: `queue:forward` answered `upToDa
 **Built [HI-1185]** (the design agreed with HR1 on the card, s7 to s17). Agents' own commits failing fast instead of
 prompting (the ready check's part 2) was split off by decision (HI-1185/r61) and built as HI-2867 (below).
 
-**The read** (`platform/gitSigning.ts`), in the folder a commit runs in, with that commit's own `-c` overrides
+**The read** (`platform/git/gitSigning.ts`), in the folder a commit runs in, with that commit's own `-c` overrides
 (`git config --show-scope`): `commit.gpgsign`; `gpg.format` (openpgp by default, ssh, x509); `user.signingkey`, shown
 shortened (an openpgp id's last 16 digits, an ssh key file's name, a literal key's type and comment; never key material);
 the program git would run: `gpg.ssh.program` for ssh; for openpgp `gpg.program` and `gpg.openpgp.program`, one setting
@@ -7241,7 +7241,7 @@ checked every agent and process by hand.
 
 Slots, review and check copies and the merge queue's folder are linked worktrees (§16.10.1): git makes them with empty
 submodule folders, and Combwork's checkouts there leave LFS files as pointers. In a Git repository that uses either,
-Combwork sets them up itself (`src/main/platform/gitModules.ts`; the design agreed on the card, HI-1182/s7–s16). The step is the Git workspace port's (`filesNeeded`) alone.
+Combwork sets them up itself (`src/main/platform/git/gitModules.ts`; the design agreed on the card, HI-1182/s7–s16). The step is the Git workspace port's (`filesNeeded`) alone.
 
 - **The setting:** Version Control → Slots and copies' **Set up submodules and LFS** (project.json `slots.gitFiles`:
   `false` turns it off; left out, it is on). Shown where the project folder uses submodules or LFS, or where it is off,

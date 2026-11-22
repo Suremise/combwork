@@ -31,8 +31,8 @@ import { LANE_MAX_ROUNDS } from '../../shared/lanes'
 import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
 import { adaptersFor } from '../platform/adapters'
 import { historyOf } from '../platform/historyPorts'
-import { NoneAdapter } from '../platform/none'
-import { readBaseline } from '../noneBaseline'
+import type { Deliverables } from '../platform/deliverables'
+import { pathsDeliverables } from '../platform/deliverablesPorts'
 import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
 import { releaseReadsOf } from '../platform/releaseReadsPorts'
 import { stillAsRead, unreleasedFor, type ReleaseReads } from '../platform/releaseReads'
@@ -611,13 +611,13 @@ const SETUP_PAUSES = new Set(['noUpstream', 'remoteAmbiguous', 'remoteUnsupporte
 
 export class Workflow {
   readonly store: FactStore
-  readonly none: NoneAdapter
+  readonly none: Deliverables
   /** The platform adapters (§16.3.1): the runtime asks them, and never switches on a platform id. */
   private platforms: Record<PlatformId, PlatformAdapter>
 
   constructor(readonly cfg: WorkflowConfig) {
     this.store = cfg.store
-    this.none = new NoneAdapter(cfg.project, cfg.options().excluded)
+    this.none = pathsDeliverables().of(cfg.project, cfg.options().excluded)
     this.platforms = adaptersFor(this, this.none)
   }
 
@@ -3594,7 +3594,7 @@ export class Workflow {
     for (let tries = 0; tries < 2; tries++) {
       const cycle = this.state(this.store.card(card0.id)).cycle
       const generation = this.none.generation
-      const now = await readBaseline(this.none, o.signal)
+      const now = await pathsDeliverables().readWhole(this.none, o.signal)
       if (!now || isUnknown(now) || o.signal?.aborted) return []
       const card = this.store.card(card0.id)
       const s = this.state(card)
@@ -3603,7 +3603,7 @@ export class Workflow {
       const before = this.none.covering(s.started?.deliverables ?? {})
       // Covered as a revision covers them (HI-2339): a declared folder's files are the card's.
       const mine = [...(o.paths ?? card.paths ?? []), ...this.prefill(card)]
-      return NoneAdapter.diff(before, this.none.covering(now))
+      return pathsDeliverables().diff(before, this.none.covering(now))
         .map((f) => f.path)
         .filter((p) => !this.none.covers(mine, p))
     }

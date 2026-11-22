@@ -2387,7 +2387,7 @@ export class SlotPool {
   }
 
   /**
-   * HI-1182: a slot's submodules and LFS files set up (platform/gitFiles.ts), as a run of the slot's, when the setting is
+   * HI-1182: a slot's submodules and LFS files set up (platform/git/gitFiles.ts), as a run of the slot's, when the setting is
    * on and the folder uses either at its revision (read first: a folder that uses neither runs nothing). Idempotent, so
    * run before every ready: why it failed (an unreadable use too, never taken for "unused"), or null.
    */

@@ -21,11 +21,11 @@ import { dirname, isAbsolute, join, resolve, sep } from 'path'
 import { readRefsOffMain } from '../git'
 import { createLogger, userText } from '../logger'
 import { declaresPaths, deliversCommits, type PlatformId } from '../../shared/platform/descriptors'
-import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
+import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from '../gitRefs'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { inMetadataDir } from '../../shared/platform/metadataDirs'
 import { unknown, type Maybe } from './types'
-import { gitIgnoredByKind, type EntryKind, type RecordedKinds } from './gitIgnoredByKind'
+import { gitIgnoredByKind, type EntryKind, type RecordedKinds } from '../gitIgnoredByKind'
 import type { Disposable, FolderChanges, ObserveEvent, ObservePort } from './history'
 
 const log = createLogger('observe')

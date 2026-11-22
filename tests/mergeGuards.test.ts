@@ -37,7 +37,7 @@ import { tr } from '../src/shared/i18n'
 import { takesOption } from '../src/shared/workflow/options'
 import { tempDir } from './tempDir'
 import { freshGitRepo, sh } from './workflow/harness'
-import { addedDiff } from '../src/main/platform/git'
+import { addedDiff } from '../src/main/gitCommands'
 import { timing } from './timing.cjs'
 
 const fixture = (name: string): string => readFileSync(join(__dirname, 'fixtures', 'mergeGuards', name), 'utf8')

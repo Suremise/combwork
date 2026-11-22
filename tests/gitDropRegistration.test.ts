@@ -19,7 +19,7 @@ vi.mock('fs', async (importOriginal) => {
   return { ...real, lstatSync, default: { ...real, lstatSync } }
 })
 
-const { gitWorkspacePort, registrationSeams } = await import('../src/main/platform/gitWorkspacePort')
+const { gitWorkspacePort, registrationSeams } = await import('../src/main/platform/git/gitWorkspacePort')
 
 afterEach(() => {
   denied.clear()

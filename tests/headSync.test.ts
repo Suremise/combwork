@@ -1,4 +1,4 @@
-// A folder's checkout read from its ref files with no git process (platform/git.ts headSync, HI-1731): the guard of a
+// A folder's checkout read from its ref files with no git process (gitCommands.ts headSync, HI-1731): the guard of a
 // carried lease's end reads it again inside the pool's write. Its branch and commit as git has them, in a repository
 // and in a linked worktree, with a loose ref, a packed one and a detached HEAD; null (unknown, so the guard keeps the
 // lease) where it can't be read.
@@ -7,7 +7,7 @@ import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
-import { headSync } from '../src/main/platform/git'
+import { headSync } from '../src/main/gitCommands'
 
 const rev = (folder: string, what = 'HEAD'): string => sh(folder, 'rev-parse', what).trim()
 
