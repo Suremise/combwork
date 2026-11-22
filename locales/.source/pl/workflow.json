@@ -409,6 +409,8 @@
   "workflow.refused.move.useIntent.next": "Use the {intent} intent instead.",
   "workflow.refused.paths.excluded.message": "{card}: {path} is in {folder}, which a project without version control leaves out of its work.",
   "workflow.refused.paths.excluded.next": "Declare only the files of the work, outside {folder}: a card's paths narrow the project's work, never widen it.",
+  "workflow.refused.paths.notDeclared.message": "{card}: cards under {platform} don’t declare paths here, so nothing was declared.",
+  "workflow.refused.paths.notDeclared.next": "Nothing was stored or read.",
   "workflow.refused.platform.detachedFolder.message": "{card} can’t start: the project folder is on no branch (its head is detached at {head}), so what its builder commits would be on none.",
   "workflow.refused.platform.detachedFolder.next": "{has, select, yes {Check out its branch in the project folder (git switch {branch}), then start it again.} other {Check out a branch in the project folder (an existing one with git switch, or a new one with git switch -c), then start it again.}}",
   "workflow.refused.platform.keptLine.message": "{card} can’t start: its branch was made from {kept} and still holds history {target} lacks, but its lane merges into {target}.",

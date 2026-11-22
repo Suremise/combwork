@@ -411,6 +411,8 @@ interface CombworkMessageValues {
   'workflow.refused.move.useIntent.next': { intent: string | number }
   'workflow.refused.paths.excluded.message': { card: string | number; path: string | number; folder: string | number }
   'workflow.refused.paths.excluded.next': { folder: string | number }
+  'workflow.refused.paths.notDeclared.message': { card: string | number; platform: string | number }
+  'workflow.refused.paths.notDeclared.next': undefined
   'workflow.refused.platform.detachedFolder.message': { card: string | number; head: string | number }
   'workflow.refused.platform.detachedFolder.next': { has: string; branch: string | number }
   'workflow.refused.platform.keptLine.message': { card: string | number; kept: string | number; target: string | number }

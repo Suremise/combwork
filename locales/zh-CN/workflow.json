@@ -403,6 +403,8 @@
   "workflow.refused.move.useIntent.next": "请改用 {intent} 操作。",
   "workflow.refused.paths.excluded.message": "{card}：{path} 位于 {folder} 中，没有版本控制的项目不会把它算作工作的一部分。",
   "workflow.refused.paths.excluded.next": "只声明 {folder} 之外属于这项工作的文件：卡片的路径只能缩小项目的工作范围，不能扩大。",
+  "workflow.refused.paths.notDeclared.message": "{card}：{platform} 下的卡片在这里不声明路径，因此没有声明任何内容。",
+  "workflow.refused.paths.notDeclared.next": "没有保存或读取任何内容。",
   "workflow.refused.platform.noUpstream.message": "{card} 无法开始：{target} 没有跟踪任何远程分支，而开启“目标分支跟随其远程仓库”时，每张卡片都从其远程仓库开始。",
   "workflow.refused.platform.noUpstream.next": "{how, select, ready {如果 {remote} 还没有 {target}，请将它发布到那里：{publish}。如果已有，请设置 {target} 跟踪的分支：{track1}，然后 {track2}。之后再次开始它；或关闭“目标分支跟随其远程仓库”。} choose {此仓库没有 Combwork 能确定的远程仓库，或有多个：在这些命令中，{remote} 代表 {target} 应跟随的远程仓库。如果它还没有 {target}，请将它发布到那里：{publish}。如果已有，请设置 {target} 跟踪的分支：{track1}，然后 {track2}。之后再次开始它；或关闭“目标分支跟随其远程仓库”。} shallow {此仓库是浅克隆，跟随模式无法使用：请获取其完整历史（git fetch --unshallow），然后发布 {target} 或设置它跟踪的分支，再次开始它；或关闭“目标分支跟随其远程仓库”。} other {{target} 将跟随的远程仓库（{remote}）有多个推送地址或没有推送地址，而跟随模式只发布到一个地址：请只保留一个，然后发布 {target} 或设置它跟踪的分支，再次开始它；或关闭“目标分支跟随其远程仓库”。}}",
   "workflow.refused.platform.unknown.message": "{card}：Combwork 无法读取{what}，因此无法检查规则 {rule}。",

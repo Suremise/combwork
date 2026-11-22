@@ -36,7 +36,7 @@ import { pathsDeliverables, requirePathsDeliverables } from '../platform/deliver
 import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
 import { releaseReadsOf } from '../platform/releaseReadsPorts'
 import { stillAsRead, unreleasedFor, type ReleaseReads } from '../platform/releaseReads'
-import { declaresPaths, hasCapability, isPlatformId, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
+import { declaresPaths, hasCapability, isPlatformId, needsRepository, PLATFORMS, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
 import { writeReadiness } from './dependencyReadiness'
@@ -3544,6 +3544,10 @@ export class Workflow {
   async declarePaths(ref: unknown, actor: Actor, paths: string[], commit?: () => void): Promise<{ prefill: string[]; unclaimed: string[]; revision: string | null } | Refusal> {
     const card0 = this.resolve(ref, actor)
     if (isRefusal(card0)) return card0
+    // HI-3517: only where the card's platform declares paths and its deliverables are installed: elsewhere (Git, a build
+    // without None) refused, nothing stored and nothing read.
+    const platform = this.rulesetOf(card0).options.platform
+    if (!declaresPaths(platform) || !this.none) return this.refuse(card0, actor, 'declare paths', { rule: 'paths.notDeclared', values: { card: card0.key, platform: isPlatformId(platform) ? PLATFORMS[platform].name : platform } }, null) // i18n-ignore: an intent name (the window: texts.ts's MOVE_NAMES)
     // A card's paths narrow the deliverables, never widen them (#1511): none under `.combwork`, `.git` or an excluded folder.
     const bad = this.excludedPath(paths)
     if (bad) return refusal('paths.excluded', { card: card0.key, ...bad }, null)
