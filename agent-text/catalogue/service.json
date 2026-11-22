@@ -654,6 +654,11 @@
     "note": "HI-3470: an error from the panel: the request was malformed (not reached from the window).",
     "audience": "both"
   },
+  "service.gitOperation.moved": {
+    "text": "Git has moved on in {folder} since you looked (to another commit of the {what}, or a new one began): nothing was done. Look again.",
+    "note": "HI-3470 (a reviewer's round 1): an error from the panel: the operation is still of the same kind ({what}, git's word for it: keep it as it is) but git is no longer stopped where the user saw it (a terminal went on, or it was ended and another begun); {folder} is a path. Nothing was done.",
+    "audience": "both"
+  },
   "service.gitOperation.notConflicted": {
     "text": "{file} isn't in conflict any more: nothing was done. Look again.",
     "note": "HI-3470: an error from the panel: the conflicted file the user settled ({file}, a path in the repository) was settled meanwhile (in a terminal, say).",
@@ -682,6 +687,11 @@
   "service.gitOperation.slotSession": {
     "text": "A session is in {slot}: nothing was done. Stop it first.",
     "note": "HI-3470: an error from the panel: a session runs in the slot ({slot}, such as slot-a; glossary: slot).",
+    "audience": "both"
+  },
+  "service.gitOperation.timedOut": {
+    "text": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at {folder} before you try again: a hook may have done part of its work.",
+    "note": "HI-3470: an error from the panel: git's step (a Continue running the repository's commit hooks, say) ran past Settings → Advanced's longest commit time ({seconds}) and was ended; {folder} is a path.",
     "audience": "both"
   },
   "service.gitOperation.unresolved": {

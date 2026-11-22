@@ -153,12 +153,14 @@ interface CombworkMessageValues {
   'service.gitOperation.changed': { was: string; folder: string | number }
   'service.gitOperation.failed': { why: string | number }
   'service.gitOperation.invalid': undefined
+  'service.gitOperation.moved': { folder: string | number; what: string | number }
   'service.gitOperation.notConflicted': { file: string | number }
   'service.gitOperation.notStep': undefined
   'service.gitOperation.session': { agent: string | number; folder: string | number }
   'service.gitOperation.slotChanged': { slot: string | number }
   'service.gitOperation.slotProcess': { slot: string | number }
   'service.gitOperation.slotSession': { slot: string | number }
+  'service.gitOperation.timedOut': { seconds: number; folder: string | number }
   'service.gitOperation.unresolved': { count: number }
   'service.gitRepo.addFailed': { remote: string | number; why: string | number }
   'service.gitRepo.added': { remote: string | number }

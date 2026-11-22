@@ -53,10 +53,11 @@ export async function operationPanel(ws: WorkspaceService, root: string): Promis
 /** The request as the window sent it, checked: anything else is refused before anything runs. */
 function requestOf(raw: unknown): OperationRequest {
   const r = (raw ?? {}) as Record<string, unknown>
-  if (!isOperationName(r.what)) throw combworkError(T.invalid, undefined, { kind: 'invalid' })
-  const lease = typeof r.lease === 'string' && r.lease ? { lease: r.lease } : {}
-  if (r.step === 'continue' || r.step === 'skip' || r.step === 'abort') return { what: r.what, step: r.step, ...lease }
-  if (typeof r.file === 'string' && r.file && (r.pick === 'mine' || r.pick === 'theirs' || r.pick === 'resolved')) return { what: r.what, file: r.file, pick: r.pick, ...lease }
+  // The stop the user saw (HR1's round 1): never optional, so no request acts on whatever git is at now.
+  if (!isOperationName(r.what) || typeof r.id !== 'string' || !r.id) throw combworkError(T.invalid, undefined, { kind: 'invalid' })
+  const base = { what: r.what, id: r.id, ...(typeof r.lease === 'string' && r.lease ? { lease: r.lease } : {}) }
+  if (r.step === 'continue' || r.step === 'skip' || r.step === 'abort') return { ...base, step: r.step }
+  if (typeof r.file === 'string' && r.file && (r.pick === 'mine' || r.pick === 'theirs' || r.pick === 'resolved')) return { ...base, file: r.file, pick: r.pick }
   throw combworkError(T.invalid, undefined, { kind: 'invalid' })
 }
 

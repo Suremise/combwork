@@ -618,6 +618,12 @@
   "service.gitOperation.invalid": {
     "placeholders": {}
   },
+  "service.gitOperation.moved": {
+    "placeholders": {
+      "folder": "plain",
+      "what": "plain"
+    }
+  },
   "service.gitOperation.notConflicted": {
     "placeholders": {
       "file": "plain"
@@ -645,6 +651,12 @@
   "service.gitOperation.slotSession": {
     "placeholders": {
       "slot": "plain"
+    }
+  },
+  "service.gitOperation.timedOut": {
+    "placeholders": {
+      "seconds": "number",
+      "folder": "plain"
     }
   },
   "service.gitOperation.unresolved": {

@@ -29,7 +29,7 @@ const T = {
   mine: msg({ id: 'git.operation.mine', defaultMessage: 'Use mine', description: "HI-3470: a conflicted file's button: takes the folder's own side of it (its tooltip says which that is)." }),
   theirs: msg({ id: 'git.operation.theirs', defaultMessage: 'Use theirs', description: "HI-3470: a conflicted file's button: takes the other side of it." }),
   resolved: msg({ id: 'git.operation.resolved', defaultMessage: 'Mark resolved', description: "HI-3470: a conflicted file's button: marks it settled as it is now in the folder (after editing it by hand: git add)." }),
-  mineTip: msg({ id: 'git.operation.mineTip', defaultMessage: "{swap, select, yes {Your side: the commit being applied (git calls it theirs here).} other {Your side: this folder's branch (git calls it ours).}} {has, select, yes {Takes its version of the file.} other {It deleted the file: deletes it.}} Runs {command}", description: "HI-3470: Use mine's tooltip. swap yes: a rebase or an am, where git's names for the sides are swapped. has no: that side deleted the file. {command} is the git command, as it is." }),
+  mineTip: msg({ id: 'git.operation.mineTip', defaultMessage: "{swap, select, yes {Your side: the commit being applied (git calls it theirs here).} other {Your side: this folder's branch (git calls it ours).}} {has, select, yes {Takes its version of the file.} other {It deleted the file: deletes it.}} Runs {command}", description: "HI-3470: Use mine's tooltip. swap yes: a rebase, where git's names for the sides are swapped. has no: that side deleted the file. {command} is the git command, as it is." }),
   theirsTip: msg({ id: 'git.operation.theirsTip', defaultMessage: "{swap, select, yes {The other side: the branch being rebased onto (git calls it ours here).} other {The other side: what is being merged, picked or reverted (git calls it theirs).}} {has, select, yes {Takes its version of the file.} other {It deleted the file: deletes it.}} Runs {command}", description: "HI-3470: Use theirs' tooltip, as git.operation.mineTip." }),
   resolvedTip: msg({ id: 'git.operation.resolvedTip', defaultMessage: 'Marks the file settled as it is now, once you have edited it. Runs {command}', description: "HI-3470: Mark resolved's tooltip. {command} is the git command, as it is." }),
   abortTitle: msg({ id: 'git.operation.abortTitle', defaultMessage: '{what, select, bisect {End the bisect in {folder}?} other {Abort the git {what} in {folder}?}}', description: 'HI-3470: the question before Abort (or End bisect). {what} is git\'s word for the operation; {folder} a slot\'s name or git.operation.projectFolder.' }),
@@ -97,9 +97,9 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
       )
       if (!ok) return
     }
-    await act(s, { what: op.what, step: s }, tr(T.done, { step: s, what: op.what, folder: where }))
+    await act(s, { what: op.what, id: op.id, step: s }, tr(T.done, { step: s, what: op.what, folder: where }))
   }
-  const pick = (c: GitConflict, p: ConflictPick): Promise<void> => act(`${p}:${c.path}`, { what: op.what, file: c.path, pick: p })
+  const pick = (c: GitConflict, p: ConflictPick): Promise<void> => act(`${p}:${c.path}`, { what: op.what, id: op.id, file: c.path, pick: p })
   const swap = mineIsTheirs(op.what) ? 'yes' : 'no'
   const left = op.conflicts.length
 

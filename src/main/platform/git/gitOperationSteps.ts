@@ -16,6 +16,7 @@ import { busyAgentIn } from '../../gitRepo'
 import { gitDirSync, operationSync } from '../../gitCommands'
 import { createLogger, userText } from '../../logger'
 import { withRepoLock } from '../../repoLock'
+import { platformLimits } from '../limits'
 import { workspace } from '../../workspace'
 
 const log = createLogger('git-operation')
@@ -27,15 +28,14 @@ export const OPERATION_TEXT = {
   unresolved: msg({ id: 'service.gitOperation.unresolved', defaultMessage: '{count, plural, one {# file is} other {# files are}} still in conflict: settle {count, plural, one {it} other {them}} first.', description: 'HI-3470: an error from the panel (and the reason Continue is greyed out): files still in conflict.' }),
   agentBusy: msg({ id: 'service.gitOperation.agentBusy', defaultMessage: '{agent} is working in {folder}: nothing was done. Try again once it has finished.', description: 'HI-3470: an error from the panel: an agent ({agent}) works in the folder ({folder}, a path).' }),
   busy: msg({ id: 'service.gitOperation.busy', defaultMessage: 'A run or an agent is working in {folder} ({what}): nothing was done. Try again once it has finished.', description: "HI-3470: an error from the panel: a run (a test, a build) or an agent's file lock is in the folder ({folder}, a path); {what} names the first one's folder or file." }),
-  failed: msg({ id: 'service.gitOperation.failed', defaultMessage: 'Git refused: {why}', description: "HI-3470: an error from the panel: git's own command failed; {why} is git's error line, in English." })
+  failed: msg({ id: 'service.gitOperation.failed', defaultMessage: 'Git refused: {why}', description: "HI-3470: an error from the panel: git's own command failed; {why} is git's error line, in English." }),
+  moved: msg({ id: 'service.gitOperation.moved', defaultMessage: 'Git has moved on in {folder} since you looked (to another commit of the {what}, or a new one began): nothing was done. Look again.', description: "HI-3470 (a reviewer's round 1): an error from the panel: the operation is still of the same kind ({what}, git's word for it: keep it as it is) but git is no longer stopped where the user saw it (a terminal went on, or it was ended and another begun); {folder} is a path. Nothing was done." }),
+  timedOut: msg({ id: 'service.gitOperation.timedOut', defaultMessage: 'Git was still running after {seconds, number} seconds, so Combwork ended it. Look at {folder} before you try again: a hook may have done part of its work.', description: "HI-3470: an error from the panel: git's step (a Continue running the repository's commit hooks, say) ran past Settings → Advanced's longest commit time ({seconds}) and was ended; {folder} is a path." })
 }
 const M = OPERATION_TEXT
 
 /** What the folder fence says while a step runs (the queue's log and its starts' wait). */
 const FENCE = 'the user settling a git operation' // i18n-ignore: the fence's name, in the log
-
-/** Step bounds: a Continue runs commit hooks (a formatter, a test), so it may take a while; a hung one ends here. */
-const STEP_TIMEOUT_MS = 10 * 60_000
 
 /** Git never waits on an editor nobody sees: its prepared message is taken as it is. */
 const stepEnv = (): NodeJS.ProcessEnv => ({ ...process.env, GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true', GIT_TERMINAL_PROMPT: '0' })
@@ -94,19 +94,31 @@ async function stepOf(dir: string, what: GitOperationName): Promise<{ at: number
   return null
 }
 
+/**
+ * HR1's round 1: which stop of the operation git is at, to tell the one the user saw from another of the same kind:
+ * its kind, HEAD, the commit it stopped at, its step and its sequencer's next command. Git moves at least one of them
+ * when it goes on (a commit made, the next one picked) or another begins.
+ */
+async function stopId(folder: string, dir: string, what: GitOperationName, commit: string | null, step: { at: number; of: number } | null): Promise<string> {
+  const head = await git(folder, ['rev-parse', '--verify', '-q', 'HEAD'])
+  const next = (await gitFile(dir, 'sequencer', 'todo'))?.split(/\r?\n/)[0] ?? ''
+  return [what, head.ok ? head.out.trim() : '', commit ?? '', step ? `${step.at}/${step.of}` : '', next].join('|')
+}
+
 /** HI-3470: the operation under way in a folder, with its conflicted files; null with none. */
 export async function operationState(folder: string): Promise<GitOperationState | null> {
   const what = operationSync(folder)
   const dir = what ? gitDirSync(folder) : null
   if (!what || !dir) return null
   const [conflicts, commit, step] = await Promise.all([conflictsIn(folder, what), stoppedAt(dir, what), stepOf(dir, what)])
+  const id = await stopId(folder, dir, what, commit, step)
   let at: GitOperationState['at']
   if (commit && /^[0-9a-f]{40,64}$/.test(commit)) {
     const r = await git(folder, ['log', '-1', '--format=%h%x00%s', commit, '--'])
     const [short, subject] = r.ok ? r.out.trim().split('\0') : []
     if (short) at = { commit: short, subject: subject ?? '' }
   }
-  return { what, conflicts, ...(at ? { at } : {}), ...(step ? { step } : {}) }
+  return { what, id, conflicts, ...(at ? { at } : {}), ...(step ? { step } : {}) }
 }
 
 /** The git command (its arguments) a step runs. */
@@ -130,7 +142,7 @@ export function pickArgs(what: GitOperationName, c: GitConflict, pick: ConflictP
 /**
  * HI-3470: a step of the operation under way in `folder` (the project's, or a worktree of its repository: the caller
  * checked which), or a conflicted file settled, as `req` asks. Under the repository lock and the folder's fence: the
- * operation still `req.what`, nothing of Combwork's or an agent's working there, then `guard` (refusing by throwing).
+ * operation still `req.what`, at the stop `req.id` names, nothing of Combwork's or an agent's working there, then `guard` (refusing by throwing).
  * Answers git's own output, trimmed; throws the refusal or git's error, in the window's words.
  */
 export async function operationStep(projectPath: string, folder: string, req: OperationRequest, guard?: () => Promise<void> | void): Promise<string> {
@@ -140,6 +152,9 @@ export async function operationStep(projectPath: string, folder: string, req: Op
     () =>
       changingFolder(folder, FENCE, async () => {
         if (operationSync(folder) !== req.what) throw combworkError(M.changed, { was: req.what === 'cherry-pick' ? 'cherryPick' : req.what, folder })
+        // The same kind, but is it the stop the user saw? (HR1's round 1: a terminal went on, or another began.)
+        const dir = gitDirSync(folder)
+        if (!dir || (await stopId(folder, dir, req.what, await stoppedAt(dir, req.what), await stepOf(dir, req.what))) !== req.id) throw combworkError(M.moved, { what: req.what, folder })
         const { folderBuilders } = await import('../../workflow/queueHost')
         const held = folderBuilders(workspace, folder)
         if (held) throw combworkError(M.busy, { folder, what: held[0] })
@@ -148,7 +163,13 @@ export async function operationStep(projectPath: string, folder: string, req: Op
         await guard?.()
         const run = async (args: string[]): Promise<string> => {
           log.info(`The user's ${userText(args.join(' '))} in ${userText(folder)}`)
-          const r = await git(folder, args, undefined, undefined, { env: stepEnv(), timeout: STEP_TIMEOUT_MS })
+          // A Continue or Skip commits, running the repository's hooks: Commit's own bound (Settings → Advanced,
+          // `cw.git.commitMinutes`, HR1's round 1), never one of its own.
+          const r = await git(folder, args, undefined, undefined, { env: stepEnv(), timeout: platformLimits.gitCommitMs() })
+          if (r.timedOut) {
+            log.warn(`git ${userText(args[0] ?? '')} in ${userText(folder)} ran past its bound and was ended`)
+            throw combworkError(M.timedOut, { seconds: Math.round(platformLimits.gitCommitMs() / 1000), folder })
+          }
           if (!r.ok) {
             log.info(`git ${userText(args[0] ?? '')} in ${userText(folder)} failed: ${userText(gitErrorLine(r.err))}`)
             throw combworkError(M.failed, { why: gitErrorLine(`${r.err}\n${r.out}`) || r.err.trim().slice(0, 400) || r.out.trim().slice(0, 400) })

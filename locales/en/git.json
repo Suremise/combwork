@@ -705,7 +705,7 @@
   },
   "git.operation.mineTip": {
     "defaultMessage": "{swap, select, yes {Your side: the commit being applied (git calls it theirs here).} other {Your side: this folder's branch (git calls it ours).}} {has, select, yes {Takes its version of the file.} other {It deleted the file: deletes it.}} Runs {command}",
-    "description": "HI-3470: Use mine's tooltip. swap yes: a rebase or an am, where git's names for the sides are swapped. has no: that side deleted the file. {command} is the git command, as it is."
+    "description": "HI-3470: Use mine's tooltip. swap yes: a rebase, where git's names for the sides are swapped. has no: that side deleted the file. {command} is the git command, as it is."
   },
   "git.operation.open": {
     "defaultMessage": "Open",

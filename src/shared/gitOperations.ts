@@ -25,10 +25,11 @@ export const OPERATION_STEPS: Record<GitOperationName, readonly OperationStep[]>
 export const isOperationName = (v: unknown): v is GitOperationName => typeof v === 'string' && Object.hasOwn(OPERATION_STEPS, v)
 
 /**
- * HI-3470: in a rebase or an am, git's `--ours` is the line being replayed onto and `--theirs` the commit being applied:
- * the folder's own work. Mine is that commit there, git's ours everywhere else.
+ * HI-3470: in a rebase, git's `--ours` is the line being replayed onto and `--theirs` the commit being replayed: the
+ * folder's own work. Mine is that commit there, git's ours everywhere else (an am's too: its patch is the other side,
+ * applied onto the folder's branch).
  */
-export const mineIsTheirs = (what: GitOperationName): boolean => what === 'rebase' || what === 'am'
+export const mineIsTheirs = (what: GitOperationName): boolean => what === 'rebase'
 
 /** HI-3470: a file git lists as unmerged, and whether each side has it (a side that deleted it hasn't). */
 export interface GitConflict {
@@ -40,6 +41,12 @@ export interface GitConflict {
 /** HI-3470: the operation under way in a folder, as Changes' panel shows it. */
 export interface GitOperationState {
   what: GitOperationName
+  /**
+   * HR1's round 1: which stop of it this is (its kind, HEAD, the commit it stopped at, its step): a request names the one
+   * the user saw, and one made when git is at another stop (a terminal went on, or another of the same kind began) is
+   * refused, even of the same kind. Opaque to the window.
+   */
+  id: string
   /** The commit git stopped at (a merge's: the one merged), short, with its subject; absent when git doesn't say. */
   at?: { commit: string; subject: string }
   /** A rebase's or am's place in its list: the step it stopped at, of how many. */
@@ -62,10 +69,11 @@ export interface OperationPanelState extends GitOperationState {
 }
 
 /**
- * HI-3470: what the panel asks main to do (`git:operationStep`): a step, or a conflicted file settled; `what` is the
- * operation the user saw (anything else under way now refuses it), `lease` the lent slot's lease they confirmed.
+ * HI-3470: what the panel asks main to do (`git:operationStep`): a step, or a conflicted file settled; `what` and `id` are
+ * the operation and the stop of it the user saw (anything else under way now refuses it, HR1's round 1), `lease` the lent
+ * slot's lease they confirmed.
  */
-export type OperationRequest = { what: GitOperationName; lease?: string } & ({ step: OperationStep } | { file: string; pick: ConflictPick })
+export type OperationRequest = { what: GitOperationName; id: string; lease?: string } & ({ step: OperationStep } | { file: string; pick: ConflictPick })
 
 /** HI-3470: the git command a step runs, shown in its tooltip as the panel runs it. Commands, never translated. */
 export function operationCommand(what: GitOperationName, step: OperationStep): string {

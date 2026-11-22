@@ -5835,16 +5835,19 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   commit and its subject; a rebase's or am's step, *Step 2 of 3*), and its steps: **Continue**, **Skip** and **Abort**
   for a rebase, am, cherry-pick or revert, **Continue** and **Abort** for a merge, **End bisect** (`git bisect reset`)
   only for a bisect (good and bad stay the user's terminal's). Each tooltip names git's command; Continue runs with
-  `GIT_EDITOR=true`, taking git's prepared message, and is greyed out while a file is in conflict; Abort and Skip ask
+  `GIT_EDITOR=true`, taking git's prepared message, bounded as Commit is (`cw.git.commitMinutes`: it runs the same
+  hooks), and is greyed out while a file is in conflict; Abort and Skip ask
   first, saying what they drop. Below, each conflicted file (git's unmerged entries, `ls-files -u`) with **Open**,
   **Use mine**, **Use theirs** and **Mark resolved** (`git add -A`, for a file settled by hand). *Mine* is the folder's
-  own work: git's `--ours`, except in a rebase or am, where git's sides are swapped and mine is `--theirs`; a side that
+  own work: git's `--ours`, except in a rebase, where git's sides are swapped and mine is `--theirs`; a side that
   deleted the file deletes it (`git rm`). Slots and copies' *Unfinished git …* row, Branches & remotes' banner and
   the notice of HI-3465 each have **Open in Changes**. Git's work is a Git port step (`operationSteps`, RepoOps'
   `operationStep`, `platform/git/gitOperationSteps.ts`; RepoReads' `operation`): None lists no such operation.
   **What refuses a step**, each checked as the user clicks, before git runs: a live session whose folder is in it
   (`sessions.liveStates()`); under the repository lock and the folder's fence, as Commit and Set aside check
-  (`assertQuiet`), the operation no longer the one the user saw, a Combwork run or an agent's file lock there
+  (`assertQuiet`), the operation no longer the one the user saw, or no longer at the stop they saw (a request names it:
+  its kind, HEAD, the commit git stopped at, its step and its sequencer's next command; a terminal that went on, or
+  another of the same kind begun, refuses a confirmation left open: *Git has moved on*), a Combwork run or an agent's file lock there
   (`folderBuilders`), an agent working there (`busyAgentIn`); for a slot, the pool's hold (`SlotPool.forUser`, a
   warm-kind operation with no lease): taken only while no operation, job or run's writer holds it and its open lease
   is the one the user confirmed (a slot lent to a card or lane whose builder isn't running asks first, naming them),

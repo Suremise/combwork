@@ -942,6 +942,49 @@ describe('HI-3465: a git operation left under way in a free slot', { timeout: ti
     expect(w.pool.operation('slot-a')).toBeNull()
   })
 
+  it("HI-3470 (HR1's round 1): the hold is released inside its tracked operation: a refresh meanwhile keeps it, and a close waits for it", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    revertLeft(r.slot.folder)
+    await w.pool.release(r.lease.id, 'done')
+    await w.pool.refresh()
+    // The hold's release write held back until the test lets it go.
+    const order: string[] = []
+    let letGo!: () => void
+    const gate = new Promise<void>((res) => (letGo = res))
+    let reached!: () => void
+    const atCleanup = new Promise<void>((res) => (reached = res))
+    let delay = false
+    const real = w.store.fenced.bind(w.store)
+    vi.spyOn(w.store, 'fenced').mockImplementation(async (n, t, fn) => {
+      if (delay) {
+        delay = false
+        reached()
+        await gate
+        const out = await real(n, t, fn)
+        order.push('released')
+        return out
+      }
+      return real(n, t, fn)
+    })
+    const step = w.pool.forUser('slot-a', r.slot.folder, null, async () => {
+      delay = true
+      return 'done'
+    })
+    await atCleanup
+    const held = w.store.slot('slot-a')?.op?.token
+    expect(held).toBeTruthy()
+    // A refresh while the release is queued: the hold's token is still live, so it isn't taken for an abandoned one.
+    await w.pool.refresh()
+    expect(w.store.slot('slot-a')?.op?.token).toBe(held)
+    const closing = w.pool.close().then(() => void order.push('closed'))
+    letGo()
+    expect(await step).toEqual({ ok: true, value: 'done' })
+    await closing
+    expect(order).toEqual(['released', 'closed'])
+    expect(w.store.slot('slot-a')?.op).toBeNull()
+  })
+
   it("HI-3470: a lent slot's step runs only under the lease the user confirmed, and never while its run writes there", async () => {
     const w = world({ builders: 1 })
     const r = await lent(w, { agent: 'a1', card: 1 })

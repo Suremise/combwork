@@ -2874,31 +2874,29 @@ export class SlotPool {
    * operation, a job, a run's writer), its open lease is `lease` (null: free), no session is in it, and no process (the
    * quiet check, as a removal's). Then the slot is looked at again (a free one, nothing under way any more: lent again).
    * Refused with why, `fn` not run: `changed` (any of those but a session or a process), `session`, `process`.
+   * HR1's round 1: the hold's release and that look run inside the tracked operation, failures included, so its token is
+   * live (no refresh takes the hold for an abandoned one) and a close waits for them.
    */
   async forUser<T>(name: string, folder: string, lease: string | null, fn: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; why: 'changed' | 'session' | 'process' }> {
     if (this.closed) return { ok: false, why: 'changed' }
     const token = newToken()
-    let took = false
-    try {
-      return await this.op(token, async () => {
-        const holder = await this.deps.holder.self()
-        if (this.closed || !(await this.store.holdForUser(name, folder, lease, token, holder))) return { ok: false as const, why: 'changed' as const }
-        took = true
+    return this.op(token, async () => {
+      const holder = await this.deps.holder.self()
+      if (this.closed || !(await this.store.holdForUser(name, folder, lease, token, holder))) return { ok: false as const, why: 'changed' as const }
+      try {
         if (this.deps.sessionIn?.(folder)) return { ok: false as const, why: 'session' as const }
         if (!(await quiet(folder, this.quietTarget(name)))) return { ok: false as const, why: 'process' as const }
         return { ok: true as const, value: await fn() }
-      })
-    } finally {
-      if (took) {
+      } finally {
         await this.store
           .fenced(name, token, (db, s) => this.store.setIn(db, name, s.state, {}, { op: null }))
           .catch((e) => {
             if (!(e instanceof OpLost)) throw e
           })
         // Awaited: the panel's next read, and a start right after, find the slot as this look leaves it.
-        await this.refresh().catch((e) => log.warn(`Slot ${userText(name)} wasn't looked at after the user's git step: ${userText(e instanceof Error ? e.message : String(e))}`))
+        if (!this.closed) await this.refresh().catch((e) => log.warn(`Slot ${userText(name)} wasn't looked at after the user's git step: ${userText(e instanceof Error ? e.message : String(e))}`))
       }
-    }
+    })
   }
 
   /** The guards a removal checks, in order; null when nothing holds the slot. `probe`: also prove no process holds it. */

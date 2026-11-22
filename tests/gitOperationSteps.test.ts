@@ -3,7 +3,7 @@
 // Skip, Abort, End bisect; Use mine, Use theirs, Mark resolved), with git's sides mapped in a rebase; and what refuses a
 // step before git runs (the operation changed, files still in conflict, a run or an agent in the folder, the caller's
 // guard). Real git in throwaway repositories.
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
@@ -19,10 +19,24 @@ vi.mock('../src/main/workflow/queueHost', () => ({ folderBuilders: (_ws: unknown
 let agent: string | null = null
 vi.mock('../src/main/gitRepo', async (original) => ({ ...(await original<typeof import('../src/main/gitRepo')>()), busyAgentIn: async () => agent }))
 
+/** Each git command's arguments and bound, while a test collects them (null: none). */
+let gitCalls: { args: string[]; timeout?: number }[] | null = null
+vi.mock('../src/main/git', async (original) => {
+  const real = await original<typeof import('../src/main/git')>()
+  return {
+    ...real,
+    git: (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]) => {
+      gitCalls?.push({ args, timeout: opts?.timeout })
+      return real.git(cwd, args, max, input, opts)
+    }
+  }
+})
+
 vi.setConfig({ testTimeout: timing('test.hang') })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const steps = await import('../src/main/platform/git/gitOperationSteps')
+const { platformLimits } = await import('../src/main/platform/limits')
 
 const base = tempDir('cw-gitoperation-')
 const w = createWorkspaceService()
@@ -37,7 +51,12 @@ let proj = ''
 const read = (rel: string): string => readFileSync(join(proj, rel), 'utf8')
 const gitDir = (): string => sh(proj, 'rev-parse', '--absolute-git-dir')
 const state = () => steps.operationState(proj)
-const step = (req: OperationRequest, guard?: () => void) => inWorkspace(w, () => steps.operationStep(proj, proj, req, guard))
+type Ask = OperationRequest extends infer R ? (R extends OperationRequest ? Omit<R, 'id'> & { id?: string } : never) : never
+/** A request as the panel sends it: the stop it shows now, unless the test names another (HR1's round 1). */
+const step = async (req: Ask, guard?: () => void) => {
+  const id = req.id ?? (await state())?.id ?? 'none'
+  return inWorkspace(w, () => steps.operationStep(proj, proj, { ...req, id } as OperationRequest, guard))
+}
 
 beforeEach(() => {
   proj = join(w.path!, `proj${++n}`)
@@ -46,6 +65,7 @@ beforeEach(() => {
   commit(proj, { 'a.txt': 'base\n', 'b.txt': 'b\n' }, 'files')
   held = null
   agent = null
+  gitCalls = null
 })
 
 /** `side` changes a.txt one way on a branch, main another: a conflict to merge, rebase or pick. */
@@ -149,7 +169,7 @@ describe('a revert or cherry-pick', () => {
     sh(proj, 'rm', '-q', 'r.txt')
     sh(proj, 'commit', '-q', '--no-edit')
     const hand = sh(proj, 'rev-parse', 'HEAD')
-    expect(await state()).toEqual({ what: 'revert', conflicts: [] })
+    expect(await state()).toMatchObject({ what: 'revert', conflicts: [] })
     await step({ what: 'revert', step: 'abort' })
     expect(await state()).toBeNull()
     expect(existsSync(join(gitDir(), 'sequencer'))).toBe(false)
@@ -184,11 +204,125 @@ describe('a bisect', () => {
   })
 })
 
+/** `side`'s edit of a.txt as a patch, and main's own edit of it: `git am -3` of the patch stops in conflict. */
+function amStopped(): string {
+  sh(proj, 'switch', '-q', '-c', 'side')
+  commit(proj, { 'a.txt': 'side\n' }, 'side edit')
+  const patches = join(base, `patches${n}`)
+  sh(proj, 'format-patch', '-q', '-1', '-o', patches)
+  sh(proj, 'switch', '-q', 'main')
+  const before = commit(proj, { 'a.txt': 'main\n' }, 'main edit')
+  expect(() => sh(proj, 'am', '-3', join(patches, readdirSync(patches)[0]))).toThrow()
+  return before
+}
+
+describe('git am, its sides as git names them', () => {
+  it("reads it with its step; Use mine keeps the folder's branch (git's ours: the patch is the other side); Continue applies it", async () => {
+    amStopped()
+    const s = await state()
+    expect(s).toMatchObject({ what: 'am', step: { at: 1, of: 1 }, conflicts: [{ path: 'a.txt', mine: true, theirs: true }] })
+    expect(pickCommand('am', s!.conflicts[0], 'mine')).toBe('git checkout --ours -- a.txt; git add -- a.txt')
+    await step({ what: 'am', file: 'a.txt', pick: 'mine' })
+    expect(read('a.txt')).toBe('main\n')
+    expect((await state())?.conflicts).toEqual([])
+    // Mine kept: the patch changes nothing more, so git's own refusal of an empty patch is said; Skip then ends it.
+    await expect(step({ what: 'am', step: 'continue' })).rejects.toThrow('Git refused:')
+    await step({ what: 'am', step: 'skip' })
+    expect(await state()).toBeNull()
+  })
+
+  it('Use theirs takes the patch, and Continue applies it as its commit', async () => {
+    amStopped()
+    await step({ what: 'am', file: 'a.txt', pick: 'theirs' })
+    expect(read('a.txt')).toBe('side\n')
+    await step({ what: 'am', step: 'continue' })
+    expect(await state()).toBeNull()
+    expect(sh(proj, 'log', '-1', '--format=%s')).toBe('side edit')
+  })
+
+  it('Abort puts the branch back as it was before the patches', async () => {
+    const before = amStopped()
+    await step({ what: 'am', step: 'abort' })
+    expect(await state()).toBeNull()
+    expect(sh(proj, 'rev-parse', 'HEAD')).toBe(before)
+    expect(read('a.txt')).toBe('main\n')
+  })
+})
+
+describe("the stop the user saw (HR1's round 1)", () => {
+  /** `side` has two commits that each conflict with main on a.txt: a rebase of it stops twice, at the same path. */
+  function twoStops(): void {
+    sh(proj, 'switch', '-q', '-c', 'side')
+    commit(proj, { 'a.txt': 'side 1\n' }, 'side one')
+    commit(proj, { 'a.txt': 'side 2\n' }, 'side two')
+    sh(proj, 'switch', '-q', 'main')
+    commit(proj, { 'a.txt': 'main\n' }, 'main edit')
+    sh(proj, 'switch', '-q', 'side')
+    expect(() => sh(proj, 'rebase', 'main')).toThrow()
+  }
+
+  it('a Skip, a pick or an Abort confirmed at one stop, made once a terminal went on to the next stop of the same rebase: refused, nothing done', async () => {
+    twoStops()
+    const first = (await state())!
+    expect(first).toMatchObject({ what: 'rebase', step: { at: 1, of: 2 }, at: { subject: 'side one' } })
+    // The user's terminal settles the first stop and goes on: git stops again, at the same path, in the same rebase.
+    writeFileSync(join(proj, 'a.txt'), 'by hand\n')
+    sh(proj, 'add', 'a.txt')
+    expect(() => sh(proj, '-c', 'core.editor=true', 'rebase', '--continue')).toThrow()
+    const second = (await state())!
+    expect(second).toMatchObject({ what: 'rebase', step: { at: 2, of: 2 }, at: { subject: 'side two' }, conflicts: [{ path: 'a.txt' }] })
+    expect(second.id).not.toBe(first.id)
+    const head = sh(proj, 'rev-parse', 'HEAD')
+    await expect(step({ what: 'rebase', id: first.id, step: 'skip' })).rejects.toThrow('Git has moved on in')
+    await expect(step({ what: 'rebase', id: first.id, file: 'a.txt', pick: 'theirs' })).rejects.toThrow('Git has moved on in')
+    await expect(step({ what: 'rebase', id: first.id, step: 'abort' })).rejects.toThrow('Git has moved on in')
+    // Nothing done: the second stop as it was, its conflict still there.
+    expect(await state()).toEqual(second)
+    expect(sh(proj, 'rev-parse', 'HEAD')).toBe(head)
+    expect(read('a.txt')).toContain('<<<<<<<')
+    // Asked for the stop it shows now, it is done.
+    await step({ what: 'rebase', id: second.id, step: 'skip' })
+    expect(await state()).toBeNull()
+  })
+
+  it('a merge ended in a terminal and another begun: an Abort confirmed for the first refused', async () => {
+    diverged()
+    expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
+    const first = (await state())!
+    sh(proj, 'merge', '--abort')
+    sh(proj, 'switch', '-q', '-c', 'other', 'main~1')
+    commit(proj, { 'a.txt': 'other\n' }, 'other edit')
+    sh(proj, 'switch', '-q', 'main')
+    expect(() => sh(proj, 'merge', '--no-edit', 'other')).toThrow()
+    expect((await state())!.id).not.toBe(first.id)
+    await expect(step({ what: 'merge', id: first.id, step: 'abort' })).rejects.toThrow('Git has moved on in')
+    expect(existsSync(join(gitDir(), 'MERGE_HEAD'))).toBe(true)
+  })
+})
+
+describe("the bound of a step (HR1's round 1)", () => {
+  it("Continue runs with Commit's own bound, Settings → Advanced's longest commit time, never one of its own", async () => {
+    const was = platformLimits.gitCommitMs
+    platformLimits.gitCommitMs = () => 4_321_000
+    try {
+      diverged()
+      expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
+      await step({ what: 'merge', file: 'a.txt', pick: 'theirs' })
+      gitCalls = []
+      await step({ what: 'merge', step: 'continue' })
+      const cont = gitCalls.find((c) => c.args[0] === 'merge' && c.args[1] === '--continue')
+      expect(cont?.timeout).toBe(4_321_000)
+    } finally {
+      platformLimits.gitCommitMs = was
+    }
+  })
+})
+
 describe('refused before git runs', () => {
   it('another operation than the one shown, a run or an agent in the folder, the guard: each refused, the merge as it was', async () => {
     diverged()
     expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
-    const abort: OperationRequest = { what: 'merge', step: 'abort' }
+    const abort: Ask = { what: 'merge', step: 'abort' }
     await expect(step({ what: 'rebase', step: 'abort' })).rejects.toThrow("isn't in the middle of a rebase")
     held = [proj]
     await expect(step(abort)).rejects.toThrow('A run or an agent is working in')
