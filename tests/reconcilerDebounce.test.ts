@@ -10,7 +10,7 @@ const card = { id: 1, key: 'SH-1', stage: 'approved' }
 vi.mock('../src/main/workflow/service', () => ({
   workflowFor: async () => ({ store: { cards: () => [card], meta: () => null }, state: () => ({ started: { target: 'main' } }), platform: () => ({}), cfg: { options: () => ({}) } })
 }))
-vi.mock('../src/main/platform/historyPorts', () => ({ historyOf: () => null, observePort: { subscribe: () => ({ dispose: () => undefined }) }, repoWatchOf: () => null }))
+vi.mock('../src/main/platform/historyPorts', () => ({ historyOf: () => null, observePort: { subscribe: () => ({ dispose: () => undefined }) } }))
 vi.mock('../src/main/boardStore', () => ({ boardReadOnly: () => false }))
 vi.mock('../src/main/events', () => ({ onCombworkEvent: () => () => undefined }))
 const ws = { path: 'C:\\w', lifetime: { aborted: false }, repairingMove: false, info: () => ({ projects: [{ path: 'C:\\w\\shop', name: 'shop', platform: { id: 'jj' } }] }) }

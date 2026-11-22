@@ -8,7 +8,7 @@
 import { accepts, deliversCommits, hasCapability, merges } from '../platform/descriptors'
 import type { Category, StageId } from './facts'
 import { STAGE_CATEGORY } from './facts'
-import { contradictions, finishAdvances, finishOnCandidate, finishPreviews, reviewerAgent, userReportsMerge, type Contradiction, type WorkflowOptions } from './options'
+import { contradictions, reviewerAgent, userReportsMerge, type Contradiction, type WorkflowOptions } from './options'
 import { GUARDS, isGuard, MOVES, type GuardId, type MoveId } from './pieces'
 
 export const RULESET_VERSION = 1
@@ -58,7 +58,7 @@ export function canonical(v: unknown): string {
  * are when it pushes, so it is left out whatever its value (a ruleset's options have it off). G19, the merge's commit
  * message (HI-1697), likewise: read as the options are when the queue merges. The preferences (HI-1766: card loops,
  * file locks; HI-2001: Maximum agents) aren't rules either: read as the options are when they're used. Nor are merge
- * guards (HI-3284): the merge queue and jj's candidate checks read them as the options are when they check.
+ * guards (HI-3284): the merge queue reads them as the options are when it checks.
  */
 export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
   const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, followRemote: _follow, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, assistantWakes: _assistantWakes, fileLocks: _locks, maxAgents: _max, simplifyAt: _simplify, churnStopAt: _stop, mergeGuards: _guards, ...rules } = o
@@ -66,7 +66,7 @@ export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
 }
 
 /** Does any rule need the card's change (so its folder must be clean and its revision ready)? */
-export const needsChange = (o: WorkflowOptions): boolean => deliversCommits(o.platform) && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges' || finishOnCandidate(o.finish))
+export const needsChange = (o: WorkflowOptions): boolean => deliversCommits(o.platform) && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges')
 
 /**
  * The stages the options produce (§16.5.2), in board order: Review with any review; Approved when something follows a
@@ -80,10 +80,7 @@ export function producedStages(o: WorkflowOptions): StageId[] {
   // on #1417): where work merges (Git) a merge (Combwork's, the agent's, or one Combwork doesn't check); where it is
   // accepted (None) your OK after the reviewer agent's pass (N1).
   const approves = review || o.okBefore.mode !== 'never'
-  // Where its user integrates (jj, HI-2799), your integration follows the approval, as a merge Combwork doesn't check follows Git's.
-  // HI-3235: where Combwork advances the target itself (jj's automatic advance), Approved always: the card waits there for
-  // its candidate and merge checks, as a Git card waits in Merging, review or no review.
-  const approved = finishAdvances(o.finish) || finishPreviews(o.finish) || (merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : accepts(o.platform) ? o.review === 'agentThenYou' : approves && o.finish === 'userIntegrates')
+  const approved = merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : accepts(o.platform) && o.review === 'agentThenYou'
   const out: StageId[] = ['hold', 'todo', 'active']
   if (review) out.push('review')
   if (approved) out.push('approved')

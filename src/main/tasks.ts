@@ -41,7 +41,7 @@ import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } fro
 import { hasStage, laneTargetOf, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
 import { decisionWithChoice } from '../shared/decisionChoice'
-import { answerFits, CHURN_GATES, churnTotal, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, advanceUnresolved, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type PauseChoice, type StageId } from '../shared/workflow/facts'
+import { answerFits, CHURN_GATES, churnTotal, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type PauseChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { refusal as refusalOf, refusalText, type Refusal } from '../shared/workflow/refusals'
@@ -1111,12 +1111,6 @@ function queueDependencyEdit(ws: WorkspaceService, card: TaskCard, had: number[]
   const folded = foldCard(store.facts(card.number), own)
   const late = (): number[] => card.blockedBy.filter((b) => !had.includes(b) && stage(b) !== 'done')
   const tooLate = (target: string, cards: number[]): CombworkError => combworkError(ERR.dependencyTooLate, { card: cardRef(card.number), cards: cards.map(cardRef).join(', '), target }, { kind: 'conflict' })
-  // HI-3265: a platform's advance attempted and not yet settled (jj's, `AdvanceAttempted`) is begun as IntegrationStarted
-  // is: its blockers were read in that write, so one added now can't hold it.
-  if (advanceUnresolved(folded)) {
-    const added = late()
-    if (added.length) throw tooLate(folded.started?.target ?? '', added)
-  }
   const e = openEntry(folded)
   if (!e) return
   if (e.state === 'started') {

@@ -13,11 +13,8 @@ const GATED = /jjFileGate\.(read|readSync|acquire|recheck)\(|storeGitGated\(|sto
 
 /** Files that name those paths without using the gate themselves: where their reads are gated. */
 const ALLOW: Record<string, string> = {
-  'src/main/platform/jjAdvance.ts': "its git is J5's (jjCards' gitOn, storeGitGated); its writes go through the runner (gated, with the lease's recheck)",
-  'src/main/platform/jjCandidates.ts': "its git is jjCards' gitOn (storeGitGated); its writes go through the runner, with a recheck",
-  'src/main/platform/jjIntegration.ts': "its git is jjCards' gitOn (storeGitGated); its prints are jjPublishTail's (readSync)",
-  'src/main/platform/jjRecovery.ts': "its git is slotsApp's (storeGitGated); its jj writes go through the port, with rechecks",
-  'src/main/platform/jjRepoWatch.ts': 'watches folders and lists op heads: opens no ref or working-copy file'
+  'src/main/platform/jjIntegration.ts': "its git is its caller's (deps.git)",
+  'src/main/platform/jjRecovery.ts': "its git is slotsApp's (storeGitGated); its jj writes go through the port, with rechecks"
 }
 
 const jjFiles = (): string[] => {
@@ -49,8 +46,6 @@ describe("readers of jj's replaced files (HI-2918)", () => {
   })
 
   it('the git and history handed to jj code are the gated ones', () => {
-    expect(readFileSync(join(root, 'src/main/jjCards.ts'), 'utf8')).toMatch(/storeGitGated\(store, full/)
-    expect(readFileSync(join(root, 'src/main/jjCards.ts'), 'utf8')).toMatch(/history: storeGatedHistory\(historyFor\('git'\)\)/)
     expect(readFileSync(join(root, 'src/main/slotsApp.ts'), 'utf8')).toMatch(/git: \(cwd, args\) => storeGitGated\(cwd, args/)
     expect(readFileSync(join(root, 'src/main/platform/jjCompat.ts'), 'utf8')).toMatch(/git: \(cwd, args\) => storeGitGated\(cwd, args/)
     expect(readFileSync(join(root, 'src/main/platform/jjOperations.ts'), 'utf8')).toMatch(/storeGitGated\(cwd, args, \(\) => gitRun/)

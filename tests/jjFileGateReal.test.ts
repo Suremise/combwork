@@ -14,7 +14,6 @@ import { storeGitGated } from '../src/main/platform/jjRunner'
 import { checkoutOf } from '../src/main/platform/jjWorkspacePort'
 import { gitState, readCheckout } from '../src/main/platform/jjView'
 import { gitBranches } from '../src/main/platform/jjViews'
-import { refFromFiles } from '../src/main/platform/jjPublishTail'
 import { boundaryOf } from '../src/main/platform/repoBoundary'
 import type { RunResult } from '../src/main/platform/repoContext'
 import { harness, jjExe } from './jjWorkspaceHarness'
@@ -54,7 +53,6 @@ const READERS: { name: string; colocatedOnly?: true; read: (w: World) => Promise
   { name: 'readCheckout (sync, the working copy)', read: async (w) => readCheckout(join(w.slot, '.jj')) },
   { name: 'gitBranches (async, the store)', read: (w) => gitBranches(w.store) },
   { name: 'gitState (sync, the store)', colocatedOnly: true, read: async (w) => gitState(w.store, w.store) },
-  { name: 'refFromFiles (sync, the store)', read: async (w) => refFromFiles(w.store, 'refs/heads/main') },
   { name: 'print (a worker request, the store)', read: (w) => w.h.runner.print!({ jjRepo: w.jjRepo, store: w.store, files: [{ label: 'HEAD', path: join(w.store, 'HEAD') }, { label: 'packed', path: join(w.store, 'packed-refs') }], trees: [{ label: 'heads', path: join(w.store, 'refs', 'heads') }] }) },
   { name: 'git on the store (a process)', read: (w) => storeGitGated(w.repo, ['--git-dir', w.store, 'for-each-ref', '--format=%(objectname) %(refname)'], () => w.gitAsync(['--git-dir', w.store, 'for-each-ref', '--format=%(objectname) %(refname)'])) }
 ]

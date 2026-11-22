@@ -33,8 +33,6 @@ import { advanced } from '../advanced'
 import { withRepoLock } from '../repoLock'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import { onAction } from './actionWorker'
-import { advanceHostOf } from './advanceHost'
-import type { AdvanceAnswer } from '../platform/adapter'
 import { withoutWriteFence } from './factStore'
 import { catchUpKey, catchUpOf, MergeQueue, pushOwedKey, pushOwedOf, type QueueConfig, type QueueHook, type QueueHooks, type QueueStepInfo } from './mergeQueue'
 import { changingFolder, inFolder } from '../folderFence'
@@ -493,25 +491,6 @@ function projectOfCard(ws: WorkspaceService, card: number): string | null {
 
 let stopHosts: (() => void) | null = null
 
-/**
- * HI-3235: the actions worker's handler for the user's answer to an advance's question: to the card's platform adapter
- * (its optional port: no platform named). Delivered: run again until marked, which the handler allows (it reads the
- * attempt's journal before anything, so a run after a crash runs nothing twice); a failure marks it failed, and the
- * attempt's question comes back by the reconciler's recovery once no answer is pending. Registered with the queue hosts.
- */
-export function registerAdvanceAnswers(): void {
-  onAction(
-    'advanceAnswer',
-    async (a, ws) => {
-      const project = projectOfCard(ws, a.card)
-      const wf = project ? await workflowFor(ws, project) : null
-      if (!wf) throw new Error(`advance answer: card #${a.card} has no project here`) // i18n-ignore: an action's failure, for the log
-      const card = wf.store.card(a.card)
-      await wf.platformOf(card).advanceAnswer?.(card, a.payload as unknown as AdvanceAnswer, advanceHostOf(wf))
-    },
-    'delivered'
-  )
-}
 
 /**
  * Starts the app's merge queue (index.ts, once): `enqueue` runs a target's host; `pin` pins a submission's revision
@@ -539,7 +518,6 @@ export function startQueueHosts(): void {
     const wf = project ? await workflowFor(ws, project) : null
     if (wf) await wf.platformOf(wf.store.card(a.card)).perform('pin', a.payload)
   })
-  registerAdvanceAnswers()
   const seen = new WeakSet<AbortSignal>()
   const off = onCombworkEvent((e) => {
     // The team resuming (HI-2081): its queues go on with what waited, as when the rules are turned on again.

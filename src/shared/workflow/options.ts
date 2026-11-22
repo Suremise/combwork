@@ -17,28 +17,11 @@ import { takesGuards, type MergeGuard } from './mergeGuards'
 
 /** G1 / N1: who checks the work before it's done. */
 export type ReviewBy = 'none' | 'agent' | 'agentThenYou' | 'you'
-/**
- * G5: who finishes a code card. None's only way is acceptance; jj's (HI-2799, option A: no automatic advance) is the user
- * integrating the reviewed work themselves, reported as a merge Combwork doesn't make.
- */
-export type Finisher = 'combworkMerges' | 'agentMerges' | 'committed' | 'notChecked' | 'accept' | 'userIntegrates' | 'combworkAdvances' | 'previewAdvance'
+/** G5: who finishes a code card. None's only way is acceptance. */
+export type Finisher = 'combworkMerges' | 'agentMerges' | 'committed' | 'notChecked' | 'accept'
 
-/**
- * HI-3235: whether Combwork itself integrates a passed card by its platform's advance (jj's bookmark move, HI-2840's
- * stage 2): the card waits in Approved for its candidate and merge checks, then the adapter's `advance` port moves the
- * target. Never a platform check: the descriptor declares the finish, the adapter implements the port.
- */
-export const finishAdvances = (f: Finisher): boolean => f === 'combworkAdvances'
-/**
- * HI-3236: whether Combwork integrates a passed card by its platform's advance once the user clicks Integrate on its
- * preview (jj's preview and click): the adapter's `advancePreview` port asks, bound to one plan.
- */
-export const finishPreviews = (f: Finisher): boolean => f === 'previewAdvance'
-/** HI-3235/HI-3236: a finish whose candidate and merge checks come before integration where work isn't merged by the queue (jj's three). */
-export const finishOnCandidate = (f: Finisher): boolean => f === 'userIntegrates' || f === 'combworkAdvances' || f === 'previewAdvance'
-
-/** A finish whose merge someone reports (the agent's excepted): a merge Combwork doesn't check, or jj's user integrating. */
-export const userReportsMerge = (f: Finisher): boolean => f === 'notChecked' || f === 'userIntegrates'
+/** A finish whose merge someone reports (the agent's excepted): a merge Combwork doesn't check. */
+export const userReportsMerge = (f: Finisher): boolean => f === 'notChecked'
 /** G11: where cards are built. None always works in the project folder (OP-16). */
 export type FolderMode = 'slots' | 'project'
 /** G9's install: from scratch when the manifests changed (the default, and always so), or before every merge. */
@@ -110,7 +93,7 @@ export interface WorkflowOptions {
   mergeInstall: MergeInstall
   /**
    * Merge guards (HI-3284): patterns a merge refuses in the lines it adds (mergeGuards.ts), checked by the merge queue on
-   * the merged result and by jj's candidate checks on the candidate, a match returning the card like a failed merge check.
+   * the merged result, a match returning the card like a failed merge check.
    * Not a rule (`GUARD_OPTIONS`): read as the options are when they check, so a guard added applies to cards in flight;
    * a result counts only for the guards it was checked with. Unset: none.
    */
@@ -201,8 +184,8 @@ export const NAME_OPTIONS: readonly OptionKey[] = ['stageNames']
 export const BRANCH_OPTIONS: readonly OptionKey[] = ['otherTargets']
 
 /**
- * Merge guards (HI-3284), not rules: left out of a ruleset (the merge queue and jj's candidate checks read them as the
- * options are when they check), never set by a preset, never making the options Custom.
+ * Merge guards (HI-3284), not rules: left out of a ruleset (the merge queue reads them as the options are when it
+ * checks), never set by a preset, never making the options Custom.
  */
 export const GUARD_OPTIONS: readonly OptionKey[] = ['mergeGuards']
 
@@ -413,7 +396,6 @@ export const CONTRADICTIONS = {
   focusedNeedsRunner: msg({ id: 'workflow.contradiction.focusedNeedsRunner', defaultMessage: 'Each card’s focused tests need the command that runs them.', description: 'Why workflow options cannot be saved (G20): “Each card’s focused tests” is on but the project has no command to run them (its runner, focused.run).' }),
   subfolderTarget: msg({ id: 'workflow.contradiction.subfolderTarget', defaultMessage: 'This project is inside a larger repository: name the branch its work merges into.', description: 'Why workflow options cannot be saved (OP-29): Combwork or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository).' }),
   noneHasNoSlots: msg({ id: 'workflow.contradiction.noneHasNoSlots', defaultMessage: 'Without version control, everyone works in the project folder.', description: 'Why workflow options cannot be saved: separate folders per card were set for a project with no version control.' }),
-  jjYouIntegrate: msg({ id: 'workflow.contradiction.jjYouIntegrate', defaultMessage: 'That choice is for another version control: with jj, Combwork or you integrate the work by moving the target bookmark; with Git, it is merged.', description: 'Why workflow options cannot be saved (HI-2799, HI-3315: a jj project given one of Git’s finishes, or a Git project one of jj’s). Keep jj (the tool’s name) and Git; a bookmark is jj’s name for a branch.' }),
   jjNeedsSlots: msg({ id: 'workflow.contradiction.jjNeedsSlots', defaultMessage: 'With jj, each card needs its own folder: agents sharing the project folder aren’t supported yet.', description: 'Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) was set to have everyone work in the project folder. Keep jj (the tool’s name).' })
 } satisfies Record<string, Msg>
 
@@ -454,7 +436,6 @@ export const CONTRADICTION_ROWS: Record<Contradiction, OptionKey[]> = {
   poolNeedsAgent: ['reviewerMode', 'review'],
   upToDateNeedsSlots: ['slotsUpToDate', 'folder'],
   noneHasNoSlots: ['folder'],
-  jjYouIntegrate: ['finish'],
   jjNeedsSlots: ['folder'],
   focusedNeedsRunner: ['focusedTests'],
   subfolderTarget: ['target', 'finish']
@@ -482,13 +463,12 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
   if (reviewerAgent(o.review) && !o.noSelfReview) out.push('selfReview')
   if (o.reviewers === 2 && !reviewerAgent(o.review)) out.push('quorumNeedsAgent')
   if (reviewerModeOf(o) === 'pool' && !reviewerAgent(o.review)) out.push('poolNeedsAgent')
-  // By the platform's descriptor (HI-2840, `finishes`): a finish it doesn't declare is a contradiction, worded for the
-  // platform's own way when that is the user integrating (jj, HI-2799), or for You integrate chosen where work merges,
-  // else as acceptance and merging not mixing (HI-2822). Separate folders need isolation, and a closed gate sharedFolder
-  // needs slots (jj).
+  // By the platform's descriptor (HI-2840, `finishes`): a finish it doesn't declare is a contradiction, worded as
+  // acceptance and merging not mixing (HI-2822). Separate folders need isolation, and a closed gate sharedFolder needs
+  // slots (jj).
   const merging = merges(o.platform)
   const finishes = PLATFORMS[o.platform].finishes
-  if (!finishes.includes(o.finish)) out.push(finishes.includes('userIntegrates') || (merging && finishOnCandidate(o.finish)) ? 'jjYouIntegrate' : 'combworkMergesNeedsGit')
+  if (!finishes.includes(o.finish)) out.push('combworkMergesNeedsGit')
   if (!hasCapability(o.platform, 'isolation') && o.folder !== 'project') out.push('noneHasNoSlots')
   if (hasGate(o.platform, 'sharedFolder') && o.folder !== 'slots') out.push('jjNeedsSlots')
   if (merging) {
@@ -535,7 +515,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   preChecks: strings,
   otherTargets: (v) => strings(v) && (v as string[]).every((b) => b.trim() === b && b.length > 0) && new Set(v as string[]).size === (v as string[]).length,
   sameness: oneOf<WorkflowOptions['sameness']>(['change', 'exact']),
-  finish: oneOf<Finisher>(['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept', 'userIntegrates', 'combworkAdvances', 'previewAdvance']),
+  finish: oneOf<Finisher>(['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept']),
   style: oneOf<WorkflowOptions['style']>(['merge', 'squash', 'rebase']),
   target: (v) => typeof v === 'string',
   targetOwn: (v) => v === true,
@@ -672,16 +652,14 @@ export function previewRows(options: WorkflowOptions, effective: WorkflowOptions
  * with everyone in the project folder (the only place a commit can take in another agent's files).
  */
 export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
-  // HI-2938: G9 also where the user integrates (jj's candidate); G20 stays the merge queue's.
-  if (key === 'mergeChecks') return o.finish === 'combworkMerges' || finishOnCandidate(o.finish)
-  // HI-3284: merge guards where the merge checks run (the merge queue, jj's candidate).
-  if (key === 'mergeGuards') return o.finish === 'combworkMerges' || finishOnCandidate(o.finish)
+  if (key === 'mergeChecks') return o.finish === 'combworkMerges'
+  // HI-3284: merge guards where the merge checks run (the merge queue).
+  if (key === 'mergeGuards') return o.finish === 'combworkMerges'
   if (key === 'focusedTests') return o.finish === 'combworkMerges'
   // The install comes before G9's checks and G20's run alike (HI-1367): focused tests alone install too.
-  if (key === 'mergeInstall') return (o.finish === 'combworkMerges' && (o.mergeChecks.length > 0 || o.focusedTests)) || (finishOnCandidate(o.finish) && o.mergeChecks.length > 0)
-  // G8 strict (#1352): the merge queue brings work up to date, so only when Combwork merges; or (HI-2871) jj's candidate,
-  // where the user integrates.
-  if (key === 'strict') return o.finish === 'combworkMerges' || finishOnCandidate(o.finish)
+  if (key === 'mergeInstall') return o.finish === 'combworkMerges' && (o.mergeChecks.length > 0 || o.focusedTests)
+  // G8 strict (#1352): the merge queue brings work up to date, so only when Combwork merges.
+  if (key === 'strict') return o.finish === 'combworkMerges'
   // G18 (#1179): only the merge queue pushes.
   if (key === 'pushTarget') return o.finish === 'combworkMerges'
   // G21 (HI-1183): only the merge queue fetches and publishes.

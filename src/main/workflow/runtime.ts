@@ -11,11 +11,11 @@
 import { appliesRequest, auditOnly } from '../requestReceipts'
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_STOPPED_GATE, agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type StageId, CHURN_GATES, CHURN_LIMIT_GATE, PAUSE_GATES, SIMPLIFY_GATE, churnDue, churnTotal, countsChurn, type PauseChoice } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type StageId, CHURN_GATES, CHURN_LIMIT_GATE, PAUSE_GATES, SIMPLIFY_GATE, churnDue, churnTotal, countsChurn, type PauseChoice } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
-import { finishOnCandidate, FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
+import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import { reviewsInProgress, submissionReviewers } from '../../shared/workflow/reviewerPool'
 import { ACCEPT_MAX, chosenTests, focusedCheckName, reviewProved, standingFocusedRun, validTestId, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
 import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
@@ -28,8 +28,7 @@ import { parseCardRef } from '../../shared/workflow/cardRefs'
 import type { ForwardOverride } from '../../shared/workflow/forwardOrder'
 import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
 import { LANE_MAX_ROUNDS } from '../../shared/lanes'
-import type { AdvanceAnswer, FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
-import { advanceHostOf } from './advanceHost'
+import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
 import type { JjCardDeps } from '../platform/jjPlatform'
 import { adaptersFor } from '../platform/adapters'
 import { historyOf } from '../platform/historyPorts'
@@ -292,7 +291,7 @@ export interface WorkflowConfig {
   slotHeld?: (lease: string, slot: string, folder: string, card: number) => boolean | null
   /** HI-2944: a start found its target's folder with uncommitted changes (warned, never refused): the app tells the window. */
   targetChanges?: (changes: TargetChanges, card: string) => void
-  /** jj's card work's dependencies (HI-2868, the app's jjCards.ts): absent where jj's adapter answers nothing. */
+  /** jj's card work's dependencies (HI-2868): nothing composes them since HI-3483; they go with jj's adapter (HI-3486). */
   jj?: JjCardDeps
   /** Runs an agent started that are still going (G13). */
   runsOf?: (agent: string) => string[]
@@ -828,7 +827,7 @@ export class Workflow {
    * merge Combwork saw this cycle, HI-3282). Such a write isn't fenced: it changes nothing a stale call could, and its
    * answer is the one the same call gets when the card was already there at its read. Writing anything then throws.
    */
-  async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>, opts: { runActions?: boolean; settled?: (w: Write) => boolean } = {}): Promise<T> {
+  async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>, opts: { settled?: (w: Write) => boolean } = {}): Promise<T> {
     const scope = alongsideScope()
     let movedTo: { from: StageId; to: StageId } | null = null
     const asked: string[] = []
@@ -892,9 +891,7 @@ export class Workflow {
         // A hook's own failure never undoes or fails the committed write.
       }
     }
-    // HI-3235: a write made holding a platform's repository lock (an advance's records) leaves its actions for its caller to
-    // run once that lock is let go, so none of them (an advance answer's) runs nested inside it.
-    if (this.cfg.autoRun !== false && opts.runActions !== false) await this.runActions()
+    if (this.cfg.autoRun !== false) await this.runActions()
     return out
   }
 
@@ -1318,7 +1315,7 @@ export class Workflow {
       await this.cfg.hooks?.beforeWrite?.('start')
       // How many times it may be gathered again while only its fingerprint moved (its platform's; HI-2916: jj's head moves
       // with Combwork's own jj operations beside it).
-      const gathers = this.platform(g.o).gathers ?? 1
+      const gathers = 1
       // Each pass gathered again is awaited here, never returned bare (HI-2916): this pass's `finally` gives back the slot
       // it lent only once the pass after has started with it, or hasn't. Returned bare, the `finally` ran at once, so the
       // pass after found its lease ended, lent another, and a third could find the slot still settling and wait.
@@ -1487,7 +1484,7 @@ export class Workflow {
     // covers, so a change to it before the write would go unseen (#1401 round 2).
     if (!this.platform(o).planCovered(before.primed, plan)) {
       if (lent) await this.slotUnused(card, lent)
-      this.startRefusedLog(card, 'plan', this.platform(o).gathers ?? 1)
+      this.startRefusedLog(card, 'plan', 1)
       return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
     }
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
@@ -2009,19 +2006,6 @@ export class Workflow {
           w.move('done', 'derived')
         }
         return
-      case 'userIntegrates':
-        // jj (HI-2868, option A): the user integrates what passed. It waits in Approved, its OK asked there first where G10
-        // applies, until reconciliation finds it in its target (J9b2); Combwork never merges or moves anything for it.
-        if (hasStage(r, 'approved')) w.move('approved', 'derived')
-        if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
-        return
-      case 'combworkAdvances':
-      case 'previewAdvance':
-        // HI-3235 (HI-3236: its preview too): Combwork integrates what passed (its platform's advance port): it waits in Approved, its OK asked there
-        // first where G10 applies, for its candidate and merge checks; the reconcile then calls the adapter's advance.
-        w.move('approved', 'derived')
-        if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
-        return
       default:
         return
     }
@@ -2398,7 +2382,7 @@ export class Workflow {
     // As a start's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant, as often
     // as its platform allows. jj's head moves with Combwork's own jj operations beside a review (its review copy put at
     // the revision reviewed as start review leases it), which change nothing the verdict decides on.
-    const gathers = this.platform(r.options).gathers ?? 1
+    const gathers = 1
     if (await this.revalidate(card, s, r.options, before, gathers, 'verdict')) return this.regather(card, () => this.verdict(ref, actor, args))
     let evidenceMoved = false
     const out = await this.writeWhole(card, r, actor, (w) => {
@@ -2575,8 +2559,6 @@ export class Workflow {
     const usersOnly = (gate: string): GuardRefusal | null => (by === 'assistant' && (gate !== SIMPLIFY_GATE || (opts.choice !== 'carryOn' && opts.choice !== 'simplify')) ? ({ rule: 'loop.usersChoice', values: { card: card.key, request } } as GuardRefusal) : null)
     const notTheirs = usersOnly(req.gate)
     if (notTheirs) return this.refuse(card, by, 'answer', notTheirs)
-    // HI-3235: an advance's question is the user's alone (its Approve can be an attestation): only the window's answer.
-    if (ADVANCE_GATES.includes(req.gate) && ((opts.by ?? 'user') !== 'user' || (answer !== 'approved' && answer !== 'declined'))) return this.refuse(card, by, 'answer', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'answer', moves: '' } })
     const r = this.rulesetOf(card, s)
     const before = await this.evidenceOf(card, s, r.options)
     const fin = await this.finishInputs(card, s, r, s.approved?.revision ?? s.latest?.revision)
@@ -2592,7 +2574,7 @@ export class Workflow {
     // HI-3391: as a verdict's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant,
     // as often as its platform allows. jj's head moves with any jj operation in the repository (another lane's commit, a
     // review copy's checkout), which changes nothing the answer decides on; a change by content still refuses at once.
-    const gathers = this.platform(r.options).gathers ?? 1
+    const gathers = 1
     if (await this.revalidate(card, s, r.options, before, gathers, 'answer')) return this.regather(card, () => this.answer(ref, request, answer, opts))
     let evidenceMoved = false
     const out = await this.write(card, r, by, (w) => {
@@ -2643,13 +2625,6 @@ export class Workflow {
         // `publishUnknown` pause lifted, rather than waiting for a Resume, another card or a restart).
         const e = st.entries.find((x) => x.id === req.entry)
         if (e) w.action('enqueue', { target: e.target, ...(req.gate === QUEUE_STUCK_GATE ? { recheck: true } : {}) })
-      }
-      if (ADVANCE_GATES.includes(req.gate) && req.entry && req.result && (answer === 'approved' || answer === 'declined')) {
-        // HI-3235: the platform adapter takes the answer up in a durable action bound to what was asked (its request,
-        // attempt, plan, cycle and state): one per answer, its handler reading the attempt's journal before anything.
-        const payload: AdvanceAnswer = { request, gate: req.gate, attempt: req.entry, plan: req.result, cycle: st.cycle, state: req.gate === ADVANCE_STOPPED_GATE ? 'stopped' : req.gate === ADVANCE_PREVIEW_GATE ? 'preview' : 'uncertain', answer, project: this.cfg.project }
-        w.action('advanceAnswer', { ...payload })
-        return null
       }
       if (req.gate === MERGE_CHOICE_GATE) {
         // HI-1697: the merge style and commit message are saved with the answer (chooseMerge); its queue looks again now.
@@ -3304,7 +3279,7 @@ export class Workflow {
       if (releasedTarget && !opts.dry && opts.released !== releasedTarget) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'start', (releasedRule as { refusal: GuardRefusal }).refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
       // A start's passes, as `start`'s (its platform's `gathers`, HI-2916).
-      const gathers = gs ? (this.platform(gs.o).gathers ?? 1) : 1
+      const gathers = 1
       if (gs && (await this.revalidate(card, s, gs.o, gs.before, gathers))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       const cause: FactData['Moved']['cause'] = skipped.length ? 'override' : 'user'
@@ -3714,7 +3689,7 @@ export class Workflow {
   private async guardWarnings(o: WorkflowOptions, base: string, revision: string): Promise<string[]> {
     const guards = guardsOf(this.cfg.options())
     const adapter = this.platform(o)
-    if (!guards.length || !adapter.addedDiff || !(o.finish === 'combworkMerges' || finishOnCandidate(o.finish))) return []
+    if (!guards.length || !adapter.addedDiff || o.finish !== 'combworkMerges') return []
     // A warning only, which says nothing when it can't finish: never a submit held for the merge's own limit (HI-3377).
     const limits = this.cfg.guardLimits?.() ?? GUARD_CHECK_DEFAULTS
     const r = await checkMergeGuards(guards, () => adapter.addedDiff!(base, revision), { ...limits, timeoutMs: Math.min(limits.timeoutMs, SUBMIT_GUARDS_MS) })
@@ -4022,11 +3997,6 @@ export class Workflow {
       case 'prepareSlot':
       case 'pin':
         await this.platformOf(card).perform(kind, payload)
-        return
-      case 'advanceAnswer':
-        // HI-3235: the platform's handler (its journal first: a replay after a crash runs nothing it may have run), then the
-        // actions its records left (run here, outside its locks).
-        await this.platformOf(card).advanceAnswer?.(card, payload as unknown as AdvanceAnswer, advanceHostOf(this))
         return
       // A finish (HI-2014) ends its lane once all its cards are Done, as `endLaneIfDone` (written before it) still does.
       case 'finish':

@@ -5,12 +5,11 @@
 // P2 spike (#1118): the interface the spike proves; P3 builds it into main.
 
 import type { PlatformId } from '../../shared/platform/descriptors'
-import type { CardState, CheckRanData, FactData, FileChange, Manifest } from '../../shared/workflow/facts'
+import type { CardState, CheckRanData, FileChange, Manifest } from '../../shared/workflow/facts'
 import type { GuardInputs, GuardRefusal } from '../../shared/workflow/guards'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { CardRecord } from '../workflow/factStore'
 import type { ReconcileHooks } from '../workflow/reconcile'
-import type { Write } from '../workflow/runtime'
 import type { Disposable, ObserveEvent } from './observe'
 import type { Containment, DiffRead, Maybe, Unknown } from './types'
 import type { TargetChanges } from '../../shared/types'
@@ -211,159 +210,12 @@ export interface PlatformAdapter {
    * content (None) or the platform can't say.
    */
   content(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): Promise<string | null>
-  /**
-   * How many times a start or a verdict is gathered again from the top while only its fingerprint moved and its answer
-   * by content didn't (`content`), each pass reading everything afresh; absent: once (#1206's rule for every intent).
-   * jj's (HI-2916, HI-3216 for the verdict): any jj operation, Combwork's own included (a slot made, another detached, a
-   * review copy put at the revision reviewed), moves the head its fingerprint keeps, so an intent beside them needs a few
-   * passes. Spent, the intent is refused as evidence that changed.
-   */
-  readonly gathers?: number
   /** A check copy at the card's revision (§16.13 `--isolated`), or null where the platform has no isolation (None). */
   checkCopy(card: CardRecord, s: CardState, folder: string): Promise<string | null>
   /** The project's changes outside an intent (§16.3.1 observe), from the watcher (observe.ts), until disposed. */
   observe(onChange: (e: ObserveEvent) => void): Disposable
-  /**
-   * Once per reconciliation run of the project, after its cards (HI-2882, jj's): the platform's own passes (jj's publish
-   * observations and retained bundles). `more`: work remains for a continuation run. Absent: nothing.
-   */
-  afterRun?(signal?: AbortSignal): Promise<{ more: boolean }>
-  /**
-   * Something its repository watch says may have changed, or its tick (HI-2882): `what` as the watch names it. Whether a
-   * reconciliation run is wanted for it. Absent: always.
-   */
-  invalidated?(what: string): Promise<boolean>
-  /**
-   * HI-3235 (HI-2840/s30, s34; HI-3235/s10–s16): where its descriptor declares a finish Combwork advances by
-   * (`finishAdvances`), the card in Approved with its OK given and no advance unsettled: integrate it if it is ready (its
-   * candidate and checks are the platform's to judge), journaled first and recorded through `host`. Each call first
-   * settles the card's earlier attempts it finds. Called by the generic reconcile, never by a platform check.
-   */
-  advance?(card: CardRecord, s: CardState, host: AdvanceHost): Promise<AdvanceStep>
-  /**
-   * HI-3236: where the finish previews (`finishPreviews`), the card in Approved with its OK given: its preview asked for
-   * the plan now once its platform finds it ready (one open preview, or one pending answer, per card), never an attempt.
-   */
-  advancePreview?(card: CardRecord, s: CardState, host: AdvanceHost): Promise<AdvanceStep>
-  /** HI-3235: the user's answer to an advance's question (ADVANCE_GATES), as its durable action carries it. */
-  advanceAnswer?(card: CardRecord, answer: AdvanceAnswer, host: AdvanceHost): Promise<void>
-  /** HI-3235: the project's journaled advances settled, after a reconciliation run's cards (a crash, a card out of reach). */
-  recoverAdvances?(host: AdvanceHost): Promise<void>
 }
 
-/** HI-3235: an advance call's outcome: nothing to do yet, an earlier attempt unsettled (no new one), or this attempt made. */
-export type AdvanceStep = 'notReady' | 'busy' | { attempted: string }
-
-/** HI-3235: an advance question's answer, bound to what it was asked about (its request, attempt, plan, cycle and state). */
-export interface AdvanceAnswer {
-  request: string
-  gate: string
-  attempt: string
-  plan: string
-  cycle: number
-  state: 'stopped' | 'uncertain' | 'preview'
-  answer: 'approved' | 'declined'
-  /** The project the request was asked in (its workspace's path for it). */
-  project: string
-}
-
-/** HI-3235: what an advance question says: why (a code the window words), what was read, and why it is asked again. */
-export interface AdvanceWords {
-  /** The target and the commit it was to move to (shown short). */
-  target: string
-  result: string
-  why: string
-  detail: string
-  op?: string
-  /** Asked again after an answer that couldn't be acted on: why, as a code the question's message words (FOR_YOU.advance*). */
-  again?: string
-  /**
-   * A refusal's (HI-3365): the finish it came under (`preview`: Combwork never moves the target by itself, it offers a
-   * preview) and when it's tried again: `repository` (refused at the base: once the repository changes) or `plan` (nothing
-   * moved past the base, for a reason of jj's: only once the plan changes).
-   */
-  mode?: 'auto' | 'preview'
-  next?: 'repository' | 'plan'
-}
-
-/** HI-3236: what a preview says: the move (target, from, to), how the candidate was built, and the commits it adds. */
-export interface PreviewWords {
-  target: string
-  expected: string
-  result: string
-  style: string
-  /** The commits added, a line each (a short id and its first line), at most a few. */
-  commits: string
-  /** How many more commits there are beyond those listed. */
-  more: number
-  /** Asked again because the plan changed since the last preview. */
-  again?: 'planChanged'
-}
-
-/** HI-3235: an advance's identity on its card: the cycle it belongs to and its attempt. */
-export interface AdvanceRef {
-  cycle: number
-  attempt: string
-}
-
-/**
- * HI-3235: the generic workflow's records of a platform's advance, each written under the card's transaction and only
- * while the card is still where the call says (its cycle; for an attempt's outcome, that attempt unsettled). The adapter
- * calls these holding its own card and repository locks (card → repository → the board's transaction): none of them
- * takes a repository lock.
- */
-export interface AdvanceHost {
-  /**
-   * HI-3265 (HI-2709, SPEC §16.9.1): the cards this card still waits for (its blockers that aren't Done, one that can't be
-   * read among them), read now: an advance or a preview begins only while it's empty. `attempted`'s write reads it again.
-   */
-  waitsFor(card: CardRecord): string[]
-  /**
-   * `AdvanceAttempted`, read back: false when it couldn't be written or confirmed (the attempt then stops before any
-   * change), or when the card waits for a blocker in that write (HI-3265: the blockers are the advance's authority).
-   */
-  attempted(card: CardRecord, cycle: number, plan: string, attempt: string): Promise<boolean>
-  /** Verified: `Integrated { by: 'combwork' }` once per attempt, and the card moved to Done where the rules act. */
-  advanced(card: CardRecord, ref: AdvanceRef, integrated: Pick<FactData['Integrated'], 'revision' | 'target' | 'result' | 'method' | 'platform'>, also?: (w: Write) => void): Promise<boolean>
-  /** Stopped or uncertain: `AdvanceStopped`, and its question asked (one open request per attempt). */
-  stopped(card: CardRecord, ref: AdvanceRef, plan: string, stop: { code: string; detail?: string; undo: boolean; uncertain: boolean }, words: AdvanceWords): Promise<boolean>
-  /** Settled without `Integrated`: nothing moved, a verified undo, or the user's start again. */
-  resolved(card: CardRecord, ref: AdvanceRef, how: 'nothingMoved' | 'undone' | 'startAgain', detail?: string): Promise<boolean>
-  /** The user's attestation of an answered question: `AdvanceResolved attested`, an `Override` naming `reason`, and Done. */
-  attested(card: CardRecord, ref: AdvanceRef, answer: AdvanceAnswer, reason: string): Promise<boolean>
-  /** A fresh question for the attempt (the consumed `answer`'s retired), saying why it is asked again. */
-  askAgain(card: CardRecord, ref: AdvanceRef, plan: string, state: 'stopped' | 'uncertain', words: AdvanceWords, answer: AdvanceAnswer | null): Promise<boolean>
-  /**
-   * Refused at the base (nothing written), or nothing moved past it for a reason of jj's (HI-3365): the card's comment
-   * saying why, once per cycle, plan and reason.
-   */
-  refused(card: CardRecord, cycle: number, plan: string, words: AdvanceWords): Promise<boolean>
-  /**
-   * HI-3236: the card's preview for `plan` (gate advancePreview, bound to the plan), any earlier preview of the card closed
-   * in the same write: false when the card isn't in Approved at `cycle`, or an advance is unsettled.
-   */
-  askPreview(card: CardRecord, cycle: number, plan: string, words: PreviewWords): Promise<boolean>
-  /**
-   * HI-3390: a preview whose consent no longer holds (`why`: the finish no longer previews, or the card waits for `waits`),
-   * said on the card. `clicked` null: the card's open previews closed in the same write. `clicked`: an Integrate that ran
-   * nothing for that reason, said once for its request. 'recorded': this write said it; 'already': an earlier one did (a
-   * replay); 'changed': nothing written, the reason no longer holding in the write (or no preview open, the card moved
-   * on), for the caller to read the card again; 'failed': nothing committed (HR1's round 1).
-   */
-  previewClosed(card: CardRecord, cycle: number, why: 'finish' | 'blocked', waits: string[], clicked: string | null): Promise<'recorded' | 'already' | 'changed' | 'failed'>
-  /** HI-3236: the user dismissed the preview of `plan` (Not for this plan): that plan isn't previewed again in this cycle. */
-  declinePreview(card: CardRecord, cycle: number, plan: string): Promise<boolean>
-  /** HI-3236: whether the user dismissed the preview of `plan` in `cycle`. */
-  previewDeclined(card: CardRecord, cycle: number, plan: string): boolean
-  /**
-   * HI-3367: an attempt no longer attached to its card's cycle (`ref`: the attempt's own cycle), its marker and, when it may
-   * have moved its target (`warn`), the card's comment saying so, in one write. 'recorded': this write committed them;
-   * 'already': an earlier one did; 'failed': nothing was committed (its journal stays live, to be tried again).
-   */
-  superseded(card: CardRecord, ref: AdvanceRef, warn: { target: string } | null): Promise<'recorded' | 'already' | 'failed'>
-  /** The one-time note that the project's default finish is Combwork's advance (once per project). */
-  noteDefault(card: CardRecord): Promise<void>
-}
 
 /** HI-3152: a waiting card's kept work (`keptWork`): none, proved on `target`, or unproved (`slot` named when one is kept). */
 export type KeptWork = null | { slot: string; target: string } | { unproved: true; slot: string | null }

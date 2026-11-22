@@ -13,7 +13,6 @@ const OWN_CONNECTIONS: Record<string, string> = {
   'db.ts': 'beginTransaction itself',
   'walCheckpointWorker.ts': "the checkpoints' worker: the restart's own transaction",
   'combworkMoveWorker.ts': 'the move worker, on a connection of its own',
-  'platform/jjPublishCommit.ts': "the publish worker's connection to its own database",
   'repoLockCore.ts': "the repository lock's database, on the lock's worker",
   'slots.ts': 'fileSlotConn: a connection of its own, opened with no checkpointer (another process; tests)',
   'workflow/factStore.ts': 'FactStore.open: a connection of its own, opened with no checkpointer (another process; tests)'

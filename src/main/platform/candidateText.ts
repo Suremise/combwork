@@ -1,11 +1,10 @@
-// The candidate's agent-facing logs, one wording for every platform's candidate (Git's gitIntegration.ts, jj's
-// jjCandidates.ts). Kept apart from integration.ts, whose contract imports only types (tests/integrationPortsImports.test.ts).
+// The candidate's agent-facing logs (Git's gitIntegration.ts). Kept apart from integration.ts, whose contract imports
+// only types (tests/integrationPortsImports.test.ts).
 
 import { agentMsg } from '../../shared/agentText'
 
 /**
- * A card's log when a rebased candidate isn't what lands (agent-facing: the builder reads it on the card), each platform's
- * candidate (Git's, gitIntegration.ts; jj's, jjCandidates.ts) saying it in the same words.
+ * A card's log when a rebased candidate isn't what lands (agent-facing: the builder reads it on the card).
  */
 export const CANDIDATE_TEXT = {
   notOnTop: agentMsg({ id: 'queue.candidate.notOnTop', text: "{card}: {revision} rebased onto {expected} isn't on top of the target: rebase it onto the target yourself and submit it again.", note: "A card's log from the merge queue (Rebase and fast-forward): the rebased revision doesn't sit on the target's head, so the card goes back. card: its key; revision and expected: short commit ids." }),

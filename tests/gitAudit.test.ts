@@ -16,7 +16,7 @@ import { timing } from './timing.cjs'
 vi.setConfig({ testTimeout: timing('test.hang') })
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
-type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; compat: string[]; jj: string[] }
+type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; jj: string[] }
 const root = join(__dirname, '..')
 const run = (over: Record<string, string> = {}): Audit => audit(root, over)
 const text = (file: string): string => readFileSync(join(root, file), 'utf8')
@@ -111,14 +111,14 @@ describe('the Git/None cutover audit', () => {
     const adapter = 'src/main/platform/jjPlatform.ts'
     const over: Record<string, string> = {
       [runtime]: `${text(runtime)}
-const modes = { finishes: ['userIntegrates'] as const }
+const modes = { finishes: ['committed'] as const }
 `,
       [form]: `${text(form)}
 const told = { finishes: 3, defaultFinish: 'later' }
 const row = { defaultFinish: ('notChecked' satisfies string) }
 `,
       [adapter]: `${text(adapter)}
-class Modes { 'finishes' = ['userIntegrates'] }
+class Modes { 'finishes' = ['agentMerges'] }
 `
     }
     const lines = (f: string): number => over[f].split(/\n/).length - 1
@@ -198,9 +198,9 @@ const r = (platform: string) => platform === 'none'
   it("exempts a composition only by its data: a switch elsewhere in slotsApp, or on another id in a jj home, fails (HI-3140)", () => {
     const app = 'src/main/slotsApp.ts'
     expect(run({ [app]: `${text(app)}\nconst x = (p: string) => p === 'jj'\n` }).switches).toEqual(["src/main/slotsApp: 1 switches on a platform's id, listed 0"])
-    const cards = 'src/main/jjCards.ts'
-    expect(run({ [cards]: `${text(cards)}\nconst y = (p: string) => p === 'jj'\n` }).switches).toEqual([])
-    expect(run({ [cards]: `${text(cards)}\nconst z = (p: string) => p === 'git'\n` }).switches).toEqual(["src/main/jjCards: 1 switches on a platform's id, listed 0"])
+    const tool = 'src/shared/jjTool.ts'
+    expect(run({ [tool]: `${text(tool)}\nconst y = (p: string) => p === 'jj'\n` }).switches).toEqual([])
+    expect(run({ [tool]: `${text(tool)}\nconst z = (p: string) => p === 'git'\n` }).switches).toEqual(["src/shared/jjTool: 1 switches on a platform's id, listed 0"])
   })
 
   it('fails an exemption nothing uses any more: a NOT_PLATFORM name, a jj home, a listed switch (HI-3140)', () => {
@@ -214,33 +214,22 @@ const r = (platform: string) => platform === 'none'
     expect(Object.values(NOT_PLATFORM as Record<string, string>).every((why) => !!why)).toBe(true)
   })
 
-  it("fails a production import of a path kept only for the tests (HI-3140: jj's candidate modules moved to the platform layer)", () => {
-    expect(run().compat).toEqual([])
-    const reconcile = 'src/main/workflow/reconcile.ts'
-    expect(run({ [reconcile]: `import { checksKeyOf } from './jjCandidateChecks'\n${text(reconcile)}` }).compat).toEqual(['src/main/workflow/reconcile -> src/main/workflow/jjCandidateChecks'])
-    const cards = 'src/main/jjCards.ts'
-    expect(run({ [cards]: `${text(cards)}\nconst later = () => import("./workflow/jjCandidateReturn")\n` }).compat).toEqual(['src/main/jjCards -> src/main/workflow/jjCandidateReturn'])
-    const service = 'src/main/workflow/service.ts'
-    expect(run({ [service]: `${text(service)}\nconst words = require('./jjCandidateReturn')\n` }).compat).toEqual(['src/main/workflow/service -> src/main/workflow/jjCandidateReturn'])
-    // The moved modules themselves, by their new paths: not this check's (the jj edges' below).
-    expect(run({ [reconcile]: `import type { ChecksJournal } from '../platform/jjCandidateChecks'\n${text(reconcile)}` }).compat).toEqual([])
-  })
-
   it("lists each jj module reached from outside the platform layer, edge by edge and name by name (HI-3140)", () => {
     expect(run().jj).toEqual([])
     const edges = JJ_EDGES as Edge[]
     expect(edges.filter((e) => !['impl', 'registry', 'jjUi', 'defect'].includes(e.class) || !e.why || !e.names?.length || (e.class === 'defect' && !e.card)).map((e) => `${e.file} -> ${e.module}`)).toEqual([])
-    // A new edge from the workflow (the moved candidate modules, by their new path), a name beyond its list, one gone.
+    // A new edge from the workflow, a name beyond its list, one gone.
     const reconcile = 'src/main/workflow/reconcile.ts'
-    expect(run({ [reconcile]: `import { checksKeyOf } from '../platform/jjCandidateChecks'\n${text(reconcile)}` }).jj).toEqual(['src/main/workflow/reconcile -> src/main/platform/jjCandidateChecks: unlisted'])
-    const t = text(reconcile)
-    expect(t).toContain('type JjCandidateStep } from')
-    expect(run({ [reconcile]: t.replace('type JjCandidateStep } from', 'type JjCandidateStep, candidateNow } from') }).jj).toEqual(['src/main/workflow/reconcile -> src/main/platform/jjCandidateStep: candidateNow'])
+    expect(run({ [reconcile]: `import { jjRunner } from '../platform/jjRunner'\n${text(reconcile)}` }).jj).toEqual(['src/main/workflow/reconcile -> src/main/platform/jjRunner: unlisted'])
+    const runtime = 'src/main/workflow/runtime.ts'
+    const t = text(runtime)
+    expect(t).toContain('import type { JjCardDeps } from')
+    expect(run({ [runtime]: t.replace('import type { JjCardDeps } from', 'import type { JjCardDeps, JjSubmittedSlot } from') }).jj).toEqual(['src/main/workflow/runtime -> src/main/platform/jjPlatform: JjSubmittedSlot'])
     const diag = 'src/main/diagnostics.ts'
     expect(run({ [diag]: text(diag).replace(/^import \{ jjRunner \} from '\.\/platform\/jjRunner'\r?\n/m, '') }).jj).toEqual(['src/main/diagnostics -> src/main/platform/jjRunner: stale'])
     // jj's homes and the platform layer itself are not edges.
-    const cards = 'src/main/jjCards.ts'
-    expect(run({ [cards]: `import { checksKeyOf } from './platform/jjCandidateChecks'\n${text(cards)}` }).jj).toEqual([])
+    const tool = 'src/shared/jjTool.ts'
+    expect(run({ [tool]: `import { jjRunner } from '../main/platform/jjRunner'\n${text(tool)}` }).jj).toEqual([])
   })
 
   it('fails a new seam call in a listed file, and one in a file with none', () => {

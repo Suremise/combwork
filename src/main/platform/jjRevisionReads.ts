@@ -5,12 +5,14 @@
 
 import { MAX_DIFF_BYTES, isBinary, tooLargeDiff } from '../diffSides'
 import type { GitDiff } from '../../shared/types'
-import { rootFile } from './jjCandidates'
 import { jjContextOf } from './jjDetect'
 import { jjRunner, type JjRunner } from './jjRunner'
 import type { RevisionReads } from './revisionReads'
 import { combworkError } from '../combworkError'
 import { msg } from '../../shared/i18n'
+
+/** A path as jj's `root-file:` pattern names it, quoted. */
+const rootFile = (path: string): string => `root-file:"${path.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 
 const M = {
   unreadable: msg({ id: 'service.jj.revisionUnreadable', defaultMessage: "Couldn't read {path} at {commit}: {error}", description: "A card's revision diff couldn't be read from a jj repository: the file's path, the commit's short id and jj's error." }),
