@@ -9,7 +9,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { timing } from './waits'
 import { commit, gitRepo, sh } from './workflow/harness'
-import { pickCommand, type OperationRequest } from '../src/shared/gitOperations'
+import { pickCommand, shellWord, submoduleUpdateCommand, type OperationRequest } from '../src/shared/gitOperations'
 
 const norm = (p: string): string => resolve(p).toLowerCase()
 /** What the queue counts as building in a folder: none unless a test says. */
@@ -198,8 +198,118 @@ describe('a path git would read as a glob (HI-3501)', () => {
     expect(pickCommand('merge', { path: 'a[1].txt', ...both }, 'resolved')).toBe("git add -A -- ':(literal)a[1].txt'")
     expect(pickCommand('merge', { path: 'app/[id].tsx', ...both }, 'theirs')).toBe("git checkout --theirs -- ':(literal)app/[id].tsx'; git add -- ':(literal)app/[id].tsx'")
     expect(pickCommand('merge', { path: 'd[1].txt', mine: false, theirs: true }, 'mine')).toBe("git rm -- ':(literal)d[1].txt'")
-    expect(pickCommand('merge', { path: "it's here.txt", ...both }, 'resolved')).toBe("git add -A -- 'it'\\''s here.txt'")
+    expect(pickCommand('merge', { path: "it's here.txt", ...both }, 'resolved')).toBe('git add -A -- "it\'s here.txt"')
     expect(pickCommand('merge', { path: 'src/a-b_c.txt', ...both }, 'resolved')).toBe('git add -A -- src/a-b_c.txt')
+  })
+})
+
+describe("a shown command's words read the same in PowerShell and Git Bash (HI-3502, HR2's round 1)", () => {
+  it('a submodule notice names its path literally, one argument, never a second command', () => {
+    expect(submoduleUpdateCommand('vendor/lib')).toBe('git submodule update -- vendor/lib')
+    expect(submoduleUpdateCommand('third party/lib')).toBe("git submodule update -- 'third party/lib'")
+    expect(submoduleUpdateCommand('vendor; Write-Output marker')).toBe("git submodule update -- 'vendor; Write-Output marker'")
+    expect(submoduleUpdateCommand('libs/[id] x')).toBe("git submodule update -- ':(literal)libs/[id] x'")
+    expect(submoduleUpdateCommand("it's lib")).toBe('git submodule update -- "it\'s lib"')
+    // Each shell expands something inside double quotes: with an apostrophe too, nothing pastes the same in both.
+    for (const p of ["it's $HOME", "it's `x", 'it’s $x', "it's \"q\""]) expect(submoduleUpdateCommand(p)).toBeNull()
+  })
+
+  it('quotes a word in single quotes, else double quotes, else not at all', () => {
+    expect(shellWord('a-b_c/d.txt')).toBe('a-b_c/d.txt')
+    expect(shellWord('a b;c&d|e$f`g')).toBe("'a b;c&d|e$f`g'")
+    expect(shellWord('it’s')).toBe('"it’s"')
+    expect(shellWord("it's!")).toBeNull()
+  })
+})
+
+describe('a submodule in conflict (HI-3502)', () => {
+  /** git, with a local submodule allowed (git refuses file:// clones by default). */
+  const sub = (cwd: string, ...args: string[]): string => sh(cwd, '-c', 'protocol.file.allow=always', ...args)
+  /** The index's commit of `lib` (stage 0). */
+  const staged = (): string => sh(proj, 'ls-files', '-s', '--', 'lib').split(/\s+/)[1] ?? ''
+  /**
+   * A submodule `lib` at a first commit in proj, then moved to `main` on main and to `side` on a branch `side`: two
+   * commits of its own repository that diverge from the first, so neither side's move fast-forwards and git leaves it
+   * in conflict.
+   */
+  function submodule(): { main: string; side: string } {
+    const src = join(w.path!, `sub${n}`)
+    mkdirSync(src, { recursive: true })
+    gitRepo(src)
+    const start = commit(src, { 'f.txt': '1\n' }, 'sub base')
+    const main = commit(src, { 'f.txt': '2\n' }, 'sub main')
+    sh(src, 'switch', '-q', '-c', 'other', start)
+    const side = commit(src, { 'g.txt': '3\n' }, 'sub side')
+    sub(proj, 'submodule', '-q', 'add', src, 'lib')
+    const at = (c: string): void => void sh(join(proj, 'lib'), 'checkout', '-q', c)
+    at(start)
+    sh(proj, 'add', '-A')
+    sh(proj, 'commit', '-q', '-m', 'lib at base')
+    sh(proj, 'switch', '-q', '-c', 'side')
+    at(side)
+    sh(proj, 'add', 'lib')
+    sh(proj, 'commit', '-q', '-m', 'lib on side')
+    sh(proj, 'switch', '-q', 'main')
+    at(main)
+    sh(proj, 'add', 'lib')
+    sh(proj, 'commit', '-q', '-m', 'lib on main')
+    return { main, side }
+  }
+
+  it('Use theirs stages their commit, not the one the folder has checked out; Continue commits it', async () => {
+    const c = submodule()
+    expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
+    const lib = (await state())!.conflicts.find((x) => x.path === 'lib')!
+    expect(lib).toEqual({ path: 'lib', mine: true, theirs: true, submodule: { mine: c.main, theirs: c.side } })
+    expect(pickCommand('merge', lib, 'theirs')).toBe(`git update-index --cacheinfo 160000 ${c.side} lib`)
+    expect(sh(join(proj, 'lib'), 'rev-parse', 'HEAD')).toBe(c.main)
+    await step({ what: 'merge', file: 'lib', pick: 'theirs' })
+    expect(staged()).toBe(c.side)
+    expect((await state())?.conflicts).toEqual([])
+    await step({ what: 'merge', step: 'continue' })
+    expect(sh(proj, 'rev-parse', 'HEAD:lib')).toBe(c.side)
+    // Its folder is left as it was: the notice says how to check the commit out there.
+    expect(sh(join(proj, 'lib'), 'rev-parse', 'HEAD')).toBe(c.main)
+  })
+
+  it('Use mine stages mine, even with their commit checked out in its folder', async () => {
+    const c = submodule()
+    expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
+    sh(join(proj, 'lib'), 'checkout', '-q', c.side)
+    await step({ what: 'merge', file: 'lib', pick: 'mine' })
+    expect(staged()).toBe(c.main)
+    expect((await state())?.conflicts).toEqual([])
+  })
+
+  it("a rebase: Use mine stages the replayed commit's move (git's theirs), never dropping it", async () => {
+    const c = submodule()
+    sh(proj, 'switch', '-q', 'side')
+    expect(() => sh(proj, 'rebase', 'main')).toThrow()
+    const lib = (await state())!.conflicts.find((x) => x.path === 'lib')!
+    expect(lib.submodule).toEqual({ mine: c.side, theirs: c.main })
+    await step({ what: 'rebase', file: 'lib', pick: 'mine' })
+    expect(staged()).toBe(c.side)
+    await step({ what: 'rebase', step: 'continue' })
+    expect(sh(proj, 'rev-parse', 'HEAD:lib')).toBe(c.side)
+    expect(sh(proj, 'rev-parse', 'HEAD~1')).toBe(sh(proj, 'rev-parse', 'main'))
+  })
+
+  it('a side that deleted the submodule: Use that side removes it; Use the other stages its commit', async () => {
+    const c = submodule()
+    sh(join(proj, 'lib'), 'checkout', '-q', c.main)
+    sh(proj, 'rm', '-q', 'lib')
+    sh(proj, 'commit', '-q', '-m', 'lib gone on main')
+    expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
+    const lib = (await state())!.conflicts.find((x) => x.path === 'lib')!
+    expect(lib).toEqual({ path: 'lib', mine: false, theirs: true, submodule: { theirs: c.side } })
+    await step({ what: 'merge', file: 'lib', pick: 'theirs' })
+    expect(staged()).toBe(c.side)
+    expect((await state())?.conflicts).toEqual([])
+    await step({ what: 'merge', step: 'abort' })
+    expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
+    await step({ what: 'merge', file: 'lib', pick: 'mine' })
+    expect(staged()).toBe('')
+    expect((await state())?.conflicts).toEqual([])
   })
 })
 

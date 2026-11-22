@@ -13,6 +13,8 @@
 //   error and `git switch --detach`, shown in Slots and copies, not lent; the lock gone, it is lent again.
 // - HI-3470: a merge left in conflict in the project folder (two files): Branches & remotes' banner opens Changes,
 //   whose panel lists both with their buttons (Continue waiting); Use theirs settles one; Abort, confirmed, ends it.
+// - HI-3502: a submodule at `third party/lib` merged into conflict: Use theirs stages their commit, its folder left at
+//   mine, and the notice gives `git submodule update -- 'third party/lib'`.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (no agent is started).
 // Dev build only (#1578): its slots are lent and released through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
@@ -256,6 +258,56 @@ const clearPopups = async (page) => !!(await until(async () => {
     await mergeAsk.waitFor({ timeout: HUNG_MS })
     await mergeAsk.getByRole('button', { name: 'Abort', exact: true }).click()
     check('…Abort ends the merge: the folder back at main, the panel gone', !!(await until(async () => !fs.existsSync(path.join(gitDirA, 'MERGE_HEAD')) && (await mergePanel.count()) === 0, HUNG_MS)) && ga(['rev-parse', 'HEAD']).trim() !== mainHead && ga(['status', '--porcelain']).trim() === '' && fs.readFileSync(path.join(fx.alpha, 'c1.txt'), 'utf8') === 'main\n', ga(['status', '--porcelain']))
+
+    // --- HI-3502 (HR2's round 1): a submodule at a path with a space, moved to diverging commits on main and a branch,
+    // merged into conflict. Use theirs stages their commit (the folder keeps mine checked out), and the notice says so
+    // with `git submodule update`, its path quoted as one argument.
+    const subSrc = path.join(fx.tools, 'hi3502-sub')
+    lib.gitProject(subSrc, { 'f.txt': '1\n' })
+    const gs = (args) => lib.git(subSrc, ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args]).trim()
+    const subStart = gs(['rev-parse', 'HEAD'])
+    fs.writeFileSync(path.join(subSrc, 'f.txt'), '2\n')
+    gs(['commit', '-qam', 'sub main'])
+    const subMain = gs(['rev-parse', 'HEAD'])
+    gs(['switch', '-q', '-c', 'other', subStart])
+    fs.writeFileSync(path.join(subSrc, 'g.txt'), '3\n')
+    gs(['add', 'g.txt'])
+    gs(['commit', '-qm', 'sub side'])
+    const subSide = gs(['rev-parse', 'HEAD'])
+    const libRel = 'third party/lib'
+    const libDir = path.join(fx.alpha, 'third party', 'lib')
+    ga(['-c', 'protocol.file.allow=always', 'submodule', '-q', 'add', subSrc, libRel])
+    const at = (c) => lib.git(libDir, ['checkout', '-q', c])
+    at(subStart)
+    ga(['add', '-A'])
+    ga(['commit', '-qm', 'lib at start'])
+    ga(['switch', '-q', '-c', 'hi3502-side'])
+    at(subSide)
+    ga(['add', '--', libRel])
+    ga(['commit', '-qm', 'lib on side'])
+    ga(['switch', '-q', 'main'])
+    at(subMain)
+    ga(['add', '--', libRel])
+    ga(['commit', '-qm', 'lib on main'])
+    ga(['merge', '--no-edit', 'hi3502-side'], false)
+    check('HI-3502: the project folder is mid-merge with its submodule in conflict', fs.existsSync(path.join(gitDirA, 'MERGE_HEAD')) && ga(['ls-files', '-u']).includes('160000'), ga(['ls-files', '-u']))
+    check('…its notifications dismissed', await clearPopups(page))
+    await page.locator('.git-sections [data-section="branches"]').click()
+    await banner.locator('[data-action="open-operation"]').click()
+    const libRow = mergePanel.locator(`[data-conflict="${libRel}"]`)
+    check('…the panel lists the submodule', !!(await until(async () => (await libRow.count()) === 1, HUNG_MS)), await mergePanel.innerText().catch(() => ''))
+    await libRow.locator('[data-pick="theirs"]').click()
+    const note = page.locator('.popup', { hasText: 'is a submodule' })
+    const wantNote = `${libRel} is a submodule: its commit ${subSide.slice(0, 7)} is staged. Its folder is left as it is: to check that commit out there, run git submodule update -- '${libRel}'`
+    // Read while it shows (a notice times out): its text, and a screenshot of it.
+    let noteText = ''
+    const noted = !!(await until(async () => {
+      noteText = await note.first().innerText().catch(() => '')
+      if (!noteText.includes(wantNote)) return false
+      await note.first().screenshot({ path: path.join(fx.shots, 'slotpool-7-submodule-notice.png') }).catch(() => undefined)
+      return true
+    }, HUNG_MS))
+    check('…Use theirs stages their commit, its folder left at mine; the notice gives the command, its path one quoted argument', noted && ga(['ls-files', '-s', '--', libRel]).split(/\s+/)[1] === subSide && lib.git(libDir, ['rev-parse', 'HEAD']).trim() === subMain, `${noteText} | staged ${ga(['ls-files', '-s', '--', libRel])}`)
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
