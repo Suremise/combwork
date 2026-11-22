@@ -434,6 +434,7 @@
   "service.gitStash.busy": "有运行或智能体正在 {folder} 中工作（{what}）：未做任何操作。请在其完成后重试。",
   "service.gitStash.conflicted": "{file} 在 {folder} 中存在冲突：未做任何操作。请先解决它。",
   "service.gitStash.failed": "Git 拒绝了：{why}",
+  "service.gitStash.moved": "在此期间储藏列表已变化，且有多个储藏与你所选的相同：未做任何操作。请重新查看。",
   "service.gitStash.gone": "该储藏已不在列表中（在此期间已被删除或弹出）：未做任何操作。请重新查看。",
   "service.gitStash.invalid": "请求有误：未做任何操作。",
   "service.gitStash.notDropped": "储藏已应用，但 Git 没有删除它：{why}。它仍在列表中。",

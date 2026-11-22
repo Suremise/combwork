@@ -434,6 +434,7 @@
   "service.gitStash.busy": "Ein Lauf oder ein Agent arbeitet in {folder} ({what}): Es wurde nichts getan. Versuche es erneut, sobald die Arbeit dort fertig ist.",
   "service.gitStash.conflicted": "{file} hat einen Konflikt in {folder}: Es wurde nichts getan. Löse ihn zuerst.",
   "service.gitStash.failed": "Git hat abgelehnt: {why}",
+  "service.gitStash.moved": "Die Stashes haben sich inzwischen geändert, und mehr als einer gleicht dem gewählten: Es wurde nichts getan. Sieh noch einmal nach.",
   "service.gitStash.gone": "Dieser Stash ist nicht mehr in der Liste (inzwischen gelöscht oder gepoppt): Es wurde nichts getan. Sieh noch einmal nach.",
   "service.gitStash.invalid": "Das wurde falsch angefragt: Es wurde nichts getan.",
   "service.gitStash.notDropped": "Der Stash wurde angewendet, aber Git hat ihn nicht gelöscht: {why}. Er ist noch in der Liste.",

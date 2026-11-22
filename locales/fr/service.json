@@ -434,6 +434,7 @@
   "service.gitStash.busy": "Une exécution ou un agent travaille dans {folder} ({what}) : rien n’a été fait. Réessaie une fois le travail terminé.",
   "service.gitStash.conflicted": "{file} est en conflit dans {folder} : rien n’a été fait. Règle-le d’abord.",
   "service.gitStash.failed": "Git a refusé : {why}",
+  "service.gitStash.moved": "Les stashs ont changé entre-temps, et plusieurs ressemblent à celui que tu as choisi : rien n’a été fait. Regarde de nouveau.",
   "service.gitStash.gone": "Ce stash n’est plus dans la liste (supprimé ou sorti entre-temps) : rien n’a été fait. Regarde de nouveau.",
   "service.gitStash.invalid": "La demande était incorrecte : rien n’a été fait.",
   "service.gitStash.notDropped": "Le stash a été appliqué, mais git ne l’a pas supprimé : {why}. Il est toujours dans la liste.",

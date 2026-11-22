@@ -4,7 +4,8 @@
 // Apply puts a stash in and keeps it, and a second Apply is refused while the folder has changes to its file; Pop puts
 // Combwork's in and drops it; a Pop that conflicts keeps its stash, the file left with git's markers, said in a warning,
 // and (HI-3518) shown in Changes' panel as left in conflict, from that stash, where Use the stash's settles it;
-// Drop (asked first) deletes the last, and the section goes. Screenshots of the section, Show's diff and the Drop
+// Drop (asked first) deletes the row clicked (HI-3527: the bottom of two rows of one commit, then the top), the list
+// showing the rows git has. Screenshots of the section, Show's diff and the Drop
 // question in both themes. Git's global config the suite's own. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
@@ -139,14 +140,30 @@ const check = (name, ok, extra = '') => {
     await left.locator('[data-conflict="b.txt"] [data-pick="theirs"]').click()
     check("…Use the stash's takes its side and settles the file; nothing left, the panel goes", !!(await lib.until(async () => (await left.count()) === 0, HUNG_MS)) && read('b.txt') === 'b stashed\n' && g('diff', '--name-only', '--diff-filter=U').trim() === '', `${read('b.txt')} | ${await text(left).catch(() => '')}`)
 
-    // --- Drop, asked first.
-    await row(plain).locator('[data-action="stash-drop"]').click()
+    // --- Drop, asked first. HI-3527: of the row clicked, though another row lists the same commit (`git stash store`
+    // of it, under another stash: git lists a commit again only under another top).
+    const between = g('stash', 'create').trim()
+    g('stash', 'store', '-m', 'between', between)
+    g('stash', 'store', '-m', 'relisted', plain)
+    const messages = () => g('stash', 'list', '--format=%gs').split(/\r?\n/).filter(Boolean).map((m) => m.replace(/^On [^:]+: /, ''))
+    // A write in the folder: Changes reads again, and the list with it.
+    fs.writeFileSync(path.join(alpha, 'poke.txt'), 'poke\n')
+    const at = (i) => section.locator(`[data-stash-index="${i}"]`)
+    const shownRows = async () => Promise.all((await section.locator('[data-stash]').all()).map(async (r) => `${await r.getAttribute('data-stash-index')}:${await r.getAttribute('data-stash')}`))
+    check('HI-3527: the list shows both rows of the commit, and the one between', !!(await lib.until(async () => (await shownRows()).join(' ') === `0:${plain} 1:${between} 2:${plain}`, HUNG_MS)), (await shownRows()).join(' '))
+    await at(2).locator('[data-action="stash-drop"]').click()
     q = ask('Drop the stash “my own work”?')
     await q.waitFor({ timeout: HUNG_MS })
     check('Drop asks first, saying its files and its commit', /the 1 file it holds/.test(await text(q)) && (await text(q)).includes(plain.slice(0, 10)), await text(q))
     await shoot(q, '3-drop')
     await q.getByRole('button', { name: 'Drop', exact: true }).click()
-    check('…dropped: no stash left, the section gone, the commit said', !!(await lib.until(async () => stashes().length === 0 && (await section.count()) === 0, HUNG_MS)) && (await toasts()).includes(plain), await toasts())
+    check('…dropped: the row clicked, the commit said; the other row of its commit kept', !!(await lib.until(async () => messages().join(' | ') === 'relisted | between', HUNG_MS)) && (await toasts()).includes(plain), `${messages().join(' | ')} | ${await toasts()}`)
+    check('…the list shows the rows git has, no more', !!(await lib.until(async () => (await shownRows()).join(' ') === `0:${plain} 1:${between}` && /relisted/.test(await text(at(0))), HUNG_MS)), (await shownRows()).join(' '))
+    await at(0).locator('[data-action="stash-drop"]').click()
+    q = ask('Drop the stash “relisted”?')
+    await q.waitFor({ timeout: HUNG_MS })
+    await q.getByRole('button', { name: 'Drop', exact: true }).click()
+    check('…the top row by its own Drop: the one between is left, listed alone', !!(await lib.until(async () => messages().join(' | ') === 'between' && (await shownRows()).join(' ') === `0:${between}`, HUNG_MS)), `${messages().join(' | ')} | ${(await shownRows()).join(' ')}`)
   } finally {
     await app.close()
   }

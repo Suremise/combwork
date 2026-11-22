@@ -19,7 +19,7 @@ import type { FileGitDone, FolderChangeAction, FolderChangesDone, MergeResult } 
 import type { Operation } from '../../shared/platform/descriptors'
 import type { OperationRequest, OperationStepResult } from '../../shared/gitOperations'
 import type { RemotePrune, RepoHealth } from '../../shared/gitHealth'
-import type { StashApplied, StashFile, StashRequest, StashRow } from '../../shared/gitStashes'
+import type { StashApplied, StashFile, StashRef, StashRequest, StashRow } from '../../shared/gitStashes'
 import type { GitDiff } from '../../shared/types'
 
 /**
@@ -142,6 +142,6 @@ export interface RepoOps {
    * there before git does and refuses by throwing.
    */
   applyStash(projectPath: string, folder: string, req: StashRequest, guard?: () => Promise<void> | void): Promise<StashApplied>
-  /** The stash dropped, under the repository lock, only while its place in the list is still it. */
-  dropStash(projectPath: string, commit: string): Promise<void>
+  /** The row of the list dropped (HI-3527: that row, never another holding its commit), under the repository lock. */
+  dropStash(projectPath: string, ref: StashRef): Promise<void>
 }
