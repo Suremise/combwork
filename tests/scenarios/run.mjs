@@ -57,12 +57,14 @@ import { endRunTemp, msysTempKept, startRunTemp } from '../runTemp.mts'
 
 const require = createRequire(import.meta.url)
 // What may be deleted (#253): never what a card that isn't Done cites, nothing earlier while the board can't be read.
-const evidence = require('../e2e/evidence.cjs').evidenceFor(join(import.meta.dirname, '..', '..'))
+const { evidenceFor, noBoardRefusal } = require('../e2e/evidence.cjs')
+const evidence = evidenceFor(join(import.meta.dirname, '..', '..'), { since: Date.now() })
 const spare = (p) => evidence.protects(p)
 // Without the board nothing a run made could be removed, so copies would pile up (#285): as the e2e runner, it doesn't
-// start (CW_TEST_NO_BOARD=1: no board cites test output on this machine).
+// start (CW_TEST_BOARD names the board for a checkout outside the workspace; under CW_TEST_NO_BOARD=1 a run removes
+// only what it made, HI-3514).
 if (!evidence.ok) {
-  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set CW_TEST_NO_BOARD=1 if no Combwork board cites test output on this machine.`)
+  console.error(noBoardRefusal(evidence.why))
   process.exit(2)
 }
 // The run's own temp folder in combwork-test\tmp (HI-2102): the test copies of Combwork and the CLIs its scenarios start get it
