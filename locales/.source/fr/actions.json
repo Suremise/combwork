@@ -74,7 +74,6 @@
   "actions.mcp.openFailed": "Could not open the file",
   "actions.mcp.rename": "Choose Another Name",
   "actions.mcp.replace": "Replace",
-  "actions.mcp.replaceMessage": "The workspace has a server named {name}.",
   "actions.mcp.replaceTitle": "Replace {name}?",
   "actions.mcp.updateFailedAdded": "Could not update the server",
   "actions.pane.edge": "{agent} can't move further {dir, select, left {left} right {right} up {up} other {down}}",

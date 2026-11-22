@@ -6,8 +6,9 @@
 // Outdated is measured against locales/.source/<code>/<area>.json, the English each translation was made from (id →
 // that English). After translating, record it: `npm run i18n:coverage -- --record <code>` records the English of the
 // language's translations that have no record yet; after updating outdated ones, name them:
-// `npm run i18n:coverage -- --record <code> <id> <id>…`.
-import { existsSync, mkdirSync, readdirSync, readFileSync } from 'fs'
+// `npm run i18n:coverage -- --record <code> <id> <id>…`. A message removed from the English leaves its record behind, which
+// i18n:check fails on (HI-3519): `npm run i18n:coverage -- --prune` drops those of every language.
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { areaOf, rootArg, writeKeepingEndings } from './i18nExtract.mjs'
@@ -78,11 +79,43 @@ export function recordSource(root, code, ids = []) {
   return take
 }
 
+/**
+ * Drops a language's records of ids the English catalogue no longer has (HI-3519: i18n:check fails on one), each area's
+ * file rewritten only if it changed, with its line endings, and removed once it records nothing. Returns the ids dropped.
+ */
+export function pruneSource(root, code) {
+  const english = englishMessages(root)
+  const dir = join(root, 'locales', '.source', code)
+  if (!existsSync(dir)) return []
+  const dropped = []
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.json')).sort()) {
+    let data
+    try {
+      data = JSON.parse(readFileSync(join(dir, f), 'utf8'))
+    } catch {
+      continue // i18n:check names a damaged record
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) continue
+    const gone = Object.keys(data).filter((id) => !(id in english))
+    if (!gone.length) continue
+    dropped.push(...gone)
+    const kept = Object.fromEntries(Object.entries(data).filter(([id]) => id in english))
+    if (Object.keys(kept).length) writeKeepingEndings(join(dir, f), `${JSON.stringify(kept, null, 2)}\n`)
+    else rmSync(join(dir, f))
+  }
+  return dropped
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2)
   const root = rootArg(args)
   const at = args.indexOf('--record')
-  if (at >= 0) {
+  if (args.includes('--prune')) {
+    for (const code of translatedLanguages(root)) {
+      const dropped = pruneSource(root, code)
+      console.log(`${code}: dropped ${dropped.length} recorded English of messages that are gone${dropped.length ? ` (${dropped.join(', ')})` : ''}`)
+    }
+  } else if (at >= 0) {
     const code = args[at + 1]
     if (!code || !translatedLanguages(root).includes(code)) {
       console.error(`--record <code>: a language in locales/ (${translatedLanguages(root).join(', ')})`)

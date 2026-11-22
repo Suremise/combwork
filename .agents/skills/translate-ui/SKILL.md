@@ -41,7 +41,8 @@ the shared note `plans/2026-10-14-i18n-design.md`.
    locale's own words for Combwork's names (Version Control → Workflow, the presets, the Assistant), as its other messages
    have them, and each language's plural forms (`many` in es and fr; `few` and `many` in pl; only `other` in ja and
    zh-CN).
-4. `npm run i18n:check` must pass: an extra key (a message removed: drop it from each locale), broken ICU, a changed
+4. `npm run i18n:check` must pass: an extra key (a message removed: drop it from each locale, and its recorded English
+   with `npm run i18n:coverage -- --prune`), broken ICU, a changed
    placeholder or a control character fails it. A missing translation shows English and doesn't fail, so no check
    catches it: the builder does, and the reviewer checks it.
 5. `npm run i18n:coverage` lists what is missing or outdated. Once translated, record the English they were made from:

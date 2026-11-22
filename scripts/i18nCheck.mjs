@@ -4,6 +4,7 @@
 //   - a message that isn't valid ICU, or whose structure differs from the English: a placeholder renamed or dropped
 //     ({name} → {nazwa}), a plural without `other`, a tag that isn't the English's;
 //   - a file that isn't an object of texts, or a message filed under another area's file;
+//   - a recorded English (locales/.source/<code>) of an id the English catalogue doesn't have (HI-3519);
 //   - a control character (U+0000–U+001F, U+007F) in a translation, but for a line break where the English has one, or
 //     a lone surrogate: formatjs verify lets both through, and the window shows them as ▯ (#888).
 // It runs `formatjs verify --source-locale en --extra-keys --structural-equality` (without --missing-keys) once per
@@ -139,6 +140,32 @@ export function verifyWithCli(code, english, translated) {
   }
 }
 
+/**
+ * What's wrong with a language's records of the English its translations were made from (locales/.source/<code>, which
+ * i18n:coverage reads): an id the English catalogue doesn't have (HI-3519: its message is gone, and nothing else drops
+ * it; `npm run i18n:coverage -- --prune` does), or a file that isn't an object of texts.
+ */
+export function sourceProblems(root, code, english = englishMessages(root)) {
+  const dir = join(root, 'locales', '.source', code)
+  if (!existsSync(dir)) return []
+  const problems = []
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.json')).sort()) {
+    let data
+    try {
+      data = JSON.parse(readFileSync(join(dir, f), 'utf8'))
+    } catch (e) {
+      problems.push(`.source/${code}/${f}: not JSON (${String(e.message).split(/\r?\n/)[0]})`)
+      continue
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      problems.push(`.source/${code}/${f}: not an object of recorded English (id → text)`)
+      continue
+    }
+    for (const id of Object.keys(data)) if (!(id in english)) problems.push(`.source/${code}/${f}: ${id} is recorded, but the English has no such message (npm run i18n:coverage -- --prune drops it)`)
+  }
+  return problems
+}
+
 /** Every language's problems (code → lines), and which way they were checked. */
 export function checkTranslations(root = ROOT, { js = !hasNativeCli() } = {}) {
   const english = englishMessages(root)
@@ -146,7 +173,7 @@ export function checkTranslations(root = ROOT, { js = !hasNativeCli() } = {}) {
   for (const code of translatedLanguages(root)) {
     const { messages: read, problems } = readLanguage(root, code, english)
     const messages = Object.fromEntries(Object.entries(read).map(([id, text]) => [id, asEnglishPlaceholders(id, text)]))
-    results[code] = [...problems, ...(js ? verifyWithJs(english, messages) : verifyWithCli(code, english, messages))]
+    results[code] = [...problems, ...sourceProblems(root, code, english), ...(js ? verifyWithJs(english, messages) : verifyWithCli(code, english, messages))]
   }
   return { results, engine: js ? 'js' : 'cli' }
 }
