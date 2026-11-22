@@ -5947,6 +5947,21 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
     and with several and none at its place, Combwork refuses, saying the stashes changed and to look again. Pop drops
     that row, and the list keys its rows and Show by row. Show reads by commit alone: rows of one commit hold the same
     files.
+  - **Another git between the check and the drop** (HI-3533): `git stash drop` takes only a place, in a process of its
+    own, and Combwork's repository lock holds only its own gits: one in a terminal or an agent's session that pushes or
+    drops a stash between Combwork's check of the place and git's drop makes git drop another stash. Git can't drop
+    by identity, so Combwork checks what git did: its drop runs without `--quiet` and git names the commit it dropped;
+    the drop is the row's only when that is the row's commit **and** the list read again has one row fewer with its
+    commit and message (HR1's round 1: another row of the same commit, listed meanwhile, can be what moved onto its
+    place). Anything else is stored back at once (`git stash store`) and the drop refused, naming that commit. Its
+    message is the one the list had for a row of that commit it now has one fewer of; a row made meanwhile, whose
+    message only git's dropped entry held, comes back under its commit's own subject (which `git stash push` makes the
+    same as its message). The one put back goes to the top of the list (git can't put it back in its place); the row
+    chosen is still listed, and a Pop's changes still applied. If git refuses to store it back, the error says it isn't
+    listed and gives `git stash store <commit>`, which lists it again (git keeps its objects a while). Git's reply
+    naming no commit is taken as the drop asked, and logged. This is best effort, decided on the card (HI-3533, option
+    A): the stash chosen is never dropped in a race, and anything git drops instead is put back or named for recovery;
+    no stronger guarantee (an atomic drop by identity) is sought.
 - **A detach that keeps failing** (HI-3467): a clean free Git slot whose detach at its target fails for any other reason
   (an index lock, files in the way, git unable to read its head or the target's, the target's branch gone; not its
   card's own work, which keeps it) stays not ready, and the same record (`slot_operation:`, `what` `detach`) keeps git's

@@ -439,6 +439,7 @@
   "service.gitStash.notDropped": "El stash se aplicó, pero git no lo eliminó: {why}. Sigue en la lista.",
   "service.gitStash.operation": "Git está en medio de {what, select, merge {una fusión} rebase {un rebase} am {un am} cherryPick {un cherry-pick} bisect {un bisect} other {un revert}} en {folder}: no se hizo nada. Termínalo primero (el panel de arriba).",
   "service.gitStash.overlap": "{file} tiene cambios sin confirmar en {folder}, y el stash también lo contiene: no se hizo nada. Confírmalo o apártalo primero.",
+  "service.gitStash.raced": "Otro git cambió los stashes justo cuando Combwork eliminaba este, así que git eliminó otro stash: {commit}. {back, select, yes {Combwork lo volvió a poner, arriba de la lista, así que no se pierde nada.} other {Combwork no pudo volver a ponerlo, así que ahora no está en la lista: git stash store {commit} lo vuelve a listar (git conserva sus cambios un tiempo).}} El stash que elegiste no se eliminó{pop, select, yes {, y sus cambios se aplicaron} other {}}. Vuelve a mirar.",
   "service.gitStash.session": "La sesión de {agent} está en {folder}: no se hizo nada. Detenla primero.",
   "service.gitStash.slotChanged": "{slot} cambió mientras tanto (prestado, liberado, o algo de Combwork empezó en él): no se hizo nada. Vuelve a mirar.",
   "service.gitStash.slotProcess": "Un proceso tiene abierto un archivo o una carpeta de {slot}: no se hizo nada. Ciérralo (una terminal, un editor) y vuelve a intentarlo.",

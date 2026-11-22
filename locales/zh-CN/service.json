@@ -439,6 +439,7 @@
   "service.gitStash.notDropped": "储藏已应用，但 Git 没有删除它：{why}。它仍在列表中。",
   "service.gitStash.operation": "Git 在 {folder} 中正处于{what, select, merge {合并} rebase {变基} am {am} cherryPick {拣选（cherry-pick）} bisect {二分查找（bisect）} other {还原（revert）}}过程中：未做任何操作。请先完成它（上方的面板）。",
   "service.gitStash.overlap": "{file} 在 {folder} 中有未提交的更改，而储藏也包含它：未做任何操作。请先提交或搁置它。",
+  "service.gitStash.raced": "就在 Combwork 删除此储藏时，另一个 git 更改了储藏列表，因此 git 删除了另一个储藏 {commit}。{back, select, yes {Combwork 已将其放回列表顶部，没有任何丢失。} other {Combwork 无法将其放回，因此它现在不在列表中：git stash store {commit} 可将其重新列出（git 会暂时保留其更改）。}}你所选的储藏未被删除{pop, select, yes {，且其更改已应用} other {}}。请重新查看。",
   "service.gitStash.session": "{agent} 的会话在 {folder} 中：未做任何操作。请先停止它。",
   "service.gitStash.slotChanged": "{slot} 在此期间发生了变化（被借出、被释放，或 Combwork 的某项操作已在其中启动）：未做任何操作。请重新查看。",
   "service.gitStash.slotProcess": "有进程打开了 {slot} 中的文件或文件夹：未做任何操作。请关闭它（终端、编辑器）后重试。",

@@ -439,6 +439,7 @@
   "service.gitStash.notDropped": "スタッシュは適用されましたが、Gitが削除しませんでした：{why}。まだ一覧にあります。",
   "service.gitStash.operation": "{folder}のGitは{what, select, merge {マージ} rebase {リベース} am {am} cherryPick {チェリーピック} bisect {bisect} other {リバート}}の途中です。何も行っていません。先にそれを終えてください（上のパネル）。",
   "service.gitStash.overlap": "{file}には{folder}でコミットされていない変更があり、スタッシュにも含まれています。何も行っていません。先にコミットするか退避してください。",
+  "service.gitStash.raced": "Combwork がこのスタッシュを削除したちょうどその時に別の git がスタッシュを変更したため、git は別のスタッシュ {commit} を削除しました。{back, select, yes {Combwork はそれを一覧の先頭に戻したので、失われたものはありません。} other {Combwork はそれを戻せなかったため、今は一覧にありません。git stash store {commit} で一覧に戻せます（git はその変更をしばらく保持します）。}}選んだスタッシュは削除されていません{pop, select, yes {。その変更は適用済みです} other {}}。もう一度確認してください。",
   "service.gitStash.session": "{agent}のセッションが{folder}にあります。何も行っていません。先に停止してください。",
   "service.gitStash.slotChanged": "{slot}がその間に変わりました（貸し出し、解放、またはCombworkの処理が開始）。何も行っていません。もう一度確認してください。",
   "service.gitStash.slotProcess": "{slot}内のファイルまたはフォルダーをプロセスが開いています。何も行っていません。それ（ターミナルやエディター）を閉じてもう一度お試しください。",
