@@ -637,6 +637,8 @@
   "tips.resumeLongIdle.text": "Una conversación inactiva durante más de una hora probablemente ha perdido su caché de prompts, así que reanudarla puede costar muchos tokens. Reanudar dice cuánto tiempo lleva inactiva y qué tamaño tiene, y ofrece Archivar y empezar de nuevo en su lugar.",
   "tips.stashes.text": "Control de versiones → Cambios → Stashes lista los stashes del repositorio, los de Apartar de Combwork con su tarjeta: muestra lo que contiene cada uno y luego aplícalo, sácalo (pop) o elimínalo.",
   "tips.stashes.title": "Ver, aplicar o eliminar tus stashes de git",
+  "tips.branchMoves.text": "Control de versiones → Historial → Movimientos lista cada vez que una rama se movió, tal como lo guarda el reflog de git: las fusiones de tarjetas de Combwork, commits, rebases, resets y pulls. Restaurar a este punto… devuelve la rama atrás, mostrando antes qué commits pierde o recupera.",
+  "tips.branchMoves.title": "Deshacer un reset, rebase o fusión de una rama",
   "tips.renameBranch.title": "Renombra una rama, también en su remoto",
   "tips.renameBranch.text": "Renombrar… (✎) en una rama de Control de versiones → Ramas y remotos le da un nuevo nombre. Elige Renombrarla allí también para renombrar además la rama remota que sigue: el nombre antiguo allí solo se elimina si nadie hizo push a ella desde tu último fetch.",
   "tips.tagPushDelete.title": "Haz push de una etiqueta de git o elimínala",

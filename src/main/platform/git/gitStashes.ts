@@ -14,6 +14,9 @@
 //   HI-3518's panel shows it, told the stash's side by stashConflictIn.
 // - Drop: under the repository lock, only of the row the user saw: the one at its place while that is still its commit
 //   and message, else the only row that is (another stash moved the places); refused when none is, or several are.
+//   HI-3533: git drops by place, so another git moving the list in between makes it drop another stash: git names the
+//   commit it dropped, and unless that is the row's commit and the list has one row fewer of its commit and message,
+//   what git dropped is stored back at once (`git stash store`) and the drop refused.
 import { normalize } from 'path'
 import { combworkStash, stashSubject, type StashApplied, type StashConflict, type StashFile, type StashRef, type StashRequest, type StashRow } from '../../../shared/gitStashes'
 import type { GitDiff } from '../../../shared/types'
@@ -32,6 +35,7 @@ import { platformLimits } from '../limits'
 const log = createLogger('git-stash')
 
 export const STASH_TEXT = {
+  raced: msg({ id: 'service.gitStash.raced', defaultMessage: "Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, {commit}. {back, select, yes {Combwork put it back, at the top of the list, so nothing is lost.} other {Combwork couldn't put it back, so it isn't listed now: git stash store {commit} lists it again (git keeps its changes for a while).}} The stash you chose wasn't dropped{pop, select, yes {, and its changes were applied} other {}}. Look again.", description: "HI-3533: an error from Version Control → Changes → Stashes' Drop or Pop: another git (a terminal, an agent) pushed or dropped a stash at the moment Combwork dropped one, so git dropped another ({commit}, its full commit id). back yes: Combwork listed it again; no: it couldn't, so that stash is off the list until the command (keep git stash store as it is) lists it again. pop yes: it was a Pop, whose apply had already gone in." }),
   moved: msg({ id: 'service.gitStash.moved', defaultMessage: 'The stashes changed meanwhile, and more than one is like the one you chose: nothing was done. Look again.', description: "HI-3527: an error from Version Control → Changes → Stashes' Apply, Pop or Drop: the list's places moved since the user looked, and several stashes now have the same commit and message as the one they chose, so Combwork can't tell which they meant." }),
   gone: msg({ id: 'service.gitStash.gone', defaultMessage: "That stash isn't in the list any more (dropped or popped meanwhile): nothing was done. Look again.", description: 'HI-3472: an error from Version Control → Changes → Stashes: the stash the user acted on is no longer one of the repository\'s stashes.' }),
   operation: msg({ id: 'service.gitStash.operation', defaultMessage: 'Git is in the middle of {what, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}: nothing was done. Finish it first (the panel above).', description: "HI-3472: an error from Stashes' Apply or Pop: an operation is under way in the folder ({what}, git's word for it; {folder} a path); HI-3470's panel above the list ends it." }),
@@ -53,9 +57,21 @@ const stashEnv = (): NodeJS.ProcessEnv => ({ ...process.env, GIT_EDITOR: 'true',
 
 const refused = (r: GitResult): Error => combworkError(M.failed, { why: gitErrorLine(`${r.err}\n${r.out}`) || r.err.trim().slice(0, 400) || r.out.trim().slice(0, 400) })
 
+/**
+ * HI-3539: `git stash list` with `args`. It checks that refs/stash is there, then logs it: another git dropping the
+ * last stash between the two (deleting refs/stash) makes it fail with "bad revision 'refs/stash'". Read once more: the
+ * ref gone by then, git lists none. A second failure, or any other, is git's error to show.
+ */
+async function stashList(root: string, args: string[]): Promise<GitResult> {
+  const r = await git(root, ['stash', 'list', ...args])
+  if (r.ok || !/bad revision 'refs\/stash'/.test(r.err)) return r
+  log.info(`git stash list met refs/stash going (another git dropping the last stash) in ${userText(root)}: read again`)
+  return git(root, ['stash', 'list', ...args])
+}
+
 /** The stashes as `git stash list` gives them: each one's commit, place, date, parents and reflog subject. */
 async function listed(root: string): Promise<{ commit: string; index: number; at: number; parents: string[]; subject: string }[]> {
-  const r = await git(root, ['stash', 'list', '--format=%H%x1f%ct%x1f%P%x1f%gs%x1e'])
+  const r = await stashList(root, ['--format=%H%x1f%ct%x1f%P%x1f%gs%x1e'])
   if (!r.ok) throw refused(r)
   return r.out
     .split('\x1e')
@@ -82,7 +98,7 @@ export async function listStashes(root: string): Promise<StashRow[]> {
   const rows = await listed(root)
   if (!rows.length) return []
   // Each stash's changes against the commit it was made on (its first parent), in one call.
-  const changed = await git(root, ['stash', 'list', '-m', '--first-parent', '--no-renames', '--name-only', '--format=%x1e%H'])
+  const changed = await stashList(root, ['-m', '--first-parent', '--no-renames', '--name-only', '--format=%x1e%H'])
   if (!changed.ok) throw refused(changed)
   const tracked = countsOf(changed.out)
   // The untracked files each keeps (its third parent, a commit of them alone), in one call. HI-3531: each commit once,
@@ -115,7 +131,10 @@ const isRow = (s: { commit: string; subject: string }, ref: StashRef): boolean =
  * its place, so which one they meant can't be told.
  */
 async function rowOf(root: string, ref: StashRef): Promise<Listed | 'gone' | 'moved'> {
-  const rows = await listed(root)
+  return rowIn(await listed(root), ref)
+}
+
+function rowIn(rows: Listed[], ref: StashRef): Listed | 'gone' | 'moved' {
   const at = rows[ref.index]
   if (at && isRow(at, ref)) return at
   const like = rows.filter((s) => isRow(s, ref))
@@ -235,9 +254,16 @@ export async function stashConflictIn(folder: string): Promise<StashConflict | n
   return null
 }
 
-/** Drops the row the user named (rowOf). Not ok: no such row now (`why`), or git's drop failed (`r`). */
-async function dropAt(root: string, ref: StashRef): Promise<{ ok: true } | { ok: false; why: 'gone' | 'moved' } | { ok: false; r: GitResult }> {
-  const s = await rowOf(root, ref)
+/** What `git stash drop` says it dropped (`Dropped refs/stash@{n} (<commit>)`, git's English: HI-3534), or null. */
+const droppedCommit = (out: string): string | null => /^Dropped .*\(([0-9a-f]{40}(?:[0-9a-f]{24})?)\)\s*$/m.exec(out)?.[1] ?? null
+
+/**
+ * Drops the row the user named (rowOf). Not ok: no such row now (`why`), git's drop failed (`r`), or (HI-3533) another
+ * git moved the list between Combwork's check and git's drop, so git dropped another stash: put back (`raced`).
+ */
+async function dropAt(root: string, ref: StashRef): Promise<{ ok: true } | { ok: false; why: 'gone' | 'moved' } | { ok: false; r: GitResult } | { ok: false; raced: { commit: string; back: boolean } }> {
+  const rows = await listed(root)
+  const s = rowIn(rows, ref)
   if (typeof s === 'string') return { ok: false, why: s }
   const place = `stash@{${s.index}}`
   // The row at the place read again just before git drops it, its commit and its reflog subject: another git's stash
@@ -245,9 +271,34 @@ async function dropAt(root: string, ref: StashRef): Promise<{ ok: true } | { ok:
   const at = await git(root, ['log', '-g', '-1', '--format=%H%x1f%gs', place, '--'])
   const [commit, subject] = at.ok ? at.out.trim().split('\x1f') : []
   if (commit !== s.commit || subject !== s.subject.trim()) return { ok: false, why: 'gone' } // i18n-ignore: rowError's key, never shown
-  const r = await git(root, ['stash', 'drop', '--quiet', place])
-  return r.ok ? { ok: true } : { ok: false, r }
+  // HI-3533: git drops by place alone, in a process of its own, and another git (a terminal, an agent's own stash) can
+  // push or drop one between that check and this drop, Combwork's lock being only its own. Git names the commit it
+  // dropped: another than the one checked is put straight back, with its own message, and the drop refused.
+  const r = await git(root, ['stash', 'drop', place])
+  if (!r.ok) return { ok: false, r }
+  const gone = droppedCommit(r.out)
+  if (gone === null) {
+    log.warn(`git stash drop didn't say which stash it dropped (expected ${s.commit.slice(0, 12)})`)
+    return { ok: true }
+  }
+  // The row chosen is what git dropped only if git dropped its commit and one fewer row has its commit and message now
+  // (HR1's round 1: another row of the same commit, stored meanwhile, can be what moved onto its place).
+  const after = await listed(root)
+  const count = (list: Listed[], c: string, subj: string): number => list.filter((x) => x.commit === c && x.subject === subj).length
+  if (gone === s.commit && count(after, s.commit, s.subject) < count(rows, s.commit, s.subject)) return { ok: true }
+  // Another row was dropped. Its message: that of a row of its commit the list had and has one fewer of now; else (a
+  // row made meanwhile, whose message only git's dropped entry held) its commit's own subject, which git stash push
+  // makes the same.
+  const subjects = [...new Set(rows.filter((x) => x.commit === gone).map((x) => x.subject))]
+  const known = subjects.find((subj) => count(after, gone, subj) < count(rows, gone, subj))
+  const own = known ?? (await git(root, ['log', '-1', '--format=%s', gone, '--'])).out.trim()
+  const back = await git(root, ['stash', 'store', '-m', own || 'restored', gone])
+  log.warn(`Another git moved the stashes while the user dropped ${s.commit.slice(0, 12)}: git dropped ${gone.slice(0, 12)}, ${back.ok ? 'put back' : `not put back (${userText(gitErrorLine(back.err))})`}`)
+  return { ok: false, raced: { commit: gone, back: back.ok } }
 }
+
+/** HI-3533: the refusal of a drop another git raced (dropAt), for Drop or after Pop's apply. */
+const racedError = (raced: { commit: string; back: boolean }, pop: boolean): Error => combworkError(M.raced, { commit: raced.commit, back: raced.back ? 'yes' : 'no', pop: pop ? 'yes' : 'no' }, { kind: 'conflict' })
 
 /**
  * HI-3472: Apply (or Pop) of the stash `req.commit` into `folder` (the project's, or a worktree of its repository: the
@@ -300,6 +351,7 @@ export async function applyStash(projectPath: string, folder: string, req: Stash
         const d = await dropAt(folder, { commit: req.commit, index: s.index, message: req.message })
         if (!d.ok) {
           if ('r' in d) throw combworkError(M.notDropped, { why: gitErrorLine(d.r.err) || d.r.err.trim().slice(0, 400) })
+          if ('raced' in d) throw racedError(d.raced, true)
           // Dropped by another git meanwhile: nothing of it is left to drop.
           return { conflicts: [], dropped: false }
         }
@@ -320,6 +372,7 @@ export async function dropStash(projectPath: string, ref: StashRef): Promise<voi
         return
       }
       if ('r' in d) throw refused(d.r)
+      if ('raced' in d) throw racedError(d.raced, false)
       throw rowError(d.why)
     },
     { project: projectPath }

@@ -641,6 +641,107 @@
       "why": "plain"
     }
   },
+  "service.gitMoves.agentBusy": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "service.gitMoves.busy": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "service.gitMoves.card": {
+    "placeholders": {
+      "branch": "plain",
+      "card": "plain"
+    }
+  },
+  "service.gitMoves.conflicted": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.gitMoves.detached": {
+    "placeholders": {}
+  },
+  "service.gitMoves.failed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.gitMoves.inSlot": {
+    "placeholders": {
+      "branch": "plain",
+      "slot": "plain"
+    }
+  },
+  "service.gitMoves.inTheWay": {
+    "placeholders": {
+      "count": "plural"
+    }
+  },
+  "service.gitMoves.inWorktree": {
+    "placeholders": {
+      "branch": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitMoves.invalid": {
+    "placeholders": {}
+  },
+  "service.gitMoves.moved": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitMoves.noBranch": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitMoves.noCommit": {
+    "placeholders": {
+      "commit": "plain"
+    }
+  },
+  "service.gitMoves.operation": {
+    "placeholders": {
+      "what": "select"
+    }
+  },
+  "service.gitMoves.queue": {
+    "placeholders": {
+      "card": "plain",
+      "branch": "plain"
+    }
+  },
+  "service.gitMoves.same": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitMoves.session": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "service.gitMoves.slotHeld": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitMoves.timedOut": {
+    "placeholders": {
+      "seconds": "number"
+    }
+  },
+  "service.gitMoves.unlisted": {
+    "placeholders": {
+      "branch": "plain",
+      "why": "plain"
+    }
+  },
   "service.gitOperation.agentBusy": {
     "placeholders": {
       "agent": "plain",
@@ -1211,6 +1312,13 @@
     "placeholders": {
       "file": "plain",
       "folder": "plain"
+    }
+  },
+  "service.gitStash.raced": {
+    "placeholders": {
+      "commit": "plain",
+      "back": "select",
+      "pop": "select"
     }
   },
   "service.gitStash.session": {

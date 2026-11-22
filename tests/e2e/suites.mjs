@@ -172,6 +172,7 @@ export const SUITES = [
   { name: 'githubhosts' },
   { name: 'gitinit' },
   { name: 'gitmissing' },
+  { name: 'gitmoves' },
   { name: 'gitremotes' },
   { name: 'gitstashes' },
   { name: 'gitupdate' },

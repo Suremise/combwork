@@ -582,6 +582,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/ChangesLeftovers.tsx', 'src/shared/branchCleanup.ts'], suites: ['changesleftovers', 'gitcleanup'] },
   // HI-3473: Branches & remotes' Repository health.
   { paths: ['tests/e2e/githealth.cjs', 'src/main/platform/git/gitHealth.ts', 'src/shared/gitHealth.ts', 'src/renderer/src/components/RepoHealth.tsx', 'src/renderer/src/views/GitBranches.tsx'], suites: ['githealth'] },
+  { paths: ['tests/e2e/gitmoves.cjs', 'src/main/platform/git/gitMoves.ts', 'src/shared/gitMoves.ts', 'src/renderer/src/components/BranchMoves.tsx'], suites: ['gitmoves'] },
   { paths: ['tests/e2e/gitstashes.cjs', 'src/main/stashPanel.ts', 'src/main/platform/git/gitStashes.ts', 'src/shared/gitStashes.ts', 'src/renderer/src/components/StashesSection.tsx', 'src/renderer/src/components/OperationPanel.tsx', 'src/main/operationPanel.ts', 'src/main/platform/git/gitOperationSteps.ts', 'src/shared/gitOperations.ts'], suites: ['gitstashes'] },
   { paths: ['src/renderer/src/components/DataTable.tsx', 'src/shared/tableView.ts'], suites: ['overview', 'ctxpercent', 'performance', 'perftable', 'boardarchive'] },
   { paths: ['src/renderer/src/views/ProjectView.tsx', 'src/renderer/src/oneAgentMenu.ts', 'src/shared/oneAgent.ts'], suites: ['oneagent', 'agents-ui', 'agentstable', 'resumeall', 'paneheader', 'rail', 'tabstrip', 'startall', 'narrowmain', 'removeall', 'defaultprovider'] },

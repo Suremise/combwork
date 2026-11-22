@@ -1690,7 +1690,7 @@ export async function busyAgentIn(projectPath: string, folder: string): Promise<
 }
 
 /** Where a branch is checked out: the project folder, another worktree (a slot's, or not), or nowhere (null). */
-async function branchFolder(projectPath: string, branch: string): Promise<Pick<BranchUpdatePlan, 'where' | 'folder' | 'slot'>> {
+export async function branchFolder(projectPath: string, branch: string): Promise<Pick<BranchUpdatePlan, 'where' | 'folder' | 'slot'>> {
   const s = await repoSummary(projectPath)
   if (s.branch === branch) return { where: 'project', folder: projectPath, slot: null }
   const trees = await git(projectPath, ['worktree', 'list', '--porcelain'])

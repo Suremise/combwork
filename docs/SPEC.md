@@ -5896,7 +5896,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   branch it was made on (git's *On main:*, *no branch* for a detached HEAD), its date and how many files it holds (its
   changes against the commit it was made on and the untracked files its third parent keeps, which `git stash show`
   alone leaves out). There is no cap and no setting: however many there are, each is read (HI-3531: the commits of
-  their untracked files go to git on its input, never its command line, which Windows bounds). Combwork's own, made by Set Aside (HI-2944), are told by the mark
+  their untracked files go to git on its input, never its command line, which Windows bounds). A read that meets
+  another git dropping the last stash (`git stash list` finding refs/stash, then failing with *bad revision
+  'refs/stash'* once it is deleted) is read once more, and lists none (HI-3539); a second failure is git's error to
+  show. Combwork's own, made by Set Aside (HI-2944), are told by the mark
   their message carries (`Combwork: set aside <why> [cw:<6 hex>]`) and read *Set aside by Combwork before merging
   HI-12* (*before bringing 1.7.0 up to date with HI-12*, *before starting work on main*), the card key a link to the
   card; any other stash shows git's message as it is. No request names a stash by its place in the list alone, which
@@ -5947,6 +5950,60 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
     and with several and none at its place, Combwork refuses, saying the stashes changed and to look again. Pop drops
     that row, and the list keys its rows and Show by row. Show reads by commit alone: rows of one commit hold the same
     files.
+  - **Another git between the check and the drop** (HI-3533): `git stash drop` takes only a place, in a process of its
+    own, and Combwork's repository lock holds only its own gits: one in a terminal or an agent's session that pushes or
+    drops a stash between Combwork's check of the place and git's drop makes git drop another stash. Git can't drop
+    by identity, so Combwork checks what git did: its drop runs without `--quiet` and git names the commit it dropped;
+    the drop is the row's only when that is the row's commit **and** the list read again has one row fewer with its
+    commit and message (HR1's round 1: another row of the same commit, listed meanwhile, can be what moved onto its
+    place). Anything else is stored back at once (`git stash store`) and the drop refused, naming that commit. Its
+    message is the one the list had for a row of that commit it now has one fewer of; a row made meanwhile, whose
+    message only git's dropped entry held, comes back under its commit's own subject (which `git stash push` makes the
+    same as its message). The one put back goes to the top of the list (git can't put it back in its place); the row
+    chosen is still listed, and a Pop's changes still applied. If git refuses to store it back, the error says it isn't
+    listed and gives `git stash store <commit>`, which lists it again (git keeps its objects a while). Git's reply
+    naming no commit is taken as the drop asked, and logged. This is best effort, decided on the card (HI-3533, option
+    A): the stash chosen is never dropped in a race, and anything git drops instead is put back or named for recovery;
+    no stronger guarantee (an atomic drop by identity) is sought.
+- **Moves** (HI-3469, the design agreed on the card, request r11): Version Control → History's heading has a
+  **Commits | Moves** switch (the project's choice while Combwork runs). **Moves** lists a local branch's reflog
+  (`git log -g refs/heads/<branch>`), newest first, 20 a page with History's arrows, as far back as git keeps it (its
+  own expiry, 90 days by default: no cap and no setting); its picker offers the local branches only and opens on the
+  project folder's, else the target. HEAD's own reflog isn't listed: it is mostly checkouts, which move no branch. While
+  the project folder is on a detached HEAD, Moves lists nothing and says so (read again on a click of ↻ or the window's
+  focus), and Restore is refused, until it is on a branch. Each
+  row: what the move was in plain words, from git's message (git writes them in English): *Committed*, *Amended the last
+  commit*, *Merged X*, *Fast-forwarded to X*, *Pulled*, *Rebased onto abc1234*, *Reset to X*, *Created from X*,
+  *Renamed from X*, a cherry-pick or a revert; the merge queue moves its target with no message, so a move with none
+  whose commit carries a `Combwork-Card` trailer reads *Combwork merged HI-12*, the key opening the card; Combwork's
+  other moves (`Combwork: …` messages) say so; anything else shows git's message as it is. Then the commit it left the
+  branch at (short id and subject), when, and git's own words in the tooltip. Git's work is a Git port operation
+  (`branchMoves`: RepoOps' `moves`, `restorePlan`, `restore`; `platform/git/gitMoves.ts`); None lists none of it.
+  Agents have no tool, route or count for it.
+  - **Restore to here…** (every row whose commit isn't where the branch is now) first reads what it would do
+    (`restorePlan`) and shows it: the branch from its commit back to the row's, the commits it drops and brings back
+    (20 of each, then how many more), how many of the dropped ones its upstream has already (counted against its full
+    ref, `refs/remotes/…`, or `refs/heads/…` for a branch tracking a local one; a later Push is refused,
+    Combwork never forces, and Pull brings them back), and where it runs. **The project folder's branch** moves by `git
+    reset --keep <commit>` there, under Commit's bound (`cw.git.commitMinutes`): uncommitted changes stay, and git
+    refuses rather than lose one, so the dialog lists the uncommitted files (untracked ones too) the two commits differ
+    in and offers no Restore while there are any (commit them or set them aside first). **A branch checked out nowhere**
+    moves by a compare-and-swap (`update-ref <branch> <to> <from>`). Either writes its own reflog entry (`Combwork:
+    restore from <commit>`, through `GIT_REFLOG_ACTION` for reset), so the restore shows at the top of Moves as
+    *Restored here with Combwork, from abc1234*, and Restore to here… on the move below it undoes it; the notice after
+    gives the commit it was at in full.
+  - **Refused**, said in the dialog in place of Restore, and checked again as it runs under the branch's merge slot
+    (`mergeSlots.asUser`), the repository lock and, for the project folder, its fence, nothing awaited between the last
+    check and git: the branch no longer at the commit the user saw (*has moved on*), or no longer a local branch, or
+    the commit gone; the project folder on a detached HEAD; git's list of worktrees unreadable (a worktree it would name
+    could have the branch); the branch checked out in a slot or another worktree (restored there, by its agent or in a
+    terminal); an open card's line (`lineCard`: its builder moves it); a card the merge queue is testing into it
+    (`queueOrder`'s testing); its merge slot held or waited for by an agent or the queue. In the project folder also a
+    live session there (`sessions.liveStates()`), a Combwork run or an agent's file lock (`folderBuilders`), an agent
+    working there (`busyAgentIn`), an operation under way (HI-3470's panel ends it), a file in conflict, and the files
+    in the way above.
+  - A dropped stash isn't listed (HI-3472): git drops its reflog entry with it, so no reflog holds it; Drop's notice
+    gives its commit.
 - **A detach that keeps failing** (HI-3467): a clean free Git slot whose detach at its target fails for any other reason
   (an index lock, files in the way, git unable to read its head or the target's, the target's branch gone; not its
   card's own work, which keeps it) stays not ready, and the same record (`slot_operation:`, `what` `detach`) keeps git's

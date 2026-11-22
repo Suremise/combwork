@@ -5,7 +5,8 @@
 // Combwork's in and drops it; a Pop that conflicts keeps its stash, the file left with git's markers, said in a warning,
 // and (HI-3518) shown in Changes' panel as left in conflict, from that stash, where Use the stash's settles it;
 // Drop (asked first) deletes the row clicked (HI-3527: the bottom of two rows of one commit, then the top), the list
-// showing the rows git has. Screenshots of the section, Show's diff and the Drop
+// showing the rows git has, and the last one dropped, the section goes (HI-3532: git's list read meanwhile can say
+// "bad revision 'refs/stash'", read again). Screenshots of the section, Show's diff and the Drop
 // question in both themes. Git's global config the suite's own. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
@@ -29,7 +30,8 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.writeFileSync(globalConfig, '[user]\n\tname = Test User\n\temail = 1+test@users.noreply.github.com\n[init]\n\tdefaultBranch = main\n[core]\n\tautocrlf = false\n')
   const gitEnv = lib.gitEnv({ GIT_CONFIG_GLOBAL: globalConfig })
-  const g = (...a) => execFileSync('git', a, { cwd: alpha, env: gitEnv, encoding: 'utf8' }).trim()
+  // git's errors in what it throws (e.stderr), not on the suite's console.
+  const g = (...a) => execFileSync('git', a, { cwd: alpha, env: gitEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
   const read = (f) => (fs.existsSync(path.join(alpha, f)) ? fs.readFileSync(path.join(alpha, f), 'utf8') : null)
   fs.mkdirSync(alpha, { recursive: true })
   execFileSync('git', ['init', '-q', '-b', 'main', alpha], { env: gitEnv })
@@ -43,7 +45,18 @@ const check = (name, ok, extra = '') => {
   g('stash', 'push', '--include-untracked', '-q', '-m', 'Combwork: set aside before merging HI-12 [cw:abc123]')
   fs.writeFileSync(path.join(alpha, 'b.txt'), 'b stashed\n')
   g('stash', 'push', '-q', '-m', 'my own work')
-  const stashes = () => g('stash', 'list', '--format=%H').split(/\r?\n/).filter(Boolean)
+  // The stash list as git has it now; null while git can't say. HI-3532: while the last stash is dropped git empties its
+  // reflog, then deletes refs/stash, and a list read between the two fails with "bad revision 'refs/stash'". A poll reads
+  // again; anything else git says is the run's error.
+  const stashList = (format) => {
+    try {
+      return g('stash', 'list', `--format=${format}`).split(/\r?\n/).filter(Boolean)
+    } catch (e) {
+      if (/bad revision 'refs\/stash'/.test(String(e.stderr ?? ''))) return null
+      throw e
+    }
+  }
+  const stashes = () => stashList('%H')
   const [plain, ours] = stashes()
   const claude = lib.fakeClaude(userData, claudeHome, [alpha])
   const env = { ...claude, CW_API_PORT: lib.port(47604), GIT_CONFIG_GLOBAL: globalConfig }
@@ -100,7 +113,7 @@ const check = (name, ok, extra = '') => {
     await q.waitFor({ timeout: HUNG_MS })
     check('Apply asks first, naming the stash', /my own work/.test(await text(q)) && /The stash is kept/.test(await text(q)), await text(q))
     await q.getByRole('button', { name: 'Apply', exact: true }).click()
-    check('…applied: b.txt has its change, the stash is still listed', !!(await lib.until(async () => read('b.txt') === 'b stashed\n', HUNG_MS)) && stashes().length === 2, `${read('b.txt')} | ${stashes().length}`)
+    check('…applied: b.txt has its change, the stash is still listed', !!(await lib.until(async () => read('b.txt') === 'b stashed\n', HUNG_MS)) && stashes()?.length === 2, `${read('b.txt')} | ${stashes()?.length}`)
     await row(plain).locator('[data-action="stash-apply"]').click()
     q = ask('Apply the stash to the project folder?')
     await q.waitFor({ timeout: HUNG_MS })
@@ -113,7 +126,7 @@ const check = (name, ok, extra = '') => {
     q = ask('Pop the stash into the project folder?')
     await q.waitFor({ timeout: HUNG_MS })
     await q.getByRole('button', { name: 'Pop', exact: true }).click()
-    check('Pop puts its changes in, its untracked file too, and drops it', !!(await lib.until(async () => read('a.txt') === 'a set aside\n' && read('new.txt') === 'new\n' && stashes().length === 1, HUNG_MS)) && !!(await lib.until(async () => (await section.locator('[data-stash]').count()) === 1, HUNG_MS)), `${read('a.txt')} | ${stashes().length}`)
+    check('Pop puts its changes in, its untracked file too, and drops it', !!(await lib.until(async () => read('a.txt') === 'a set aside\n' && read('new.txt') === 'new\n' && stashes()?.length === 1, HUNG_MS)) && !!(await lib.until(async () => (await section.locator('[data-stash]').count()) === 1, HUNG_MS)), `${read('a.txt')} | ${stashes()?.length}`)
     g('add', '-A')
     g('commit', '-qm', 'took it')
 
@@ -124,7 +137,7 @@ const check = (name, ok, extra = '') => {
     q = ask('Pop the stash into the project folder?')
     await q.waitFor({ timeout: HUNG_MS })
     await q.getByRole('button', { name: 'Pop', exact: true }).click()
-    check('a Pop that conflicts keeps the stash and says which file', !!(await lib.until(async () => /1 file is in conflict in the project folder/.test(await toasts()), HUNG_MS)) && stashes().length === 1 && /<<<<<<</.test(read('b.txt') ?? ''), `${await toasts()} | ${stashes().length}`)
+    check('a Pop that conflicts keeps the stash and says which file', !!(await lib.until(async () => /1 file is in conflict in the project folder/.test(await toasts()), HUNG_MS)) && stashes()?.length === 1 && /<<<<<<</.test(read('b.txt') ?? ''), `${await toasts()} | ${stashes()?.length}`)
     // HI-3518: Changes' panel shows the file left in conflict, with no operation under way: where it came from, the
     // stash's side named on its button, no step. Use the stash's settles it, and with nothing left the panel goes.
     const left = page.locator('.operation-panel[data-operation="conflicts"]')
@@ -147,7 +160,7 @@ const check = (name, ok, extra = '') => {
     const between = g('stash', 'create').trim()
     g('stash', 'store', '-m', 'between', between)
     g('stash', 'store', '-m', 'relisted', plain)
-    const messages = () => g('stash', 'list', '--format=%gs').split(/\r?\n/).filter(Boolean).map((m) => m.replace(/^On [^:]+: /, ''))
+    const messages = () => stashList('%gs')?.map((m) => m.replace(/^On [^:]+: /, ''))
     // A write in the folder: Changes reads again, and the list with it.
     fs.writeFileSync(path.join(alpha, 'poke.txt'), 'poke\n')
     const at = (i) => section.locator(`[data-stash-index="${i}"]`)
@@ -159,13 +172,20 @@ const check = (name, ok, extra = '') => {
     check('Drop asks first, saying its files and its commit', /the 1 file it holds/.test(await text(q)) && (await text(q)).includes(plain.slice(0, 10)), await text(q))
     await shoot(q, '3-drop')
     await q.getByRole('button', { name: 'Drop', exact: true }).click()
-    check('…dropped: the row clicked, the commit said; the other row of its commit kept', !!(await lib.until(async () => messages().join(' | ') === 'relisted | between', HUNG_MS)) && (await toasts()).includes(plain), `${messages().join(' | ')} | ${await toasts()}`)
+    check('…dropped: the row clicked, the commit said; the other row of its commit kept', !!(await lib.until(async () => messages()?.join(' | ') === 'relisted | between' && (await toasts()).includes(plain), HUNG_MS)),`${messages()?.join(' | ')} | ${await toasts()}`)
     check('…the list shows the rows git has, no more', !!(await lib.until(async () => (await shownRows()).join(' ') === `0:${plain} 1:${between}` && /relisted/.test(await text(at(0))), HUNG_MS)), (await shownRows()).join(' '))
     await at(0).locator('[data-action="stash-drop"]').click()
     q = ask('Drop the stash “relisted”?')
     await q.waitFor({ timeout: HUNG_MS })
     await q.getByRole('button', { name: 'Drop', exact: true }).click()
-    check('…the top row by its own Drop: the one between is left, listed alone', !!(await lib.until(async () => messages().join(' | ') === 'between' && (await shownRows()).join(' ') === `0:${between}`, HUNG_MS)), `${messages().join(' | ')} | ${(await shownRows()).join(' ')}`)
+    check('…the top row by its own Drop: the one between is left, listed alone', !!(await lib.until(async () => messages()?.join(' | ') === 'between' && (await shownRows()).join(' ') === `0:${between}`, HUNG_MS)), `${messages()?.join(' | ')} | ${(await shownRows()).join(' ')}`)
+    // The last one dropped: the section goes. HI-3532: the poll reads git's list while the window's drop of the last stash
+    // runs, when git can briefly answer "bad revision 'refs/stash'" (stashList: read again).
+    await at(0).locator('[data-action="stash-drop"]').click()
+    q = ask('Drop the stash “between”?')
+    await q.waitFor({ timeout: HUNG_MS })
+    await q.getByRole('button', { name: 'Drop', exact: true }).click()
+    check('…the last dropped: no stash left, the section gone, the commit said', !!(await lib.until(async () => stashes()?.length === 0 && (await section.count()) === 0 && (await toasts()).includes(between), HUNG_MS)),`${stashes()?.length} | ${await toasts()}`)
   } finally {
     await app.close()
   }
