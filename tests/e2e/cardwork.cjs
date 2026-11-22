@@ -444,6 +444,7 @@ const commit = (dir, file, text, message) => {
   await fileButton('second.ts').press('Enter')
   const secondPlus = tfRev.locator('[data-revision-diff="second.ts"] .editor.modified .cw-comment-add')
   check('a file chosen under a pointer that stays still shows the + on the line under it', !!(await lib.until(async () => (await secondPlus.count()) === 1, HUNG_MS)), await tfRev.innerText().catch(() => ''))
+  await tfRev.screenshot({ path: path.join(lib.WORK, 'cardwork-still-pointer-plus.png') })
   await fileButton('first.ts').click()
   await lib.until(async () => (await tfDraftBox().inputValue().catch(() => '')) === 'Typed on first.ts', HUNG_MS)
   // HR1's round 1: a save under way when the file changes. Main holds the add (CW_TEST_HOLD_IPC, as above) while the user
