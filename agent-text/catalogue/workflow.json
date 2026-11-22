@@ -1087,6 +1087,16 @@
     "note": "The next step after a refused declaration of a card's paths: name files outside the excluded folder {folder} (#1511).",
     "audience": "both"
   },
+  "workflow.refused.paths.notDeclared.message": {
+    "text": "{card}: cards under {platform} don’t declare paths here, so nothing was declared.",
+    "note": "HI-3517: a refused declaration of a card’s paths: the card’s version control ({platform}, its name, such as Git) takes no declared paths, or this Combwork has nothing to read them with. {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.refused.paths.notDeclared.next": {
+    "text": "Nothing was stored or read.",
+    "note": "HI-3517: what follows a refused declaration of a card’s paths: nothing was saved on the card and no files were read.",
+    "audience": "both"
+  },
   "workflow.refused.platform.detachedFolder.message": {
     "text": "{card} can’t start: the project folder is on no branch (its head is detached at {head}), so what its builder commits would be on none.",
     "note": "HI-3104: a refused start in a Git project whose cards are built in the project folder: the folder has no branch checked out (a detached head), so commits made there would belong to no branch. {card} is a card key like AM-12; {head} a short commit id.",

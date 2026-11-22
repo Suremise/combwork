@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- **Declaring a card's paths in a Git project is refused** (HI-3517). An agent's `cw_declare_paths` on a Git card used to save the paths on the card and read the whole project to answer, though a Git card's work is its commits. It is now refused, saying nothing was declared; in a project without version control it works as before.
 - **Changes follows what git does in a terminal** (HI-3505). Version Control → Changes read the folder's status only when opened, so a merge stopped in conflict in a terminal left it saying *Working tree clean*, without the unfinished operation panel (HI-3470), while the status bar already said *merging*. Changes now reads again as files in the folder change, when the window gets focus and every minute, so its list and the panel show and go by themselves.
 - **Continue or Skip that stops at the next conflict says it went on** (HI-3503). In the unfinished git operation panel (HI-3470), a rebase's, `git am`'s or a cherry-pick's Continue or Skip that went through and stopped at the next commit in conflict was reported as *Git couldn't do that*; it now says git went on and stopped again, and the panel shows where.
 - **A slot's "can't be moved back" notice says to run its command in PowerShell, and quotes only git** (HI-3516). The `git switch --detach` it offers is quoted for PowerShell, so a branch name holding `&` or `;` would run something else in cmd: the notice and Slots and copies now say PowerShell. And when git couldn't read a branch, *Git said* no longer quotes Combwork's own words as git's.
