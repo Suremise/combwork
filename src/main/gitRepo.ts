@@ -1311,7 +1311,7 @@ export async function renameBranch(projectPath: string, branch: BranchAt, to: st
       const now = await branchUseNow(projectPath, from)
       if (now.why && now.why !== 'current') throw refusal(R.inUse, { why: now.why, branch: from })
       // An open card's line is kept whatever folder has it checked out (HR1's round 1): `localUse` says the folder's own first.
-      if (now.why === 'current' && cardLines(projectPath).has(from)) throw refusal(R.inUse, { why: 'card', branch: from })
+      if (now.why === 'current' && cardLines(projectPath).has(from)) throw refusal(R.inUse, { why: 'card', branch: from }) // i18n-ignore: a select's key, never shown
       if (now.why === 'current') {
         const busy = (await folderAgents(projectPath)).find((a) => a.status && FOLDER_BUSY.has(a.status))
         if (busy) throw refusal(R.agentHere, { agent: busy.name, branch: from })
