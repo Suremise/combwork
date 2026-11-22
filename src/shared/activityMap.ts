@@ -204,8 +204,12 @@ export interface MapAgentInput {
   notLoaded?: boolean
   /** Its subagent sessions in this turn, background tasks and the processes it runs (not its own plumbing): by name. */
   subagents: number
-  tasks: { type?: BackgroundTaskType }[]
-  processes: string[]
+  /** Each subagent session's state, when known (HI-3498: the Agents panel lists them). */
+  subagentStates?: ActivityState[]
+  /** Its background tasks: their type, and since when (Unix ms; null: not known). */
+  tasks: { type?: BackgroundTaskType; since?: number | null }[]
+  /** Its processes: the executable's name (never its command line), its id and since when (Unix ms; null: not known). */
+  processes: { name: string; pid?: number; since?: number | null }[]
   /** Its edits Combwork's file lock blocks now (HI-982). */
   blocks: number
   /** The stations its provider reports (its descriptor's activityStations); none given: all. */
@@ -226,6 +230,12 @@ export interface MapCall {
   at: string | null
   failed: boolean
   done: boolean
+  /** In its agent's latest turn (HI-3498). */
+  thisTurn?: boolean
+  /** A path tool's one path, as the transcript gives it (HI-3498: opened in Files); only when the label is that path's. */
+  path?: string
+  /** An MCP tool's server (HI-3498: the Tools panel groups by it). */
+  server?: string
 }
 
 /** What a station shows: unsupported (no shown agent's provider reports it), loading (nothing read yet), or counted. */
@@ -349,6 +359,34 @@ export interface MapModel {
   calls: MapCall[]
   /** The sessions whose turns are in (their keys): a call in one of them is new once it wasn't in the last read. */
   sessions: string[]
+  /** What runs now (HI-3498): each agent's processes (Shell), its subagent sessions and background tasks (Agents). */
+  running: MapRunning[]
+}
+
+/** Something running now at a station (HI-3498): a process by its executable's name, a background task, a subagent. */
+export interface MapRunning {
+  key: string
+  agentKey: string
+  station: 'shell' | 'agents'
+  kind: 'process' | 'task' | 'subagent'
+  /** A process's executable name; empty for a task or subagent (named by their kind). */
+  name: string
+  pid?: number
+  type?: BackgroundTaskType
+  state?: ActivityState
+  /** Since when (Unix ms); null: not known. */
+  since: number | null
+}
+
+/**
+ * A path tool's one path as the transcript gives it (relative to its project, or whole), for opening it in Files
+ * (HI-3498): only where the map's label is that path's (`mapLabel`: one path, its last two segments), never a list or
+ * a summary that isn't one.
+ */
+function callPath(name: string, summary: string, label: string): string | null {
+  if (!PATH_TOOLS.has(lower(name))) return null
+  const t = summary.trim()
+  return pathLabel(t) === label && !t.endsWith('…') ? t : null
 }
 
 /**
@@ -367,7 +405,7 @@ export function agentCalls(a: MapAgentInput, budget = MAP_CALLS): { calls: MapCa
       capped = true
       return false
     }
-    out.push({ ...c, sessionKey: sk, agentKey: a.key })
+    out.push({ ...c, sessionKey: sk, agentKey: a.key, ...(last ? { thisTurn: true } : {}) })
     if (last) lastTurn.add(c.key)
     return true
   }
@@ -378,7 +416,11 @@ export function agentCalls(a: MapAgentInput, budget = MAP_CALLS): { calls: MapCa
   }
   const one = (name: string, summary: () => string, key: string, tool: { at: string | null; failed: boolean; done: boolean }, last: boolean): boolean => {
     const st = stationOf(name)
-    return take({ key, station: st.station, ...(st.group ? { group: st.group } : {}), label: mapLabel({ name, summary: summary() }), at: tool.at, failed: tool.failed, done: tool.done }, last)
+    const text = summary()
+    const label = mapLabel({ name, summary: text })
+    const path = callPath(name, text, label)
+    const server = st.group === 'mcp' || st.group === 'combwork' ? mcpParts(name)?.server : undefined
+    return take({ key, station: st.station, ...(st.group ? { group: st.group } : {}), label, at: tool.at, failed: tool.failed, done: tool.done, ...(path ? { path } : {}), ...(server ? { server } : {}) }, last)
   }
   walk: for (let ti = turns.length - 1; ti >= 0; ti--) {
     const turn = turns[ti]
@@ -410,6 +452,7 @@ export function buildMapModel(agents: readonly MapAgentInput[], at: number): Map
   const stations = Object.fromEntries(MAP_STATIONS.map((s) => [s, { station: s, status: 'ok', count: 0, heat: 0, last: '', failed: false, here: [], running: 0, partial: false }])) as unknown as Record<MapStation, MapStationView>
   const all: MapCall[] = []
   const views: MapAgentView[] = []
+  const running: MapRunning[] = []
   const loaded = agents.filter((a) => !a.notLoaded)
   for (const a of agents) {
     const load: MapAgentView['load'] = a.notLoaded ? 'notLoaded' : a.turns ? 'loaded' : 'loading'
@@ -429,13 +472,19 @@ export function buildMapModel(agents: readonly MapAgentInput[], at: number): Map
     if (capped || a.notLoaded) for (const s of MAP_STATIONS) stations[s].partial = true
     if (a.waiting && !stations.you.here.includes(a.key)) stations.you.here.push(a.key)
     if (a.blocks > 0) stations.edit.failed = true
+    if (!a.notLoaded) {
+      a.processes.forEach((p, i) => running.push({ key: `${a.key}${SEP}p${p.pid ?? `#${i}`}`, agentKey: a.key, station: 'shell', kind: 'process', name: p.name, ...(p.pid !== undefined ? { pid: p.pid } : {}), since: p.since ?? null }))
+      // A command task runs a shell's command: Shell's; the rest (a monitor, a subagent's, a workflow) are Agents'.
+      a.tasks.forEach((t, i) => running.push({ key: `${a.key}${SEP}t${i}`, agentKey: a.key, station: t.type === 'command' ? 'shell' : 'agents', kind: 'task', name: '', ...(t.type ? { type: t.type } : {}), since: t.since ?? null }))
+      for (let i = 0; i < a.subagents; i++) running.push({ key: `${a.key}${SEP}s${i}`, agentKey: a.key, station: 'agents', kind: 'subagent', name: '', ...(a.subagentStates?.[i] ? { state: a.subagentStates[i] } : {}), since: null })
+    }
     if (a.subagents + a.tasks.length > 0 && !a.notLoaded) {
       stations.agents.count += a.subagents + a.tasks.length
       stations.agents.running += a.subagents + a.tasks.length
       if (!stations.agents.here.includes(a.key)) stations.agents.here.push(a.key)
     }
     if (a.processes.length && !a.notLoaded) {
-      stations.shell.last = a.processes[a.processes.length - 1]
+      stations.shell.last = a.processes[a.processes.length - 1].name
       stations.shell.running += a.processes.length
       if (!stations.shell.here.includes(a.key)) stations.shell.here.push(a.key)
     }
@@ -461,7 +510,7 @@ export function buildMapModel(agents: readonly MapAgentInput[], at: number): Map
     else if (loaded.length && loaded.every((a) => !a.turns)) st.status = 'loading'
   }
   const sessions = agents.flatMap((a) => (!a.notLoaded && a.turns && a.sessionKey ? [a.sessionKey] : []))
-  return { agents: views, stations, feed: sorted.slice(0, FEED_LENGTH), calls: all, sessions }
+  return { agents: views, stations, feed: sorted.slice(0, FEED_LENGTH), calls: all, sessions, running }
 }
 
 /** The heat at which a station's load is about two thirds full (HI-3479): it builds quickly, then saturates. */
@@ -532,3 +581,105 @@ export function mapMode(filterAgents: readonly string[] | undefined): 'single' |
 /** An agent's colour on the shared map: a fixed palette in pane order (cycled). */
 export const AGENT_COLOURS = 8
 export const agentColour = (index: number): number => ((index % AGENT_COLOURS) + AGENT_COLOURS) % AGENT_COLOURS
+
+/** At most this many rows in a station panel's section (HI-3498): the rest are counted under it. */
+export const PANEL_ROWS = 10
+
+/** A row of a station's panel (HI-3498): something running, a call, a file, or a group of calls (a server, a host, a tool). */
+export interface MapPanelRow {
+  key: string
+  kind: 'running' | 'call' | 'file' | 'group'
+  /** Its agent (the shared map shows its colour); a group across agents: the first. */
+  agentKey: string
+  /** As the map names it: a process's executable, a call's label, a file's path, a server's, host's or tool's name. */
+  label: string
+  /** running: what it is, since when. */
+  running?: Pick<MapRunning, 'kind' | 'type' | 'state' | 'pid' | 'since'>
+  /** call: a turn's prompt (You), named by the word for one, never its text. */
+  prompt?: boolean
+  /** call and file: its newest call's time, whether it failed or is still open. */
+  at?: string | null
+  failed?: boolean
+  open?: boolean
+  /** file: its path to open in Files (`MapCall.path`). */
+  path?: string
+  /** file and group: how many calls it had; group: its tools' names (an MCP server's), newest first. */
+  count?: number
+  tools?: string[]
+}
+
+export type MapPanelSection = 'running' | 'thisTurn' | 'files' | 'subagents' | 'tasks' | 'servers' | 'web' | 'skills' | 'other'
+
+/** A station's panel (HI-3498): its sections in order, each with its rows (at most PANEL_ROWS) and how many more there are. */
+export interface MapPanel {
+  station: MapStation
+  sections: { id: MapPanelSection; rows: MapPanelRow[]; more: number }[]
+}
+
+/** Between a file row's agent and label in its key: neither holds it. */
+const SEP = '\u0001'
+
+const newestFirst = (calls: readonly MapCall[]): MapCall[] =>
+  calls
+    .map((c, i) => ({ c, i, t: Date.parse(c.at ?? '') || 0 }))
+    .sort((x, y) => y.t - x.t || y.i - x.i)
+    .map((x) => x.c)
+
+/** Calls grouped by a key, newest first: each group's newest call, its count, and the names gathered by `name`. */
+function grouped(calls: readonly MapCall[], keyOf: (c: MapCall) => string, kind: MapPanelRow['kind'], name?: (c: MapCall) => string, labelOf: (c: MapCall, key: string) => string = (_c, k) => k): MapPanelRow[] {
+  const rows = new Map<string, MapPanelRow>()
+  for (const c of newestFirst(calls)) {
+    const k = keyOf(c)
+    const row = rows.get(k)
+    if (row) {
+      row.count = (row.count ?? 0) + 1
+      if (c.failed) row.failed = true
+      if (!c.done) row.open = true
+      if (name && row.tools && !row.tools.includes(name(c))) row.tools.push(name(c))
+      continue
+    }
+    rows.set(k, { key: `${kind}:${k}`, kind, agentKey: c.agentKey, label: labelOf(c, k), at: c.at, failed: c.failed, open: !c.done, count: 1, ...(c.path ? { path: c.path } : {}), ...(name ? { tools: [name(c)] } : {}) })
+  }
+  return [...rows.values()]
+}
+
+/**
+ * What a station's panel lists (HI-3498), from the map's own model: nothing read for it, names only as the map shows them.
+ * Shell: what runs (processes, command tasks) and this turn's calls. Read and Edit: the files of the calls read, newest
+ * first, each once (by agent: two agents' same file are two rows). Agents: subagent sessions, background tasks and this
+ * turn's calls. Tools: by group, MCP servers (with their tools), web hosts, skills and other tools. You: this turn's.
+ */
+export function stationPanel(model: Pick<MapModel, 'calls' | 'running'>, station: MapStation): MapPanel {
+  const calls = model.calls.filter((c) => c.station === station)
+  const thisTurn = newestFirst(calls.filter((c) => c.thisTurn)).map((c): MapPanelRow => ({ key: `call:${c.key}`, kind: 'call', agentKey: c.agentKey, label: c.label, at: c.at, failed: c.failed, open: !c.done, ...(c.kind === 'prompt' ? { prompt: true } : {}) }))
+  const running = (kind?: MapRunning['kind']): MapPanelRow[] =>
+    model.running
+      .filter((r) => r.station === station && (!kind || r.kind === kind))
+      .map((r) => ({ key: `run:${r.key}`, kind: 'running', agentKey: r.agentKey, label: r.name, running: { kind: r.kind, type: r.type, state: r.state, pid: r.pid, since: r.since } }))
+  const out: MapPanel['sections'] = []
+  const section = (id: MapPanelSection, rows: MapPanelRow[]): void => {
+    out.push({ id, rows: rows.slice(0, PANEL_ROWS), more: Math.max(0, rows.length - PANEL_ROWS) })
+  }
+  if (station === 'shell') {
+    section('running', running())
+    section('thisTurn', thisTurn)
+  } else if (station === 'read' || station === 'edit') {
+    // Each file once per agent: keyed by its agent and label, shown by its path where there is one.
+    // A file is known by its whole path (HR1's round 1: two files can share the last two segments the label keeps), as
+    // spelt either way and in any case; a call with no path (a search, a list) by its label, apart from any path.
+    const fileKey = (c: MapCall): string => `${c.agentKey}${SEP}${c.path ? `path:${c.path.replace(/\\/g, '/').toLowerCase()}` : `label:${c.label}`}`
+    const files = grouped(calls.filter((c) => c.kind !== 'prompt'), fileKey, 'file', undefined, (c) => c.label)
+    section('files', files)
+  } else if (station === 'agents') {
+    section('subagents', running('subagent'))
+    section('tasks', running('task'))
+    section('thisTurn', thisTurn)
+  } else if (station === 'tools') {
+    const of = (g: ToolGroup[]): MapCall[] => calls.filter((c) => c.group && g.includes(c.group))
+    section('servers', grouped(of(['mcp', 'combwork']), (c) => c.server ?? c.label, 'group', (c) => c.label))
+    section('web', grouped(of(['web']), (c) => c.label, 'group'))
+    section('skills', grouped(of(['skill']), (c) => c.label, 'group'))
+    section('other', grouped(of(['other']), (c) => c.label, 'group'))
+  } else section('thisTurn', thisTurn)
+  return { station, sections: out.filter((x) => x.rows.length > 0) }
+}

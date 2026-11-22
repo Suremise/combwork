@@ -629,6 +629,15 @@ Each station counts the calls of the agent's current turn and names the last one
 - **Show** above the list turns the **Map**, its **Feed** and the **Context** rings on and off, for every Activity view. With the map off, it reads nothing of its own.
 - Like the list, it is frozen when it opens: dots move only while it follows live (**Play**), and nothing is drawn while the tab is hidden. With Windows' **Show animations** off, a station flashes instead of a dot moving, and the map changes without easing; **Settings → Advanced → The Activity map's moving pulses** chooses that yourself.
 
+- **Click a station** to see what's behind it, in the place of **Last actions**:
+  - **Shell**: the programs running now and how long they've run, then this turn's commands, named by their tool.
+  - **Read** and **Edit**: the files touched, newest first. Click one to open it in **Files**.
+  - **Agents**: subagents and background tasks.
+  - **Tools**: the MCP servers and the tools used on each, web sites, skills and other tools.
+  - **You**: this turn's prompts and questions.
+
+  Click the station again, the panel's ✕, or press Escape to close it. Like the map, the panel shows names, never what a command or a search said.
+
 The workspace's Activity (below) has the same map, across its projects.
 
 ### An agent's hooks <a id="agent-hooks"></a>

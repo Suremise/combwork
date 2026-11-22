@@ -10,7 +10,7 @@ import { NO_PROJECTS, activityAgentKey, cardActivityAgents, openActivity, set, u
 import { Icon, IconButton, InfoTip, statusText, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
-import { ActivityMap, MapToggles, mapSessions, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { ActivityMap, MapToggles, mapSessions, openMapFile, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
 import { liveIn, mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { ACTIVITY_M, Details, FADE_MS, LIST_EVERY, markOf, NO_NOW, PartView, TICK_MS, TURNS_AT_ONCE, usePageVisible } from './ActivityTab'
@@ -429,6 +429,10 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
   const mapOn = mapShow.map
+  // A panel's file opened in Files (HI-3498): stable, so the map (memo) draws nothing more for it.
+  const entriesNow = useRef(entries)
+  entriesNow.current = entries
+  const openFile = useCallback((key: string, path: string) => openMapFile(entriesNow.current, key, path), [])
   // Animated once live and the snapshot released (HI-2939): see the project's tab.
   const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at })
   const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts, readEntries) : undefined), [alone, entries, drawn.contexts, readEntries])
@@ -577,7 +581,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
           </div>
         )}
         <div className={cx('activity-body', mapOn && entries.length > 0 && 'with-map')}>
-          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={workspaceName} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} />}
+          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={workspaceName} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} onOpenFile={openFile} />}
         {!parts.length || !current ? (
           <div className="pane-empty">{reading ? null : forCardLabel ? tr(M.cardNobody, { card: forCardLabel }) : tr(filtered ? ACTIVITY_M.emptyFiltered : M.empty)}</div>
         ) : (

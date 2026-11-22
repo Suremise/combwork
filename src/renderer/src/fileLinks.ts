@@ -65,6 +65,19 @@ export function openFileLink(t: LinkTarget, line?: number, col?: number): void {
   setProjectTab(t.project, 'files')
 }
 
+/**
+ * Opens a path an agent named (relative to where it works, or whole) in its project's Files tab, when it is a file there
+ * (HI-3498: the Activity map's Read and Edit panels). False when it isn't one (moved, deleted, outside the projects).
+ */
+export async function openPathInFiles(projectPath: string, agentId: string | undefined, path: string): Promise<boolean> {
+  const base = linkBase(projectPath, agentId)
+  const target = base ? resolveLink(path, base, linkRoots()) : null
+  const [file] = target ? await existing([target]) : [null]
+  if (!file) return false
+  openFileLink(file)
+  return true
+}
+
 /** A line's text, and the terminal column each character starts in (wide characters take two). */
 export function lineText(line: IBufferLine, cols: number): { text: string; colOf: number[] } {
   let text = ''

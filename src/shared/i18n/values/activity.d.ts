@@ -47,10 +47,21 @@ interface CombworkMessageValues {
   'activity.map.notLoaded': undefined
   'activity.map.notReported': undefined
   'activity.map.notRunning': { name: string | number }
+  'activity.map.panelCalls': { n: number }
+  'activity.map.panelClose': undefined
+  'activity.map.panelEmpty': undefined
+  'activity.map.panelMore': { n: number }
+  'activity.map.panelNoFile': { path: string | number }
+  'activity.map.panelOpen': undefined
+  'activity.map.panelOpenTip': { path: string | number }
+  'activity.map.panelPid': { pid: string | number }
+  'activity.map.panelSection': { section: string }
+  'activity.map.panelSummary': { n: number; heat: number }
   'activity.map.partial': undefined
   'activity.map.pct': { pct: number }
   'activity.map.prompt': undefined
   'activity.map.ringTipShown': { name: string | number; load: string; known: string; pct: number; shown: string }
+  'activity.map.runningKind': { kind: string; type: string }
   'activity.map.show': undefined
   'activity.map.state': { state: string }
   'activity.map.station': { station: string }

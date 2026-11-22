@@ -1,7 +1,7 @@
 // The Activity map (HI-2903): the Activity tab's reads drawn as a honeycomb. HB1 and HB2 run the fake Claude Code; HB1
 // works on a card. With HB1 alone in the filter its map shows: the fake drives each station (Read, Edit, Shell, Agents,
 // Tools, You), a failed call turns Shell red, a fetched URL shows only its host, and the context ring turns amber at 70 %
-// and red at 90 % (69 % stays as it is). Live, a new call sends a pulse (with motion off, a flash, and no easing: HI-3479); frozen, Map off or hidden, nothing is drawn,
+// and red at 90 % (69 % stays as it is). A click on a station opens its panel in the feed's place (HI-3498: Read's files open in Files, Shell's calls by tool only, Tools by group; again, Enter or Escape), left open through frozen and hidden. Live, a new call sends a pulse (with motion off, a flash, and no easing: HI-3479); frozen, Map off or hidden, nothing is drawn,
 // pulsed or read by the map (its counters). All agents: one shared map with an agent ring each, and a click on a ring
 // shows that agent alone, the selection, its tabs and the strip kept, switching with another ring, back with the same or
 // Escape (HI-3180); the tab and the strip mark the one agent shown, a click in either switching both, kept under Hide
@@ -115,6 +115,36 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await turn('hb1', 'window 100000 then context 90000 then tool Read src/alpha/d.ts')
     check('context 90 %: red', !!(await lib.until(async () => (await level()) === 'red', HUNG_MS, 250)), String(await level()))
     await shoot('2-single-red-dark')
+
+    // --- Station panels (HI-3498): a click opens what is behind a station, docked where the feed is.
+    fs.mkdirSync(path.join(alpha, 'src', 'alpha'), { recursive: true })
+    fs.writeFileSync(path.join(alpha, 'src', 'alpha', 'd.ts'), 'export const d = 1\n')
+    const panel = (s) => page.locator(`.activity-map-panel[data-station="${s}"]`)
+    await station('read').click()
+    const dRow = panel('read').locator('button.activity-map-panel-row', { hasText: 'src/alpha/d.ts' })
+    check("a click on Read opens its panel in the feed's place: its files, newest first, each to open", !!(await lib.until(async () => (await dRow.count()) === 1 && (await feed.count()) === 0, HUNG_MS, 250)) && (await station('read').getAttribute('aria-expanded')) === 'true', await panel('read').innerText().catch(() => ''))
+    // At rest for the picture: the panel's entrance and the station's light done.
+    await lib.animationsDone(map)
+    await shoot('10-panel-read-dark')
+    await dRow.click()
+    const fileTree = page.locator('.file-tree')
+    check('…a file in it opens in Files, selected', !!(await lib.until(async () => (await fileTree.count()) === 1 && (await page.locator('.file-row.selected').getAttribute('data-rel').catch(() => null)) === 'src/alpha/d.ts', HUNG_MS, 250)), String(await page.locator('.file-row.selected').getAttribute('data-rel').catch(() => null)))
+    await page.locator('.tab', { hasText: 'Activity' }).click()
+    await lib.until(async () => (await map.count()) === 1, HUNG_MS, 250)
+    if (await head.getByRole('button', { name: 'Play', exact: true }).count()) await head.getByRole('button', { name: 'Play', exact: true }).click()
+    // The panel kept or not across the tab switch, a click on Shell shows Shell's: its calls this turn, by tool only.
+    if ((await panel('shell').count()) === 0) await station('shell').click()
+    check("a click on Shell shows its panel: this turn's calls by their tool, never a command", !!(await lib.until(async () => (await panel('shell').count()) === 1, HUNG_MS, 250)) && (await panel('read').count()) === 0 && !/npm-run-lint/.test(await panel('shell').innerText()), await panel('shell').innerText().catch(() => ''))
+    await station('shell').click()
+    check('…the same station again closes it, the feed back', !!(await lib.until(async () => (await panel('shell').count()) === 0 && (await feed.count()) === 1, HUNG_MS, 250)))
+    await station('tools').focus()
+    await page.keyboard.press('Enter')
+    check('Enter on a focused station opens its panel: Tools by group, an MCP server with its tool, a page by its host', !!(await lib.until(async () => /github/.test(await panel('tools').innerText().catch(() => '')) && /get_issue/.test(await panel('tools').innerText().catch(() => '')) && /docs\.example\.com/.test(await panel('tools').innerText().catch(() => '')), HUNG_MS, 250)) && !/hush|8443|private/.test(await panel('tools').innerText()), await panel('tools').innerText().catch(() => ''))
+    await page.keyboard.press('Escape')
+    check('…and Escape closes it', !!(await lib.until(async () => (await panel('tools').count()) === 0, HUNG_MS, 250)))
+    // Left open through Frozen and Hidden below: the panel reads and draws nothing of its own either.
+    await station('shell').click()
+    await lib.until(async () => (await panel('shell').count()) === 1, HUNG_MS, 250)
 
     // --- Frozen: nothing pulses.
     await head.getByRole('button', { name: 'Pause', exact: true }).click()
@@ -387,6 +417,13 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === 'light', HUNG_MS)
     await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
     await shoot('4-shared-light')
+    // The shared map's panels (HI-3498): each row marked with its agent's colour.
+    await station('read').click()
+    check("the shared map's Read panel: both agents' files, each by its agent's colour", !!(await lib.until(async () => (await panel('read').locator('.activity-map-panel-row .activity-map-dot').count()) >= 2 && /beta\/z\.ts/.test(await panel('read').innerText().catch(() => '')), HUNG_MS, 250)), await panel('read').innerText().catch(() => ''))
+    await lib.animationsDone(map)
+    await shoot('10b-panel-shared-light')
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await panel('read').count()) === 0, HUNG_MS, 250)
     await head.locator('.activity-pick').first().click()
     await lib.menuEntry(page, 'HB1').click()
     await page.keyboard.press('Escape')
