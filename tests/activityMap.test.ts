@@ -5,7 +5,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationOf, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationLoad, stationOf, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
@@ -205,6 +205,8 @@ describe("the map's model", () => {
   it("counts Agents from subagent sessions, background tasks and agent calls alike", () => {
     const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Agent' }]]), subagents: 1, tasks: [{ type: 'command' }] })], 0)
     expect(m.stations.agents.count).toBe(3)
+    // Running (HI-3479): the subagent session and the task, not the finished call.
+    expect(m.stations.agents.running).toBe(2)
   })
 
   it("marks You for an agent waiting, Edit for a lock block, and Shell's last as a running process's name", () => {
@@ -212,6 +214,21 @@ describe("the map's model", () => {
     expect(m.stations.you.here).toEqual(['A'])
     expect(m.stations.edit.failed).toBe(true)
     expect(m.stations.shell.last).toBe('node.exe')
+    expect(m.stations.shell.running).toBe(1)
+    expect(m.stations.read.running).toBe(0)
+  })
+
+  // HI-3479: the honey level each station's hex fills to.
+  it("loads a station by its recent calls, saturating, and by what runs there; empty until it is counted", () => {
+    const ok = { status: 'ok' as const, running: 0 }
+    expect(stationLoad({ ...ok, heat: 0 })).toBe(0)
+    expect(stationLoad({ ...ok, heat: 3 })).toBeGreaterThan(0)
+    expect(stationLoad({ ...ok, heat: 3 })).toBeLessThan(stationLoad({ ...ok, heat: 12 }))
+    expect(stationLoad({ ...ok, heat: 500 })).toBeLessThanOrEqual(1)
+    expect(stationLoad({ ...ok, heat: 0, running: 2 })).toBe(0.5)
+    expect(stationLoad({ ...ok, heat: 0, running: 9 })).toBe(1)
+    expect(stationLoad({ status: 'loading', heat: 40, running: 2 })).toBe(0)
+    expect(stationLoad({ status: 'notReported', heat: 40, running: 0 })).toBe(0)
   })
 
   it('counts a Codex or OpenCode script by its calls', () => {
@@ -355,6 +372,7 @@ describe('pulses (HR2, s11 gap 2)', () => {
     expect(r.pulses.map((p) => [p.callKey, p.back, p.station])).toEqual([['2', false, 'shell']])
     r = diffPulses(r.seen, [call('1', true), call('2', true, 'shell')], next, r.sessions)
     expect(r.pulses.map((p) => [p.callKey, p.back])).toEqual([['2', true]])
+    expect(r.pulses[0].follows).toBeUndefined()
     r = diffPulses(r.seen, [call('1', true), call('2', true, 'shell')], next, r.sessions)
     expect(r.pulses).toEqual([])
   })
@@ -362,6 +380,8 @@ describe('pulses (HR2, s11 gap 2)', () => {
   it('a call that started and ended between two reads goes out and comes back', () => {
     const r = diffPulses(new Map([['1', true]]), [call('1', true), call('9', true)], ids(), new Set(['s']))
     expect(r.pulses.map((p) => [p.callKey, p.back])).toEqual([['9', false], ['9', true]])
+    // HI-3479: its return follows its going out (it leaves once that one lands); a return of its own read doesn't.
+    expect(r.pulses.map((p) => !!p.follows)).toEqual([false, true])
   })
 
   it("a session's turns read late, after the scope began (a stale answer, a restart's new session), are a baseline of their own", () => {

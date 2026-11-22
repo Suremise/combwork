@@ -1,9 +1,9 @@
 // The Activity map (HI-2903): the Activity tab's reads drawn as a honeycomb (shared/activityMap.ts has the model). One
 // agent in the filter shows its map; none or several, one shared map, each agent its own colour. It draws from the same
 // reads as the list (frozen or live), animates only while shown, live and on, and reads nothing of its own while hidden.
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { activityTabs, buildActivityView, type ActivityFilter, type ActivityInput, type ActivityTabInfo } from '@shared/activity'
-import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, mapReadKeys, stationLastShown, stationTitle, type TextFits, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
+import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, mapReadKeys, stationLastShown, stationLoad, stationTitle, type TextFits, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
 import { ACTIVITY_MAP_MOTION } from '@shared/advanced'
 import { boundedQueue } from '@shared/coalesce'
 import { formatTime } from '@shared/dates'
@@ -207,6 +207,39 @@ const hexPoints = (x0: number, y0: number, r: number): string =>
     return `${(x0 + r * Math.cos(a)).toFixed(1)},${(y0 + r * Math.sin(a)).toFixed(1)}`
   }).join(' ')
 const hexPath = (x0: number, y0: number, r: number): string => `M${hexPoints(x0, y0, r).split(' ').join('L')}Z`
+
+/**
+ * Each station's spoke (HI-3479): a curve from the centre's edge to the station's, bent a little clockwise, the path its
+ * pulses travel (CSS offset-path) as well as the line drawn.
+ */
+const SPOKE_BEND = 0.2
+const spokePath = (i: number): string => {
+  const a = (Math.PI / 180) * (60 * i - 90)
+  const at = (r: number) => ({ x: CX + r * Math.cos(a), y: CY + r * Math.sin(a) })
+  const from = at(CENTRE_R + 6)
+  const to = at(SPOKE - STATION_R + 2)
+  const c = { x: (from.x + to.x) / 2 - (to.y - from.y) * SPOKE_BEND, y: (from.y + to.y) / 2 + (to.x - from.x) * SPOKE_BEND }
+  return `M${from.x.toFixed(1)},${from.y.toFixed(1)} Q${c.x.toFixed(1)},${c.y.toFixed(1)} ${to.x.toFixed(1)},${to.y.toFixed(1)}`
+}
+const SPOKES = Object.fromEntries(MAP_STATIONS.map((s, i) => [s, spokePath(i)])) as Record<MapStation, string>
+/** A pulse's tail (HI-3479): dots following its head along the spoke, each a little later and fainter. */
+const TAIL = [0, 1, 2, 3]
+/** The honey's wavy surface (HI-3479), drawn across a hex at its centre's height and moved down to the station's level. */
+const honeyPath = (x: number, y: number, r: number): string => {
+  const w = r / 2
+  return `M${x - r * 1.2},${y} q${w / 2},-4 ${w},0 t${w},0 t${w},0 t${w},0 t${w},0 V${y + r * 2} H${x - r * 1.2} Z` // i18n-ignore: an SVG path, never shown
+}
+/** The running pips' place (HI-3479): just outside a station's hex, on its spoke's line. */
+const PIP_R = 6
+const pipAt = (i: number, j: number, n: number): { x: number; y: number } => {
+  const a = (Math.PI / 180) * (60 * i - 90)
+  const r = SPOKE + STATION_R + 10
+  const t = { x: -Math.sin(a), y: Math.cos(a) }
+  const off = (j - (n - 1) / 2) * (PIP_R * 2.4)
+  return { x: CX + r * Math.cos(a) + t.x * off, y: CY + r * Math.sin(a) + t.y * off }
+}
+/** At most this many pips a station (the rest are in its count). */
+const MAX_PIPS = 5
 const short = (s: string, n = 24): string => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
 /**
@@ -287,6 +320,7 @@ export function mapStrip(entries: readonly MapEntry[], contexts: ReadonlyMap<str
 /** The map: stations, spokes, pulses, the centre, the feed and (shared) the agents' context rings. */
 export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulses, endPulse, show, onPick, strip, picked = null }: ActivityMapProps) {
   const motion = useMotion()
+  const ids = useMapIds()
   // Each drawing counted as it lands (a layout effect: no write during render), and the pulses then in flight.
   useLayoutEffect(() => {
     mapCounts.renders++
@@ -303,7 +337,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
   const ringAgents: readonly MapStripAgent[] = strip ?? (mode === 'shared' ? model.agents : [])
   return (
     <div
-      className={cx('activity-map', mode === 'shared' && 'shared')}
+      className={cx('activity-map', mode === 'shared' && 'shared', !motion && 'still')}
       data-mode={mode}
       data-picked={picked ?? undefined}
       style={{ '--activity-map-width': `${width}px` } as React.CSSProperties}
@@ -323,41 +357,56 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
           </div>
         ) : (
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={tr(M.mapLabel)} className="activity-map-svg">
+          <Defs ids={ids} />
           <g className="activity-map-comb" aria-hidden="true">
             {COMB.map((p, i) => (
               <polygon key={i} points={p} />
             ))}
           </g>
+          {/* The warmth behind the centre (HI-3479): a warm light, stronger while an agent works. */}
+          <circle className={cx('activity-map-halo', working > 0 && 'on')} cx={CX} cy={CY} r={SPOKE + 20} fill={`url(#${ids.halo})`} aria-hidden="true" />
           {MAP_STATIONS.map((s) => {
             const st = model.stations[s]
-            const p = POS[s]
-            return <line key={s} className={cx('activity-map-spoke', st.failed && 'failed', st.status === 'notReported' && 'na')} x1={CX} y1={CY} x2={p.x} y2={p.y} strokeWidth={1.5 + Math.min(5, st.heat / 3)} data-heat={st.heat} />
+            // Its track, and over it its heat: wider and brighter with the calls of the last ten minutes (HI-3479).
+            return (
+              <g key={s} className={cx('activity-map-spoke', st.failed && 'failed', st.status === 'notReported' && 'na')} data-station={s} data-heat={st.heat}>
+                <path d={SPOKES[s]} className="track" />
+                <path d={SPOKES[s]} className="heat" filter={`url(#${ids.soft})`} style={{ strokeWidth: 1 + Math.min(5, st.heat / 3), opacity: st.heat ? 0.25 + Math.min(0.55, st.heat / 30) : 0 }} />
+              </g>
+            )
           })}
-          {/* Pulses under the hexes: out of the centre and into the station, or back. */}
+          {/* Pulses under the hexes: a comet along the spoke, out of the centre and into the station, or back (HI-3479). */}
           {motion &&
             pulses.map((pl) => {
-              const p = POS[pl.station]
+              const fill = pl.failed ? 'var(--error)' : colourOf(colours.get(pl.agentKey))
               return (
-                <g key={pl.id} transform={`translate(${CX} ${CY})`}>
-                  <circle
-                    className={cx('activity-map-pulse', pl.back && 'back', pl.failed && 'failed')}
-                    r={6}
-                    data-station={pl.station}
-                    style={{ '--dx': `${(p.x - CX).toFixed(1)}px`, '--dy': `${(p.y - CY).toFixed(1)}px`, fill: pl.failed ? 'var(--error)' : colourOf(colours.get(pl.agentKey)) } as React.CSSProperties}
-                    onAnimationEnd={() => endPulse(pl.id)}
-                  />
+                <g
+                  key={pl.id}
+                  className={cx('activity-map-pulse', pl.back && 'back', pl.failed && 'failed')}
+                  data-station={pl.station}
+                  style={{ '--spoke': `path('${SPOKES[pl.station]}')`, '--pulse': fill, ...(pl.follows ? { '--after': 'var(--activity-map-pulse-ms)' } : {}) } as React.CSSProperties}
+                  // Done when its last dot lands (each dot's own end bubbles here).
+                  onAnimationEnd={(e) => {
+                    if ((e.target as Element).getAttribute('data-last') === 'yes') endPulse(pl.id)
+                  }}
+                >
+                  {TAIL.map((t) => (
+                    <circle key={t} className="tail" r={4.5 - t * 0.8} style={{ animationDelay: `calc(var(--after, 0ms) + ${t * 70}ms)`, fillOpacity: 0.6 - t * 0.13 }} data-last={t === TAIL.length - 1 ? 'yes' : undefined} />
+                  ))}
+                  <circle className="glow" r={13} style={{ fill: `url(#${ids.spark})` }} />
+                  <circle className="head" r={5} />
                 </g>
               )
             })}
-          {MAP_STATIONS.map((s) => (
-            <Station key={s} view={model.stations[s]} name={stationName(s)} colours={colours} />
+          {MAP_STATIONS.map((s, i) => (
+            <Station key={s} index={i} view={model.stations[s]} name={stationName(s)} colours={colours} ids={ids} />
           ))}
           {!motion &&
             pulses.map((pl) => {
               const p = POS[pl.station]
               return <polygon key={pl.id} className={cx('activity-map-flash', pl.failed && 'failed')} data-station={pl.station} points={hexPoints(p.x, p.y, STATION_R)} onAnimationEnd={() => endPulse(pl.id)} />
             })}
-          {one ? <Centre agent={one} showContext={show.context} /> : <SharedCentre title={title} agents={model.agents.length} working={working} waiting={waiting} />}
+          {one ? <Centre agent={one} showContext={show.context} ids={ids} /> : <SharedCentre title={title} agents={model.agents.length} working={working} waiting={waiting} ids={ids} />}
         </svg>
         )}
         {show.context && ringAgents.length > 0 && (
@@ -405,17 +454,87 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
   )
 })
 
-function Station({ view: st, name, colours }: { view: MapStationView; name: string; colours: ReadonlyMap<string, number | undefined> }) {
+/** The ids of one map's gradients, filters and clips (HI-3479): unique, as a window can show more than one map. */
+type MapIds = ReturnType<typeof useMapIds>
+function useMapIds() {
+  const base = useId().replace(/[^A-Za-z0-9_-]/g, '')
+  return useMemo(
+    () => ({
+      glow: `${base}-glow`,
+      soft: `${base}-soft`,
+      cell: `${base}-cell`,
+      honey: `${base}-honey`,
+      halo: `${base}-halo`,
+      spark: `${base}-spark`,
+      ring: `${base}-ring`,
+      clip: (s: MapStation) => `${base}-clip-${s}`
+    }),
+    [base]
+  )
+}
+
+/** The map's gradients and filters (HI-3479): drawn in the theme's colours, so both themes have them. */
+function Defs({ ids }: { ids: MapIds }) {
+  return (
+    <defs>
+      <filter id={ids.glow} x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="5" result="b" />
+        <feMerge>
+          <feMergeNode in="b" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+      <filter id={ids.soft} x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="2.5" />
+      </filter>
+      <linearGradient id={ids.cell} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" className="activity-map-stop-cell-top" />
+        <stop offset="1" className="activity-map-stop-cell-bottom" />
+      </linearGradient>
+      <linearGradient id={ids.honey} x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0" className="activity-map-stop-honey-deep" />
+        <stop offset="1" className="activity-map-stop-honey-light" />
+      </linearGradient>
+      <radialGradient id={ids.halo}>
+        <stop offset="0" className="activity-map-stop-halo" />
+        <stop offset="1" className="activity-map-stop-clear" />
+      </radialGradient>
+      <radialGradient id={ids.spark}>
+        <stop offset="0" className="activity-map-stop-spark" />
+        <stop offset="1" className="activity-map-stop-clear" />
+      </radialGradient>
+      <linearGradient id={ids.ring} x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" className="activity-map-stop-ring-light" />
+        <stop offset="1" className="activity-map-stop-ring-deep" />
+      </linearGradient>
+    </defs>
+  )
+}
+
+function Station({ index, view: st, name, colours, ids }: { index: number; view: MapStationView; name: string; colours: ReadonlyMap<string, number | undefined>; ids: MapIds }) {
   const p = POS[st.station]
   const active = st.here.length > 0
   const waitingHere = st.station === 'you' && active
   const sub = st.status === 'notReported' ? tr(M.notReported) : st.status === 'loading' ? tr(M.loading) : tr(M.count, { n: st.count })
   const last = st.lastKind === 'prompt' ? tr(M.prompt) : st.last
   const title = stationTitle(st, name, last)
+  const load = stationLoad(st)
+  const pips = Math.min(MAX_PIPS, st.running)
   return (
-    <g className={cx('activity-map-station', active && 'active', (st.failed || waitingHere) && 'failed', st.status !== 'ok' && st.status)} data-station={st.station} data-count={st.count} data-status={st.status} data-failed={st.failed ? 'yes' : 'no'}>
+    <g className={cx('activity-map-station', active && 'active', (st.failed || waitingHere) && 'failed', st.status !== 'ok' && st.status)} data-station={st.station} data-count={st.count} data-status={st.status} data-failed={st.failed ? 'yes' : 'no'} data-load={load.toFixed(2)} data-running={st.running}>
       <title>{title}</title>
-      <polygon points={hexPoints(p.x, p.y, STATION_R)} />
+      {/* Its outline first: the e2e measures each text against it. */}
+      <polygon className="activity-map-cell" points={hexPoints(p.x, p.y, STATION_R)} fill={`url(#${ids.cell})`} />
+      {/* The honey (HI-3479): its load, filling the hex from its base, rising and settling smoothly. */}
+      <clipPath id={ids.clip(st.station)}>
+        <polygon points={hexPoints(p.x, p.y, STATION_R - 1.5)} />
+      </clipPath>
+      <g clipPath={`url(#${ids.clip(st.station)})`} aria-hidden="true">
+        <path className="activity-map-honey" d={honeyPath(p.x, p.y, STATION_R)} fill={`url(#${ids.honey})`} style={{ transform: `translateY(${(STATION_R * (1 - 2 * load) + (load ? 0 : 4)).toFixed(1)}px)` }} />
+      </g>
+      <polygon className="activity-map-bevel" points={hexPoints(p.x, p.y, STATION_R - 4)} aria-hidden="true" />
+      {/* Lit while a call is open there, settling slowly once it ends. */}
+      <polygon className="activity-map-lit" points={hexPoints(p.x, p.y, STATION_R + 1)} filter={`url(#${ids.glow})`} aria-hidden="true" />
       <text x={p.x} y={p.y - 12} className="activity-map-station-name">
         {name}
       </text>
@@ -429,20 +548,34 @@ function Station({ view: st, name, colours }: { view: MapStationView; name: stri
       )}
       {colours.size > 1 &&
         st.here.slice(0, 6).map((k, i, all) => <circle key={k} cx={p.x - (all.length - 1) * 6 + i * 12} cy={p.y + 34} r={4} style={{ fill: colourOf(colours.get(k)) }} />)}
+      {/* What runs there now (HI-3479): a small lit cell each, outside the hex (its count and hover say how many). */}
+      {pips > 0 && (
+        <g className="activity-map-pips" aria-hidden="true">
+          {Array.from({ length: pips }, (_, j) => {
+            const c = pipAt(index, j, pips)
+            return <polygon key={j} points={hexPoints(c.x, c.y, PIP_R)} filter={`url(#${ids.glow})`} />
+          })}
+        </g>
+      )}
     </g>
   )
 }
 
-function Centre({ agent: a, showContext }: { agent: MapModel['agents'][number]; showContext: boolean }) {
+function Centre({ agent: a, showContext, ids }: { agent: MapModel['agents'][number]; showContext: boolean; ids: MapIds }) {
   const level = contextLevel(a.context?.pct)
   const doing = a.waiting ? tr(M.needsYou) : a.doing ? tr(M.doing, { doing: a.doing }) : tr(M.state, { state: a.state })
   return (
-    <g className={cx('activity-map-centre', a.waiting && 'waiting')} data-agent={a.key}>
-      <polygon points={hexPoints(CX, CY, CENTRE_R)} />
+    <g className={cx('activity-map-centre', a.waiting && 'waiting', a.state === 'working' && 'working')} data-agent={a.key}>
+      <polygon className="activity-map-cell" points={hexPoints(CX, CY, CENTRE_R)} fill={`url(#${ids.cell})`} />
+      <polygon className="activity-map-bevel" points={hexPoints(CX, CY, CENTRE_R - 5)} aria-hidden="true" />
       {showContext && (
         <g className={cx('activity-map-context', level)} data-level={level} data-pct={a.context?.pct ?? ''}>
           <path d={hexPath(CX, CY, CENTRE_R + 8)} className="track" />
-          {a.context?.pct != null && <path d={hexPath(CX, CY, CENTRE_R + 8)} className="fill" pathLength={100} strokeDasharray={`${a.context.pct} 100`} />}
+          {/* Filling smoothly as it changes (HI-3479), glowing; the theme's honey while it is fine, amber and red as they were. */}
+          {/* None at 0 %: a round cap would draw a dot. */}
+          {!!a.context?.pct && (
+            <path d={hexPath(CX, CY, CENTRE_R + 8)} className="fill" pathLength={100} filter={`url(#${ids.glow})`} style={{ strokeDasharray: `${a.context.pct} 100`, ...(level === 'ok' ? { stroke: `url(#${ids.ring})` } : {}) }} />
+          )}
         </g>
       )}
       <text x={CX} y={CY - 22} className="activity-map-centre-name">
@@ -465,10 +598,11 @@ function Centre({ agent: a, showContext }: { agent: MapModel['agents'][number]; 
   )
 }
 
-function SharedCentre({ title, agents, working, waiting }: { title: string; agents: number; working: number; waiting: number }) {
+function SharedCentre({ title, agents, working, waiting, ids }: { title: string; agents: number; working: number; waiting: number; ids: MapIds }) {
   return (
-    <g className={cx('activity-map-centre', waiting > 0 && 'waiting')}>
-      <polygon points={hexPoints(CX, CY, CENTRE_R - 6)} />
+    <g className={cx('activity-map-centre', waiting > 0 && 'waiting', working > 0 && 'working')}>
+      <polygon className="activity-map-cell" points={hexPoints(CX, CY, CENTRE_R - 6)} fill={`url(#${ids.cell})`} />
+      <polygon className="activity-map-bevel" points={hexPoints(CX, CY, CENTRE_R - 11)} aria-hidden="true" />
       <text x={CX} y={CY - 14} className="activity-map-centre-name">
         {short(title, 16)}
       </text>
@@ -489,7 +623,7 @@ function Ring({ pct, colour, hatched }: { pct: number | null; colour: string; ha
   return (
     <svg width={26} height={26} viewBox="0 0 26 26" aria-hidden="true" className={cx('activity-map-ring-mark', level, hatched && 'hatched')}>
       <path d={hexPath(13, 13, 10)} className="track" />
-      {pct !== null && <path d={hexPath(13, 13, 10)} className="fill" pathLength={100} strokeDasharray={`${pct} 100`} />}
+      {!!pct && <path d={hexPath(13, 13, 10)} className="fill" pathLength={100} style={{ strokeDasharray: `${pct} 100` }} />}
       <circle cx={13} cy={13} r={3.5} style={{ fill: colour }} />
     </svg>
   )

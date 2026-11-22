@@ -8393,6 +8393,11 @@ button.agent-place:hover {
 [data-theme='dark'] {
   --map-hex: #26262a;
   --map-comb: rgba(255, 255, 255, 0.035);
+  --map-bevel: rgba(255, 255, 255, 0.05);
+  --map-honey-deep: 0.42;
+  --map-honey-light: 0.12;
+  --map-halo: 0.16;
+  --map-lit: 0.55;
   --map-agent-0: #f59e0b;
   --map-agent-1: #3b9eff;
   --map-agent-2: #b48cff;
@@ -8405,6 +8410,11 @@ button.agent-place:hover {
 [data-theme='light'] {
   --map-hex: #fafafa;
   --map-comb: rgba(0, 0, 0, 0.035);
+  --map-bevel: rgba(255, 255, 255, 0.7);
+  --map-honey-deep: 0.34;
+  --map-honey-light: 0.1;
+  --map-halo: 0.12;
+  --map-lit: 0.45;
   --map-agent-0: #d97706;
   --map-agent-1: #0969da;
   --map-agent-2: #8250df;
@@ -8499,35 +8509,119 @@ button.agent-place:hover {
   fill: none;
   stroke: var(--map-comb);
 }
-.activity-map-spoke {
-  stroke: var(--border);
+/* HI-3479: the map in the window's honey look. Cells with depth (a gradient and an inner edge), a warm light behind the
+   centre, curved spokes glowing with their heat, stations that light up and settle, and their load as honey. */
+.activity-map-stop-cell-top {
+  stop-color: var(--bg-elevated);
+}
+.activity-map-stop-cell-bottom {
+  stop-color: var(--map-hex);
+}
+.activity-map-stop-honey-deep {
+  stop-color: var(--accent);
+  stop-opacity: var(--map-honey-deep);
+}
+.activity-map-stop-honey-light {
+  stop-color: var(--honey-light);
+  stop-opacity: var(--map-honey-light);
+}
+.activity-map-stop-halo {
+  stop-color: var(--accent);
+  stop-opacity: var(--map-halo);
+}
+.activity-map-stop-spark {
+  stop-color: var(--honey-light);
+  stop-opacity: 0.7;
+}
+.activity-map-stop-clear {
+  stop-color: var(--accent);
+  stop-opacity: 0;
+}
+.activity-map-stop-ring-light {
+  stop-color: var(--honey-light);
+}
+.activity-map-stop-ring-deep {
+  stop-color: var(--accent-strong);
+}
+.activity-map-halo {
+  opacity: 0.45;
+  transition: opacity 1.2s ease;
+}
+.activity-map-halo.on {
+  opacity: 1;
+}
+.activity-map-spoke path {
+  fill: none;
   stroke-linecap: round;
+}
+.activity-map-spoke .track {
+  stroke: var(--border);
+  stroke-width: 1.5;
   opacity: 0.9;
 }
-.activity-map-spoke.failed {
+.activity-map-spoke .heat {
+  stroke: var(--accent);
+  transition:
+    stroke-width 0.8s ease,
+    opacity 0.8s ease;
+}
+.activity-map-spoke.failed .track,
+.activity-map-spoke.failed .heat {
   stroke: var(--error);
 }
-.activity-map-spoke.na {
+.activity-map-spoke.na .track {
   stroke: var(--fg-decor);
   stroke-dasharray: 3 5;
   opacity: 0.6;
 }
-.activity-map-station polygon {
-  fill: var(--map-hex);
+.activity-map-cell {
   stroke: var(--border);
   stroke-width: 1;
+  transition:
+    stroke 0.3s ease,
+    stroke-width 0.3s ease;
 }
-.activity-map-station.active polygon {
-  fill: var(--accent-soft);
+.activity-map-station.active > .activity-map-cell {
   stroke: var(--accent);
   stroke-width: 2;
 }
-.activity-map-station.failed polygon {
+.activity-map-station.failed > .activity-map-cell {
   stroke: var(--error);
   stroke-width: 2;
 }
-.activity-map-station.notReported polygon {
+.activity-map-station.notReported > .activity-map-cell {
   stroke-dasharray: 4 4;
+}
+.activity-map-bevel {
+  fill: none;
+  stroke: var(--map-bevel);
+  pointer-events: none;
+}
+.activity-map-honey {
+  transition: transform 1.1s cubic-bezier(0.33, 1, 0.68, 1);
+}
+/* Lit at once when a call opens there; the light settles slowly once it ends. */
+.activity-map-lit {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.4s ease-out;
+}
+.activity-map-station.active > .activity-map-lit {
+  opacity: var(--map-lit);
+  transition-duration: 0.25s;
+}
+.activity-map-station.failed > .activity-map-lit {
+  stroke: var(--error);
+}
+.activity-map-pips polygon {
+  fill: var(--success);
+}
+/* Motion off (the Advanced setting, or Windows' reduced motion): every change lands at once. */
+.activity-map.still * {
+  transition: none !important;
 }
 .activity-map svg text {
   text-anchor: middle;
@@ -8551,11 +8645,15 @@ button.agent-place:hover {
   font-size: 10.5px !important;
   fill: var(--fg-muted) !important;
 }
-.activity-map-centre > polygon {
-  fill: var(--bg-elevated);
+.activity-map-centre > .activity-map-cell {
   stroke: var(--border);
 }
-.activity-map-centre.waiting > polygon {
+.activity-map-centre.working > .activity-map-cell {
+  stroke: var(--accent);
+  stroke-opacity: 0.7;
+  stroke-width: 1.5;
+}
+.activity-map-centre.waiting > .activity-map-cell {
   stroke: var(--state-waiting);
   stroke-width: 2;
 }
@@ -8584,6 +8682,9 @@ button.agent-place:hover {
 .activity-map-context .fill,
 .activity-map-ring-mark .fill {
   stroke: var(--accent);
+  transition:
+    stroke-dasharray 0.9s cubic-bezier(0.33, 1, 0.68, 1),
+    stroke 0.4s ease;
 }
 /* A ring is only ever stroked: an amber one's warning fill painted its whole hex solid (HI-3190). */
 .activity-map-context.amber .fill,
@@ -8607,28 +8708,55 @@ button.agent-place:hover {
 .activity-map-centre-context.ok {
   fill: var(--accent) !important;
 }
-.activity-map-pulse {
-  animation: activity-map-out 700ms ease-in-out forwards;
-  stroke: var(--bg);
-  stroke-width: 2;
+/* A pulse (HI-3479): a comet along its spoke, its head glowing and its tail following, eased out and in. */
+.activity-map {
+  --activity-map-pulse-ms: 900ms;
 }
-.activity-map-pulse.back {
+.activity-map-pulse circle {
+  offset-path: var(--spoke);
+  offset-rotate: 0deg;
+  offset-distance: 0%;
+  animation: activity-map-out var(--activity-map-pulse-ms) cubic-bezier(0.45, 0, 0.25, 1) var(--after, 0ms) both;
+  fill: var(--pulse);
+  pointer-events: none;
+}
+.activity-map-pulse.back circle {
   animation-name: activity-map-back;
 }
+.activity-map-pulse .head {
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
 @keyframes activity-map-out {
-  from {
-    transform: translate(0, 0);
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
   }
-  to {
-    transform: translate(var(--dx), var(--dy));
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
   }
 }
 @keyframes activity-map-back {
-  from {
-    transform: translate(var(--dx), var(--dy));
+  0% {
+    offset-distance: 100%;
+    opacity: 0;
   }
-  to {
-    transform: translate(0, 0);
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 0%;
+    opacity: 0;
   }
 }
 .activity-map-flash {

@@ -1,7 +1,7 @@
 // The Activity map (HI-2903): the Activity tab's reads drawn as a honeycomb. HB1 and HB2 run the fake Claude Code; HB1
 // works on a card. With HB1 alone in the filter its map shows: the fake drives each station (Read, Edit, Shell, Agents,
 // Tools, You), a failed call turns Shell red, a fetched URL shows only its host, and the context ring turns amber at 70 %
-// and red at 90 % (69 % stays as it is). Live, a new call sends a pulse; frozen, Map off or hidden, nothing is drawn,
+// and red at 90 % (69 % stays as it is). Live, a new call sends a pulse (with motion off, a flash, and no easing: HI-3479); frozen, Map off or hidden, nothing is drawn,
 // pulsed or read by the map (its counters). All agents: one shared map with an agent ring each, and a click on a ring
 // shows that agent alone, the selection, its tabs and the strip kept, switching with another ring, back with the same or
 // Escape (HI-3180); the tab and the strip mark the one agent shown, a click in either switching both, kept under Hide
@@ -165,6 +165,29 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check('Map off: no map reads, drawing or pulses', off1.reads === off0.reads && off1.turnReads === off0.turnReads && off1.renders === off0.renders && off1.pulses === off0.pulses, JSON.stringify([off0, off1]))
     await toggles.locator('[data-toggle="map"]').click()
     await lib.until(async () => (await map.count()) === 1, HUNG_MS, 250)
+    // --- Motion off (HI-3479): a new call flashes its station, no comet, and the map's changes land without easing.
+    await inv('advanced:set', 'cw.activity.mapMotion', 'off')
+    check('motion off: the map is still (no transitions)', !!(await lib.until(async () => /\bstill\b/.test((await map.getAttribute('class')) ?? ''), HUNG_MS, 250)))
+    const flashes = () => page.evaluate(() => window.__cwFlashSeen ?? 0)
+    await page.evaluate(() => {
+      window.__cwFlashSeen = 0
+      window.__cwCometSeen = 0
+      window.__cwMotionWatch = new MutationObserver(() => {
+        if (document.querySelector('.activity-map-flash')) window.__cwFlashSeen++
+        if (document.querySelector('.activity-map-pulse')) window.__cwCometSeen++
+      })
+      window.__cwMotionWatch.observe(document.querySelector('.activity-map'), { childList: true, subtree: true })
+    })
+    // Following live, as before Map off (Play if it froze).
+    if (await head.getByRole('button', { name: 'Play', exact: true }).count()) await head.getByRole('button', { name: 'Play', exact: true }).click()
+    const still0 = await counts()
+    await turn('hb1', 'window 100000 then context 30000 then tool Read src/alpha/h2.ts')
+    check('…a new call flashes its station, and no comet travels', !!(await lib.until(async () => (await flashes()) > 0, HUNG_MS, 250)) && (await page.evaluate(() => window.__cwCometSeen)) === 0 && (await counts()).pulses > still0.pulses, JSON.stringify([still0, await counts()]))
+    const transitions = await map.evaluate((m) => [...m.querySelectorAll('.activity-map-honey, .activity-map-lit, .activity-map-context .fill')].map((e) => getComputedStyle(e).transitionDuration).filter((d) => d.split(',').some((x) => parseFloat(x) > 0)))
+    check('…and its honey, light and context ring change without easing', transitions.length === 0, JSON.stringify(transitions))
+    await page.evaluate(() => window.__cwMotionWatch.disconnect())
+    await inv('advanced:set', 'cw.activity.mapMotion', 'system')
+    await lib.until(async () => !/\bstill\b/.test((await map.getAttribute('class')) ?? ''), HUNG_MS, 250)
     // Feed off: kept for the next time.
     await toggles.locator('[data-toggle="feed"]').click()
     check('Feed off: the feed is gone, the map stays', !!(await lib.until(async () => (await feed.count()) === 0, HUNG_MS, 250)) && (await map.count()) === 1)
