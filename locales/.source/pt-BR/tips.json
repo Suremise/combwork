@@ -3,6 +3,8 @@
   "tips.activityMap.title": "A map of what your agents are doing",
   "tips.activityMapPanels.text": "Click a station on the Activity map for what is behind it: Shell's running programs and how long they've run, the files Read and Edit touched (each opens in Files), subagents, and the MCP servers and tools used. Click it again or press Escape to close it.",
   "tips.activityMapPanels.title": "See what is behind a station",
+  "tips.activityMapShowCall.text": "Click a row of the Activity map's Last actions, or a call in a station's panel, to show it in the list beside the map, selected with its details. In the shared map, click an agent's dot on a station to show its map alone.",
+  "tips.activityMapShowCall.title": "From the map to the list",
   "tips.activityTab.text": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
   "tips.activityTab.title": "See what each agent is running",
   "tips.activityWorkspace.text": "Activity, in the activity bar, shows every project's running agents together, their tabs grouped by project. A card in progress opens it on the agents working on that card, and a run or a lane in the Progress panel on its agents (Show in Activity).",

@@ -1,7 +1,7 @@
 // The Activity map (HI-2903): the Activity tab's reads drawn as a honeycomb. HB1 and HB2 run the fake Claude Code; HB1
 // works on a card. With HB1 alone in the filter its map shows: the fake drives each station (Read, Edit, Shell, Agents,
 // Tools, You), a failed call turns Shell red, a fetched URL shows only its host, and the context ring turns amber at 70 %
-// and red at 90 % (69 % stays as it is). A click on a station opens its panel in the feed's place (HI-3498: Read's files open in Files, Shell's calls by tool only, Tools by group; again, Enter or Escape), left open through frozen and hidden. Live, a new call sends a pulse (with motion off, a flash, and no easing: HI-3479); frozen, Map off or hidden, nothing is drawn,
+// and red at 90 % (69 % stays as it is). A feed row shows its call in the list, an earlier turn's under From the map, and a station's agent dot shows that agent alone (HI-3499, both levels). A click on a station opens its panel in the feed's place (HI-3498: Read's files open in Files, Shell's calls by tool only, Tools by group; again, Enter or Escape), left open through frozen and hidden. Live, a new call sends a pulse (with motion off, a flash, and no easing: HI-3479); frozen, Map off or hidden, nothing is drawn,
 // pulsed or read by the map (its counters). All agents: one shared map with an agent ring each, and a click on a ring
 // shows that agent alone, the selection, its tabs and the strip kept, switching with another ring, back with the same or
 // Escape (HI-3180); the tab and the strip mark the one agent shown, a click in either switching both, kept under Hide
@@ -121,7 +121,7 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     fs.writeFileSync(path.join(alpha, 'src', 'alpha', 'd.ts'), 'export const d = 1\n')
     const panel = (s) => page.locator(`.activity-map-panel[data-station="${s}"]`)
     await station('read').click()
-    const dRow = panel('read').locator('button.activity-map-panel-row', { hasText: 'src/alpha/d.ts' })
+    const dRow = panel('read').locator('button.activity-map-panel-main', { hasText: 'src/alpha/d.ts' })
     check("a click on Read opens its panel in the feed's place: its files, newest first, each to open", !!(await lib.until(async () => (await dRow.count()) === 1 && (await feed.count()) === 0, HUNG_MS, 250)) && (await station('read').getAttribute('aria-expanded')) === 'true', await panel('read').innerText().catch(() => ''))
     // At rest for the picture: the panel's entrance and the station's light done.
     await lib.animationsDone(map)
@@ -142,6 +142,18 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check('Enter on a focused station opens its panel: Tools by group, an MCP server with its tool, a page by its host', !!(await lib.until(async () => /github/.test(await panel('tools').innerText().catch(() => '')) && /get_issue/.test(await panel('tools').innerText().catch(() => '')) && /docs\.example\.com/.test(await panel('tools').innerText().catch(() => '')), HUNG_MS, 250)) && !/hush|8443|private/.test(await panel('tools').innerText()), await panel('tools').innerText().catch(() => ''))
     await page.keyboard.press('Escape')
     check('…and Escape closes it', !!(await lib.until(async () => (await panel('tools').count()) === 0, HUNG_MS, 250)))
+    // --- A feed row shows its call in the list (HI-3499): an earlier turn's under From the map, selected with its details;
+    // the latest turn's prompt is the list's own row, selected.
+    const listSel = page.locator('.activity-tab:not(.activity-workspace) .activity-list .activity-row.selected')
+    const fromMap = page.locator('.activity-tab:not(.activity-workspace) .activity-list .activity-group[data-group="fromMap"]')
+    await feed.locator('button.activity-map-feed-row', { hasText: 'alpha/c.ts' }).click()
+    check("a feed row of an earlier turn shows its call in the list: From the map, selected, its details open", !!(await lib.until(async () => (await fromMap.count()) === 1 && (await listSel.count()) === 1 && ((await listSel.getAttribute('data-key')) ?? '').startsWith('tool:') && /Read/.test(await listSel.innerText()), HUNG_MS, 250)), `${await fromMap.count()} ${await listSel.getAttribute('data-key').catch(() => null)}`)
+    // Escape (the feed row focused, no panel open) clears it: its row and its Details go (HR1's round 1).
+    const details = page.locator('.activity-tab:not(.activity-workspace) .activity-details')
+    await page.keyboard.press('Escape')
+    check('…Escape clears it: the From the map row and its Details go', !!(await lib.until(async () => (await fromMap.count()) === 0 && (await details.count()) === 0 && (await listSel.count()) === 0, HUNG_MS, 250)), `${await fromMap.count()} ${await details.count()}`)
+    await feed.locator('button.activity-map-feed-row', { hasText: 'Prompt' }).first().click()
+    check("…the latest turn's prompt selects the list's own row, and From the map goes", !!(await lib.until(async () => (await fromMap.count()) === 0 && ((await listSel.getAttribute('data-key').catch(() => '')) ?? '').startsWith('turn:'), HUNG_MS, 250)), String(await listSel.getAttribute('data-key').catch(() => null)))
     // Left open through Frozen and Hidden below: the panel reads and draws nothing of its own either.
     await station('shell').click()
     await lib.until(async () => (await panel('shell').count()) === 1, HUNG_MS, 250)
@@ -215,6 +227,7 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check('…a new call flashes its station, and no comet travels', !!(await lib.until(async () => (await flashes()) > 0, HUNG_MS, 250)) && (await page.evaluate(() => window.__cwCometSeen)) === 0 && (await counts()).pulses > still0.pulses, JSON.stringify([still0, await counts()]))
     const transitions = await map.evaluate((m) => [...m.querySelectorAll('.activity-map-honey, .activity-map-lit, .activity-map-context .fill')].map((e) => getComputedStyle(e).transitionDuration).filter((d) => d.split(',').some((x) => parseFloat(x) > 0)))
     check('…and its honey, light and context ring change without easing', transitions.length === 0, JSON.stringify(transitions))
+    check('…and no agent arrives or leaves eased (HI-3499)', (await map.locator('.arriving, .leaving').count()) === 0)
     await page.evaluate(() => window.__cwMotionWatch.disconnect())
     await inv('advanced:set', 'cw.activity.mapMotion', 'system')
     await lib.until(async () => !/\bstill\b/.test((await map.getAttribute('class')) ?? ''), HUNG_MS, 250)
@@ -539,6 +552,8 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     }
     const last = more.at(-1)
     await turn(last.id, 'window 100000 then context 55000 then tool Read src/late/eleven.ts')
+    // HB1 leaves a program running (it ends by itself): Shell marks HB1 in the shared map, its dot a way to its map (HI-3499).
+    await turn('hb1', 'linger 1')
     const views = [
       { label: 'the project tab', scope: '.activity-tab:not(.activity-workspace)', open: () => page.locator('.activity-btn[aria-label="Projects"]').click(), ring: `.activity-map-ring[data-agent="${last.id}"]` },
       { label: 'the workspace view', scope: '.activity-workspace', open: () => page.locator('.activity-btn[aria-label="Activity"]').click(), ring: '.activity-map-ring' }
@@ -553,7 +568,14 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       await lib.menuEntry(page, 'All').click()
       await page.keyboard.press('Escape')
       if ((await vHead.locator('.activity-hide input').isChecked())) await vHead.locator('.activity-hide input').uncheck()
-      if ((await vHead.getByRole('button', { name: 'Play', exact: true }).count()) === 1) await vHead.getByRole('button', { name: 'Play', exact: true }).click()
+      // A station's agent dot drawn on a frozen map (it opens frozen) arrives with no animation (HR1's round 1).
+      const vDots = page.locator(`${v.scope} .activity-map-here`)
+      // An animation declared at all (a short one could end before it is looked at), or one running.
+      const dotsMoving = () => vDots.evaluateAll((els) => els.filter((e) => getComputedStyle(e).animationName !== 'none' || e.getAnimations().length > 0).length)
+      if ((await vHead.getByRole('button', { name: 'Play', exact: true }).count()) === 1) {
+        check(`${v.label}, frozen: its agent dots drawn without an animation`, !!(await lib.until(async () => (await vDots.count()) >= 1, HUNG_MS, 250)) && (await dotsMoving()) === 0, String(await dotsMoving()))
+        await vHead.getByRole('button', { name: 'Play', exact: true }).click()
+      }
       const vRings = page.locator(`${v.scope} .activity-map-ring`)
       const lastRing = v.label === 'the workspace view' ? vRings.filter({ hasText: 'HB11' }) : page.locator(`${v.scope} ${v.ring}`)
       check(`${v.label}: ten agents, the shared map, HB11 past the eight it reads`, !!(await lib.until(async () => (await vMap.getAttribute('data-mode').catch(() => null)) === 'shared' && (await vRings.count()) >= 10 && (await lastRing.getAttribute('data-load').catch(() => null)) === 'notLoaded', HUNG_MS, 250)), `${await vRings.count()} ${await lastRing.getAttribute('data-load').catch(() => null)}`)
@@ -572,8 +594,26 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       await turn(last.id, `window 100000 then context 55000 then tool Edit src/late/edit${edits}.ts`)
       check('…and its new calls come in as it works', !!(await lib.until(async () => ((await vStation('edit').textContent().catch(() => '')) ?? '').includes(`late/edit${edits}.ts`), HUNG_MS, 250)), String(await vStation('edit').textContent().catch(() => '')))
       await shoot(`9-ninth-of-ten-${v.label === 'the workspace view' ? 'workspace' : 'project'}-light`)
+      // HI-3499: HB11's earlier call, from the feed, shown in this view's list under From the map, selected.
+      await page.locator(`${v.scope} button.activity-map-feed-row`, { hasText: 'late/eleven.ts' }).click()
+      const vSel = page.locator(`${v.scope} .activity-list .activity-row.selected`)
+      check(`…a feed row shows HB11's earlier call in ${v.label}'s list, selected under From the map`, !!(await lib.until(async () => (await page.locator(`${v.scope} .activity-list .activity-group[data-group="fromMap"]`).count()) === 1 && ((await vSel.getAttribute('data-key').catch(() => '')) ?? '').startsWith('tool:') && /HB11/.test(await vTabNow()), HUNG_MS, 250)), String(await vSel.getAttribute('data-key').catch(() => null)))
+      await page.locator(`${v.scope} button.activity-map-feed-row`, { hasText: 'late/eleven.ts' }).focus()
+      await page.keyboard.press('Escape')
+      check(`…Escape clears it first in ${v.label}: its row and Details go, HB11 still shown alone`, !!(await lib.until(async () => (await page.locator(`${v.scope} .activity-list .activity-group[data-group="fromMap"]`).count()) === 0 && (await page.locator(`${v.scope} .activity-details`).count()) === 0 && (await vMap.getAttribute('data-mode').catch(() => null)) === 'single', HUNG_MS, 250)))
       await page.keyboard.press('Escape')
       await lib.until(async () => (await vMap.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
+      // A station's agent dot shows that agent alone (HI-3499), as its ring does; Escape, all again.
+      const dot = page.locator(`${v.scope} .activity-map-station[data-station="shell"] .activity-map-here`).first()
+      check(`…${v.label}: Shell marks HB1, its program running`, !!(await lib.until(async () => (await dot.count()) === 1, HUNG_MS, 250)))
+      const dotAgent = await dot.getAttribute('data-agent')
+      await dot.click()
+      check(`…a click on its dot shows its map alone`, !!(await lib.until(async () => (await vMap.getAttribute('data-mode').catch(() => null)) === 'single' && (await vMap.getAttribute('data-picked').catch(() => null)) === dotAgent, HUNG_MS, 250)), `${await vMap.getAttribute('data-picked').catch(() => null)} vs ${dotAgent}`)
+      await page.keyboard.press('Escape')
+      await lib.until(async () => (await vMap.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
+      // Live to frozen: nothing of the dots animates.
+      await vHead.getByRole('button', { name: 'Pause', exact: true }).click()
+      check(`…${v.label}, frozen again: its agent dots still, no animation`, !!(await lib.until(async () => (await vHead.getByRole('button', { name: 'Play', exact: true }).count()) === 1, HUNG_MS, 250)) && (await dotsMoving()) === 0, String(await dotsMoving()))
     }
     for (const a of more) await inv('session:stop', alpha, a.id).catch(() => undefined)
     await inv('session:stop', alpha, 'hb1').catch(() => undefined)

@@ -627,8 +627,10 @@
   "tips.opencodeHistory.title": "El historial, los tokens y el coste de un agente de OpenCode",
   "tips.activityMap.text": "Actividad dibuja sus agentes como un panal: cada llamada a herramienta va a su estación (Leer, Editar, Shell, Agentes, Herramientas, Tú), con un anillo de contexto por agente. Elige un agente en Agentes ▾ para ver su propio mapa; Mostrar oculta el mapa, su registro y los anillos.",
   "tips.activityMapPanels.text": "Haz clic en una estación del mapa de Actividad para ver qué hay detrás: los programas en ejecución de Shell y cuánto llevan, los archivos que tocaron Leer y Editar (cada uno se abre en Archivos), los subagentes y los servidores MCP y herramientas usados. Haz clic de nuevo o pulsa Esc para cerrarlo.",
+  "tips.activityMapShowCall.text": "Haz clic en una fila de Últimas acciones del mapa de Actividad, o en una llamada del panel de una estación, para mostrarla en la lista junto al mapa, seleccionada con sus detalles. En el mapa compartido, haz clic en el punto de un agente en una estación para ver solo su mapa.",
   "tips.activityMap.title": "Un mapa de lo que hacen tus agentes",
   "tips.activityMapPanels.title": "Ver qué hay detrás de una estación",
+  "tips.activityMapShowCall.title": "Del mapa a la lista",
   "tips.resumeLongIdle.title": "Una conversación inactiva desde hace mucho pregunta antes de reanudarse",
   "tips.resumeLongIdle.text": "Una conversación inactiva durante más de una hora probablemente ha perdido su caché de prompts, así que reanudarla puede costar muchos tokens. Reanudar dice cuánto tiempo lleva inactiva y qué tamaño tiene, y ofrece Archivar y empezar de nuevo en su lugar."
 }

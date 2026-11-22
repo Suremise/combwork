@@ -627,8 +627,10 @@
   "tips.opencodeHistory.title": "L’historique, les tokens et le coût d’un agent OpenCode",
   "tips.activityMap.text": "Activité dessine ses agents en nid d’abeilles : chaque appel d’outil part vers sa station (Lire, Modifier, Shell, Agents, Outils, Toi), avec un anneau de contexte par agent. Choisis un agent dans Agents ▾ pour sa propre carte ; Afficher masque la carte, son fil et les anneaux.",
   "tips.activityMapPanels.text": "Clique sur une station de la carte d’Activité pour voir ce qu’il y a derrière : les programmes en cours de Shell et depuis combien de temps, les fichiers que Lire et Modifier ont touchés (chacun s’ouvre dans Fichiers), les sous-agents et les serveurs MCP et outils utilisés. Clique de nouveau ou appuie sur Échap pour la fermer.",
+  "tips.activityMapShowCall.text": "Clique sur une ligne de Dernières actions de la carte d’Activité, ou sur un appel du panneau d’une station, pour l’afficher dans la liste à côté de la carte, sélectionné avec ses détails. Dans la carte partagée, clique sur le point d’un agent sur une station pour n’afficher que sa carte.",
   "tips.activityMap.title": "Une carte de ce que font tes agents",
   "tips.activityMapPanels.title": "Voir ce qu’il y a derrière une station",
+  "tips.activityMapShowCall.title": "De la carte à la liste",
   "tips.resumeLongIdle.title": "Une conversation inactive depuis longtemps demande avant de reprendre",
   "tips.resumeLongIdle.text": "Une conversation inactive depuis plus d’une heure a très probablement perdu son cache des prompts, donc la reprendre peut coûter beaucoup de jetons. Reprendre indique depuis combien de temps elle est inactive et sa taille, et propose plutôt Archiver et repartir de zéro."
 }

@@ -5,7 +5,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationLoad, stationOf, stationPanel, PANEL_ROWS, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationLoad, stationOf, stationPanel, PANEL_ROWS, mapCallNode, mapSessionKey, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
@@ -680,5 +680,40 @@ describe("a station's panel", () => {
   it("leaves out an agent past the shared map's bound: nothing of it runs on the map", () => {
     const m = buildMapModel([agent('A', { notLoaded: true, processes: [{ name: 'node.exe' }], subagents: 1 })], AT)
     expect(m.running).toEqual([])
+  })
+})
+
+// HI-3499: a call the map shows, found in the list by its own agent, host, session and transcript items (HR1's check).
+describe('a map call shown in the list', () => {
+  const AT = Date.parse('2026-11-10T12:00:00Z')
+  const host = 'C:\\ws\\alpha'
+  const turns = turnsOf('s1', [[{ name: 'Read', summary: 'src/a.ts' }], [{ name: 'Bash', failed: true }, { name: 'code', calls: ['Read', 'Grep'] }]])
+  const entry = (over: { path?: string; sid?: string } = {}) => ({ key: 'hb1', path: over.path ?? host, agentId: 'hb1', input: { agents: [{ id: 'hb1', name: 'HB1', live: { sessionId: over.sid ?? 's1', status: 'working' as const, text: '', working: true, waiting: false, failed: false } }], turns: new Map([['s1', turns]]) } })
+  const calls = buildMapModel([agent('hb1', { turns, sessionKey: mapSessionKey(host, 's1') })], AT).calls
+  const ref = (c: MapCall) => ({ agentKey: c.agentKey, sessionKey: c.sessionKey, ref: c.ref, ...(c.kind ? { kind: c.kind } : {}) })
+
+  it("finds a tool call by its item, a prompt by its turn, keyed as the list keys them", () => {
+    const bash = calls.find((c) => c.label === 'Bash')!
+    expect(mapCallNode([entry()], ref(bash))).toMatchObject({ entryKey: 'hb1', agentId: 'hb1', node: { kind: 'tool', key: `tool:s1:${bash.ref!.item}`, sessionId: 's1', state: 'failed' } })
+    const prompt = calls.filter((c) => c.kind === 'prompt')[0]
+    expect(mapCallNode([entry()], ref(prompt))).toMatchObject({ node: { kind: 'turn', key: `turn:s1:${prompt.ref!.turn}`, state: 'done' } })
+  })
+
+  it("finds a script's call as its script's item", () => {
+    const grep = calls.find((c) => c.label === 'Grep')!
+    const scriptRead = calls.filter((c) => c.label === 'Read').at(-1)!
+    expect(grep.ref).toEqual(scriptRead.ref)
+    expect(mapCallNode([entry()], ref(grep))?.node).toMatchObject({ kind: 'tool', tool: { name: 'code' } })
+  })
+
+  it('finds nothing, never another row, for a restarted session, another host or an item no longer read', () => {
+    const bash = ref(calls.find((c) => c.label === 'Bash')!)
+    expect(mapCallNode([entry({ sid: 's2' })], bash)).toBeNull()
+    expect(mapCallNode([entry({ path: 'C:\\ws\\beta' })], bash)).toBeNull()
+    expect(mapCallNode([entry()], { ...bash, ref: { turn: bash.ref!.turn, item: 9999 } })).toBeNull()
+    expect(mapCallNode([entry()], { ...bash, ref: { turn: 9999, item: bash.ref!.item } })).toBeNull()
+    expect(mapCallNode([entry()], { ...bash, agentKey: 'hb2' })).toBeNull()
+    // The host's path in any case is the same host.
+    expect(mapCallNode([entry({ path: host.toUpperCase() })], bash)).not.toBeNull()
   })
 })
