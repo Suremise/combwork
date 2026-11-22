@@ -257,7 +257,7 @@ export interface MapStationView {
   failed: boolean
   /** Agents with a call here open now (their keys), or waiting (You). */
   here: string[]
-  /** What runs here now (HI-3479): Shell, the agents' processes; Agents, their subagent sessions and background tasks. */
+  /** What runs here now (HI-3479): Shell, the agents' processes and command tasks; Agents, their subagent sessions and other background tasks (HI-3509: where the panel lists each). */
   running: number
   /** The counts are from a sample: some agent's calls were past MAP_CALLS, or an agent is past the shared map's bound. */
   partial: boolean
@@ -364,7 +364,7 @@ export interface MapModel {
   calls: MapCall[]
   /** The sessions whose turns are in (their keys): a call in one of them is new once it wasn't in the last read. */
   sessions: string[]
-  /** What runs now (HI-3498): each agent's processes (Shell), its subagent sessions and background tasks (Agents). */
+  /** What runs now (HI-3498): each agent's processes and command tasks (Shell), its subagent sessions and other background tasks (Agents). */
   running: MapRunning[]
 }
 
@@ -478,20 +478,21 @@ export function buildMapModel(agents: readonly MapAgentInput[], at: number): Map
     if (a.waiting && !stations.you.here.includes(a.key)) stations.you.here.push(a.key)
     if (a.blocks > 0) stations.edit.failed = true
     if (!a.notLoaded) {
-      a.processes.forEach((p, i) => running.push({ key: `${a.key}${SEP}p${p.pid ?? `#${i}`}`, agentKey: a.key, station: 'shell', kind: 'process', name: p.name, ...(p.pid !== undefined ? { pid: p.pid } : {}), since: p.since ?? null }))
+      const mine: MapRunning[] = []
+      a.processes.forEach((p, i) => mine.push({ key: `${a.key}${SEP}p${p.pid ?? `#${i}`}`, agentKey: a.key, station: 'shell', kind: 'process', name: p.name, ...(p.pid !== undefined ? { pid: p.pid } : {}), since: p.since ?? null }))
       // A command task runs a shell's command: Shell's; the rest (a monitor, a subagent's, a workflow) are Agents'.
-      a.tasks.forEach((t, i) => running.push({ key: `${a.key}${SEP}t${i}`, agentKey: a.key, station: t.type === 'command' ? 'shell' : 'agents', kind: 'task', name: '', ...(t.type ? { type: t.type } : {}), since: t.since ?? null }))
-      for (let i = 0; i < a.subagents; i++) running.push({ key: `${a.key}${SEP}s${i}`, agentKey: a.key, station: 'agents', kind: 'subagent', name: '', ...(a.subagentStates?.[i] ? { state: a.subagentStates[i] } : {}), since: null })
-    }
-    if (a.subagents + a.tasks.length > 0 && !a.notLoaded) {
-      stations.agents.count += a.subagents + a.tasks.length
-      stations.agents.running += a.subagents + a.tasks.length
-      if (!stations.agents.here.includes(a.key)) stations.agents.here.push(a.key)
-    }
-    if (a.processes.length && !a.notLoaded) {
-      stations.shell.last = a.processes[a.processes.length - 1].name
-      stations.shell.running += a.processes.length
-      if (!stations.shell.here.includes(a.key)) stations.shell.here.push(a.key)
+      a.tasks.forEach((t, i) => mine.push({ key: `${a.key}${SEP}t${i}`, agentKey: a.key, station: t.type === 'command' ? 'shell' : 'agents', kind: 'task', name: '', ...(t.type ? { type: t.type } : {}), since: t.since ?? null }))
+      for (let i = 0; i < a.subagents; i++) mine.push({ key: `${a.key}${SEP}s${i}`, agentKey: a.key, station: 'agents', kind: 'subagent', name: '', ...(a.subagentStates?.[i] ? { state: a.subagentStates[i] } : {}), since: null })
+      // Counted where its panel lists it (HI-3509: one rule for both, so a command task lights Shell, not Agents): each
+      // running there and its agent here; Agents also counts what runs there in its total, Shell its calls only.
+      for (const r of mine) {
+        const s = stations[r.station]
+        s.running++
+        if (r.station === 'agents') s.count++
+        if (!s.here.includes(a.key)) s.here.push(a.key)
+      }
+      running.push(...mine)
+      if (a.processes.length) stations.shell.last = a.processes[a.processes.length - 1].name
     }
   }
   // Each station's last label: its newest call's (Shell keeps a running process's name). Calls sharing a time (parallel

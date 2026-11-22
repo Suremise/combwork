@@ -5,7 +5,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationLoad, stationOf, stationPanel, PANEL_ROWS, mapCallNode, mapPickNode, mapSessionKey, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapPick, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAP_STATIONS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationLoad, stationOf, stationPanel, PANEL_ROWS, mapCallNode, mapPickNode, mapSessionKey, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapPick, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
@@ -202,11 +202,36 @@ describe("the map's model", () => {
     expect(mixed.stations.agents.status).toBe('ok')
   })
 
-  it("counts Agents from subagent sessions, background tasks and agent calls alike", () => {
-    const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Agent' }]]), subagents: 1, tasks: [{ type: 'command' }] })], 0)
+  it("counts Agents from subagent sessions, background tasks other than commands and agent calls alike", () => {
+    const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Agent' }]]), subagents: 1, tasks: [{ type: 'monitor' }, { type: 'command' }] })], 0)
     expect(m.stations.agents.count).toBe(3)
-    // Running (HI-3479): the subagent session and the task, not the finished call.
+    // Running (HI-3479): the subagent session and the monitor, not the finished call.
     expect(m.stations.agents.running).toBe(2)
+    // A command task is Shell's, as its panel lists it (HI-3509): running there, its agent there, not a call of its turn.
+    expect(m.stations.shell).toMatchObject({ running: 1, here: ['A'], count: 0 })
+  })
+
+  // HI-3509: what a station counts as running is what its panel lists as running, for every station and kind.
+  it("counts what runs on the station whose panel lists it", () => {
+    const one = buildMapModel([agent('A', { tasks: [{ type: 'command' }] })], 0)
+    expect(one.stations.agents).toMatchObject({ running: 0, count: 0, here: [] })
+    expect(one.stations.shell).toMatchObject({ running: 1, here: ['A'] })
+    const m = buildMapModel(
+      [
+        agent('A', { processes: [{ name: 'node.exe', pid: 1 }], tasks: [{ type: 'command' }, { type: 'monitor' }, { type: 'subagent' }, {}], subagents: 2 }),
+        agent('B', { sessionKey: 'B-s', tasks: [{ type: 'command' }, { type: 'command' }] }),
+        agent('C', { sessionKey: 'C-s', subagents: 1 })
+      ],
+      0
+    )
+    for (const s of MAP_STATIONS) {
+      const listed = stationPanel(m, s).sections.reduce((n, sec) => n + sec.rows.filter((r) => r.kind === 'running').length, 0)
+      const agents = new Set(m.running.filter((r) => r.station === s).map((r) => r.agentKey))
+      expect([s, m.stations[s].running]).toEqual([s, listed])
+      expect([s, [...agents].every((k) => m.stations[s].here.includes(k))]).toEqual([s, true])
+    }
+    expect(m.stations.shell.running).toBe(4)
+    expect(m.stations.agents.running).toBe(6)
   })
 
   it("marks You for an agent waiting, Edit for a lock block, and Shell's last as a running process's name", () => {
