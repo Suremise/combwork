@@ -76,7 +76,7 @@ const check = (name, ok, extra = '') => {
       return /1 whose folder is gone/.test(await state('worktrees')) && /in use or too new/.test(await state('locks')) ? true : null
     }, HUNG_MS)
     check('the section counts the gone worktree and the lock, too new yet', !!found, `${await state('worktrees')} | ${await state('locks')}`)
-    check('Fetch with Prune is offered for the remote', (await health.locator('[data-action="health-fetch"]').isEnabled()) && /deleted on the remote/.test(await state('fetch')))
+    check('Fetch with Prune is offered for the remote', !!(await lib.until(async () => (await health.locator('[data-action="health-fetch"]').isEnabled()) && /deleted on the remote/.test(await state('fetch')), HUNG_MS)), await state('fetch'))
     for (const t of ['dark', 'light']) {
       await theme(t)
       await page.mouse.move(5, 5)

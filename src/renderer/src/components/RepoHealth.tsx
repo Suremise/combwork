@@ -72,7 +72,10 @@ const heldText = (h: LockHeld): string =>
 /** A list of tick boxes: `rows` each with its key, its label and an optional note; `on` those ticked to start with. */
 function Ticks<R>({ rows, keyOf, label, note, on, enabled, onChange, data }: { rows: R[]; keyOf: (r: R) => string; label: (r: R) => string; note?: (r: R) => string | null; on: (r: R) => boolean; enabled?: (r: R) => boolean; onChange: (picked: R[]) => void; data: string }) {
   const [ticked, setTicked] = useState<ReadonlySet<string>>(() => new Set(rows.filter(on).map(keyOf)))
-  useEffect(() => onChange(rows.filter((r) => ticked.has(keyOf(r)))), [rows, ticked, keyOf, onChange])
+  // A block, never the call's value as the effect's: React would take a returned value for its cleanup.
+  useEffect(() => {
+    onChange(rows.filter((r) => ticked.has(keyOf(r))))
+  }, [rows, ticked, keyOf, onChange])
   return (
     <div className="git-cleanup">
     <ul className="git-cleanup-list git-health-list">
