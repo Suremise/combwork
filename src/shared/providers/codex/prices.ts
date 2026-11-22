@@ -9,7 +9,7 @@ const openai = (input: number, cachedInput: number, output: number, cacheWrite?:
  * `codex-auto-review`, its approval reviewer) has no row: its sessions show as unpriced, never $0.
  */
 export const CODEX_PRICES: ProviderPrices = {
-  checked: '2026-11-07',
+  checked: '2026-11-22',
   shipped: {
     // All checked against OpenAI's pricing page on 7 Nov 2026 (HI-2675): unchanged but for gpt-6.1-terra, added. Prompts
     // over 272K input tokens cost more (2× input and cached, 1.5× output); not modelled. GPT-5.6 Sol's is a promotional
