@@ -693,6 +693,7 @@
   "assistant.undo.askTitle": "{n, plural, one {¿Deshacer # cambio?} many {¿Deshacer # cambios?} other {¿Deshacer # cambios?}}",
   "assistant.undo.card": "{card}: {fields}",
   "assistant.undo.changed": "{fields}: cambiado desde entonces",
+  "assistant.undo.confirm": "Deshacer",
   "assistant.undo.dismiss": "Cerrar el resultado de deshacer",
   "assistant.undo.ended": "el carril ha terminado",
   "assistant.undo.error": "falló: {error}",

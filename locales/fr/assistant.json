@@ -693,6 +693,7 @@
   "assistant.undo.askTitle": "{n, plural, one {Annuler # modification ?} many {Annuler # modifications ?} other {Annuler # modifications ?}}",
   "assistant.undo.card": "{card} : {fields}",
   "assistant.undo.changed": "Modifié depuis : {fields}",
+  "assistant.undo.confirm": "Annuler les modifications",
   "assistant.undo.dismiss": "Fermer le résultat de l’annulation",
   "assistant.undo.ended": "le couloir est terminé",
   "assistant.undo.error": "échec : {error}",

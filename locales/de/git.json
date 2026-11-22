@@ -201,7 +201,7 @@
   "git.newBranch.switchNow": "Gleich dorthin wechseln",
   "git.newBranch.tip": "Ein Branch bei {commit}",
   "git.newBranch.title": "Neuer Branch",
-  "git.operation.abort": "Abbrechen",
+  "git.operation.abort": "Vorgang abbrechen",
   "git.operation.abortMessage": "{what, select, rebase {Der Branch kehrt dahin zurück, wo er vor dem Rebase war: Die bisher übertragenen Commits und alle gelösten Konflikte gehen verloren.} am {Der Branch kehrt dahin zurück, wo er vor den Patches war: Die bisher angewendeten und alle gelösten Konflikte gehen verloren.} bisect {Git checkt wieder den Commit aus, bei dem das Bisect begann.} other {Git setzt den Ordner zurück, wie er vor dem {what} war: Alle bisher gelösten Konflikte gehen verloren. Commits, die du seitdem selbst gemacht hast, bleiben.}}",
   "git.operation.abortTitle": "{what, select, bisect {Das Bisect in {folder} beenden?} other {Das Git-{what} in {folder} abbrechen?}}",
   "git.operation.at": "Angehalten bei {commit} {subject}",

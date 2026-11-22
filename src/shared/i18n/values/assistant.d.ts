@@ -695,6 +695,7 @@ interface CombworkMessageValues {
   'assistant.undo.askTitle': { n: number }
   'assistant.undo.card': { card: string | number; fields: string | number }
   'assistant.undo.changed': { fields: string | number }
+  'assistant.undo.confirm': undefined
   'assistant.undo.dismiss': undefined
   'assistant.undo.ended': undefined
   'assistant.undo.error': { error: string | number }

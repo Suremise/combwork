@@ -693,6 +693,7 @@
   "assistant.undo.askTitle": "{n, plural, one {Desfazer # alteração?} other {Desfazer # alterações?}}",
   "assistant.undo.card": "{card}: {fields}",
   "assistant.undo.changed": "{fields}: alterado desde então",
+  "assistant.undo.confirm": "Desfazer",
   "assistant.undo.dismiss": "Fechar o resultado de desfazer",
   "assistant.undo.ended": "a raia terminou",
   "assistant.undo.error": "falhou: {error}",

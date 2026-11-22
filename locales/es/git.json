@@ -201,7 +201,7 @@
   "git.newBranch.switchNow": "Cambiar a ella ahora",
   "git.newBranch.tip": "Una rama en {commit}",
   "git.newBranch.title": "Nueva rama",
-  "git.operation.abort": "Cancelar",
+  "git.operation.abort": "Abortar",
   "git.operation.abortMessage": "{what, select, rebase {La rama vuelve a donde estaba antes del rebase: se descartan los commits reaplicados hasta ahora y cada conflicto resuelto.} am {La rama vuelve a donde estaba antes de los parches: se descartan los aplicados hasta ahora y cada conflicto resuelto.} bisect {Git vuelve a sacar el commit desde el que empezó el bisect.} other {Git deja la carpeta como estaba antes de que empezara el {what}: se descarta cada conflicto resuelto hasta ahora. Los commits que hayas hecho tú desde entonces se quedan.}}",
   "git.operation.abortTitle": "{what, select, bisect {¿Terminar el bisect en {folder}?} other {¿Cancelar el git {what} en {folder}?}}",
   "git.operation.at": "Detenido en {commit} {subject}",
