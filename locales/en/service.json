@@ -831,6 +831,18 @@
     "defaultMessage": "{why, select, target {{branch} is the branch work merges into: kept.} default {{branch} is the default branch: kept.} current {{branch} is checked out in the project folder: kept.} worktree {{branch} is checked out in a worktree or slot: kept.} card {An open card works on {branch}: kept.} remoteHead {{branch} is the remote's default branch: kept.} moved {{branch} has moved since you were shown it: kept. Look at it again.} unmerged {{branch} has commits that aren't in {target}: kept.} gone {There's no branch {branch}.} other {{branch} isn't a valid branch name.}}",
     "description": "Why a branch wasn't deleted (Clean Up Merged Branches, Delete branch…, in Version Control → Branches & remotes). {branch} is its name, {target} the branch the project's work merges into. Keep the select keys."
   },
+  "service.gitRepo.branchRenamed": {
+    "defaultMessage": "{tracks, select, yes {Renamed {from} to {to}. It still tracks {upstream}.} other {Renamed {from} to {to}.}}",
+    "description": "HI-3474: after renaming the branch {from} to {to} here only. When {tracks} is yes it still follows the remote branch {upstream} by its old name."
+  },
+  "service.gitRepo.branchRenamedBoth": {
+    "defaultMessage": "Renamed {from} to {to}, here and on {remote}.",
+    "description": "HI-3474: after renaming the branch {from} to {to} in the repository and on the remote {remote} (pushed by its new name, the old one deleted there)."
+  },
+  "service.gitRepo.branchSameName": {
+    "defaultMessage": "{branch} keeps its name.",
+    "description": "HI-3474: after Rename… on a branch in Version Control → Branches & remotes, when it was given its own name."
+  },
   "service.gitRepo.branchTaken": {
     "defaultMessage": "There’s already a branch {name}.",
     "description": "HI-2807: an error creating a branch: the repository has a branch called {name} already."
@@ -939,6 +951,10 @@
     "defaultMessage": "There’s no branch, tag or commit {ref}.",
     "description": "HI-2807: an error creating a branch from a start point: nothing in the repository is called {ref} (as typed in Starts at)."
   },
+  "service.gitRepo.noTag": {
+    "defaultMessage": "There's no tag {name}.",
+    "description": "HI-3474: an error deleting or pushing a tag in Version Control → History: the repository has no tag called {name}."
+  },
   "service.gitRepo.noTarget": {
     "defaultMessage": "There's no branch {target} here to check the branches against.",
     "description": "An error deleting branches in Version Control → Branches & remotes: the branch the project's work merges into ({target}; the default branch when none is set) isn't in the repository, so Combwork can't tell which branches are merged."
@@ -1031,9 +1047,53 @@
     "defaultMessage": "Couldn't remove {remote}: {why}",
     "description": "An error removing the remote {remote} in the Git view; {why} is git's own words."
   },
+  "service.gitRepo.renameAgentHere": {
+    "defaultMessage": "{agent} is working in the project folder, on {branch}: rename it once it has finished.",
+    "description": "HI-3474: an error renaming the branch {branch} checked out in the project folder: the agent {agent} is working there now."
+  },
+  "service.gitRepo.renameFailed": {
+    "defaultMessage": "Couldn't rename {branch}: {why}",
+    "description": "HI-3474: an error renaming the branch {branch}; {why} is git's own words."
+  },
+  "service.gitRepo.renameInUse": {
+    "defaultMessage": "{why, select, target {{branch} is the branch work merges into: it keeps its name.} default {{branch} is the default branch: it keeps its name.} worktree {{branch} is checked out in a worktree or slot: it keeps its name.} other {An open card works on {branch}: it keeps its name.}}",
+    "description": "HI-3474: why the branch {branch} can't be renamed: it is the project's target, the default branch, checked out in a worktree or slot, or an open card's branch. Keep the select keys."
+  },
+  "service.gitRepo.renameMoved": {
+    "defaultMessage": "{branch} has moved since you were shown it: nothing was renamed. Look at it again.",
+    "description": "HI-3474: an error renaming the branch {branch}: it points at another commit than the one the window showed."
+  },
+  "service.gitRepo.renameNoUpstream": {
+    "defaultMessage": "{branch} doesn't track a branch on a remote: there's nothing to rename there. Nothing was renamed.",
+    "description": "HI-3474: an error renaming the branch {branch} with Also rename on the remote: it tracks no remote branch."
+  },
+  "service.gitRepo.renameOldKept": {
+    "defaultMessage": "Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but {remote} refused to delete {old}: it has commits there you haven't fetched, or it doesn't allow deleting branches. Look at it before you delete it.",
+    "description": "HI-3474: an error after renaming a branch here and on a remote: the remote {remote} refused to delete the old branch {old} (Combwork deletes it only at the commit last fetched)."
+  },
+  "service.gitRepo.renamePushFailed": {
+    "defaultMessage": "Renamed {from} to {to} here, but couldn't push {to} to {remote}: {why} It still tracks {upstream}.",
+    "description": "HI-3474: an error after renaming the branch {from} to {to} locally: pushing it to the remote {remote} failed or was refused ({why}, git's words or why), so it still follows {upstream}."
+  },
   "service.gitRepo.renameRemoteFailed": {
     "defaultMessage": "Couldn't rename {remote}: {why}",
     "description": "An error renaming the remote {remote} in the Git view; {why} is git's own words."
+  },
+  "service.gitRepo.renameRemoteTaken": {
+    "defaultMessage": "{remote} already has a branch {to} (as of the last fetch): nothing was renamed.",
+    "description": "HI-3474: an error renaming a branch to {to} with Also rename on the remote: the remote {remote} has a branch of that name."
+  },
+  "service.gitRepo.renameStopped": {
+    "defaultMessage": "{step, select, push {Renamed {from} to {to} here, but the push of {to} to {remote} was stopped: it may have reached {remote}. {to} still tracks {upstream}.} other {Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but deleting {old} there was stopped: it may still be there.}} Refresh to see where things stand.",
+    "description": "HI-3474 (round 1): after the user cancelled renaming a branch on its remote too, once {from} was renamed {to} here: during the push of the new name to the remote {remote} (it still follows {upstream}), or during the deletion of the old name {old} there. Keep the select keys."
+  },
+  "service.gitRepo.renameTrackFailed": {
+    "defaultMessage": "Renamed {from} to {to} and pushed it to {remote}, but couldn't make it track {remote}/{to}: {why} It still tracks {upstream}, and {old} is still on {remote}.",
+    "description": "HI-3474 (round 1): an error renaming a branch here and on a remote: {from} was renamed {to} and pushed to the remote {remote}, but setting it to follow its new name there failed ({why}, git's words); it still follows {upstream}, and the old name {old} wasn't deleted there."
+  },
+  "service.gitRepo.renameUpstreamKept": {
+    "defaultMessage": "{upstream} is the remote's default branch, the branch work merges into or the default branch: Combwork won't delete it there, so nothing was renamed.",
+    "description": "HI-3474: an error renaming a branch with Also rename on the remote: the remote branch it tracks ({upstream}, such as origin/main) is one Combwork never deletes."
   },
   "service.gitRepo.setFailed": {
     "defaultMessage": "Couldn't set {key}: {why}",
@@ -1059,9 +1119,41 @@
     "defaultMessage": "Switched to {branch}, tracking {remote}.",
     "description": "After switching to a remote branch in the Git view: a new local branch {branch} was made, following the remote branch {remote} (origin/x)."
   },
+  "service.gitRepo.tagDeleteFailed": {
+    "defaultMessage": "Couldn't delete the tag {name}: {why}",
+    "description": "HI-3474: an error deleting the tag {name}; {why} is git's own words."
+  },
+  "service.gitRepo.tagDeleted": {
+    "defaultMessage": "{onRemote, select, yes {Deleted the tag {name}, here and on {remote}.} other {Deleted the tag {name}.}}",
+    "description": "HI-3474: after deleting the tag {name} in Version Control → History; when {onRemote} is yes, on the remote {remote} too."
+  },
+  "service.gitRepo.tagMoved": {
+    "defaultMessage": "The tag {name} has changed since you were shown it: nothing was deleted. Look at it again.",
+    "description": "HI-3474: an error deleting the tag {name}: it points at something else than the window showed."
+  },
   "service.gitRepo.tagPushFailed": {
     "defaultMessage": "Tagged {commit} {name}, but couldn't push it to {remote}: {why}",
     "description": "An error in the Git view: the commit {commit} was tagged {name}, but pushing the tag to the remote {remote} failed; {why} is git's own words."
+  },
+  "service.gitRepo.tagPushOnlyFailed": {
+    "defaultMessage": "Couldn't push the tag {name} to {remote}: {why}",
+    "description": "HI-3474: an error pushing the tag {name} to the remote {remote}; {why} is git's own words."
+  },
+  "service.gitRepo.tagPushRefused": {
+    "defaultMessage": "{remote} has another tag {name}, so the push was refused (Combwork never forces a push).",
+    "description": "HI-3474: an error pushing the tag {name}: the remote {remote} has a tag of that name pointing elsewhere."
+  },
+  "service.gitRepo.tagPushed": {
+    "defaultMessage": "{result, select, upToDate {{remote} already has the tag {name}.} other {Pushed the tag {name} to {remote}.}}",
+    "description": "HI-3474: after Push… on a tag in Version Control → History: the tag {name} went to the remote {remote}, or it was there already."
+  },
+  "service.gitRepo.tagRemoteFailed": {
+    "defaultMessage": "Couldn't delete the tag {name} on {remote}: {why} Nothing was deleted here either.",
+    "description": "HI-3474: an error deleting the tag {name} on the remote {remote}; {why} is git's own words. The local tag was kept."
+  },
+  "service.gitRepo.tagRemoteRefused": {
+    "defaultMessage": "{remote} refused to delete the tag {name}: its tag {name} isn't this one, or it has none, or it doesn't allow deleting tags. Nothing was deleted here either.",
+    "description": "HI-3474: an error deleting the tag {name} here and on the remote {remote}: the remote refused (its tag differs or is missing, or it forbids deletions), so the local tag was kept too."
   },
   "service.gitRepo.tagTaken": {
     "defaultMessage": "There’s a tag {name}: a branch of the same name would make the name mean two things to git.",

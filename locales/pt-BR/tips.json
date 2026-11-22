@@ -638,5 +638,9 @@
   "tips.stashes.text": "Controle de versão → Alterações → Stashes lista os stashes do repositório, os do Deixar de lado do Combwork com o cartão deles: mostre o que cada um contém e depois aplique, retire (pop) ou apague.",
   "tips.stashes.title": "Veja, aplique ou apague seus stashes do git",
   "tips.branchMoves.text": "Controle de versão → Histórico → Movimentos lista cada vez que um branch se moveu, como o reflog do git guarda: os merges de cartões do Combwork, commits, rebases, resets e pulls. Restaurar para este ponto… leva o branch de volta, mostrando antes quais commits ele perde ou traz de volta.",
-  "tips.branchMoves.title": "Desfazer um reset, rebase ou merge de um branch"
+  "tips.branchMoves.title": "Desfazer um reset, rebase ou merge de um branch",
+  "tips.renameBranch.title": "Renomeie um branch, no remote também",
+  "tips.renameBranch.text": "Renomear… (✎) em um branch em Controle de versão → Branches e remotes dá a ele um novo nome. Escolha Renomear lá também para renomear também o branch remoto que ele rastreia: o nome antigo lá só é excluído se ninguém fez push nele desde o seu último fetch.",
+  "tips.tagPushDelete.title": "Faça push de uma tag do git ou exclua-a",
+  "tips.tagPushDelete.text": "Cada tag em Controle de versão → Histórico tem Fazer push… para enviá-la a um remote, e Excluir… para excluí-la aqui, ou também em um remote para que o próximo fetch não a traga de volta."
 }

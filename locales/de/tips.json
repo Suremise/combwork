@@ -638,5 +638,9 @@
   "tips.stashes.text": "Versionsverwaltung → Änderungen → Stashes listet die Stashes des Repositorys auf, die von Combworks Beiseitelegen mit ihrer Karte: Zeige an, was jeder enthält, und wende ihn an, poppe oder lösche ihn.",
   "tips.stashes.title": "Git-Stashes ansehen, anwenden oder löschen",
   "tips.branchMoves.text": "Versionsverwaltung → Verlauf → Bewegungen listet jede Bewegung eines Branchs auf, so wie git sie im Reflog festhält: die Merges von Karten durch Combwork, Commits, Rebases, Resets und Pulls. „Diesen Stand wiederherstellen…“ setzt den Branch zurück und zeigt vorher, welche Commits wegfallen oder zurückkommen.",
-  "tips.branchMoves.title": "Reset, Rebase oder Merge eines Branchs rückgängig machen"
+  "tips.branchMoves.title": "Reset, Rebase oder Merge eines Branchs rückgängig machen",
+  "tips.renameBranch.title": "Einen Branch umbenennen, auch auf seinem Remote",
+  "tips.renameBranch.text": "Umbenennen… (✎) an einem Branch in Versionsverwaltung → Branches & Remotes gibt ihm einen neuen Namen. Wähle „Dort auch umbenennen“, um auch den Remote-Branch umzubenennen, den er verfolgt: Der alte Name dort wird nur gelöscht, wenn seit deinem letzten Fetch niemand dorthin gepusht hat.",
+  "tips.tagPushDelete.title": "Einen Git-Tag pushen oder löschen",
+  "tips.tagPushDelete.text": "Jeder Tag in Versionsverwaltung → Verlauf hat Pushen…, um ihn zu einem Remote zu senden, und Löschen…, um ihn hier zu löschen, oder auch auf einem Remote, damit der nächste Fetch ihn nicht zurückbringt."
 }
