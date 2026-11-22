@@ -209,20 +209,21 @@ describe('a submodule in conflict (HI-3502)', () => {
   /** The index's commit of `lib` (stage 0). */
   const staged = (): string => sh(proj, 'ls-files', '-s', '--', 'lib').split(/\s+/)[1] ?? ''
   /**
-   * A submodule `lib` at `base` in proj, then moved to `main` on main and to `side` on a branch `side`: two commits of
-   * its own repository that diverge from base, so neither side's move fast-forwards and git leaves it in conflict.
+   * A submodule `lib` at a first commit in proj, then moved to `main` on main and to `side` on a branch `side`: two
+   * commits of its own repository that diverge from the first, so neither side's move fast-forwards and git leaves it
+   * in conflict.
    */
-  function submodule(): { base: string; main: string; side: string } {
+  function submodule(): { main: string; side: string } {
     const src = join(w.path!, `sub${n}`)
     mkdirSync(src, { recursive: true })
     gitRepo(src)
-    const base = commit(src, { 'f.txt': '1\n' }, 'sub base')
+    const start = commit(src, { 'f.txt': '1\n' }, 'sub base')
     const main = commit(src, { 'f.txt': '2\n' }, 'sub main')
-    sh(src, 'switch', '-q', '-c', 'other', base)
+    sh(src, 'switch', '-q', '-c', 'other', start)
     const side = commit(src, { 'g.txt': '3\n' }, 'sub side')
     sub(proj, 'submodule', '-q', 'add', src, 'lib')
     const at = (c: string): void => void sh(join(proj, 'lib'), 'checkout', '-q', c)
-    at(base)
+    at(start)
     sh(proj, 'add', '-A')
     sh(proj, 'commit', '-q', '-m', 'lib at base')
     sh(proj, 'switch', '-q', '-c', 'side')
@@ -233,7 +234,7 @@ describe('a submodule in conflict (HI-3502)', () => {
     at(main)
     sh(proj, 'add', 'lib')
     sh(proj, 'commit', '-q', '-m', 'lib on main')
-    return { base, main, side }
+    return { main, side }
   }
 
   it('Use theirs stages their commit, not the one the folder has checked out; Continue commits it', async () => {
