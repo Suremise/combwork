@@ -30,7 +30,8 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.writeFileSync(globalConfig, '[user]\n\tname = Test User\n\temail = 1+test@users.noreply.github.com\n[init]\n\tdefaultBranch = main\n[core]\n\tautocrlf = false\n')
   const gitEnv = lib.gitEnv({ GIT_CONFIG_GLOBAL: globalConfig })
-  const g = (...a) => execFileSync('git', a, { cwd: alpha, env: gitEnv, encoding: 'utf8' }).trim()
+  // git's errors in what it throws (e.stderr), not on the suite's console.
+  const g = (...a) => execFileSync('git', a, { cwd: alpha, env: gitEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
   const read = (f) => (fs.existsSync(path.join(alpha, f)) ? fs.readFileSync(path.join(alpha, f), 'utf8') : null)
   fs.mkdirSync(alpha, { recursive: true })
   execFileSync('git', ['init', '-q', '-b', 'main', alpha], { env: gitEnv })
@@ -171,7 +172,7 @@ const check = (name, ok, extra = '') => {
     check('Drop asks first, saying its files and its commit', /the 1 file it holds/.test(await text(q)) && (await text(q)).includes(plain.slice(0, 10)), await text(q))
     await shoot(q, '3-drop')
     await q.getByRole('button', { name: 'Drop', exact: true }).click()
-    check('…dropped: the row clicked, the commit said; the other row of its commit kept', !!(await lib.until(async () => messages()?.join(' | ') === 'relisted | between', HUNG_MS)) && (await toasts()).includes(plain), `${messages()?.join(' | ')} | ${await toasts()}`)
+    check('…dropped: the row clicked, the commit said; the other row of its commit kept', !!(await lib.until(async () => messages()?.join(' | ') === 'relisted | between' && (await toasts()).includes(plain), HUNG_MS)),`${messages()?.join(' | ')} | ${await toasts()}`)
     check('…the list shows the rows git has, no more', !!(await lib.until(async () => (await shownRows()).join(' ') === `0:${plain} 1:${between}` && /relisted/.test(await text(at(0))), HUNG_MS)), (await shownRows()).join(' '))
     await at(0).locator('[data-action="stash-drop"]').click()
     q = ask('Drop the stash “relisted”?')
@@ -184,7 +185,7 @@ const check = (name, ok, extra = '') => {
     q = ask('Drop the stash “between”?')
     await q.waitFor({ timeout: HUNG_MS })
     await q.getByRole('button', { name: 'Drop', exact: true }).click()
-    check('…the last dropped: no stash left, the section gone, the commit said', !!(await lib.until(async () => stashes()?.length === 0 && (await section.count()) === 0, HUNG_MS)) && (await toasts()).includes(between), `${stashes()?.length} | ${await toasts()}`)
+    check('…the last dropped: no stash left, the section gone, the commit said', !!(await lib.until(async () => stashes()?.length === 0 && (await section.count()) === 0 && (await toasts()).includes(between), HUNG_MS)),`${stashes()?.length} | ${await toasts()}`)
   } finally {
     await app.close()
   }
