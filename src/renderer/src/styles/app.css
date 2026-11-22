@@ -1994,10 +1994,11 @@ textarea.input {
 .banner.operation-panel .btn {
   margin-left: 0;
 }
-/* Many files in conflict scroll in the panel, the file list below staying in reach. */
-.operation-panel .operation-conflicts {
-  max-height: 40vh;
+/* Many files in conflict scroll in the panel: it takes at most half the list's column, the file list keeping the rest. */
+.banner.operation-panel {
+  max-height: 45%;
   overflow-y: auto;
+  flex-shrink: 0;
 }
 .banner.info {
   background: var(--accent-soft);
