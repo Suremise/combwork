@@ -4,13 +4,18 @@
 // the user saw, whatever moved its place), and what refuses Apply and Pop before git runs (an operation under way, a
 // file in conflict, uncommitted changes to a file the stash holds, a run or an agent in the folder, the caller's guard).
 // Real git in throwaway repositories.
+import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join, resolve } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { timing } from './waits'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { combworkStash, stashRefOf, stashRequestOf, stashSubject, type StashRef } from '../src/shared/gitStashes'
+
+/** A git child's environment from the run context's allowlist, never the shell's (tests/README.md, Isolation). */
+const { gitEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
 
 const norm = (p: string): string => resolve(p).toLowerCase()
 /** What the queue counts as building in a folder: none unless a test says. */
@@ -101,6 +106,33 @@ describe('parsing', () => {
 })
 
 describe('the list and Show', () => {
+  it('HI-3531: lists hundreds of stashes with untracked files, past what one command line holds, each counted', async () => {
+    // A real one first (git keeps refs/stash's reflog), then 820 more, each with an untracked commit of its own: made
+    // in one fast-import and listed in one update-ref transaction each, so it is quick however loaded the machine is.
+    write('extra.txt', 'x\n')
+    sh(proj, 'stash', 'push', '-q', '-u', '-m', 'real')
+    const head = sh(proj, 'rev-parse', 'HEAD').trim()
+    const N = 820
+    const who = 'committer T <t@example.invalid> 1700000000 +0000\n'
+    let stream = ''
+    for (let i = 1; i <= N; i++) {
+      const file = `u${i}.txt`
+      stream += `reset refs/cw/u\ncommit refs/cw/u\nmark :${i}\n${who}data 1\nu\nM 100644 inline ${file}\ndata 2\n${i % 10}\n\n`
+      stream += `commit refs/cw/s\nmark :${N + i}\n${who}data 2\ns\nfrom ${head}\nmerge ${head}\nmerge :${i}\n\n`
+    }
+    const marks = join(base, `marks-${n}.txt`)
+    execFileSync('git', ['fast-import', '--quiet', `--export-marks=${marks}`], { cwd: proj, env: gitEnv(), input: stream })
+    const sha = new Map(readFileSync(marks, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => l.split(' ') as [string, string]))
+    const tx = Array.from({ length: N }, (_, i) => `start\nupdate refs/stash ${sha.get(`:${N + i + 1}`)}\ncommit\n`).join('')
+    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', 'update-ref', '--stdin'], { cwd: proj, env: gitEnv(), input: tx })
+    expect(stashes().length).toBe(N + 1)
+    const rows = await list()
+    expect(rows.length).toBe(N + 1)
+    // Every one's untracked file counted, the real one's too.
+    expect(rows.every((r) => r.files === 1)).toBe(true)
+    expect(rows[N].message).toBe('real')
+  })
+
   it('lists every stash, newest first, with its branch, message, date and files, untracked ones included', async () => {
     expect(await list()).toEqual([])
     write('a.txt', 'mine\n')

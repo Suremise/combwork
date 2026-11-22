@@ -5941,7 +5941,8 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   shares them between its folders, so each folder shows the same list), newest first, each with its message, the
   branch it was made on (git's *On main:*, *no branch* for a detached HEAD), its date and how many files it holds (its
   changes against the commit it was made on and the untracked files its third parent keeps, which `git stash show`
-  alone leaves out). There is no cap and no setting. Combwork's own, made by Set Aside (HI-2944), are told by the mark
+  alone leaves out). There is no cap and no setting: however many there are, each is read (HI-3531: the commits of
+  their untracked files go to git on its input, never its command line, which Windows bounds). Combwork's own, made by Set Aside (HI-2944), are told by the mark
   their message carries (`Combwork: set aside <why> [cw:<6 hex>]`) and read *Set aside by Combwork before merging
   HI-12* (*before bringing 1.7.0 up to date with HI-12*, *before starting work on main*), the card key a link to the
   card; any other stash shows git's message as it is. No request names a stash by its place in the list alone, which
