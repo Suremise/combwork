@@ -283,6 +283,7 @@ interface CombworkMessageValues {
   'service.gitStash.notDropped': { why: string | number }
   'service.gitStash.operation': { what: string; folder: string | number }
   'service.gitStash.overlap': { file: string | number; folder: string | number }
+  'service.gitStash.raced': { commit: string | number; back: string; pop: string }
   'service.gitStash.session': { agent: string | number; folder: string | number }
   'service.gitStash.slotChanged': { slot: string | number }
   'service.gitStash.slotProcess': { slot: string | number }

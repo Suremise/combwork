@@ -1095,6 +1095,13 @@
       "folder": "plain"
     }
   },
+  "service.gitStash.raced": {
+    "placeholders": {
+      "commit": "plain",
+      "back": "select",
+      "pop": "select"
+    }
+  },
   "service.gitStash.session": {
     "placeholders": {
       "agent": "plain",

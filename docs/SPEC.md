@@ -5947,6 +5947,16 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
     and with several and none at its place, Combwork refuses, saying the stashes changed and to look again. Pop drops
     that row, and the list keys its rows and Show by row. Show reads by commit alone: rows of one commit hold the same
     files.
+  - **Another git between the check and the drop** (HI-3533): `git stash drop` takes only a place, in a process of its
+    own, and Combwork's repository lock holds only its own gits: one in a terminal or an agent's session that pushes or
+    drops a stash between Combwork's check of the place and git's drop makes git drop another stash. Git can't drop
+    by identity, so Combwork checks what git did: its drop runs without `--quiet`, git names the commit it dropped, and
+    one that isn't the row's is stored back at once (`git stash store`, with the message the list had for it, or for
+    one pushed meanwhile its commit's own subject, which `git stash push` makes the same) and the drop refused, naming
+    that commit: nothing is lost, the one put back at the top of the list (git can't put it back in its place), the
+    row chosen still listed, and a Pop's changes still applied. Git's reply naming no commit is taken as the drop
+    asked, and logged. Two rows of one commit, one moved onto the other's place in between, can't be told apart this
+    way: the commit dropped is the one checked, and only which of their messages stays differs.
 - **A detach that keeps failing** (HI-3467): a clean free Git slot whose detach at its target fails for any other reason
   (an index lock, files in the way, git unable to read its head or the target's, the target's branch gone; not its
   card's own work, which keeps it) stays not ready, and the same record (`slot_operation:`, `what` `detach`) keeps git's
