@@ -2005,12 +2005,12 @@ textarea.input {
   overflow-y: auto;
   flex-shrink: 0;
 }
-/* HI-3472: Changes' Stashes, under the operation panel: a heading that opens the list; the list scrolls, taking at most a
-   third of the right side, the diff keeping the rest. */
+/* HI-3472: Changes' Stashes, under the operation panel: a heading that opens the list; the list scrolls, taking at most
+   half the right side, the diff keeping the rest. */
 .stash-section {
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
-  max-height: 35%;
+  max-height: 45%;
   display: flex;
   flex-direction: column;
 }

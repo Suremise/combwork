@@ -87,6 +87,7 @@ const check = (name, ok, extra = '') => {
     await files.nth(0).click()
     const diff = page.locator('[data-stash-diff="a.txt"]')
     check("…a click shows the file's diff, named as the stash's", !!(await lib.until(async () => (await diff.count()) === 1, HUNG_MS)) && /in the stash/.test(await text(diff)), await text(diff))
+    check('…its diff drawn', !!(await lib.until(async () => (await page.locator('.split-main .editor-host .monaco-diff-editor').count()) === 1 && (await page.locator('.split-main .editor-host .empty-state').count()) === 0, HUNG_MS)))
     await shoot(page.locator('.split-main'), '2-show')
     await page.locator('[data-action="stash-diff-close"]').click()
     check('…its close button goes back to the folder', !!(await lib.until(async () => (await diff.count()) === 0, HUNG_MS)))
