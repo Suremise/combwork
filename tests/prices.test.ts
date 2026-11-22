@@ -25,6 +25,13 @@ describe('estimated cost', () => {
     expect(unpricedModel('codex', 'gpt-6.2-sol')).toBeNull()
     expect(estimateCost({ ...usage('codex', 'gpt-6.2-sol'), cacheWriteTokens: 0 })).toBeCloseTo(2 + 0.2 + 1, 6)
   })
+  it("prices GPT-6.2 Astra at OpenAI's published rates; GPT-6.2 Astra for Law's promotional price isn't shipped (HI-3497)", () => {
+    // OpenAI's pricing and model pages (developers.openai.com, 22 Nov 2026), standard tier, short context.
+    expect(modelPrice('codex', 'gpt-6.2-astra')).toEqual({ input: 8, cachedInput: 0.4, cacheWrite: 10, output: 40 })
+    expect(unpricedModel('codex', 'gpt-6.2-astra')).toBeNull()
+    expect(estimateCost({ ...usage('codex', 'gpt-6.2-astra'), cacheWriteTokens: 0 })).toBeCloseTo(8 + 0.8 + 4, 6)
+    expect(unpricedModel('codex', 'gpt-6.2-astra-law')).toBe('gpt-6.2-astra-law')
+  })
   it('a model without a price has an unknown cost, never $0, and says where to add one', () => {
     expect(estimateCost(usage('codex', 'gpt-9-nova'))).toBeNull()
     expect(unpricedModel('codex', 'gpt-9-nova')).toBe('gpt-9-nova')

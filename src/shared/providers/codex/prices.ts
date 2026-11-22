@@ -20,6 +20,10 @@ export const CODEX_PRICES: ProviderPrices = {
     // (developers.openai.com/api/docs/models/gpt-6.2-sol), checked 21 Nov 2026, standard tier, the same as gpt-6.1-sol's;
     // its cache write is the 30-minute one.
     'gpt-6.2-sol': openai(2, 0.1, 10, 2.5),
+    // HI-3497: OpenAI's pricing page and model page (developers.openai.com/api/docs/models/gpt-6.2-astra), checked
+    // 22 Nov 2026, standard tier, short context; its cache write is the 30-minute one. No row for gpt-6.2-astra-law: the
+    // pricing page marks its price as promotional, and it has no model page.
+    'gpt-6.2-astra': openai(8, 0.4, 40, 10),
     'gpt-6.1-sol': openai(2, 0.1, 10, 2.5),
     'gpt-6.1-terra': openai(1, 0.05, 5),
     'gpt-6-astra': openai(10, 1, 50),
