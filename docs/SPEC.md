@@ -2572,7 +2572,8 @@ A card's history text (`TaskHistoryEntry`) stays, for people; the facts are the 
   never an empty side. A renamed file shows as added (its old path isn't recorded). None has no revision reads: no
   Changes. `DiffView`'s `onEditor` gives the editor to a layer over it (HI-3219's line comments).
 - **Line comments** [HI-3219, from HI-3191's design s12/s17/s20]: the user comments on
-  lines of a revision's diff (Changes): a **+** in either side's glyph margin on the line under the mouse; pressed, a
+  lines of a revision's diff (Changes): a **+** in either side's glyph margin on the line under the mouse (also a pointer that hasn't moved since the diff
+  came up or its lines moved under it, HI-3496); pressed, a
   Markdown box under that line, or under the selected lines when the **+** is on one of them (a Monaco view zone),
   Ctrl+Enter to save, Escape to cancel. Several drafts can be open (HI-3274): a **+** elsewhere opens another beside each
   draft with text, an empty one giving way, and a **+** on an open draft's own lines goes back to its box; what is typed (a
