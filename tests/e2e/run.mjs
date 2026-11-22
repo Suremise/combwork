@@ -65,7 +65,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..', '..')
 const lib = createRequire(import.meta.url)('./lib.cjs')
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
-const { claimedByRuns, clearDir, evidenceFor, findBoard, finishSuiteDir, freshFolder, recordKept, releaseKept } = createRequire(import.meta.url)('./evidence.cjs')
+const { boardFor, claimedByRuns, clearDir, evidenceFor, finishSuiteDir, noBoardRefusal, freshFolder, recordKept, releaseKept } = createRequire(import.meta.url)('./evidence.cjs')
 const { stopProcessesIn, endChildTree, endCopies, processes, recordedCopies } = createRequire(import.meta.url)('./folderProcesses.cjs')
 /** The machine's processes now, or null (off Windows, or the listing failed): each user of it lists again when null. */
 const listOnce = () => {
@@ -98,8 +98,8 @@ if (opts.fingerprint) {
 // nobody needs a shell delete on a computed path; it refuses anything else and evidence (evidence.cjs clearDir).
 if (opts.clearDir) {
   try {
-    const board = process.env.CW_TEST_NO_BOARD === '1' ? { cards: [] } : { tasksDir: findBoard(root) }
-    console.log(`Emptied ${clearDir(opts.clearDir, { board })}`)
+    // A folder named by hand: under CW_TEST_NO_BOARD=1 it is cleared, made before this run or not.
+    console.log(`Emptied ${clearDir(opts.clearDir, { board: boardFor(root) })}`)
     process.exit(0)
   } catch (e) {
     console.error(`Not cleared: ${e.message}`)
@@ -109,10 +109,11 @@ if (opts.clearDir) {
 
 // What may be deleted (#253, evidence.cjs): never what a card that isn't Done cites. That needs the board: without it
 // nothing a run made could be removed, and runs would pile up copies of their suites' folders (#285), so it doesn't
-// start. CW_TEST_NO_BOARD=1 says there is no board (a checkout outside a Combwork workspace): nothing is evidence then.
-const evidence = evidenceFor(root)
+// start. A checkout outside the workspace names its board (CW_TEST_BOARD); CW_TEST_NO_BOARD=1 says no board cites test
+// output on this machine: nothing is cited then, and the run removes only what it made (HI-3514).
+const evidence = evidenceFor(root, { since: Date.now() })
 if (!evidence.ok) {
-  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set CW_TEST_NO_BOARD=1 if no Combwork board cites test output on this machine.`)
+  console.error(noBoardRefusal(evidence.why))
   process.exit(2)
 }
 // The run's own temp folder in combwork-test\tmp (HI-2102): its suites, Playwright's playwright-artifacts-* folders, the

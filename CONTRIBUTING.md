@@ -89,8 +89,10 @@ Say a German button reads badly.
    - **From the source:** `npx install-electron --no` once, then `npm run dev -- -- --lang=de` (both `--` are
      needed: the first is npm's, the second electron-vite's).
    - **Screenshots of the main screens** in both themes, without clicking around:
-     `npm run e2e -- --lang de --build` (after `npx install-electron --no`; outside a Combwork workspace, set
-     `CW_TEST_NO_BOARD=1` first, in PowerShell `$env:CW_TEST_NO_BOARD='1'`). It needs no sign-in: the agents in it
+     `npm run e2e -- --lang de --build` (after `npx install-electron --no`; in a clone no Combwork board
+     tracks, set `CW_TEST_NO_BOARD=1` first, in PowerShell `$env:CW_TEST_NO_BOARD='1'`: a run then removes only what
+     it made, and `npm run test:clean` the rest; a copy of a checkout Combwork works in, such as an export, names that
+     workspace's board instead, `$env:CW_TEST_BOARD='<the workspace folder>'`, so what its cards cite is kept). It needs no sign-in: the agents in it
      are a stand-in. The runner prints where it kept the screenshots. Look for text that is cut off or wraps
      badly. See [tests/e2e/README.md](tests/e2e/README.md), *The i18n screenshot route*.
 

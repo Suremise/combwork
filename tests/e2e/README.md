@@ -902,9 +902,14 @@ kept and why, without removing anything; `--days N` sets the age, default 3).
   kept every folder every later run made there, 2,078 of them, 23 GB in six hours). The cards are read from the
   workspace's board, found up from this repository's main checkout, afresh for every deletion (a card that cites
   something a moment before it would go keeps it). **Without the board** (none found, or a card that can't be read)
-  the runners don't start: nothing they made could be removed. Set `CW_TEST_NO_BOARD=1` on a machine where no Combwork
-  board cites test output. Should the board become unreadable during a run, nothing is deleted meanwhile and what
-  stays is tied to the run.
+  the runners don't start: nothing they made could be removed. **A checkout outside the workspace** (a `git archive`
+  export, a review copy) names its board with `CW_TEST_BOARD`: the workspace folder, its `.combwork` folder or its
+  `.combwork\combwork.db` (in PowerShell `$env:CW_TEST_BOARD='<the workspace folder>'`); the cards it cites are
+  kept as in the workspace (HI-3514). Set `CW_TEST_NO_BOARD=1` only on a machine where no Combwork board cites test
+  output (a contributor's clone): nothing is cited then, and a run (e2e or scenarios) removes only what it made itself,
+  never what was there before it started, so the flag set by mistake can't remove another run's evidence; what earlier
+  runs left goes when you run `npm run test:clean`. `CW_TEST_BOARD` wins when both are set. Should the board become
+  unreadable during a run, nothing is deleted meanwhile and what stays is tied to the run.
 - **A suite's folder** in its lane (`lanes\<k>\<suite>`): when the suite passes, the whole folder goes; when it fails
   (or something in it must stay), it is tied to the run (`.kept-folders.json` in the run's log folder) and goes when
   that run's logs are pruned (the newest ten runs, a day's runs up to 2 GB, a failed run a day): only in a lane the pruning runner may work in
