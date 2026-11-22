@@ -273,6 +273,22 @@ interface CombworkMessageValues {
   'service.gitRepo.upstreamGone': { upstream: string | number }
   'service.gitRepo.urlChanged': { remote: string | number }
   'service.gitRepo.urlFailed': { remote: string | number; why: string | number }
+  'service.gitRestore.agentBusy': { agent: string | number; folder: string | number }
+  'service.gitRestore.busy': { folder: string | number; what: string | number }
+  'service.gitRestore.conflicted': { file: string | number }
+  'service.gitRestore.failed': { why: string | number }
+  'service.gitRestore.invalid': undefined
+  'service.gitRestore.missing': { file: string | number; commit: string | number }
+  'service.gitRestore.moved': undefined
+  'service.gitRestore.noCommit': undefined
+  'service.gitRestore.noTarget': undefined
+  'service.gitRestore.notTracked': { file: string | number }
+  'service.gitRestore.nothing': { file: string | number }
+  'service.gitRestore.operation': { what: string; folder: string | number }
+  'service.gitRestore.request': undefined
+  'service.gitRestore.session': { agent: string | number; folder: string | number }
+  'service.gitRestore.stashedFailed': { why: string | number }
+  'service.gitRestore.timedOut': { seconds: number; file: string | number }
   'service.gitStash.agentBusy': { agent: string | number; folder: string | number }
   'service.gitStash.busy': { folder: string | number; what: string | number }
   'service.gitStash.conflicted': { file: string | number; folder: string | number }

@@ -292,6 +292,36 @@ const check = (name, ok, extra = '') => {
   await page.locator('.tab', { hasText: 'Files' }).click()
   await lib.until(async () => (await row('made-outside.txt').count()) === 1, HUNG_MS)
 
+  // HI-3477: Discard Changes… and Restore From → A Commit…, each after a confirm showing its diff; the changes stashed.
+  const app_ = () => fs.readFileSync(path.join(proj, 'src', 'app.ts'), 'utf8')
+  const stashNames = () => gitOut('stash', 'list', '--format=%gs')
+  const dialog = page.locator('.dialog')
+  check('discard: offered for a modified file', (await gitMenu('src/app.ts')) && (await shown(menuItem('Discard Changes'))))
+  await menuItem('Discard Changes').click()
+  check('discard: the confirm shows the diff it undoes', (await shown(dialog.locator('[data-restore-diff] .monaco'))) && /back to the commit checked out/.test(await dialog.innerText().catch(() => '')))
+  await page.screenshot({ path: path.join(shots, '8-discard-confirm.png') })
+  await page.getByRole('button', { name: 'Discard Changes', exact: true }).click()
+  check('discard: the file is back to its commit, its changes in a named stash', !!(await lib.until(() => app_() === 'export const a = 1\n' && /Combwork: set aside before discarding src\/app\.ts \[cw:/.test(stashNames()), HUNG_MS)), JSON.stringify([app_(), stashNames()]))
+  check('discard: the toast says where the changes went', !!(await lib.until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Discarded the changes to app\.ts/.test(t) && /Stashes/.test(t)), HUNG_MS)))
+  // A second commit of the file: A Commit… lists both, and Restore takes the one picked.
+  w('src/app.ts', 'export const a = 3\n')
+  gitOut('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'three')
+  // The tree has read git's status again: the row has no letter.
+  await lib.until(async () => (await row('src/app.ts').locator('.git-status').count()) === 0, HUNG_MS)
+  check('restore: offered, with no Target Branch while the folder is on the target', (await gitMenu('src/app.ts')) && (await shown(menuItem('Restore From'))) && (await menuItem('Discard Changes').count()) === 0)
+  await menuItem('Restore From').click()
+  check('restore: A Commit… under it', (await shown(menuItem('A Commit'))) && (await menuItem('Target Branch').count()) === 0)
+  await menuItem('A Commit').click()
+  const commits = dialog.locator('[data-restore-picker] .git-commit')
+  check("restore: lists the file's commits", !!(await lib.until(async () => (await commits.count()) === 2, HUNG_MS)), String(await commits.count()))
+  await commits.nth(1).click()
+  check('restore: the commit picked shows its diff', await shown(dialog.locator('[data-restore-diff] .monaco')))
+  await page.screenshot({ path: path.join(shots, '8-restore-commit.png') })
+  await page.getByRole('button', { name: 'Restore', exact: true }).click()
+  check('restore: the file is that commit\'s, as a change to commit', !!(await lib.until(() => app_() === 'export const a = 1\n' && /^ M src\/app\.ts/m.test(gitOut('status', '--porcelain')), HUNG_MS)), JSON.stringify(app_()))
+  // Put src/app.ts back as the suite had it (modified), for what follows.
+  w('src/app.ts', 'export const a = 2\n')
+
     // Attachments tab (#387): the old .combwork/images moved into .combwork/attachments, every kind listed, filters by kind.
   await page.locator('.tab', { hasText: 'Attachments' }).click()
   await lib.until(async () => (await page.locator('.thumb').count()) === 8, lib.timing('hang.ui'))

@@ -575,6 +575,110 @@
     "defaultMessage": "Refresh",
     "description": "Button or menu item: reads the folder (or the attachments) again."
   },
+  "files.restore.becomes": {
+    "defaultMessage": "After ({commit})",
+    "description": "HI-3477: above the right side of the confirmation's diff: the file as it will be, from that commit ({commit}, a short id)."
+  },
+  "files.restore.binary": {
+    "defaultMessage": "Binary file",
+    "description": "HI-3477: in place of the confirmation's diff when the file is binary."
+  },
+  "files.restore.discard": {
+    "defaultMessage": "Discard Changes…",
+    "description": "HI-3477: the Files tab's right-click menu, for a changed file: puts it back to the commit checked out, after showing what it would undo. Its changes go to a stash."
+  },
+  "files.restore.discardButton": {
+    "defaultMessage": "Discard Changes",
+    "description": "HI-3477: the button of the confirmation before Discard Changes."
+  },
+  "files.restore.discardMessage": {
+    "defaultMessage": "It goes back to the commit checked out ({commit}). Its changes are kept in a stash: Apply in Version Control → Changes → Stashes brings them back.",
+    "description": "HI-3477: the confirmation before Discard Changes. {commit} is a short commit id."
+  },
+  "files.restore.discardTitle": {
+    "defaultMessage": "Discard the changes to \"{name}\"?",
+    "description": "HI-3477: title of the confirmation before Discard Changes. {name} is the file."
+  },
+  "files.restore.discarded": {
+    "defaultMessage": "Discarded the changes to {name}.",
+    "description": "HI-3477: notification after Discard Changes. {name} is the file."
+  },
+  "files.restore.discarding": {
+    "defaultMessage": "Discarding…",
+    "description": "HI-3477: Discard Changes' button while it runs."
+  },
+  "files.restore.failed": {
+    "defaultMessage": "Could not restore the file",
+    "description": "Title of an error notification after the Files tab's Discard Changes… or Restore From… (HI-3477)."
+  },
+  "files.restore.from": {
+    "defaultMessage": "Restore From",
+    "description": "HI-3477: the Files tab's right-click menu, for a file git tracks: opens a menu of where to take the file's version from (the target branch, a commit)."
+  },
+  "files.restore.fromCommit": {
+    "defaultMessage": "A Commit…",
+    "description": "HI-3477: a choice under Restore From: opens a list of the commits that changed the file, to pick one."
+  },
+  "files.restore.fromTarget": {
+    "defaultMessage": "Target Branch ({target})",
+    "description": "HI-3477: a choice under Restore From: the file's version on the project's target branch ({target}, its name)."
+  },
+  "files.restore.missingInCommit": {
+    "defaultMessage": "The file isn't in {commit} (that commit deleted it): pick another.",
+    "description": "HI-3477: under the commit list of Restore From → A Commit…, when the commit picked ({commit}, a short id) has no file at this path."
+  },
+  "files.restore.missingMessage": {
+    "defaultMessage": "The target ({commit}) has no file at this path: there is nothing to restore it from.",
+    "description": "HI-3477: the note Restore From → Target Branch shows when the file is not on the target. {commit} is a short commit id."
+  },
+  "files.restore.missingTitle": {
+    "defaultMessage": "\"{name}\" isn't on {target}",
+    "description": "HI-3477: title of the note Restore From → Target Branch shows when the file is not on the target branch ({target}, its name). {name} is the file."
+  },
+  "files.restore.noCommits": {
+    "defaultMessage": "No commit on this branch changed this file.",
+    "description": "HI-3477: in Restore From → A Commit… when the file has no commits on the branch checked out."
+  },
+  "files.restore.now": {
+    "defaultMessage": "On disk now",
+    "description": "HI-3477: above the left side of the confirmation's diff: the file as it is now, what Discard or Restore replaces."
+  },
+  "files.restore.pickFirst": {
+    "defaultMessage": "Pick a commit first.",
+    "description": "HI-3477: an error in Restore From → A Commit… when Restore is pressed before a commit is picked."
+  },
+  "files.restore.readFailed": {
+    "defaultMessage": "Couldn't read it: {error}",
+    "description": "HI-3477: in Restore From → A Commit… when reading the commits or a diff failed. {error} is why."
+  },
+  "files.restore.restoreButton": {
+    "defaultMessage": "Restore",
+    "description": "HI-3477: the button of the confirmation before Restore From."
+  },
+  "files.restore.restoreMessage": {
+    "defaultMessage": "{source, select, target {It becomes its version on {target} ({commit}),} other {It becomes its version in the commit you pick,}} as a change to commit. {changed, select, yes {Its uncommitted changes are kept in a stash first (Version Control → Changes → Stashes).} other {It has no uncommitted changes: nothing is lost.}}",
+    "description": "HI-3477: the confirmation before Restore From. target: from the target branch ({target}, its name; {commit} a short commit id); other: from a commit the user picks in the list below. {changed}: yes when the file has uncommitted changes, which are stashed."
+  },
+  "files.restore.restoreTitle": {
+    "defaultMessage": "{source, select, target {Restore \"{name}\" from {target}?} other {Restore \"{name}\" from a commit}}",
+    "description": "HI-3477: title of the confirmation before Restore From. {name} is the file; target: from the target branch ({target}, its name); other: from a commit the user picks."
+  },
+  "files.restore.restored": {
+    "defaultMessage": "Restored {name} from {commit}.",
+    "description": "HI-3477: notification after Restore From. {name} is the file; {commit} a short commit id."
+  },
+  "files.restore.restoring": {
+    "defaultMessage": "Restoring…",
+    "description": "HI-3477: Restore From's button while it runs."
+  },
+  "files.restore.same": {
+    "defaultMessage": "No difference: the file on disk is already this version.",
+    "description": "HI-3477: in place of the confirmation's diff when the file on disk is the same as the version it would become."
+  },
+  "files.restore.stashedNote": {
+    "defaultMessage": "Its earlier changes are in Version Control → Changes → Stashes.",
+    "description": "HI-3477: under the notification after Discard Changes or Restore From, when the file had changes, which were stashed."
+  },
   "files.reveal": {
     "defaultMessage": "Reveal",
     "description": "Short button: shows the file in Windows File Explorer."

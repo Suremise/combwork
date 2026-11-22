@@ -77,5 +77,18 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   'git:dropStash': async (root, ref) => {
     const ops = opsAt('git:dropStash')
     return (await import('./stashPanel')).dropStashAt(workspace, root, ref, ops)
+  },
+  // HI-3477: the Files tab's Discard Changes… and Restore From…: refused here first, then the project folder's checks (fileRestorePanel.ts).
+  'files:gitRestorePlan': async (p, rel, source, commit) => {
+    const ops = opsAt('files:gitRestorePlan')
+    return (await import('./fileRestorePanel')).restorePlanAt(workspace, p, rel, source, commit, ops)
+  },
+  'files:gitFileCommits': async (p, rel, page) => {
+    const ops = opsAt('files:gitFileCommits')
+    return (await import('./fileRestorePanel')).fileCommitsAt(workspace, p, rel, page, ops)
+  },
+  'files:gitRestore': async (p, req) => {
+    const ops = opsAt('files:gitRestore')
+    return (await import('./fileRestorePanel')).restoreAt(workspace, p, req, ops)
   }
 }

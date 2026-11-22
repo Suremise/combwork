@@ -12,6 +12,7 @@ import * as changes from './gitFolderChanges'
 import * as operations from './gitOperationSteps'
 import * as health from './gitHealth'
 import * as stashes from './gitStashes'
+import * as restore from './gitFileRestore'
 import type { RepoOps } from '../repoOps'
 
 export const gitRepoOps: RepoOps = {
@@ -52,5 +53,8 @@ export const gitRepoOps: RepoOps = {
   stashFiles: (root, commit) => stashes.stashFiles(root, commit),
   stashDiff: (root, commit, file, untracked) => stashes.stashDiff(root, commit, file, untracked),
   applyStash: (p, folder, req, guard) => stashes.applyStash(p, folder, req, guard),
-  dropStash: (p, ref) => stashes.dropStash(p, ref)
+  dropStash: (p, ref) => stashes.dropStash(p, ref),
+  restorePlan: (p, rel, source, target, commit) => restore.restorePlan(p, rel, source, target, commit),
+  fileCommits: (p, rel, page) => restore.fileCommits(p, rel, page),
+  restoreFile: (p, req, guard) => restore.restoreFile(p, req, guard)
 }

@@ -5,7 +5,7 @@
 import type { OperationLent } from './gitOperations'
 
 /** Why Combwork set changes aside, as Set Aside names its stash (queueControls.ts's label): the card or target it names. */
-export type CombworkStash = { why: 'merging'; card: string } | { why: 'catchUp'; target: string; card: string } | { why: 'starting'; target: string } | { why: 'other'; text: string }
+export type CombworkStash = { why: 'merging'; card: string } | { why: 'catchUp'; target: string; card: string } | { why: 'starting'; target: string } | { why: 'discarding'; file: string } | { why: 'restoring'; file: string; from: string } | { why: 'other'; text: string }
 
 /** A stash as the list shows it. */
 export interface StashRow {
@@ -70,7 +70,7 @@ export interface StashConflict {
   head: string
 }
 
-/** Set Aside's mark (gitFolderChanges.ts settleChanges): `Combwork: set aside <why> [cw:<6 hex>]`. */
+/** Set Aside's mark (gitFolderChanges.ts settleChanges; HI-3477's gitFileRestore.ts too): `Combwork: set aside <why> [cw:<6 hex>]`. */
 const COMBWORK = /^Combwork: set aside (.+) \[cw:[0-9a-f]{6}\]$/
 const KEY = '[A-Z][A-Z0-9]*-\\d+'
 
@@ -85,6 +85,11 @@ export function combworkStash(message: string): CombworkStash | null {
   if (x) return { why: 'catchUp', target: x[1], card: x[2] } // i18n-ignore: a select's key, never shown
   x = /^before starting work on (.+)$/.exec(why)
   if (x) return { why: 'starting', target: x[1] } // i18n-ignore: a select's key, never shown
+  // HI-3477: the Files tab's Discard Changes… and Restore From… (gitFileRestore.ts).
+  x = /^before discarding (.+)$/.exec(why)
+  if (x) return { why: 'discarding', file: x[1] } // i18n-ignore: a select's key, never shown
+  x = /^before restoring (.+) from ([0-9a-f]{7,})$/.exec(why)
+  if (x) return { why: 'restoring', file: x[1], from: x[2] } // i18n-ignore: a select's key, never shown
   return { why: 'other', text: why } // i18n-ignore: a select's key, never shown
 }
 

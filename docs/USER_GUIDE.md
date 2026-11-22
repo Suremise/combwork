@@ -2193,7 +2193,7 @@ Names are coloured by git status like in VS Code (modified, new), folders contai
 
 ### Git in the Files tab <a id="git-in-the-files-tab"></a>
 
-Right-click a file or folder in the project folder for its **Git** section. It's a short menu, not a git client: staging, committing and discarding changes are in the **Version Control** tab.
+Right-click a file or folder in the project folder for its **Git** section. It's a short menu, not a git client: staging and committing are in the **Version Control** tab.
 
 - **Exclude from Git** opens a menu of what to ignore: **This file** or **This folder** (exactly that path, so nothing else of the same name), or **All \*.log files** for a file's extension. Under **Shared with the repository (a commit)** it adds a line to the project's `.gitignore`, which is then committed, so collaborators and agents get it too: the notification's **Commit It** commits `.gitignore` alone, as it is now (with any earlier edits to it), or commit it later in Version Control. It waits while an agent or a run is working in the repository: with a project folder inside a larger repository, that's anywhere in the repository, not only the project folder. Left uncommitted, it can pause the merge queue when a card also changes `.gitignore`. Under **Only on this PC (nothing to commit)** it adds the line to `.git/info/exclude`, which git never commits. Each choice shows the line and the file it goes in. A line already there isn't added twice, and the file keeps its line endings. An ignore file that is a link, or that leads outside the repository, is left alone: change it by hand. The change to `.gitignore` shows in the Version Control tab like any other. Several selected entries are excluded by their exact paths.
 - **Stop Tracking, Keep the File…** is offered for files and folders git tracks, because excluding a file git already tracks does nothing on its own. After you confirm, git stops tracking it (`git rm --cached`) and the file stays on disk; the Version Control tab shows the removal as a deletion to commit. Exclude it too, or git offers it as new again.
@@ -2202,6 +2202,15 @@ Right-click a file or folder in the project folder for its **Git** section. It's
 - **Show Changes**, for a changed or new file, opens its diff in the Version Control tab's Changes.
 
 The Git section acts on the project folder, on the branch it has checked out, which its confirmation or notification names; it isn't offered while the Files tab shows an agent's slot or worktree. In a project that isn't a git repository it offers **Initialise Repository…** instead.
+
+#### Discarding or restoring a file <a id="discard-or-restore-a-file"></a>
+
+Two more entries of the Git section put one file back to another version. Each asks first and shows the file on disk now (left) against what it will be (right), and nothing is lost: the file's uncommitted changes go to a stash first, which **Version Control → Changes → Stashes** lists as *Set aside by Combwork before discarding …*, where **Apply** brings them back.
+
+- **Discard Changes…**, for a changed file, puts it back to the commit checked out, staged changes included. (A new file git doesn't track yet has no earlier version: **Delete** sends it to the Recycle Bin.)
+- **Restore From** ▸ **Target Branch** takes the file's version on the project's target branch (not offered when the folder has the target checked out), and **A Commit…** lists the commits that changed the file, a page at a time: click one to see its version, then **Restore**. The file then shows in Changes as a change to commit.
+
+They act on one file at a time, and refuse while an agent or its session is working in the project folder, a run is going there, git is in the middle of a merge or rebase, or the file is in conflict.
 
 ### Viewing and editing files <a id="viewing-and-editing-files"></a>
 

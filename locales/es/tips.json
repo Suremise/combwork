@@ -230,6 +230,8 @@
   "tips.editTemplates.title": "Edita una plantilla en su sitio",
   "tips.fileLinks.text": "Las rutas de archivo que imprime un agente, como src/app.ts:42, son enlaces: haz Ctrl+clic en una para abrir el archivo en la pestaña Archivos en esa línea.",
   "tips.fileLinks.title": "Ctrl+clic en una ruta en la terminal",
+  "tips.fileRestore.text": "Haz clic derecho en un archivo cambiado en la pestaña Archivos: Descartar cambios… lo devuelve al commit actual, y Restaurar desde toma su versión en la rama de destino o en uno de sus commits. Ambos muestran primero el diff y guardan sus cambios en un stash.",
+  "tips.fileRestore.title": "Deshaz los cambios de un archivo desde la pestaña Archivos",
   "tips.filesGit.text": "Haz clic derecho en un archivo o carpeta en la pestaña Archivos: Excluir de Git lo agrega a .gitignore (o solo a .git/info/exclude de este PC), Dejar de seguir saca de git un archivo confirmado pero lo deja en el disco, y ¿Por qué se ignora? abre la regla de un archivo atenuado.",
   "tips.filesGit.title": "Deja un archivo fuera de git desde la pestaña Archivos",
   "tips.filesTab.text": "La pestaña Archivos explora y edita el proyecto, muestra vistas previas de Markdown, CSV, HTML e imágenes, y conserva las ediciones sin guardar al cambiar de archivo.",

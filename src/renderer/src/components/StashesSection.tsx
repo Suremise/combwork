@@ -25,8 +25,8 @@ export const STASH_TEXT = {
   readFailed: msg({ id: 'git.stash.readFailed', defaultMessage: "Couldn't read the stashes: {error}", description: 'HI-3472: under the Stashes heading when reading them failed. {error} is why.' }),
   combwork: msg({
     id: 'git.stash.combwork',
-    defaultMessage: '{why, select, merging {Set aside by Combwork before merging {card}} catchUp {Set aside by Combwork before bringing {target} up to date with {card}} starting {Set aside by Combwork before starting work on {target}} other {Set aside by Combwork {text}}}',
-    description: "HI-3472: a stash's name in the list when Combwork's Set Aside made it (HI-2944: a paused merge's button). {card} is a card's key (HI-12), {target} a branch; other: {text} is Combwork's own English words after \"set aside\". Keep the select keys."
+    defaultMessage: '{why, select, merging {Set aside by Combwork before merging {card}} catchUp {Set aside by Combwork before bringing {target} up to date with {card}} starting {Set aside by Combwork before starting work on {target}} discarding {Set aside by Combwork before discarding {file}} restoring {Set aside by Combwork before restoring {file} from {from}} other {Set aside by Combwork {text}}}',
+    description: "HI-3472: a stash's name in the list when Combwork's Set Aside made it (HI-2944: a paused merge's button). {card} is a card's key (HI-12), {target} a branch; discarding and restoring (HI-3477: the Files tab's Discard Changes… and Restore From…): {file} is a file's path, {from} a short commit id; other: {text} is Combwork's own English words after \"set aside\". Keep the select keys."
   }),
   meta: msg({ id: 'git.stash.meta', defaultMessage: '{branch, select, none {no branch} other {on {branch}}} · {when} · {files, plural, one {# file} other {# files}}', description: "HI-3472: under a stash's name: the branch it was made on ({branch}; none: a detached HEAD), when ({when}, a date and time) and how many files it holds." }),
   openCard: msg({ id: 'git.stash.openCard', defaultMessage: 'Open {card}', description: "HI-3472: the tooltip of a Combwork stash's card key: opens the card ({card}, its key)." }),
@@ -68,7 +68,7 @@ const T = STASH_TEXT
 export function stashName(s: StashRow): string {
   const c: CombworkStash | null = s.combwork
   if (!c) return s.message
-  return tr(T.combwork, { why: c.why, card: 'card' in c ? c.card : '', target: 'target' in c ? c.target : '', text: c.why === 'other' ? c.text : '' })
+  return tr(T.combwork, { why: c.why, card: 'card' in c ? c.card : '', target: 'target' in c ? c.target : '', file: 'file' in c ? c.file : '', from: c.why === 'restoring' ? c.from : '', text: c.why === 'other' ? c.text : '' })
 }
 
 /** The card a Combwork stash names, if any. */

@@ -21,6 +21,7 @@ import type { OperationRequest, OperationStepResult } from '../../shared/gitOper
 import type { RemotePrune, RepoHealth } from '../../shared/gitHealth'
 import type { StashApplied, StashFile, StashRef, StashRequest, StashRow } from '../../shared/gitStashes'
 import type { GitDiff } from '../../shared/types'
+import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from '../../shared/gitFileRestore'
 
 /**
  * Which members each operation may call (HR3's s15): the port is handed out for one operation, typed down to its own
@@ -51,6 +52,7 @@ export interface OpMembers {
   operationSteps: 'operationStep'
   repoHealth: 'health' | 'pruneWorktrees' | 'removeLocks' | 'remotePrunePreview' | 'fetchPrune'
   stashes: 'stashes' | 'stashFiles' | 'stashDiff' | 'applyStash' | 'dropStash'
+  restoreFile: 'restorePlan' | 'fileCommits' | 'restoreFile'
 }
 
 /** The port as handed out for one operation: its own members only. */
@@ -144,4 +146,14 @@ export interface RepoOps {
   applyStash(projectPath: string, folder: string, req: StashRequest, guard?: () => Promise<void> | void): Promise<StashApplied>
   /** The row of the list dropped (HI-3527: that row, never another holding its commit), under the repository lock. */
   dropStash(projectPath: string, ref: StashRef): Promise<void>
+  // HI-3477: the Files tab's Discard Changes… and Restore From…, of one tracked file in the project folder.
+  /** What it would do: the commit its version comes from (`target`: the project's target, by name), the file on disk against it. */
+  restorePlan(projectPath: string, rel: unknown, source: RestoreSource, target: string | null, commit: string | null): Promise<FileRestorePlan>
+  /** A page of the commits that changed the file on the folder's branch, newest first. */
+  fileCommits(projectPath: string, rel: unknown, page: unknown): Promise<FileCommits>
+  /**
+   * Its uncommitted changes stashed, then (a Restore) its version at `req.commit` written, under the repository lock and
+   * the folder's fence, refused while anything works there; `guard` runs there before git does and refuses by throwing.
+   */
+  restoreFile(projectPath: string, req: FileRestoreRequest, guard?: () => Promise<void> | void): Promise<FileRestored>
 }
