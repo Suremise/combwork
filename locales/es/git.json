@@ -583,5 +583,6 @@
   "git.moves.wayBack": "La restauración es en sí un movimiento: aparece arriba en Movimientos, y Restaurar a este punto… en el movimiento de debajo la deshace.",
   "git.moves.what": "{kind, select, commit {Commit} initial {Primer commit} amend {Se modificó el último commit (amend)} mergeCommit {Commit de fusión} fastForward {Avance rápido hasta {name}} merge {Fusión de {name}} pull {Pull} rebase {Rebase sobre {name}} reset {Reset a {name}} created {Creada a partir de {name}} renamed {Renombrada desde {name}} cherryPick {Cherry-pick de un commit} revert {Revert de un commit} combworkMerge {Combwork fusionó {name}} restored {Restaurada aquí con Combwork, desde {name}} combwork {Combwork: {name}} unnamed {Movida (git no anotó ningún motivo)} other {{name}}}",
   "git.moves.whereNowhere": "{branch} no está activa en ninguna carpeta: solo se mueve la rama.",
-  "git.moves.whereProject": "La carpeta del proyecto la tiene activa: sus archivos la siguen (git reset --keep), y tus cambios sin commit se quedan como están."
+  "git.moves.whereProject": "La carpeta del proyecto la tiene activa: sus archivos la siguen (git reset --keep), y tus cambios sin commit se quedan como están.",
+  "git.moves.detached": "La carpeta del proyecto está en un HEAD separado (ninguna rama extraída): Movimientos muestra los movimientos de una rama cuando esté en una."
 }

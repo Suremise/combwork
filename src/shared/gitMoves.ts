@@ -36,6 +36,8 @@ export interface MoveRow {
 export interface BranchMoves {
   /** The branch shown, by name; null when the repository has no local branch. */
   branch: string | null
+  /** The project folder is on a detached HEAD: no moves are shown until it is on a branch (the agreed design, r11). */
+  detached: boolean
   /** Its commit now (what a restore names as `from`). */
   head: string | null
   /** Local branches, by name. */

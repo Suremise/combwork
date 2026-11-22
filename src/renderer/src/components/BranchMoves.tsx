@@ -27,6 +27,7 @@ export const MOVES_TEXT = {
   loadFailed: msg({ id: 'git.moves.loadFailed', defaultMessage: "Couldn't read the moves: {error}", description: 'HI-3469: in place of the moves when reading them failed. {error} is why.' }),
   about: msg({ id: 'git.moves.about', defaultMessage: "Each time the branch moved, newest first, as git's reflog keeps it (git forgets moves after about 90 days). Restore to here… moves it back to that commit.", description: "HI-3469: the hint atop History's Moves. Restore to here… is the button of that name." }),
   none: msg({ id: 'git.moves.none', defaultMessage: 'Git has no moves of this branch.', description: "HI-3469: Moves when the branch's reflog is empty (or git keeps none)." }),
+  detached: msg({ id: 'git.moves.detached', defaultMessage: "The project folder is on a detached HEAD (no branch checked out): Moves shows a branch's moves once it is on one.", description: "HI-3469: Moves when the project folder has no branch checked out (git's detached HEAD)." }),
   noBranch: msg({ id: 'git.moves.noBranch', defaultMessage: 'The repository has no local branch yet.', description: 'HI-3469: Moves when there is no local branch to show.' }),
   what: msg({
     id: 'git.moves.what',
@@ -153,6 +154,12 @@ export function MovesSection({ project, view, onView }: { project: ProjectInfo; 
   const own = state?.for === project.path ? state : null
   const data = own?.data ?? null
   const reload = (): void => setReads((n) => n + 1)
+  // What was done in a terminal meanwhile (a checkout, a reset) shows on coming back to the window, as History's commits.
+  useEffect(() => {
+    const again = (): void => setReads((n) => n + 1)
+    window.addEventListener('focus', again)
+    return () => window.removeEventListener('focus', again)
+  }, [])
   const optionText = (m: BranchMoves, b: string): string => tr(T.option, { branch: b, kind: b === m.target ? 'target' : b === m.folderBranch ? 'folder' : 'other' /* i18n-ignore: a select's key, never shown */ })
 
   const restore = async (m: BranchMoves, row: MoveRow): Promise<void> => {
@@ -203,7 +210,11 @@ export function MovesSection({ project, view, onView }: { project: ProjectInfo; 
         <p className="hint" data-moves-error="">
           {tr(T.loadFailed, { error: own.error })}
         </p>
-      ) : !data ? null : !data.branch ? (
+      ) : !data ? null : data.detached ? (
+        <p className="hint" data-moves-detached="">
+          {tr(T.detached)}
+        </p>
+      ) : !data.branch ? (
         <p className="hint">{tr(T.noBranch)}</p>
       ) : data.moves.length === 0 ? (
         <p className="hint" data-moves-none="">

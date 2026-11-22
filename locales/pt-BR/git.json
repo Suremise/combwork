@@ -583,5 +583,6 @@
   "git.moves.wayBack": "A restauração é ela própria um movimento: aparece no topo de Movimentos, e Restaurar para este ponto… no movimento abaixo dela a desfaz.",
   "git.moves.what": "{kind, select, commit {Commit feito} initial {Primeiro commit} amend {Último commit corrigido (amend)} mergeCommit {Commit de merge} fastForward {Avançou (fast-forward) para {name}} merge {Merge de {name}} pull {Pull feito} rebase {Rebase sobre {name}} reset {Reset para {name}} created {Criado a partir de {name}} renamed {Renomeado de {name}} cherryPick {Cherry-pick de um commit} revert {Revert de um commit} combworkMerge {O Combwork fez merge de {name}} restored {Restaurado aqui com o Combwork, a partir de {name}} combwork {Combwork: {name}} unnamed {Movido (o git não anotou motivo)} other {{name}}}",
   "git.moves.whereNowhere": "{branch} não está com checkout feito em nenhuma pasta: só o branch se move.",
-  "git.moves.whereProject": "A pasta do projeto está com checkout dele: os arquivos dela acompanham (git reset --keep), e as suas alterações sem commit ficam como estão."
+  "git.moves.whereProject": "A pasta do projeto está com checkout dele: os arquivos dela acompanham (git reset --keep), e as suas alterações sem commit ficam como estão.",
+  "git.moves.detached": "A pasta do projeto está em um HEAD desanexado (nenhum branch em checkout): Movimentos mostra os movimentos de um branch quando ela estiver em um."
 }

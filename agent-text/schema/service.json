@@ -662,6 +662,9 @@
       "file": "plain"
     }
   },
+  "service.gitMoves.detached": {
+    "placeholders": {}
+  },
   "service.gitMoves.failed": {
     "placeholders": {
       "why": "plain"
@@ -731,6 +734,12 @@
   "service.gitMoves.timedOut": {
     "placeholders": {
       "seconds": "number"
+    }
+  },
+  "service.gitMoves.unlisted": {
+    "placeholders": {
+      "branch": "plain",
+      "why": "plain"
     }
   },
   "service.gitOperation.agentBusy": {

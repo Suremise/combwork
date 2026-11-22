@@ -22,6 +22,13 @@ vi.mock('../src/main/gitRepo', async (original) => ({ ...(await original<typeof 
 let card: { number: number; key: string; title: string } | null = null
 vi.mock('../src/main/branchMerge', async (original) => ({ ...(await original<typeof import('../src/main/branchMerge')>()), lineCard: async () => card }))
 
+/** HR1's round 1: git's list of worktrees failing, when a test says. */
+let worktreesFail = false
+vi.mock('../src/main/git', async (original) => {
+  const real = await original<typeof import('../src/main/git')>()
+  return { ...real, git: (cwd: string, args: string[], ...rest: unknown[]) => (worktreesFail && args[0] === 'worktree' && args[1] === 'list' ? Promise.resolve({ ok: false, out: '', err: 'fatal: cannot list worktrees', code: 128 }) : (real.git as (...a: unknown[]) => ReturnType<typeof real.git>)(cwd, args, ...rest)) }
+})
+
 vi.setConfig({ testTimeout: timing('test.hang') })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -64,6 +71,7 @@ beforeEach(() => {
   card = null
   sessionIn = null
   slotHeld = false
+  worktreesFail = false
 })
 
 describe('parsing', () => {
@@ -245,6 +253,62 @@ describe('Restore to here…', () => {
     await expect(restore('main', old)).rejects.toThrow('in the middle of a merge')
     sh(proj, 'merge', '--abort')
     expect(head()).toBe(two)
+  })
+
+  it("refuses when git can't list the worktrees (a branch checked out there could be missed); nothing changes (HR1's round 1)", async () => {
+    sh(proj, 'branch', 'side')
+    const old = head('side')
+    sh(proj, 'switch', '-q', 'side')
+    commit(proj, { 'a.txt': 'two\n' }, 'two')
+    sh(proj, 'switch', '-q', 'main')
+    const other = join(base, `wt${n}`)
+    sh(proj, 'worktree', 'add', '-q', other, 'side')
+    const now = head('side')
+    worktreesFail = true
+    await expect(plan('side', old)).rejects.toThrow("Git couldn't list this repository's worktrees")
+    await expect(restore('side', old)).rejects.toThrow("Git couldn't list this repository's worktrees")
+    expect(head('side')).toBe(now)
+    worktreesFail = false
+    expect((await plan('side', old)).blocked).toContain('is checked out in')
+  })
+
+  it("counts the dropped commits a local upstream has, and an upstream whose short name is ambiguous (HR1's round 1)", async () => {
+    const old = head()
+    commit(proj, { 'a.txt': 'two\n' }, 'two')
+    commit(proj, { 'a.txt': 'three\n' }, 'three')
+    // side tracks the local main (remote "."): its upstream is refs/heads/main.
+    sh(proj, 'branch', 'side')
+    sh(proj, 'config', 'branch.side.remote', '.')
+    sh(proj, 'config', 'branch.side.merge', 'refs/heads/main')
+    // main moved back to "two" (side checked out meanwhile, so main isn't), then main checked out again.
+    sh(proj, 'switch', '-q', 'side')
+    sh(proj, 'branch', '-f', 'main', 'HEAD~1')
+    sh(proj, 'switch', '-q', 'main')
+    let p = await plan('side', old)
+    expect([p.upstream, p.pushedDropped, p.dropped.length]).toEqual(['main', 1, 2])
+    // A remote-tracking upstream with a local branch of the same short name beside it.
+    sh(proj, 'remote', 'add', 'origin', join(base, 'nowhere.git'))
+    sh(proj, 'update-ref', 'refs/remotes/origin/side', head('side'))
+    sh(proj, 'branch', 'origin/side', old)
+    sh(proj, 'config', 'branch.side.remote', 'origin')
+    sh(proj, 'config', 'branch.side.merge', 'refs/heads/side')
+    p = await plan('side', old)
+    expect([p.pushedDropped, p.dropped.length]).toEqual([2, 2])
+    expect(p.upstream).toMatch(/origin\/side$/)
+  })
+
+  it('shows no moves and refuses a restore while the project folder is on a detached HEAD (the agreed design)', async () => {
+    const old = head()
+    commit(proj, { 'a.txt': 'two\n' }, 'two')
+    sh(proj, 'branch', 'side')
+    sh(proj, 'switch', '-q', '--detach')
+    const m = await moves()
+    expect([m.detached, m.branch, m.moves]).toEqual([true, null, []])
+    expect(m.branches).toEqual(['main', 'side'])
+    expect((await plan('side', old)).blocked).toContain('detached HEAD')
+    await expect(restore('side', old)).rejects.toThrow('detached HEAD')
+    sh(proj, 'switch', '-q', 'main')
+    expect((await moves()).detached).toBe(false)
   })
 
   it('refuses a request that is malformed or names a commit git no longer has', async () => {

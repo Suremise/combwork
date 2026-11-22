@@ -2341,7 +2341,7 @@ Branches outlive their work: a card that was superseded or archived keeps its br
 
 #### Moves <a id="moves"></a>
 
-**Moves** (the switch in History's heading, beside **Commits**) lists each time a local branch moved, newest first, as git's reflog keeps it: about 90 days back, 20 a page. Its picker shows the project folder's branch first; choose any other local branch there. Each move says what it was in plain words where Combwork knows them: *Combwork merged HI-12* (click the key to open the card), *Committed*, *Merged …*, *Pulled*, *Rebased onto …*, *Reset to …*, and git's own words otherwise (hover a move for them, with its commit and time). The commit it left the branch at is beside it.
+**Moves** (the switch in History's heading, beside **Commits**) lists each time a local branch moved, newest first, as git's reflog keeps it: about 90 days back, 20 a page. Its picker shows the project folder's branch first; choose any other local branch there. While the project folder is on a detached HEAD (no branch checked out), Moves shows nothing until it is on a branch again. Each move says what it was in plain words where Combwork knows them: *Combwork merged HI-12* (click the key to open the card), *Committed*, *Merged …*, *Pulled*, *Rebased onto …*, *Reset to …*, and git's own words otherwise (hover a move for them, with its commit and time). The commit it left the branch at is beside it.
 
 **Restore to here…** moves the branch back to that move's commit. It first shows what changes: the commits the branch would drop and those it would get back, and, when some of the dropped ones are on its remote already, that a later **Push** will be refused (Combwork never forces one) and **Pull** would bring them back.
 

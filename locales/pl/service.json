@@ -463,5 +463,7 @@
   "service.gitMoves.same": "Gałąź {branch} już jest na tym commicie: nie ma nic do zrobienia.",
   "service.gitMoves.session": "Sesja agenta {agent} działa w folderze projektu: nic nie zrobiono. Najpierw ją zatrzymaj.",
   "service.gitMoves.slotHeld": "Scalanie do {branch} jest w toku albo czeka (na swój slot scalania): spróbuj ponownie, gdy się zakończy.",
-  "service.gitMoves.timedOut": "Git nadal działał po {seconds, number} s, więc Combwork go zakończył. Zanim spróbujesz ponownie, sprawdź folder projektu."
+  "service.gitMoves.timedOut": "Git nadal działał po {seconds, number} s, więc Combwork go zakończył. Zanim spróbujesz ponownie, sprawdź folder projektu.",
+  "service.gitMoves.unlisted": "Git nie mógł wyświetlić listy worktree tego repozytorium, więc Combwork nie wie, gdzie wybrano gałąź {branch}: nic nie zrobiono. Git zgłosił: {why}",
+  "service.gitMoves.detached": "Folder projektu jest na odłączonym HEAD: Przesunięcia przywracają gałąź, gdy folder będzie na gałęzi."
 }

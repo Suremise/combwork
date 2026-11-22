@@ -463,5 +463,7 @@
   "service.gitMoves.same": "{branch}はすでにそのコミットにあります。何もすることはありません。",
   "service.gitMoves.session": "{agent}のセッションがプロジェクトフォルダーにあります。何も行っていません。先に停止してください。",
   "service.gitMoves.slotHeld": "{branch}へのマージが進行中か待機中です（そのマージ枠）。終わってからもう一度お試しください。",
-  "service.gitMoves.timedOut": "Gitが{seconds, number}秒たっても実行中だったため、Combworkが終了させました。もう一度試す前にプロジェクトフォルダーを確認してください。"
+  "service.gitMoves.timedOut": "Gitが{seconds, number}秒たっても実行中だったため、Combworkが終了させました。もう一度試す前にプロジェクトフォルダーを確認してください。",
+  "service.gitMoves.unlisted": "Git がこのリポジトリの worktree を一覧できなかったため、Combwork は {branch} がどこでチェックアウトされているか判断できません。何も行っていません。Git の出力: {why}",
+  "service.gitMoves.detached": "プロジェクトフォルダーは detached HEAD です。フォルダーがブランチ上にあるときに、移動記録からブランチを戻せます。"
 }

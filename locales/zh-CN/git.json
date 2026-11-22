@@ -583,5 +583,6 @@
   "git.moves.wayBack": "恢复本身也是一次移动：它会显示在移动记录的顶部，在它下面那条移动上使用“恢复到此处…”即可撤销。",
   "git.moves.what": "{kind, select, commit {提交} initial {首次提交} amend {修改了上一个提交} mergeCommit {提交了一次合并} fastForward {快进到 {name}} merge {合并了 {name}} pull {拉取} rebase {变基到 {name}} reset {重置到 {name}} created {从 {name} 创建} renamed {从 {name} 重命名} cherryPick {拣选了一个提交} revert {还原了一个提交} combworkMerge {Combwork 合并了 {name}} restored {用 Combwork 恢复到此处，来自 {name}} combwork {Combwork：{name}} unnamed {已移动（Git 未记录原因）} other {{name}}}",
   "git.moves.whereNowhere": "{branch} 未在任何文件夹中检出：只有分支会移动。",
-  "git.moves.whereProject": "项目文件夹已检出它：其中的文件会随之改变（git reset --keep），你未提交的更改保持不变。"
+  "git.moves.whereProject": "项目文件夹已检出它：其中的文件会随之改变（git reset --keep），你未提交的更改保持不变。",
+  "git.moves.detached": "项目文件夹处于分离的 HEAD 状态（未检出任何分支）：切换到分支后，移动记录会显示该分支的移动。"
 }

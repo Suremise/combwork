@@ -170,6 +170,7 @@ interface CombworkMessageValues {
   'service.gitMoves.busy': { what: string | number }
   'service.gitMoves.card': { branch: string | number; card: string | number }
   'service.gitMoves.conflicted': { file: string | number }
+  'service.gitMoves.detached': undefined
   'service.gitMoves.failed': { why: string | number }
   'service.gitMoves.inSlot': { branch: string | number; slot: string | number }
   'service.gitMoves.inTheWay': { count: number }
@@ -185,6 +186,7 @@ interface CombworkMessageValues {
   'service.gitMoves.session': { agent: string | number }
   'service.gitMoves.slotHeld': { branch: string | number }
   'service.gitMoves.timedOut': { seconds: number }
+  'service.gitMoves.unlisted': { branch: string | number; why: string | number }
   'service.gitOperation.agentBusy': { agent: string | number; folder: string | number }
   'service.gitOperation.busy': { folder: string | number; what: string | number }
   'service.gitOperation.changed': { was: string; folder: string | number }

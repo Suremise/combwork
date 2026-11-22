@@ -583,5 +583,6 @@
   "git.moves.wayBack": "戻す操作もそれ自体が1つの移動です。移動記録の一番上に表示され、そのすぐ下の移動で「ここに戻す…」を使うと元に戻せます。",
   "git.moves.what": "{kind, select, commit {コミット} initial {最初のコミット} amend {直前のコミットを修正} mergeCommit {マージをコミット} fastForward {{name}に早送り} merge {{name}をマージ} pull {プル} rebase {{name}にリベース} reset {{name}にリセット} created {{name}から作成} renamed {{name}から名前を変更} cherryPick {コミットをチェリーピック} revert {コミットをリバート} combworkMerge {Combworkが{name}をマージ} restored {Combworkでここに戻しました（{name}から）} combwork {Combwork：{name}} unnamed {移動（Gitは理由を記録していません）} other {{name}}}",
   "git.moves.whereNowhere": "{branch}はどのフォルダーでもチェックアウトされていません。移動するのはブランチだけです。",
-  "git.moves.whereProject": "プロジェクトフォルダーでチェックアウトされています。ファイルもそれに合わせて変わり（git reset --keep）、未コミットの変更はそのまま残ります。"
+  "git.moves.whereProject": "プロジェクトフォルダーでチェックアウトされています。ファイルもそれに合わせて変わり（git reset --keep）、未コミットの変更はそのまま残ります。",
+  "git.moves.detached": "プロジェクトフォルダーは detached HEAD です（ブランチがチェックアウトされていません）。ブランチに切り替えると、移動記録にそのブランチの移動が表示されます。"
 }

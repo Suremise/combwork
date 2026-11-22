@@ -463,5 +463,7 @@
   "service.gitMoves.same": "{branch} 已经在该提交上：无需操作。",
   "service.gitMoves.session": "{agent} 的会话在项目文件夹中：未做任何操作。请先停止它。",
   "service.gitMoves.slotHeld": "合并到 {branch} 的操作正在进行或等待中（其合并槽位）：请在完成后重试。",
-  "service.gitMoves.timedOut": "Git 运行 {seconds, number} 秒后仍未结束，因此 Combwork 结束了它。重试前请先查看项目文件夹。"
+  "service.gitMoves.timedOut": "Git 运行 {seconds, number} 秒后仍未结束，因此 Combwork 结束了它。重试前请先查看项目文件夹。",
+  "service.gitMoves.unlisted": "Git 无法列出此仓库的 worktree，因此 Combwork 无法确定 {branch} 检出在哪里：未执行任何操作。Git 输出：{why}",
+  "service.gitMoves.detached": "项目文件夹处于分离的 HEAD 状态：文件夹位于分支上时，才能通过移动记录恢复分支。"
 }

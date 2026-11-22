@@ -699,6 +699,11 @@
     "note": "HI-3469: why Restore to here… is refused: a file ({file}, a path) is in conflict in the project folder.",
     "audience": "both"
   },
+  "service.gitMoves.detached": {
+    "text": "The project folder is on a detached HEAD: Moves restores a branch once the folder is on one.",
+    "note": "HI-3469 (a reviewer's round 1): why Restore to here… is refused: the project folder has no branch checked out (git's detached HEAD); the design shows no Moves then.",
+    "audience": "both"
+  },
   "service.gitMoves.failed": {
     "text": "Git refused: {why}",
     "note": "HI-3469: an error from Restore to here…: git's own command failed; {why} is git's error line, in English.",
@@ -767,6 +772,11 @@
   "service.gitMoves.timedOut": {
     "text": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at the project folder before you try again.",
     "note": "HI-3469: an error from Restore to here…: git reset ran past Settings → Advanced's longest commit time ({seconds}) and was ended.",
+    "audience": "both"
+  },
+  "service.gitMoves.unlisted": {
+    "text": "Git couldn't list this repository's worktrees, so Combwork can't tell where {branch} is checked out: nothing was done. Git said: {why}",
+    "note": "HI-3469 (a reviewer's round 1): an error from Restore to here…: git worktree list failed, so a worktree that has the branch ({branch}) checked out could be missed. {why} is git's error line, in English.",
     "audience": "both"
   },
   "service.gitOperation.agentBusy": {

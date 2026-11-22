@@ -189,6 +189,7 @@
   "git.moves.branch": "Branch whose moves to show",
   "git.moves.cantTitle": "{branch} can't be restored now",
   "git.moves.confirm": "Restore",
+  "git.moves.detached": "The project folder is on a detached HEAD (no branch checked out): Moves shows a branch's moves once it is on one.",
   "git.moves.dropped": "{n, plural, one {The commit it drops} other {The # commits it drops}}",
   "git.moves.failed": "Couldn't restore the branch",
   "git.moves.heading": "Moves of",

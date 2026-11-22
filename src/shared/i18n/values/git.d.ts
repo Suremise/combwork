@@ -191,6 +191,7 @@ interface CombworkMessageValues {
   'git.moves.branch': undefined
   'git.moves.cantTitle': { branch: string | number }
   'git.moves.confirm': undefined
+  'git.moves.detached': undefined
   'git.moves.dropped': { n: number }
   'git.moves.failed': undefined
   'git.moves.heading': undefined

@@ -463,5 +463,7 @@
   "service.gitMoves.same": "{branch} steht schon auf diesem Commit: Es gibt nichts zu tun.",
   "service.gitMoves.session": "Die Sitzung von {agent} läuft im Projektordner: Es wurde nichts getan. Beende sie zuerst.",
   "service.gitMoves.slotHeld": "Ein Merge in {branch} läuft oder wartet (sein Merge-Slot): Versuche es erneut, sobald er fertig ist.",
-  "service.gitMoves.timedOut": "Git lief nach {seconds, number} Sekunden noch, also hat Combwork es beendet. Sieh dir den Projektordner an, bevor du es erneut versuchst."
+  "service.gitMoves.timedOut": "Git lief nach {seconds, number} Sekunden noch, also hat Combwork es beendet. Sieh dir den Projektordner an, bevor du es erneut versuchst.",
+  "service.gitMoves.unlisted": "Git konnte die Worktrees dieses Repositorys nicht auflisten, daher kann Combwork nicht sagen, wo {branch} ausgecheckt ist: Es wurde nichts getan. Git meldete: {why}",
+  "service.gitMoves.detached": "Der Projektordner ist auf einem losgelösten HEAD: Bewegungen stellt einen Branch wieder her, sobald der Ordner auf einem ist."
 }

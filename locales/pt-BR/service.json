@@ -463,5 +463,7 @@
   "service.gitMoves.same": "{branch} já está nesse commit: nada a fazer.",
   "service.gitMoves.session": "A sessão de {agent} está na pasta do projeto: nada foi feito. Pare-a primeiro.",
   "service.gitMoves.slotHeld": "Um merge em {branch} está em andamento ou esperando (o slot de merge dele): tente de novo quando terminar.",
-  "service.gitMoves.timedOut": "O git ainda estava rodando depois de {seconds, number} segundos, então o Combwork o encerrou. Olhe a pasta do projeto antes de tentar de novo."
+  "service.gitMoves.timedOut": "O git ainda estava rodando depois de {seconds, number} segundos, então o Combwork o encerrou. Olhe a pasta do projeto antes de tentar de novo.",
+  "service.gitMoves.unlisted": "O Git não conseguiu listar os worktrees deste repositório, então o Combwork não sabe onde {branch} está em checkout: nada foi feito. O Git disse: {why}",
+  "service.gitMoves.detached": "A pasta do projeto está em um HEAD desanexado: Movimentos restaura um branch quando a pasta estiver em um."
 }

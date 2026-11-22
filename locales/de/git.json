@@ -583,5 +583,6 @@
   "git.moves.wayBack": "Das Wiederherstellen ist selbst eine Bewegung: Es erscheint oben unter „Bewegungen“, und „Diesen Stand wiederherstellen…“ bei der Bewegung darunter macht es rückgängig.",
   "git.moves.what": "{kind, select, commit {Committet} initial {Erster Commit} amend {Letzten Commit geändert (amend)} mergeCommit {Merge committet} fastForward {Auf {name} vorgespult} merge {{name} gemergt} pull {Gepullt} rebase {Auf {name} rebased} reset {Auf {name} zurückgesetzt} created {Aus {name} erstellt} renamed {Umbenannt von {name}} cherryPick {Cherry-Pick eines Commits} revert {Revert eines Commits} combworkMerge {Combwork hat {name} gemergt} restored {Mit Combwork auf diesen Stand wiederhergestellt, von {name} aus} combwork {Combwork: {name}} unnamed {Bewegt (git hat keinen Grund vermerkt)} other {{name}}}",
   "git.moves.whereNowhere": "{branch} ist in keinem Ordner ausgecheckt: Nur der Branch bewegt sich.",
-  "git.moves.whereProject": "Der Projektordner hat ihn ausgecheckt: Seine Dateien ziehen mit (git reset --keep), und deine nicht committeten Änderungen bleiben, wie sie sind."
+  "git.moves.whereProject": "Der Projektordner hat ihn ausgecheckt: Seine Dateien ziehen mit (git reset --keep), und deine nicht committeten Änderungen bleiben, wie sie sind.",
+  "git.moves.detached": "Der Projektordner ist auf einem losgelösten HEAD (kein Branch ausgecheckt): Bewegungen zeigt die Bewegungen eines Branches, sobald er auf einem ist."
 }

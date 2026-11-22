@@ -463,5 +463,7 @@
   "service.gitMoves.same": "{branch} est déjà sur ce commit : rien à faire.",
   "service.gitMoves.session": "La session de {agent} est dans le dossier du projet : rien n’a été fait. Arrête-la d’abord.",
   "service.gitMoves.slotHeld": "Une fusion vers {branch} est en cours ou en attente (son créneau de fusion) : réessaie une fois qu’elle est terminée.",
-  "service.gitMoves.timedOut": "Git tournait encore après {seconds, number} secondes, alors Combwork l’a arrêté. Regarde le dossier du projet avant de réessayer."
+  "service.gitMoves.timedOut": "Git tournait encore après {seconds, number} secondes, alors Combwork l’a arrêté. Regarde le dossier du projet avant de réessayer.",
+  "service.gitMoves.unlisted": "Git n’a pas pu lister les worktrees de ce dépôt, donc Combwork ne peut pas savoir où {branch} est extraite : rien n’a été fait. Git a dit : {why}",
+  "service.gitMoves.detached": "Le dossier du projet est sur un HEAD détaché : Mouvements restaure une branche dès que le dossier est sur l’une d’elles."
 }

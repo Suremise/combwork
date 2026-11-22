@@ -583,5 +583,6 @@
   "git.moves.wayBack": "Przywrócenie samo jest przesunięciem: pojawia się na górze Przesunięć, a Przywróć do tego miejsca… na przesunięciu pod nim je cofa.",
   "git.moves.what": "{kind, select, commit {Commit} initial {Pierwszy commit} amend {Poprawiono ostatni commit} mergeCommit {Commit scalenia} fastForward {Przewinięto (fast-forward) do {name}} merge {Scalono {name}} pull {Ściągnięto zmiany} rebase {Rebase na {name}} reset {Reset do {name}} created {Utworzono z {name}} renamed {Zmieniono nazwę z {name}} cherryPick {Cherry-pick commita} revert {Cofnięto commit (revert)} combworkMerge {Combwork scalił {name}} restored {Przywrócono tutaj w Combwork, z {name}} combwork {Combwork: {name}} unnamed {Przesunięto (git nie zapisał powodu)} other {{name}}}",
   "git.moves.whereNowhere": "Gałąź {branch} nie jest pobrana w żadnym folderze: przesuwa się tylko gałąź.",
-  "git.moves.whereProject": "Folder projektu ma ją pobraną: jego pliki podążają za nią (git reset --keep), a Twoje niezatwierdzone zmiany zostają bez zmian."
+  "git.moves.whereProject": "Folder projektu ma ją pobraną: jego pliki podążają za nią (git reset --keep), a Twoje niezatwierdzone zmiany zostają bez zmian.",
+  "git.moves.detached": "Folder projektu jest na odłączonym HEAD (żadna gałąź nie jest wybrana): Przesunięcia pokażą przesunięcia gałęzi, gdy folder będzie na gałęzi."
 }

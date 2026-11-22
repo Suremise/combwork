@@ -5966,7 +5966,9 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   **Commits | Moves** switch (the project's choice while Combwork runs). **Moves** lists a local branch's reflog
   (`git log -g refs/heads/<branch>`), newest first, 20 a page with History's arrows, as far back as git keeps it (its
   own expiry, 90 days by default: no cap and no setting); its picker offers the local branches only and opens on the
-  project folder's, else the target. HEAD's own reflog isn't listed: it is mostly checkouts, which move no branch. Each
+  project folder's, else the target. HEAD's own reflog isn't listed: it is mostly checkouts, which move no branch. While
+  the project folder is on a detached HEAD, Moves lists nothing and says so (read again on a click of ↻ or the window's
+  focus), and Restore is refused, until it is on a branch. Each
   row: what the move was in plain words, from git's message (git writes them in English): *Committed*, *Amended the last
   commit*, *Merged X*, *Fast-forwarded to X*, *Pulled*, *Rebased onto abc1234*, *Reset to X*, *Created from X*,
   *Renamed from X*, a cherry-pick or a revert; the merge queue moves its target with no message, so a move with none
@@ -5977,7 +5979,8 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   Agents have no tool, route or count for it.
   - **Restore to here…** (every row whose commit isn't where the branch is now) first reads what it would do
     (`restorePlan`) and shows it: the branch from its commit back to the row's, the commits it drops and brings back
-    (20 of each, then how many more), how many of the dropped ones its upstream has already (a later Push is refused,
+    (20 of each, then how many more), how many of the dropped ones its upstream has already (counted against its full
+    ref, `refs/remotes/…`, or `refs/heads/…` for a branch tracking a local one; a later Push is refused,
     Combwork never forces, and Pull brings them back), and where it runs. **The project folder's branch** moves by `git
     reset --keep <commit>` there, under Commit's bound (`cw.git.commitMinutes`): uncommitted changes stay, and git
     refuses rather than lose one, so the dialog lists the uncommitted files (untracked ones too) the two commits differ
@@ -5989,7 +5992,8 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   - **Refused**, said in the dialog in place of Restore, and checked again as it runs under the branch's merge slot
     (`mergeSlots.asUser`), the repository lock and, for the project folder, its fence, nothing awaited between the last
     check and git: the branch no longer at the commit the user saw (*has moved on*), or no longer a local branch, or
-    the commit gone; the branch checked out in a slot or another worktree (restored there, by its agent or in a
+    the commit gone; the project folder on a detached HEAD; git's list of worktrees unreadable (a worktree it would name
+    could have the branch); the branch checked out in a slot or another worktree (restored there, by its agent or in a
     terminal); an open card's line (`lineCard`: its builder moves it); a card the merge queue is testing into it
     (`queueOrder`'s testing); its merge slot held or waited for by an agent or the queue. In the project folder also a
     live session there (`sessions.liveStates()`), a Combwork run or an agent's file lock (`folderBuilders`), an agent

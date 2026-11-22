@@ -142,6 +142,14 @@ const check = (name, ok, extra = '') => {
     check("…it isn't checked out: only the branch moves", /isn't checked out in any folder/.test(await text(q)), await text(q))
     await q.getByRole('button', { name: 'Restore', exact: true }).click()
     check('…side is back at the first commit, the folder untouched', !!(await lib.until(async () => head('side') === first, HUNG_MS)) && head() === merged && read('c.txt') === 'c\n', head('side'))
+
+    // --- The project folder on a detached HEAD while Moves is open: no moves (the agreed design), until it's on a branch.
+    g('switch', '-q', '--detach')
+    await moves.locator('[data-action="reload-moves"]').click()
+    check('a detached HEAD shows no moves, saying why', !!(await lib.until(async () => (await moves.locator('[data-moves-detached]').count()) === 1 && (await rows.count()) === 0, HUNG_MS)), await text(moves))
+    g('switch', '-q', 'main')
+    await moves.locator('[data-action="reload-moves"]').click()
+    check('…back on a branch, the moves show again (side, still picked)', !!(await lib.until(async () => (await moves.getAttribute('data-moves-branch')) === 'side' && (await rows.count()) > 0, HUNG_MS)), await text(moves))
   } finally {
     await app.close()
   }

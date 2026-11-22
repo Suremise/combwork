@@ -759,6 +759,10 @@
     "defaultMessage": "Restore",
     "description": "HI-3469: the confirm button of Restore to here…'s dialog."
   },
+  "git.moves.detached": {
+    "defaultMessage": "The project folder is on a detached HEAD (no branch checked out): Moves shows a branch's moves once it is on one.",
+    "description": "HI-3469: Moves when the project folder has no branch checked out (git's detached HEAD)."
+  },
   "git.moves.dropped": {
     "defaultMessage": "{n, plural, one {The commit it drops} other {The # commits it drops}}",
     "description": "HI-3469: a heading in Restore's dialog: the commits the branch would no longer have (they stay in Moves, for a while)."

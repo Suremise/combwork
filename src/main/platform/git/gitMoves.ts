@@ -17,10 +17,10 @@ import { msg, tr } from '../../../shared/i18n'
 import { lineCard } from '../../branchMerge'
 import { CombworkError, combworkError } from '../../combworkError'
 import { changingFolder } from '../../folderFence'
-import { containsPlace } from '../../fsutil'
+import { containsPlace, samePlace } from '../../fsutil'
 import { git, gitErrorLine, type GitResult } from '../../git'
 import { operationSync } from '../../gitCommands'
-import { branchFolder, busyAgentIn, repoSummary, workTargetOf } from '../../gitRepo'
+import { branchFolder, busyAgentIn, parseWorktrees, repoSummary, workTargetOf } from '../../gitRepo'
 import { createLogger, userText } from '../../logger'
 import { mergeSlots } from '../../mergeSlotHost'
 import { withRepoLock } from '../../repoLock'
@@ -48,6 +48,8 @@ export const MOVES_TEXT = {
   inTheWay: msg({ id: 'service.gitMoves.inTheWay', defaultMessage: '{count, plural, one {An uncommitted file would change} other {# uncommitted files would change}}: commit {count, plural, one {it} other {them}} or set {count, plural, one {it} other {them}} aside first.', description: "HI-3469: why Restore to here… is refused: files with uncommitted changes in the project folder differ between the branch's commit and the one restored to (git reset --keep refuses rather than lose them); the files are listed under it." }),
   failed: msg({ id: 'service.gitMoves.failed', defaultMessage: 'Git refused: {why}', description: "HI-3469: an error from Restore to here…: git's own command failed; {why} is git's error line, in English." }),
   timedOut: msg({ id: 'service.gitMoves.timedOut', defaultMessage: 'Git was still running after {seconds, number} seconds, so Combwork ended it. Look at the project folder before you try again.', description: "HI-3469: an error from Restore to here…: git reset ran past Settings → Advanced's longest commit time ({seconds}) and was ended." }),
+  unlisted: msg({ id: 'service.gitMoves.unlisted', defaultMessage: "Git couldn't list this repository's worktrees, so Combwork can't tell where {branch} is checked out: nothing was done. Git said: {why}", description: "HI-3469 (a reviewer's round 1): an error from Restore to here…: git worktree list failed, so a worktree that has the branch ({branch}) checked out could be missed. {why} is git's error line, in English." }),
+  detached: msg({ id: 'service.gitMoves.detached', defaultMessage: 'The project folder is on a detached HEAD: Moves restores a branch once the folder is on one.', description: "HI-3469 (a reviewer's round 1): why Restore to here… is refused: the project folder has no branch checked out (git's detached HEAD); the design shows no Moves then." }),
   invalid: msg({ id: 'service.gitMoves.invalid', defaultMessage: 'That was asked for wrongly: nothing was done.', description: 'HI-3469: an error from Moves: the request was malformed (not reached from the window).' }),
   restored: msg({ id: 'service.gitMoves.restored', defaultMessage: 'Restored {branch} to {to}. It was at {from}: the move just made is at the top of Moves, and Restore to here… on the one below it undoes it.', description: 'HI-3469: a notice after Restore to here…: the branch ({branch}) is at the commit {to} (a short id) now; {from} is the commit it was at, in full (keep it whole: it is the way back).' })
 }
@@ -77,7 +79,9 @@ export async function listMoves(projectPath: string, branch: string | null, page
   const target = work && branches.includes(work) ? work : null
   const folderBranch = summary.branch && branches.includes(summary.branch) ? summary.branch : null
   const shown = branch && branches.includes(branch) ? branch : (folderBranch ?? target ?? branches[0] ?? null)
-  const none: BranchMoves = { branch: shown, head: null, branches, target, folderBranch, moves: [], page: 1, pages: 1, total: 0 }
+  const none: BranchMoves = { branch: shown, detached: false, head: null, branches, target, folderBranch, moves: [], page: 1, pages: 1, total: 0 }
+  // The agreed design (r11): a project folder on a detached HEAD shows no moves until it is on a branch.
+  if (summary.isRepo && !summary.branch) return { ...none, branch: null, detached: true }
   if (!shown) return none
   const ref = `refs/heads/${shown}`
   const head = await commitOf(projectPath, ref)
@@ -136,6 +140,22 @@ async function revs(root: string, args: string[]): Promise<Set<string>> {
   return new Set(r.ok ? r.out.split(/\r?\n/).filter(Boolean) : [])
 }
 
+type Place = { where: 'project' | 'nowhere'; folder: null; slot: null } | { where: 'slot' | 'worktree'; folder: string; slot: string | null }
+
+/**
+ * Where `branch` is checked out: the project folder, a slot or another worktree, or nowhere. Git's list of worktrees
+ * unreadable refuses (HR1's round 1): a worktree it would name could have the branch, which a move would change under it.
+ */
+async function placeOf(projectPath: string, branch: string, folderBranch: string | null): Promise<Place> {
+  if (folderBranch === branch) return { where: 'project', folder: null, slot: null }
+  const trees = await git(projectPath, ['worktree', 'list', '--porcelain'])
+  if (!trees.ok) throw combworkError(M.unlisted, { branch, why: gitErrorLine(trees.err) || trees.err.trim().slice(0, 400) || 'git worktree list failed' }, { kind: 'conflict' }) // i18n-ignore: git's command, as it is
+  const tree = parseWorktrees(trees.out).find((w) => w.branch === branch && !samePlace(w.path, projectPath))
+  if (!tree) return { where: 'nowhere', folder: null, slot: null }
+  const at = await branchFolder(projectPath, branch)
+  return at.where === 'slot' ? { where: 'slot', folder: tree.path, slot: at.slot } : { where: 'worktree', folder: tree.path, slot: null }
+}
+
 /** What a restore would do now, and the first reason it can't be done (null: none). Throws for a request that no longer holds. */
 async function planOf(projectPath: string, req: RestoreRequest): Promise<{ plan: RestorePlan; refusal: CombworkError | null }> {
   const { branch, from, to } = req
@@ -144,13 +164,17 @@ async function planOf(projectPath: string, req: RestoreRequest): Promise<{ plan:
   if ((await commitOf(projectPath, ref)) !== from) throw combworkError(M.moved, { branch }, { kind: 'conflict' })
   if ((await commitOf(projectPath, to)) !== to) throw combworkError(M.noCommit, { commit: to.slice(0, 7) }, { kind: 'conflict' })
   const [dropped, back] = await Promise.all([commitsIn(projectPath, `${to}..${from}`), commitsIn(projectPath, `${from}..${to}`)])
-  const place = await branchFolder(projectPath, branch)
+  const summary = await repoSummary(projectPath)
+  const place = await placeOf(projectPath, branch, summary.branch)
   const where: RestorePlan['where'] = place.where === 'project' ? 'project' : 'nowhere'
-  const up = await git(projectPath, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', `${branch}@{upstream}`])
-  const upstream = up.ok && up.out.trim() ? up.out.trim() : null
+  // The upstream by its full name for the count (HR1's round 1: a local branch's, `remote = .`, is refs/heads/…), and
+  // its short one to show.
+  const [full, short] = await Promise.all([git(projectPath, ['rev-parse', '--symbolic-full-name', `${branch}@{upstream}`]), git(projectPath, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', `${branch}@{upstream}`])])
+  const upstreamRef = full.ok && full.out.trim().startsWith('refs/') ? full.out.trim() : null
+  const upstream = upstreamRef ? (short.ok && short.out.trim()) || upstreamRef : null
   let pushedDropped = 0
-  if (upstream && dropped.list.length) {
-    const [gone, theirs] = await Promise.all([revs(projectPath, [from, `^${to}`]), revs(projectPath, [`refs/remotes/${upstream}`, `^${to}`])])
+  if (upstreamRef && dropped.list.length) {
+    const [gone, theirs] = await Promise.all([revs(projectPath, [from, `^${to}`]), revs(projectPath, [upstreamRef, `^${to}`])])
     for (const c of gone) if (theirs.has(c)) pushedDropped++
   }
   let inTheWay: string[] = []
@@ -158,6 +182,7 @@ async function planOf(projectPath: string, req: RestoreRequest): Promise<{ plan:
   const refuse = (e: CombworkError): void => {
     refusal ??= e
   }
+  if (summary.isRepo && !summary.branch) refuse(combworkError(M.detached, undefined, { kind: 'conflict' }))
   if (from === to) refuse(combworkError(M.same, { branch }))
   if (place.where === 'slot') refuse(combworkError(M.inSlot, { branch, slot: place.slot ?? '' }, { kind: 'conflict' }))
   else if (place.where === 'worktree') refuse(combworkError(M.inWorktree, { branch, folder: place.folder ?? '' }, { kind: 'conflict' }))
@@ -239,7 +264,7 @@ export async function restoreBranch(projectPath: string, raw: unknown): Promise<
   return mergeSlots.asUser(projectPath, branch, () =>
     withRepoLock(
       projectPath,
-      async () => ((await branchFolder(projectPath, branch)).where === 'project' ? changingFolder(projectPath, FENCE, run) : run()),
+      async () => ((await repoSummary(projectPath)).branch === branch ? changingFolder(projectPath, FENCE, run) : run()),
       { project: projectPath }
     )
   )
