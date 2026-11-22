@@ -2227,6 +2227,14 @@
     "defaultMessage": "Fresh sessions for every agent",
     "description": "A tip's title."
   },
+  "tips.stashes.text": {
+    "defaultMessage": "Version Control → Changes → Stashes lists the repository's stashes, Combwork's Set Aside ones with their card: Show what each holds, then Apply, Pop or Drop it.",
+    "description": "A tip (HI-3472). Names of Combwork's menus, views, sections and buttons: keep them as Combwork shows them."
+  },
+  "tips.stashes.title": {
+    "defaultMessage": "See, apply or drop your git stashes",
+    "description": "A tip's title (HI-3472). A stash is git's: changes kept aside."
+  },
   "tips.stoppedPane.text": {
     "defaultMessage": "When an agent's session ends, its pane is dimmed and its bar says when and why (stopped by you, its lane ended, its CLI exited…). Its last output stays readable, and Resume or New Session there starts it again.",
     "description": "A tip (HI-1881). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

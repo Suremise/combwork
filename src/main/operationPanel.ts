@@ -28,7 +28,7 @@ const T = {
 }
 
 /** The slot a Changes root is, in its project's pool, or null (the project folder, an agent's 0.9 worktree, another worktree). */
-async function slotAt(ws: WorkspaceService, project: string, folder: string): Promise<{ pool: SlotPool; slot: Slot } | null> {
+export async function slotAt(ws: WorkspaceService, project: string, folder: string): Promise<{ pool: SlotPool; slot: Slot } | null> {
   if (samePlace(folder, project)) return null
   const pool = await poolFor(ws, project)
   const slot = pool.slots().find((s) => samePlace(s.folder, folder))
@@ -36,7 +36,7 @@ async function slotAt(ws: WorkspaceService, project: string, folder: string): Pr
 }
 
 /** The slot's open lease as the panel names it before the user confirms, or null (free, or not a slot). */
-function lentOf(ws: WorkspaceService, at: { pool: SlotPool; slot: Slot } | null): OperationLent | null {
+export function lentOf(ws: WorkspaceService, at: { pool: SlotPool; slot: Slot } | null): OperationLent | null {
   const l = at ? at.pool.openLease(at.slot.name) : null
   if (!at || !l) return null
   return { slot: at.slot.name, lease: l.id, agent: l.agent, card: l.card !== null ? (cardKeyOf(ws, l.card)?.key ?? `#${l.card}`) : null, lane: l.lane }

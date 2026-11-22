@@ -634,5 +634,7 @@
   "tips.repositoryHealth.text": "Gdy git mówi „index.lock: File exists” albo odmawia utworzenia worktree, którego folder usunięto, Kontrola wersji → Gałęzie i zdalne repozytoria → Kondycja repozytorium pokazuje, co zostało, i czyści to, co zaznaczysz.",
   "tips.repositoryHealth.title": "Usuń nieaktualną blokadę gita lub wpis worktree",
   "tips.resumeLongIdle.title": "Długo bezczynna rozmowa pyta przed wznowieniem",
-  "tips.resumeLongIdle.text": "Rozmowa bezczynna dłużej niż godzinę najprawdopodobniej straciła pamięć podręczną promptu, więc jej wznowienie może kosztować wiele tokenów. Wznów mówi, jak długo jest bezczynna i jak duża jest, i proponuje zamiast tego Zarchiwizuj i zacznij nową."
+  "tips.resumeLongIdle.text": "Rozmowa bezczynna dłużej niż godzinę najprawdopodobniej straciła pamięć podręczną promptu, więc jej wznowienie może kosztować wiele tokenów. Wznów mówi, jak długo jest bezczynna i jak duża jest, i proponuje zamiast tego Zarchiwizuj i zacznij nową.",
+  "tips.stashes.text": "Kontrola wersji → Zmiany → Stashe pokazuje stashe repozytorium, te z Odłóż w Combwork razem z ich kartą: zobacz, co zawiera każdy, a potem go zastosuj, zdejmij (pop) lub usuń.",
+  "tips.stashes.title": "Przeglądaj, stosuj i usuwaj swoje stashe gita"
 }

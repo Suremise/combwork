@@ -426,5 +426,19 @@
   "service.workspace.sharedNames": "Nazwy agentów są teraz unikalne w całym obszarze roboczym, więc każdego agenta da się odróżnić. {shared}: nadal działają, ale zmień nazwę jednego z każdej grupy, np. agenta {agent} w projekcie {project} na {suggestion}.",
   "service.workspace.stillClosing": "Obszar roboczy {name} wciąż się zamyka: poczekaj, aż skończy, i spróbuj ponownie.",
   "service.workspace.stillOpening": "Obszar roboczy {name} wciąż się otwiera: poczekaj, aż skończy, i spróbuj ponownie.",
-  "service.workspace.twoCalled": "Dwóch agentów nazywa się {name}"
+  "service.workspace.twoCalled": "Dwóch agentów nazywa się {name}",
+  "service.gitStash.agentBusy": "{agent} pracuje w folderze {folder}: nic nie zrobiono. Spróbuj ponownie, gdy skończy.",
+  "service.gitStash.busy": "Uruchomienie lub agent pracuje w folderze {folder} ({what}): nic nie zrobiono. Spróbuj ponownie, gdy skończy.",
+  "service.gitStash.conflicted": "{file} ma konflikt w folderze {folder}: nic nie zrobiono. Najpierw go rozwiąż.",
+  "service.gitStash.failed": "Git odmówił: {why}",
+  "service.gitStash.gone": "Tego stasha nie ma już na liście (w międzyczasie usunięty lub zdjęty): nic nie zrobiono. Sprawdź jeszcze raz.",
+  "service.gitStash.invalid": "Żądanie było nieprawidłowe: nic nie zrobiono.",
+  "service.gitStash.notDropped": "Stash został zastosowany, ale git go nie usunął: {why}. Nadal jest na liście.",
+  "service.gitStash.operation": "Git w folderze {folder} jest w trakcie {what, select, merge {scalania} rebase {rebase’u} am {am} cherryPick {cherry-picka} bisect {bisectu} other {revertu}}: nic nie zrobiono. Najpierw to dokończ (panel powyżej).",
+  "service.gitStash.overlap": "{file} ma niezatwierdzone zmiany w folderze {folder}, a stash też go zawiera: nic nie zrobiono. Najpierw go zatwierdź albo odłóż.",
+  "service.gitStash.session": "Sesja agenta {agent} działa w folderze {folder}: nic nie zrobiono. Najpierw ją zatrzymaj.",
+  "service.gitStash.slotChanged": "{slot} zmienił się w międzyczasie (wypożyczony, zwolniony albo coś z Combwork w nim ruszyło): nic nie zrobiono. Sprawdź jeszcze raz.",
+  "service.gitStash.slotProcess": "Jakiś proces ma otwarty plik lub folder w {slot}: nic nie zrobiono. Zamknij go (terminal, edytor) i spróbuj ponownie.",
+  "service.gitStash.slotSession": "W {slot} działa sesja: nic nie zrobiono. Najpierw ją zatrzymaj.",
+  "service.gitStash.timedOut": "Git nadal działał po {seconds, number} s, więc Combwork go zakończył. Zanim spróbujesz ponownie, sprawdź folder {folder}: część stasha mogła zostać zastosowana."
 }

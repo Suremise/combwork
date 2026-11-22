@@ -19,6 +19,8 @@ import type { FileGitDone, FolderChangeAction, FolderChangesDone, MergeResult } 
 import type { Operation } from '../../shared/platform/descriptors'
 import type { OperationRequest } from '../../shared/gitOperations'
 import type { RemotePrune, RepoHealth } from '../../shared/gitHealth'
+import type { StashApplied, StashFile, StashRequest, StashRow } from '../../shared/gitStashes'
+import type { GitDiff } from '../../shared/types'
 
 /**
  * Which members each operation may call (HR3's s15): the port is handed out for one operation, typed down to its own
@@ -48,6 +50,7 @@ export interface OpMembers {
   folderChanges: 'settleChanges' | 'commitIgnore'
   operationSteps: 'operationStep'
   repoHealth: 'health' | 'pruneWorktrees' | 'removeLocks' | 'remotePrunePreview' | 'fetchPrune'
+  stashes: 'stashes' | 'stashFiles' | 'stashDiff' | 'applyStash' | 'dropStash'
 }
 
 /** The port as handed out for one operation: its own members only. */
@@ -125,4 +128,19 @@ export interface RepoOps {
   remotePrunePreview(projectPath: string): Promise<RemotePrune[]>
   /** The remotes (as sent, checked) fetched with prune: what was dropped. */
   fetchPrune(projectPath: string, remotes: unknown): Promise<string>
+  // HI-3472: Changes' Stashes, the user's click at a time.
+  /** The repository's stashes, newest first (any folder of it: git shares them). */
+  stashes(root: string): Promise<StashRow[]>
+  /** The files a stash holds (Show): changed, then untracked. */
+  stashFiles(root: string, commit: string): Promise<StashFile[]>
+  /** One file of a stash, against the commit it was made on. */
+  stashDiff(root: string, commit: string, file: string, untracked: boolean): Promise<GitDiff>
+  /**
+   * The stash applied into `folder` (and for a Pop, dropped once clean), under the repository lock and the folder's
+   * fence, refused while anything works there or the folder has uncommitted changes to a file it holds; `guard` runs
+   * there before git does and refuses by throwing.
+   */
+  applyStash(projectPath: string, folder: string, req: StashRequest, guard?: () => Promise<void> | void): Promise<StashApplied>
+  /** The stash dropped, under the repository lock, only while its place in the list is still it. */
+  dropStash(projectPath: string, commit: string): Promise<void>
 }

@@ -426,5 +426,19 @@
   "service.workspace.sharedNames": "Os nomes de agente agora são únicos em todo o espaço de trabalho, para que cada agente possa ser identificado. {shared}: eles continuam funcionando, mas renomeie um de cada, por exemplo, o agente {agent} do projeto {project} para {suggestion}.",
   "service.workspace.stillClosing": "{name} ainda está fechando: espere terminar e tente de novo.",
   "service.workspace.stillOpening": "{name} ainda está abrindo: espere terminar e tente de novo.",
-  "service.workspace.twoCalled": "Dois agentes se chamam {name}"
+  "service.workspace.twoCalled": "Dois agentes se chamam {name}",
+  "service.gitStash.agentBusy": "{agent} está trabalhando em {folder}: nada foi feito. Tente de novo quando terminar.",
+  "service.gitStash.busy": "Uma execução ou um agente está trabalhando em {folder} ({what}): nada foi feito. Tente de novo quando terminar.",
+  "service.gitStash.conflicted": "{file} está em conflito em {folder}: nada foi feito. Resolva-o primeiro.",
+  "service.gitStash.failed": "O git recusou: {why}",
+  "service.gitStash.gone": "Esse stash não está mais na lista (apagado ou retirado nesse meio-tempo): nada foi feito. Olhe de novo.",
+  "service.gitStash.invalid": "O pedido foi feito de forma incorreta: nada foi feito.",
+  "service.gitStash.notDropped": "O stash foi aplicado, mas o git não o apagou: {why}. Ele ainda está na lista.",
+  "service.gitStash.operation": "O git está no meio de {what, select, merge {um merge} rebase {um rebase} am {um am} cherryPick {um cherry-pick} bisect {um bisect} other {um revert}} em {folder}: nada foi feito. Termine-o primeiro (o painel acima).",
+  "service.gitStash.overlap": "{file} tem mudanças não commitadas em {folder}, e o stash também o contém: nada foi feito. Faça commit dele ou deixe-o de lado primeiro.",
+  "service.gitStash.session": "A sessão de {agent} está em {folder}: nada foi feito. Pare-a primeiro.",
+  "service.gitStash.slotChanged": "{slot} mudou nesse meio-tempo (emprestado, liberado ou algo do Combwork começou nele): nada foi feito. Olhe de novo.",
+  "service.gitStash.slotProcess": "Um processo está com um arquivo ou uma pasta de {slot} aberto: nada foi feito. Feche-o (um terminal, um editor) e tente de novo.",
+  "service.gitStash.slotSession": "Há uma sessão em {slot}: nada foi feito. Pare-a primeiro.",
+  "service.gitStash.timedOut": "O git ainda estava rodando depois de {seconds, number} segundos, então o Combwork o encerrou. Olhe {folder} antes de tentar de novo: parte do stash pode ter sido aplicada."
 }

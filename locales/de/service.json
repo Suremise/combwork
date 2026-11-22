@@ -426,5 +426,19 @@
   "service.workspace.sharedNames": "Agentennamen sind jetzt im ganzen Arbeitsbereich eindeutig, damit jeder Agent unterscheidbar ist. {shared}: Sie arbeiten weiter, aber benenne jeweils einen um, z. B. Agent {agent} von {project} in {suggestion}.",
   "service.workspace.stillClosing": "{name} wird noch geschlossen: Warte, bis das fertig ist, und versuche es dann erneut.",
   "service.workspace.stillOpening": "{name} wird noch geöffnet: Warte, bis das fertig ist, und versuche es dann erneut.",
-  "service.workspace.twoCalled": "Zwei Agenten heißen {name}"
+  "service.workspace.twoCalled": "Zwei Agenten heißen {name}",
+  "service.gitStash.agentBusy": "{agent} arbeitet in {folder}: Es wurde nichts getan. Versuche es erneut, sobald {agent} fertig ist.",
+  "service.gitStash.busy": "Ein Lauf oder ein Agent arbeitet in {folder} ({what}): Es wurde nichts getan. Versuche es erneut, sobald die Arbeit dort fertig ist.",
+  "service.gitStash.conflicted": "{file} hat einen Konflikt in {folder}: Es wurde nichts getan. Löse ihn zuerst.",
+  "service.gitStash.failed": "Git hat abgelehnt: {why}",
+  "service.gitStash.gone": "Dieser Stash ist nicht mehr in der Liste (inzwischen gelöscht oder gepoppt): Es wurde nichts getan. Sieh noch einmal nach.",
+  "service.gitStash.invalid": "Das wurde falsch angefragt: Es wurde nichts getan.",
+  "service.gitStash.notDropped": "Der Stash wurde angewendet, aber Git hat ihn nicht gelöscht: {why}. Er ist noch in der Liste.",
+  "service.gitStash.operation": "Git ist in {folder} mitten in {what, select, merge {einem Merge} rebase {einem Rebase} am {einem am} cherryPick {einem Cherry-Pick} bisect {einem Bisect} other {einem Revert}}: Es wurde nichts getan. Schließe es zuerst ab (das Feld darüber).",
+  "service.gitStash.overlap": "{file} hat nicht committete Änderungen in {folder}, und der Stash enthält die Datei auch: Es wurde nichts getan. Committe sie oder lege sie zuerst beiseite.",
+  "service.gitStash.session": "Die Sitzung von {agent} läuft in {folder}: Es wurde nichts getan. Beende sie zuerst.",
+  "service.gitStash.slotChanged": "{slot} hat sich inzwischen geändert (verliehen, freigegeben oder etwas von Combwork wurde darin gestartet): Es wurde nichts getan. Sieh noch einmal nach.",
+  "service.gitStash.slotProcess": "Ein Prozess hat eine Datei oder einen Ordner in {slot} geöffnet: Es wurde nichts getan. Schließe ihn (ein Terminal, einen Editor) und versuche es erneut.",
+  "service.gitStash.slotSession": "In {slot} läuft eine Sitzung: Es wurde nichts getan. Beende sie zuerst.",
+  "service.gitStash.timedOut": "Git lief nach {seconds, number} Sekunden noch, also hat Combwork es beendet. Sieh dir {folder} an, bevor du es erneut versuchst: Ein Teil des Stashs ist vielleicht angewendet."
 }
