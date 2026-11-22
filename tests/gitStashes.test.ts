@@ -219,6 +219,18 @@ describe('Apply and Pop', () => {
     expect(await S.stashConflictIn(proj)).toBeNull()
   })
 
+  it('HI-3528: a read of the conflicts while an Apply runs waits for it, so the conflicts it leaves are never unnamed', async () => {
+    write('a.txt', 'mine\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'work')
+    const [c] = stashes()
+    commit(proj, { 'a.txt': 'theirs\n' }, 'moved on')
+    const head = sh(proj, 'rev-parse', 'HEAD')
+    // The panel's read, made while the Apply runs (its guard runs inside it, before git does).
+    let during: Promise<unknown> | null = null
+    expect(await apply(c, false, () => void (during = S.stashConflictIn(proj)))).toEqual({ conflicts: ['a.txt'], dropped: false })
+    expect(await during).toEqual({ commit: c, label: 'work', head })
+  })
+
   it("HI-3528: a conflict made since, by another stash in a terminal, isn't named as the applied stash's; settling some of its own keeps it", async () => {
     write('a.txt', 'first\n')
     sh(proj, 'stash', 'push', '-q', '-m', 'first')
