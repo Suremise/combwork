@@ -1,14 +1,13 @@
 // HI-3140: version control stays pluggable. Shared code and the window ask a platform's descriptor, its presentation
 // rows or its port, never its id; these pin that each answer is exactly what the id switches it replaced gave, for Git,
 // jj and None: the form's finish and folder choices, the agents' rule keys, the Version Control tab's fact line and its
-// the Agent API's found text, the slot pool's reading of jj's refusals, and the descriptor's own new data.
+// the Agent API's found text, and the descriptor's own new data.
 import { describe, expect, it } from 'vitest'
 import { allRuleKeys, ownsWorkspaces, PLATFORMS, platformName, ruleKeyOf, type Detection, type PlatformId, type ProjectPlatform } from '../src/shared/platform/descriptors'
 import { factOf, PLATFORM_VIEW } from '../src/shared/platform/presentation'
 import { formFinishes, formFolders } from '../src/shared/workflow/options'
 import { platformRule, withPlatformRule } from '../src/shared/combworkGuidance'
 import { FOUND } from '../src/main/platform/agentPresentation'
-import { JJ_REFUSED, jjRefusal } from '../src/main/platform/jjWorkspacePort'
 
 const IDS: PlatformId[] = ['git', 'jj', 'none']
 
@@ -96,14 +95,6 @@ describe('HI-3140: the descriptor, presentation and port answers equal the id sw
     const old = (d: Detection): string =>
       d.platform === 'git' ? `git at ${d.root ?? ''}${d.subfolder ? ' (a subfolder of that repository)' : ''}` : d.platform === 'jj' ? `jj at ${d.root ?? ''}${d.jj?.colocated ? ' (colocated with git)' : ' (not colocated: no git working copy)'}` : 'none'
     for (const d of DETECTIONS.filter((x) => !x.other)) expect(FOUND[d.platform](d), JSON.stringify(d)).toBe(old(d))
-  })
-
-  it("reads jj's refusals for the slot pool as its id switches did", () => {
-    expect(jjRefusal(JJ_REFUSED.fence)).toBe('fence')
-    expect(jjRefusal(JJ_REFUSED.uncertain)).toBe('uncertain')
-    expect(jjRefusal(JJ_REFUSED.stale)).toBe('stale')
-    for (const held of [JJ_REFUSED.unintegrated, JJ_REFUSED.notIntegrated, JJ_REFUSED.divergent, JJ_REFUSED.notEmpty, JJ_REFUSED.journal]) expect(jjRefusal(held)).toBe('held')
-    for (const other of [JJ_REFUSED.identity, JJ_REFUSED.heads, JJ_REFUSED.exists, 'busy', 'anything else', '']) expect(jjRefusal(other)).toBeNull()
   })
 
   it("keeps the descriptor's names, owned workspaces and detection as the id switches had them", () => {

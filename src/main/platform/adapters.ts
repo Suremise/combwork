@@ -8,17 +8,14 @@ import type { PlatformAdapter } from './adapter'
 import { GitPlatform } from './gitPlatform'
 import type { NoneAdapter } from './none'
 import { NonePlatform } from './nonePlatform'
-import { JjPlatform } from './jjPlatform'
 
 /** Each platform's adapter for a project's workflow; None's is given the workflow's content hashing. */
-const ADAPTERS: Record<PlatformId, (wf: Workflow, none: NoneAdapter) => PlatformAdapter> = {
+const ADAPTERS: Partial<Record<PlatformId, (wf: Workflow, none: NoneAdapter) => PlatformAdapter>> = {
   git: (wf) => new GitPlatform(wf),
-  none: (wf, none) => new NonePlatform(wf, none),
-  // HI-2868: jj's card work (on since J9e, HI-2874); its dependencies come from the workflow's config.
-  jj: (wf) => new JjPlatform(wf)
+  none: (wf, none) => new NonePlatform(wf, none)
 }
 
 /** Every platform's adapter for one workflow, built in the order the map names them (as the runtime built them before). */
-export function adaptersFor(wf: Workflow, none: NoneAdapter): Record<PlatformId, PlatformAdapter> {
-  return Object.fromEntries(Object.entries(ADAPTERS).map(([id, make]) => [id, make(wf, none)])) as Record<PlatformId, PlatformAdapter>
+export function adaptersFor(wf: Workflow, none: NoneAdapter): Partial<Record<PlatformId, PlatformAdapter>> {
+  return Object.fromEntries(Object.entries(ADAPTERS).map(([id, make]) => [id, make!(wf, none)])) as Partial<Record<PlatformId, PlatformAdapter>>
 }

@@ -162,38 +162,6 @@
     "note": "The kind of a request for the user (For you), shown as its label: approve something, decide something, test something, sign in somewhere, or anything else. Translate each choice; keep the codes before the braces.",
     "audience": "both"
   },
-  "workflow.jj.containment": {
-    "text": "whether a jj card's change is in its target (decided by jj's integration proof, not enabled yet)",
-    "note": "HI-2868: what Combwork couldn't read for a jj project's card: containment in its target is decided by a later card's proof."
-  },
-  "workflow.jj.notYet": {
-    "text": "a jj project's card work (not enabled yet)",
-    "note": "HI-2799: what Combwork couldn't read for a card of a project using jj: its card work isn't enabled yet."
-  },
-  "workflow.jj.start.carryTarget": {
-    "text": "its earlier work is in slot {slot} on {target}",
-    "note": "HI-2868: why a restarted jj card could not start: its earlier work is still in its slot, on another target bookmark. {slot} is the slot name, {target} the bookmark."
-  },
-  "workflow.jj.start.inGit": {
-    "text": "the slot is inside the Git repository at {root}, which git commands in it would reach",
-    "note": "HI-2896: why a jj card could not start: its slot of a jj repository not colocated with Git is inside a Git working tree ({root}, made or moved there after the switch)."
-  },
-  "workflow.jj.start.noSlot": {
-    "text": "no slot for its builder",
-    "note": "HI-2868: why a jj card could not start: its builder was lent no slot."
-  },
-  "workflow.jj.start.notWorkspace": {
-    "text": "the slot is not a jj workspace Combwork made",
-    "note": "HI-2868: why a jj card could not start: its slot folder is not a workspace Combwork made."
-  },
-  "workflow.jj.start.slots": {
-    "text": "jj cards work in slots",
-    "note": "HI-2868: why a jj card could not start: the project does not give cards slots."
-  },
-  "workflow.jj.start.target": {
-    "text": "a jj project needs a target bookmark (Work merges into)",
-    "note": "HI-2868: why a jj card could not start: no target bookmark is set. Work merges into is a name in the window."
-  },
   "workflow.mergeGuards.problem.empty": {
     "text": "Merge guard {n, number} has no {field, select, name {name} pattern {pattern} other {message}}.",
     "note": "Why workflow options cannot be saved (HI-3284): a merge guard’s name, pattern or message is empty (select: translate each; keep the keys). {n} is its position, from 1.",
@@ -1137,16 +1105,6 @@
   "workflow.refused.platform.jjRefused.next": {
     "text": "{why, select, tooLarge {Leave a file out deliberately with .gitignore, or raise jj's limit (jj config set --repo snapshot.max-new-file-size and a size in bytes) and commit it with jj commit, then submit again.} autoTrack {Set it back to all() for this repository (jj config set --repo snapshot.auto-track 'all()'), then submit again: jj then records the new files.} mergeWorkingCopy {Commit the work with jj commit, so the working copy is empty on one parent, then submit again.} notFromBase {Rebase the work onto the card's base, or start the card again.} otherCard {Leave that card's commits out of this card's work (rebase without them), then submit again.} divergent {Resolve the divergence in jj (abandon or rewrite one side), then try again.} conflicted {Resolve the conflicts in jj, then try again.} tooLong {Squash some of the commits, then submit again.} unbound {{state, select, pending {Combwork prepares the card's slot once you're idle: end your turn. If anything there stops it, Combwork tells you what and how to clear it.} held {{told}} other {Put the card back and start it again.}}} isolated {Run the check again without --isolated, in the card's slot.} recovered {Compare each copy with its original and keep what you want under the original name, then take the copies out of every commit of the work (jj squash or jj diffedit: deleting them in a later commit leaves them in its history) and submit again.} other {Look at the slot with jj, then try again.}}",
     "note": "HI-2868: the next step after a refused move on a jj project's card, by the reason (why, select). jj commit, --isolated, .gitignore, jj config set --repo snapshot.max-new-file-size and jj config set --repo snapshot.auto-track 'all()' are commands and names: keep them as they are. 'working copy' and 'divergent' are jj's terms. Translate each sentence. recovered (HI-2996): copies Recover… wrote beside the originals are in commits of the card's work: the user's version of each is compared with the original, kept under the original name if wanted, and the copies taken out of every commit (jj squash and jj diffedit are commands: keep them).",
-    "audience": "both"
-  },
-  "workflow.refused.platform.keptElsewhere.message": {
-    "text": "{card} can't start there: its committed work from before it was put back is kept in slot {slot}, and it starts only in that slot.",
-    "note": "HI-3132: a refused start: the card was put back with commits, kept for it in slot {slot} (a name), and this start would have put it somewhere else (the project folder, or across a wait for that slot), without that work. {card} is a card key like AM-12.",
-    "audience": "both"
-  },
-  "workflow.refused.platform.keptElsewhere.next": {
-    "text": "Wait until {slot} is free, then start {card} again: it gets that slot back, with its work.",
-    "note": "HI-3132: the next step after that refusal: once the slot {slot} is free (nothing works in it), starting the card {card} again lends it that slot with the work kept in it.",
     "audience": "both"
   },
   "workflow.refused.platform.keptLine.message": {

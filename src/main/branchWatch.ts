@@ -87,13 +87,8 @@ function findAgent(projectPath: string, agentId: string): Watched | null {
  */
 export async function lineStatus(found: Watched): Promise<AgentBranchStatus | null> {
   const { project, worktree } = found
-  // A line its slot's platform's port calls a preparation key (a jj card's: a slot's locator, HI-2866) is never a Git
-  // branch: nothing for git to check (HI-2896: in a non-colocated jj project git there finds no repository at all, every
-  // check a warning). HI-3170: the port says so; a slot whose platform's port isn't registered can't be read here either.
-  if (found.platform) {
-    const port = workspacePortOf(found.platform)
-    if (!port || port.lineIsKey?.(worktree.branch)) return null
-  }
+  // HI-3170: a slot whose platform has no workspace port can't be read here.
+  if (found.platform && !workspacePortOf(found.platform)) return null
   // A branch that isn't there has nothing to merge, and isn't an error to log (HI-1698: an agent's 0.9 branch gone with
   // its worktree, a card's line deleted after its merge, each checked on every refresh): null, quietly.
   if ((await G.lineHead(project.path, worktree.branch)) === null) return null

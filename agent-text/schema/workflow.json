@@ -176,35 +176,6 @@
       "kind": "select"
     }
   },
-  "workflow.jj.containment": {
-    "placeholders": {}
-  },
-  "workflow.jj.notYet": {
-    "placeholders": {}
-  },
-  "workflow.jj.start.carryTarget": {
-    "placeholders": {
-      "slot": "plain",
-      "target": "plain"
-    }
-  },
-  "workflow.jj.start.inGit": {
-    "placeholders": {
-      "root": "plain"
-    }
-  },
-  "workflow.jj.start.noSlot": {
-    "placeholders": {}
-  },
-  "workflow.jj.start.notWorkspace": {
-    "placeholders": {}
-  },
-  "workflow.jj.start.slots": {
-    "placeholders": {}
-  },
-  "workflow.jj.start.target": {
-    "placeholders": {}
-  },
   "workflow.mergeGuards.problem.empty": {
     "placeholders": {
       "n": "number",
@@ -980,18 +951,6 @@
       "why": "select",
       "state": "select",
       "told": "plain"
-    }
-  },
-  "workflow.refused.platform.keptElsewhere.message": {
-    "placeholders": {
-      "card": "plain",
-      "slot": "plain"
-    }
-  },
-  "workflow.refused.platform.keptElsewhere.next": {
-    "placeholders": {
-      "slot": "plain",
-      "card": "plain"
     }
   },
   "workflow.refused.platform.keptLine.message": {

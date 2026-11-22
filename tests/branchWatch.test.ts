@@ -17,7 +17,6 @@ vi.mock('../src/main/gitRepo', () => ({ workTargetOf: async () => projectTarget.
 const { lineStatus } = await import('../src/main/branchWatch')
 const { createWorktree } = await import('../src/main/worktrees')
 const { setSlotsMigrated } = await import('../src/main/agentFolders')
-const { registerWorkspacePort } = await import('../src/main/platform/workspacePorts')
 
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' })
 let root = ''
@@ -75,22 +74,9 @@ describe("an agent's line, counted against where it merges (#1627)", () => {
     await expect(lineStatus({ project: pr, worktree: { path: slot, branch: 'cw/P/P-2-not-yet', base: '1.0.0' }, slot: true, target: '1.0.0' })).resolves.toBeNull()
   })
 
-  it("HI-3170: a line its slot's platform's port calls a preparation key is no branch to count; Git's slot's line is", async () => {
+  it("a Git slot's line is counted (HI-3170)", async () => {
     const { project: pr, slot } = await project()
     const line = { project: pr, worktree: { path: slot, branch: 'cw/P/P-1-fix', base: '1.0.0' }, slot: true as const, target: '1.0.0' }
-    // A jj slot whose port isn't registered (as in a unit test): nothing git can read for it.
-    await expect(lineStatus({ ...line, platform: 'jj' })).resolves.toBeNull()
-    // Registered, its port says whether the line is its key (a real branch here, so only the port's answer stops git).
-    let keyed = true
-    registerWorkspacePort('jj', { lineIsKey: (l: string) => keyed && l === 'cw/P/P-1-fix' } as never)
-    try {
-      await expect(lineStatus({ ...line, platform: 'jj' })).resolves.toBeNull()
-      keyed = false
-      expect(await lineStatus({ ...line, platform: 'jj' })).toMatchObject({ into: '1.0.0', ahead: 1 })
-    } finally {
-      registerWorkspacePort('jj', undefined as never)
-    }
-    // Git's port has no keys: its slot's line is counted.
     expect(await lineStatus({ ...line, platform: 'git' })).toMatchObject({ into: '1.0.0', ahead: 1 })
   })
 

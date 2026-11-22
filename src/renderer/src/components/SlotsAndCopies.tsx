@@ -3,8 +3,7 @@ import type { CopyView, GitFilesStatus, ProjectInfo, SlotView, WorkflowLevel } f
 import { SLOT_COPY_TEXT, type SlotLevelForm, type SlotOptionOrigin } from '@shared/slotDefaults'
 import { COPIES_REVIEW } from '@shared/advanced'
 import { reviewsWork, agentWorkflowRole } from '@shared/workflow/roles'
-import { fmt, msg, tr } from '@shared/i18n'
-import { revisionShort } from '@shared/platform/descriptors'
+import { msg, tr } from '@shared/i18n'
 import { DETACH_FAILED, gitDetachCommand, gitOperationEnd } from '@shared/gitOperations'
 import * as actions from '../actions'
 import { call } from '../api'
@@ -50,43 +49,15 @@ const T = {
     gone: msg({ id: 'workflow.slots.state.gone', defaultMessage: 'Folder missing', description: 'A slot’s state in the list under “Slots and copies”: its folder is gone (Combwork recreates it).' }),
     removing: msg({ id: 'workflow.slots.state.removing', defaultMessage: 'Being removed', description: 'A slot’s state in the list under “Slots and copies”.' })
   } satisfies Record<SlotView['state'], ReturnType<typeof msg>>,
-  // HI-2869: a stale jj slot and its recovery (J9a's explicit action).
-  staleAbandoned: msg({ id: 'workflow.slots.staleAbandoned', defaultMessage: 'Stale: its jj operation was abandoned (jj op abandon)', description: 'HI-3135: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.stale: the operation its folder was last brought to was discarded by the user’s jj op abandon, so jj can’t read it until it is recovered; it isn’t lent until then. jj op abandon is a command: keep it as it is.' }),
-  stale: msg({ id: 'workflow.slots.stale', defaultMessage: 'Stale: another jj workspace changed it', description: 'Beside a jj slot in the list under “Slots and copies” (HI-2869): its files are behind its working-copy commit because another jj workspace rewrote it; it isn’t lent until recovered. “workspace” is jj’s term.' }),
-  recover: msg({ id: 'workflow.slots.recover', defaultMessage: 'Recover…', description: 'A button beside a stale jj slot (HI-2869): brings it up to date, keeping any edits jj hadn’t recorded (asks first).' }),
-  recoverTitle: msg({ id: 'workflow.slots.recoverTitle', defaultMessage: 'Recover {slot}?', description: 'The title of the confirmation before recovering a stale jj slot (HI-2869). {slot} is the slot’s name.' }),
-  recoverMessage: msg({ id: 'workflow.slots.recoverMessage', defaultMessage: 'Combwork copies any edits jj hadn’t recorded in it aside first, into the folder below, then brings the slot up to date with jj. It runs only while nothing works in the slot.', description: 'The confirmation before recovering a stale jj slot (HI-2869); the folder edits are copied into is listed under it.' }),
-  recovered: msg({ id: 'workflow.slots.recovered', defaultMessage: '{slot} is recovered.', description: 'A notice after a stale jj slot was recovered (HI-2869).' }),
-  // HI-2996: what Recover… did, when there is something to look at.
-  recoveredTitle: msg({ id: 'workflow.slots.recoveredTitle', defaultMessage: '{slot} is recovered: look at these', description: 'HI-2996: the title of the window shown after a stale jj slot ({slot}, its name) was recovered, when the recovery left something for the user to look at: copies it wrote, deleted files it kept, or a commit it kept.' }),
-  recoveredCopies: msg({ id: 'workflow.slots.recoveredCopies', defaultMessage: '{n, plural, one {# file had changed meanwhile, so your version of it was written beside it, under the name below.} other {# files had changed meanwhile, so your version of each was written beside it, under the names below.}} Compare them, keep what you want under the original name, then delete the copies: a card’s work that holds one can’t be submitted.', description: 'HI-2996: after a stale jj slot was recovered: files the user had edited (not yet recorded by jj) had also changed in the update, so Combwork kept the update in the file and wrote the user’s version beside it as a copy (listed under this, as paths). The user compares and deletes the copies; a card can’t be submitted for review while they are in its work.' }),
-  recoveredPutBack: msg({ id: 'workflow.slots.recoveredPutBack', defaultMessage: '{n, plural, =0 {No other file needed putting back.} one {# other file was put back as it was.} other {# other files were put back as they were.}}', description: 'HI-2996: after a stale jj slot was recovered, the number of the user’s edited files put back unchanged (nothing to look at for these).' }),
-  recoveredKeptDeleted: msg({ id: 'workflow.slots.recoveredKeptDeleted', defaultMessage: '{n, plural, one {You had deleted {files}, but it changed or came back meanwhile, so it was kept.} other {You had deleted {files}, but they changed or came back meanwhile, so they were kept.}}', description: 'HI-2996: after a stale jj slot was recovered: files the user had deleted there (not yet recorded by jj) changed in the update or were created again, so Combwork kept them rather than deleting them. {files} lists their paths, joined as a list.' }),
-  recoveredAsides: msg({ id: 'workflow.slots.recoveredAsides', defaultMessage: '{n, plural, one {# file was created again during the recovery, so the version it had before was left beside it: {files}.} other {# files were created again during the recovery, so the version each had before was left beside it: {files}.}} Keep what you want of it, then delete it.', description: 'HI-2996: after a stale jj slot was recovered: while it put files back, something created some of them again, so Combwork left the version the file had just before (moved aside) under another name beside it. {files} lists their full paths, joined as a list. The user keeps what they want and deletes that copy.' }),
-  recoveredDivergent: msg({ id: 'workflow.slots.recoveredDivergent', defaultMessage: 'jj also kept commit {commit}, which holds what it recorded of the slot during the recovery. It shows as divergent in jj: once you’ve looked at it, abandon it with jj abandon {commit}.', description: 'HI-2996: after a stale jj slot was recovered, jj made a commit of the slot’s files that Combwork couldn’t prove was only what it kept, so it left it (a divergent change in jj). {commit} is its short id. jj abandon is a command: keep it as it is.' }),
-  divergentTitle: msg({ id: 'workflow.slots.divergentTitle', defaultMessage: '{slot} wasn’t recovered', description: 'HI-3134: the title of a window after Recover… of a stale jj slot was refused because the commit its folder holds is still in jj beside the one jj now gives the slot. {slot} is its name (slot-a).' }),
-  divergent: msg({ id: 'workflow.slots.divergent', defaultMessage: '{same, select, yes {The slot’s change is divergent in jj: its folder holds commit {folder}, and jj’s latest operation gives the slot commit {head}, another version of the same change.} other {The slot’s folder holds commit {folder}, which is still in jj, but jj’s latest operation gives the slot commit {head}.}} Recovering would take what only {folder} holds out of the folder, so nothing was changed.', description: 'HI-3134: the text of the window after Recover… was refused (divergentTitle). {folder} and {head} are short jj commit ids: the one the slot’s folder holds, and the one jj now gives the slot. same: yes when both are versions of one change (jj calls that divergent). Keep the select keys.' }),
-  divergentNext: msg({ id: 'workflow.slots.divergentNext', defaultMessage: 'Look at both versions in jj (jj log -r "{folder} | {head}", and jj diff --from {head} --to {folder}), choose the one the slot should have, keeping anything in its folder you want, then choose Recover… again.', description: 'HI-3134: the second paragraph of the window after Recover… was refused (divergentTitle): what to do next. {folder} and {head} are short jj commit ids; the jj commands are commands: keep them as they are.' }),
-  notRecovered: msg({ id: 'workflow.slots.notRecovered', defaultMessage: '{slot} wasn’t recovered: {why, select, busy {something works in it (an agent working there: stop it first)} preparing {its card is still being prepared there} notStale {it isn’t stale any more} identity {its folder isn’t the workspace Combwork made} other {jj couldn’t do it}}.', description: 'A notice after recovering a stale jj slot was refused (HI-2869, HI-2913). {why} picks the reason: busy (something works in the slot, such as the agent of the lane holding it, which the user stops first), preparing (the card the slot is lent to is still being prepared there), and the others. Keep the select keys.' }),
-  keptState: msg({ id: 'workflow.slots.state.kept', defaultMessage: 'Holds a card’s commits', description: 'HI-2995: a jj slot’s state in the list under “Slots and copies”, in place of “Has changes left in it”: it holds the commits of a card that was put back (named beside it, workflow.slots.keptFor), not uncommitted files.' }),
-  keptEditState: msg({ id: 'workflow.slots.state.keptEdit', defaultMessage: 'Holds a card’s uncommitted changes', description: 'HI-3143: a jj slot’s state in the list under “Slots and copies”, in place of workflow.slots.state.kept: it holds a put-back card’s changes that aren’t committed yet (edits, or new files jj doesn’t track), kept for that card (named beside it, workflow.slots.keptEditFor).' }),
-  keptEditFor: msg({ id: 'workflow.slots.keptEditFor', defaultMessage: 'Kept for {card}: its changes aren’t committed yet', description: 'HI-3143: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the card {card} (its key, HI-12) was put back with changes in the slot that aren’t committed yet, so the slot is kept for that card and given back to it when it starts again; no other card is lent it.' }),
-  keptFor: msg({ id: 'workflow.slots.keptFor', defaultMessage: 'Kept for {card}: its committed work isn’t in the target yet', description: 'HI-2995: beside a jj slot in the list under “Slots and copies”: the card {card} (its key, HI-12) was put back with commits that aren’t in its target yet, and the slot holds them, so it is kept for that card and given back to it when it starts again; no other card is lent it.' }),
-  keptGoneFor: msg({ id: 'workflow.slots.keptGoneFor', defaultMessage: 'Kept for {card}, but its folder is missing', description: 'HI-3032: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the slot was kept for the card {card} (its key, HI-12), which was put back with commits not in its target yet, but its folder has been deleted, so the card can’t get it back. Remove… beside it ends it.' }),
-  forgottenState: msg({ id: 'workflow.slots.state.forgotten', defaultMessage: 'Not listed by jj', description: 'HI-3097: a jj slot’s state in the list under “Slots and copies”, in place of “Folder missing” (workflow.slots.state.gone): its folder is there, but its jj workspace was forgotten outside Combwork, so jj no longer lists it (workflow.slots.keptForgottenFor beside it).' }),
-  keptForgottenFor: msg({ id: 'workflow.slots.keptForgottenFor', defaultMessage: 'Kept for {card}, but jj no longer lists its workspace', description: 'HI-3097: beside a jj slot in the list under “Slots and copies”, in place of workflow.slots.keptFor: the slot was kept for the card {card} (its key, HI-12), but its jj workspace was forgotten outside Combwork (jj workspace forget), its folder left in place, so the card can’t get it back. Remove… beside it ends it.' }),
-  removeForgottenFree: msg({ id: 'workflow.slots.removeForgottenFree', defaultMessage: 'jj no longer lists {slot}’s workspace. Its folder goes to the Recycle Bin as it is, with any changes in it.', description: 'HI-3103: the confirmation before removing a jj slot kept for no card whose workspace was forgotten outside Combwork (jj workspace forget), its folder still there: the whole folder, uncommitted changes included, goes to the Recycle Bin. {slot} is the slot’s name.' }),
-  removeForgottenMessage: msg({ id: 'workflow.slots.removeForgottenMessage', defaultMessage: 'Its folder goes to the Recycle Bin as it is, with any changes in it. {card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}', description: 'HI-3097: in place of workflow.slots.removeKeptMessage, the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose workspace jj no longer lists, its folder still there: the whole folder, uncommitted edits included, is moved to the Recycle Bin. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none.' }),
-  removeKept: msg({ id: 'workflow.slots.removeKept', defaultMessage: 'Remove…', description: 'HI-3032: a button beside a jj slot kept for a card whose folder is missing (workflow.slots.keptGoneFor): asks, then removes the slot so the card can start again.' }),
-  removeKeptTitle: msg({ id: 'workflow.slots.removeKeptTitle', defaultMessage: 'Remove {slot}?', description: 'HI-3032: the title of the confirmation before removing a jj slot kept for a card whose folder is missing. {slot} is the slot’s name.' }),
-  removeKeptMessage: msg({ id: 'workflow.slots.removeKeptMessage', defaultMessage: '{card} then starts again from its target, in another slot. The work it committed here stays in jj’s store{commit, select, none {.} other {: its last commit is {commit}.}}', description: 'HI-3032: the confirmation before removing a jj slot kept for the card {card} (its key, HI-12) whose folder is missing. {commit} is the short id of the last commit of the card’s work (jj keeps it), or none when Combwork has none recorded: keep the select key none.' }),
+  removeGone: msg({ id: 'workflow.slots.removeKept', defaultMessage: 'Remove…', description: 'HI-3032: a button beside a jj slot kept for a card whose folder is missing (workflow.slots.keptGoneFor): asks, then removes the slot so the card can start again.' }),
+  removeGoneTitle: msg({ id: 'workflow.slots.removeKeptTitle', defaultMessage: 'Remove {slot}?', description: 'HI-3032: the title of the confirmation before removing a jj slot kept for a card whose folder is missing. {slot} is the slot’s name.' }),
   operationState: msg({ id: 'workflow.slots.operationState', defaultMessage: 'Unfinished git {what}', description: "HI-3465: a slot's state in the list under “Slots and copies”, in place of its usual state: a git operation was left under way in its folder, so Combwork doesn't lend it. {what} is git's word for it (merge, rebase, am, cherry-pick, revert or bisect: keep it as it is)." }),
   detachFailedState: msg({ id: 'workflow.slots.detachFailedState', defaultMessage: "Can't be moved back to {target}", description: "HI-3467: a slot's state in the list under “Slots and copies”, in place of its usual state: Combwork tried more than once to put this free slot back at the head of its target branch {target} for its next card, and git refused, so it isn't lent." }),
   detachFailedHint: msg({ id: 'workflow.slots.detachFailedHint', defaultMessage: '{said, select, yes {Git said: {error}} other {Git can’t find {target}.}} Put right what’s in the way in its folder, or run {command} there', description: "HI-3467: beside workflow.slots.detachFailedState: why, and how to free the slot. {error} is git's own error line, in English (keep it as it is); said: yes when git gave one, else no (the branch {target} isn't there): keep the select keys. {command} is the git command that does it by hand (git switch --detach main: keep it as it is). Combwork tries again whenever it looks at its slots." }),
   operationHint: msg({ id: 'workflow.slots.operationHint', defaultMessage: 'Finish it in its folder, or end it there with {command}', description: "HI-3465: beside workflow.slots.operationState: how to free the slot. {command} is the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is). Combwork never runs it itself." }),
   removeGoneMessage: msg({ id: 'workflow.slots.removeGoneMessage', defaultMessage: 'Its folder is missing, or isn’t a worktree any more, so it can’t be lent. Combwork forgets {slot} and makes a new slot when a card needs one. Nothing is deleted: anything left at its folder stays as it is.', description: 'HI-3464: the confirmation before removing a Git slot no card holds whose folder is missing, or there but not a worktree git lists (made by hand, say). Combwork forgets the slot; a folder at its place is left untouched, never deleted or moved to the Recycle Bin. {slot} is the slot’s name.' }),
-  removedKept: msg({ id: 'workflow.slots.removedKept', defaultMessage: '{slot} is removed.', description: 'HI-3032: a notice after a jj slot kept for a card whose folder was missing was removed. {slot} is its name.' }),
-  notRemovedKept: msg({ id: 'workflow.slots.notRemovedKept', defaultMessage: '{slot} wasn’t removed: {why, select, changed {it changed after the list was shown (its folder is back, or it was made again)} busy {something works in it now} other {Combwork kept it}}.', description: 'HI-3032: a notice after removing a jj slot kept for a card was refused. {why} picks the reason; keep the select keys.' }),
+  removedGone: msg({ id: 'workflow.slots.removedKept', defaultMessage: '{slot} is removed.', description: 'HI-3032: a notice after a jj slot kept for a card whose folder was missing was removed. {slot} is its name.' }),
+  notRemovedGone: msg({ id: 'workflow.slots.notRemovedKept', defaultMessage: '{slot} wasn’t removed: {why, select, changed {it changed after the list was shown (its folder is back, or it was made again)} busy {something works in it now} other {Combwork kept it}}.', description: 'HI-3032: a notice after removing a jj slot kept for a card was refused. {why} picks the reason; keep the select keys.' }),
   lentCard: msg({ id: 'workflow.slots.lentCard', defaultMessage: '{agent}, for {card}', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12).' }),
   lentLane: msg({ id: 'workflow.slots.lentLane', defaultMessage: '{agent}, for a lane', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for its lane (glossary: lane).' }),
   carried: msg({ id: 'workflow.slots.carried', defaultMessage: '{agent}’s old worktree, finishing its current work', description: 'What a slot holds, in the list under “Slots and copies”: an agent’s worktree from before 1.0, kept for it until its current card or lane ends (#1441). {agent} is its name.' }),
@@ -118,7 +89,7 @@ const copyOrigin = (o: SlotOptionOrigin) => (o === 'default' ? 'platform' : o)
 /** A slot's line in the list: what it is lent to (or carries), in words. */
 function lentText(s: SlotView, agentName: (id: string) => string, card: (n: number) => string): string | null {
   const l = s.lease
-  if (!l) return s.keptFor !== undefined ? tr(s.keptGone ? (s.keptGone.forgotten ? T.keptForgottenFor : T.keptGoneFor) : s.keptEdit ? T.keptEditFor : T.keptFor, { card: card(s.keptFor) }) : null
+  if (!l) return null
   if (l.kind === 'carried') return tr(T.carried, { agent: agentName(l.agent) })
   if (l.card !== null) return tr(T.lentCard, { agent: agentName(l.agent), card: card(l.card) })
   return tr(T.lentLane, { agent: agentName(l.agent) })
@@ -260,7 +231,7 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                       <tr key={s.name} data-slot={s.name} data-state={s.state}>
                         <td className="mono">{s.name}</td>
                         <td>
-                          {s.keptFor !== undefined && !s.keptGone ? tr(s.keptEdit ? T.keptEditState : T.keptState) : s.keptGone?.forgotten || s.forgotten ? tr(T.forgottenState) : s.operation?.what === DETACH_FAILED ? tr(T.detachFailedState, { target: s.operation.target ?? '' }) : s.operation ? tr(T.operationState, { what: s.operation.what }) : tr(T.state[s.state])}
+                          {s.operation?.what === DETACH_FAILED ? tr(T.detachFailedState, { target: s.operation.target ?? '' }) : s.operation ? tr(T.operationState, { what: s.operation.what }) : tr(T.state[s.state])}
                           {s.operation?.what === DETACH_FAILED && (
                             <>
                               {' · '}
@@ -277,35 +248,12 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                               </span>
                             </>
                           )}
-                          {s.stale && (
-                            <>
-                              {' · '}
-                              <span className="s-desc" data-stale={s.staleWhy ?? 'rewritten'}>
-                                {tr(s.staleWhy === 'abandoned' ? T.staleAbandoned : T.stale)}
-                              </span>
-                            </>
-                          )}
                         </td>
-                        <td data-kept-for={s.keptFor}>{lentText(s, agentName, card) ?? ''}</td>
+                        <td>{lentText(s, agentName, card) ?? ''}</td>
                         <td>
-                          {s.stale && (
-                            <button className="btn subtle small" data-action="recover" onClick={() => void recoverSlot(project.path, s, reload)}>
-                              {tr(T.recover)}
-                            </button>
-                          )}
-                          {s.keptGone && s.keptFor !== undefined && (
-                            <button className="btn subtle small" data-action="remove-kept" onClick={() => void removeKeptSlot(project.path, s, card, reload)}>
-                              {tr(T.removeKept)}
-                            </button>
-                          )}
                           {s.goneFree && (
                             <button className="btn subtle small" data-action="remove-gone" onClick={() => void removeGoneSlot(project.path, s, reload)}>
-                              {tr(T.removeKept)}
-                            </button>
-                          )}
-                          {s.forgotten && (
-                            <button className="btn subtle small" data-action="remove-forgotten" onClick={() => void removeForgottenSlot(project.path, s, reload)}>
-                              {tr(T.removeKept)}
+                              {tr(T.removeGone)}
                             </button>
                           )}
                           {s.writer?.held && (
@@ -474,83 +422,12 @@ function Field({ value, placeholder, onCommit, multiline }: { value: string; pla
   return <input className="input mono" value={text} placeholder={placeholder} onChange={(e) => type(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && commit()} />
 }
 
-/** A stale jj slot recovered, the user's explicit action (HI-2869, J9a's `slots:recoverStale`), after their confirmation. */
-/** A revision of a slot whose workspaces are its platform's own records (HI-3140: only such a slot is recovered or kept), as that platform shows it. */
-const slotRevision = (s: SlotView, id: string): string => (s.platform ? revisionShort(s.platform, id) : id)
-
-async function recoverSlot(projectPath: string, s: SlotView, reload: () => void): Promise<void> {
-  const aside = `${s.folder.replace(/[\\/][^\\/]+$/, '')}${s.folder.includes('\\') ? '\\' : '/'}.cw-recovery${s.folder.includes('\\') ? '\\' : '/'}${s.name}`
-  if (!(await confirm({ title: tr(T.recoverTitle, { slot: s.name }), message: tr(T.recoverMessage), list: [aside], confirmLabel: tr(T.recover).replace('…', '') }))) return
-  const r = await call('slots:recoverStale', projectPath, s.name).catch(() => ({ ok: false as const, why: '' }))
-  reload()
-  // HI-3134: the folder's commit still in jj beside the one jj gives the slot now: both named, with what to do.
-  if (!r.ok && r.why === 'divergent' && 'divergent' in r && r.divergent) {
-    const d = { folder: slotRevision(s, r.divergent.folder), head: slotRevision(s, r.divergent.head) }
-    await confirm({ title: tr(T.divergentTitle, { slot: s.name }), message: tr(T.divergent, { ...d, same: r.divergent.same ? 'yes' : 'no' }), okOnly: true, content: <div data-recover-divergent="">{tr(T.divergentNext, d)}</div> }) // i18n-ignore: select keys
-    return
-  }
-  if (!r.ok) return notify('warning', tr(T.notRecovered, { slot: s.name, why: recoverWhy(r.why) }))
-  // What it did (HI-2996): said in a window when it wrote copies, kept deletions or kept a commit; else a notice.
-  const done = r.recovered
-  if (!done || (!done.copies.length && !done.asides.length && !done.keptDeleted.length && !done.divergent)) return notify('success', tr(T.recovered, { slot: s.name }))
-  const sep = s.folder.includes('\\') ? '\\' : '/'
-  const full = (copy: string): string => `${s.folder}${sep}${copy.split('/').join(sep)}`
-  const copies = done.copies.map((c) => full(c.copy))
-  const paragraphs = [
-    copies.length ? tr(T.recoveredPutBack, { n: done.restored }) : null,
-    done.asides.length ? tr(T.recoveredAsides, { n: done.asides.length, files: fmt.list(done.asides.map((a) => full(a.copy))) }) : null,
-    done.keptDeleted.length ? tr(T.recoveredKeptDeleted, { n: done.keptDeleted.length, files: fmt.list(done.keptDeleted) }) : null,
-    done.divergent ? tr(T.recoveredDivergent, { commit: slotRevision(s, done.divergent) }) : null
-  ].filter((x): x is string => !!x)
-  await confirm({
-    title: tr(T.recoveredTitle, { slot: s.name }),
-    message: copies.length ? tr(T.recoveredCopies, { n: copies.length }) : tr(T.recoveredPutBack, { n: done.restored }),
-    list: copies,
-    okOnly: true,
-    ...(paragraphs.length ? { content: <div data-recovered="">{paragraphs.map((p, i) => <p key={i}>{p}</p>)}</div> } : {})
-  })
-}
-
-/** A slot kept for a card with its folder gone, removed (HI-3032, `slots:removeKept`): the user's action, after their confirmation. */
-/** A slot kept for no card whose workspace was forgotten, removed (HI-3103, `slots:removeForgotten`): the user's action, after their confirmation. */
-async function removeForgottenSlot(projectPath: string, s: SlotView, reload: () => void): Promise<void> {
-  const f = s.forgotten
-  if (!f) return
-  if (!(await confirm({ title: tr(T.removeKeptTitle, { slot: s.name }), message: tr(T.removeForgottenFree, { slot: s.name }), confirmLabel: tr(T.removeKept).replace('…', '') }))) return
-  const r = await call('slots:removeForgotten', projectPath, s.name, f.generation).catch(() => ({ ok: false as const, why: '' }))
-  reload()
-  if (r.ok) return notify('success', tr(T.removedKept, { slot: s.name }))
-  notify('warning', tr(T.notRemovedKept, { slot: s.name, why: r.why === 'changed' ? 'changed' : ['busy', 'leased', 'session', 'process'].includes(r.why) ? 'busy' : 'other' })) // i18n-ignore: select keys
-}
-
 /** A free slot whose folder is missing or not a worktree, forgotten (HI-3464, `slots:removeGone`): the user's action, after their confirmation. */
 async function removeGoneSlot(projectPath: string, s: SlotView, reload: () => void): Promise<void> {
   if (!s.goneFree) return
-  if (!(await confirm({ title: tr(T.removeKeptTitle, { slot: s.name }), message: tr(T.removeGoneMessage, { slot: s.name }), confirmLabel: tr(T.removeKept).replace('…', '') }))) return
+  if (!(await confirm({ title: tr(T.removeGoneTitle, { slot: s.name }), message: tr(T.removeGoneMessage, { slot: s.name }), confirmLabel: tr(T.removeGone).replace('…', '') }))) return
   const r = await call('slots:removeGone', projectPath, s.name).catch(() => ({ ok: false as const, why: '' }))
   reload()
-  if (r.ok) return notify('success', tr(T.removedKept, { slot: s.name }))
-  notify('warning', tr(T.notRemovedKept, { slot: s.name, why: r.why === 'changed' ? 'changed' : ['busy', 'leased', 'session', 'process'].includes(r.why) ? 'busy' : 'other' })) // i18n-ignore: select keys
-}
-
-async function removeKeptSlot(projectPath: string, s: SlotView, card: (n: number) => string, reload: () => void): Promise<void> {
-  const kept = s.keptGone
-  if (!kept || s.keptFor === undefined) return
-  const commit = kept.commit ? slotRevision(s, kept.commit) : 'none' // i18n-ignore: a select key
-  const message = tr(kept.forgotten ? T.removeForgottenMessage : T.removeKeptMessage, { card: card(s.keptFor), commit })
-  if (!(await confirm({ title: tr(T.removeKeptTitle, { slot: s.name }), message, confirmLabel: tr(T.removeKept).replace('…', '') }))) return
-  // The mode confirmed goes with it (HI-3097): a folder missing then but back now, or the reverse, is refused `changed`.
-  const r = await call('slots:removeKept', projectPath, s.name, s.keptFor, kept.generation, !!kept.forgotten).catch(() => ({ ok: false as const, why: '' }))
-  reload()
-  if (r.ok) return notify('success', tr(T.removedKept, { slot: s.name }))
-  notify('warning', tr(T.notRemovedKept, { slot: s.name, why: r.why === 'changed' ? 'changed' : ['busy', 'leased', 'session', 'process'].includes(r.why) ? 'busy' : 'other' })) // i18n-ignore: select keys
-}
-
-/** The select key of a refused recovery's reason (the port's refusal text, English, never shown). */
-function recoverWhy(why: string): string {
-  if (/^preparing$/.test(why)) return 'preparing' // i18n-ignore: a select key
-  if (/busy|in use|quiet/i.test(why)) return 'busy' // i18n-ignore: a select key
-  if (/stale/i.test(why)) return 'notStale' // i18n-ignore: a select key
-  if (/identity|recorded/i.test(why)) return 'identity' // i18n-ignore: a select key
-  return 'other' // i18n-ignore: a select key
+  if (r.ok) return notify('success', tr(T.removedGone, { slot: s.name }))
+  notify('warning', tr(T.notRemovedGone, { slot: s.name, why: r.why === 'changed' ? 'changed' : ['busy', 'leased', 'session', 'process'].includes(r.why) ? 'busy' : 'other' })) // i18n-ignore: select keys
 }

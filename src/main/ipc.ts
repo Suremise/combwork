@@ -141,7 +141,7 @@ import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesNow } from './workflow/rulesets'
-import { poolFor, recoverStaleSlot, removeForgottenSlot, removeGoneSlot, removeKeptSlot, slotTest, slotViews } from './slotsApp'
+import { poolFor, removeGoneSlot, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
@@ -1118,9 +1118,6 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
     // A stale jj slot recovered, the user's explicit action (HI-2866).
-    'slots:recoverStale': (p, slot) => recoverStaleSlot(workspace, workspace.assertProject(p), String(slot)),
-    'slots:removeKept': (p, slot, card, generation, forgotten) => removeKeptSlot(workspace, workspace.assertProject(p), String(slot), Number(card), String(generation), forgotten === true),
-    'slots:removeForgotten': (p, slot, generation) => removeForgottenSlot(workspace, workspace.assertProject(p), String(slot), String(generation)),
     'slots:removeGone': (p, slot) => removeGoneSlot(workspace, workspace.assertProject(p), String(slot)),
     'slots:heldWriter': (p, slot) => heldWriter(workspace.assertProject(p), String(slot)),
     'slots:releaseWriter': (p, slot, run, end) => releaseHeldWriter(workspace.assertProject(p), String(slot), String(run), { end: end === true }),

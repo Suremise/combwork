@@ -37,9 +37,6 @@
       "what": "plain"
     }
   },
-  "slot.error.identityUnread": {
-    "placeholders": {}
-  },
   "slot.error.interrupted": {
     "placeholders": {}
   },
@@ -103,74 +100,6 @@
   "slot.hold.reviews": {
     "placeholders": {}
   },
-  "slot.jj.filesUnread": {
-    "placeholders": {
-      "slot": "plain"
-    }
-  },
-  "slot.jj.forgetFailed": {
-    "placeholders": {}
-  },
-  "slot.jj.lineUnread": {
-    "placeholders": {
-      "what": "plain"
-    }
-  },
-  "slot.jj.noTarget": {
-    "placeholders": {}
-  },
-  "slot.jj.notListed": {
-    "placeholders": {}
-  },
-  "slot.jj.prepareFailed": {
-    "placeholders": {
-      "slot": "plain",
-      "error": "plain"
-    }
-  },
-  "slot.jj.workspaceAdd": {
-    "placeholders": {
-      "error": "plain"
-    }
-  },
-  "slot.jj.workspaceUnread": {
-    "placeholders": {
-      "slot": "plain"
-    }
-  },
-  "slot.kept.busy": {
-    "placeholders": {}
-  },
-  "slot.kept.forgotten": {
-    "placeholders": {}
-  },
-  "slot.kept.gone": {
-    "placeholders": {}
-  },
-  "slot.kept.lane": {
-    "placeholders": {
-      "other": "plain"
-    }
-  },
-  "slot.kept.other": {
-    "placeholders": {}
-  },
-  "slot.kept.platform": {
-    "placeholders": {
-      "platform": "plain",
-      "now": "plain",
-      "gone": "select"
-    }
-  },
-  "slot.kept.stale": {
-    "placeholders": {}
-  },
-  "slot.kept.written": {
-    "placeholders": {
-      "agent": "plain",
-      "other": "plain"
-    }
-  },
   "slot.laneEnd.merged": {
     "placeholders": {
       "card": "plain",
@@ -201,24 +130,6 @@
       "agent": "plain",
       "slot": "plain",
       "why": "plain"
-    }
-  },
-  "slot.place.held": {
-    "placeholders": {
-      "card": "plain",
-      "slot": "plain",
-      "kind": "select",
-      "target": "plain",
-      "why": "plain",
-      "hasCommits": "select",
-      "ids": "plain",
-      "more": "plural",
-      "selectArg": "plain",
-      "hasEdits": "select",
-      "at": "plain",
-      "base": "plain",
-      "stopped": "select",
-      "builder": "plain"
     }
   },
   "slot.place.notReady": {
@@ -267,11 +178,6 @@
   "slot.prepare.leaseEnded": {
     "placeholders": {}
   },
-  "slot.prepare.stale": {
-    "placeholders": {
-      "slot": "plain"
-    }
-  },
   "slot.prepare.switchFailed": {
     "placeholders": {
       "error": "plain"
@@ -309,12 +215,6 @@
       "slot": "plain",
       "agent": "plain",
       "what": "plain"
-    }
-  },
-  "slot.refusal.kept": {
-    "placeholders": {
-      "slot": "plain",
-      "why": "plain"
     }
   },
   "slot.refusal.lane": {
@@ -397,11 +297,6 @@
   },
   "slot.run.noSupervisor": {
     "placeholders": {}
-  },
-  "slot.start.keptMoved": {
-    "placeholders": {
-      "slot": "plain"
-    }
   },
   "slot.start.leaseEnded": {
     "placeholders": {
