@@ -5841,7 +5841,9 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   first, saying what they drop. Below, each conflicted file (git's unmerged entries, `ls-files -u`) with **Open**,
   **Use mine**, **Use theirs** and **Mark resolved** (`git add -A`, for a file settled by hand). *Mine* is the folder's
   own work: git's `--ours`, except in a rebase, where git's sides are swapped and mine is `--theirs`; a side that
-  deleted the file deletes it (`git rm`). Slots and copies' *Unfinished git …* row, Branches & remotes' banner and
+  deleted the file deletes it (`git rm`). Each acts on the file clicked alone, whatever its name (HI-3501): its path is
+  a literal pathspec (`--literal-pathspecs`; the tooltip's command `:(literal)…`, quoted), never a glob, so `a[1].txt`
+  never also settles, stages or deletes `a1.txt`. Slots and copies' *Unfinished git …* row, Branches & remotes' banner and
   the notice of HI-3465 each have **Open in Changes**. Git's work is a Git port step (`operationSteps`, RepoOps'
   `operationStep`, `platform/git/gitOperationSteps.ts`; RepoReads' `operation`): None lists no such operation.
   **What refuses a step**, each checked as the user clicks, before git runs: a live session whose folder is in it
