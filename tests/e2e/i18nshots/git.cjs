@@ -309,8 +309,13 @@ async function operationPanel(ctx) {
     // The conflict stops it, as wanted: checked below.
   }
   if (!fs.existsSync(path.join(ctx.project, '.git', 'MERGE_HEAD'))) throw new Error("the project folder isn't mid-merge")
-  await ctx.page.evaluate(() => window.dispatchEvent(new Event('focus')))
-  await section(ctx, 'changes', '.operation-panel[data-operation="merge"] [data-conflict]', 'the operation panel with its conflict')
+  // Branches & remotes read again says so, with Open in Changes (as tests/e2e/slotpool.cjs reaches it).
+  await section(ctx, 'branches', '[data-git-branches]', 'Branches & remotes')
+  const banner = ctx.page.locator('.banner[data-git-state="merge"]')
+  const reload = () => ctx.page.locator('[data-git-branches] [data-action="reload-branches"]').first().click({ timeout: timing('poll.clickMs') }).then(() => false, () => false)
+  if (!(await ctx.lib.until(async () => (await banner.count()) > 0 || (await reload()), ctx.hungMs))) throw new Error("Branches & remotes' merge banner did not show")
+  await banner.locator('[data-action="open-operation"]').first().click()
+  await shown(ctx, ctx.page.locator('.operation-panel[data-operation="merge"] [data-conflict]'), 'the operation panel with its conflict')
   return gitView(ctx)
 }
 
@@ -320,10 +325,17 @@ async function abortDialog(ctx) {
   return shown(ctx, ctx.page.locator('.dialog').last(), 'the Abort dialog')
 }
 
-/** Its Cancel, then the merge ended in git and the branch dropped, the panel gone. */
+/** Its confirm button (the dialog's last): the merge ended, the panel gone; then the branch dropped. */
 async function abortClose(ctx) {
-  await cancelDialog(ctx)
-  if (fs.existsSync(path.join(ctx.project, '.git', 'MERGE_HEAD'))) git(ctx, 'merge', '--abort')
+  const { page, lib } = ctx
+  const merging = () => fs.existsSync(path.join(ctx.project, '.git', 'MERGE_HEAD'))
+  if ((await page.locator('.dialog').count()) > 0) {
+    await page.locator('.dialog').last().locator('.dialog-footer button').last().click()
+    if (!(await lib.until(async () => !merging(), ctx.hungMs))) {
+      git(ctx, 'merge', '--abort')
+      throw new Error("the dialog's Abort didn't end the merge")
+    }
+  } else if (merging()) git(ctx, 'merge', '--abort')
   try {
     git(ctx, 'branch', '-D', 'i18n-side')
   } catch {
