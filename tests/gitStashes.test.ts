@@ -28,11 +28,26 @@ vi.mock('../src/main/gitRepo', async (original) => ({ ...(await original<typeof 
 let beforeDrop: (() => void) | null = null
 /** HI-3533 (HR1's round 1): Combwork's next `git stash store` fails, as git's own refusal (a ref that isn't there). */
 let failStore = false
+/**
+ * HI-3539: Combwork's next `stash list` calls (as many as `listRaces` holds) meet another git deleting refs/stash
+ * mid-read: each answers git's own "bad revision 'refs/stash'" (its log of a refs/stash that isn't there, in a repository
+ * with none), after running its function (another git's work done meanwhile, such as dropping the last stash); 'pass'
+ * lets that call through.
+ */
+let listRaces: ('pass' | (() => void) | null)[] = []
+let noStash = ''
 vi.mock('../src/main/git', async (original) => {
   const real = await original<typeof import('../src/main/git')>()
   return {
     ...real,
-    git: (cwd: string, args: string[], ...rest: unknown[]) => {
+    git: async (cwd: string, args: string[], ...rest: unknown[]) => {
+      if (listRaces.length && args[0] === 'stash' && args[1] === 'list' && listRaces[0] === 'pass') listRaces.shift()
+      else if (listRaces.length && args[0] === 'stash' && args[1] === 'list') {
+        const meanwhile = listRaces.shift() as (() => void) | null
+        const failed = await real.git(noStash, ['log', '-g', '--format=%H', 'refs/stash', '--'])
+        meanwhile?.()
+        return failed
+      }
       if (beforeDrop && args[0] === 'stash' && args[1] === 'drop') {
         const f = beforeDrop
         beforeDrop = null
@@ -55,6 +70,8 @@ const S = await import('../src/main/platform/git/gitStashes')
 const base = tempDir('cw-gitstash-')
 const w = createWorkspaceService()
 w.path = join(base, 'ws')
+// HI-3539: a repository with no refs/stash, where git's log of it answers "bad revision 'refs/stash'" (listRaces).
+noStash = gitRepo(join(base, 'no-stash'))
 afterAll(async () => {
   await disposeWorkspaceService(w)
   rmSync(base, { recursive: true, force: true })
@@ -92,6 +109,7 @@ beforeEach(() => {
   held = null
   beforeDrop = null
   failStore = false
+  listRaces = []
   agent = null
 })
 
@@ -198,6 +216,36 @@ describe('the list and Show', () => {
     expect([gone.original.replace(/\r\n/g, '\n'), gone.modified, gone.binary]).toEqual(['base\n', '', false])
     const added = await S.stashDiff(proj, s.commit, 'a.txt/child', false)
     expect([added.original, added.modified.replace(/\r\n/g, '\n')]).toEqual(['', 'new\n'])
+  })
+
+  it('HI-3539: a read that meets another git dropping the last stash reads again: no stash, no error', async () => {
+    write('a.txt', 'mine\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'last')
+    // Git's "bad revision 'refs/stash'", and meanwhile the other git's drop of the last stash finishes.
+    listRaces = [() => void sh(proj, 'stash', 'drop', '-q')]
+    expect(await list()).toEqual([])
+    expect(listRaces).toEqual([])
+  })
+
+  it('HI-3539: the same met by the second read of the list (its files): read again, each counted', async () => {
+    write('a.txt', 'mine\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'one')
+    write('b.txt', 'more\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'two')
+    const before = await list()
+    expect(before.map((r) => [r.message, r.files])).toEqual([['two', 1], ['one', 1]])
+    // The first read (the rows) is git's own; the next (their changed files) meets the race once.
+    listRaces = ['pass', null]
+    expect(await list()).toEqual(before)
+    expect(listRaces).toEqual([])
+  })
+
+  it("HI-3539: a refs/stash git still can't read on the second try is git's error, not an empty list", async () => {
+    write('a.txt', 'mine\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'one')
+    listRaces = [null, null]
+    await expect(list()).rejects.toThrow("Git refused: fatal: bad revision 'refs/stash'")
+    expect(listRaces).toEqual([])
   })
 
   it('a stash gone meanwhile refuses Show', async () => {

@@ -57,9 +57,21 @@ const stashEnv = (): NodeJS.ProcessEnv => ({ ...process.env, GIT_EDITOR: 'true',
 
 const refused = (r: GitResult): Error => combworkError(M.failed, { why: gitErrorLine(`${r.err}\n${r.out}`) || r.err.trim().slice(0, 400) || r.out.trim().slice(0, 400) })
 
+/**
+ * HI-3539: `git stash list` with `args`. It checks that refs/stash is there, then logs it: another git dropping the
+ * last stash between the two (deleting refs/stash) makes it fail with "bad revision 'refs/stash'". Read once more: the
+ * ref gone by then, git lists none. A second failure, or any other, is git's error to show.
+ */
+async function stashList(root: string, args: string[]): Promise<GitResult> {
+  const r = await git(root, ['stash', 'list', ...args])
+  if (r.ok || !/bad revision 'refs\/stash'/.test(r.err)) return r
+  log.info(`git stash list met refs/stash going (another git dropping the last stash) in ${userText(root)}: read again`)
+  return git(root, ['stash', 'list', ...args])
+}
+
 /** The stashes as `git stash list` gives them: each one's commit, place, date, parents and reflog subject. */
 async function listed(root: string): Promise<{ commit: string; index: number; at: number; parents: string[]; subject: string }[]> {
-  const r = await git(root, ['stash', 'list', '--format=%H%x1f%ct%x1f%P%x1f%gs%x1e'])
+  const r = await stashList(root, ['--format=%H%x1f%ct%x1f%P%x1f%gs%x1e'])
   if (!r.ok) throw refused(r)
   return r.out
     .split('\x1e')
@@ -86,7 +98,7 @@ export async function listStashes(root: string): Promise<StashRow[]> {
   const rows = await listed(root)
   if (!rows.length) return []
   // Each stash's changes against the commit it was made on (its first parent), in one call.
-  const changed = await git(root, ['stash', 'list', '-m', '--first-parent', '--no-renames', '--name-only', '--format=%x1e%H'])
+  const changed = await stashList(root, ['-m', '--first-parent', '--no-renames', '--name-only', '--format=%x1e%H'])
   if (!changed.ok) throw refused(changed)
   const tracked = countsOf(changed.out)
   // The untracked files each keeps (its third parent, a commit of them alone), in one call. HI-3531: each commit once,
