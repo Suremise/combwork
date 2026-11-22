@@ -356,8 +356,8 @@ export const BOARD_MIGRATIONS: Migration[] = [
   },
   // Versions 28 and 29 change nothing: steps that keep a board's version sequence without a gap. In the 1.0 group, as
   // 25–27 are.
-  { version: 28, name: 'no change', group: UPGRADE_GROUP_ID, up: () => {} },
-  { version: 29, name: 'no change', group: UPGRADE_GROUP_ID, up: () => {} },
+  { version: 28, name: 'no change', group: UPGRADE_GROUP_ID, up: () => {} }, // i18n-ignore: a schema step's name, recorded in schema_version
+  { version: 29, name: 'no change', group: UPGRADE_GROUP_ID, up: () => {} }, // i18n-ignore: a schema step's name, recorded in schema_version
   {
     // HI-3195: each keyed Agent API write's durable "applied" marker, saved in the write's transaction
     // (schema/requestReceiptsStep.ts, requestReceipts.ts). In the 1.0 group, as 25–29 are.
