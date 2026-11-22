@@ -8,12 +8,14 @@
 //   was last written runs: Windows can't say a process's folder, and a git started after a lock was made fails on it, so
 //   only an older one can hold it. Moved aside and proved to be the file the user saw before it is removed. No process
 //   is ever ended.
-// - Fetch with prune: per remote, `git remote prune --dry-run`, then `git fetch --prune`, as Fetch reaches the remote
-//   (its bound and Cancel).
-// Each refuses while an agent's session works in a folder of the repository, a run or an agent's file lock is in one, a
-// slot is being made or removed, or a Combwork run works in one (a merge check, a slot's setup), checked under the
-// repository's lock (for Fetch with prune, taken for the check only): a merge holding it (the merge queue's or the
-// user's) is waited for, with the notice of who holds it, never run beside.
+// - Fetch with prune: per remote set up as git's default (its branches into `refs/remotes/<name>/`, HR1's round 1), the
+//   remote-tracking branches `git ls-remote --heads` no longer lists, then `git fetch --prune <remote> <that refspec>`
+//   with tag pruning off, so nothing but those can be dropped; as Fetch reaches the remote (its bound and Cancel).
+// Each refuses while an agent's session works in a folder of the repository (git's list of worktrees unreadable refuses
+// too), a run or an agent's file lock is in one, a slot is being made or removed, or a Combwork run works in one (a
+// merge check, a slot's setup), checked under the repository's lock, held until it is done (Fetch with prune's fetch
+// included): a merge holding it (the merge queue's or the user's) is waited for, with the notice of who holds it, never
+// run beside.
 import { readdir, readFile, rm } from 'original-fs/promises'
 import { existsSync, lstatSync, readFileSync, renameSync } from 'original-fs'
 import { randomBytes } from 'crypto'
@@ -47,6 +49,8 @@ export const HEALTH_TEXT = {
   busy: msg({ id: 'service.gitHealth.busy', defaultMessage: 'A run or an agent is working in {folder} ({what}): nothing was done. Try again once it has finished.', description: "HI-3473: an error from Repository health: a run (a test, a build) or an agent's file lock is in a folder of the repository ({folder}, a path); {what} names the first one's folder or file." }),
   combworkRun: msg({ id: 'service.gitHealth.combworkRun', defaultMessage: 'Combwork is running “{what}” in {folder}: nothing was done. Try again once it has finished.', description: "HI-3473: an error from Repository health: one of Combwork's own runs (a merge check, a slot's setup; {what} is its title) works in a folder of the repository ({folder}, a path)." }),
   slotBusy: msg({ id: 'service.gitHealth.slotBusy', defaultMessage: '{slot} is being {state, select, creating {made} other {removed}}: nothing was done. Try again in a moment.', description: 'HI-3473: an error from Repository health: the slot {slot} (such as slot-a; glossary: slot) is being made or removed now. Keep the select keys.' }),
+  unlisted: msg({ id: 'service.gitHealth.unlisted', defaultMessage: "Git couldn't list this repository's worktrees, so Combwork can't tell nothing works in them: nothing was done. Git said: {why}", description: "HI-3473 (a reviewer's round 1): an error from Repository health: git worktree list failed, so a worktree an agent or a run works in could be missed. {why} is git's error line, in English." }),
+  notStandard: msg({ id: 'service.gitHealth.notStandard', defaultMessage: "{remote} isn't fetched as git sets a remote up (its remote.{remote}.fetch names more than its branches, or it's a mirror), so pruning could drop more than its remote-tracking branches: Combwork leaves it to you, in a terminal.", description: "HI-3473 (a reviewer's round 1): why Fetch with Prune skips or refuses the remote {remote}: its fetch settings aren't git's default. remote.{remote}.fetch is a git setting's name: keep it." }),
   noProcesses: msg({ id: 'service.gitHealth.noProcesses', defaultMessage: "Windows' list of processes couldn't be read, so no lock can be called stale: nothing was removed. Try again.", description: 'HI-3473: an error from Remove stale lock: the list of running processes (used to rule out a git holding the lock) could not be read whole.' }),
   pruned: msg({ id: 'service.gitHealth.pruned', defaultMessage: '{n, plural, =0 {No worktree entry was dropped.} one {Dropped # worktree entry.} other {Dropped # worktree entries.}}{kept, plural, =0 {} one { # was kept: {keptList}.} other { # were kept: {keptList}.}}', description: "HI-3473: after Prune worktrees: how many of git's entries for missing worktrees were dropped ({n}), and how many were kept ({kept}) with each one's name and why ({keptList}, a list of 'name (why)')." }),
   removed: msg({ id: 'service.gitHealth.removed', defaultMessage: '{n, plural, =0 {No lock file was removed.} one {Removed # lock file.} other {Removed # lock files.}}{kept, plural, =0 {} one { # was kept: {keptList}.} other { # were kept: {keptList}.}}', description: "HI-3473: after Remove stale lock: how many of git's lock files were removed ({n}), and how many kept ({kept}) with each one's path and why ({keptList}, a list of 'path (why)')." }),
@@ -71,10 +75,14 @@ export const LOCK_NAME = /^(?:index|packed-refs|config|config\.worktree|shallow|
 /** The most entries a scan of `refs` reads (a repository with many loose refs): past it, the rest isn't looked at. */
 const REFS_SCAN_MAX = 50_000
 
-/** Folders of the repository: the project's and every worktree git lists that is there. */
+/**
+ * Folders of the repository: the project's and every worktree git lists that is there. Git's list unreadable refuses
+ * (HR1's round 1): a worktree it would have named could have an agent or a run in it.
+ */
 async function repoFolders(projectPath: string): Promise<string[]> {
   const r = await git(projectPath, ['worktree', 'list', '--porcelain'])
-  const listed = r.ok ? parseWorktrees(r.out).map((w) => w.path) : []
+  if (!r.ok) throw combworkError(M.unlisted, { why: gitErrorLine(r.err) || r.err.trim().slice(0, 400) }, { kind: 'conflict' })
+  const listed = parseWorktrees(r.out).map((w) => w.path)
   const out = [projectPath]
   for (const p of listed) if (!out.some((x) => samePlace(x, p)) && existsSync(p)) out.push(p)
   return out
@@ -395,18 +403,44 @@ function netWhy(r: GitResult): string {
   return gitErrorLine(r.err) || r.err.trim().slice(0, 400) || r.out.trim().slice(0, 400)
 }
 
-/** The remote-tracking branches `git remote prune --dry-run` would drop (` * [would prune] origin/old`). */
-export function parseRemotePrune(text: string): string[] {
-  return [...text.matchAll(/^\s*\*\s*\[would prune\]\s+(\S+)\s*$/gm)].map((m) => m[1])
-}
-
 /** The repository's remotes, as git lists them. */
 async function remotesOf(projectPath: string): Promise<string[]> {
   const r = await git(projectPath, ['remote'])
   return r.ok ? r.out.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('-')) : []
 }
 
-/** HI-3473: per remote, the remote-tracking branches deleted on it, each with the local branches that track it. */
+/** The refspec Fetch with prune fetches a remote by, and the only one it prunes: its branches, as remote-tracking branches. */
+export const trackingSpec = (remote: string): string => `+refs/heads/*:refs/remotes/${remote}/*`
+
+/**
+ * HR1's round 1: whether a remote is fetched as git's default sets it up (`remote.<name>.fetch` exactly its branches into
+ * `refs/remotes/<name>/`, with or without `+`; not a mirror), the one setup whose pruning is what the dialog shows. Any
+ * other (a tag refspec, another destination, several) could prune refs the dialog never listed, so it isn't done.
+ */
+async function standardRemote(projectPath: string, remote: string): Promise<boolean> {
+  const specs = await git(projectPath, ['config', '--get-all', `remote.${remote}.fetch`])
+  const lines = specs.ok ? specs.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : []
+  const mirror = (await git(projectPath, ['config', '--type=bool', '--get', `remote.${remote}.mirror`])).out.trim() === 'true'
+  return !mirror && lines.length === 1 && (lines[0] === trackingSpec(remote) || lines[0] === trackingSpec(remote).slice(1))
+}
+
+/** What `git ls-remote --heads` lists: the remote's branch names. */
+export function parseLsRemoteHeads(text: string): Set<string> {
+  return new Set([...text.matchAll(/^[0-9a-f]{40,64}\trefs\/heads\/(.+)$/gm)].map((m) => m[1].trim()))
+}
+
+/** A remote's remote-tracking branches now, by name (`old` for `refs/remotes/origin/old`), its HEAD left out. */
+async function trackingNames(projectPath: string, remote: string): Promise<Set<string>> {
+  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', `refs/remotes/${remote}/`])
+  const prefix = `refs/remotes/${remote}/`
+  return new Set(r.ok ? r.out.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith(prefix) && l !== `${prefix}HEAD`).map((l) => l.slice(prefix.length)) : [])
+}
+
+/**
+ * HI-3473: per remote, the remote-tracking branches deleted on it (its branches as `git ls-remote --heads` lists them,
+ * against `refs/remotes/<name>/`: exactly what a fetch of trackingSpec with --prune drops), each with the local branches
+ * that track it. A remote not set up as git's default is listed with why, never fetched (HR1's round 1).
+ */
 export async function remotePrunePreview(projectPath: string): Promise<RemotePrune[]> {
   return oneAtATime(projectPath, async () => {
     const remotes = await remotesOf(projectPath)
@@ -414,41 +448,53 @@ export async function remotePrunePreview(projectPath: string): Promise<RemotePru
     const rows = tracks.ok ? tracks.out.split(/\r?\n/).map((l) => l.split('\0')).filter((f) => f.length === 2 && f[1]) : []
     const out: RemotePrune[] = []
     for (const remote of remotes) {
-      const r = await net(projectPath, ['remote', 'prune', '--dry-run', remote])
+      if (!(await standardRemote(projectPath, remote))) {
+        out.push({ remote, branches: [], error: tr(M.notStandard, { remote }) })
+        continue
+      }
+      const r = await net(projectPath, ['ls-remote', '--heads', remote])
       if (!r.ok) {
         out.push({ remote, branches: [], error: netWhy(r) })
         continue
       }
-      out.push({ remote, branches: parseRemotePrune(`${r.out}\n${r.err}`).map((name) => ({ name, trackedBy: rows.filter((f) => f[1] === name).map((f) => f[0]) })) })
+      const there = parseLsRemoteHeads(r.out)
+      const gone = [...(await trackingNames(projectPath, remote))].filter((b) => !there.has(b)).sort((a, b) => a.localeCompare(b, 'en'))
+      out.push({ remote, branches: gone.map((b) => `${remote}/${b}`).map((name) => ({ name, trackedBy: rows.filter((f) => f[1] === name).map((f) => f[0]) })) })
     }
     return out
   })
 }
 
-/** A remote's remote-tracking refs now (full names). */
-async function trackingRefs(projectPath: string, remote: string): Promise<Set<string>> {
-  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', `refs/remotes/${remote}/`])
-  return new Set(r.ok ? r.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : [])
-}
-
-/** HI-3473: the user's Fetch with prune of `raw`'s remotes: `git fetch --prune`, each in turn, saying what was dropped. */
+/**
+ * HI-3473: the user's Fetch with prune of `raw`'s remotes, each in turn: its branches fetched into its remote-tracking
+ * branches and those deleted on it dropped (trackingSpec, given on the command line so no configured refspec is pruned,
+ * and tag pruning off whatever the config says: HR1's round 1), saying what was dropped. Under the repository's lock,
+ * the quiet check made as it starts (HR1's round 1: no merge beside it, nothing started since the check).
+ */
 export async function fetchPrune(projectPath: string, raw: unknown): Promise<string> {
   const asks = remoteAsks(raw)
   if (!asks) throw combworkError(M.invalid, undefined, { kind: 'invalid' })
   const known = await remotesOf(projectPath)
   if (asks.some((a) => !known.includes(a))) throw combworkError(M.invalid, undefined, { kind: 'invalid' })
-  await withRepoLock(projectPath, () => assertRepoQuiet(projectPath), { project: projectPath })
-  return oneAtATime(projectPath, async () => {
-    const dropped: string[] = []
-    for (const remote of asks) {
-      const before = await trackingRefs(projectPath, remote)
-      const r = await net(projectPath, ['fetch', '--prune', '--', remote])
-      if (!r.ok) throw combworkError(M.fetchFailed, { remote, why: netWhy(r) })
-      const after = await trackingRefs(projectPath, remote)
-      for (const ref of before) if (!after.has(ref)) dropped.push(ref.replace(/^refs\/remotes\//, ''))
-    }
-    log.info(`The user's Fetch with prune of ${userText(asks.join(', '))} in ${userText(projectPath)} dropped ${dropped.length}`)
-    void checkProject(projectPath)
-    return tr(M.fetchedPruned, { remotes: fmt.list(asks), n: dropped.length, branches: fmt.list(dropped, 'unit') })
-  })
+  return oneAtATime(projectPath, () =>
+    withRepoLock(
+      projectPath,
+      async () => {
+        await assertRepoQuiet(projectPath)
+        for (const remote of asks) if (!(await standardRemote(projectPath, remote))) throw combworkError(M.notStandard, { remote }, { kind: 'conflict' })
+        const dropped: string[] = []
+        for (const remote of asks) {
+          const before = await trackingNames(projectPath, remote)
+          const r = await net(projectPath, ['-c', 'fetch.pruneTags=false', '-c', `remote.${remote}.pruneTags=false`, 'fetch', '--prune', '--', remote, trackingSpec(remote)])
+          if (!r.ok) throw combworkError(M.fetchFailed, { remote, why: netWhy(r) })
+          const after = await trackingNames(projectPath, remote)
+          for (const b of before) if (!after.has(b)) dropped.push(`${remote}/${b}`)
+        }
+        log.info(`The user's Fetch with prune of ${userText(asks.join(', '))} in ${userText(projectPath)} dropped ${dropped.length}`)
+        void checkProject(projectPath)
+        return tr(M.fetchedPruned, { remotes: fmt.list(asks), n: dropped.length, branches: fmt.list(dropped, 'unit') })
+      },
+      { project: projectPath }
+    )
+  )
 }

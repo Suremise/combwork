@@ -635,6 +635,10 @@
     "defaultMessage": "Windows' list of processes couldn't be read, so no lock can be called stale: nothing was removed. Try again.",
     "description": "HI-3473: an error from Remove stale lock: the list of running processes (used to rule out a git holding the lock) could not be read whole."
   },
+  "service.gitHealth.notStandard": {
+    "defaultMessage": "{remote} isn't fetched as git sets a remote up (its remote.{remote}.fetch names more than its branches, or it's a mirror), so pruning could drop more than its remote-tracking branches: Combwork leaves it to you, in a terminal.",
+    "description": "HI-3473 (a reviewer's round 1): why Fetch with Prune skips or refuses the remote {remote}: its fetch settings aren't git's default. remote.{remote}.fetch is a git setting's name: keep it."
+  },
   "service.gitHealth.pruned": {
     "defaultMessage": "{n, plural, =0 {No worktree entry was dropped.} one {Dropped # worktree entry.} other {Dropped # worktree entries.}}{kept, plural, =0 {} one { # was kept: {keptList}.} other { # were kept: {keptList}.}}",
     "description": "HI-3473: after Prune worktrees: how many of git's entries for missing worktrees were dropped ({n}), and how many were kept ({kept}) with each one's name and why ({keptList}, a list of 'name (why)')."
@@ -650,6 +654,10 @@
   "service.gitHealth.stopped": {
     "defaultMessage": "Stopped here. What git fetched or dropped before it stopped stays: look again to see where things stand.",
     "description": "HI-3473: after the user cancelled Fetch with prune or its check of a remote."
+  },
+  "service.gitHealth.unlisted": {
+    "defaultMessage": "Git couldn't list this repository's worktrees, so Combwork can't tell nothing works in them: nothing was done. Git said: {why}",
+    "description": "HI-3473 (a reviewer's round 1): an error from Repository health: git worktree list failed, so a worktree an agent or a run works in could be missed. {why} is git's error line, in English."
   },
   "service.gitOperation.agentBusy": {
     "defaultMessage": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",

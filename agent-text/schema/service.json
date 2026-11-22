@@ -622,6 +622,11 @@
   "service.gitHealth.noProcesses": {
     "placeholders": {}
   },
+  "service.gitHealth.notStandard": {
+    "placeholders": {
+      "remote": "plain"
+    }
+  },
   "service.gitHealth.slotBusy": {
     "placeholders": {
       "slot": "plain",
@@ -630,6 +635,11 @@
   },
   "service.gitHealth.stopped": {
     "placeholders": {}
+  },
+  "service.gitHealth.unlisted": {
+    "placeholders": {
+      "why": "plain"
+    }
   },
   "service.gitOperation.agentBusy": {
     "placeholders": {

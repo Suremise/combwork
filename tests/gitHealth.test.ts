@@ -38,11 +38,28 @@ vi.mock('../src/main/processTree', async (original) => {
   return { ...real, listNamedProcesses: (ms?: number) => (realProcs ? real.listNamedProcesses(ms) : Promise.resolve(procs)) }
 })
 
+/** HR1's round 1: a step before each git command a test watches (null: none), and `git worktree list` made to fail. */
+let gitHook: ((args: string[]) => Promise<void> | void) | null = null
+let failList = false
+vi.mock('../src/main/git', async (original) => {
+  const real = await original<typeof import('../src/main/git')>()
+  return {
+    ...real,
+    git: async (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]) => {
+      // A real failure of git's own: the listing asked with an option git doesn't know.
+      if (failList && args[0] === 'worktree' && args[1] === 'list') return real.git(cwd, ['worktree', 'list', '--no-such-option'], max, input, opts)
+      await gitHook?.(args)
+      return real.git(cwd, args, max, input, opts)
+    }
+  }
+})
+
 vi.setConfig({ testTimeout: timing('test.hang') })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const H = await import('../src/main/platform/git/gitHealth')
 const { platformLimits } = await import('../src/main/platform/limits')
+const { heldStoreKeys, storeKeyOf, withRepoLock } = await import('../src/main/repoLock')
 const { namedProcessList } = await vi.importActual<typeof import('../src/main/processTree')>('../src/main/processTree')
 
 const base = tempDir('cw-githealth-')
@@ -73,6 +90,8 @@ beforeEach(() => {
   slots = []
   procs = []
   realProcs = false
+  gitHook = null
+  failList = false
   // Every lock is old enough unless a test says (the age rule has its own tests).
   platformLimits.staleLockMs = () => 0
 })
@@ -91,7 +110,7 @@ describe('what git prints', () => {
       { id: 'wt1', reason: 'gitdir file points to non-existent location' },
       { id: 'b', reason: 'gitdir file does not exist' }
     ])
-    expect(H.parseRemotePrune('Pruning origin\nURL: file:///x\n * [would prune] origin/old\n * [would prune] origin/gone-too\n')).toEqual(['origin/old', 'origin/gone-too'])
+    expect([...H.parseLsRemoteHeads(`${'a'.repeat(40)}\trefs/heads/main\n${'b'.repeat(40)}\trefs/heads/cw/x\n${'c'.repeat(40)}\tHEAD\n`)]).toEqual(['main', 'cw/x'])
     expect(namedProcessList('4 0 System\n812 1700000000000 git.exe\nend\n', true)).toEqual([
       { pid: 4, started: 0, name: 'System' },
       { pid: 812, started: 1700000000000, name: 'git.exe' }
@@ -282,5 +301,91 @@ describe('Fetch with prune', () => {
     expect(r.error).toBeTruthy()
     agent = 'HB1'
     await expect(inWs(() => H.fetchPrune(proj, ['origin']))).rejects.toThrow(/HB1 is working in/)
+  })
+})
+
+describe("HR1's round 1", () => {
+  /** A project with a remote `origin` (a bare repository beside it) fetched once, `old` and `kept` on it, a local `old` tracking origin/old. */
+  function withRemote(): string {
+    const remote = join(w.path!, `remote${n}.git`)
+    sh(w.path!, 'clone', '-q', '--bare', proj, remote)
+    sh(proj, 'remote', 'add', 'origin', remote)
+    sh(remote, 'branch', 'old', 'main')
+    sh(remote, 'branch', 'kept', 'main')
+    sh(proj, 'fetch', '-q', 'origin')
+    sh(proj, 'branch', '--track', 'old', 'origin/old')
+    sh(remote, 'branch', '-D', 'old')
+    return remote
+  }
+
+  it('a local-only tag survives Fetch with prune though the config prunes tags; only the branch listed goes', async () => {
+    withRemote()
+    sh(proj, 'tag', 'local-only')
+    sh(proj, 'config', 'fetch.pruneTags', 'true')
+    sh(proj, 'config', 'remote.origin.pruneTags', 'true')
+    sh(proj, 'config', 'fetch.prune', 'true')
+    expect(await inWs(() => H.remotePrunePreview(proj))).toEqual([{ remote: 'origin', branches: [{ name: 'origin/old', trackedBy: ['old'] }] }])
+    expect(await inWs(() => H.fetchPrune(proj, ['origin']))).toBe('Fetched origin. Dropped 1 remote-tracking branch: origin/old.')
+    expect(sh(proj, 'tag', '--list')).toBe('local-only')
+    expect(sh(proj, 'branch', '-r')).toContain('origin/kept')
+  })
+
+  it('a remote fetched with more than its branches (a tag refspec) is listed with why, and refused: its tags survive', async () => {
+    withRemote()
+    sh(proj, 'tag', 'local-only')
+    sh(proj, 'config', '--add', 'remote.origin.fetch', '+refs/tags/*:refs/tags/*')
+    const [r] = await inWs(() => H.remotePrunePreview(proj))
+    expect(r).toMatchObject({ remote: 'origin', branches: [] })
+    expect(r.error).toContain("isn't fetched as git sets a remote up")
+    await expect(inWs(() => H.fetchPrune(proj, ['origin']))).rejects.toThrow("isn't fetched as git sets a remote up")
+    expect(sh(proj, 'tag', '--list')).toBe('local-only')
+    expect(sh(proj, 'branch', '-r')).toContain('origin/old')
+    // A mirror too.
+    sh(proj, 'config', '--unset', 'remote.origin.fetch', 'tags')
+    sh(proj, 'config', 'remote.origin.mirror', 'true')
+    await expect(inWs(() => H.fetchPrune(proj, ['origin']))).rejects.toThrow("isn't fetched as git sets a remote up")
+  })
+
+  it("git's fetch runs holding the repository's lock; another taker of it waits for the fetch to end", async () => {
+    withRemote()
+    const store = storeKeyOf(sh(proj, 'rev-parse', '--path-format=absolute', '--git-common-dir'))
+    const order: string[] = []
+    let entered!: () => void
+    const inFetch = new Promise<void>((res) => (entered = res))
+    let release!: () => void
+    const gate = new Promise<void>((res) => (release = res))
+    let heldDuringFetch: boolean | null = null
+    gitHook = async (args) => {
+      if (!args.includes('fetch')) return
+      heldDuringFetch = heldStoreKeys().has(store)
+      order.push('fetch')
+      entered()
+      await gate
+      order.push('fetch done')
+    }
+    const fetching = inWs(() => H.fetchPrune(proj, ['origin']))
+    await inFetch
+    // Another taker (a merge, say), started while git's fetch runs.
+    const other = withRepoLock(proj, async () => {
+      order.push('other')
+    })
+    release()
+    await Promise.all([fetching, other])
+    expect(heldDuringFetch).toBe(true)
+    expect(order).toEqual(['fetch', 'fetch done', 'other'])
+  })
+
+  it("refuses every repair when git can't list the repository's worktrees, a busy sibling unseen; nothing changes", async () => {
+    const a = worktree('wt-a')
+    const sibling = worktree('wt-b', false)
+    const [e] = (await health()).worktrees.filter((x) => norm(x.folder!) === norm(a))
+    writeFileSync(join(gitDir(), 'index.lock'), '')
+    const [l] = (await health()).locks
+    held = [sibling]
+    failList = true
+    await expect(inWs(() => H.pruneWorktrees(proj, [e]))).rejects.toThrow("Git couldn't list this repository's worktrees")
+    await expect(inWs(() => H.removeLocks(proj, [l]))).rejects.toThrow("Git couldn't list this repository's worktrees")
+    expect(existsSync(join(gitDir(), 'worktrees', e.id))).toBe(true)
+    expect(existsSync(join(gitDir(), 'index.lock'))).toBe(true)
   })
 })

@@ -160,10 +160,12 @@ interface CombworkMessageValues {
   'service.gitHealth.kept.held': undefined
   'service.gitHealth.kept.refused': undefined
   'service.gitHealth.noProcesses': undefined
+  'service.gitHealth.notStandard': { remote: string | number }
   'service.gitHealth.pruned': { n: number; kept: number; keptList: string | number }
   'service.gitHealth.removed': { n: number; kept: number; keptList: string | number }
   'service.gitHealth.slotBusy': { slot: string | number; state: string }
   'service.gitHealth.stopped': undefined
+  'service.gitHealth.unlisted': { why: string | number }
   'service.gitOperation.agentBusy': { agent: string | number; folder: string | number }
   'service.gitOperation.busy': { folder: string | number; what: string | number }
   'service.gitOperation.changed': { was: string; folder: string | number }

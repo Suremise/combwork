@@ -5887,17 +5887,24 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
     repository's lock and with a new process list, each is removed only while it is the file the user saw (its file id,
     times and size) and still stale: renamed aside in the git folder (a file a live git has open can't be), proved
     again, then removed; anything else is kept, back under its name if free, and said. No process is ever ended.
-  - **Remote-tracking branches**: **Fetch with Prune…** asks each remote which of its branches are gone (`git remote
-    prune --dry-run`, reaching the remote as Fetch does: `cw.git.networkMinutes`, a Cancel in its notice), lists them by
-    remote with the local branches that track each (they stay, their upstream shown as gone) and any remote that
-    couldn't be asked, then fetches the reachable ones with `git fetch --prune` and says what was dropped (a branch
-    deleted on the remote since the check included). Nothing changes on the remote.
-  - **Refused while anything works on the repository**, checked on the confirm under the repository's lock (Fetch with
-    prune takes it for the check only): an agent's session working in a folder of the repository (the project folder or
-    any worktree git lists: `sessions.liveStates()`, and `busyAgentIn` for each), a run or an agent's file lock there
+  - **Remote-tracking branches**: **Fetch with Prune…** asks each remote which of its branches are gone (`git
+    ls-remote --heads`, reaching the remote as Fetch does: `cw.git.networkMinutes`, a Cancel in its notice, against
+    its `refs/remotes/<name>/`), lists them by remote with the local branches that track each (they stay, their upstream
+    shown as gone) and any remote that couldn't be asked, then fetches the reachable ones and says what was dropped (a
+    branch deleted on the remote since the check included). The fetch names its refspec, `+refs/heads/*:refs/remotes/
+    <name>/*`, on the command line with `--prune` and tag pruning off (`fetch.pruneTags` and `remote.<name>.pruneTags`
+    false for it), so it can drop nothing but that remote's remote-tracking branches, whatever the config says (HR1's
+    round 1: a configured `pruneTags` would delete local tags, another refspec's destination other refs). A remote not
+    set up as git's default (its `remote.<name>.fetch` anything but that one refspec, or a mirror) is listed with why
+    and never fetched: the user's, in a terminal. Nothing changes on the remote.
+  - **Refused while anything works on the repository**, checked on the confirm under the repository's lock, held until
+    the repair is done (Fetch with prune's fetch included, HR1's round 1): an agent's session working in a folder of
+    the repository (the project folder or any worktree git lists: `sessions.liveStates()`, and `busyAgentIn` for each;
+    git's list unreadable refuses, since a worktree it would name could have one), a run or an agent's file lock there
     (`folderBuilders`), one of Combwork's own runs there (a merge check, a slot's setup), or a slot being made or
     removed. A merge holding the repository's lock (the merge queue's or the user's) is waited for, as other changes to
-    the repository wait, with the notice of who holds it: none of these runs beside it.
+    the repository wait, with the notice of who holds it, and one that comes meanwhile waits for the repair: none of
+    these runs beside it.
 - **A detach that keeps failing** (HI-3467): a clean free Git slot whose detach at its target fails for any other reason
   (an index lock, files in the way, git unable to read its head or the target's, the target's branch gone; not its
   card's own work, which keeps it) stays not ready, and the same record (`slot_operation:`, `what` `detach`) keeps git's
