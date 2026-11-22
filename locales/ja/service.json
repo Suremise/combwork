@@ -244,6 +244,7 @@
   "service.gitRestore.moved": "その間にチェックアウト中のコミットが変わりました。何も行っていません。もう一度確認してください。",
   "service.gitRestore.noCommit": "そのコミットはこのリポジトリにありません。何も行っていません。",
   "service.gitRestore.noTarget": "プロジェクトのマージ先はここではブランチではありません。何も行っていません。",
+  "service.gitRestore.notFile": "{file}は{commit}ではファイルではありません（フォルダーまたはサブモジュールです）。何も行っていません。",
   "service.gitRestore.notTracked": "Gitは{file}を追跡していません。何も行っていません。",
   "service.gitRestore.nothing": "{file}にはコミットされていない変更がありません。何も行っていません。",
   "service.gitRestore.operation": "{folder}のGitは{what, select, merge {マージ} rebase {リベース} am {am} cherryPick {チェリーピック} bisect {bisect} other {リバート}}の途中です。何も行っていません。先にそれを終えてください（「バージョン管理」→「変更」）。",

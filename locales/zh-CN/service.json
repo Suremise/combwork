@@ -244,6 +244,7 @@
   "service.gitRestore.moved": "在此期间当前签出的提交已变化：未做任何操作。请重新查看。",
   "service.gitRestore.noCommit": "该提交不在此仓库中：未做任何操作。",
   "service.gitRestore.noTarget": "项目的目标在这里不是分支：未做任何操作。",
+  "service.gitRestore.notFile": "{file} 在 {commit} 中不是文件（那里是文件夹或子模块）：未做任何操作。",
   "service.gitRestore.notTracked": "Git 未跟踪 {file}：未做任何操作。",
   "service.gitRestore.nothing": "{file} 没有未提交的更改：未做任何操作。",
   "service.gitRestore.operation": "Git 在 {folder} 中正处于{what, select, merge {合并} rebase {变基} am {am} cherryPick {拣选（cherry-pick）} bisect {二分查找（bisect）} other {还原（revert）}}过程中：未做任何操作。请先完成它（“版本控制”→“更改”）。",

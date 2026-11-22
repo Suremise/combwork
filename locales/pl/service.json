@@ -244,6 +244,7 @@
   "service.gitRestore.moved": "Bieżący commit zmienił się w międzyczasie: nic nie zrobiono. Sprawdź jeszcze raz.",
   "service.gitRestore.noCommit": "Tego commita nie ma w tym repozytorium: nic nie zrobiono.",
   "service.gitRestore.noTarget": "Cel projektu nie jest tu gałęzią: nic nie zrobiono.",
+  "service.gitRestore.notFile": "{file} nie jest plikiem w {commit} (jest tam folderem lub submodułem): nic nie zrobiono.",
   "service.gitRestore.notTracked": "Git nie śledzi {file}: nic nie zrobiono.",
   "service.gitRestore.nothing": "{file} nie ma niezatwierdzonych zmian: nic nie zrobiono.",
   "service.gitRestore.operation": "Git w folderze {folder} jest w trakcie {what, select, merge {scalania} rebase {rebase’u} am {am} cherryPick {cherry-picka} bisect {bisectu} other {revertu}}: nic nie zrobiono. Najpierw to dokończ (Kontrola wersji → Zmiany).",

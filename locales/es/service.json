@@ -244,6 +244,7 @@
   "service.gitRestore.moved": "El commit actual cambió mientras tanto: no se hizo nada. Vuelve a mirar.",
   "service.gitRestore.noCommit": "Ese commit no está en este repositorio: no se hizo nada.",
   "service.gitRestore.noTarget": "El destino del proyecto no es una rama aquí: no se hizo nada.",
+  "service.gitRestore.notFile": "{file} no es un archivo en {commit} (allí es una carpeta o un submódulo): no se hizo nada.",
   "service.gitRestore.notTracked": "Git no hace seguimiento de {file}: no se hizo nada.",
   "service.gitRestore.nothing": "{file} no tiene cambios sin confirmar: no se hizo nada.",
   "service.gitRestore.operation": "Git está en medio de {what, select, merge {una fusión} rebase {un rebase} am {un am} cherryPick {un cherry-pick} bisect {un bisect} other {un revert}} en {folder}: no se hizo nada. Termínalo primero (Control de versiones → Cambios).",

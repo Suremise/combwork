@@ -282,6 +282,7 @@ interface CombworkMessageValues {
   'service.gitRestore.moved': undefined
   'service.gitRestore.noCommit': undefined
   'service.gitRestore.noTarget': undefined
+  'service.gitRestore.notFile': { file: string | number; commit: string | number }
   'service.gitRestore.notTracked': { file: string | number }
   'service.gitRestore.nothing': { file: string | number }
   'service.gitRestore.operation': { what: string; folder: string | number }

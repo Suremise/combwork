@@ -244,6 +244,7 @@
   "service.gitRestore.moved": "Der ausgecheckte Commit hat sich inzwischen geändert: Es wurde nichts getan. Sieh noch einmal nach.",
   "service.gitRestore.noCommit": "Dieser Commit ist nicht in diesem Repository: Es wurde nichts getan.",
   "service.gitRestore.noTarget": "Das Ziel des Projekts ist hier kein Branch: Es wurde nichts getan.",
+  "service.gitRestore.notFile": "{file} ist in {commit} keine Datei (dort ein Ordner oder ein Submodul): Es wurde nichts getan.",
   "service.gitRestore.notTracked": "Git verfolgt {file} nicht: Es wurde nichts getan.",
   "service.gitRestore.nothing": "{file} hat keine nicht committeten Änderungen: Es wurde nichts getan.",
   "service.gitRestore.operation": "Git ist in {folder} mitten in {what, select, merge {einem Merge} rebase {einem Rebase} am {einem am} cherryPick {einem Cherry-Pick} bisect {einem Bisect} other {einem Revert}}: Es wurde nichts getan. Schließe es zuerst ab (Versionsverwaltung → Änderungen).",

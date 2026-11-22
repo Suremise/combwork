@@ -11,6 +11,7 @@ import { bumpGit, confirm, notify } from '../store'
 import { cx } from '../util'
 import { Pager } from './DataTable'
 import { DiffView } from './Editors'
+import { commitPicks, type CommitPicks, type PickShown } from './commitPicks'
 import { Icon } from './ui'
 
 // HI-3477: the Files tab's Discard Changes… and Restore From… (SPEC §16.10.2, Discard and restore a file): each asks
@@ -65,10 +66,12 @@ function RestoreDiff({ plan }: { plan: FileRestorePlan }) {
 }
 
 /** A Commit…'s list: the commits that changed the file, a page at a time; a click shows that commit's version. */
-function CommitPicker({ project, rel, onPick }: { project: ProjectInfo; rel: string; onPick: (plan: FileRestorePlan | null) => void }) {
+function CommitPicker({ project, rel, picks }: { project: ProjectInfo; rel: string; picks: CommitPicks<FileRestorePlan> }) {
   const [page, setPage] = useState(1)
   const [list, setList] = useState<{ page: number; data: FileCommits | null; error?: string } | null>(null)
-  const [plan, setPlan] = useState<{ commit: string; plan: FileRestorePlan | null; error?: string } | null>(null)
+  // What the picks show: the latest click's answer only, the same one Restore acts on (commitPicks.ts).
+  const [plan, setPlan] = useState<PickShown<FileRestorePlan> | null>(picks.shown())
+  useEffect(() => picks.watch(setPlan), [picks])
   useEffect(() => {
     let live = true
     void repoOp('files:gitFileCommits', project.path, rel, page).then(
@@ -79,17 +82,6 @@ function CommitPicker({ project, rel, onPick }: { project: ProjectInfo; rel: str
       live = false
     }
   }, [project.path, rel, page])
-  const pick = (commit: string): void => {
-    onPick(null)
-    setPlan({ commit, plan: null })
-    void repoOp('files:gitRestorePlan', project.path, rel, 'commit', commit).then(
-      (p) => {
-        onPick(p.exists ? p : null)
-        setPlan((was) => (was?.commit === commit ? { commit, plan: p } : was))
-      },
-      (e) => setPlan((was) => (was?.commit === commit ? { commit, plan: null, error: errorMessage(e) } : was))
-    )
-  }
   const data = list?.data
   return (
     <div className="file-restore-picker" data-restore-picker="">
@@ -102,7 +94,7 @@ function CommitPicker({ project, rel, onPick }: { project: ProjectInfo; rel: str
       ) : (
         <div className="git-rows file-restore-commits">
           {data.commits.map((c) => (
-            <button type="button" key={c.hash} className={cx('git-row', 'git-commit', plan?.commit === c.hash && 'current')} data-commit={c.short} onClick={() => pick(c.hash)}>
+            <button type="button" key={c.hash} className={cx('git-row', 'git-commit', plan?.commit === c.hash && 'current')} data-commit={c.short} onClick={() => picks.pick(c.hash)}>
               <code className="git-hash">{c.short}</code>
               <span className="git-subject">{c.subject}</span>
               <span className="git-meta faint">
@@ -166,17 +158,17 @@ export async function restoreFile(project: ProjectInfo, rel: string, source: Exc
 /** Restore From → A Commit…: the file's commits listed in the confirm, Restore acting on the one picked. */
 export async function restoreFromCommit(project: ProjectInfo, rel: string, changed: boolean, reload: () => void): Promise<void> {
   const name = nameOf(rel)
-  let picked: FileRestorePlan | null = null
+  const picks = commitPicks((commit) => repoOp('files:gitRestorePlan', project.path, rel, 'commit', commit), errorMessage)
   let result: { plan: FileRestorePlan; r: FileRestored } | null = null
   const ok = await confirm({
     title: tr(T.restoreTitle, { source: 'commit', name, target: '' }),
     message: tr(T.restoreMessage, { source: 'commit', target: '', commit: '', changed: changed ? 'yes' : 'no' }),
-    content: <CommitPicker project={project} rel={rel} onPick={(p) => (picked = p)} />,
+    content: <CommitPicker project={project} rel={rel} picks={picks} />,
     wide: true,
     confirmLabel: tr(T.restoreButton),
     busyLabel: tr(T.restoring),
     run: async () => {
-      const plan = picked as FileRestorePlan | null
+      const plan = picks.chosen()
       if (!plan) throw new Error(tr(T.pickFirst))
       result = { plan, r: await repoOp('files:gitRestore', project.path, { rel: plan.rel, source: 'commit', commit: plan.commit }) }
     }

@@ -33,6 +33,7 @@ export const RESTORE_TEXT = {
   notTracked: msg({ id: 'service.gitRestore.notTracked', defaultMessage: "Git doesn't track {file}: nothing was done.", description: "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: the file ({file}, a path) isn't one git tracks." }),
   noTarget: msg({ id: 'service.gitRestore.noTarget', defaultMessage: "The project's target isn't a branch here: nothing was done.", description: "HI-3477: an error from the Files tab's Restore From → Target Branch: the project's target branch isn't a branch in this repository." }),
   noCommit: msg({ id: 'service.gitRestore.noCommit', defaultMessage: "That commit isn't in this repository: nothing was done.", description: "HI-3477: an error from the Files tab's Restore From → A Commit…: the commit chosen can't be found." }),
+  notFile: msg({ id: 'service.gitRestore.notFile', defaultMessage: "{file} isn't a file in {commit} (a folder or a submodule there): nothing was done.", description: "HI-3477: an error from the Files tab's Restore From…: at the commit chosen or on the target ({commit}, a short commit id) the path ({file}) is a folder or a submodule, not a file, so it can't be restored as one." }),
   missing: msg({ id: 'service.gitRestore.missing', defaultMessage: "{file} isn't in {commit}: nothing was done.", description: "HI-3477: an error from the Files tab's Restore From…: the file ({file}, a path) isn't in the commit chosen or on the target ({commit}, a short commit id)." }),
   nothing: msg({ id: 'service.gitRestore.nothing', defaultMessage: '{file} has no uncommitted changes: nothing was done.', description: "HI-3477: an error from the Files tab's Discard Changes…: the file ({file}, a path) has nothing to discard (committed or discarded meanwhile)." }),
   moved: msg({ id: 'service.gitRestore.moved', defaultMessage: 'The commit checked out changed meanwhile: nothing was done. Look again.', description: "HI-3477: an error from the Files tab's Discard Changes…: the folder's HEAD moved since the confirm showed the diff (a commit, a switch)." }),
@@ -63,10 +64,14 @@ function fileOf(projectPath: string, rel: unknown): string {
   return p
 }
 
-/** Refused unless git tracks the file (in the index, so a file staged as new is one too). */
+/**
+ * Refused unless git tracks the file itself: an index entry of exactly that path (a file staged as new is one too), a
+ * file's, never a folder with tracked files in it or a submodule.
+ */
 async function assertTracked(projectPath: string, rel: string): Promise<void> {
-  const r = await git(projectPath, ['--literal-pathspecs', 'ls-files', '--error-unmatch', '--', rel])
-  if (!r.ok) throw combworkError(M.notTracked, { file: rel }, { kind: 'conflict' })
+  const r = await git(projectPath, ['--literal-pathspecs', 'ls-files', '-s', '-z', '--', rel])
+  const entry = r.ok ? r.out.split('\0').find((row) => row.slice(row.indexOf('\t') + 1) === rel) : undefined
+  if (!entry || entry.startsWith('160000 ')) throw combworkError(M.notTracked, { file: rel }, { kind: 'conflict' })
 }
 
 /** The file's row in `git status`: its two letters, or null when it has no uncommitted changes. */
@@ -107,8 +112,21 @@ async function versionAt(projectPath: string, commit: string, rel: string): Prom
   return r.ok ? r : null
 }
 
-async function existsAt(projectPath: string, commit: string, rel: string): Promise<boolean> {
-  return (await git(projectPath, ['cat-file', '-e', `${commit}:./${rel}`])).ok
+/**
+ * What the path is in a commit: a file ('blob'), something else (a folder, a submodule), or null when it isn't there.
+ * Only a file is restored: a folder at that path would turn the file into it (round 1's finding).
+ */
+async function entryAt(projectPath: string, commit: string, rel: string): Promise<'blob' | 'other' | null> {
+  const r = await git(projectPath, ['cat-file', '-t', `${commit}:./${rel}`])
+  if (!r.ok) return null
+  return r.out.trim() === 'blob' ? 'blob' : 'other'
+}
+
+/** Refused when the path is in the commit but isn't a file there. Whether it is a file there. */
+async function fileAt(projectPath: string, commit: string, rel: string): Promise<boolean> {
+  const kind = await entryAt(projectPath, commit, rel)
+  if (kind === 'other') throw combworkError(M.notFile, { file: rel, commit: commit.slice(0, 7) }, { kind: 'conflict' })
+  return kind === 'blob'
 }
 
 /** HI-3477: what Discard (source head) or Restore would do to `rel`, for its confirm. */
@@ -116,8 +134,9 @@ export async function restorePlan(projectPath: string, relRaw: unknown, source: 
   const rel = fileOf(projectPath, relRaw)
   await assertTracked(projectPath, rel)
   const commit = await sourceCommit(projectPath, source, target, picked)
-  const [xy, at, working] = await Promise.all([statusOf(projectPath, rel), versionAt(projectPath, commit, rel), workingCopy(projectPath, resolve(projectPath, rel))])
-  const plan = { rel, source, commit, short: commit.slice(0, 7), target: source === 'target' ? target : null, exists: !!at, changed: !!xy }
+  const exists = await fileAt(projectPath, commit, rel)
+  const [xy, at, working] = await Promise.all([statusOf(projectPath, rel), exists ? versionAt(projectPath, commit, rel) : null, workingCopy(projectPath, resolve(projectPath, rel))])
+  const plan = { rel, source, commit, short: commit.slice(0, 7), target: source === 'target' ? target : null, exists, changed: !!xy }
   const diff = ((): GitDiff => {
     if (!Buffer.isBuffer(working)) return tooLargeDiff(rel, working.tooLarge)
     const becomes = at?.buf ?? Buffer.alloc(0)
@@ -187,7 +206,7 @@ export async function restoreFile(projectPath: string, req: FileRestoreRequest, 
           if (!xy) throw combworkError(M.nothing, { file: rel }, { kind: 'conflict' })
         } else {
           if (!(await commitOf(projectPath, req.commit))) throw combworkError(M.noCommit, undefined, { kind: 'conflict' })
-          if (!(await existsAt(projectPath, req.commit, rel))) throw combworkError(M.missing, { file: rel, commit: req.commit.slice(0, 7) }, { kind: 'conflict' })
+          if (!(await fileAt(projectPath, req.commit, rel))) throw combworkError(M.missing, { file: rel, commit: req.commit.slice(0, 7) }, { kind: 'conflict' })
         }
         let stashed = false
         if (xy) {

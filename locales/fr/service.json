@@ -244,6 +244,7 @@
   "service.gitRestore.moved": "Le commit extrait a changé entre-temps : rien n’a été fait. Regarde de nouveau.",
   "service.gitRestore.noCommit": "Ce commit n’est pas dans ce dépôt : rien n’a été fait.",
   "service.gitRestore.noTarget": "La cible du projet n’est pas une branche ici : rien n’a été fait.",
+  "service.gitRestore.notFile": "{file} n’est pas un fichier dans {commit} (un dossier ou un sous-module à cet endroit) : rien n’a été fait.",
   "service.gitRestore.notTracked": "Git ne suit pas {file} : rien n’a été fait.",
   "service.gitRestore.nothing": "{file} n’a pas de modifications non commitées : rien n’a été fait.",
   "service.gitRestore.operation": "Git est au milieu {what, select, merge {d’une fusion} rebase {d’un rebase} am {d’un am} cherryPick {d’un cherry-pick} bisect {d’un bisect} other {d’un revert}} dans {folder} : rien n’a été fait. Termine-le d’abord (Gestion de versions → Modifications).",

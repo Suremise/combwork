@@ -181,6 +181,28 @@ describe('Restore From', () => {
     expect(stashMessages()).toEqual([])
   })
 
+  it('round 1: refuses a commit where the path is a folder, in the plan and the restore; nothing is changed', async () => {
+    // a.txt a folder then (a.txt/child), a file now.
+    sh(proj, 'rm', '-q', 'a.txt')
+    commit(proj, { 'a.txt/child': 'child\n' }, 'a folder')
+    const folderAt = head()
+    sh(proj, 'rm', '-rq', 'a.txt')
+    commit(proj, { 'a.txt': 'a file again\n' }, 'a file')
+    write('a.txt', 'mine\n')
+    await expect(plan('a.txt', 'commit', null, folderAt)).rejects.toThrow(`a.txt isn't a file in ${folderAt.slice(0, 7)}`)
+    await expect(restore('a.txt', 'commit', folderAt)).rejects.toThrow(`a.txt isn't a file in ${folderAt.slice(0, 7)}`)
+    expect(read('a.txt')).toBe('mine\n')
+    expect(stashMessages()).toEqual([])
+  })
+
+  it('round 1: refuses a folder of tracked files as the file, before anything is stashed', async () => {
+    write('sub/c.txt', 'mine\n')
+    await expect(plan('sub', 'head')).rejects.toThrow("Git doesn't track sub")
+    await expect(restore('sub', 'head', head())).rejects.toThrow("Git doesn't track sub")
+    expect(read('sub/c.txt')).toBe('mine\n')
+    expect(stashMessages()).toEqual([])
+  })
+
   it("A Commit…'s list: only the file's own commits, newest first, a page at a time", async () => {
     for (let i = 1; i <= HISTORY_COMMITS + 2; i++) commit(proj, { 'a.txt': `v${i}\n`, ...(i % 2 ? { 'b.txt': `b${i}\n` } : {}) }, `a ${i}`)
     commit(proj, { 'b.txt': 'only b\n' }, 'only b')

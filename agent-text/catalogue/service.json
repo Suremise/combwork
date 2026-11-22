@@ -1099,6 +1099,11 @@
     "note": "HI-3477: an error from the Files tab's Restore From → Target Branch: the project's target branch isn't a branch in this repository.",
     "audience": "both"
   },
+  "service.gitRestore.notFile": {
+    "text": "{file} isn't a file in {commit} (a folder or a submodule there): nothing was done.",
+    "note": "HI-3477: an error from the Files tab's Restore From…: at the commit chosen or on the target ({commit}, a short commit id) the path ({file}) is a folder or a submodule, not a file, so it can't be restored as one.",
+    "audience": "both"
+  },
   "service.gitRestore.notTracked": {
     "text": "Git doesn't track {file}: nothing was done.",
     "note": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: the file ({file}, a path) isn't one git tracks.",

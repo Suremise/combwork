@@ -1086,6 +1086,12 @@
   "service.gitRestore.noTarget": {
     "placeholders": {}
   },
+  "service.gitRestore.notFile": {
+    "placeholders": {
+      "file": "plain",
+      "commit": "plain"
+    }
+  },
   "service.gitRestore.notTracked": {
     "placeholders": {
       "file": "plain"

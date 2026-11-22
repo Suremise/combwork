@@ -280,6 +280,7 @@
   "service.gitRestore.moved": "The commit checked out changed meanwhile: nothing was done. Look again.",
   "service.gitRestore.noCommit": "That commit isn't in this repository: nothing was done.",
   "service.gitRestore.noTarget": "The project's target isn't a branch here: nothing was done.",
+  "service.gitRestore.notFile": "{file} isn't a file in {commit} (a folder or a submodule there): nothing was done.",
   "service.gitRestore.notTracked": "Git doesn't track {file}: nothing was done.",
   "service.gitRestore.nothing": "{file} has no uncommitted changes: nothing was done.",
   "service.gitRestore.operation": "Git is in the middle of {what, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}: nothing was done. Finish it first (Version Control → Changes).",
