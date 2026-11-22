@@ -32,7 +32,7 @@ import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../pla
 import { adaptersFor } from '../platform/adapters'
 import { historyOf } from '../platform/historyPorts'
 import type { Deliverables } from '../platform/deliverables'
-import { pathsDeliverables } from '../platform/deliverablesPorts'
+import { pathsDeliverables, requirePathsDeliverables } from '../platform/deliverablesPorts'
 import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
 import { releaseReadsOf } from '../platform/releaseReadsPorts'
 import { stillAsRead, unreleasedFor, type ReleaseReads } from '../platform/releaseReads'
@@ -611,14 +611,25 @@ const SETUP_PAUSES = new Set(['noUpstream', 'remoteAmbiguous', 'remoteUnsupporte
 
 export class Workflow {
   readonly store: FactStore
-  readonly none: Deliverables
+  /**
+   * The content hashing of the platform whose cards declare paths (None's), kept for every project while one is installed
+   * (the watcher's writes and agents' edits invalidate it); null in a build without such a platform (HI-3489), where no
+   * card declares paths.
+   */
+  readonly none: Deliverables | null
   /** The platform adapters (§16.3.1): the runtime asks them, and never switches on a platform id. */
   private platforms: Record<PlatformId, PlatformAdapter>
 
   constructor(readonly cfg: WorkflowConfig) {
     this.store = cfg.store
-    this.none = pathsDeliverables().of(cfg.project, cfg.options().excluded)
-    this.platforms = adaptersFor(this, this.none)
+    this.none = pathsDeliverables()?.of(cfg.project, cfg.options().excluded) ?? null
+    this.platforms = adaptersFor(this)
+  }
+
+  /** The content hashing, where only a card declaring paths gets: its platform is installed, so it is there. */
+  deliverables(): Deliverables {
+    if (!this.none) throw new Error('No platform declares paths') // i18n-ignore: an internal error, for the log
+    return this.none
   }
 
   /** The adapter of a ruleset's platform (a card keeps its ruleset's, so a switch applies from the next card). */
@@ -1301,7 +1312,7 @@ export class Workflow {
           evidenceMoved = true
           return undone(changed)
         }
-        if (g.baselineGen !== undefined && g.baselineGen !== this.none.generation) {
+        if (g.baselineGen !== undefined && g.baselineGen !== this.none?.generation) {
           baselineMoved = true
           return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
         }
@@ -3538,7 +3549,7 @@ export class Workflow {
   /** Edits Combwork saw through the card's agents' hooks and file locks: the pre-fill of its paths. */
   noteEdit(card: CardRecord, path: string): void {
     this.store.addPrefill(card.id, path)
-    this.none.invalidate(path)
+    this.none?.invalidate(path)
   }
 
   /**
@@ -3546,7 +3557,7 @@ export class Workflow {
    * agent or the user active), else left as an unclaimed change.
    */
   noteWrite(path: string, active: { agents: string[]; user: boolean }): void {
-    this.none.invalidate(path)
+    this.none?.invalidate(path)
     if (active.user || active.agents.length !== 1) return
     const card = this.store.cards().find((c) => c.stage === 'active' && this.state(c).started?.builder === active.agents[0])
     if (card) this.noteEdit(card, path)
@@ -3568,14 +3579,14 @@ export class Workflow {
       commit?.()
       return this.store.updateCard(card0.id, { paths })
     })
-    const rev = this.none.revision(paths)
+    const rev = this.deliverables().revision(paths)
     return { prefill: this.prefill(card), unclaimed: await this.unclaimed(card), revision: isUnknown(rev) ? null : rev.revision }
   }
 
   /** The first declared path under `.combwork`, `.git` or an excluded folder (#1511), with that folder; null when none is. */
   private excludedPath(paths: readonly string[]): { path: string; folder: string } | null {
     for (const path of paths) {
-      const folder = this.none.excludedPart(path)
+      const folder = this.deliverables().excludedPart(path)
       if (folder) return { path, folder }
     }
     return null
@@ -3593,19 +3604,20 @@ export class Workflow {
     if (this.store.card(card0.id).kind === 'no-code') return []
     for (let tries = 0; tries < 2; tries++) {
       const cycle = this.state(this.store.card(card0.id)).cycle
-      const generation = this.none.generation
-      const now = await pathsDeliverables().readWhole(this.none, o.signal)
+      const none = this.deliverables()
+      const generation = none.generation
+      const now = await requirePathsDeliverables().readWhole(none, o.signal)
       if (!now || isUnknown(now) || o.signal?.aborted) return []
       const card = this.store.card(card0.id)
       const s = this.state(card)
       if (s.cycle !== cycle || card.kind === 'no-code') return []
-      if (this.none.generation !== generation) continue
-      const before = this.none.covering(s.started?.deliverables ?? {})
+      if (none.generation !== generation) continue
+      const before = none.covering(s.started?.deliverables ?? {})
       // Covered as a revision covers them (HI-2339): a declared folder's files are the card's.
       const mine = [...(o.paths ?? card.paths ?? []), ...this.prefill(card)]
-      return pathsDeliverables().diff(before, this.none.covering(now))
+      return requirePathsDeliverables().diff(before, none.covering(now))
         .map((f) => f.path)
-        .filter((p) => !this.none.covers(mine, p))
+        .filter((p) => !none.covers(mine, p))
     }
     return []
   }
@@ -3634,7 +3646,7 @@ export class Workflow {
     if (!declaresPaths(o.platform) || card.kind !== 'code') return []
     const paths = card.paths ?? []
     const out: string[] = []
-    const outside = given ? [] : this.prefill(card).filter((p) => !this.none.covers(paths, p))
+    const outside = given ? [] : this.prefill(card).filter((p) => !this.deliverables().covers(paths, p))
     if (outside.length) out.push(say(W.pathsLeaveOut, { card: card.key, files: outside.join(', ') }))
     const unclaimed = (await this.unclaimed(card, { paths, signal })).filter((p) => !outside.includes(p))
     if (unclaimed.length) out.push(say(W.unclaimed, { card: card.key, files: unclaimed.join(', ') }))
@@ -3649,7 +3661,7 @@ export class Workflow {
     if (!declaresPaths(o.platform) || card.kind !== 'code') return null
     const prefill = this.prefill(card)
     const paths = card.paths ?? prefill
-    const outside = prefill.filter((p) => !this.none.covers(paths, p))
+    const outside = prefill.filter((p) => !this.deliverables().covers(paths, p))
     const files = [...outside, ...(await this.unclaimed(card, { paths })).filter((p) => !outside.includes(p))]
     return files.length ? { paths, files } : null
   }

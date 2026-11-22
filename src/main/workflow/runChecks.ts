@@ -20,7 +20,7 @@ import { getTask } from '../tasks'
 import type { WorkspaceService } from '../workspace'
 import { platformIdOf } from '../platform/registry'
 import type { Deliverables } from '../platform/deliverables'
-import { pathsDeliverables } from '../platform/deliverablesPorts'
+import { requirePathsDeliverables } from '../platform/deliverablesPorts'
 import type { WriteLog } from '../platform/history'
 import { hasHistory, historyOf, observePort as appObserver } from '../platform/historyPorts'
 import { isUnknown, type Maybe } from '../platform/types'
@@ -91,7 +91,7 @@ const kept = (paths: string[]): string[] => [...new Set(paths)].slice(0, CHANGES
 
 /** None's hasher of the project, its configured exclusions left out of the deliverables. */
 function noneOf(r: CheckRunFor): Deliverables {
-  return pathsDeliverables().of(r.project, r.excluded)
+  return requirePathsDeliverables().of(r.project, r.excluded)
 }
 
 /**
@@ -101,7 +101,7 @@ function noneOf(r: CheckRunFor): Deliverables {
  */
 async function nonePoint(r: CheckRunFor, paths: readonly string[], withSnapshot: boolean): Promise<{ revision: string | null; snapshot: string | null }> {
   const none = noneOf(r)
-  const p = await pathsDeliverables().readPoint(none, paths, withSnapshot)
+  const p = await requirePathsDeliverables().readPoint(none, paths, withSnapshot)
   return { revision: p?.revision ?? null, snapshot: p?.snapshot ?? null }
 }
 

@@ -406,11 +406,14 @@ the registries: `platform/adapters.ts` and the port lookups `repoPorts.ts`, `wor
 `sealBreaks` (check:repo) fails any other import of a folder's file from `src/`, a new folder's at once; tests import a
 folder's files directly. **Adding a version control** is a folder `src/main/platform/<vc>/` holding its adapter and
 port implementations, its line in `adapters.ts` and in each port registry it implements, and its descriptor in
-`src/shared/platform/descriptors.ts` (its `PlatformId`, its `PLATFORMS` entry); removing one is deleting its folder,
-those lines and its descriptor. What else names a platform by its id is data keyed by it, and typecheck lists each
-place when one goes: the `Record<PlatformId, …>` maps (`PLATFORM_VIEW`, `FOUND`, `PLATFORM_NAME`, presets, form groups
-and their words, a page's sections), the lists of every id (the levels', the settings catalogue's, the templates'), and
-the defaults that name None (detection finding nothing, a project with no platform recorded, the default exclusions).
+`src/shared/platform/descriptors.ts` (its `PlatformId`, its `PLATFORMS` entry), plus its rows in the data keyed by
+platform id. **Removing one** is deleting its folder, those lines, its descriptor and those rows (HI-3489's decision:
+the rows stay in the shared tables, not in the folder). Typecheck lists each row when the id goes, so none is missed:
+the `Record<PlatformId, …>` maps (`PLATFORM_VIEW`, `FOUND`, `PLATFORM_NAME`, presets, form groups and their words, a
+page's sections), the lists of every id (the levels', the settings catalogue's, the templates'), and the defaults that
+name None (detection finding nothing, a project with no platform recorded, the default exclusions). Nothing else needs
+a platform at run time: the workflow keeps None's content hashing (`Workflow.none`) only while a platform declaring
+paths is installed, and asks for it (`deliverables()`) only on such a card's paths and checks.
 
 **Removed: jj** (HI-3468). Combwork supported Jujutsu as a third version control from 1.5.0 to 1.6.x; 1.7.0 removed it
 with no migration, leaving Git and None behind the same adapter interface. A `.jj` folder now reads as another version

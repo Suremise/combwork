@@ -11,12 +11,17 @@ const PORTS: Partial<Record<PlatformId, DeliverablesPort>> = { none: noneDeliver
 const ORDER: readonly DeliverablesPort[] = Object.values(PORTS)
 
 /**
- * The deliverables of the platform whose cards declare paths, for the workflow, which keeps one for every project
- * whatever its platform (its watcher's writes and agents' edits invalidate it) and asks it on a None card's paths and
- * checks. 1.4.0 has one such platform (None).
+ * The deliverables of the platform whose cards declare paths, or null when no installed platform's do (a build without
+ * None). The workflow keeps one for every project while there is one (its watcher's writes and agents' edits invalidate
+ * it) and asks it on a card's paths and checks; nothing else needs it, so a build without None starts without it.
  */
-export function pathsDeliverables(): DeliverablesPort {
-  const p = ORDER[0]
+export function pathsDeliverables(): DeliverablesPort | null {
+  return ORDER[0] ?? null
+}
+
+/** pathsDeliverables where only a card declaring paths gets: its platform is installed, so one is there. */
+export function requirePathsDeliverables(): DeliverablesPort {
+  const p = pathsDeliverables()
   if (!p) throw new Error('No platform declares paths') // i18n-ignore: an internal error, for the log
   return p
 }

@@ -543,7 +543,7 @@ export async function reconcileNone(wf: Workflow, card: CardRecord, s: CardState
     return
   }
   if (!passingReviewers(s).length) return
-  const now = wf.none.revision(card.paths ?? [])
+  const now = wf.deliverables().revision(card.paths ?? [])
   if (isUnknown(now) || now.revision === s.approved?.revision) return
   await wf.write(card, r, 'outside', (w) => {
     if (!sameCycle(w, s)) return

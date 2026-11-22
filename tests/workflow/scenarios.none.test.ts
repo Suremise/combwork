@@ -378,8 +378,8 @@ describe('None: what a submission leaves out of its paths is named (HI-2339)', (
     expect(changed).toEqual(expect.arrayContaining(['src/a.txt', 'lib/b.txt']))
     expect(changed.some((f) => f.startsWith('node_modules/'))).toBe(false)
     // An empty path is no declaration of the root: it covers nothing.
-    expect(e.wf.none.covers([''], 'src/a.txt')).toBe(false)
-    expect(e.wf.none.covers(['.'], 'node_modules/x/index.js')).toBe(false)
+    expect(e.wf.deliverables().covers([''], 'src/a.txt')).toBe(false)
+    expect(e.wf.deliverables().covers(['.'], 'node_modules/x/index.js')).toBe(false)
   })
 
   it('Solo with no version control: its submission (Done, no review) names what its paths leave out too', async () => {

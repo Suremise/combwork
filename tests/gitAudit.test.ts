@@ -44,7 +44,13 @@ describe('the Git/None cutover audit', () => {
     const seam = 'src/main/platform/workspacePort.ts'
     expect(sealed({ [seam]: `import { NonePlatform } from './none/nonePlatform'\n${text(seam)}` })).toEqual(['src/main/platform/workspacePort -> src/main/platform/none/nonePlatform'])
     const gitFile = 'src/main/platform/git/gitPlatform.ts'
+    const nonePlatformFile = 'src/main/platform/none/nonePlatform.ts'
     expect(sealed({ [gitFile]: `import { NoneAdapter } from '../none/none'\n${text(gitFile)}` })).toEqual(['src/main/platform/git/gitPlatform -> src/main/platform/none/none'])
+    // A computed specifier inside a platform's folder can't be proved to stay there (HI-3489 round 1: one in git/ loading
+    // ../none/none, spelled by char codes, went unseen).
+    const charCodes = 'const target = String.fromCharCode(46,46,47,110,111,110,101,47,110,111,110,101)\nvoid import(target)\n'
+    expect(sealed({ [gitFile]: `${text(gitFile)}\n${charCodes}` })).toEqual(['src/main/platform/git/gitPlatform -> (computed specifier)'])
+    expect(sealed({ [nonePlatformFile]: `${text(nonePlatformFile)}\nconst m = './no' + 'ne'\nconst later = () => require(m)\n` })).toEqual(['src/main/platform/none/nonePlatform -> (computed specifier)'])
     // A registry may: the adapters' map names every platform's adapter. A folder's own files import each other.
     const adapters = 'src/main/platform/adapters.ts'
     expect(sealed({ [adapters]: `import { NoneAdapter } from './none/none'\n${text(adapters)}` })).toEqual([])

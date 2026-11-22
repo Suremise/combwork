@@ -165,7 +165,7 @@ function fileEdges(root, file, text) {
  * The "platform with lines" seams (HI-2792), and the platform with declared paths' (HI-3489: `pathsDeliverables`): each
  * call of these lookups, counted per file.
  */
-export const SEAM_CALLS = ['lineHistory', 'lineRepoReads', 'lineRepoOps', 'queueIntegration', 'slotWorkspaces', 'slotRelocation', 'pathsDeliverables']
+export const SEAM_CALLS = ['lineHistory', 'lineRepoReads', 'lineRepoOps', 'queueIntegration', 'slotWorkspaces', 'slotRelocation', 'pathsDeliverables', 'requirePathsDeliverables']
 
 /** Each file's count of each seam call (`name(`), outside the port modules that define them. */
 export function seamCounts(root, over = {}) {
@@ -562,7 +562,7 @@ const sealParsed = new Map()
 
 /**
  * Each import of a platform folder's file from outside that folder, not a registry's: `<file> -> <module>` (and a
- * computed specifier outside the folders, which could load one). Empty when every folder is sealed.
+ * computed specifier anywhere, inside the folders too, which could load one). Empty when every folder is sealed.
  */
 export function sealBreaks(root, over = {}) {
   const folders = platformFolders(root, over)
@@ -579,7 +579,9 @@ export function sealBreaks(root, over = {}) {
     if (kept?.text !== text) sealParsed.set(key, (kept = { text, modules: modulesNamed(root, file, text) }))
     const own = folderOf(f)
     for (const m of kept.modules) {
-      if (m === HIDDEN ? !own : folderOf(m) !== null && folderOf(m) !== own) out.push(`${f} -> ${m}`)
+      // A computed specifier can't be proved to stay in its folder, so it breaks the seal anywhere, a platform's own files
+      // included (one in git/ could load none/).
+      if (m === HIDDEN || (folderOf(m) !== null && folderOf(m) !== own)) out.push(`${f} -> ${m}`)
     }
   }
   return out.sort()
