@@ -8506,6 +8506,10 @@ button.agent-place:hover {
   padding: 10px 12px;
   overflow: auto;
 }
+/* Focused only to keep Escape's keys (HI-3507), never by Tab: no ring of its own. */
+.activity-map:focus {
+  outline: none;
+}
 .activity-map > .pane-resizer {
   display: none;
 }
