@@ -733,6 +733,13 @@ export class WorkspaceService {
     this.wsConfig = structuredClone(DEFAULT_WORKSPACE_CONFIG)
     // A save waiting for an open that ended before its read writes nothing (settingsToSave).
     this.settingsReadNow()
+    // Its workspace.json saves under way end before it is closed (HI-3544), as its refreshes do (#1341): one a refresh
+    // started and didn't wait for (flagDuplicateNames) otherwise wrote into the folder after its window let it go, failing
+    // a move of it, or a test's removal of it. One still waiting for the read writes nothing now (settingsToSave).
+    for (let saving = this.savingConfig; ; saving = this.savingConfig) {
+      await saving
+      if (saving === this.savingConfig) break
+    }
     // A new lifetime only once it is fully closed: work started while it was closing (its path still set) belongs to the
     // aborted one, so nothing can be admitted for a workspace that is going away.
     this.life = new AbortController()
