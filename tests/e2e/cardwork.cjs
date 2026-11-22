@@ -437,6 +437,15 @@ const commit = (dir, file, text, message) => {
   await lib.until(async () => (await fileButton('first.ts').count()) === 1, HUNG_MS)
   await fileButton('first.ts').click()
   check('…and after closing the card and opening its changes again', !!(await lib.until(async () => (await tfDraftBox().inputValue().catch(() => '')) === 'Typed on first.ts', HUNG_MS)), await tfRev.innerText().catch(() => ''))
+  // HI-3496: a pointer that doesn't move when a file's comment layer attaches still gets the +. Over first.ts's line 1, the
+  // keyboard chooses second.ts, whose line 1 comes up under the pointer with no mouse move at all.
+  await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line', { hasText: 'first' }).hover()
+  await lib.until(async () => (await tfPlus.count()) === 1, HUNG_MS)
+  await fileButton('second.ts').press('Enter')
+  const secondPlus = tfRev.locator('[data-revision-diff="second.ts"] .editor.modified .cw-comment-add')
+  check('a file chosen under a pointer that stays still shows the + on the line under it', !!(await lib.until(async () => (await secondPlus.count()) === 1, HUNG_MS)), await tfRev.innerText().catch(() => ''))
+  await fileButton('first.ts').click()
+  await lib.until(async () => (await tfDraftBox().inputValue().catch(() => '')) === 'Typed on first.ts', HUNG_MS)
   // HR1's round 1: a save under way when the file changes. Main holds the add (CW_TEST_HOLD_IPC, as above) while the user
   // chooses another file, then lets it go.
   const tfDraft = () => tfRev.locator('[data-revision-diff="first.ts"] [data-draft="new:1-1"]')
