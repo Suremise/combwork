@@ -687,6 +687,7 @@ export class Workflow {
     // (nothing it reads can be asked of that platform); `removedOk`: the user's and the Assistant's column moves, which
     // check it themselves (to Todo or Done they go on).
     const removed = removedOk ? null : this.removedPlatformOfSafe(c)
+    // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
     if (removed) return refusal('platform.removed', { card: c.key, platform: removed }, 'the user') // i18n-ignore: the override field, agent-facing (§16.8.3)
     return c
   }

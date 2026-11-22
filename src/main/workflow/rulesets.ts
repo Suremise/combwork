@@ -172,13 +172,13 @@ export function resolvedOf(ws: Pick<WorkspaceService, 'config'>, projectPath: st
 }
 
 /**
- * The options a project sets itself for `platform`: its workflow's, only when that workflow is the platform's (HI-3510: a
- * former jj project's saved options are another platform's, neither applied nor shown); undefined with no workflow. The
- * runtime and the options form read them so (optionsForm.ts `ownOf`).
+ * The options a project sets itself for `platform`: its workflow's, unless that workflow names another platform (HI-3510:
+ * a former jj project's saved options are jj's, neither applied nor shown); undefined with no workflow. The runtime and
+ * the options form read them so (optionsForm.ts `ownOf`).
  */
 export function ownOptions(cfg: Pick<ProjectConfig, 'workflow'>, platform: PlatformId): Partial<WorkflowOptions> | undefined {
   if (!cfg.workflow) return undefined
-  return cfg.workflow.platform === platform ? cfg.workflow.options : {}
+  return !cfg.workflow.platform || cfg.workflow.platform === platform ? cfg.workflow.options : {}
 }
 
 /**
