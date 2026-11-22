@@ -9,7 +9,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types, shared with scripts/gitInventory.mjs
-import { audit, EDGES, modeDeclarations, NOT_PLATFORM, platformFolders, platformIdsIn, REGISTRIES, sealBreaks, SEAMS, SWITCHES } from './gitAudit.mjs'
+import { audit, EDGES, modeDeclarations, NOT_PLATFORM, platformFolders, platformIdsIn, REGISTRIES, sealBreaks, SEAMS, sources, SWITCHES } from './gitAudit.mjs'
 import { timing } from './timing.cjs'
 
 // A bound for a hung test (HI-3349): each audit reads the whole source tree, and a full unit run on a loaded machine
@@ -62,6 +62,38 @@ describe('the Git/None cutover audit', () => {
     expect(sealed({ 'src/main/platform/hg/hgPlatform.ts': 'export const hg = 1\n', [sessions]: `import { hg } from './platform/hg/hgPlatform'\n${text(sessions)}` })).toEqual(['src/main/sessions -> src/main/platform/hg/hgPlatform'])
     // And the audit reports it.
     expect(run({ [sessions]: `import { NoneAdapter } from './platform/none/none'\n${text(sessions)}` }).sealed).toEqual(['src/main/sessions -> src/main/platform/none/none'])
+  })
+
+  // HI-3506: the prefilter passed a computed specifier that starts with a literal, so its file was never parsed. The probe
+  // is a new file naming neither folder as a word (`/git`, `/none`), as such a line passes wherever that holds.
+  it('fails a computed specifier that starts with a string literal, wherever it is', () => {
+    const probe = 'src/main/sealProbe.ts'
+    const sealed = (body: string): string[] => sealBreaks(root, { [probe]: body })
+    const computed = {
+      'a literal and a variable': "export const f = (id: string) => import('./platform/' + id + '/nonePlatform')\n",
+      'a template with a substitution': 'export const f = (d: string) => require(`./platform/${d}/gitPlatform`)\n',
+      'joined pieces': "export const f = () => require('./platform/' + ['no', 'ne'].join('') + '/noneBaseline')\n",
+      'a space before the parenthesis': "export const f = (id: string) => import ('./platform/' + id)\n"
+    }
+    for (const [form, body] of Object.entries(computed)) {
+      expect(sealed(body), form).toEqual(['src/main/sealProbe -> (computed specifier)'])
+      // The Git audit's prefilter had the same hole for import().
+      expect(run({ [probe]: body }).unlisted, form).toEqual(['src/main/sealProbe -> (computed specifier)'])
+    }
+    // A whole literal, with options or without, a plain template among them, is read as the module it names.
+    for (const body of ["export const f = () => import('./sessions')\n", 'export const f = () => import("./sessions", { with: {} })\n', 'export const f = () => require(`./sessions`)\n'])
+      expect(sealed(body), body).toEqual([])
+  })
+
+  it('reads .mts sources, the renderer\'s @root alias, and a registry passing a platform\'s files on', () => {
+    expect(sources(root)).toContain('src/main/progressReporters/report.mts')
+    expect(sealBreaks(root, { 'src/main/sealProbe.mts': "import { NoneAdapter } from './platform/none/none'\n" })).toEqual(['src/main/sealProbe -> src/main/platform/none/none'])
+    expect(sealBreaks(root, { 'src/renderer/src/sealProbe.ts': "import type { NoneAdapter } from '@root/src/main/platform/none/none'\n" })).toEqual(['src/renderer/src/sealProbe -> src/main/platform/none/none'])
+    // A registry imports a platform's files, but a re-export would hand them to everyone importing the registry.
+    const adapters = 'src/main/platform/adapters.ts'
+    for (const line of ["export * from './none/none'", "export * as none from './none/none'", "export { NoneAdapter } from './none/none'"])
+      expect(sealBreaks(root, { [adapters]: `${line}\n${text(adapters)}` }), line).toEqual(['src/main/platform/adapters -> src/main/platform/none/none (re-exported)'])
+    expect(sealBreaks(root, { [adapters]: `${text(adapters)}\nconst m = './no' + 'ne/none'\nconst later = () => import(m)\n` })).toEqual(['src/main/platform/adapters -> (computed specifier)'])
   })
 
   it('gives each edge a class and a reason; a historic one its legacy operation, a defect its card', () => {

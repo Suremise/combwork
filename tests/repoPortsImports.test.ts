@@ -65,13 +65,14 @@ describe('callers moved to the workspace lifecycle port', () => {
     const found = CALLERS.flatMap((f) => [
       ...(/from '\.\/git'/.test(read(f)) ? [`${f} imports ./git`] : []),
       ...namesFrom(f, './worktrees').filter((n) => !['GIT_FAILED', 'uniqueFolder'].includes(n)).map((n) => `${f} imports ${n} from ./worktrees`),
-      ...(/from '\.\/platform\/gitWorkspacePort'/.test(read(f)) ? [`${f} imports Git's port itself`] : [])
+      // HI-3506: Git's port is in the Git platform's folder since HI-3489 (the old path could no longer match).
+      ...(/from '\.\/platform\/git\/gitWorkspacePort'/.test(read(f)) ? [`${f} imports Git's port itself`] : [])
     ])
     expect(found).toEqual([])
   })
 
   it("copies, a Resume's claim and a lane's start read folders through the port alone, and agents' worktrees are listed and made through it (HI-2789)", () => {
-    const viaGit = ['src/main/copies.ts', 'src/main/agentFolders.ts', 'src/main/lanes.ts'].filter((f) => /from '\.\/platform\/git'|import\('\.\/platform\/git'\)/.test(read(f)))
+    const viaGit = ['src/main/copies.ts', 'src/main/agentFolders.ts', 'src/main/lanes.ts'].filter((f) => /from '\.\/platform\/git\/|import\('\.\/platform\/git\//.test(read(f)))
     expect(viaGit).toEqual([])
     // projectAgents.ts keeps worktrees.ts for a 0.9 worktree's guarded removal, its reuse check and the Merge dialog (R3's, R9's audit).
     expect(read('src/main/projectAgents.ts').match(/\bwt\.(listWorktrees|currentBranch|createWorktree|copyIgnored)\b/g)).toBeNull()

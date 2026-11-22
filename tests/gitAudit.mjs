@@ -51,21 +51,45 @@ const GIT_FILES = new Set([
 /** Whether a module (repo path, no extension) is Git's: one of GIT_FILES, or one in the Git platform's folder (HI-3489). */
 export const isGitModule = (m) => GIT_FILES.has(m) || m.startsWith('src/main/platform/git/')
 
+/**
+ * A dynamic import or require whose argument isn't one whole string literal (`import('./x')`, `require("./x", o)`): its
+ * specifier may be computed, so the file is parsed (HI-3506: a prefilter on the first character alone passed
+ * `import('./platform/' + id)` and a template with a substitution). A literal holding `$` or a backslash counts as maybe
+ * computed: it only costs a parse.
+ */
+const MAYBE_COMPUTED = /(?:import|require)\s*\((?!\s*(?:'[^'\\\r\n]*'|"[^"\\\r\n]*"|`[^`$\\]*`)\s*[,)])/.source
+
 /** A file that could name a Git module: only these are parsed (the rest can't import one). */
-const MAY_NAME_GIT = new RegExp(String.raw`git|worktree|repoLock|folderFence|branchWatch|branchMerge|refHold|require\(|import\(\s*[^'"${'`'}\s]`, 'i')
+const MAY_NAME_GIT = new RegExp(String.raw`git|worktree|repoLock|folderFence|branchWatch|branchMerge|refHold|require\(|${MAYBE_COMPUTED}`, 'i')
 
 /** A dynamic import or require whose specifier isn't a string (built from pieces): it could load anything, so it is an edge too. */
 const HIDDEN = '(computed specifier)'
 
-/** Every .ts/.tsx file under `dir` (repo paths, forward slashes). */
-function sources(root, dir = 'src') {
+/** A TypeScript source's extension: .ts, .tsx, and the module kinds .mts and .cts (HI-3506: src has .mts files). */
+const SRC_EXT = /\.(tsx?|[mc]ts)$/
+
+/** A source's repo path without its extension: its module. */
+const moduleOf = (file) => file.replace(SRC_EXT, '')
+
+/** Every TypeScript source under `dir`, declarations aside (repo paths, forward slashes). */
+export function sources(root, dir = 'src') {
   const out = []
   for (const e of readdirSync(join(root, dir))) {
     const p = `${dir}/${e}`
     if (statSync(join(root, p)).isDirectory()) out.push(...sources(root, p))
-    else if (/\.tsx?$/.test(e) && !/\.d\.tsx?$/.test(e)) out.push(p)
+    else if (SRC_EXT.test(e) && !/\.d\.(tsx?|[mc]ts)$/.test(e)) out.push(p)
   }
   return out
+}
+
+/**
+ * The module a specifier in `file` names (a repo path without its extension), or null for a package's: a relative one,
+ * or one through the renderer's aliases for src/shared and the repo's root (electron.vite.config.ts; HI-3506: `@root/`
+ * went unread).
+ */
+function moduleNamed(root, file, spec) {
+  const path = spec.startsWith('@shared/') ? `src/shared/${spec.slice('@shared/'.length)}` : spec.startsWith('@root/') ? spec.slice('@root/'.length) : spec.startsWith('.') ? relative(root, resolve(root, dirname(file), spec)) : null
+  return path === null ? null : path.replace(/\\/g, '/').replace(/\.([mc]?[jt]s|tsx)$/, '')
 }
 
 /** The files read, with `over`'s texts in place of theirs (a test's change to one, or a file added). */
@@ -78,7 +102,7 @@ const filesOf = (root, over) => [...new Set([...sources(root), ...Object.keys(ov
 export function gitEdges(root, over = {}) {
   const out = []
   for (const { file, text } of filesOf(root, over)) {
-    if (isGitModule(file.replace(/\.tsx?$/, ''))) continue
+    if (isGitModule(moduleOf(file))) continue
     // Each file's edges kept by its text (a test's runs reparse only the file it changes).
     const key = `${root}|${file}`
     const kept = parsed.get(key)
@@ -103,11 +127,8 @@ function fileEdges(root, file, text) {
     const found = new Map()
     const add = (spec, names) => {
       if (spec === `./${HIDDEN}`) return void found.set(HIDDEN, null)
-      // The renderer's alias for src/shared (electron.vite.config.ts).
-      const path = spec.startsWith('@shared/') ? `src/shared/${spec.slice('@shared/'.length)}` : spec.startsWith('.') ? relative(root, resolve(root, dirname(file), spec)) : null
-      if (path === null) return
-      const module = path.replace(/\\/g, '/').replace(/\.(tsx?|js)$/, '')
-      if (!isGitModule(module)) return
+      const module = moduleNamed(root, file, spec)
+      if (module === null || !isGitModule(module)) return
       const had = found.get(module)
       if (names === null || had === null) found.set(module, null)
       else found.set(module, [...new Set([...(had ?? []), ...names])].sort())
@@ -156,7 +177,7 @@ function fileEdges(root, file, text) {
     }
     visit(sf)
     // Repo paths without the extension (a script's path in the table would read as one it runs: the WorkspaceService rule).
-    for (const [module, names] of found) out.push({ file: file.replace(/\.tsx?$/, ''), module, names })
+    for (const [module, names] of found) out.push({ file: moduleOf(file), module, names })
   }
   return out
 }
@@ -174,7 +195,7 @@ export function seamCounts(root, over = {}) {
     if (/^src\/main\/platform\/(historyPorts|repoReadsPorts|repoOpsPorts|integrationPorts|workspacePorts|releaseReadsPorts|deliverablesPorts)\.ts$/.test(file)) continue
     for (const s of SEAM_CALLS) {
       const n = [...text.matchAll(new RegExp(`\\b${s}\\(`, 'g'))].length
-      if (n) (out[file.replace(/\.tsx?$/, '')] ??= {})[s] = n
+      if (n) (out[moduleOf(file)] ??= {})[s] = n
     }
   }
   return out
@@ -436,7 +457,7 @@ export function switchCounts(root, over = {}, used = new Set()) {
   const ids = platformIds(root, over)
   const out = {}
   for (const { file, text } of filesOf(root, over)) {
-    const f = file.replace(/\.tsx?$/, '')
+    const f = moduleOf(file)
     if (SWITCH_HOME(f)) continue
     // Each file's answer kept by its text and the ids (a test's runs reparse only the file it changes).
     const key = `${root}|${file}|${ids.join(',')}`
@@ -503,7 +524,7 @@ export function modeDeclarations(root, over = {}) {
   }
   const out = []
   for (const { file, text } of filesOf(root, over)) {
-    if (file.replace(/\.tsx?$/, '') === DESCRIPTORS || !MODE_FIELDS.some((f) => text.includes(f))) continue
+    if (moduleOf(file) === DESCRIPTORS || !MODE_FIELDS.some((f) => text.includes(f))) continue
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
     const visit = (n) => {
       const value = ts.isPropertyAssignment(n) || ts.isPropertyDeclaration(n) ? n.initializer : null
@@ -535,16 +556,23 @@ export function platformFolders(root, over = {}) {
   return [...new Set([...listed, ...added])].sort()
 }
 
-/** Every module a file names: imports, re-exports, dynamic imports and requires (repo paths, no extension); HIDDEN for a computed one. */
+/**
+ * Every module a file names: imports, re-exports, dynamic imports and requires (repo paths, no extension); HIDDEN for a
+ * computed one. `reexported`: those it re-exports (`export … from`).
+ */
 function modulesNamed(root, file, text) {
   const out = new Set()
+  const reexported = new Set()
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
-  const add = (spec) => {
-    if (!spec.startsWith('.')) return
-    out.add(relative(root, resolve(root, dirname(file), spec)).replace(/\\/g, '/').replace(/\.(tsx?|js)$/, ''))
+  const add = (spec, to = out) => {
+    const m = moduleNamed(root, file, spec)
+    if (m !== null) to.add(m)
   }
   const visit = (n) => {
-    if ((ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text)
+    if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) {
+      add(n.moduleSpecifier.text)
+      add(n.moduleSpecifier.text, reexported)
+    } else if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text)
     else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text)
     // A type's `import('./x').T`: a type taken from the folder is as much an import of it.
     else if (ts.isImportTypeNode(n) && ts.isLiteralTypeNode(n.argument) && ts.isStringLiteral(n.argument.literal)) add(n.argument.literal.text)
@@ -555,7 +583,7 @@ function modulesNamed(root, file, text) {
     ts.forEachChild(n, visit)
   }
   visit(sf)
-  return [...out]
+  return { modules: [...out], reexported: [...reexported] }
 }
 
 /** sealBreaks' answers per file, by its text and the folders. */
@@ -563,21 +591,28 @@ const sealParsed = new Map()
 
 /**
  * Each import of a platform folder's file from outside that folder, not a registry's: `<file> -> <module>` (and a
- * computed specifier anywhere, inside the folders too, which could load one). Empty when every folder is sealed.
+ * computed specifier anywhere, inside the folders too, which could load one). A registry may import a folder's files
+ * but not pass them on: its re-export of one, `<file> -> <module> (re-exported)`, breaks the seal (HI-3506), and so does
+ * a computed specifier in it. Empty when every folder is sealed.
  */
 export function sealBreaks(root, over = {}) {
   const folders = platformFolders(root, over)
   const folderOf = (m) => folders.find((d) => m === `${PLATFORM_DIR}/${d}` || m.startsWith(`${PLATFORM_DIR}/${d}/`)) ?? null
   // Only a file that could name a folder (a folder's name is a word: git, none) or load something computed is parsed.
-  const names = new RegExp(String.raw`/(${folders.join('|')})\b|(import|require)\(\s*[^'"${'`'}\s)]`)
+  const names = new RegExp(String.raw`/(${folders.join('|')})\b|${MAYBE_COMPUTED}`)
   const out = []
   for (const { file, text } of filesOf(root, over)) {
     if (!file.startsWith('src/')) continue
-    const f = file.replace(/\.tsx?$/, '')
-    if (REGISTRIES.includes(f) || !names.test(text)) continue
+    const f = moduleOf(file)
+    if (!names.test(text)) continue
     const key = `${root}|${file}|${folders.join(',')}`
     let kept = sealParsed.get(key)
-    if (kept?.text !== text) sealParsed.set(key, (kept = { text, modules: modulesNamed(root, file, text) }))
+    if (kept?.text !== text) sealParsed.set(key, (kept = { text, ...modulesNamed(root, file, text) }))
+    if (REGISTRIES.includes(f)) {
+      if (kept.modules.includes(HIDDEN)) out.push(`${f} -> ${HIDDEN}`)
+      for (const m of kept.reexported) if (folderOf(m) !== null) out.push(`${f} -> ${m} (re-exported)`)
+      continue
+    }
     const own = folderOf(f)
     for (const m of kept.modules) {
       // A computed specifier can't be proved to stay in its folder, so it breaks the seal anywhere, a platform's own files
