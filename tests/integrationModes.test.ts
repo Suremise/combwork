@@ -21,7 +21,8 @@ vi.mock('../src/shared/platform/descriptors', async (importOriginal) => {
 })
 
 const { allOff, contradictions, formFinishes } = await import('../src/shared/workflow/options')
-const { PLATFORMS, PLATFORM_IDS } = await import('../src/shared/platform/descriptors')
+const { PLATFORMS } = await import('../src/shared/platform/descriptors')
+const PLATFORM_IDS = Object.keys(PLATFORMS) as (keyof typeof PLATFORMS)[]
 
 afterEach(() => {
   stand.modes = null

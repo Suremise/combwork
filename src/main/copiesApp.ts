@@ -118,7 +118,7 @@ export function setReviewCopyHooks(h: { over: typeof reviewOver; afterLook: type
  * (`runOpen`: whether that run is open, undefined when there is no such run), or, with no such run, once its link's
  * life (`ttlMs`) has passed. Null for another kind.
  */
-export function checkLeaseOver(l: { id: string; kind: string; ref: string | null; from: string }, runOpen: (ref: string) => boolean | undefined, ttlMs: number, now: number = Date.now()): boolean | null {
+function checkLeaseOver(l: { id: string; kind: string; ref: string | null; from: string }, runOpen: (ref: string) => boolean | undefined, ttlMs: number, now: number = Date.now()): boolean | null {
   if (l.kind !== 'check') return null
   const open = l.ref ? runOpen(l.ref) : undefined
   if (open !== undefined) return !open

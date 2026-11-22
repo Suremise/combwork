@@ -3917,11 +3917,11 @@
   },
   "board.target.kept": {
     "defaultMessage": "Its work is kept on {branch}: it starts there again, whatever this says.",
-    "description": "HI-3129: a note under the card dialog’s Merges into, for a card put back whose work is kept (in its slot) on another branch or bookmark ({branch}) than the one the field shows: its next start carries on there. Changing the field doesn’t move that work."
+    "description": "HI-3129: a note under the card dialog’s Merges into, for a card put back whose work is kept (in its slot) on another branch ({branch}) than the one the field shows: its next start carries on there. Changing the field doesn’t move that work."
   },
   "board.target.keptUnknown": {
     "defaultMessage": "Its work is kept in a slot whose branch Combwork can’t read now: it won’t start until it can.",
-    "description": "HI-3129: a note under the card dialog’s Merges into, for a card put back whose kept work’s branch or bookmark can’t be read now: its start is refused until it can be, never started on the one the field shows."
+    "description": "HI-3129: a note under the card dialog’s Merges into, for a card put back whose kept work’s branch can’t be read now: its start is refused until it can be, never started on the one the field shows."
   },
   "board.target.mark": {
     "defaultMessage": "Into {branch}",

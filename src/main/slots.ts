@@ -1225,7 +1225,7 @@ export interface OpHolder {
   live: Set<string>
 }
 
-export interface PoolDeps {
+interface PoolDeps {
   store: SlotStore
   /** How its slots' folders are made, inspected, prepared and removed (HI-2786's R4); unset: `slotWorkspaces()`, Git's worktrees. */
   workspaces?: WorkspacePort
@@ -1886,21 +1886,6 @@ export class SlotPool {
   owedSlots(): string[] {
     const prefix = owedKey(this.store.project, '')
     return this.store.conn.read((db) => (db.prepare('SELECT key FROM board_meta WHERE substr(key, 1, ?) = ?').all(prefix.length, prefix) as { key: string }[]).map((r) => r.key.slice(prefix.length))) // agent-protocol: SQL
-  }
-
-  /** A slot's owed record (tests, the log): why and since when, or null. */
-  owedOf(name: string): { why: string; since: number } | null {
-    const v = this.store.conn.read((db) => db.prepare('SELECT value FROM board_meta WHERE key = ?').get(owedKey(this.store.project, name)) as { value: string } | undefined) // agent-protocol: SQL
-    try {
-      return v ? (JSON.parse(v.value) as { why: string; since: number }) : null
-    } catch {
-      return { why: 'unreadable', since: 0 } // agent-protocol: a log detail
-    }
-  }
-
-  /** Whether a wake of the owed pass is pending (tests). */
-  owedWakePending(): boolean {
-    return !!this.owedWake
   }
 
   /**

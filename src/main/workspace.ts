@@ -83,11 +83,6 @@ const M = {
   platformSettled: msg({ id: 'service.workspace.platformSettled', defaultMessage: 'Settled: nothing to change now', description: "What the notice that a project's version control changed says once it no longer applies (HI-2320): the project was switched, or its folder is back as it was. Shown in place of its button." }),
   openVc: msg({ id: 'service.workspace.platformOpen', defaultMessage: 'Open Version Control', description: "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Combwork offers the switch (glossary 2.1)." })
 }
-/** What runs after each refresh reported (HI-2799: the platform fence's store map and recovery), registered by its module. */
-const afterRefresh: ((ws: WorkspaceService) => void)[] = []
-export function onAfterRefresh(fn: (ws: WorkspaceService) => void): void {
-  afterRefresh.push(fn)
-}
 
 // What a closed workspace's refused open throws (#1381: made when refused, not kept per workspace).
 setFenceReason(() => combworkError(M.closed, undefined, { kind: 'conflict' }))
@@ -1965,7 +1960,6 @@ export class WorkspaceService {
     this.cached = { path: this.path, name: basename(this.path), config: this.wsConfig, projects, assistant: assistant && { ...assistant, name: ASSISTANT_NAME, active: true, unmanagedMcp: [] }, moved: this.moved }
     this.emit({ type: 'workspace-changed', workspace: this.cached })
     this.flagDuplicateNames(projects)
-    for (const fn of afterRefresh) fn(this)
     return this.cached
   }
 

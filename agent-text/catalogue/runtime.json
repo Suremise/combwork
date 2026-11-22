@@ -53,11 +53,11 @@
   },
   "runtime.reportMerge.mergeSeen": {
     "text": "Done already: Combwork saw its merge into {target}; nothing more to report",
-    "note": "HI-3282: report merge's answer (an OK, nothing written), its reply's `already` value, on a card Combwork had already seen merged into its target this cycle (its reconciliation or merge queue, before the builder's report). Historical: no fresh check is made. {target}: the branch or bookmark."
+    "note": "HI-3282: report merge's answer (an OK, nothing written), its reply's `already` value, on a card Combwork had already seen merged into its target this cycle (its reconciliation or merge queue, before the builder's report). Historical: no fresh check is made. {target}: the branch."
   },
   "runtime.reportMerge.mergeSeenMove": {
     "text": "{card} was already Done: Combwork saw its merge into {target}; nothing more to report.",
-    "note": "HI-3282: an agent's old move to Done (cw_update_task) on a card already Done whose merge Combwork saw this cycle: a line of its reply, as report merge answers. {target}: the branch or bookmark."
+    "note": "HI-3282: an agent's old move to Done (cw_update_task) on a card already Done whose merge Combwork saw this cycle: a line of its reply, as report merge answers. {target}: the branch."
   },
   "runtime.reportMerge.mergeSeenMoveNext": {
     "text": "As report merge: next time call {tool}",

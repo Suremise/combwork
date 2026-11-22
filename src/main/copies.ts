@@ -41,12 +41,6 @@ import type { ProviderAdapter } from './providers/types'
 
 const log = createLogger('copies')
 
-/**
- * The workspace lifecycle port copies are made, reset and removed with (SPEC §16.3.6 Port 2, HI-2789's R5), unless the
- * pool is given another (HI-2795: by injection only).
- */
-const defaultPort = slotWorkspaces
-
 /** The folder a project's copies are in, under its worktrees folder: fixed, so a reviewer's grant never changes. */
 export const COPIES_DIR = 'copies'
 /** What a lease's operation taken over from a gone holder leaves as the copy's error: stored, so said in the Default. */
@@ -123,11 +117,6 @@ export interface CopyLease {
   returned: string | null
   why: string | null
   freed: string | null
-  /**
-   * A copy's verification after its quiescence barrier (HI-2795): true, it was exactly its revision once every consumer
-   * had ended; false, it wasn't; null, not verified (every Git lease).
-   */
-  intact?: boolean | null
 }
 
 export type CopyRefusal =
@@ -223,8 +212,7 @@ const leaseOfRow = (r: Row): CopyLease => ({
   from: r.from_at as string,
   returned: (r.returned_at as string | null) ?? null,
   why: (r.why as string | null) ?? null,
-  freed: (r.freed_at as string | null) ?? null,
-  intact: r.intact === undefined || r.intact === null ? null : r.intact === 1
+  freed: (r.freed_at as string | null) ?? null
 })
 
 /** No operation, no job, no lease that isn't freed. */
@@ -427,7 +415,7 @@ export class CopyStore {
   }
 }
 
-export interface CopyPoolDeps {
+interface CopyPoolDeps {
   store: CopyStore
   /** The project's folder (its repository). */
   project: string
@@ -451,8 +439,6 @@ export interface CopyPoolDeps {
   reviewOn: () => boolean
   /** How long a returning copy is held back before it shows as still in use (Settings → Advanced). */
   quietWaitMs: () => number
-  /** How its copies are made, reset, verified and removed (HI-2795); unset: Git's worktrees. */
-  workspaces?: WorkspacePort
   now?: () => number
 }
 
@@ -483,9 +469,9 @@ export class CopyPool {
     return this.deps.now?.() ?? Date.now()
   }
 
-  /** The pool's port: the deps', else Git's (HI-2795). */
+  /** The workspace lifecycle port copies are made, reset and removed with (SPEC §16.3.6 Port 2, HI-2789's R5). */
   private get port(): WorkspacePort {
-    return this.deps.workspaces ?? defaultPort()
+    return slotWorkspaces()
   }
 
   get closed(): boolean {

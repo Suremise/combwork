@@ -12,5 +12,5 @@ export const CANDIDATE_TEXT = {
   rebasedNotSame: agentMsg({ id: 'queue.candidate.rebasedNotSame', text: "{card}: {revision} rebased onto {expected} isn't the same change as reviewed: rebase it onto the target yourself and submit it again.", note: "A card's log from the merge queue (Rebase and fast-forward): the rebased revision isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids." })
 }
 
-/** Strict's update (G8) brought up to date but not the same change as reviewed: each platform's update (Git's) in the same words. */
+/** Strict's update (G8) brought up to date but not the same change as reviewed: Git's update. */
 export const UPDATE_NOT_SAME = agentMsg({ id: 'queue.candidate.notSame', text: "{card}: {revision} brought up to date with {target} ({expected}) isn't the same change as reviewed: bring it up to date yourself and submit it again.", note: "A card's log from the merge queue (strict, G8): the reviewed revision, brought up to date with the target in the queue's worktree, isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids; target: the branch." })

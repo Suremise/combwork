@@ -4652,7 +4652,7 @@ export interface LaneStartInfo {
 
 /**
  * HI-3129: where a card waiting to start would start when that isn't the Merges into its dialog shows (main's
- * `tasks.keptTarget`): its kept work's branch or bookmark, or `unknown` when that can't be read; null: where it shows.
+ * `tasks.keptTarget`): its kept work's branch, or `unknown` when that can't be read; null: where it shows.
  */
 export type KeptTargetShown = { target: string } | { unknown: true } | null
 

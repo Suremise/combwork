@@ -16,7 +16,7 @@ export const workspacePortOf = (platform: PlatformId): WorkspacePort | null => P
 
 /**
  * The relocation of the repository platform holding `folder` (HI-2792: Repair after a move), read from its folders; null
- * when none holds it or its platform has no relocation (§16.3.6's gate: relocation).
+ * when none holds it or its platform has no relocation (§16.3.6).
  */
 export function relocationIn(folder: string): Relocation | null {
   const holder = repoHolding(folder)

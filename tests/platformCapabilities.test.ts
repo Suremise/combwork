@@ -3,7 +3,7 @@
 // and None: the form's finish and folder choices, the Version Control tab's fact line, the Agent API's found text, and
 // the descriptor's own data.
 import { describe, expect, it } from 'vitest'
-import { hasCapability, merges, PLATFORMS, platformName, type Detection, type PlatformId, type ProjectPlatform } from '../src/shared/platform/descriptors'
+import { hasCapability, merges, PLATFORMS, type Detection, type PlatformId, type ProjectPlatform } from '../src/shared/platform/descriptors'
 import { factOf, PLATFORM_VIEW } from '../src/shared/platform/presentation'
 import { formFinishes, formFolders } from '../src/shared/workflow/options'
 import { FOUND } from '../src/main/platform/agentPresentation'
@@ -51,8 +51,6 @@ describe('HI-3140: the descriptor, presentation and port answers equal the id sw
   it("names the offer's button and the None · Git preview as before", () => {
     expect(PLATFORM_VIEW.git.switchTo.id).toBe('git.vc.offer.switchGit')
     expect(PLATFORM_VIEW.none.switchTo.id).toBe('git.vc.offer.switchNone')
-    // The preview moves between None and Git's page, its tooltip on Git (`id === 'git'`).
-    expect(IDS.filter((id) => PLATFORM_VIEW[id].previewable)).toEqual(['git', 'none'])
   })
 
   it("tells agents what was found as before (servers' versionControlOf)", () => {
@@ -62,8 +60,7 @@ describe('HI-3140: the descriptor, presentation and port answers equal the id sw
   })
 
   it("keeps the descriptor's names as the id switches had them", () => {
-    expect(IDS.map(platformName)).toEqual(['Git', 'None'])
-    expect(platformName('hg')).toBe('hg')
+    expect(IDS.map((id) => PLATFORMS[id].name)).toEqual(['Git', 'None'])
   })
 
   it('HI-3487: check copies follow isolation, and moving a card to another target follows merging (the capabilities they folded into)', () => {

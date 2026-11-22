@@ -386,7 +386,7 @@ export const NOT_PLATFORM = {
 }
 
 /** The descriptor helpers that take a platform's id: one given by name is a switch. */
-const HELPERS = new Set(['revisionShort', 'hasCapability', 'merges', 'accepts', 'deliversCommits', 'declaresPaths', 'needsRepository', 'hasOperation', 'hasGate', 'platformName'])
+const HELPERS = new Set(['revisionShort', 'hasCapability', 'merges', 'accepts', 'deliversCommits', 'declaresPaths', 'needsRepository', 'hasOperation'])
 
 /** Where a switch belongs, whole: the platform layer (its descriptors and presentation, its ports and their registries) and Git's own modules. */
 const SWITCH_HOME = (f) => /^src\/(shared\/platform|main\/platform)\//.test(f) || isGitModule(f)
