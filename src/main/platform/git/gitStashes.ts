@@ -211,7 +211,7 @@ async function dropAt(root: string, ref: StashRef): Promise<{ ok: true } | { ok:
   // meanwhile moves every place by one, and the row moved onto it can hold the same commit.
   const at = await git(root, ['log', '-g', '-1', '--format=%H%x1f%gs', place, '--'])
   const [commit, subject] = at.ok ? at.out.trim().split('\x1f') : []
-  if (commit !== s.commit || subject !== s.subject.trim()) return { ok: false, why: 'gone' }
+  if (commit !== s.commit || subject !== s.subject.trim()) return { ok: false, why: 'gone' } // i18n-ignore: rowError's key, never shown
   const r = await git(root, ['stash', 'drop', '--quiet', place])
   return r.ok ? { ok: true } : { ok: false, r }
 }
