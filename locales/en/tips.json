@@ -995,6 +995,14 @@
     "defaultMessage": "Ctrl+click a path in the terminal",
     "description": "A tip's title."
   },
+  "tips.fileRestore.text": {
+    "defaultMessage": "Right-click a changed file in the Files tab: Discard Changes… puts it back to the commit checked out, and Restore From takes its version on the target branch or in one of its commits. Both show the diff first, and keep its changes in a stash.",
+    "description": "A tip (HI-3477). Names of Combwork's menus, views and commands: keep them as Combwork shows them. A stash is git's: changes kept aside."
+  },
+  "tips.fileRestore.title": {
+    "defaultMessage": "Undo a file's changes from the Files tab",
+    "description": "A tip's title (HI-3477)."
+  },
   "tips.filesGit.text": {
     "defaultMessage": "Right-click a file or folder in the Files tab: Exclude from Git adds it to .gitignore (or only to this PC's .git/info/exclude), Stop Tracking takes a committed file out of git but leaves it on disk, and Why Is This Ignored? opens a dimmed file's rule.",
     "description": "A tip (HI-2743). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep .gitignore and .git/info/exclude."
@@ -1971,6 +1979,14 @@
     "defaultMessage": "Remove every agent at once",
     "description": "A tip's title."
   },
+  "tips.renameBranch.text": {
+    "defaultMessage": "Rename… (✎) on a branch in Version Control → Branches & remotes gives it a new name. Choose Rename it there too to rename the remote branch it tracks as well: the old name there is deleted only if nobody pushed to it since your last fetch.",
+    "description": "A tip (HI-3474). Names of Combwork's menus, views, sections, buttons and choices: keep them as Combwork shows them."
+  },
+  "tips.renameBranch.title": {
+    "defaultMessage": "Rename a branch, on its remote too",
+    "description": "A tip's title (HI-3474)."
+  },
   "tips.repositoryHealth.text": {
     "defaultMessage": "When git says \"index.lock: File exists\", or refuses a worktree whose folder was deleted, Version Control → Branches & remotes → Repository health lists what was left behind and clears what you tick.",
     "description": "A tip (HI-3473). The quoted text is git's own error: keep it. Names of Combwork's menus, views and sections: keep them as Combwork shows them."
@@ -2290,6 +2306,14 @@
   "tips.submodulesLfs.title": {
     "defaultMessage": "Submodules and Git LFS in slots",
     "description": "A tip's title (HI-1182). A slot: a folder Combwork lends to a card or a lane. Keep Git LFS (a product's name)."
+  },
+  "tips.tagPushDelete.text": {
+    "defaultMessage": "Each tag in Version Control → History has Push… to send it to a remote, and Delete… to delete it here, or on a remote too so the next fetch doesn’t bring it back.",
+    "description": "A tip (HI-3474). Names of Combwork's menus, views, sections and buttons: keep them as Combwork shows them."
+  },
+  "tips.tagPushDelete.title": {
+    "defaultMessage": "Push or delete a git tag",
+    "description": "A tip's title (HI-3474)."
   },
   "tips.taskbarBadge.text": {
     "defaultMessage": "Combwork's taskbar button shows how many agents need you, and flashes when one asks you something while Combwork is in the background.",

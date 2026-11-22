@@ -230,6 +230,8 @@
   "tips.editTemplates.title": "Edite um modelo ali mesmo",
   "tips.fileLinks.text": "Caminhos de arquivo que um agente imprime, como src/app.ts:42, são links: use Ctrl+clique em um para abrir o arquivo na aba Arquivos, naquela linha.",
   "tips.fileLinks.title": "Ctrl+clique em um caminho no terminal",
+  "tips.fileRestore.text": "Clique com o botão direito em um arquivo alterado na aba Arquivos: Descartar alterações… o volta ao commit atual, e Restaurar de pega a versão dele no branch de destino ou em um dos commits dele. Os dois mostram o diff primeiro e guardam as alterações dele em um stash.",
+  "tips.fileRestore.title": "Desfaça as alterações de um arquivo pela aba Arquivos",
   "tips.filesGit.text": "Clique com o botão direito em um arquivo ou pasta na aba Arquivos: Excluir do Git o adiciona ao .gitignore (ou só ao .git/info/exclude deste PC), Parar de rastrear tira do git um arquivo com commit, mas o deixa no disco, e Por que está ignorado? abre a regra de um arquivo esmaecido.",
   "tips.filesGit.title": "Deixe um arquivo fora do git pela aba Arquivos",
   "tips.filesTab.text": "A aba Arquivos navega e edita o projeto, mostra prévias de Markdown, CSV, HTML e imagens, e guarda as edições não salvas quando você troca de arquivo.",
@@ -639,6 +641,10 @@
   "tips.stashes.title": "Veja, aplique ou apague seus stashes do git",
   "tips.branchMoves.text": "Controle de versão → Histórico → Movimentos lista cada vez que um branch se moveu, como o reflog do git guarda: os merges de cartões do Combwork, commits, rebases, resets e pulls. Restaurar para este ponto… leva o branch de volta, mostrando antes quais commits ele perde ou traz de volta.",
   "tips.branchMoves.title": "Desfazer um reset, rebase ou merge de um branch",
+  "tips.renameBranch.title": "Renomeie um branch, no remote também",
+  "tips.renameBranch.text": "Renomear… (✎) em um branch em Controle de versão → Branches e remotes dá a ele um novo nome. Escolha Renomear lá também para renomear também o branch remoto que ele rastreia: o nome antigo lá só é excluído se ninguém fez push nele desde o seu último fetch.",
+  "tips.tagPushDelete.title": "Faça push de uma tag do git ou exclua-a",
+  "tips.tagPushDelete.text": "Cada tag em Controle de versão → Histórico tem Fazer push… para enviá-la a um remote, e Excluir… para excluí-la aqui, ou também em um remote para que o próximo fetch não a traga de volta.",
   "tips.commitDetails.text": "Clique em um commit em Controle de versão → Histórico para ver os arquivos e as alterações dele. Dali, use Revert… ou Cherry-pick… no branch da pasta do projeto, ou Criar branch aqui… e Criar tag aqui… nele.",
   "tips.commitDetails.title": "Faça revert, cherry-pick, branch ou tag de um commit no Histórico"
 }

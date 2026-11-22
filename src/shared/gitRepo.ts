@@ -217,6 +217,8 @@ export interface GitTagRow {
   /** An annotated tag's message, else the commit's subject. */
   subject: string
   annotated: boolean
+  /** HI-3474: what the tag's ref holds, whole (an annotated tag's own object, else its commit): Delete is pinned to it. */
+  sha: string
 }
 
 export interface GitHistory {

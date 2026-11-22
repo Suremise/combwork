@@ -179,7 +179,17 @@ const M = {
   untrackTitle: msg({ id: 'git.untrack.title', defaultMessage: 'Stop {branch} tracking {upstream}?', description: 'Title of the confirmation before a branch stops tracking its remote branch.' }),
   untrackFailed: msg({ id: 'git.untrack.failed', defaultMessage: "Couldn't stop {branch} tracking {upstream}", description: 'Title of an error notification.' }),
   untrackMessage: msg({ id: 'git.untrack.message', defaultMessage: '{branch} no longer tracks a remote branch: Pull has nothing to pull from, and Push asks where to push it. Nothing changes on the remote.', description: 'The confirmation before a branch stops tracking its remote branch. Pull and Push are buttons: keep their names.' }),
-  untrack: msg({ id: 'git.untrack.button', defaultMessage: 'Stop tracking', description: 'The button of the confirmation before a branch stops tracking its remote branch.' })
+  untrack: msg({ id: 'git.untrack.button', defaultMessage: 'Stop tracking', description: 'The button of the confirmation before a branch stops tracking its remote branch.' }),
+  // A branch's Rename… (HI-3474).
+  renameTip: msg({ id: 'git.branchRename.tip', defaultMessage: 'Rename {branch}…', description: "HI-3474: tooltip on a local branch's rename button in Version Control → Branches & remotes. {branch} is its name." }),
+  renameTitle: msg({ id: 'git.branchRename.title', defaultMessage: 'Rename {branch}', description: 'HI-3474: title of the form that renames the local branch {branch}.' }),
+  renameAbout: msg({ id: 'git.branchRename.about', defaultMessage: "{tracks, select, yes {Renames {branch} here. It tracks {upstream}: choose below whether {remote} gets the new name too. Never forced: there, the old name is deleted only where it's as you last fetched it.} other {Renames {branch} here. It tracks no remote branch, so no remote changes.}}", description: 'HI-3474: the form that renames the branch {branch}. {upstream} is the remote branch it tracks (origin/x) on the remote {remote}; {tracks} is no when it tracks none.' }),
+  renameNewName: msg({ id: 'git.branchRename.newName', defaultMessage: 'New name', description: "HI-3474: field of the Rename form: the branch's new name." }),
+  renameOn: msg({ id: 'git.branchRename.on', defaultMessage: 'On {remote}', description: "HI-3474: label of the Rename form's drop-down: what happens to the branch on the remote {remote} it tracks." }),
+  renameKeepThere: msg({ id: 'git.branchRename.keepThere', defaultMessage: '{upstream} keeps its name', description: "HI-3474: a choice of the Rename form's drop-down: the remote branch {upstream} stays as it is (the local branch still tracks it)." }),
+  renameThere: msg({ id: 'git.branchRename.there', defaultMessage: 'Rename it there too', description: "HI-3474: a choice of the Rename form's drop-down: push the new name to the remote, track it, and delete the old name there." }),
+  renameButton: msg({ id: 'git.branchRename.button', defaultMessage: 'Rename', description: "HI-3474: the Rename form's button." }),
+  renaming: msg({ id: 'git.branchRename.busy', defaultMessage: 'Renaming…', description: "HI-3474: the Rename form's button while it runs." })
 }
 
 /** Branches by their state, and cleaning up the merged ones (#1642). */
@@ -436,6 +446,9 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         // Update from <target> (HI-1180): a branch that lacks some of the target's commits (never the target), with work of
         // its own, or in use (HR4's round 1: a card's new line behind its target, fast-forwarded); a merged branch nothing
         // uses is Clean Up's, not to update.
+        // HI-3474: any branch nothing uses, or the folder's own unless an open card works on it (HR1's round 1); main
+        // refuses the folder's own while an agent works there.
+        const renamable = (b: GitBranchRow): boolean => !busyBranches.has(b.name) && [null, 'current'].includes(localUse(b, info, busyBranches))
         const updatable = (b: GitBranchRow): boolean => !!target && b.name !== target && !!b.fromTarget && (!!b.toTarget || !!localUse(b, info, busyBranches))
         const updateFrom = async (b: GitBranchRow): Promise<void> => {
           const plan = await attempt(tr(U.planFailed, { branch: b.name }), () => call('git:updatePlan', project.path, b.name))
@@ -639,6 +652,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                     )}
                     {updatable(b) && offered('git:updateBranch') ? <IconButton icon="repo-pull" title={tr(U.tip, { branch: b.name, target: target! })} action="update-branch" disabled={!!ro} onClick={() => void updateFrom(b)} /> : <span className="git-act-slot" />}
                     {!b.current && offered('worktrees:mergeBranch') ? <IconButton icon="git-merge" title={tr(M.mergeBranch, { branch: b.name })} action="merge-branch" disabled={!!ro} onClick={() => set({ branchMergeFor: { project: project.path, branch: b.name } })} /> : <span className="git-act-slot" />}
+                    {renamable(b) && offered('git:renameBranch') ? <IconButton icon="edit" title={tr(M.renameTip, { branch: b.name })} action="rename-branch" disabled={off} onClick={() => setForm({ make: () => renameForm(project, b) })} /> : <span className="git-act-slot" />}
                     {free && offered('git:deleteBranches') ? <IconButton icon="trash" title={tr(C.deleteTip, { branch: b.name })} action="delete-branch" disabled={off} onClick={() => void deleteBranch(project, b, target!)} /> : <span className="git-act-slot" />}
                     {!b.current && offered('git:switch') ? (
                       <Tooltip content={why ?? tr(M.switchTip, { branch: b.name })}>
@@ -1052,6 +1066,27 @@ function trackForm(project: ProjectInfo, info: GitRepoInfo, b: GitBranchRow): Fo
     // HI-3372: its push first, when it pushes, cancellable from the dialog.
     cancellable: true,
     submit: (v, op) => repoOp('git:setUpstream', project.path, b.name, v.remote, v.branch.trim(), !known(v), op)
+  }
+}
+
+/** HI-3474: Rename…: a new name, and for a branch tracking a remote branch, whether that is renamed too (off at first). */
+function renameForm(project: ProjectInfo, b: GitBranchRow): FormSpec {
+  const remote = b.upstream && b.upstreamRemote && !b.gone ? b.upstreamRemote : null
+  return {
+    project,
+    title: tr(M.renameTitle, { branch: b.name }),
+    icon: 'edit',
+    about: tr(M.renameAbout, { branch: b.name, tracks: remote ? 'yes' : 'no', upstream: b.upstream ?? '', remote: remote ?? '' }),
+    fields: [
+      { key: 'name', label: tr(M.renameNewName), initial: b.name },
+      ...(remote ? [{ key: 'there', label: tr(M.renameOn, { remote }), initial: '', options: [{ label: tr(M.renameKeepThere, { upstream: b.upstream! }), value: '' }, { label: tr(M.renameThere), value: 'yes' }] }] : [])
+    ],
+    confirm: tr(M.renameButton),
+    busyLabel: tr(M.renaming),
+    validate: (v) => (!v.name.trim() ? tr(M.enterName) : /\s/.test(v.name.trim()) ? tr(M.branchNoSpaces) : null),
+    // Its push and the old name's deletion, when it renames there, cancellable from the dialog.
+    cancellable: true,
+    submit: (v, op) => repoOp('git:renameBranch', project.path, { name: b.name, sha: b.sha ?? '' }, v.name.trim(), v.there === 'yes', op)
   }
 }
 

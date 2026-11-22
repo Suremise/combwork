@@ -16,6 +16,9 @@ import { lineRepoOps } from './platform/repoOpsPorts'
 import { workspace } from './workspace'
 import type { OpsFor } from './platform/repoOps'
 
+/** A branch or tag as the window was shown it, whatever came over IPC. */
+const branchAtArg = (x: unknown): { name: string; sha: string } => ({ name: String((x as { name?: unknown } | null)?.name ?? ''), sha: String((x as { sha?: unknown } | null)?.sha ?? '') })
+
 /** The port for a channel's operation, refused (in the window's words) when its platform doesn't list it. */
 export const opsAt = <C extends RepoOpChannel>(channel: C): OpsFor<(typeof REPO_OP_CHANNELS)[C]> => lineRepoOps(REPO_OP_CHANNELS[channel])
 
@@ -45,6 +48,10 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   'git:pushTo': (p, remote, scope, branch) => opsAt('git:pushTo').pushTo(p, String(remote ?? ''), scope === 'all' ? 'all' : 'branch', branch ? String(branch) : undefined),
   'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst) => opsAt('git:setUpstream').setUpstream(p, String(branch ?? ''), remote == null ? null : String(remote), String(remoteBranch ?? ''), !!pushFirst),
   'git:createTag': (p, name, message, pushTo, _op, at) => opsAt('git:createTag').createTag(p, String(name ?? ''), String(message ?? ''), pushTo ? String(pushTo) : undefined, at ? String(at) : undefined),
+  // HI-3474 (reaching a remote, they are ipc.ts' too, under the window's Cancel).
+  'git:renameBranch': (p, branch, to, onRemote) => opsAt('git:renameBranch').renameLine(p, branchAtArg(branch), String(to ?? ''), onRemote === true),
+  'git:deleteTag': (p, tag, remote) => opsAt('git:deleteTag').deleteTag(p, branchAtArg(tag), remote ? String(remote) : null),
+  'git:pushTag': (p, name, remote) => opsAt('git:pushTag').pushTag(p, String(name ?? ''), String(remote ?? '')),
   'git:setIdentity': (p, name, email) => opsAt('git:setIdentity').setIdentity(p, String(name ?? ''), String(email ?? '')),
   'git:initCheck': (p) => opsAt('git:initCheck').initCheck(p),
   'git:init': (p, opts) => opsAt('git:init').init(p, opts && typeof opts === 'object' ? opts : { gitignore: 'none' }),
@@ -82,6 +89,19 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   'git:moves': (p, branch, page) => opsAt('git:moves').moves(workspace.assertProject(p), typeof branch === 'string' && branch ? branch : null, Number(page) || 1),
   'git:restorePlan': (p, req) => opsAt('git:restorePlan').restorePlan(workspace.assertProject(p), req),
   'git:restore': (p, req) => opsAt('git:restore').restore(workspace.assertProject(p), req),
+  // HI-3477: the Files tab's Discard Changes… and Restore From…: refused here first, then the project folder's checks (fileRestorePanel.ts).
+  'files:gitRestorePlan': async (p, rel, source, commit) => {
+    const ops = opsAt('files:gitRestorePlan')
+    return (await import('./fileRestorePanel')).restorePlanAt(workspace, p, rel, source, commit, ops)
+  },
+  'files:gitFileCommits': async (p, rel, page) => {
+    const ops = opsAt('files:gitFileCommits')
+    return (await import('./fileRestorePanel')).fileCommitsAt(workspace, p, rel, page, ops)
+  },
+  'files:gitRestore': async (p, req) => {
+    const ops = opsAt('files:gitRestore')
+    return (await import('./fileRestorePanel')).restoreAt(workspace, p, req, ops)
+  },
   // HI-3471: History's Commit dialog (the requests checked by the port, gitCommitActions.ts).
   'git:commitDetail': (p, commit) => opsAt('git:commitDetail').commitDetail(workspace.assertProject(p), commit),
   'git:commitFileDiff': (p, commit, file) => opsAt('git:commitFileDiff').commitFileDiff(workspace.assertProject(p), commit, String(file ?? '')),

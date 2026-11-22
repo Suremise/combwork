@@ -230,6 +230,8 @@
   "tips.editTemplates.title": "Edita una plantilla en su sitio",
   "tips.fileLinks.text": "Las rutas de archivo que imprime un agente, como src/app.ts:42, son enlaces: haz Ctrl+clic en una para abrir el archivo en la pestaña Archivos en esa línea.",
   "tips.fileLinks.title": "Ctrl+clic en una ruta en la terminal",
+  "tips.fileRestore.text": "Haz clic derecho en un archivo cambiado en la pestaña Archivos: Descartar cambios… lo devuelve al commit actual, y Restaurar desde toma su versión en la rama de destino o en uno de sus commits. Ambos muestran primero el diff y guardan sus cambios en un stash.",
+  "tips.fileRestore.title": "Deshaz los cambios de un archivo desde la pestaña Archivos",
   "tips.filesGit.text": "Haz clic derecho en un archivo o carpeta en la pestaña Archivos: Excluir de Git lo agrega a .gitignore (o solo a .git/info/exclude de este PC), Dejar de seguir saca de git un archivo confirmado pero lo deja en el disco, y ¿Por qué se ignora? abre la regla de un archivo atenuado.",
   "tips.filesGit.title": "Deja un archivo fuera de git desde la pestaña Archivos",
   "tips.filesTab.text": "La pestaña Archivos explora y edita el proyecto, muestra vistas previas de Markdown, CSV, HTML e imágenes, y conserva las ediciones sin guardar al cambiar de archivo.",
@@ -639,6 +641,10 @@
   "tips.stashes.title": "Ver, aplicar o eliminar tus stashes de git",
   "tips.branchMoves.text": "Control de versiones → Historial → Movimientos lista cada vez que una rama se movió, tal como lo guarda el reflog de git: las fusiones de tarjetas de Combwork, commits, rebases, resets y pulls. Restaurar a este punto… devuelve la rama atrás, mostrando antes qué commits pierde o recupera.",
   "tips.branchMoves.title": "Deshacer un reset, rebase o fusión de una rama",
+  "tips.renameBranch.title": "Renombra una rama, también en su remoto",
+  "tips.renameBranch.text": "Renombrar… (✎) en una rama de Control de versiones → Ramas y remotos le da un nuevo nombre. Elige Renombrarla allí también para renombrar además la rama remota que sigue: el nombre antiguo allí solo se elimina si nadie hizo push a ella desde tu último fetch.",
+  "tips.tagPushDelete.title": "Haz push de una etiqueta de git o elimínala",
+  "tips.tagPushDelete.text": "Cada etiqueta de Control de versiones → Historial tiene Hacer push… para enviarla a un remoto, y Eliminar… para eliminarla aquí, o también en un remoto para que el próximo fetch no la traiga de vuelta.",
   "tips.commitDetails.text": "Haz clic en un commit en Control de versiones → Historial para ver sus archivos y cambios. Desde ahí, Revert… o Cherry-pick… lo aplican a la rama de la carpeta del proyecto, y Rama desde aquí… y Etiquetar aquí… parten de él.",
   "tips.commitDetails.title": "Revertir, hacer cherry-pick, ramificar o etiquetar un commit desde el Historial"
 }

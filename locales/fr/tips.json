@@ -230,6 +230,8 @@
   "tips.editTemplates.title": "Modifier un modèle sur place",
   "tips.fileLinks.text": "Les chemins de fichiers qu’affiche un agent, comme src/app.ts:42, sont des liens : fais Ctrl+clic sur l’un d’eux pour ouvrir le fichier dans l’onglet Fichiers à cette ligne.",
   "tips.fileLinks.title": "Ctrl+clic sur un chemin dans le terminal",
+  "tips.fileRestore.text": "Fais un clic droit sur un fichier modifié dans l’onglet Fichiers : Abandonner les modifications… le ramène au commit extrait, et Restaurer depuis prend sa version sur la branche cible ou dans l’un de ses commits. Les deux montrent d’abord le diff et gardent ses modifications dans un stash.",
+  "tips.fileRestore.title": "Annuler les modifications d’un fichier depuis l’onglet Fichiers",
   "tips.filesGit.text": "Fais un clic droit sur un fichier ou un dossier dans l’onglet Fichiers : Exclure de Git l’ajoute à .gitignore (ou seulement au .git/info/exclude de ce PC), Ne plus suivre retire de git un fichier commité mais le laisse sur le disque, et Pourquoi est-ce ignoré ? ouvre la règle d’un fichier grisé.",
   "tips.filesGit.title": "Garder un fichier hors de git depuis l’onglet Fichiers",
   "tips.filesTab.text": "L’onglet Fichiers parcourt et modifie le projet, prévisualise le Markdown, le CSV, le HTML et les images, et garde les modifications non enregistrées quand tu passes d’un fichier à l’autre.",
@@ -639,6 +641,10 @@
   "tips.stashes.title": "Voir, appliquer ou supprimer tes stashes git",
   "tips.branchMoves.text": "Gestion de versions → Historique → Mouvements liste chaque fois qu’une branche a bougé, tel que le reflog de git le garde : les fusions de cartes par Combwork, les commits, rebases, resets et pulls. Restaurer à ce point… ramène la branche en arrière, en montrant d’abord quels commits elle perd ou récupère.",
   "tips.branchMoves.title": "Annuler un reset, un rebase ou une fusion d’une branche",
+  "tips.renameBranch.title": "Renomme une branche, sur son dépôt distant aussi",
+  "tips.renameBranch.text": "Renommer… (✎) sur une branche dans Gestion de versions → Branches et dépôts distants lui donne un nouveau nom. Choisis La renommer là-bas aussi pour renommer aussi la branche distante qu’elle suit : l’ancien nom n’y est supprimé que si personne n’y a fait de push depuis ton dernier fetch.",
+  "tips.tagPushDelete.title": "Faire un push d’un tag git ou le supprimer",
+  "tips.tagPushDelete.text": "Chaque tag dans Gestion de versions → Historique a Push… pour l’envoyer vers un dépôt distant, et Supprimer… pour le supprimer ici, ou aussi sur un dépôt distant pour que le prochain fetch ne le ramène pas.",
   "tips.commitDetails.text": "Clique sur un commit dans Gestion de versions → Historique pour voir ses fichiers et ses modifications. De là, Revert… ou Cherry-pick… l’appliquent à la branche du dossier du projet, et Nouvelle branche ici… et Créer un tag ici… partent de lui.",
   "tips.commitDetails.title": "Revert, cherry-pick, branche ou tag d’un commit depuis l’Historique"
 }

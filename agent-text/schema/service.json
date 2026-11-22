@@ -965,6 +965,11 @@
       "ref": "plain"
     }
   },
+  "service.gitRepo.noTag": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
   "service.gitRepo.noTagCommit": {
     "placeholders": {
       "commit": "plain"
@@ -1054,10 +1059,86 @@
       "why": "plain"
     }
   },
+  "service.gitRepo.renameAgentHere": {
+    "placeholders": {
+      "agent": "plain",
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.renameFailed": {
+    "placeholders": {
+      "branch": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.renameInUse": {
+    "placeholders": {
+      "why": "select",
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.renameMoved": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.renameNoUpstream": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.renameOldKept": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "remote": "plain",
+      "old": "plain"
+    }
+  },
+  "service.gitRepo.renamePushFailed": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "remote": "plain",
+      "why": "plain",
+      "upstream": "plain"
+    }
+  },
   "service.gitRepo.renameRemoteFailed": {
     "placeholders": {
       "remote": "plain",
       "why": "plain"
+    }
+  },
+  "service.gitRepo.renameRemoteTaken": {
+    "placeholders": {
+      "remote": "plain",
+      "to": "plain"
+    }
+  },
+  "service.gitRepo.renameStopped": {
+    "placeholders": {
+      "step": "select",
+      "from": "plain",
+      "to": "plain",
+      "remote": "plain",
+      "upstream": "plain",
+      "old": "plain"
+    }
+  },
+  "service.gitRepo.renameTrackFailed": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "remote": "plain",
+      "why": "plain",
+      "upstream": "plain",
+      "old": "plain"
+    }
+  },
+  "service.gitRepo.renameUpstreamKept": {
+    "placeholders": {
+      "upstream": "plain"
     }
   },
   "service.gitRepo.setFailed": {
@@ -1083,12 +1164,49 @@
       "why": "plain"
     }
   },
+  "service.gitRepo.tagDeleteFailed": {
+    "placeholders": {
+      "name": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.tagMoved": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
   "service.gitRepo.tagPushFailed": {
     "placeholders": {
       "commit": "plain",
       "name": "plain",
       "remote": "plain",
       "why": "plain"
+    }
+  },
+  "service.gitRepo.tagPushOnlyFailed": {
+    "placeholders": {
+      "name": "plain",
+      "remote": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.tagPushRefused": {
+    "placeholders": {
+      "remote": "plain",
+      "name": "plain"
+    }
+  },
+  "service.gitRepo.tagRemoteFailed": {
+    "placeholders": {
+      "name": "plain",
+      "remote": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.tagRemoteRefused": {
+    "placeholders": {
+      "remote": "plain",
+      "name": "plain"
     }
   },
   "service.gitRepo.tagTaken": {
@@ -1189,6 +1307,88 @@
     "placeholders": {
       "remote": "plain",
       "why": "plain"
+    }
+  },
+  "service.gitRestore.agentBusy": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitRestore.busy": {
+    "placeholders": {
+      "folder": "plain",
+      "what": "plain"
+    }
+  },
+  "service.gitRestore.conflicted": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.gitRestore.failed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.gitRestore.invalid": {
+    "placeholders": {}
+  },
+  "service.gitRestore.missing": {
+    "placeholders": {
+      "file": "plain",
+      "commit": "plain"
+    }
+  },
+  "service.gitRestore.moved": {
+    "placeholders": {}
+  },
+  "service.gitRestore.noCommit": {
+    "placeholders": {}
+  },
+  "service.gitRestore.noTarget": {
+    "placeholders": {}
+  },
+  "service.gitRestore.notFile": {
+    "placeholders": {
+      "file": "plain",
+      "commit": "plain"
+    }
+  },
+  "service.gitRestore.notTracked": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.gitRestore.nothing": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.gitRestore.operation": {
+    "placeholders": {
+      "what": "select",
+      "folder": "plain"
+    }
+  },
+  "service.gitRestore.request": {
+    "placeholders": {}
+  },
+  "service.gitRestore.session": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitRestore.stashedFailed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.gitRestore.timedOut": {
+    "placeholders": {
+      "seconds": "number",
+      "file": "plain"
     }
   },
   "service.gitStash.agentBusy": {

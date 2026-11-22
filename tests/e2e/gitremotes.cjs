@@ -1,7 +1,8 @@
 // Remotes in the Git view (#1385, the user's backup remote on a NAS): a project with origin and a second remote, backup.
 // Push to… backup, all branches and tags: everything goes there, and what main tracks is unchanged (Push still goes to
 // origin). Track… main to backup/main: Push then goes to backup. Track… a branch to a remote branch not there yet: the
-// form says it pushes it there first, and does. Stop tracking clears it. Rename backup to nas: the branches tracking it
+// form says it pushes it there first, and does. Stop tracking clears it. HI-3474: Rename… a branch tracking origin, there
+// too; a tag's Push… to origin, and Delete… here and on origin. Rename backup to nas: the branches tracking it
 // follow. Remove nas: the confirm names the branches that stop tracking it, and they do; the remote's own branches are
 // untouched. Remotes are local bare repositories in the suite's folder (never a real remote), git's global config is
 // the suite's own (GIT_CONFIG_GLOBAL). Screenshots of the dialogs in both themes, and Push to… in German. Dev build,
@@ -202,6 +203,46 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
       await lib.until(async () => (await untrack.count()) === 1, HUNG_MS)
       await untrack.getByRole('button', { name: 'Stop tracking', exact: true }).click()
       check('Stop tracking clears what it tracks, and the remote keeps its branch', !!(await lib.until(async () => upstreamOf('feature/x') === '' && (await featureRow.locator('[data-action="untrack"]').count()) === 0, HUNG_MS)) && !!has(origin, 'feature/x'))
+
+      // --- HI-3474: Rename… a branch tracking origin, there too: the new name pushed and tracked, the old one gone there.
+      g(alpha, 'branch', 'topic', 'main')
+      g(alpha, 'push', '-q', '-u', 'origin', 'topic')
+      await page.locator('[data-action="reload-branches"]').click()
+      const topicRow = branches.locator('[data-branch="topic"]')
+      await lib.until(async () => (await topicRow.locator('[data-action="rename-branch"]').count()) === 1, HUNG_MS)
+      check('Rename… is offered on a free branch, not on the target', (await branches.locator('[data-branch="main"] [data-action="rename-branch"]').count()) === 0)
+      await topicRow.locator('[data-action="rename-branch"]').click()
+      const renameBranch = page.locator('.dialog', { hasText: 'Rename topic' })
+      await lib.until(async () => (await renameBranch.count()) === 1, HUNG_MS)
+      check('…its form: the name, and On origin keeping its name there until asked', (await renameBranch.locator('#git-form-name').inputValue()) === 'topic' && (await renameBranch.locator('#git-form-there').inputValue()) === '' && /It tracks origin\/topic/.test(await text(renameBranch)), await text(renameBranch))
+      await renameBranch.locator('#git-form-name').fill('topic2')
+      await renameBranch.locator('#git-form-there').selectOption('yes')
+      await shot(page, '5b-rename-branch-dark')
+      await renameBranch.getByRole('button', { name: 'Rename', exact: true }).click()
+      check('…renames it here and on origin, tracking its new name there', !!(await lib.until(async () => (await renameBranch.count()) === 0 && (await branches.locator('[data-branch="topic2"]').count()) === 1, HUNG_MS)) && !has(alpha, 'refs/heads/topic') && !has(origin, 'refs/heads/topic') && !!has(origin, 'refs/heads/topic2') && upstreamOf('topic2') === 'origin/topic2', JSON.stringify({ up: upstreamOf('topic2'), old: has(origin, 'refs/heads/topic') }))
+
+      // --- HI-3474: a tag's Push… to origin, then Delete… here and on origin.
+      await page.locator('.git-sections [data-section="history"]').click()
+      const history = page.locator('[data-git-history]')
+      const v1 = history.locator('[data-tag="v1"]')
+      await lib.until(async () => (await v1.locator('[data-action="push-tag"]').count()) === 1, HUNG_MS)
+      await v1.locator('[data-action="push-tag"]').click()
+      const pushTag = page.locator('.dialog', { hasText: 'Push the tag v1' })
+      await lib.until(async () => (await pushTag.count()) === 1, HUNG_MS)
+      await pushTag.locator('#git-form-remote').selectOption('origin')
+      await shot(page, '6-push-tag-dark')
+      await pushTag.getByRole('button', { name: 'Push', exact: true }).click()
+      check('Push… sends the tag to origin', !!(await lib.until(async () => (await pushTag.count()) === 0 && has(origin, 'refs/tags/v1') === has(alpha, 'refs/tags/v1'), HUNG_MS)))
+      await v1.locator('[data-action="delete-tag"]').click()
+      const deleteTag = page.locator('.dialog', { hasText: 'Delete the tag v1' })
+      await lib.until(async () => (await deleteTag.count()) === 1, HUNG_MS)
+      check('Delete… deletes here only unless a remote is chosen', (await deleteTag.locator('#git-form-remote').inputValue()) === '', await text(deleteTag))
+      await deleteTag.locator('#git-form-remote').selectOption('origin')
+      await shot(page, '7-delete-tag-dark')
+      await deleteTag.getByRole('button', { name: 'Delete', exact: true }).click()
+      check('…deletes it here and on origin', !!(await lib.until(async () => (await deleteTag.count()) === 0 && (await v1.count()) === 0, HUNG_MS)) && !has(alpha, 'refs/tags/v1') && !has(origin, 'refs/tags/v1') && !!has(backup, 'refs/tags/v1'))
+      await page.locator('.git-sections [data-section="branches"]').click()
+      await lib.until(async () => (await branches.locator('[data-git-head]').count()) === 1, HUNG_MS)
 
       // --- Rename backup to nas: main follows.
       await branches.locator('[data-remote="backup"] [data-action="rename-remote"]').click()

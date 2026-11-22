@@ -189,6 +189,7 @@ import type { OperationPanelState, OperationRequest, OperationStepResult } from 
 import type { LockAsk, PruneAsk, RemotePrune, RepoHealth } from './gitHealth'
 import type { StashApplied, StashFile, StashList, StashRef, StashRequest } from './gitStashes'
 import type { BranchMoves, RestorePlan, RestoreRequest } from './gitMoves'
+import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from './gitFileRestore'
 import type { CommitActionDone, CommitActionRequest, CommitDetail } from './gitCommitView'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
@@ -1171,6 +1172,12 @@ export interface CombworkRequests {
   'git:restorePlan': (projectPath: string, req: RestoreRequest) => RestorePlan
   /** HI-3469: Restore to here…: the branch moved back to that commit, only from the commit the user saw; the notice. */
   'git:restore': (projectPath: string, req: RestoreRequest) => string
+  /** HI-3477: the Files tab's Discard Changes… (source head) and Restore From… (the project's target, or a commit of the file's): what it would do, for its confirm. */
+  'files:gitRestorePlan': (projectPath: string, rel: string, source: RestoreSource, commit?: string | null) => FileRestorePlan
+  /** HI-3477: Restore From → A Commit…'s list: a page of the commits that changed the file, newest first. */
+  'files:gitFileCommits': (projectPath: string, rel: string, page?: number) => FileCommits
+  /** HI-3477: the Discard or Restore its confirm showed: the file's changes stashed first. Refused while anything works in the project folder. */
+  'files:gitRestore': (projectPath: string, req: FileRestoreRequest) => FileRestored
   /** HI-3471: History's Commit dialog: a commit's details and files, and why Revert… or Cherry-pick… can't be done now. */
   'git:commitDetail': (projectPath: string, commit: string) => CommitDetail
   /** HI-3471: one file of a commit against its first parent. */
@@ -1241,6 +1248,12 @@ export interface CombworkRequests {
   /** What a local branch tracks (#1385): `remote`'s `remoteBranch`, or nothing (`remote` null); `pushFirst` makes it there first. */
   'git:setUpstream': (projectPath: string, branch: string, remote: string | null, remoteBranch?: string, pushFirst?: boolean, op?: string) => string
   'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string, op?: string, at?: string) => string
+  /** HI-3474: a local branch renamed at the commit shown; `onRemote`: the remote branch it tracks too (pushed, the old one deleted by lease). */
+  'git:renameBranch': (projectPath: string, branch: BranchAt, to: string, onRemote?: boolean, op?: string) => string
+  /** HI-3474: a tag deleted as shown (`sha`: its ref's whole value); with `remote`, on it first. */
+  'git:deleteTag': (projectPath: string, tag: BranchAt, remote?: string | null, op?: string) => string
+  /** HI-3474: a tag pushed to a remote, never forced. */
+  'git:pushTag': (projectPath: string, name: string, remote: string, op?: string) => string
   /** This repository's own user.name and user.email; empty removes it (the global one applies). */
   'git:setIdentity': (projectPath: string, name: string, email: string) => string
   /** Initialise repository (#701): whether it can be done, and what the dialog asks; then git init on main, .combwork excluded first, a starter .gitignore, the first commit. */

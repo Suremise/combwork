@@ -22,6 +22,7 @@ import type { RemotePrune, RepoHealth } from '../../shared/gitHealth'
 import type { StashApplied, StashFile, StashRef, StashRequest, StashRow } from '../../shared/gitStashes'
 import type { GitDiff } from '../../shared/types'
 import type { BranchMoves, RestorePlan } from '../../shared/gitMoves'
+import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from '../../shared/gitFileRestore'
 import type { CommitActionDone, CommitDetail } from '../../shared/gitCommitView'
 
 /**
@@ -54,6 +55,10 @@ export interface OpMembers {
   repoHealth: 'health' | 'pruneWorktrees' | 'removeLocks' | 'remotePrunePreview' | 'fetchPrune'
   stashes: 'stashes' | 'stashFiles' | 'stashDiff' | 'applyStash' | 'dropStash'
   branchMoves: 'moves' | 'restorePlan' | 'restore'
+  renameLine: 'renameLine'
+  deleteTag: 'deleteTag'
+  pushTag: 'pushTag'
+  restoreFile: 'fileRestorePlan' | 'fileCommits' | 'restoreFile'
   commitActions: 'commitDetail' | 'commitFileDiff' | 'commitAction'
 }
 
@@ -94,9 +99,15 @@ export interface RepoOps {
   push(projectPath: string, remote?: string): Promise<string>
   pushTo(projectPath: string, remote: string, scope: PushScope, line?: string): Promise<string>
   setUpstream(projectPath: string, line: string, remote: string | null, remoteLine: string, pushFirst: boolean): Promise<string>
+  /** HI-3474: a line renamed at the commit shown; with `onRemote`, the remote line it tracks too. */
+  renameLine(projectPath: string, line: BranchAt, to: string, onRemote: boolean): Promise<string>
   // Tags, identity, initialising.
   /** A tag on the commit checked out, or (HI-3471's Tag here…) on `at`, a commit in full. */
   createTag(projectPath: string, name: string, message: string, pushTo?: string, at?: string): Promise<string>
+  /** HI-3474: a tag deleted as shown (`sha`, its ref's whole value); with `remote`, there first. */
+  deleteTag(projectPath: string, tag: BranchAt, remote: string | null): Promise<string>
+  /** HI-3474: a tag pushed to a remote, never forced. */
+  pushTag(projectPath: string, name: string, remote: string): Promise<string>
   setIdentity(projectPath: string, name: string, email: string): Promise<string>
   /** Initialise repository's dialog: what initialising would find (a read, for the operation it asks about). */
   initCheck(projectPath: string): Promise<GitInitCheck>
@@ -159,6 +170,16 @@ export interface RepoOps {
    * nowhere by a compare-and-swap, under its merge slot, the repository lock and the folder's fence; the notice.
    */
   restore(projectPath: string, req: unknown): Promise<string>
+  // HI-3477: the Files tab's Discard Changes… and Restore From…, of one tracked file in the project folder.
+  /** What it would do: the commit its version comes from (`target`: the project's target, by name), the file on disk against it. */
+  fileRestorePlan(projectPath: string, rel: unknown, source: RestoreSource, target: string | null, commit: string | null): Promise<FileRestorePlan>
+  /** A page of the commits that changed the file on the folder's branch, newest first. */
+  fileCommits(projectPath: string, rel: unknown, page: unknown): Promise<FileCommits>
+  /**
+   * Its uncommitted changes stashed, then (a Restore) its version at `req.commit` written, under the repository lock and
+   * the folder's fence, refused while anything works there; `guard` runs there before git does and refuses by throwing.
+   */
+  restoreFile(projectPath: string, req: FileRestoreRequest, guard?: () => Promise<void> | void): Promise<FileRestored>
   // HI-3471: History's Commit dialog, the user's click at a time (requests as sent, checked).
   /** A commit's details and files, and whether Revert… and Cherry-pick… can be done now. */
   commitDetail(projectPath: string, commit: unknown): Promise<CommitDetail>

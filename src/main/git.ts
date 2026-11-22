@@ -502,7 +502,7 @@ export async function gitDiff(projectPath: string, file: string, base?: string):
 }
 
 /** A path's working copy: its content, a link's target as git stores it, empty when deleted; its size when too large. */
-async function workingCopy(projectPath: string, abs: string): Promise<Buffer | { tooLarge: number }> {
+export async function workingCopy(projectPath: string, abs: string): Promise<Buffer | { tooLarge: number }> {
   try {
     const s = await lstat(abs)
     // A link is shown as git stores it (the path it points to), never followed: it could lead outside the project.

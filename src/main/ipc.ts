@@ -541,6 +541,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'git:pushTo': (p, remote, scope, branch, op) => netRun(p, op, () => repoOpHandlers['git:pushTo'](p, remote, scope, branch)),
     'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst, op) => netRun(p, op, () => repoOpHandlers['git:setUpstream'](p, branch, remote, remoteBranch, pushFirst)),
     'git:createTag': (p, name, message, pushTo, op, at) => netRun(p, op, () => repoOpHandlers['git:createTag'](p, name, message, pushTo, op, at)),
+    'git:renameBranch': (p, branch, to, onRemote, op) => netRun(p, op, () => repoOpHandlers['git:renameBranch'](p, branch, to, onRemote)),
+    'git:deleteTag': (p, tag, remote, op) => netRun(p, op, () => repoOpHandlers['git:deleteTag'](p, tag, remote)),
+    'git:pushTag': (p, name, remote, op) => netRun(p, op, () => repoOpHandlers['git:pushTag'](p, name, remote)),
     'git:deleteRemoteBranches': (p, remote, items, op) => netRun(p, op, () => repoOpHandlers['git:deleteRemoteBranches'](p, remote, items)),
     // HI-3473: Repository health's checks and fetches of the remotes.
     'git:remotePrunePreview': (p, op) => netRun(p, op, () => repoOpHandlers['git:remotePrunePreview'](p)),
@@ -1425,7 +1428,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'files:watch': (p) => files.watchProject(p),
     'files:setUnsaved': (paths) => quitControl.setUnsaved(win(), Array.isArray(paths) ? paths.filter((p) => typeof p === 'string') : []),
     'files:unwatch': (p) => files.unwatchProject(p),
-    'files:gitInfo': (p, items) => filesGit.gitInfo(p, items),
+    // HI-3477: with the project's target, for Restore From → Target Branch.
+    'files:gitInfo': async (p, items) => {
+      const info = await filesGit.gitInfo(p, items)
+      return info.repo ? { ...info, target: await lineRepoReads().workTarget(workspace.assertProject(p)).catch(() => null) } : info
+    },
     'files:gitRuleText': (p, items) => filesGit.ignoreRuleText(p, items),
 
     'attachments:list': (p) => files.listAttachments(p),

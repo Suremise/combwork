@@ -24,7 +24,7 @@ const namesFrom = (file: string, mod: string): string[] =>
 
 /** The mutations, by the module holding their Git implementation: what a moved caller takes from the port instead. */
 const MUTATIONS: Record<string, readonly string[]> = {
-  'src/main/gitRepo': ['switchBranch', 'createBranch', 'deleteBranches', 'deleteRemoteBranches', 'updateBranch', 'makeBranchAt', 'removeMadeBranch', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetchAll', 'pull', 'push', 'pushToRemote', 'setUpstream', 'createTag', 'setIdentity'],
+  'src/main/gitRepo': ['switchBranch', 'createBranch', 'deleteBranches', 'deleteRemoteBranches', 'updateBranch', 'makeBranchAt', 'removeMadeBranch', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetchAll', 'pull', 'push', 'pushToRemote', 'setUpstream', 'createTag', 'setIdentity', 'renameBranch', 'deleteTag', 'pushTag'],
   'src/main/gitInit': ['initCheck', 'initRepo'],
   'src/main/branchMerge': ['mergeBranch'],
   'src/main/worktrees': ['mergeWorktree'],

@@ -230,6 +230,8 @@
   "tips.editTemplates.title": "直接编辑模板",
   "tips.fileLinks.text": "智能体输出的文件路径（如 src/app.ts:42）都是链接：按住 Ctrl 单击即可在“文件”标签页中打开该文件并定位到那一行。",
   "tips.fileLinks.title": "在终端中 Ctrl+单击路径",
+  "tips.fileRestore.text": "在“文件”标签页中右键单击已更改的文件：“放弃更改…”会将其恢复到当前签出的提交，“恢复自”会取用它在目标分支上或其某个提交中的版本。两者都会先显示差异，并将其更改保存到储藏中。",
+  "tips.fileRestore.title": "在“文件”标签页中撤销文件的更改",
   "tips.filesGit.text": "在“文件”标签页中右键单击文件或文件夹：“从 Git 中排除”会将其添加到 .gitignore（或仅添加到本机的 .git/info/exclude），“停止跟踪，保留文件”会将已提交的文件移出 git 但保留在磁盘上，“为什么被忽略？”会打开灰显文件的规则。",
   "tips.filesGit.title": "在“文件”标签页中让文件不进入 git",
   "tips.filesTab.text": "“文件”标签页可以浏览和编辑项目，预览 Markdown、CSV、HTML 和图片，切换时会保留未保存的编辑。",
@@ -639,6 +641,10 @@
   "tips.stashes.title": "查看、应用或删除你的 git 储藏",
   "tips.branchMoves.text": "“版本控制”→“历史”→“移动记录”按 Git 的 reflog 保存的样子，列出分支每次移动的记录：Combwork 对卡片的合并、提交、变基、重置和拉取。“恢复到此处…”会把分支移回去，并先显示它会丢弃或带回哪些提交。",
   "tips.branchMoves.title": "撤销分支的重置、变基或合并",
+  "tips.renameBranch.title": "重命名分支，远程仓库上也一样",
+  "tips.renameBranch.text": "在“版本控制”→“分支与远程仓库”中，分支的“重命名…”（✎）会给它一个新名称。选择“那里也重命名”可同时重命名它跟踪的远程分支：只有在你上次获取之后没人推送过时，那里的旧名称才会被删除。",
+  "tips.tagPushDelete.title": "推送或删除 git 标签",
+  "tips.tagPushDelete.text": "“版本控制”→“历史”中的每个标签都有“推送…”，可将它发送到远程仓库；还有“删除…”，可在这里删除它，或同时在远程仓库上删除，这样下次获取时不会把它带回来。",
   "tips.commitDetails.text": "在“版本控制”→“历史”中点击某个提交，即可查看它的文件和更改。在那里可以将它“还原…”或“拣选…”到项目文件夹的分支上，或在它那里“从此处新建分支…”和“在此处打标签…”。",
   "tips.commitDetails.title": "从历史中还原、拣选提交，或在其处新建分支、打标签"
 }

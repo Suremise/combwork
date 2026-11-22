@@ -221,6 +221,9 @@ interface CombworkMessageValues {
   'service.gitRepo.alreadyOn': { branch: string | number }
   'service.gitRepo.badName': { kind: string; hasName: string; name: string | number }
   'service.gitRepo.branchKept': { why: string; branch: string | number; target: string | number }
+  'service.gitRepo.branchRenamed': { tracks: string; from: string | number; to: string | number; upstream: string | number }
+  'service.gitRepo.branchRenamedBoth': { from: string | number; to: string | number; remote: string | number }
+  'service.gitRepo.branchSameName': { branch: string | number }
   'service.gitRepo.branchTaken': { name: string | number }
   'service.gitRepo.branchesDeleted': { n: number; branches: string | number }
   'service.gitRepo.chooseRemote': undefined
@@ -248,6 +251,7 @@ interface CombworkMessageValues {
   'service.gitRepo.noRemotes': undefined
   'service.gitRepo.noRemotesFetch': undefined
   'service.gitRepo.noStart': { ref: string | number }
+  'service.gitRepo.noTag': { name: string | number }
   'service.gitRepo.noTagCommit': { commit: string | number }
   'service.gitRepo.noTarget': { target: string | number }
   'service.gitRepo.noUpstream': { branch: string | number }
@@ -272,14 +276,33 @@ interface CombworkMessageValues {
   'service.gitRepo.remoteTaken': { remote: string | number }
   'service.gitRepo.remoteTrackingChanged': { remote: string | number }
   'service.gitRepo.removeRemoteFailed': { remote: string | number; why: string | number }
+  'service.gitRepo.renameAgentHere': { agent: string | number; branch: string | number }
+  'service.gitRepo.renameFailed': { branch: string | number; why: string | number }
+  'service.gitRepo.renameInUse': { why: string; branch: string | number }
+  'service.gitRepo.renameMoved': { branch: string | number }
+  'service.gitRepo.renameNoUpstream': { branch: string | number }
+  'service.gitRepo.renameOldKept': { from: string | number; to: string | number; remote: string | number; old: string | number }
+  'service.gitRepo.renamePushFailed': { from: string | number; to: string | number; remote: string | number; why: string | number; upstream: string | number }
   'service.gitRepo.renameRemoteFailed': { remote: string | number; why: string | number }
+  'service.gitRepo.renameRemoteTaken': { remote: string | number; to: string | number }
+  'service.gitRepo.renameStopped': { step: string; from: string | number; to: string | number; remote: string | number; upstream: string | number; old: string | number }
+  'service.gitRepo.renameTrackFailed': { from: string | number; to: string | number; remote: string | number; why: string | number; upstream: string | number; old: string | number }
+  'service.gitRepo.renameUpstreamKept': { upstream: string | number }
   'service.gitRepo.setFailed': { key: string | number; why: string | number }
   'service.gitRepo.startMoved': { ref: string | number; now: string | number }
   'service.gitRepo.stopped': { kind: string }
   'service.gitRepo.switchFailed': { branch: string | number; why: string | number }
   'service.gitRepo.switched': { branch: string | number }
   'service.gitRepo.switchedTracking': { branch: string | number; remote: string | number }
+  'service.gitRepo.tagDeleteFailed': { name: string | number; why: string | number }
+  'service.gitRepo.tagDeleted': { onRemote: string; name: string | number; remote: string | number }
+  'service.gitRepo.tagMoved': { name: string | number }
   'service.gitRepo.tagPushFailed': { commit: string | number; name: string | number; remote: string | number; why: string | number }
+  'service.gitRepo.tagPushOnlyFailed': { name: string | number; remote: string | number; why: string | number }
+  'service.gitRepo.tagPushRefused': { remote: string | number; name: string | number }
+  'service.gitRepo.tagPushed': { result: string; remote: string | number; name: string | number }
+  'service.gitRepo.tagRemoteFailed': { name: string | number; remote: string | number; why: string | number }
+  'service.gitRepo.tagRemoteRefused': { remote: string | number; name: string | number }
   'service.gitRepo.tagTaken': { name: string | number }
   'service.gitRepo.tagged': { commit: string | number; name: string | number }
   'service.gitRepo.taggedPushed': { commit: string | number; name: string | number; remote: string | number }
@@ -307,6 +330,23 @@ interface CombworkMessageValues {
   'service.gitRepo.upstreamGone': { upstream: string | number }
   'service.gitRepo.urlChanged': { remote: string | number }
   'service.gitRepo.urlFailed': { remote: string | number; why: string | number }
+  'service.gitRestore.agentBusy': { agent: string | number; folder: string | number }
+  'service.gitRestore.busy': { folder: string | number; what: string | number }
+  'service.gitRestore.conflicted': { file: string | number }
+  'service.gitRestore.failed': { why: string | number }
+  'service.gitRestore.invalid': undefined
+  'service.gitRestore.missing': { file: string | number; commit: string | number }
+  'service.gitRestore.moved': undefined
+  'service.gitRestore.noCommit': undefined
+  'service.gitRestore.noTarget': undefined
+  'service.gitRestore.notFile': { file: string | number; commit: string | number }
+  'service.gitRestore.notTracked': { file: string | number }
+  'service.gitRestore.nothing': { file: string | number }
+  'service.gitRestore.operation': { what: string; folder: string | number }
+  'service.gitRestore.request': undefined
+  'service.gitRestore.session': { agent: string | number; folder: string | number }
+  'service.gitRestore.stashedFailed': { why: string | number }
+  'service.gitRestore.timedOut': { seconds: number; file: string | number }
   'service.gitStash.agentBusy': { agent: string | number; folder: string | number }
   'service.gitStash.busy': { folder: string | number; what: string | number }
   'service.gitStash.conflicted': { file: string | number; folder: string | number }

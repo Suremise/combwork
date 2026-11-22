@@ -230,6 +230,8 @@
   "tips.editTemplates.title": "Eine Vorlage direkt bearbeiten",
   "tips.fileLinks.text": "Dateipfade, die ein Agent ausgibt, etwa src/app.ts:42, sind Links: Strg+Klick öffnet die Datei im Tab „Dateien“ an dieser Zeile.",
   "tips.fileLinks.title": "Strg+Klick auf einen Pfad im Terminal",
+  "tips.fileRestore.text": "Klicke im Tab Dateien mit der rechten Maustaste auf eine geänderte Datei: Änderungen verwerfen… setzt sie auf den ausgecheckten Commit zurück, und Wiederherstellen aus holt ihre Version auf dem Zielbranch oder in einem ihrer Commits. Beide zeigen zuerst den Diff und bewahren ihre Änderungen in einem Stash auf.",
+  "tips.fileRestore.title": "Die Änderungen an einer Datei im Tab Dateien rückgängig machen",
   "tips.filesGit.text": "Klicke im Tab Dateien mit der rechten Maustaste auf eine Datei oder einen Ordner: Von Git ausschließen fügt sie zu .gitignore hinzu (oder nur zu .git/info/exclude dieses PCs), Nicht mehr verfolgen nimmt eine committete Datei aus Git, lässt sie aber auf der Festplatte, und Warum wird das ignoriert? öffnet die Regel einer abgeblendeten Datei.",
   "tips.filesGit.title": "Eine Datei im Tab Dateien aus Git heraushalten",
   "tips.filesTab.text": "Im Tab „Dateien“ durchsuchst und bearbeitest du das Projekt, siehst eine Vorschau von Markdown, CSV, HTML und Bildern, und ungespeicherte Änderungen bleiben beim Wechseln erhalten.",
@@ -639,6 +641,10 @@
   "tips.stashes.title": "Git-Stashes ansehen, anwenden oder löschen",
   "tips.branchMoves.text": "Versionsverwaltung → Verlauf → Bewegungen listet jede Bewegung eines Branchs auf, so wie git sie im Reflog festhält: die Merges von Karten durch Combwork, Commits, Rebases, Resets und Pulls. „Diesen Stand wiederherstellen…“ setzt den Branch zurück und zeigt vorher, welche Commits wegfallen oder zurückkommen.",
   "tips.branchMoves.title": "Reset, Rebase oder Merge eines Branchs rückgängig machen",
+  "tips.renameBranch.title": "Einen Branch umbenennen, auch auf seinem Remote",
+  "tips.renameBranch.text": "Umbenennen… (✎) an einem Branch in Versionsverwaltung → Branches & Remotes gibt ihm einen neuen Namen. Wähle „Dort auch umbenennen“, um auch den Remote-Branch umzubenennen, den er verfolgt: Der alte Name dort wird nur gelöscht, wenn seit deinem letzten Fetch niemand dorthin gepusht hat.",
+  "tips.tagPushDelete.title": "Einen Git-Tag pushen oder löschen",
+  "tips.tagPushDelete.text": "Jeder Tag in Versionsverwaltung → Verlauf hat Pushen…, um ihn zu einem Remote zu senden, und Löschen…, um ihn hier zu löschen, oder auch auf einem Remote, damit der nächste Fetch ihn nicht zurückbringt.",
   "tips.commitDetails.text": "Klicke in Versionsverwaltung → Verlauf auf einen Commit, um seine Dateien und Änderungen zu sehen. Von dort wendest du ihn mit „Revert…“ oder „Cherry-Pick…“ auf den Branch des Projektordners an oder legst mit „Branch ab hier…“ und „Hier taggen…“ einen Branch oder ein Tag an ihm an.",
   "tips.commitDetails.title": "Einen Commit aus dem Verlauf reverten, cherry-picken, abzweigen oder taggen"
 }
