@@ -1267,7 +1267,6 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
         <div className="muted" style={{ padding: '0 14px 8px', fontSize: 12 }}>
           <Icon name="git-branch" /> {status.branch} {whose && base ? <span className="faint">{tr(C.sinceLeft, { base: base ?? '' })}</span> : <>{status.ahead > 0 && `↑${status.ahead}`} {status.behind > 0 && `↓${status.behind}`}</>}
         </div>
-        <OperationPanel project={owner} root={root} folder={agent ? (agent.place.name ?? whose) : spare ? (spare.slot ?? unusedName(spare)) : null} reloadKey={status} onChanged={load} />
         <div className="pane-body">
           {status.files.length === 0 && <div className="pane-empty">{agent && own?.branch ? tr(C.noAgentChanges, { branch: own.branch }) : agent ? tr(C.clean) : spare ? tr(C.nothingOn, { branch: unusedName(spare), base: base ?? '' }) : tr(C.clean)}</div>}
           {status.files.map((f) => (
@@ -1283,6 +1282,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
       </div>
       <div className="split-main">
         {about}
+        <OperationPanel project={owner} root={root} folder={agent ? (agent.place.name ?? whose) : spare ? (spare.slot ?? unusedName(spare)) : null} reloadKey={status} onChanged={load} />
         {diff ? (
           <>
             <div className="editor-toolbar">

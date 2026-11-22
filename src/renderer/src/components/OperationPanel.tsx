@@ -47,7 +47,7 @@ const T = {
 const STEP_LABEL = { continue: T.continue, skip: T.skip, abort: T.abort } as const
 
 /**
- * The panel, above Changes' file list, for the folder `root` shows (`folder`: its name, null for the project folder).
+ * The panel, atop Changes' right side above the diff, for the folder `root` shows (`folder`: its name, null for the project folder).
  * Read again whenever `reloadKey` changes (each new status of the folder) and after each of its own steps.
  */
 export function OperationPanel({ project, root, folder, reloadKey, onChanged }: { project: ProjectInfo; root: string; folder: string | null; reloadKey: unknown; onChanged: () => void }) {

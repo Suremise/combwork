@@ -5830,7 +5830,7 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   is under way in the card's folder, as it did for a merge's, rebase's, cherry-pick's and revert's markers, now with the
   sequencer and a bisect too (listed as `(sequencer)`, `(BISECT_LOG)`).
 - **Ending it from the window** (HI-3470, the design agreed on the card, request r11): Version Control → Changes shows
-  a panel above the file list whenever the folder it shows (the project folder, an agent's slot or worktree, a free
+  a panel above the diff whenever the folder it shows (the project folder, an agent's slot or worktree, a free
   slot under Unused worktrees) has an operation under way: *Unfinished git revert in slot-a*, where git stopped (the
   commit and its subject; a rebase's or am's step, *Step 2 of 3*), and its steps: **Continue**, **Skip** and **Abort**
   for a rebase, am, cherry-pick or revert, **Continue** and **Abort** for a merge, **End bisect** (`git bisect reset`)

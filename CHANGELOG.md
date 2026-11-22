@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Continue or abort an unfinished git operation from Version Control → Changes** (HI-3470). When the folder Changes shows (the project folder or a slot) was left in the middle of a git merge, rebase, cherry-pick, revert, `git am` or bisect, a panel above its files says so, where git stopped, and offers **Continue**, **Skip** and **Abort** (for a bisect, **End bisect**), each naming the git command it runs. Each file in conflict has **Open**, **Use mine**, **Use theirs** and **Mark resolved**. Slots and copies, Branches & remotes and the notice about a stuck slot each have **Open in Changes**, so a slot left mid-revert is freed in a click. Combwork refuses a step while an agent's session, one of its own runs or another program works in that folder, and asks first for a slot lent to a card whose builder isn't running.
+- **Continue or abort an unfinished git operation from Version Control → Changes** (HI-3470). When the folder Changes shows (the project folder or a slot) was left in the middle of a git merge, rebase, cherry-pick, revert, `git am` or bisect, a panel above the diff says so, where git stopped, and offers **Continue**, **Skip** and **Abort** (for a bisect, **End bisect**), each naming the git command it runs. Each file in conflict has **Open**, **Use mine**, **Use theirs** and **Mark resolved**. Slots and copies, Branches & remotes and the notice about a stuck slot each have **Open in Changes**, so a slot left mid-revert is freed in a click. Combwork refuses a step while an agent's session, one of its own runs or another program works in that folder, and asks first for a slot lent to a card whose builder isn't running.
 
 ### Removed
 

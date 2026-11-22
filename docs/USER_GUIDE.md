@@ -2291,7 +2291,7 @@ Combwork checks your projects' git status in the background (this tab, branch st
 
 #### An unfinished git operation <a id="unfinished-git-operation"></a>
 
-When the folder Changes shows (the project folder, an agent's slot, or a free slot under **Unused worktrees**) was left in the middle of a git merge, rebase, cherry-pick, revert, `git am` or bisect, a panel above its files says so: *Unfinished git revert in slot-a*, the commit git stopped at, and for a rebase which step of how many. It has git's own way on:
+When the folder Changes shows (the project folder, an agent's slot, or a free slot under **Unused worktrees**) was left in the middle of a git merge, rebase, cherry-pick, revert, `git am` or bisect, a panel at the top, above the diff, says so: *Unfinished git revert in slot-a*, the commit git stopped at, and for a rebase which step of how many. It has git's own way on:
 
 - **Continue** goes on with it, taking git's prepared commit message (it's greyed out while a file is still in conflict). **Skip** (a rebase, `git am`, a cherry-pick or a revert) drops the commit git stopped at and goes on. **Abort** ends it and puts the folder back as it was before it began; for a bisect, **End bisect** (`git bisect reset`) is the only step: mark commits good or bad in a terminal. Point at a button to see the git command it runs. Skip and Abort ask first, saying what they drop.
 - Each file in conflict is listed with **Open** (to settle it by hand), **Use mine** (your side: the folder's own branch, or in a rebase the commit being replayed, which git calls *theirs* there), **Use theirs** (the other side) and **Mark resolved** (once you have edited it). Where a side deleted the file, using that side deletes it.

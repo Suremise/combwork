@@ -1958,7 +1958,7 @@ textarea.input {
   background: rgba(242, 85, 90, 0.12);
   color: var(--error);
 }
-/* HI-3470: Changes' panel for an unfinished git operation, above the file list: a column, its file rows below. */
+/* HI-3470: Changes' panel for an unfinished git operation, atop its right side: a column, a row a conflicted file. */
 .banner.operation-panel {
   flex-direction: column;
   align-items: stretch;
@@ -1977,8 +1977,13 @@ textarea.input {
 }
 .operation-panel .operation-conflict {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.operation-panel .operation-conflict .label {
+  flex: 1;
+  min-width: 120px;
 }
 .operation-panel .operation-conflict .label {
   overflow: hidden;
@@ -1994,7 +1999,7 @@ textarea.input {
 .banner.operation-panel .btn {
   margin-left: 0;
 }
-/* Many files in conflict scroll in the panel: it takes at most half the list's column, the file list keeping the rest. */
+/* Many files in conflict scroll in the panel: it takes at most half the right side, the diff keeping the rest. */
 .banner.operation-panel {
   max-height: 45%;
   overflow-y: auto;
