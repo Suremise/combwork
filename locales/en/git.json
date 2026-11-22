@@ -739,6 +739,138 @@
     "defaultMessage": "Learn more",
     "description": "Link or button that opens the user guide's section about this."
   },
+  "git.moves.about": {
+    "defaultMessage": "Each time the branch moved, newest first, as git's reflog keeps it (git forgets moves after about 90 days). Restore to here… moves it back to that commit.",
+    "description": "HI-3469: the hint atop History's Moves. Restore to here… is the button of that name."
+  },
+  "git.moves.back": {
+    "defaultMessage": "{n, plural, one {The commit it brings back} other {The # commits it brings back}}",
+    "description": "HI-3469: a heading in Restore's dialog: the commits the branch would have again."
+  },
+  "git.moves.branch": {
+    "defaultMessage": "Branch whose moves to show",
+    "description": "HI-3469: the name, for screen readers, of Moves' branch picker."
+  },
+  "git.moves.cantTitle": {
+    "defaultMessage": "{branch} can't be restored now",
+    "description": "HI-3469: the title of Restore to here…'s dialog when something refuses it (said in the dialog)."
+  },
+  "git.moves.confirm": {
+    "defaultMessage": "Restore",
+    "description": "HI-3469: the confirm button of Restore to here…'s dialog."
+  },
+  "git.moves.detached": {
+    "defaultMessage": "The project folder is on a detached HEAD (no branch checked out): Moves shows a branch's moves once it is on one.",
+    "description": "HI-3469: Moves when the project folder has no branch checked out (git's detached HEAD)."
+  },
+  "git.moves.dropped": {
+    "defaultMessage": "{n, plural, one {The commit it drops} other {The # commits it drops}}",
+    "description": "HI-3469: a heading in Restore's dialog: the commits the branch would no longer have (they stay in Moves, for a while)."
+  },
+  "git.moves.failed": {
+    "defaultMessage": "Couldn't restore the branch",
+    "description": "HI-3469: the title of the error notice when Restore to here… was refused or failed."
+  },
+  "git.moves.heading": {
+    "defaultMessage": "Moves of",
+    "description": "HI-3469: the heading of History's Moves, before the branch picker (a drop-down of the local branches)."
+  },
+  "git.moves.inTheWay": {
+    "defaultMessage": "Uncommitted files the move would change",
+    "description": "HI-3469: a heading in Restore's dialog over the project folder's files with uncommitted changes that differ between the two commits: git refuses while there are any."
+  },
+  "git.moves.loadFailed": {
+    "defaultMessage": "Couldn't read the moves: {error}",
+    "description": "HI-3469: in place of the moves when reading them failed. {error} is why."
+  },
+  "git.moves.more": {
+    "defaultMessage": "and {n, number} more",
+    "description": "HI-3469: under a list of commits in Restore's dialog: how many more are not listed."
+  },
+  "git.moves.moveLine": {
+    "defaultMessage": "{branch} goes from {from} back to {to}.",
+    "description": "HI-3469: the first line of Restore to here…'s dialog. {from} and {to} are short commit ids."
+  },
+  "git.moves.noBranch": {
+    "defaultMessage": "The repository has no local branch yet.",
+    "description": "HI-3469: Moves when there is no local branch to show."
+  },
+  "git.moves.none": {
+    "defaultMessage": "Git has no moves of this branch.",
+    "description": "HI-3469: Moves when the branch's reflog is empty (or git keeps none)."
+  },
+  "git.moves.nothing": {
+    "defaultMessage": "No commit is dropped or brought back: only where the branch points changes.",
+    "description": "HI-3469: in Restore's dialog when the two commits have the same history either way (rare)."
+  },
+  "git.moves.now": {
+    "defaultMessage": "now",
+    "description": "HI-3469: beside the newest move: where the branch is now."
+  },
+  "git.moves.ok": {
+    "defaultMessage": "OK",
+    "description": "HI-3469: the button of Restore's dialog when it can't be done now."
+  },
+  "git.moves.openCard": {
+    "defaultMessage": "Open {card}",
+    "description": "HI-3469: the tooltip of a Combwork merge's card key in Moves: opens the card."
+  },
+  "git.moves.option": {
+    "defaultMessage": "{kind, select, target {{branch} · target} folder {{branch} · project folder} other {{branch}}}",
+    "description": "HI-3469: a branch in Moves' picker: the project's target, the one the project folder has checked out, or another. Keep the select keys."
+  },
+  "git.moves.pushed": {
+    "defaultMessage": "{n, plural, one {One of the dropped commits is} other {# of the dropped commits are}} on {upstream} already: a later Push is refused (Combwork never forces one), and Pull brings {n, plural, one {it} other {them}} back.",
+    "description": "HI-3469: a warning in Restore's dialog: the branch's upstream ({upstream}, such as origin/main) has some of the commits it drops."
+  },
+  "git.moves.reload": {
+    "defaultMessage": "Read the moves again",
+    "description": "HI-3469: the tooltip of Moves' refresh button."
+  },
+  "git.moves.restore": {
+    "defaultMessage": "Restore to here…",
+    "description": "HI-3469: a move's button: moves the branch back to the commit of that move, after asking."
+  },
+  "git.moves.restoreTip": {
+    "defaultMessage": "Moves {branch} back to {commit}, after showing what changes",
+    "description": "HI-3469: Restore to here…'s tooltip. {commit} is a short commit id."
+  },
+  "git.moves.running": {
+    "defaultMessage": "Restoring…",
+    "description": "HI-3469: Restore to here…'s button while it runs."
+  },
+  "git.moves.tip": {
+    "defaultMessage": "Git noted: {message}\n{commit}\n{when}",
+    "description": "HI-3469: the tooltip of a move: git's own words for it ({message}, English), the commit it left the branch at in full, and when."
+  },
+  "git.moves.title": {
+    "defaultMessage": "Restore {branch} to {commit}?",
+    "description": "HI-3469: the question of Restore to here…'s dialog. {commit} is a short commit id."
+  },
+  "git.moves.view": {
+    "defaultMessage": "{view, select, moves {Moves} other {Commits}}",
+    "description": "HI-3469: the two views of Version Control → History, a switch in its heading: the branch's commits, or its moves (git's reflog: each time the branch was moved, by a commit, a merge, a reset…). Keep the select keys."
+  },
+  "git.moves.viewName": {
+    "defaultMessage": "What History shows",
+    "description": "HI-3469: the name, for screen readers, of History's Commits | Moves switch."
+  },
+  "git.moves.wayBack": {
+    "defaultMessage": "The restore is itself a move: it shows at the top of Moves, and Restore to here… on the move below it undoes it.",
+    "description": "HI-3469: the last line of Restore's dialog: how to undo it."
+  },
+  "git.moves.what": {
+    "defaultMessage": "{kind, select, commit {Committed} initial {First commit} amend {Amended the last commit} mergeCommit {Committed a merge} fastForward {Fast-forwarded to {name}} merge {Merged {name}} pull {Pulled} rebase {Rebased onto {name}} reset {Reset to {name}} created {Created from {name}} renamed {Renamed from {name}} cherryPick {Cherry-picked a commit} revert {Reverted a commit} combworkMerge {Combwork merged {name}} restored {Restored here with Combwork, from {name}} combwork {Combwork: {name}} unnamed {Moved (git noted no reason)} other {{name}}}",
+    "description": "HI-3469: what a move of a branch was, read from git's reflog. {name}: a branch, a commit's short id, a card's key (combworkMerge), Combwork's or git's own words (combwork, other: as they are, in English). Keep the select keys."
+  },
+  "git.moves.whereNowhere": {
+    "defaultMessage": "{branch} isn't checked out in any folder: only the branch moves.",
+    "description": "HI-3469: in Restore's dialog, for a branch checked out nowhere."
+  },
+  "git.moves.whereProject": {
+    "defaultMessage": "The project folder has it checked out: its files follow (git reset --keep), and your uncommitted changes stay as they are.",
+    "description": "HI-3469: in Restore's dialog, for the project folder's own branch. Keep git reset --keep as it is: a command."
+  },
   "git.newBranch.blocked": {
     "defaultMessage": "It can't be switched to now: {why}",
     "description": "After \"A branch at …\" in the New branch form, when switching branch is refused now. {why} says why."

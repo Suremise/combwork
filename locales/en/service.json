@@ -659,6 +659,90 @@
     "defaultMessage": "Git couldn't list this repository's worktrees, so Combwork can't tell nothing works in them: nothing was done. Git said: {why}",
     "description": "HI-3473 (a reviewer's round 1): an error from Repository health: git worktree list failed, so a worktree an agent or a run works in could be missed. {why} is git's error line, in English."
   },
+  "service.gitMoves.agentBusy": {
+    "defaultMessage": "{agent} is working in the project folder: try again once it has finished.",
+    "description": "HI-3469: why Restore to here… is refused: an agent ({agent}) works in the project folder."
+  },
+  "service.gitMoves.busy": {
+    "defaultMessage": "A run or an agent is working in the project folder ({what}): try again once it has finished.",
+    "description": "HI-3469: why Restore to here… is refused: a run (a test, a build) or an agent's file lock is in the project folder; {what} names the first one's folder or file."
+  },
+  "service.gitMoves.card": {
+    "defaultMessage": "{branch} is the branch of {card}, which is still open: its builder moves it, or move the card to Done first.",
+    "description": "HI-3469: why Restore to here… is refused: the branch ({branch}) is a card's line ({card}, its key) and the card isn't Done."
+  },
+  "service.gitMoves.conflicted": {
+    "defaultMessage": "{file} is in conflict in the project folder: settle it first.",
+    "description": "HI-3469: why Restore to here… is refused: a file ({file}, a path) is in conflict in the project folder."
+  },
+  "service.gitMoves.detached": {
+    "defaultMessage": "The project folder is on a detached HEAD: Moves restores a branch once the folder is on one.",
+    "description": "HI-3469 (a reviewer's round 1): why Restore to here… is refused: the project folder has no branch checked out (git's detached HEAD); the design shows no Moves then."
+  },
+  "service.gitMoves.failed": {
+    "defaultMessage": "Git refused: {why}",
+    "description": "HI-3469: an error from Restore to here…: git's own command failed; {why} is git's error line, in English."
+  },
+  "service.gitMoves.inSlot": {
+    "defaultMessage": "{branch} is checked out in {slot}: restore it there, by its agent or in a terminal.",
+    "description": "HI-3469: why Restore to here… is refused: the branch ({branch}) is checked out in a slot ({slot}, such as slot-a; glossary: slot), whose folder Combwork leaves to whoever works there."
+  },
+  "service.gitMoves.inTheWay": {
+    "defaultMessage": "{count, plural, one {An uncommitted file would change} other {# uncommitted files would change}}: commit {count, plural, one {it} other {them}} or set {count, plural, one {it} other {them}} aside first.",
+    "description": "HI-3469: why Restore to here… is refused: files with uncommitted changes in the project folder differ between the branch's commit and the one restored to (git reset --keep refuses rather than lose them); the files are listed under it."
+  },
+  "service.gitMoves.inWorktree": {
+    "defaultMessage": "{branch} is checked out in {folder}: restore it there, in a terminal.",
+    "description": "HI-3469: why Restore to here… is refused: the branch ({branch}) is checked out in another worktree ({folder}, a path)."
+  },
+  "service.gitMoves.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was done.",
+    "description": "HI-3469: an error from Moves: the request was malformed (not reached from the window)."
+  },
+  "service.gitMoves.moved": {
+    "defaultMessage": "{branch} has moved on since you looked: nothing was done. Look again.",
+    "description": "HI-3469: an error from Moves' Restore to here…: the branch ({branch}) is no longer at the commit the user saw."
+  },
+  "service.gitMoves.noBranch": {
+    "defaultMessage": "{branch} isn't a local branch any more: nothing was done. Look again.",
+    "description": "HI-3469: an error from Version Control → History → Moves: the branch ({branch}) was deleted or renamed since the user looked."
+  },
+  "service.gitMoves.noCommit": {
+    "defaultMessage": "Git no longer has the commit {commit}: nothing was done.",
+    "description": "HI-3469: an error from Restore to here…: the commit to restore to ({commit}, a short id) is gone from the repository (git's clean-up removed it)."
+  },
+  "service.gitMoves.operation": {
+    "defaultMessage": "Git is in the middle of {what, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in the project folder: finish it first (Version Control → Changes).",
+    "description": "HI-3469: why Restore to here… is refused: an operation is under way in the project folder ({what}, git's word for it); Changes' panel ends it."
+  },
+  "service.gitMoves.queue": {
+    "defaultMessage": "The merge queue is testing {card}'s merge into {branch}: try again once it is done.",
+    "description": "HI-3469: why Restore to here… is refused: a card ({card}, its key) is being tested and merged into the branch ({branch}) now."
+  },
+  "service.gitMoves.restored": {
+    "defaultMessage": "Restored {branch} to {to}. It was at {from}: the move just made is at the top of Moves, and Restore to here… on the one below it undoes it.",
+    "description": "HI-3469: a notice after Restore to here…: the branch ({branch}) is at the commit {to} (a short id) now; {from} is the commit it was at, in full (keep it whole: it is the way back)."
+  },
+  "service.gitMoves.same": {
+    "defaultMessage": "{branch} is at that commit already: nothing to do.",
+    "description": "HI-3469: Restore to here… on a move whose commit is where the branch is now."
+  },
+  "service.gitMoves.session": {
+    "defaultMessage": "{agent}'s session is in the project folder: nothing was done. Stop it first.",
+    "description": "HI-3469: why Restore to here… is refused for the project folder's branch: an agent's session ({agent}, its name) runs there."
+  },
+  "service.gitMoves.slotHeld": {
+    "defaultMessage": "A merge into {branch} is under way or waiting (its merge slot): try again once it is done.",
+    "description": "HI-3469: why Restore to here… is refused: an agent or the merge queue holds or waits for the branch's merge slot."
+  },
+  "service.gitMoves.timedOut": {
+    "defaultMessage": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at the project folder before you try again.",
+    "description": "HI-3469: an error from Restore to here…: git reset ran past Settings → Advanced's longest commit time ({seconds}) and was ended."
+  },
+  "service.gitMoves.unlisted": {
+    "defaultMessage": "Git couldn't list this repository's worktrees, so Combwork can't tell where {branch} is checked out: nothing was done. Git said: {why}",
+    "description": "HI-3469 (a reviewer's round 1): an error from Restore to here…: git worktree list failed, so a worktree that has the branch ({branch}) checked out could be missed. {why} is git's error line, in English."
+  },
   "service.gitOperation.agentBusy": {
     "defaultMessage": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",
     "description": "HI-3470: an error from the panel: an agent ({agent}) works in the folder ({folder}, a path)."

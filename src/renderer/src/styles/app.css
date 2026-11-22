@@ -15976,6 +15976,33 @@ button.progress-lane-retry {
   gap: 6px;
   font-weight: normal;
 }
+/* HI-3469: History's Commits | Moves switch, its moves, and Restore to here…'s dialog. */
+.history-view {
+  font-weight: normal;
+}
+.git-move .git-move-what {
+  flex-shrink: 0;
+}
+.git-move .git-subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.restore-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.restore-plan p {
+  margin: 0;
+}
+.restore-commits {
+  max-height: 160px;
+  overflow: auto;
+  margin-top: 4px;
+  padding-left: 8px;
+}
 .git-rows {
   display: flex;
   flex-direction: column;

@@ -19,6 +19,7 @@ import { projectSlots, useMergeSlots } from '../components/MergeSlots'
 import { BusyButton, Icon, IconButton, LoadFailed, Modal, StaleNote, Tooltip, useBusy } from '../components/ui'
 import { InitRepoButton } from '../components/InitRepo'
 import { Pager } from '../components/DataTable'
+import { HistoryViewSwitch, MovesSection } from '../components/BranchMoves'
 
 /** A message with markup, as React children (keyed, so a list of parts renders without warnings). */
 export const rich = (m: Msg, values: Parameters<typeof tRich<React.ReactNode>>[1]): React.ReactNode[] => Children.toArray(tRich<React.ReactNode>(m, values))
@@ -183,7 +184,15 @@ export function Loading<T>({ read, what, children }: { read: { data: T | null; e
 // History
 // ---------------------------------------------------------------------------
 
+/** History: the branch's commits, or (HI-3469) its moves, a switch in the heading; the project's own choice while Combwork runs. */
 export function HistorySection({ project, summary }: { project: ProjectInfo; summary: GitRepoSummary | null }) {
+  const [shown, setShown] = useState<{ for: string; view: 'commits' | 'moves' }>({ for: project.path, view: 'commits' })
+  const view = shown.for === project.path && offered('git:moves') ? shown.view : 'commits'
+  const onView = (v: 'commits' | 'moves'): void => setShown({ for: project.path, view: v })
+  return view === 'moves' ? <MovesSection project={project} view={view} onView={onView} /> : <CommitsSection project={project} summary={summary} onView={onView} />
+}
+
+function CommitsSection({ project, summary, onView }: { project: ProjectInfo; summary: GitRepoSummary | null; onView: (v: 'commits' | 'moves') => void }) {
   // The branch chosen (null: the default, the project's target) and the page, the project's own (#1643).
   const [pick, setPick] = useState<{ for: string; ref: string | null; page: number }>({ for: project.path, ref: null, page: 1 })
   const mine = pick.for === project.path ? pick : { for: project.path, ref: null, page: 1 }
@@ -223,6 +232,7 @@ export function HistorySection({ project, summary }: { project: ProjectInfo; sum
       {(h: GitHistory) => (
         <div className="git-history" data-git-history="" data-history-ref={h.ref ?? ''} data-history-page={h.page}>
           <h2 className="section git-section-head">
+            <HistoryViewSwitch view="commits" onView={onView} />
             {rich(M.historyOf, { head: picker(h), faint })}
             <span className="git-section-actions">
               <IconButton icon={read.loading ? 'loading' : 'refresh'} spin={read.loading} title={tr(M.readHistoryAgain)} action="reload-history" onClick={read.reload} />
