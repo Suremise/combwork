@@ -9,9 +9,9 @@ export type CombworkStash = { why: 'merging'; card: string } | { why: 'catchUp';
 
 /** A stash as the list shows it. */
 export interface StashRow {
-  /** The stash's commit: what every request names (its place in the list moves as others are made or dropped). */
+  /** The stash's commit: what Show names (its place in the list moves as others are made or dropped). */
   commit: string
-  /** Its place in `git stash list` now (`stash@{index}`). */
+  /** Its place in `git stash list` now (`stash@{index}`): with its commit and message, the row Drop and Pop name. */
   index: number
   /** The branch it was made on (git's "On main:"), or null when git's message names none (a detached HEAD). */
   branch: string | null
@@ -38,9 +38,19 @@ export interface StashFile {
   untracked: boolean
 }
 
-/** What Apply or Pop asks: the stash the user saw (its commit), whether it is dropped after, the lent slot's lease they confirmed. */
-export interface StashRequest {
+/**
+ * HI-3527: the row of the list the user acted on: its commit, its place and its message as they saw them. Several rows
+ * can hold one commit (`git stash store` of a stash's commit lists it again): Drop and Pop act on the row, never just the
+ * first with that commit.
+ */
+export interface StashRef {
   commit: string
+  index: number
+  message: string
+}
+
+/** What Apply or Pop asks: the row the user saw, whether it is dropped after, the lent slot's lease they confirmed. */
+export interface StashRequest extends StashRef {
   pop: boolean
   lease?: string
 }
@@ -87,9 +97,17 @@ export function stashSubject(subject: string): { branch: string | null; message:
 
 export const isStashCommit = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(v)
 
+/** A row as the window named it, checked; null when it is anything else. */
+export function stashRefOf(raw: unknown): StashRef | null {
+  const r = (raw ?? {}) as Record<string, unknown>
+  if (!isStashCommit(r.commit) || typeof r.index !== 'number' || !Number.isSafeInteger(r.index) || r.index < 0 || typeof r.message !== 'string') return null
+  return { commit: r.commit, index: r.index, message: r.message }
+}
+
 /** A request as the window sent it, checked; null when it is anything else. */
 export function stashRequestOf(raw: unknown): StashRequest | null {
+  const ref = stashRefOf(raw)
   const r = (raw ?? {}) as Record<string, unknown>
-  if (!isStashCommit(r.commit) || typeof r.pop !== 'boolean') return null
-  return { commit: r.commit, pop: r.pop, ...(typeof r.lease === 'string' && r.lease ? { lease: r.lease } : {}) }
+  if (!ref || typeof r.pop !== 'boolean') return null
+  return { ...ref, pop: r.pop, ...(typeof r.lease === 'string' && r.lease ? { lease: r.lease } : {}) }
 }

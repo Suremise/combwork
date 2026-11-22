@@ -279,6 +279,7 @@ interface CombworkMessageValues {
   'service.gitStash.failed': { why: string | number }
   'service.gitStash.gone': undefined
   'service.gitStash.invalid': undefined
+  'service.gitStash.moved': undefined
   'service.gitStash.notDropped': { why: string | number }
   'service.gitStash.operation': { what: string; folder: string | number }
   'service.gitStash.overlap': { file: string | number; folder: string | number }

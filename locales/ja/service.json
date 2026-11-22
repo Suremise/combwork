@@ -433,6 +433,7 @@
   "service.gitStash.busy": "実行またはエージェントが{folder}で作業中です（{what}）。何も行っていません。終わってからもう一度お試しください。",
   "service.gitStash.conflicted": "{folder}で{file}が競合しています。何も行っていません。先に解決してください。",
   "service.gitStash.failed": "Gitが拒否しました：{why}",
+  "service.gitStash.moved": "その間にスタッシュが変わり、選んだものと同じスタッシュが複数あります。何も行っていません。もう一度確認してください。",
   "service.gitStash.gone": "そのスタッシュはもう一覧にありません（その間に削除またはポップされました）。何も行っていません。もう一度確認してください。",
   "service.gitStash.invalid": "リクエストが正しくないため、何も行いませんでした。",
   "service.gitStash.notDropped": "スタッシュは適用されましたが、Gitが削除しませんでした：{why}。まだ一覧にあります。",

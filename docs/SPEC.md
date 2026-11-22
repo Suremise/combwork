@@ -5895,11 +5895,12 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   shares them between its folders, so each folder shows the same list), newest first, each with its message, the
   branch it was made on (git's *On main:*, *no branch* for a detached HEAD), its date and how many files it holds (its
   changes against the commit it was made on and the untracked files its third parent keeps, which `git stash show`
-  alone leaves out). There is no cap and no setting. Combwork's own, made by Set Aside (HI-2944), are told by the mark
+  alone leaves out). There is no cap and no setting: however many there are, each is read (HI-3531: the commits of
+  their untracked files go to git on its input, never its command line, which Windows bounds). Combwork's own, made by Set Aside (HI-2944), are told by the mark
   their message carries (`Combwork: set aside <why> [cw:<6 hex>]`) and read *Set aside by Combwork before merging
   HI-12* (*before bringing 1.7.0 up to date with HI-12*, *before starting work on main*), the card key a link to the
-  card; any other stash shows git's message as it is. Every request names a stash by its commit, never its place in
-  the list, which moves as stashes are made or dropped. Git's work is a Git port operation (`stashes`: RepoOps'
+  card; any other stash shows git's message as it is. No request names a stash by its place in the list alone, which
+  moves as stashes are made or dropped: Show names its commit, and Apply, Pop and Drop its row (HI-3527). Git's work is a Git port operation (`stashes`: RepoOps'
   `stashes`, `stashFiles`, `stashDiff`, `applyStash`, `dropStash`; `platform/git/gitStashes.ts`); None lists none of
   it. Agents have no tool, route or count for it: it is the user's, as the rest of Version Control is.
   - **Show** lists the stash's files under it, changed then untracked; a click on one shows its diff where the
@@ -5931,9 +5932,16 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
     round 1): another conflict of that file in its place (one stash's settled in a terminal, another's applied at
     the same HEAD) is refused, while other files' picks meanwhile aren't. Once no file is unmerged the panel goes.
   - **Drop** asks first, naming the stash, its files and, for Combwork's, its card, and saying its commit can be
-    found in a terminal for a while (`git fsck --unreachable`). Under the repository lock it drops the stash only while
-    its place in the list still holds the commit the user saw, read again just before `git stash drop`, and the notice
-    after gives the commit in full. Drop changes no folder, so it waits only for the lock.
+    found in a terminal for a while (`git fsck --unreachable`). Under the repository lock it drops the row the user
+    saw (HI-3527, below), its place read again just before `git stash drop`, and the notice after gives the commit in
+    full. Drop changes no folder, so it waits only for the lock.
+  - **The row, not just the commit** (HI-3527): one commit can be listed in several rows (`git stash store` of a
+    stash's commit lists it again, with its own message), so Apply, Pop and Drop name the row the user saw: its commit,
+    its place and its message. The row at that place is used while it still holds that commit and message; when the
+    places moved meanwhile (a stash made or dropped elsewhere), the only row that does; with none, the stash is gone,
+    and with several and none at its place, Combwork refuses, saying the stashes changed and to look again. Pop drops
+    that row, and the list keys its rows and Show by row. Show reads by commit alone: rows of one commit hold the same
+    files.
 - **A detach that keeps failing** (HI-3467): a clean free Git slot whose detach at its target fails for any other reason
   (an index lock, files in the way, git unable to read its head or the target's, the target's branch gone; not its
   card's own work, which keeps it) stays not ready, and the same record (`slot_operation:`, `what` `detach`) keeps git's

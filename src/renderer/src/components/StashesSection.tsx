@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GitDiff, ProjectInfo } from '@shared/types'
-import type { CombworkStash, StashFile, StashList, StashRow } from '@shared/gitStashes'
+import type { CombworkStash, StashFile, StashList, StashRef, StashRow } from '@shared/gitStashes'
 import { formatDateTime } from '@shared/dates'
 import { msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -74,10 +74,18 @@ export function stashName(s: StashRow): string {
 /** The card a Combwork stash names, if any. */
 const cardOf = (s: StashRow): string | null => (s.combwork && 'card' in s.combwork ? s.combwork.card : null)
 
+/** HI-3527: a row's key: several rows can hold one commit (`git stash store`), so a row is its place and its commit. */
+const rowKey = (s: StashRow): string => `${s.index}:${s.commit}`
+
+/** A row as Drop and Pop name it. */
+const refOf = (s: StashRow): StashRef => ({ commit: s.commit, index: s.index, message: s.message })
+
 /** A stash file shown in place of the folder's diff. */
 export interface StashFileShown {
   root: string
   commit: string
+  /** The row it was shown from (rowKey). */
+  row: string
   name: string
   file: StashFile
 }
@@ -90,7 +98,7 @@ export function StashesSection({ project, root, folder, branch, reloadKey, shown
   const [state, setState] = useState<{ for: string; list: StashList | null; error?: string } | null>(null)
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const [files, setFiles] = useState<{ commit: string; files: StashFile[] | null; error?: string } | null>(null)
+  const [files, setFiles] = useState<{ row: string; files: StashFile[] | null; error?: string } | null>(null)
   const reads = useRef(0)
   const read = useCallback(() => {
     if (!offered('git:stashes')) return
@@ -117,15 +125,16 @@ export function StashesSection({ project, root, folder, branch, reloadKey, shown
   }
 
   const toggleFiles = (s: StashRow): void => {
-    if (files?.commit === s.commit) {
+    const row = rowKey(s)
+    if (files?.row === row) {
       setFiles(null)
-      if (shown?.commit === s.commit) onShow(null)
+      if (shown?.row === row) onShow(null)
       return
     }
-    setFiles({ commit: s.commit, files: null })
+    setFiles({ row, files: null })
     void call('git:stashFiles', root, s.commit).then(
-      (f) => setFiles((x) => (x?.commit === s.commit ? { commit: s.commit, files: f } : x)),
-      (e) => setFiles((x) => (x?.commit === s.commit ? { commit: s.commit, files: null, error: errorMessage(e) } : x))
+      (f) => setFiles((x) => (x?.row === row ? { row, files: f } : x)),
+      (e) => setFiles((x) => (x?.row === row ? { row, files: null, error: errorMessage(e) } : x))
     )
   }
 
@@ -139,8 +148,8 @@ export function StashesSection({ project, root, folder, branch, reloadKey, shown
       if (!go) return
       confirmed.current = list.lent.lease
     }
-    setBusy(`${pop ? 'pop' : 'apply'}:${s.commit}`)
-    const r = await attempt(tr(T.failed), () => repoOp('git:applyStash', root, { commit: s.commit, pop, ...(list.lent ? { lease: list.lent.lease } : {}) }))
+    setBusy(`${pop ? 'pop' : 'apply'}:${rowKey(s)}`)
+    const r = await attempt(tr(T.failed), () => repoOp('git:applyStash', root, { ...refOf(s), pop, ...(list.lent ? { lease: list.lent.lease } : {}) }))
     setBusy(null)
     after()
     if (!r) return
@@ -152,10 +161,10 @@ export function StashesSection({ project, root, folder, branch, reloadKey, shown
     if (busy) return
     const ok = await confirm({ title: tr(T.dropTitle, { name: stashName(s) }), message: tr(T.dropMessage, { files: s.files, card: cardOf(s) ?? 'none', commit: s.commit.slice(0, 10) }), confirmLabel: tr(T.drop), danger: true })
     if (!ok) return
-    setBusy(`drop:${s.commit}`)
-    const r = await attempt(tr(T.failed), () => repoOp('git:dropStash', root, s.commit).then(() => true))
+    setBusy(`drop:${rowKey(s)}`)
+    const r = await attempt(tr(T.failed), () => repoOp('git:dropStash', root, refOf(s)).then(() => true))
     setBusy(null)
-    if (shown?.commit === s.commit) onShow(null)
+    if (shown?.row === rowKey(s)) onShow(null)
     after()
     if (r) notify('success', tr(T.dropped, { commit: s.commit }))
   }
@@ -173,9 +182,10 @@ export function StashesSection({ project, root, folder, branch, reloadKey, shown
             const card = cardOf(s)
             const n = card ? cardNumberOf(card) : null
             const off = !!busy
-            const showing = files?.commit === s.commit
+            const row = rowKey(s)
+            const showing = files?.row === row
             return (
-              <div key={s.commit} className="stash-row" data-stash={s.commit} data-combwork={s.combwork ? s.combwork.why : undefined}>
+              <div key={row} className="stash-row" data-stash={s.commit} data-stash-index={s.index} data-combwork={s.combwork ? s.combwork.why : undefined}>
                 <div className="stash-line">
                   <div className="stash-name">
                     <span className="label" title={s.message}>
@@ -196,17 +206,17 @@ export function StashesSection({ project, root, folder, branch, reloadKey, shown
                     </button>
                     <Tooltip content={tr(T.applyTip, { folder: where })}>
                       <button type="button" className="btn small" data-action="stash-apply" disabled={off} onClick={() => void apply(s, false)}>
-                        {busy === `apply:${s.commit}` && <Icon name="loading" spin />} {tr(T.apply)}
+                        {busy === `apply:${row}` && <Icon name="loading" spin />} {tr(T.apply)}
                       </button>
                     </Tooltip>
                     <Tooltip content={tr(T.popTip, { folder: where })}>
                       <button type="button" className="btn small" data-action="stash-pop" disabled={off} onClick={() => void apply(s, true)}>
-                        {busy === `pop:${s.commit}` && <Icon name="loading" spin />} {tr(T.pop)}
+                        {busy === `pop:${row}` && <Icon name="loading" spin />} {tr(T.pop)}
                       </button>
                     </Tooltip>
                     <Tooltip content={tr(T.dropTip)}>
                       <button type="button" className="btn small" data-action="stash-drop" disabled={off} onClick={() => void drop(s)}>
-                        {busy === `drop:${s.commit}` && <Icon name="loading" spin />} {tr(T.drop)}
+                        {busy === `drop:${row}` && <Icon name="loading" spin />} {tr(T.drop)}
                       </button>
                     </Tooltip>
                   </span>
@@ -222,7 +232,7 @@ export function StashesSection({ project, root, folder, branch, reloadKey, shown
                     ) : (
                       files.files.map((f) => (
                         <Tooltip block key={`${f.untracked ? 'u' : 't'}:${f.path}`} content={tr(T.fileTip)}>
-                          <div className={cx('row', shown?.commit === s.commit && shown.file.path === f.path && shown.file.untracked === f.untracked && 'selected')} data-stash-file={f.path} onClick={() => onShow({ root, commit: s.commit, name: stashName(s), file: f })}>
+                          <div className={cx('row', shown?.row === row && shown.file.path === f.path && shown.file.untracked === f.untracked && 'selected')} data-stash-file={f.path} onClick={() => onShow({ root, commit: s.commit, row, name: stashName(s), file: f })}>
                             <span className="label">{f.path}</span>
                             {f.untracked && <span className="faint">{tr(T.untracked)}</span>}
                             <span className={cx('git-status', f.untracked ? 'U' : f.status)}>{f.untracked ? 'U' : f.status /* i18n-ignore: git's status letter */}</span>

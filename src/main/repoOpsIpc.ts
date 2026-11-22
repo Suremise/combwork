@@ -74,8 +74,8 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
     const ops = opsAt('git:applyStash')
     return (await import('./stashPanel')).applyStashAt(workspace, root, req, ops)
   },
-  'git:dropStash': async (root, commit) => {
+  'git:dropStash': async (root, ref) => {
     const ops = opsAt('git:dropStash')
-    return (await import('./stashPanel')).dropStashAt(workspace, root, commit, ops)
+    return (await import('./stashPanel')).dropStashAt(workspace, root, ref, ops)
   }
 }
