@@ -128,7 +128,9 @@ const check = (name, ok, extra = '') => {
     // HI-3518: Changes' panel shows the file left in conflict, with no operation under way: where it came from, the
     // stash's side named on its button, no step. Use the stash's settles it, and with nothing left the panel goes.
     const left = page.locator('.operation-panel[data-operation="conflicts"]')
-    check("HI-3518: the panel shows the file left in conflict, from the stash, with no step", !!(await lib.until(async () => (await left.locator('[data-conflict="b.txt"]').count()) === 1, HUNG_MS)) && /Files left in conflict in the project folder/.test(await text(left)) && (await text(left)).includes('From applying the stash “my own work”') && (await left.locator('[data-step]').count()) === 0 && (await left.locator('[data-pick="theirs"]').innerText()).includes("Use the stash's"), await text(left).catch(() => ''))
+    // What it shows waited for as a whole, not its first row alone (HI-3528: the row and its stash come in one read now,
+    // but a check of text read once the row appears would pass or fail by when the panel read).
+    check("HI-3518: the panel shows the file left in conflict, from the stash, with no step", !!(await lib.until(async () => (await left.locator('[data-conflict="b.txt"]').count()) === 1 && /Files left in conflict in the project folder/.test(await text(left)) && (await text(left)).includes('From applying the stash “my own work”'), HUNG_MS)) && (await left.locator('[data-step]').count()) === 0 && (await left.locator('[data-pick="theirs"]').innerText()).includes("Use the stash's"), await text(left).catch(() => ''))
     // Its notifications dismissed by their own close buttons, so the screenshot shows the panel under them.
     check('…its notifications dismissed for the screenshot', !!(await lib.until(async () => {
       const close = page.locator('.popup-close')

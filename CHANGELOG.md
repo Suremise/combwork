@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- **A stash's conflicts are named only while they are that stash's** (HI-3528). After an **Apply** in Changes left a file in conflict, a conflict made later in a terminal (another `git stash apply`, with the first file put back) was shown in **Files left in conflict** as coming from the first stash, and its **Use the stash's** named it. Combwork now remembers the exact conflicts that Apply left, and names the stash only while those are what's in conflict.
 - **A file replaced by a folder shows its diff** (HI-3529). Where a commit turned a file into a folder of the same name (or a folder into a file), the file's diff in a stash's **Show**, Compare in Changes and a card's changes failed with git's *bad file*; it now shows the file deleted (or added), and the folder's files as added.
 - **A project added to an open workspace keeps its version control notice's buttons** (HI-3524). When a project folder was added while the workspace was open and its version control needed saying (a repository found or gone), the notice reached the window before the project did, so it read *"… isn't in this workspace any more"* at once and lost its **Open Version Control** button. It now comes once the window shows the project.
 - **Stashes lists a long history of stashes** (HI-3531). With hundreds of stashes holding untracked files, Changes' **Stashes** failed to read any of them (Windows' command line was too long); it now lists every one, each with its files counted.

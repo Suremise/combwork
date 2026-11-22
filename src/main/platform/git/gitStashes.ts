@@ -175,30 +175,62 @@ async function folderChanges(folder: string): Promise<{ changed: Set<string>; co
   return { changed, conflicted }
 }
 
-/** The files git lists as unmerged in a folder. */
-async function unmergedIn(folder: string): Promise<string[]> {
-  const r = await git(folder, ['diff', '--name-only', '--diff-filter=U', '-z'])
-  if (!r.ok) return []
-  return [...new Set(r.out.split('\0').filter(Boolean))].sort()
-}
-
 async function headOf(folder: string): Promise<string> {
   const r = await git(folder, ['rev-parse', '--verify', '-q', 'HEAD'])
   return r.ok ? r.out.trim() : ''
 }
 
+/**
+ * HI-3528: a folder's unmerged index entries, each as git lists it (`<mode> <blob> <stage>\t<path>`): which files are in
+ * conflict and the exact sides of each. Empty when git can't say.
+ */
+async function unmergedEntries(folder: string): Promise<string[]> {
+  const r = await git(folder, ['ls-files', '-u', '-z'])
+  if (!r.ok) return []
+  return r.out.split('\0').filter(Boolean)
+}
+
+/** The files of unmerged entries (unmergedEntries), each once, sorted. */
+const pathsOf = (entries: string[]): string[] => [...new Set(entries.map((e) => e.slice(e.indexOf('\t') + 1)))].sort()
+
 /** HI-3518's hand-off: the stash last applied with conflicts in each folder (by its normalised path), while they last. */
-const conflicts = new Map<string, StashConflict>()
+const conflicts = new Map<string, { conflict: StashConflict; entries: Set<string> }>()
 const keyOf = (folder: string): string => normalize(folder).toLowerCase()
+
+/**
+ * HI-3528: each folder's Apply or Pop while it runs (under the folder's fence). A read of the folder's conflicts
+ * meanwhile (the panel, read again as the folder's files change under git) waits for it, so it never finds git's
+ * conflicts before the record of whose they are, and shows them unnamed.
+ */
+const applying = new Map<string, Promise<unknown>>()
+
+async function recording<T>(folder: string, fn: () => Promise<T>): Promise<T> {
+  const k = keyOf(folder)
+  const run = fn()
+  const settled = run.catch(() => undefined)
+  applying.set(k, settled)
+  try {
+    return await run
+  } finally {
+    if (applying.get(k) === settled) applying.delete(k)
+  }
+}
 
 /**
  * HI-3518: the stash last applied with conflicts in `folder` (its commit, its message, the HEAD it was applied onto),
  * while HEAD is still that and a file is still in conflict there; null otherwise (and forgotten). Main's memory only.
+ * HI-3528: and only while every conflict there is one that Apply left: each unmerged entry now (its path, stage and
+ * blob) one of those it saw. Settling files leaves fewer; a conflict made since (another `git stash apply` in a
+ * terminal, the same file conflicted again with other sides) isn't the stash's, so it is forgotten.
  */
 export async function stashConflictIn(folder: string): Promise<StashConflict | null> {
+  await applying.get(keyOf(folder))
   const rec = conflicts.get(keyOf(folder))
   if (!rec) return null
-  if ((await headOf(folder)) === rec.head && (await unmergedIn(folder)).length) return rec
+  if ((await headOf(folder)) === rec.conflict.head) {
+    const now = await unmergedEntries(folder)
+    if (now.length && now.every((e) => rec.entries.has(e))) return rec.conflict
+  }
   conflicts.delete(keyOf(folder))
   return null
 }
@@ -226,7 +258,8 @@ export async function applyStash(projectPath: string, folder: string, req: Stash
   return withRepoLock(
     projectPath,
     () =>
-      changingFolder(folder, FENCE, async () => {
+      // HI-3528: the folder's conflict reads wait for the whole Apply (recording), git's step and its record included.
+      changingFolder(folder, FENCE, () => recording(folder, async () => {
         const s = await rowOf(folder, req)
         if (typeof s === 'string') throw rowError(s)
         const op = operationSync(folder)
@@ -249,9 +282,11 @@ export async function applyStash(projectPath: string, folder: string, req: Stash
           log.warn(`git stash apply in ${userText(folder)} ran past its bound and was ended`)
           throw combworkError(M.timedOut, { seconds: Math.round(platformLimits.gitCommitMs() / 1000), folder })
         }
-        const left = await unmergedIn(folder)
+        const entries = await unmergedEntries(folder)
+        const left = pathsOf(entries)
         if (left.length) {
-          conflicts.set(keyOf(folder), { commit: req.commit, label: stashSubject(s.subject).message, head })
+          // Apply refused while a file was in conflict, so every unmerged entry now is this stash's.
+          conflicts.set(keyOf(folder), { conflict: { commit: req.commit, label: stashSubject(s.subject).message, head }, entries: new Set(entries) })
           log.info(`The stash ${req.commit.slice(0, 12)} left ${left.length} file(s) in conflict in ${userText(folder)}; it is kept`)
           return { conflicts: left, dropped: false }
         }
@@ -269,7 +304,7 @@ export async function applyStash(projectPath: string, folder: string, req: Stash
           return { conflicts: [], dropped: false }
         }
         return { conflicts: [], dropped: true }
-      }),
+      })),
     { project: projectPath }
   )
 }
