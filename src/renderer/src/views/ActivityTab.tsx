@@ -94,6 +94,15 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   useEffect(() => {
     if (mapPick && selected !== mapPick.node.key) setMapPick(null)
   }, [selected, mapPick])
+  // Escape clears a call the map showed (HI-3499, HR1's round 1): its From the map row and its Details, after an open
+  // station panel and before the agent shown alone (the map's own Escape asks first); from the list or Details too.
+  const pickNow = useRef(mapPick)
+  pickNow.current = mapPick
+  const clearPick = useCallback((): boolean => {
+    if (!pickNow.current) return false
+    setSelected(null)
+    return true
+  }, [])
   // Live (HI-1743): a choice, never the default; each opening is frozen.
   const [live, setLive] = useState(false)
   // The agents as last taken in: live state changes often, the tab follows once a tick, and only when it changed.
@@ -436,7 +445,12 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const card = content.card
   const solo = parts[0]?.session?.session
   return (
-    <div className="activity-tab">
+    <div
+      className="activity-tab"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && clearPick()) e.stopPropagation()
+      }}
+    >
       <div className="activity-main">
         <div className="activity-head">
           <span className="pane-header-title">{tr(M.heading)}</span>
@@ -487,7 +501,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
           </div>
         )}
         <div className={cx('activity-body', mapOn && entries.length > 0 && 'with-map')}>
-          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={project.name} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} onOpenFile={openFile} onShowCall={showCall} live={map.animate} />}
+          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={project.name} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} onOpenFile={openFile} onShowCall={showCall} onEscape={clearPick} live={map.animate} />}
         {!parts.length ? (
           <div className="pane-empty">{reading ? null : tr(filtered ? M.emptyFiltered : M.empty)}</div>
         ) : (

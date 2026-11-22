@@ -329,6 +329,8 @@ export interface ActivityMapProps {
   onOpenFile?: (agentKey: string, path: string) => void
   /** A feed row's or a panel row's call, shown in the list (HI-3499). */
   onShowCall?: (call: MapCallRef) => void
+  /** Escape, once no panel is open: true when the view cleared a call the map showed (HI-3499), before un-picking. */
+  onEscape?: () => boolean
   /** Animating (shown, live and on: `useActivityMap`'s): agents arriving and leaving are eased only then (HI-3499). */
   live?: boolean
 }
@@ -350,7 +352,7 @@ export function mapStrip(entries: readonly MapEntry[], contexts: ReadonlyMap<str
 }
 
 /** The map: stations, spokes, pulses, the centre, the feed and (shared) the agents' context rings. */
-export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulses, endPulse, show, onPick, strip, picked = null, onOpenFile, onShowCall, live = false }: ActivityMapProps) {
+export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulses, endPulse, show, onPick, strip, picked = null, onOpenFile, onShowCall, onEscape, live = false }: ActivityMapProps) {
   const motion = useMotion()
   const ids = useMapIds()
   // The station whose panel is open (HI-3498): docked over the feed; its station again, its ✕ or Escape closes it.
@@ -372,6 +374,10 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
   const ringAgents: readonly MapStripAgent[] = strip ?? (mode === 'shared' ? model.agents : [])
   // Agents arriving in the strip and leaving it (HI-3499), eased only while the map moves.
   const comings = useComings(ringAgents, live && motion)
+  // The agents' dots arriving at stations (HI-3499, HR1's round 1): eased only as they come while the map moves, never
+  // on a frozen map's opening or redrawing, nor all at once as it goes live.
+  const dots = useMemo(() => MAP_STATIONS.flatMap((s) => model.stations[s].here.map((k) => ({ key: dotKey(s, k) }))), [model.stations])
+  const dotComings = useComings(dots, live && motion, false)
   const names = useMemo(() => new Map(model.agents.map((a) => [a.key, a.name])), [model.agents])
   return (
     <div
@@ -379,12 +385,12 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
       data-mode={mode}
       data-picked={picked ?? undefined}
       style={{ '--activity-map-width': `${width}px` } as React.CSSProperties}
-      // Escape: an open panel closes first (HI-3498), then back to every agent of the selection (HI-3180).
+      // Escape: an open panel closes first (HI-3498), then a call shown in the list (HI-3499), then back to every agent
+      // of the selection (HI-3180).
       onKeyDown={(e) => {
-        if (e.key !== 'Escape' || (!panel && !picked)) return
-        e.stopPropagation()
-        if (panel) setPanel(null)
-        else if (picked) onPick?.(picked)
+        if (e.key !== 'Escape') return
+        const done = panel ? (setPanel(null), true) : !!onEscape?.() || (!!picked && (onPick?.(picked), true))
+        if (done) e.stopPropagation()
       }}
     >
       <PaneResizer paneKey={MAP_PANE.key} min={MAP_PANE.min} max={MAP_PANE.max} keep={MAP_PANE.keep} />
@@ -438,7 +444,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
               )
             })}
           {MAP_STATIONS.map((s, i) => (
-            <Station key={s} index={i} view={model.stations[s]} name={stationName(s)} colours={colours} ids={ids} open={panel === s} onToggle={togglePanel} names={names} onPick={onPick} />
+            <Station key={s} index={i} view={model.stations[s]} name={stationName(s)} colours={colours} ids={ids} open={panel === s} onToggle={togglePanel} names={names} onPick={onPick} arriving={dotComings.arriving} />
           ))}
           {!motion &&
             pulses.map((pl) => {
@@ -517,7 +523,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
  * change, what was kept is dropped at once, so nothing waits on an animation that never ends (hidden, frozen). Bounded:
  * the last change's, at most MAP_AGENTS.
  */
-function useComings<T extends { key: string }>(items: readonly T[], moving: boolean): { arriving: ReadonlySet<string>; leaving: { item: T; index: number }[]; gone: (key: string) => void } {
+function useComings<T extends { key: string }>(items: readonly T[], moving: boolean, keepLeaving = true): { arriving: ReadonlySet<string>; leaving: { item: T; index: number }[]; gone: (key: string) => void } {
   const prev = useRef<readonly T[] | null>(null)
   const [state, setState] = useState<{ arriving: ReadonlySet<string>; leaving: { item: T; index: number }[] }>(NO_COMINGS)
   useLayoutEffect(() => {
@@ -530,13 +536,15 @@ function useComings<T extends { key: string }>(items: readonly T[], moving: bool
     const now = new Set(items.map((i) => i.key))
     const before = new Set(was.map((i) => i.key))
     const arriving = new Set(items.filter((i) => !before.has(i.key)).map((i) => i.key))
-    const leaving = was.flatMap((item, index) => (now.has(item.key) ? [] : [{ item, index }])).slice(0, MAP_AGENTS)
+    const leaving = keepLeaving ? was.flatMap((item, index) => (now.has(item.key) ? [] : [{ item, index }])).slice(0, MAP_AGENTS) : []
     if (arriving.size || leaving.length) setState({ arriving, leaving })
-  }, [items, moving])
+  }, [items, moving, keepLeaving])
   const gone = useCallback((key: string) => setState((s) => ({ ...s, leaving: s.leaving.filter((x) => x.item.key !== key) })), [])
   return { ...(state as { arriving: ReadonlySet<string>; leaving: { item: T; index: number }[] }), gone }
 }
 const NO_COMINGS = { arriving: new Set<string>(), leaving: [] }
+/** A station's agent dot, as `useComings` knows it. */
+const dotKey = (station: MapStation, agentKey: string): string => `${station}:${agentKey}`
 
 /** The ids of one map's gradients, filters and clips (HI-3479): unique, as a window can show more than one map. */
 type MapIds = ReturnType<typeof useMapIds>
@@ -691,7 +699,7 @@ function StationPanel({ station, view, model, name, colourOf: dot, onClose, onOp
   )
 }
 
-function Station({ index, view: st, name, colours, ids, open, onToggle, names, onPick }: { index: number; view: MapStationView; name: string; colours: ReadonlyMap<string, number | undefined>; ids: MapIds; open: boolean; onToggle: (s: MapStation) => void; names: ReadonlyMap<string, string>; onPick?: (key: string) => void }) {
+function Station({ index, view: st, name, colours, ids, open, onToggle, names, onPick, arriving }: { index: number; view: MapStationView; name: string; colours: ReadonlyMap<string, number | undefined>; ids: MapIds; open: boolean; onToggle: (s: MapStation) => void; names: ReadonlyMap<string, string>; onPick?: (key: string) => void; arriving: ReadonlySet<string> }) {
   const p = POS[st.station]
   const active = st.here.length > 0
   const waitingHere = st.station === 'you' && active
@@ -756,7 +764,7 @@ function Station({ index, view: st, name, colours, ids, open, onToggle, names, o
           return (
             <circle
               key={k}
-              className="activity-map-here"
+              className={cx('activity-map-here', arriving.has(dotKey(st.station, k)) && 'arriving')}
               data-agent={k}
               cx={p.x - (all.length - 1) * 6 + i * 12}
               cy={p.y + 34}

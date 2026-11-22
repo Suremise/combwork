@@ -9128,6 +9128,9 @@ button.activity-map-panel-row:focus-visible,
   outline: none;
   transform-box: fill-box;
   transform-origin: center;
+}
+/* Only a dot arriving while the map moves (HI-3499: never on a frozen map). */
+.activity-map-here.arriving {
   animation: activity-map-arrive 260ms cubic-bezier(0.33, 1, 0.68, 1);
 }
 .activity-map-here:hover,

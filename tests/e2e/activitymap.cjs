@@ -148,6 +148,10 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     const fromMap = page.locator('.activity-tab:not(.activity-workspace) .activity-list .activity-group[data-group="fromMap"]')
     await feed.locator('button.activity-map-feed-row', { hasText: 'alpha/c.ts' }).click()
     check("a feed row of an earlier turn shows its call in the list: From the map, selected, its details open", !!(await lib.until(async () => (await fromMap.count()) === 1 && (await listSel.count()) === 1 && ((await listSel.getAttribute('data-key')) ?? '').startsWith('tool:') && /Read/.test(await listSel.innerText()), HUNG_MS, 250)), `${await fromMap.count()} ${await listSel.getAttribute('data-key').catch(() => null)}`)
+    // Escape (the feed row focused, no panel open) clears it: its row and its Details go (HR1's round 1).
+    const details = page.locator('.activity-tab:not(.activity-workspace) .activity-details')
+    await page.keyboard.press('Escape')
+    check('…Escape clears it: the From the map row and its Details go', !!(await lib.until(async () => (await fromMap.count()) === 0 && (await details.count()) === 0 && (await listSel.count()) === 0, HUNG_MS, 250)), `${await fromMap.count()} ${await details.count()}`)
     await feed.locator('button.activity-map-feed-row', { hasText: 'Prompt' }).first().click()
     check("…the latest turn's prompt selects the list's own row, and From the map goes", !!(await lib.until(async () => (await fromMap.count()) === 0 && ((await listSel.getAttribute('data-key').catch(() => '')) ?? '').startsWith('turn:'), HUNG_MS, 250)), String(await listSel.getAttribute('data-key').catch(() => null)))
     // Left open through Frozen and Hidden below: the panel reads and draws nothing of its own either.
@@ -564,7 +568,14 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       await lib.menuEntry(page, 'All').click()
       await page.keyboard.press('Escape')
       if ((await vHead.locator('.activity-hide input').isChecked())) await vHead.locator('.activity-hide input').uncheck()
-      if ((await vHead.getByRole('button', { name: 'Play', exact: true }).count()) === 1) await vHead.getByRole('button', { name: 'Play', exact: true }).click()
+      // A station's agent dot drawn on a frozen map (it opens frozen) arrives with no animation (HR1's round 1).
+      const vDots = page.locator(`${v.scope} .activity-map-here`)
+      // An animation declared at all (a short one could end before it is looked at), or one running.
+      const dotsMoving = () => vDots.evaluateAll((els) => els.filter((e) => getComputedStyle(e).animationName !== 'none' || e.getAnimations().length > 0).length)
+      if ((await vHead.getByRole('button', { name: 'Play', exact: true }).count()) === 1) {
+        check(`${v.label}, frozen: its agent dots drawn without an animation`, !!(await lib.until(async () => (await vDots.count()) >= 1, HUNG_MS, 250)) && (await dotsMoving()) === 0, String(await dotsMoving()))
+        await vHead.getByRole('button', { name: 'Play', exact: true }).click()
+      }
       const vRings = page.locator(`${v.scope} .activity-map-ring`)
       const lastRing = v.label === 'the workspace view' ? vRings.filter({ hasText: 'HB11' }) : page.locator(`${v.scope} ${v.ring}`)
       check(`${v.label}: ten agents, the shared map, HB11 past the eight it reads`, !!(await lib.until(async () => (await vMap.getAttribute('data-mode').catch(() => null)) === 'shared' && (await vRings.count()) >= 10 && (await lastRing.getAttribute('data-load').catch(() => null)) === 'notLoaded', HUNG_MS, 250)), `${await vRings.count()} ${await lastRing.getAttribute('data-load').catch(() => null)}`)
@@ -589,6 +600,8 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       check(`…a feed row shows HB11's earlier call in ${v.label}'s list, selected under From the map`, !!(await lib.until(async () => (await page.locator(`${v.scope} .activity-list .activity-group[data-group="fromMap"]`).count()) === 1 && ((await vSel.getAttribute('data-key').catch(() => '')) ?? '').startsWith('tool:') && /HB11/.test(await vTabNow()), HUNG_MS, 250)), String(await vSel.getAttribute('data-key').catch(() => null)))
       await page.locator(`${v.scope} button.activity-map-feed-row`, { hasText: 'late/eleven.ts' }).focus()
       await page.keyboard.press('Escape')
+      check(`…Escape clears it first in ${v.label}: its row and Details go, HB11 still shown alone`, !!(await lib.until(async () => (await page.locator(`${v.scope} .activity-list .activity-group[data-group="fromMap"]`).count()) === 0 && (await page.locator(`${v.scope} .activity-details`).count()) === 0 && (await vMap.getAttribute('data-mode').catch(() => null)) === 'single', HUNG_MS, 250)))
+      await page.keyboard.press('Escape')
       await lib.until(async () => (await vMap.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
       // A station's agent dot shows that agent alone (HI-3499), as its ring does; Escape, all again.
       const dot = page.locator(`${v.scope} .activity-map-station[data-station="shell"] .activity-map-here`).first()
@@ -598,6 +611,9 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       check(`…a click on its dot shows its map alone`, !!(await lib.until(async () => (await vMap.getAttribute('data-mode').catch(() => null)) === 'single' && (await vMap.getAttribute('data-picked').catch(() => null)) === dotAgent, HUNG_MS, 250)), `${await vMap.getAttribute('data-picked').catch(() => null)} vs ${dotAgent}`)
       await page.keyboard.press('Escape')
       await lib.until(async () => (await vMap.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
+      // Live to frozen: nothing of the dots animates.
+      await vHead.getByRole('button', { name: 'Pause', exact: true }).click()
+      check(`…${v.label}, frozen again: its agent dots still, no animation`, !!(await lib.until(async () => (await vHead.getByRole('button', { name: 'Play', exact: true }).count()) === 1, HUNG_MS, 250)) && (await dotsMoving()) === 0, String(await dotsMoving()))
     }
     for (const a of more) await inv('session:stop', alpha, a.id).catch(() => undefined)
     await inv('session:stop', alpha, 'hb1').catch(() => undefined)

@@ -637,7 +637,7 @@ Each station counts the calls of the agent's current turn and names the last one
   - **You**: this turn's prompts and questions.
 
   Click the station again, the panel's ✕, or press Escape to close it. Like the map, the panel shows names, never what a command or a search said.
-- **Click a row of Last actions**, or a call in a station's panel (a file's time there), to show that call in the list beside the map: its agent's tab, the call selected with its details. A call from an earlier turn, which the list doesn't otherwise show, gets a row of its own under **From the map** until you select another.
+- **Click a row of Last actions**, or a call in a station's panel (a file's time there), to show that call in the list beside the map: its agent's tab, the call selected with its details. A call from an earlier turn, which the list doesn't otherwise show, gets a row of its own under **From the map** until you select another or press Escape.
 - In the shared map, **click an agent's dot** on a station to show its map alone, as clicking its ring does. Agents joining or leaving the map ease in and fade out (not with Windows' **Show animations** off).
 
 The workspace's Activity (below) has the same map, across its projects.

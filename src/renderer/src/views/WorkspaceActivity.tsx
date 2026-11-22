@@ -113,6 +113,15 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   useEffect(() => {
     if (mapPick && selected !== mapPick.node.key) setMapPick(null)
   }, [selected, mapPick])
+  // Escape clears a call the map showed (HI-3499, HR1's round 1): its From the map row and its Details, after an open
+  // station panel and before the agent shown alone (the map's own Escape asks first); from the list or Details too.
+  const pickNow = useRef(mapPick)
+  pickNow.current = mapPick
+  const clearPick = useCallback((): boolean => {
+    if (!pickNow.current) return false
+    setSelected(null)
+    return true
+  }, [])
   const [live, setLive] = useState(false)
   // Drawn again when an agent's live state changed (its status, its line); `members` only when an agent started, stopped
   // or began another session: what the session lists and a card's agents depend on (HR5's HI-1664 round 1).
@@ -531,7 +540,12 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const forCardLabel = forCard ? (cardRef.current ? cardLabel(cardRef.current) : `#${forCard}`) : null
   const filtered = !!view.agents?.length || !!view.cards?.length
   return (
-    <div className="activity-tab activity-workspace">
+    <div
+      className="activity-tab activity-workspace"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && clearPick()) e.stopPropagation()
+      }}
+    >
       <div className="activity-main">
         <div className="activity-head">
           <span className="pane-header-title">{tr(M.heading)}</span>
@@ -599,7 +613,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
           </div>
         )}
         <div className={cx('activity-body', mapOn && entries.length > 0 && 'with-map')}>
-          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={workspaceName} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} onOpenFile={openFile} onShowCall={showCall} live={map.animate} />}
+          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={workspaceName} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} onOpenFile={openFile} onShowCall={showCall} onEscape={clearPick} live={map.animate} />}
         {!parts.length || !current ? (
           <div className="pane-empty">{reading ? null : forCardLabel ? tr(M.cardNobody, { card: forCardLabel }) : tr(filtered ? ACTIVITY_M.emptyFiltered : M.empty)}</div>
         ) : (
