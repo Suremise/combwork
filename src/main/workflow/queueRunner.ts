@@ -27,7 +27,7 @@ import { basename, dirname, join } from 'path'
 import { removePath, samePlace } from '../fsutil'
 import { access } from 'original-fs/promises'
 import { GIT_PREFIX, withoutGitRoute } from '../git'
-import { onOutputSettled, withLauncherEnv, type GitOutcome, type GitRequest } from '../gitWorker'
+import { gitEnv, onOutputSettled, type GitOutcome, type GitRequest } from '../gitWorker'
 import { gitExe, gitExeGone, PATH_GIT, type GitExe } from '../gitTool'
 import { createLogger, userText } from '../logger'
 import { treeEnding } from '../processTree'
@@ -523,8 +523,8 @@ export class QueueRunner {
   }
 
   private async gitAs(use: GitExe, cwd: string, args: string[], what: Launched, opts: { env?: NodeJS.ProcessEnv; timeoutMs?: number }): Promise<RunResult> {
-    const env = use.launcherEnv ? withLauncherEnv(opts.env ?? process.env, use.launcherEnv) : opts.env
-    const r = opts.timeoutMs ? await this.run(what, use.exe, [...GIT_PREFIX, ...args], { cwd, ...opts, env }) : await this.hostGit(cwd, [...GIT_PREFIX, ...args], env ?? process.env, use.exe)
+    const env = gitEnv(opts.env, use.launcherEnv)
+    const r = opts.timeoutMs ? await this.run(what, use.exe, [...GIT_PREFIX, ...args], { cwd, ...opts, env }) : await this.hostGit(cwd, [...GIT_PREFIX, ...args], env, use.exe)
     // As git() does: the real git gone, this command once more with PATH's, whichever command found it gone first.
     if (r.notRun === 'ENOENT' && use.exe !== PATH_GIT.exe && existsSync(cwd)) {
       gitExeGone(use.exe)
@@ -554,7 +554,7 @@ export class QueueRunner {
     // As execFile checks its bound (the worker's path throws so too): a number, 0 or more (0: no output at all).
     if (typeof m.maxBuffer !== 'number' || Number.isNaN(m.maxBuffer) || m.maxBuffer < 0) throw Object.assign(new RangeError(`The value of "maxBuffer" is out of range. It must be >= 0. Received ${String(m.maxBuffer)}`), { code: 'ERR_OUT_OF_RANGE' }) // i18n-ignore: Node's own error, as execFile throws it
     // HI-2137: the git git() names (gitExe), with its PATH as the worker gives it.
-    const env = m.launcherEnv ? withLauncherEnv(m.env ?? process.env, m.launcherEnv) : (m.env ?? process.env)
+    const env = gitEnv(m.env, m.launcherEnv)
     const r = await this.inHost({ command: m.exe ?? 'git', args: m.args, cwd: m.cwd, env, ...(m.input !== undefined ? { input: m.input } : {}), maxBuffer: m.maxBuffer, ...(m.timeout ? { timeout: m.timeout } : {}) })
     return r ? outcomeOf(r, m.cwd) : { stdout: NO_BYTES, stderr: NO_BYTES, error: { code: 'leaseLost', killed: false, signal: null }, cwdExists: true }
   }

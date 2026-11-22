@@ -4,9 +4,11 @@
 // prune (what a remote has deleted, the local branches tracking it, what was dropped), and what refuses every repair
 // before git runs (an agent, a run, a session, a Combwork run, a slot being made). Real git in throwaway repositories;
 // Windows' process list stands in by a seam, but for one test of the real listing.
+import { spawnSync } from 'child_process'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { germanGit, withProcessEnv } from './gitCatalog'
 import { tempDir } from './tempDir'
 import { timing } from './waits'
 import { commit, gitRepo, sh } from './workflow/harness'
@@ -170,6 +172,18 @@ describe('Prune worktrees', () => {
     const left = (await health()).worktrees
     expect(left.map((x) => norm(x.folder!))).toEqual([norm(b)])
     expect(sh(proj, 'worktree', 'list')).not.toContain(`wt-a-${n}`)
+  })
+
+  it('HI-3534: lists and drops the entry though the user\'s git speaks German', async () => {
+    const a = worktree('wt-de')
+    await withProcessEnv(germanGit(join(base, `locale-${n}`)), async () => {
+      // The user's git, started as Combwork's environment has it, says it in German.
+      expect(spawnSync('git', ['worktree', 'prune', '--dry-run', '--verbose'], { cwd: proj, encoding: 'utf8' }).stderr).toContain(`Entferne worktrees/wt-de-${n}`)
+      const h = await health()
+      expect(h.worktrees.map((x) => ({ id: x.id, folder: norm(x.folder!), reason: x.reason }))).toEqual([{ id: `wt-de-${n}`, folder: norm(a), reason: 'gitdir file points to non-existent location' }])
+      expect(await inWs(() => H.pruneWorktrees(proj, [{ id: h.worktrees[0].id, folder: h.worktrees[0].folder }]))).toBe('Dropped 1 worktree entry.')
+    })
+    expect((await health()).worktrees).toEqual([])
   })
 
   it('keeps an entry whose folder came back, and one gone since or never listed', async () => {

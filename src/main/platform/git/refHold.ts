@@ -9,7 +9,7 @@
 import { spawn, type ChildProcess } from 'child_process'
 import { GIT_PREFIX } from '../../git'
 import { gitExe } from '../../gitTool'
-import { withLauncherEnv } from '../../gitWorker'
+import { gitEnv } from '../../gitWorker'
 
 // A ref and the commit it must be at, a hold and its refusal: the repository context port's (SPEC §16.3.6).
 import type { HoldOptions, RefAt, RefHold, RefHoldRefused } from '../repoContext'
@@ -28,7 +28,7 @@ export async function holdRefs(repo: string, refs: readonly RefAt[], o: HoldOpti
   let child: ChildProcess
   try {
     const use = gitExe()
-    child = spawn(use.exe, [...GIT_PREFIX, 'update-ref', '--stdin'], { cwd: repo, env: use.launcherEnv ? withLauncherEnv(process.env, use.launcherEnv) : process.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
+    child = spawn(use.exe, [...GIT_PREFIX, 'update-ref', '--stdin'], { cwd: repo, env: gitEnv(undefined, use.launcherEnv), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
   } catch (e) {
     return { refused: { why: 'failed', detail: e instanceof Error ? e.message : String(e) } } // i18n-ignore: a reason's code, said in words where it is shown
   }
