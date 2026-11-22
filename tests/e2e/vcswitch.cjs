@@ -52,6 +52,10 @@ function writeProject(dir, cfg) {
   writeProject(gamma, { platform: 'git', workflow: { platform: 'git', preset: null, options: GAMMA } })
   lib.gitProject(delta, { 'd.txt': 'd\n', '.gitignore': '.combwork/\n' })
   writeProject(delta, { platform: 'git', workflow: { platform: 'git', preset: null, options: {} } })
+  // eps: a colocated jj project as 1.6.0 left it, in the workspace when it opens (as an upgrade finds it).
+  lib.gitProject(eps, { 'e.txt': 'e\n', '.gitignore': '.combwork/\n' })
+  fs.mkdirSync(path.join(eps, '.jj', 'repo'), { recursive: true })
+  writeProject(eps, { platform: 'jj', platformFound: 'jj', workflow: { platform: 'jj', preset: 'pair', options: { finish: 'userIntegrates', folder: 'slots' } } })
   fs.rmSync(outer, { recursive: true, force: true })
   fs.mkdirSync(inner, { recursive: true })
   fs.writeFileSync(path.join(inner, 'index.js'), 'module.exports = 1\n')
@@ -286,16 +290,8 @@ function writeProject(dir, cfg) {
     await until(async () => (await dialog.count()) === 0, HUNG_MS)
 
     // --- eps (HI-3510): project.json naming jj, which this Combwork doesn't have. Its notice writes the one in force.
-    // Made now and the workspace read again, so its notice is said while this step looks (the one at the open is gone).
-    lib.gitProject(eps, { 'e.txt': 'e\n', '.gitignore': '.combwork/\n' })
-    fs.mkdirSync(path.join(eps, '.jj', 'repo'), { recursive: true })
-    writeProject(eps, { platform: 'jj', platformFound: 'jj', workflow: { platform: 'jj', preset: 'pair', options: { finish: 'userIntegrates', folder: 'slots' } } })
-    // Added as another project, not worked on: made active, as the user would, to be read whole (its platform with it).
-    await inv('workspace:refresh')
-    await inv('project:setActive', eps, true)
-    await toTab('eps')
-    // Read in the bell, which keeps every notice with its buttons: a test window never has the focus, so whether it also
-    // popped up depends on where the notice was routed.
+    // Said as the workspace opened. Read in the bell, which keeps every notice with its buttons: a test window never has
+    // the focus, so whether it also popped up depends on where the notice was routed.
     const bell = page.locator('.activitybar button[aria-label="Notifications"]')
     if ((await page.locator('.notif-panel').count()) === 0) await bell.click()
     const epsJson = () => JSON.parse(fs.readFileSync(path.join(eps, '.combwork', 'project.json'), 'utf8'))
