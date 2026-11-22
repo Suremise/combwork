@@ -10,7 +10,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { timing } from './waits'
 import { commit, gitRepo, sh } from './workflow/harness'
-import { combworkStash, stashRequestOf, stashSubject } from '../src/shared/gitStashes'
+import { combworkStash, stashRefOf, stashRequestOf, stashSubject, type StashRef } from '../src/shared/gitStashes'
 
 const norm = (p: string): string => resolve(p).toLowerCase()
 /** What the queue counts as building in a folder: none unless a test says. */
@@ -38,8 +38,22 @@ let proj = ''
 const read = (rel: string): string => readFileSync(join(proj, rel), 'utf8').replace(/\r\n/g, '\n')
 const write = (rel: string, text: string): void => writeFileSync(join(proj, rel), text)
 const list = () => S.listStashes(proj)
-const apply = (stash: string, pop: boolean, guard?: () => void) => inWorkspace(w, () => S.applyStash(proj, proj, { commit: stash, pop }, guard))
-const drop = (stash: string) => inWorkspace(w, () => S.dropStash(proj, stash))
+/** The row of the list holding `commit` now (the first, newest), as the window names it. */
+const rowOf = async (c: string): Promise<StashRef> => {
+  const r = (await list()).find((x) => x.commit === c)
+  if (!r) throw new Error(`no stash ${c}`)
+  return { commit: r.commit, index: r.index, message: r.message }
+}
+const refFor = async (stash: string | StashRef): Promise<StashRef> => (typeof stash === 'string' ? rowOf(stash) : stash)
+const apply = async (stash: string | StashRef, pop: boolean, guard?: () => void) => {
+  const ref = await refFor(stash)
+  return inWorkspace(w, () => S.applyStash(proj, proj, { ...ref, pop }, guard))
+}
+const drop = async (stash: string | StashRef) => {
+  const ref = await refFor(stash)
+  return inWorkspace(w, () => S.dropStash(proj, ref))
+}
+const messages = async (): Promise<string[]> => (await list()).map((r) => r.message)
 const stashes = (): string[] => sh(proj, 'stash', 'list', '--format=%H').split(/\r?\n/).filter(Boolean)
 
 beforeEach(() => {
@@ -70,13 +84,19 @@ describe('parsing', () => {
     expect(stashSubject('something else')).toEqual({ branch: null, message: 'something else' })
   })
 
-  it('takes only a request naming a stash by its commit', () => {
+  it('takes only a request naming a row by its commit, place and message', () => {
     const c = 'a'.repeat(40)
-    expect(stashRequestOf({ commit: c, pop: true, lease: 'L1' })).toEqual({ commit: c, pop: true, lease: 'L1' })
-    expect(stashRequestOf({ commit: c, pop: false })).toEqual({ commit: c, pop: false })
-    expect(stashRequestOf({ commit: 'stash@{0}', pop: false })).toBeNull()
-    expect(stashRequestOf({ commit: c })).toBeNull()
+    const row = { commit: c, index: 2, message: 'm' }
+    expect(stashRequestOf({ ...row, pop: true, lease: 'L1' })).toEqual({ ...row, pop: true, lease: 'L1' })
+    expect(stashRequestOf({ ...row, pop: false })).toEqual({ ...row, pop: false })
+    expect(stashRequestOf({ ...row, commit: 'stash@{0}', pop: false })).toBeNull()
+    expect(stashRequestOf({ commit: c, pop: false })).toBeNull()
+    expect(stashRequestOf(row)).toBeNull()
     expect(stashRequestOf(null)).toBeNull()
+    expect(stashRefOf(row)).toEqual(row)
+    expect(stashRefOf({ ...row, index: -1 })).toBeNull()
+    expect(stashRefOf({ ...row, index: 1.5 })).toBeNull()
+    expect(stashRefOf({ ...row, message: 3 })).toBeNull()
   })
 })
 
@@ -196,8 +216,23 @@ describe('Apply and Pop', () => {
     write('a.txt', 'mine\n')
     sh(proj, 'stash', 'push', '-q')
     const [c] = stashes()
+    const row = await rowOf(c)
     sh(proj, 'stash', 'drop', '-q')
-    await expect(apply(c, false)).rejects.toThrow("isn't in the list any more")
+    await expect(apply(row, false)).rejects.toThrow("isn't in the list any more")
+  })
+
+  it('HI-3527: Pop drops the row the user saw, not another holding its commit', async () => {
+    write('a.txt', 'one\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'original')
+    const [one] = stashes()
+    write('b.txt', 'two\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'middle')
+    sh(proj, 'stash', 'store', '-m', 'relisted', one)
+    const rows = await list()
+    expect(rows.map((r) => [r.message, r.commit === one])).toEqual([['relisted', true], ['middle', false], ['original', true]])
+    expect(await apply(rows[2], true)).toEqual({ conflicts: [], dropped: true })
+    expect(read('a.txt')).toBe('one\n')
+    expect(await messages()).toEqual(['relisted', 'middle'])
   })
 })
 
@@ -210,10 +245,62 @@ describe('Drop', () => {
     sh(proj, 'stash', 'push', '-q', '-m', 'two')
     const two = stashes()[0]
     // `one` is stash@{1} now.
-    await drop(one)
+    const row = await rowOf(one)
+    await drop(row)
     expect(stashes()).toEqual([two])
-    await expect(drop(one)).rejects.toThrow("isn't in the list any more")
+    await expect(drop(row)).rejects.toThrow("isn't in the list any more")
     await drop(two)
     expect(stashes()).toEqual([])
+  })
+
+  it('HI-3527: drops the row the user saw when several hold one commit, the bottom one too', async () => {
+    write('a.txt', 'one\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'original')
+    const [one] = stashes()
+    write('b.txt', 'two\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'middle')
+    sh(proj, 'stash', 'store', '-m', 'relisted', one)
+    const rows = await list()
+    await drop(rows[2])
+    expect(await messages()).toEqual(['relisted', 'middle'])
+    // The bottom one of another commit's two rows, by its own row. (Git lists a stored commit only under another top.)
+    const [, mid] = stashes()
+    sh(proj, 'stash', 'store', '-m', 'again', mid)
+    const again = await list()
+    expect(again.map((r) => r.message)).toEqual(['again', 'relisted', 'middle'])
+    await drop(again[2])
+    expect(await messages()).toEqual(['again', 'relisted'])
+  })
+
+  it('HI-3527: finds the row after the places moved; refuses when no row, or several and none at its place, is it', async () => {
+    write('a.txt', 'one\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'original')
+    const [one] = stashes()
+    write('b.txt', 'two\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'other')
+    const [other] = stashes()
+    sh(proj, 'stash', 'store', '-m', 'relisted', one)
+    const [relisted, , original] = (await list()).map((r) => ({ commit: r.commit, index: r.index, message: r.message }))
+    expect([relisted.message, original.message]).toEqual(['relisted', 'original'])
+    // A stash made meanwhile moves every place by one; and the row the user chose is dropped meanwhile.
+    write('a.txt', 'three\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'meanwhile')
+    sh(proj, 'stash', 'drop', '-q', 'stash@{3}')
+    expect(await messages()).toEqual(['meanwhile', 'relisted', 'other'])
+    // The other row holding its commit isn't taken instead.
+    await expect(drop(original)).rejects.toThrow("isn't in the list any more")
+    expect(await messages()).toEqual(['meanwhile', 'relisted', 'other'])
+    // A row whose place moved is found by its commit and message.
+    await drop(relisted)
+    expect(await messages()).toEqual(['meanwhile', 'other'])
+    // Two rows alike (commit and message), none at the place the user saw: which one can't be told.
+    sh(proj, 'stash', 'store', '-m', 'twin', one)
+    sh(proj, 'stash', 'store', '-m', 'between', other)
+    sh(proj, 'stash', 'store', '-m', 'twin', one)
+    expect(await messages()).toEqual(['twin', 'between', 'twin', 'meanwhile', 'other'])
+    await expect(drop({ commit: one, index: 4, message: 'twin' })).rejects.toThrow('more than one is like the one you chose')
+    expect(await messages()).toEqual(['twin', 'between', 'twin', 'meanwhile', 'other'])
+    await drop({ commit: one, index: 2, message: 'twin' })
+    expect(await messages()).toEqual(['twin', 'between', 'meanwhile', 'other'])
   })
 })

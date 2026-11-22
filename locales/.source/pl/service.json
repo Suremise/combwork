@@ -277,6 +277,7 @@
   "service.gitStash.failed": "Git refused: {why}",
   "service.gitStash.gone": "That stash isn't in the list any more (dropped or popped meanwhile): nothing was done. Look again.",
   "service.gitStash.invalid": "That was asked for wrongly: nothing was done.",
+  "service.gitStash.moved": "The stashes changed meanwhile, and more than one is like the one you chose: nothing was done. Look again.",
   "service.gitStash.notDropped": "The stash was applied, but git didn't drop it: {why}. It is still in the list.",
   "service.gitStash.operation": "Git is in the middle of {what, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}: nothing was done. Finish it first (the panel above).",
   "service.gitStash.overlap": "{file} has uncommitted changes in {folder}, and the stash holds it too: nothing was done. Commit it or set it aside first.",

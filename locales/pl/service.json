@@ -434,6 +434,7 @@
   "service.gitStash.busy": "Uruchomienie lub agent pracuje w folderze {folder} ({what}): nic nie zrobiono. Spróbuj ponownie, gdy skończy.",
   "service.gitStash.conflicted": "{file} ma konflikt w folderze {folder}: nic nie zrobiono. Najpierw go rozwiąż.",
   "service.gitStash.failed": "Git odmówił: {why}",
+  "service.gitStash.moved": "Stashe zmieniły się w międzyczasie i więcej niż jeden jest taki jak wybrany: nic nie zrobiono. Sprawdź jeszcze raz.",
   "service.gitStash.gone": "Tego stasha nie ma już na liście (w międzyczasie usunięty lub zdjęty): nic nie zrobiono. Sprawdź jeszcze raz.",
   "service.gitStash.invalid": "Żądanie było nieprawidłowe: nic nie zrobiono.",
   "service.gitStash.notDropped": "Stash został zastosowany, ale git go nie usunął: {why}. Nadal jest na liście.",

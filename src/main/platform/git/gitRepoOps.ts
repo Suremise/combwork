@@ -52,5 +52,5 @@ export const gitRepoOps: RepoOps = {
   stashFiles: (root, commit) => stashes.stashFiles(root, commit),
   stashDiff: (root, commit, file, untracked) => stashes.stashDiff(root, commit, file, untracked),
   applyStash: (p, folder, req, guard) => stashes.applyStash(p, folder, req, guard),
-  dropStash: (p, commit) => stashes.dropStash(p, commit)
+  dropStash: (p, ref) => stashes.dropStash(p, ref)
 }
