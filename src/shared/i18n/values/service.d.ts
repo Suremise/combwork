@@ -334,7 +334,6 @@ interface CombworkMessageValues {
   'service.queue.purgeUnknown': undefined
   'service.releaseOffer.stale': { project: string | number }
   'service.repoOps.notOffered': { platform: string | number }
-  'service.slots.held': { card: string | number; slot: string | number; kind: string; target: string | number; why: string | number; hasCommits: string; ids: string | number; more: number; selectArg: string | number; hasEdits: string; at: string | number; base: string | number; stopped: string; builder: string | number }
   'service.slots.notPrepared': { slot: string | number; card: string | number; why: string | number }
   'service.slots.resumeFailed': { agent: string | number; slot: string | number; card: string | number; why: string | number }
   'service.slots.resumeHeld': { card: string | number; agent: string | number; slot: string | number; why: string | number }

@@ -403,8 +403,6 @@
   "workflow.refused.move.useIntent.next": "请改用 {intent} 操作。",
   "workflow.refused.paths.excluded.message": "{card}：{path} 位于 {folder} 中，没有版本控制的项目不会把它算作工作的一部分。",
   "workflow.refused.paths.excluded.next": "只声明 {folder} 之外属于这项工作的文件：卡片的路径只能缩小项目的工作范围，不能扩大。",
-  "workflow.refused.platform.jjRefused.message": "{why, select, tooLarge {{card}：jj 将 {count, plural, other {# 个新文件}} 排除在快照之外，因为它们超过了新文件的大小上限 (snapshot.max-new-file-size)，所以工作没有被完整记录：{files}。} autoTrack {{card}：这里 jj 的设置 snapshot.auto-track 为 {setting}，不是 all()，因此 jj 不会自动记录新文件，工作可能没有全部记录。} mergeWorkingCopy {{card}：槽位的工作副本有多个父提交，因此它的工作不是一条提交线。} notFromBase {{card}：槽位中的工作不是从卡片的基点 {base} 开始的。} otherCard {{card}：提交 {commit} 是 {other} 的工作。} divergent {{card}：提交 {commit} 在 jj 中有分歧（它的变更有多个可见提交）。} conflicted {{card}：提交 {commit} 有未解决的冲突。} tooLong {{card}：它的工作超过 {max, number} 个提交。} unbound {{state, select, pending {{card}：它的槽位尚未为它准备好。} held {{card}：它的槽位尚未为它准备好。} other {{card}：它的槽位已不再为这张卡片准备。}}} isolated {{card}：jj 项目还没有检查副本。} recovered {{card}：其工作的提交中含有“恢复…”写在原文件旁边的副本：{files}。} other {{card}：jj 拒绝了它。}}",
-  "workflow.refused.platform.jjRefused.next": "{why, select, tooLarge {用 .gitignore 有意排除文件，或提高 jj 的上限 (jj config set --repo snapshot.max-new-file-size 加上以字节为单位的大小) 并用 jj commit 提交它，然后再次提交。} autoTrack {请为此仓库将其改回 all()（jj config set --repo snapshot.auto-track 'all()'），然后重新提交：jj 随后会记录新文件。} mergeWorkingCopy {用 jj commit 提交工作，使工作副本在单个父提交上为空，然后再次提交。} notFromBase {把工作变基到卡片的基点上，或重新开始这张卡片。} otherCard {把那张卡片的提交从这张卡片的工作中去掉（不带它们变基），然后再次提交。} divergent {在 jj 中解决分歧（放弃或改写其中一方），然后重试。} conflicted {在 jj 中解决冲突，然后重试。} tooLong {用 squash 合并部分提交，然后再次提交。} unbound {{state, select, pending {一旦你空闲，Combwork 就会为卡片准备槽位：请结束你的回合。如果那里有东西阻碍它，Combwork 会告诉你是什么以及如何清除。} held {{told}} other {把卡片放回，然后重新开始。}}} isolated {不带 --isolated，在卡片的槽位中重新运行检查。} recovered {把每个副本与原文件比较，把想保留的内容留在原文件名下，然后把这些副本从工作的每个提交中去掉（用 jj squash 或 jj diffedit：在之后的提交中删除，它们仍留在历史中），再重新提交。} other {用 jj 查看槽位，然后重试。}}",
   "workflow.refused.platform.noUpstream.message": "{card} 无法开始：{target} 没有跟踪任何远程分支，而开启“目标分支跟随其远程仓库”时，每张卡片都从其远程仓库开始。",
   "workflow.refused.platform.noUpstream.next": "{how, select, ready {如果 {remote} 还没有 {target}，请将它发布到那里：{publish}。如果已有，请设置 {target} 跟踪的分支：{track1}，然后 {track2}。之后再次开始它；或关闭“目标分支跟随其远程仓库”。} choose {此仓库没有 Combwork 能确定的远程仓库，或有多个：在这些命令中，{remote} 代表 {target} 应跟随的远程仓库。如果它还没有 {target}，请将它发布到那里：{publish}。如果已有，请设置 {target} 跟踪的分支：{track1}，然后 {track2}。之后再次开始它；或关闭“目标分支跟随其远程仓库”。} shallow {此仓库是浅克隆，跟随模式无法使用：请获取其完整历史（git fetch --unshallow），然后发布 {target} 或设置它跟踪的分支，再次开始它；或关闭“目标分支跟随其远程仓库”。} other {{target} 将跟随的远程仓库（{remote}）有多个推送地址或没有推送地址，而跟随模式只发布到一个地址：请只保留一个，然后发布 {target} 或设置它跟踪的分支，再次开始它；或关闭“目标分支跟随其远程仓库”。}}",
   "workflow.refused.platform.unknown.message": "{card}：Combwork 无法读取{what}，因此无法检查规则 {rule}。",
@@ -699,8 +697,6 @@
   "workflow.why.strict": "合并队列无论如何都会测试合并结果，因此这主要改变的是历史记录的形态。",
   "workflow.why.style": "合并提交会保留每张卡片自己的提交，这也是 Combwork 一直以来的合并方式。",
   "workflow.why.target": "完成的工作进入仓库的默认分支；单人工作时，进入项目当前所在的分支。",
-  "workflow.refused.platform.noTarget.message": "{card} 无法开始：它的项目没有选择目标书签（工作合并到的书签）。",
-  "workflow.refused.platform.noTarget.next": "请在 版本控制 → 工作流程（工作合并到）中选择一个，然后重新开始它。",
   "workflow.refused.platform.detachedFolder.message": "{card} 无法开始：项目文件夹不在任何分支上（其 HEAD 分离在 {head}），因此它的构建者提交的内容不会在任何分支上。",
   "workflow.refused.platform.detachedFolder.next": "{has, select, yes {请在项目文件夹中检出它的分支（git switch {branch}），然后重新开始它。} other {请在项目文件夹中检出一个分支（已有的用 git switch，新建的用 git switch -c），然后重新开始它。}}",
   "workflow.refused.platform.keptLine.message": "{card} 无法开始：其分支是从 {kept} 创建的，仍包含 {target} 缺少的历史，但其通道合并到 {target}。",
@@ -710,14 +706,9 @@
   "workflow.refused.start.released.message": "{card} 无法在 {target} 上启动：{target} 已发布（{dated, select, yes {{tag}，于 {date, date, medium} 打标签} other {{tag}}}，已合并到 {into}）。",
   "workflow.refused.start.released.next": "{has, select, yes {你是指 {suggest} 吗？将它的“合并到”设为 {suggest}；或者，对于 {target} 上的热修复工作，请询问用户：用户或助手仍可在那里启动它。} other {请在未发布的分支上启动它；或者，对于 {target} 上的热修复工作，请询问用户：用户或助手仍可在那里启动它。}}",
   "workflow.rule.start.released": "新工作只在未发布的分支上开始",
-  "workflow.summary.jj.pair": "快速检查后，由评审者智能体评审通过每张卡片，然后由你自己整合。",
-  "workflow.summary.jj.solo": "每张卡片在自己的 jj 工作区中，不评审：由你自己整合工作。",
-  "workflow.summary.jj.team": "快速检查和测试后，先由评审者智能体、再由你检查每张卡片，然后由你自己整合。",
   "workflow.slots.removeKept": "移除…",
   "workflow.slots.removeKeptTitle": "移除 {slot}？",
   "workflow.slots.removeGoneMessage": "它的文件夹缺失，或已不再是工作树，因此无法借出。Combwork 会忘掉 {slot}，并在卡片需要时新建一个槽位。不会删除任何内容：它文件夹中留下的东西保持原样。",
   "workflow.slots.removedKept": "{slot} 已移除。",
-  "workflow.slots.notRemovedKept": "{slot} 未移除：{why, select, changed {列表显示后它已改变（它的文件夹回来了，或它被重新创建）} busy {现在有工作正在其中进行} other {Combwork 保留了它}}。",
-  "workflow.refused.platform.keptOnTarget.message": "{why, select, unread {{card} 的工作保留在槽位 {slot} 中，但 Combwork 无法读取该工作位于哪个书签上。} other {{card} 之前的工作在槽位 {slot} 中，位于 {target}：它不能在 {now} 上开始。}}",
-  "workflow.refused.platform.keptOnTarget.next": "{why, select, unread {查看该槽位（版本控制 → 槽位和副本，或直接用 jj），然后重新开始它。} other {把它的合并到改回 {target} 以在那里继续，或先集成那项工作。}}"
+  "workflow.slots.notRemovedKept": "{slot} 未移除：{why, select, changed {列表显示后它已改变（它的文件夹回来了，或它被重新创建）} busy {现在有工作正在其中进行} other {Combwork 保留了它}}。"
 }

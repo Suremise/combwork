@@ -45,7 +45,7 @@ interface Followed {
   platform: PlatformId
   alive: () => boolean
   watch: Disposable
-  /** Ends what a run of this follow has under way (jj's publish requests) once it is dropped. */
+  /** Ends what a run of this follow has under way once it is dropped. */
   abort: AbortController
   timer: NodeJS.Timeout | null
   /** Lines (Git branches) that moved since the last run: their Done cards are looked at too. */

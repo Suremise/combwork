@@ -9,7 +9,6 @@ import * as electron from 'electron'
 import type { CombworkEvent, ProjectConfig } from '../src/shared/types'
 import { PLATFORMS, revisionShort } from '../src/shared/platform/descriptors'
 import { detect, foundKey, projectPlatform } from '../src/main/platform/registry'
-import { jjOf } from '../src/main/vcsDetect'
 import { git, gitTestHooks } from '../src/main/git'
 import { checkGit } from '../src/main/gitTool'
 import { excludeCopies } from '../src/main/providers/common'
@@ -88,23 +87,28 @@ describe('detection, per case of §16.3.5', () => {
     expect(projectPlatform(j, 'git').offer).toEqual({ offer: 'none', why: 'otherFound' })
   })
 
-  it('a Git repository inside a non-colocated jj workspace is Git’s, the nearest marker (HI-2976)', () => {
+  it('a Git repository inside a Jujutsu workspace reads as Jujutsu found, as one inside a Mercurial checkout does (HI-3487)', () => {
     const outer = tempDir('cw-platform-gitinjj-')
     mkdirSync(join(outer, '.jj'), { recursive: true })
     const inner = join(outer, 'inner')
     mkdirSync(join(inner, 'deep'), { recursive: true })
     gitInit(inner)
-    expect(jjOf(inner)).toBeNull()
-    expect(detect(inner)).toEqual({ platform: 'git', root: inner })
-    expect(detect(join(inner, 'deep'))).toEqual({ platform: 'git', root: inner, subfolder: true })
-    expect(projectPlatform(inner, 'git').offer).toBeUndefined()
-    expect(projectPlatform(inner, 'none').offer).toEqual({ offer: 'git', why: 'gitFound' })
-    // Outside the Git repository, still in the jj workspace: the other version control.
+    // Another version control at any level above decides, whatever git is nearer (otherVcsOf), Jujutsu as Mercurial.
+    expect(detect(inner)).toEqual({ platform: 'none', other: 'Jujutsu' })
+    expect(detect(join(inner, 'deep'))).toEqual({ platform: 'none', other: 'Jujutsu' })
+    expect(projectPlatform(inner, 'git').offer).toEqual({ offer: 'none', why: 'otherFound' })
+    expect(projectPlatform(inner, 'none').offer).toBeUndefined()
     expect(detect(outer)).toEqual({ platform: 'none', other: 'Jujutsu' })
-    // Another system nearer than the .jj decides (None, its name).
+    // Another system nearer than the .jj names itself.
     mkdirSync(join(outer, 'hg', '.hg'), { recursive: true })
-    expect(jjOf(join(outer, 'hg'))).toBeNull()
     expect(detect(join(outer, 'hg'))).toEqual({ platform: 'none', other: 'Mercurial' })
+    // The same for a Git repository inside a Mercurial checkout.
+    const hg = tempDir('cw-platform-gitinhg-')
+    mkdirSync(join(hg, '.hg'), { recursive: true })
+    const inHg = join(hg, 'inner')
+    mkdirSync(inHg, { recursive: true })
+    gitInit(inHg)
+    expect(detect(inHg)).toEqual({ platform: 'none', other: 'Mercurial' })
   })
 })
 

@@ -16,7 +16,7 @@ import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } fr
 import { dirname } from 'path'
 import { keyedWrite } from '../../shared/requestKeys'
 import { createInterface } from 'readline'
-import { combworkInstructions, withLatestHandover, withPlatformRule } from '../../shared/combworkGuidance'
+import { combworkInstructions, withLatestHandover } from '../../shared/combworkGuidance'
 import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, assistantTools, controlAllows, hiddenForSide, TOOLS_SERVER, WORKER_ONLY_TOOLS, workflowHiddenOf } from '../../shared/assistantTools'
 import { COLUMN_IDS } from '../../shared/tasks'
 import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
@@ -1627,8 +1627,7 @@ const FULL = new Set(alwaysLoaded(ASSISTANT))
 const JOURNAL_SCOPE = ASSISTANT && JOURNAL ? (process.env.CW_JOURNAL_SCOPE ?? '').split(',').filter(Boolean) : null
 // The skills the session isn't given (#1431: switched off in Skills), which its instructions don't name.
 const SKILLS_OFF = new Set((process.env.CW_SKILLS_OFF ?? '').split(',').map((n) => n.trim().toLowerCase()).filter(Boolean))
-// A jj project's agents get the jj rule after the contract (HI-2800: CW_PLATFORM, set at launch from the project's config).
-const INSTRUCTIONS = withPlatformRule(combworkInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.CW_PROGRESS_COMMANDS !== '0', SKILLS_OFF, JOURNAL_SCOPE), ASSISTANT ? null : process.env.CW_PLATFORM)
+const INSTRUCTIONS = combworkInstructions(PROJECT, ASSISTANT ? 'assistant' : 'agent', process.env.CW_PROGRESS_COMMANDS !== '0', SKILLS_OFF, JOURNAL_SCOPE)
 
 /** A project agent given Combwork's tools without its guidance (#1285: Settings → Advanced, Combwork's guidance for agents). */
 const GUIDED = ASSISTANT || process.env.CW_GUIDANCE !== '0'

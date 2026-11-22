@@ -1,25 +1,20 @@
 // HI-3140: version control stays pluggable. Shared code and the window ask a platform's descriptor, its presentation
-// rows or its port, never its id; these pin that each answer is exactly what the id switches it replaced gave, for Git,
-// jj and None: the form's finish and folder choices, the agents' rule keys, the Version Control tab's fact line and its
-// the Agent API's found text, and the descriptor's own new data.
+// rows or its port, never its id; these pin that each answer is exactly what the id switches it replaced gave, for Git
+// and None: the form's finish and folder choices, the Version Control tab's fact line, the Agent API's found text, and
+// the descriptor's own data.
 import { describe, expect, it } from 'vitest'
-import { allRuleKeys, ownsWorkspaces, PLATFORMS, platformName, ruleKeyOf, type Detection, type PlatformId, type ProjectPlatform } from '../src/shared/platform/descriptors'
+import { hasCapability, merges, PLATFORMS, platformName, type Detection, type PlatformId, type ProjectPlatform } from '../src/shared/platform/descriptors'
 import { factOf, PLATFORM_VIEW } from '../src/shared/platform/presentation'
 import { formFinishes, formFolders } from '../src/shared/workflow/options'
-import { platformRule, withPlatformRule } from '../src/shared/combworkGuidance'
 import { FOUND } from '../src/main/platform/agentPresentation'
 
-const IDS: PlatformId[] = ['git', 'jj', 'none']
+const IDS: PlatformId[] = ['git', 'none']
 
-/** The detections a fact line and a found text are asked of: each platform's, colocated or not, inside Git, other, none. */
+/** The detections a fact line and a found text are asked of: each platform's, a subfolder, other, none. */
 const DETECTIONS: Detection[] = [
   { platform: 'git', root: 'D:\\r' },
   { platform: 'git', root: 'D:\\r', subfolder: true },
   { platform: 'git' },
-  { platform: 'jj', root: 'D:\\j', jj: { colocated: true } },
-  { platform: 'jj', root: 'D:\\j', jj: { colocated: false } },
-  { platform: 'jj', root: 'D:\\j', jj: { colocated: false, inGit: 'D:\\outer' } },
-  { platform: 'jj', root: 'D:\\j' },
   { platform: 'none' },
   { platform: 'none', other: 'Mercurial' },
   { platform: 'git', root: 'D:\\r', other: 'Mercurial' }
@@ -39,44 +34,13 @@ describe('HI-3140: the descriptor, presentation and port answers equal the id sw
     expect(formFinishes('git')).toEqual(['combworkMerges', 'agentMerges', 'committed', 'notChecked'])
     // HI-2840: None's own finish, its descriptor's (its form has no finish row, so nothing it shows changed).
     expect(formFinishes('none')).toEqual(['accept'])
-    // HI-3483: jj's finishes are gone; Not checked stands in until its descriptor goes (HI-3487).
-    expect(formFinishes('jj')).toEqual(['notChecked'])
     expect(formFolders('git')).toEqual(['slots', 'project'])
     expect(formFolders('none')).toEqual(['slots', 'project'])
   })
 
-  it("gives the agents' rule keys as before: jj's two, in the guidance revision's order, by what detection found", () => {
-    // The guidance revision hashes these texts in this order (guidance.ts): jj, then jj-separate.
-    expect(allRuleKeys()).toEqual(['jj', 'jj-separate'])
-    const at = (d: Detection | null) => () => d
-    expect(ruleKeyOf('jj', at({ platform: 'jj', root: 'D:\\j', jj: { colocated: true } }))).toBe('jj')
-    expect(ruleKeyOf('jj', at({ platform: 'jj', root: 'D:\\j', jj: { colocated: false } }))).toBe('jj-separate')
-    // Detection that found no jj (unknown, or its .jj gone): the colocated rule, as `platformRuleKey('jj', …) ?? 'jj'` gave.
-    expect(ruleKeyOf('jj', at({ platform: 'none' }))).toBe('jj')
-    expect(ruleKeyOf('jj', at(null))).toBe('jj')
-    // Git and None: none (CW_PLATFORM unset; the instructions without a rule, as platformRule('git') was empty).
-    let asked = 0
-    const counted = () => {
-      asked++
-      return null
-    }
-    expect(ruleKeyOf('git', counted)).toBeNull()
-    expect(ruleKeyOf('none', counted)).toBeNull()
-    expect(ruleKeyOf(undefined, counted)).toBeNull()
-    expect(ruleKeyOf('hg', counted)).toBeNull()
-    // Detection, which reads the folder, is asked only for a platform with a rule (as before: only for jj).
-    expect(asked).toBe(0)
-    expect(platformRule('jj')).not.toBe('')
-    expect(platformRule('jj-separate')).not.toBe('')
-    expect(platformRule('jj')).not.toBe(platformRule('jj-separate'))
-    for (const k of ['git', 'none', '', null, undefined, 'toString']) expect(platformRule(k)).toBe('')
-    expect(withPlatformRule('x', null)).toBe('x')
-    expect(withPlatformRule('x', 'jj')).toBe(`x\n${platformRule('jj')}`)
-  })
-
-  it("says the tab's fact line as before for Git and None, and every detection of theirs (jj's went with HI-3484)", () => {
+  it("says the tab's fact line as before for Git and None, and every detection of theirs", () => {
     for (const id of ['git', 'none'] as const)
-      for (const d of DETECTIONS.filter((x) => x.platform !== 'jj')) {
+      for (const d of DETECTIONS) {
         const p: ProjectPlatform = { id, capabilities: PLATFORMS[id].capabilities, detected: d }
         const f = factOf(p)
         const was = oldFact(p)
@@ -87,21 +51,23 @@ describe('HI-3140: the descriptor, presentation and port answers equal the id sw
   it("names the offer's button and the None · Git preview as before", () => {
     expect(PLATFORM_VIEW.git.switchTo.id).toBe('git.vc.offer.switchGit')
     expect(PLATFORM_VIEW.none.switchTo.id).toBe('git.vc.offer.switchNone')
-    // The preview moved between None and Git's page (`id !== 'jj'`), its tooltip on Git (`id === 'git'`).
+    // The preview moves between None and Git's page, its tooltip on Git (`id === 'git'`).
     expect(IDS.filter((id) => PLATFORM_VIEW[id].previewable)).toEqual(['git', 'none'])
   })
 
   it("tells agents what was found as before (servers' versionControlOf)", () => {
     const old = (d: Detection): string =>
-      d.platform === 'git' ? `git at ${d.root ?? ''}${d.subfolder ? ' (a subfolder of that repository)' : ''}` : d.platform === 'jj' ? `jj at ${d.root ?? ''}${d.jj?.colocated ? ' (colocated with git)' : ' (not colocated: no git working copy)'}` : 'none'
+      d.platform === 'git' ? `git at ${d.root ?? ''}${d.subfolder ? ' (a subfolder of that repository)' : ''}` : 'none'
     for (const d of DETECTIONS.filter((x) => !x.other)) expect(FOUND[d.platform](d), JSON.stringify(d)).toBe(old(d))
   })
 
-  it("keeps the descriptor's names, owned workspaces and detection as the id switches had them", () => {
-    expect(IDS.map(platformName)).toEqual(['Git', 'jj', 'None'])
+  it("keeps the descriptor's names as the id switches had them", () => {
+    expect(IDS.map(platformName)).toEqual(['Git', 'None'])
     expect(platformName('hg')).toBe('hg')
-    expect(IDS.filter((id) => ownsWorkspaces(id))).toEqual(['jj'])
-    expect([ownsWorkspaces(null), ownsWorkspaces(undefined)]).toEqual([false, false])
-    expect(IDS.filter((id) => PLATFORMS[id].detectionSteady)).toEqual(['jj'])
+  })
+
+  it('HI-3487: check copies follow isolation, and moving a card to another target follows merging (the capabilities they folded into)', () => {
+    expect(IDS.filter((id) => hasCapability(id, 'isolation'))).toEqual(['git'])
+    expect(IDS.filter((id) => merges(id))).toEqual(['git'])
   })
 })

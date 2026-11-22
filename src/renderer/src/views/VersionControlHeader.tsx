@@ -32,7 +32,7 @@ export const M = {
 const S = {
   gitFound: msg({ id: 'git.vc.offer.gitFound', defaultMessage: 'Git found at {root}: switch to Git?', description: 'An offer atop the Version Control tab of a project without version control, after someone ran git init: {root} is the repository root. Combwork never switches by itself.' }),
   repositoryGone: msg({ id: 'git.vc.offer.repositoryGone', defaultMessage: 'The Git repository is gone. Git’s rules hold until you switch, because what they check can’t be read.', description: 'An offer atop the Version Control tab of a Git project whose .git folder was removed or moved: its cards are refused until the user switches to None or the repository is back.' }),
-  otherFound: msg({ id: 'git.vc.offer.otherFound', defaultMessage: '{vcs} found: not supported yet, so this project can only use None.', description: 'An offer atop the Version Control tab of a Git project where another version control ({vcs}: Mercurial, Jujutsu) is found now. None: glossary 2.1.' }),
+  otherFound: msg({ id: 'git.vc.offer.otherFound', defaultMessage: '{vcs} found: not supported yet, so this project can only use None.', description: 'An offer atop the Version Control tab of a Git project where another version control ({vcs}: Mercurial, Subversion) is found now. None: glossary 2.1.' }),
   notNow: msg({ id: 'git.vc.offer.notNow', defaultMessage: 'Not Now', description: 'A button of the offer to switch version control (atop the Version Control tab): hides the offer until Combwork starts again.' }),
   title: msg({ id: 'git.vc.switch.title', defaultMessage: 'Switch {project} to {platform}?', description: 'Title of the warning before switching a project’s version control. {project} is its name, {platform} None or Git.' }),
   what: msg({ id: 'git.vc.switch.what', defaultMessage: 'From its next card, {project} uses {to} and {to}’s own workflow options. Cards already started keep {from}’s rules.', description: 'The warning before switching a project’s version control: what changes. {to} and {from} are None or Git.' }),
@@ -214,7 +214,7 @@ export function presetState(f: WorkflowForm): { state: 'preset' | 'custom' | 'no
 
 /** The project's workflow form, read again when its saved options change (here, or by the Assistant's tool). */
 export function useWorkflowForm(project: ProjectInfo): WorkflowForm | null {
-  // Read again when its options or its version control change (HI-3315: a switch to jj reads jj's options).
+  // Read again when its options or its version control change (HI-3315: a switch reads the new platform's options).
   const saved = JSON.stringify([project.config.workflow ?? null, project.platform?.id ?? null])
   const [form, setForm] = useState<{ for: string; form: WorkflowForm } | null>(null)
   useEffect(() => {

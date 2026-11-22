@@ -1,4 +1,4 @@
-// How many passes deep an intent is in being gathered again (#1206's `regather`; a jj start's several, HI-2916), its own:
+// How many passes deep an intent is in being gathered again (#1206's `regather`, HI-2916), its own:
 // each intent's async call chain carries the depth of its own passes, so two intents on one card at once (the user's
 // drag and an agent's start, say) never share, clear or restore each other's (HR1's round 1 on HI-2916: a depth kept in
 // one map for the workflow, saved and restored around each pass, was left set once overlapping passes ended out of

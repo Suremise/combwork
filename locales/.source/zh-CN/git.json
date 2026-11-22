@@ -380,7 +380,6 @@
   "git.vc.initHint": "Initialise repository… makes this folder a Git repository on a branch called main, keeps its .combwork out of git and commits its files.",
   "git.vc.initOwnHint": "Initialise its own repository… makes this folder a Git repository of its own on a branch called main, keeps its .combwork out of git and commits its files.",
   "git.vc.insideRepo": "This folder is inside the Git repository at {root}: use that one, or give this folder its own.",
-  "git.vc.jj": "jj",
   "git.vc.noCommitYet": "This folder's Git repository has no first commit yet.",
   "git.vc.none": "None",
   "git.vc.notRepoYet": "This folder isn't a Git repository yet.",

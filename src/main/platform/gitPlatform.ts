@@ -206,7 +206,7 @@ export class GitPlatform implements PlatformAdapter {
   /**
    * A start in the project folder: its line the folder's branch, its base the folder's head. HI-3104: `built` (the card is
    * built there: a code card, not a provisional plan while a slot is waited for) and the folder on no branch (a detached
-   * head, as a colocated jj repository leaves it) is refused `platform.detachedFolder`: its commits would be on none.
+   * head) is refused `platform.detachedFolder`: its commits would be on none.
    * An unreadable branch or head stays unknown, never taken for detached.
    */
   private async projectPlan(card: CardRecord, o: WorkflowOptions, built: boolean): Promise<Maybe<StartPlan>> {

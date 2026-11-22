@@ -300,8 +300,8 @@ export const SEAMS = {
  * - a comparison (`===`, `!==`, `==`, `!=`, either side) with a platform id's string literal;
  * - a `case` of one;
  * - `'<id>' in x` (a platform's own shape read by its key; `none` is every union's "nothing" member, `{ none }`, so not);
- * - a platform id given to a descriptor helper (`revisionShort('jj', …)`, `hasCapability('git', …)`) or read off
- *   `PLATFORMS` by name (`PLATFORMS.jj`, `PLATFORMS['git']`).
+ * - a platform id given to a descriptor helper (`revisionShort('none', …)`, `hasCapability('git', …)`) or read off
+ *   `PLATFORMS` by name (`PLATFORMS.none`, `PLATFORMS['git']`).
  * `none` is also other enums' value (`review === 'none'`): a comparison or case with it is exempt only when the other
  * side's name is one NOT_PLATFORM lists, with why; any other spelling (`to`, `id`, `p`…) counts.
  */
@@ -353,7 +353,7 @@ export const NOT_PLATFORM = {
 }
 
 /** The descriptor helpers that take a platform's id: one given by name is a switch. */
-const HELPERS = new Set(['revisionShort', 'hasCapability', 'merges', 'accepts', 'deliversCommits', 'declaresPaths', 'needsRepository', 'hasOperation', 'hasGate', 'ownsWorkspaces', 'platformName', 'ruleKeyOf'])
+const HELPERS = new Set(['revisionShort', 'hasCapability', 'merges', 'accepts', 'deliversCommits', 'declaresPaths', 'needsRepository', 'hasOperation', 'hasGate', 'platformName'])
 
 /** Where a switch belongs, whole: the platform layer (its descriptors and presentation, its ports and their registries) and Git's own modules. */
 const SWITCH_HOME = (f) => /^src\/(shared\/platform|main\/platform)\//.test(f) || isGitModule(f)
@@ -376,7 +376,7 @@ const COMPARE = new Set([ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.Ex
 
 /** One file's switches: each `{ id, line }`; `exempt` collects the NOT_PLATFORM names it used. */
 export function fileSwitches(file, text, ids, exempt) {
-  // Every file is parsed (no text prefilter: HR1's round 1 found one skipping `PLATFORMS.jj`); switchCounts keeps each
+  // Every file is parsed (no text prefilter: HR1's round 1 found one skipping `PLATFORMS.<id>`); switchCounts keeps each
   // file's answer by its text.
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   const idOf = (n0) => {

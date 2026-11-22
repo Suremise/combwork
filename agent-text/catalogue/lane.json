@@ -532,7 +532,7 @@
     "note": "Delivered to a lane's builder after a reorder applied now (HI-1995) put its card in flight back; {by} is who reordered it, {line} its branch (or lane.reorder.itsBranch)."
   },
   "lane.tell.yield": {
-    "text": "Your lane's list was changed by {by} to put {first} first: {card} waits on it. Commit {card}'s work and end your turn: Combwork then puts {card} back in Todo (its work stays on its branch) and starts {first}; your lane comes back to {card} after. If {card}'s folder can't be read as clean (a jj slot, an error), Combwork waits and tries again at your next turn end.",
+    "text": "Your lane's list was changed by {by} to put {first} first: {card} waits on it. Commit {card}'s work and end your turn: Combwork then puts {card} back in Todo (its work stays on its branch) and starts {first}; your lane comes back to {card} after. If {card}'s folder can't be read as clean (an error), Combwork waits and tries again at your next turn end.",
     "note": "HI-3323: delivered once to a lane's builder when its lane's new list puts first {first}, a card that its card in Doing ({card}) waits on, and the builder is in a turn or the folder isn't clean yet; {by} is who changed the list."
   },
   "lane.wait.hours": {

@@ -439,6 +439,5 @@
   "git.worktrees.queueHeading": "合并队列（Combwork 的）",
   "git.worktrees.queueHint": "Combwork 的合并队列在卡片的合并进入之前测试它的地方。由 Combwork 管理：这里没有可移除的内容。",
   "git.worktrees.queueRow": "合并队列的文件夹",
-  "git.worktrees.readOnly": "此处只读：智能体的工作通过“合并”进入项目文件夹。",
-  "git.vc.jj": "jj"
+  "git.worktrees.readOnly": "此处只读：智能体的工作通过“合并”进入项目文件夹。"
 }

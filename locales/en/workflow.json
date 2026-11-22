@@ -1641,19 +1641,11 @@
   },
   "workflow.refused.platform.detachedFolder.message": {
     "defaultMessage": "{card} can’t start: the project folder is on no branch (its head is detached at {head}), so what its builder commits would be on none.",
-    "description": "HI-3104: a refused start in a Git project whose cards are built in the project folder: the folder has no branch checked out (a detached head, as a jj repository colocated with Git leaves it after switching back to Git), so commits made there would belong to no branch. {card} is a card key like AM-12; {head} a short commit id."
+    "description": "HI-3104: a refused start in a Git project whose cards are built in the project folder: the folder has no branch checked out (a detached head), so commits made there would belong to no branch. {card} is a card key like AM-12; {head} a short commit id."
   },
   "workflow.refused.platform.detachedFolder.next": {
     "defaultMessage": "{has, select, yes {Check out its branch in the project folder (git switch {branch}), then start it again.} other {Check out a branch in the project folder (an existing one with git switch, or a new one with git switch -c), then start it again.}}",
     "description": "HI-3104: the next step after a start refused because the project folder is on no branch. has (select): yes when Combwork found the branch to check out ({branch}, its name), other when it found none it could name. git switch and git switch -c are commands: keep them as they are. Translate both whole sentences."
-  },
-  "workflow.refused.platform.jjRefused.message": {
-    "defaultMessage": "{why, select, tooLarge {{card}: jj left {count, plural, one {a new file} other {# new files}} out of its snapshot for being over its size limit for new files (snapshot.max-new-file-size), so the work isn't all recorded: {files}.} autoTrack {{card}: jj's setting snapshot.auto-track is {setting} here, not all(), so jj doesn't record new files by itself and the work may not all be recorded.} mergeWorkingCopy {{card}: the slot's working copy has more than one parent, so its work isn't one line of commits.} notFromBase {{card}: the work in its slot doesn't start from the card's base {base}.} otherCard {{card}: commit {commit} is {other}'s work.} divergent {{card}: commit {commit} is divergent in jj (its change has more than one visible commit).} conflicted {{card}: commit {commit} has unresolved conflicts.} tooLong {{card}: its work has more than {max, number} commits.} unbound {{state, select, pending {{card}: its slot isn't prepared for it yet.} held {{card}: its slot isn't prepared for it yet.} other {{card}: its slot isn't prepared for this card any more.}}} isolated {{card}: jj projects have no check copies yet.} recovered {{card}: commits of its work hold copies that Recover… wrote beside the original files: {files}.} other {{card}: jj refused it.}}",
-    "description": "HI-2868: a refused move on a card of a project using jj (Jujutsu): why its work can't be taken as it is. In unbound, {state} (HI-3115) is pending (the card's slot isn't prepared for it yet) held (its preparation waits on what the slot holds; {told} is Combwork's own notice about it, in English: keep it as it is), or other (prepared for another card since): keep its select keys. {card} is a card key like AM-12; {commit} and {base} are short commit ids; {other} is another card's key; {max} is a number; {files} is a list of file paths and {count} their number (HI-2973). 'working copy', 'divergent' and 'snapshot' are jj's terms; snapshot.max-new-file-size is jj's setting: keep it as it is. Translate each sentence. autoTrack (HI-3096): the user's jj setting snapshot.auto-track ({setting}, its value) isn't all(), so jj leaves new files untracked; snapshot.auto-track and all() are jj's: keep them. recovered (HI-2996): Recover… (a button of a stale slot, as the window names it) wrote a copy of the user's version beside a file that had changed meanwhile, and commits of the card's work hold that copy; {files} is a list of file paths, as they are."
-  },
-  "workflow.refused.platform.jjRefused.next": {
-    "defaultMessage": "{why, select, tooLarge {Leave a file out deliberately with .gitignore, or raise jj's limit (jj config set --repo snapshot.max-new-file-size and a size in bytes) and commit it with jj commit, then submit again.} autoTrack {Set it back to all() for this repository (jj config set --repo snapshot.auto-track 'all()'), then submit again: jj then records the new files.} mergeWorkingCopy {Commit the work with jj commit, so the working copy is empty on one parent, then submit again.} notFromBase {Rebase the work onto the card's base, or start the card again.} otherCard {Leave that card's commits out of this card's work (rebase without them), then submit again.} divergent {Resolve the divergence in jj (abandon or rewrite one side), then try again.} conflicted {Resolve the conflicts in jj, then try again.} tooLong {Squash some of the commits, then submit again.} unbound {{state, select, pending {Combwork prepares the card's slot once you're idle: end your turn. If anything there stops it, Combwork tells you what and how to clear it.} held {{told}} other {Put the card back and start it again.}}} isolated {Run the check again without --isolated, in the card's slot.} recovered {Compare each copy with its original and keep what you want under the original name, then take the copies out of every commit of the work (jj squash or jj diffedit: deleting them in a later commit leaves them in its history) and submit again.} other {Look at the slot with jj, then try again.}}",
-    "description": "HI-2868: the next step after a refused move on a jj project's card, by the reason (why, select). jj commit, --isolated, .gitignore, jj config set --repo snapshot.max-new-file-size and jj config set --repo snapshot.auto-track 'all()' are commands and names: keep them as they are. 'working copy' and 'divergent' are jj's terms. Translate each sentence. recovered (HI-2996): copies Recover… wrote beside the originals are in commits of the card's work: the user's version of each is compared with the original, kept under the original name if wanted, and the copies taken out of every commit (jj squash and jj diffedit are commands: keep them)."
   },
   "workflow.refused.platform.keptLine.message": {
     "defaultMessage": "{card} can’t start: its branch was made from {kept} and still holds history {target} lacks, but its lane merges into {target}.",
@@ -1662,22 +1654,6 @@
   "workflow.refused.platform.keptLine.next": {
     "defaultMessage": "Take it out of the lane and start it on its own, to merge into {kept}; or make a new card for {target}.",
     "description": "HI-3112: the next step after a start refused because the card’s kept branch ({kept}) isn’t its lane’s ({target}). {kept} and {target} are branch names."
-  },
-  "workflow.refused.platform.keptOnTarget.message": {
-    "defaultMessage": "{why, select, unread {{card}'s work is kept in slot {slot}, but Combwork can't read which bookmark that work is on.} other {{card}'s earlier work is in slot {slot}, on {target}: it can't start on {now}.}}",
-    "description": "HI-3129: a refused start of a jj card put back with work kept in slot {slot} (a name). why (keep the select keys): unread, Combwork could not prove the bookmark that work is on; mismatch (other), the work is on the bookmark {target} but the card’s own Merges into names {now}. {card} is a card key like AM-12; {target} and {now} are bookmark names."
-  },
-  "workflow.refused.platform.keptOnTarget.next": {
-    "defaultMessage": "{why, select, unread {Look at the slot (Version Control → Slots and copies, or jj itself), then start it again.} other {Set its Merges into back to {target} to go on with it there, or integrate that work first.}}",
-    "description": "HI-3129: the next step after that refusal, by why (keep the select keys). Merges into is the card’s field naming the bookmark its work goes to; {target} a bookmark name."
-  },
-  "workflow.refused.platform.noTarget.message": {
-    "defaultMessage": "{card} can’t start: its project has no target bookmark chosen, the one its work merges into.",
-    "description": "HI-3106: a refused start in a project using jj (Jujutsu): no target bookmark (Work merges into) is chosen, and jj has no default to fall back on, as Git has its default branch. {card} is a card key like AM-12. A bookmark is jj’s name for a branch."
-  },
-  "workflow.refused.platform.noTarget.next": {
-    "defaultMessage": "Choose one in Version Control → Workflow (Work merges into), then start it again.",
-    "description": "HI-3106: the next step after a start refused for no target bookmark: the user chooses it in the window. Version Control, Workflow and Work merges into are names in the window: as translated there."
   },
   "workflow.refused.platform.noUpstream.message": {
     "defaultMessage": "{card} can’t start: {target} tracks no remote branch, and with “The target branch follows its remote” on each card starts from its remote.",
@@ -2257,7 +2233,7 @@
   },
   "workflow.slots.notRemovedKept": {
     "defaultMessage": "{slot} wasn’t removed: {why, select, changed {it changed after the list was shown (its folder is back, or it was made again)} busy {something works in it now} other {Combwork kept it}}.",
-    "description": "HI-3032: a notice after removing a jj slot kept for a card was refused. {why} picks the reason; keep the select keys."
+    "description": "HI-3464: a notice after removing a free slot whose folder was missing was refused. {why} picks the reason; keep the select keys."
   },
   "workflow.slots.off": {
     "defaultMessage": "Off",
@@ -2289,15 +2265,15 @@
   },
   "workflow.slots.removeKept": {
     "defaultMessage": "Remove…",
-    "description": "HI-3032: a button beside a jj slot kept for a card whose folder is missing (workflow.slots.keptGoneFor): asks, then removes the slot so the card can start again."
+    "description": "HI-3464: a button beside a free slot whose folder is missing or isn’t a worktree any more: asks (workflow.slots.removeGoneMessage), then Combwork forgets the slot."
   },
   "workflow.slots.removeKeptTitle": {
     "defaultMessage": "Remove {slot}?",
-    "description": "HI-3032: the title of the confirmation before removing a jj slot kept for a card whose folder is missing. {slot} is the slot’s name."
+    "description": "HI-3464: the title of the confirmation before removing a free slot whose folder is missing or isn’t a worktree any more. {slot} is the slot’s name."
   },
   "workflow.slots.removedKept": {
     "defaultMessage": "{slot} is removed.",
-    "description": "HI-3032: a notice after a jj slot kept for a card whose folder was missing was removed. {slot} is its name."
+    "description": "HI-3464: a notice after a free slot whose folder was missing or wasn’t a worktree any more was removed. {slot} is its name."
   },
   "workflow.slots.reviewCopies": {
     "defaultMessage": "Reviewers review in review copies",
@@ -2414,18 +2390,6 @@
   "workflow.summary.git.team": {
     "defaultMessage": "Pair with stricter checks: the unit tests too, a clean install before every merge, and your OK for cards labelled ui or release.",
     "description": "What the Team preset sets up, for a Git project (glossary 2.1: Team, Pair)."
-  },
-  "workflow.summary.jj.pair": {
-    "defaultMessage": "A reviewer agent passes each card after the quick checks, then you integrate it yourself.",
-    "description": "What the Pair preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj."
-  },
-  "workflow.summary.jj.solo": {
-    "defaultMessage": "Each card in its own jj workspace, no review: you integrate the work yourself.",
-    "description": "What the Solo preset sets up, for a project using jj (Jujutsu, HI-2799). Keep jj; a jj workspace is a working folder jj makes."
-  },
-  "workflow.summary.jj.team": {
-    "defaultMessage": "A reviewer agent, then you, check each card after the quick checks and the tests, then you integrate it yourself.",
-    "description": "What the Team preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj."
   },
   "workflow.summary.none.pair": {
     "defaultMessage": "A reviewer agent checks each card, after the quick checks pass.",

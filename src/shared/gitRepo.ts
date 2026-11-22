@@ -384,8 +384,7 @@ export type VcSection = (typeof VC_SECTIONS)[number]['id']
 /** Each platform's own sections, after Workflow: None has none of its own. */
 const PLATFORM_SECTIONS: Record<PlatformId, readonly VcSection[]> = {
   git: ['changes', 'history', 'branches', 'queue'],
-  none: [],
-  jj: []
+  none: []
 }
 
 /**

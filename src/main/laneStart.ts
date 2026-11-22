@@ -475,8 +475,8 @@ async function firstCardWithBrief(ws: WorkspaceService, projectPath: string, lan
 export async function briefAfterFailedPrepare(ws: WorkspaceService, projectPath: string, n: number, builderId: string): Promise<void> {
   const lane = (await rawLanes(ws)).find((l) => l.state === 'active' && l.builder.id === builderId && l.cards.includes(n))
   if (!lane || sessions.liveFor(projectPath, builderId)) return
-  // The lane's first card only (HI-2923): a later card's builder had its brief with an earlier one, and a jj lane's builder
-  // is stopped before each card's preparation (freeSlotOfBuilder), so stopped says nothing about a brief never given.
+  // The lane's first card only (HI-2923): a later card's builder had its brief with an earlier one, so stopped says nothing
+  // about a brief never given.
   const view = laneNow(ws, { lane: lane.id })
   if (view?.cards.find(ownOpen)?.number !== n || view.cards.some((c) => c.number !== n && c.column === 'done')) return
   const ref = `${lane.id}:builder`

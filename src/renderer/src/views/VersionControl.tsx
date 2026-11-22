@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import type { QueueView } from '@shared/workflow/queue'
-import { merges, needsRepository, PLATFORMS } from '@shared/platform/descriptors'
+import { merges, needsRepository } from '@shared/platform/descriptors'
 import { msg, tr } from '@shared/i18n'
 import { gitStatusText, gitStatusTip, VC_SECTIONS, vcSections, vcSectionShown, type GitRepoSummary } from '@shared/gitRepo'
 import { get, notify, set, showVersionControl, useLanguage, useStore } from '../store'
@@ -54,8 +54,7 @@ function useDetectionCatchUp(project: ProjectInfo, s: GitRepoSummary | null): vo
   const asked = useRef<string | null>(null)
   const detected = project.platform?.detected
   const readGit = !!s && s.isRepo && !s.gitProblem
-  // A platform whose descriptor says `detectionSteady` (HI-3140) is detection's to decide, as another system is.
-  const differ = !!s && !s.gitProblem && !!detected && !detected.other && !PLATFORMS[detected.platform].detectionSteady && readGit !== (detected.platform === 'git')
+  const differ = !!s && !s.gitProblem && !!detected && !detected.other && readGit !== (detected.platform === 'git')
   const key = `${project.path}:${readGit}`
   useEffect(() => {
     // Agreeing again (however detection caught up: this refresh, F5, another's) rearms it for the next change (HR6's

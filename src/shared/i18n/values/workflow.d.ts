@@ -413,14 +413,8 @@ interface CombworkMessageValues {
   'workflow.refused.paths.excluded.next': { folder: string | number }
   'workflow.refused.platform.detachedFolder.message': { card: string | number; head: string | number }
   'workflow.refused.platform.detachedFolder.next': { has: string; branch: string | number }
-  'workflow.refused.platform.jjRefused.message': { why: string; card: string | number; count: number; files: string | number; setting: string | number; base: string | number; commit: string | number; other: string | number; max: number; state: string }
-  'workflow.refused.platform.jjRefused.next': { why: string; state: string; told: string | number }
   'workflow.refused.platform.keptLine.message': { card: string | number; kept: string | number; target: string | number }
   'workflow.refused.platform.keptLine.next': { kept: string | number; target: string | number }
-  'workflow.refused.platform.keptOnTarget.message': { why: string; card: string | number; slot: string | number; target: string | number; now: string | number }
-  'workflow.refused.platform.keptOnTarget.next': { why: string; target: string | number }
-  'workflow.refused.platform.noTarget.message': { card: string | number }
-  'workflow.refused.platform.noTarget.next': undefined
   'workflow.refused.platform.noUpstream.message': { card: string | number; target: string | number }
   'workflow.refused.platform.noUpstream.next': { how: string; remote: string | number; target: string | number; publish: string | number; track1: string | number; track2: string | number }
   'workflow.refused.platform.offLine.message': { card: string | number; line: string | number; where: string; head: string | number; on: string | number }
@@ -605,9 +599,6 @@ interface CombworkMessageValues {
   'workflow.summary.git.pairAgent': undefined
   'workflow.summary.git.solo': undefined
   'workflow.summary.git.team': undefined
-  'workflow.summary.jj.pair': undefined
-  'workflow.summary.jj.solo': undefined
-  'workflow.summary.jj.team': undefined
   'workflow.summary.none.pair': undefined
   'workflow.summary.none.solo': undefined
   'workflow.summary.none.team': undefined

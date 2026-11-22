@@ -43,7 +43,7 @@ const log = createLogger('copies')
 
 /**
  * The workspace lifecycle port copies are made, reset and removed with (SPEC §16.3.6 Port 2, HI-2789's R5), unless the
- * pool is given another (HI-2795: jj's, by injection only).
+ * pool is given another (HI-2795: by injection only).
  */
 const defaultPort = slotWorkspaces
 
@@ -124,8 +124,8 @@ export interface CopyLease {
   why: string | null
   freed: string | null
   /**
-   * A jj copy's verification after its quiescence barrier (HI-2795): true, it was exactly its revision once every consumer
-   * had ended; false, it wasn't; null, not verified (every Git lease, and a jj lease not freed yet). jj's credit needs true.
+   * A copy's verification after its quiescence barrier (HI-2795): true, it was exactly its revision once every consumer
+   * had ended; false, it wasn't; null, not verified (every Git lease).
    */
   intact?: boolean | null
 }

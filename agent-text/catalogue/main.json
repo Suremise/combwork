@@ -401,7 +401,7 @@
   },
   "main.gitInit.otherVcs": {
     "text": "{vcs} keeps this folder (in {root}): Combwork makes a git repository only where no other version control system is.",
-    "note": "Why a folder can't be made a git repository: another version control system (Jujutsu, Mercurial…), {vcs}, keeps it. {root} is the folder it keeps.",
+    "note": "Why a folder can't be made a git repository: another version control system (Mercurial, Subversion…), {vcs}, keeps it. {root} is the folder it keeps.",
     "audience": "both"
   },
   "main.gitInit.stopped": {

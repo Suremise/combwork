@@ -1,5 +1,5 @@
 // A folder held against agent launches (HI-2887; design HI-2887/s17–s20, HR1's): while something that must have no agent
-// in a folder runs (jj's control workspace's making, which snapshots the project folder's working copy), no session is
+// in a folder runs (an operation that reads the project folder's working copy whole), no session is
 // admitted there. Admission is where a start's folder becomes known (sessions.ts' `start`, once its place is resolved,
 // before anything is launched or prepared); its record lasts until the start ends, by which time a started session's live
 // entry covers the folder. Each side is one synchronous step on main's thread: a hold checks the admitted and live

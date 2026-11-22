@@ -141,10 +141,8 @@ describe('switching a project (#1419)', () => {
         mkdirSync(join(repo, marker))
         await w.refresh()
       }
-      // Back to Git: refused while the other version control is there.
-      // HI-2799: a .jj makes Git the repository's switch (jj's fallback): refused here, no drained group shown.
-      if (marker === '.hg') await expect(sw.setPlatform(w, repo, 'git')).rejects.toThrow(/not supported yet/)
-      if (marker === '.jj') await expect(sw.setPlatform(w, repo, 'git')).rejects.toThrow()
+      // Back to Git: refused while the other version control is there (Jujutsu's as Mercurial's).
+      if (marker) await expect(sw.setPlatform(w, repo, 'git')).rejects.toThrow(/not supported yet/)
     }
   })
 

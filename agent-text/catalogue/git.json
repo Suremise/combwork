@@ -89,11 +89,6 @@
     "note": "A version control system’s name, in the choice atop the Version Control tab (glossary 2.1: keep).",
     "audience": "both"
   },
-  "git.vc.jj": {
-    "text": "jj",
-    "note": "Jujutsu’s command name, as its users call it, in the choice atop the Version Control tab (HI-2799). Keep it: a product’s name, lower case.",
-    "audience": "both"
-  },
   "git.vc.none": {
     "text": "None",
     "note": "The version control of a project without any, in the choice atop the Version Control tab and in \"Workflow: None · Solo\" (glossary 2.1: None).",
@@ -101,7 +96,7 @@
   },
   "git.vc.switch.changed": {
     "text": "Changed meanwhile: this project uses {platform} now. Look again before switching.",
-    "note": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None, Git or jj.",
+    "note": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None or Git.",
     "audience": "both"
   },
   "git.vc.switch.noGit": {

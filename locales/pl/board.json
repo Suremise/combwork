@@ -1117,7 +1117,7 @@
   "board.work.target": "Cel",
   "board.work.title": "Praca",
   "board.work.verdict": "{reviewer}: {pass, select, yes {zaliczona} other {niezaliczona}}{current, select, no { (już się nie liczy)} other {}}",
-  "board.work.notReady": "Jeszcze nie rozpoczęta w slocie {slot}: {stale, select, yes {inny obszar roboczy jj przepisał jego kopię roboczą, więc jest nieaktualny. Odzyskaj go w Kontroli wersji → Sloty i kopie, a karta zostanie tam przygotowana ponownie.} other {Combwork nie mógł go przygotować ({why}).}}",
+  "board.work.notReady": "Jeszcze nie rozpoczęta w slocie {slot}: Combwork nie mógł go przygotować ({why}).",
   "board.work.openComments": "{n, plural, one {# otwarty komentarz} few {# otwarte komentarze} many {# otwartych komentarzy} other {# otwartego komentarza}}",
   "board.workQueue.advance": "Przetestowana i gotowa: zaktualizować teraz gałąź {target} w jej folderze?",
   "board.workQueue.advancing": "Trwa scalanie z {target}",

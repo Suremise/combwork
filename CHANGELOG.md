@@ -5,6 +5,7 @@
 ### Removed
 
 - **jj (Jujutsu) support is removed: Combwork supports Git and None** (HI-3481). A project's Version Control tab and the workflow defaults offer None and Git only, and a folder with a `.jj` repository is reported as another version control, as a Mercurial one is.
+- **A Git repository inside a Jujutsu workspace is reported as Jujutsu found** (HI-3487). A `.jj` folder above the project counts as another version control, as a Mercurial checkout's always did, so such a project is offered None instead of being read as Git.
 
 ### Changed
 

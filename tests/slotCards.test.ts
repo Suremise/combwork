@@ -1928,7 +1928,7 @@ describe("a slot that couldn't be prepared, recorded (HI-2913)", { timeout: timi
 
   it('records the failure on its cycle, and its cycle reads as failed, not prepared, until a SlotPrepared', async () => {
     const { facts } = await failing({ error: 'slot-a failed (test)' })
-    expect(facts().find((f) => f.kind === 'SlotPrepareFailed')?.data).toEqual({ lease: 'l-1', slot: 'slot-a', why: 'slot-a failed (test)', stale: false })
+    expect(facts().find((f) => f.kind === 'SlotPrepareFailed')?.data).toEqual({ lease: 'l-1', slot: 'slot-a', why: 'slot-a failed (test)' })
     expect(cycleIn(facts())).toMatchObject({ prepared: null, prepareFailed: { why: 'slot-a failed (test)' } })
   })
 

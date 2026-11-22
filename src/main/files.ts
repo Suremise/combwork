@@ -379,7 +379,7 @@ export function watchProject(projectPath: string): void {
     entry.w = watch(projectPath, { recursive: true }, (_evt, file) => {
       if (!file) return
       const rel = String(file).split(sep).join('/')
-      // A platform's own folder (`.git`, and jj's `.jj`, whose every command writes there: HI-2800).
+      // A version control's own folder (`.git`…: METADATA_DIRS).
       if (inMetadataDir(rel)) return
       // An install writes thousands of files there; the tree shows the folder itself.
       if (rel.startsWith('node_modules/') || rel.includes('/node_modules/')) return

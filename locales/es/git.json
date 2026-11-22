@@ -439,6 +439,5 @@
   "git.worktrees.queueHeading": "Cola de fusión (de Combwork)",
   "git.worktrees.queueHint": "Donde la cola de fusión de Combwork prueba la fusión de una tarjeta antes de que entre. Combwork la gestiona: aquí no hay nada que quitar.",
   "git.worktrees.queueRow": "La carpeta de la cola de fusión",
-  "git.worktrees.readOnly": "Solo lectura aquí: el trabajo de un agente llega a la carpeta del proyecto mediante Fusionar.",
-  "git.vc.jj": "jj"
+  "git.worktrees.readOnly": "Solo lectura aquí: el trabajo de un agente llega a la carpeta del proyecto mediante Fusionar."
 }

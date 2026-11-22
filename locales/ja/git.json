@@ -439,6 +439,5 @@
   "git.worktrees.queueHeading": "マージキュー（Combwork）",
   "git.worktrees.queueHint": "Combworkのマージキューが、カードのマージを取り込む前にテストする場所です。Combworkが管理するため、ここで削除するものはありません。",
   "git.worktrees.queueRow": "マージキューのフォルダー",
-  "git.worktrees.readOnly": "ここでは読み取り専用です。エージェントの作業は「マージ」でプロジェクトのフォルダーに取り込みます。",
-  "git.vc.jj": "jj"
+  "git.worktrees.readOnly": "ここでは読み取り専用です。エージェントの作業は「マージ」でプロジェクトのフォルダーに取り込みます。"
 }

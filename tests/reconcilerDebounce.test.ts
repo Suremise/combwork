@@ -13,7 +13,7 @@ vi.mock('../src/main/workflow/service', () => ({
 vi.mock('../src/main/platform/historyPorts', () => ({ historyOf: () => null, observePort: { subscribe: () => ({ dispose: () => undefined }) } }))
 vi.mock('../src/main/boardStore', () => ({ boardReadOnly: () => false }))
 vi.mock('../src/main/events', () => ({ onCombworkEvent: () => () => undefined }))
-const ws = { path: 'C:\\w', lifetime: { aborted: false }, repairingMove: false, info: () => ({ projects: [{ path: 'C:\\w\\shop', name: 'shop', platform: { id: 'jj' } }] }) }
+const ws = { path: 'C:\\w', lifetime: { aborted: false }, repairingMove: false, info: () => ({ projects: [{ path: 'C:\\w\\shop', name: 'shop', platform: { id: 'git' } }] }) }
 vi.mock('../src/main/workspace', () => ({ openWorkspaces: () => [ws], WorkspaceService: { closingListeners: new Set() } }))
 
 const { RECONCILE_DEBOUNCE_MS, reconcileCard, startReconciling, stopReconciling } = await import('../src/main/workflow/reconciler')

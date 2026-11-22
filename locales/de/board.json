@@ -1117,7 +1117,7 @@
   "board.work.target": "Ziel",
   "board.work.title": "Arbeit",
   "board.work.verdict": "{reviewer}: {pass, select, yes {bestanden} other {nicht bestanden}}{current, select, no { (zählt nicht mehr)} other {}}",
-  "board.work.notReady": "Noch nicht in {slot} gestartet: {stale, select, yes {ein anderer jj-Workspace hat seine Arbeitskopie umgeschrieben, daher ist er veraltet. Stelle ihn unter Versionsverwaltung → Slots und Kopien wieder her, dann wird die Karte dort erneut vorbereitet.} other {Combwork konnte ihn nicht bereitstellen ({why}).}}",
+  "board.work.notReady": "Noch nicht in {slot} gestartet: Combwork konnte ihn nicht bereitstellen ({why}).",
   "board.work.openComments": "{n, plural, one {# offener Kommentar} other {# offene Kommentare}}",
   "board.workQueue.advance": "Getestet und bereit: {target} jetzt in seinem Ordner aktualisieren?",
   "board.workQueue.advancing": "Wird jetzt in {target} gemergt",

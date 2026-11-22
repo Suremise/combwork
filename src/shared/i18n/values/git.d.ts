@@ -375,7 +375,6 @@ interface CombworkMessageValues {
   'git.vc.initHint': undefined
   'git.vc.initOwnHint': undefined
   'git.vc.insideRepo': { root: string | number }
-  'git.vc.jj': undefined
   'git.vc.noCommitYet': undefined
   'git.vc.none': undefined
   'git.vc.notRepoYet': undefined

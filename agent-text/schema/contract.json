@@ -11,12 +11,6 @@
       "project": "plain"
     }
   },
-  "contract.agent.jj": {
-    "placeholders": {}
-  },
-  "contract.agent.jjSeparate": {
-    "placeholders": {}
-  },
   "contract.agent.scratch": {
     "placeholders": {}
   },

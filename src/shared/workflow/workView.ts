@@ -278,10 +278,10 @@ export interface WorkView {
   line: string | null
   /**
    * HI-2913: its slot couldn't be prepared for this cycle (a `SlotPrepareFailed` for its lease, no `SlotPrepared` after
-   * it): the slot, why (English, as its builder was told) and whether it was a stale jj workspace. The window shows the
-   * card not ready there rather than started.
+   * it): the slot, and why (English, as its builder was told). The window shows the card not ready there rather than
+   * started.
    */
-  notReady?: { slot: string; why: string; stale: boolean }
+  notReady?: { slot: string; why: string }
   /** Every line it has started on, over its whole history (HI-1823: an open card's earlier work, never a leftover). */
   lines: string[]
   /** The revision its change starts from. */
@@ -420,24 +420,6 @@ export function inTargetNow(s: CardState): FactData['InTarget'] | null {
   return m && m.submission === s.latest?.id && m.revision === s.latest?.revision && m.target === (s.started?.target ?? null) ? m : null
 }
 
-/**
- * HI-2924: a jj card the user moved to Done themselves while its integration wasn't proved
- * (a hand-resolved conflict changes the change's diff, so J5's proofs don't hold). Their Done is their word that it's
- * integrated: shown as "Done by you, integration not proved", and its slot's binding may be released without
- * containment (jjWorkspacePort's reuse and detach). Only the user's own move into Done this cycle (never the Assistant's,
- * a repair or Combwork's), on a jj line, with neither `Integrated` nor `Accepted` this cycle. `line`, given: only that
- * cycle's (its jj line key). Null otherwise.
- */
-export function doneUnproved(facts: readonly Fact[], s: Pick<CardState, 'stage' | 'cycle' | 'started' | 'integrated' | 'accepted'>, line?: string): { at: string; line: string } | null {
-  const own = s.started?.line
-  if (s.stage !== 'done' || !s.started || s.integrated || s.accepted || !own || !own.startsWith('jj:')) return null
-  if (line !== undefined && own !== line) return null
-  const moved = facts.findLast((f) => f.kind === 'Moved' && f.seq >= s.cycle && (f.data as FactData['Moved']).to === 'done')
-  if (!moved || moved.actor !== 'user') return null
-  const cause = (moved.data as FactData['Moved']).cause
-  return cause === 'user' || cause === 'override' ? { at: moved.at, line: own } : null
-}
-
 function unknownOf(platform: Record<string, unknown> | undefined): Record<string, string> {
   const u = platform?.unknown
   if (!u || typeof u !== 'object') return {}
@@ -514,7 +496,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     ...reviewSkipView(facts),
     folder: started?.folder ?? null,
     line: started?.line ?? null,
-    ...(notReady ? { notReady: { slot: notReady.slot, why: notReady.why, stale: notReady.stale } } : {}),
+    ...(notReady ? { notReady: { slot: notReady.slot, why: notReady.why } } : {}),
     lines: s.lines,
     base: started?.base ?? null,
     target: started?.target ?? null,

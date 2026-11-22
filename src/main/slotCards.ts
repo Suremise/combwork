@@ -1426,7 +1426,7 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
         // Recorded (HI-2913) only while this very cycle and lease are current and not prepared: the window then shows the
         // card not ready there.
         const now = cycleIn(w.tx.facts(n))
-        if (now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared) w.fact('SlotPrepareFailed', { lease: l.id, slot: st.slot, why: r.error, stale: false }) // i18n-ignore: a fact's kind, not text
+        if (now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared) w.fact('SlotPrepareFailed', { lease: l.id, slot: st.slot, why: r.error }) // i18n-ignore: a fact's kind, not text
         w.action('notify', { text: english, shown: workflowText(SLOT_NOTICES.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
         wf.wake(w, st.builder, english)
       })
