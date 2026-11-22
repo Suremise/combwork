@@ -11,7 +11,7 @@ import { confirm, isAssistantPath, notify, openInSessionsTab, revealAgent, set, 
 import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
-import { ActivityMap, MapToggles, mapSessions, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { ActivityMap, MapToggles, mapSessions, openMapFile, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
 import { mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapContext } from '@shared/activityMap'
 import { cx } from '../util'
 import { boundedQueue, latestOnly } from '@shared/coalesce'
@@ -341,6 +341,10 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setMapEntries(forContexts.entries), [forContexts.key])
   const mapOn = mapShow.map
+  // A panel's file opened in Files (HI-3498): stable, so the map (memo) draws nothing more for it.
+  const entriesNow = useRef(entries)
+  entriesNow.current = entries
+  const openFile = useCallback((key: string, path: string) => openMapFile(entriesNow.current, key, path), [])
   // Animated once live and the snapshot released (HI-2939): its first pulses' baseline is then the live reads, never the
   // held ones (from those, what came while frozen was sent as a burst).
   const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at: input.at })
@@ -467,7 +471,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
           </div>
         )}
         <div className={cx('activity-body', mapOn && entries.length > 0 && 'with-map')}>
-          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={project.name} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} />}
+          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={project.name} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} onOpenFile={openFile} />}
         {!parts.length ? (
           <div className="pane-empty">{reading ? null : tr(filtered ? M.emptyFiltered : M.empty)}</div>
         ) : (

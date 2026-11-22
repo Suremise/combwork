@@ -7,6 +7,14 @@
     "defaultMessage": "A map of what your agents are doing",
     "description": "A tip's title (HI-2903)."
   },
+  "tips.activityMapPanels.text": {
+    "defaultMessage": "Click a station on the Activity map for what is behind it: Shell's running programs and how long they've run, the files Read and Edit touched (each opens in Files), subagents, and the MCP servers and tools used. Click it again or press Escape to close it.",
+    "description": "A tip (HI-3498). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (the station names are the map's: Read, Edit, Shell, Agents, Tools, You; Files is a tab)."
+  },
+  "tips.activityMapPanels.title": {
+    "defaultMessage": "See what is behind a station",
+    "description": "A tip's title (HI-3498): a station is one of the Activity map's hexes."
+  },
   "tips.activityTab.text": {
     "defaultMessage": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Click a station on the Activity map to see what's behind it** (HI-3498). Shell lists its running programs and how long they've run, Read and Edit the files touched (each opens in Files), Agents its subagents and background tasks, and Tools the MCP servers and tools used. The panel opens where Last actions is, and Escape closes it.
+
 ### Removed
 
 - **jj (Jujutsu) support is removed: Combwork supports Git and None** (HI-3481). A project's Version Control tab and the workflow defaults offer None and Git only, and a folder with a `.jj` repository is reported as another version control, as a Mercurial one is.

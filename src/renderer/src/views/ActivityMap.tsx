@@ -2,18 +2,20 @@
 // agent in the filter shows its map; none or several, one shared map, each agent its own colour. It draws from the same
 // reads as the list (frozen or live), animates only while shown, live and on, and reads nothing of its own while hidden.
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { activityTabs, buildActivityView, type ActivityFilter, type ActivityInput, type ActivityTabInfo } from '@shared/activity'
-import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, mapReadKeys, stationLastShown, stationLoad, stationTitle, type TextFits, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
+import { activityTabs, buildActivityView, filetimeMs, type ActivityFilter, type ActivityInput, type ActivityTabInfo } from '@shared/activity'
+import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, mapReadKeys, stationLastShown, stationLoad, stationPanel, stationTitle, type MapPanelRow, type TextFits, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
 import { ACTIVITY_MAP_MOTION } from '@shared/advanced'
 import { boundedQueue } from '@shared/coalesce'
 import { formatTime } from '@shared/dates'
+import { durationText } from '@shared/tasks'
 import { contextShown } from '@shared/defaults'
 import { msg, tr } from '@shared/i18n'
 import { providerDescriptor } from '@shared/providers'
 import type { ProjectInfo } from '@shared/types'
 import { call } from '../api'
 import { useAdvancedValue } from '../advanced'
-import { useStore } from '../store'
+import { notify, useStore } from '../store'
+import { openPathInFiles } from '../fileLinks'
 import { cx } from '../util'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import type { MapShow } from '../activityView'
@@ -35,6 +37,18 @@ export interface MapEntry {
   input: ActivityInput
   /** Its live state as the project has it now (its provider, session and local limits). */
   live: ProjectInfo['agents'][number]['live'] | null
+}
+
+/**
+ * Opens a file a station's panel lists in its project's Files tab (HI-3498): from where its agent works; a file not
+ * there now (moved, deleted, outside the projects) is said, never a blank tab.
+ */
+export function openMapFile(entries: readonly MapEntry[], key: string, path: string): void {
+  const e = entries.find((x) => x.key === key)
+  if (!e) return
+  void openPathInFiles(e.path, e.agentId, path).then((ok) => {
+    if (!ok) notify('warning', tr(M.panelNoFile, { path }))
+  })
 }
 
 /** A session's key in the map: its host's path (lower-cased) and its id, as the workspace level keys its reads. */
@@ -91,8 +105,10 @@ function mapInputs(entries: readonly MapEntry[], contexts: ReadonlyMap<string, M
       turns: sid ? e.input.turns.get(sid) : NO_TURNS,
       notLoaded,
       subagents: part ? part.subagents.filter((n) => n.kind === 'session' && !n.gone).length : 0,
-      tasks: part ? part.subagents.flatMap((n) => (n.kind === 'task' ? [{ type: n.task.type }] : [])) : [],
-      processes: part ? part.processes.flatMap((n) => (n.kind === 'process' && !n.gone ? [n.process.name] : [])) : [],
+      subagentStates: part ? part.subagents.flatMap((n) => (n.kind === 'session' && !n.gone ? [n.state] : [])) : [],
+      tasks: part ? part.subagents.flatMap((n) => (n.kind === 'task' ? [{ type: n.task.type, since: n.task.at }] : [])) : [],
+      // By its executable's name only, never its command line (names, never content).
+      processes: part ? part.processes.flatMap((n) => (n.kind === 'process' && !n.gone ? [{ name: n.process.name, pid: n.process.pid, since: filetimeMs(n.process.created) }] : [])) : [],
       blocks: part?.blocks.length ?? 0,
       ...(provider && providerDescriptor(provider).capabilities.session?.activityStations ? { reported: providerDescriptor(provider).capabilities.session?.activityStations } : {})
     }
@@ -299,6 +315,8 @@ export interface ActivityMapProps {
    */
   strip?: readonly MapStripAgent[]
   picked?: string | null
+  /** A file a Read or Edit panel lists, opened in Files (HI-3498): its agent's key and its path as the agent named it. */
+  onOpenFile?: (agentKey: string, path: string) => void
 }
 
 /** An agent in the strip: its ring, its name and its context. */
@@ -318,9 +336,12 @@ export function mapStrip(entries: readonly MapEntry[], contexts: ReadonlyMap<str
 }
 
 /** The map: stations, spokes, pulses, the centre, the feed and (shared) the agents' context rings. */
-export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulses, endPulse, show, onPick, strip, picked = null }: ActivityMapProps) {
+export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulses, endPulse, show, onPick, strip, picked = null, onOpenFile }: ActivityMapProps) {
   const motion = useMotion()
   const ids = useMapIds()
+  // The station whose panel is open (HI-3498): docked over the feed; its station again, its ✕ or Escape closes it.
+  const [panel, setPanel] = useState<MapStation | null>(null)
+  const togglePanel = useCallback((s: MapStation) => setPanel((p) => (p === s ? null : s)), [])
   // Each drawing counted as it lands (a layout effect: no write during render), and the pulses then in flight.
   useLayoutEffect(() => {
     mapCounts.renders++
@@ -341,11 +362,12 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
       data-mode={mode}
       data-picked={picked ?? undefined}
       style={{ '--activity-map-width': `${width}px` } as React.CSSProperties}
-      // Escape: back to every agent of the selection (HI-3180).
+      // Escape: an open panel closes first (HI-3498), then back to every agent of the selection (HI-3180).
       onKeyDown={(e) => {
-        if (e.key !== 'Escape' || !picked) return
+        if (e.key !== 'Escape' || (!panel && !picked)) return
         e.stopPropagation()
-        onPick?.(picked)
+        if (panel) setPanel(null)
+        else if (picked) onPick?.(picked)
       }}
     >
       <PaneResizer paneKey={MAP_PANE.key} min={MAP_PANE.min} max={MAP_PANE.max} keep={MAP_PANE.keep} />
@@ -399,7 +421,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
               )
             })}
           {MAP_STATIONS.map((s, i) => (
-            <Station key={s} index={i} view={model.stations[s]} name={stationName(s)} colours={colours} ids={ids} />
+            <Station key={s} index={i} view={model.stations[s]} name={stationName(s)} colours={colours} ids={ids} open={panel === s} onToggle={togglePanel} />
           ))}
           {!motion &&
             pulses.map((pl) => {
@@ -430,7 +452,8 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
           </div>
         )}
       </div>
-      {show.feed && (
+      {panel && <StationPanel station={panel} view={model.stations[panel]} model={model} name={stationName(panel)} colourOf={mode === 'shared' ? (k) => colourOf(colours.get(k)) : null} onClose={() => setPanel(null)} onOpenFile={onOpenFile} />}
+      {show.feed && !panel && (
         <div className="activity-map-feed" aria-label={tr(M.feedHeading)}>
           <h4>{tr(M.feedHeading)}</h4>
           {model.feed.length === 0 ? (
@@ -511,7 +534,87 @@ function Defs({ ids }: { ids: MapIds }) {
   )
 }
 
-function Station({ index, view: st, name, colours, ids }: { index: number; view: MapStationView; name: string; colours: ReadonlyMap<string, number | undefined>; ids: MapIds }) {
+/**
+ * A station's panel (HI-3498), docked where the feed is: what is behind it, from the map's own model (`stationPanel`),
+ * names only. Read and Edit's files open in Files; how long something has run is said as of this drawing (no timer).
+ */
+function StationPanel({ station, view, model, name, colourOf: dot, onClose, onOpenFile }: { station: MapStation; view: MapStationView; model: MapModel; name: string; colourOf: ((agentKey: string) => string) | null; onClose: () => void; onOpenFile?: (agentKey: string, path: string) => void }) {
+  const panel = useMemo(() => stationPanel(model, station), [model, station])
+  const now = Date.now()
+  const time = (r: MapPanelRow): string => {
+    if (r.running) return r.running.since ? durationText(Math.max(0, now - r.running.since), tr) : ''
+    const t = Date.parse(r.at ?? '')
+    return Number.isFinite(t) ? formatTime(r.at!) : ''
+  }
+  const label = (r: MapPanelRow): string => {
+    if (r.prompt) return tr(M.prompt)
+    if (r.running && r.running.kind !== 'process') return tr(M.runningKind, { kind: r.running.kind, type: r.running.type ?? 'other' })
+    return r.path ?? r.label
+  }
+  const detail = (r: MapPanelRow): string => {
+    if (r.running?.kind === 'process' && r.running.pid !== undefined) return tr(M.panelPid, { pid: r.running.pid })
+    if (r.running?.kind === 'subagent' && r.running.state) return tr(M.state, { state: r.running.state })
+    if (r.count && r.count > 1) return tr(M.panelCalls, { n: r.count })
+    return ''
+  }
+  return (
+    <div className="activity-map-panel" data-station={station} role="region" aria-label={name}>
+      <div className="activity-map-panel-head">
+        <span className="activity-map-panel-name">{name}</span>
+        <span className="faint">{view.status === 'ok' ? tr(M.panelSummary, { n: view.count, heat: view.heat }) : tr(M.loading)}</span>
+        <button className="activity-map-panel-close" aria-label={tr(M.panelClose)} title={tr(M.panelClose)} onClick={onClose}>
+          ✕
+        </button>
+      </div>
+      {panel.sections.length === 0 ? (
+        <div className="faint">{tr(M.panelEmpty)}</div>
+      ) : (
+        panel.sections.map((sec) => (
+          <div key={sec.id} className="activity-map-panel-section" data-section={sec.id}>
+            <h5>{tr(M.panelSection, { section: sec.id })}</h5>
+            {sec.rows.map((r) => {
+              const opens = !!(r.path && onOpenFile)
+              const body = (
+                <>
+                  {dot && <span className="activity-map-dot" style={{ background: dot(r.agentKey) }} />}
+                  {r.running && <span className={cx('activity-map-panel-live', r.running.kind)} aria-hidden="true" />}
+                  {r.open && !r.running && <span className="activity-map-panel-live" aria-hidden="true" />}
+                  <span className="activity-map-panel-label" title={r.path ?? (r.prompt ? undefined : r.label)}>
+                    {label(r)}
+                  </span>
+                  {r.tools && r.tools.length > 0 && (
+                    <span className="activity-map-panel-tools">
+                      {r.tools.slice(0, 4).map((t) => (
+                        <span key={t} className="activity-map-panel-tool">
+                          {t}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                  <span className="faint activity-map-panel-detail">{detail(r)}</span>
+                  <span className="activity-map-panel-time">{time(r)}</span>
+                  {opens && <span className="activity-map-panel-open">{tr(M.panelOpen)}</span>}
+                </>
+              )
+              return opens ? (
+                <button key={r.key} className={cx('activity-map-panel-row', r.failed && 'failed')} data-kind={r.kind} title={tr(M.panelOpenTip, { path: r.path! })} onClick={() => onOpenFile!(r.agentKey, r.path!)}>
+                  {body}
+                </button>
+              ) : (
+                <div key={r.key} className={cx('activity-map-panel-row', r.failed && 'failed')} data-kind={r.kind}>
+                  {body}
+                </div>
+              )
+            })}
+            {sec.more > 0 && <div className="faint activity-map-panel-more">{tr(M.panelMore, { n: sec.more })}</div>}
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
+function Station({ index, view: st, name, colours, ids, open, onToggle }: { index: number; view: MapStationView; name: string; colours: ReadonlyMap<string, number | undefined>; ids: MapIds; open: boolean; onToggle: (s: MapStation) => void }) {
   const p = POS[st.station]
   const active = st.here.length > 0
   const waitingHere = st.station === 'you' && active
@@ -521,7 +624,26 @@ function Station({ index, view: st, name, colours, ids }: { index: number; view:
   const load = stationLoad(st)
   const pips = Math.min(MAX_PIPS, st.running)
   return (
-    <g className={cx('activity-map-station', active && 'active', (st.failed || waitingHere) && 'failed', st.status !== 'ok' && st.status)} data-station={st.station} data-count={st.count} data-status={st.status} data-failed={st.failed ? 'yes' : 'no'} data-load={load.toFixed(2)} data-running={st.running}>
+    <g
+      className={cx('activity-map-station', active && 'active', (st.failed || waitingHere) && 'failed', st.status !== 'ok' && st.status, open && 'open')}
+      data-station={st.station}
+      data-count={st.count}
+      data-status={st.status}
+      data-failed={st.failed ? 'yes' : 'no'}
+      data-load={load.toFixed(2)}
+      data-running={st.running}
+      // A click (or Enter, Space) opens its panel, and closes it again (HI-3498).
+      role="button"
+      tabIndex={0}
+      aria-expanded={open}
+      aria-label={title}
+      onClick={() => onToggle(st.station)}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        onToggle(st.station)
+      }}
+    >
       <title>{title}</title>
       {/* Its outline first: the e2e measures each text against it. */}
       <polygon className="activity-map-cell" points={hexPoints(p.x, p.y, STATION_R)} fill={`url(#${ids.cell})`} />
@@ -674,5 +796,16 @@ const M = {
   show: msg({ id: 'activity.map.show', defaultMessage: 'Show', description: "Before the Activity tab's toggles for its map: Map, Feed, Context." }),
   toggleMap: msg({ id: 'activity.map.toggleMap', defaultMessage: 'Map', description: "A toggle above the Activity tab: show its map (a honeycomb of what agents do)." }),
   toggleFeed: msg({ id: 'activity.map.toggleFeed', defaultMessage: 'Feed', description: "A toggle above the Activity tab: show the map's feed of the last actions." }),
+  runningKind: msg({ id: 'activity.map.runningKind', defaultMessage: '{kind, select, subagent {Subagent} other {{type, select, command {Command} monitor {Monitor} subagent {Subagent task} workflow {Workflow} other {Background task}}}}', description: "A row in a station's panel on the Activity map (HI-3498): something running that has no name of its own, by its kind: a subagent session, or a background task by its type (a command, a monitor, a subagent's task, a workflow). Keep the select keys." }),
+  panelPid: msg({ id: 'activity.map.panelPid', defaultMessage: 'process {pid}', description: "Beside a running program in the Shell panel of the Activity map (HI-3498): its process id. Lower case." }),
+  panelCalls: msg({ id: 'activity.map.panelCalls', defaultMessage: '{n, plural, one {# call} other {# calls}}', description: "Beside a file, server, site or tool in a station's panel on the Activity map (HI-3498): how many of the calls read went to it." }),
+  panelSummary: msg({ id: 'activity.map.panelSummary', defaultMessage: '{n, plural, one {# call} other {# calls}} this turn · {heat, plural, one {# call} other {# calls}} in the last ten minutes', description: "Under a station's name at the top of its panel on the Activity map (HI-3498): its calls in the agent's current turn, and in the last ten minutes of the turns read." }),
+  panelClose: msg({ id: 'activity.map.panelClose', defaultMessage: 'Close (Esc)', description: "The close button of a station's panel on the Activity map (HI-3498), for its hover and screen readers. Esc is the Escape key." }),
+  panelEmpty: msg({ id: 'activity.map.panelEmpty', defaultMessage: 'Nothing here in the turns read.', description: "A station's panel on the Activity map (HI-3498) when nothing ran or was called there in the agent's turns that were read." }),
+  panelSection: msg({ id: 'activity.map.panelSection', defaultMessage: '{section, select, running {Running now} thisTurn {This turn} files {Files} subagents {Subagents} tasks {Background tasks} servers {MCP servers} web {Web} skills {Skills} other {Other tools}}', description: "A heading in a station's panel on the Activity map (HI-3498): what runs now, this turn's calls, the files read or changed, subagents, background tasks, MCP servers (with their tools), web sites, skills, and other tools. Keep the select keys." }),
+  panelMore: msg({ id: 'activity.map.panelMore', defaultMessage: '{n, plural, one {and # more} other {and # more}}', description: "Under a section of a station's panel on the Activity map (HI-3498) when it lists only the first ten: how many more there are." }),
+  panelOpen: msg({ id: 'activity.map.panelOpen', defaultMessage: 'Open', description: "At the end of a file's row in the Read or Edit panel of the Activity map (HI-3498): opens the file in the Files tab." }),
+  panelOpenTip: msg({ id: 'activity.map.panelOpenTip', defaultMessage: 'Open {path} in Files', description: "Hover of a file's row in the Read or Edit panel of the Activity map (HI-3498). {path} is the file's path; Files is the tab's name: use it as the tab is named." }),
+  panelNoFile: msg({ id: 'activity.map.panelNoFile', defaultMessage: '{path} isn’t a file in the project now', description: "A notice when a file chosen in the Activity map's Read or Edit panel (HI-3498) can't be opened in Files: it was moved or deleted since, or is outside the workspace's projects. {path} is its path as the agent named it." }),
   toggleContext: msg({ id: 'activity.map.toggleContext', defaultMessage: 'Context', description: "A toggle above the Activity tab: show the agents' context rings on the map." })
 }

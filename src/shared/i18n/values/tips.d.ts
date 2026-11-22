@@ -3,6 +3,8 @@
 interface CombworkMessageValues {
   'tips.activityMap.text': undefined
   'tips.activityMap.title': undefined
+  'tips.activityMapPanels.text': undefined
+  'tips.activityMapPanels.title': undefined
   'tips.activityTab.text': undefined
   'tips.activityTab.title': undefined
   'tips.activityWorkspace.text': undefined

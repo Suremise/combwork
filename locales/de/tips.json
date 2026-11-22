@@ -624,7 +624,9 @@
   "tips.opencodeHistory.text": "Die Unterhaltung eines OpenCode-Agenten erscheint im Tab „Sitzungen“, seine Tokens und Kosten in der Übersicht und der Fußzeile seines Bereichs, wie OpenCode sie meldet. $0 Kosten sind kein Maß für das Kontingent deines Plans; Limits gibt es nur für OpenCode Go oder Console.",
   "tips.opencodeHistory.title": "Verlauf, Tokens und Kosten eines OpenCode-Agenten",
   "tips.activityMap.text": "„Aktivität“ zeigt seine Agenten als Wabe: Jeder Tool-Aufruf geht zu seiner Station (Lesen, Ändern, Shell, Agenten, Tools, Du), mit einem Kontextring pro Agent. Wähle einen Agenten unter „Agenten ▾“ für seine eigene Karte; „Zeigen“ blendet die Karte, ihren Verlauf und die Ringe aus.",
+  "tips.activityMapPanels.text": "Klicke auf der Aktivitätskarte auf eine Station, um zu sehen, was dahintersteckt: die laufenden Programme der Shell und wie lange sie schon laufen, die Dateien, die Lesen und Ändern angefasst haben (jede öffnet sich in Dateien), Subagenten sowie die genutzten MCP-Server und Tools. Klicke erneut oder drücke Esc, um sie zu schließen.",
   "tips.activityMap.title": "Eine Karte dessen, was deine Agenten tun",
+  "tips.activityMapPanels.title": "Sehen, was hinter einer Station steckt",
   "tips.resumeLongIdle.title": "Eine lange ruhende Unterhaltung fragt vor dem Fortsetzen",
   "tips.resumeLongIdle.text": "Eine Unterhaltung, die über eine Stunde ruht, hat ihren Prompt-Cache höchstwahrscheinlich verloren, daher kann ihr Fortsetzen viele Tokens kosten. „Fortsetzen“ sagt, wie lange sie ruht und wie groß sie ist, und bietet stattdessen „Archivieren und neu beginnen“ an."
 }

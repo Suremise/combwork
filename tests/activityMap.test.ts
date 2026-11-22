@@ -5,7 +5,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationLoad, stationOf, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationLoad, stationOf, stationPanel, PANEL_ROWS, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
@@ -210,7 +210,7 @@ describe("the map's model", () => {
   })
 
   it("marks You for an agent waiting, Edit for a lock block, and Shell's last as a running process's name", () => {
-    const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Bash' }]]), waiting: true, blocks: 1, processes: ['node.exe'] })], 0)
+    const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Bash' }]]), waiting: true, blocks: 1, processes: [{ name: 'node.exe', pid: 7, since: 5 }] })], 0)
     expect(m.stations.you.here).toEqual(['A'])
     expect(m.stations.edit.failed).toBe(true)
     expect(m.stations.shell.last).toBe('node.exe')
@@ -590,5 +590,85 @@ describe('one shown agent: the map shows the current tab’s alone (HI-3186)', (
   it('says whether an agent has a running session, for the map’s plain line in place of its graph', () => {
     const m = buildMapModel([agent('mb1'), agent('mr1', { state: 'idle', doing: null, sessionKey: null })], Date.now())
     expect(m.agents.map((a) => a.running)).toEqual([true, false])
+  })
+})
+
+// HI-3498: a station's panel, from the map's own model (names only, nothing read for it).
+describe("a station's panel", () => {
+  const AT = Date.parse('2026-11-10T12:00:00Z')
+  const ago = (min: number): string => new Date(AT - min * 60_000).toISOString()
+
+  it("Shell: what runs (processes by their executable's name, command tasks) and this turn's calls, newest first", () => {
+    const turns = turnsOf('s', [[{ name: 'Bash', at: ago(9) }], [{ name: 'Bash', at: ago(2), failed: true }, { name: 'PowerShell', at: ago(1), done: false }]])
+    const m = buildMapModel([agent('A', { turns, processes: [{ name: 'node.exe', pid: 41, since: 1000 }], tasks: [{ type: 'command', since: 2000 }, { type: 'monitor', since: 3000 }] })], AT)
+    const p = stationPanel(m, 'shell')
+    expect(p.sections.map((x) => x.id)).toEqual(['running', 'thisTurn'])
+    expect(p.sections[0].rows.map((r) => [r.label, r.running?.kind, r.running?.pid ?? r.running?.type, r.running?.since])).toEqual([
+      ['node.exe', 'process', 41, 1000],
+      ['', 'task', 'command', 2000]
+    ])
+    expect(p.sections[1].rows.map((r) => [r.label, r.failed, r.open])).toEqual([
+      ['PowerShell', false, true],
+      ['Bash', true, false]
+    ])
+  })
+
+  it('Read and Edit: each file once per agent, newest first, counted, with its path to open; a list or a non-path has none', () => {
+    const turns = turnsOf('s', [[{ name: 'Read', summary: 'src/a.ts', at: ago(5) }, { name: 'Read', summary: 'src/b.ts', at: ago(4) }, { name: 'Read', summary: 'src/a.ts', at: ago(3) }, { name: 'Grep', summary: 'needle', at: ago(2) }, { name: 'Read', summary: 'C:\\p\\deep\\c.ts', at: ago(1) }]])
+    const other = turnsOf('t', [[{ name: 'Read', summary: 'src/a.ts', at: ago(0.5) }]])
+    const m = buildMapModel([agent('A', { turns }), agent('B', { turns: other, sessionKey: 'B-s' })], AT)
+    const rows = stationPanel(m, 'read').sections[0].rows
+    expect(rows.map((r) => [r.agentKey, r.label, r.count, r.path])).toEqual([
+      ['B', 'src/a.ts', 1, 'src/a.ts'],
+      ['A', 'deep/c.ts', 1, 'C:\\p\\deep\\c.ts'],
+      ['A', 'Grep', 1, undefined],
+      ['A', 'src/a.ts', 2, 'src/a.ts'],
+      ['A', 'src/b.ts', 1, 'src/b.ts']
+    ])
+    const patch = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'apply_patch', summary: 'a/x.ts, b/y.ts' }]]) })], AT)
+    expect(stationPanel(patch, 'edit').sections[0].rows[0]).toMatchObject({ label: 'a/x.ts +1' })
+    expect(stationPanel(patch, 'edit').sections[0].rows[0].path).toBeUndefined()
+  })
+
+  it('Agents: subagent sessions with their state, background tasks other than commands, and the calls', () => {
+    const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Agent' }]]), subagents: 2, subagentStates: ['working', 'done'], tasks: [{ type: 'subagent', since: 9 }, { type: 'command', since: 8 }] })], AT)
+    const p = stationPanel(m, 'agents')
+    expect(p.sections.map((x) => [x.id, x.rows.length])).toEqual([
+      ['subagents', 2],
+      ['tasks', 1],
+      ['thisTurn', 1]
+    ])
+    expect(p.sections[0].rows.map((r) => r.running?.state)).toEqual(['working', 'done'])
+    expect(p.sections[1].rows[0].running).toMatchObject({ kind: 'task', type: 'subagent', since: 9 })
+  })
+
+  it('Tools: MCP servers with their tools, web hosts, skills and other tools, each counted; nothing of a query', () => {
+    const turns = turnsOf('s', [[{ name: 'mcp__github__get_issue', at: ago(4) }, { name: 'mcp__github__list_prs', at: ago(3) }, { name: 'mcp__combwork__cw_inbox', at: ago(2) }, { name: 'WebFetch', summary: 'https://docs.example.com/x?q=hush', at: ago(1) }, { name: 'WebSearch', summary: 'secret words' }, { name: 'Skill' }, { name: 'ToolSearch' }]])
+    const p = stationPanel(buildMapModel([agent('A', { turns })], AT), 'tools')
+    const by = Object.fromEntries(p.sections.map((x) => [x.id, x.rows.map((r) => [r.label, r.count, r.tools ?? null])]))
+    expect(by.servers).toEqual([
+      ['combwork', 1, ['cw_inbox']],
+      ['github', 2, ['list_prs', 'get_issue']]
+    ])
+    expect(by.web).toEqual([
+      ['docs.example.com', 1, null],
+      ['WebSearch', 1, null]
+    ])
+    expect(by.skills).toEqual([['Skill', 1, null]])
+    expect(by.other).toEqual([['ToolSearch', 1, null]])
+    expect(JSON.stringify(p)).not.toMatch(/hush|secret/)
+  })
+
+  it('bounds each section at PANEL_ROWS, counting the rest; an empty section is left out', () => {
+    const many = turnsOf('s', [Array.from({ length: PANEL_ROWS + 3 }, (_, i) => ({ name: 'Read', summary: `src/f${i}.ts`, at: ago(1) }))])
+    const p = stationPanel(buildMapModel([agent('A', { turns: many })], AT), 'read')
+    expect(p.sections[0]).toMatchObject({ id: 'files', more: 3 })
+    expect(p.sections[0].rows).toHaveLength(PANEL_ROWS)
+    expect(stationPanel(buildMapModel([agent('A', { turns: many })], AT), 'agents').sections).toEqual([])
+  })
+
+  it("leaves out an agent past the shared map's bound: nothing of it runs on the map", () => {
+    const m = buildMapModel([agent('A', { notLoaded: true, processes: [{ name: 'node.exe' }], subagents: 1 })], AT)
+    expect(m.running).toEqual([])
   })
 })
