@@ -701,8 +701,8 @@ describe('a map call shown in the list', () => {
 
   it("finds a script's call as its script's item", () => {
     const grep = calls.find((c) => c.label === 'Grep')!
-    const read = calls.filter((c) => c.label === 'Read').at(-1)!
-    expect(grep.ref).toEqual(read.ref)
+    const scriptRead = calls.filter((c) => c.label === 'Read').at(-1)!
+    expect(grep.ref).toEqual(scriptRead.ref)
     expect(mapCallNode([entry()], ref(grep))?.node).toMatchObject({ kind: 'tool', tool: { name: 'code' } })
   })
 
