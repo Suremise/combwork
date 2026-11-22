@@ -413,7 +413,12 @@ the `Record<PlatformId, …>` maps (`PLATFORM_VIEW`, `FOUND`, `PLATFORM_NAME`, p
 page's sections), the lists of every id (the levels', the settings catalogue's, the templates'), and the defaults that
 name None (detection finding nothing, a project with no platform recorded, the default exclusions). Nothing else needs
 a platform at run time: the workflow keeps None's content hashing (`Workflow.none`) only while a platform declaring
-paths is installed, and asks for it (`deliverables()`) only on such a card's paths and checks.
+paths is installed, and asks for it (`deliverables()`) only on such a card's paths and checks. **None is the
+baseline, not removable in this way:** its id is what detection says when it finds no version control (or one Combwork
+doesn't support), and the switch offers, Initialise repository's switch and "use the parent repository" move a project
+between it and the one found; a build without it would have no answer for a plain folder. Its implementation is sealed
+in `none/` all the same, and a Git workflow runs without it (HI-3489's trial: both typechecks clean once its rows went,
+the Git workflow suites passing).
 
 **Removed: jj** (HI-3468). Combwork supported Jujutsu as a third version control from 1.5.0 to 1.6.x; 1.7.0 removed it
 with no migration, leaving Git and None behind the same adapter interface. A `.jj` folder now reads as another version
