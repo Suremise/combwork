@@ -6,7 +6,7 @@
 // them; the Version Control tab (#1278) edits them.
 
 import { msg, type Msg } from '../i18n/msg'
-import { accepts, hasCapability, hasGate, merges, PLATFORMS, type PlatformId } from '../platform/descriptors'
+import { accepts, hasCapability, merges, PLATFORMS, type PlatformId } from '../platform/descriptors'
 import type { FileLockMode } from '../types'
 import { CHURN_MAX, LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from '../loopLimits'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from '../agentLimits'
@@ -284,18 +284,17 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
  */
 export const formFinishes = (platform: PlatformId): readonly Finisher[] => PLATFORMS[platform].finishes
 
-/** The folders the options form offers a platform, in its order (HI-3140): slots only where the gate sharedFolder is closed (jj, HI-2799). */
-export const formFolders = (platform: PlatformId): readonly FolderMode[] => (hasGate(platform, 'sharedFolder') ? ['slots'] : ['slots', 'project'])
+/** The folders the options form offers a platform, in its order (HI-3140). */
+export const formFolders = (_platform: PlatformId): readonly FolderMode[] => ['slots', 'project']
 
 /**
  * Every check and balance off (§16.6.4): cards move freely, facts are still recorded. Also a new project's options
  * before a preset is chosen (§16.7.4). None has no G17, so no level sets it there.
  */
 export function allOff(platform: PlatformId): WorkflowOptions {
-  // The descriptor's default finish (HI-2840): None accepts, Git's is Not checked, jj's You integrate (HI-2799: option A).
-  // Slots only where the gate sharedFolder is closed (jj). G17 only where its form has it.
+  // The descriptor's default finish (HI-2840): None accepts, Git's is Not checked. G17 only where its form has it.
   const finish = PLATFORMS[platform].defaultFinish
-  const off: WorkflowOptions = { ...BASE, platform, finish, ...(hasGate(platform, 'sharedFolder') ? { folder: 'slots' as const } : {}) }
+  const off: WorkflowOptions = { ...BASE, platform, finish }
   if (!platformHasOption(platform, 'reviewerMode')) delete off.reviewerMode
   return off
 }
@@ -396,7 +395,6 @@ export const CONTRADICTIONS = {
   focusedNeedsRunner: msg({ id: 'workflow.contradiction.focusedNeedsRunner', defaultMessage: 'Each card’s focused tests need the command that runs them.', description: 'Why workflow options cannot be saved (G20): “Each card’s focused tests” is on but the project has no command to run them (its runner, focused.run).' }),
   subfolderTarget: msg({ id: 'workflow.contradiction.subfolderTarget', defaultMessage: 'This project is inside a larger repository: name the branch its work merges into.', description: 'Why workflow options cannot be saved (OP-29): Combwork or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository).' }),
   noneHasNoSlots: msg({ id: 'workflow.contradiction.noneHasNoSlots', defaultMessage: 'Without version control, everyone works in the project folder.', description: 'Why workflow options cannot be saved: separate folders per card were set for a project with no version control.' }),
-  jjNeedsSlots: msg({ id: 'workflow.contradiction.jjNeedsSlots', defaultMessage: 'With jj, each card needs its own folder: agents sharing the project folder aren’t supported yet.', description: 'Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) was set to have everyone work in the project folder. Keep jj (the tool’s name).' })
 } satisfies Record<string, Msg>
 
 export type Contradiction = keyof typeof CONTRADICTIONS
@@ -436,7 +434,6 @@ export const CONTRADICTION_ROWS: Record<Contradiction, OptionKey[]> = {
   poolNeedsAgent: ['reviewerMode', 'review'],
   upToDateNeedsSlots: ['slotsUpToDate', 'folder'],
   noneHasNoSlots: ['folder'],
-  jjNeedsSlots: ['folder'],
   focusedNeedsRunner: ['focusedTests'],
   subfolderTarget: ['target', 'finish']
 }
@@ -464,13 +461,11 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
   if (o.reviewers === 2 && !reviewerAgent(o.review)) out.push('quorumNeedsAgent')
   if (reviewerModeOf(o) === 'pool' && !reviewerAgent(o.review)) out.push('poolNeedsAgent')
   // By the platform's descriptor (HI-2840, `finishes`): a finish it doesn't declare is a contradiction, worded as
-  // acceptance and merging not mixing (HI-2822). Separate folders need isolation, and a closed gate sharedFolder needs
-  // slots (jj).
+  // acceptance and merging not mixing (HI-2822). Separate folders need isolation.
   const merging = merges(o.platform)
   const finishes = PLATFORMS[o.platform].finishes
   if (!finishes.includes(o.finish)) out.push('combworkMergesNeedsGit')
   if (!hasCapability(o.platform, 'isolation') && o.folder !== 'project') out.push('noneHasNoSlots')
-  if (hasGate(o.platform, 'sharedFolder') && o.folder !== 'slots') out.push('jjNeedsSlots')
   if (merging) {
     if ((o.finish === 'combworkMerges' || o.finish === 'agentMerges') && o.folder !== 'slots') out.push('mergeNeedsSlots')
     if (o.finish === 'committed' && o.folder !== 'project') out.push('committedNeedsFolder')

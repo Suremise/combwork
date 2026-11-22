@@ -8,9 +8,6 @@
   "workflow.contradiction.focusedNeedsRunner": {
     "placeholders": {}
   },
-  "workflow.contradiction.jjNeedsSlots": {
-    "placeholders": {}
-  },
   "workflow.contradiction.mergeNeedsSlots": {
     "placeholders": {}
   },
@@ -952,17 +949,6 @@
       "folder": "plain"
     }
   },
-  "workflow.refused.platform.changed.message": {
-    "placeholders": {
-      "card": "plain",
-      "platform": "plain"
-    }
-  },
-  "workflow.refused.platform.changed.next": {
-    "placeholders": {
-      "platform": "plain"
-    }
-  },
   "workflow.refused.platform.detachedFolder.message": {
     "placeholders": {
       "card": "plain",
@@ -994,21 +980,6 @@
       "why": "select",
       "state": "select",
       "told": "plain"
-    }
-  },
-  "workflow.refused.platform.keptAcross.message": {
-    "placeholders": {
-      "card": "plain",
-      "slot": "plain",
-      "platform": "plain",
-      "now": "plain"
-    }
-  },
-  "workflow.refused.platform.keptAcross.next": {
-    "placeholders": {
-      "gone": "select",
-      "card": "plain",
-      "platform": "plain"
     }
   },
   "workflow.refused.platform.keptElsewhere.message": {
@@ -1105,14 +1076,6 @@
     "placeholders": {
       "unknown": "select"
     }
-  },
-  "workflow.refused.platform.switching.message": {
-    "placeholders": {
-      "card": "plain"
-    }
-  },
-  "workflow.refused.platform.switching.next": {
-    "placeholders": {}
   },
   "workflow.refused.platform.targetGone.message": {
     "placeholders": {
@@ -1239,14 +1202,6 @@
     }
   },
   "workflow.refused.start.notBlocked.next": {
-    "placeholders": {}
-  },
-  "workflow.refused.start.platformReady.message": {
-    "placeholders": {
-      "card": "plain"
-    }
-  },
-  "workflow.refused.start.platformReady.next": {
     "placeholders": {}
   },
   "workflow.refused.start.releaseUnknown.message": {
@@ -1525,9 +1480,6 @@
     "placeholders": {}
   },
   "workflow.rule.start.notBlocked": {
-    "placeholders": {}
-  },
-  "workflow.rule.start.platformReady": {
     "placeholders": {}
   },
   "workflow.rule.start.released": {

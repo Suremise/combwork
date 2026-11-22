@@ -2375,7 +2375,7 @@ export function startSlotCards(): void {
   }
   onAction('prepareSlot', (a, ws) => ask(a.card, ws))
   onAction('releaseSlot', (a, ws) => ask(a.card, ws))
-  setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused, standIn, keptAcross: async (ws, project, card) => (await poolFor(ws, project)).keptAcross(card), keptHere: async (ws, project, card) => (await poolFor(ws, project)).keptHere(card), held: (ws, project, lease, slot, folder, card) => slotHeldFor(ws, project, lease, slot, folder, card) })
+  setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused, standIn, keptHere: async (ws, project, card) => (await poolFor(ws, project)).keptHere(card), held: (ws, project, lease, slot, folder, card) => slotHeldFor(ws, project, lease, slot, folder, card) })
   // The pool's size: the project's builders (#1430's roles: builders and either), at least one (slots.ts).
   setBuilderCount(async (projectPath) => {
     const ws = workspaceFor(projectPath)

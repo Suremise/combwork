@@ -1,15 +1,14 @@
 // HI-3140: version control stays pluggable. Shared code and the window ask a platform's descriptor, its presentation
 // rows or its port, never its id; these pin that each answer is exactly what the id switches it replaced gave, for Git,
 // jj and None: the form's finish and folder choices, the agents' rule keys, the Version Control tab's fact line and its
-// caution, the Agent API's found text, the slot pool's reading of jj's refusals, and the descriptor's own new data.
+// the Agent API's found text, the slot pool's reading of jj's refusals, and the descriptor's own new data.
 import { describe, expect, it } from 'vitest'
 import { allRuleKeys, ownsWorkspaces, PLATFORMS, platformName, ruleKeyOf, type Detection, type PlatformId, type ProjectPlatform } from '../src/shared/platform/descriptors'
-import { detectedCaution, factOf, PLATFORM_VIEW } from '../src/shared/platform/presentation'
+import { factOf, PLATFORM_VIEW } from '../src/shared/platform/presentation'
 import { formFinishes, formFolders } from '../src/shared/workflow/options'
 import { platformRule, withPlatformRule } from '../src/shared/combworkGuidance'
 import { FOUND } from '../src/main/platform/agentPresentation'
 import { JJ_REFUSED, jjRefusal } from '../src/main/platform/jjWorkspacePort'
-import { STORE_SIDES, noStoreFor, leavingSides } from '../src/main/platform/storeSides'
 
 const IDS: PlatformId[] = ['git', 'jj', 'none']
 
@@ -31,8 +30,6 @@ const DETECTIONS: Detection[] = [
 function oldFact(p: ProjectPlatform): { id: string; values?: Record<string, string> } {
   const d = p.detected
   if (d.other) return { id: p.id === 'git' ? 'git.vc.fact.otherGit' : 'git.vc.fact.other', values: { vcs: d.other } }
-  if (d.platform === 'jj') return d.jj?.inGit ? { id: 'git.vc.fact.jjInGit', values: { root: d.root ?? '', git: d.jj.inGit } } : { id: 'git.vc.fact.jj', values: { root: d.root ?? '', colocated: d.jj?.colocated ? 'yes' : 'no' } }
-  if (p.id === 'jj') return { id: 'git.vc.fact.jjGone' }
   if (PLATFORMS[p.id].repository && d.platform !== p.id) return { id: 'git.vc.fact.gone' }
   if (d.platform === 'git' && d.root) return { id: d.subfolder ? 'git.vc.fact.subfolder' : 'git.vc.fact.repo', values: { root: d.root } }
   return { id: 'git.vc.fact.none' }
@@ -47,7 +44,6 @@ describe('HI-3140: the descriptor, presentation and port answers equal the id sw
     expect(formFinishes('jj')).toEqual(['notChecked'])
     expect(formFolders('git')).toEqual(['slots', 'project'])
     expect(formFolders('none')).toEqual(['slots', 'project'])
-    expect(formFolders('jj')).toEqual(['slots'])
   })
 
   it("gives the agents' rule keys as before: jj's two, in the guidance revision's order, by what detection found", () => {
@@ -79,20 +75,18 @@ describe('HI-3140: the descriptor, presentation and port answers equal the id sw
     expect(withPlatformRule('x', 'jj')).toBe(`x\n${platformRule('jj')}`)
   })
 
-  it("says the tab's fact line, and its caution, as before for every platform and detection", () => {
-    for (const id of IDS)
-      for (const d of DETECTIONS) {
+  it("says the tab's fact line as before for Git and None, and every detection of theirs (jj's went with HI-3484)", () => {
+    for (const id of ['git', 'none'] as const)
+      for (const d of DETECTIONS.filter((x) => x.platform !== 'jj')) {
         const p: ProjectPlatform = { id, capabilities: PLATFORMS[id].capabilities, detected: d }
         const f = factOf(p)
         const was = oldFact(p)
         expect({ id: f.m.id, values: f.values }, `${id} ${JSON.stringify(d)}`).toEqual({ id: was.id, values: was.values })
-        expect(detectedCaution(d), JSON.stringify(d)).toBe(d.platform === 'jj' && !!d.jj?.inGit)
       }
   })
 
   it("names the offer's button and the None · Git preview as before", () => {
     expect(PLATFORM_VIEW.git.switchTo.id).toBe('git.vc.offer.switchGit')
-    expect(PLATFORM_VIEW.jj.switchTo.id).toBe('git.vc.offer.switchJj')
     expect(PLATFORM_VIEW.none.switchTo.id).toBe('git.vc.offer.switchNone')
     // The preview moved between None and Git's page (`id !== 'jj'`), its tooltip on Git (`id === 'git'`).
     expect(IDS.filter((id) => PLATFORM_VIEW[id].previewable)).toEqual(['git', 'none'])
@@ -118,13 +112,5 @@ describe('HI-3140: the descriptor, presentation and port answers equal the id sw
     expect(IDS.filter((id) => ownsWorkspaces(id))).toEqual(['jj'])
     expect([ownsWorkspaces(null), ownsWorkspaces(undefined)]).toEqual([false, false])
     expect(IDS.filter((id) => PLATFORMS[id].detectionSteady)).toEqual(['jj'])
-  })
-
-  it("asks a store switch's sides as storeSwitch's id switches did", () => {
-    expect([noStoreFor('jj'), noStoreFor('git'), noStoreFor('none')]).toEqual(['noJj', 'noGit', 'noGit'])
-    expect(IDS.filter((id) => !!STORE_SIDES[id]?.arrive)).toEqual(['jj'])
-    expect(leavingSides()).toEqual([STORE_SIDES.jj])
-    // jj's gates refused whatever the repository: its descriptor's, less those a repository is assessed for.
-    expect(STORE_SIDES.jj!.arrive!.unsupported.every((g) => PLATFORMS.jj.gates.includes(g))).toBe(true)
   })
 })

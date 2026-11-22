@@ -253,12 +253,6 @@ export interface WorkspacePort {
   lineHead(repo: string, line: string): Promise<Maybe<string | null>>
   /** The repository's default target line (Git: main, else master). */
   defaultLine(repo: string): Promise<Maybe<string>>
-  /**
-   * HI-3129 (decision (a)): the lines a card or lane may name as its Merges into, read from the
-   * repository (jj: its local bookmarks, conflicted ones left out), for a platform whose targets are its repository's.
-   * Absent (Git): the project's configured Other branches are its list. Unknown when it can't be read.
-   */
-  targetLines?(repo: string): Promise<Maybe<string[]>>
   /** Whether a line exists (false also when the tool can't say: a 0.9 worktree's recreation chooses by it, as before). */
   lineExists(repo: string, line: string): Promise<boolean>
   /** The workspaces whose registrations a prune would drop (their folders gone), by where each was. */

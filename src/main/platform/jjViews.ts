@@ -6,7 +6,6 @@
 import { join, resolve } from 'path'
 import { readFileSync, statSync } from 'original-fs'
 import { jjOf } from '../vcsDetect'
-import { PLATFORMS } from '../../shared/platform/descriptors'
 import { isJjViewUnknown, JJ_CONFLICTS_MAX, JJ_DIFF_MAX, JJ_HISTORY_MAX, jjRevisionInput, type JjBookmarkRow, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjRepoView, type JjResolved, type JjRow, type JjView, type JjViewUnknown, type JjWorkspaceRow } from '../../shared/jjViews'
 import { jjContextOf, type JjContext } from './jjDetect'
 import { jjRunner, type JjRunner } from './jjRunner'
@@ -149,7 +148,7 @@ export async function jjRepoView(folder: string, runner: JjRunner = jjRunner): P
   const c = await contextOf(folder, runner)
   if (isJjViewUnknown(c)) return c
   const heads = readOpHeads(c.jjRepo)
-  const base = { root: c.root, store: c.store, colocated: c.colocated, linked: c.linked, tool: c.tool, gates: PLATFORMS.jj.gates }
+  const base = { root: c.root, store: c.store, colocated: c.colocated, linked: c.linked, tool: c.tool }
   if (!heads || heads.length !== 1) return { ...base, op: null, heads: heads?.length ?? 0, workspaces: { jjUnknown: 'heads', detail: heads ? `${heads.length}` : 'unreadable' } } // i18n-ignore: a protocol code
   const reads = readsOf(c, runner)
   const ws = await reads.pinned(async (op): Promise<JjMaybe<JjWorkspaceRow[]>> => {

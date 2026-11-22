@@ -4,7 +4,6 @@
 // apart everywhere (R3.1): a change id names a change across rewrites and can be divergent, so it never stands in for a
 // commit. Plain data, shared by main (platform/jjViews.ts) and the window (views/JjSections.tsx).
 
-import type { Gate } from './platform/descriptors'
 import type { JjTool } from './jjTool'
 
 /**
@@ -46,8 +45,6 @@ export interface JjRepoView {
   op: string | null
   heads: number
   workspaces: JjView<JjWorkspaceRow[]>
-  /** The gates jj's descriptor still lists (SPEC §16.3.6): each shown as not supported, with its reason. */
-  gates: readonly Gate[]
 }
 
 /** A commit as the views show it: its commit id and change id apart, and what jj says of it. */

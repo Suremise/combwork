@@ -5,7 +5,6 @@ interface CombworkMessageValues {
   'workflow.contradiction.combworkMergesNeedsGit': undefined
   'workflow.contradiction.committedNeedsFolder': undefined
   'workflow.contradiction.focusedNeedsRunner': undefined
-  'workflow.contradiction.jjNeedsSlots': undefined
   'workflow.contradiction.mergeNeedsSlots': undefined
   'workflow.contradiction.noneHasNoSlots': undefined
   'workflow.contradiction.okWithReview': undefined
@@ -14,8 +13,6 @@ interface CombworkMessageValues {
   'workflow.contradiction.selfReview': undefined
   'workflow.contradiction.subfolderTarget': undefined
   'workflow.contradiction.upToDateNeedsSlots': undefined
-  'workflow.earlierWork.message': { read: string; n: number; lines: string | number }
-  'workflow.earlierWork.title': { read: string; card: string | number; line: string | number }
   'workflow.forYou.churnLimit': { card: string | number; churn: number }
   'workflow.forYou.decidedAfterMerge': { card: string | number }
   'workflow.forYou.focusedSkip': { card: string | number; tests: string | number }
@@ -414,14 +411,10 @@ interface CombworkMessageValues {
   'workflow.refused.move.useIntent.next': { intent: string | number }
   'workflow.refused.paths.excluded.message': { card: string | number; path: string | number; folder: string | number }
   'workflow.refused.paths.excluded.next': { folder: string | number }
-  'workflow.refused.platform.changed.message': { card: string | number; platform: string | number }
-  'workflow.refused.platform.changed.next': { platform: string | number }
   'workflow.refused.platform.detachedFolder.message': { card: string | number; head: string | number }
   'workflow.refused.platform.detachedFolder.next': { has: string; branch: string | number }
   'workflow.refused.platform.jjRefused.message': { why: string; card: string | number; count: number; files: string | number; setting: string | number; base: string | number; commit: string | number; other: string | number; max: number; state: string }
   'workflow.refused.platform.jjRefused.next': { why: string; state: string; told: string | number }
-  'workflow.refused.platform.keptAcross.message': { card: string | number; slot: string | number; platform: string | number; now: string | number }
-  'workflow.refused.platform.keptAcross.next': { gone: string; card: string | number; platform: string | number }
   'workflow.refused.platform.keptElsewhere.message': { card: string | number; slot: string | number }
   'workflow.refused.platform.keptElsewhere.next': { slot: string | number; card: string | number }
   'workflow.refused.platform.keptLine.message': { card: string | number; kept: string | number; target: string | number }
@@ -436,8 +429,6 @@ interface CombworkMessageValues {
   'workflow.refused.platform.offLine.next': { where: string; lineArg: string | number; made: string; start: string | number; onArg: string | number }
   'workflow.refused.platform.slotLeft.message': { unknown: string; card: string | number; slot: string | number; folder: string | number }
   'workflow.refused.platform.slotLeft.next': { unknown: string }
-  'workflow.refused.platform.switching.message': { card: string | number }
-  'workflow.refused.platform.switching.next': undefined
   'workflow.refused.platform.targetGone.message': { card: string | number; target: string | number }
   'workflow.refused.platform.targetGone.next': undefined
   'workflow.refused.platform.unknown.message': { card: string | number; what: string | number; rule: string | number }
@@ -466,8 +457,6 @@ interface CombworkMessageValues {
   'workflow.refused.start.notBlocked.change': undefined
   'workflow.refused.start.notBlocked.message': { card: string | number; reason: string | number }
   'workflow.refused.start.notBlocked.next': undefined
-  'workflow.refused.start.platformReady.message': { card: string | number }
-  'workflow.refused.start.platformReady.next': undefined
   'workflow.refused.start.releaseUnknown.message': { target: string | number; what: string | number; card: string | number }
   'workflow.refused.start.releaseUnknown.next': undefined
   'workflow.refused.start.released.message': { card: string | number; target: string | number; dated: string; tag: string | number; date: Date | number; into: string | number }
@@ -534,7 +523,6 @@ interface CombworkMessageValues {
   'workflow.rule.review.notAuthor': undefined
   'workflow.rule.start.dependenciesIntegrated': undefined
   'workflow.rule.start.notBlocked': undefined
-  'workflow.rule.start.platformReady': undefined
   'workflow.rule.start.released': undefined
   'workflow.rule.start.slotAvailable': undefined
   'workflow.rule.submit.checksPassed': undefined
