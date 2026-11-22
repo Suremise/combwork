@@ -85,11 +85,12 @@ export async function listStashes(root: string): Promise<StashRow[]> {
   const changed = await git(root, ['stash', 'list', '-m', '--first-parent', '--no-renames', '--name-only', '--format=%x1e%H'])
   if (!changed.ok) throw refused(changed)
   const tracked = countsOf(changed.out)
-  // The untracked files each keeps (its third parent, a commit of them alone), in one call.
-  const thirds = rows.filter((s) => s.parents.length >= 3).map((s) => s.parents[2])
+  // The untracked files each keeps (its third parent, a commit of them alone), in one call. HI-3531: each commit once,
+  // given on git's stdin, never as arguments: hundreds of them pass what a Windows command line holds.
+  const thirds = [...new Set(rows.filter((s) => s.parents.length >= 3).map((s) => s.parents[2]))]
   let untracked = new Map<string, number>()
   if (thirds.length) {
-    const u = await git(root, ['log', '--no-walk=unsorted', '--root', '--no-renames', '--name-only', '--format=%x1e%H', ...thirds, '--'])
+    const u = await git(root, ['log', '--no-walk=unsorted', '--root', '--no-renames', '--name-only', '--format=%x1e%H', '--stdin', '--'], undefined, `${thirds.join('\n')}\n`)
     if (!u.ok) throw refused(u)
     untracked = countsOf(u.out)
   }
