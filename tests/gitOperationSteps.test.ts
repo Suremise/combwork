@@ -660,7 +660,7 @@ describe("another operation of the same kind at the same HEAD (HR1's round 2)", 
     const second = (await state())!
     // The same kind, HEAD, step and conflicted path: only the patch tells them apart.
     expect(sh(proj, 'rev-parse', 'HEAD')).toBe(head)
-    expect(second).toMatchObject({ what: 'am', step: first.step, conflicts: first.conflicts.map(({ stages: _, ...c }) => c) })
+    expect(second).toMatchObject({ what: 'am', step: first.step, conflicts: first.conflicts.map((c) => ({ path: c.path, mine: c.mine, theirs: c.theirs })) })
     expect(first.id).toBeTruthy()
     expect(second.id).not.toBe(first.id)
     const patchNow = readFileSync(join(gitDir(), 'rebase-apply', '0001'), 'utf8')
