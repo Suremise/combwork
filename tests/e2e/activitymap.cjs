@@ -154,15 +154,15 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check('…Escape clears it: the From the map row and its Details go', !!(await lib.until(async () => (await fromMap.count()) === 0 && (await details.count()) === 0 && (await listSel.count()) === 0, HUNG_MS, 250)), `${await fromMap.count()} ${await details.count()}`)
     await feed.locator('button.activity-map-feed-row', { hasText: 'Prompt' }).first().click()
     check("…the latest turn's prompt selects the list's own row, and From the map goes", !!(await lib.until(async () => (await fromMap.count()) === 0 && ((await listSel.getAttribute('data-key').catch(() => '')) ?? '').startsWith('turn:'), HUNG_MS, 250)), String(await listSel.getAttribute('data-key').catch(() => null)))
-    // HI-3507: a call shown from a station's panel. The first Escape closes the panel (its row's button goes with it), the
+    // HI-3507: a call shown from a station's panel. The first Escape closes the panel (its time's button goes with it), the
     // second still reaches the map and clears the call.
-    await station('shell').click()
-    const shellRow = panel('shell').locator('button.activity-map-panel-row').first()
-    check("a call in Shell's panel to show", !!(await lib.until(async () => (await shellRow.count()) === 1, HUNG_MS, 250)), await panel('shell').innerText().catch(() => ''))
-    await shellRow.click()
+    await station('read').click()
+    const readCall = panel('read').locator('button.activity-map-panel-time').first()
+    check("a call in Read's panel to show (a file's time)", !!(await lib.until(async () => (await readCall.count()) === 1, HUNG_MS, 250)), await panel('read').innerText().catch(() => ''))
+    await readCall.click()
     check('…a click shows it in the list, selected', !!(await lib.until(async () => (await listSel.count()) === 1, HUNG_MS, 250)))
     await page.keyboard.press('Escape')
-    check('…Escape closes the panel first, the call still shown', !!(await lib.until(async () => (await panel('shell').count()) === 0 && (await feed.count()) === 1, HUNG_MS, 250)) && (await listSel.count()) === 1, String(await page.evaluate(() => document.activeElement?.className ?? null)))
+    check('…Escape closes the panel first, the call still shown', !!(await lib.until(async () => (await panel('read').count()) === 0 && (await feed.count()) === 1, HUNG_MS, 250)) && (await listSel.count()) === 1, String(await page.evaluate(() => document.activeElement?.className ?? null)))
     await page.keyboard.press('Escape')
     check('…and Escape again, its button gone, clears the call', !!(await lib.until(async () => (await listSel.count()) === 0, HUNG_MS, 250)), String(await page.evaluate(() => document.activeElement?.className ?? null)))
     // Left open through Frozen and Hidden below: the panel reads and draws nothing of its own either.
