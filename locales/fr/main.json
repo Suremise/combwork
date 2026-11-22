@@ -370,6 +370,7 @@
   "main.slots.detachFailed.message": "{said, select, yes {Git indique : {error}} other {Git ne trouve pas {target}.}} Tant que ce n’est pas possible, Combwork ne prête pas {slot} à une autre carte. Corrige ce qui bloque dans {folder}, ou lance toi-même {command} là-bas : Combwork réessaie chaque fois qu’il examine ses slots, et prête de nouveau {slot} dès que cela fonctionne.",
   "main.slots.detachFailed.title": "Combwork ne peut pas ramener {slot} sur {target}",
   "main.slots.operation.message": "Combwork ne peut pas prêter {slot} à une autre carte tant que ce n’est pas terminé. Termine-le dans {folder}, ou arrête-le là avec {command}. Combwork ne l’arrête jamais lui-même, et prête de nouveau le slot dès que plus rien n’y est en cours.",
+  "main.slots.operation.open": "Ouvrir dans Modifications",
   "main.slots.operation.title": "{slot} a un git {what} inachevé",
   "main.storage.claimed": "Le dossier appartient de nouveau à une session.",
   "main.storage.launchInUse": "son agent appartient de nouveau au projet, ou démarre",

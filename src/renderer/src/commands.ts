@@ -19,7 +19,7 @@ import { requestStripMenu, type StripMenu } from './stripMenus'
 import { dismissAntivirusOffer, showAntivirus } from './components/Antivirus'
 import { focusTileAfter } from './components/AgentTiles'
 import type { VcSection } from '@shared/gitRepo'
-import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, tilesPageSize, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
+import { agentPage, assistantOnLeft, closeTile, showTilePage, tileFocusOf, tilePage, tilesPageSize, focusedAgentId, get, isAssistantPath, setAssistantSide, notify, openInSessionsTab, openChangesOf, openProjectSettings, openVersionControl, revealAgent, set, setActivity, setAssistantOpen, setProgressOpen, progressIsOpen, showAssistantView, showView, showUnusedWorktrees, setProjectTab, showAgent, showPage, panePageCount, shownLayout, toggleCompactSidebar, type ProjectTab } from './store'
 import { STRIP_TABS } from '@shared/projectTabs'
 import { commitIgnore, settleFolderChanges, showFolderChanges } from './folderChanges'
 import { cancelGitRun } from './gitRuns'
@@ -587,6 +587,13 @@ const COMMAND_DEFS: CommandDef[] = [
     category: 'project',
     internal: true,
     run: (projectPath?: unknown) => (typeof projectPath === 'string' ? showFolderChanges(projectPath) : undefined)
+  },
+  {
+    id: 'git.openOperation',
+    name: msg({ id: 'shell.command.git.openOperation', defaultMessage: 'Show Unfinished Git Operation', description: "HI-3470: a command, in the Project category. It isn't in the menus or the palette: the notice that a slot has an unfinished git operation runs it from its Open in Changes button (the slot in Version Control → Changes, with its panel)." }),
+    category: 'project',
+    internal: true,
+    run: (projectPath?: unknown, folder?: unknown) => (typeof projectPath === 'string' && typeof folder === 'string' ? openChangesOf(projectPath, { folder }) : undefined)
   },
   {
     id: 'files.commitIgnore',

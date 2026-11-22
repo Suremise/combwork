@@ -561,6 +561,7 @@
   "workflow.slots.off": "Off",
   "workflow.slots.on": "On",
   "workflow.slots.openAdvanced": "Open Advanced",
+  "workflow.slots.openOperation": "Open in Changes",
   "workflow.slots.operationHint": "Finish it in its folder, or end it there with {command}",
   "workflow.slots.operationState": "Unfinished git {what}",
   "workflow.slots.release": "Release…",

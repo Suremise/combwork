@@ -135,7 +135,8 @@ export function sweepSealsOf(root: string, o: { once?: boolean } = {}): void {
 /** HI-3465: the notice, told once, of a git operation left under way in a free slot. */
 const OPERATION = {
   title: msg({ id: 'main.slots.operation.title', defaultMessage: '{slot} has an unfinished git {what}', description: "HI-3465: a notice's title: a git operation was left under way in a slot (a worktree Combwork lends to cards), so Combwork can't lend it. {slot} is the slot's name; {what} is git's word for the operation (merge, rebase, am, cherry-pick, revert or bisect: keep it as it is)." }),
-  message: msg({ id: 'main.slots.operation.message', defaultMessage: "Combwork can't lend {slot} to another card until it's finished. Finish it in {folder}, or end it there with {command}. Combwork never ends it itself, and lends the slot again once nothing is under way in it.", description: "HI-3465: the notice's text below main.slots.operation.title. {slot} is the slot's name, {folder} its folder's path, {command} the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is)." })
+  message: msg({ id: 'main.slots.operation.message', defaultMessage: "Combwork can't lend {slot} to another card until it's finished. Finish it in {folder}, or end it there with {command}. Combwork never ends it itself, and lends the slot again once nothing is under way in it.", description: "HI-3465: the notice's text below main.slots.operation.title. {slot} is the slot's name, {folder} its folder's path, {command} the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is)." }),
+  open: msg({ id: 'main.slots.operation.open', defaultMessage: 'Open in Changes', description: "HI-3470: the notice's button (main.slots.operation.title): shows the slot in Version Control → Changes, whose panel continues or aborts the operation. Changes is the section's name: keep it as it is named there." })
 }
 
 /**
@@ -350,7 +351,7 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
           return
         }
         const values = { slot, what, folder, command: gitOperationEnd(what) ?? what }
-        tell({ kind: 'warning', level: 'warning', title: tr(OPERATION.title, values), message: tr(OPERATION.message, values), apiTitle: OPERATION.title.defaultMessage, projectPath, id: `slot-operation:${projectPath}:${slot}` })
+        tell({ kind: 'warning', level: 'warning', title: tr(OPERATION.title, values), message: tr(OPERATION.message, values), apiTitle: OPERATION.title.defaultMessage, projectPath, id: `slot-operation:${projectPath}:${slot}`, actions: [{ label: tr(OPERATION.open), command: 'git.openOperation', args: [projectPath, folder] }] })
       },
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
       renamer: renamerFor(ws, projectPath)

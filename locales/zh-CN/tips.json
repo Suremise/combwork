@@ -569,6 +569,8 @@
   "tips.ui.tryIt": "试一试",
   "tips.unexpectedClose.text": "如果 Combwork 未经退出就被结束（崩溃或被其他程序关闭），下次启动时会说明它最后一次运行的时间以及哪些智能体正在运行，并提供“全部恢复”。“设置”→“会话”→“意外关闭后恢复智能体”会自动恢复它们。",
   "tips.unexpectedClose.title": "了解 Combwork 何时意外关闭",
+  "tips.unfinishedGitOperation.text": "当文件夹停在合并、变基、拣选、还原或二分查找的中途时，版本控制 → 更改会显示一个面板：继续、跳过或中止它，并用“用我的”“用他们的”或“标记为已解决”处理每个有冲突的文件。",
+  "tips.unfinishedGitOperation.title": "完成做到一半的 git 合并或变基",
   "tips.unmerged.text": "智能体的标签页会显示尚未合并的提交数，它的 ⋯ 菜单中的“合并…”会说明还剩什么，“版本控制”→“更改”会显示智能体自建立分支以来更改的所有内容。",
   "tips.unmerged.title": "查看工作树智能体有哪些待合并",
   "tips.unusedWorktrees.text": "删除了智能体但保留了它的工作树？“版本控制”→“更改”会打开未被任何智能体使用的工作树，并注明各自由谁创建：打开一个查看并合并其工作，或连同分支删除已合并的工作树。",

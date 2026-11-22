@@ -569,6 +569,8 @@
   "tips.ui.tryIt": "Probar",
   "tips.unexpectedClose.text": "Si Combwork terminó sin salir (un fallo, o algo lo cerró), el siguiente inicio dice cuándo se vio por última vez y qué agentes estaban en ejecución, con Reanudar todos. Configuración → Sesiones → Reanudar los agentes tras un cierre inesperado los reanuda por sí solo.",
   "tips.unexpectedClose.title": "Entérate de cuándo Combwork se cerró inesperadamente",
+  "tips.unfinishedGitOperation.text": "Cuando una carpeta queda en medio de una fusión, un rebase, un cherry-pick, un revert o un bisect, Control de versiones → Cambios muestra un panel: continúa, omite o cancela, y resuelve cada archivo en conflicto con Usar la mía, Usar la suya o Marcar resuelto.",
+  "tips.unfinishedGitOperation.title": "Termina una fusión o un rebase de git a medias",
   "tips.unmerged.text": "La pestaña del agente muestra cuántos commits faltan por fusionar, Fusionar… en su menú ⋯ dice lo que queda, y Control de versiones → Cambios muestra todo lo que cambió el agente desde que creó su rama.",
   "tips.unmerged.title": "Mira lo que un agente con worktree tiene por fusionar",
   "tips.unusedWorktrees.text": "¿Quitaste un agente pero conservaste su worktree? Control de versiones → Cambios se abre con los worktrees que no usa ningún agente, diciendo quién hizo cada uno: abre uno para ver su trabajo y fusionarlo, o quita los fusionados con sus ramas.",

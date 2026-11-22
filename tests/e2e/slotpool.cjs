@@ -7,9 +7,12 @@
 // - HI-3464: with one builder, slot-a's folder deleted and a folder with a file made in its place: the next lend gets a
 //   new slot, slot-a stays gone with Remove… in Slots and copies, which forgets it and leaves the folder as it is.
 // - HI-3465: that slot released with a revert left under way (nothing uncommitted, git's sequencer left): told once,
-//   shown in Slots and copies with `git revert --abort`, not lent; ended there, it is lent again.
+//   shown in Slots and copies with `git revert --abort`, not lent; HI-3470: Open in Changes shows its panel, whose
+//   Abort (confirmed) ends it, and it is lent again.
 // - HI-3467: then released on its card's line with a stale index.lock: git refuses each detach; told once with git's
 //   error and `git switch --detach`, shown in Slots and copies, not lent; the lock gone, it is lent again.
+// - HI-3470: a merge left in conflict in the project folder (two files): Branches & remotes' banner opens Changes,
+//   whose panel lists both with their buttons (Continue waiting); Use theirs settles one; Abort, confirmed, ends it.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (no agent is started).
 // Dev build only (#1578): its slots are lent and released through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
@@ -27,6 +30,13 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
+/** HI-3470 (HR1's round 2): every notification dismissed by its own close button, so a screenshot shows what is under it. */
+const clearPopups = async (page) => !!(await until(async () => {
+  const close = page.locator('.popup-close')
+  if ((await close.count()) === 0) return true
+  await close.first().click().catch(() => undefined)
+  return false
+}, HUNG_MS))
 
 ;(async () => {
   q.prepare(fx)
@@ -159,7 +169,18 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const opRow = form.locator('.workflow-slots-table tr[data-slot="slot-b"]')
     check('Slots and copies shows slot-b as an unfinished git revert, with the command that ends it', !!(await until(async () => (await opRow.locator('[data-operation="revert"]').count()) === 1, HUNG_MS)) && /Unfinished git revert/.test(await opRow.innerText()) && (await opRow.innerText()).includes('git revert --abort'), await opRow.innerText().catch(() => ''))
     await opRow.screenshot({ path: path.join(fx.shots, 'slotpool-4-operation.png') })
-    g(['revert', '--abort'])
+    // HI-3470: ended from the window: Open in Changes shows slot-b with the panel, whose Abort (confirmed) runs git's.
+    await opRow.locator('[data-action="open-operation"]').click()
+    const opPanel = page.locator('.operation-panel[data-operation="revert"]')
+    check("HI-3470: Open in Changes shows slot-b's panel, its unfinished revert with Continue, Skip and Abort", !!(await until(async () => (await opPanel.count()) === 1, HUNG_MS)) && /Unfinished git revert in slot-b/.test(await opPanel.innerText()) && (await opPanel.locator('[data-step]').count()) === 3, await opPanel.innerText().catch(() => ''))
+    check('…its notifications dismissed for the screenshot', await clearPopups(page))
+    await opPanel.screenshot({ path: path.join(fx.shots, 'slotpool-4b-operation-panel.png') })
+    await opPanel.locator('[data-step="abort"]').click()
+    const abortAsk = page.locator('.dialog', { hasText: 'Abort the git revert in slot-b?' })
+    await abortAsk.waitFor({ timeout: HUNG_MS })
+    await abortAsk.getByRole('button', { name: 'Abort', exact: true }).click()
+    const gitDirB = g(['rev-parse', '--absolute-git-dir']).trim()
+    check('…Abort ends it: the sequencer gone, the panel gone', !!(await until(async () => !fs.existsSync(path.join(gitDirB, 'sequencer')) && (await opPanel.count()) === 0, HUNG_MS)), await page.locator('.toast').allInnerTexts().then((t) => t.join(' | ')).catch(() => ''))
     // A lend refused `busy` while a process is still in the folder (git's own background maintenance after the abort, a
     // process listing not yet caught up): asked again until it isn't, bounded; any other answer is the check's.
     const lendQuiet = async (card) => {
@@ -195,6 +216,46 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     fs.rmSync(lock)
     const unlocked = await lendQuiet(107)
     check('the lock gone, slot-b is detached at its next look and lent again, nothing shown', unlocked.ok && unlocked.slot.name === 'slot-b' && !(await slot('slot-b'))?.operation, JSON.stringify(unlocked))
+
+    // --- HI-3470 (HR1's round 1): a merge left in conflict in the project folder, two files. Branches & remotes' banner
+    // opens Changes with the panel listing both with their buttons; Use theirs settles one; Abort (confirmed) ends it.
+    const ga = (args, ok = true) => {
+      try {
+        return lib.git(fx.alpha, ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args])
+      } catch (e) {
+        if (ok) throw e
+        return null
+      }
+    }
+    const edit = (text, message) => {
+      for (const f of ['c1.txt', 'c2.txt']) fs.writeFileSync(path.join(fx.alpha, f), `${text}\n`)
+      ga(['add', 'c1.txt', 'c2.txt'])
+      ga(['commit', '-qm', message])
+    }
+    const mainHead = ga(['rev-parse', 'HEAD']).trim()
+    ga(['switch', '-q', '-c', 'hi3470-side'])
+    edit('side', 'side edits')
+    ga(['switch', '-q', 'main'])
+    edit('main', 'main edits')
+    ga(['merge', '--no-edit', 'hi3470-side'], false)
+    const gitDirA = ga(['rev-parse', '--absolute-git-dir']).trim()
+    check('HI-3470: the project folder is mid-merge with two files in conflict', fs.existsSync(path.join(gitDirA, 'MERGE_HEAD')) && ga(['ls-files', '-u']).trim().split('\n').length === 4)
+    await page.locator('.git-sections [data-section="branches"]').click()
+    const banner = page.locator('.banner[data-git-state="merge"]')
+    check("…Branches & remotes' banner says so, with Open in Changes", !!(await until(async () => (await banner.count()) === 1, HUNG_MS)), await banner.innerText().catch(() => ''))
+    await banner.locator('[data-action="open-operation"]').click()
+    const mergePanel = page.locator('.operation-panel[data-operation="merge"]')
+    const conflictRows = mergePanel.locator('[data-conflict]')
+    check('…the panel lists both files, each with Open, Use mine, Use theirs and Mark resolved; Continue waits for them', !!(await until(async () => (await conflictRows.count()) === 2, HUNG_MS)) && /Unfinished git merge in the project folder/.test(await mergePanel.innerText()) && (await mergePanel.locator('[data-conflict="c1.txt"] [data-pick]').count()) === 4 && (await mergePanel.locator('[data-step="continue"]').isDisabled()), await mergePanel.innerText().catch(() => ''))
+    check('…its notifications dismissed for the screenshot', await clearPopups(page))
+    await mergePanel.screenshot({ path: path.join(fx.shots, 'slotpool-6-conflicts.png') })
+    await mergePanel.locator('[data-conflict="c1.txt"] [data-pick="theirs"]').click()
+    check("…Use theirs settles c1.txt with the side branch's version", !!(await until(async () => (await conflictRows.count()) === 1, HUNG_MS)) && fs.readFileSync(path.join(fx.alpha, 'c1.txt'), 'utf8') === 'side\n', await mergePanel.innerText().catch(() => ''))
+    await mergePanel.locator('[data-step="abort"]').click()
+    const mergeAsk = page.locator('.dialog', { hasText: 'Abort the git merge in the project folder?' })
+    await mergeAsk.waitFor({ timeout: HUNG_MS })
+    await mergeAsk.getByRole('button', { name: 'Abort', exact: true }).click()
+    check('…Abort ends the merge: the folder back at main, the panel gone', !!(await until(async () => !fs.existsSync(path.join(gitDirA, 'MERGE_HEAD')) && (await mergePanel.count()) === 0, HUNG_MS)) && ga(['rev-parse', 'HEAD']).trim() !== mainHead && ga(['status', '--porcelain']).trim() === '' && fs.readFileSync(path.join(fx.alpha, 'c1.txt'), 'utf8') === 'main\n', ga(['status', '--porcelain']))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

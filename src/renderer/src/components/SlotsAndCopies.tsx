@@ -8,7 +8,7 @@ import { DETACH_FAILED, gitDetachCommand, gitOperationEnd } from '@shared/gitOpe
 import * as actions from '../actions'
 import { call } from '../api'
 import { useAdvancedValue } from '../advanced'
-import { cardLabelOf, confirm, notify, openVersionControl, set as setStore, setActivity, useStore } from '../store'
+import { cardLabelOf, confirm, notify, openChangesOf, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { NumberField } from './NumberField'
 import { Icon, Switch } from './ui'
 import { ORIGIN_TEXT } from '../workflowOrigins'
@@ -54,6 +54,7 @@ const T = {
   operationState: msg({ id: 'workflow.slots.operationState', defaultMessage: 'Unfinished git {what}', description: "HI-3465: a slot's state in the list under “Slots and copies”, in place of its usual state: a git operation was left under way in its folder, so Combwork doesn't lend it. {what} is git's word for it (merge, rebase, am, cherry-pick, revert or bisect: keep it as it is)." }),
   detachFailedState: msg({ id: 'workflow.slots.detachFailedState', defaultMessage: "Can't be moved back to {target}", description: "HI-3467: a slot's state in the list under “Slots and copies”, in place of its usual state: Combwork tried more than once to put this free slot back at the head of its target branch {target} for its next card, and git refused, so it isn't lent." }),
   detachFailedHint: msg({ id: 'workflow.slots.detachFailedHint', defaultMessage: '{said, select, yes {Git said: {error}} other {Git can’t find {target}.}} Put right what’s in the way in its folder, or run {command} there', description: "HI-3467: beside workflow.slots.detachFailedState: why, and how to free the slot. {error} is git's own error line, in English (keep it as it is); said: yes when git gave one, else no (the branch {target} isn't there): keep the select keys. {command} is the git command that does it by hand (git switch --detach main: keep it as it is). Combwork tries again whenever it looks at its slots." }),
+  openOperation: msg({ id: 'workflow.slots.openOperation', defaultMessage: 'Open in Changes', description: "HI-3470: a button beside a slot's workflow.slots.operationState: shows the slot in Version Control → Changes, whose panel continues or aborts the operation. Changes is the section's name: keep it as it is named there." }),
   operationHint: msg({ id: 'workflow.slots.operationHint', defaultMessage: 'Finish it in its folder, or end it there with {command}', description: "HI-3465: beside workflow.slots.operationState: how to free the slot. {command} is the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is). Combwork never runs it itself." }),
   removeGoneMessage: msg({ id: 'workflow.slots.removeGoneMessage', defaultMessage: 'Its folder is missing, or isn’t a worktree any more, so it can’t be lent. Combwork forgets {slot} and makes a new slot when a card needs one. Nothing is deleted: anything left at its folder stays as it is.', description: 'HI-3464: the confirmation before removing a Git slot no card holds whose folder is missing, or there but not a worktree git lists (made by hand, say). Combwork forgets the slot; a folder at its place is left untouched, never deleted or moved to the Recycle Bin. {slot} is the slot’s name.' }),
   removedGone: msg({ id: 'workflow.slots.removedKept', defaultMessage: '{slot} is removed.', description: 'HI-3464: a notice after a free slot whose folder was missing or wasn’t a worktree any more was removed. {slot} is its name.' }),
@@ -251,6 +252,11 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                         </td>
                         <td>{lentText(s, agentName, card) ?? ''}</td>
                         <td>
+                          {s.operation && s.operation.what !== DETACH_FAILED && (
+                            <button className="btn subtle small" data-action="open-operation" onClick={() => openChangesOf(project.path, { folder: s.folder })}>
+                              {tr(T.openOperation)}
+                            </button>
+                          )}
                           {s.goneFree && (
                             <button className="btn subtle small" data-action="remove-gone" onClick={() => void removeGoneSlot(project.path, s, reload)}>
                               {tr(T.removeGone)}

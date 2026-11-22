@@ -1006,6 +1006,18 @@ export class SlotStore {
   }
 
   /**
+   * HI-3470: the slot held for the user's step on a git operation left in it (Changes' panel): a warm-kind operation with
+   * no lease, taken only while no operation, job or writer holds it, at `folder`, and its open lease (if any) is `lease`
+   * (null: none open). Whether it was.
+   */
+  async holdForUser(name: string, folder: string, lease: string | null, token: string, holder: Holder): Promise<boolean> {
+    const leased = 'EXISTS (SELECT 1 FROM slot_leases l WHERE l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL' // agent-protocol: SQL
+    const leaseIs = lease === null ? `NOT ${leased})` : `${leased} AND l.id = ?) AND NOT ${leased} AND l.id <> ?)` // agent-protocol: SQL
+    const args = lease === null ? [] : [lease, lease]
+    return this.conn.write((db) => Number(db.prepare(`UPDATE slots SET op = ?, op_kind = 'warm', op_lease = NULL, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND folder = ? AND op IS NULL AND job IS NULL AND writer_run IS NULL AND ${leaseIs}`).run(token, holder.pid, holder.started, this.project, name, folder, ...args).changes) === 1)
+  }
+
+  /**
    * A slot's folder moved by Repair (#1447): its row follows it (`folder`), only while no operation or job holds it. With
    * `gone` (a free slot whose folder wasn't found): marked gone at its place in the moved pool, so its next lease makes
    * it again there, only while it is free. Whether it was.
@@ -2854,6 +2866,37 @@ export class SlotPool {
     if (kept) return { ok: false, why: 'kept', kept }
     log.info(`Forgot slot ${userText(name)}, its folder gone or not a worktree: anything at ${userText(seen.folder)} left as it is`)
     return { ok: true }
+  }
+
+  /**
+   * HI-3470: runs the user's step on a git operation left in slot `name` (Changes' panel) while the pool holds the slot
+   * for it, so no lend, settle or removal takes it meanwhile: only while it is at `folder`, nothing else holds it (an
+   * operation, a job, a run's writer), its open lease is `lease` (null: free), no session is in it, and no process (the
+   * quiet check, as a removal's). Then the slot is looked at again (a free one, nothing under way any more: lent again).
+   * Refused with why, `fn` not run: `changed` (any of those but a session or a process), `session`, `process`.
+   * HR1's round 1: the hold's release and that look run inside the tracked operation, failures included, so its token is
+   * live (no refresh takes the hold for an abandoned one) and a close waits for them.
+   */
+  async forUser<T>(name: string, folder: string, lease: string | null, fn: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; why: 'changed' | 'session' | 'process' }> {
+    if (this.closed) return { ok: false, why: 'changed' }
+    const token = newToken()
+    return this.op(token, async () => {
+      const holder = await this.deps.holder.self()
+      if (this.closed || !(await this.store.holdForUser(name, folder, lease, token, holder))) return { ok: false as const, why: 'changed' as const }
+      try {
+        if (this.deps.sessionIn?.(folder)) return { ok: false as const, why: 'session' as const }
+        if (!(await quiet(folder, this.quietTarget(name)))) return { ok: false as const, why: 'process' as const }
+        return { ok: true as const, value: await fn() }
+      } finally {
+        await this.store
+          .fenced(name, token, (db, s) => this.store.setIn(db, name, s.state, {}, { op: null }))
+          .catch((e) => {
+            if (!(e instanceof OpLost)) throw e
+          })
+        // Awaited: the panel's next read, and a start right after, find the slot as this look leaves it.
+        if (!this.closed) await this.refresh().catch((e) => log.warn(`Slot ${userText(name)} wasn't looked at after the user's git step: ${userText(e instanceof Error ? e.message : String(e))}`))
+      }
+    })
   }
 
   /** The guards a removal checks, in order; null when nothing holds the slot. `probe`: also prove no process holds it. */

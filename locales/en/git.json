@@ -95,6 +95,10 @@
     "defaultMessage": "{n, plural, one {# commit not in {target}} other {# commits not in {target}}}",
     "description": "On a branch of the Not merged group in Version Control → Branches & remotes: how many of its commits aren't in the target branch {target}."
   },
+  "git.branches.openOperation": {
+    "defaultMessage": "Open in Changes",
+    "description": "HI-3470: a button in the banner git.branches.stateBanner: shows the project folder in Version Control → Changes, whose panel continues or aborts the operation. Changes is the section’s name: keep it as it is named there."
+  },
   "git.branches.reload": {
     "defaultMessage": "Read git again (doesn't fetch)",
     "description": "Tooltip on the refresh button in Git → Branches & remotes."
@@ -108,8 +112,8 @@
     "description": "Shown for a moment after copying a revision beside a branch (Version Control → Branches & remotes)."
   },
   "git.branches.stateBanner": {
-    "defaultMessage": "Git is {state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}} in the project folder. Finish or abort it in a terminal (or ask an agent to): Combwork doesn't.",
-    "description": "Banner in Git → Branches & remotes while git has an operation in progress."
+    "defaultMessage": "Git is {state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}} in the project folder. Continue or abort it in Changes, in a terminal, or ask an agent to.",
+    "description": "Banner in Git → Branches & remotes while git has an operation in progress. HI-3470: Changes (Version Control → Changes, its section’s name: keep it as named there) has a panel that continues or aborts it."
   },
   "git.branches.trackLocal": {
     "defaultMessage": "A local {branch} tracking {remote}, and switch to it",
@@ -646,6 +650,122 @@
   "git.newBranch.title": {
     "defaultMessage": "New branch",
     "description": "Title of the form that creates a branch."
+  },
+  "git.operation.abort": {
+    "defaultMessage": "Abort",
+    "description": "HI-3470: the panel's button: git ends the operation and puts the folder back as it was (git <op> --abort)."
+  },
+  "git.operation.abortMessage": {
+    "defaultMessage": "{what, select, rebase {The branch goes back to where it was before the rebase: the commits replayed so far and every conflict settled are dropped.} am {The branch goes back to where it was before the patches: those applied so far and every conflict settled are dropped.} bisect {Git checks out again the commit the bisect started from.} other {Git puts the folder back as it was before the {what} began: every conflict settled so far is dropped. Commits you made yourself since stay.}}",
+    "description": "HI-3470: what Abort loses, under git.operation.abortTitle. {what} is git's word for the operation (merge, cherry-pick, revert in other)."
+  },
+  "git.operation.abortTitle": {
+    "defaultMessage": "{what, select, bisect {End the bisect in {folder}?} other {Abort the git {what} in {folder}?}}",
+    "description": "HI-3470: the question before Abort (or End bisect). {what} is git's word for the operation; {folder} a slot's name or git.operation.projectFolder."
+  },
+  "git.operation.at": {
+    "defaultMessage": "Stopped at {commit} {subject}",
+    "description": "HI-3470: under the panel's heading: the commit git stopped at ({commit}, a short commit id; {subject}, its first line), or for a merge the commit being merged."
+  },
+  "git.operation.conflicts": {
+    "defaultMessage": "In conflict ({count, number})",
+    "description": "HI-3470: the heading of the panel's list of conflicted files."
+  },
+  "git.operation.continue": {
+    "defaultMessage": "Continue",
+    "description": "HI-3470: the panel's button: git goes on with the operation (git <op> --continue), taking its prepared message."
+  },
+  "git.operation.done": {
+    "defaultMessage": "{step, select, continue {Git went on with the {what} in {folder}.} skip {Git skipped a commit of the {what} in {folder}.} other {{what, select, bisect {The bisect in {folder} is ended.} other {The git {what} in {folder} is aborted.}}}}",
+    "description": "HI-3470: a notice after the panel's step worked. {what} is git's word for the operation; {folder} a slot's name or git.operation.projectFolder."
+  },
+  "git.operation.endBisect": {
+    "defaultMessage": "End bisect",
+    "description": "HI-3470: the panel's button for a bisect: git bisect reset (good and bad stay the user's, in a terminal)."
+  },
+  "git.operation.failed": {
+    "defaultMessage": "Git couldn't do that",
+    "description": "HI-3470: the title of the error notice when the panel's step or a conflicted file's button failed or was refused."
+  },
+  "git.operation.goOn": {
+    "defaultMessage": "Go On",
+    "description": "HI-3470: the button that confirms acting in a lent slot (git.operation.lentTitle)."
+  },
+  "git.operation.lentMessage": {
+    "defaultMessage": "Its builder, {agent}, finds the folder as you leave it. Act on its git {what} anyway?",
+    "description": "HI-3470: under git.operation.lentTitle. {agent} is the builder agent's name; {what} git's word for the operation."
+  },
+  "git.operation.lentTitle": {
+    "defaultMessage": "{slot} is lent to {card, select, none {lane {lane}} other {{card}}}",
+    "description": "HI-3470: the question before the panel acts in a slot lent to a card ({card}, its key) or a lane ({lane}, its name) whose builder isn't running. Glossary: slot, lane."
+  },
+  "git.operation.mine": {
+    "defaultMessage": "Use mine",
+    "description": "HI-3470: a conflicted file's button: takes the folder's own side of it (its tooltip says which that is)."
+  },
+  "git.operation.mineTip": {
+    "defaultMessage": "{swap, select, yes {Your side: the commit being applied (git calls it theirs here).} other {Your side: this folder's branch (git calls it ours).}} {has, select, yes {Takes its version of the file.} other {It deleted the file: deletes it.}} Runs {command}",
+    "description": "HI-3470: Use mine's tooltip. swap yes: a rebase, where git's names for the sides are swapped. has no: that side deleted the file. {command} is the git command, as it is."
+  },
+  "git.operation.open": {
+    "defaultMessage": "Open",
+    "description": "HI-3470: a conflicted file's button: opens it in the editor, to settle it by hand."
+  },
+  "git.operation.projectFolder": {
+    "defaultMessage": "the project folder",
+    "description": "HI-3470: {folder} in git.operation.title and the dialogs when the folder shown is the project folder."
+  },
+  "git.operation.readFailed": {
+    "defaultMessage": "Couldn't read the git operation under way: {error}",
+    "description": "HI-3470: the panel, when reading the operation failed. {error} is why."
+  },
+  "git.operation.resolved": {
+    "defaultMessage": "Mark resolved",
+    "description": "HI-3470: a conflicted file's button: marks it settled as it is now in the folder (after editing it by hand: git add)."
+  },
+  "git.operation.resolvedTip": {
+    "defaultMessage": "Marks the file settled as it is now, once you have edited it. Runs {command}",
+    "description": "HI-3470: Mark resolved's tooltip. {command} is the git command, as it is."
+  },
+  "git.operation.runs": {
+    "defaultMessage": "Runs {command}",
+    "description": "HI-3470: a tooltip on the panel's buttons: the git command it runs ({command}, as it is)."
+  },
+  "git.operation.skip": {
+    "defaultMessage": "Skip",
+    "description": "HI-3470: the panel's button: git drops the commit it stopped at and goes on (git <op> --skip)."
+  },
+  "git.operation.skipMessage": {
+    "defaultMessage": "Its changes are left out, with every conflict settled in it, and git goes on with the next one.",
+    "description": "HI-3470: what Skip loses, under git.operation.skipTitle."
+  },
+  "git.operation.skipTitle": {
+    "defaultMessage": "Skip {commit, select, none {this commit} other {{commit}}} of the git {what}?",
+    "description": "HI-3470: the question before Skip. {commit} is the short id of the commit git stopped at (none: not known); {what} is git's word for the operation."
+  },
+  "git.operation.step": {
+    "defaultMessage": "Step {at, number} of {of, number}",
+    "description": "HI-3470: under the panel's heading, for a rebase or an am: which commit of the list git stopped at."
+  },
+  "git.operation.theirs": {
+    "defaultMessage": "Use theirs",
+    "description": "HI-3470: a conflicted file's button: takes the other side of it."
+  },
+  "git.operation.theirsTip": {
+    "defaultMessage": "{swap, select, yes {The other side: the branch being rebased onto (git calls it ours here).} other {The other side: what is being merged, picked or reverted (git calls it theirs).}} {has, select, yes {Takes its version of the file.} other {It deleted the file: deletes it.}} Runs {command}",
+    "description": "HI-3470: Use theirs' tooltip, as git.operation.mineTip."
+  },
+  "git.operation.title": {
+    "defaultMessage": "Unfinished git {what} in {folder}",
+    "description": "HI-3470: the heading of the panel in Version Control → Changes when a git operation was left under way in the folder shown. {what} is git's word for it (merge, rebase, am, cherry-pick, revert, bisect: keep it as it is); {folder} is a slot's name or the project folder (git.operation.projectFolder)."
+  },
+  "git.operation.unreadable": {
+    "defaultMessage": "Combwork can't read where git stopped here, so it takes no step: finish it in a terminal.",
+    "description": "HI-3470 (a reviewer's round 2): under the panel's heading when git's files that say where the operation stopped can't be read; its buttons are greyed out."
+  },
+  "git.operation.unresolved": {
+    "defaultMessage": "{count, plural, one {# file is} other {# files are}} still in conflict: settle {count, plural, one {it} other {them}} first.",
+    "description": "HI-3470: why Continue is greyed out (its tooltip): files still in conflict."
   },
   "git.parentRepo": {
     "defaultMessage": "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Combwork changes only a project's own repository.",

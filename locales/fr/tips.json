@@ -569,6 +569,8 @@
   "tips.ui.tryIt": "Essayer",
   "tips.unexpectedClose.text": "Si Combwork a été arrêté sans qu’on le quitte (un plantage, ou quelque chose l’a fermé), le démarrage suivant dit quand il a été vu pour la dernière fois et quels agents tournaient, avec Tout reprendre. Paramètres → Sessions → Reprendre les agents après une fermeture inattendue les reprend tout seul.",
   "tips.unexpectedClose.title": "Savoir quand Combwork s’est fermé de façon inattendue",
+  "tips.unfinishedGitOperation.text": "Quand un dossier reste au milieu d’une fusion, d’un rebase, d’un cherry-pick, d’un revert ou d’un bisect, Gestion de versions → Modifications affiche un panneau : poursuis, saute ou annule, et règle chaque fichier en conflit avec Prendre la mienne, Prendre la leur ou Marquer comme réglé.",
+  "tips.unfinishedGitOperation.title": "Terminer une fusion ou un rebase git laissé à moitié",
   "tips.unmerged.text": "L’onglet de l’agent montre combien de commits ne sont pas encore fusionnés, Fusionner… dans son menu ⋯ dit ce qui reste, et Gestion de versions → Modifications montre tout ce que l’agent a changé depuis la création de sa branche.",
   "tips.unmerged.title": "Voir ce qu’un agent en worktree a à fusionner",
   "tips.unusedWorktrees.text": "Tu as retiré un agent mais gardé son worktree ? Gestion de versions → Modifications s’ouvre sur les worktrees qu’aucun agent n’utilise, en indiquant qui a créé chacun : ouvres-en un pour voir son travail et le fusionner, ou retire ceux qui sont fusionnés avec leurs branches.",

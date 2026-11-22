@@ -13,6 +13,7 @@ import type { CombworkChannel, CombworkRequests } from '../shared/api'
 import { REPO_OP_CHANNELS, type RepoOpChannel } from '../shared/repoOpChannels'
 import { branchStartArg } from '../shared/nextVersion'
 import { lineRepoOps } from './platform/repoOpsPorts'
+import { workspace } from './workspace'
 import type { OpsFor } from './platform/repoOps'
 
 /** The port for a channel's operation, refused (in the window's words) when its platform doesn't list it. */
@@ -52,5 +53,11 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   'files:gitUntrack': (p, items) => opsAt('files:gitUntrack').untrack(p, items),
   'files:gitInclude': (p, items) => opsAt('files:gitInclude').include(p, items),
   // HI-2944: Files' Commit it (queue:settleChanges is ipc.ts', with the queue's pause and resume).
-  'files:gitCommitIgnore': (p) => opsAt('files:gitCommitIgnore').commitIgnore(p)
+  'files:gitCommitIgnore': (p) => opsAt('files:gitCommitIgnore').commitIgnore(p),
+  // HI-3470: Changes' panel for an unfinished git operation: refused here first, then its folder's checks (operationPanel.ts).
+  'git:operationStep': async (root, req) => {
+    const ops = opsAt('git:operationStep')
+    const { stepOperation } = await import('./operationPanel')
+    return stepOperation(workspace, root, req, ops)
+  }
 }

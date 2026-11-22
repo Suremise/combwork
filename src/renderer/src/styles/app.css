@@ -1958,6 +1958,53 @@ textarea.input {
   background: rgba(242, 85, 90, 0.12);
   color: var(--error);
 }
+/* HI-3470: Changes' panel for an unfinished git operation, atop its right side: a column, a row a conflicted file. */
+.banner.operation-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 14px;
+}
+.operation-panel .operation-steps {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.operation-panel .operation-conflicts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--fg);
+}
+.operation-panel .operation-conflict {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.operation-panel .operation-conflict .label {
+  flex: 1;
+  min-width: 120px;
+}
+.operation-panel .operation-conflict .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.operation-panel .operation-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+/* A banner pushes its first button right (HI-2148): the panel's buttons stay in rows from the left. */
+.banner.operation-panel .btn {
+  margin-left: 0;
+}
+/* Many files in conflict scroll in the panel: it takes at most half the right side, the diff keeping the rest. */
+.banner.operation-panel {
+  max-height: 45%;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
 .banner.info {
   background: var(--accent-soft);
   color: var(--fg-strong);

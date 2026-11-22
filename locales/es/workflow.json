@@ -551,6 +551,7 @@
   "workflow.slots.off": "Desactivado",
   "workflow.slots.on": "Activado",
   "workflow.slots.openAdvanced": "Abrir Avanzado",
+  "workflow.slots.openOperation": "Abrir en Cambios",
   "workflow.slots.operationHint": "Termínalo en su carpeta, o detenlo allí con {command}",
   "workflow.slots.operationState": "git {what} sin terminar",
   "workflow.slots.release": "Liberar…",

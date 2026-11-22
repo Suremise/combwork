@@ -909,6 +909,92 @@ describe('HI-3465: a git operation left under way in a free slot', { timeout: ti
     expect(w.pool.operation('slot-a')).toBeNull()
   })
 
+  it("HI-3470: the user's step from Changes' panel runs while the pool holds the slot; lent again once it ends", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    revertLeft(r.slot.folder)
+    await w.pool.release(r.lease.id, 'done')
+    await w.pool.refresh()
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'revert' })
+    // A lease the user didn't confirm (the slot is free): refused, nothing run.
+    let ran = 0
+    expect(await w.pool.forUser('slot-a', r.slot.folder, 'lease-x', async () => ran++)).toEqual({ ok: false, why: 'changed' })
+    // A session in it: refused, nothing run, and the slot not held after.
+    w.set.sessions.set(r.slot.folder.toLowerCase(), 'a1')
+    expect(await w.pool.forUser('slot-a', r.slot.folder, null, async () => ran++)).toEqual({ ok: false, why: 'session' })
+    expect(w.store.slot('slot-a')?.op).toBeNull()
+    w.set.sessions.clear()
+    expect(ran).toBe(0)
+    // Held while it runs: no lend takes it meanwhile.
+    const during: unknown[] = []
+    const done = await w.pool.forUser('slot-a', r.slot.folder, null, async () => {
+      during.push(w.store.slot('slot-a')?.op?.kind, await w.pool.lend({ agent: 'a2', card: 2 }))
+      sh(r.slot.folder, 'revert', '--abort')
+      return 'ended'
+    })
+    expect(done).toEqual({ ok: true, value: 'ended' })
+    expect(during[0]).toBe('warm')
+    expect(during[1]).toMatchObject({ ok: false })
+    expect(w.store.slot('slot-a')?.op).toBeNull()
+    // Looked at again after it: nothing under way, its record gone, lent again.
+    const again = await lent(w, { agent: 'a2', card: 2 })
+    expect(again.slot.name).toBe('slot-a')
+    expect(w.pool.operation('slot-a')).toBeNull()
+  })
+
+  it("HI-3470 (HR1's round 1): the hold is released inside its tracked operation: a refresh meanwhile keeps it, and a close waits for it", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    revertLeft(r.slot.folder)
+    await w.pool.release(r.lease.id, 'done')
+    await w.pool.refresh()
+    // The hold's release write held back until the test lets it go.
+    const order: string[] = []
+    let letGo!: () => void
+    const gate = new Promise<void>((res) => (letGo = res))
+    let reached!: () => void
+    const atCleanup = new Promise<void>((res) => (reached = res))
+    let delay = false
+    const real = w.store.fenced.bind(w.store)
+    vi.spyOn(w.store, 'fenced').mockImplementation(async (n, t, fn) => {
+      if (delay) {
+        delay = false
+        reached()
+        await gate
+        const out = await real(n, t, fn)
+        order.push('released')
+        return out
+      }
+      return real(n, t, fn)
+    })
+    const step = w.pool.forUser('slot-a', r.slot.folder, null, async () => {
+      delay = true
+      return 'done'
+    })
+    await atCleanup
+    const held = w.store.slot('slot-a')?.op?.token
+    expect(held).toBeTruthy()
+    // A refresh while the release is queued: the hold's token is still live, so it isn't taken for an abandoned one.
+    await w.pool.refresh()
+    expect(w.store.slot('slot-a')?.op?.token).toBe(held)
+    const closing = w.pool.close().then(() => void order.push('closed'))
+    letGo()
+    expect(await step).toEqual({ ok: true, value: 'done' })
+    await closing
+    expect(order).toEqual(['released', 'closed'])
+    expect(w.store.slot('slot-a')?.op).toBeNull()
+  })
+
+  it("HI-3470: a lent slot's step runs only under the lease the user confirmed, and never while its run writes there", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    expect(await w.pool.forUser('slot-a', r.slot.folder, null, async () => 'x')).toEqual({ ok: false, why: 'changed' })
+    expect(await w.pool.forUser('slot-a', r.slot.folder, r.lease.id, async () => 'x')).toEqual({ ok: true, value: 'x' })
+    // Its lease kept, and the slot as it was.
+    expect(w.pool.openLease('slot-a')?.id).toBe(r.lease.id)
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
+  })
+
   it('each operation is named as git names it, read from the worktree’s own git dir', async () => {
     const w = world({ builders: 1 })
     const r = await lent(w, { agent: 'a1', card: 1 })

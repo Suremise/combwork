@@ -231,6 +231,10 @@
     "defaultMessage": "Cancel Git Action",
     "description": "HI-3372: a command, in the Project category. It isn't in the menus or the palette: a commit's, set aside's, fetch's, pull's or push's notification runs it from its Cancel button while that action runs."
   },
+  "shell.command.git.openOperation": {
+    "defaultMessage": "Show Unfinished Git Operation",
+    "description": "HI-3470: a command, in the Project category. It isn't in the menus or the palette: the notice that a slot has an unfinished git operation runs it from its Open in Changes button (the slot in Version Control → Changes, with its panel)."
+  },
   "shell.command.help.about": {
     "defaultMessage": "About {app}",
     "description": "A command (the Help menu, the command palette), in the Help category. {app} is Combwork's name."

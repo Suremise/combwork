@@ -551,6 +551,7 @@
   "workflow.slots.off": "Wyłączone",
   "workflow.slots.on": "Włączone",
   "workflow.slots.openAdvanced": "Otwórz Zaawansowane",
+  "workflow.slots.openOperation": "Otwórz w Zmianach",
   "workflow.slots.operationHint": "Dokończ to w jego folderze albo zakończ tam poleceniem {command}",
   "workflow.slots.operationState": "Niedokończone git {what}",
   "workflow.slots.release": "Zwolnij…",

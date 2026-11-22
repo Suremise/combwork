@@ -185,6 +185,7 @@ import type { AdvancedState, Text } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
+import type { OperationPanelState, OperationRequest } from './gitOperations'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1148,6 +1149,10 @@ export interface CombworkRequests {
   /** root is a project or one of its agents' worktrees. With base, lists everything changed since the branch left base. */
   'git:status': (root: string, base?: string) => GitStatus
   'git:diff': (root: string, file: string, base?: string) => GitDiff
+  /** HI-3470: the git operation left under way in a Changes root (a merge, a rebase…), its conflicted files and its slot's lease; null with none. */
+  'git:operation': (root: string) => OperationPanelState | null
+  /** HI-3470: the user's step on it (Continue, Skip, Abort) or a conflicted file settled; git's output. Refused while anything works in the folder. */
+  'git:operationStep': (root: string, req: OperationRequest) => string
   /** The Changes tab's branch comparison (HI-1824, read-only): what can be compared, two branches, one file of them. */
   'git:compareLines': (projectPath: string) => CompareLines
   /** The Changes tab's leftover branches (HI-1823): every local branch, uncut, with its worktree and commits not in the target. */

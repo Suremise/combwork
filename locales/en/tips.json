@@ -2383,6 +2383,14 @@
     "defaultMessage": "Know when Combwork closed unexpectedly",
     "description": "A tip's title."
   },
+  "tips.unfinishedGitOperation.text": {
+    "defaultMessage": "When a folder is left in the middle of a merge, rebase, cherry-pick, revert or bisect, Version Control → Changes shows a panel: Continue, Skip or Abort it, and settle each file in conflict with Use mine, Use theirs or Mark resolved.",
+    "description": "A tip (HI-3470). Names of Combwork's menus, views and buttons: keep them as Combwork shows them."
+  },
+  "tips.unfinishedGitOperation.title": {
+    "defaultMessage": "Finish a git merge or rebase left half done",
+    "description": "A tip's title (HI-3470)."
+  },
   "tips.unmerged.text": {
     "defaultMessage": "The agent's tab shows how many commits aren't merged yet, Merge… in its ⋯ menu says what is left, and Version Control → Changes shows everything the agent changed since it branched.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

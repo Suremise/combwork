@@ -10,10 +10,12 @@ import * as watch from '../../branchWatch'
 import * as merge from '../../branchMerge'
 import type { RepoReads } from '../repoReads'
 import { viewSigning } from './gitSigning'
+import { operationState } from './gitOperationSteps'
 
 export const gitRepoReads: RepoReads = {
   changes: (root, base) => G.gitStatus(root, base),
   changeDiff: (root, file, base) => G.gitDiff(root, file, base),
+  operation: (root) => operationState(root),
   summary: (root) => repo.repoSummary(root),
   workTarget: (projectPath) => repo.workTargetOf(projectPath),
   info: (root, workTarget) => repo.repoInfo(root, workTarget),
