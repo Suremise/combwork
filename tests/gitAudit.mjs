@@ -93,44 +93,52 @@ function hiddenLoader(n) {
 /** Whether a statement is exported (`export import X = …`, `export const …`): what it loads, it passes on. */
 const isExported =(n) => !!n.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
 
-/** The names a declaration binds (`a`, `{ a, b: c }`, `[d]`). */
-const namesIn = (n) => (ts.isIdentifier(n) ? [n.text] : ts.isObjectBindingPattern(n) || ts.isArrayBindingPattern(n) ? n.elements.flatMap((e) => (ts.isBindingElement(e) ? namesIn(e.name) : [])) : [])
-
-/**
- * The names an expression hands on as they are, not built from (HI-3522): `a`, `a.b`, `a['b']`, through parentheses,
- * `await`, a cast, either side of `? :` and of `??`, `||`, `&&`. `new A()`, `f(a)`, `[a]`, `{ k: a }` are built.
- */
-function passedNames(e) {
-  while (e && (ts.isParenthesizedExpression(e) || ts.isAwaitExpression(e) || ts.isAsExpression(e) || ts.isNonNullExpression(e) || ts.isSatisfiesExpression(e) || ts.isTypeAssertionExpression(e) || ts.isPropertyAccessExpression(e) || ts.isElementAccessExpression(e))) e = e.expression
-  if (!e) return []
-  if (ts.isIdentifier(e)) return [e.text]
-  if (ts.isConditionalExpression(e)) return [...passedNames(e.whenTrue), ...passedNames(e.whenFalse)]
-  const logical = [ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.AmpersandAmpersandToken]
-  return ts.isBinaryExpression(e) && logical.includes(e.operatorToken.kind) ? [...passedNames(e.left), ...passedNames(e.right)] : []
+/** Whether an identifier is a name read where it stands, not a member's, a key's or an import's own binding. */
+function isRead(n) {
+  const p = n.parent
+  if (ts.isImportSpecifier(p) || ts.isImportClause(p) || ts.isNamespaceImport(p)) return false
+  if ((ts.isPropertyAccessExpression(p) && p.name === n) || (ts.isQualifiedName(p) && p.right === n)) return false
+  if (ts.isExportSpecifier(p) && p.propertyName && p.name === n) return false
+  if (ts.isBindingElement(p) && p.propertyName === n) return false
+  return !NOT_A_LOAD.some((is) => is(p) && p.name === n)
 }
 
 /**
- * The modules a file exports as a static import bound them (HI-3522): a name an import binds, or a local holding one
- * as it is (`const a = none`), exported unbuilt: `export { a }`, `export { a as b }`, `export default a`, `export = a`,
- * `export const n = a`. A value built from it (`[new NoneAdapter()]`, `{ git: gitHistory }`) is not passed on.
+ * Where a registry may use a name a static import bound (HI-3522's allow-list, the registries' own uses): `new X(…)`,
+ * `X(…)` or `X.f(…)` called, a value in an object literal (`{ git: gitHistory }`, `{ gitHistory }`), and a function's
+ * result (`return x`, `(wf) => x`). A namespace's name only through a member (`new none.X()`), never alone.
  */
-function passedOn(sf, bound) {
+function builtFrom(e, isNamespace) {
+  if (isNamespace && !ts.isPropertyAccessExpression(e.parent)) return false
+  while (ts.isPropertyAccessExpression(e.parent) && e.parent.expression === e) e = e.parent
+  const p = e.parent
+  if ((ts.isNewExpression(p) || ts.isCallExpression(p)) && p.expression === e) return true
+  if ((ts.isPropertyAssignment(p) && p.initializer === e) || ts.isShorthandPropertyAssignment(p)) return true
+  return ts.isReturnStatement(p) || (ts.isArrowFunction(p) && p.body === e)
+}
+
+/**
+ * The modules whose bound names a file uses anywhere else (HI-3522): exported as they are (`export { a }`, `export
+ * default a`, `export = a`, `export const n = a`), held under another name (`const m = a`, `m = a`), in a type
+ * (`type T = a`), in an array, as an argument. The registries' allow-list: everything not built from is passed on.
+ */
+function usedUnbuilt(sf) {
+  const bound = new Map()
+  const namespaces = new Set()
+  for (const st of sf.statements) {
+    const c = ts.isImportDeclaration(st) && ts.isStringLiteral(st.moduleSpecifier) ? st.importClause : null
+    if (!c) continue
+    if (c.name) bound.set(c.name.text, st.moduleSpecifier.text)
+    const ns = c.namedBindings && ts.isNamespaceImport(c.namedBindings) ? c.namedBindings.name.text : null
+    if (ns !== null) namespaces.add(ns)
+    for (const name of ns !== null ? [ns] : (c.namedBindings?.elements ?? []).map((el) => el.name.text)) bound.set(name, st.moduleSpecifier.text)
+  }
   const out = new Set()
-  const mark = (names) => names.forEach((n) => bound.has(n) && out.add(bound.get(n)))
-  // Locals first, in order (a local is declared before it is read), so an `export { a }` above `const a` is seen.
-  for (const st of sf.statements) {
-    if (!ts.isVariableStatement(st)) continue
-    for (const d of st.declarationList.declarations) {
-      const from = passedNames(d.initializer).find((n) => bound.has(n))
-      if (from === undefined) continue
-      if (isExported(st)) out.add(bound.get(from))
-      else for (const n of namesIn(d.name)) bound.set(n, bound.get(from))
-    }
+  const visit = (n) => {
+    if (ts.isIdentifier(n) && bound.has(n.text) && isRead(n) && !builtFrom(n, namespaces.has(n.text))) out.add(bound.get(n.text))
+    ts.forEachChild(n, visit)
   }
-  for (const st of sf.statements) {
-    if (ts.isExportAssignment(st)) mark(passedNames(st.expression))
-    else if (ts.isExportDeclaration(st) && !st.moduleSpecifier && st.exportClause && ts.isNamedExports(st.exportClause)) mark(st.exportClause.elements.map((el) => (el.propertyName ?? el.name).text))
-  }
+  visit(sf)
   return [...out]
 }
 
@@ -631,27 +639,21 @@ export function platformFolders(root, over = {}) {
  * Every module a file names: imports, re-exports, dynamic imports and requires (repo paths, no extension); HIDDEN for a
  * computed one or a loader it can't follow (hiddenLoader). For the registries' allow-list (HI-3522): `loose`, those named
  * other than by a static `import … from` (a re-export, `import X = require(…)`, a dynamic import or require, an
- * `import('…')` type), and `passedOn`, those a static import bound that the file exports unbuilt.
+ * `import('…')` type), and `unbuilt`, those a static import bound whose names it uses but to build (usedUnbuilt).
  */
 function modulesNamed(root, file, text) {
   const out = new Set()
   const loose = new Set()
-  const bound = new Map()
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   const add = (spec, isLoose = true) => {
     const m = moduleNamed(root, file, spec)
     if (m !== null) out.add(m)
     if (m !== null && isLoose) loose.add(m)
-    return m
   }
   const visit = (n) => {
     if (hiddenLoader(n)) out.add(HIDDEN)
-    else if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) {
-      const m = add(n.moduleSpecifier.text, false)
-      const c = n.importClause
-      const names = !c ? [] : [...(c.name ? [c.name.text] : []), ...(!c.namedBindings ? [] : ts.isNamespaceImport(c.namedBindings) ? [c.namedBindings.name.text] : c.namedBindings.elements.map((el) => el.name.text))]
-      if (m !== null) for (const name of names) bound.set(name, m)
-    } else if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text)
+    else if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text, false)
+    else if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text)
     else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text)
     // A type's `import('./x').T`: a type taken from the folder is as much an import of it.
     else if (ts.isImportTypeNode(n) && ts.isLiteralTypeNode(n.argument) && ts.isStringLiteral(n.argument.literal)) add(n.argument.literal.text)
@@ -662,7 +664,7 @@ function modulesNamed(root, file, text) {
     ts.forEachChild(n, visit)
   }
   visit(sf)
-  return { modules: [...out], loose: [...loose], passedOn: passedOn(sf, bound) }
+  return { modules: [...out], loose: [...loose], unbuilt: usedUnbuilt(sf).map((spec) => moduleNamed(root, file, spec)).filter((m) => m !== null) }
 }
 
 /** sealBreaks' answers per file, by its text and the folders. */
@@ -673,8 +675,8 @@ const sealParsed = new Map()
  * computed specifier anywhere, inside the folders too, which could load one). A registry's reach is an allow-list
  * (HI-3522): it imports a folder's files only by a static `import … from` with a literal specifier, and exports only
  * values it builds from them (`[new NoneAdapter()]`). Any other way it names one is `<file> -> <module> (not a static
- * import)`, an export of a name such an import bound, unbuilt, `<file> -> <module> (re-exported)`, and a computed
- * specifier in it breaks the seal too. Empty when every folder is sealed.
+ * import)`, any use of a name such an import bound but those builtFrom allows `<file> -> <module> (passed on)`, and a
+ * computed specifier in it breaks the seal too. Empty when every folder is sealed.
  */
 export function sealBreaks(root, over = {}) {
   const folders = platformFolders(root, over)
@@ -692,7 +694,7 @@ export function sealBreaks(root, over = {}) {
     if (REGISTRIES.includes(f)) {
       if (kept.modules.includes(HIDDEN)) out.push(`${f} -> ${HIDDEN}`)
       for (const m of kept.loose) if (folderOf(m) !== null) out.push(`${f} -> ${m} (not a static import)`)
-      for (const m of kept.passedOn) if (folderOf(m) !== null) out.push(`${f} -> ${m} (re-exported)`)
+      for (const m of kept.unbuilt) if (folderOf(m) !== null) out.push(`${f} -> ${m} (passed on)`)
       continue
     }
     const own = folderOf(f)

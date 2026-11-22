@@ -143,9 +143,11 @@ describe('the Git/None cutover audit', () => {
 
   // HI-3522: a registry passed a platform's file on through a name it imported. The seal became an allow-list: a static
   // import with a literal specifier, and exports built from what it imports; every other reach breaks it.
-  it('allows a registry only static imports of a platform, and exports it builds from them', () => {
+  // Round 1: the export side was a list of passthrough shapes too; now a bound name is refused anywhere but where
+  // builtFrom allows it (new, a call, an object literal's value, a function's result).
+  it('allows a registry only static imports of a platform, and only builds from them', () => {
     const adapters = 'src/main/platform/adapters.ts'
-    const passed = ['src/main/platform/adapters -> src/main/platform/none/none (re-exported)']
+    const passed = ['src/main/platform/adapters -> src/main/platform/none/none (passed on)']
     const named = "import { NoneAdapter } from './none/none'"
     const whole = "import * as none from './none/none'"
     // `export default` and `export =` stand alone (a file holds one), so each replaces the registry's text.
@@ -161,13 +163,22 @@ describe('the Git/None cutover audit', () => {
       'export const destructured': `${whole}\nexport const { NoneAdapter } = none\n${text(adapters)}`,
       'export const chosen': `${named}\nexport const n = Math.random() ? NoneAdapter : null\n${text(adapters)}`,
       'a local alias exported': `${whole}\nexport { m }\nconst m = none\n${text(adapters)}`,
-      'a default import exported': `import none from './none/none'\nexport default none\n`
+      'a default import exported': `import none from './none/none'\nexport default none\n`,
+      'assigned to a let': `${whole}\nlet alias\nalias = none\nexport { alias }\n${text(adapters)}`,
+      'a comma expression': `${whole}\ndeclare function initialise(): void\nexport const alias = (initialise(), none)\n${text(adapters)}`,
+      'a type alias': `import type { NoneAdapter } from './none/none'\nexport type PlatformAlias = NoneAdapter\n${text(adapters)}`,
+      'a namespace member type': `${whole}\nexport type PlatformAlias = none.NoneAdapter\n${text(adapters)}`,
+      'in an array': `${named}\nexport const all = [NoneAdapter]\n${text(adapters)}`,
+      'as an argument': `${named}\nexport const kept = Object.freeze(NoneAdapter)\n${text(adapters)}`,
+      'a namespace in an object': `${whole}\nexport const ports = { none }\n${text(adapters)}`
     }
     for (const [form, body] of Object.entries(forms)) expect(sealBreaks(root, { [adapters]: body }), form).toEqual(passed)
     // `import NoneMod = require(…)` then `export { NoneMod }`: the ImportEquals alone breaks it.
     expect(sealBreaks(root, { [adapters]: `import NoneMod = require('./none/none')\nexport { NoneMod }\n${text(adapters)}` })).toEqual(['src/main/platform/adapters -> src/main/platform/none/none (not a static import)'])
-    // A value built from what it imports is what a registry is for; so is passing on a name from elsewhere.
+    // A value built from what it imports is what a registry is for (the tree's registries: new, an object literal's
+    // value, a function's result); so is passing on a name from elsewhere.
     for (const body of [
+      `${named}\nconst PORTS = { none: NoneAdapter }\nexport const portOf = () => PORTS.none\nexport function only() {\n  return NoneAdapter\n}\n${text(adapters)}`,
       `${named}\nexport const adapters = [new NoneAdapter()]\n${text(adapters)}`,
       `${whole}\nexport const ports = { none: none.NoneAdapter }\nexport const make = () => new none.NoneAdapter()\n${text(adapters)}`,
       `${whole}\nconst made = new none.NoneAdapter()\nexport { made }\n${text(adapters)}`,
