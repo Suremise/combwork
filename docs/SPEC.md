@@ -5959,7 +5959,9 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
     same as its message). The one put back goes to the top of the list (git can't put it back in its place); the row
     chosen is still listed, and a Pop's changes still applied. If git refuses to store it back, the error says it isn't
     listed and gives `git stash store <commit>`, which lists it again (git keeps its objects a while). Git's reply
-    naming no commit is taken as the drop asked, and logged.
+    naming no commit is taken as the drop asked, and logged. This is best effort, decided on the card (HI-3533, option
+    A): the stash chosen is never dropped in a race, and anything git drops instead is put back or named for recovery;
+    no stronger guarantee (an atomic drop by identity) is sought.
 - **A detach that keeps failing** (HI-3467): a clean free Git slot whose detach at its target fails for any other reason
   (an index lock, files in the way, git unable to read its head or the target's, the target's branch gone; not its
   card's own work, which keeps it) stays not ready, and the same record (`slot_operation:`, `what` `detach`) keeps git's
