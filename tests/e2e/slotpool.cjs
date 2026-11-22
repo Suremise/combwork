@@ -17,6 +17,8 @@
 //   mine, and the notice gives `git submodule update -- 'third party/lib'`.
 // - HI-3503: a rebase of two commits in conflict: Continue after step 1 stops at step 2, and the notice says git went
 //   on and stopped again, not that it couldn't.
+// - HI-3505: that rebase aborted, then a merge begun, both by git outside the window: Changes' panel goes, then shows,
+//   with no click.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (no agent is started).
 // Dev build only (#1578): its slots are lent and released through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
@@ -348,7 +350,21 @@ const clearPopups = async (page) => !!(await until(async () => {
       return true
     }, HUNG_MS))
     check('…Continue commits step 1 and stops at step 2: the notice says git went on and stopped again; the panel shows step 2', said && !!(await until(async () => /Step 2 of 2/.test(await rebasePanel.innerText().catch(() => '')), HUNG_MS)) && (await page.locator('.popup', { hasText: "Git couldn't do that" }).count()) === 0 && ga(['log', '-1', '--format=%s', 'HEAD']).trim() === 'topic one', againText)
+
+    // --- HI-3505: an operation ended and begun outside Combwork (a terminal: here the test's git, no click, no focus)
+    // leaves and shows Changes' panel by itself, as the status bar's git state does.
+    // Bounded below Changes' minute re-read, so it is the folder's live file events that show it.
+    const LIVE_MS = lib.timing('hang.ui')
+    let t0 = Date.now()
     ga(['rebase', '--abort'])
+    check('HI-3505: a rebase aborted in a terminal: Changes drops its panel by itself', !!(await until(async () => (await rebasePanel.count()) === 0, LIVE_MS)), `after ${Date.now() - t0} ms`)
+    console.log(`(HI-3505: the panel went ${Date.now() - t0} ms after the abort)`)
+    ga(['switch', '-q', 'main'])
+    t0 = Date.now()
+    ga(['merge', '--no-edit', 'hi3503-topic'], false)
+    check('…a merge begun in a terminal: Changes shows its panel by itself, with its files in conflict', !!(await until(async () => (await mergePanel.locator('[data-conflict]').count()) === 2, LIVE_MS)) && (await mergePanel.locator('[data-conflict="c3.txt"]').count()) === 1, `${Date.now() - t0} ms: ${await page.locator('.git-sections').innerText().catch(() => '')}`)
+    console.log(`(HI-3505: the panel showed ${Date.now() - t0} ms after the merge)`)
+    ga(['merge', '--abort'])
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
