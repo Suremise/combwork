@@ -6,12 +6,16 @@
 // Real git in throwaway repositories.
 import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join, resolve } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { timing } from './waits'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { combworkStash, stashRefOf, stashRequestOf, stashSubject, type StashRef } from '../src/shared/gitStashes'
+
+/** A git child's environment from the run context's allowlist, never the shell's (tests/README.md, Isolation). */
+const { gitEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
 
 const norm = (p: string): string => resolve(p).toLowerCase()
 /** What the queue counts as building in a folder: none unless a test says. */
@@ -117,10 +121,10 @@ describe('the list and Show', () => {
       stream += `commit refs/cw/s\nmark :${N + i}\n${who}data 2\ns\nfrom ${head}\nmerge ${head}\nmerge :${i}\n\n`
     }
     const marks = join(base, `marks-${n}.txt`)
-    execFileSync('git', ['fast-import', '--quiet', `--export-marks=${marks}`], { cwd: proj, input: stream })
+    execFileSync('git', ['fast-import', '--quiet', `--export-marks=${marks}`], { cwd: proj, env: gitEnv(), input: stream })
     const sha = new Map(readFileSync(marks, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => l.split(' ') as [string, string]))
     const tx = Array.from({ length: N }, (_, i) => `start\nupdate refs/stash ${sha.get(`:${N + i + 1}`)}\ncommit\n`).join('')
-    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', 'update-ref', '--stdin'], { cwd: proj, input: tx })
+    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', 'update-ref', '--stdin'], { cwd: proj, env: gitEnv(), input: tx })
     expect(stashes().length).toBe(N + 1)
     const rows = await list()
     expect(rows.length).toBe(N + 1)
