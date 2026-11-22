@@ -1075,6 +1075,9 @@
   "service.gitStash.invalid": {
     "placeholders": {}
   },
+  "service.gitStash.moved": {
+    "placeholders": {}
+  },
   "service.gitStash.notDropped": {
     "placeholders": {
       "why": "plain"
