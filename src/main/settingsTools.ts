@@ -2,7 +2,8 @@ import { basename } from 'path'
 import type { SettingsPatch } from '../shared/api'
 import type { EffortOption, FallbackModel, ModelPrice, ProjectConfig, ProviderId, SlotDefaults, WorkspaceConfig } from '../shared/types'
 import { modelCaps } from '../shared/models'
-import { merges } from '../shared/platform/descriptors'
+import { isPlatformId, merges } from '../shared/platform/descriptors'
+import { platformIdOf } from './platform/registry'
 import { advancedDef, advancedTakes } from '../shared/advanced'
 import { agentMsg, say } from '../shared/agentText'
 import { projectProviderConfig, providerSettings } from '../shared/providers'
@@ -300,7 +301,7 @@ export async function applySetting(
       workspace.mutateProjectConfig(projectPath, (cfg) => {
         old = settingValue(e, config.settings, cfg)
         guard?.(old)
-        const patch = change.project(cfg)
+        const patch = change.project(e.workflow ? workflowInForce(projectPath, cfg) : cfg)
         if (e.workflow) checkWorkflowPatch(projectPath, patch)
         return patch
       })
@@ -484,6 +485,17 @@ async function retargetNote(projectPath: string, from: string): Promise<string |
   const items = [...(p.laneMoves ?? []).map((l) => (l.card ? `${l.name ?? l.builder} (${l.card.key})` : (l.name ?? l.builder))), ...p.cards.move.map((c) => c.key), ...p.slots.move.map((s) => s.name)]
   if (!items.length) return null
   return say(T.retarget, { from, to, items: items.join(', '), preview: offerRetarget(projectPath, p), stay: String(p.cards.keep.length + p.slots.keep.length + p.lanes.length) })
+}
+
+/**
+ * HI-3510: a project's config as a workflow option's write reads it. One whose workflow names a platform Combwork no
+ * longer has (a former jj project's) writes the platform in force instead, from no options of its own: its saved ones
+ * are another platform's, which don't apply (rulesets.ts `ownOptions`).
+ */
+function workflowInForce(projectPath: string, cfg: ProjectConfig): ProjectConfig {
+  if (isPlatformId(cfg.workflow?.platform ?? cfg.platform)) return cfg
+  const platform = platformIdOf(projectPath, cfg.platform)
+  return cfg.workflow ? { ...cfg, workflow: { ...cfg.workflow, platform, preset: null, options: {} } } : { ...cfg, platform }
 }
 
 async function keptTargetsNote(projectPath: string, cfg: ProjectConfig): Promise<string | null> {

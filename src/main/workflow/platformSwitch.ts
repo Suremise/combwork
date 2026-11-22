@@ -81,22 +81,42 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
  * the caller's authority, checked again under the lock (the Assistant's Control). Nothing in flight changes. Returns the
  * platform it was and is now.
  */
-export async function setPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void } = {}): Promise<{ from: PlatformId; to: PlatformId }> {
+export async function setPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: SwitchOptions = {}): Promise<{ from: PlatformId; to: PlatformId }> {
   // In its turn among workflow writes (#1422): an options save or a level's check never interleaves with it.
   // Its repository's lock first (#1642 round 5): a switch moves what the project's branches are measured against.
   return withFolderRepoLocks([projectPath], () => workflowWrite(() => switchPlatform(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
 }
 
-async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void }): Promise<{ from: PlatformId; to: PlatformId }> {
+/**
+ * `expected`: the platform the window showed. `invalid` (HI-3510): the value project.json had when the window offered to
+ * replace it (a former jj project's `jj`): with the platform in force asked for, that value is written over, only while
+ * project.json still says it (checked under the lock, so a valid value set meanwhile is kept). `guard`: the caller's.
+ */
+type SwitchOptions = { expected?: unknown; invalid?: string; guard?: (current: PlatformId) => void }
+
+async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: SwitchOptions): Promise<{ from: PlatformId; to: PlatformId }> {
   const to = platformArg(raw)
   const expected = o.expected === undefined || o.expected === null ? null : platformArg(o.expected)
   const project = projectOf(ws, projectPath)
   let from: PlatformId = to
+  let replaced = false
+  let stale = false
   await ws.mutateProjectConfig(project.path, (cfg) => {
     const now = projectPlatform(project.path, cfg.platform)
     from = now.id
     if (expected && expected !== from) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[from] }, { kind: 'conflict' })
     o.guard?.(from)
+    // HI-3510: the notice's Use {platform} is only ever that: the platform in force written where project.json still names
+    // the value the notice was about. Anything else since (a valid value set, the folder now detected otherwise) leaves
+    // project.json as it is, never a switch (HR2's round 1).
+    if (o.invalid !== undefined) {
+      if (now.invalid !== o.invalid || from !== to) {
+        stale = true
+        return {}
+      }
+      replaced = true
+      return { platform: to, platformFound: foundKey(now.detected) }
+    }
     if (from === to) return {}
     const refused = switchRefused(to, now.detected)
     if (refused) {
@@ -108,7 +128,13 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
     // the folder shows now is kept, so the switch isn't offered back while it shows that (None for a Git folder).
     return { platform: to, platformFound: foundKey(now.detected), ...(cfg.workflow ? { workflow: setKept(cfg.workflow, to) } : {}) }
   })
-  if (from === to) return { from, to }
+  if (replaced) {
+    log.info(`${userText(basename(project.path))}'s project.json named no platform Combwork has: it says ${to} now`)
+    await ws.refresh().catch((e) => log.warn('refreshing after a platform setting was replaced', e))
+    workflowChanged(ws, project.path)
+  }
+  if (stale) log.info(`${userText(basename(project.path))}'s platform notice was answered after project.json changed: left as it is`)
+  if (from === to || stale) return { from, to: from }
   await afterSwitch(ws, project.path, from, to)
   return { from, to }
 }

@@ -422,6 +422,7 @@
   "service.workspace.platformRepositoryGone": "O repositório Git de {project} sumiu. As regras do Git continuam valendo, então os cartões dele não podem avançar até o repositório voltar ou você mudar o projeto para Nenhum na aba Controle de versão dele.",
   "service.workspace.platformSettled": "Resolvido: nada a mudar agora",
   "service.workspace.platformTitle": "O controle de versão mudou em {project}",
+  "service.workspace.platformUse": "Usar {platform}",
   "service.workspace.renameAgent": "Renomear o agente {agent} do projeto {project}…",
   "service.workspace.sharedNames": "Os nomes de agente agora são únicos em todo o espaço de trabalho, para que cada agente possa ser identificado. {shared}: eles continuam funcionando, mas renomeie um de cada, por exemplo, o agente {agent} do projeto {project} para {suggestion}.",
   "service.workspace.stillClosing": "{name} ainda está fechando: espere terminar e tente de novo.",

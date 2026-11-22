@@ -419,6 +419,8 @@ interface CombworkMessageValues {
   'workflow.refused.platform.noUpstream.next': { how: string; remote: string | number; target: string | number; publish: string | number; track1: string | number; track2: string | number }
   'workflow.refused.platform.offLine.message': { card: string | number; line: string | number; where: string; head: string | number; on: string | number }
   'workflow.refused.platform.offLine.next': { where: string; lineArg: string | number; made: string; start: string | number; onArg: string | number }
+  'workflow.refused.platform.removed.message': { card: string | number; platform: string | number }
+  'workflow.refused.platform.removed.next': { reader: string }
   'workflow.refused.platform.slotLeft.message': { unknown: string; card: string | number; slot: string | number; folder: string | number }
   'workflow.refused.platform.slotLeft.next': { unknown: string }
   'workflow.refused.platform.targetGone.message': { card: string | number; target: string | number }

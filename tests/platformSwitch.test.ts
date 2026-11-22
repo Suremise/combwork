@@ -351,3 +351,64 @@ describe('S20: the repository gone (#1419)', () => {
     expect(refusalLines('platform.unknown', { card: 'AM-1', what: 'the line', rule: 'start' }, english as never).next).toBe('Check Provider Setup or the folder, then try again.')
   })
 })
+
+// HI-3510: a project 1.6.0 left naming jj (its project.json's platform and workflow), opened without jj: None in force.
+describe('a project.json naming jj (HI-3510)', () => {
+  const jjWorkflow = { platform: 'jj', preset: 'pair', options: { finish: 'userIntegrates', folder: 'slots' } }
+  async function former(): Promise<{ w: WS; repo: string }> {
+    const made = await workspace({ platform: 'jj' as never, workflow: jjWorkflow })
+    mkdirSync(join(made.repo, '.jj'))
+    await made.w.refresh()
+    return made
+  }
+
+  it('the notice writes the platform in force over it, only while project.json still says it; its saved jj options stay unread', async () => {
+    const { w, repo } = await former()
+    expect(platformOf(w, repo)).toMatchObject({ id: 'none', invalid: 'jj' })
+    // Another value than the one the notice was about: nothing written.
+    expect(await sw.setPlatform(w, repo, 'none', { invalid: 'hg' })).toEqual({ from: 'none', to: 'none' })
+    expect((await w.projectConfig(repo)).platform).toBe('jj')
+    expect(await sw.setPlatform(w, repo, 'none', { invalid: 'jj' })).toEqual({ from: 'none', to: 'none' })
+    expect((await w.projectConfig(repo)).platform).toBe('none')
+    expect(platformOf(w, repo).invalid).toBeUndefined()
+    // Its workflow is left as it was: another platform's, so none of it applies (rulesets.ts ownOptions).
+    expect(await workflowOf(w, repo)).toMatchObject(jjWorkflow)
+    const { resolvedOf } = await import('../src/main/workflow/rulesets')
+    const cfg = await w.projectConfig(repo)
+    expect(resolvedOf(w, repo, 'none', cfg).options).toEqual(resolvedOf(w, repo, 'none', { ...cfg, workflow: { platform: 'none', preset: null, options: {} } }).options)
+  })
+
+  it('a valid value set meanwhile is kept: the write is checked under the lock', async () => {
+    const { w, repo } = await former()
+    await w.mutateProjectConfig(repo, () => ({ platform: 'none' }))
+    expect(await sw.setPlatform(w, repo, 'none', { invalid: 'jj' })).toEqual({ from: 'none', to: 'none' })
+    expect((await w.projectConfig(repo)).platform).toBe('none')
+  })
+
+  // HR2's round 1: a notice answered late never becomes a switch, whatever the project is now.
+  it('a stale Use None after the project became a valid Git one leaves its platform and workflow as they are', async () => {
+    const { w, repo } = await workspace({ platform: 'git', workflow: { platform: 'git', preset: 'pair', options: { review: 'agent' } } })
+    const before = await w.projectConfig(repo)
+    expect(await sw.setPlatform(w, repo, 'none', { invalid: 'jj' })).toEqual({ from: 'git', to: 'git' })
+    const after = await w.projectConfig(repo)
+    expect(after.platform).toBe('git')
+    expect(after.workflow).toEqual(before.workflow)
+  })
+
+  it('a notice whose platform is no longer the one in force writes nothing', async () => {
+    const { w, repo } = await former()
+    // Still naming jj, but asked to write Git where None is in force (the folder has .jj): nothing written, no switch.
+    expect(await sw.setPlatform(w, repo, 'git', { invalid: 'jj' })).toEqual({ from: 'none', to: 'none' })
+    const after = await w.projectConfig(repo)
+    expect(after.platform).toBe('jj')
+    expect(after.workflow).toMatchObject(jjWorkflow)
+  })
+
+  it("the settings tool changes an option of such a project under the platform in force, from none of jj's options", async () => {
+    const { w, repo } = await former()
+    let reply: Awaited<ReturnType<typeof settingsTools.applySetting>> | null = null
+    await inWorkspace(w, async () => (reply = await settingsTools.applySetting(settingEntry('project.workflow.review')!, 'none', repo)))
+    expect(reply).toMatchObject({ new: 'none' })
+    expect(await workflowOf(w, repo)).toMatchObject({ platform: 'none', preset: null, options: { review: 'none' } })
+  })
+})

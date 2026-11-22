@@ -168,7 +168,17 @@ export function resolveLogged(project: string, platform: PlatformId, levels: Opt
  * only some options), over the workspace's and Combwork's; a project's options for another platform don't apply.
  */
 export function resolvedOf(ws: Pick<WorkspaceService, 'config'>, projectPath: string, platform: PlatformId, cfg: Pick<ProjectConfig, 'workflow'>): ResolvedOptions {
-  return resolveLogged(projectPath, platform, { global: config.settings.workflow, workspace: ws.config.workflow, project: cfg.workflow?.options })
+  return resolveLogged(projectPath, platform, { global: config.settings.workflow, workspace: ws.config.workflow, project: ownOptions(cfg, platform) })
+}
+
+/**
+ * The options a project sets itself for `platform`: its workflow's, unless that workflow names another platform (HI-3510:
+ * a former jj project's saved options are jj's, neither applied nor shown); undefined with no workflow. The runtime and
+ * the options form read them so (optionsForm.ts `ownOf`).
+ */
+export function ownOptions(cfg: Pick<ProjectConfig, 'workflow'>, platform: PlatformId): Partial<WorkflowOptions> | undefined {
+  if (!cfg.workflow) return undefined
+  return !cfg.workflow.platform || cfg.workflow.platform === platform ? cfg.workflow.options : {}
 }
 
 /**
@@ -231,7 +241,7 @@ export async function rulesetsNow(ws: Pick<WorkspaceService, 'config' | 'info' |
  * the platform, the three levels of options and the target asked.
  */
 function idOf(ws: Pick<WorkspaceService, 'config'>, path: string, platform: PlatformId, cfg: Pick<ProjectConfig, 'workflow'>, target?: string): string | null {
-  const key = JSON.stringify([platform, config.settings.workflow ?? null, ws.config.workflow ?? null, cfg.workflow?.options ?? null, target ?? null])
+  const key = JSON.stringify([platform, config.settings.workflow ?? null, ws.config.workflow ?? null, cfg.workflow?.platform ?? null, cfg.workflow?.options ?? null, target ?? null])
   const at = JSON.stringify([path.toLowerCase(), target ?? null])
   const was = rulesetIds.get(at)
   if (was?.key === key) return was.id

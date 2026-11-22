@@ -227,6 +227,13 @@ export const ASK_ACTIONS_MAX = 3
 const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, CHURN_LIMIT_GATE, SIMPLIFY_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, QUEUE_PUBLISH_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, 'decision'])
 export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !CW_GATES.has(r.gate)
 
+/**
+ * HI-3510: the gates of Combwork's own requests that 1.6.0 had and this Combwork doesn't (jj's integration: an advance
+ * stopped, uncertain or previewed). A request under one is never open: not an agent's question (askedQuestion would make
+ * it one), and nothing here can answer it. Only these: every other gate outside CW_GATES stays a question.
+ */
+export const RETIRED_GATES: ReadonlySet<string> = new Set(['advanceStopped', 'advanceUncertain', 'advancePreview'])
+
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
 export interface AnswerShape {
   outcome: 'approved' | 'declined' | 'answered'
@@ -925,7 +932,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         const d: Request = { ...(f.data as FactData['ApprovalRequested']), at: f.at, ...(f.actor === 'assistant' ? { byAssistant: true as const } : {}) }
         // The merge queue asks again (the target moved, a new test merge): its earlier request of that gate is retired.
         if (d.entry) s.requests = s.requests.filter((r) => !r.entry || r.gate !== d.gate)
-        s.requests.push(d)
+        if (!RETIRED_GATES.has(d.gate)) s.requests.push(d)
         s.made[d.request] = d
         // HI-3188: an agent's question or test ask to the user is churn; Combwork's own requests have no asker.
         if (d.asker) s.churn = { ...s.churn, asks: s.churn.asks + 1 }

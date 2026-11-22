@@ -50,7 +50,7 @@ export function workflowHiddenNow(ws: WorkspaceService, projectPath: string, cfg
   const enforced = advanced.get<boolean>(WORKFLOW_ENFORCE)
   if (!enforced) return []
   const token = boardReadToken(ws)
-  const key = JSON.stringify([token, platform, config.settings.workflow ?? null, ws.config.workflow ?? null, c.workflow?.options ?? null])
+  const key = JSON.stringify([token, platform, config.settings.workflow ?? null, ws.config.workflow ?? null, c.workflow?.platform ?? null, c.workflow?.options ?? null])
   const was = kept.get(projectPath.toLowerCase())
   if (token !== null && was?.key === key) return was.hidden
   let hidden: string[] = []
