@@ -424,18 +424,6 @@ between it and the one found; a build without it would have no answer for a plai
 in `none/` all the same, and a Git workflow runs without it (HI-3489's trial: both typechecks clean once its rows went,
 the Git workflow suites passing).
 
-**Removed: jj** (HI-3468). Combwork supported Jujutsu as a third version control from 1.5.0 to 1.6.x; 1.7.0 removed it
-with no migration, leaving Git and None behind the same adapter interface. A `.jj` folder now reads as another version
-control, as Mercurial's `.hg` does. The last commit with it is the annotated tag `jj-support-final`. What went, by
-area: the jj platform modules in `platform/` (`jj*.ts`: the runner and worker, detection, the workspace port and
-recovery, history and evidence, operations, the advance and candidates, the keep-out); the app's jj modules (`jjCards.ts`, `jjPublish.ts` and its worker, `jjSetupStamp.ts`, `jjWindow.ts`), the shared
-ones (`jjTool.ts`, `jjViews.ts`) and the renderer's `views/JjSections.tsx`; the store switch and its sides, the
-platform fence, the compatibility gates, kept slots, Recover… and forgotten workspaces, and the adapter and port
-members only jj used (`advance`, `gathers`, `keptWork`, the fence and journal members); jj's descriptor, guidance
-variants, workflow options and words, its locale namespace, `resources/tested-vcs.json`'s jj and `npm run jj:fetch`;
-its tests, e2e suites and scenarios. To read or restore any of it: `git show jj-support-final:<path>`, or
-`git checkout jj-support-final -- <paths>` (`git ls-tree -r --name-only jj-support-final` lists the files).
-
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets
 with open entries) start it; it takes the target's lease (`QueueRunner.acquire`, with agents' process supervisor), runs

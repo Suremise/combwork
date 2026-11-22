@@ -207,8 +207,7 @@ const wfOf = async (w: WS, repo: string) => (await workflowFor(w, repo))!
 
 /**
  * A card started by b1 on 1.2.0, its slot's line made and one commit of its own on it: its number, folder and line. A
- * line made here, not by the slot's own preparation, has that preparation recorded as the slot does (`SlotPrepared`, as
- * the jj candidate tests do): until then the reconciler never observes the line (#1551), and a pass's reconciliation
+ * line made here, not by the slot's own preparation, has that preparation recorded as the slot does (`SlotPrepared`): until then the reconciler never observes the line (#1551), and a pass's reconciliation
  * (HI-2938) would take the card's head for its base and its pass for stale (HI-3001).
  */
 async function started(w: WS, repo: string, title = 'Card'): Promise<{ n: number; folder: string; line: string }> {

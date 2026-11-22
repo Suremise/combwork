@@ -37,7 +37,6 @@ import { ensureCombworkExcluded, combworkVcs } from './combworkVcs'
 import { detect, initialOf, projectPlatform } from './platform/registry'
 import { currentLine, repoHolding } from './platform/repoPorts'
 import type { ProjectPlatform } from '../shared/platform/descriptors'
-import { PLATFORM_NAME } from '../shared/platform/switching'
 import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
 import { migrateProjectPreferences } from '../shared/workflow/preferences'
@@ -82,7 +81,6 @@ const M = {
   platformInvalid: msg({ id: 'service.workspace.platformInvalid', defaultMessage: "{project}'s project.json names a version control Combwork doesn't know (platform: {value}). Until it says \"git\" or \"none\", Combwork uses what it finds in the folder.", description: 'A notice: the platform setting in the project {project}\'s .combwork/project.json is {value}, which is not one Combwork has (only "git" and "none" are: keep them as they are, they are setting values).' }),
   otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Combwork doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.", description: 'A notice: another version control system ({vcs}: Mercurial, Subversion…) was found in a project Combwork treats as a Git project. Combwork does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1).' }),
   platformSettled: msg({ id: 'service.workspace.platformSettled', defaultMessage: 'Settled: nothing to change now', description: "What the notice that a project's version control changed says once it no longer applies (HI-2320): the project was switched, or its folder is back as it was. Shown in place of its button." }),
-  usePlatform: msg({ id: 'service.workspace.platformUse', defaultMessage: 'Use {platform}', description: "HI-3510: a button on the notice that a project's project.json names a version control Combwork doesn't know (such as jj, which Combwork no longer has): writes the version control Combwork uses there now, {platform} (None or Git, as the Version Control tab names them), into project.json, so the notice doesn't come back." }),
   openVc: msg({ id: 'service.workspace.platformOpen', defaultMessage: 'Open Version Control', description: "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Combwork offers the switch (glossary 2.1)." })
 }
 
@@ -1901,9 +1899,8 @@ export class WorkspaceService {
     }
     if (p.invalid !== undefined) log.warn(`${userText(basename(projectPath))}'s project.json names no platform Combwork has (${userText(p.invalid)}): it uses ${p.id}, as detected`)
     else log.info(`${userText(basename(projectPath))} is a ${p.id} project; its folder now says ${p.detected.platform}${p.detected.other ? ` (${p.detected.other} found)` : ''}`)
-    // An offer has its button to the tab that makes it (#1419); an unknown setting (HI-3510: a former jj project's) one
-    // that writes the platform in force over it.
-    const actions = p.offer ? [{ label: tr(M.openVc), command: 'project.openVersionControl', args: [projectPath] }] : p.invalid !== undefined ? [{ label: tr(M.usePlatform, { platform: tr(PLATFORM_NAME[p.id]) }), command: 'project.usePlatform', args: [projectPath, p.id, p.invalid] }] : undefined
+    // An offer has its button to the tab that makes it (#1419); an unknown setting is fixed in project.json.
+    const actions = p.offer ? [{ label: tr(M.openVc), command: 'project.openVersionControl', args: [projectPath] }] : undefined
     // One notice per project: a newer detection replaces the one before it rather than stacking (#1419).
     // Its offer (HI-2320) is the project's platform notice: settled, it says so and loses its button.
     const n = platformNotice(basename(projectPath), p)

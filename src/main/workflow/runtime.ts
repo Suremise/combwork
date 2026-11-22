@@ -36,7 +36,7 @@ import { pathsDeliverables, requirePathsDeliverables } from '../platform/deliver
 import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
 import { releaseReadsOf } from '../platform/releaseReadsPorts'
 import { stillAsRead, unreleasedFor, type ReleaseReads } from '../platform/releaseReads'
-import { declaresPaths, hasCapability, isPlatformId, needsRepository, PLATFORMS, type PlatformId } from '../../shared/platform/descriptors'
+import { declaresPaths, hasCapability, needsRepository, PLATFORMS, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
 import { writeReadiness } from './dependencyReadiness'
@@ -596,17 +596,6 @@ class DragUndone extends Error {
   }
 }
 
-/**
- * HI-3510: an adapter asked for a platform Combwork no longer has (a card or lane started under jj keeps it in its
- * ruleset). The intents refuse such a card first (`platform.removed`); this is what any other path meets, never a
- * TypeError.
- */
-export class PlatformRemoved extends Error {
-  constructor(readonly platform: string) {
-    super(`no platform ${platform}`) // i18n-ignore: an internal error, for the log
-  }
-}
-
 /** Refuses from inside a write, undoing what it wrote (writeWhole, dragForward). */
 const undo = (g: GuardRefusal): never => {
   throw new DragUndone(g)
@@ -640,32 +629,7 @@ export class Workflow {
 
   /** The adapter of a ruleset's platform (a card keeps its ruleset's, so a switch applies from the next card). */
   platform(o: WorkflowOptions): PlatformAdapter {
-    const a = this.platforms[o.platform] as PlatformAdapter | undefined
-    if (!a) throw new PlatformRemoved(o.platform)
-    return a
-  }
-
-  /**
-   * HI-3510: the platform a card's ruleset names when Combwork no longer has it (a card or lane started under jj, kept
-   * as it was: no migration, SPEC §16.3.6), else null. `s`: the state its rules are read at (a reopening's, as from Todo).
-   */
-  removedPlatformOf(card: CardRecord, s: CardState = this.state(card)): string | null {
-    const p = this.rulesetOf(card, s).options.platform as string
-    return isPlatformId(p) ? null : p
-  }
-
-  /** `removedPlatformOf`, null when the card's rules can't be read at all (an intent goes on to say so, as before). */
-  private removedPlatformOfSafe(card: CardRecord): string | null {
-    try {
-      return this.removedPlatformOf(card)
-    } catch {
-      return null
-    }
-  }
-
-  /** HI-3510: a move on such a card refused, saying so (the user's moves to Todo and Done aren't). */
-  private removedRefusal(card: CardRecord, platform: string): GuardRefusal {
-    return { rule: 'platform.removed', values: { card: card.key, platform } }
+    return this.platforms[o.platform]
   }
 
   /** A card's platform adapter, by the ruleset it works under. */
@@ -680,20 +644,7 @@ export class Workflow {
   }
 
   /** A card by reference (`AM-12`, `#12`) or id; a plain number from an agent is refused (§16.12). */
-  resolve(ref: unknown, actor: Actor = 'user', removedOk = false): CardRecord | Refusal {
-    const c = this.cardOf(ref, actor)
-    if (isRefusal(c)) return c
-    // HI-3510: every intent on a card whose rules name a platform Combwork no longer has, and every read through one
-    // (nothing it reads can be asked of that platform); `removedOk`: the user's and the Assistant's column moves, which
-    // check it themselves (to Todo or Done they go on).
-    const removed = removedOk ? null : this.removedPlatformOfSafe(c)
-    // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
-    if (removed) return refusal('platform.removed', { card: c.key, platform: removed }, 'the user') // i18n-ignore: the override field, agent-facing (§16.8.3)
-    return c
-  }
-
-  /** `resolve`'s card, before its platform is asked about. */
-  private cardOf(ref: unknown, actor: Actor): CardRecord | Refusal {
+  resolve(ref: unknown, actor: Actor = 'user'): CardRecord | Refusal {
     if (typeof ref === 'number' && !agentOf(actor)) return this.store.card(ref)
     const p = parseCardRef(ref)
     if (!p.ok) return refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12` }, null)
@@ -3014,7 +2965,7 @@ export class Workflow {
    * that skips nothing just moves (§16.7.1). The Assistant passes `override: { reason }` or is refused.
    */
   async move(ref: unknown, to: StageId, by: 'user' | 'assistant', opts: { confirm?: boolean; reason?: string; builder?: string; dry?: boolean; paths?: string[]; askPaths?: boolean; released?: string } = {}): Promise<Moved | Ask | Refusal> {
-    const card = this.resolve(ref, 'user', true)
+    const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
     const from = s.stage
@@ -3030,9 +2981,6 @@ export class Workflow {
     // A Done card dragged on is reopened: its next cycle's rules (as from Todo), not its last's.
     const reopened = from === 'done' && ORDER.indexOf(to) > ORDER.indexOf('todo')
     const r = this.rulesetOf(card, reopened ? { ...s, stage: 'todo' } : s)
-    // HI-3510: a card whose rules name a platform Combwork no longer has moves only to Todo (it starts again under the
-    // project's rules) or Done, neither of which asks its platform anything.
-    if (!isPlatformId(r.options.platform) && to !== 'todo' && to !== 'done') return this.refuse(card, by, 'move', this.removedRefusal(card, r.options.platform))
     // Never into a stage the card's ruleset doesn't have (no review: no Review; no merge step: no Approved or Merging).
     if (!hasStage(r, to)) return this.refuse(card, by, 'move', { rule: 'move.noStage', values: { card: card.key, stage: to, stages: r.stages.map((x) => x.id).join(', ') } })
     // On Hold cancels a queue entry and keeps the lease; leaving it returns the card where it was (§16.7.4).
@@ -3547,7 +3495,7 @@ export class Workflow {
     // HI-3517: only where the card's platform declares paths and its deliverables are installed: elsewhere (Git, a build
     // without None) refused, nothing stored and nothing read.
     const platform = this.rulesetOf(card0).options.platform
-    if (!declaresPaths(platform) || !this.none) return this.refuse(card0, actor, 'declare paths', { rule: 'paths.notDeclared', values: { card: card0.key, platform: isPlatformId(platform) ? PLATFORMS[platform].name : platform } }, null) // i18n-ignore: an intent name (the window: texts.ts's MOVE_NAMES)
+    if (!declaresPaths(platform) || !this.none) return this.refuse(card0, actor, 'declare paths', { rule: 'paths.notDeclared', values: { card: card0.key, platform: PLATFORMS[platform].name } }, null) // i18n-ignore: an intent name (the window: texts.ts's MOVE_NAMES)
     // A card's paths narrow the deliverables, never widen them (#1511): none under `.combwork`, `.git` or an excluded folder.
     const bad = this.excludedPath(paths)
     if (bad) return refusal('paths.excluded', { card: card0.key, ...bad }, null)

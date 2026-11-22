@@ -1,6 +1,6 @@
 // The reconciler's debounce (HI-2914): a run asked for again and again (Waiting read every 200 ms, each read asking for a
 // run of a card with no observation; a burst of watch events) still starts within the debounce of the first ask. Each
-// ask used to restart the wait, so while the asks went on nothing ran (jjlane's Waiting stayed "not checked yet" for its
+// ask used to restart the wait, so while the asks went on nothing ran (a lane's Waiting stayed "not checked yet" for its
 // whole minute). The workspace, the workflow and the per-card reconcile are stood in for; the reconciler is real.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 

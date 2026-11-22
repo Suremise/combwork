@@ -294,20 +294,18 @@ describe('the guards', () => {
     expect(check.refused).toMatch(/^Mercurial keeps this folder/)
     await expect(initRepo(hg, { gitignore: 'none', nested: true })).rejects.toThrow(/^Mercurial keeps this folder/)
     expect(existsSync(join(hg, '.git'))).toBe(false)
-    // Below a Jujutsu working copy's root too.
-    const jjRoot = join(base, 'jj')
-    mkdirSync(join(jjRoot, '.jj'), { recursive: true })
-    const jj = project('sub', {}, jjRoot)
-    expect((await initCheck(jj)).refused).toMatch(/^Jujutsu keeps this folder/)
-    // A colocated Jujutsu repository (.jj beside .git) above it: refused, not taken for a git one to nest in, even confirmed.
+    // Below a Mercurial working copy's root too.
+    const sub = project('sub', {}, hg)
+    expect((await initCheck(sub)).refused).toMatch(/^Mercurial keeps this folder/)
+    // A Mercurial checkout colocated with a git repository (.hg beside .git) above it: refused, not taken for a git one to nest in, even confirmed.
     const colo = join(base, 'colocated')
-    mkdirSync(join(colo, '.jj'), { recursive: true })
+    mkdirSync(join(colo, '.hg'), { recursive: true })
     execFileSync('git', ['init', '-q', '-b', 'main', colo])
     const inner = project('inner', { 'file.txt': 'f\n' }, colo)
     const coloCheck = await initCheck(inner)
-    expect(coloCheck.refused).toBe(`Jujutsu keeps this folder (in ${colo}): Combwork makes a git repository only where no other version control system is.`)
+    expect(coloCheck.refused).toBe(`Mercurial keeps this folder (in ${colo}): Combwork makes a git repository only where no other version control system is.`)
     expect(coloCheck.parentRepo).toBeUndefined()
-    await expect(initRepo(inner, { gitignore: 'none', nested: true })).rejects.toThrow(/^Jujutsu keeps this folder/)
+    await expect(initRepo(inner, { gitignore: 'none', nested: true })).rejects.toThrow(/^Mercurial keeps this folder/)
     expect(existsSync(join(inner, '.git'))).toBe(false)
     const p = project('done')
     await initRepo(p, { gitignore: 'none' })
