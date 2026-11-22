@@ -1234,7 +1234,8 @@ export async function setUpstream(projectPath: string, branch: string, remote: s
 }
 
 /** Tags the folder's commit: annotated when there's a message. Pushes the tag to `pushTo` when given. */
-export async function createTag(projectPath: string, name: string, message: string, pushTo?: string): Promise<string> {
+/** A tag on the commit the folder has checked out, or (HI-3471's Tag here…) on `at`, a commit in full; pushed to `pushTo` if named. */
+export async function createTag(projectPath: string, name: string, message: string, pushTo?: string, at?: string): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
   name = name.trim()
   message = message.trim()
@@ -1243,14 +1244,18 @@ export async function createTag(projectPath: string, name: string, message: stri
     if (!s.head) throw refusal(msg({ id: 'service.gitRepo.nothingToTag', defaultMessage: 'The repository has no commits yet: nothing to tag.', description: 'An error tagging in the Git view: the repository has no commit yet.' }))
     if (!name || name.startsWith('-') || !(await refFormatOk(projectPath, [`refs/tags/${name}`]))) throw refusal(M.badName, { kind: 'tag', hasName: name ? 'yes' : 'no', name })
     if (pushTo && !s.remotes.includes(pushTo)) throw refusal(M.noRemote, { remote: pushTo })
-    const r = await git(projectPath, message ? ['tag', '-a', '-m', message, name, 'HEAD'] : ['tag', name, 'HEAD'])
+    // HI-3471: Tag here… names its commit in full; one git doesn't have is refused before anything is made.
+    const target = at ? (await git(projectPath, ['rev-parse', '--verify', '-q', `${at}^{commit}`])).out.trim() : 'HEAD'
+    if (at && (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(at) || target !== at)) throw refusal(msg({ id: 'service.gitRepo.noTagCommit', defaultMessage: 'Git has no commit {commit} to tag.', description: "HI-3471: an error from Tag here… (History's Commit dialog): the commit ({commit}, a short id) isn't in the repository." }), { commit: at.slice(0, 7) })
+    const shown = at ? at.slice(0, 7) : s.head
+    const r = await git(projectPath, message ? ['tag', '-a', '-m', message, name, target] : ['tag', name, target])
     if (!r.ok) throw failed(M.createFailed, { name }, r)
     log.info(`Tagged ${userText(projectPath)} ${userText(name)}`)
-    if (!pushTo) return tr(msg({ id: 'service.gitRepo.tagged', defaultMessage: 'Tagged {commit} {name}.', description: 'After tagging in the Git view: the commit {commit} (a short hash) has the tag {name}.' }), { commit: s.head, name })
+    if (!pushTo) return tr(msg({ id: 'service.gitRepo.tagged', defaultMessage: 'Tagged {commit} {name}.', description: 'After tagging in the Git view: the commit {commit} (a short hash) has the tag {name}.' }), { commit: shown, name })
     const p = await net(projectPath, ['push', '--', pushTo, `refs/tags/${name}:refs/tags/${name}`])
     if (p.cancelled) throw stopped('tag')
-    if (!p.ok) throw failed(msg({ id: 'service.gitRepo.tagPushFailed', defaultMessage: "Tagged {commit} {name}, but couldn't push it to {remote}: {why}", description: "An error in the Git view: the commit {commit} was tagged {name}, but pushing the tag to the remote {remote} failed; {why} is git's own words." }), { commit: s.head, name, remote: pushTo }, p)
-    return tr(msg({ id: 'service.gitRepo.taggedPushed', defaultMessage: 'Tagged {commit} {name} and pushed it to {remote}.', description: 'After tagging in the Git view: the commit {commit} has the tag {name}, which went to the remote {remote} too.' }), { commit: s.head, name, remote: pushTo })
+    if (!p.ok) throw failed(msg({ id: 'service.gitRepo.tagPushFailed', defaultMessage: "Tagged {commit} {name}, but couldn't push it to {remote}: {why}", description: "An error in the Git view: the commit {commit} was tagged {name}, but pushing the tag to the remote {remote} failed; {why} is git's own words." }), { commit: shown, name, remote: pushTo }, p)
+    return tr(msg({ id: 'service.gitRepo.taggedPushed', defaultMessage: 'Tagged {commit} {name} and pushed it to {remote}.', description: 'After tagging in the Git view: the commit {commit} has the tag {name}, which went to the remote {remote} too.' }), { commit: shown, name, remote: pushTo })
   })
 }
 

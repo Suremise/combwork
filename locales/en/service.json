@@ -583,6 +583,54 @@
     "defaultMessage": "That action is already running.",
     "description": "HI-3372: an error when the window starts an action (a commit, a fetch, a push) under an id another one still runs under: it isn't started again."
   },
+  "service.gitCommit.alreadyIn": {
+    "defaultMessage": "{branch} has this commit already.",
+    "description": "HI-3471: why Cherry-pick… can't be done: the project folder's branch ({branch}) already contains the commit."
+  },
+  "service.gitCommit.detached": {
+    "defaultMessage": "The project folder is on a detached HEAD: switch to a branch first.",
+    "description": "HI-3471: why Revert… or Cherry-pick… can't be done: the project folder has no branch checked out (git's detached HEAD)."
+  },
+  "service.gitCommit.dirty": {
+    "defaultMessage": "The project folder has uncommitted changes: commit them or set them aside first.",
+    "description": "HI-3471: why Revert… or Cherry-pick… can't be done: tracked files in the project folder have uncommitted changes (git would refuse, or mix them in)."
+  },
+  "service.gitCommit.done": {
+    "defaultMessage": "{action, select, revert {Reverted {commit} on {branch}} other {Cherry-picked {commit} onto {branch}}}: the new commit is {made}.",
+    "description": "HI-3471: a notice after Revert… or Cherry-pick… committed. {commit} and {made} are short commit ids; {branch} the project folder's branch. Keep the select keys."
+  },
+  "service.gitCommit.failed": {
+    "defaultMessage": "Git refused: {why}",
+    "description": "HI-3471: an error from Revert… or Cherry-pick…: git's own command failed; {why} is git's error line, in English."
+  },
+  "service.gitCommit.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was done.",
+    "description": "HI-3471: an error from History's Commit dialog: the request was malformed (not reached from the window)."
+  },
+  "service.gitCommit.moved": {
+    "defaultMessage": "The project folder is no longer on {branch} at the commit you saw: nothing was done. Look again.",
+    "description": "HI-3471: an error from Revert… or Cherry-pick…: the project folder switched branch, or its branch ({branch}) moved, since the dialog read it."
+  },
+  "service.gitCommit.noCommit": {
+    "defaultMessage": "Git has no commit {commit}: it may be gone. Look again.",
+    "description": "HI-3471: an error from History's Commit dialog: the commit ({commit}, a short id) isn't in the repository."
+  },
+  "service.gitCommit.notIn": {
+    "defaultMessage": "{branch} doesn't have this commit, so there is nothing of it to revert. Cherry-pick… brings it in.",
+    "description": "HI-3471: why Revert… can't be done: the project folder's branch ({branch}) doesn't contain the commit."
+  },
+  "service.gitCommit.stopped": {
+    "defaultMessage": "{action, select, revert {The revert} other {The cherry-pick}} of {commit} stopped on {count, plural, one {a conflict in # file} other {conflicts in # files}}: finish or abort it in Version Control → Changes.",
+    "description": "HI-3471: a notice after Revert… or Cherry-pick… stopped on a conflict: git is left mid-operation, and Changes' panel (HI-3470) continues or aborts it. {commit}: a short id. Keep the select keys."
+  },
+  "service.gitCommit.stoppedEmpty": {
+    "defaultMessage": "{action, select, revert {The revert} other {The cherry-pick}} of {commit} stopped: git says it would change nothing. Skip or abort it in Version Control → Changes.",
+    "description": "HI-3471: a notice after Revert… or Cherry-pick… stopped with no conflict (git found nothing to commit) and left the operation under way, for Changes' panel. Keep the select keys."
+  },
+  "service.gitCommit.timedOut": {
+    "defaultMessage": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at Version Control → Changes before you try again.",
+    "description": "HI-3471: an error from Revert… or Cherry-pick…: git ran past Settings → Advanced's longest commit time ({seconds}) and was ended."
+  },
   "service.gitCompare.noBranch": {
     "defaultMessage": "There's no branch {branch} here any more.",
     "description": "An error comparing two branches in the Changes tab: the branch {branch} was deleted or renamed since the list was read."
@@ -938,6 +986,10 @@
   "service.gitRepo.noStart": {
     "defaultMessage": "There’s no branch, tag or commit {ref}.",
     "description": "HI-2807: an error creating a branch from a start point: nothing in the repository is called {ref} (as typed in Starts at)."
+  },
+  "service.gitRepo.noTagCommit": {
+    "defaultMessage": "Git has no commit {commit} to tag.",
+    "description": "HI-3471: an error from Tag here… (History's Commit dialog): the commit ({commit}, a short id) isn't in the repository."
   },
   "service.gitRepo.noTarget": {
     "defaultMessage": "There's no branch {target} here to check the branches against.",

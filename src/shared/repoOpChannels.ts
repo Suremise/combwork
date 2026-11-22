@@ -50,7 +50,11 @@ export const REPO_OP_CHANNELS = {
   // HI-3469: History's Moves (its reads too: offered only where the platform has it).
   'git:moves': 'branchMoves',
   'git:restorePlan': 'branchMoves',
-  'git:restore': 'branchMoves'
+  'git:restore': 'branchMoves',
+  // HI-3471: History's Commit dialog (its reads too: offered only where the platform has it).
+  'git:commitDetail': 'commitActions',
+  'git:commitFileDiff': 'commitActions',
+  'git:commitAction': 'commitActions'
 } as const satisfies Partial<Record<CombworkChannel, Operation>>
 
 export type RepoOpChannel = keyof typeof REPO_OP_CHANNELS

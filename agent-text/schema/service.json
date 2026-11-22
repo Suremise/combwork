@@ -587,6 +587,45 @@
   "service.gitCancel.taken": {
     "placeholders": {}
   },
+  "service.gitCommit.alreadyIn": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitCommit.detached": {
+    "placeholders": {}
+  },
+  "service.gitCommit.dirty": {
+    "placeholders": {}
+  },
+  "service.gitCommit.failed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.gitCommit.invalid": {
+    "placeholders": {}
+  },
+  "service.gitCommit.moved": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitCommit.noCommit": {
+    "placeholders": {
+      "commit": "plain"
+    }
+  },
+  "service.gitCommit.notIn": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitCommit.timedOut": {
+    "placeholders": {
+      "seconds": "number"
+    }
+  },
   "service.gitCompare.noBranch": {
     "placeholders": {
       "branch": "plain"
@@ -924,6 +963,11 @@
   "service.gitRepo.noStart": {
     "placeholders": {
       "ref": "plain"
+    }
+  },
+  "service.gitRepo.noTagCommit": {
+    "placeholders": {
+      "commit": "plain"
     }
   },
   "service.gitRepo.noTarget": {

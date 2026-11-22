@@ -2339,6 +2339,14 @@ Branches outlive their work: a card that was superseded or archived keeps its br
 
 **History** lists a branch's commits, newest first, 20 a page (the arrows under them go back through older ones), with their branches and tags. It opens on the branch your project's work merges into (its **Target branch** in Workflow, such as 1.0.0), or, with none set, the branch the project folder is on; the branch named in its heading is a picker for any other, yours or a remote's. Below the commits come the repository's tags. **Create tag…** tags the commit the folder has checked out: give it a name, and a message for an annotated tag, and choose a remote to push it to if you like.
 
+#### A commit's details <a id="a-commits-details"></a>
+
+Click a commit in History (or a move's commit in **Moves**) to open it: its hash (**Copy hash** copies it whole), author, date, whole message and the card it names (click the key to open the card), and the files it changed, each file's changes beside them.
+
+- **Revert…** makes a new commit that undoes it, and **Cherry-pick…** copies it as a new commit, both on the branch the project folder has checked out, after asking. For a merge, they take what the merge brought in. Revert is greyed out for a commit your branch doesn't have, and Cherry-pick for one it has: to pick onto another branch, switch to it first. If git stops on a conflict, a notice says so: **Open in Changes**, where the panel above the diff finishes or aborts it.
+- Both are greyed out, saying why, while the project folder has uncommitted changes to tracked files, is on a detached HEAD, or an agent, its session, a run or a merge works there.
+- **Branch from here…** opens **New branch…** starting at this commit, and **Tag here…** opens **Create tag…** for it.
+
 #### Moves <a id="moves"></a>
 
 **Moves** (the switch in History's heading, beside **Commits**) lists each time a local branch moved, newest first, as git's reflog keeps it: about 90 days back, 20 a page. Its picker shows the project folder's branch first; choose any other local branch there. While the project folder is on a detached HEAD (no branch checked out), Moves shows nothing until it is on a branch again. Each move says what it was in plain words where Combwork knows them: *Combwork merged HI-12* (click the key to open the card), *Committed*, *Merged …*, *Pulled*, *Rebased onto …*, *Reset to …*, and git's own words otherwise (hover a move for them, with its commit and time). The commit it left the branch at is beside it.

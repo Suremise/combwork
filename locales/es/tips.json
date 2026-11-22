@@ -638,5 +638,7 @@
   "tips.stashes.text": "Control de versiones → Cambios → Stashes lista los stashes del repositorio, los de Apartar de Combwork con su tarjeta: muestra lo que contiene cada uno y luego aplícalo, sácalo (pop) o elimínalo.",
   "tips.stashes.title": "Ver, aplicar o eliminar tus stashes de git",
   "tips.branchMoves.text": "Control de versiones → Historial → Movimientos lista cada vez que una rama se movió, tal como lo guarda el reflog de git: las fusiones de tarjetas de Combwork, commits, rebases, resets y pulls. Restaurar a este punto… devuelve la rama atrás, mostrando antes qué commits pierde o recupera.",
-  "tips.branchMoves.title": "Deshacer un reset, rebase o fusión de una rama"
+  "tips.branchMoves.title": "Deshacer un reset, rebase o fusión de una rama",
+  "tips.commitDetails.text": "Haz clic en un commit en Control de versiones → Historial para ver sus archivos y cambios. Desde ahí, Revert… o Cherry-pick… lo aplican a la rama de la carpeta del proyecto, y Rama desde aquí… y Etiquetar aquí… parten de él.",
+  "tips.commitDetails.title": "Revertir, hacer cherry-pick, ramificar o etiquetar un commit desde el Historial"
 }

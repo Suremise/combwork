@@ -465,5 +465,18 @@
   "service.gitMoves.slotHeld": "合并到 {branch} 的操作正在进行或等待中（其合并槽位）：请在完成后重试。",
   "service.gitMoves.timedOut": "Git 运行 {seconds, number} 秒后仍未结束，因此 Combwork 结束了它。重试前请先查看项目文件夹。",
   "service.gitMoves.unlisted": "Git 无法列出此仓库的 worktree，因此 Combwork 无法确定 {branch} 检出在哪里：未执行任何操作。Git 输出：{why}",
-  "service.gitMoves.detached": "项目文件夹处于分离的 HEAD 状态：文件夹位于分支上时，才能通过移动记录恢复分支。"
+  "service.gitMoves.detached": "项目文件夹处于分离的 HEAD 状态：文件夹位于分支上时，才能通过移动记录恢复分支。",
+  "service.gitCommit.alreadyIn": "{branch} 已包含此提交。",
+  "service.gitCommit.detached": "项目文件夹处于分离的 HEAD 状态：请先切换到分支。",
+  "service.gitCommit.dirty": "项目文件夹有未提交的更改：请先提交或搁置它们。",
+  "service.gitCommit.done": "{action, select, revert {已在 {branch} 上还原 {commit}} other {已将 {commit} 拣选到 {branch}}}：新提交为 {made}。",
+  "service.gitCommit.failed": "Git 拒绝了：{why}",
+  "service.gitCommit.invalid": "请求的格式有误：未做任何操作。",
+  "service.gitCommit.moved": "项目文件夹已不再位于你看到的那个提交处的 {branch} 上：未做任何操作。请重新查看。",
+  "service.gitCommit.noCommit": "Git 中没有提交 {commit}：它可能已不存在。请重新查看。",
+  "service.gitCommit.notIn": "{branch} 不包含此提交，因此没有可还原的内容。“拣选…”可将它带入。",
+  "service.gitCommit.stopped": "{commit} 的{action, select, revert {还原} other {拣选}}因{count, plural, other {# 个文件中的冲突}}而停下：请在“版本控制”→“更改”中完成或中止它。",
+  "service.gitCommit.stoppedEmpty": "{commit} 的{action, select, revert {还原} other {拣选}}已停下：Git 表示它不会更改任何内容。请在“版本控制”→“更改”中跳过或中止它。",
+  "service.gitCommit.timedOut": "Git 运行 {seconds, number} 秒后仍未结束，因此 Combwork 结束了它。重试前请先查看“版本控制”→“更改”。",
+  "service.gitRepo.noTagCommit": "Git 中没有要打标签的提交 {commit}。"
 }

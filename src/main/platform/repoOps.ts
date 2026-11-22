@@ -22,6 +22,7 @@ import type { RemotePrune, RepoHealth } from '../../shared/gitHealth'
 import type { StashApplied, StashFile, StashRef, StashRequest, StashRow } from '../../shared/gitStashes'
 import type { GitDiff } from '../../shared/types'
 import type { BranchMoves, RestorePlan } from '../../shared/gitMoves'
+import type { CommitActionDone, CommitDetail } from '../../shared/gitCommitView'
 
 /**
  * Which members each operation may call (HR3's s15): the port is handed out for one operation, typed down to its own
@@ -53,6 +54,7 @@ export interface OpMembers {
   repoHealth: 'health' | 'pruneWorktrees' | 'removeLocks' | 'remotePrunePreview' | 'fetchPrune'
   stashes: 'stashes' | 'stashFiles' | 'stashDiff' | 'applyStash' | 'dropStash'
   branchMoves: 'moves' | 'restorePlan' | 'restore'
+  commitActions: 'commitDetail' | 'commitFileDiff' | 'commitAction'
 }
 
 /** The port as handed out for one operation: its own members only. */
@@ -93,7 +95,8 @@ export interface RepoOps {
   pushTo(projectPath: string, remote: string, scope: PushScope, line?: string): Promise<string>
   setUpstream(projectPath: string, line: string, remote: string | null, remoteLine: string, pushFirst: boolean): Promise<string>
   // Tags, identity, initialising.
-  createTag(projectPath: string, name: string, message: string, pushTo?: string): Promise<string>
+  /** A tag on the commit checked out, or (HI-3471's Tag here…) on `at`, a commit in full. */
+  createTag(projectPath: string, name: string, message: string, pushTo?: string, at?: string): Promise<string>
   setIdentity(projectPath: string, name: string, email: string): Promise<string>
   /** Initialise repository's dialog: what initialising would find (a read, for the operation it asks about). */
   initCheck(projectPath: string): Promise<GitInitCheck>
@@ -156,4 +159,11 @@ export interface RepoOps {
    * nowhere by a compare-and-swap, under its merge slot, the repository lock and the folder's fence; the notice.
    */
   restore(projectPath: string, req: unknown): Promise<string>
+  // HI-3471: History's Commit dialog, the user's click at a time (requests as sent, checked).
+  /** A commit's details and files, and whether Revert… and Cherry-pick… can be done now. */
+  commitDetail(projectPath: string, commit: unknown): Promise<CommitDetail>
+  /** One file of a commit against its first parent. */
+  commitFileDiff(projectPath: string, commit: unknown, file: string): Promise<GitDiff>
+  /** Revert… or Cherry-pick… onto the project folder's branch, under its merge slot, the repository lock and its fence. */
+  commitAction(projectPath: string, req: unknown): Promise<CommitActionDone>
 }

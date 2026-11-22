@@ -167,6 +167,7 @@ export const SUITES = [
   { name: 'freshresume' },
   { name: 'gitbranchcards' },
   { name: 'gitcleanup' },
+  { name: 'gitcommit' },
   { name: 'gitdirect' },
   { name: 'githealth' },
   { name: 'githubhosts' },

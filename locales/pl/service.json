@@ -465,5 +465,18 @@
   "service.gitMoves.slotHeld": "Scalanie do {branch} jest w toku albo czeka (na swój slot scalania): spróbuj ponownie, gdy się zakończy.",
   "service.gitMoves.timedOut": "Git nadal działał po {seconds, number} s, więc Combwork go zakończył. Zanim spróbujesz ponownie, sprawdź folder projektu.",
   "service.gitMoves.unlisted": "Git nie mógł wyświetlić listy worktree tego repozytorium, więc Combwork nie wie, gdzie wybrano gałąź {branch}: nic nie zrobiono. Git zgłosił: {why}",
-  "service.gitMoves.detached": "Folder projektu jest na odłączonym HEAD: Przesunięcia przywracają gałąź, gdy folder będzie na gałęzi."
+  "service.gitMoves.detached": "Folder projektu jest na odłączonym HEAD: Przesunięcia przywracają gałąź, gdy folder będzie na gałęzi.",
+  "service.gitCommit.alreadyIn": "Gałąź {branch} ma już ten commit.",
+  "service.gitCommit.detached": "Folder projektu jest na odłączonym HEAD: najpierw przełącz się na gałąź.",
+  "service.gitCommit.dirty": "Folder projektu ma zmiany bez commita: najpierw zrób ich commit lub je odłóż.",
+  "service.gitCommit.done": "{action, select, revert {Wykonano revert {commit} na gałęzi {branch}} other {Wykonano cherry-pick {commit} na gałąź {branch}}}: nowy commit to {made}.",
+  "service.gitCommit.failed": "Git odmówił: {why}",
+  "service.gitCommit.invalid": "To zostało źle zlecone: nic nie zrobiono.",
+  "service.gitCommit.moved": "Folder projektu nie jest już na gałęzi {branch} przy commicie, który widziałeś: nic nie zrobiono. Sprawdź jeszcze raz.",
+  "service.gitCommit.noCommit": "Git nie ma commita {commit}: mógł zniknąć. Sprawdź jeszcze raz.",
+  "service.gitCommit.notIn": "Gałąź {branch} nie ma tego commita, więc nie ma w niej czego cofać. Cherry-pick… go wprowadza.",
+  "service.gitCommit.stopped": "{action, select, revert {Revert} other {Cherry-pick}} {commit} zatrzymał się na {count, plural, one {konflikcie w # pliku} few {konfliktach w # plikach} many {konfliktach w # plikach} other {konfliktach w # pliku}}: dokończ go lub przerwij w widoku Kontrola wersji → Zmiany.",
+  "service.gitCommit.stoppedEmpty": "{action, select, revert {Revert} other {Cherry-pick}} {commit} zatrzymał się: git twierdzi, że niczego by nie zmienił. Pomiń go lub przerwij w widoku Kontrola wersji → Zmiany.",
+  "service.gitCommit.timedOut": "Git nadal działał po {seconds, number} s, więc Combwork go zakończył. Zanim spróbujesz ponownie, sprawdź widok Kontrola wersji → Zmiany.",
+  "service.gitRepo.noTagCommit": "Git nie ma commita {commit} do otagowania."
 }

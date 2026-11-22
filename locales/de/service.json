@@ -465,5 +465,18 @@
   "service.gitMoves.slotHeld": "Ein Merge in {branch} läuft oder wartet (sein Merge-Slot): Versuche es erneut, sobald er fertig ist.",
   "service.gitMoves.timedOut": "Git lief nach {seconds, number} Sekunden noch, also hat Combwork es beendet. Sieh dir den Projektordner an, bevor du es erneut versuchst.",
   "service.gitMoves.unlisted": "Git konnte die Worktrees dieses Repositorys nicht auflisten, daher kann Combwork nicht sagen, wo {branch} ausgecheckt ist: Es wurde nichts getan. Git meldete: {why}",
-  "service.gitMoves.detached": "Der Projektordner ist auf einem losgelösten HEAD: Bewegungen stellt einen Branch wieder her, sobald der Ordner auf einem ist."
+  "service.gitMoves.detached": "Der Projektordner ist auf einem losgelösten HEAD: Bewegungen stellt einen Branch wieder her, sobald der Ordner auf einem ist.",
+  "service.gitCommit.alreadyIn": "{branch} enthält diesen Commit bereits.",
+  "service.gitCommit.detached": "Der Projektordner ist auf einem losgelösten HEAD: Wechsle zuerst zu einem Branch.",
+  "service.gitCommit.dirty": "Der Projektordner hat nicht committete Änderungen: Committe sie oder lege sie zuerst beiseite.",
+  "service.gitCommit.done": "{action, select, revert {{commit} auf {branch} revertiert} other {{commit} per Cherry-Pick auf {branch} übernommen}}: Der neue Commit ist {made}.",
+  "service.gitCommit.failed": "Git hat abgelehnt: {why}",
+  "service.gitCommit.invalid": "Das wurde falsch angefragt: Es wurde nichts getan.",
+  "service.gitCommit.moved": "Der Projektordner ist nicht mehr auf {branch} beim Commit, den du gesehen hast: Es wurde nichts getan. Sieh noch einmal nach.",
+  "service.gitCommit.noCommit": "Git hat keinen Commit {commit}: Vielleicht gibt es ihn nicht mehr. Sieh noch einmal nach.",
+  "service.gitCommit.notIn": "{branch} enthält diesen Commit nicht, daher gibt es davon nichts zu reverten. „Cherry-Pick…“ holt ihn herein.",
+  "service.gitCommit.stopped": "{action, select, revert {Der Revert} other {Der Cherry-Pick}} von {commit} hat bei {count, plural, one {einem Konflikt in # Datei} other {Konflikten in # Dateien}} angehalten: Schließe ihn unter Versionsverwaltung → Änderungen ab oder brich ihn ab.",
+  "service.gitCommit.stoppedEmpty": "{action, select, revert {Der Revert} other {Der Cherry-Pick}} von {commit} hat angehalten: Laut Git würde er nichts ändern. Überspringe ihn unter Versionsverwaltung → Änderungen oder brich ihn ab.",
+  "service.gitCommit.timedOut": "Git lief nach {seconds, number} Sekunden noch, also hat Combwork es beendet. Sieh dir Versionsverwaltung → Änderungen an, bevor du es erneut versuchst.",
+  "service.gitRepo.noTagCommit": "Git hat keinen Commit {commit} zum Taggen."
 }

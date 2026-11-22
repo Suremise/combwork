@@ -44,9 +44,11 @@ export type Operation =
   | 'stashes'
   /** HI-3469: History's Moves: a local branch's reflog listed, and the branch restored to one of its moves. */
   | 'branchMoves'
+  /** HI-3471: History's Commit dialog: a commit's details and diffs, reverted or cherry-picked onto the folder's branch. */
+  | 'commitActions'
 
 /** Every operation, in one place: Git lists them all (it has each today). */
-export const OPERATIONS: readonly Operation[] = ['switchLine', 'createLine', 'deleteLines', 'deleteRemoteLines', 'updateLine', 'mergeLine', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetch', 'pull', 'push', 'pushTo', 'setUpstream', 'createTag', 'setIdentity', 'init', 'ignoreRules', 'folderChanges', 'operationSteps', 'repoHealth', 'stashes', 'branchMoves']
+export const OPERATIONS: readonly Operation[] = ['switchLine', 'createLine', 'deleteLines', 'deleteRemoteLines', 'updateLine', 'mergeLine', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetch', 'pull', 'push', 'pushTo', 'setUpstream', 'createTag', 'setIdentity', 'init', 'ignoreRules', 'folderChanges', 'operationSteps', 'repoHealth', 'stashes', 'branchMoves', 'commitActions']
 
 /**
  * How a platform's integration combines approved work (SPEC §16.3.1, HI-2822): merged from the card's line into a target

@@ -20,6 +20,7 @@ import { BusyButton, Icon, IconButton, LoadFailed, Modal, StaleNote, Tooltip, us
 import { InitRepoButton } from '../components/InitRepo'
 import { Pager } from '../components/DataTable'
 import { HistoryViewSwitch, MovesSection } from '../components/BranchMoves'
+import { CommitDialog } from '../components/CommitDialog'
 
 /** A message with markup, as React children (keyed, so a list of parts renders without warnings). */
 export const rich = (m: Msg, values: Parameters<typeof tRich<React.ReactNode>>[1]): React.ReactNode[] => Children.toArray(tRich<React.ReactNode>(m, values))
@@ -51,6 +52,7 @@ export const GIT_TEXT = {
   enterName: msg({ id: 'git.form.enterName', defaultMessage: 'Enter a name', description: "Under a form's name box (a branch, a tag) while it is empty." }),
   cancel: msg({ id: 'git.cancel', defaultMessage: 'Cancel', description: "Button: closes the Git tab's dialog or form without doing anything." }),
   tagTitle: msg({ id: 'git.tags.title', defaultMessage: 'Tag {commit}', description: 'Title of the Create tag form. {commit} is the short hash of the commit checked out.' }),
+  tagHereAbout: msg({ id: 'git.tags.hereAbout', defaultMessage: "Tags {commit}, “{subject}”. With a message, it's an annotated tag.", description: "HI-3471: Tag here…'s form (History's Commit dialog): it tags the commit {commit} (a short id) whose subject is {subject}." }),
   tagTheCommit: msg({ id: 'git.tags.titleNoCommit', defaultMessage: 'Tag the commit', description: 'Title of the Create tag form before the commit is known.' }),
   tagAbout: msg({ id: 'git.tags.about', defaultMessage: "{onBranch, select, yes {Tags the commit the project folder has checked out ({branch}). With a message, it's an annotated tag.} other {Tags the commit the project folder has checked out. With a message, it's an annotated tag.}}", description: 'The Create tag form. {branch} is the branch checked out ({onBranch} is no when HEAD is detached).' }),
   tagName: msg({ id: 'git.tags.name', defaultMessage: 'Name', description: "Field of the Create tag form: the new tag's name (v1.0.0, say)." }),
@@ -204,6 +206,8 @@ function CommitsSection({ project, summary, onView }: { project: ProjectInfo; su
   }, [raw.data, project.path])
   const read = { ...raw, data: raw.data ?? (last?.for === project.path ? last.data : null) }
   const [form, setForm] = useState<OpenForm | null>(null)
+  // HI-3471: the commit whose dialog is open.
+  const [shownCommit, setShownCommit] = useState<string | null>(null)
   useNow(60000)
   const optionText = (h: GitHistory, b: string): string => tr(M.historyOption, { branch: b, kind: b === h.target ? 'target' : b === summary?.branch ? 'folder' : 'other' /* i18n-ignore: a select's key, never shown */ })
   const picker = (h: GitHistory): React.ReactNode => (
@@ -244,7 +248,7 @@ function CommitsSection({ project, summary, onView }: { project: ProjectInfo; su
             <div className="git-rows">
               {h.commits.map((c) => (
                 <Tooltip block key={c.hash} content={<span style={{ whiteSpace: 'pre-line' }}>{`${c.hash}\n${c.author} <${c.email}>\n${fmt.dateTime(c.date)}`}</span>}>
-                  <div className="git-row git-commit" data-commit={c.short}>
+                  <div className={cx('git-row', 'git-commit', offered('git:commitDetail') && 'clickable')} data-commit={c.short} onClick={() => offered('git:commitDetail') && setShownCommit(c.hash)}>
                     <code className="git-hash">{c.short}</code>
                     <span className="git-subject">{c.subject}</span>
                     {c.refs.map((r) => (
@@ -288,6 +292,7 @@ function CommitsSection({ project, summary, onView }: { project: ProjectInfo; su
             </div>
           )}
           {form && <GitForm make={form.make} onClose={() => setForm(null)} />}
+          {shownCommit && <CommitDialog project={project} commit={shownCommit} onClose={() => setShownCommit(null)} />}
         </div>
       )}
     </Loading>
@@ -416,13 +421,14 @@ function FormRow({ field, value, first, onChange, onEnter }: { field: FormField;
   )
 }
 
-function tagForm(project: ProjectInfo, s: GitRepoSummary | null): FormSpec {
+/** Create tag…'s form: the commit checked out, or (HI-3471's Tag here…) `here`, a commit with its short id and subject. */
+export function tagForm(project: ProjectInfo, s: GitRepoSummary | null, here?: { hash: string; short: string; subject: string }): FormSpec {
   const remotes = s?.remotes ?? []
   return {
     project,
-    title: s?.head ? tr(M.tagTitle, { commit: s.head }) : tr(M.tagTheCommit),
+    title: here ? tr(M.tagTitle, { commit: here.short }) : s?.head ? tr(M.tagTitle, { commit: s.head }) : tr(M.tagTheCommit),
     icon: 'tag',
-    about: tr(M.tagAbout, { onBranch: s?.branch ? 'yes' : 'no', branch: s?.branch ?? '' }),
+    about: here ? tr(M.tagHereAbout, { commit: here.short, subject: here.subject }) : tr(M.tagAbout, { onBranch: s?.branch ? 'yes' : 'no', branch: s?.branch ?? '' }),
     fields: [
       // i18n-ignore: an example version
       { key: 'name', label: tr(M.tagName), placeholder: 'v1.0.0' },
@@ -434,7 +440,7 @@ function tagForm(project: ProjectInfo, s: GitRepoSummary | null): FormSpec {
     validate: (v) => (!v.name.trim() ? tr(M.enterName) : /\s/.test(v.name.trim()) ? tr(M.tagNoSpaces) : null),
     // HI-3372: its push, when it pushes, cancellable from the dialog.
     cancellable: true,
-    submit: (v, op) => repoOp('git:createTag', project.path, v.name.trim(), v.message ?? '', v.push || undefined, op)
+    submit: (v, op) => repoOp('git:createTag', project.path, v.name.trim(), v.message ?? '', v.push || undefined, op, here?.hash)
   }
 }
 

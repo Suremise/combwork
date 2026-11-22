@@ -196,6 +196,8 @@
   "tips.combworkTokens.text": "Claude Code's /usage counts every request after one of Combwork's tool calls, each re-reading the whole conversation, so its combwork share is calls times context. A card's start now carries the whole card when it fits, so the agent reads it once.",
   "tips.combworkTokens.title": "What \"combwork\" in /usage counts",
   "tips.commandName": "“{command}”",
+  "tips.commitDetails.text": "Click a commit in Version Control → History to see its files and changes. From there, Revert… or Cherry-pick… it onto the project folder's branch, or Branch from here… and Tag here… at it.",
+  "tips.commitDetails.title": "Revert, cherry-pick, branch or tag a commit from History",
   "tips.compactFocus.text": "Compact summarises the conversation so every later message costs less. Give it a focus (\"keep the API decisions, drop the test output\") and the agent keeps what matters. {key}",
   "tips.compactFocus.title": "Compact with a focus",
   "tips.compactSidebar.text": "Toggle Compact Sidebar turns the project list into a narrow rail of tiles with each project's agents, leaving more room for the terminals.",

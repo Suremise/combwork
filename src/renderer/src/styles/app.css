@@ -16003,6 +16003,87 @@ button.progress-lane-retry {
   margin-top: 4px;
   padding-left: 8px;
 }
+/* HI-3471: a commit opens its dialog from History and Moves. */
+.git-commit.clickable,
+.git-move-commit.clickable {
+  cursor: pointer;
+}
+.git-commit.clickable:hover {
+  background: var(--bg-hover);
+}
+.git-move-commit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.git-move-commit:hover .git-subject {
+  text-decoration: underline;
+}
+.dialog.wide:has(.commit-dialog) {
+  width: min(1180px, calc(100vw - 48px));
+}
+.commit-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.commit-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.commit-body {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  color: var(--fg-muted);
+  max-height: 120px;
+  overflow: auto;
+}
+.commit-meta,
+.commit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.commit-body-split {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) 1fr;
+  gap: 8px;
+  height: 50vh;
+  min-height: 260px;
+}
+.commit-files {
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  padding-right: 6px;
+}
+.commit-files .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.commit-files .row .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-files .row.selected {
+  background: var(--accent-soft);
+}
+.commit-diff {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
 .git-rows {
   display: flex;
   flex-direction: column;

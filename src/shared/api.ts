@@ -189,6 +189,7 @@ import type { OperationPanelState, OperationRequest, OperationStepResult } from 
 import type { LockAsk, PruneAsk, RemotePrune, RepoHealth } from './gitHealth'
 import type { StashApplied, StashFile, StashList, StashRef, StashRequest } from './gitStashes'
 import type { BranchMoves, RestorePlan, RestoreRequest } from './gitMoves'
+import type { CommitActionDone, CommitActionRequest, CommitDetail } from './gitCommitView'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1170,6 +1171,12 @@ export interface CombworkRequests {
   'git:restorePlan': (projectPath: string, req: RestoreRequest) => RestorePlan
   /** HI-3469: Restore to here…: the branch moved back to that commit, only from the commit the user saw; the notice. */
   'git:restore': (projectPath: string, req: RestoreRequest) => string
+  /** HI-3471: History's Commit dialog: a commit's details and files, and why Revert… or Cherry-pick… can't be done now. */
+  'git:commitDetail': (projectPath: string, commit: string) => CommitDetail
+  /** HI-3471: one file of a commit against its first parent. */
+  'git:commitFileDiff': (projectPath: string, commit: string, file: string) => GitDiff
+  /** HI-3471: Revert… or Cherry-pick… onto the project folder's branch; a conflict leaves git mid-operation for Changes' panel. */
+  'git:commitAction': (projectPath: string, req: CommitActionRequest) => CommitActionDone
   /** The Changes tab's branch comparison (HI-1824, read-only): what can be compared, two branches, one file of them. */
   'git:compareLines': (projectPath: string) => CompareLines
   /** The Changes tab's leftover branches (HI-1823): every local branch, uncut, with its worktree and commits not in the target. */
@@ -1233,7 +1240,7 @@ export interface CombworkRequests {
   'git:renameRemote': (projectPath: string, from: string, to: string) => string
   /** What a local branch tracks (#1385): `remote`'s `remoteBranch`, or nothing (`remote` null); `pushFirst` makes it there first. */
   'git:setUpstream': (projectPath: string, branch: string, remote: string | null, remoteBranch?: string, pushFirst?: boolean, op?: string) => string
-  'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string, op?: string) => string
+  'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string, op?: string, at?: string) => string
   /** This repository's own user.name and user.email; empty removes it (the global one applies). */
   'git:setIdentity': (projectPath: string, name: string, email: string) => string
   /** Initialise repository (#701): whether it can be done, and what the dialog asks; then git init on main, .combwork excluded first, a starter .gitignore, the first commit. */

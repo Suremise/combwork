@@ -638,5 +638,7 @@
   "tips.stashes.text": "Gestion de versions → Modifications → Stashes liste les stashes du dépôt, ceux de Mettre de côté de Combwork avec leur carte : affiche ce que chacun contient, puis applique-le, sors-le (pop) ou supprime-le.",
   "tips.stashes.title": "Voir, appliquer ou supprimer tes stashes git",
   "tips.branchMoves.text": "Gestion de versions → Historique → Mouvements liste chaque fois qu’une branche a bougé, tel que le reflog de git le garde : les fusions de cartes par Combwork, les commits, rebases, resets et pulls. Restaurer à ce point… ramène la branche en arrière, en montrant d’abord quels commits elle perd ou récupère.",
-  "tips.branchMoves.title": "Annuler un reset, un rebase ou une fusion d’une branche"
+  "tips.branchMoves.title": "Annuler un reset, un rebase ou une fusion d’une branche",
+  "tips.commitDetails.text": "Clique sur un commit dans Gestion de versions → Historique pour voir ses fichiers et ses modifications. De là, Revert… ou Cherry-pick… l’appliquent à la branche du dossier du projet, et Nouvelle branche ici… et Créer un tag ici… partent de lui.",
+  "tips.commitDetails.title": "Revert, cherry-pick, branche ou tag d’un commit depuis l’Historique"
 }

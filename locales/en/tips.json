@@ -787,6 +787,14 @@
     "defaultMessage": "“{command}”",
     "description": "A command's name in a tip's text, where its shortcut would be when it has none. Use your language's quotation marks."
   },
+  "tips.commitDetails.text": {
+    "defaultMessage": "Click a commit in Version Control → History to see its files and changes. From there, Revert… or Cherry-pick… it onto the project folder's branch, or Branch from here… and Tag here… at it.",
+    "description": "A tip (HI-3471). Names of Combwork's menus, views, sections and buttons: keep them as Combwork shows them."
+  },
+  "tips.commitDetails.title": {
+    "defaultMessage": "Revert, cherry-pick, branch or tag a commit from History",
+    "description": "A tip's title (HI-3471)."
+  },
   "tips.compactFocus.text": {
     "defaultMessage": "Compact summarises the conversation so every later message costs less. Give it a focus (\"keep the API decisions, drop the test output\") and the agent keeps what matters. {key}",
     "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

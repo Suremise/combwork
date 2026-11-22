@@ -465,5 +465,18 @@
   "service.gitMoves.slotHeld": "Um merge em {branch} está em andamento ou esperando (o slot de merge dele): tente de novo quando terminar.",
   "service.gitMoves.timedOut": "O git ainda estava rodando depois de {seconds, number} segundos, então o Combwork o encerrou. Olhe a pasta do projeto antes de tentar de novo.",
   "service.gitMoves.unlisted": "O Git não conseguiu listar os worktrees deste repositório, então o Combwork não sabe onde {branch} está em checkout: nada foi feito. O Git disse: {why}",
-  "service.gitMoves.detached": "A pasta do projeto está em um HEAD desanexado: Movimentos restaura um branch quando a pasta estiver em um."
+  "service.gitMoves.detached": "A pasta do projeto está em um HEAD desanexado: Movimentos restaura um branch quando a pasta estiver em um.",
+  "service.gitCommit.alreadyIn": "{branch} já tem este commit.",
+  "service.gitCommit.detached": "A pasta do projeto está em um HEAD desanexado: troque para um branch primeiro.",
+  "service.gitCommit.dirty": "A pasta do projeto tem alterações sem commit: faça commit delas ou deixe-as de lado primeiro.",
+  "service.gitCommit.done": "{action, select, revert {Revert de {commit} feito em {branch}} other {Cherry-pick de {commit} feito em {branch}}}: o novo commit é {made}.",
+  "service.gitCommit.failed": "O git recusou: {why}",
+  "service.gitCommit.invalid": "Isso foi pedido de forma errada: nada foi feito.",
+  "service.gitCommit.moved": "A pasta do projeto não está mais em {branch} no commit que você viu: nada foi feito. Olhe de novo.",
+  "service.gitCommit.noCommit": "O git não tem o commit {commit}: ele pode ter sumido. Olhe de novo.",
+  "service.gitCommit.notIn": "{branch} não tem este commit, então não há nada dele para reverter. Cherry-pick… o traz.",
+  "service.gitCommit.stopped": "{action, select, revert {O revert} other {O cherry-pick}} de {commit} parou em {count, plural, one {um conflito em # arquivo} many {conflitos em # arquivos} other {conflitos em # arquivos}}: conclua ou aborte a operação em Controle de versão → Alterações.",
+  "service.gitCommit.stoppedEmpty": "{action, select, revert {O revert} other {O cherry-pick}} de {commit} parou: o git diz que não mudaria nada. Pule ou aborte a operação em Controle de versão → Alterações.",
+  "service.gitCommit.timedOut": "O git ainda estava rodando depois de {seconds, number} segundos, então o Combwork o encerrou. Olhe Controle de versão → Alterações antes de tentar de novo.",
+  "service.gitRepo.noTagCommit": "O git não tem o commit {commit} para criar uma tag."
 }

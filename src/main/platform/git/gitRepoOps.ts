@@ -13,6 +13,7 @@ import * as operations from './gitOperationSteps'
 import * as health from './gitHealth'
 import * as stashes from './gitStashes'
 import * as moves from './gitMoves'
+import * as commits from './gitCommitActions'
 import type { RepoOps } from '../repoOps'
 
 export const gitRepoOps: RepoOps = {
@@ -34,7 +35,7 @@ export const gitRepoOps: RepoOps = {
   push: (p, remote) => repo.push(p, remote),
   pushTo: (p, remote, scope, line) => repo.pushToRemote(p, remote, scope, line),
   setUpstream: (p, line, remote, remoteLine, pushFirst) => repo.setUpstream(p, line, remote, remoteLine, pushFirst),
-  createTag: (p, name, message, to) => repo.createTag(p, name, message, to),
+  createTag: (p, name, message, to, at) => repo.createTag(p, name, message, to, at),
   setIdentity: (p, name, email) => repo.setIdentity(p, name, email),
   initCheck: (p) => init.initCheck(p),
   init: (p, opts) => init.initRepo(p, opts),
@@ -56,5 +57,8 @@ export const gitRepoOps: RepoOps = {
   dropStash: (p, ref) => stashes.dropStash(p, ref),
   moves: (p, branch, page) => moves.listMoves(p, branch, page),
   restorePlan: (p, req) => moves.restorePlan(p, req),
-  restore: (p, req) => moves.restoreBranch(p, req)
+  restore: (p, req) => moves.restoreBranch(p, req),
+  commitDetail: (p, commit) => commits.commitDetail(p, commit),
+  commitFileDiff: (p, commit, file) => commits.commitFileDiff(p, commit, file),
+  commitAction: (p, req) => commits.commitAction(p, req)
 }

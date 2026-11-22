@@ -638,5 +638,7 @@
   "tips.stashes.text": "Controle de versão → Alterações → Stashes lista os stashes do repositório, os do Deixar de lado do Combwork com o cartão deles: mostre o que cada um contém e depois aplique, retire (pop) ou apague.",
   "tips.stashes.title": "Veja, aplique ou apague seus stashes do git",
   "tips.branchMoves.text": "Controle de versão → Histórico → Movimentos lista cada vez que um branch se moveu, como o reflog do git guarda: os merges de cartões do Combwork, commits, rebases, resets e pulls. Restaurar para este ponto… leva o branch de volta, mostrando antes quais commits ele perde ou traz de volta.",
-  "tips.branchMoves.title": "Desfazer um reset, rebase ou merge de um branch"
+  "tips.branchMoves.title": "Desfazer um reset, rebase ou merge de um branch",
+  "tips.commitDetails.text": "Clique em um commit em Controle de versão → Histórico para ver os arquivos e as alterações dele. Dali, use Revert… ou Cherry-pick… no branch da pasta do projeto, ou Criar branch aqui… e Criar tag aqui… nele.",
+  "tips.commitDetails.title": "Faça revert, cherry-pick, branch ou tag de um commit no Histórico"
 }

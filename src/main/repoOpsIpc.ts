@@ -44,7 +44,7 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   'git:push': (p, remote) => opsAt('git:push').push(p, remote ? String(remote) : undefined),
   'git:pushTo': (p, remote, scope, branch) => opsAt('git:pushTo').pushTo(p, String(remote ?? ''), scope === 'all' ? 'all' : 'branch', branch ? String(branch) : undefined),
   'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst) => opsAt('git:setUpstream').setUpstream(p, String(branch ?? ''), remote == null ? null : String(remote), String(remoteBranch ?? ''), !!pushFirst),
-  'git:createTag': (p, name, message, pushTo) => opsAt('git:createTag').createTag(p, String(name ?? ''), String(message ?? ''), pushTo ? String(pushTo) : undefined),
+  'git:createTag': (p, name, message, pushTo, _op, at) => opsAt('git:createTag').createTag(p, String(name ?? ''), String(message ?? ''), pushTo ? String(pushTo) : undefined, at ? String(at) : undefined),
   'git:setIdentity': (p, name, email) => opsAt('git:setIdentity').setIdentity(p, String(name ?? ''), String(email ?? '')),
   'git:initCheck': (p) => opsAt('git:initCheck').initCheck(p),
   'git:init': (p, opts) => opsAt('git:init').init(p, opts && typeof opts === 'object' ? opts : { gitignore: 'none' }),
@@ -81,5 +81,9 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   // HI-3469: History's Moves and Restore to here… (the request checked by the port, gitMoves.ts).
   'git:moves': (p, branch, page) => opsAt('git:moves').moves(workspace.assertProject(p), typeof branch === 'string' && branch ? branch : null, Number(page) || 1),
   'git:restorePlan': (p, req) => opsAt('git:restorePlan').restorePlan(workspace.assertProject(p), req),
-  'git:restore': (p, req) => opsAt('git:restore').restore(workspace.assertProject(p), req)
+  'git:restore': (p, req) => opsAt('git:restore').restore(workspace.assertProject(p), req),
+  // HI-3471: History's Commit dialog (the requests checked by the port, gitCommitActions.ts).
+  'git:commitDetail': (p, commit) => opsAt('git:commitDetail').commitDetail(workspace.assertProject(p), commit),
+  'git:commitFileDiff': (p, commit, file) => opsAt('git:commitFileDiff').commitFileDiff(workspace.assertProject(p), commit, String(file ?? '')),
+  'git:commitAction': (p, req) => opsAt('git:commitAction').commitAction(workspace.assertProject(p), req)
 }

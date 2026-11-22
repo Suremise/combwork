@@ -638,5 +638,7 @@
   "tips.stashes.text": "Versionsverwaltung → Änderungen → Stashes listet die Stashes des Repositorys auf, die von Combworks Beiseitelegen mit ihrer Karte: Zeige an, was jeder enthält, und wende ihn an, poppe oder lösche ihn.",
   "tips.stashes.title": "Git-Stashes ansehen, anwenden oder löschen",
   "tips.branchMoves.text": "Versionsverwaltung → Verlauf → Bewegungen listet jede Bewegung eines Branchs auf, so wie git sie im Reflog festhält: die Merges von Karten durch Combwork, Commits, Rebases, Resets und Pulls. „Diesen Stand wiederherstellen…“ setzt den Branch zurück und zeigt vorher, welche Commits wegfallen oder zurückkommen.",
-  "tips.branchMoves.title": "Reset, Rebase oder Merge eines Branchs rückgängig machen"
+  "tips.branchMoves.title": "Reset, Rebase oder Merge eines Branchs rückgängig machen",
+  "tips.commitDetails.text": "Klicke in Versionsverwaltung → Verlauf auf einen Commit, um seine Dateien und Änderungen zu sehen. Von dort wendest du ihn mit „Revert…“ oder „Cherry-Pick…“ auf den Branch des Projektordners an oder legst mit „Branch ab hier…“ und „Hier taggen…“ einen Branch oder ein Tag an ihm an.",
+  "tips.commitDetails.title": "Einen Commit aus dem Verlauf reverten, cherry-picken, abzweigen oder taggen"
 }
