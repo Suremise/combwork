@@ -100,17 +100,24 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
   const project = projectOf(ws, projectPath)
   let from: PlatformId = to
   let replaced = false
+  let stale = false
   await ws.mutateProjectConfig(project.path, (cfg) => {
     const now = projectPlatform(project.path, cfg.platform)
     from = now.id
     if (expected && expected !== from) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[from] }, { kind: 'conflict' })
     o.guard?.(from)
-    if (from === to) {
-      // HI-3510: the platform in force written where project.json names one Combwork doesn't have, its notice settled.
-      if (o.invalid === undefined || now.invalid !== o.invalid) return {}
+    // HI-3510: the notice's Use {platform} is only ever that: the platform in force written where project.json still names
+    // the value the notice was about. Anything else since (a valid value set, the folder now detected otherwise) leaves
+    // project.json as it is, never a switch (HR2's round 1).
+    if (o.invalid !== undefined) {
+      if (now.invalid !== o.invalid || from !== to) {
+        stale = true
+        return {}
+      }
       replaced = true
       return { platform: to, platformFound: foundKey(now.detected) }
     }
+    if (from === to) return {}
     const refused = switchRefused(to, now.detected)
     if (refused) {
       const t = switchRefusalText(refused)
@@ -126,7 +133,8 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
     await ws.refresh().catch((e) => log.warn('refreshing after a platform setting was replaced', e))
     workflowChanged(ws, project.path)
   }
-  if (from === to) return { from, to }
+  if (stale) log.info(`${userText(basename(project.path))}'s platform notice was answered after project.json changed: left as it is`)
+  if (from === to || stale) return { from, to: from }
   await afterSwitch(ws, project.path, from, to)
   return { from, to }
 }

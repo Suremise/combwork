@@ -385,6 +385,25 @@ describe('a project.json naming jj (HI-3510)', () => {
     expect((await w.projectConfig(repo)).platform).toBe('none')
   })
 
+  // HR2's round 1: a notice answered late never becomes a switch, whatever the project is now.
+  it('a stale Use None after the project became a valid Git one leaves its platform and workflow as they are', async () => {
+    const { w, repo } = await workspace({ platform: 'git', workflow: { platform: 'git', preset: 'pair', options: { review: 'agent' } } })
+    const before = await w.projectConfig(repo)
+    expect(await sw.setPlatform(w, repo, 'none', { invalid: 'jj' })).toEqual({ from: 'git', to: 'git' })
+    const after = await w.projectConfig(repo)
+    expect(after.platform).toBe('git')
+    expect(after.workflow).toEqual(before.workflow)
+  })
+
+  it('a notice whose platform is no longer the one in force writes nothing', async () => {
+    const { w, repo } = await former()
+    // Still naming jj, but asked to write Git where None is in force (the folder has .jj): nothing written, no switch.
+    expect(await sw.setPlatform(w, repo, 'git', { invalid: 'jj' })).toEqual({ from: 'none', to: 'none' })
+    const after = await w.projectConfig(repo)
+    expect(after.platform).toBe('jj')
+    expect(after.workflow).toMatchObject(jjWorkflow)
+  })
+
   it("the settings tool changes an option of such a project under the platform in force, from none of jj's options", async () => {
     const { w, repo } = await former()
     let reply: Awaited<ReturnType<typeof settingsTools.applySetting>> | null = null

@@ -2351,7 +2351,8 @@ control is still a platform of its own (§16.3.1, the type map below). The last 
   them), so jj's are neither applied nor shown, and the settings tool writes a changed option under the platform in
   force. The notice that project.json names a version control Combwork doesn't know has **Use {platform}** (the one in
   force, None for a jj folder): it writes that value, only while project.json still names the one the notice was about
-  (checked under the project's lock), and the notice settles; `workflow` is left as it is.
+  and that platform is still the one in force (checked under the project's lock), and the notice settles; `workflow` is
+  left as it is. Answered late, it writes nothing: it is never a switch.
 - **Detection:** a `.jj` folder is another version control, as Mercurial's `.hg` is (§16.3.5): the folder is None,
   a Git project with one beside its `.git` is offered None, and Git isn't offered where one is found. A `.jj` in a
   folder above counts too (HI-3487): a Git repository inside a jj workspace, which 1.6.x read as Git, is now
