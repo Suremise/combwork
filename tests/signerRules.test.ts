@@ -2,7 +2,7 @@
 // Combwork's (validated before anything is dropped), a session's environment with the signer, which calls are signing
 // calls, and the known installations whatever the variables' case.
 import { describe, expect, it } from 'vitest'
-import { decodeArgv, encodeArgv, gitConfigCount, interpreterOf, isKnownSigner, isMsys2Sh, quoteArgMsvc, quoteArgMsys2, resolveProgramWith, signerRun, isSignLauncher, isSigningCall, knownSignerPaths, lastScoped, signerKind, withoutOurEntries, withSessionSigner, SIGN_ENV } from '../src/main/platform/signerRules'
+import { decodeArgv, encodeArgv, gitConfigCount, interpreterOf, isKnownSigner, isMsys2Sh, quoteArgMsvc, quoteArgMsys2, resolveProgramWith, signerRun, isSignLauncher, isSigningCall, knownSignerPaths, lastScoped, signerKind, withoutOurEntries, withSessionSigner, SIGN_ENV } from '../src/main/signer/signerRules'
 
 const L = 'C:\\Program Files\\Combwork\\resources\\bin\\cw-sign.exe'
 const signer = { launcher: L, exec: 'C:\\Program Files\\Combwork\\Combwork.exe', script: 'C:\\x\\cw-sign.js', timeoutMs: 120_000 } // timing-ok: data, not a wait

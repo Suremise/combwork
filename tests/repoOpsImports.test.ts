@@ -59,7 +59,7 @@ describe('callers moved to the repository operations port (HI-2788)', () => {
       }
     }
     walk('src')
-    expect(files.filter((f) => importsOf(f).includes('src/main/platform/gitRepoOps'))).toEqual(['src/main/platform/repoOpsPorts.ts'])
+    expect(files.filter((f) => importsOf(f).includes('src/main/platform/git/gitRepoOps'))).toEqual(['src/main/platform/repoOpsPorts.ts'])
     // The registry exports only the gated lookups: no ungated way to the port.
     expect([...read('src/main/platform/repoOpsPorts.ts').matchAll(/^export (?:function|const) (\w+)/gm)].map((m) => m[1]).sort()).toEqual(['lineRepoOps', 'repoOpsFor'])
   })

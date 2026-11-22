@@ -9,8 +9,8 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { join } from 'path'
 import { build } from 'esbuild'
 import { tempDir } from '../tempDir'
-import { withSessionSigner, encodeArgv, SIGN_ENV, type SessionSigner } from '../../src/main/platform/signerRules'
-import { configuredSigner } from '../../src/main/platform/signerPick'
+import { withSessionSigner, encodeArgv, SIGN_ENV, type SessionSigner } from '../../src/main/signer/signerRules'
+import { configuredSigner } from '../../src/main/signer/signerPick'
 // @ts-expect-error: a build script (JavaScript), its one function used here
 import { buildSignLauncher, frameworkCsc } from '../../scripts/buildSignLauncher.mjs'
 import { timing } from '../timing.cjs'
@@ -50,7 +50,7 @@ beforeAll(async () => {
   writeFileSync(join(home, '.gitconfig'), '')
   const launcher = buildSignLauncher(join(dir, 'bin'), () => undefined)
   const script = join(dir, 'cw-sign.js')
-  await build({ entryPoints: [join(ROOT, 'src', 'main', 'platform', 'cw-sign.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: script, logLevel: 'silent' })
+  await build({ entryPoints: [join(ROOT, 'src', 'main', 'signer', 'cw-sign.ts')], bundle: true, platform: 'node', format: 'cjs', outfile: script, logLevel: 'silent' })
   signer = { launcher, exec: process.execPath, script, timeoutMs: HUNG_MS }
   for (const k of ['PATH', 'PATHEXT', 'SystemRoot', 'windir', 'ComSpec', 'TEMP', 'TMP', 'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432', 'SystemDrive', 'ProgramData']) if (process.env[k]) base[k] = process.env[k]!
   // Git's own folders first, as a session started from Git's installation finds gpg (git adds them for its children).

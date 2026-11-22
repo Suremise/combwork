@@ -4,7 +4,7 @@
 // platform's own (tests/integrationPortsImports.test.ts holds it to that for the candidate steps).
 
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { gitIntegration } from './gitIntegration'
+import { gitIntegration } from './git/gitIntegration'
 import type { IntegrationPort } from './integration'
 
 const PORTS: Partial<Record<PlatformId, IntegrationPort>> = { git: gitIntegration }

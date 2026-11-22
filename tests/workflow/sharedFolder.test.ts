@@ -253,7 +253,7 @@ describe('workflow scenarios, several agents in one folder', () => {
     const folder = e.wf.folderOf(e.wf.state(card))
     const before = commit(folder, { 'a.txt': 'a\n' }, 'a')
     const head = commit(folder, { 'b.txt': 'b\n' }, 'b')
-    const { notTheHead } = await import('../../src/main/platform/gitPlatform')
+    const { notTheHead } = await import('../../src/main/platform/git/gitPlatform')
     expect(await notTheHead(folder, head, head)).toBeNull()
     expect(await notTheHead(folder, head.slice(0, 7), head)).toBeNull()
     expect(await notTheHead(folder, ` ${head.slice(0, 10).toUpperCase()} `, head)).toBeNull()

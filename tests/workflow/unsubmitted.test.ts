@@ -7,7 +7,7 @@ import { renameSync } from 'fs'
 import { B1, B2, commit, moved, put, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { attributeFolder } from '../../src/main/workflow/reconcile'
-import { UNSUBMITTED_MAX } from '../../src/main/platform/gitPlatform'
+import { UNSUBMITTED_MAX } from '../../src/main/platform/git/gitPlatform'
 import { taskWaitText } from '../../src/shared/toolReplies'
 
 let env: Env | null = null

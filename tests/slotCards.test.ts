@@ -1808,7 +1808,7 @@ describe('Combwork quitting (#1628)', { timeout: timing('test.hang') }, () => {
 
 describe("HI-3010: a lane's next card, its builder busy in the slot", { timeout: timing('test.hang') }, () => {
   it('the slot is on its line at once, with what its builder committed, and no hook runs; placed once its builder is free', async () => {
-    const { gitWorkspacePort } = await import('../src/main/platform/gitWorkspacePort')
+    const { gitWorkspacePort } = await import('../src/main/platform/git/gitWorkspacePort')
     const { NOT_IN_PLACE } = await import('../src/main/slots')
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
     state.wf = e.wf

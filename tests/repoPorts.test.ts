@@ -25,7 +25,7 @@ vi.mock('../src/main/repoLockWorker', async (original) => {
 const { git, gitTestHooks } = await import('../src/main/git')
 const { commonGitDir, inStoreOrder, withRepoLock, withRepoLocks } = await import('../src/main/repoLock')
 const { repoLockHolder } = await import('../src/main/repoLockCore')
-const { gitRepoPorts } = await import('../src/main/platform/gitRepoPorts')
+const { gitRepoPorts } = await import('../src/main/platform/git/gitRepoPorts')
 const { hasRepository, portsOf, repoContext, repoContexts, repoPortsOf, withFolderRepoLocks } = await import('../src/main/platform/repoPorts')
 const { sameStore } = await import('../src/main/platform/repoContext')
 

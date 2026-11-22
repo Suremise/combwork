@@ -6,7 +6,7 @@ import { createRequire } from 'module'
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'fs'
 import { isAbsolute, join, resolve } from 'path'
 import { describe, expect, it } from 'vitest'
-import { readRepoRefs } from '../src/main/platform/repoRefs'
+import { readRepoRefs } from '../src/main/gitRefs'
 import { tempDir } from './tempDir'
 
 const { gitEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }

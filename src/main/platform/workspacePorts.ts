@@ -4,7 +4,7 @@
 // import this module and workspacePort.ts, never a platform's own worktree modules (tests/repoPortsImports.test.ts).
 
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { gitWorkspacePort } from './gitWorkspacePort'
+import { gitWorkspacePort } from './git/gitWorkspacePort'
 import type { Relocation, WorkspacePort } from './workspacePort'
 import { repoHolding } from './repoPorts'
 

@@ -11,7 +11,7 @@ import { build } from 'esbuild'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { git, gitTestHooks, readRefsOffMain, useGitWorker, type GitResult } from '../src/main/git'
 import { runGit } from '../src/main/gitWorker'
-import { readRepoRefs } from '../src/main/platform/repoRefs'
+import { readRepoRefs } from '../src/main/gitRefs'
 import { tempDir } from './tempDir'
 import { timing } from './timing.cjs'
 

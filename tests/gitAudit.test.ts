@@ -2,13 +2,14 @@
 // module from outside Git's implementation is a classified edge in tests/gitAudit.mjs, taking only the names it lists,
 // and every "platform with lines" seam is counted per caller. A new edge, a new name across a constrained one, a new seam
 // call in a listed file, or a listed edge that is gone fails here, naming it; so does a switch on a platform's id
-// (`platform === 'git'`) outside the descriptors, adapters and registry that SWITCHES doesn't justify (HI-2822).
+// (`platform === 'git'`) outside the descriptors, adapters and registry that SWITCHES doesn't justify (HI-2822), and an
+// import of a platform's folder (src/main/platform/<vc>/) from outside it that isn't a registry's (HI-3489).
 // scripts/gitInventory.mjs prints the audit.
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types, shared with scripts/gitInventory.mjs
-import { audit, EDGES, modeDeclarations, NOT_PLATFORM, platformIdsIn, SEAMS, SWITCHES } from './gitAudit.mjs'
+import { audit, EDGES, modeDeclarations, NOT_PLATFORM, platformFolders, platformIdsIn, REGISTRIES, sealBreaks, SEAMS, SWITCHES } from './gitAudit.mjs'
 import { timing } from './timing.cjs'
 
 // A bound for a hung test (HI-3349): each audit reads the whole source tree, and a full unit run on a loaded machine
@@ -16,7 +17,7 @@ import { timing } from './timing.cjs'
 vi.setConfig({ testTimeout: timing('test.hang') })
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
-type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[] }
+type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; sealed: string[] }
 const root = join(__dirname, '..')
 const run = (over: Record<string, string> = {}): Audit => audit(root, over)
 const text = (file: string): string => readFileSync(join(root, file), 'utf8')
@@ -24,7 +25,43 @@ const text = (file: string): string => readFileSync(join(root, file), 'utf8')
 describe('the Git/None cutover audit', () => {
   it('classifies every Git import outside Git\'s implementation, and counts every seam', () => {
     const a = run()
-    expect({ unlisted: a.unlisted, stale: a.stale, extraNames: a.extraNames, seams: a.seams, switches: a.switches }).toEqual({ unlisted: [], stale: [], extraNames: [], seams: [], switches: [] })
+    expect({ unlisted: a.unlisted, stale: a.stale, extraNames: a.extraNames, seams: a.seams, switches: a.switches, sealed: a.sealed }).toEqual({ unlisted: [], stale: [], extraNames: [], seams: [], switches: [], sealed: [] })
+  })
+
+  // HI-3489: each version control's folder (src/main/platform/<vc>/) is imported only from inside it and by the registries.
+  it("seals each platform's folder: only the registries import it from outside, and tests aren't read", () => {
+    const sealed = (over: Record<string, string>): string[] => sealBreaks(root, over)
+    expect(platformFolders(root)).toEqual(['git', 'none'])
+    expect(REGISTRIES).toContain('src/main/platform/adapters')
+    const sessions = 'src/main/sessions.ts'
+    // An outside file, however it imports: a named import, a type, a re-export, a dynamic import, a require.
+    for (const line of ["import { NoneAdapter } from './platform/none/none'", "import type { NoneAdapter } from './platform/none/none'", "export { NoneAdapter } from './platform/none/none'", "const n = () => import('./platform/none/none')", "const n = require('./platform/none/none')", "type N = import('./platform/none/none').NoneAdapter", 'import "./platform/none/none.ts"'])
+      expect(sealed({ [sessions]: `${line}\n${text(sessions)}` }), line).toEqual(['src/main/sessions -> src/main/platform/none/none'])
+    expect(sealed({ [sessions]: `import { gitHistory } from './platform/git/gitHistory'\n${text(sessions)}` })).toEqual(['src/main/sessions -> src/main/platform/git/gitHistory'])
+    // A computed specifier outside the folders could load one.
+    expect(sealed({ [sessions]: `${text(sessions)}\nconst m = './platform/no' + 'ne/none'\nconst later = () => import(m)\n` })).toEqual(['src/main/sessions -> (computed specifier)'])
+    // The seam beside the folders is outside them too, and so is another platform's folder.
+    const seam = 'src/main/platform/workspacePort.ts'
+    expect(sealed({ [seam]: `import { NonePlatform } from './none/nonePlatform'\n${text(seam)}` })).toEqual(['src/main/platform/workspacePort -> src/main/platform/none/nonePlatform'])
+    const gitFile = 'src/main/platform/git/gitPlatform.ts'
+    const nonePlatformFile = 'src/main/platform/none/nonePlatform.ts'
+    expect(sealed({ [gitFile]: `import { NoneAdapter } from '../none/none'\n${text(gitFile)}` })).toEqual(['src/main/platform/git/gitPlatform -> src/main/platform/none/none'])
+    // A computed specifier inside a platform's folder can't be proved to stay there (HI-3489 round 1: one in git/ loading
+    // ../none/none, spelled by char codes, went unseen).
+    const charCodes = 'const target = String.fromCharCode(46,46,47,110,111,110,101,47,110,111,110,101)\nvoid import(target)\n'
+    expect(sealed({ [gitFile]: `${text(gitFile)}\n${charCodes}` })).toEqual(['src/main/platform/git/gitPlatform -> (computed specifier)'])
+    expect(sealed({ [nonePlatformFile]: `${text(nonePlatformFile)}\nconst m = './no' + 'ne'\nconst later = () => require(m)\n` })).toEqual(['src/main/platform/none/nonePlatform -> (computed specifier)'])
+    // A registry may: the adapters' map names every platform's adapter. A folder's own files import each other.
+    const adapters = 'src/main/platform/adapters.ts'
+    expect(sealed({ [adapters]: `import { NoneAdapter } from './none/none'\n${text(adapters)}` })).toEqual([])
+    const nonePlatform = 'src/main/platform/none/nonePlatform.ts'
+    expect(sealed({ [nonePlatform]: `import { NONE_MAX_FILES } from './none'\n${text(nonePlatform)}` })).toEqual([])
+    // A test imports a platform's files directly: not read.
+    expect(sealed({ 'tests/sealProbe.test.ts': "import { NoneAdapter } from '../src/main/platform/none/none'\n" })).toEqual([])
+    // A new platform's folder is sealed as soon as it is there.
+    expect(sealed({ 'src/main/platform/hg/hgPlatform.ts': 'export const hg = 1\n', [sessions]: `import { hg } from './platform/hg/hgPlatform'\n${text(sessions)}` })).toEqual(['src/main/sessions -> src/main/platform/hg/hgPlatform'])
+    // And the audit reports it.
+    expect(run({ [sessions]: `import { NoneAdapter } from './platform/none/none'\n${text(sessions)}` }).sealed).toEqual(['src/main/sessions -> src/main/platform/none/none'])
   })
 
   it('gives each edge a class and a reason; a historic one its legacy operation, a defect its card', () => {
@@ -41,7 +78,7 @@ describe('the Git/None cutover audit', () => {
   it('fails a new Git import in a file whose listed edge is to another module (sessions.ts: the fence, not git)', () => {
     const file = 'src/main/sessions.ts'
     expect(run({ [file]: `import { git } from './git'\n${text(file)}` }).unlisted).toEqual(['src/main/sessions -> src/main/git'])
-    expect(run({ [file]: `import * as G from './platform/git'\nG.head('x')\n${text(file)}` }).unlisted).toEqual(['src/main/sessions -> src/main/platform/git'])
+    expect(run({ [file]: `import * as G from './gitCommands'\nG.head('x')\n${text(file)}` }).unlisted).toEqual(['src/main/sessions -> src/main/gitCommands'])
   })
 
   it('fails a new Git import however it is written: double quotes, indented, a side effect, a re-export, a require (HR1, round 1)', () => {
@@ -108,7 +145,7 @@ describe('the Git/None cutover audit', () => {
     // field of that name holding no mode (a count, another word) is not one.
     const runtime = 'src/main/workflow/runtime.ts'
     const form = 'src/renderer/src/components/WorkflowOptions.tsx'
-    const adapter = 'src/main/platform/gitPlatform.ts'
+    const adapter = 'src/main/platform/git/gitPlatform.ts'
     const over: Record<string, string> = {
       [runtime]: `${text(runtime)}
 const modes = { finishes: ['committed'] as const }
@@ -122,7 +159,7 @@ class Modes { 'finishes' = ['agentMerges'] }
 `
     }
     const lines = (f: string): number => over[f].split(/\n/).length - 1
-    expect(modeDeclarations(root, over)).toEqual([`src/main/platform/gitPlatform.ts:${lines(adapter)} finishes`, `src/main/workflow/runtime.ts:${lines(runtime)} finishes`, `src/renderer/src/components/WorkflowOptions.tsx:${lines(form)} defaultFinish`])
+    expect(modeDeclarations(root, over)).toEqual([`src/main/platform/git/gitPlatform.ts:${lines(adapter)} finishes`, `src/main/workflow/runtime.ts:${lines(runtime)} finishes`, `src/renderer/src/components/WorkflowOptions.tsx:${lines(form)} defaultFinish`])
   })
 
   it("fails a switch on a platform's id outside the descriptors, adapters and registry, and one more in a justified file (HI-2822)", () => {

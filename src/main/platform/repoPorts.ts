@@ -7,7 +7,7 @@
 import type { PlatformId } from '../../shared/platform/descriptors'
 import type { IgnoreRule } from '../../shared/gitIgnoreRules'
 import { METADATA_DIRS } from '../../shared/platform/metadataDirs'
-import { gitRepoPorts } from './gitRepoPorts'
+import { gitRepoPorts } from './git/gitRepoPorts'
 import type { RepoContext, RepoLockOptions, RepoPorts } from './repoContext'
 import { withStoreLocks } from '../repoLock'
 

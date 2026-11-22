@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 describe('callers moved to the repository context port', () => {
   const root = join(__dirname, '..')
   /** R1's Git modules: the runner, its worker and tool check, the queue's host, the locks, the fence and ref holds. */
-  const GIT_SEAMS = ['src/main/git', 'src/main/gitTool', 'src/main/gitWorker', 'src/main/workflow/gitHost', 'src/main/repoLock', 'src/main/repoLockCore', 'src/main/repoLockWorker', 'src/main/folderFence', 'src/main/platform/refHold', 'src/main/platform/gitRepoPorts']
+  const GIT_SEAMS = ['src/main/git', 'src/main/gitTool', 'src/main/gitWorker', 'src/main/workflow/gitHost', 'src/main/repoLock', 'src/main/repoLockCore', 'src/main/repoLockWorker', 'src/main/folderFence', 'src/main/platform/git/refHold', 'src/main/platform/git/gitRepoPorts']
   /**
    * The callers moved: each takes repository locks (HI-2784), or reads a folder's repository context (HI-2789: the trust
    * check's roots, Claude Code's memory base, the skill copies' exclude), through repoPorts.ts.
@@ -46,7 +46,7 @@ describe('callers moved to the repository context port', () => {
       }
     }
     walk('src')
-    expect(files.filter((f) => importsOf(f).includes('src/main/platform/gitRepoPorts'))).toEqual(['src/main/platform/repoPorts.ts'])
+    expect(files.filter((f) => importsOf(f).includes('src/main/platform/git/gitRepoPorts'))).toEqual(['src/main/platform/repoPorts.ts'])
   })
 })
 

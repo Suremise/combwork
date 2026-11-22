@@ -20,7 +20,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 const { gitTree } = await import('../src/main/workflow/mergeQueue')
 const { runPick } = await import('../src/main/workflow/focusedRun')
 const { execCommand } = await import('../src/main/workflow/queueChecks')
-const { gitFilesExec } = await import('../src/main/platform/gitModulesRun')
+const { gitFilesExec } = await import('../src/main/platform/git/gitModulesRun')
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }

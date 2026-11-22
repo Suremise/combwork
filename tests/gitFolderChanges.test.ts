@@ -140,10 +140,10 @@ vi.mock('../src/main/gitRepo', async (original) => {
 vi.setConfig({ testTimeout: timing('test.hang') })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
-const changes = await import('../src/main/gitFolderChanges')
+const changes = await import('../src/main/platform/git/gitFolderChanges')
 const { cancellableGit } = await import('../src/main/gitCancel')
-const { checkouts, worktreeNow } = await import('../src/main/platform/git')
-const { GitPlatform } = await import('../src/main/platform/gitPlatform')
+const { checkouts, worktreeNow } = await import('../src/main/gitCommands')
+const { GitPlatform } = await import('../src/main/platform/git/gitPlatform')
 const { isUnknown } = await import('../src/main/platform/types')
 
 const base = tempDir('cw-folderchanges-')

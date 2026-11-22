@@ -6,7 +6,7 @@ import { failure as commandFailed, git, gitlinkChange, isBinary, MAX_DIFF_BYTES,
 import { subprojectLine, type GitlinkSide } from '../shared/gitlink'
 import { gitProblem } from './gitTool'
 import { combworkError } from './combworkError'
-import * as G from './platform/git'
+import * as G from './gitCommands'
 import { isUnknown } from './platform/types'
 
 /**

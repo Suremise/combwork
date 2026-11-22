@@ -11,8 +11,8 @@ import { boardFile } from '../../src/main/boardStore'
 import type { CardRecord } from '../../src/main/workflow/factStore'
 
 const flags = vi.hoisted(() => ({ afterContains: null as (() => void) | null }))
-vi.mock('../../src/main/platform/git', async (orig) => {
-  const actual = (await orig()) as typeof import('../../src/main/platform/git')
+vi.mock('../../src/main/gitCommands', async (orig) => {
+  const actual = (await orig()) as typeof import('../../src/main/gitCommands')
   return {
     ...actual,
     contains: async (...args: Parameters<typeof actual.contains>) => {

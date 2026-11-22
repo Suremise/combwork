@@ -1,5 +1,5 @@
 // HI-3465: a git operation left under way in a slot (a merge, rebase, am, cherry-pick, revert or bisect, as git names it:
-// platform/git.ts operationSync) and the command that ends it, said beside it in Slots and copies and in the notice
+// gitCommands.ts operationSync) and the command that ends it, said beside it in Slots and copies and in the notice
 // Combwork gives once. Combwork never runs it itself: ending an operation is the agent's or the user's choice.
 
 /**

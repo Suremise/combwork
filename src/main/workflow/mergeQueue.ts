@@ -41,8 +41,6 @@ import { again, isAgain } from '../platform/again'
 import type { Again, BegunAdvance, CandidateFail, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, PublishReply, QueueGitOptions, QueueGitResult, TransportSnapshot } from '../platform/integration'
 import type { TransportStore } from './transportSnapshots'
 import { integrationFor, queueIntegration } from '../platform/integrationPorts'
-// Git's commit reading (HI-2790: moved to the platform with the candidate steps), named here for its tests.
-export { commitFailed, readCommitStream, type CommitChild, type CommitStream } from '../platform/gitCommits'
 import type { ConflictsRecord } from '../../shared/workflow/conflicts'
 import { bracketEnd, bracketStart } from './queueChecks'
 import { CW_RUNS } from '../progress'

@@ -182,7 +182,7 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
     byProject.set(key, inst)
   }
   inst.resolved = resolved
-  inst.wf.none.setExcluded(resolved.options.excluded)
+  inst.wf.none?.setExcluded(resolved.options.excluded)
   // Declared paths' content hashes (None's revisions), kept current before the runtime answers.
   if (declaresPaths(resolved.options.platform)) {
     await syncHashes(inst, project.path)
@@ -209,11 +209,12 @@ function syncHashes(inst: Instance, project: string): Promise<void> {
     const from = inst.syncedAt
     const to = Date.now()
     const seen = await observer.changedBetween(project, from, to, (paths) => paths)
-    if (isUnknown(seen)) inst.wf.none.forget()
-    else for (const p of seen.paths) inst.wf.none.invalidate(p)
+    const none = inst.wf.deliverables()
+    if (isUnknown(seen)) none.forget()
+    else for (const p of seen.paths) none.invalidate(p)
     inst.syncedAt = to
   })
-  inst.sync = run.catch(() => inst.wf.none.forget())
+  inst.sync = run.catch(() => inst.wf.none?.forget())
   return inst.sync
 }
 

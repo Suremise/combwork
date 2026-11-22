@@ -32,7 +32,7 @@ describe("the merge queue's candidate through the integration port", () => {
       ['the merge base', /'merge-base',\s*a,\s*b/]
     ]
     expect(commands.filter(([, re]) => re.test(text)).map(([what]) => what)).toEqual([])
-    expect(importsOf('src/main/workflow/mergeQueue.ts')).not.toContain('src/main/platform/gitIntegration')
+    expect(importsOf('src/main/workflow/mergeQueue.ts')).not.toContain('src/main/platform/git/gitIntegration')
     expect(importsOf('src/main/workflow/mergeQueue.ts')).not.toContain('src/main/workflow/conflictRead')
   })
 
@@ -50,7 +50,7 @@ describe("the merge queue's candidate through the integration port", () => {
     ]
     for (const [file, what, re] of rules) if (re.test(read(file))) found.push(`${file}: ${what}`)
     expect(found).toEqual([])
-    for (const file of ['src/main/workflow/queueHost.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueControls.ts']) expect(importsOf(file), file).not.toContain('src/main/platform/gitIntegration')
+    for (const file of ['src/main/workflow/queueHost.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueControls.ts']) expect(importsOf(file), file).not.toContain('src/main/platform/git/gitIntegration')
   })
 
   it("the port's contract imports no platform's code, only types", () => {
@@ -69,6 +69,6 @@ describe("the merge queue's candidate through the integration port", () => {
       }
     }
     walk('src')
-    expect(files.filter((f) => importsOf(f).includes('src/main/platform/gitIntegration'))).toEqual(['src/main/platform/integrationPorts.ts'])
+    expect(files.filter((f) => importsOf(f).includes('src/main/platform/git/gitIntegration'))).toEqual(['src/main/platform/integrationPorts.ts'])
   })
 })

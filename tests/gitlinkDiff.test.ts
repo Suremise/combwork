@@ -13,7 +13,7 @@ import { tempDir } from './tempDir'
 import { commit, freshGitRepo, sh } from './workflow/harness'
 import { gitDiff } from '../src/main/git'
 import { compareDiff } from '../src/main/gitCompare'
-import { filesChanged, treeSide } from '../src/main/platform/git'
+import { filesChanged, treeSide } from '../src/main/gitCommands'
 import { isUnknown } from '../src/main/platform/types'
 import { gitlinkOf, parseRawRows, parseSubprojectPatch, sideOf, subprojectLine, unresolved } from '../src/shared/gitlink'
 

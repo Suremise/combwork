@@ -29,7 +29,7 @@ vi.mock('../src/main/git', async (importOriginal) => {
 })
 const { ensureCombworkExcluded, combworkVcs, syncServiceOf, trackedCombworkFiles, untrackCombwork, vcsOf } = await import('../src/main/combworkVcs')
 // Git's exclude syntax moved with Git's keep-out (HI-2792).
-const { excludeLine, hasExcludeLine, literalPattern } = await import('../src/main/platform/gitKeepOut')
+const { excludeLine, hasExcludeLine, literalPattern } = await import('../src/main/gitKeepOut')
 afterEach(() => {
   failing = null
 })
