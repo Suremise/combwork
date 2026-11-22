@@ -1300,13 +1300,6 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       }
       return unknown(UNREADABLE.defaultBranch, { folder: repo })
     },
-    targetLines: async (repo) => {
-      const op = await pinned(repo)
-      if (isUnknown(op)) return op
-      const out = await read(repo, op, ['bookmark', 'list', '-T', `if(!remote, name ++ "${SEPARATOR}" ++ conflict ++ "\\n")`], unknown(UNREADABLE.line, { branch: '' }))
-      if (isUnknown(out)) return out
-      return lines(out).map((l) => l.split(SEPARATOR)).filter(([n, c]) => !!n && c !== 'true').map(([n]) => n)
-    },
     lineExists: async (repo, line) => {
       const h = await port.lineHead(repo, line)
       return !isUnknown(h) && !!h

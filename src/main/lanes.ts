@@ -48,7 +48,6 @@ import { lineWaiting, onLineWaitChanged } from './workflow/lineUpdates'
 import { hooksMissingFor, onHooksHealthChanged } from './hooksHealth'
 import { teamPauseOf } from './teamPause'
 import { independentIn } from './independent'
-import { admitOrThrow, projectIdOf } from './platform/fenceAdmit'
 import { platformIdOf } from './platform/registry'
 
 const log = createLogger('lanes')
@@ -1723,8 +1722,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const projectPath = ws.path ? join(ws.path, s.project) : s.project
   const laneCfg = ws.path ? await ws.projectConfig(projectPath).catch(() => null) : null
   const prefs = projectPreferences(ws, projectPath, laneCfg)
-  // The platform fence (HI-2799): a new lane is an admission on its project's repository, refused while it switches.
-  const admission = { id: projectIdOf(laneCfg, projectPath), platform: platformIdOf(projectPath, laneCfg?.platform) }
+  const platform = platformIdOf(projectPath, laneCfg?.platform)
   const defaults = { rounds: prefs.loopRounds, waitHours: prefs.loopWaitHours }
   const on = await enforced()
   // The texts for the caller name cards as it may see them (HR3's HI-2169 round 1): a builder's own start is a project
@@ -1748,7 +1746,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const running0 = (await read(ws)).find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
     // A new lane on a released line (or one that can't be checked) is refused, unless the user's or the Assistant's
     // override names that line; a running lane's list change isn't a new start of its line (its cards' starts are checked).
-    if (!running0 && on) await laneReleased(projectPath, admission.platform, pick ?? defaultTarget, defaultTarget, s.released)
+    if (!running0 && on) await laneReleased(projectPath, platform, pick ?? defaultTarget, defaultTarget, s.released)
     const target0 = running0 ? otherThanOwn(laneTarget(ws, running0), defaultTarget) : null
     if (running0 && on && pick !== undefined && (pick ?? null) !== target0) throw new LaneError(409, withValues(M.targetFixed, { builder: running0.builder.name, target: target0 ?? defaultTarget ?? '' }))
     refuseOtherTargets(ws, s.project, s.cards, running0 && on ? target0 : (pick ?? null), defaultTarget, s.ownBuilder ? s.project : null)
@@ -1830,7 +1828,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     // to the save (its checks, run just before it): a tag made meanwhile throws it back to be decided again, so it is refused then.
     releasedGrant = null
     if (on) {
-      const rel = await laneReleased(projectPath, admission.platform, pick ?? defaultTarget, defaultTarget, s.released)
+      const rel = await laneReleased(projectPath, platform, pick ?? defaultTarget, defaultTarget, s.released)
       releasedGrant = rel.grant
       if (rel.bound) {
         const stillBound = rel.bound
@@ -1879,7 +1877,6 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const brief = nextBrief(undefined, carried?.brief?.text ?? s.brief, s.briefNotIn)
     if (brief) rec.brief = brief
     lanes.push(rec)
-    also.push((db) => admitOrThrow(db, admission.id, admission.platform))
     also.push((db) => noteLaneIn(db, ws.path!, null, rec))
     return { rec, did: 'started' as const, replaced }
   })

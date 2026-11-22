@@ -24,7 +24,7 @@ import type { WorkflowOptions } from '../../shared/workflow/options'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import type { CardRecord } from '../workflow/factStore'
 import type { Workflow } from '../workflow/runtime'
-import type { CheckBracket, FinishInputs, HeadMove, KeptWork, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
+import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import type { HistoryPort } from './history'
 import { historyFor, observePort } from './historyPorts'
 import type { Disposable, ObserveEvent } from './observe'
@@ -289,14 +289,6 @@ export class JjPlatform implements PlatformAdapter {
     const b = port && identity && !isUnknown(identity) ? await port.binding(folder) : null
     if (!identity || isUnknown(identity) || !b || isUnknown(b) || b.card !== card.id || b.generation !== identity.generation || !b.target) return null
     return { b: { target: b.target }, identity: { generation: identity.generation } }
-  }
-
-  async keptWork(card: CardRecord): Promise<KeptWork> {
-    if (card.kind === 'no-code' || !this.wf) return null
-    const kept = await this.wf.cfg.keptHere?.(card)
-    if (!kept) return null
-    const proved = await this.provedKept(card, kept.folder)
-    return proved ? { slot: kept.slot, target: proved.b.target } : { unproved: true, slot: kept.slot }
   }
 
   async start(card: CardRecord, o: WorkflowOptions, builder?: string, dry = false): Promise<Maybe<StartPlan>> {

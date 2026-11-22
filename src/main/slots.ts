@@ -42,7 +42,6 @@ import { createHash, randomBytes } from 'crypto'
 import { untilBound, type RetryBound } from './retryBounds'
 import { claimOf, recoverClaim, releaseClaim, takeClaim, type QuietTarget } from './quietClaims'
 import type { DatabaseSync } from 'node:sqlite'
-import { admitOrThrow } from './platform/fenceAdmit'
 import { existsSync, lstatSync, readdirSync } from 'original-fs'
 import { mkdir, readdir, readFile, rename, rmdir } from 'original-fs/promises'
 import { basename, dirname, join } from 'path'
@@ -85,14 +84,6 @@ export const DELETING = agentMsg({ id: 'slot.error.deleting', text: 'the project
 
 /** Text kept on a slot, a lease or a card for any reader (dialects, HI-2065): said in the Default. */
 const sayStored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect(() => say(m, values))
-
-/** HI-3069: a kept slot of another version control than its pool's (SlotPool.keptAcross). */
-export interface KeptAcross {
-  slot: string
-  platform: string
-  now: string
-  gone: boolean
-}
 
 /** HI-3069: the kept refusal for a slot made under another version control than `now`, naming its way on. */
 function keptAcrossText(s: Pick<Slot, 'name' | 'platform' | 'folder'>, now: string): string {
@@ -561,8 +552,6 @@ export class SlotStore {
         const at = this.iso()
         // The project being deleted (#1447): nothing lent or made until its reservation ends.
         if (deletingIn(db, this.project)) return { ok: false as const, refusal: { why: 'notReady' as const, slot: req.slot ?? say(T.aSlot), state: 'removing' as const, error: say(DELETING) } }
-        // The platform fence (HI-2799): a lease is an admission on the project's repository, refused while it switches.
-        admitOrThrow(db, this.project, o.platform ?? 'git')
         const mine = this.dispatchOf(db, req.agent)
         if (mine) {
           if ((req.card !== undefined && mine.card === req.card) || (req.lane !== undefined && mine.lane === req.lane)) return { ok: true as const, lease: mine, slot: this.slotIn(db, mine.slot)!, fresh: false, again: true }
@@ -1958,18 +1947,6 @@ export class SlotPool {
     const same = s.identity?.generation === k.held.generation
     const free = s.state === 'dirty' && same && !s.op && !s.job && !s.writer && !this.store.openLease(s.name) && !this.store.asideOf(s.name)
     return free ? { slot: s } : refuse(same ? T.keptBusy : T.keptStale)
-  }
-
-  /**
-   * HI-3069: a card whose committed work is kept in a slot made under the other version control (a switch since it was
-   * put back): the slot, its platform, the pool's now, and whether its folder is absent now (fail-closed). Null with
-   * no kept slot, or one of this pool's platform. Every start, real or dry, asks it before choosing its folder, so neither
-   * a slot nor the project folder takes the card without its work (the workflow's `platform.keptAcross`).
-   */
-  keptAcross(card: number): KeptAcross | null {
-    const k = this.store.keptSlotFor(card)
-    if (!k || (k.slot.platform ?? 'git') === this.port.platform) return null
-    return { slot: k.slot.name, platform: k.slot.platform ?? 'git', now: this.port.platform, gone: folderAbsentSync(k.slot.folder) }
   }
 
   /**
@@ -3619,22 +3596,18 @@ export class SlotPool {
     if ((await folderThere(seen!.folder, this.quietTarget(seen!.name))) !== forgotten) return { ok: false, why: 'changed' }
     if (forgotten && (await this.present(seen!)) !== false) return { ok: false, why: 'changed' }
     let changed = false
-    // HI-3069: a slot of a platform switched from, its folder missing: only Combwork's record forgotten (`recordOnly`),
-    // the fence asked to admit the project's platform now. HI-3097's forgotten mode (its folder there, trashed) keeps
-    // its own platform's fence and proofs, so it is never done across a switch (refused `changed`).
+    // HI-3069: a slot of a platform switched from, its folder missing: only Combwork's record forgotten (`recordOnly`).
+    // HI-3097's forgotten mode (its folder there, trashed) is never done across a switch (refused `changed`).
     const recordOnly = across(seen!) && !forgotten
-    // Under its operation: the platform's fence admitting it (the slot's own; record-only, the project's now).
-    const admits = (slot: Slot, token: string): Promise<boolean> =>
+    // Under its operation: still this operation's.
+    const ours = (token: string): Promise<boolean> =>
       this.store
-        .fenced(name, token, (db) => {
-          admitOrThrow(db, this.store.project, recordOnly ? this.port.platform : (slot.platform ?? 'git'))
-          return true
-        })
+        .fenced(name, token, () => true)
         .catch(() => false)
     const still = async (slot: Slot, token: string): Promise<boolean> => {
       // The row as read before its removal began (`removing` now, by this operation): its record and folder as then (its
       // folder still absent, or still there and still not listed: HI-3097).
-      const ok = same(slot) && (await folderThere(slot.folder, this.quietTarget(slot.name))) === forgotten && (!forgotten || (await this.present(slot)) === false) && (await admits(slot, token))
+      const ok = same(slot) && (await folderThere(slot.folder, this.quietTarget(slot.name))) === forgotten && (!forgotten || (await this.present(slot)) === false) && (await ours(token))
       changed = !ok
       return ok
     }
@@ -3675,12 +3648,9 @@ export class SlotPool {
       name,
       async (slot, token) => {
         // The row as read before its removal began (`removing` now, by this operation), the same conditions again, and
-        // the platform's fence admitting it.
+        // the operation still this one.
         const admits = await this.store
-          .fenced(name, token, (db) => {
-            admitOrThrow(db, this.store.project, slot.platform ?? 'git')
-            return true
-          })
+          .fenced(name, token, () => true)
           .catch(() => false)
         const ok = (await eligible(slot)) && admits
         changed = !ok
@@ -3707,7 +3677,7 @@ export class SlotPool {
    * a lend passes over), forgotten by the user's Remove… (Slots and copies): Combwork's record of it, and git's
    * registration of its folder while that is absent (`recordOnly`: never a repository-wide prune). A folder in its place
    * is left as it is, never deleted. Checked again under the removal's operation (still `goneRemovable`, git still not
-   * listing it, the platform's fence admitting it): `changed` otherwise, for the user to look again.
+   * listing it, the operation still this one): `changed` otherwise, for the user to look again.
    */
   async removeGone(name: string): Promise<{ ok: true } | { ok: false; why: 'changed' } | { ok: false; why: 'kept'; kept: SlotKept }> {
     const seen = this.store.slot(name)
@@ -3715,12 +3685,9 @@ export class SlotPool {
     let changed = false
     const still = async (slot: Slot, token: string): Promise<boolean> => {
       // `removing` now, by this operation: the row as read before (gone, free but for this operation), git still not
-      // listing its folder, and the fence admitting it.
+      // listing its folder, and the operation still this one.
       const admits = await this.store
-        .fenced(name, token, (db) => {
-          admitOrThrow(db, this.store.project, this.port.platform)
-          return true
-        })
+        .fenced(name, token, () => true)
         .catch(() => false)
       const ok = slot.state === 'gone' && this.ownPlatform(slot) && !this.store.keptRecord(name) && (await this.present(slot)) === false && admits
       changed = !ok

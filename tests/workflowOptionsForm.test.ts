@@ -447,8 +447,6 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
       okWithReview: { ...allOff('git'), review: 'you', okBefore: { mode: 'every', labels: [] } },
       combworkMergesNeedsGit: { ...allOff('none'), finish: 'combworkMerges' },
       noneHasNoSlots: { ...allOff('none'), folder: 'slots' },
-      // jj (HI-2799): in slots.
-      jjNeedsSlots: { ...allOff('jj'), folder: 'project' },
       // G20 on with no runner (HI-1367).
       focusedNeedsRunner: { ...allOff('git'), finish: 'combworkMerges', folder: 'slots', focusedTests: true },
       // A project inside a larger repository (#1419), its target not its own: known where the save checks it.

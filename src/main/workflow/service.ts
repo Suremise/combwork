@@ -23,7 +23,7 @@ import { combworkError } from '../combworkError'
 import { observer } from '../platform/observe'
 import { detect } from '../platform/registry'
 import { isUnknown } from '../platform/types'
-import { fmt, msg, tr } from '../../shared/i18n'
+import { msg } from '../../shared/i18n'
 import { declaresPaths, type PlatformId } from '../../shared/platform/descriptors'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { WorkspaceService } from '../workspace'
@@ -32,10 +32,7 @@ import { locksSettled } from './lockRecord'
 import { checksSettled } from './runChecks'
 import { resolvedOf, type ResolvedOptions } from './rulesets'
 import { lastActionId, noteRequestsSince } from '../workflowNotices'
-import { earlierWorkText, Workflow, type KeptAcross, type SlotForStart } from './runtime'
-import type { EarlierLine } from './earlierWork'
-import { tell } from '../notify'
-import { commentAsCombwork } from '../tasks'
+import { Workflow, type SlotForStart } from './runtime'
 import type { CardRecord } from './factStore'
 import { legacyWorktree, slotsMigrated } from '../agentFolders'
 import { NOT_RUN_HERE, type QueueLive } from './queueState'
@@ -87,8 +84,6 @@ export function setQueueLive(fn: ((ws: WorkspaceService, project: string, target
 export interface SlotStarts {
   leaseFor: (ws: WorkspaceService, project: string, card: CardRecord, builder: string, o: { dry: boolean; target: string | null; kept?: { slot: string; generation: string; target: string } }) => Promise<SlotForStart>
   unused: (ws: WorkspaceService, project: string, lease: string) => Promise<void>
-  /** HI-3069: a card's kept slot of the other version control (SlotPool.keptAcross), else null. */
-  keptAcross?: (ws: WorkspaceService, project: string, card: number) => Promise<KeptAcross | null>
   /** HI-3132: a card's kept slot of the project's own version control (SlotPool.keptHere), else null. */
   keptHere?: (ws: WorkspaceService, project: string, card: number) => Promise<{ slot: string; folder: string } | null>
   /**
@@ -103,23 +98,6 @@ export interface SlotStarts {
   held?: (ws: WorkspaceService, project: string, lease: string, slot: string, folder: string, card: number) => boolean | null
 }
 let slotStarts: SlotStarts | null = null
-const EARLIER = {
-  title: msg({ id: 'workflow.earlierWork.title', defaultMessage: '{read, select, yes {{card}: its earlier work is on {line}} other {{card}: its earlier work couldn’t be read}}', description: 'HI-3107: a notice when a card starts: it ran before under another version control (Git, before the repository switched to jj), and its line from then may still have work (yes); or its earlier starts couldn’t be read, so that can’t be told (other). Keep the select keys. {card} is a card key; {line} a branch or bookmark name.' }),
-  message: msg({ id: 'workflow.earlierWork.message', defaultMessage: '{read, select, yes {{n, plural, one {Its earlier line, {lines}, may hold work its target lacked:} other {Its earlier lines, {lines}, may hold work their target lacked:}} Combwork leaves that work there and doesn’t carry it in.} other {Combwork couldn’t read the card’s earlier starts, so it can’t tell whether work from before was left on a line of its own.}} Check what the card’s folder has (its target may hold that work by now), then bring in what you need, or leave it. Its builder is told on the card.', description: 'HI-3107: the notice’s text. yes: {lines} lists branch or bookmark names, {n} how many; other: the card’s starts couldn’t be read. Keep the select keys. Never says the folder lacks the work: its target may hold it. The builder gets the same as a comment on the card.' })
-}
-
-/**
- * HI-3107: a start written with earlier work on another version control's lines: a comment on the card from Combwork
- * (which its builder's start task carries, and the user sees on the card), once per start, and a notice to the user.
- */
-async function sayEarlierWork(ws: WorkspaceService, projectPath: string, card: CardRecord, lines: EarlierLine[], now: PlatformId): Promise<void> {
-  const text = lines.map((e) => earlierWorkText(card.key, e, now)).join('\n\n')
-  const named = lines.flatMap((e) => (e.line === null ? [] : [e.line]))
-  const starts = (await workflowFor(ws, projectPath).catch(() => null))?.store.facts(card.id).filter((f) => f.kind === 'Started').length ?? 0
-  await commentAsCombwork(card.id, text, ws, () => true, `earlier-work:${card.id}:${starts}`)
-  tell({ kind: 'warning', level: 'warning', title: tr(EARLIER.title, { read: named.length ? 'yes' : 'no', card: card.key, line: named[0] ?? '' }), message: tr(EARLIER.message, { read: named.length ? 'yes' : 'no', n: named.length, lines: fmt.list(named) }), apiTitle: EARLIER.title.defaultMessage, projectPath })
-}
-
 export function setSlotStarts(s: SlotStarts | null): void {
   slotStarts = s
 }
@@ -268,7 +246,6 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     slotUnused: (lease) => slotStarts?.unused(ws, project.path, lease) ?? Promise.resolve(),
     // HI-3118: a submit from a slot asks whether its lease still holds it for the card, of the pool that lent it.
     slotHeld: (lease, slot, folder, card) => (slotStarts?.held ? slotStarts.held(ws, project.path, lease, slot, folder, card) : true),
-    keptAcross: (card) => slotStarts?.keptAcross?.(ws, project.path, card.id) ?? Promise.resolve(null),
     keptHere: (card) => slotStarts?.keptHere?.(ws, project.path, card.id) ?? Promise.resolve(null),
     // HI-3148: a running lane's grant to start on a released line (its record's, given with its start), for its cards' starts.
     // Read from the lanes as stored, synchronously (inside the start's write too): an ended or replaced lane grants nothing.
@@ -277,7 +254,6 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
       const l = readLanes({ version: 1, lanes: readTable(ws.path, 'lanes').docs as Record<string, unknown>[] }).find((x) => x.id === lane && x.state === 'active')
       return l?.releasedOverride?.target ?? null
     },
-    earlierWork: (card, lines, now) => sayEarlierWork(ws, project.path, card, lines, now),
     // HI-2944: a start's warning of its target's uncommitted changes, in the project's window too.
     targetChanges: (changes) => noticeTargetChanges(ws, project.path, changes),
     // Actions run by the actions worker after the commit, never here.

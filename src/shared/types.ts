@@ -26,7 +26,7 @@ import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
-import type { StoreSwitch, SwitchRefusal } from './platform/switching'
+import type { SwitchRefusal } from './platform/switching'
 import type { Contradiction, PresetId, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
@@ -1778,7 +1778,7 @@ export interface RetargetPreview {
    * as checked, and its own target then, which the apply expects); one that can't stays with why.
    */
   cards: { move: { number: number; key: string; title: string; started?: { head: string; own: string | null } }[]; keep: { number: number; key: string; title: string; why: RetargetCardKeep }[] }
-  slots: { move: { name: string; folder: string; target: string | null; head: string }[]; keep: { name: string; why: 'lent' | 'dirty' | 'busy' | 'unmerged' | 'cantCheck' | 'kept' }[] }
+  slots: { move: { name: string; folder: string; target: string | null; head: string }[]; keep: { name: string; why: 'lent' | 'dirty' | 'busy' | 'unmerged' | 'cantCheck' }[] }
   /** Running lanes on `from` that stay, with why (none given: more than one card of it in flight). */
   lanes: { id: string; name: string | null; builder: string; why?: RetargetCardKeep }[]
   /** HI-2753: running lanes on `from` that move to `to`, each with its card in flight (moved with it in one write), if any. */
@@ -1786,7 +1786,7 @@ export interface RetargetPreview {
 }
 
 /** Why a card stays on the old target in a retarget (HI-2680, HI-2753): its own work, or why its move in flight can't be made. */
-export type RetargetCardKeep = 'work' | 'started' | 'cantCheck' | 'queued' | 'notInTarget' | 'reviewed' | 'noLine' | 'refused' | 'line' | 'kept' | 'lane'
+export type RetargetCardKeep = 'work' | 'started' | 'cantCheck' | 'queued' | 'notInTarget' | 'reviewed' | 'noLine' | 'refused' | 'line' | 'lane'
 
 /** What a retarget did (HI-2680): each item moved, or skipped with why (never all or nothing). */
 export interface RetargetResult {
@@ -1794,7 +1794,7 @@ export interface RetargetResult {
   to: string
   moved: { cards: { number: number; key: string }[]; slots: string[]; lanes?: string[] }
   /** A card's (`card`, `key`) or a slot's (`slot`), with why it didn't move. */
-  skipped: { card?: number; key?: string; slot?: string; lane?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed' | 'fixed'; detail?: string }[]
+  skipped: { card?: number; key?: string; slot?: string; lane?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed'; detail?: string }[]
 }
 
 export interface KeptTargets {
@@ -1818,8 +1818,6 @@ export interface PlatformSwitchCheck {
   gitFolder: boolean
   /** A card in flight goes through Combwork's merge queue (its ruleset's): the queue carries on, and stays shown. */
   queue: boolean
-  /** A switch between Git and jj (HI-2799): the repository's projects switch together, after a drain. */
-  store?: StoreSwitch
 }
 
 /** A project's Session tab as this user left it (AppConfig.ui.projectViews, HI-1749): ProjectConfig's view fields. */
@@ -4693,8 +4691,7 @@ export interface ReleaseOfferPart {
 export interface LaneStartInfo {
   pool: { id: string; name: string }[] | null
   /** The branches its Merges into offers (HI-2556): the project's Work merges into and the others it lists; null: none to pick. */
-  /** HI-3129: `fixedInFlight`, a card in flight keeps its target (its platform can't move started work). */
-  targets: { default: string; others: string[]; othersUnread?: true; fixedInFlight?: true } | null
+  targets: { default: string; others: string[] } | null
 }
 
 /**

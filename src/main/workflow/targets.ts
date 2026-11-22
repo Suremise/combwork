@@ -8,13 +8,10 @@
 
 import { existsSync } from 'original-fs'
 import { historyOf, lineHistory } from '../platform/historyPorts'
-import { repoHolding } from '../platform/repoPorts'
-import { workspacePortOf } from '../platform/workspacePorts'
 import { isUnknown } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
 import type { CardState } from '../../shared/workflow/facts'
 import { platformIdOf } from '../platform/registry'
-import { hasCapability, type PlatformId } from '../../shared/platform/descriptors'
 import { resolvedOf } from './rulesets'
 import { combworkError } from '../combworkError'
 import { fmt, msg } from '../../shared/i18n'
@@ -23,33 +20,20 @@ import { fmt, msg } from '../../shared/i18n'
 export interface ProjectTargets {
   default: string
   others: string[]
-  /** HI-3129: the repository's lines couldn't be read: only the default is offered now. */
-  othersUnread?: true
-  /** HI-3129: a card in flight keeps its target (its platform can't move started work: no `retarget` capability). */
-  fixedInFlight?: true
 }
 
 /** The targets a lane or card of this project may name, as the options resolve now; null: not a Git project, or no default readable. */
 export async function projectTargets(ws: WorkspaceService, projectPath: string): Promise<ProjectTargets | null> {
   const cfg = await ws.projectConfig(projectPath)
   const platform = platformIdOf(projectPath, cfg.platform)
-  // Git's default from its history port, as before; a platform without one (jj, HI-3129) from its workspace port.
+  // Git's default from its history port; a platform without one (None) has no targets.
   const H = historyOf(platform)
-  const port = workspacePortOf(platform)
-  if (!H && !port) return null
+  if (!H) return null
   const o = resolvedOf(ws, projectPath, platform, cfg).options
-  const fallback = o.target ? null : await (H ? H.defaultTarget(projectPath) : port!.defaultLine(projectPath)).catch(() => null)
+  const fallback = o.target ? null : await H.defaultTarget(projectPath).catch(() => null)
   const def = o.target || (fallback && !isUnknown(fallback) ? fallback : '')
   if (!def) return null
-  // A platform whose targets are its repository's lines (jj's local bookmarks, HI-3129): read now;
-  // unreadable, the default alone, marked (a pick of another is refused, never offered blind). Else G7b's list.
-  const fixed = hasCapability(platform, 'retarget') ? {} : { fixedInFlight: true as const }
-  if (port?.targetLines) {
-    const l = await port.targetLines(projectPath).catch(() => null)
-    if (!l || isUnknown(l)) return { default: def, others: [], othersUnread: true, ...fixed }
-    return { default: def, others: l.filter((b) => b !== def), ...fixed }
-  }
-  return { default: def, others: (o.otherTargets ?? []).filter((b) => b !== def), ...fixed }
+  return { default: def, others: (o.otherTargets ?? []).filter((b) => b !== def) }
 }
 
 /**
@@ -65,22 +49,11 @@ export function pickTarget(t: ProjectTargets | null, raw: unknown): { target: st
 }
 
 /** HI-2556: whether a listed branch is a local branch now (a pick names one work can start from); unknown: git can't say. */
-/** HI-3129: whether a branch a card or lane names exists, by the project's own platform (its targets' port). */
-export async function targetExists(ws: WorkspaceService, projectPath: string, branch: string): Promise<boolean | 'unknown'> {
-  const cfg = await ws.projectConfig(projectPath)
-  return branchExists(projectPath, branch, platformIdOf(projectPath, cfg.platform))
+export async function targetExists(_ws: WorkspaceService, projectPath: string, branch: string): Promise<boolean | 'unknown'> {
+  return branchExists(projectPath, branch)
 }
 
-export async function branchExists(projectPath: string, branch: string, platform?: PlatformId): Promise<boolean | 'unknown'> {
-  // A platform whose targets are its repository's lines (jj, HI-3129): its own port's read (a non-colocated jj
-  // repository's bookmarks aren't Git's refs); a conflicted or unreadable one is unknown. Its platform as the caller
-  // knows it (the project's), else as the folder is read.
-  const holder = platform ? null : repoHolding(projectPath)
-  const port = platform ? workspacePortOf(platform) : holder ? workspacePortOf(holder.platform) : null
-  if (port?.targetLines) {
-    const at = await port.lineHead(projectPath, branch).catch(() => null)
-    return at === null || isUnknown(at) ? (at === null ? false : 'unknown') : !!at
-  }
+export async function branchExists(projectPath: string, branch: string): Promise<boolean | 'unknown'> {
   const h = await lineHistory().lineHead(projectPath, branch)
   return isUnknown(h) ? 'unknown' : !!h
 }

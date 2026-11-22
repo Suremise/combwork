@@ -166,23 +166,7 @@ export function loadRuleset(data: unknown): LoadResult {
     for (const id of ids as string[]) if (!isGuard(id)) return { ok: false, error: 'unknownPiece', piece: id }
   }
   const readOnly = r.version > RULESET_VERSION
-  return { ok: true, ruleset: readOnly ? (r as Ruleset) : withoutRetired(r as Ruleset), readOnly }
-}
-
-/**
- * The guard J6 put in every jj ruleset until J9e (HI-2874) let jj cards run: `start.platformReady`. A jj ruleset stored
- * before (a lane's, an Override's) still names it; it is dropped as the ruleset is read, so its cards start under the rest
- * of its rules. Kept a known piece so such a row still loads, and its texts kept for the `Refused` facts it left.
- */
-export const RETIRED_GUARD: GuardId = 'start.platformReady'
-
-/**
- * A supported ruleset as read (HI-2874): a jj one with the retired guard gets a copy without it, its id, version, other
- * guards, options and stages as they were; any other is returned as it is.
- */
-function withoutRetired(r: Ruleset): Ruleset {
-  if (r.options?.platform !== 'jj' || !r.guards.start?.includes(RETIRED_GUARD)) return r
-  return { ...r, guards: { ...r.guards, start: r.guards.start.filter((g) => g !== RETIRED_GUARD) } }
+  return { ok: true, ruleset: r as Ruleset, readOnly }
 }
 
 export const hasStage = (r: Ruleset, id: StageId): boolean => r.stages.some((s) => s.id === id)

@@ -184,9 +184,6 @@ export const EDGES = [
   { file: 'src/main/platform/jjOperations', module: 'src/main/git', class: 'impl', names: ['git'], why: "an operation preview reads the colocated store's refs and HEAD to compare with jj's record (HI-2800, E8): read-only git calls, never an import" },
   { file: 'src/main/platform/jjKeepOut', module: 'src/main/platform/gitKeepOut', class: 'impl', names: ['excludeLine', 'hasExcludeLine'], why: "a non-colocated jj repository's .combwork kept out in its Git store's info/exclude (HI-2800): Git's exclude-line text, pure helpers, no git run" },
   { file: 'src/main/platform/jjIgnoredEntries', module: 'src/main/platform/gitShadowIgnore', class: 'impl', names: ['shadowCheckIgnore'], why: "a jj check's snapshot and write record leave out what jj ignores (HI-3158): Git's check-ignore on jj's Git-backed store (`--git-dir`, `--no-index`), read-only, by kind in the shadow work tree Git's record shares (HI-3175)" },
-  { file: 'src/main/platform/jjCompat', module: 'src/main/git', class: 'impl', names: ['git'], why: "jj's compatibility assessment reads Git's effective config, attributes and files of the colocated store (HI-2799, §16.3.6's gates): read-only git calls" },
-  { file: 'src/main/workflow/storeSwitch', module: 'src/main/repoLock', class: 'common', names: ['commonGitDir'], why: "the store a Git ↔ jj switch is about (HI-2799): the Git store both platforms share, the repository lock's own key" },
-  { file: 'src/main/platform/jjStoreSide', module: 'src/main/repoLock', class: 'common', names: ['commonGitDir'], why: "a switch back to Git checks the jj repository beside the Git store a member names (HI-3034; HI-3140 moved it from storeSwitch): the repository lock's own key" },
   { file: 'src/main/deliveries', module: 'src/main/folderFence', class: 'common', names: ['folderChanging', 'folderSteady', 'inFolder', 'onFolderSteady'], why: "the folder fence: keyed by folder, every platform's (§16.3.6 port 1)" },
   { file: 'src/main/files', module: 'src/shared/gitIgnoreRules', class: 'gitUi', why: "the Files tab's ignore rule type (the Git dimming's tooltip)" },
   { file: 'src/main/index', module: 'src/main/branchWatch', class: 'gitUi', why: "starts the branch cards' watcher (the Git view's branch status)" },
@@ -473,8 +470,6 @@ export const SWITCHES = {
   'src/main/ipc': { n: 1, class: 'gitUi', why: "the Files tab's Git menu reads only a Git repository's boundary (git:…)" },
   'src/main/workflow/platformSwitch': { n: 1, class: 'gitUi', why: "the switch to None warns that the folder is still a Git repository (gitFolder, git.vc.switch.gitFolder): Git-facing text" },
   'src/main/workflow/commitMessageStep': { n: 2, class: 'historic', why: "HI-1997's one-time step over G19's stored Git options (in force, or kept as `kept.git`): Git's data alone" },
-  'src/shared/workflow/compile': { n: 1, class: 'historic', why: "HI-2874's one-time drop of the retired guard start.platformReady, which only jj rulesets had: jj's data alone" },
-  'src/main/workflow/storeSwitch': { n: 6, class: 'data', why: "a project's store read (`none`: no repository found), as storeOf and mapStores answer it: not a platform" },
   'src/renderer/src/components/AgentTiles': { n: 1, class: 'data', why: "a CSS grid column token (`none`): not a platform" },
   'src/renderer/src/components/WorkflowOptions': { n: 1, class: 'data', why: "the review option's value `none` (G3), said in None's words where the platform accepts work: not a platform" },
   'src/renderer/src/views/VersionControl': { n: 1, class: 'gitUi', why: "the Version Control tab compares git's own read of the folder (its status summary) with detection finding Git: Git's page" },
@@ -524,7 +519,6 @@ export const JJ_EDGES = [
   { file: 'src/main/slotsApp', module: 'src/main/platform/jjWorkspacePort', class: 'registry', names: ['JjWorkspacePort', 'createJjWorkspacePort', 'generationOf'], why: "jj's workspace port made with the app's dependencies (APP_PORTS' maker) and a slot's generation for Remove…" },
   { file: 'src/main/slotStaleView', module: 'src/main/platform/jjWorkspacePort', class: 'registry', names: ['StaleWhy'], why: "a stale jj slot's reason's type, for the Slots view's read of jj's port (HI-2912)" },
   { file: 'src/main/workflow/runtime', module: 'src/main/platform/jjPlatform', class: 'registry', names: ['JjCardDeps'], why: "the type of jj's card work's dependencies, which the app gives each project's workflow (setJjCards, HI-2868)" },
-  { file: 'src/main/workflow/storeSwitch', module: 'src/main/platform/jjStoreSide', class: 'impl', names: ['fallbackOf', 'retryMoved'], why: "re-exported for storeSwitch's callers and tests (HI-3140 moved jj's side of the store switch)" }
 ]
 
 /** The descriptor fields that declare a platform's integration modes (HI-2840): its finishes and its default one. */

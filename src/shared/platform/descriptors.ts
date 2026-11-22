@@ -42,17 +42,6 @@ export type Operation =
   /** HI-2944: the uncommitted changes in a folder the merge queue merges into, committed or set aside (Files' Commit it too). */
   | 'folderChanges'
 
-/**
- * A compatibility gate (SPEC §16.3.6's matrix, HI-2793's J0): a capability or operation a platform refuses until its J
- * card's evidence opens it. Closed, it is absent from the platform's descriptor and the switch's assessment says why;
- * detecting a repository that uses one (attributes, hooks, LFS, submodules) fails closed: unreadable is "uses it". Git and
- * None have none; jj's descriptor (HI-2799, J6) lists every gate still closed.
- */
-export type Gate = 'attributes' | 'hooks' | 'lfs' | 'submodules' | 'signing' | 'relocation' | 'plainGit' | 'advance' | 'publish' | 'sharedFolder'
-
-/** Every gate, in the matrix's order. */
-export const GATES: readonly Gate[] = ['attributes', 'hooks', 'lfs', 'submodules', 'signing', 'relocation', 'plainGit', 'advance', 'publish', 'sharedFolder']
-
 /** Every operation, in one place: Git lists them all (it has each today). */
 export const OPERATIONS: readonly Operation[] = ['switchLine', 'createLine', 'deleteLines', 'deleteRemoteLines', 'updateLine', 'mergeLine', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetch', 'pull', 'push', 'pushTo', 'setUpstream', 'createTag', 'setIdentity', 'init', 'ignoreRules', 'folderChanges']
 
@@ -105,8 +94,6 @@ export interface PlatformDescriptor {
   remedies?: Remedies
   /** A change id as shown (jj's, HI-2799): absent on a platform without change ids. Never used for credit (R3.1). */
   changeShort?: (id: string) => string
-  /** The compatibility gates still closed on this platform (SPEC §16.3.6): what it refuses, shown as not supported. */
-  gates: readonly Gate[]
   /**
    * HI-3140: whether its workspaces are recorded by its own commands (jj, HI-2795): a slot's or copy's row carries the
    * workspace's identity, preparing and detaching one are owned writes (the row's identity, the operation's fence), a
@@ -148,10 +135,10 @@ const short12 = (id: string): string => id.slice(0, 12)
 
 export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Git answers everything: worktrees for isolation, merges for integration, replay for sameness.
-  git: { id: 'git', name: 'Git', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe', 'retarget'], integration: 'merge', deliverables: 'commits', finishes: ['combworkMerges', 'agentMerges', 'committed', 'notChecked'], defaultFinish: 'notChecked', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES, gates: [] }, // i18n-ignore: a product name, the same in every language
+  git: { id: 'git', name: 'Git', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'isolation', 'checkCopies', 'integration', 'containment', 'sameness', 'authorship', 'observe', 'retarget'], integration: 'merge', deliverables: 'commits', finishes: ['combworkMerges', 'agentMerges', 'committed', 'notChecked'], defaultFinish: 'notChecked', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES }, // i18n-ignore: a product name, the same in every language
   // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
-  none: { id: 'none', name: 'None', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', finishes: ['accept'], defaultFinish: 'accept', repository: false, defaultTarget: false, operations: [], revisionShort: short, gates: [] }, // i18n-ignore: a product name, the same in every language
+  none: { id: 'none', name: 'None', ownedWorkspaces: false, detectionSteady: false, capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', finishes: ['accept'], defaultFinish: 'accept', repository: false, defaultTarget: false, operations: [], revisionShort: short }, // i18n-ignore: a product name, the same in every language
   // jj (HI-2799, J6; SPEC §16.3.6): workspaces for isolation (J2), pinned history and attribution (J3). No merge queue:
   // a passed card's candidate is integrated by the adapter's advance (HI-3235, its residual
   // races documented) or by the user, and no operation in the window (R5.2). Every other gate stays closed until its J
@@ -172,8 +159,6 @@ export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
     operations: [],
     revisionShort: short12,
     changeShort: short12,
-    // HI-3235: `advance` is open since Combwork's advance (HI-2840/s30's protocol, its residual races accepted).
-    gates: GATES.filter((g) => g !== 'advance'),
     ownedWorkspaces: true,
     guidance: { keys: ['jj', 'jj-separate'], key: (d) => (d?.jj && !d.jj.colocated ? 'jj-separate' : 'jj') },
     detectionSteady: true
@@ -221,8 +206,6 @@ export const needsRepository = (platform: PlatformId): boolean => PLATFORMS[plat
 /** Whether a platform offers an operation in its repository (port 5, HI-2788). */
 export const hasOperation = (platform: PlatformId, op: Operation): boolean => PLATFORMS[platform].operations.includes(op)
 
-/** Whether a platform still refuses what a gate covers (SPEC §16.3.6). */
-export const hasGate = (platform: PlatformId, g: Gate): boolean => PLATFORMS[platform].gates.includes(g)
 
 /** Whether a value read from a file (project.json's `platform`) names a platform Combwork has. */
 export const isPlatformId = (v: unknown): v is PlatformId => typeof v === 'string' && Object.hasOwn(PLATFORMS, v)
