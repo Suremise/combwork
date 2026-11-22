@@ -4,6 +4,7 @@ import { msg, tr } from '@shared/i18n'
 import { mineIsTheirs, OPERATION_STEPS, operationCommand, pickCommand, submoduleUpdateCommand, type ConflictPick, type GitConflict, type OperationPanelState, type OperationRequest, type OperationStep } from '@shared/gitOperations'
 import { call, errorMessage } from '../api'
 import { attempt } from '../actions'
+import { repoOp } from '../repoOps'
 import { bumpGit, confirm, notify } from '../store'
 import { Icon, Tooltip } from './ui'
 
@@ -87,7 +88,7 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
       confirmed.current = op.lent.lease
     }
     setBusy(key)
-    const r = await attempt(tr(T.failed), () => call('git:operationStep', root, { ...req, ...(op.lent ? { lease: op.lent.lease } : {}) }))
+    const r = await attempt(tr(T.failed), () => repoOp('git:operationStep', root, { ...req, ...(op.lent ? { lease: op.lent.lease } : {}) }))
     setBusy(null)
     bumpGit(project.path)
     read()
