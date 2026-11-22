@@ -225,6 +225,7 @@
   "git.operation.skipMessage": "As alterações dele ficam de fora, com cada conflito resolvido nele, e o git segue para o próximo.",
   "git.operation.skipTitle": "Pular {commit, select, none {este commit} other {{commit}}} do git {what}?",
   "git.operation.step": "Etapa {at, number} de {of, number}",
+  "git.operation.stoppedAgain": "{step, select, skip {O git pulou um commit do {what} em {folder} e depois parou de novo.} other {O git continuou o {what} em {folder} e depois parou de novo.}} O painel mostra onde.",
   "git.operation.submoduleStaged": "{path} é um submódulo: o commit {commit} dele está preparado para o commit. A pasta dele fica como está: {command, select, none {para fazer checkout desse commit nela, execute git submodule update para ele em um terminal.} other {para fazer checkout desse commit nela, execute {command}}}",
   "git.operation.theirs": "Usar a deles",
   "git.operation.theirsTip": "{swap, select, yes {O outro lado: o branch sobre o qual o rebase é feito (o git o chama de ours aqui).} other {O outro lado: o que está sendo mesclado, escolhido ou revertido (o git o chama de theirs).}} {has, select, yes {Usa a versão dele do arquivo.} submodule {Prepara para o commit o commit dele do submódulo.} other {Ele apagou o arquivo: apaga o arquivo.}} Executa {command}",

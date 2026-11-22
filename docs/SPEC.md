@@ -5838,7 +5838,9 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   only for a bisect (good and bad stay the user's terminal's). Each tooltip names git's command; Continue runs with
   `GIT_EDITOR=true`, taking git's prepared message, bounded as Commit is (`cw.git.commitMinutes`: it runs the same
   hooks), and is greyed out while a file is in conflict; Abort and Skip ask
-  first, saying what they drop. Below, each conflicted file (git's unmerged entries, `ls-files -u`) with **Open**,
+  first, saying what they drop. A Continue or Skip that goes through and stops at the next commit (git exits non-zero
+  then) says it went on and stopped again, never that git refused (HI-3503): git refused only where the stop is
+  unchanged (`stopId` before and after). Below, each conflicted file (git's unmerged entries, `ls-files -u`) with **Open**,
   **Use mine**, **Use theirs** and **Mark resolved** (`git add -A`, for a file settled by hand). *Mine* is the folder's
   own work: git's `--ours`, except in a rebase, where git's sides are swapped and mine is `--theirs`; a side that
   deleted the file deletes it (`git rm`). Each acts on the file clicked alone, whatever its name (HI-3501): its path is

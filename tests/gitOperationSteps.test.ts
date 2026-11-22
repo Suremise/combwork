@@ -341,6 +341,66 @@ describe('a rebase, its sides swapped', () => {
   })
 })
 
+describe('a step that goes on and stops at the next conflict (HI-3503)', () => {
+  /** `side` has two commits, one changing c.txt, then one d.txt; main changes both: each of side's commits conflicts. */
+  function twoStops(): string[] {
+    commit(proj, { 'c.txt': 'c\n', 'd.txt': 'd\n' }, 'c and d')
+    sh(proj, 'switch', '-q', '-c', 'side')
+    const one = commit(proj, { 'c.txt': 'side c\n' }, 'topic one')
+    const two = commit(proj, { 'd.txt': 'side d\n' }, 'topic two')
+    sh(proj, 'switch', '-q', 'main')
+    commit(proj, { 'c.txt': 'main c\n', 'd.txt': 'main d\n' }, 'main edits')
+    return [one, two]
+  }
+
+  it('a rebase: Continue commits step 1 and stops at step 2: said as gone on, not as refused', async () => {
+    twoStops()
+    sh(proj, 'switch', '-q', 'side')
+    expect(() => sh(proj, 'rebase', 'main')).toThrow()
+    expect(await state()).toMatchObject({ step: { at: 1, of: 2 }, conflicts: [{ path: 'c.txt' }] })
+    await step({ what: 'rebase', file: 'c.txt', pick: 'mine' })
+    expect(await step({ what: 'rebase', step: 'continue' })).toMatchObject({ stoppedAgain: true })
+    expect(await state()).toMatchObject({ what: 'rebase', step: { at: 2, of: 2 }, at: { subject: 'topic two' }, conflicts: [{ path: 'd.txt' }] })
+    expect(sh(proj, 'log', '-1', '--format=%s', 'HEAD')).toBe('topic one')
+  })
+
+  it('a rebase: Skip drops step 1 and stops at step 2: said as gone on', async () => {
+    twoStops()
+    sh(proj, 'switch', '-q', 'side')
+    expect(() => sh(proj, 'rebase', 'main')).toThrow()
+    expect(await step({ what: 'rebase', step: 'skip' })).toMatchObject({ stoppedAgain: true })
+    expect(await state()).toMatchObject({ step: { at: 2, of: 2 }, conflicts: [{ path: 'd.txt' }] })
+    expect(sh(proj, 'log', '-1', '--format=%s', 'HEAD')).toBe('main edits')
+  })
+
+  it('a cherry-pick of two commits: Continue picks the first and stops at the second', async () => {
+    const [one, two] = twoStops()
+    expect(() => sh(proj, 'cherry-pick', one, two)).toThrow()
+    await step({ what: 'cherry-pick', file: 'c.txt', pick: 'theirs' })
+    expect(await step({ what: 'cherry-pick', step: 'continue' })).toMatchObject({ stoppedAgain: true })
+    expect(await state()).toMatchObject({ what: 'cherry-pick', at: { subject: 'topic two' }, conflicts: [{ path: 'd.txt' }] })
+  })
+
+  it('a step that went through and finished it: no stop again', async () => {
+    diverged()
+    expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
+    await step({ what: 'merge', file: 'a.txt', pick: 'theirs' })
+    const done = await step({ what: 'merge', step: 'continue' })
+    expect(done.stoppedAgain).toBeUndefined()
+    expect(await state()).toBeNull()
+  })
+
+  it("a step git refuses, where it stays, is still refused with git's error", async () => {
+    diverged()
+    // The side's change kept out: the pick is empty, and git won't commit it.
+    expect(() => sh(proj, 'cherry-pick', 'side')).toThrow()
+    const before = (await state())!.id
+    await step({ what: 'cherry-pick', file: 'a.txt', pick: 'mine' })
+    await expect(step({ what: 'cherry-pick', step: 'continue' })).rejects.toThrow(/Git refused: .*empty/)
+    expect((await state())?.id).toBe(before)
+  })
+})
+
 describe('a revert or cherry-pick', () => {
   it("the reported case (a stop committed by hand, only the sequencer left): read as a revert with nothing in conflict; Abort ends it, keeping the hand commit", async () => {
     commit(proj, { 'r.txt': 'one\n' }, 'c1')
