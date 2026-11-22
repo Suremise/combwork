@@ -162,10 +162,18 @@ function writeProject(dir, cfg) {
     const c3 = (await inv('tasks:create', { title: 'Gamma next', project: 'gamma' })).number
     check('gamma: a card in flight under Git', (await q.intent(h, g1, c1, 'start')).status === 200 && (await startedUnder(c1)) === 'git')
     // A lane of its own builder, registered by it (the cw_lane tool's route): no agent is started again, so G1 keeps
-    // its session and token.
+    // its session and token. GL, idle outside slots, is given a new conversation whose first turn is the lane's brief
+    // (HI-2232); the suite waits for that turn to be over (HI-3526). A switch while it runs finds GL working, and the window
+    // then asks whether to restart GL for the new workflow (HI-2694, as a user switching then is asked): under load the
+    // brief outlasted the steps below, and that question covered Git's choice. Quiet first, so GL is renewed at once.
     const gl = await q.agent(fx, h, 'GL', { project: gamma })
+    const apiToken = JSON.parse(fs.readFileSync(path.join(fx.userData, 'agent-api.json'), 'utf8')).token
+    const glLive = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === gamma.toLowerCase() && s.agentId === gl.id)
+    check('gamma: GL quiet before its lane', !!(await until(async () => lib.agentQuiet(PORT, 'gamma', await glLive(), apiToken), HUNG_MS)), JSON.stringify(await glLive()))
+    const glBefore = (await glLive())?.sessionId
     const lane = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${gl.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'gamma', reviewer: 'GR', cards: [c2], name: 'gamma lane' }) })
     check('gamma: a lane runs', lane.status === 200, `${lane.status} ${await lane.text().catch(() => '')}`)
+    check("gamma: GL's new conversation is done with the lane's brief", !!(await until(async () => lib.laneBriefDone(PORT, 'gamma', await glLive(), glBefore, apiToken), HUNG_MS)), JSON.stringify(await glLive()))
     // The tab open on gamma while its repository goes (#1492): coming back to the window, the tab reads git again and the
     // header follows it, with no workspace refresh asked for here.
     await toTab('gamma')
