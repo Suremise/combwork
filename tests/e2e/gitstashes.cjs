@@ -128,6 +128,13 @@ const check = (name, ok, extra = '') => {
     // stash's side named on its button, no step. Use the stash's settles it, and with nothing left the panel goes.
     const left = page.locator('.operation-panel[data-operation="conflicts"]')
     check("HI-3518: the panel shows the file left in conflict, from the stash, with no step", !!(await lib.until(async () => (await left.locator('[data-conflict="b.txt"]').count()) === 1, HUNG_MS)) && /Files left in conflict in the project folder/.test(await text(left)) && (await text(left)).includes('From applying the stash “my own work”') && (await left.locator('[data-step]').count()) === 0 && (await left.locator('[data-pick="theirs"]').innerText()).includes("Use the stash's"), await text(left).catch(() => ''))
+    // Its notifications dismissed by their own close buttons, so the screenshot shows the panel under them.
+    check('…its notifications dismissed for the screenshot', !!(await lib.until(async () => {
+      const close = page.locator('.popup-close')
+      if ((await close.count()) === 0) return true
+      await close.first().click().catch(() => undefined)
+      return false
+    }, HUNG_MS)))
     await shoot(left, '4-left-conflicts')
     await left.locator('[data-conflict="b.txt"] [data-pick="theirs"]').click()
     check("…Use the stash's takes its side and settles the file; nothing left, the panel goes", !!(await lib.until(async () => (await left.count()) === 0, HUNG_MS)) && read('b.txt') === 'b stashed\n' && g('diff', '--name-only', '--diff-filter=U').trim() === '', `${read('b.txt')} | ${await text(left).catch(() => '')}`)

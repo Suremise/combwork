@@ -667,6 +667,11 @@
   "service.gitOperation.invalid": {
     "placeholders": {}
   },
+  "service.gitOperation.leftChanged": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "service.gitOperation.moved": {
     "placeholders": {
       "folder": "plain",
