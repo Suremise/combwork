@@ -2,8 +2,8 @@
 // agent in the filter shows its map; none or several, one shared map, each agent its own colour. It draws from the same
 // reads as the list (frozen or live), animates only while shown, live and on, and reads nothing of its own while hidden.
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { activityTabs, buildActivityView, filetimeMs, type ActivityFilter, type ActivityInput, type ActivityTabInfo } from '@shared/activity'
-import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, mapReadKeys, stationLastShown, stationLoad, stationPanel, stationTitle, mapCallNode, mapSessionKey, type MapCallRef, type MapPanelRow, type TextFits, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
+import { activityTabs, buildActivityView, filetimeMs, type ActivityFilter, type ActivityInput, type ActivityNode, type ActivityTabInfo } from '@shared/activity'
+import { MAP_AGENTS, MAP_STATIONS, addPulses, agentColour, buildMapModel, contextLevel, diffPulses, mapContextKey, mapReadKeys, stationLastShown, stationLoad, stationPanel, stationTitle, mapCallNode, mapPickNode, mapSessionKey, type MapCallRef, type MapPick, type MapPanelRow, type TextFits, type MapAgentInput, type MapContext, type MapModel, type MapPulse, type MapStation, type MapStationView } from '@shared/activityMap'
 import { ACTIVITY_MAP_MOTION } from '@shared/advanced'
 import { boundedQueue } from '@shared/coalesce'
 import { formatTime } from '@shared/dates'
@@ -59,6 +59,24 @@ export function showMapCall(entries: readonly MapEntry[], ref: MapCallRef, show:
   const found = mapCallNode(entries, ref)
   if (found) show(found)
   else notify('info', tr(M.callGone))
+}
+
+/**
+ * The node of a call the map showed (HI-3508), found again in `input` (its host's reads) at each drawing, so it follows
+ * the call as it ends. Once it isn't there any more, the same notice as a click, and `clear` (the selection goes).
+ * No `input` (its host not read now): nothing shown, nothing said.
+ */
+export function usePickedCall(pick: MapPick | null, input: ActivityInput | undefined, clear: () => void): ActivityNode | null {
+  const node = useMemo(() => (pick && input ? mapPickNode(pick, input) : null), [pick, input])
+  const gone = !!pick && !!input && !node
+  const clearNow = useRef(clear)
+  clearNow.current = clear
+  useEffect(() => {
+    if (!gone) return
+    notify('info', tr(M.callGone))
+    clearNow.current()
+  }, [gone])
+  return node
 }
 
 /** A session's key in the map: its host's path (lower-cased) and its id, as the workspace level keys its reads. */

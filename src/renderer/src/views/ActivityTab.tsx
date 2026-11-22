@@ -11,8 +11,8 @@ import { confirm, isAssistantPath, notify, openInSessionsTab, revealAgent, set, 
 import { Icon, IconButton, statusText, useContextMenu, type MenuEntry } from '../components/ui'
 import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
-import { ActivityMap, MapToggles, mapSessions, openMapFile, showMapCall, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
-import { mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapCallRef, type MapContext } from '@shared/activityMap'
+import { ActivityMap, MapToggles, mapSessions, openMapFile, showMapCall, usePickedCall, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapCallRef, type MapContext, type MapPick } from '@shared/activityMap'
 import { cx } from '../util'
 import { boundedQueue, latestOnly } from '@shared/coalesce'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -89,10 +89,11 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   const [nowRead, setNowRead] = useState(false)
   const [turns, setTurns] = useState<ReadonlyMap<string, ActivityTurns>>(new Map())
   const [selected, setSelected] = useState<string | null>(null)
-  // A call the map showed (HI-3499): its node and agent, kept while it is the one selected.
-  const [mapPick, setMapPick] = useState<{ agentId: string; node: ActivityNode } | null>(null)
+  // A call the map showed (HI-3499): what finds it, kept while it is the one selected; its node is found again in each
+  // drawing's reads (HI-3508: pickNode, below).
+  const [mapPick, setMapPick] = useState<MapPick | null>(null)
   useEffect(() => {
-    if (mapPick && selected !== mapPick.node.key) setMapPick(null)
+    if (mapPick && selected !== mapPick.key) setMapPick(null)
   }, [selected, mapPick])
   // Escape clears a call the map showed (HI-3499, HR1's round 1): its From the map row and its Details, after an open
   // station panel and before the agent shown alone (the map's own Escape asks first); from the list or Details too.
@@ -103,6 +104,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     setSelected(null)
     return true
   }, [])
+  const clearSelected = useCallback(() => setSelected(null), [])
   // Live (HI-1743): a choice, never the default; each opening is frozen.
   const [live, setLive] = useState(false)
   // The agents as last taken in: live state changes often, the tab follows once a tick, and only when it changed.
@@ -364,7 +366,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     (c: MapCallRef) =>
       showMapCall(entriesNow.current, c, (found) => {
         setView({ tab: found.entryKey })
-        setMapPick({ agentId: found.agentId, node: found.node })
+        setMapPick({ entryKey: found.entryKey, path: found.path, agentId: found.agentId, key: found.node.key, call: c })
         setSelected(found.node.key)
       }),
     [setView]
@@ -411,12 +413,14 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
     if (active && unread) readTurns(unread.split(','))
   }, [active, unread, readTurns])
 
+  // The map's call as the reads have it now (HI-3508): done or failed once it ends; gone, said and unselected.
+  const pickNode = usePickedCall(mapPick, input, clearSelected)
   const byKey = useMemo(() => {
     const m = new Map<string, ActivityNode>()
     for (const p of parts) for (const n of [p.session, p.turn, p.doing?.kind === 'tool' ? p.doing.tool : null, ...p.subagents, ...p.processes]) if (n) m.set(n.key, n)
-    if (mapPick && !m.has(mapPick.node.key) && parts.some((p) => p.agentId === mapPick.agentId)) m.set(mapPick.node.key, mapPick.node)
+    if (mapPick && pickNode && !m.has(pickNode.key) && parts.some((p) => p.agentId === mapPick.agentId)) m.set(pickNode.key, pickNode)
     return m
-  }, [parts, mapPick])
+  }, [parts, mapPick, pickNode])
   const chosen = selected ? (byKey.get(selected) ?? null) : null
   const filtered = !!view.agents?.length || !!view.cards?.length
 
@@ -532,7 +536,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
               </div>
             ) : null}
             {parts.map((p) => (
-              <PartView key={p.agentId} project={project} part={p} many={parts.length > 1} selected={selected} onSelect={setSelected} showOwn={!!view.showOwn} onShowOwn={(v) => setView({ showOwn: v })} picked={mapPick?.agentId === p.agentId ? mapPick.node : null} />
+              <PartView key={p.agentId} project={project} part={p} many={parts.length > 1} selected={selected} onSelect={setSelected} showOwn={!!view.showOwn} onShowOwn={(v) => setView({ showOwn: v })} picked={mapPick?.agentId === p.agentId ? pickNode : null} />
             ))}
           </div>
         )}
@@ -726,6 +730,8 @@ export function Details({ project, node, onClose }: { project: ProjectInfo; node
   // A prompt's or a tool call's whole input, as written, masked: read for the node shown.
   const item = node.kind === 'tool' ? { sessionId: node.sessionId, itemId: node.tool.itemId } : node.kind === 'turn' ? { sessionId: node.sessionId, itemId: node.turn.itemId } : null
   const itemKey = item ? `${item.sessionId}:${item.itemId}` : null
+  // Read again as a call ends (HI-3508: one the map showed stays selected), so its result comes in.
+  const ended = node.kind === 'tool' && node.state !== 'working'
   useEffect(() => {
     setDetail(null)
     setError(null)
@@ -738,7 +744,7 @@ export function Details({ project, node, onClose }: { project: ProjectInfo; node
       stop = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemKey, project.path])
+  }, [itemKey, ended, project.path])
   const rows: [string, string][] = []
   if (state) rows.push([tr(M.statusLabel), tr(M.state, { state })])
   let input: string | null = null

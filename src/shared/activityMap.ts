@@ -718,3 +718,20 @@ export function mapCallNode(entries: readonly { key: string; path: string; agent
   if (!tool) return null
   return { ...at, node: { kind: 'tool', key: `tool:${sid}:${tool.itemId}`, sessionId: sid, tool, state: tool.failed ? 'failed' : tool.done ? 'done' : 'working' } }
 }
+
+/**
+ * A call the map showed in the list (HI-3499), kept by what finds it: never the node as it was then (HI-3508), so a call
+ * picked while it ran shows as done or failed once it ends. `key` is its node's, the selection's.
+ */
+export interface MapPick {
+  entryKey: string
+  path: string
+  agentId: string
+  key: string
+  call: MapCallRef
+}
+
+/** A pick's node in the reads now: null once it isn't there (its session restarted, its item no longer read). */
+export function mapPickNode(pick: MapPick, input: Pick<ActivityInput, 'agents' | 'turns'>): Extract<ActivityNode, { kind: 'turn' | 'tool' }> | null {
+  return mapCallNode([{ key: pick.entryKey, path: pick.path, agentId: pick.agentId, input }], pick.call)?.node ?? null
+}

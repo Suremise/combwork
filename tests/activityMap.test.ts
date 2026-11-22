@@ -5,7 +5,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationLoad, stationOf, stationPanel, PANEL_ROWS, mapCallNode, mapSessionKey, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationLoad, stationOf, stationPanel, PANEL_ROWS, mapCallNode, mapPickNode, mapSessionKey, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapPick, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
@@ -715,5 +715,21 @@ describe('a map call shown in the list', () => {
     expect(mapCallNode([entry()], { ...bash, agentKey: 'hb2' })).toBeNull()
     // The host's path in any case is the same host.
     expect(mapCallNode([entry({ path: host.toUpperCase() })], bash)).not.toBeNull()
+  })
+
+  // HI-3508: a pick keeps what finds the call, never its node then, so its state is the reads' each time.
+  it('finds a pick again in the reads now: working, then done or failed once it ends; gone as it goes', () => {
+    const running = turnsOf('s1', [[{ name: 'Bash', done: false }]])
+    const live = { sessionId: 's1', status: 'working' as const, text: '', working: true, waiting: false, failed: false }
+    const inputOf = (t: ActivityTurns, sid = 's1') => ({ agents: [{ id: 'hb1', name: 'HB1', live: { ...live, sessionId: sid } }], turns: new Map([['s1', t]]) })
+    const call = buildMapModel([agent('hb1', { turns: running, sessionKey: mapSessionKey(host, 's1') })], AT).calls.find((c) => c.label === 'Bash')!
+    const found = mapCallNode([{ key: 'hb1', path: host, agentId: 'hb1', input: inputOf(running) }], ref(call))!
+    const pick: MapPick = { entryKey: found.entryKey, path: found.path, agentId: found.agentId, key: found.node.key, call: ref(call) }
+    expect(mapPickNode(pick, inputOf(running))).toMatchObject({ key: pick.key, state: 'working' })
+    expect(mapPickNode(pick, inputOf(turnsOf('s1', [[{ name: 'Bash' }, { name: 'Read' }]])))).toMatchObject({ key: pick.key, state: 'done', tool: { done: true } })
+    expect(mapPickNode(pick, inputOf(turnsOf('s1', [[{ name: 'Bash', failed: true }]])))).toMatchObject({ key: pick.key, state: 'failed' })
+    // Its session restarted, or its turn no longer read: nothing, never the old node.
+    expect(mapPickNode(pick, inputOf(running, 's2'))).toBeNull()
+    expect(mapPickNode(pick, inputOf(turnsOf('s1', [[{ name: 'Read' }]], 50)))).toBeNull()
   })
 })
