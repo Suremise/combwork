@@ -213,6 +213,9 @@ interface CombworkMessageValues {
   'git.operation.endBisect': undefined
   'git.operation.failed': undefined
   'git.operation.goOn': undefined
+  'git.operation.leftFrom': { from: string; stash: string | number }
+  'git.operation.leftTheirsTip': { from: string; stash: string | number; has: string; command: string | number }
+  'git.operation.leftTitle': { folder: string | number }
   'git.operation.lentMessage': { agent: string | number; what: string | number }
   'git.operation.lentTitle': { slot: string | number; card: string; lane: string | number }
   'git.operation.mine': undefined
@@ -230,6 +233,7 @@ interface CombworkMessageValues {
   'git.operation.stoppedAgain': { step: string; what: string | number; folder: string | number }
   'git.operation.submoduleStaged': { path: string | number; commit: string | number; command: string }
   'git.operation.theirs': undefined
+  'git.operation.theirsStash': undefined
   'git.operation.theirsTip': { swap: string; has: string; command: string | number }
   'git.operation.title': { what: string | number; folder: string | number }
   'git.operation.unreadable': undefined

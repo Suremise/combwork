@@ -42,6 +42,10 @@ const T = {
   goOn: msg({ id: 'git.operation.goOn', defaultMessage: 'Go On', description: 'HI-3470: the button that confirms acting in a lent slot (git.operation.lentTitle).' }),
   done: msg({ id: 'git.operation.done', defaultMessage: "{step, select, continue {Git went on with the {what} in {folder}.} skip {Git skipped a commit of the {what} in {folder}.} other {{what, select, bisect {The bisect in {folder} is ended.} other {The git {what} in {folder} is aborted.}}}}", description: "HI-3470: a notice after the panel's step worked. {what} is git's word for the operation; {folder} a slot's name or git.operation.projectFolder." }),
   stoppedAgain: msg({ id: 'git.operation.stoppedAgain', defaultMessage: "{step, select, skip {Git skipped a commit of the {what} in {folder}, then stopped again.} other {Git went on with the {what} in {folder}, then stopped again.}} The panel shows where.", description: "HI-3503: a notice after Continue or Skip went through and git stopped at the next commit of the operation (in conflict, say): the panel shows the new stop. {what} is git's word for the operation (keep it as it is); {folder} a slot's name or git.operation.projectFolder." }),
+  leftTitle: msg({ id: 'git.operation.leftTitle', defaultMessage: 'Files left in conflict in {folder}', description: "HI-3518: the heading of the panel in Version Control → Changes when files are left in conflict with no git operation under way (after a stash's Apply or Pop, say). {folder} is a slot's name or git.operation.projectFolder." }),
+  leftFrom: msg({ id: 'git.operation.leftFrom', defaultMessage: '{from, select, stash {From applying the stash “{stash}”: settle each file below. The stash is kept.} other {No git operation is under way: settle each file below.}}', description: "HI-3518: under git.operation.leftTitle: where the conflicts came from. from stash: Combwork applied a stash ({stash}, its message as Stashes lists it), which git keeps when it conflicts; other: Combwork doesn't know (a terminal's command)." }),
+  theirsStash: msg({ id: 'git.operation.theirsStash', defaultMessage: "Use the stash's", description: "HI-3518: a conflicted file's button, in place of git.operation.theirs, when the conflict came from applying a stash: takes the stash's side of it." }),
+  leftTheirsTip: msg({ id: 'git.operation.leftTheirsTip', defaultMessage: "{from, select, stash {The other side: the stash's (“{stash}”).} other {The other side: what was brought in (git calls it theirs).}} {has, select, yes {Takes its version of the file.} submodule {Stages its commit of the submodule.} other {It deleted the file: deletes it.}} Runs {command}", description: "HI-3518: the tooltip of a conflicted file's other side when files are left in conflict with no git operation under way, as git.operation.theirsTip. from stash: it came from applying a stash ({stash}, its message); other: not known. {command} is the git command, as it is." }),
   failed: msg({ id: 'git.operation.failed', defaultMessage: "Git couldn't do that", description: "HI-3470: the title of the error notice when the panel's step or a conflicted file's button failed or was refused." }),
   unreadable: msg({ id: 'git.operation.unreadable', defaultMessage: "Combwork can't read where git stopped here, so it takes no step: finish it in a terminal.", description: "HI-3470 (a reviewer's round 2): under the panel's heading when git's files that say where the operation stopped can't be read; its buttons are greyed out." }),
   readFailed: msg({ id: 'git.operation.readFailed', defaultMessage: "Couldn't read the git operation under way: {error}", description: 'HI-3470: the panel, when reading the operation failed. {error} is why.' })
@@ -107,7 +111,7 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
   const pick = async (c: GitConflict, p: ConflictPick): Promise<void> => {
     // HI-3502: a submodule's side is its commit staged, its folder left as it is: said once it is done.
     const link = p === 'resolved' ? undefined : c.submodule?.[p]
-    if (id) await act(`${p}:${c.path}`, { what: op.what, id, file: c.path, pick: p }, link ? tr(T.submoduleStaged, { path: c.path, commit: link.slice(0, 7), command: submoduleUpdateCommand(c.path) ?? 'none' }) : undefined)
+    if (id) await act(`${p}:${c.path}`, { what: op.what, id, file: c.path, pick: p, ...(c.stages ? { seen: c.stages } : {}) }, link ? tr(T.submoduleStaged, { path: c.path, commit: link.slice(0, 7), command: submoduleUpdateCommand(c.path) ?? 'none' }) : undefined)
   }
   /** A side's word for its tooltip: it has the file, it is a submodule's commit, or it deleted it. */
   const sideHas = (c: GitConflict, side: 'mine' | 'theirs'): string => (c.submodule?.[side] ? 'submodule' : c[side] ? 'yes' : 'no')
@@ -116,12 +120,19 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
   const id = op.id
   const off = !!busy || !id
   const left = op.conflicts.length
+  // HI-3518: the operation under way, or null for files left in conflict with none (no step, only their files).
+  const operation = op.what === 'conflicts' ? null : op.what
 
   return (
     <div className="banner warn operation-panel" data-operation={op.what}>
       <div className="operation-head">
-        <Icon name="warning" /> <strong>{tr(T.title, { what: op.what, folder: where })}</strong>
+        <Icon name="warning" /> <strong>{operation ? tr(T.title, { what: operation, folder: where }) : tr(T.leftTitle, { folder: where })}</strong>
       </div>
+      {!operation && (
+        <div className="hint operation-at" data-operation-from={op.from ? 'stash' : ''}>
+          {tr(T.leftFrom, { from: op.from ? 'stash' : 'other', stash: op.from?.stash ?? '' })}
+        </div>
+      )}
       {(op.at || op.step) && (
         <div className="hint operation-at">
           {op.step && tr(T.step, { at: op.step.at, of: op.step.of })}
@@ -134,18 +145,20 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
           {tr(T.unreadable)}
         </div>
       )}
-      <div className="flex operation-steps">
-        {OPERATION_STEPS[op.what].map((s) => {
-          const blocked = s === 'continue' && left > 0
-          return (
-            <Tooltip key={s} content={blocked ? tr(T.unresolved, { count: left }) : tr(T.runs, { command: operationCommand(op.what, s) })}>
-              <button className={s === 'continue' ? 'btn small primary' : 'btn small'} data-step={s} disabled={off || blocked} onClick={() => void step(s)}>
-                {busy === s && <Icon name="loading" spin />} {tr(op.what === 'bisect' ? T.endBisect : STEP_LABEL[s])}
-              </button>
-            </Tooltip>
-          )
-        })}
-      </div>
+      {operation && (
+        <div className="flex operation-steps">
+          {OPERATION_STEPS[operation].map((s) => {
+            const blocked = s === 'continue' && left > 0
+            return (
+              <Tooltip key={s} content={blocked ? tr(T.unresolved, { count: left }) : tr(T.runs, { command: operationCommand(operation, s) })}>
+                <button className={s === 'continue' ? 'btn small primary' : 'btn small'} data-step={s} disabled={off || blocked} onClick={() => void step(s)}>
+                  {busy === s && <Icon name="loading" spin />} {tr(operation === 'bisect' ? T.endBisect : STEP_LABEL[s])}
+                </button>
+              </Tooltip>
+            )
+          })}
+        </div>
+      )}
       {left > 0 && (
         <div className="operation-conflicts">
           <div className="faint">{tr(T.conflicts, { count: left })}</div>
@@ -163,9 +176,9 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
                     {tr(T.mine)}
                   </button>
                 </Tooltip>
-                <Tooltip content={tr(T.theirsTip, { swap, has: sideHas(c, 'theirs'), command: pickCommand(op.what, c, 'theirs') })}>
+                <Tooltip content={operation ? tr(T.theirsTip, { swap, has: sideHas(c, 'theirs'), command: pickCommand(op.what, c, 'theirs') }) : tr(T.leftTheirsTip, { from: op.from ? 'stash' : 'other', stash: op.from?.stash ?? '', has: sideHas(c, 'theirs'), command: pickCommand(op.what, c, 'theirs') })}>
                   <button className="btn small" data-pick="theirs" disabled={off} onClick={() => void pick(c, 'theirs')}>
-                    {tr(T.theirs)}
+                    {tr(op.from ? T.theirsStash : T.theirs)}
                   </button>
                 </Tooltip>
                 <Tooltip content={tr(T.resolvedTip, { command: pickCommand(op.what, c, 'resolved') })}>

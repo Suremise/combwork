@@ -21,12 +21,15 @@ vi.mock('../src/main/gitRepo', async (original) => ({ ...(await original<typeof 
 
 /** Each git command's arguments and bound, while a test collects them (null: none). */
 let gitCalls: { args: string[]; timeout?: number }[] | null = null
+/** HI-3518 (HR1's round 1): HEAD can't be read while a test says (rev-parse of HEAD fails). */
+let headUnreadable = false
 vi.mock('../src/main/git', async (original) => {
   const real = await original<typeof import('../src/main/git')>()
   return {
     ...real,
     git: (cwd: string, args: string[], max?: number, input?: string, opts?: Parameters<typeof real.git>[4]) => {
       gitCalls?.push({ args, timeout: opts?.timeout })
+      if (headUnreadable && args[0] === 'rev-parse' && args.includes('HEAD')) return Promise.resolve({ ok: false, out: '', err: 'fatal: bad object HEAD', code: 128 })
       return real.git(cwd, args, max, input, opts)
     }
   }
@@ -53,9 +56,12 @@ const gitDir = (): string => sh(proj, 'rev-parse', '--absolute-git-dir')
 const state = () => steps.operationState(proj)
 type Ask = OperationRequest extends infer R ? (R extends OperationRequest ? Omit<R, 'id'> & { id?: string } : never) : never
 /** A request as the panel sends it: the stop it shows now, unless the test names another (HR1's round 1). */
-const step = async (req: Ask, guard?: () => void) => {
-  const id = req.id ?? (await state())?.id ?? 'none'
-  return inWorkspace(w, () => steps.operationStep(proj, proj, { ...req, id } as OperationRequest, guard))
+const step = async (req: Ask & { seen?: string }, guard?: () => void) => {
+  const now = await state()
+  const id = req.id ?? now?.id ?? 'none'
+  // A pick names the conflict the panel shows for its file (HI-3518, HR1's round 1), unless the test names another.
+  const seen = 'file' in req && req.seen === undefined ? now?.conflicts.find((c) => c.path === req.file)?.stages : req.seen
+  return inWorkspace(w, () => steps.operationStep(proj, proj, { ...req, id, ...(seen ? { seen } : {}) } as OperationRequest, guard))
 }
 
 beforeEach(() => {
@@ -66,6 +72,7 @@ beforeEach(() => {
   held = null
   agent = null
   gitCalls = null
+  headUnreadable = false
 })
 
 /** `side` changes a.txt one way on a branch, main another: a conflict to merge, rebase or pick. */
@@ -124,7 +131,7 @@ describe('a merge', () => {
     sh(proj, 'commit', '-q', '-m', 'gone on main')
     expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
     const c = (await state())!.conflicts[0]
-    expect(c).toEqual({ path: 'a.txt', mine: false, theirs: true })
+    expect(c).toMatchObject({ path: 'a.txt', mine: false, theirs: true })
     expect(pickCommand('merge', c, 'mine')).toBe('git rm -- a.txt')
     await step({ what: 'merge', file: 'a.txt', pick: 'mine' })
     expect(existsSync(join(proj, 'a.txt'))).toBe(false)
@@ -186,7 +193,7 @@ describe('a path git would read as a glob (HI-3501)', () => {
     commit(proj, { 'd1.txt': 'main\n' }, 'one gone on main')
     expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
     const c = (await state())!.conflicts.find((x) => x.path === 'd[1].txt')!
-    expect(c).toEqual({ path: 'd[1].txt', mine: false, theirs: true })
+    expect(c).toMatchObject({ path: 'd[1].txt', mine: false, theirs: true })
     await step({ what: 'merge', file: 'd[1].txt', pick: 'mine' })
     expect(existsSync(join(proj, 'd[1].txt'))).toBe(false)
     expect(existsSync(join(proj, 'd1.txt'))).toBe(true)
@@ -260,7 +267,7 @@ describe('a submodule in conflict (HI-3502)', () => {
     const c = submodule()
     expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
     const lib = (await state())!.conflicts.find((x) => x.path === 'lib')!
-    expect(lib).toEqual({ path: 'lib', mine: true, theirs: true, submodule: { mine: c.main, theirs: c.side } })
+    expect(lib).toMatchObject({ path: 'lib', mine: true, theirs: true, submodule: { mine: c.main, theirs: c.side } })
     expect(pickCommand('merge', lib, 'theirs')).toBe(`git update-index --cacheinfo 160000 ${c.side} lib`)
     expect(sh(join(proj, 'lib'), 'rev-parse', 'HEAD')).toBe(c.main)
     await step({ what: 'merge', file: 'lib', pick: 'theirs' })
@@ -301,7 +308,8 @@ describe('a submodule in conflict (HI-3502)', () => {
     sh(proj, 'commit', '-q', '-m', 'lib gone on main')
     expect(() => sh(proj, 'merge', '--no-edit', 'side')).toThrow()
     const lib = (await state())!.conflicts.find((x) => x.path === 'lib')!
-    expect(lib).toEqual({ path: 'lib', mine: false, theirs: true, submodule: { theirs: c.side } })
+    expect(lib).toMatchObject({ path: 'lib', mine: false, theirs: true, submodule: { theirs: c.side } })
+    expect(lib.submodule).toEqual({ theirs: c.side })
     await step({ what: 'merge', file: 'lib', pick: 'theirs' })
     expect(staged()).toBe(c.side)
     expect((await state())?.conflicts).toEqual([])
@@ -398,6 +406,94 @@ describe('a step that goes on and stops at the next conflict (HI-3503)', () => {
     await step({ what: 'cherry-pick', file: 'a.txt', pick: 'mine' })
     await expect(step({ what: 'cherry-pick', step: 'continue' })).rejects.toThrow(/Git refused: .*empty/)
     expect((await state())?.id).toBe(before)
+  })
+})
+
+describe('files left in conflict with no operation under way (HI-3518)', () => {
+  /** a.txt and b.txt changed and stashed; then main commits other changes to both: applying the stash conflicts in both. */
+  function stashConflict(): void {
+    writeFileSync(join(proj, 'a.txt'), 'stashed a\n')
+    writeFileSync(join(proj, 'b.txt'), 'stashed b\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'my work')
+    commit(proj, { 'a.txt': 'main a\n', 'b.txt': 'main b\n' }, 'main edits')
+    expect(() => sh(proj, 'stash', 'apply', '-q')).toThrow()
+  }
+
+  it('a conflicting stash apply: its files, mine and the stash as theirs; each pick settles its file; then nothing to show', async () => {
+    stashConflict()
+    const s = await state()
+    expect(s).toMatchObject({ what: 'conflicts', conflicts: [{ path: 'a.txt', mine: true, theirs: true }, { path: 'b.txt', mine: true, theirs: true }] })
+    expect(s!.id).toBe(`conflicts|${sh(proj, 'rev-parse', 'HEAD')}`)
+    expect(s!.step).toBeUndefined()
+    await step({ what: 'conflicts', file: 'a.txt', pick: 'theirs' })
+    expect(read('a.txt')).toBe('stashed a\n')
+    expect((await state())?.conflicts.map((c) => c.path)).toEqual(['b.txt'])
+    await step({ what: 'conflicts', file: 'b.txt', pick: 'mine' })
+    expect(read('b.txt')).toBe('main b\n')
+    // Nothing unmerged is left: no panel. The stash git kept is still there.
+    expect(await state()).toBeNull()
+    expect(sh(proj, 'stash', 'list')).toContain('my work')
+  })
+
+  it('Mark resolved takes the file as edited by hand', async () => {
+    stashConflict()
+    writeFileSync(join(proj, 'a.txt'), 'both a\n')
+    await step({ what: 'conflicts', file: 'a.txt', pick: 'resolved' })
+    expect(sh(proj, 'show', ':a.txt')).toBe('both a')
+    expect((await state())?.conflicts.map((c) => c.path)).toEqual(['b.txt'])
+  })
+
+  it('has no step: Continue, Skip and Abort are refused before git runs', async () => {
+    stashConflict()
+    for (const s of ['continue', 'skip', 'abort'] as const) await expect(step({ what: 'conflicts', step: s })).rejects.toThrow("That isn't a step git offers")
+    expect((await state())?.conflicts).toHaveLength(2)
+  })
+
+  it('refused once HEAD has moved since the user looked, or the request names an operation', async () => {
+    stashConflict()
+    const id = (await state())!.id!
+    await expect(step({ what: 'merge', id, file: 'a.txt', pick: 'mine' })).rejects.toThrow("Git isn't in the middle of a merge")
+    sh(proj, 'update-ref', 'HEAD', 'HEAD~1')
+    await expect(step({ what: 'conflicts', id, file: 'a.txt', pick: 'mine' })).rejects.toThrow('changed since you looked')
+    expect(read('a.txt')).toContain('<<<<<<<')
+  })
+
+  it("HR1's round 1: stash A's conflict settled in a terminal and stash B's in its place, at the same HEAD: A's pick is refused, B's conflict as it was", async () => {
+    writeFileSync(join(proj, 'a.txt'), 'stash A\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'A')
+    writeFileSync(join(proj, 'a.txt'), 'stash B\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'B')
+    commit(proj, { 'a.txt': 'main a\n' }, 'main edit')
+    expect(() => sh(proj, 'stash', 'apply', '-q', 'stash@{1}')).toThrow()
+    const sawA = (await state())!
+    const aConflict = sawA.conflicts.find((c) => c.path === 'a.txt')!
+    // In a terminal: A's conflict thrown away, then B applied onto the same HEAD, a.txt in conflict again.
+    sh(proj, 'reset', '-q', '--hard')
+    expect(() => sh(proj, 'stash', 'apply', '-q', 'stash@{0}')).toThrow()
+    const sawB = (await state())!
+    expect(sawB.id).toBe(sawA.id)
+    expect(sawB.conflicts.find((c) => c.path === 'a.txt')!.stages).not.toBe(aConflict.stages)
+    const index = sh(proj, 'ls-files', '-u', '--', 'a.txt')
+    const onDisk = read('a.txt')
+    await expect(step({ what: 'conflicts', id: sawA.id!, file: 'a.txt', pick: 'theirs', seen: aConflict.stages })).rejects.toThrow("a.txt's conflict changed since you looked")
+    expect(sh(proj, 'ls-files', '-u', '--', 'a.txt')).toBe(index)
+    expect(read('a.txt')).toBe(onDisk)
+    // A pick without the conflict it saw is refused too: files left in conflict always name it.
+    await expect(inWorkspace(w, () => steps.operationStep(proj, proj, { what: 'conflicts', id: sawB.id!, file: 'a.txt', pick: 'theirs' }))).rejects.toThrow("a.txt's conflict changed since you looked")
+    // B's own pick, as its panel shows it, works.
+    await step({ what: 'conflicts', file: 'a.txt', pick: 'theirs' })
+    expect(read('a.txt')).toBe('stash B\n')
+  })
+
+  it("HR1's round 1: HEAD can't be read: no stop to show, and a pick is refused before git touches a file", async () => {
+    stashConflict()
+    const id = (await state())!.id!
+    headUnreadable = true
+    expect((await state())?.id).toBeNull()
+    gitCalls = []
+    await expect(step({ what: 'conflicts', id, file: 'a.txt', pick: 'theirs' })).rejects.toThrow("can't read where git stopped")
+    expect(gitCalls.filter((c) => ['checkout', 'add', 'rm', 'update-index'].some((cmd) => c.args.includes(cmd)))).toEqual([])
+    expect(read('a.txt')).toContain('<<<<<<<')
   })
 })
 
@@ -564,7 +660,7 @@ describe("another operation of the same kind at the same HEAD (HR1's round 2)", 
     const second = (await state())!
     // The same kind, HEAD, step and conflicted path: only the patch tells them apart.
     expect(sh(proj, 'rev-parse', 'HEAD')).toBe(head)
-    expect(second).toMatchObject({ what: 'am', step: first.step, conflicts: first.conflicts })
+    expect(second).toMatchObject({ what: 'am', step: first.step, conflicts: first.conflicts.map((c) => ({ path: c.path, mine: c.mine, theirs: c.theirs })) })
     expect(first.id).toBeTruthy()
     expect(second.id).not.toBe(first.id)
     const patchNow = readFileSync(join(gitDir(), 'rebase-apply', '0001'), 'utf8')

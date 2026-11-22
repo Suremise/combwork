@@ -664,8 +664,18 @@
       "why": "plain"
     }
   },
+  "service.gitOperation.fileChanged": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
   "service.gitOperation.invalid": {
     "placeholders": {}
+  },
+  "service.gitOperation.leftChanged": {
+    "placeholders": {
+      "folder": "plain"
+    }
   },
   "service.gitOperation.moved": {
     "placeholders": {

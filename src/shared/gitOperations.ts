@@ -25,11 +25,19 @@ export const OPERATION_STEPS: Record<GitOperationName, readonly OperationStep[]>
 export const isOperationName = (v: unknown): v is GitOperationName => typeof v === 'string' && Object.hasOwn(OPERATION_STEPS, v)
 
 /**
+ * HI-3518: what Changes' panel shows: a git operation under way, or `conflicts`: files left unmerged with none under way
+ * (a stash's Apply or Pop that conflicted, HI-3472, or a terminal's): their files only, no step.
+ */
+export type PanelKind = GitOperationName | 'conflicts'
+
+export const isPanelKind = (v: unknown): v is PanelKind => v === 'conflicts' || isOperationName(v)
+
+/**
  * HI-3470: in a rebase, git's `--ours` is the line being replayed onto and `--theirs` the commit being replayed: the
  * folder's own work. Mine is that commit there, git's ours everywhere else (an am's too: its patch is the other side,
  * applied onto the folder's branch).
  */
-export const mineIsTheirs = (what: GitOperationName): boolean => what === 'rebase'
+export const mineIsTheirs = (what: PanelKind): boolean => what === 'rebase'
 
 /** HI-3470: a file git lists as unmerged, and whether each side has it (a side that deleted it hasn't). */
 export interface GitConflict {
@@ -41,11 +49,16 @@ export interface GitConflict {
    * `checkout --ours/--theirs` never moves a submodule, so a pick of that side stages its commit instead (pickArgs).
    */
   submodule?: { mine?: string; theirs?: string }
+  /**
+   * HI-3518 (HR1's round 1): the conflict's fingerprint, its unmerged entries (modes, objects, stages) hashed: a pick
+   * names the one the user saw (`seen`), and another conflict of the same file in its place is refused. Opaque.
+   */
+  stages?: string
 }
 
-/** HI-3470: the operation under way in a folder, as Changes' panel shows it. */
+/** HI-3470: the operation under way in a folder, as Changes' panel shows it (HI-3518: or files left in conflict). */
 export interface GitOperationState {
-  what: GitOperationName
+  what: PanelKind
   /**
    * HR1's round 1: which stop of it this is (its kind, HEAD, the commit it stopped at, its step): a request names the one
    * the user saw, and one made when git is at another stop (a terminal went on, or another of the same kind began) is
@@ -58,6 +71,8 @@ export interface GitOperationState {
   /** A rebase's or am's place in its list: the step it stopped at, of how many. */
   step?: { at: number; of: number }
   conflicts: GitConflict[]
+  /** HI-3518: where files left in conflict came from, when Combwork knows: the stash applied (its message). */
+  from?: { stash: string }
 }
 
 /** HI-3470: the folder's slot, when it is lent to a card or lane: the panel asks the user to confirm first, naming it. */
@@ -79,7 +94,7 @@ export interface OperationPanelState extends GitOperationState {
  * the operation and the stop of it the user saw (anything else under way now refuses it, HR1's round 1), `lease` the lent
  * slot's lease they confirmed.
  */
-export type OperationRequest = { what: GitOperationName; id: string; lease?: string } & ({ step: OperationStep } | { file: string; pick: ConflictPick })
+export type OperationRequest = { what: PanelKind; id: string; lease?: string } & ({ step: OperationStep } | { file: string; pick: ConflictPick; seen?: string })
 
 /**
  * HI-3503: what a step did: git's output, and `stoppedAgain` when a Continue or Skip went on and git stopped at another
@@ -137,7 +152,7 @@ export function submoduleUpdateCommand(path: string): string | null {
  * HI-3470: a pick's git command, for its tooltip (a side without the file: git rm). Commands, never translated. The path
  * is literal (pathArg), as the panel runs it (HI-3501: main's pickArgs, `--literal-pathspecs`).
  */
-export function pickCommand(what: GitOperationName, c: GitConflict, pick: ConflictPick): string {
+export function pickCommand(what: PanelKind, c: GitConflict, pick: ConflictPick): string {
   const p = tipWord(pathArg(c.path), literalSpec(c.path))
   if (pick === 'resolved') return `git add -A -- ${p}` // i18n-ignore: a git command
   const has = pick === 'mine' ? c.mine : c.theirs

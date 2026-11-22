@@ -699,9 +699,19 @@
     "note": "HI-3470: an error from the panel: git's own command failed; {why} is git's error line, in English.",
     "audience": "both"
   },
+  "service.gitOperation.fileChanged": {
+    "text": "{file}'s conflict changed since you looked: nothing was done. Look again.",
+    "note": "HI-3518 (a reviewer's round 1): an error from the unfinished git operation panel: the conflicted file the user settled ({file}, a path in the repository) is still in conflict, but not the conflict they saw (it was settled in a terminal and another took its place). Nothing was done.",
+    "audience": "both"
+  },
   "service.gitOperation.invalid": {
     "text": "That step was asked for wrongly: nothing was done.",
     "note": "HI-3470: an error from the panel: the request was malformed (not reached from the window).",
+    "audience": "both"
+  },
+  "service.gitOperation.leftChanged": {
+    "text": "{folder} changed since you looked (a commit, or a git operation began): nothing was done. Look again.",
+    "note": "HI-3518: an error from the panel showing files left in conflict with no git operation under way (after a stash's Apply, say): since the user looked, HEAD moved or a git operation (a merge, a rebase…) began in the folder ({folder}, a path). Nothing was done.",
     "audience": "both"
   },
   "service.gitOperation.moved": {

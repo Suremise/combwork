@@ -6,7 +6,7 @@
 // live session in it, and the port checks again, under the repository lock and the folder's fence, that nothing of
 // Combwork's or an agent's works there and that the operation is still the one the user saw.
 import type { OperationLent, OperationPanelState, OperationRequest, OperationStepResult } from '../shared/gitOperations'
-import { isOperationName } from '../shared/gitOperations'
+import { isPanelKind } from '../shared/gitOperations'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { containsPlace } from './fsutil'
@@ -42,22 +42,28 @@ export function lentOf(ws: WorkspaceService, at: { pool: SlotPool; slot: Slot } 
   return { slot: at.slot.name, lease: l.id, agent: l.agent, card: l.card !== null ? (cardKeyOf(ws, l.card)?.key ?? `#${l.card}`) : null, lane: l.lane }
 }
 
-/** `git:operation`: the operation under way in a Changes root, with its conflicted files and its slot's lease; null with none. */
+/**
+ * `git:operation`: the operation under way in a Changes root, with its conflicted files and its slot's lease (HI-3518: or
+ * files left in conflict with none under way, and the stash they came from); null with none.
+ */
 export async function operationPanel(ws: WorkspaceService, root: string): Promise<OperationPanelState | null> {
   const { folder, project } = ws.changesRootProject(root)
-  const state = await lineRepoReads().operation(folder)
+  const reads = lineRepoReads()
+  const state = await reads.operation(folder)
   if (!state) return null
-  return { ...state, lent: lentOf(ws, await slotAt(ws, project, folder)) }
+  // HI-3518: files left in conflict say where they came from when Combwork knows: the stash it applied (HI-3472).
+  const stash = state.what === 'conflicts' ? await reads.stashConflict(folder) : null
+  return { ...state, ...(stash ? { from: { stash: stash.label } } : {}), lent: lentOf(ws, await slotAt(ws, project, folder)) }
 }
 
 /** The request as the window sent it, checked: anything else is refused before anything runs. */
 function requestOf(raw: unknown): OperationRequest {
   const r = (raw ?? {}) as Record<string, unknown>
   // The stop the user saw (HR1's round 1): never optional, so no request acts on whatever git is at now.
-  if (!isOperationName(r.what) || typeof r.id !== 'string' || !r.id) throw combworkError(T.invalid, undefined, { kind: 'invalid' })
+  if (!isPanelKind(r.what) || typeof r.id !== 'string' || !r.id) throw combworkError(T.invalid, undefined, { kind: 'invalid' })
   const base = { what: r.what, id: r.id, ...(typeof r.lease === 'string' && r.lease ? { lease: r.lease } : {}) }
   if (r.step === 'continue' || r.step === 'skip' || r.step === 'abort') return { ...base, step: r.step }
-  if (typeof r.file === 'string' && r.file && (r.pick === 'mine' || r.pick === 'theirs' || r.pick === 'resolved')) return { ...base, file: r.file, pick: r.pick }
+  if (typeof r.file === 'string' && r.file && (r.pick === 'mine' || r.pick === 'theirs' || r.pick === 'resolved')) return { ...base, file: r.file, pick: r.pick, ...(typeof r.seen === 'string' && r.seen ? { seen: r.seen } : {}) }
   throw combworkError(T.invalid, undefined, { kind: 'invalid' })
 }
 
