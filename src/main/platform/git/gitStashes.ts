@@ -187,18 +187,34 @@ async function headOf(folder: string): Promise<string> {
   return r.ok ? r.out.trim() : ''
 }
 
+/**
+ * HI-3528: a folder's unmerged index entries, each as git lists it (`<mode> <blob> <stage>\t<path>`): which files are in
+ * conflict and the exact sides of each. Empty when git can't say.
+ */
+async function unmergedEntries(folder: string): Promise<string[]> {
+  const r = await git(folder, ['ls-files', '-u', '-z'])
+  if (!r.ok) return []
+  return r.out.split('\0').filter(Boolean)
+}
+
 /** HI-3518's hand-off: the stash last applied with conflicts in each folder (by its normalised path), while they last. */
-const conflicts = new Map<string, StashConflict>()
+const conflicts = new Map<string, { conflict: StashConflict; entries: Set<string> }>()
 const keyOf = (folder: string): string => normalize(folder).toLowerCase()
 
 /**
  * HI-3518: the stash last applied with conflicts in `folder` (its commit, its message, the HEAD it was applied onto),
  * while HEAD is still that and a file is still in conflict there; null otherwise (and forgotten). Main's memory only.
+ * HI-3528: and only while every conflict there is one that Apply left: each unmerged entry now (its path, stage and
+ * blob) one of those it saw. Settling files leaves fewer; a conflict made since (another `git stash apply` in a
+ * terminal, the same file conflicted again with other sides) isn't the stash's, so it is forgotten.
  */
 export async function stashConflictIn(folder: string): Promise<StashConflict | null> {
   const rec = conflicts.get(keyOf(folder))
   if (!rec) return null
-  if ((await headOf(folder)) === rec.head && (await unmergedIn(folder)).length) return rec
+  if ((await headOf(folder)) === rec.conflict.head) {
+    const now = await unmergedEntries(folder)
+    if (now.length && now.every((e) => rec.entries.has(e))) return rec.conflict
+  }
   conflicts.delete(keyOf(folder))
   return null
 }
@@ -251,7 +267,8 @@ export async function applyStash(projectPath: string, folder: string, req: Stash
         }
         const left = await unmergedIn(folder)
         if (left.length) {
-          conflicts.set(keyOf(folder), { commit: req.commit, label: stashSubject(s.subject).message, head })
+          // Apply refused while a file was in conflict, so every unmerged entry now is this stash's.
+          conflicts.set(keyOf(folder), { conflict: { commit: req.commit, label: stashSubject(s.subject).message, head }, entries: new Set(await unmergedEntries(folder)) })
           log.info(`The stash ${req.commit.slice(0, 12)} left ${left.length} file(s) in conflict in ${userText(folder)}; it is kept`)
           return { conflicts: left, dropped: false }
         }

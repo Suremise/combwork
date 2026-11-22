@@ -5965,7 +5965,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
     the stash is kept (git drops a popped one only after a clean apply): a warning names the files. HI-3518's panel
     shows such conflicts; it learns which stash they came from through RepoReads' `stashConflict` (the stash last
     applied there with conflicts, its message and the HEAD it went onto, in main's memory, while that HEAD stays and a
-    file is still in conflict).
+    file is still in conflict). HI-3528: it also keeps the unmerged index entries that apply left (each file's stages
+    and their blobs, `git ls-files -u`), and names the stash only while every entry in conflict now is one of them:
+    settling some leaves the rest named; a conflict made since (another `git stash apply` in a terminal, or the same
+    file conflicted again with other sides) isn't the stash's, and the record is forgotten.
   - **Files left in conflict** (HI-3518): with unmerged files and no operation under way (such an Apply or Pop, or a
     terminal's), the panel shows *Files left in conflict in {folder}* (kind `conflicts`): their files with **Open**,
     **Use mine**, **Use theirs** and **Mark resolved** as an operation's (git's own sides: mine is HEAD), and no

@@ -219,6 +219,41 @@ describe('Apply and Pop', () => {
     expect(await S.stashConflictIn(proj)).toBeNull()
   })
 
+  it("HI-3528: a conflict made since, by another stash in a terminal, isn't named as the applied stash's; settling some of its own keeps it", async () => {
+    write('a.txt', 'first\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'first')
+    write('b.txt', 'second\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'second')
+    write('a.txt', 'both a\n')
+    write('b.txt', 'both b\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'both')
+    const [both, second, first] = stashes()
+    commit(proj, { 'a.txt': 'theirs a\n', 'b.txt': 'theirs b\n' }, 'moved on')
+    const head = sh(proj, 'rev-parse', 'HEAD')
+    expect(await apply(first, false)).toEqual({ conflicts: ['a.txt'], dropped: false })
+    expect(await S.stashConflictIn(proj)).toEqual({ commit: first, label: 'first', head })
+    // In a terminal: a.txt put back as HEAD has it, then the other stash applied, HEAD unchanged; b.txt is in conflict.
+    sh(proj, 'restore', '--source=HEAD', '--staged', '--worktree', 'a.txt')
+    expect(() => sh(proj, 'stash', 'apply', second)).toThrow()
+    expect(sh(proj, 'diff', '--name-only', '--diff-filter=U')).toBe('b.txt')
+    expect(await S.stashConflictIn(proj)).toBeNull()
+    // And once forgotten, it stays so, though the terminal's conflict is settled and the HEAD is the same.
+    sh(proj, 'checkout', '--theirs', '--', 'b.txt')
+    sh(proj, 'add', 'b.txt')
+    expect(await S.stashConflictIn(proj)).toBeNull()
+    sh(proj, 'reset', '-q', '--hard')
+    // Two files of one stash in conflict: settling one keeps the stash named; the same file conflicted again by
+    // another stash, with other sides, doesn't.
+    expect(await apply(both, false)).toEqual({ conflicts: ['a.txt', 'b.txt'], dropped: false })
+    sh(proj, 'checkout', '--theirs', '--', 'a.txt')
+    sh(proj, 'add', 'a.txt')
+    expect(await S.stashConflictIn(proj)).toEqual({ commit: both, label: 'both', head })
+    sh(proj, 'restore', '--source=HEAD', '--staged', '--worktree', 'b.txt')
+    expect(() => sh(proj, 'stash', 'apply', second)).toThrow()
+    expect(sh(proj, 'diff', '--name-only', '--diff-filter=U')).toBe('b.txt')
+    expect(await S.stashConflictIn(proj)).toBeNull()
+  })
+
   it("refuses while the folder has uncommitted changes to a file the stash holds, untracked ones too; another file's don't", async () => {
     write('a.txt', 'mine\n')
     write('new.txt', 'new\n')
