@@ -2,10 +2,9 @@
 // during the run (observe.ts' changedBetween). Git's folder-only rules (`out/`, `__pycache__/`) match a path without a
 // slash only when it is a folder on disk now, so asking the record's paths in the folder itself gets both ways wrong: a
 // deleted ignored `out/` (no longer on disk) is taken as a file and counts, and a file `out` the run replaced with an
-// `out/` folder is taken as the folder and passes. jj's record has the same filter by kind (HI-3160, jjChecks.ts'
-// withoutIgnored); Git's record has no run watch, so its kinds come from the record: each event's entry as it was read
-// when the event came (observe.ts' FolderLog), a folder where the record has paths under it, and what is on disk now
-// where an event's entry wasn't read. A path is ignored only as every kind it had; one with no kind known is asked as a
+// `out/` folder is taken as the folder and passes. Git's record has no run watch, so its kinds come from the record:
+// each event's entry as it was read when the event came (observe.ts' FolderLog), a folder where the record has paths
+// under it, and what is on disk now where an event's entry wasn't read. A path is ignored only as every kind it had; one with no kind known is asked as a
 // file too (a folder-only rule then doesn't cover it: it counts). The residual is HI-3158's decision (option
 // 2): a file named as an ignored folder, made and gone again before its event is read, passes as the folder.
 
@@ -74,5 +73,5 @@ async function askedByKind(folder: string, rels: string[]): Promise<Set<string> 
   if (!rels.length) return new Set()
   const gd = await git(folder, ['rev-parse', '--absolute-git-dir'])
   if (!gd.ok || !gd.out.trim()) return null
-  return shadowCheckIgnore(folder, gd.out.trim(), rels, true)
+  return shadowCheckIgnore(folder, gd.out.trim(), rels)
 }

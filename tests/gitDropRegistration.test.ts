@@ -1,4 +1,4 @@
-// HI-3069: Git's port drops one worktree registration (a kept jj slot's, its folder gone) on HI-3046's owned-entry
+// HI-3069: Git's port drops one worktree registration (a slot's, its folder gone) on HI-3046's owned-entry
 // proof, never by a repository-wide prune (HR1's round 1): its entry found by its gitdir, proved synchronously (the
 // folder absent only on ENOENT or ENOTDIR), moved aside, proved again on what was moved, then removed (HR2's round 2).
 // Real git; the race and the access errors are injected at exact points (a seam right before the move; `fs.lstatSync`).
@@ -28,7 +28,7 @@ afterEach(() => {
 
 const g = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 
-/** A repository with two worktrees: slot-a (relative paths, as a colocated jj workspace registers) and the user's own. */
+/** A repository with two worktrees: slot-a (relative paths, git's worktree.useRelativePaths) and the user's own. */
 function twoWorktrees(): { repo: string; slot: string; mine: string; base: string } {
   const base = tempDir('dropreg-')
   const repo = join(base, 'project')

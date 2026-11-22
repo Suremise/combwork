@@ -240,8 +240,6 @@ interface CombworkMessageValues {
   'service.gitRepo.urlFailed': { remote: string | number; why: string | number }
   'service.intent.noWorkflow': { card: string | number }
   'service.intent.queueNotAgents': undefined
-  'service.jj.revisionNoRepo': undefined
-  'service.jj.revisionUnreadable': { path: string | number; commit: string | number; error: string | number }
   'service.keys.closed': undefined
   'service.keys.form': undefined
   'service.keys.notice': { keys: string | number }

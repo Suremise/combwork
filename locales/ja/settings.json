@@ -520,8 +520,6 @@
   "settings.advanced.cw.inbox.idleWakes.title": "アイドルのエージェントを起こす",
   "settings.advanced.cw.inbox.stopContinuation.desc": "エージェントが受信箱に未読の項目を残したままターンを終えようとすると、Combworkはターンごとに一度、先にそれを読むよう続けさせます。CodexとCopilotでは停止を保留し、Claude Codeでは停止に一行加えます。オフにすると、ターンはCLIが終えるとおりに終わり、項目はアイドル時の起こしまで受信箱で待ちます。プロジェクトは「プロジェクト設定」→「セッション」で独自に設定できます。",
   "settings.advanced.cw.inbox.stopContinuation.title": "未読を残して止まるエージェントを続けさせる",
-  "settings.advanced.cw.jj.commandSeconds.desc": "Combworkが実行する1つのjjコマンドにかけられる時間です。大きな作業コピーのスナップショット（snapshot）も含みます。これを過ぎるとCombworkはコマンドを終了します。その場合、読み取りは不明として扱われ、マージ中の変更はあなたが解決するよう残されます。非常に大きなリポジトリや遅いディスクでは増やしてください。",
-  "settings.advanced.cw.jj.commandSeconds.title": "jj：コマンドの最長時間",
   "settings.advanced.cw.journal.builds.desc": "Combwork自身のインストーラーをソースコードからビルドすると（npm run distまたはnpm run release）、Combworkはそのビルドを自身のエントリとしてアシスタントのジャーナルに書き込みます。バージョン、コミット、ビルドの種類、インストーラーの場所です。書き込むのは成功したビルドだけで、ジャーナルがオンで、その範囲にイベントが含まれている間に限ります。オフにするとビルドは書き込まれず、Combworkが閉じている間に残されたビルドはワークスペースを開いたときに破棄されます。",
   "settings.advanced.cw.journal.builds.title": "ビルドをジャーナルに記録する",
   "settings.advanced.cw.lanes.endWaitMinutes.desc": "レーンの終了から、ビルダーがターンを終えてレーンの終了を読むまでCombworkが待つ時間です。これを過ぎると、CombworkはビルダーのCLIを終了させます。終了コマンドで終了させるか、入力できない場合（入力欄に自分の下書きがある）や終了しない場合は強制終了します。",

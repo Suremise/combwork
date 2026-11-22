@@ -27,9 +27,8 @@
 //   removes its own: tempWorktrees.mjs) and the Progress panel's timings. Logs (`e2e\logs`) are pruned by the runner
 //   (logs.mjs).
 // - What is set up once, by hand or pinned, that a suite or release check runs (HI-2902; the age rule took them):
-//   `agy-probe` (the agy profile onboarded once by hand: antigravityreal), `tools` (portable tools fetched and checked:
-//   npm run jj:fetch), and the pinned CLI copies `copilot-<version>` (the Copilot builds a release's two-version run
-//   uses, HI-2780) and `opencode-<version>` (opencodereal's pinned build). Each is listed as kept, with its reason
+//   `agy-probe` (the agy profile onboarded once by hand: antigravityreal), and the pinned CLI copies `copilot-<version>`
+//   (the Copilot builds a release's two-version run uses, HI-2780) and `opencode-<version>` (opencodereal's pinned build). Each is listed as kept, with its reason
 //   (KEPT, KEPT_PATTERNS); a new such folder goes in one of them.
 // - A lane a runner holds.
 // - Anything a card that isn't Done (nor archived) cites (evidence.cjs: its path, a path inside it, or a folder it is
@@ -66,7 +65,6 @@ export const KEPT = {
   'build-locks': "the worktrees' build locks",
   concurrency: "the concurrency checker's folders (it removes its own)",
   'codex-home-locks': "the Codex test home's lease (codexHomeLock.mjs)",
-  tools: 'portable tools the real fixtures run, each checked as it was fetched (npm run jj:fetch, HI-2793)',
   'agy-probe': "the agy profile onboarded once by hand, past agy's first-run screens (antigravityreal; tests/e2e/README.md, The real Antigravity CLI)",
   'progress-timings.json': "the Progress panel's suite timings",
   'config.json': "the machine's test settings (heavySlots, sideSlots, modelTrials, smallRun: slots.mjs CONFIG_FILE, #589, HI-2070)"

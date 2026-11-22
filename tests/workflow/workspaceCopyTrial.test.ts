@@ -35,7 +35,7 @@ const under = (p: string, root: string): boolean => p.toLowerCase().startsWith(r
 const report: string[] = []
 
 describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)', () => {
-  it('copies it, upgrades the copy and migrates it, twice', { timeout: timing('test.hangRealJj') }, async () => {
+  it('copies it, upgrades the copy and migrates it, twice', { timeout: timing('test.hangRealLong') }, async () => {
     const dst = join(base, basename(SRC))
     const at = (p: string): string => (under(p, SRC) ? dst + p.slice(SRC.length) : p)
     // The workspace's own files, read-only.

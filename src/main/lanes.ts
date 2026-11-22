@@ -1386,20 +1386,19 @@ async function yieldNow(ws: WorkspaceService, l: LaneRecord, y: LaneYield): Prom
   const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return { kind: 'wait', why: 'folder' } // i18n-ignore: a wait's code, never shown
   const started = wf.state(wf.store.card(y.card)).started
-  // As a reorder applied now reads it: a non-colocated jj slot (HI-2896) or an unreadable one is a wait, never taken for clean.
+  // As a reorder applied now reads it: an unreadable slot is a wait, never taken for clean.
   if (!(await cardFolderClean(started?.folder))) return { kind: 'wait', why: 'folder' } // i18n-ignore: a wait's code, never shown
   return { kind: 'run', runId: st?.runId ?? null, line: started?.line ?? null }
 }
 
 /**
  * Whether a card's folder (its start's) has nothing uncommitted, for a put back that keeps its work on its line (HI-1995,
- * HI-3323): the project folder, or none, is; a slot is when its changes read as none. A non-colocated jj slot (HI-2896:
- * Git can't read it, and jj can't see unrecorded edits without a snapshot) or one that can't be read is not.
+ * HI-3323): the project folder, or none, is; a slot is when its changes read as none. One that can't be read is not.
  */
 async function cardFolderClean(folder: string | undefined): Promise<boolean> {
   if (!folder || folder === 'project') return true
-  const { gitCantRead, slotWorkspaces } = await import('./platform/workspacePorts')
-  const d = (await gitCantRead(folder)) ? null : await slotWorkspaces().dirty(folder).catch(() => null)
+  const { slotWorkspaces } = await import('./platform/workspacePorts')
+  const d = await slotWorkspaces().dirty(folder).catch(() => null)
   return Array.isArray(d) && !d.length
 }
 

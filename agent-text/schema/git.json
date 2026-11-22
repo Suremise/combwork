@@ -37,11 +37,6 @@
       "profile": "plain"
     }
   },
-  "git.repoLock.jjFolder": {
-    "placeholders": {
-      "folder": "plain"
-    }
-  },
   "git.repoLock.noGitDir": {
     "placeholders": {
       "folder": "plain",
@@ -50,12 +45,6 @@
   },
   "git.repoLock.order": {
     "placeholders": {}
-  },
-  "git.repoLock.unknownRepo": {
-    "placeholders": {
-      "root": "plain",
-      "why": "plain"
-    }
   },
   "git.tool.missing": {
     "placeholders": {}

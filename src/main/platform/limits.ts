@@ -11,7 +11,5 @@ export const platformLimits = {
   /** The merge queue's own fetches and pushes (`cw.queue.networkMinutes`, 30 min). */
   queueNetworkMs: (): number => 30 * 60_000,
   /** One of the merge queue's checks, which a follow-mode pre-push hook is too (`cw.queue.checkMinutes`, 90 min). */
-  queueCheckMs: (): number => 90 * 60_000,
-  /** One jj command (`cw.jj.commandSeconds`, 300 s); `jj --version` keeps its own. */
-  jjCommandMs: (): number => 300_000
+  queueCheckMs: (): number => 90 * 60_000
 }

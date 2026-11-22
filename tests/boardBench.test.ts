@@ -30,7 +30,7 @@ afterAll(async () => {
 })
 
 describe('the board on a real board’s copy', () => {
-  it.skipIf(!source)('reads and writes, timed', { timeout: timing('test.hangRealJj') }, async () => {
+  it.skipIf(!source)('reads and writes, timed', { timeout: timing('test.hangRealLong') }, async () => {
     const ws = join(base, 'ws')
     mkdirSync(join(ws, '.combwork'), { recursive: true })
     const file = join(ws, '.combwork', 'combwork.db')

@@ -1,5 +1,5 @@
-// HI-3372 (timing-margins audit, 18 Nov: the user's own git and jj work): the settings that bound a commit or set aside,
-// a fetch, pull or push, the merge queue's network steps and a jj command, their defaults and ranges; main's wiring of
+// HI-3372 (timing-margins audit, 18 Nov: the user's own git work): the settings that bound a commit or set aside,
+// a fetch, pull or push, and the merge queue's network steps, their defaults and ranges; main's wiring of
 // them into the ports' getters, each in its unit (a value of the test's own, not the default); the merge queue's own push
 // reading it; the signer's bounds; and the user's Cancel's owner: only the window, workspace and project that started a
 // run can cancel it, a duplicate id is refused, a run leaves the list however it ends.
@@ -16,7 +16,7 @@ mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { advanced } = await import('../src/main/advanced')
-const { advancedDef, GIT_COMMIT_MINUTES, GIT_NETWORK_MINUTES, JJ_COMMAND_SECONDS, QUEUE_CHECK_MINUTES, QUEUE_NETWORK_MINUTES, QUEUE_SIGN_SECONDS } = await import('../src/shared/advanced')
+const { advancedDef, GIT_COMMIT_MINUTES, GIT_NETWORK_MINUTES, QUEUE_CHECK_MINUTES, QUEUE_NETWORK_MINUTES, QUEUE_SIGN_SECONDS } = await import('../src/shared/advanced')
 const { applyAdvancedLimits } = await import('../src/main/limitsApp')
 const { platformLimits } = await import('../src/main/platform/limits')
 const { gitIntegration } = await import('../src/main/platform/gitIntegration')
@@ -26,18 +26,17 @@ const { cancelGitRun, cancelOwnerOf, gitRunsNow, withGitCancel } = await import(
 advanced.load(join(base, 'profile'))
 afterAll(() => advanced.stop())
 
-describe('the git and jj limits’ settings (HI-3372)', () => {
-  it('four new settings, each its default and range; the signed merge commit’s default 300 s; the sign check 15 s', () => {
+describe('the git limits’ settings (HI-3372)', () => {
+  it('three new settings, each its default and range; the signed merge commit’s default 300 s; the sign check 15 s', () => {
     expect(advancedDef(GIT_COMMIT_MINUTES)).toMatchObject({ id: 'cw.git.commitMinutes', group: 'cw', kind: 'number', default: 30, min: 1, max: 240, unit: 'min' })
     expect(advancedDef(GIT_NETWORK_MINUTES)).toMatchObject({ id: 'cw.git.networkMinutes', group: 'cw', kind: 'number', default: 30, min: 1, max: 240, unit: 'min' })
     expect(advancedDef(QUEUE_NETWORK_MINUTES)).toMatchObject({ id: 'cw.queue.networkMinutes', group: 'cw', kind: 'number', default: 30, min: 1, max: 240, unit: 'min' })
-    expect(advancedDef(JJ_COMMAND_SECONDS)).toMatchObject({ id: 'cw.jj.commandSeconds', group: 'cw', kind: 'number', default: 300, min: 30, max: 3600, unit: 's' })
     expect(advancedDef(QUEUE_SIGN_SECONDS)).toMatchObject({ default: 300, min: 5, max: 3600 })
     expect(SIGN_CHECK_MS).toBe(15_000)
   })
 
   it('the ports’ getters before main sets them: each setting’s own default', () => {
-    expect([platformLimits.gitCommitMs(), platformLimits.gitNetworkMs(), platformLimits.queueNetworkMs(), platformLimits.queueCheckMs(), platformLimits.jjCommandMs()]).toEqual([30 * 60_000, 30 * 60_000, 30 * 60_000, 90 * 60_000, 300_000])
+    expect([platformLimits.gitCommitMs(), platformLimits.gitNetworkMs(), platformLimits.queueNetworkMs(), platformLimits.queueCheckMs()]).toEqual([30 * 60_000, 30 * 60_000, 30 * 60_000, 90 * 60_000])
   })
 
   it('main’s wiring: each getter reads its setting now, in its unit, a change applying to the next command', async () => {
@@ -45,10 +44,10 @@ describe('the git and jj limits’ settings (HI-3372)', () => {
     try {
       applyAdvancedLimits()
       expect(platformLimits.gitCommitMs()).toBe(30 * 60_000)
-      for (const [id, v] of [[GIT_COMMIT_MINUTES, 7], [GIT_NETWORK_MINUTES, 11], [QUEUE_NETWORK_MINUTES, 13], [QUEUE_CHECK_MINUTES, 17], [JJ_COMMAND_SECONDS, 45]] as const) await advanced.set(id, v)
-      expect([platformLimits.gitCommitMs(), platformLimits.gitNetworkMs(), platformLimits.queueNetworkMs(), platformLimits.queueCheckMs(), platformLimits.jjCommandMs()]).toEqual([7 * 60_000, 11 * 60_000, 13 * 60_000, 17 * 60_000, 45_000])
+      for (const [id, v] of [[GIT_COMMIT_MINUTES, 7], [GIT_NETWORK_MINUTES, 11], [QUEUE_NETWORK_MINUTES, 13], [QUEUE_CHECK_MINUTES, 17]] as const) await advanced.set(id, v)
+      expect([platformLimits.gitCommitMs(), platformLimits.gitNetworkMs(), platformLimits.queueNetworkMs(), platformLimits.queueCheckMs()]).toEqual([7 * 60_000, 11 * 60_000, 13 * 60_000, 17 * 60_000])
     } finally {
-      for (const id of [GIT_COMMIT_MINUTES, GIT_NETWORK_MINUTES, QUEUE_NETWORK_MINUTES, QUEUE_CHECK_MINUTES, JJ_COMMAND_SECONDS]) await advanced.set(id, null)
+      for (const id of [GIT_COMMIT_MINUTES, GIT_NETWORK_MINUTES, QUEUE_NETWORK_MINUTES, QUEUE_CHECK_MINUTES]) await advanced.set(id, null)
       Object.assign(platformLimits, was)
     }
   })

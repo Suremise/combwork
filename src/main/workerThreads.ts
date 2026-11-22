@@ -20,7 +20,7 @@ export function bundledScriptExists(file: string): boolean {
 }
 
 /** Combwork's own worker threads, by the names Copy Diagnostics gives them; a provider's own are named by it (its worker.ts' `threads`). */
-type CombworkWorkerName = 'folder move' | 'usage history' | 'git' | 'repository lock' | 'WAL checkpoints' | 'stall watchdog' | 'log writer' | 'None baseline' | 'jj'
+type CombworkWorkerName = 'folder move' | 'usage history' | 'git' | 'repository lock' | 'WAL checkpoints' | 'stall watchdog' | 'log writer' | 'None baseline'
 export type WorkerName = CombworkWorkerName | (string & {})
 /** Copy Diagnostics' list: Combwork's, with the providers' own threads before None baseline's. */
 const namesWith = (providers: readonly string[]): string[] => ['usage history', 'git', 'repository lock', 'WAL checkpoints', 'stall watchdog', 'log writer', ...providers, 'None baseline'] // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)

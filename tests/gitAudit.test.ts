@@ -4,11 +4,11 @@
 // call in a listed file, or a listed edge that is gone fails here, naming it; so does a switch on a platform's id
 // (`platform === 'git'`) outside the descriptors, adapters and registry that SWITCHES doesn't justify (HI-2822).
 // scripts/gitInventory.mjs prints the audit.
-import { existsSync, readFileSync } from 'fs'
+import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types, shared with scripts/gitInventory.mjs
-import { audit, EDGES, JJ_EDGES, JJ_HOMES, modeDeclarations, NOT_PLATFORM, platformIdsIn, SEAMS, SWITCHES } from './gitAudit.mjs'
+import { audit, EDGES, modeDeclarations, NOT_PLATFORM, platformIdsIn, SEAMS, SWITCHES } from './gitAudit.mjs'
 import { timing } from './timing.cjs'
 
 // A bound for a hung test (HI-3349): each audit reads the whole source tree, and a full unit run on a loaded machine
@@ -16,7 +16,7 @@ import { timing } from './timing.cjs'
 vi.setConfig({ testTimeout: timing('test.hang') })
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
-type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; jj: string[] }
+type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[] }
 const root = join(__dirname, '..')
 const run = (over: Record<string, string> = {}): Audit => audit(root, over)
 const text = (file: string): string => readFileSync(join(root, file), 'utf8')
@@ -195,41 +195,19 @@ const r = (platform: string) => platform === 'none'
     expect(() => platformIdsIn(desc, t.replace(was, 'export type Platform = "git"'))).toThrow(/PlatformId/)
   })
 
-  it("exempts a composition only by its data: a switch elsewhere in slotsApp, or on another id in a jj home, fails (HI-3140)", () => {
+  it('exempts a composition only by its data: a switch elsewhere in slotsApp fails (HI-3140)', () => {
     const app = 'src/main/slotsApp.ts'
     expect(run({ [app]: `${text(app)}\nconst x = (p: string) => p === 'jj'\n` }).switches).toEqual(["src/main/slotsApp: 1 switches on a platform's id, listed 0"])
-    const tool = 'src/shared/jjTool.ts'
-    expect(run({ [tool]: `${text(tool)}\nconst y = (p: string) => p === 'jj'\n` }).switches).toEqual([])
-    expect(run({ [tool]: `${text(tool)}\nconst z = (p: string) => p === 'git'\n` }).switches).toEqual(["src/shared/jjTool: 1 switches on a platform's id, listed 0"])
   })
 
-  it('fails an exemption nothing uses any more: a NOT_PLATFORM name, a jj home, a listed switch (HI-3140)', () => {
+  it('fails an exemption nothing uses any more: a NOT_PLATFORM name, a listed switch (HI-3140)', () => {
     const tiles = 'src/renderer/src/components/AgentTiles.tsx'
     expect(run({ [tiles]: text(tiles).replace("x !== 'none'", "x !== 'auto'") }).switches).toEqual(["src/renderer/src/components/AgentTiles: 0 switches on a platform's id, listed 1"])
     const scan = 'src/renderer/src/components/Antivirus.tsx'
     const noScan = text(scan).replace(/status\.scan === 'none'/g, 'status.scan === null').replace(/case 'none':/g, "case 'off':")
     expect(run({ [scan]: noScan }).switches).toEqual(['NOT_PLATFORM scan: no comparison uses it (stale)'])
-    expect(Object.keys(JJ_HOMES as Record<string, unknown>).every((f) => existsSync(join(root, `${f}.ts`)) || existsSync(join(root, `${f}.tsx`)))).toBe(true)
     expect(Object.values(SWITCHES as Record<string, { class?: string }>).filter((s) => !['data', 'historic', 'gitUi', 'schema'].includes(s.class ?? '')).length).toBe(0)
     expect(Object.values(NOT_PLATFORM as Record<string, string>).every((why) => !!why)).toBe(true)
-  })
-
-  it("lists each jj module reached from outside the platform layer, edge by edge and name by name (HI-3140)", () => {
-    expect(run().jj).toEqual([])
-    const edges = JJ_EDGES as Edge[]
-    expect(edges.filter((e) => !['impl', 'registry', 'jjUi', 'defect'].includes(e.class) || !e.why || !e.names?.length || (e.class === 'defect' && !e.card)).map((e) => `${e.file} -> ${e.module}`)).toEqual([])
-    // A new edge from the workflow, a name beyond its list, one gone.
-    const reconcile = 'src/main/workflow/reconcile.ts'
-    expect(run({ [reconcile]: `import { jjRunner } from '../platform/jjRunner'\n${text(reconcile)}` }).jj).toEqual(['src/main/workflow/reconcile -> src/main/platform/jjRunner: unlisted'])
-    const vcs = 'src/main/combworkVcs.ts'
-    const t = text(vcs)
-    expect(t).toContain('import { ensureJjExcluded } from')
-    expect(run({ [vcs]: t.replace('import { ensureJjExcluded } from', 'import { ensureJjExcluded, jjKeepOutFor } from') }).jj).toEqual(['src/main/combworkVcs -> src/main/platform/jjKeepOut: jjKeepOutFor'])
-    const diag = 'src/main/diagnostics.ts'
-    expect(run({ [diag]: text(diag).replace(/^import \{ jjRunner \} from '\.\/platform\/jjRunner'\r?\n/m, '') }).jj).toEqual(['src/main/diagnostics -> src/main/platform/jjRunner: stale'])
-    // jj's homes and the platform layer itself are not edges.
-    const tool = 'src/shared/jjTool.ts'
-    expect(run({ [tool]: `import { jjRunner } from '../main/platform/jjRunner'\n${text(tool)}` }).jj).toEqual([])
   })
 
   it('fails a new seam call in a listed file, and one in a file with none', () => {

@@ -91,8 +91,8 @@ export function gitEdges(root, over = {}) {
 /** gitEdges' answers per file, by its text. */
 const parsed = new Map()
 
-/** One file's Git edges (gitEdges'), or, given `target` and `may`, its edges to the modules `target` names (jjEdges'). */
-function fileEdges(root, file, text, target = isGitModule, may = MAY_NAME_GIT) {
+/** One file's Git edges (gitEdges'). */
+function fileEdges(root, file, text) {
   const out = []
   {
     const found = new Map()
@@ -102,14 +102,14 @@ function fileEdges(root, file, text, target = isGitModule, may = MAY_NAME_GIT) {
       const path = spec.startsWith('@shared/') ? `src/shared/${spec.slice('@shared/'.length)}` : spec.startsWith('.') ? relative(root, resolve(root, dirname(file), spec)) : null
       if (path === null) return
       const module = path.replace(/\\/g, '/').replace(/\.(tsx?|js)$/, '')
-      if (!target(module)) return
+      if (!isGitModule(module)) return
       const had = found.get(module)
       if (names === null || had === null) found.set(module, null)
       else found.set(module, [...new Set([...(had ?? []), ...names])].sort())
     }
     // TypeScript's own parser (HR1's HI-2792 round 1: a regex missed double quotes, indentation and side-effect imports).
     // Only a file whose text could name a Git module is parsed.
-    if (!may.test(text)) return out
+    if (!MAY_NAME_GIT.test(text)) return out
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
     /** The members used through a namespace's name (`wt.createWorktree`), anywhere in the file. */
     const membersOf = (alias) => {
@@ -181,9 +181,6 @@ export const EDGES = [
   { file: 'src/main/antivirus', module: 'src/main/worktrees', class: 'impl', names: ['worktreesRoot'], why: "the worktrees folder beside the workspace, excluded from scanning (Git's slots and 0.9 worktrees live there)" },
   { file: 'src/main/combworkMove', module: 'src/main/platform/gitKeepOut', class: 'historic', names: ['excludeLine', 'gitDirOf'], op: 'excludeMoveLock and moveExcludeLine (HI-2462)', why: "1.1's .hive → .combwork move keeps git's exclude lines right" }, // old-name: the 1.1 folder move's input, named as it was
   { file: 'src/main/combworkMove', module: 'src/main/repoLock', class: 'common', names: ['withNamedLock'], why: "the folder move's named lock (a lock file of Combwork's, not git's)" },
-  { file: 'src/main/platform/jjOperations', module: 'src/main/git', class: 'impl', names: ['git'], why: "an operation preview reads the colocated store's refs and HEAD to compare with jj's record (HI-2800, E8): read-only git calls, never an import" },
-  { file: 'src/main/platform/jjKeepOut', module: 'src/main/platform/gitKeepOut', class: 'impl', names: ['excludeLine', 'hasExcludeLine'], why: "a non-colocated jj repository's .combwork kept out in its Git store's info/exclude (HI-2800): Git's exclude-line text, pure helpers, no git run" },
-  { file: 'src/main/platform/jjIgnoredEntries', module: 'src/main/platform/gitShadowIgnore', class: 'impl', names: ['shadowCheckIgnore'], why: "a jj check's snapshot and write record leave out what jj ignores (HI-3158): Git's check-ignore on jj's Git-backed store (`--git-dir`, `--no-index`), read-only, by kind in the shadow work tree Git's record shares (HI-3175)" },
   { file: 'src/main/deliveries', module: 'src/main/folderFence', class: 'common', names: ['folderChanging', 'folderSteady', 'inFolder', 'onFolderSteady'], why: "the folder fence: keyed by folder, every platform's (§16.3.6 port 1)" },
   { file: 'src/main/files', module: 'src/shared/gitIgnoreRules', class: 'gitUi', why: "the Files tab's ignore rule type (the Git dimming's tooltip)" },
   { file: 'src/main/index', module: 'src/main/branchWatch', class: 'gitUi', why: "starts the branch cards' watcher (the Git view's branch status)" },
@@ -361,16 +358,6 @@ const HELPERS = new Set(['revisionShort', 'hasCapability', 'merges', 'accepts', 
 /** Where a switch belongs, whole: the platform layer (its descriptors and presentation, its ports and their registries) and Git's own modules. */
 const SWITCH_HOME = (f) => /^src\/(shared\/platform|main\/platform)\//.test(f) || isGitModule(f)
 
-/**
- * jj's modules outside the platform layer (HI-3140's §D), exempt for jj's own id only: a comparison on another id there
- * still counts, so shared logic can't hide in them. `compose`: jj's work composed with the app's services; `jjUi`: jj's
- * page and the window's jj reads and types.
- */
-export const JJ_HOMES = {
-  'src/shared/jjViews': { class: 'jjUi', why: "jj's page's view types, as shared/gitRepo is Git's" },
-  'src/shared/jjTool': { class: 'jjUi', why: "jj's tool and its tested version, as shared/gitTool is Git's" }
-}
-
 /** An expression without what never changes its value: parentheses, `!`, `as`, `satisfies`, `<T>x`. */
 function bare(n) {
   while (n && (ts.isParenthesizedExpression(n) || ts.isNonNullExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n) || ts.isTypeAssertionExpression(n))) n = n.expression
@@ -431,15 +418,14 @@ export function fileSwitches(file, text, ids, exempt) {
 const switchesParsed = new Map()
 
 /**
- * Each file's count of switches on a platform's id outside their home (a jj home's on jj's own id left out). `used`
- * collects the NOT_PLATFORM names the files used, and `files` every file read.
+ * Each file's count of switches on a platform's id outside their home. `used` collects the NOT_PLATFORM names the files
+ * used.
  */
-export function switchCounts(root, over = {}, used = new Set(), files = new Set()) {
+export function switchCounts(root, over = {}, used = new Set()) {
   const ids = platformIds(root, over)
   const out = {}
   for (const { file, text } of filesOf(root, over)) {
     const f = file.replace(/\.tsx?$/, '')
-    files.add(f)
     if (SWITCH_HOME(f)) continue
     // Each file's answer kept by its text and the ids (a test's runs reparse only the file it changes).
     const key = `${root}|${file}|${ids.join(',')}`
@@ -450,8 +436,7 @@ export function switchCounts(root, over = {}, used = new Set(), files = new Set(
       switchesParsed.set(key, kept)
     }
     for (const n of kept.exempt) used.add(n)
-    const found = kept.found.filter((s) => !(JJ_HOMES[f] && s.id === 'jj'))
-    if (found.length) out[f] = found.length
+    if (kept.found.length) out[f] = kept.found.length
   }
   return out
 }
@@ -472,43 +457,6 @@ export const SWITCHES = {
   'src/renderer/src/views/VersionControlHeader': { n: 1, class: 'gitUi', why: "Initialise repository… switches the project to Git by name once Git's page made it one (switchAfterInit): Git's page" }
 }
 
-
-/** jj's platform modules (platform/jj…): reached from outside the platform layer only by a listed edge (HI-3140). */
-export const isJjModule = (m) => /^src\/main\/platform\/jj[A-Z]\w*$/.test(m)
-
-/** A file that could name a jj module (only these are parsed). */
-const MAY_NAME_JJ = new RegExp(String.raw`jj[A-Z]|require\(|import\(\s*[^'"${'`'}\s]`)
-
-/**
- * Each import of a jj platform module from outside the platform layer and jj's homes (JJ_HOMES): `{ file, module, names }`
- * as gitEdges gives them.
- */
-export function jjEdges(root, over = {}) {
-  const out = []
-  for (const { file, text } of filesOf(root, over)) {
-    const f = file.replace(/\.tsx?$/, '')
-    if (f.startsWith('src/main/platform/') || Object.hasOwn(JJ_HOMES, f)) continue
-    const key = `${root}|${file}|jj`
-    const kept = parsed.get(key)
-    if (kept?.text === text) {
-      out.push(...kept.edges)
-      continue
-    }
-    const edges = fileEdges(root, file, text, isJjModule, MAY_NAME_JJ)
-    parsed.set(key, { text, edges })
-    out.push(...edges)
-  }
-  return out.sort((a, b) => (a.file + a.module).localeCompare(b.file + b.module))
-}
-
-/**
- * The jj edges left outside the platform layer (HI-3140), each with the names it may take and why: keeping .combwork out
- * of a jj repository, and what jj's runner tells the diagnostics. A new edge, a name beyond its list, or a listed edge gone fails tests/gitAudit.test.ts.
- */
-export const JJ_EDGES = [
-  { file: 'src/main/combworkVcs', module: 'src/main/platform/jjKeepOut', class: 'registry', names: ['ensureJjExcluded'], why: "keeping .combwork out of a jj repository: combworkVcs routes to each platform's keep-out (port 1)" },
-  { file: 'src/main/diagnostics', module: 'src/main/platform/jjRunner', class: 'jjUi', names: ['jjRunner'], why: "Copy Diagnostics names jj's tool and its readiness (J0)" },
-]
 
 /** The descriptor fields that declare a platform's integration modes (HI-2840): its finishes and its default one. */
 export const MODE_FIELDS = ['finishes', 'defaultFinish']
@@ -577,24 +525,9 @@ export function audit(root, over = {}) {
     return [...new Set([...Object.keys(have), ...Object.keys(want)])].filter((s) => (have[s] ?? 0) !== (want[s] ?? 0)).map((s) => `${file}: ${s}() ×${have[s] ?? 0}, listed ×${want[s] ?? 0}`)
   })
   const used = new Set()
-  const files = new Set()
-  const switched = switchCounts(root, over, used, files)
+  const switched = switchCounts(root, over, used)
   const switches = [...new Set([...Object.keys(switched), ...Object.keys(SWITCHES)])].sort().filter((f) => (switched[f] ?? 0) !== (SWITCHES[f]?.n ?? 0)).map((f) => `${f}: ${switched[f] ?? 0} switches on a platform's id, listed ${SWITCHES[f]?.n ?? 0}`)
-  // HI-3140: an exemption nothing uses any more is stale: a NOT_PLATFORM name no comparison has, a jj home that is gone.
+  // HI-3140: an exemption nothing uses any more is stale: a NOT_PLATFORM name no comparison has.
   switches.push(...Object.keys(NOT_PLATFORM).filter((n) => !used.has(n)).map((n) => `NOT_PLATFORM ${n}: no comparison uses it (stale)`))
-  switches.push(...Object.keys(JJ_HOMES).filter((f) => !files.has(f)).map((f) => `JJ_HOMES ${f}: no such file (stale)`))
-  // HI-3140: jj's modules reached from outside the platform layer, edge by edge and name by name, as Git's are.
-  const jjFound = jjEdges(root, over)
-  const jjListed = new Map(JJ_EDGES.map((e) => [key(e), e]))
-  const jj = [
-    ...jjFound.filter((e) => !jjListed.has(key(e))).map((e) => `${key(e)}: unlisted`),
-    ...JJ_EDGES.filter((e) => !jjFound.some((f) => key(f) === key(e))).map((e) => `${key(e)}: stale`),
-    ...jjFound.flatMap((f) => {
-      const e = jjListed.get(key(f))
-      if (!e) return []
-      if (f.names === null) return [`${key(f)}: imports it whole (namespace or dynamic), not just ${e.names.join(', ')}`]
-      return f.names.filter((n) => !e.names.includes(n)).map((n) => `${key(f)}: ${n}`)
-    })
-  ]
-  return { found, unlisted, stale, extraNames, seams, switches, jj }
+  return { found, unlisted, stale, extraNames, seams, switches }
 }

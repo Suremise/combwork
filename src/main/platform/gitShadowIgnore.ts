@@ -1,5 +1,5 @@
 // HI-3175: Git's check-ignore by the kind each path is asked as, never by what is on disk now, for Git's write record
-// (gitIgnoredByKind.ts, HI-3173) and jj's (jjIgnoredEntries.ts, HI-3158/HI-3160) alike. Git takes a path without a
+// (gitIgnoredByKind.ts, HI-3173). Git takes a path without a
 // slash that is a folder on disk as that folder (a file `out` where an ignored `out/` is now), so the paths are asked in
 // a work tree of its own holding only the `.gitignore` files on their way (the root's and each folder's down to theirs),
 // where nothing else is: a path with a slash is a folder, one without a file.
@@ -16,11 +16,10 @@ const absent = (e: unknown): boolean => {
 
 /**
  * Of `rels` (root-relative, with `/`; a folder with its trailing slash), those Git ignores, asked with `gitDir` and the
- * `.gitignore` files under `root` on their way. `index`: the git dir's index decides too (a tracked path is never
- * ignored: Git's own working folder); without it, `--no-index` (jj's Git store, whose index isn't the workspace's).
- * Null where it can't say: a `.gitignore` on the way unreadable, or Git failing.
+ * `.gitignore` files under `root` on their way. The git dir's index decides too (a tracked path is never ignored: Git's
+ * own working folder). Null where it can't say: a `.gitignore` on the way unreadable, or Git failing.
  */
-export async function shadowCheckIgnore(root: string, gitDir: string, rels: string[], index: boolean): Promise<Set<string> | null> {
+export async function shadowCheckIgnore(root: string, gitDir: string, rels: string[]): Promise<Set<string> | null> {
   if (!rels.length) return new Set()
   const shadow = await mkdtemp(join(tmpdir(), 'combwork-ignore-'))
   try {
@@ -36,7 +35,7 @@ export async function shadowCheckIgnore(root: string, gitDir: string, rels: stri
       await mkdir(join(shadow, f), { recursive: true })
       await writeFile(join(shadow, f, '.gitignore'), text)
     }
-    const r = await git(shadow, [`--git-dir=${gitDir}`, `--work-tree=${shadow}`, 'check-ignore', ...(index ? [] : ['--no-index']), '-z', '--stdin'], undefined, rels.join('\0'))
+    const r = await git(shadow, [`--git-dir=${gitDir}`, `--work-tree=${shadow}`, 'check-ignore', '-z', '--stdin'], undefined, rels.join('\0'))
     // Exit 1: none of them is ignored. Anything else is Git failing.
     if (!r.ok && r.code !== 1) return null
     return new Set(r.out.split('\0').filter(Boolean))

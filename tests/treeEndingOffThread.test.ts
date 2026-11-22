@@ -1,4 +1,4 @@
-// HI-3009: a command's tree ended on main's thread never blocks it (as HI-2997 did for jj's, tests/jjProcessTree.test.ts):
+// HI-3009: a command's tree ended on main's thread never blocks it (as HI-2997 did for jj's):
 // the merge queue's bounded git, a card's focused pick, a check's or a slot's command and the submodules step end theirs
 // through treeEnding (endTreeAsync), never endTree's spawnSync; the thread ticks meanwhile; and the outcome comes only
 // once the whole tree has gone. The source guard (only cw-progress's own process uses the blocking endTree) is

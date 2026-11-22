@@ -1,5 +1,5 @@
 // A diff's sides as every version control shows them (HI-3218, moved from git.ts): the largest side read, a binary side,
-// and what a side over the limit shows instead. git.ts re-exports them; jj's revision reads use them as they are.
+// and what a side over the limit shows instead. git.ts re-exports them.
 
 import { msg, tr } from '../shared/i18n'
 import type { GitDiff } from '../shared/types'

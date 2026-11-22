@@ -1091,7 +1091,7 @@ app.whenReady().then(async () => {
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
-  // HI-3372: the version-control ports' bounds (a commit, a fetch or push, the queue's network, jj) from those settings.
+  // HI-3372: the version-control ports' bounds (a commit, a fetch or push, the queue's network) from those settings.
   applyAdvancedLimits()
   // HI-3374: the databases' wait for another program's lock, before any of them opens (it applies from here on).
   setDbBusyMs(advanced.get<number>('cw.db.busySeconds') * 1000)
