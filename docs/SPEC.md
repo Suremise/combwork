@@ -5864,7 +5864,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   own work: git's `--ours`, except in a rebase, where git's sides are swapped and mine is `--theirs`; a side that
   deleted the file deletes it (`git rm`). Each acts on the file clicked alone, whatever its name (HI-3501): its path is
   a literal pathspec (`--literal-pathspecs`; the tooltip's command `:(literal)…`, quoted), never a glob, so `a[1].txt`
-  never also settles, stages or deletes `a1.txt`. A submodule in conflict (a gitlink) is settled by its commit
+  never also settles, stages or deletes `a1.txt`. The tooltip's path is quoted as PowerShell and Git Bash both read it
+  (`shellWord`: single quotes, or double quotes for an apostrophe); a name with an apostrophe and something both
+  expand (`$`, a backtick, `\`, `!`, `"`), where no quoting suits both, is quoted for PowerShell, Windows' own shell,
+  each quote character doubled (HI-3513). A submodule in conflict (a gitlink) is settled by its commit
   (HI-3502): Use mine or Use theirs stages that side's commit (`git update-index --cacheinfo 160000`), since git's
   `checkout --ours/--theirs` never moves a submodule and `git add` would stage the commit its folder has checked out;
   the submodule's own folder is left as it is, and a notice says so, with `git submodule update -- <path>`: its path

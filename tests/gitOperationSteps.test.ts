@@ -207,6 +207,11 @@ describe('a path git would read as a glob (HI-3501)', () => {
     expect(pickCommand('merge', { path: 'd[1].txt', mine: false, theirs: true }, 'mine')).toBe("git rm -- ':(literal)d[1].txt'")
     expect(pickCommand('merge', { path: "it's here.txt", ...both }, 'resolved')).toBe('git add -A -- "it\'s here.txt"')
     expect(pickCommand('merge', { path: 'src/a-b_c.txt', ...both }, 'resolved')).toBe('git add -A -- src/a-b_c.txt')
+    // HI-3513: an apostrophe with something both shells expand: no quoting suits both, so PowerShell's (Windows' own),
+    // each quote character doubled in single quotes, the typographic ones too.
+    expect(pickCommand('merge', { path: "it's $x.txt", ...both }, 'resolved')).toBe("git add -A -- 'it''s $x.txt'")
+    expect(pickCommand('merge', { path: "a[1] it's `q`.txt", ...both }, 'resolved')).toBe("git add -A -- ':(literal)a[1] it''s `q`.txt'")
+    expect(pickCommand('merge', { path: 'don’t ‘$x’.txt', ...both }, 'resolved')).toBe("git add -A -- 'don’’t ‘‘$x’’.txt'")
   })
 })
 
