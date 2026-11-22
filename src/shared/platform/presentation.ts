@@ -11,8 +11,8 @@ const M = {
   repo: msg({ id: 'git.vc.fact.repo', defaultMessage: 'This folder is a Git repository at {root}.', description: 'Atop the Version Control tab: what Combwork found in the project folder. {root} is the repository root (glossary 2.1: repository root).' }),
   subfolder: msg({ id: 'git.vc.fact.subfolder', defaultMessage: 'This folder is inside a Git repository at {root}: branch and merge actions affect that whole repository.', description: 'Atop the Version Control tab, when the project is a subfolder of a larger repository. {root} is that repository’s root.' }),
   gone: msg({ id: 'git.vc.fact.gone', defaultMessage: 'The Git repository is gone from this folder. Until it’s back, what needs Git can’t be read.', description: 'Atop the Version Control tab of a Git project whose .git was removed or moved.' }),
-  other: msg({ id: 'git.vc.fact.other', defaultMessage: '{vcs} found: not supported yet, so this project uses None.', description: 'Atop the Version Control tab: another version control was found in the folder. {vcs} is its name (Mercurial, Jujutsu). None: glossary 2.1.' }),
-  otherGit: msg({ id: 'git.vc.fact.otherGit', defaultMessage: '{vcs} found in this folder: not supported yet.', description: 'Atop the Version Control tab of a project still using Git, where another version control was found ({vcs}: Mercurial, Jujutsu). The offer under it says what to do.' }),
+  other: msg({ id: 'git.vc.fact.other', defaultMessage: '{vcs} found: not supported yet, so this project uses None.', description: 'Atop the Version Control tab: another version control was found in the folder. {vcs} is its name (Mercurial, Subversion). None: glossary 2.1.' }),
+  otherGit: msg({ id: 'git.vc.fact.otherGit', defaultMessage: '{vcs} found in this folder: not supported yet.', description: 'Atop the Version Control tab of a project still using Git, where another version control was found ({vcs}: Mercurial, Subversion). The offer under it says what to do.' }),
   switchGit: msg({ id: 'git.vc.offer.switchGit', defaultMessage: 'Switch…', description: 'A button of the offer to switch a project to Git (atop the Version Control tab): shows what changes, then asks. The … says it asks first: keep it.' }),
   switchNone: msg({ id: 'git.vc.offer.switchNone', defaultMessage: 'Switch to None…', description: 'A button of the offer to switch a project to None, no version control (atop the Version Control tab): shows what changes, then asks. The … says it asks first: keep it. None: glossary 2.1.' })
 }
@@ -45,9 +45,7 @@ export const PLATFORM_VIEW: Record<PlatformId, PlatformView> = {
     found: (d) => (d.root ? { m: d.subfolder ? M.subfolder : M.repo, values: { root: d.root } } : null),
     gone: M.gone,
     previewable: true
-  },
-  // Never detected or chosen since HI-3481: its row goes with jj's id (HI-3487).
-  jj: { switchTo: M.switchNone, other: M.other, previewable: false }
+  }
 }
 
 /**

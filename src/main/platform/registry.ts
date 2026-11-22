@@ -3,18 +3,15 @@
 // (workspace.ts ensureProject), and each refresh compares what detection finds with it (`projectPlatform`).
 
 import { resolve } from 'path'
-import { jjOf, otherVcsOf, vcsOf } from '../vcsDetect'
+import { otherVcsOf, vcsOf } from '../vcsDetect'
 import { isPlatformId, PLATFORMS, type Detection, type PlatformId, type PlatformOffer, type ProjectPlatform } from '../../shared/platform/descriptors'
 
 export type { Detection } from '../../shared/platform/descriptors'
 
 export function detect(folder: string): Detection {
-  // A Jujutsu repository, colocated with Git or not, is another version control, as Mercurial's is (HI-3481: jj is no
-  // longer supported). Its nearest marker decides: a Git repository inside a jj workspace is Git's (HI-2976: jjOf finds no
-  // jj when a `.git` is nearer), as the repository boundary says.
-  if (jjOf(folder)) return { platform: 'none', other: 'Jujutsu' } // i18n-ignore: a product's name, the marker's
+  // Another version control at or above the folder (Mercurial's, Subversion's…) is not supported, whatever git is there too.
   const other = otherVcsOf(folder)
-  if (other && other.name !== 'Jujutsu') return { platform: 'none', other: other.name } // i18n-ignore: a product's name, the marker's
+  if (other) return { platform: 'none', other: other.name } // i18n-ignore: a product's name, the marker's
   const v = vcsOf(folder)
   if (v?.kind === 'git') return { platform: 'git', root: v.root, ...(resolve(v.root) !== resolve(folder) ? { subfolder: true } : {}) }
   return { platform: 'none' }

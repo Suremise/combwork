@@ -40,7 +40,7 @@ export interface StartPlan {
   deliverables?: Manifest
   /** None (HI-2340): the adapter's generation its whole-project read was made under, checked again at the write. */
   baselineGen?: number
-  /** What only this platform records of the start (`Started.platform`; jj's workspace and its identity, HI-2868). */
+  /** What only this platform records of the start (`Started.platform`, HI-2868). */
   platform?: Record<string, unknown>
 }
 

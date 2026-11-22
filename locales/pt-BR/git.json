@@ -439,6 +439,5 @@
   "git.worktrees.queueHeading": "Fila de merge (do Combwork)",
   "git.worktrees.queueHint": "Onde a fila de merge do Combwork testa o merge de um cartão antes de ele entrar. O Combwork a gerencia: não há nada para remover aqui.",
   "git.worktrees.queueRow": "A pasta da fila de merge",
-  "git.worktrees.readOnly": "Somente leitura aqui: o trabalho de um agente chega à pasta do projeto pelo comando Fazer merge.",
-  "git.vc.jj": "jj"
+  "git.worktrees.readOnly": "Somente leitura aqui: o trabalho de um agente chega à pasta do projeto pelo comando Fazer merge."
 }

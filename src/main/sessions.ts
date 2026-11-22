@@ -1,5 +1,3 @@
-import { detect } from './platform/registry'
-import { ruleKeyOf } from '../shared/platform/descriptors'
 import { endReason, type SessionEnd, type StopCause } from '../shared/sessionEnd'
 import type { ActivityTask } from '../shared/activity'
 import { maskText } from '../shared/redact'
@@ -1953,12 +1951,6 @@ class SessionManager {
       const hidden = this.workflowToolsHidden(projectPath, side, pc)
       mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side, ...(hidden.length ? { CW_WORKFLOW_HIDDEN: hidden.join(',') } : {}) } }
     }
-    // A jj project's agents (HI-2800): its instructions add the jj rule (platformRule). Part of the signature, so a
-    // switch to jj or back is told to a running agent at its next start.
-    // A jj repository with no Git working copy (HI-2896): its own variant, `jj-separate`. The key is the platform's
-    // (HI-3140, its descriptor's `guidance`): none for Git and None.
-    const ruleKey = mcpServers[TOOLS_SERVER] && !assistant ? ruleKeyOf(pc.platform, () => detect(projectPath)) : null
-    if (mcpServers[TOOLS_SERVER] && ruleKey) mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_PLATFORM: ruleKey } }
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
@@ -2576,7 +2568,7 @@ class SessionManager {
     this.assertStarting(id)
     const cwd = place.cwd
     // HI-2887: admitted in its folder now its folder is known, before anything is launched or prepared there: a folder
-    // held against launches (jj's control's making) makes it wait; its admission lasts until the start ends.
+    // held against launches (launchHolds.ts) makes it wait; its admission lasts until the start ends.
     await admitLaunch(id, cwd, () => !!this.starting.get(id)?.cancelled)
     this.assertStarting(id)
     if (!existsSync(cwd)) throw combworkError(msg({ id: 'session.start.worktreeMissing', defaultMessage: "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.", description: "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command." }), { agent: agent.name, folder: cwd }, { kind: 'conflict' })

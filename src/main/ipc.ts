@@ -1113,7 +1113,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return slotLevelForm(workspace, level)
     },
     'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
-    // A stale jj slot recovered, the user's explicit action (HI-2866).
+    // A free slot whose folder is gone forgotten, the user's explicit action (HI-3464).
     'slots:removeGone': (p, slot) => removeGoneSlot(workspace, workspace.assertProject(p), String(slot)),
     'slots:heldWriter': (p, slot) => heldWriter(workspace.assertProject(p), String(slot)),
     'slots:releaseWriter': (p, slot, run, end) => releaseHeldWriter(workspace.assertProject(p), String(slot), String(run), { end: end === true }),

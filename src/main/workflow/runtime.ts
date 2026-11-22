@@ -160,7 +160,6 @@ export interface Effects {
 /** What `slotFor` gives a start (#1438): the slot and lease, or why it waits for one; null, no slot. */
 
 
-/** A version control's name as a refusal shows it (Git, jj: product names, kept in every language), else its id. */
 /** A platform's product name, the same in every language (HI-3140: its descriptor's). */
 export const shownPlatform = (p: string): string => platformName(p)
 
@@ -311,8 +310,7 @@ export interface WorkflowConfig {
   autoRun?: boolean
   effects?: Effects
   /**
-   * After a write that moved a card, once it is committed: from and to (HI-2938: a jj card's pass changes no jj operation
-   * or ref, so the app asks for its reconciliation here, which builds its candidate).
+   * After a write that moved a card, once it is committed: from and to (HI-2938: the app asks for its reconciliation here).
    */
   moved?: (card: CardRecord, from: StageId, to: StageId) => void
   /** Test seams: called between gathering and the transaction. */
@@ -564,7 +562,7 @@ interface SubmitGathered {
   files: FactData['Submitted']['files']
   commits?: string[]
   paths?: string[]
-  /** What only the platform records of the submission (`Submitted.platform`: jj's ids and chain, HI-2868). */
+  /** What only the platform records of the submission (`Submitted.platform`, HI-2868). */
   platform?: Record<string, unknown>
   inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>
   /** G20 (HI-1367): its submission's operation, aborted once a newer submission of the card or its workspace's close ended it. */
@@ -615,7 +613,7 @@ export class Workflow {
   readonly store: FactStore
   readonly none: NoneAdapter
   /** The platform adapters (§16.3.1): the runtime asks them, and never switches on a platform id. */
-  private platforms: Partial<Record<PlatformId, PlatformAdapter>>
+  private platforms: Record<PlatformId, PlatformAdapter>
 
   constructor(readonly cfg: WorkflowConfig) {
     this.store = cfg.store
@@ -625,9 +623,7 @@ export class Workflow {
 
   /** The adapter of a ruleset's platform (a card keeps its ruleset's, so a switch applies from the next card). */
   platform(o: WorkflowOptions): PlatformAdapter {
-    const p = this.platforms[o.platform]
-    if (!p) throw new Error(`no adapter for the version control ${o.platform}`) // i18n-ignore: a ruleset naming no adapter's platform, for the log
-    return p
+    return this.platforms[o.platform]
   }
 
   /** A card's platform adapter, by the ruleset it works under. */
@@ -1281,8 +1277,7 @@ export class Workflow {
       if (res && g.data.target !== res.to) return await this.refuse(card, actor, 'start', { rule: 'forward.resolutionTarget', values: { card: card.key, from: res.from, to: res.to, target: g.data.target ?? '' } })
       // Its ruleset is stored by the write that names it (write()), under the store's lock.
       await this.cfg.hooks?.beforeWrite?.('start')
-      // How many times it may be gathered again while only its fingerprint moved (its platform's; HI-2916: jj's head moves
-      // with Combwork's own jj operations beside it).
+      // How many times it may be gathered again while only its fingerprint moved (its platform's; HI-2916).
       const gathers = 1
       // Each pass gathered again is awaited here, never returned bare (HI-2916): this pass's `finally` gives back the slot
       // it lent only once the pass after has started with it, or hasn't. Returned bare, the `finally` ran at once, so the
@@ -1384,9 +1379,8 @@ export class Workflow {
       check = await reads.watch(this.cfg.project, target).catch(() => null)
       first = check ? check() : null
       r = first === null ? unknown(UNREADABLE.line, { branch: target }) : await reads.released(this.cfg.project, target)
-      // HI-3319: unknown only because what it rests on was unsettled or moved under the read (jj's operation head while
-      // an operation lands, Combwork's own beside it: a slot made or detached), it is read again whole, at most
-      // RELEASE_READS reads in all, as jjTargetHead is (HI-2916); nothing of a moved read is kept. A steady unknown (a
+      // HI-3319: unknown only because what it rests on was unsettled or moved under the read, it is read again whole, at
+      // most RELEASE_READS reads in all (HI-2916); nothing of a moved read is kept. A steady unknown (a
       // conflicted tag, a failed read) is not read again.
       if (!isUnknown(r) || !check || stillAsRead(check, first) || i >= RELEASE_READS) break
       log.info(`#${card.id}'s release read again (${first === null ? 'unsettled' : 'moved'} under it), read ${i + 1} of ${RELEASE_READS}`) // i18n-ignore: a log line
@@ -1554,8 +1548,7 @@ export class Workflow {
   /**
    * Whether a start or a verdict on a platform allowing several passes (`gathers`) is gathered again (HI-2972, HI-3216), asked with passes
    * left: `moved`, its fingerprint moved and its answer by content is the gathered one; `unreadable`, its fingerprint
-   * couldn't be read when it was gathered or can't be now (jj's operation heads while any jj operation lands, Combwork's
-   * own included: the new head is written before the old one goes); `steady`, the fingerprint is the gathered one;
+   * couldn't be read when it was gathered or can't be now; `steady`, the fingerprint is the gathered one;
    * null, a real change (the cards waited for, or the content). Another pass reads everything afresh, and the write
    * still needs exactly the fingerprint it gathered, so nothing unreadable or changed is ever written on: unlike
    * `sameContent`, this asks no steadiness across its own read, since its answer only decides to read again.
@@ -2148,7 +2141,7 @@ export class Workflow {
       inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
       // The first missing check's newest run on the revision, if it passed and didn't count: the refusal says why (#1654).
       const last = inputs.checksMissing.length ? s.checks.findLast((c) => c.name === inputs.checksMissing![0] && c.revision === revision) : undefined
-      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: hasCapability(o.platform, 'checkCopies') && !last.isolated }
+      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: hasCapability(o.platform, 'isolation') && !last.isolated }
     }
     // G13: the builder's own running work, whoever submits (an agent itself; the user's or the Assistant's move: the
     // card's builder). Read again in the write (`runsNow`): work started meanwhile counts.
@@ -2325,8 +2318,7 @@ export class Workflow {
     let acceptance: ReturnType<typeof acceptedRuns> = { accepted: [], warnings: [] }
     await this.cfg.hooks?.beforeWrite?.('verdict')
     // As a start's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant, as often
-    // as its platform allows. jj's head moves with Combwork's own jj operations beside a review (its review copy put at
-    // the revision reviewed as start review leases it), which change nothing the verdict decides on.
+    // as its platform allows.
     const gathers = 1
     if (await this.revalidate(card, s, r.options, before, gathers, 'verdict')) return this.regather(card, () => this.verdict(ref, actor, args))
     let evidenceMoved = false
@@ -2517,8 +2509,7 @@ export class Workflow {
     if (unmerged) return this.refuse(card, by, 'answer', unmerged)
     await this.cfg.hooks?.beforeWrite?.('answer')
     // HI-3391: as a verdict's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant,
-    // as often as its platform allows. jj's head moves with any jj operation in the repository (another lane's commit, a
-    // review copy's checkout), which changes nothing the answer decides on; a change by content still refuses at once.
+    // as often as its platform allows; a change by content still refuses at once.
     const gathers = 1
     if (await this.revalidate(card, s, r.options, before, gathers, 'answer')) return this.regather(card, () => this.answer(ref, request, answer, opts))
     let evidenceMoved = false
@@ -2784,7 +2775,7 @@ export class Workflow {
     const s = this.state(card)
     if (s.stage !== 'todo' && s.stage !== 'hold' && s.stage !== 'active' && s.stage !== 'review') return null
     const o = this.rulesetOf(card, s).options
-    return checksView(o.preChecks, card.key, hasCapability(o.platform, 'checkCopies'))
+    return checksView(o.preChecks, card.key, hasCapability(o.platform, 'isolation'))
   }
 
   /** The merge slot claimed for a card (#1354): refused, and recorded as Refused, when Combwork merges it. */

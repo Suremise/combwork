@@ -232,8 +232,7 @@ export type PresetId = 'solo' | 'pair' | 'team' | 'pairAgent'
 /** The presets the form offers for a platform, in order (every one since P7: #1445). */
 export const PRESETS: Record<PlatformId, { id: PresetId }[]> = {
   git: [{ id: 'solo' }, { id: 'pairAgent' }, { id: 'pair' }, { id: 'team' }],
-  none: [{ id: 'solo' }, { id: 'pair' }, { id: 'team' }],
-  jj: [{ id: 'solo' }, { id: 'pair' }, { id: 'team' }]
+  none: [{ id: 'solo' }, { id: 'pair' }, { id: 'team' }]
 }
 
 /** What a preset fills in from the project: its suggested checks (OP-24) with their commands, and the identity G12 shows. */
@@ -319,14 +318,6 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
   // Accepted where it is (None): the presets differ only in their review and checks.
   if (accepts(platform)) {
     const solo: WorkflowOptions = { ...allOff(platform), dependenciesDone: true, maxAgents: PRESET_TEAM.solo, ...SOLO_CHURN }
-    if (id === 'solo') return solo
-    if (id === 'pair' || id === 'pairAgent') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick, commands: commandsOf(checks.quick), maxAgents: PRESET_TEAM.pair, simplifyAt: undefined, churnStopAt: undefined }
-    return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests, commands: commandsOf(quickAndTests), maxAgents: PRESET_TEAM.team, simplifyAt: undefined, churnStopAt: undefined }
-  }
-  // jj (HI-2799): each card in a slot (a jj workspace), the user integrating what passed (option A); Pair a reviewer agent
-  // with the quick checks, Team review by an agent then you, with the tests too. No merge step: no merge checks or style.
-  if (!merges(platform)) {
-    const solo: WorkflowOptions = { ...allOff(platform), target: checks.target || 'main', identity: checks.identity ?? null, stopOwnRuns: true, dependenciesDone: true, maxAgents: PRESET_TEAM.solo, ...SOLO_CHURN }
     if (id === 'solo') return solo
     if (id === 'pair' || id === 'pairAgent') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick, commands: commandsOf(checks.quick), maxAgents: PRESET_TEAM.pair, simplifyAt: undefined, churnStopAt: undefined }
     return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests, commands: commandsOf(quickAndTests), maxAgents: PRESET_TEAM.team, simplifyAt: undefined, churnStopAt: undefined }
@@ -580,18 +571,6 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
     { id: 'work', options: ['excluded', 'dependenciesDone', 'fileLocks'] },
     { id: 'loops', options: LOOP_OPTIONS },
     { id: 'stages', options: ['stageNames'] }
-  ],
-  // jj (HI-2799): Git's rows without a merge step (option A: the user integrates) or a shared folder (gate sharedFolder).
-  jj: [
-    { id: 'team', options: ['maxAgents'] },
-    { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
-    // HI-2938: the merge checks (and their install) run on the candidate before it is offered.
-    { id: 'checks', options: ['preChecks', 'mergeChecks', 'mergeInstall', 'mergeGuards'] },
-    // HI-2871: style and strict shape the candidate Combwork builds before the user integrates.
-    { id: 'merging', options: ['finish', 'style', 'target', 'otherTargets', 'strict', 'dependenciesDone'] },
-    { id: 'where', options: ['folder', 'identity', 'stopOwnRuns'] },
-    { id: 'loops', options: LOOP_OPTIONS },
-    { id: 'stages', options: ['stageNames'] }
   ]
 }
 
@@ -604,8 +583,7 @@ export const platformHasOption = (platform: PlatformId, key: OptionKey): boolean
  */
 export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
   git: FORM_GROUPS.git.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k)),
-  none: FORM_GROUPS.none.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k)),
-  jj: FORM_GROUPS.jj.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k))
+  none: FORM_GROUPS.none.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k))
 }
 
 /**
@@ -614,8 +592,7 @@ export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
  */
 export const PREVIEW_OPTIONS: Record<PlatformId, OptionKey[]> = {
   git: FORM_GROUPS.git.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k) || PRESET_PREFERENCES.includes(k)),
-  none: FORM_GROUPS.none.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k) || PRESET_PREFERENCES.includes(k)),
-  jj: FORM_GROUPS.jj.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k) || PRESET_PREFERENCES.includes(k))
+  none: FORM_GROUPS.none.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k) || PRESET_PREFERENCES.includes(k))
 }
 
 /**

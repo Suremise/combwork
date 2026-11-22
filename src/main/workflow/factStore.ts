@@ -1067,7 +1067,7 @@ export class FactStore {
         const full = { ...f, seq, card, at: at() } as Fact<K>
         w.prepare('INSERT INTO card_facts (card, seq, kind, at, actor, source, ruleset, dedupe, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(card, seq, f.kind, full.at, f.actor, f.source, f.ruleset ?? null, f.dedupe ?? null, JSON.stringify(f.data))
         // The project's provenance epoch (HI-2868): moved in the same transaction as every accepted submission or adoption,
-        // so an intent that decided on the provenance before it (jj's attribution) sees it moved in its own write.
+        // so an intent that decided on the provenance before it sees it moved in its own write.
         if (f.kind === 'Submitted' || f.kind === 'Adopted') w.prepare("INSERT INTO board_meta (key, value) VALUES (?, '1') ON CONFLICT (key) DO UPDATE SET value = CAST(value AS INTEGER) + 1").run(this.epochKey())
         return full
       }

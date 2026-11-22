@@ -81,7 +81,7 @@ export class NoneAdapter {
   private skip(name: string): boolean {
     const fold = (s: string): string => (this.anyCase ? s.toLowerCase() : s)
     const n = fold(name)
-    // A platform's own folder is never a deliverable: `.git`, and jj's `.jj` (HI-2800: a non-colocated jj repository is a None project).
+    // A version control's own folder is never a deliverable (`.git`…: METADATA_DIRS).
     return n === CW_DIR || METADATA_DIRS.includes(n) || this.excluded.some((x) => fold(x) === n)
   }
 

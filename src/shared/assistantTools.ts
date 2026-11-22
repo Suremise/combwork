@@ -179,8 +179,8 @@ export const WORKFLOW_TOOLS: Readonly<Record<string, (o: WorkflowToolOptions) =>
  * The stages a card can be in that keep a tool usable past what its options allow (HI-2694, HR1's s15 check): a card
  * moved into Review or Approved past its rules still takes these, `under` the finishes its handler takes them in. The
  * merge report is refused outside Combwork merges, the agent merges and not checked whatever the card's stage
- * (runtime.ts's reportMerge), so an Approved card under You integrate (jj) or Committed is done keeps nothing: kept,
- * every Approved jj card restarted its builder for a tool it could never use (HI-3008).
+ * (runtime.ts's reportMerge), so an Approved card under Committed is done keeps nothing: kept, every such card restarted
+ * its builder for a tool it could never use (HI-3008).
  */
 export const WORKFLOW_TOOL_STAGES: Readonly<Record<string, { stages: readonly string[]; under: (o: WorkflowToolOptions) => boolean }>> = {
   cw_start_review: { stages: ['review'], under: () => true },

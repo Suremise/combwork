@@ -208,7 +208,7 @@ class FolderLog {
       this.gitEvent?.(rel.slice(5))
       return
     }
-    // jj's store (HI-2800): every jj command writes there, and none of it is the project's work.
+    // A version control's own folder (METADATA_DIRS): none of it is the project's work.
     if (inMetadataDir(rel)) return
     // Every path is kept, `node_modules` too (a project can track vendored files there): what git ignores is dropped
     // when a check asks. An install's thousands of writes are bounded by WRITE_LOG_MAX: past it, the oldest go and a

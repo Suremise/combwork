@@ -357,7 +357,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
     up: (db) => addCommentArchive(db)
   },
   {
-    // HI-2795 (jj's J2): slots' and copies' platform identity, and a copy lease's verification (schema/workspaceIdentityStep.ts).
+    // HI-2795 (J2): slots' and copies' platform identity, and a copy lease's verification (schema/workspaceIdentityStep.ts).
     // In the 1.0 group, as 25–27 are: every step outside it is 0.9's.
     version: 28,
     name: WORKSPACE_IDENTITY_STEP.name,
@@ -365,8 +365,8 @@ export const BOARD_MIGRATIONS: Migration[] = [
     up: (db) => WORKSPACE_IDENTITY_STEP.up(db)
   },
   {
-    // HI-2882 (jj's J9b2): jj integrations' publish obligations, their per-target sequence and sweep, and the retained
-    // proof bundles (schema/jjPublishStep.ts). In the 1.0 group, as 25–28 are.
+    // HI-2882 (J9b2): integrations' publish obligations, their per-target sequence and sweep, and the retained proof
+    // bundles (schema/jjPublishStep.ts), kept for the board's version sequence. In the 1.0 group, as 25–28 are.
     version: 29,
     name: JJ_PUBLISH_STEP.name,
     group: UPGRADE_GROUP_ID,

@@ -1117,7 +1117,7 @@
   "board.work.target": "Destino",
   "board.work.title": "Trabalho",
   "board.work.verdict": "{reviewer}: {pass, select, yes {bem-sucedida} other {reprovada}}{current, select, no { (não vale mais)} other {}}",
-  "board.work.notReady": "Ainda não iniciado em {slot}: {stale, select, yes {outro workspace do jj reescreveu a cópia de trabalho dele, então ele está desatualizado. Recupere-o em Controle de versão → Slots e cópias, e o card será preparado ali de novo.} other {O Combwork não conseguiu prepará-lo ({why}).}}",
+  "board.work.notReady": "Ainda não iniciado em {slot}: O Combwork não conseguiu prepará-lo ({why}).",
   "board.work.openComments": "{n, plural, one {# comentário aberto} other {# comentários abertos}}",
   "board.workQueue.advance": "Testado e pronto: atualizar {target} na pasta dele agora?",
   "board.workQueue.advancing": "Fazendo merge em {target} agora",

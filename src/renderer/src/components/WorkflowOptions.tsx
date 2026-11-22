@@ -654,8 +654,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       case 'sameness':
         return select('sameness', [['change', tr(V.sameness.change)], ['exact', tr(V.sameness.exact)]])
       case 'finish':
-        // Combwork merges since P5's queue (#1355); jj (HI-2799, option A): the user integrates, the only finish it has
-        // (HI-3140: the platform's, formFinishes).
+        // Combwork merges since P5's queue (#1355); the platform's finishes (HI-3140: formFinishes).
         return select('finish', formFinishes(platform).map((f) => [f, tr(V.finish[f as keyof typeof V.finish])]))
       case 'mergeInstall':
         return select('mergeInstall', [['onManifestChange', tr(V.mergeInstall.onManifestChange)], ['always', tr(V.mergeInstall.always)]])
@@ -664,7 +663,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       case 'commitMessage':
         return select('commitMessage', [['combwork', tr(V.commitMessage.combwork)], ['branch', tr(V.commitMessage.branch)]])
       case 'folder':
-        // jj (HI-2799): slots only, the shared folder a closed gate (sharedFolder; HI-3140: formFolders).
+        // The platform's folders (HI-3140: formFolders).
         return select('folder', formFolders(platform).map((f) => [f, tr(V.folder[f])]))
       case 'reviewerMode':
         return select('reviewerMode', [['lane', tr(V.reviewerMode.lane)], ['pool', tr(V.reviewerMode.pool)]])

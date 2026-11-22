@@ -146,16 +146,16 @@ const r = (platform: string) => platform === 'none'
     const added = (code: string): string[] => run({ [options]: `${text(options)}\n${code}\n` }).switches
     const one = ["src/shared/workflow/options: 1 switches on a platform's id, listed 0"]
     for (const code of [
-      "const a = (p: { platform: string }) => p.platform === 'jj'",
+      "const a = (p: { platform: string }) => p.platform === 'git'",
       "const b = (p: string) => 'git' !== p",
       'const c = (to: string) => to === "none"',
       "const d = (id: string) => id === 'none'",
       'const e = (to: string) => to == `none`',
-      "const f = (p: string) => { switch (p) { case 'jj': return 1 } return 0 }",
-      "const g = (d: object) => 'jj' in d",
-      "const h = (x: string) => revisionShort('jj', x)",
+      "const f = (p: string) => { switch (p) { case 'git': return 1 } return 0 }",
+      "const g = (d: object) => 'git' in d",
+      "const h = (x: string) => revisionShort('git', x)",
       "const i = PLATFORMS['git'].name",
-      'const j = PLATFORMS.jj.name'
+      'const j = PLATFORMS.none.name'
     ])
       expect(added(code), code).toEqual(one)
     // Allowed: another enum's `none` by its field's name, a comparison of two variables, prose and other strings, a
@@ -163,9 +163,9 @@ const r = (platform: string) => platform === 'none'
     for (const code of [
       "const k = (o: { review: string }) => o.review === 'none'",
       'const l = (a: string, b: string) => a === b',
-      "// a comment saying platform === 'jj'\nconst m = 'jj is a platform'",
-      "const n = () => registerWorkspacePort('jj', port)",
-      'const o2: Record<string, number> = { jj: 1, git: 2, none: 3 }',
+      "// a comment saying platform === 'git'\nconst m = 'git is a platform'",
+      "const n = () => registerWorkspacePort('git', port)",
+      'const o2: Record<string, number> = { git: 2, none: 3 }',
       "const q = (b: object) => 'none' in b"
     ])
       expect(added(code), code).toEqual([])
@@ -174,20 +174,20 @@ const r = (platform: string) => platform === 'none'
   it("fails a switch in a new file with nothing else naming a platform, and one wrapped in parentheses or a cast (HR1's round 1)", () => {
     const fresh = 'src/shared/newPlatformUse.ts'
     const one = ["src/shared/newPlatformUse: 1 switches on a platform's id, listed 0"]
-    for (const code of ['export const x = PLATFORMS.jj.name', "export const y = (p: string) => p === ('jj')", "export const z = (p: string) => p === ('jj' as const)", "export const w = (p: string) => ('git' satisfies string) !== p", "export const v = (d: object) => ('jj') in d"])
+    for (const code of ['export const x = PLATFORMS.git.name', "export const y = (p: string) => p === ('git')", "export const z = (p: string) => p === ('none' as const)", "export const w = (p: string) => ('git' satisfies string) !== p", "export const v = (d: object) => ('git') in d"])
       expect(run({ [fresh]: `${code}\n` }).switches, code).toEqual(one)
     // Controls: a plain string and a parenthesized one compared to another enum, in a file of their own.
-    for (const code of ["export const u = (o: { review: string }) => o.review === ('none')", "export const t = 'jj' + 'git'"]) expect(run({ [fresh]: `${code}\n` }).switches, code).toEqual([])
+    for (const code of ["export const u = (o: { review: string }) => o.review === ('none')", "export const t = 'none' + 'git'"]) expect(run({ [fresh]: `${code}\n` }).switches, code).toEqual([])
   })
 
   it("reads every platform id from PlatformId's union however it is written, and fails when it can't (HR1's round 1)", () => {
     const desc = 'src/shared/platform/descriptors.ts'
     const t = text(desc)
     const was = /export type PlatformId = [^\r\n]+/.exec(t)![0]
-    expect(platformIdsIn(desc, t)).toEqual(['none', 'git', 'jj'])
-    for (const union of ['export type PlatformId = "git" | "none" | "jj" | "hg"', "export type PlatformId =\n  | 'none'\n  | \"git\"\n  | 'jj'\n  | 'hg'"]) {
+    expect(platformIdsIn(desc, t)).toEqual(['none', 'git'])
+    for (const union of ['export type PlatformId = "git" | "none" | "hg"', "export type PlatformId =\n  | 'none'\n  | \"git\"\n  | 'hg'"]) {
       const four = t.replace(was, union)
-      expect(platformIdsIn(desc, four).sort(), union).toEqual(['git', 'hg', 'jj', 'none'])
+      expect(platformIdsIn(desc, four).sort(), union).toEqual(['git', 'hg', 'none'])
       // The new id is scanned for at once: a switch on it in shared code fails.
       expect(run({ [desc]: four, 'src/shared/hgUse.ts': "export const h = (p: string) => p === 'hg'\n" }).switches).toEqual(["src/shared/hgUse: 1 switches on a platform's id, listed 0"])
     }
@@ -197,7 +197,7 @@ const r = (platform: string) => platform === 'none'
 
   it('exempts a composition only by its data: a switch elsewhere in slotsApp fails (HI-3140)', () => {
     const app = 'src/main/slotsApp.ts'
-    expect(run({ [app]: `${text(app)}\nconst x = (p: string) => p === 'jj'\n` }).switches).toEqual(["src/main/slotsApp: 1 switches on a platform's id, listed 0"])
+    expect(run({ [app]: `${text(app)}\nconst x = (p: string) => p === 'git'\n` }).switches).toEqual(["src/main/slotsApp: 1 switches on a platform's id, listed 0"])
   })
 
   it('fails an exemption nothing uses any more: a NOT_PLATFORM name, a listed switch (HI-3140)', () => {

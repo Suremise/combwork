@@ -439,6 +439,5 @@
   "git.worktrees.queueHeading": "Kolejka scalania (Combwork)",
   "git.worktrees.queueHint": "Tu kolejka scalania Combwork testuje scalenie karty, zanim trafi ono dalej. Zarządza nim Combwork: nie ma tu nic do usunięcia.",
   "git.worktrees.queueRow": "Folder kolejki scalania",
-  "git.worktrees.readOnly": "Tu tylko do odczytu: praca agenta trafia do folderu projektu przez scalanie (Scal).",
-  "git.vc.jj": "jj"
+  "git.worktrees.readOnly": "Tu tylko do odczytu: praca agenta trafia do folderu projektu przez scalanie (Scal)."
 }

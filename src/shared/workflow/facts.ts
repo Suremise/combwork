@@ -342,20 +342,11 @@ export interface FactData {
    */
   SlotPrepared: { lease: string; line: string; revision: string }
   /**
-   * A card's slot couldn't be prepared for its start (HI-2913): `why` as Combwork told the builder (English), `stale` when
-   * the reason was a stale jj workspace (its Recover…). Written in a write that finds the card's start the same and not
-   * prepared; until a later `SlotPrepared` for the same lease, the card isn't started there (the window says not ready),
-   * and the user's Recover… of that slot is let through while its lease holds it.
+   * A card's slot couldn't be prepared for its start (HI-2913): `why` as Combwork told the builder (English). Written in a
+   * write that finds the card's start the same and not prepared; until a later `SlotPrepared` for the same lease, the card
+   * isn't started there (the window says not ready).
    */
-  SlotPrepareFailed: { lease: string; slot: string; why: string; stale: boolean }
-  /**
-   * HI-3115 (decision B, design HI-3115/s42): a jj card's slot holds what keeps its preparation waiting (work over the last
-   * card's, the last card's work not integrated, divergence, or what it holds unreadable). `why` the hold's reason code,
-   * `told` the sentence Combwork said (English, as on the card and in the builder's wake). Never a failure: the cycle
-   * waits and is prepared once the slot is clear. Written once per cycle and reason, in a write that finds the start the
-   * same and not prepared; read by a submit's `unbound` advice.
-   */
-  SlotPrepareHeld: { lease: string; slot: string; why: string; told: string }
+  SlotPrepareFailed: { lease: string; slot: string; why: string }
   /** Its builder's placement in the slot claimed by a Combwork (its process), so two never place it; one gone is taken over. */
   PlacementClaimed: { lease: string; pid: number; started: number }
   /** Its builder given the card in the slot: typed in, or a new conversation started there; `delivery` the one made. */

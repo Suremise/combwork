@@ -2,8 +2,8 @@
 // place, a card with no facts (before 1.0), a revision rewritten after a pass (stale) and one kept (carried over), the
 // integration and the marks, and the badges the board reads of every live card.
 import { describe, expect, it } from 'vitest'
-import { foldCard, type Actor, type Fact, type FactData, type FactKind, type StartedData, type SubmittedData } from '../../src/shared/workflow/facts'
-import { checksOn, currentRevision, doneUnproved, workBadge, workView, type WorkBadge } from '../../src/shared/workflow/workView'
+import { type Actor, type Fact, type FactData, type FactKind, type StartedData, type SubmittedData } from '../../src/shared/workflow/facts'
+import { checksOn, currentRevision, workBadge, workView, type WorkBadge } from '../../src/shared/workflow/workView'
 import { agentCard, branchCards } from '../../src/shared/branchCards'
 
 let seq = 0
@@ -41,34 +41,6 @@ describe("a card's work view (#1223)", () => {
     // A new cycle starts from its own Started's line.
     facts.push(fact('Started', start({ line: 'cw/Tools/a/b1-2' }), 'agent:B1'))
     expect(workView(card, facts).line).toBe('cw/Tools/a/b1-2')
-  })
-
-  it("HI-2924: a jj card the user moved to Done themselves, not proved integrated (doneUnproved, the slots' reuse): never the Assistant's, Combwork's, a Git card's, or once Integrated", () => {
-    const jjLine = 'jj:cw-ab12cd34-slot-c/7.1'
-    const base = (): Fact[] => {
-      seq = 0
-      return [fact('Started', start({ line: jjLine }), 'agent:B1'), fact('Moved', moved('todo', 'active')), fact('Submitted', submit('rev1111aaaa', 1), 'agent:B1'), fact('Moved', moved('active', 'review')), fact('Verdict', verdict(3, 'rev1111aaaa', true, 1), 'agent:R1'), fact('Moved', moved('review', 'approved'))]
-    }
-    const du = (facts: Fact[], stage: 'done' | 'approved') => doneUnproved(facts, foldCard(facts, stage))
-    const byUser = [...base(), fact('Override', { rules: ['integrate.integrated'], move: 'approved→done', by: 'user', reason: '' }, 'user'), fact('Moved', { from: 'approved', to: 'done', cause: 'override' }, 'user')]
-    const last = byUser.at(-1)!
-    expect(doneUnproved(byUser, foldCard(byUser, 'done'))).toMatchObject({ at: last.at })
-    // Its exact cycle only (the slot's check names its line key).
-    const s = { stage: 'done' as const, cycle: 1, started: { ...start({ line: jjLine }), seq: 1, adopted: false }, integrated: null, accepted: null }
-    expect(doneUnproved(byUser, s, jjLine)).toMatchObject({ line: jjLine })
-    expect(doneUnproved(byUser, s, 'jj:cw-ab12cd34-slot-c/7.2')).toBeNull()
-    // A plain drag (nothing skipped) is the user's too.
-    expect(du([...base(), fact('Moved', { from: 'approved', to: 'done', cause: 'user' }, 'user')], 'done')).not.toBeNull()
-    // The Assistant's, Combwork's (derived, a repair): not the user's word.
-    expect(du([...base(), fact('Moved', { from: 'approved', to: 'done', cause: 'override' }, 'assistant')], 'done')).toBeNull()
-    expect(du([...base(), fact('Moved', { from: 'approved', to: 'done', cause: 'derived' })], 'done')).toBeNull()
-    expect(du([...base(), fact('Moved', { from: 'approved', to: 'done', cause: 'repair' }, 'user')], 'done')).toBeNull()
-    // Proved after all (Integrated this cycle): none.
-    expect(du([...byUser, fact('Integrated', { revision: 'rev1111aaaa', target: 'main', result: 'res0000aaaa', method: 'committed', by: 'outside' })], 'done')).toBeNull()
-    // Not Done, or a Git card: none.
-    expect(du(base(), 'approved')).toBeNull()
-    seq = 0
-    expect(du([fact('Started', start(), 'agent:B1'), fact('Moved', { from: 'active', to: 'done', cause: 'user' }, 'user')], 'done')).toBeNull()
   })
 
   it('a card with no facts (before 1.0): its stage and nothing invented', () => {

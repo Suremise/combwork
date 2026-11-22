@@ -1465,11 +1465,11 @@
   },
   "git.vc.fact.other": {
     "defaultMessage": "{vcs} found: not supported yet, so this project uses None.",
-    "description": "Atop the Version Control tab: another version control was found in the folder. {vcs} is its name (Mercurial, Jujutsu). None: glossary 2.1."
+    "description": "Atop the Version Control tab: another version control was found in the folder. {vcs} is its name (Mercurial, Subversion). None: glossary 2.1."
   },
   "git.vc.fact.otherGit": {
     "defaultMessage": "{vcs} found in this folder: not supported yet.",
-    "description": "Atop the Version Control tab of a project still using Git, where another version control was found ({vcs}: Mercurial, Jujutsu). The offer under it says what to do."
+    "description": "Atop the Version Control tab of a project still using Git, where another version control was found ({vcs}: Mercurial, Subversion). The offer under it says what to do."
   },
   "git.vc.fact.repo": {
     "defaultMessage": "This folder is a Git repository at {root}.",
@@ -1495,10 +1495,6 @@
     "defaultMessage": "This folder is inside the Git repository at {root}: use that one, or give this folder its own.",
     "description": "Git’s page in the Version Control tab of a project inside another repository, chosen before it has its own: above the buttons Use that repository… and Initialise its own repository…. {root} is the outer repository’s folder."
   },
-  "git.vc.jj": {
-    "defaultMessage": "jj",
-    "description": "Jujutsu’s command name, as its users call it, in the choice atop the Version Control tab (HI-2799). Keep it: a product’s name, lower case."
-  },
   "git.vc.noCommitYet": {
     "defaultMessage": "This folder's Git repository has no first commit yet.",
     "description": "Git’s page in the Version Control tab, when Initialise repository… made the repository but stopped before its first commit: above the Make first commit… button."
@@ -1521,7 +1517,7 @@
   },
   "git.vc.offer.otherFound": {
     "defaultMessage": "{vcs} found: not supported yet, so this project can only use None.",
-    "description": "An offer atop the Version Control tab of a Git project where another version control ({vcs}: Mercurial, Jujutsu) is found now. None: glossary 2.1."
+    "description": "An offer atop the Version Control tab of a Git project where another version control ({vcs}: Mercurial, Subversion) is found now. None: glossary 2.1."
   },
   "git.vc.offer.repositoryGone": {
     "defaultMessage": "The Git repository is gone. Git’s rules hold until you switch, because what they check can’t be read.",
@@ -1625,7 +1621,7 @@
   },
   "git.vc.switch.changed": {
     "defaultMessage": "Changed meanwhile: this project uses {platform} now. Look again before switching.",
-    "description": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None, Git or jj."
+    "description": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None or Git."
   },
   "git.vc.switch.confirm": {
     "defaultMessage": "Switch",

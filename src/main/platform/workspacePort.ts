@@ -104,7 +104,7 @@ export interface WorkspaceFilesRunOptions {
 
 /**
  * HI-1182: a platform's step for what a checkout leaves out of its workspaces (Git: submodules and LFS files,
- * platform/gitModules.ts). jj refuses repositories that use them (HI-2799), so only Git's port has it.
+ * platform/gitModules.ts): only Git's port has it.
  */
 export interface WorkspaceFiles {
   /** The step's run title in the Progress panel (the commands it may run). */

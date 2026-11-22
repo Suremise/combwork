@@ -439,6 +439,5 @@
   "git.worktrees.queueHeading": "Merge-Warteschlange (von Combwork)",
   "git.worktrees.queueHint": "Hier testet die Merge-Warteschlange von Combwork den Merge einer Karte, bevor er übernommen wird. Combwork verwaltet ihn: Hier gibt es nichts zu entfernen.",
   "git.worktrees.queueRow": "Der Ordner der Merge-Warteschlange",
-  "git.worktrees.readOnly": "Hier schreibgeschützt: Die Arbeit eines Agenten kommt über „Mergen“ in den Projektordner.",
-  "git.vc.jj": "jj"
+  "git.worktrees.readOnly": "Hier schreibgeschützt: Die Arbeit eines Agenten kommt über „Mergen“ in den Projektordner."
 }
