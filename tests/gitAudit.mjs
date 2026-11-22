@@ -61,7 +61,7 @@ export const isGitModule = (m) => GIT_FILES.has(m) || m.startsWith('src/main/pla
 const MAYBE_COMPUTED = String.raw`(?:import|require)\s*\((?!\s*(?:'[^'\\\r\n]*'|"[^"\\\r\n]*"|${'`'}[^${'`'}$\\]*${'`'})\s*[,)])`
 
 /** A file that may load through `require` some other way (hiddenLoader's: handed on, `module.require`, `createRequire`): parsed too (HI-3512). */
-const MAYBE_HIDDEN = String.raw`${MAYBE_COMPUTED}|\brequire\b|createRequire`
+const MAYBE_HIDDEN = String.raw`${MAYBE_COMPUTED}|\brequire\b|createRequire|\bmodule\s*\[`
 
 /** A file that could name a Git module: only these are parsed (the rest can't import one). */
 const MAY_NAME_GIT = new RegExp(String.raw`git|worktree|repoLock|folderFence|branchWatch|branchMerge|refHold|${MAYBE_HIDDEN}`, 'i')
@@ -79,7 +79,8 @@ const NOT_A_LOAD = [ts.isPropertyAssignment, ts.isPropertySignature, ts.isProper
  * A direct `require(…)` is read where it is called.
  */
 function hiddenLoader(n) {
-  if (ts.isElementAccessExpression(n)) return ts.isStringLiteralLike(n.argumentExpression) && ['require', 'createRequire'].includes(n.argumentExpression.text)
+  // A member of `module` by a name built from pieces (`module['req' + 'uire']`) could be `require` (HI-3521).
+  if (ts.isElementAccessExpression(n)) return ts.isStringLiteralLike(n.argumentExpression) ? ['require', 'createRequire'].includes(n.argumentExpression.text) : ts.isIdentifier(n.expression) && n.expression.text === 'module'
   if (!ts.isIdentifier(n)) return false
   if (n.text === 'createRequire') return true
   if (n.text !== 'require') return false
@@ -89,8 +90,25 @@ function hiddenLoader(n) {
   return !NOT_A_LOAD.some((is) => is(p) && p.name === n)
 }
 
-/** Whether an `import X = require(…)` is exported (`export import X = …`): it passes the module on. */
-const exportedImportEquals = (n) => !!n.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+/** Whether a statement is exported (`export import X = …`, `export const …`): what it loads, it passes on. */
+const isExported =(n) => !!n.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+
+/** The literal specifier of a dynamic import or require that `e` is (through parentheses, `await`, a cast), else null. */
+function loaderSpec(e) {
+  while (e && (ts.isParenthesizedExpression(e) || ts.isAwaitExpression(e) || ts.isAsExpression(e) || ts.isNonNullExpression(e) || ts.isSatisfiesExpression(e))) e = e.expression
+  const loads = e && ts.isCallExpression(e) && (e.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(e.expression) && e.expression.text === 'require'))
+  return loads && e.arguments.length && ts.isStringLiteralLike(e.arguments[0]) ? e.arguments[0].text : null
+}
+
+/**
+ * The modules a statement exports as loaded (HI-3521): `export = require(…)`, `export default await import(…)`, and an
+ * exported variable holding one (`export const none = require(…)`). Each passes the module on, as a re-export does.
+ */
+function exportedLoads(n) {
+  if (ts.isExportAssignment(n)) return [loaderSpec(n.expression)].filter((s) => s !== null)
+  if (!ts.isVariableStatement(n) || !isExported(n)) return []
+  return n.declarationList.declarations.map((d) => loaderSpec(d.initializer)).filter((s) => s !== null)
+}
 
 /** A TypeScript source's extension: .ts, .tsx, and the module kinds .mts and .cts (HI-3506: src has .mts files). */
 const SRC_EXT = /\.(tsx?|[mc]ts)$/
@@ -188,7 +206,7 @@ function fileEdges(root, file, text) {
       if (hiddenLoader(n)) add(`./${HIDDEN}`, null)
       else if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text, clauseNames(n.importClause))
       // An exported one passes the whole module on, as `export * as X from` would.
-      else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text, exportedImportEquals(n) ? null : membersOf(n.name.text))
+      else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text, isExported(n) ? null : membersOf(n.name.text))
       else if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) {
         const c = n.exportClause
         add(n.moduleSpecifier.text, !c ? null : ts.isNamespaceExport(c) ? null : c.elements.map((e) => (e.propertyName ?? e.name).text))
@@ -588,7 +606,7 @@ export function platformFolders(root, over = {}) {
 /**
  * Every module a file names: imports, re-exports, dynamic imports and requires (repo paths, no extension); HIDDEN for a
  * computed one or a loader it can't follow (hiddenLoader). `reexported`: those it re-exports (`export … from`, `export
- * import X = require(…)`).
+ * import X = require(…)`, and exportedLoads': `export = require(…)`, an exported variable holding a load).
  */
 function modulesNamed(root, file, text) {
   const out = new Set()
@@ -607,8 +625,10 @@ function modulesNamed(root, file, text) {
     else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) {
       add(n.moduleReference.expression.text)
       // `export import X = require(…)` re-exports it (HI-3512).
-      if (exportedImportEquals(n)) add(n.moduleReference.expression.text, reexported)
+      if (isExported(n)) add(n.moduleReference.expression.text, reexported)
     }
+    // `export = require(…)`, `export const x = await import(…)`: the call itself is read below, as its child.
+    else if (ts.isExportAssignment(n) || ts.isVariableStatement(n)) for (const spec of exportedLoads(n)) add(spec, reexported)
     // A type's `import('./x').T`: a type taken from the folder is as much an import of it.
     else if (ts.isImportTypeNode(n) && ts.isLiteralTypeNode(n.argument) && ts.isStringLiteral(n.argument.literal)) add(n.argument.literal.text)
     else if (ts.isCallExpression(n) && (n.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(n.expression) && n.expression.text === 'require')) && n.arguments.length) {

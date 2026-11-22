@@ -1079,6 +1079,62 @@
     "defaultMessage": "Couldn't change {remote}'s URL: {why}",
     "description": "An error changing the address of the remote {remote} in the Git view; {why} is git's own words."
   },
+  "service.gitStash.agentBusy": {
+    "defaultMessage": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: an agent ({agent}) works in the folder ({folder}, a path)."
+  },
+  "service.gitStash.busy": {
+    "defaultMessage": "A run or an agent is working in {folder} ({what}): nothing was done. Try again once it has finished.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: a run (a test, a build) or an agent's file lock is in the folder ({folder}, a path); {what} names the first one's folder or file."
+  },
+  "service.gitStash.conflicted": {
+    "defaultMessage": "{file} is in conflict in {folder}: nothing was done. Settle it first.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: a file ({file}, a path in the repository) is already in conflict in the folder ({folder}, a path)."
+  },
+  "service.gitStash.failed": {
+    "defaultMessage": "Git refused: {why}",
+    "description": "HI-3472: an error from Stashes: git's own command failed; {why} is git's error line, in English."
+  },
+  "service.gitStash.gone": {
+    "defaultMessage": "That stash isn't in the list any more (dropped or popped meanwhile): nothing was done. Look again.",
+    "description": "HI-3472: an error from Version Control → Changes → Stashes: the stash the user acted on is no longer one of the repository's stashes."
+  },
+  "service.gitStash.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was done.",
+    "description": "HI-3472: an error from Stashes: the request was malformed (not reached from the window)."
+  },
+  "service.gitStash.notDropped": {
+    "defaultMessage": "The stash was applied, but git didn't drop it: {why}. It is still in the list.",
+    "description": "HI-3472: an error from Stashes' Pop: the apply was clean but git's drop failed; {why} is git's error line, in English."
+  },
+  "service.gitStash.operation": {
+    "defaultMessage": "Git is in the middle of {what, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}: nothing was done. Finish it first (the panel above).",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: an operation is under way in the folder ({what}, git's word for it; {folder} a path); HI-3470's panel above the list ends it."
+  },
+  "service.gitStash.overlap": {
+    "defaultMessage": "{file} has uncommitted changes in {folder}, and the stash holds it too: nothing was done. Commit it or set it aside first.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: the folder ({folder}, a path) has uncommitted changes to a file ({file}, a path in the repository) that the stash also changes; Combwork refuses rather than mix them in a conflict."
+  },
+  "service.gitStash.session": {
+    "defaultMessage": "{agent}'s session is in {folder}: nothing was done. Stop it first.",
+    "description": "HI-3472: an error from Version Control → Changes → Stashes' Apply or Pop: an agent's session ({agent}, its name) runs in the folder ({folder}, a path), so Combwork doesn't change its files."
+  },
+  "service.gitStash.slotChanged": {
+    "defaultMessage": "{slot} changed meanwhile (lent, released, or something of Combwork's started in it): nothing was done. Look again.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: the slot ({slot}) was lent to a card, released, or taken by one of Combwork's own steps since the user looked, or the lent slot they confirmed is lent under another lease now."
+  },
+  "service.gitStash.slotProcess": {
+    "defaultMessage": "A process has a file or a folder in {slot} open: nothing was done. Close it (a terminal, an editor) and try again.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: something has the slot's folder ({slot}) open, so Windows refused to rename it aside for a moment (the check that nothing works there)."
+  },
+  "service.gitStash.slotSession": {
+    "defaultMessage": "A session is in {slot}: nothing was done. Stop it first.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: a session runs in the slot ({slot}, such as slot-a; glossary: slot)."
+  },
+  "service.gitStash.timedOut": {
+    "defaultMessage": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at {folder} before you try again: part of the stash may be applied.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: git ran past Settings → Advanced's longest commit or set aside time ({seconds}) and was ended; {folder} is a path."
+  },
   "service.intent.noWorkflow": {
     "defaultMessage": "{card} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.",
     "description": "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {card} is the card's key (HI-12)."

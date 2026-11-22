@@ -426,5 +426,19 @@
   "service.workspace.sharedNames": "智能体名称现在在整个工作区中唯一，以便区分每个智能体。{shared}：它们仍可正常工作，但请在每组同名智能体中重命名一个，例如将 {project} 的 {agent} 改为 {suggestion}。",
   "service.workspace.stillClosing": "{name} 仍在关闭中：请等它完成后再试。",
   "service.workspace.stillOpening": "{name} 仍在打开中：请等它完成后再试。",
-  "service.workspace.twoCalled": "有两个智能体都叫 {name}"
+  "service.workspace.twoCalled": "有两个智能体都叫 {name}",
+  "service.gitStash.agentBusy": "{agent} 正在 {folder} 中工作：未做任何操作。请在它完成后重试。",
+  "service.gitStash.busy": "有运行或智能体正在 {folder} 中工作（{what}）：未做任何操作。请在其完成后重试。",
+  "service.gitStash.conflicted": "{file} 在 {folder} 中存在冲突：未做任何操作。请先解决它。",
+  "service.gitStash.failed": "Git 拒绝了：{why}",
+  "service.gitStash.gone": "该储藏已不在列表中（在此期间已被删除或弹出）：未做任何操作。请重新查看。",
+  "service.gitStash.invalid": "请求有误：未做任何操作。",
+  "service.gitStash.notDropped": "储藏已应用，但 Git 没有删除它：{why}。它仍在列表中。",
+  "service.gitStash.operation": "Git 在 {folder} 中正处于{what, select, merge {合并} rebase {变基} am {am} cherryPick {拣选（cherry-pick）} bisect {二分查找（bisect）} other {还原（revert）}}过程中：未做任何操作。请先完成它（上方的面板）。",
+  "service.gitStash.overlap": "{file} 在 {folder} 中有未提交的更改，而储藏也包含它：未做任何操作。请先提交或搁置它。",
+  "service.gitStash.session": "{agent} 的会话在 {folder} 中：未做任何操作。请先停止它。",
+  "service.gitStash.slotChanged": "{slot} 在此期间发生了变化（被借出、被释放，或 Combwork 的某项操作已在其中启动）：未做任何操作。请重新查看。",
+  "service.gitStash.slotProcess": "有进程打开了 {slot} 中的文件或文件夹：未做任何操作。请关闭它（终端、编辑器）后重试。",
+  "service.gitStash.slotSession": "{slot} 中有会话：未做任何操作。请先停止它。",
+  "service.gitStash.timedOut": "Git 运行 {seconds, number} 秒后仍未结束，因此 Combwork 结束了它。重试前请先查看 {folder}：储藏可能已部分应用。"
 }

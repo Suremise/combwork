@@ -5914,6 +5914,39 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
     removed. A merge holding the repository's lock (the merge queue's or the user's) is waited for, as other changes to
     the repository wait, with the notice of who holds it, and one that comes meanwhile waits for the repair: none of
     these runs beside it.
+- **Stashes** (HI-3472, the design agreed on the card, request r11): Version Control → Changes has a **Stashes**
+  section under the operation panel, closed until clicked and absent with none: every stash of the repository (git
+  shares them between its folders, so each folder shows the same list), newest first, each with its message, the
+  branch it was made on (git's *On main:*, *no branch* for a detached HEAD), its date and how many files it holds (its
+  changes against the commit it was made on and the untracked files its third parent keeps, which `git stash show`
+  alone leaves out). There is no cap and no setting. Combwork's own, made by Set Aside (HI-2944), are told by the mark
+  their message carries (`Combwork: set aside <why> [cw:<6 hex>]`) and read *Set aside by Combwork before merging
+  HI-12* (*before bringing 1.7.0 up to date with HI-12*, *before starting work on main*), the card key a link to the
+  card; any other stash shows git's message as it is. Every request names a stash by its commit, never its place in
+  the list, which moves as stashes are made or dropped. Git's work is a Git port operation (`stashes`: RepoOps'
+  `stashes`, `stashFiles`, `stashDiff`, `applyStash`, `dropStash`; `platform/git/gitStashes.ts`); None lists none of
+  it. Agents have no tool, route or count for it: it is the user's, as the rest of Version Control is.
+  - **Show** lists the stash's files under it, changed then untracked; a click on one shows its diff where the
+    folder's diff goes (the file at the commit the stash was made on against the stash's), until one of the folder's
+    files or the diff's close button is clicked. Nothing changes.
+  - **Apply** (`git stash apply <commit>`) puts the stash's changes into the folder Changes shows and keeps it; **Pop**
+    does the same, then drops it only if it went in without a conflict. Both ask first, naming the stash, how many
+    files go in and, when it was made on another branch than the folder has checked out, both branches. Each refuses,
+    as the user clicks: a live session in the folder; for a slot, its pool's hold, a lent one asking first as the
+    operation panel does; then, under the repository lock and the folder's fence, the stash no longer in the list, an
+    operation under way there, a file already in conflict, a Combwork run or an agent's file lock there, an agent
+    working there, and uncommitted changes (untracked files included) to any file the stash holds, named, so a
+    conflict is only ever of what the stash brings. These checks are the folder's alone, not the whole repository's
+    as Repository health's are: an agent working in another slot doesn't stop them. Git runs under Commit's bound
+    (`cw.git.commitMinutes`). **On a conflict** git leaves the files with its markers and no operation under way, and
+    the stash is kept (git drops a popped one only after a clean apply): a warning names the files. HI-3518's panel
+    shows such conflicts; it learns which stash they came from through RepoReads' `stashConflict` (the stash last
+    applied there with conflicts, its message and the HEAD it went onto, in main's memory, while that HEAD stays and a
+    file is still in conflict).
+  - **Drop** asks first, naming the stash, its files and, for Combwork's, its card, and saying its commit can be
+    found in a terminal for a while (`git fsck --unreachable`). Under the repository lock it drops the stash only while
+    its place in the list still holds the commit the user saw, read again just before `git stash drop`, and the notice
+    after gives the commit in full. Drop changes no folder, so it waits only for the lock.
 - **A detach that keeps failing** (HI-3467): a clean free Git slot whose detach at its target fails for any other reason
   (an index lock, files in the way, git unable to read its head or the target's, the target's branch gone; not its
   card's own work, which keeps it) stays not ready, and the same record (`slot_operation:`, `what` `detach`) keeps git's

@@ -1036,6 +1036,79 @@
       "why": "plain"
     }
   },
+  "service.gitStash.agentBusy": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitStash.busy": {
+    "placeholders": {
+      "folder": "plain",
+      "what": "plain"
+    }
+  },
+  "service.gitStash.conflicted": {
+    "placeholders": {
+      "file": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitStash.failed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.gitStash.gone": {
+    "placeholders": {}
+  },
+  "service.gitStash.invalid": {
+    "placeholders": {}
+  },
+  "service.gitStash.notDropped": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.gitStash.operation": {
+    "placeholders": {
+      "what": "select",
+      "folder": "plain"
+    }
+  },
+  "service.gitStash.overlap": {
+    "placeholders": {
+      "file": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitStash.session": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitStash.slotChanged": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "service.gitStash.slotProcess": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "service.gitStash.slotSession": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "service.gitStash.timedOut": {
+    "placeholders": {
+      "seconds": "number",
+      "folder": "plain"
+    }
+  },
   "service.intent.noWorkflow": {
     "placeholders": {
       "card": "plain"

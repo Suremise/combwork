@@ -634,5 +634,7 @@
   "tips.repositoryHealth.text": "Wenn git „index.lock: File exists“ meldet oder einen Worktree verweigert, dessen Ordner gelöscht wurde, listet Versionsverwaltung → Branches & Remotes → Repository-Zustand auf, was zurückgeblieben ist, und räumt weg, was du anhakst.",
   "tips.repositoryHealth.title": "Eine veraltete git-Sperre oder einen veralteten Worktree-Eintrag beseitigen",
   "tips.resumeLongIdle.title": "Eine lange ruhende Unterhaltung fragt vor dem Fortsetzen",
-  "tips.resumeLongIdle.text": "Eine Unterhaltung, die über eine Stunde ruht, hat ihren Prompt-Cache höchstwahrscheinlich verloren, daher kann ihr Fortsetzen viele Tokens kosten. „Fortsetzen“ sagt, wie lange sie ruht und wie groß sie ist, und bietet stattdessen „Archivieren und neu beginnen“ an."
+  "tips.resumeLongIdle.text": "Eine Unterhaltung, die über eine Stunde ruht, hat ihren Prompt-Cache höchstwahrscheinlich verloren, daher kann ihr Fortsetzen viele Tokens kosten. „Fortsetzen“ sagt, wie lange sie ruht und wie groß sie ist, und bietet stattdessen „Archivieren und neu beginnen“ an.",
+  "tips.stashes.text": "Versionsverwaltung → Änderungen → Stashes listet die Stashes des Repositorys auf, die von Combworks Beiseitelegen mit ihrer Karte: Zeige an, was jeder enthält, und wende ihn an, poppe oder lösche ihn.",
+  "tips.stashes.title": "Git-Stashes ansehen, anwenden oder löschen"
 }

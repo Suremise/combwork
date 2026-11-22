@@ -11,6 +11,7 @@ import * as files from '../../filesGit'
 import * as changes from './gitFolderChanges'
 import * as operations from './gitOperationSteps'
 import * as health from './gitHealth'
+import * as stashes from './gitStashes'
 import type { RepoOps } from '../repoOps'
 
 export const gitRepoOps: RepoOps = {
@@ -46,5 +47,10 @@ export const gitRepoOps: RepoOps = {
   pruneWorktrees: (p, entries) => health.pruneWorktrees(p, entries),
   removeLocks: (p, locks) => health.removeLocks(p, locks),
   remotePrunePreview: (p) => health.remotePrunePreview(p),
-  fetchPrune: (p, remotes) => health.fetchPrune(p, remotes)
+  fetchPrune: (p, remotes) => health.fetchPrune(p, remotes),
+  stashes: (root) => stashes.listStashes(root),
+  stashFiles: (root, commit) => stashes.stashFiles(root, commit),
+  stashDiff: (root, commit, file, untracked) => stashes.stashDiff(root, commit, file, untracked),
+  applyStash: (p, folder, req, guard) => stashes.applyStash(p, folder, req, guard),
+  dropStash: (p, commit) => stashes.dropStash(p, commit)
 }

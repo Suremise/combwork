@@ -110,6 +110,26 @@ describe('the Git/None cutover audit', () => {
     expect(sealBreaks(root, { [adapters]: `import NoneMod = require('./none/none')\n${text(adapters)}` })).toEqual([])
   })
 
+  // HI-3521: a registry's export of a load wasn't a re-export, and only a literal 'require' member was read.
+  it("fails a registry exporting what it loads, and a member of module by a built name", () => {
+    const adapters = 'src/main/platform/adapters.ts'
+    const passedOn = ['src/main/platform/adapters -> src/main/platform/none/none (re-exported)']
+    // `export =` and `export default` each stand alone (a file holds one), so each replaces the registry's text.
+    for (const body of ["export = require('./none/none')\n", "export default require('./none/none')\n", "export default (await import('./none/none'))\n"]) expect(sealBreaks(root, { [adapters]: body }), body).toEqual(passedOn)
+    for (const line of ["export const none = require('./none/none')", "export const { NoneAdapter } = await import('./none/none')", "export const none = require('./none/none') as unknown"])
+      expect(sealBreaks(root, { [adapters]: `${line}\n${text(adapters)}` }), line).toEqual(passedOn)
+    // Loading it unexported is a registry's to do.
+    expect(sealBreaks(root, { [adapters]: `const none = require('./none/none')\n${text(adapters)}` })).toEqual([])
+    // A member of module by a built name could be require: outside the folders, and in a registry.
+    const probe = 'src/main/sealProbe.ts'
+    const built = (spec: string): string => `const k = 'req' + 'uire'\nexport const f = () => module[k]('${spec}')\nexport const g = () => module['req' + 'uire']\n`
+    expect(sealBreaks(root, { [probe]: built('./platform/none/none') })).toEqual(['src/main/sealProbe -> (computed specifier)'])
+    expect(run({ [probe]: built('./git') }).unlisted).toEqual(['src/main/sealProbe -> (computed specifier)'])
+    expect(sealBreaks(root, { [adapters]: `${text(adapters)}\nexport const later = () => module['req' + 'uire']('./no' + 'ne/none')\n` })).toEqual(['src/main/platform/adapters -> (computed specifier)'])
+    // Another object's built member is no loader of its own; module's literal ones other than require aren't either.
+    expect(sealBreaks(root, { [probe]: "const k = 'a' + 'b'\nexport const f = (o: Record<string, number>) => o[k]\nexport const id = module['id']\n" })).toEqual([])
+  })
+
   it('reads .mts sources, the renderer\'s @root alias, and a registry passing a platform\'s files on', () => {
     expect(sources(root)).toContain('src/main/progressReporters/report.mts')
     expect(sealBreaks(root, { 'src/main/sealProbe.mts': "import { NoneAdapter } from './platform/none/none'\n" })).toEqual(['src/main/sealProbe -> src/main/platform/none/none'])

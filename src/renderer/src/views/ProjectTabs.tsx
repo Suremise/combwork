@@ -36,6 +36,7 @@ import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, SectionNav, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
 import { OperationPanel } from '../components/OperationPanel'
+import { StashesSection, StashFileDiff, type StashFileShown } from '../components/StashesSection'
 import { cliReadyOf, ConnectionMark, connectionCli, connectionLine, firstReadyConnection, useConnections } from '../components/ConnectionChoice'
 import { connectionOf } from '@shared/connectionLabel'
 import { useConnectionsInUse } from '../connectionUsage'
@@ -1047,6 +1048,8 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   const [diffOf, setDiffOf] = useState<{ for: string; diff: GitDiff } | null>(null)
   const [diffErrorOf, setDiffErrorOf] = useState<{ for: string; error: string } | null>(null)
   const [inline, setInline] = useState(false)
+  // HI-3472: a stash's file shown in place of the folder's diff (its own root: another folder's never shows here).
+  const [stashShown, setStashShown] = useState<StashFileShown | null>(null)
   // The project's unused worktrees (#400): listed in the folder picker, shown all at once, or one opened like an agent's.
   // The last list shows at once while git is asked again (#476).
   const { data: unusedData, reload: reloadUnused, loading: unusedLoading, error: unusedError, at: unusedAt } = useUnusedWorktrees(owner)
@@ -1241,6 +1244,8 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
       </div>
     )
   }
+  const folderName = agent ? (agent.place.name ?? whose) : spare ? (spare.slot ?? unusedName(spare)) : null
+  const stashFile = stashShown?.root === root ? stashShown : null
   return (
     <ChangesSplit listWidth={listWidth}>
       <div className="split-list">
@@ -1271,7 +1276,10 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
           {status.files.length === 0 && <div className="pane-empty">{agent && own?.branch ? tr(C.noAgentChanges, { branch: own.branch }) : agent ? tr(C.clean) : spare ? tr(C.nothingOn, { branch: unusedName(spare), base: base ?? '' }) : tr(C.clean)}</div>}
           {status.files.map((f) => (
             <Tooltip block key={f.path} content={tr(f.staged ? C.staged : C.unstaged, { status: tr(C.gitStatus, { status: f.status === '?' ? 'untracked' : f.status }), path: f.path })}>
-              <div className={cx('row', file === f.path && 'selected')} data-path={f.path} style={{ width: '100%' }} onClick={() => setFile(f.path)}>
+              <div className={cx('row', file === f.path && !stashFile && 'selected')} data-path={f.path} style={{ width: '100%' }} onClick={() => {
+                setStashShown(null)
+                setFile(f.path)
+              }}>
                 <span className="label">{f.path.split('/').pop()}</span>
                 <span className="desc" style={{ flex: 1, minWidth: 0 }}>{f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : ''}</span>
                 <span className={cx('git-status', f.status === '?' ? 'U' : f.status)}>{f.status === '?' ? 'U' : f.status /* i18n-ignore: git's status letter */}</span>
@@ -1282,8 +1290,11 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
       </div>
       <div className="split-main">
         {about}
-        <OperationPanel project={owner} root={root} folder={agent ? (agent.place.name ?? whose) : spare ? (spare.slot ?? unusedName(spare)) : null} reloadKey={status} onChanged={load} />
-        {diff ? (
+        <OperationPanel project={owner} root={root} folder={folderName} reloadKey={status} onChanged={load} />
+        <StashesSection project={owner} root={root} folder={folderName} branch={status.branch || null} reloadKey={status} shown={stashFile} onShow={setStashShown} onChanged={load} />
+        {stashFile ? (
+          <StashFileDiff shown={stashFile} onClose={() => setStashShown(null)} />
+        ) : diff ? (
           <>
             <div className="editor-toolbar">
               <Icon name="git-compare" />

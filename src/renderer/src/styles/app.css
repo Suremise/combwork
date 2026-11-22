@@ -2005,6 +2005,63 @@ textarea.input {
   overflow-y: auto;
   flex-shrink: 0;
 }
+/* HI-3472: Changes' Stashes, under the operation panel: a heading that opens the list; the list scrolls, taking at most
+   half the right side, the diff keeping the rest. */
+.stash-section {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  max-height: 45%;
+  display: flex;
+  flex-direction: column;
+}
+.stash-section .stash-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: none;
+  border: none;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+}
+.stash-section .stash-list {
+  overflow-y: auto;
+  padding: 0 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stash-section .stash-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.stash-section .stash-name {
+  flex: 1;
+  min-width: 160px;
+}
+.stash-section .stash-name .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stash-section .stash-meta {
+  font-size: 12px;
+}
+.stash-section .stash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.stash-section .stash-files {
+  padding: 4px 0 2px 12px;
+}
+.stash-section .stash-files .row .label {
+  flex: 1;
+  min-width: 0;
+}
 .banner.info {
   background: var(--accent-soft);
   color: var(--fg-strong);
