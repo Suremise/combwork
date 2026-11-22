@@ -1,9 +1,8 @@
-// Version control's own folders (HI-2800): Git's `.git`, and `.jj` (Jujutsu's store, another version control's, which
-// writes there on every command). Each is hidden in the Files tab, skipped by search and the watchers, never a document or
-// a deliverable, and never a project write, whatever the project's platform.
+// Version control's own folders (HI-2800): Git's `.git`. Each is hidden in the Files tab, skipped by search and the
+// watchers, never a document or a deliverable, and never a project write, whatever the project's platform.
 
 /** The version controls' own folders, at a project's root. */
-export const METADATA_DIRS: readonly string[] = ['.git', '.jj']
+export const METADATA_DIRS: readonly string[] = ['.git']
 
 /** Whether a project-relative path (`/` or `\`) is a platform's own folder or inside one; `anyCase` folds case (Windows). */
 export function inMetadataDir(rel: string, anyCase = false): boolean {

@@ -1,7 +1,7 @@
-// HI-3366: a card into Done reconciles each project it blocks a card of. A jj card held for a blocker (HI-3265) has no
-// merge-queue entry for kickDependents to run again: its only wake is a reconciliation of its own project. Before, a
-// blocker's Done asked only for its own project's, so a dependent in another project waited for a jj operation there, a
-// window's focus or the minute tick. Git projects here: the hook is the platform's neither way.
+// HI-3366: a card into Done reconciles each project it blocks a card of. A card held for a blocker with no merge-queue
+// entry for kickDependents to run again has only a reconciliation of its own project to wake it. Before, a blocker's
+// Done asked only for its own project's, so a dependent in another project waited for a window's focus or the minute
+// tick. Git projects here: the hook is the platform's neither way.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'

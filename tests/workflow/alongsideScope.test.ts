@@ -1,8 +1,7 @@
 // HI-3322: an intent's `alongside` hooks (tasks.ts runIntent: an agent request's attempt fence and the card's 0.9 fields)
 // run in the intent's own writes only. What the intent sets off and outlives it (a reconciliation scheduled by its move,
-// a candidate's checks, a timer) inherits its async context, but never its hooks: a jj card's verdict once left the
-// reviewer's fence on Combwork's own later writes, refused as attempt.staleLaunch after the reviewer's launch ended, so
-// the card never came back from its candidate's merge check nor went Done after the user's integration.
+// a candidate's checks, a timer) inherits its async context, but never its hooks: a verdict's would leave the reviewer's
+// fence on Combwork's own later writes, refused as attempt.staleLaunch after the reviewer's launch ended.
 import { afterEach, describe, expect, it } from 'vitest'
 import { alongside } from '../../src/main/workflow/runtime'
 import { B1, moved, setup, type Env } from './harness'

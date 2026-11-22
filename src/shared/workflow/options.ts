@@ -6,7 +6,7 @@
 // them; the Version Control tab (#1278) edits them.
 
 import { msg, type Msg } from '../i18n/msg'
-import { accepts, hasCapability, isPlatformId, merges, PLATFORMS, type PlatformId } from '../platform/descriptors'
+import { accepts, hasCapability, merges, PLATFORMS, type PlatformId } from '../platform/descriptors'
 import type { FileLockMode } from '../types'
 import { CHURN_MAX, LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from '../loopLimits'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from '../agentLimits'
@@ -454,7 +454,7 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
   // By the platform's descriptor (HI-2840, `finishes`): a finish it doesn't declare is a contradiction, worded as
   // acceptance and merging not mixing (HI-2822). Separate folders need isolation.
   const merging = merges(o.platform)
-  const finishes = isPlatformId(o.platform) ? PLATFORMS[o.platform].finishes : []
+  const finishes = PLATFORMS[o.platform].finishes
   if (!finishes.includes(o.finish)) out.push('combworkMergesNeedsGit')
   if (!hasCapability(o.platform, 'isolation') && o.folder !== 'project') out.push('noneHasNoSlots')
   if (merging) {

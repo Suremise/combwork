@@ -4,13 +4,18 @@
 // the user saw, whatever moved its place), and what refuses Apply and Pop before git runs (an operation under way, a
 // file in conflict, uncommitted changes to a file the stash holds, a run or an agent in the folder, the caller's guard).
 // Real git in throwaway repositories.
+import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join, resolve } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { timing } from './waits'
 import { commit, gitRepo, sh } from './workflow/harness'
-import { combworkStash, stashRequestOf, stashSubject } from '../src/shared/gitStashes'
+import { combworkStash, stashRefOf, stashRequestOf, stashSubject, type StashRef } from '../src/shared/gitStashes'
+
+/** A git child's environment from the run context's allowlist, never the shell's (tests/README.md, Isolation). */
+const { gitEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
 
 const norm = (p: string): string => resolve(p).toLowerCase()
 /** What the queue counts as building in a folder: none unless a test says. */
@@ -19,6 +24,28 @@ vi.mock('../src/main/workflow/queueHost', () => ({ folderBuilders: (_ws: unknown
 /** An agent working in the folder: none unless a test says. */
 let agent: string | null = null
 vi.mock('../src/main/gitRepo', async (original) => ({ ...(await original<typeof import('../src/main/gitRepo')>()), busyAgentIn: async () => agent }))
+/** HI-3533: another git's work, run once just before Combwork's next `git stash drop` (between its check and its drop). */
+let beforeDrop: (() => void) | null = null
+/** HI-3533 (HR1's round 1): Combwork's next `git stash store` fails, as git's own refusal (a ref that isn't there). */
+let failStore = false
+vi.mock('../src/main/git', async (original) => {
+  const real = await original<typeof import('../src/main/git')>()
+  return {
+    ...real,
+    git: (cwd: string, args: string[], ...rest: unknown[]) => {
+      if (beforeDrop && args[0] === 'stash' && args[1] === 'drop') {
+        const f = beforeDrop
+        beforeDrop = null
+        f()
+      }
+      if (failStore && args[0] === 'stash' && args[1] === 'store') {
+        failStore = false
+        return real.git(cwd, ['rev-parse', '--verify', 'refs/cw-test/not-a-ref'])
+      }
+      return (real.git as (...a: unknown[]) => ReturnType<typeof real.git>)(cwd, args, ...rest)
+    }
+  }
+})
 
 vi.setConfig({ testTimeout: timing('test.hang') })
 
@@ -38,8 +65,22 @@ let proj = ''
 const read = (rel: string): string => readFileSync(join(proj, rel), 'utf8').replace(/\r\n/g, '\n')
 const write = (rel: string, text: string): void => writeFileSync(join(proj, rel), text)
 const list = () => S.listStashes(proj)
-const apply = (stash: string, pop: boolean, guard?: () => void) => inWorkspace(w, () => S.applyStash(proj, proj, { commit: stash, pop }, guard))
-const drop = (stash: string) => inWorkspace(w, () => S.dropStash(proj, stash))
+/** The row of the list holding `commit` now (the first, newest), as the window names it. */
+const rowOf = async (c: string): Promise<StashRef> => {
+  const r = (await list()).find((x) => x.commit === c)
+  if (!r) throw new Error(`no stash ${c}`)
+  return { commit: r.commit, index: r.index, message: r.message }
+}
+const refFor = async (stash: string | StashRef): Promise<StashRef> => (typeof stash === 'string' ? rowOf(stash) : stash)
+const apply = async (stash: string | StashRef, pop: boolean, guard?: () => void) => {
+  const ref = await refFor(stash)
+  return inWorkspace(w, () => S.applyStash(proj, proj, { ...ref, pop }, guard))
+}
+const drop = async (stash: string | StashRef) => {
+  const ref = await refFor(stash)
+  return inWorkspace(w, () => S.dropStash(proj, ref))
+}
+const messages = async (): Promise<string[]> => (await list()).map((r) => r.message)
 const stashes = (): string[] => sh(proj, 'stash', 'list', '--format=%H').split(/\r?\n/).filter(Boolean)
 
 beforeEach(() => {
@@ -49,6 +90,8 @@ beforeEach(() => {
   sh(proj, 'config', 'core.autocrlf', 'false')
   commit(proj, { 'a.txt': 'base\n', 'b.txt': 'b\n' }, 'files')
   held = null
+  beforeDrop = null
+  failStore = false
   agent = null
 })
 
@@ -70,17 +113,50 @@ describe('parsing', () => {
     expect(stashSubject('something else')).toEqual({ branch: null, message: 'something else' })
   })
 
-  it('takes only a request naming a stash by its commit', () => {
+  it('takes only a request naming a row by its commit, place and message', () => {
     const c = 'a'.repeat(40)
-    expect(stashRequestOf({ commit: c, pop: true, lease: 'L1' })).toEqual({ commit: c, pop: true, lease: 'L1' })
-    expect(stashRequestOf({ commit: c, pop: false })).toEqual({ commit: c, pop: false })
-    expect(stashRequestOf({ commit: 'stash@{0}', pop: false })).toBeNull()
-    expect(stashRequestOf({ commit: c })).toBeNull()
+    const row = { commit: c, index: 2, message: 'm' }
+    expect(stashRequestOf({ ...row, pop: true, lease: 'L1' })).toEqual({ ...row, pop: true, lease: 'L1' })
+    expect(stashRequestOf({ ...row, pop: false })).toEqual({ ...row, pop: false })
+    expect(stashRequestOf({ ...row, commit: 'stash@{0}', pop: false })).toBeNull()
+    expect(stashRequestOf({ commit: c, pop: false })).toBeNull()
+    expect(stashRequestOf(row)).toBeNull()
     expect(stashRequestOf(null)).toBeNull()
+    expect(stashRefOf(row)).toEqual(row)
+    expect(stashRefOf({ ...row, index: -1 })).toBeNull()
+    expect(stashRefOf({ ...row, index: 1.5 })).toBeNull()
+    expect(stashRefOf({ ...row, message: 3 })).toBeNull()
   })
 })
 
 describe('the list and Show', () => {
+  it('HI-3531: lists hundreds of stashes with untracked files, past what one command line holds, each counted', async () => {
+    // A real one first (git keeps refs/stash's reflog), then 820 more, each with an untracked commit of its own: made
+    // in one fast-import and listed in one update-ref transaction each, so it is quick however loaded the machine is.
+    write('extra.txt', 'x\n')
+    sh(proj, 'stash', 'push', '-q', '-u', '-m', 'real')
+    const head = sh(proj, 'rev-parse', 'HEAD').trim()
+    const N = 820
+    const who = 'committer T <t@example.invalid> 1700000000 +0000\n'
+    let stream = ''
+    for (let i = 1; i <= N; i++) {
+      const file = `u${i}.txt`
+      stream += `reset refs/cw/u\ncommit refs/cw/u\nmark :${i}\n${who}data 1\nu\nM 100644 inline ${file}\ndata 2\n${i % 10}\n\n`
+      stream += `commit refs/cw/s\nmark :${N + i}\n${who}data 2\ns\nfrom ${head}\nmerge ${head}\nmerge :${i}\n\n`
+    }
+    const marks = join(base, `marks-${n}.txt`)
+    execFileSync('git', ['fast-import', '--quiet', `--export-marks=${marks}`], { cwd: proj, env: gitEnv(), input: stream })
+    const sha = new Map(readFileSync(marks, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => l.split(' ') as [string, string]))
+    const tx = Array.from({ length: N }, (_, i) => `start\nupdate refs/stash ${sha.get(`:${N + i + 1}`)}\ncommit\n`).join('')
+    execFileSync('git', ['-c', 'user.name=T', '-c', 'user.email=t@example.invalid', 'update-ref', '--stdin'], { cwd: proj, env: gitEnv(), input: tx })
+    expect(stashes().length).toBe(N + 1)
+    const rows = await list()
+    expect(rows.length).toBe(N + 1)
+    // Every one's untracked file counted, the real one's too.
+    expect(rows.every((r) => r.files === 1)).toBe(true)
+    expect(rows[N].message).toBe('real')
+  })
+
   it('lists every stash, newest first, with its branch, message, date and files, untracked ones included', async () => {
     expect(await list()).toEqual([])
     write('a.txt', 'mine\n')
@@ -105,6 +181,23 @@ describe('the list and Show', () => {
     expect([d.original.replace(/\r\n/g, '\n'), d.modified.replace(/\r\n/g, '\n'), d.binary]).toEqual(['base\n', 'mine\n', false])
     const u = await S.stashDiff(proj, rows[1].commit, 'new.txt', true)
     expect([u.original, u.modified.replace(/\r\n/g, '\n')]).toEqual(['', 'new\n'])
+  })
+
+  it('HI-3529: Show of a stash that replaced a file with a folder: the file deleted, the folder\'s file added', async () => {
+    sh(proj, 'rm', '-q', 'a.txt')
+    mkdirSync(join(proj, 'a.txt'))
+    write('a.txt/child', 'new\n')
+    sh(proj, 'add', '-A')
+    sh(proj, 'stash', 'push', '-q', '-m', 'reorganise')
+    const [s] = await list()
+    expect(await S.stashFiles(proj, s.commit)).toEqual([
+      { path: 'a.txt', status: 'D', untracked: false },
+      { path: 'a.txt/child', status: 'A', untracked: false }
+    ])
+    const gone = await S.stashDiff(proj, s.commit, 'a.txt', false)
+    expect([gone.original.replace(/\r\n/g, '\n'), gone.modified, gone.binary]).toEqual(['base\n', '', false])
+    const added = await S.stashDiff(proj, s.commit, 'a.txt/child', false)
+    expect([added.original, added.modified.replace(/\r\n/g, '\n')]).toEqual(['', 'new\n'])
   })
 
   it('a stash gone meanwhile refuses Show', async () => {
@@ -147,6 +240,53 @@ describe('Apply and Pop', () => {
     await expect(apply(c, false)).rejects.toThrow('a.txt is in conflict')
     sh(proj, 'checkout', '--theirs', '--', 'a.txt')
     sh(proj, 'add', 'a.txt')
+    expect(await S.stashConflictIn(proj)).toBeNull()
+  })
+
+  it('HI-3528: a read of the conflicts while an Apply runs waits for it, so the conflicts it leaves are never unnamed', async () => {
+    write('a.txt', 'mine\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'work')
+    const [c] = stashes()
+    commit(proj, { 'a.txt': 'theirs\n' }, 'moved on')
+    const head = sh(proj, 'rev-parse', 'HEAD')
+    // The panel's read, made while the Apply runs (its guard runs inside it, before git does).
+    let during: Promise<unknown> | null = null
+    expect(await apply(c, false, () => void (during = S.stashConflictIn(proj)))).toEqual({ conflicts: ['a.txt'], dropped: false })
+    expect(await during).toEqual({ commit: c, label: 'work', head })
+  })
+
+  it("HI-3528: a conflict made since, by another stash in a terminal, isn't named as the applied stash's; settling some of its own keeps it", async () => {
+    write('a.txt', 'first\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'first')
+    write('b.txt', 'second\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'second')
+    write('a.txt', 'both a\n')
+    write('b.txt', 'both b\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'both')
+    const [both, second, first] = stashes()
+    commit(proj, { 'a.txt': 'theirs a\n', 'b.txt': 'theirs b\n' }, 'moved on')
+    const head = sh(proj, 'rev-parse', 'HEAD')
+    expect(await apply(first, false)).toEqual({ conflicts: ['a.txt'], dropped: false })
+    expect(await S.stashConflictIn(proj)).toEqual({ commit: first, label: 'first', head })
+    // In a terminal: a.txt put back as HEAD has it, then the other stash applied, HEAD unchanged; b.txt is in conflict.
+    sh(proj, 'restore', '--source=HEAD', '--staged', '--worktree', 'a.txt')
+    expect(() => sh(proj, 'stash', 'apply', second)).toThrow()
+    expect(sh(proj, 'diff', '--name-only', '--diff-filter=U')).toBe('b.txt')
+    expect(await S.stashConflictIn(proj)).toBeNull()
+    // And once forgotten, it stays so, though the terminal's conflict is settled and the HEAD is the same.
+    sh(proj, 'checkout', '--theirs', '--', 'b.txt')
+    sh(proj, 'add', 'b.txt')
+    expect(await S.stashConflictIn(proj)).toBeNull()
+    sh(proj, 'reset', '-q', '--hard')
+    // Two files of one stash in conflict: settling one keeps the stash named; the same file conflicted again by
+    // another stash, with other sides, doesn't.
+    expect(await apply(both, false)).toEqual({ conflicts: ['a.txt', 'b.txt'], dropped: false })
+    sh(proj, 'checkout', '--theirs', '--', 'a.txt')
+    sh(proj, 'add', 'a.txt')
+    expect(await S.stashConflictIn(proj)).toEqual({ commit: both, label: 'both', head })
+    sh(proj, 'restore', '--source=HEAD', '--staged', '--worktree', 'b.txt')
+    expect(() => sh(proj, 'stash', 'apply', second)).toThrow()
+    expect(sh(proj, 'diff', '--name-only', '--diff-filter=U')).toBe('b.txt')
     expect(await S.stashConflictIn(proj)).toBeNull()
   })
 
@@ -196,8 +336,23 @@ describe('Apply and Pop', () => {
     write('a.txt', 'mine\n')
     sh(proj, 'stash', 'push', '-q')
     const [c] = stashes()
+    const row = await rowOf(c)
     sh(proj, 'stash', 'drop', '-q')
-    await expect(apply(c, false)).rejects.toThrow("isn't in the list any more")
+    await expect(apply(row, false)).rejects.toThrow("isn't in the list any more")
+  })
+
+  it('HI-3527: Pop drops the row the user saw, not another holding its commit', async () => {
+    write('a.txt', 'one\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'original')
+    const [one] = stashes()
+    write('b.txt', 'two\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'middle')
+    sh(proj, 'stash', 'store', '-m', 'relisted', one)
+    const rows = await list()
+    expect(rows.map((r) => [r.message, r.commit === one])).toEqual([['relisted', true], ['middle', false], ['original', true]])
+    expect(await apply(rows[2], true)).toEqual({ conflicts: [], dropped: true })
+    expect(read('a.txt')).toBe('one\n')
+    expect(await messages()).toEqual(['relisted', 'middle'])
   })
 })
 
@@ -210,10 +365,164 @@ describe('Drop', () => {
     sh(proj, 'stash', 'push', '-q', '-m', 'two')
     const two = stashes()[0]
     // `one` is stash@{1} now.
-    await drop(one)
+    const row = await rowOf(one)
+    await drop(row)
     expect(stashes()).toEqual([two])
-    await expect(drop(one)).rejects.toThrow("isn't in the list any more")
+    await expect(drop(row)).rejects.toThrow("isn't in the list any more")
     await drop(two)
     expect(stashes()).toEqual([])
+  })
+
+  it('HI-3527: drops the row the user saw when several hold one commit, the bottom one too', async () => {
+    write('a.txt', 'one\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'original')
+    const [one] = stashes()
+    write('b.txt', 'two\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'middle')
+    sh(proj, 'stash', 'store', '-m', 'relisted', one)
+    const rows = await list()
+    await drop(rows[2])
+    expect(await messages()).toEqual(['relisted', 'middle'])
+    // The bottom one of another commit's two rows, by its own row. (Git lists a stored commit only under another top.)
+    const [, mid] = stashes()
+    sh(proj, 'stash', 'store', '-m', 'again', mid)
+    const again = await list()
+    expect(again.map((r) => r.message)).toEqual(['again', 'relisted', 'middle'])
+    await drop(again[2])
+    expect(await messages()).toEqual(['again', 'relisted'])
+  })
+
+  it('HI-3527: finds the row after the places moved; refuses when no row, or several and none at its place, is it', async () => {
+    write('a.txt', 'one\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'original')
+    const [one] = stashes()
+    write('b.txt', 'two\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'other')
+    const [other] = stashes()
+    sh(proj, 'stash', 'store', '-m', 'relisted', one)
+    const [relisted, , original] = (await list()).map((r) => ({ commit: r.commit, index: r.index, message: r.message }))
+    expect([relisted.message, original.message]).toEqual(['relisted', 'original'])
+    // A stash made meanwhile moves every place by one; and the row the user chose is dropped meanwhile.
+    write('a.txt', 'three\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'meanwhile')
+    sh(proj, 'stash', 'drop', '-q', 'stash@{3}')
+    expect(await messages()).toEqual(['meanwhile', 'relisted', 'other'])
+    // The other row holding its commit isn't taken instead.
+    await expect(drop(original)).rejects.toThrow("isn't in the list any more")
+    expect(await messages()).toEqual(['meanwhile', 'relisted', 'other'])
+    // A row whose place moved is found by its commit and message.
+    await drop(relisted)
+    expect(await messages()).toEqual(['meanwhile', 'other'])
+    // Two rows alike (commit and message), none at the place the user saw: which one can't be told.
+    sh(proj, 'stash', 'store', '-m', 'twin', one)
+    sh(proj, 'stash', 'store', '-m', 'between', other)
+    sh(proj, 'stash', 'store', '-m', 'twin', one)
+    expect(await messages()).toEqual(['twin', 'between', 'twin', 'meanwhile', 'other'])
+    await expect(drop({ commit: one, index: 4, message: 'twin' })).rejects.toThrow('more than one is like the one you chose')
+    expect(await messages()).toEqual(['twin', 'between', 'twin', 'meanwhile', 'other'])
+    await drop({ commit: one, index: 2, message: 'twin' })
+    expect(await messages()).toEqual(['twin', 'between', 'meanwhile', 'other'])
+  })
+})
+
+describe('HI-3533: another git moving the list between the check and the drop', () => {
+  /** git's stash list as `<message>`s (git's own "On main: " cut), newest first. */
+  const gitMessages = (): string[] => sh(proj, 'stash', 'list', '--format=%gs').split(/\r?\n/).filter(Boolean).map((m) => m.replace(/^On [^:]+: /, ''))
+  const setUp = async (): Promise<StashRef> => {
+    write('a.txt', 'one\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'one')
+    write('a.txt', 'two\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'two')
+    const rows = await list()
+    expect(rows.slice(0, 2).map((r) => r.message)).toEqual(['two', 'one'])
+    return { commit: rows[1].commit, index: 1, message: 'one' }
+  }
+
+  it('a stash pushed meanwhile: git drops another, which is put back; the one chosen stays, nothing lost', async () => {
+    const one = await setUp()
+    const all = new Set(stashes())
+    beforeDrop = () => {
+      write('b.txt', 'three\n')
+      sh(proj, 'stash', 'push', '-q', '-m', 'three')
+    }
+    await expect(drop(one)).rejects.toThrow(/^Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, [0-9a-f]{40}\. Combwork put it back, at the top of the list, so nothing is lost\. The stash you chose wasn't dropped\. Look again\.$/)
+    expect(beforeDrop).toBeNull()
+    // 'two' (moved onto the place git dropped) is listed again, at the top, with its own message; 'one' is still there.
+    expect(gitMessages()).toEqual(['two', 'three', 'one'])
+    for (const c of all) expect(stashes()).toContain(c)
+    // Looked at again, the same row drops.
+    await drop({ ...one, index: 2 })
+    expect(gitMessages()).toEqual(['two', 'three'])
+  })
+
+  it('a stash dropped meanwhile: the same, the one chosen kept', async () => {
+    write('a.txt', 'zero\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'zero')
+    const one = await setUp()
+    expect(gitMessages()).toEqual(['two', 'one', 'zero'])
+    beforeDrop = () => void sh(proj, 'stash', 'drop', '-q', 'stash@{0}')
+    await expect(drop(one)).rejects.toThrow('so git dropped a different stash')
+    // Git dropped 'zero' (moved onto the place): put back; 'one' kept; only the other git's drop of 'two' stands.
+    expect(gitMessages()).toEqual(['zero', 'one'])
+  })
+
+  it("a Pop's drop raced: its changes applied, the stash kept, the other put back", async () => {
+    const one = await setUp()
+    beforeDrop = () => {
+      write('b.txt', 'three\n')
+      sh(proj, 'stash', 'push', '-q', '-m', 'three', '--', 'b.txt')
+    }
+    await expect(apply(one, true)).rejects.toThrow("The stash you chose wasn't dropped, and its changes were applied. Look again.")
+    expect(read('a.txt')).toBe('one\n')
+    expect(gitMessages()).toEqual(['two', 'three', 'one'])
+  })
+
+  it("HR1's round 1: another row of the chosen stash's commit, stored meanwhile onto its place, isn't taken for it", async () => {
+    write('a.txt', 'one\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'original')
+    write('a.txt', 'two\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'two')
+    const [y, x] = stashes()
+    const original: StashRef = { commit: x, index: 1, message: 'original' }
+    // Meanwhile another git lists the chosen commit again with another message (under another top: git lists a commit
+    // again only there), then pushes a stash: that row is now at the chosen one's place. Git drops it and names the
+    // chosen commit.
+    beforeDrop = () => {
+      sh(proj, 'stash', 'store', '-m', 'new row', x)
+      write('b.txt', 'three\n')
+      sh(proj, 'stash', 'push', '-q', '-m', 'three')
+    }
+    await expect(drop(original)).rejects.toThrow(`so git dropped a different stash, ${x}. Combwork put it back`)
+    // The row chosen is still there; the one git dropped is listed again. Its message was only in git's dropped entry,
+    // so it comes back under its commit's own subject (git stash push made it "On main: original").
+    expect(gitMessages()).toEqual(['original', 'three', 'two', 'original'])
+    expect(stashes()[0]).toBe(x)
+    expect(stashes()[2]).toBe(y)
+  })
+
+  it("HR1's round 1: when the stash git dropped can't be put back, the error says so and how, never that nothing was lost", async () => {
+    const one = await setUp()
+    const two = stashes()[0]
+    beforeDrop = () => {
+      write('b.txt', 'three\n')
+      sh(proj, 'stash', 'push', '-q', '-m', 'three')
+    }
+    failStore = true
+    const e = await drop(one).then(
+      () => null,
+      (x: Error) => x.message
+    )
+    expect(e).toBe(`Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, ${two}. Combwork couldn't put it back, so it isn't listed now: git stash store ${two} lists it again (git keeps its changes for a while). The stash you chose wasn't dropped. Look again.`)
+    expect(failStore).toBe(false)
+    expect(gitMessages()).toEqual(['three', 'one'])
+    // The command it names lists it again.
+    sh(proj, 'stash', 'store', '-m', 'two', two)
+    expect(gitMessages()).toEqual(['two', 'three', 'one'])
+  })
+
+  it('with nothing in between, the drop is as before (git names the stash it dropped)', async () => {
+    const one = await setUp()
+    await drop(one)
+    expect(gitMessages()).toEqual(['two'])
   })
 })

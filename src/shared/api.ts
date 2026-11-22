@@ -187,7 +187,7 @@ import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
 import type { OperationPanelState, OperationRequest, OperationStepResult } from './gitOperations'
 import type { LockAsk, PruneAsk, RemotePrune, RepoHealth } from './gitHealth'
-import type { StashApplied, StashFile, StashList, StashRequest } from './gitStashes'
+import type { StashApplied, StashFile, StashList, StashRef, StashRequest } from './gitStashes'
 import type { BranchMoves, RestorePlan, RestoreRequest } from './gitMoves'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
@@ -449,7 +449,7 @@ export interface CombworkRequests {
    * Switches the project's version control from its next card (#1419), checked again under its lock: refused when
    * `expected` (the platform the window showed) isn't the one in force, or what is detected doesn't allow it.
    */
-  'workflow:setPlatform': (projectPath: string, to: PlatformId, opts: { expected?: PlatformId; invalid?: string }) => { from: PlatformId; to: PlatformId }
+  'workflow:setPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId }) => { from: PlatformId; to: PlatformId }
   /**
    * "How do you work?" answered Not now (#1423) for the platform the step showed: no preset, the options inherited, not
    * asked again for it. Ignored if the project uses another platform now, or was answered meanwhile.
@@ -1162,8 +1162,8 @@ export interface CombworkRequests {
   'git:stashDiff': (root: string, commit: string, file: string, untracked: boolean) => GitDiff
   /** HI-3472: Apply or Pop of a stash into a Changes root. Refused while anything works in the folder. */
   'git:applyStash': (root: string, req: StashRequest) => StashApplied
-  /** HI-3472: Drop of a stash, only while it is still in the list. */
-  'git:dropStash': (root: string, commit: string) => void
+  /** HI-3472: Drop of a row of the stash list (HI-3527: its commit, place and message), only while it is still in the list. */
+  'git:dropStash': (root: string, ref: StashRef) => void
   /** HI-3469: History's Moves: a page of a local branch's reflog (null: the project folder's branch). */
   'git:moves': (projectPath: string, branch: string | null, page: number) => BranchMoves
   /** HI-3469: what Restore to here… would do now, for its dialog; `blocked` says why it can't. */

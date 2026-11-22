@@ -1167,6 +1167,9 @@
   "service.gitStash.invalid": {
     "placeholders": {}
   },
+  "service.gitStash.moved": {
+    "placeholders": {}
+  },
   "service.gitStash.notDropped": {
     "placeholders": {
       "why": "plain"
@@ -1182,6 +1185,13 @@
     "placeholders": {
       "file": "plain",
       "folder": "plain"
+    }
+  },
+  "service.gitStash.raced": {
+    "placeholders": {
+      "commit": "plain",
+      "back": "select",
+      "pop": "select"
     }
   },
   "service.gitStash.session": {

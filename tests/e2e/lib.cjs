@@ -2513,7 +2513,7 @@ async function agentMenu(page, name, ms = 10000) {
  * with its translations from locales/<code>, or `base` itself when no code is given. Main reads the catalogue itself
  * and only the code crosses Playwright's channel (HI-3428): a whole catalogue (about 1.4 MB) sent through app.evaluate
  * goes by Node's inspector, whose I/O thread crashed the test app's main process under a full run's load (an access
- * violation on InspectorIo, rc.15's jjwindow). `base`'s own translations are never sent either (HI-3434: a test app
+ * violation on InspectorIo). `base`'s own translations are never sent either (HI-3434: a test app
  * started in Japanese has its catalogue in app:info's language): with no code, a `base` that has some is told by its own
  * code, main reading them again, and keeps its locale. Returns the catalogue, for the text a step expects.
  */

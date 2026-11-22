@@ -298,9 +298,11 @@ interface CombworkMessageValues {
   'service.gitStash.failed': { why: string | number }
   'service.gitStash.gone': undefined
   'service.gitStash.invalid': undefined
+  'service.gitStash.moved': undefined
   'service.gitStash.notDropped': { why: string | number }
   'service.gitStash.operation': { what: string; folder: string | number }
   'service.gitStash.overlap': { file: string | number; folder: string | number }
+  'service.gitStash.raced': { commit: string | number; back: string; pop: string }
   'service.gitStash.session': { agent: string | number; folder: string | number }
   'service.gitStash.slotChanged': { slot: string | number }
   'service.gitStash.slotProcess': { slot: string | number }
@@ -459,7 +461,6 @@ interface CombworkMessageValues {
   'service.workspace.platformRepositoryGone': { project: string | number }
   'service.workspace.platformSettled': undefined
   'service.workspace.platformTitle': { project: string | number }
-  'service.workspace.platformUse': { platform: string | number }
   'service.workspace.renameAgent': { project: string | number; agent: string | number }
   'service.workspace.sharedNames': { shared: string | number; project: string | number; agent: string | number; suggestion: string | number }
   'service.workspace.stillClosing': { name: string | number }

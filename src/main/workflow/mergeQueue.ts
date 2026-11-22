@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'orig
 import { tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
-import { onOutputSettled, withLauncherEnv } from '../gitWorker'
+import { gitEnv, onOutputSettled } from '../gitWorker'
 import { gitExe } from '../gitTool'
 import { treeEnding } from '../processTree'
 import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, type CardState, type Fact, type FactData, type FocusedReturn, type IntegrationFailReason, type PublishFact, type QueueEntry } from '../../shared/workflow/facts'
@@ -437,7 +437,7 @@ export function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Pro
     let child: ChildProcess
     try {
       const use = gitExe()
-      child = spawn(use.exe, [...GIT_PREFIX, ...args], { cwd, env: use.launcherEnv ? withLauncherEnv(opts.env ?? process.env, use.launcherEnv) : opts.env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+      child = spawn(use.exe, [...GIT_PREFIX, ...args], { cwd, env: gitEnv(opts.env, use.launcherEnv), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     } catch (e) {
       // HI-2020: a start that failed at once ran nothing.
       return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1, notRun: String((e as NodeJS.ErrnoException).code ?? 'error') })

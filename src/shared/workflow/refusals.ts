@@ -11,7 +11,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'paths.notDeclared' | 'platform.unknown' | 'platform.removed' | 'platform.targetGone' | 'platform.offLine' | 'platform.slotLeft' | 'platform.detachedFolder' | 'platform.keptLine' | 'platform.noUpstream' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'forward.notAgents' | 'forward.resolutionTarget' | 'forward.resolutionSource' | 'evidence.changed' | 'loop.roundLimit' | 'loop.churnPending' | 'loop.usersChoice' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.followUpInReview' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'merge.waitsForBlockers' | 'done.noCodeUnmerged' | 'queue.advancing' | 'start.released' | 'start.releaseUnknown' | 'attempt.staleLaunch' | 'attempt.moved' | 'attempt.notAssignee'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'paths.notDeclared' | 'platform.unknown' | 'platform.targetGone' | 'platform.offLine' | 'platform.slotLeft' | 'platform.detachedFolder' | 'platform.keptLine' | 'platform.noUpstream' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'forward.notAgents' | 'forward.resolutionTarget' | 'forward.resolutionSource' | 'evidence.changed' | 'loop.roundLimit' | 'loop.churnPending' | 'loop.usersChoice' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.followUpInReview' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'merge.waitsForBlockers' | 'done.noCodeUnmerged' | 'queue.advancing' | 'start.released' | 'start.releaseUnknown' | 'attempt.staleLaunch' | 'attempt.moved' | 'attempt.notAssignee'
 
 export type RuleId = GuardId | MoveRule
 
@@ -24,12 +24,6 @@ interface RefusalText {
 const r = (message: Msg, next: Msg, change: Msg | null = null): RefusalText => ({ message, next, change })
 
 /** The three sentences of each rule. Placeholders: {card} the card's key, {revision} a short revision, and per rule. */
-/**
- * HI-3510: whether a stored rule id is one this Combwork has: a `Refused` fact can name a retired guard or a removed
- * platform's rule (1.6.0's jj ones), which nothing shows.
- */
-export const isRule = (rule: string): rule is RuleId => Object.hasOwn(REFUSALS, rule)
-
 export const REFUSALS: Record<RuleId, RefusalText> = {
   'start.notBlocked': r(
     msg({ id: 'workflow.refused.start.notBlocked.message', defaultMessage: "{card} can't start: it is blocked ({reason}).", description: 'A refused start of a card. {card} is a card key like AM-12; {reason} is why the card is blocked, in the words given.' }),
@@ -195,10 +189,6 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'paths.notDeclared': r(
     msg({ id: 'workflow.refused.paths.notDeclared.message', defaultMessage: '{card}: cards under {platform} don’t declare paths here, so nothing was declared.', description: 'HI-3517: a refused declaration of a card’s paths: the card’s version control ({platform}, its name, such as Git) takes no declared paths, or this Combwork has nothing to read them with. {card} is a card key like AM-12.' }),
     msg({ id: 'workflow.refused.paths.notDeclared.next', defaultMessage: 'Nothing was stored or read.', description: 'HI-3517: what follows a refused declaration of a card’s paths: nothing was saved on the card and no files were read.' })
-  ),
-  'platform.removed': r(
-    msg({ id: 'workflow.refused.platform.removed.message', defaultMessage: '{card} was started under {platform}, a version control Combwork no longer has, so its moves can’t be checked.', description: 'HI-3510: a refused move on a card started under a version control Combwork has since removed (jj, in 1.6.0). {card} is a card key like AM-12; {platform} the stored id of that version control, as it was saved (such as jj): keep it as it is.' }),
-    msg({ id: 'workflow.refused.platform.removed.next', defaultMessage: '{reader, select, you {Move it to Todo to start it again under this project’s version control, or to Done.} other {Its moves stay refused; the user’s moves to Todo and Done are not.}}', description: 'HI-3510: the next step after a move refused on a card started under a removed version control. {reader} (select): you is the window’s wording (the user moves the card to Todo, where it starts again under the project’s version control now, or to Done); other is read by agents and only states what stays refused and what the user can still do. Translate both whole sentences.' })
   ),
   'platform.unknown': r(
     msg({ id: 'workflow.refused.platform.unknown.message', defaultMessage: "{card}: Combwork couldn't read {what}, so the rule {rule} can't be checked.", description: 'A refused move: a fact a rule needs could not be read (git missing, folder gone). {what} says what, {rule} the rule id.' }),

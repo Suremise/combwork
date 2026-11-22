@@ -117,37 +117,32 @@ export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   none: { id: 'none', name: 'None', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', finishes: ['accept'], defaultFinish: 'accept', repository: false, operations: [], revisionShort: short } // i18n-ignore: a product name, the same in every language
 }
 
+export const hasCapability = (platform: PlatformId, c: Capability): boolean => PLATFORMS[platform].capabilities.includes(c)
+
+/** Whether a platform's integration merges lines into a target (HI-2822): targets, merging, the merge queue and its options. */
+export const merges = (platform: PlatformId): boolean => PLATFORMS[platform].integration === 'merge'
+
+/** Whether a platform accepts approved work where it is (HI-2822: None's finisher, its presets and words). */
+export const accepts = (platform: PlatformId): boolean => PLATFORMS[platform].integration === 'accept'
+
+/** Whether a platform's code cards deliver commits (HI-2822: Git's; a rule needing the change needs its folder clean). */
+export const deliversCommits = (platform: PlatformId): boolean => PLATFORMS[platform].deliverables === 'commits'
+
+/** Whether a platform's code cards deliver the paths they declare (HI-2822: None's paths, pre-fill and exclusions). */
+export const declaresPaths = (platform: PlatformId): boolean => PLATFORMS[platform].deliverables === 'paths'
+
+/** Whether a platform needs its repository found in the project's folder (HI-2822: Git's). */
+export const needsRepository = (platform: PlatformId): boolean => PLATFORMS[platform].repository
+
+/** Whether a platform offers an operation in its repository (port 5, HI-2788). */
+export const hasOperation = (platform: PlatformId, op: Operation): boolean => PLATFORMS[platform].operations.includes(op)
+
+
 /** Whether a value read from a file (project.json's `platform`) names a platform Combwork has. */
 export const isPlatformId = (v: unknown): v is PlatformId => typeof v === 'string' && Object.hasOwn(PLATFORMS, v)
 
-/**
- * A platform's descriptor, or null for an id Combwork doesn't have (HI-3510: a card or lane started under jj keeps
- * `platform: 'jj'` in its stored ruleset). The helpers below answer false for such an id, never reading it undefined.
- */
-const descriptorOf = (platform: string): PlatformDescriptor | null => (isPlatformId(platform) ? PLATFORMS[platform] : null)
-
-export const hasCapability = (platform: PlatformId, c: Capability): boolean => !!descriptorOf(platform)?.capabilities.includes(c)
-
-/** Whether a platform's integration merges lines into a target (HI-2822): targets, merging, the merge queue and its options. */
-export const merges = (platform: PlatformId): boolean => descriptorOf(platform)?.integration === 'merge'
-
-/** Whether a platform accepts approved work where it is (HI-2822: None's finisher, its presets and words). */
-export const accepts = (platform: PlatformId): boolean => descriptorOf(platform)?.integration === 'accept'
-
-/** Whether a platform's code cards deliver commits (HI-2822: Git's; a rule needing the change needs its folder clean). */
-export const deliversCommits = (platform: PlatformId): boolean => descriptorOf(platform)?.deliverables === 'commits'
-
-/** Whether a platform's code cards deliver the paths they declare (HI-2822: None's paths, pre-fill and exclusions). */
-export const declaresPaths = (platform: PlatformId): boolean => descriptorOf(platform)?.deliverables === 'paths'
-
-/** Whether a platform needs its repository found in the project's folder (HI-2822: Git's). */
-export const needsRepository = (platform: PlatformId): boolean => !!descriptorOf(platform)?.repository
-
-/** Whether a platform offers an operation in its repository (port 5, HI-2788). */
-export const hasOperation = (platform: PlatformId, op: Operation): boolean => !!descriptorOf(platform)?.operations.includes(op)
-
-/** A revision as the project's platform shows it (7 characters for an id Combwork doesn't have, as both platforms do). */
-export const revisionShort = (platform: PlatformId, id: string): string => (descriptorOf(platform)?.revisionShort ?? short)(id)
+/** A revision as the project's platform shows it. */
+export const revisionShort = (platform: PlatformId, id: string): string => PLATFORMS[platform].revisionShort(id)
 
 /** What a folder's version control is (SPEC §16.3.5), read from its folders: never a switch on its own. */
 export interface Detection {

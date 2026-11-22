@@ -1174,6 +1174,11 @@
     "note": "HI-3472: an error from Stashes: the request was malformed (not reached from the window).",
     "audience": "both"
   },
+  "service.gitStash.moved": {
+    "text": "The stashes changed meanwhile, and more than one is like the one you chose: nothing was done. Look again.",
+    "note": "HI-3527: an error from Version Control → Changes → Stashes' Apply, Pop or Drop: the list's places moved since the user looked, and several stashes now have the same commit and message as the one they chose, so Combwork can't tell which they meant.",
+    "audience": "both"
+  },
   "service.gitStash.notDropped": {
     "text": "The stash was applied, but git didn't drop it: {why}. It is still in the list.",
     "note": "HI-3472: an error from Stashes' Pop: the apply was clean but git's drop failed; {why} is git's error line, in English.",
@@ -1187,6 +1192,11 @@
   "service.gitStash.overlap": {
     "text": "{file} has uncommitted changes in {folder}, and the stash holds it too: nothing was done. Commit it or set it aside first.",
     "note": "HI-3472: an error from Stashes' Apply or Pop: the folder ({folder}, a path) has uncommitted changes to a file ({file}, a path in the repository) that the stash also changes; Combwork refuses rather than mix them in a conflict.",
+    "audience": "both"
+  },
+  "service.gitStash.raced": {
+    "text": "Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, {commit}. {back, select, yes {Combwork put it back, at the top of the list, so nothing is lost.} other {Combwork couldn't put it back, so it isn't listed now: git stash store {commit} lists it again (git keeps its changes for a while).}} The stash you chose wasn't dropped{pop, select, yes {, and its changes were applied} other {}}. Look again.",
+    "note": "HI-3533: an error from Version Control → Changes → Stashes' Drop or Pop: another git (a terminal, an agent) pushed or dropped a stash at the moment Combwork dropped one, so git dropped another ({commit}, its full commit id). back yes: Combwork listed it again; no: it couldn't, so that stash is off the list until the command (keep git stash store as it is) lists it again. pop yes: it was a Pop, whose apply had already gone in.",
     "audience": "both"
   },
   "service.gitStash.session": {

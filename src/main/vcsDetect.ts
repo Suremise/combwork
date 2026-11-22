@@ -10,7 +10,6 @@ import { existsSync } from 'original-fs'
 const OTHER_VCS: [string, string][] = [
   ['.hg', 'Mercurial'], // i18n-ignore: a product's name
   ['.svn', 'Subversion'], // i18n-ignore: a product's name
-  ['.jj', 'Jujutsu'], // i18n-ignore: a product's name
   ['.bzr', 'Bazaar'], // i18n-ignore: a product's name
   ['_FOSSIL_', 'Fossil'], // i18n-ignore: a product's name
   ['.fslckout', 'Fossil'] // i18n-ignore: a product's name

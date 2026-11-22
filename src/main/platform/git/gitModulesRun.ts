@@ -5,7 +5,7 @@
 
 import type { ChildProcess } from 'child_process'
 import { gitExe } from '../../gitTool'
-import { withLauncherEnv } from '../../gitWorker'
+import { gitEnv } from '../../gitWorker'
 import { treeEnding, type TreeEnding } from '../../processTree'
 import type { GitFilesExec, GitFilesRun } from './gitModules'
 import type { WorkspaceFilesRunOptions } from '../workspacePort'
@@ -46,7 +46,7 @@ export function gitFilesExec(o: GitFilesRunOptions): GitFilesExec & { timedOut()
         if (stopped()) return resolve({ ok: false, code: null, out: '', err: 'ended' })
         const exe = gitExe()
         const env0: NodeJS.ProcessEnv = { ...o.env, ...opt.env }
-        const env = exe.launcherEnv ? withLauncherEnv(env0, exe.launcherEnv) : env0
+        const env = gitEnv(env0, exe.launcherEnv)
         if (opt.log) write(`$ git ${args.join(' ')}\n`) // i18n-ignore: the run's log: the command run, as it is
         let child: ChildProcess
         try {

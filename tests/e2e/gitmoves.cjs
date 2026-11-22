@@ -89,7 +89,8 @@ const check = (name, ok, extra = '') => {
     // --- The list.
     check("Moves shows main's moves, newest first, the queue's as Combwork's merge", !!(await lib.until(async () => (await moves.getAttribute('data-moves-branch')) === 'main' && (await kinds()).startsWith('combworkMerge,reset,commit,commit'), HUNG_MS)), await kinds())
     const top = rows.first()
-    check('…in plain words, its card a link', /Combwork merged HI-12/.test(await text(top)) && (await top.locator('[data-action="move-card"]').count()) === 1 && /HI-12: a card/.test(await text(top)) && (await top.locator('[data-action="move-restore"]').count()) === 0, await text(top))
+    // A key the board has no card for (this workspace has no HI-12) is said, not linked, as Stashes' are.
+    check('…in plain words, by its card, with no Restore where the branch is now', /Combwork merged HI-12/.test(await text(top)) && (await top.locator('[data-action="move-card"]').count()) === 0 && /HI-12: a card/.test(await text(top)) && (await top.locator('[data-action="move-restore"]').count()) === 0, await text(top))
     check('…a reset said as one, with Restore to here…', /Reset to HEAD~1/.test(await text(rows.nth(1))) && (await rows.nth(1).locator('[data-action="move-restore"]').count()) === 1, await text(rows.nth(1)))
     await shoot(moves, '1-list')
 

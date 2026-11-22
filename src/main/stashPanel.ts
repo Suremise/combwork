@@ -5,7 +5,7 @@
 // a live session in the folder, and a slot's only while its pool holds it for the user (SlotPool.forUser), under the
 // lease the user confirmed when it is lent. The port checks again, under the repository lock and the folder's fence,
 // that nothing of Combwork's or an agent's works there (gitStashes.ts). Drop changes no folder: the repository lock only.
-import { isStashCommit, stashRequestOf, type StashApplied, type StashList } from '../shared/gitStashes'
+import { isStashCommit, stashRefOf, stashRequestOf, type StashApplied, type StashList } from '../shared/gitStashes'
 import { msg } from '../shared/i18n'
 import type { GitDiff } from '../shared/types'
 import { combworkError } from './combworkError'
@@ -63,7 +63,9 @@ export async function applyStashAt(ws: WorkspaceService, root: string, raw: unkn
   throw r.why === 'session' ? combworkError(T.slotSession, { slot: name }) : r.why === 'process' ? combworkError(T.slotProcess, { slot: name }) : combworkError(T.slotChanged, { slot: name }, { kind: 'conflict' })
 }
 
-/** `git:dropStash`: Drop, for the Changes root's repository. */
-export function dropStashAt(ws: WorkspaceService, root: string, commit: unknown, ops: OpsFor<'stashes'>): Promise<void> {
-  return ops.dropStash(ws.changesRootProject(root).project, commitOf(commit))
+/** `git:dropStash`: Drop of a row of the list (HI-3527), for the Changes root's repository. */
+export function dropStashAt(ws: WorkspaceService, root: string, raw: unknown, ops: OpsFor<'stashes'>): Promise<void> {
+  const ref = stashRefOf(raw)
+  if (!ref) throw combworkError(T.invalid, undefined, { kind: 'invalid' })
+  return ops.dropStash(ws.changesRootProject(root).project, ref)
 }
