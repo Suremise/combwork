@@ -271,6 +271,20 @@ interface CombworkMessageValues {
   'service.gitRepo.upstreamGone': { upstream: string | number }
   'service.gitRepo.urlChanged': { remote: string | number }
   'service.gitRepo.urlFailed': { remote: string | number; why: string | number }
+  'service.gitStash.agentBusy': { agent: string | number; folder: string | number }
+  'service.gitStash.busy': { folder: string | number; what: string | number }
+  'service.gitStash.conflicted': { file: string | number; folder: string | number }
+  'service.gitStash.failed': { why: string | number }
+  'service.gitStash.gone': undefined
+  'service.gitStash.invalid': undefined
+  'service.gitStash.notDropped': { why: string | number }
+  'service.gitStash.operation': { what: string; folder: string | number }
+  'service.gitStash.overlap': { file: string | number; folder: string | number }
+  'service.gitStash.session': { agent: string | number; folder: string | number }
+  'service.gitStash.slotChanged': { slot: string | number }
+  'service.gitStash.slotProcess': { slot: string | number }
+  'service.gitStash.slotSession': { slot: string | number }
+  'service.gitStash.timedOut': { seconds: number; folder: string | number }
   'service.intent.noWorkflow': { card: string | number }
   'service.intent.queueNotAgents': undefined
   'service.keys.closed': undefined

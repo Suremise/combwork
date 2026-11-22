@@ -1403,6 +1403,154 @@
     "defaultMessage": "Yes",
     "description": "In the Signing table: commits are signed."
   },
+  "git.stash.applied": {
+    "defaultMessage": "{dropped, select, yes {Popped the stash into {folder}: it is dropped.} other {Applied the stash to {folder}: it is kept.}}",
+    "description": "HI-3472: a notice after Apply or Pop went in without a conflict. {folder} as in git.stash.applyTitle."
+  },
+  "git.stash.apply": {
+    "defaultMessage": "Apply",
+    "description": "HI-3472: a stash's button: puts its changes into the folder Changes shows, and keeps the stash (git stash apply)."
+  },
+  "git.stash.applyMessage": {
+    "defaultMessage": "“{name}”: {files, plural, one {its # file goes} other {its # files go}} into {folder}. {pop, select, yes {The stash is then dropped, unless a file is in conflict: then it is kept.} other {The stash is kept.}}",
+    "description": "HI-3472: under git.stash.applyTitle. {name} is the stash's name as the list shows it; {files} how many files it holds; {folder} as in the title."
+  },
+  "git.stash.applyTip": {
+    "defaultMessage": "Puts its changes into {folder} and keeps the stash. Runs git stash apply.",
+    "description": "HI-3472: Apply's tooltip. {folder} is a slot's name or the project folder (git.operation.projectFolder). Keep git stash apply as it is: a command."
+  },
+  "git.stash.applyTitle": {
+    "defaultMessage": "{pop, select, yes {Pop the stash into {folder}?} other {Apply the stash to {folder}?}}",
+    "description": "HI-3472: the question before Apply or Pop. {folder} is a slot's name or the project folder (git.operation.projectFolder)."
+  },
+  "git.stash.binary": {
+    "defaultMessage": "Binary file",
+    "description": "HI-3472: in place of a stash file's diff when it is binary."
+  },
+  "git.stash.close": {
+    "defaultMessage": "Back to the folder's changes",
+    "description": "HI-3472: the tooltip of the button above a stash file's diff that goes back to the folder's own changes."
+  },
+  "git.stash.combwork": {
+    "defaultMessage": "{why, select, merging {Set aside by Combwork before merging {card}} catchUp {Set aside by Combwork before bringing {target} up to date with {card}} starting {Set aside by Combwork before starting work on {target}} other {Set aside by Combwork {text}}}",
+    "description": "HI-3472: a stash's name in the list when Combwork's Set Aside made it (HI-2944: a paused merge's button). {card} is a card's key (HI-12), {target} a branch; other: {text} is Combwork's own English words after \"set aside\". Keep the select keys."
+  },
+  "git.stash.conflicts": {
+    "defaultMessage": "{count, plural, one {# file is} other {# files are}} in conflict in {folder}",
+    "description": "HI-3472: the title of the warning after Apply or Pop left files in conflict. {folder} as in git.stash.applyTitle."
+  },
+  "git.stash.conflictsDetail": {
+    "defaultMessage": "The stash is kept. Settle {files} (each shows its conflict markers), then drop the stash when you no longer need it.",
+    "description": "HI-3472: under git.stash.conflicts. {files} lists the files in conflict."
+  },
+  "git.stash.diffFailed": {
+    "defaultMessage": "Couldn't show the file's changes in the stash: {error}",
+    "description": "HI-3472: in place of a stash file's diff when reading it failed. {error} is why."
+  },
+  "git.stash.drop": {
+    "defaultMessage": "Drop",
+    "description": "HI-3472: a stash's button: deletes the stash (git stash drop), after asking."
+  },
+  "git.stash.dropMessage": {
+    "defaultMessage": "Git deletes it, with {files, plural, one {the # file} other {the # files}} it holds{card, select, none {} other {, set aside for {card}}}. Its commit, {commit}, can still be found in a terminal for a while (git fsck --unreachable).",
+    "description": "HI-3472: under git.stash.dropTitle: what Drop loses. {files}: how many files; {card}: the card Combwork set it aside for (none: not one of Combwork's); {commit}: its short commit id. Keep git fsck --unreachable as it is: a command."
+  },
+  "git.stash.dropTip": {
+    "defaultMessage": "Deletes the stash, after asking. Runs git stash drop.",
+    "description": "HI-3472: Drop's tooltip. Keep git stash drop as it is: a command."
+  },
+  "git.stash.dropTitle": {
+    "defaultMessage": "Drop the stash “{name}”?",
+    "description": "HI-3472: the question before Drop. {name} is the stash's name as the list shows it."
+  },
+  "git.stash.dropped": {
+    "defaultMessage": "Dropped the stash. Its commit was {commit}: git stash apply {commit} brings it back while git keeps it.",
+    "description": "HI-3472: a notice after Drop. {commit} is the stash's full commit id. Keep git stash apply as it is: a command."
+  },
+  "git.stash.failed": {
+    "defaultMessage": "Git couldn't do that",
+    "description": "HI-3472: the title of the error notice when Apply, Pop or Drop failed or was refused."
+  },
+  "git.stash.fileTip": {
+    "defaultMessage": "Shows its changes in the stash",
+    "description": "HI-3472: the tooltip of a stash's file: a click shows its diff."
+  },
+  "git.stash.filesFailed": {
+    "defaultMessage": "Couldn't read its files: {error}",
+    "description": "HI-3472: under a stash when Show couldn't read its files. {error} is why."
+  },
+  "git.stash.filesLoading": {
+    "defaultMessage": "Reading its files…",
+    "description": "HI-3472: under a stash while Show reads its files."
+  },
+  "git.stash.goOn": {
+    "defaultMessage": "Go On",
+    "description": "HI-3472: the button that confirms putting a stash into a lent slot (git.stash.lentTitle)."
+  },
+  "git.stash.hide": {
+    "defaultMessage": "Hide",
+    "description": "HI-3472: a stash's button while its files are listed: hides them."
+  },
+  "git.stash.inStash": {
+    "defaultMessage": "in the stash “{name}”",
+    "description": "HI-3472: beside a file's path above its diff when it is a stash's file: {name} is the stash's name."
+  },
+  "git.stash.inline": {
+    "defaultMessage": "{inline, select, yes {Side by side} other {Inline}}",
+    "description": "HI-3472: the tooltip of the button above a stash file's diff that switches its view."
+  },
+  "git.stash.lentMessage": {
+    "defaultMessage": "Its builder, {agent}, finds the folder as you leave it. Put the stash into it anyway?",
+    "description": "HI-3472: under git.stash.lentTitle. {agent} is the builder agent's name."
+  },
+  "git.stash.lentTitle": {
+    "defaultMessage": "{slot} is lent to {card, select, none {lane {lane}} other {{card}}}",
+    "description": "HI-3472: the question before Apply or Pop in a slot lent to a card ({card}, its key) or a lane ({lane}, its name) whose builder isn't running. Glossary: slot, lane."
+  },
+  "git.stash.meta": {
+    "defaultMessage": "{branch, select, none {no branch} other {on {branch}}} · {when} · {files, plural, one {# file} other {# files}}",
+    "description": "HI-3472: under a stash's name: the branch it was made on ({branch}; none: a detached HEAD), when ({when}, a date and time) and how many files it holds."
+  },
+  "git.stash.openCard": {
+    "defaultMessage": "Open {card}",
+    "description": "HI-3472: the tooltip of a Combwork stash's card key: opens the card ({card}, its key)."
+  },
+  "git.stash.otherBranch": {
+    "defaultMessage": "It was made on {branch}, and {folder} has {current} checked out.",
+    "description": "HI-3472: added to the question before Apply or Pop when the stash was made on another branch ({branch}) than the one checked out in the folder ({current}); {folder} as in git.stash.applyTitle."
+  },
+  "git.stash.pop": {
+    "defaultMessage": "Pop",
+    "description": "HI-3472: a stash's button: puts its changes into the folder, then drops the stash (git stash pop). Git's word: keep it short."
+  },
+  "git.stash.popTip": {
+    "defaultMessage": "Puts its changes into {folder}, then drops the stash if they went in without a conflict. Runs git stash apply, then git stash drop.",
+    "description": "HI-3472: Pop's tooltip. {folder} as in git.stash.applyTip. Keep the git commands as they are."
+  },
+  "git.stash.projectFolder": {
+    "defaultMessage": "the project folder",
+    "description": "HI-3472: {folder} in the Stashes dialogs and notices when the folder shown is the project folder."
+  },
+  "git.stash.readFailed": {
+    "defaultMessage": "Couldn't read the stashes: {error}",
+    "description": "HI-3472: under the Stashes heading when reading them failed. {error} is why."
+  },
+  "git.stash.show": {
+    "defaultMessage": "Show",
+    "description": "HI-3472: a stash's button: lists its files (a click on one shows its changes). Nothing changes."
+  },
+  "git.stash.title": {
+    "defaultMessage": "Stashes",
+    "description": "HI-3472: the heading of the list of git stashes in Version Control → Changes (glossary: stash, git's word: changes kept aside)."
+  },
+  "git.stash.toggle": {
+    "defaultMessage": "{open, select, yes {Hide the stashes} other {Show the stashes}}",
+    "description": "HI-3472: the tooltip of the Stashes heading, a button that opens or closes the list."
+  },
+  "git.stash.untracked": {
+    "defaultMessage": "untracked",
+    "description": "HI-3472: beside a stash's file: it was an untracked file (new, never added to git) when the stash was made."
+  },
   "git.state": {
     "defaultMessage": "{state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}}",
     "description": "What git has in progress in the project folder, in the status bar and the Git tab (badge), lower case: \"main · merging\"."

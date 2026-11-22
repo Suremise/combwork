@@ -558,6 +558,8 @@ interface CombworkMessageValues {
   'tips.startFreshIdle.title': undefined
   'tips.startNewAll.text': undefined
   'tips.startNewAll.title': undefined
+  'tips.stashes.text': undefined
+  'tips.stashes.title': undefined
   'tips.stoppedPane.text': undefined
   'tips.stoppedPane.title': undefined
   'tips.storageCleanup.text': undefined

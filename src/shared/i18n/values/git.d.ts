@@ -352,6 +352,43 @@ interface CombworkMessageValues {
   'git.signing.unattended': undefined
   'git.signing.unreadable': { message: string | number }
   'git.signing.yes': undefined
+  'git.stash.applied': { dropped: string; folder: string | number }
+  'git.stash.apply': undefined
+  'git.stash.applyMessage': { name: string | number; files: number; folder: string | number; pop: string }
+  'git.stash.applyTip': { folder: string | number }
+  'git.stash.applyTitle': { pop: string; folder: string | number }
+  'git.stash.binary': undefined
+  'git.stash.close': undefined
+  'git.stash.combwork': { why: string; card: string | number; target: string | number; text: string | number }
+  'git.stash.conflicts': { count: number; folder: string | number }
+  'git.stash.conflictsDetail': { files: string | number }
+  'git.stash.diffFailed': { error: string | number }
+  'git.stash.drop': undefined
+  'git.stash.dropMessage': { files: number; card: string; commit: string | number }
+  'git.stash.dropTip': undefined
+  'git.stash.dropTitle': { name: string | number }
+  'git.stash.dropped': { commit: string | number }
+  'git.stash.failed': undefined
+  'git.stash.fileTip': undefined
+  'git.stash.filesFailed': { error: string | number }
+  'git.stash.filesLoading': undefined
+  'git.stash.goOn': undefined
+  'git.stash.hide': undefined
+  'git.stash.inStash': { name: string | number }
+  'git.stash.inline': { inline: string }
+  'git.stash.lentMessage': { agent: string | number }
+  'git.stash.lentTitle': { slot: string | number; card: string; lane: string | number }
+  'git.stash.meta': { branch: string; when: string | number; files: number }
+  'git.stash.openCard': { card: string | number }
+  'git.stash.otherBranch': { branch: string | number; folder: string | number; current: string | number }
+  'git.stash.pop': undefined
+  'git.stash.popTip': { folder: string | number }
+  'git.stash.projectFolder': undefined
+  'git.stash.readFailed': { error: string | number }
+  'git.stash.show': undefined
+  'git.stash.title': undefined
+  'git.stash.toggle': { open: string }
+  'git.stash.untracked': undefined
   'git.state': { state: string }
   'git.status.aheadBehind': { ahead: number; behind: number }
   'git.status.noUpstream': undefined

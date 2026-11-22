@@ -40,7 +40,13 @@ export const REPO_OP_CHANNELS = {
   'git:pruneWorktrees': 'repoHealth',
   'git:removeLocks': 'repoHealth',
   'git:remotePrunePreview': 'repoHealth',
-  'git:fetchPrune': 'repoHealth'
+  'git:fetchPrune': 'repoHealth',
+  // HI-3472: Changes' Stashes (its reads too: offered only where the platform has it).
+  'git:stashes': 'stashes',
+  'git:stashFiles': 'stashes',
+  'git:stashDiff': 'stashes',
+  'git:applyStash': 'stashes',
+  'git:dropStash': 'stashes'
 } as const satisfies Partial<Record<CombworkChannel, Operation>>
 
 export type RepoOpChannel = keyof typeof REPO_OP_CHANNELS

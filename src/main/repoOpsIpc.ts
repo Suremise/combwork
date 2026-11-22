@@ -65,5 +65,17 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   'git:pruneWorktrees': (p, entries) => opsAt('git:pruneWorktrees').pruneWorktrees(workspace.assertProject(p), entries),
   'git:removeLocks': (p, locks) => opsAt('git:removeLocks').removeLocks(workspace.assertProject(p), locks),
   'git:remotePrunePreview': (p) => opsAt('git:remotePrunePreview').remotePrunePreview(workspace.assertProject(p)),
-  'git:fetchPrune': (p, remotes) => opsAt('git:fetchPrune').fetchPrune(workspace.assertProject(p), remotes)
+  'git:fetchPrune': (p, remotes) => opsAt('git:fetchPrune').fetchPrune(workspace.assertProject(p), remotes),
+  // HI-3472: Changes' Stashes: refused here first, then the Changes root's checks (stashPanel.ts).
+  'git:stashes': async (root) => (await import('./stashPanel')).stashList(workspace, root, opsAt('git:stashes')),
+  'git:stashFiles': async (root, commit) => (await import('./stashPanel')).stashFilesAt(workspace, root, commit, opsAt('git:stashFiles')),
+  'git:stashDiff': async (root, commit, file, untracked) => (await import('./stashPanel')).stashDiffAt(workspace, root, commit, file, untracked, opsAt('git:stashDiff')),
+  'git:applyStash': async (root, req) => {
+    const ops = opsAt('git:applyStash')
+    return (await import('./stashPanel')).applyStashAt(workspace, root, req, ops)
+  },
+  'git:dropStash': async (root, commit) => {
+    const ops = opsAt('git:dropStash')
+    return (await import('./stashPanel')).dropStashAt(workspace, root, commit, ops)
+  }
 }

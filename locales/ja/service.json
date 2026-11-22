@@ -426,5 +426,19 @@
   "service.workspace.sharedNames": "エージェント名はワークスペース全体で一意になり、各エージェントを区別できるようになりました。{shared}：引き続き動作しますが、それぞれどちらかの名前を変更してください（例：{project}の{agent}を{suggestion}に）。",
   "service.workspace.stillClosing": "{name}はまだ閉じている途中です。完了するまで待ってから、もう一度お試しください。",
   "service.workspace.stillOpening": "{name}はまだ開いている途中です。完了するまで待ってから、もう一度お試しください。",
-  "service.workspace.twoCalled": "2個のエージェントが{name}という名前です"
+  "service.workspace.twoCalled": "2個のエージェントが{name}という名前です",
+  "service.gitStash.agentBusy": "{agent}が{folder}で作業中です。何も行っていません。終わってからもう一度お試しください。",
+  "service.gitStash.busy": "実行またはエージェントが{folder}で作業中です（{what}）。何も行っていません。終わってからもう一度お試しください。",
+  "service.gitStash.conflicted": "{folder}で{file}が競合しています。何も行っていません。先に解決してください。",
+  "service.gitStash.failed": "Gitが拒否しました：{why}",
+  "service.gitStash.gone": "そのスタッシュはもう一覧にありません（その間に削除またはポップされました）。何も行っていません。もう一度確認してください。",
+  "service.gitStash.invalid": "リクエストが正しくないため、何も行いませんでした。",
+  "service.gitStash.notDropped": "スタッシュは適用されましたが、Gitが削除しませんでした：{why}。まだ一覧にあります。",
+  "service.gitStash.operation": "{folder}のGitは{what, select, merge {マージ} rebase {リベース} am {am} cherryPick {チェリーピック} bisect {bisect} other {リバート}}の途中です。何も行っていません。先にそれを終えてください（上のパネル）。",
+  "service.gitStash.overlap": "{file}には{folder}でコミットされていない変更があり、スタッシュにも含まれています。何も行っていません。先にコミットするか退避してください。",
+  "service.gitStash.session": "{agent}のセッションが{folder}にあります。何も行っていません。先に停止してください。",
+  "service.gitStash.slotChanged": "{slot}がその間に変わりました（貸し出し、解放、またはCombworkの処理が開始）。何も行っていません。もう一度確認してください。",
+  "service.gitStash.slotProcess": "{slot}内のファイルまたはフォルダーをプロセスが開いています。何も行っていません。それ（ターミナルやエディター）を閉じてもう一度お試しください。",
+  "service.gitStash.slotSession": "{slot}にセッションがあります。何も行っていません。先に停止してください。",
+  "service.gitStash.timedOut": "Gitが{seconds, number}秒たっても実行中だったため、Combworkが終了させました。もう一度試す前に{folder}を確認してください。スタッシュの一部が適用されている可能性があります。"
 }

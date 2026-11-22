@@ -2309,6 +2309,16 @@ When the folder Changes shows (the project folder, an agent's slot, or a free sl
 
 Combwork never takes any of these steps by itself, and refuses one while anything works in that folder: an agent's session (stop it first, or ask it to finish), one of Combwork's own runs, or, in a slot, a program with a file or folder in it open (a terminal, an editor). For a slot lent to a card whose builder isn't running, it asks first, naming the card. Once a free slot has nothing under way, it is lent again. **Version Control → Slots and copies** (a slot's *Unfinished git …* row), **Branches & remotes** (its banner for the project folder) and Combwork's notice about such a slot each have **Open in Changes**, which opens this panel.
 
+#### Stashes <a id="stashes"></a>
+
+Under that panel, **Stashes** lists the repository's git stashes, when it has any: changes kept aside with `git stash`, by you, an agent, or Combwork's **Set Aside** on a paused merge. Git shares them between the project folder and its worktrees, so every folder shows the same list. Click **Stashes** to open it. Each stash shows its message, the branch it was made on, when, and how many files it holds. One that Combwork set aside says so and why (*Set aside by Combwork before merging HI-12*), with the card's key as a link to the card.
+
+- **Show** lists its files, untracked ones included; click one to see what the stash changes in it, in place of the folder's diff. Nothing changes.
+- **Apply** puts the stash's changes into the folder Changes shows and keeps the stash. **Pop** does the same, then drops the stash, but only if everything went in without a conflict. Both ask first, and say so when the stash was made on another branch than the one checked out there.
+- **Drop** deletes the stash, after asking. The notice after it gives the stash's commit: `git stash apply <commit>` in a terminal brings it back for a while.
+
+Apply and Pop refuse while anything works in that folder (an agent, its session, a run of Combwork's, or in a slot a program with a file open), while git is in the middle of an operation there or a file is in conflict, and while the folder has uncommitted changes to a file the stash holds: commit those or set them aside first, so a conflict is only ever between the stash and the folder's commit. If the stash's changes conflict, the files are left with git's conflict markers and the stash is kept, even for a Pop: settle the files, then drop the stash when you no longer need it. A slot lent to a card whose builder isn't running asks first, naming the card. Agents can't use any of this.
+
 #### Comparing two branches <a id="comparing-two-branches"></a>
 
 The picker's **Branches** group compares any two local branches, whether or not a folder has them checked out: first your **Target branch** against main (*1.0.0 ↔ main*), then each local branch against the target (the target itself against main). Its **Slots** group lists every slot that has a branch checked out, with the card it's lent to, or *free* (*slot-c · HI-1758 · cw/HI/HI-1758-…*), a slot whose card is blocked included; each opens its branch against the branch it merges into. A branch is listed once: under Slots when a slot has it. On the page, **Branch** and **Against** choose the two, and ⇄ swaps them.

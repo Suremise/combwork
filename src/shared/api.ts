@@ -187,6 +187,7 @@ import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
 import type { OperationPanelState, OperationRequest } from './gitOperations'
 import type { LockAsk, PruneAsk, RemotePrune, RepoHealth } from './gitHealth'
+import type { StashApplied, StashFile, StashList, StashRequest } from './gitStashes'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1154,6 +1155,14 @@ export interface CombworkRequests {
   'git:operation': (root: string) => OperationPanelState | null
   /** HI-3470: the user's step on it (Continue, Skip, Abort) or a conflicted file settled; git's output. Refused while anything works in the folder. */
   'git:operationStep': (root: string, req: OperationRequest) => string
+  /** HI-3472: the repository's stashes (newest first) and the Changes root's slot's lease; Show's files and one file's diff. */
+  'git:stashes': (root: string) => StashList
+  'git:stashFiles': (root: string, commit: string) => StashFile[]
+  'git:stashDiff': (root: string, commit: string, file: string, untracked: boolean) => GitDiff
+  /** HI-3472: Apply or Pop of a stash into a Changes root. Refused while anything works in the folder. */
+  'git:applyStash': (root: string, req: StashRequest) => StashApplied
+  /** HI-3472: Drop of a stash, only while it is still in the list. */
+  'git:dropStash': (root: string, commit: string) => void
   /** The Changes tab's branch comparison (HI-1824, read-only): what can be compared, two branches, one file of them. */
   'git:compareLines': (projectPath: string) => CompareLines
   /** The Changes tab's leftover branches (HI-1823): every local branch, uncut, with its worktree and commits not in the target. */
