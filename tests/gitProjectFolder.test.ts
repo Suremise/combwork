@@ -1,6 +1,6 @@
 // A Git project's folder and its switch to None, on a real workspace (one Git repository, projects p and q inside it):
 // HI-3104, a start in a project folder on no branch; and #1419, a switch to None with work running, which keeps its
-// leases (its old rules). Moved from the Git↔jj switch's tests when that switch went (HI-3484).
+// leases (its old rules).
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'

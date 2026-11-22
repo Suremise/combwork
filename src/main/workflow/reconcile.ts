@@ -26,12 +26,6 @@ import { staleWake } from './queueState'
 import { catchUpKey, catchUpOf } from './mergeQueue'
 import { inTargetNow } from '../../shared/workflow/workView'
 import { asCardCounts } from './containment'
-import { createLogger } from '../logger'
-
-const log = createLogger('workflow')
-
-/** HI-3510: the cards already logged as skipped for a removed platform, by store (once a process). */
-const removedLogged = new WeakMap<object, Set<number>>()
 
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
@@ -269,16 +263,6 @@ export async function reconcile(wf: Workflow, card: CardRecord, hooks: Reconcile
   const c = wf.store.card(card.id)
   const s = wf.state(c)
   if (!s.started) return
-  // HI-3510: a card whose rules name a platform Combwork no longer has (started under jj) has nothing to observe it with:
-  // left as it is, said once.
-  const removed = wf.removedPlatformOf(c, s)
-  if (removed) {
-    const seen = removedLogged.get(wf.store) ?? new Set<number>()
-    removedLogged.set(wf.store, seen)
-    if (!seen.has(c.id)) log.info(`#${c.id} not reconciled: its rules name ${removed}, a platform Combwork no longer has`)
-    seen.add(c.id)
-    return
-  }
   await wf.platformOf(c, s).reconcile(c, hooks)
 }
 

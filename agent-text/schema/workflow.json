@@ -988,17 +988,6 @@
       "onArg": "plain"
     }
   },
-  "workflow.refused.platform.removed.message": {
-    "placeholders": {
-      "card": "plain",
-      "platform": "plain"
-    }
-  },
-  "workflow.refused.platform.removed.next": {
-    "placeholders": {
-      "reader": "select"
-    }
-  },
   "workflow.refused.platform.slotLeft.message": {
     "placeholders": {
       "unknown": "select",

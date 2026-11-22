@@ -70,7 +70,7 @@ the English word stays in that language.
 | **Version Control** (the tab) | The project's tab (renamed from Git) where you choose the version control and its workflow options. | Versionsverwaltung | Control de versiones | Gestion de versions | バージョン管理 | Kontrola wersji | Controle de versão | 版本控制 |
 | **version control** | The system that keeps the project's history (Git now; others later). | Versionsverwaltung | control de versiones | gestion de versions | バージョン管理 | kontrola wersji | controle de versão | 版本控制 |
 | **None** (no version control) | The choice for a project without version control. It still has a workflow. | Keine | Ninguno | Aucune | なし | Brak | Nenhum | 无 |
-| **Git**, **Mercurial**, **Jujutsu** | Version control systems' names. | *keep* | *keep* | *keep* | *keep* | *keep* | *keep* | *keep* |
+| **Git**, **Mercurial** | Version control systems' names. | *keep* | *keep* | *keep* | *keep* | *keep* | *keep* | *keep* |
 | **workflow** | How work moves from Todo to Done in a project: its stages and rules. | Workflow | flujo de trabajo | flux de travail | ワークフロー | przepływ pracy | fluxo de trabalho | 工作流程 |
 | **workflow options** | The settings under the chosen version control that make the workflow. | Workflow-Optionen | opciones del flujo de trabajo | options du flux de travail | ワークフローのオプション | opcje przepływu pracy | opções do fluxo de trabalho | 工作流程选项 |
 | **preset** | One click that fills in every option. | Voreinstellung | ajuste predefinido | préréglage | プリセット | ustawienie wstępne | predefinição | 预设 |

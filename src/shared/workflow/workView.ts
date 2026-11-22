@@ -10,7 +10,6 @@ import { askedQuestion, foldCard, type Actor, type AskAction, type AskActionKind
 import type { StoredText } from '../types'
 import { foldLineComments, type LineCommentView } from './lineComments'
 import { baseRulesetId, REVIEW_SKIPPED, rulesBaseId } from './compile'
-import { isRule } from './refusals'
 
 /** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
 export const APPLY_OPTIONS = 'applyOptions'
@@ -477,10 +476,9 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   const doneAt = facts.findLast((f) => f.seq < s.cycle && f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'done')?.seq ?? 0
   const lastOverride = facts.findLast((f) => f.kind === 'Override' && f.seq > doneAt)
   const override = lastOverride ? ((d) => ({ by: d.by, move: d.move, rules: d.rules, reason: d.reason, at: lastOverride.at }))(lastOverride.data as FactData['Override']) : null
-  // Refused since it last moved (#1279): the latest, with how many like it came in a row. One under a rule this Combwork
-  // no longer has (HI-3510: a retired guard's, a removed platform's) isn't shown: nothing says what it meant.
+  // Refused since it last moved (#1279): the latest, with how many like it came in a row.
   const movedAt = facts.findLast((f) => f.kind === 'Moved')?.seq ?? 0
-  const since = facts.filter((f) => f.kind === 'Refused' && f.seq > movedAt && isRule((f.data as FactData['Refused']).rule))
+  const since = facts.filter((f) => f.kind === 'Refused' && f.seq > movedAt)
   const lastRefused = since.at(-1)
   const refused = lastRefused ? ((d) => ({ move: d.move, rule: d.rule, values: d.values ?? {}, at: lastRefused.at, times: since.filter((f) => (f.data as FactData['Refused']).rule === d.rule && (f.data as FactData['Refused']).move === d.move).length }))(lastRefused.data as FactData['Refused']) : null
   return {

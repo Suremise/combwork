@@ -32,7 +32,7 @@ import type { KeptTargets, RetargetPreview, ProjectConfig, ProjectStages, Projec
 import { compile, mustCompile, type Ruleset } from '../../shared/workflow/compile'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
-import { checkOptions, ownOptions, problemText, problemShownOf, resolvedOf, resolveOptions, workflowChanged, type OptionLevels } from './rulesets'
+import { checkOptions, problemText, problemShownOf, resolvedOf, resolveOptions, workflowChanged, type OptionLevels } from './rulesets'
 import { closeStaleChurn, workflowEnforced, workflowFor } from './service'
 import { APPLY_OPTIONS } from './runtime'
 import { kickQueue, queueChanged } from './queueHost'
@@ -68,7 +68,7 @@ const levelsOf = (ws: WorkspaceService, own: Partial<WorkflowOptions> | null, fo
 
 /** The options the project sets itself, for its platform (a project's options for another platform don't apply). */
 // A project with no options yet shows its card loops and file locks from before HI-1766 as its own (they're read so).
-const ownOf = (cfg: Pick<ProjectConfig, 'workflow'>, platform: PlatformId): Partial<WorkflowOptions> => ownOptions(cfg, platform) ?? legacyPreferences(cfg)
+const ownOf = (cfg: Pick<ProjectConfig, 'workflow'>, platform: PlatformId): Partial<WorkflowOptions> => (cfg.workflow?.platform === platform ? cfg.workflow.options : cfg.workflow ? {} : legacyPreferences(cfg))
 
 /**
  * The project config's change that sets one of a project's preferences as its own (HI-2058: a template's load sets

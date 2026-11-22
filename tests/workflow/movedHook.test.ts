@@ -1,5 +1,5 @@
 // HI-2938: the workflow's `moved` hook, called once a write that moved a card has committed (the app asks for a
-// reconciliation on a move into Approved, which builds a jj card's candidate), and never for a write that moved nothing;
+// reconciliation on a move into Approved), and never for a write that moved nothing;
 // a hook that throws never fails the committed write.
 import { afterEach, describe, expect, it } from 'vitest'
 import { B1, moved, setup, type Env } from './harness'

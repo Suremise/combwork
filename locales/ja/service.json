@@ -424,7 +424,6 @@
   "service.workspace.platformRepositoryGone": "{project}のGitリポジトリが見つかりません。Gitのルールが引き続き適用されるため、リポジトリが戻るか、「バージョン管理」タブでプロジェクトを「なし」に切り替えるまで、カードは先に進めません。",
   "service.workspace.platformSettled": "解決済み：今は変更するものはありません",
   "service.workspace.platformTitle": "{project}のバージョン管理が変わりました",
-  "service.workspace.platformUse": "{platform}を使う",
   "service.workspace.renameAgent": "{project}の{agent}の名前を変更…",
   "service.workspace.sharedNames": "エージェント名はワークスペース全体で一意になり、各エージェントを区別できるようになりました。{shared}：引き続き動作しますが、それぞれどちらかの名前を変更してください（例：{project}の{agent}を{suggestion}に）。",
   "service.workspace.stillClosing": "{name}はまだ閉じている途中です。完了するまで待ってから、もう一度お試しください。",

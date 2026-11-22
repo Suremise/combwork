@@ -228,9 +228,9 @@ describe('the e2e suite list', () => {
     expect(base.PATH).toBeUndefined()
     expect(rc.envValue(base, 'PATH')).toBe(parent.Path)
     // Put first, the rest kept, one spelling left: a later merge (apply's last-wins) can't keep the shorter one.
-    const env = rc.withPathFirst({ ...base, X: '1' }, 'C:\\jj', rc.envValue(base, 'PATH'))
+    const env = rc.withPathFirst({ ...base, X: '1' }, 'C:\\tools', rc.envValue(base, 'PATH'))
     expect(Object.keys(env).filter((k) => k.toUpperCase() === 'PATH')).toEqual(['PATH'])
-    expect(env.PATH).toBe(`C:\\jj;${parent.Path}`)
+    expect(env.PATH).toBe(`C:\\tools;${parent.Path}`)
     expect(env.X).toBe('1')
     expect(rc.withPathFirst({}, ['a', 'b'], 'c').PATH).toBe('a;b;c')
     // No suite or harness reads PATH off a copied environment again.

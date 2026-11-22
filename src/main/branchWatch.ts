@@ -10,8 +10,6 @@ import { gitProblem } from './gitTool'
 import { workTargetOf } from './gitRepo'
 import * as G from './gitCommands'
 import { isUnknown } from './platform/types'
-import { workspacePortOf } from './platform/workspacePorts'
-import type { PlatformId } from '../shared/platform/descriptors'
 
 const log = createLogger('branches')
 
@@ -50,8 +48,6 @@ export interface Watched {
   worktree: wt.WorktreeRef
   slot?: true
   target?: string
-  /** Its slot's platform, as its row records it: whose port says whether its line is a preparation key (HI-3170). */
-  platform?: PlatformId
 }
 
 /**
@@ -74,7 +70,7 @@ function findAgent(projectPath: string, agentId: string): Watched | null {
   }
   if (leased) {
     const branch = leased.line ?? (leased.carried ? (legacy?.branch ?? null) : null)
-    return branch ? { project, agentId, worktree: { path: leased.folder, branch, base: leased.target ?? legacy?.base ?? '' }, slot: true, ...(leased.target ? { target: leased.target } : {}), ...(leased.platform ? { platform: leased.platform } : {}) } : null
+    return branch ? { project, agentId, worktree: { path: leased.folder, branch, base: leased.target ?? legacy?.base ?? '' }, slot: true, ...(leased.target ? { target: leased.target } : {}) } : null
   }
   return legacy ? { project, agentId, worktree: legacy } : null
 }
@@ -87,8 +83,6 @@ function findAgent(projectPath: string, agentId: string): Watched | null {
  */
 export async function lineStatus(found: Watched): Promise<AgentBranchStatus | null> {
   const { project, worktree } = found
-  // HI-3170: a slot whose platform has no workspace port can't be read here.
-  if (found.platform && !workspacePortOf(found.platform)) return null
   // A branch that isn't there has nothing to merge, and isn't an error to log (HI-1698: an agent's 0.9 branch gone with
   // its worktree, a card's line deleted after its merge, each checked on every refresh): null, quietly.
   if ((await G.lineHead(project.path, worktree.branch)) === null) return null
