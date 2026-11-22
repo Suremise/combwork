@@ -28,6 +28,39 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
+// HI-3496: the pointer on `line` until its comment + (`plus`) shows; true once it does. A hover is made once, and what's
+// around the diff (the card's Work section still coming in) can move the line from under a pointer that stays put, where
+// rightly no + shows: the pointer follows the line, as a user's would, only when the line has moved. A + still missing
+// logs where the line was and is, and what's under the pointer, with a screenshot, so another cause shows itself.
+const hoverPlus = async (page, line, plus, name) => {
+  await line.hover()
+  const centre = (b) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 })
+  const first = await line.boundingBox()
+  let at = first && centre(first)
+  if (at) await page.mouse.move(at.x, at.y)
+  let followed = 0
+  const shown = await lib.until(async () => {
+    if ((await plus.count()) === 1) return true
+    const b = await line.boundingBox().catch(() => null)
+    if (b && at && !(b.x <= at.x && at.x <= b.x + b.width && b.y <= at.y && at.y <= b.y + b.height)) {
+      followed++
+      at = centre(b)
+      await page.mouse.move(at.x, at.y)
+    }
+    return false
+  }, HUNG_MS)
+  if (followed) console.log(`INFO ${name}: the line moved from under the pointer after the hover; it followed ${followed} time(s)`)
+  if (!shown) {
+    const under = at && (await page.evaluate(({ x, y }) => {
+      const chain = []
+      for (let e = document.elementFromPoint(x, y); e && chain.length < 8; e = e.parentElement) chain.push(`${e.tagName.toLowerCase()}.${String(e.className).split(' ').slice(0, 3).join('.')}`)
+      return chain.join(' < ')
+    }, at))
+    console.log(`INFO ${name}: no + with the pointer at ${JSON.stringify(at)}; the line was at ${JSON.stringify(first)}, is at ${JSON.stringify(await line.boundingBox().catch(() => null))}; under the pointer: ${under}`)
+    await page.screenshot({ path: path.join(lib.WORK, `cardwork-no-plus-${name}.png`) })
+  }
+  return !!shown
+}
 const commit = (dir, file, text, message) => {
   fs.writeFileSync(path.join(dir, file), text)
   lib.git(dir, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'add', file])
@@ -148,9 +181,8 @@ const commit = (dir, file, text, message) => {
   // --- HI-3219: a line comment on the revision's diff: added with the glyph margin's +, edited, resolved, reopened, deleted.
   const comments = async () => (await inv('tasks:work', g))?.lineComments ?? []
   const modifiedLine = rev0.locator('[data-revision-diff="greet.ts"] .editor.modified .view-line').first()
-  await modifiedLine.hover()
   const plus = rev0.locator('[data-revision-diff="greet.ts"] .editor.modified .cw-comment-add')
-  check('hovering a line shows the + to comment on it', !!(await lib.until(async () => (await plus.count()) === 1, HUNG_MS)))
+  check('hovering a line shows the + to comment on it', await hoverPlus(page, modifiedLine, plus, 'greet'))
   await plus.click()
   const composer = rev0.locator('[data-comment-composer]')
   check('pressing it opens a comment box under the line', !!(await lib.until(async () => (await composer.count()) === 1, HUNG_MS)))
@@ -290,9 +322,8 @@ const commit = (dir, file, text, message) => {
   await editBox.evaluate((e) => { e.dataset.probe = 'kept' })
   const editKept = async () => (await k1Thread.locator('textarea[data-probe="kept"]').count()) === 1 && (await editBox.inputValue().catch(() => '')) === 'Half-typed edit'
   // Line 3 by its text: Monaco's lines aren't in line order in the page.
-  await ktRev.locator('[data-revision-diff="lines.ts"] .editor.modified .view-line', { hasText: 'three' }).hover()
   const ktPlus = ktRev.locator('[data-revision-diff="lines.ts"] .editor.modified .cw-comment-add')
-  await lib.until(async () => (await ktPlus.count()) === 1, HUNG_MS)
+  await hoverPlus(page, ktRev.locator('[data-revision-diff="lines.ts"] .editor.modified .view-line', { hasText: 'three' }), ktPlus, 'three')
   await ktPlus.click()
   const ktDraft = ktRev.locator('[data-comment-composer]').filter({ hasText: 'Changed 3' })
   check('a draft opened at line 3 keeps the edit typed at line 1, in the same box', !!(await lib.until(async () => (await ktDraft.count()) === 1, HUNG_MS)) && (await editKept()), `${await editBox.inputValue().catch(() => '(gone)')} | ${await ktRev.innerText().catch(() => '')}`)
@@ -316,9 +347,8 @@ const commit = (dir, file, text, message) => {
   // gives way; and a draft or an edit on the original side keeps its text while the diff shows inline, and back.
   const ktComposers = ktRev.locator('[data-comment-composer]')
   const plusAt = async (side, lineText) => {
-    await ktRev.locator(`[data-revision-diff="lines.ts"] .editor.${side} .view-line`, { hasText: lineText }).hover()
     const p = ktRev.locator(`[data-revision-diff="lines.ts"] .editor.${side} .cw-comment-add`)
-    if (!(await lib.until(async () => (await p.count()) === 1, HUNG_MS))) await ktRev.screenshot({ path: path.join(lib.WORK, `cardwork-no-plus-${side}.png`) })
+    await hoverPlus(page, ktRev.locator(`[data-revision-diff="lines.ts"] .editor.${side} .view-line`, { hasText: lineText }), p, `${side}-${lineText}`)
     await p.click()
   }
   await plusAt('modified', 'two')
@@ -421,9 +451,9 @@ const commit = (dir, file, text, message) => {
   await lib.until(async () => (await fileButton('first.ts').count()) === 1, HUNG_MS)
   await fileButton('first.ts').click()
   await lib.until(async () => (await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line', { hasText: 'first' }).count()) === 1, HUNG_MS)
-  await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line', { hasText: 'first' }).hover()
+  const tfLine = () => tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line', { hasText: 'first' })
   const tfPlus = tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .cw-comment-add')
-  await lib.until(async () => (await tfPlus.count()) === 1, HUNG_MS)
+  await hoverPlus(page, tfLine(), tfPlus, 'first')
   await tfPlus.click()
   const tfDraftBox = () => tfRev.locator('[data-revision-diff="first.ts"] [data-draft="new:1-1"] textarea')
   await lib.until(async () => (await tfDraftBox().count()) === 1, HUNG_MS)
@@ -439,8 +469,7 @@ const commit = (dir, file, text, message) => {
   check('…and after closing the card and opening its changes again', !!(await lib.until(async () => (await tfDraftBox().inputValue().catch(() => '')) === 'Typed on first.ts', HUNG_MS)), await tfRev.innerText().catch(() => ''))
   // HI-3496: a pointer that doesn't move when a file's comment layer attaches still gets the +. Over first.ts's line 1, the
   // keyboard chooses second.ts, whose line 1 comes up under the pointer with no mouse move at all.
-  await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line', { hasText: 'first' }).hover()
-  await lib.until(async () => (await tfPlus.count()) === 1, HUNG_MS)
+  await hoverPlus(page, tfLine(), tfPlus, 'still')
   await fileButton('second.ts').press('Enter')
   const secondPlus = tfRev.locator('[data-revision-diff="second.ts"] .editor.modified .cw-comment-add')
   check('a file chosen under a pointer that stays still shows the + on the line under it', !!(await lib.until(async () => (await secondPlus.count()) === 1, HUNG_MS)), await tfRev.innerText().catch(() => ''))
@@ -460,8 +489,7 @@ const commit = (dir, file, text, message) => {
     await lib.until(async () => (await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line').count()) > 0, HUNG_MS)
   }
   const draftAgain = async (words) => {
-    await tfRev.locator('[data-revision-diff="first.ts"] .editor.modified .view-line', { hasText: 'first' }).hover()
-    await lib.until(async () => (await tfPlus.count()) === 1, HUNG_MS)
+    await hoverPlus(page, tfLine(), tfPlus, 'first-again')
     await tfPlus.click()
     await lib.until(async () => (await tfDraftBox().count()) === 1, HUNG_MS)
     await tfDraftBox().fill(words)
