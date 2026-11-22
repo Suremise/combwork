@@ -163,7 +163,8 @@ export function gitOperationEnd(what: string): string | null {
 export const DETACH_FAILED = 'detach'
 
 /**
- * HI-3467: a branch name as one literal argument where the user pastes it (PowerShell, Windows' shell; HR1's round 1):
+ * HI-3467: a branch name as one literal argument where the user pastes it (PowerShell, Windows' shell; HR1's round 1;
+ * HI-3516: the texts that show it say PowerShell, since cmd doesn't take single quotes and would read `&` in one):
  * as it is when it holds only letters, digits and `._/-`, else single-quoted, a quote inside doubled (PowerShell takes
  * the typographic quotes as quotes too). Git allows `$`, `&`, `;`, quotes… in branch names, which a shell would read.
  */

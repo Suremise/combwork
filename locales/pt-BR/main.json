@@ -367,7 +367,7 @@
   "main.server.url.remoteHttp": "Um servidor em outro computador precisa de https://. O http:// simples é só para um servidor neste PC (localhost).",
   "main.server.url.scheme": "A URL deve começar com https:// (ou http:// para um servidor neste PC).",
   "main.server.url.userinfo": "A URL não pode conter nome de usuário nem senha: informe a chave no campo próprio.",
-  "main.slots.detachFailed.message": "{said, select, yes {O Git diz: {error}} other {O Git não encontra {target}.}} Enquanto não conseguir, o Combwork não empresta {slot} a outro cartão. Corrija o que está atrapalhando em {folder}, ou execute {command} ali você mesmo: o Combwork tenta de novo sempre que verifica seus slots, e empresta {slot} de novo assim que funcionar.",
+  "main.slots.detachFailed.message": "{said, select, yes {O Git diz: {error}} other {O Git não encontra {target}.}} Enquanto não conseguir, o Combwork não empresta {slot} a outro cartão. Corrija o que está atrapalhando em {folder}, ou execute {command} ali você mesmo, no PowerShell: o Combwork tenta de novo sempre que verifica seus slots, e empresta {slot} de novo assim que funcionar.",
   "main.slots.detachFailed.title": "O Combwork não consegue voltar {slot} para {target}",
   "main.slots.operation.message": "O Combwork não pode emprestar {slot} a outro cartão até que isso termine. Conclua em {folder}, ou encerre ali com {command}. O Combwork nunca encerra isso sozinho, e empresta o slot de novo quando não houver mais nada em andamento nele.",
   "main.slots.operation.open": "Abrir em Alterações",

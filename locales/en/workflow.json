@@ -2156,8 +2156,8 @@
     "description": "Under the heading “Slots and copies”: its settings save at once, unlike the workflow options, which are saved with Save…."
   },
   "workflow.slots.detachFailedHint": {
-    "defaultMessage": "{said, select, yes {Git said: {error}} other {Git can’t find {target}.}} Put right what’s in the way in its folder, or run {command} there",
-    "description": "HI-3467: beside workflow.slots.detachFailedState: why, and how to free the slot. {error} is git's own error line, in English (keep it as it is); said: yes when git gave one, else no (the branch {target} isn't there): keep the select keys. {command} is the git command that does it by hand (git switch --detach main: keep it as it is). Combwork tries again whenever it looks at its slots."
+    "defaultMessage": "{said, select, yes {Git said: {error}} other {Git can’t find {target}.}} Put right what’s in the way in its folder, or run {command} there in PowerShell",
+    "description": "HI-3467: beside workflow.slots.detachFailedState: why, and how to free the slot. {error} is git's own error line, in English (keep it as it is); said: yes when git gave one, else no (the branch {target} isn't there): keep the select keys. {command} is the git command that does it by hand (git switch --detach main: keep it as it is), quoted for PowerShell (HI-3516: in cmd a branch name with & or ; would run something else), so keep PowerShell named. Combwork tries again whenever it looks at its slots."
   },
   "workflow.slots.detachFailedState": {
     "defaultMessage": "Can't be moved back to {target}",

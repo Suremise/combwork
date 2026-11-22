@@ -529,7 +529,7 @@
   "workflow.slots.copy": "复制到新槽位的文件",
   "workflow.slots.copyDesc": "从项目文件夹复制到每个新槽位、被 Git 忽略的文件，每行一个模式，例如 .env 文件。",
   "workflow.slots.desc": "这些设置更改时即保存，独立于上面的选项。",
-  "workflow.slots.detachFailedHint": "{said, select, yes {Git 报告：{error}} other {Git 找不到 {target}。}}请在它的文件夹中清除妨碍它的问题，或在那里运行 {command}",
+  "workflow.slots.detachFailedHint": "{said, select, yes {Git 报告：{error}} other {Git 找不到 {target}。}}请在它的文件夹中清除妨碍它的问题，或在那里的 PowerShell 中运行 {command}",
   "workflow.slots.detachFailedState": "无法移回 {target}",
   "workflow.slots.fromSetup": "来自项目在 1.0 之前的初始化命令",
   "workflow.slots.gitFiles": "设置子模块和 LFS",

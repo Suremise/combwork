@@ -529,7 +529,7 @@
   "workflow.slots.copy": "Archivos copiados en los slots nuevos",
   "workflow.slots.copyDesc": "Archivos ignorados por Git que se copian de la carpeta del proyecto en cada slot nuevo, un patrón por línea, como los archivos .env.",
   "workflow.slots.desc": "Se guardan a medida que los cambias, aparte de las opciones de arriba.",
-  "workflow.slots.detachFailedHint": "{said, select, yes {Git dice: {error}} other {Git no encuentra {target}.}} Corrige lo que lo impide en su carpeta, o ejecuta allí {command}",
+  "workflow.slots.detachFailedHint": "{said, select, yes {Git dice: {error}} other {Git no encuentra {target}.}} Corrige lo que lo impide en su carpeta, o ejecuta allí {command} en PowerShell",
   "workflow.slots.detachFailedState": "No se puede devolver a {target}",
   "workflow.slots.fromSetup": "Del comando de configuración del proyecto anterior a la 1.0",
   "workflow.slots.gitFiles": "Configurar submódulos y LFS",

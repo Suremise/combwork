@@ -529,7 +529,7 @@
   "workflow.slots.copy": "Pliki kopiowane do nowych slotów",
   "workflow.slots.copyDesc": "Pliki ignorowane przez Git kopiowane z folderu projektu do każdego nowego slotu, jeden wzorzec na wiersz, np. pliki .env.",
   "workflow.slots.desc": "Zapisują się od razu po zmianie, niezależnie od opcji powyżej.",
-  "workflow.slots.detachFailedHint": "{said, select, yes {Git zgłasza: {error}} other {Git nie może znaleźć {target}.}} Usuń w jego folderze to, co przeszkadza, albo uruchom tam {command}",
+  "workflow.slots.detachFailedHint": "{said, select, yes {Git zgłasza: {error}} other {Git nie może znaleźć {target}.}} Usuń w jego folderze to, co przeszkadza, albo uruchom tam {command} w PowerShellu",
   "workflow.slots.detachFailedState": "Nie można przywrócić na {target}",
   "workflow.slots.fromSetup": "Z polecenia przygotowania projektu sprzed wersji 1.0",
   "workflow.slots.gitFiles": "Przygotuj submoduły i LFS",

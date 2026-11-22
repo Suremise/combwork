@@ -5951,7 +5951,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   error line, the settles in a row that failed so (`tries`) and the first one's time. The second in a row tells the user
   once (a notice naming the slot, its target, git's error, its folder and `git switch --detach <target>`, the way to do
   it by hand, its target single-quoted for PowerShell when it holds anything but letters, digits and `._/-`: git allows
-  `$`, `&` and quotes in a branch name), and only from then does Slots and copies show *Can't be moved back to …* with git's error: a failure the
+  `$`, `&` and quotes in a branch name; HI-3516: the notice and Slots and copies say to run it in PowerShell, since cmd
+  takes no single quotes and would read a `&` in one as a second command), and only from then does Slots and copies
+  show *Can't be moved back to …* with git's error (HI-3516: only git's own stderr follows *Git said*; a read git said
+  nothing of says none, never Combwork's own words for what it couldn't read): a failure the
   next look doesn't repeat (a lock another git held for a moment) is never told. The first look whose detach works, or
   that finds the slot otherwise ready, gone or dirty, clears it.
 - **Operations** (HR1's round 1): warming for a lease and removal own the slot from the write that starts them to the

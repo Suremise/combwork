@@ -538,7 +538,7 @@
   "workflow.slots.copy": "Files copied into new slots",
   "workflow.slots.copyDesc": "Git-ignored files copied from the project folder into each new slot, one pattern per line, such as .env files.",
   "workflow.slots.desc": "These are saved as you change them, apart from the options above.",
-  "workflow.slots.detachFailedHint": "{said, select, yes {Git said: {error}} other {Git can’t find {target}.}} Put right what’s in the way in its folder, or run {command} there",
+  "workflow.slots.detachFailedHint": "{said, select, yes {Git said: {error}} other {Git can’t find {target}.}} Put right what’s in the way in its folder, or run {command} there in PowerShell",
   "workflow.slots.detachFailedState": "Can't be moved back to {target}",
   "workflow.slots.fromSetup": "From the project’s setup command before 1.0",
   "workflow.slots.gitFiles": "Set up submodules and LFS",

@@ -529,7 +529,7 @@
   "workflow.slots.copy": "Fichiers copiés dans les nouveaux emplacements",
   "workflow.slots.copyDesc": "Fichiers ignorés par Git copiés du dossier du projet dans chaque nouvel emplacement, un motif par ligne, comme les fichiers .env.",
   "workflow.slots.desc": "Ces réglages sont enregistrés dès que tu les changes, contrairement aux options ci-dessus.",
-  "workflow.slots.detachFailedHint": "{said, select, yes {Git indique : {error}} other {Git ne trouve pas {target}.}} Corrige ce qui bloque dans son dossier, ou lance-y {command}",
+  "workflow.slots.detachFailedHint": "{said, select, yes {Git indique : {error}} other {Git ne trouve pas {target}.}} Corrige ce qui bloque dans son dossier, ou lance-y {command} dans PowerShell",
   "workflow.slots.detachFailedState": "Impossible de le ramener sur {target}",
   "workflow.slots.fromSetup": "Repris de la commande de préparation du projet d’avant la 1.0",
   "workflow.slots.gitFiles": "Préparer les sous-modules et LFS",
