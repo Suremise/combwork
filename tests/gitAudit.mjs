@@ -60,11 +60,37 @@ export const isGitModule = (m) => GIT_FILES.has(m) || m.startsWith('src/main/pla
  */
 const MAYBE_COMPUTED = String.raw`(?:import|require)\s*\((?!\s*(?:'[^'\\\r\n]*'|"[^"\\\r\n]*"|${'`'}[^${'`'}$\\]*${'`'})\s*[,)])`
 
+/** A file that may load through `require` some other way (hiddenLoader's: handed on, `module.require`, `createRequire`): parsed too (HI-3512). */
+const MAYBE_HIDDEN = String.raw`${MAYBE_COMPUTED}|\brequire\b|createRequire`
+
 /** A file that could name a Git module: only these are parsed (the rest can't import one). */
-const MAY_NAME_GIT = new RegExp(String.raw`git|worktree|repoLock|folderFence|branchWatch|branchMerge|refHold|require\(|${MAYBE_COMPUTED}`, 'i')
+const MAY_NAME_GIT = new RegExp(String.raw`git|worktree|repoLock|folderFence|branchWatch|branchMerge|refHold|${MAYBE_HIDDEN}`, 'i')
 
 /** A dynamic import or require whose specifier isn't a string (built from pieces): it could load anything, so it is an edge too. */
 const HIDDEN = '(computed specifier)'
+
+/** Names whose use as a key or a type loads nothing: a property's, a method's, an enum member's, `typeof`'s. */
+const NOT_A_LOAD = [ts.isPropertyAssignment, ts.isPropertySignature, ts.isPropertyDeclaration, ts.isMethodDeclaration, ts.isMethodSignature, ts.isEnumMember]
+
+/**
+ * A loader the parser can't follow (HI-3512), so it counts as a computed specifier: `require` other than called directly
+ * (handed on, `const r = require`, `require.call(…)`, `{ require }`), any member named `require` (`module.require(…)`,
+ * `m['require']`), and `createRequire` however it is reached (imported, `m.createRequire`, its result under any name).
+ * A direct `require(…)` is read where it is called.
+ */
+function hiddenLoader(n) {
+  if (ts.isElementAccessExpression(n)) return ts.isStringLiteralLike(n.argumentExpression) && ['require', 'createRequire'].includes(n.argumentExpression.text)
+  if (!ts.isIdentifier(n)) return false
+  if (n.text === 'createRequire') return true
+  if (n.text !== 'require') return false
+  const p = n.parent
+  if (ts.isCallExpression(p) && p.expression === n) return false
+  if (ts.isTypeOfExpression(p) || ts.isTypeQueryNode(p)) return false
+  return !NOT_A_LOAD.some((is) => is(p) && p.name === n)
+}
+
+/** Whether an `import X = require(…)` is exported (`export import X = …`): it passes the module on. */
+const exportedImportEquals = (n) => !!n.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
 
 /** A TypeScript source's extension: .ts, .tsx, and the module kinds .mts and .cts (HI-3506: src has .mts files). */
 const SRC_EXT = /\.(tsx?|[mc]ts)$/
@@ -159,8 +185,10 @@ function fileEdges(root, file, text) {
       return names
     }
     const visit = (n) => {
-      if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text, clauseNames(n.importClause))
-      else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text, membersOf(n.name.text))
+      if (hiddenLoader(n)) add(`./${HIDDEN}`, null)
+      else if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text, clauseNames(n.importClause))
+      // An exported one passes the whole module on, as `export * as X from` would.
+      else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text, exportedImportEquals(n) ? null : membersOf(n.name.text))
       else if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) {
         const c = n.exportClause
         add(n.moduleSpecifier.text, !c ? null : ts.isNamespaceExport(c) ? null : c.elements.map((e) => (e.propertyName ?? e.name).text))
@@ -559,7 +587,8 @@ export function platformFolders(root, over = {}) {
 
 /**
  * Every module a file names: imports, re-exports, dynamic imports and requires (repo paths, no extension); HIDDEN for a
- * computed one. `reexported`: those it re-exports (`export … from`).
+ * computed one or a loader it can't follow (hiddenLoader). `reexported`: those it re-exports (`export … from`, `export
+ * import X = require(…)`).
  */
 function modulesNamed(root, file, text) {
   const out = new Set()
@@ -570,11 +599,16 @@ function modulesNamed(root, file, text) {
     if (m !== null) to.add(m)
   }
   const visit = (n) => {
-    if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) {
+    if (hiddenLoader(n)) out.add(HIDDEN)
+    else if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) {
       add(n.moduleSpecifier.text)
       add(n.moduleSpecifier.text, reexported)
     } else if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text)
-    else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text)
+    else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) {
+      add(n.moduleReference.expression.text)
+      // `export import X = require(…)` re-exports it (HI-3512).
+      if (exportedImportEquals(n)) add(n.moduleReference.expression.text, reexported)
+    }
     // A type's `import('./x').T`: a type taken from the folder is as much an import of it.
     else if (ts.isImportTypeNode(n) && ts.isLiteralTypeNode(n.argument) && ts.isStringLiteral(n.argument.literal)) add(n.argument.literal.text)
     else if (ts.isCallExpression(n) && (n.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(n.expression) && n.expression.text === 'require')) && n.arguments.length) {
@@ -600,7 +634,7 @@ export function sealBreaks(root, over = {}) {
   const folders = platformFolders(root, over)
   const folderOf = (m) => folders.find((d) => m === `${PLATFORM_DIR}/${d}` || m.startsWith(`${PLATFORM_DIR}/${d}/`)) ?? null
   // Only a file that could name a folder (a folder's name is a word: git, none) or load something computed is parsed.
-  const names = new RegExp(String.raw`/(${folders.join('|')})\b|${MAYBE_COMPUTED}`)
+  const names = new RegExp(String.raw`/(${folders.join('|')})\b|${MAYBE_HIDDEN}`)
   const out = []
   for (const { file, text } of filesOf(root, over)) {
     if (!file.startsWith('src/')) continue

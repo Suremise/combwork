@@ -85,6 +85,31 @@ describe('the Git/None cutover audit', () => {
       expect(sealed(body), body).toEqual([])
   })
 
+  // HI-3512: only `import(…)` and a call of `require` itself were read as loaders, so `require` under another name,
+  // `module.require` and `createRequire` loaded a platform's file (or a Git module) unseen.
+  it('fails require handed on, module.require and createRequire, wherever they are', () => {
+    const probe = 'src/main/sealProbe.ts'
+    const loaders = (spec: string): Record<string, string> => ({
+      'require handed on': `const r = require\nexport const f = () => r('${spec}')\n`,
+      'require in an object': `const o = { require }\nexport const f = () => o.require('${spec}')\n`,
+      'module.require': `export const f = () => module.require('${spec}')\n`,
+      "module['require']": `export const f = () => module['require']('${spec}')\n`,
+      'createRequire called at once': `import { createRequire } from 'node:module'\nexport const f = () => createRequire(import.meta.url)('${spec}')\n`,
+      'createRequire kept under another name': `import { createRequire as cr } from 'module'\nconst load = cr(import.meta.url)\nexport const f = () => load('${spec}')\n`,
+      'createRequire through a namespace': `import * as m from 'node:module'\nexport const f = () => m.createRequire(import.meta.url)('${spec}')\n`
+    })
+    for (const [form, body] of Object.entries(loaders('./platform/none/none'))) expect(sealBreaks(root, { [probe]: body }), form).toEqual(['src/main/sealProbe -> (computed specifier)'])
+    // The Git audit can't see the module either: the loader is its unlisted edge.
+    for (const [form, body] of Object.entries(loaders('./git'))) expect(run({ [probe]: body }).unlisted, form).toEqual(['src/main/sealProbe -> (computed specifier)'])
+    // A name that only looks like one loads nothing: typeof, a key, a member named so, a direct literal require.
+    for (const body of ["export const has = typeof require === 'function'\n", 'export const o = { require: 1 }\nexport type T = { require: number }\n', "export const s = require('./sessions')\n"])
+      expect(sealBreaks(root, { [probe]: body }), body).toEqual([])
+    // A registry's exported ImportEquals passes the platform's file on, as a re-export does.
+    const adapters = 'src/main/platform/adapters.ts'
+    expect(sealBreaks(root, { [adapters]: `export import NoneMod = require('./none/none')\n${text(adapters)}` })).toEqual(['src/main/platform/adapters -> src/main/platform/none/none (re-exported)'])
+    expect(sealBreaks(root, { [adapters]: `import NoneMod = require('./none/none')\n${text(adapters)}` })).toEqual([])
+  })
+
   it('reads .mts sources, the renderer\'s @root alias, and a registry passing a platform\'s files on', () => {
     expect(sources(root)).toContain('src/main/progressReporters/report.mts')
     expect(sealBreaks(root, { 'src/main/sealProbe.mts': "import { NoneAdapter } from './platform/none/none'\n" })).toEqual(['src/main/sealProbe -> src/main/platform/none/none'])
