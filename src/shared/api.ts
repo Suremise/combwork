@@ -190,6 +190,7 @@ import type { LockAsk, PruneAsk, RemotePrune, RepoHealth } from './gitHealth'
 import type { StashApplied, StashFile, StashList, StashRef, StashRequest } from './gitStashes'
 import type { BranchMoves, RestorePlan, RestoreRequest } from './gitMoves'
 import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from './gitFileRestore'
+import type { CommitActionDone, CommitActionRequest, CommitDetail } from './gitCommitView'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1177,6 +1178,12 @@ export interface CombworkRequests {
   'files:gitFileCommits': (projectPath: string, rel: string, page?: number) => FileCommits
   /** HI-3477: the Discard or Restore its confirm showed: the file's changes stashed first. Refused while anything works in the project folder. */
   'files:gitRestore': (projectPath: string, req: FileRestoreRequest) => FileRestored
+  /** HI-3471: History's Commit dialog: a commit's details and files, and why Revert… or Cherry-pick… can't be done now. */
+  'git:commitDetail': (projectPath: string, commit: string) => CommitDetail
+  /** HI-3471: one file of a commit against its first parent. */
+  'git:commitFileDiff': (projectPath: string, commit: string, file: string) => GitDiff
+  /** HI-3471: Revert… or Cherry-pick… onto the project folder's branch; a conflict leaves git mid-operation for Changes' panel. */
+  'git:commitAction': (projectPath: string, req: CommitActionRequest) => CommitActionDone
   /** The Changes tab's branch comparison (HI-1824, read-only): what can be compared, two branches, one file of them. */
   'git:compareLines': (projectPath: string) => CompareLines
   /** The Changes tab's leftover branches (HI-1823): every local branch, uncut, with its worktree and commits not in the target. */
@@ -1240,7 +1247,7 @@ export interface CombworkRequests {
   'git:renameRemote': (projectPath: string, from: string, to: string) => string
   /** What a local branch tracks (#1385): `remote`'s `remoteBranch`, or nothing (`remote` null); `pushFirst` makes it there first. */
   'git:setUpstream': (projectPath: string, branch: string, remote: string | null, remoteBranch?: string, pushFirst?: boolean, op?: string) => string
-  'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string, op?: string) => string
+  'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string, op?: string, at?: string) => string
   /** HI-3474: a local branch renamed at the commit shown; `onRemote`: the remote branch it tracks too (pushed, the old one deleted by lease). */
   'git:renameBranch': (projectPath: string, branch: BranchAt, to: string, onRemote?: boolean, op?: string) => string
   /** HI-3474: a tag deleted as shown (`sha`: its ref's whole value); with `remote`, on it first. */

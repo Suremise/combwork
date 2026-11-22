@@ -14,6 +14,7 @@ import * as health from './gitHealth'
 import * as stashes from './gitStashes'
 import * as moves from './gitMoves'
 import * as restore from './gitFileRestore'
+import * as commits from './gitCommitActions'
 import type { RepoOps } from '../repoOps'
 
 export const gitRepoOps: RepoOps = {
@@ -35,7 +36,7 @@ export const gitRepoOps: RepoOps = {
   push: (p, remote) => repo.push(p, remote),
   pushTo: (p, remote, scope, line) => repo.pushToRemote(p, remote, scope, line),
   setUpstream: (p, line, remote, remoteLine, pushFirst) => repo.setUpstream(p, line, remote, remoteLine, pushFirst),
-  createTag: (p, name, message, to) => repo.createTag(p, name, message, to),
+  createTag: (p, name, message, to, at) => repo.createTag(p, name, message, to, at),
   renameLine: (p, line, to, onRemote) => repo.renameBranch(p, line, to, onRemote),
   deleteTag: (p, tag, remote) => repo.deleteTag(p, tag, remote),
   pushTag: (p, name, remote) => repo.pushTag(p, name, remote),
@@ -63,5 +64,8 @@ export const gitRepoOps: RepoOps = {
   restore: (p, req) => moves.restoreBranch(p, req),
   fileRestorePlan: (p, rel, source, target, commit) => restore.restorePlan(p, rel, source, target, commit),
   fileCommits: (p, rel, page) => restore.fileCommits(p, rel, page),
-  restoreFile: (p, req, guard) => restore.restoreFile(p, req, guard)
+  restoreFile: (p, req, guard) => restore.restoreFile(p, req, guard),
+  commitDetail: (p, commit) => commits.commitDetail(p, commit),
+  commitFileDiff: (p, commit, file) => commits.commitFileDiff(p, commit, file),
+  commitAction: (p, req) => commits.commitAction(p, req)
 }

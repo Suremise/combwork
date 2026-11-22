@@ -505,5 +505,18 @@
   "service.gitRepo.tagPushRefused": "{remote} a un autre tag {name}, donc le push a été refusé (Combwork ne force jamais un push).",
   "service.gitRepo.tagPushOnlyFailed": "Impossible de faire un push du tag {name} vers {remote} : {why}",
   "service.gitRepo.renameStopped": "{step, select, push {{from} renommée en {to} ici, mais le push de {to} vers {remote} a été arrêté : il a peut-être atteint {remote}. {to} suit toujours {upstream}.} other {{from} renommée en {to} et envoyée vers {remote}, où elle suit maintenant {to}, mais la suppression de {old} là-bas a été arrêtée : elle y est peut-être encore.}} Actualise pour voir où en sont les choses.",
-  "service.gitRepo.renameTrackFailed": "{from} renommée en {to} et envoyée vers {remote}, mais impossible de lui faire suivre {remote}/{to} : {why} Elle suit toujours {upstream}, et {old} est toujours sur {remote}."
+  "service.gitRepo.renameTrackFailed": "{from} renommée en {to} et envoyée vers {remote}, mais impossible de lui faire suivre {remote}/{to} : {why} Elle suit toujours {upstream}, et {old} est toujours sur {remote}.",
+  "service.gitCommit.alreadyIn": "{branch} contient déjà ce commit.",
+  "service.gitCommit.detached": "Le dossier du projet est sur un HEAD détaché : passe d’abord sur une branche.",
+  "service.gitCommit.dirty": "Le dossier du projet a des modifications non commitées : commite-les ou mets-les de côté d’abord.",
+  "service.gitCommit.done": "{action, select, revert {Revert de {commit} fait sur {branch}} other {Cherry-pick de {commit} fait sur {branch}}} : le nouveau commit est {made}.",
+  "service.gitCommit.failed": "Git a refusé : {why}",
+  "service.gitCommit.invalid": "La demande était incorrecte : rien n’a été fait.",
+  "service.gitCommit.moved": "Le dossier du projet n’est plus sur {branch} au commit que tu as vu : rien n’a été fait. Regarde de nouveau.",
+  "service.gitCommit.noCommit": "Git n’a pas de commit {commit} : il a peut-être disparu. Regarde de nouveau.",
+  "service.gitCommit.notIn": "{branch} n’a pas ce commit, il n’y a donc rien à en annuler. Cherry-pick… l’y apporte.",
+  "service.gitCommit.stopped": "{action, select, revert {Le revert} other {Le cherry-pick}} de {commit} s’est arrêté sur {count, plural, one {un conflit dans # fichier} many {des conflits dans # fichiers} other {des conflits dans # fichiers}} : termine-le ou abandonne-le dans Gestion de versions → Modifications.",
+  "service.gitCommit.stoppedEmpty": "{action, select, revert {Le revert} other {Le cherry-pick}} de {commit} s’est arrêté : git dit qu’il ne changerait rien. Saute-le ou abandonne-le dans Gestion de versions → Modifications.",
+  "service.gitCommit.timedOut": "Git tournait encore après {seconds, number} secondes, alors Combwork l’a arrêté. Regarde Gestion de versions → Modifications avant de réessayer.",
+  "service.gitRepo.noTagCommit": "Git n’a pas de commit {commit} sur lequel créer un tag."
 }

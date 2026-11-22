@@ -644,5 +644,7 @@
   "tips.renameBranch.title": "Renomme une branche, sur son dépôt distant aussi",
   "tips.renameBranch.text": "Renommer… (✎) sur une branche dans Gestion de versions → Branches et dépôts distants lui donne un nouveau nom. Choisis La renommer là-bas aussi pour renommer aussi la branche distante qu’elle suit : l’ancien nom n’y est supprimé que si personne n’y a fait de push depuis ton dernier fetch.",
   "tips.tagPushDelete.title": "Faire un push d’un tag git ou le supprimer",
-  "tips.tagPushDelete.text": "Chaque tag dans Gestion de versions → Historique a Push… pour l’envoyer vers un dépôt distant, et Supprimer… pour le supprimer ici, ou aussi sur un dépôt distant pour que le prochain fetch ne le ramène pas."
+  "tips.tagPushDelete.text": "Chaque tag dans Gestion de versions → Historique a Push… pour l’envoyer vers un dépôt distant, et Supprimer… pour le supprimer ici, ou aussi sur un dépôt distant pour que le prochain fetch ne le ramène pas.",
+  "tips.commitDetails.text": "Clique sur un commit dans Gestion de versions → Historique pour voir ses fichiers et ses modifications. De là, Revert… ou Cherry-pick… l’appliquent à la branche du dossier du projet, et Nouvelle branche ici… et Créer un tag ici… partent de lui.",
+  "tips.commitDetails.title": "Revert, cherry-pick, branche ou tag d’un commit depuis l’Historique"
 }

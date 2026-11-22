@@ -540,7 +540,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'git:push': (p, remote, op) => netRun(p, op, () => repoOpHandlers['git:push'](p, remote)),
     'git:pushTo': (p, remote, scope, branch, op) => netRun(p, op, () => repoOpHandlers['git:pushTo'](p, remote, scope, branch)),
     'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst, op) => netRun(p, op, () => repoOpHandlers['git:setUpstream'](p, branch, remote, remoteBranch, pushFirst)),
-    'git:createTag': (p, name, message, pushTo, op) => netRun(p, op, () => repoOpHandlers['git:createTag'](p, name, message, pushTo)),
+    'git:createTag': (p, name, message, pushTo, op, at) => netRun(p, op, () => repoOpHandlers['git:createTag'](p, name, message, pushTo, op, at)),
     'git:renameBranch': (p, branch, to, onRemote, op) => netRun(p, op, () => repoOpHandlers['git:renameBranch'](p, branch, to, onRemote)),
     'git:deleteTag': (p, tag, remote, op) => netRun(p, op, () => repoOpHandlers['git:deleteTag'](p, tag, remote)),
     'git:pushTag': (p, name, remote, op) => netRun(p, op, () => repoOpHandlers['git:pushTag'](p, name, remote)),

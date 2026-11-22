@@ -505,5 +505,18 @@
   "service.workspace.sharedNames": "Agent names are unique across the workspace now, so each agent can be told apart. {shared}: they keep working, but rename one of each, e.g. {project}'s {agent} to {suggestion}.",
   "service.workspace.stillClosing": "{name} is still closing: wait for it to finish, then try again.",
   "service.workspace.stillOpening": "{name} is still opening: wait for it to finish, then try again.",
-  "service.workspace.twoCalled": "Two agents are called {name}"
+  "service.workspace.twoCalled": "Two agents are called {name}",
+  "service.gitCommit.alreadyIn": "{branch} has this commit already.",
+  "service.gitCommit.detached": "The project folder is on a detached HEAD: switch to a branch first.",
+  "service.gitCommit.dirty": "The project folder has uncommitted changes: commit them or set them aside first.",
+  "service.gitCommit.done": "{action, select, revert {Reverted {commit} on {branch}} other {Cherry-picked {commit} onto {branch}}}: the new commit is {made}.",
+  "service.gitCommit.failed": "Git refused: {why}",
+  "service.gitCommit.invalid": "That was asked for wrongly: nothing was done.",
+  "service.gitCommit.moved": "The project folder is no longer on {branch} at the commit you saw: nothing was done. Look again.",
+  "service.gitCommit.noCommit": "Git has no commit {commit}: it may be gone. Look again.",
+  "service.gitCommit.notIn": "{branch} doesn't have this commit, so there is nothing of it to revert. Cherry-pick… brings it in.",
+  "service.gitCommit.stopped": "{action, select, revert {The revert} other {The cherry-pick}} of {commit} stopped on {count, plural, one {a conflict in # file} other {conflicts in # files}}: finish or abort it in Version Control → Changes.",
+  "service.gitCommit.stoppedEmpty": "{action, select, revert {The revert} other {The cherry-pick}} of {commit} stopped: git says it would change nothing. Skip or abort it in Version Control → Changes.",
+  "service.gitCommit.timedOut": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at Version Control → Changes before you try again.",
+  "service.gitRepo.noTagCommit": "Git has no commit {commit} to tag."
 }

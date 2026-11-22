@@ -6026,6 +6026,29 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   fails after the stash says the changes are in Stashes. Git's work is a Git port operation (`restoreFile`: RepoOps'
   `restorePlan`, `fileCommits`, `restoreFile`; `platform/git/gitFileRestore.ts`); None lists none of it. Agents have
   no tool or route for it.
+- **A commit's details** (HI-3471, the design agreed on the card, request r13): a click on a commit in History (or on a
+  move's commit in Moves) opens the **Commit** dialog: its full hash with **Copy hash**, author, date, whole message, the
+  card it names (its `Combwork-Card` trailer, else a key at the start of its subject; a link when the board has the
+  card), and its files against its first parent (a root commit's against git's empty tree; a merge's: what it brought
+  in), each one's diff beside them, read-only. Git's work is a Git port operation (`commitActions`: RepoOps'
+  `commitDetail`, `commitFileDiff`, `commitAction`; `platform/git/gitCommitActions.ts`); None lists none of it. Agents
+  have no tool, route or count for it.
+  - **Revert…** (`git revert --no-edit <commit>`) and **Cherry-pick…** (`git cherry-pick <commit>`), `-m 1` for a
+    merge, act on the branch the project folder has checked out, never another: to pick onto another, switch to it
+    first. Each asks first, naming the commit and the branch, and uses git's prepared message (`GIT_EDITOR=true`) under
+    Commit's bound (`cw.git.commitMinutes`: hooks run). Revert is refused for a commit the branch doesn't have (the
+    tooltip points to Cherry-pick), Cherry-pick for one it has. A conflict, or a pick git finds empty, leaves git
+    mid-operation: the notice says so, with **Open in Changes**, whose panel (HI-3470) continues, skips or aborts it.
+  - **Refused**, the button greyed out with why, and checked again as it runs under the branch's merge slot, the
+    repository lock and the folder's fence: the project folder on a detached HEAD, or no longer on the branch and commit
+    the dialog read; uncommitted changes to tracked files (untracked ones don't count); and HI-3469's checks
+    (`projectFolderBusy`, `branchBusy`): a live session, a Combwork run or an agent's file lock, a working agent, an
+    operation under way or a file in conflict there, the branch an open card's line, a card the merge queue is testing
+    into it, its merge slot held or waited for.
+  - **Branch from here…** opens New branch… with Starts at set to the commit (switching to it unticked, as for any start
+    away from the folder's commit); **Tag here…** opens Create tag… for the commit (`createTag`'s `at`, a full commit id
+    git must have; Create tag… itself still tags the commit checked out). Each keeps its form's own checks.
+  - No range of commits, no editing the message, no push.
 - **A detach that keeps failing** (HI-3467): a clean free Git slot whose detach at its target fails for any other reason
   (an index lock, files in the way, git unable to read its head or the target's, the target's branch gone; not its
   card's own work, which keeps it) stays not ready, and the same record (`slot_operation:`, `what` `detach`) keeps git's

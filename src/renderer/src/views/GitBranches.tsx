@@ -219,6 +219,31 @@ const C = {
   dropsFailed: msg({ id: 'git.branch.dropsFailed', defaultMessage: "Couldn't read the commits {branch} would drop", description: "An error notification's title: reading an unmerged branch's commits before deleting it failed." })
 }
 
+/**
+ * HI-2807: New branch… with where it starts (`initialStart`: the folder's branch by default; HI-3471's Branch from here…
+ * a commit), created from the commit the form showed; switched to only when asked and the folder may move (`blocked`:
+ * why it may not). A failure stays in the dialog.
+ */
+export async function newBranchDialog(project: ProjectInfo, s: GitRepoSummary, initialStart: string, blocked: string | null): Promise<void> {
+  let draft: NewBranchDraft = { name: '', start: '', resolved: null, switchNow: false }
+  let done = ''
+  await confirm({
+    title: tr(M.newBranchTitle),
+    message: [tr(M.newBranchAt, { commit: s.head ?? '', onBranch: s.branch ? 'yes' : 'no', current: s.branch ?? '' }), blocked ? tr(M.newBranchBlocked, { why: blocked }) : ''].filter(Boolean).join(' '),
+    content: <NewBranchForm projectPath={project.path} onChange={(d) => (draft = d)} initialStart={initialStart} blocked={blocked} switchLabel={tr(M.switchNow)} placeholder={tr(M.branchPlaceholder)} />,
+    confirmLabel: tr(M.create),
+    run: async () => {
+      if (!draft.name) throw new Error(tr(M.enterName))
+      if (/\s/.test(draft.name)) throw new Error(tr(M.branchNoSpaces))
+      const start = draft.resolved ?? (await call('git:resolveStart', project.path, draft.start))
+      if (!start) throw new Error(tr(M.noStartAt, { ref: draft.start }))
+      done = await repoOp('git:createBranch', project.path, draft.name, !draft.switchNow, { ref: draft.start, commit: start.commit })
+    }
+  })
+  bumpGit(project.path)
+  if (done) notify('success', done)
+}
+
 export function BranchesSection({ project }: { project: ProjectInfo }) {
   const read = useGitRead('git:info', project)
   const busyFor = useFolderBusy(project)
@@ -291,26 +316,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
    * HI-2807: New branch… with where it starts (the folder's commit by default, or any branch, tag or commit), created
    * from the commit the form showed; switched to only when asked and the folder may move. A failure stays in the dialog.
    */
-  const newBranch = async (s: GitRepoSummary): Promise<void> => {
-    const blocked = busyFor('create')
-    let draft: NewBranchDraft = { name: '', start: '', resolved: null, switchNow: false }
-    let done = ''
-    await confirm({
-      title: tr(M.newBranchTitle),
-      message: [tr(M.newBranchAt, { commit: s.head ?? '', onBranch: s.branch ? 'yes' : 'no', current: s.branch ?? '' }), blocked ? tr(M.newBranchBlocked, { why: blocked }) : ''].filter(Boolean).join(' '),
-      content: <NewBranchForm projectPath={project.path} onChange={(d) => (draft = d)} initialStart={s.branch ?? s.head ?? ''} blocked={blocked} switchLabel={tr(M.switchNow)} placeholder={tr(M.branchPlaceholder)} />,
-      confirmLabel: tr(M.create),
-      run: async () => {
-        if (!draft.name) throw new Error(tr(M.enterName))
-        if (/\s/.test(draft.name)) throw new Error(tr(M.branchNoSpaces))
-        const start = draft.resolved ?? (await call('git:resolveStart', project.path, draft.start))
-        if (!start) throw new Error(tr(M.noStartAt, { ref: draft.start }))
-        done = await repoOp('git:createBranch', project.path, draft.name, !draft.switchNow, { ref: draft.start, commit: start.commit })
-      }
-    })
-    bumpGit(project.path)
-    if (done) notify('success', done)
-  }
+  const newBranch = (s: GitRepoSummary): Promise<void> => newBranchDialog(project, s, s.branch ?? s.head ?? '', busyFor('create'))
 
   const pushNow = async (s: GitRepoSummary): Promise<void> => {
     if (s.upstream?.remote && !s.upstream.gone) return netAct('push', tr(M.pushFailed, { branch: s.branch ?? '' }), (op) => repoOp('git:push', project.path, undefined, op))

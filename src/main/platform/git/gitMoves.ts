@@ -186,24 +186,12 @@ async function planOf(projectPath: string, req: RestoreRequest): Promise<{ plan:
   if (from === to) refuse(combworkError(M.same, { branch }))
   if (place.where === 'slot') refuse(combworkError(M.inSlot, { branch, slot: place.slot ?? '' }, { kind: 'conflict' }))
   else if (place.where === 'worktree') refuse(combworkError(M.inWorktree, { branch, folder: place.folder ?? '' }, { kind: 'conflict' }))
-  const card = await lineCard(projectPath, branch)
-  if (card) refuse(combworkError(M.card, { branch, card: card.key }, { kind: 'conflict' }))
-  const testing = await queueTesting(projectPath, branch)
-  if (testing) refuse(combworkError(M.queue, { branch, card: testing }, { kind: 'conflict' }))
-  const slot = mergeSlots.list(projectPath).find((s) => s.branch === branch && ((s.holder && s.holder.kind !== 'user') || s.waiting.length))
-  if (slot) refuse(combworkError(M.slotHeld, { branch }, { kind: 'conflict' }))
+  const busy = await branchBusy(projectPath, branch)
+  if (busy) refuse(busy)
   if (where === 'project') {
-    const live = sessions.liveStates().find((x) => !!x.cwd && containsPlace(projectPath, x.cwd))
-    if (live) refuse(combworkError(M.session, { agent: live.agentName ?? live.agentId }, { kind: 'conflict' }))
-    const op = operationSync(projectPath)
-    if (op) refuse(combworkError(M.operation, { what: op === 'cherry-pick' ? 'cherryPick' : op }, { kind: 'conflict' }))
-    const { folderBuilders } = await import('../../workflow/queueHost')
-    const held = folderBuilders(workspaceOf(projectPath), projectPath)
-    if (held) refuse(combworkError(M.busy, { what: held[0] }, { kind: 'conflict' }))
-    const agent = await busyAgentIn(projectPath, projectPath)
-    if (agent) refuse(combworkError(M.agentBusy, { agent }, { kind: 'conflict' }))
-    const now = await folderChanges(projectPath)
-    if (now.conflicted.length) refuse(combworkError(M.conflicted, { file: now.conflicted[0] }, { kind: 'conflict' }))
+    const { refusal: folder, changed } = await projectFolderBusy(projectPath)
+    if (folder) refuse(folder)
+    const now = { changed }
     const d = await git(projectPath, ['diff', '--name-only', '--no-renames', '-z', from, to, '--'])
     if (!d.ok) throw refused(d)
     inTheWay = d.out.split('\0').filter((p) => p && now.changed.has(p))
@@ -211,6 +199,41 @@ async function planOf(projectPath: string, req: RestoreRequest): Promise<{ plan:
   }
   const plan: RestorePlan = { branch, from, to, dropped: dropped.list, droppedMore: dropped.more, back: back.list, backMore: back.more, where, inTheWay, upstream, pushedDropped, blocked: refusal ? shownText((refusal as CombworkError).text) : null }
   return { plan, refusal }
+}
+
+/**
+ * What keeps a branch from being moved by the user now (HI-3469; HI-3471's Revert and Cherry-pick too): an open card's
+ * line (its builder moves it), a card the merge queue is testing into it, or its merge slot held or waited for by an
+ * agent or the queue. Null: nothing.
+ */
+export async function branchBusy(projectPath: string, branch: string): Promise<CombworkError | null> {
+  const card = await lineCard(projectPath, branch)
+  if (card) return combworkError(M.card, { branch, card: card.key }, { kind: 'conflict' })
+  const testing = await queueTesting(projectPath, branch)
+  if (testing) return combworkError(M.queue, { branch, card: testing }, { kind: 'conflict' })
+  const slot = mergeSlots.list(projectPath).find((s) => s.branch === branch && ((s.holder && s.holder.kind !== 'user') || s.waiting.length))
+  if (slot) return combworkError(M.slotHeld, { branch }, { kind: 'conflict' })
+  return null
+}
+
+/**
+ * What keeps the project folder from being changed by the user now (HI-3469; HI-3471's too), the first of: a live
+ * session there, an operation under way, a Combwork run or an agent's file lock, an agent working, a file in conflict.
+ * With its uncommitted files (staged, unstaged, untracked), for the caller's own check.
+ */
+export async function projectFolderBusy(projectPath: string): Promise<{ refusal: CombworkError | null; changed: Set<string> }> {
+  const live = sessions.liveStates().find((x) => !!x.cwd && containsPlace(projectPath, x.cwd))
+  if (live) return { refusal: combworkError(M.session, { agent: live.agentName ?? live.agentId }, { kind: 'conflict' }), changed: new Set() }
+  const op = operationSync(projectPath)
+  if (op) return { refusal: combworkError(M.operation, { what: op === 'cherry-pick' ? 'cherryPick' : op }, { kind: 'conflict' }), changed: new Set() }
+  const { folderBuilders } = await import('../../workflow/queueHost')
+  const held = folderBuilders(workspaceOf(projectPath), projectPath)
+  if (held) return { refusal: combworkError(M.busy, { what: held[0] }, { kind: 'conflict' }), changed: new Set() }
+  const agent = await busyAgentIn(projectPath, projectPath)
+  if (agent) return { refusal: combworkError(M.agentBusy, { agent }, { kind: 'conflict' }), changed: new Set() }
+  const now = await folderChanges(projectPath)
+  if (now.conflicted.length) return { refusal: combworkError(M.conflicted, { file: now.conflicted[0] }, { kind: 'conflict' }), changed: now.changed }
+  return { refusal: null, changed: now.changed }
 }
 
 /** The card the merge queue is testing into `branch` now, by its key; null with none. */

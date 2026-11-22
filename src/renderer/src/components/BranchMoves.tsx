@@ -12,6 +12,7 @@ import { useNow } from '../usage'
 import { timeAgo } from '../util'
 import { Pager } from './DataTable'
 import { IconButton, Tooltip } from './ui'
+import { CommitDialog } from './CommitDialog'
 
 // HI-3469: History's Moves (SPEC §16.10.2, Moves): a local branch's moves as git's reflog keeps them, newest first, in
 // plain words where Combwork knows them, each but the newest with Restore to here…, which asks first, showing what it
@@ -138,6 +139,8 @@ export function MovesSection({ project, view, onView }: { project: ProjectInfo; 
   // Read again when the project's git changes here (a commit, a merge), as History's commits are.
   const version = useStore((s) => s.gitVersion[project.path] ?? 0)
   const [busy, setBusy] = useState(false)
+  // HI-3471: the commit whose dialog is open.
+  const [shownCommit, setShownCommit] = useState<string | null>(null)
   useNow(60000)
   const key = JSON.stringify([project.path, mine.branch, mine.page])
   useEffect(() => {
@@ -240,8 +243,9 @@ export function MovesSection({ project, view, onView }: { project: ProjectInfo; 
                       </button>
                     </Tooltip>
                   )}
-                  <code className="git-hash">{row.short}</code>
-                  <span className="git-subject faint">{row.subject}</span>
+                  <span className="git-move-commit clickable" data-action="move-commit" onClick={() => offered('git:commitDetail') && setShownCommit(row.commit)}>
+                    <code className="git-hash">{row.short}</code> <span className="git-subject faint">{row.subject}</span>
+                  </span>
                   <span className="git-meta faint">{row.index === 0 ? tr(T.now) : row.at ? timeAgo(new Date(row.at).toISOString()) : ''}</span>
                   {!current && offered('git:restore') && (
                     <Tooltip content={tr(T.restoreTip, { branch: data.branch ?? '', commit: row.short })}>
@@ -257,6 +261,7 @@ export function MovesSection({ project, view, onView }: { project: ProjectInfo; 
           {data.pages > 1 && <Pager page={data.page} pages={data.pages} from={(data.page - 1) * MOVES_PAGE + 1} to={Math.min(data.page * MOVES_PAGE, data.total)} total={data.total} onPage={(page) => setPick({ ...mine, branch: data.branch, page })} />}
         </>
       )}
+      {shownCommit && <CommitDialog project={project} commit={shownCommit} onClose={() => setShownCommit(null)} />}
     </div>
   )
 }

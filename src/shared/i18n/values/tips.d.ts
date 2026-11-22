@@ -198,6 +198,8 @@ interface CombworkMessageValues {
   'tips.combworkTokens.text': undefined
   'tips.combworkTokens.title': undefined
   'tips.commandName': { command: string | number }
+  'tips.commitDetails.text': undefined
+  'tips.commitDetails.title': undefined
   'tips.compactFocus.text': { key: string | number }
   'tips.compactFocus.title': undefined
   'tips.compactSidebar.text': undefined

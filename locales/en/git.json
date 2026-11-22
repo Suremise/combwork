@@ -331,6 +331,90 @@
     "defaultMessage": "It holds this computer's sessions, transcript backups and launch settings, which don't belong in commits or shared copies.",
     "description": "Why .combwork should be kept out of version control and sync services: what Combwork keeps there. Follows the notice's first sentence."
   },
+  "git.commit.actionTip": {
+    "defaultMessage": "{action, select, revert {Makes a commit on {branch} in the project folder that undoes this one. Runs git revert.} other {Copies this commit onto {branch} in the project folder. Runs git cherry-pick.}}",
+    "description": "HI-3471: the tooltip of Revert… or Cherry-pick… when it can be done. {branch} is the project folder's branch. Keep the git commands as they are. Keep the select keys."
+  },
+  "git.commit.askMessage": {
+    "defaultMessage": "{action, select, revert {A new commit on {branch}, in the project folder, undoes “{subject}”{merge, select, yes { (what the merge brought in, against its first parent)} other {}}.} other {A new commit on {branch}, in the project folder, makes the changes of “{subject}”{merge, select, yes { (what the merge brought in, against its first parent)} other {}}.}} It uses git’s own message. If git stops on a conflict, Version Control → Changes finishes or aborts it.",
+    "description": "HI-3471: under git.commit.askTitle: what Revert… or Cherry-pick… does. {subject} is the commit's subject; merge yes for a merge commit. Keep the select keys."
+  },
+  "git.commit.askTitle": {
+    "defaultMessage": "{action, select, revert {Revert {commit} on {branch}?} other {Cherry-pick {commit} onto {branch}?}}",
+    "description": "HI-3471: the question before Revert… or Cherry-pick…. {commit} is a short id; {branch} the project folder's branch. Keep the select keys."
+  },
+  "git.commit.binary": {
+    "defaultMessage": "Binary file",
+    "description": "HI-3471: in place of a file's diff in the Commit dialog when it is binary."
+  },
+  "git.commit.branchHere": {
+    "defaultMessage": "Branch from here…",
+    "description": "HI-3471: the Commit dialog's button: opens New branch… starting at this commit."
+  },
+  "git.commit.cherryPick": {
+    "defaultMessage": "Cherry-pick…",
+    "description": "HI-3471: the Commit dialog's button: copies this commit onto the project folder's branch, after asking (git cherry-pick). Git's word."
+  },
+  "git.commit.close": {
+    "defaultMessage": "Close",
+    "description": "HI-3471: the Commit dialog's close button."
+  },
+  "git.commit.confirm": {
+    "defaultMessage": "{action, select, revert {Revert} other {Cherry-pick}}",
+    "description": "HI-3471: the confirm button of the question before Revert… or Cherry-pick…. Keep the select keys."
+  },
+  "git.commit.copied": {
+    "defaultMessage": "Copied {commit}",
+    "description": "HI-3471: a notice after Copy hash. {commit} is the full hash."
+  },
+  "git.commit.copy": {
+    "defaultMessage": "Copy hash",
+    "description": "HI-3471: the Commit dialog's button: copies the commit's full hash."
+  },
+  "git.commit.diffFailed": {
+    "defaultMessage": "Couldn't show the file's changes: {error}",
+    "description": "HI-3471: in place of a file's diff in the Commit dialog when reading it failed."
+  },
+  "git.commit.failed": {
+    "defaultMessage": "Git couldn't do that",
+    "description": "HI-3471: the title of the error notice when Revert…, Cherry-pick… or reading a file failed or was refused."
+  },
+  "git.commit.files": {
+    "defaultMessage": "{n, plural, one {# file} other {# files}}",
+    "description": "HI-3471: the heading of the commit's files in the Commit dialog."
+  },
+  "git.commit.loadFailed": {
+    "defaultMessage": "Couldn't read the commit: {error}",
+    "description": "HI-3471: the Commit dialog when reading the commit failed. {error} is why."
+  },
+  "git.commit.loading": {
+    "defaultMessage": "Reading the commit…",
+    "description": "HI-3471: the Commit dialog while it reads the commit."
+  },
+  "git.commit.meta": {
+    "defaultMessage": "{author} · {when}",
+    "description": "HI-3471: under a commit's message in the Commit dialog: its author and when it was made (a date and time)."
+  },
+  "git.commit.openCard": {
+    "defaultMessage": "Open {card}",
+    "description": "HI-3471: the tooltip of the card key in the Commit dialog (from the commit's Combwork-Card trailer or its subject): opens the card."
+  },
+  "git.commit.openChanges": {
+    "defaultMessage": "Open in Changes",
+    "description": "HI-3471: a button on the notice after a revert or cherry-pick stopped: shows Version Control → Changes, whose panel finishes or aborts it. Changes is the section's name: keep it as it is named there."
+  },
+  "git.commit.revert": {
+    "defaultMessage": "Revert…",
+    "description": "HI-3471: the Commit dialog's button: makes a commit on the project folder's branch that undoes this one, after asking (git revert)."
+  },
+  "git.commit.tagHere": {
+    "defaultMessage": "Tag here…",
+    "description": "HI-3471: the Commit dialog's button: opens Create tag… for this commit."
+  },
+  "git.commit.title": {
+    "defaultMessage": "Commit {commit}",
+    "description": "HI-3471: the title of History's Commit dialog. {commit} is a short commit id."
+  },
   "git.fetch.at": {
     "defaultMessage": "As of the last fetch, {when}. Combwork never fetches by itself.",
     "description": "In Git → Branches & remotes, beside Fetch. {when} is how long ago, such as \"5m ago\"."
@@ -1866,6 +1950,10 @@
   "git.tags.heading": {
     "defaultMessage": "Tags",
     "description": "Heading in Git → History, followed by how many tags there are."
+  },
+  "git.tags.hereAbout": {
+    "defaultMessage": "Tags {commit}, “{subject}”. With a message, it's an annotated tag.",
+    "description": "HI-3471: Tag here…'s form (History's Commit dialog): it tags the commit {commit} (a short id) whose subject is {subject}."
   },
   "git.tags.message": {
     "defaultMessage": "Message",

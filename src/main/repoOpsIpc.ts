@@ -47,7 +47,7 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   'git:push': (p, remote) => opsAt('git:push').push(p, remote ? String(remote) : undefined),
   'git:pushTo': (p, remote, scope, branch) => opsAt('git:pushTo').pushTo(p, String(remote ?? ''), scope === 'all' ? 'all' : 'branch', branch ? String(branch) : undefined),
   'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst) => opsAt('git:setUpstream').setUpstream(p, String(branch ?? ''), remote == null ? null : String(remote), String(remoteBranch ?? ''), !!pushFirst),
-  'git:createTag': (p, name, message, pushTo) => opsAt('git:createTag').createTag(p, String(name ?? ''), String(message ?? ''), pushTo ? String(pushTo) : undefined),
+  'git:createTag': (p, name, message, pushTo, _op, at) => opsAt('git:createTag').createTag(p, String(name ?? ''), String(message ?? ''), pushTo ? String(pushTo) : undefined, at ? String(at) : undefined),
   // HI-3474 (reaching a remote, they are ipc.ts' too, under the window's Cancel).
   'git:renameBranch': (p, branch, to, onRemote) => opsAt('git:renameBranch').renameLine(p, branchAtArg(branch), String(to ?? ''), onRemote === true),
   'git:deleteTag': (p, tag, remote) => opsAt('git:deleteTag').deleteTag(p, branchAtArg(tag), remote ? String(remote) : null),
@@ -101,5 +101,9 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   'files:gitRestore': async (p, req) => {
     const ops = opsAt('files:gitRestore')
     return (await import('./fileRestorePanel')).restoreAt(workspace, p, req, ops)
-  }
+  },
+  // HI-3471: History's Commit dialog (the requests checked by the port, gitCommitActions.ts).
+  'git:commitDetail': (p, commit) => opsAt('git:commitDetail').commitDetail(workspace.assertProject(p), commit),
+  'git:commitFileDiff': (p, commit, file) => opsAt('git:commitFileDiff').commitFileDiff(workspace.assertProject(p), commit, String(file ?? '')),
+  'git:commitAction': (p, req) => opsAt('git:commitAction').commitAction(workspace.assertProject(p), req)
 }

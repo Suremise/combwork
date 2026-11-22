@@ -147,6 +147,18 @@ interface CombworkMessageValues {
   'service.git.outside': undefined
   'service.git.tooLarge': { kb: number }
   'service.gitCancel.taken': undefined
+  'service.gitCommit.alreadyIn': { branch: string | number }
+  'service.gitCommit.detached': undefined
+  'service.gitCommit.dirty': undefined
+  'service.gitCommit.done': { action: string; commit: string | number; branch: string | number; made: string | number }
+  'service.gitCommit.failed': { why: string | number }
+  'service.gitCommit.invalid': undefined
+  'service.gitCommit.moved': { branch: string | number }
+  'service.gitCommit.noCommit': { commit: string | number }
+  'service.gitCommit.notIn': { branch: string | number }
+  'service.gitCommit.stopped': { action: string; commit: string | number; count: number }
+  'service.gitCommit.stoppedEmpty': { action: string; commit: string | number }
+  'service.gitCommit.timedOut': { seconds: number }
   'service.gitCompare.noBranch': { branch: string | number }
   'service.gitHealth.agentBusy': { agent: string | number; folder: string | number }
   'service.gitHealth.busy': { folder: string | number; what: string | number }
@@ -240,6 +252,7 @@ interface CombworkMessageValues {
   'service.gitRepo.noRemotesFetch': undefined
   'service.gitRepo.noStart': { ref: string | number }
   'service.gitRepo.noTag': { name: string | number }
+  'service.gitRepo.noTagCommit': { commit: string | number }
   'service.gitRepo.noTarget': { target: string | number }
   'service.gitRepo.noUpstream': { branch: string | number }
   'service.gitRepo.notOnRemote': { remote: string | number; branch: string | number }

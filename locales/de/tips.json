@@ -644,5 +644,7 @@
   "tips.renameBranch.title": "Einen Branch umbenennen, auch auf seinem Remote",
   "tips.renameBranch.text": "Umbenennen… (✎) an einem Branch in Versionsverwaltung → Branches & Remotes gibt ihm einen neuen Namen. Wähle „Dort auch umbenennen“, um auch den Remote-Branch umzubenennen, den er verfolgt: Der alte Name dort wird nur gelöscht, wenn seit deinem letzten Fetch niemand dorthin gepusht hat.",
   "tips.tagPushDelete.title": "Einen Git-Tag pushen oder löschen",
-  "tips.tagPushDelete.text": "Jeder Tag in Versionsverwaltung → Verlauf hat Pushen…, um ihn zu einem Remote zu senden, und Löschen…, um ihn hier zu löschen, oder auch auf einem Remote, damit der nächste Fetch ihn nicht zurückbringt."
+  "tips.tagPushDelete.text": "Jeder Tag in Versionsverwaltung → Verlauf hat Pushen…, um ihn zu einem Remote zu senden, und Löschen…, um ihn hier zu löschen, oder auch auf einem Remote, damit der nächste Fetch ihn nicht zurückbringt.",
+  "tips.commitDetails.text": "Klicke in Versionsverwaltung → Verlauf auf einen Commit, um seine Dateien und Änderungen zu sehen. Von dort wendest du ihn mit „Revert…“ oder „Cherry-Pick…“ auf den Branch des Projektordners an oder legst mit „Branch ab hier…“ und „Hier taggen…“ einen Branch oder ein Tag an ihm an.",
+  "tips.commitDetails.title": "Einen Commit aus dem Verlauf reverten, cherry-picken, abzweigen oder taggen"
 }

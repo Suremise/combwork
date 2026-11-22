@@ -624,6 +624,51 @@
     "note": "HI-3372: an error when the window starts an action (a commit, a fetch, a push) under an id another one still runs under: it isn't started again.",
     "audience": "both"
   },
+  "service.gitCommit.alreadyIn": {
+    "text": "{branch} has this commit already.",
+    "note": "HI-3471: why Cherry-pick… can't be done: the project folder's branch ({branch}) already contains the commit.",
+    "audience": "both"
+  },
+  "service.gitCommit.detached": {
+    "text": "The project folder is on a detached HEAD: switch to a branch first.",
+    "note": "HI-3471: why Revert… or Cherry-pick… can't be done: the project folder has no branch checked out (git's detached HEAD).",
+    "audience": "both"
+  },
+  "service.gitCommit.dirty": {
+    "text": "The project folder has uncommitted changes: commit them or set them aside first.",
+    "note": "HI-3471: why Revert… or Cherry-pick… can't be done: tracked files in the project folder have uncommitted changes (git would refuse, or mix them in).",
+    "audience": "both"
+  },
+  "service.gitCommit.failed": {
+    "text": "Git refused: {why}",
+    "note": "HI-3471: an error from Revert… or Cherry-pick…: git's own command failed; {why} is git's error line, in English.",
+    "audience": "both"
+  },
+  "service.gitCommit.invalid": {
+    "text": "That was asked for wrongly: nothing was done.",
+    "note": "HI-3471: an error from History's Commit dialog: the request was malformed (not reached from the window).",
+    "audience": "both"
+  },
+  "service.gitCommit.moved": {
+    "text": "The project folder is no longer on {branch} at the commit you saw: nothing was done. Look again.",
+    "note": "HI-3471: an error from Revert… or Cherry-pick…: the project folder switched branch, or its branch ({branch}) moved, since the dialog read it.",
+    "audience": "both"
+  },
+  "service.gitCommit.noCommit": {
+    "text": "Git has no commit {commit}: it may be gone. Look again.",
+    "note": "HI-3471: an error from History's Commit dialog: the commit ({commit}, a short id) isn't in the repository.",
+    "audience": "both"
+  },
+  "service.gitCommit.notIn": {
+    "text": "{branch} doesn't have this commit, so there is nothing of it to revert. Cherry-pick… brings it in.",
+    "note": "HI-3471: why Revert… can't be done: the project folder's branch ({branch}) doesn't contain the commit.",
+    "audience": "both"
+  },
+  "service.gitCommit.timedOut": {
+    "text": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at Version Control → Changes before you try again.",
+    "note": "HI-3471: an error from Revert… or Cherry-pick…: git ran past Settings → Advanced's longest commit time ({seconds}) and was ended.",
+    "audience": "both"
+  },
   "service.gitCompare.noBranch": {
     "text": "There's no branch {branch} here any more.",
     "note": "An error comparing two branches in the Changes tab: the branch {branch} was deleted or renamed since the list was read.",
@@ -967,6 +1012,11 @@
   "service.gitRepo.noTag": {
     "text": "There's no tag {name}.",
     "note": "HI-3474: an error deleting or pushing a tag in Version Control → History: the repository has no tag called {name}.",
+    "audience": "both"
+  },
+  "service.gitRepo.noTagCommit": {
+    "text": "Git has no commit {commit} to tag.",
+    "note": "HI-3471: an error from Tag here… (History's Commit dialog): the commit ({commit}, a short id) isn't in the repository.",
     "audience": "both"
   },
   "service.gitRepo.noTarget": {

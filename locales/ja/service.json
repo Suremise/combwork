@@ -505,5 +505,18 @@
   "service.gitRepo.tagPushRefused": "{remote}には別のタグ{name}があるため、プッシュは拒否されました（Combworkは強制プッシュしません）。",
   "service.gitRepo.tagPushOnlyFailed": "タグ{name}を{remote}にプッシュできませんでした：{why}",
   "service.gitRepo.renameStopped": "{step, select, push {ここでは{from}の名前を{to}に変更しましたが、{to}の{remote}へのプッシュは停止されました：{remote}に届いている可能性があります。{to}は引き続き{upstream}を追跡します。} other {{from}の名前を{to}に変更して{remote}にプッシュし、今は{to}を追跡していますが、そちらの{old}の削除は停止されました：まだ残っている可能性があります。}} 更新して現在の状態を確認してください。",
-  "service.gitRepo.renameTrackFailed": "{from}の名前を{to}に変更して{remote}にプッシュしましたが、{remote}/{to}を追跡するように設定できませんでした：{why} 引き続き{upstream}を追跡しており、{old}はまだ{remote}にあります。"
+  "service.gitRepo.renameTrackFailed": "{from}の名前を{to}に変更して{remote}にプッシュしましたが、{remote}/{to}を追跡するように設定できませんでした：{why} 引き続き{upstream}を追跡しており、{old}はまだ{remote}にあります。",
+  "service.gitCommit.alreadyIn": "{branch}にはこのコミットがすでに含まれています。",
+  "service.gitCommit.detached": "プロジェクトフォルダーは detached HEAD です。先にブランチに切り替えてください。",
+  "service.gitCommit.dirty": "プロジェクトフォルダーに未コミットの変更があります。先にコミットするか退避してください。",
+  "service.gitCommit.done": "{action, select, revert {{branch}で{commit}をリバートしました} other {{commit}を{branch}にチェリーピックしました}}：新しいコミットは{made}です。",
+  "service.gitCommit.failed": "Gitが拒否しました：{why}",
+  "service.gitCommit.invalid": "要求の形式が正しくありませんでした。何も行っていません。",
+  "service.gitCommit.moved": "プロジェクトフォルダーは、表示した時点のコミットの{branch}上にもうありません。何も行っていません。もう一度確認してください。",
+  "service.gitCommit.noCommit": "Gitにコミット{commit}がありません。なくなっている可能性があります。もう一度確認してください。",
+  "service.gitCommit.notIn": "{branch}にはこのコミットが含まれていないため、リバートするものがありません。「チェリーピック…」で取り込めます。",
+  "service.gitCommit.stopped": "{commit}の{action, select, revert {リバート} other {チェリーピック}}が{count, plural, other {#個のファイルのコンフリクト}}で停止しました。「バージョン管理」→「変更」で完了または中止してください。",
+  "service.gitCommit.stoppedEmpty": "{commit}の{action, select, revert {リバート} other {チェリーピック}}が停止しました：Gitによると何も変更されません。「バージョン管理」→「変更」でスキップまたは中止してください。",
+  "service.gitCommit.timedOut": "Gitが{seconds, number}秒たっても実行中だったため、Combworkが終了させました。もう一度試す前に「バージョン管理」→「変更」を確認してください。",
+  "service.gitRepo.noTagCommit": "Gitにタグを付けるコミット{commit}がありません。"
 }

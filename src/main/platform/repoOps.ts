@@ -23,6 +23,7 @@ import type { StashApplied, StashFile, StashRef, StashRequest, StashRow } from '
 import type { GitDiff } from '../../shared/types'
 import type { BranchMoves, RestorePlan } from '../../shared/gitMoves'
 import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from '../../shared/gitFileRestore'
+import type { CommitActionDone, CommitDetail } from '../../shared/gitCommitView'
 
 /**
  * Which members each operation may call (HR3's s15): the port is handed out for one operation, typed down to its own
@@ -58,6 +59,7 @@ export interface OpMembers {
   deleteTag: 'deleteTag'
   pushTag: 'pushTag'
   restoreFile: 'fileRestorePlan' | 'fileCommits' | 'restoreFile'
+  commitActions: 'commitDetail' | 'commitFileDiff' | 'commitAction'
 }
 
 /** The port as handed out for one operation: its own members only. */
@@ -100,7 +102,8 @@ export interface RepoOps {
   /** HI-3474: a line renamed at the commit shown; with `onRemote`, the remote line it tracks too. */
   renameLine(projectPath: string, line: BranchAt, to: string, onRemote: boolean): Promise<string>
   // Tags, identity, initialising.
-  createTag(projectPath: string, name: string, message: string, pushTo?: string): Promise<string>
+  /** A tag on the commit checked out, or (HI-3471's Tag here…) on `at`, a commit in full. */
+  createTag(projectPath: string, name: string, message: string, pushTo?: string, at?: string): Promise<string>
   /** HI-3474: a tag deleted as shown (`sha`, its ref's whole value); with `remote`, there first. */
   deleteTag(projectPath: string, tag: BranchAt, remote: string | null): Promise<string>
   /** HI-3474: a tag pushed to a remote, never forced. */
@@ -177,4 +180,11 @@ export interface RepoOps {
    * the folder's fence, refused while anything works there; `guard` runs there before git does and refuses by throwing.
    */
   restoreFile(projectPath: string, req: FileRestoreRequest, guard?: () => Promise<void> | void): Promise<FileRestored>
+  // HI-3471: History's Commit dialog, the user's click at a time (requests as sent, checked).
+  /** A commit's details and files, and whether Revert… and Cherry-pick… can be done now. */
+  commitDetail(projectPath: string, commit: unknown): Promise<CommitDetail>
+  /** One file of a commit against its first parent. */
+  commitFileDiff(projectPath: string, commit: unknown, file: string): Promise<GitDiff>
+  /** Revert… or Cherry-pick… onto the project folder's branch, under its merge slot, the repository lock and its fence. */
+  commitAction(projectPath: string, req: unknown): Promise<CommitActionDone>
 }

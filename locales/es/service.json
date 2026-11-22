@@ -505,5 +505,18 @@
   "service.gitRepo.tagPushRefused": "{remote} tiene otra etiqueta {name}, así que se rechazó el push (Combwork nunca fuerza un push).",
   "service.gitRepo.tagPushOnlyFailed": "No se pudo hacer push de la etiqueta {name} a {remote}: {why}",
   "service.gitRepo.renameStopped": "{step, select, push {Se renombró {from} a {to} aquí, pero se detuvo el push de {to} a {remote}: puede que haya llegado a {remote}. {to} sigue siguiendo a {upstream}.} other {Se renombró {from} a {to} y se hizo push a {remote}, donde ahora sigue a {to}, pero se detuvo la eliminación de {old} allí: puede que siga allí.}} Actualiza para ver cómo están las cosas.",
-  "service.gitRepo.renameTrackFailed": "Se renombró {from} a {to} y se hizo push a {remote}, pero no se pudo hacer que siga a {remote}/{to}: {why} Sigue siguiendo a {upstream}, y {old} sigue en {remote}."
+  "service.gitRepo.renameTrackFailed": "Se renombró {from} a {to} y se hizo push a {remote}, pero no se pudo hacer que siga a {remote}/{to}: {why} Sigue siguiendo a {upstream}, y {old} sigue en {remote}.",
+  "service.gitCommit.alreadyIn": "{branch} ya tiene este commit.",
+  "service.gitCommit.detached": "La carpeta del proyecto está en un HEAD separado: cambia primero a una rama.",
+  "service.gitCommit.dirty": "La carpeta del proyecto tiene cambios sin commit: haz commit de ellos o apártalos primero.",
+  "service.gitCommit.done": "{action, select, revert {Se hizo revert de {commit} en {branch}} other {Se hizo cherry-pick de {commit} en {branch}}}: el commit nuevo es {made}.",
+  "service.gitCommit.failed": "Git se negó: {why}",
+  "service.gitCommit.invalid": "La petición no es válida: no se hizo nada.",
+  "service.gitCommit.moved": "La carpeta del proyecto ya no está en {branch} en el commit que viste: no se hizo nada. Vuelve a mirar.",
+  "service.gitCommit.noCommit": "Git no tiene el commit {commit}: puede que ya no exista. Vuelve a mirar.",
+  "service.gitCommit.notIn": "{branch} no tiene este commit, así que no hay nada de él que revertir. Cherry-pick… lo trae.",
+  "service.gitCommit.stopped": "{action, select, revert {El revert} other {El cherry-pick}} de {commit} se detuvo en {count, plural, one {un conflicto en # archivo} many {conflictos en # archivos} other {conflictos en # archivos}}: termínalo o abórtalo en Control de versiones → Cambios.",
+  "service.gitCommit.stoppedEmpty": "{action, select, revert {El revert} other {El cherry-pick}} de {commit} se detuvo: git dice que no cambiaría nada. Omítelo o abórtalo en Control de versiones → Cambios.",
+  "service.gitCommit.timedOut": "Git seguía ejecutándose tras {seconds, number} segundos, así que Combwork lo detuvo. Revisa Control de versiones → Cambios antes de volver a intentarlo.",
+  "service.gitRepo.noTagCommit": "Git no tiene el commit {commit} para etiquetar."
 }

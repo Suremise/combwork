@@ -84,6 +84,27 @@ interface CombworkMessageValues {
   'git.combworkVcs.untrackedDetail': undefined
   'git.combworkVcs.untracking': undefined
   'git.combworkVcs.why': undefined
+  'git.commit.actionTip': { action: string; branch: string | number }
+  'git.commit.askMessage': { action: string; branch: string | number; subject: string | number; merge: string }
+  'git.commit.askTitle': { action: string; commit: string | number; branch: string | number }
+  'git.commit.binary': undefined
+  'git.commit.branchHere': undefined
+  'git.commit.cherryPick': undefined
+  'git.commit.close': undefined
+  'git.commit.confirm': { action: string }
+  'git.commit.copied': { commit: string | number }
+  'git.commit.copy': undefined
+  'git.commit.diffFailed': { error: string | number }
+  'git.commit.failed': undefined
+  'git.commit.files': { n: number }
+  'git.commit.loadFailed': { error: string | number }
+  'git.commit.loading': undefined
+  'git.commit.meta': { author: string | number; when: string | number }
+  'git.commit.openCard': { card: string | number }
+  'git.commit.openChanges': undefined
+  'git.commit.revert': undefined
+  'git.commit.tagHere': undefined
+  'git.commit.title': { commit: string | number }
   'git.fetch.at': { when: string | number }
   'git.fetch.button': undefined
   'git.fetch.failed': undefined
@@ -468,6 +489,7 @@ interface CombworkMessageValues {
   'git.tags.createButton': undefined
   'git.tags.dontPush': undefined
   'git.tags.heading': undefined
+  'git.tags.hereAbout': { commit: string | number; subject: string | number }
   'git.tags.message': undefined
   'git.tags.name': undefined
   'git.tags.noSpaces': undefined
