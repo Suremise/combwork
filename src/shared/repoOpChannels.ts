@@ -46,7 +46,11 @@ export const REPO_OP_CHANNELS = {
   'git:stashFiles': 'stashes',
   'git:stashDiff': 'stashes',
   'git:applyStash': 'stashes',
-  'git:dropStash': 'stashes'
+  'git:dropStash': 'stashes',
+  // HI-3474: Branches & remotes' Rename…, History's tag Delete and Push….
+  'git:renameBranch': 'renameLine',
+  'git:deleteTag': 'deleteTag',
+  'git:pushTag': 'pushTag'
 } as const satisfies Partial<Record<CombworkChannel, Operation>>
 
 export type RepoOpChannel = keyof typeof REPO_OP_CHANNELS

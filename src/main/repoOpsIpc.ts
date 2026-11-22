@@ -16,6 +16,9 @@ import { lineRepoOps } from './platform/repoOpsPorts'
 import { workspace } from './workspace'
 import type { OpsFor } from './platform/repoOps'
 
+/** A branch or tag as the window was shown it, whatever came over IPC. */
+const branchAtArg = (x: unknown): { name: string; sha: string } => ({ name: String((x as { name?: unknown } | null)?.name ?? ''), sha: String((x as { sha?: unknown } | null)?.sha ?? '') })
+
 /** The port for a channel's operation, refused (in the window's words) when its platform doesn't list it. */
 export const opsAt = <C extends RepoOpChannel>(channel: C): OpsFor<(typeof REPO_OP_CHANNELS)[C]> => lineRepoOps(REPO_OP_CHANNELS[channel])
 
@@ -45,6 +48,10 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   'git:pushTo': (p, remote, scope, branch) => opsAt('git:pushTo').pushTo(p, String(remote ?? ''), scope === 'all' ? 'all' : 'branch', branch ? String(branch) : undefined),
   'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst) => opsAt('git:setUpstream').setUpstream(p, String(branch ?? ''), remote == null ? null : String(remote), String(remoteBranch ?? ''), !!pushFirst),
   'git:createTag': (p, name, message, pushTo) => opsAt('git:createTag').createTag(p, String(name ?? ''), String(message ?? ''), pushTo ? String(pushTo) : undefined),
+  // HI-3474 (reaching a remote, they are ipc.ts' too, under the window's Cancel).
+  'git:renameBranch': (p, branch, to, onRemote) => opsAt('git:renameBranch').renameLine(p, branchAtArg(branch), String(to ?? ''), onRemote === true),
+  'git:deleteTag': (p, tag, remote) => opsAt('git:deleteTag').deleteTag(p, branchAtArg(tag), remote ? String(remote) : null),
+  'git:pushTag': (p, name, remote) => opsAt('git:pushTag').pushTag(p, String(name ?? ''), String(remote ?? '')),
   'git:setIdentity': (p, name, email) => opsAt('git:setIdentity').setIdentity(p, String(name ?? ''), String(email ?? '')),
   'git:initCheck': (p) => opsAt('git:initCheck').initCheck(p),
   'git:init': (p, opts) => opsAt('git:init').init(p, opts && typeof opts === 'object' ? opts : { gitignore: 'none' }),

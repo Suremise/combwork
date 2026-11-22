@@ -636,5 +636,9 @@
   "tips.resumeLongIdle.title": "Długo bezczynna rozmowa pyta przed wznowieniem",
   "tips.resumeLongIdle.text": "Rozmowa bezczynna dłużej niż godzinę najprawdopodobniej straciła pamięć podręczną promptu, więc jej wznowienie może kosztować wiele tokenów. Wznów mówi, jak długo jest bezczynna i jak duża jest, i proponuje zamiast tego Zarchiwizuj i zacznij nową.",
   "tips.stashes.text": "Kontrola wersji → Zmiany → Stashe pokazuje stashe repozytorium, te z Odłóż w Combwork razem z ich kartą: zobacz, co zawiera każdy, a potem go zastosuj, zdejmij (pop) lub usuń.",
-  "tips.stashes.title": "Przeglądaj, stosuj i usuwaj swoje stashe gita"
+  "tips.stashes.title": "Przeglądaj, stosuj i usuwaj swoje stashe gita",
+  "tips.renameBranch.title": "Zmień nazwę gałęzi, także w jej zdalnym repozytorium",
+  "tips.renameBranch.text": "Zmień nazwę… (✎) przy gałęzi w Kontrola wersji → Gałęzie i zdalne repozytoria nadaje jej nową nazwę. Wybierz Zmień nazwę także tam, by zmienić też nazwę śledzonej gałęzi zdalnej: stara nazwa zostaje tam usunięta tylko, jeśli nikt jej nie wypchnął od twojego ostatniego pobrania.",
+  "tips.tagPushDelete.title": "Wypchnij lub usuń tag gita",
+  "tips.tagPushDelete.text": "Każdy tag w Kontrola wersji → Historia ma Wypchnij…, by wysłać go do zdalnego repozytorium, i Usuń…, by usunąć go tutaj albo także w zdalnym repozytorium, żeby następne pobranie go nie przywróciło."
 }

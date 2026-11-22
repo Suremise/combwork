@@ -490,6 +490,8 @@ interface CombworkMessageValues {
   'tips.releaseOffer.title': undefined
   'tips.removeAll.text': undefined
   'tips.removeAll.title': undefined
+  'tips.renameBranch.text': undefined
+  'tips.renameBranch.title': undefined
   'tips.repositoryHealth.text': undefined
   'tips.repositoryHealth.title': undefined
   'tips.resolveOnBuilder.text': undefined
@@ -570,6 +572,8 @@ interface CombworkMessageValues {
   'tips.submodulesInDiffs.title': undefined
   'tips.submodulesLfs.text': undefined
   'tips.submodulesLfs.title': undefined
+  'tips.tagPushDelete.text': undefined
+  'tips.tagPushDelete.title': undefined
   'tips.taskbarBadge.text': undefined
   'tips.taskbarBadge.title': undefined
   'tips.teamPreset.text': undefined

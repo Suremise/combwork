@@ -825,6 +825,11 @@
       "ref": "plain"
     }
   },
+  "service.gitRepo.noTag": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
   "service.gitRepo.noTarget": {
     "placeholders": {
       "target": "plain"
@@ -909,10 +914,66 @@
       "why": "plain"
     }
   },
+  "service.gitRepo.renameAgentHere": {
+    "placeholders": {
+      "agent": "plain",
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.renameFailed": {
+    "placeholders": {
+      "branch": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.renameInUse": {
+    "placeholders": {
+      "why": "select",
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.renameMoved": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.renameNoUpstream": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.renameOldKept": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "remote": "plain",
+      "old": "plain"
+    }
+  },
+  "service.gitRepo.renamePushFailed": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "remote": "plain",
+      "why": "plain",
+      "upstream": "plain"
+    }
+  },
   "service.gitRepo.renameRemoteFailed": {
     "placeholders": {
       "remote": "plain",
       "why": "plain"
+    }
+  },
+  "service.gitRepo.renameRemoteTaken": {
+    "placeholders": {
+      "remote": "plain",
+      "to": "plain"
+    }
+  },
+  "service.gitRepo.renameUpstreamKept": {
+    "placeholders": {
+      "upstream": "plain"
     }
   },
   "service.gitRepo.setFailed": {
@@ -938,12 +999,49 @@
       "why": "plain"
     }
   },
+  "service.gitRepo.tagDeleteFailed": {
+    "placeholders": {
+      "name": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.tagMoved": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
   "service.gitRepo.tagPushFailed": {
     "placeholders": {
       "commit": "plain",
       "name": "plain",
       "remote": "plain",
       "why": "plain"
+    }
+  },
+  "service.gitRepo.tagPushOnlyFailed": {
+    "placeholders": {
+      "name": "plain",
+      "remote": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.tagPushRefused": {
+    "placeholders": {
+      "remote": "plain",
+      "name": "plain"
+    }
+  },
+  "service.gitRepo.tagRemoteFailed": {
+    "placeholders": {
+      "name": "plain",
+      "remote": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.tagRemoteRefused": {
+    "placeholders": {
+      "remote": "plain",
+      "name": "plain"
     }
   },
   "service.gitRepo.tagTaken": {

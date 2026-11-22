@@ -42,9 +42,14 @@ export type Operation =
   | 'repoHealth'
   /** HI-3472: Changes' Stashes: the repository's stashes listed and shown, applied, popped and dropped. */
   | 'stashes'
+  /** HI-3474: a line renamed (and the remote line it tracks, with it). */
+  | 'renameLine'
+  /** HI-3474: a tag deleted (here, and on a remote with it), or pushed to a remote. */
+  | 'deleteTag'
+  | 'pushTag'
 
 /** Every operation, in one place: Git lists them all (it has each today). */
-export const OPERATIONS: readonly Operation[] = ['switchLine', 'createLine', 'deleteLines', 'deleteRemoteLines', 'updateLine', 'mergeLine', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetch', 'pull', 'push', 'pushTo', 'setUpstream', 'createTag', 'setIdentity', 'init', 'ignoreRules', 'folderChanges', 'operationSteps', 'repoHealth', 'stashes']
+export const OPERATIONS: readonly Operation[] = ['switchLine', 'createLine', 'deleteLines', 'deleteRemoteLines', 'updateLine', 'mergeLine', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetch', 'pull', 'push', 'pushTo', 'setUpstream', 'createTag', 'setIdentity', 'init', 'ignoreRules', 'folderChanges', 'operationSteps', 'repoHealth', 'stashes', 'renameLine', 'deleteTag', 'pushTag']
 
 /**
  * How a platform's integration combines approved work (SPEC §16.3.1, HI-2822): merged from the card's line into a target

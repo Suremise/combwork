@@ -51,6 +51,9 @@ export interface OpMembers {
   operationSteps: 'operationStep'
   repoHealth: 'health' | 'pruneWorktrees' | 'removeLocks' | 'remotePrunePreview' | 'fetchPrune'
   stashes: 'stashes' | 'stashFiles' | 'stashDiff' | 'applyStash' | 'dropStash'
+  renameLine: 'renameLine'
+  deleteTag: 'deleteTag'
+  pushTag: 'pushTag'
 }
 
 /** The port as handed out for one operation: its own members only. */
@@ -90,8 +93,14 @@ export interface RepoOps {
   push(projectPath: string, remote?: string): Promise<string>
   pushTo(projectPath: string, remote: string, scope: PushScope, line?: string): Promise<string>
   setUpstream(projectPath: string, line: string, remote: string | null, remoteLine: string, pushFirst: boolean): Promise<string>
+  /** HI-3474: a line renamed at the commit shown; with `onRemote`, the remote line it tracks too. */
+  renameLine(projectPath: string, line: BranchAt, to: string, onRemote: boolean): Promise<string>
   // Tags, identity, initialising.
   createTag(projectPath: string, name: string, message: string, pushTo?: string): Promise<string>
+  /** HI-3474: a tag deleted as shown (`sha`, its ref's whole value); with `remote`, there first. */
+  deleteTag(projectPath: string, tag: BranchAt, remote: string | null): Promise<string>
+  /** HI-3474: a tag pushed to a remote, never forced. */
+  pushTag(projectPath: string, name: string, remote: string): Promise<string>
   setIdentity(projectPath: string, name: string, email: string): Promise<string>
   /** Initialise repository's dialog: what initialising would find (a read, for the operation it asks about). */
   initCheck(projectPath: string): Promise<GitInitCheck>

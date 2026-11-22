@@ -636,5 +636,9 @@
   "tips.resumeLongIdle.title": "长时间空闲的对话在恢复前会先询问",
   "tips.resumeLongIdle.text": "空闲超过一小时的对话很可能已失去提示词缓存，因此恢复它可能花费大量 Token。“恢复”会说明它已空闲多久、有多大，并提供“归档并新建会话”作为替代。",
   "tips.stashes.text": "版本控制 → 更改 → 储藏列出仓库的储藏，Combwork 搁置的会附上其卡片：查看每个储藏包含的内容，然后应用、弹出或删除它。",
-  "tips.stashes.title": "查看、应用或删除你的 git 储藏"
+  "tips.stashes.title": "查看、应用或删除你的 git 储藏",
+  "tips.renameBranch.title": "重命名分支，远程仓库上也一样",
+  "tips.renameBranch.text": "在“版本控制”→“分支与远程仓库”中，分支的“重命名…”（✎）会给它一个新名称。选择“那里也重命名”可同时重命名它跟踪的远程分支：只有在你上次获取之后没人推送过时，那里的旧名称才会被删除。",
+  "tips.tagPushDelete.title": "推送或删除 git 标签",
+  "tips.tagPushDelete.text": "“版本控制”→“历史”中的每个标签都有“推送…”，可将它发送到远程仓库；还有“删除…”，可在这里删除它，或同时在远程仓库上删除，这样下次获取时不会把它带回来。"
 }

@@ -9,6 +9,15 @@ interface CombworkMessageValues {
   'git.branch.deleteUnmergedMessage': { n: number; target: string | number; branch: string | number }
   'git.branch.deleteUnmergedTitle': { n: number; branch: string | number }
   'git.branch.dropsFailed': { branch: string | number }
+  'git.branchRename.about': { tracks: string; branch: string | number; upstream: string | number; remote: string | number }
+  'git.branchRename.busy': undefined
+  'git.branchRename.button': undefined
+  'git.branchRename.keepThere': { upstream: string | number }
+  'git.branchRename.newName': undefined
+  'git.branchRename.on': { remote: string | number }
+  'git.branchRename.there': undefined
+  'git.branchRename.tip': { branch: string | number }
+  'git.branchRename.title': { branch: string | number }
   'git.branches.branch': undefined
   'git.branches.cardOpen': { card: string | number; stage: string | number }
   'git.branches.checkedOut': { where: string; agent: string | number }
@@ -406,6 +415,20 @@ interface CombworkMessageValues {
   'git.switch.message': { current: string | number; branch: string | number }
   'git.switch.tip': { branch: string | number }
   'git.switch.title': { project: string | number; branch: string | number }
+  'git.tagDelete.about': { name: string | number; commit: string | number }
+  'git.tagDelete.also': { remote: string | number }
+  'git.tagDelete.busy': undefined
+  'git.tagDelete.button': undefined
+  'git.tagDelete.here': undefined
+  'git.tagDelete.tip': { name: string | number }
+  'git.tagDelete.title': { name: string | number }
+  'git.tagDelete.where': undefined
+  'git.tagPush.about': { name: string | number }
+  'git.tagPush.busy': undefined
+  'git.tagPush.button': undefined
+  'git.tagPush.remote': undefined
+  'git.tagPush.tip': { name: string | number }
+  'git.tagPush.title': { name: string | number }
   'git.tags.about': { onBranch: string; branch: string | number }
   'git.tags.busy': undefined
   'git.tags.create': undefined

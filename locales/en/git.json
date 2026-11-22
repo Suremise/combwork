@@ -31,6 +31,42 @@
     "defaultMessage": "Couldn't read the commits {branch} would drop",
     "description": "An error notification's title: reading an unmerged branch's commits before deleting it failed."
   },
+  "git.branchRename.about": {
+    "defaultMessage": "{tracks, select, yes {Renames {branch} here. It tracks {upstream}: choose below whether {remote} gets the new name too. Never forced: there, the old name is deleted only where it's as you last fetched it.} other {Renames {branch} here. It tracks no remote branch, so no remote changes.}}",
+    "description": "HI-3474: the form that renames the branch {branch}. {upstream} is the remote branch it tracks (origin/x) on the remote {remote}; {tracks} is no when it tracks none."
+  },
+  "git.branchRename.busy": {
+    "defaultMessage": "Renaming…",
+    "description": "HI-3474: the Rename form's button while it runs."
+  },
+  "git.branchRename.button": {
+    "defaultMessage": "Rename",
+    "description": "HI-3474: the Rename form's button."
+  },
+  "git.branchRename.keepThere": {
+    "defaultMessage": "{upstream} keeps its name",
+    "description": "HI-3474: a choice of the Rename form's drop-down: the remote branch {upstream} stays as it is (the local branch still tracks it)."
+  },
+  "git.branchRename.newName": {
+    "defaultMessage": "New name",
+    "description": "HI-3474: field of the Rename form: the branch's new name."
+  },
+  "git.branchRename.on": {
+    "defaultMessage": "On {remote}",
+    "description": "HI-3474: label of the Rename form's drop-down: what happens to the branch on the remote {remote} it tracks."
+  },
+  "git.branchRename.there": {
+    "defaultMessage": "Rename it there too",
+    "description": "HI-3474: a choice of the Rename form's drop-down: push the new name to the remote, track it, and delete the old name there."
+  },
+  "git.branchRename.tip": {
+    "defaultMessage": "Rename {branch}…",
+    "description": "HI-3474: tooltip on a local branch's rename button in Version Control → Branches & remotes. {branch} is its name."
+  },
+  "git.branchRename.title": {
+    "defaultMessage": "Rename {branch}",
+    "description": "HI-3474: title of the form that renames the local branch {branch}."
+  },
   "git.branches.branch": {
     "defaultMessage": "Branch",
     "description": "Heading in Git → Branches & remotes: the branch checked out in the project folder."
@@ -1618,6 +1654,62 @@
   "git.switch.title": {
     "defaultMessage": "Switch {project} to {branch}?",
     "description": "Title of the confirmation before switching the project folder's branch."
+  },
+  "git.tagDelete.about": {
+    "defaultMessage": "Deletes the tag {name} (on {commit}) here; the commit stays. A remote you choose loses it too, first, and only where it is this same tag: if it refuses, the tag stays here as well.",
+    "description": "HI-3474: the form that deletes the tag {name}, which points at the commit {commit} (a short hash)."
+  },
+  "git.tagDelete.also": {
+    "defaultMessage": "Here and on {remote}",
+    "description": "HI-3474: a choice of the Delete tag form's drop-down: in this repository and on the remote {remote}."
+  },
+  "git.tagDelete.busy": {
+    "defaultMessage": "Deleting…",
+    "description": "HI-3474: the Delete tag form's button while it runs."
+  },
+  "git.tagDelete.button": {
+    "defaultMessage": "Delete",
+    "description": "HI-3474: the Delete tag form's button."
+  },
+  "git.tagDelete.here": {
+    "defaultMessage": "Here only",
+    "description": "HI-3474: a choice of the Delete tag form's drop-down: only in this repository."
+  },
+  "git.tagDelete.tip": {
+    "defaultMessage": "Delete the tag {name}…",
+    "description": "HI-3474: tooltip on a tag's delete button in Version Control → History. {name} is the tag."
+  },
+  "git.tagDelete.title": {
+    "defaultMessage": "Delete the tag {name}",
+    "description": "HI-3474: title of the form that deletes the tag {name}."
+  },
+  "git.tagDelete.where": {
+    "defaultMessage": "Delete it",
+    "description": "HI-3474: label of the Delete tag form's drop-down: where the tag is deleted."
+  },
+  "git.tagPush.about": {
+    "defaultMessage": "Pushes the tag {name} to the remote you choose. Never forced: a remote with another tag of that name refuses it.",
+    "description": "HI-3474: the form that pushes the tag {name}."
+  },
+  "git.tagPush.busy": {
+    "defaultMessage": "Pushing…",
+    "description": "HI-3474: the Push tag form's button while it runs."
+  },
+  "git.tagPush.button": {
+    "defaultMessage": "Push",
+    "description": "HI-3474: the Push tag form's button."
+  },
+  "git.tagPush.remote": {
+    "defaultMessage": "Remote",
+    "description": "HI-3474: label of the Push tag form's drop-down of remotes."
+  },
+  "git.tagPush.tip": {
+    "defaultMessage": "Push the tag {name} to a remote…",
+    "description": "HI-3474: tooltip on a tag's push button in Version Control → History. {name} is the tag."
+  },
+  "git.tagPush.title": {
+    "defaultMessage": "Push the tag {name}",
+    "description": "HI-3474: title of the form that pushes the tag {name} to a remote."
   },
   "git.tags.about": {
     "defaultMessage": "{onBranch, select, yes {Tags the commit the project folder has checked out ({branch}). With a message, it's an annotated tag.} other {Tags the commit the project folder has checked out. With a message, it's an annotated tag.}}",

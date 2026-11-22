@@ -1517,3 +1517,131 @@ describe('Update from <target> (HI-1180)', () => {
     expect(head('card')).toBe(head('main'))
   })
 })
+
+// HI-3474: a branch renamed (and the remote branch it tracks, by lease), a tag deleted (and on a remote, there first) or
+// pushed, each by whole refs, never forced.
+describe('a branch renamed, a tag deleted or pushed (HI-3474)', () => {
+  const sha = (ref: string): string => git(proj, 'rev-parse', ref)
+  const has = (cwd: string, ref: string): boolean => {
+    try {
+      git(cwd, 'show-ref', '--verify', '-q', ref)
+      return true
+    } catch {
+      return false
+    }
+  }
+  const at = (name: string): { name: string; sha: string } => ({ name, sha: sha(`refs/heads/${name}`) })
+
+  it('renames a branch here only, at the commit shown, keeping what it tracks', async () => {
+    git(proj, 'branch', 'feature/a')
+    git(proj, 'push', '-q', '-u', 'origin', 'feature/a')
+    expect(await repo.renameBranch(proj, at('feature/a'), 'feature/b')).toBe('Renamed feature/a to feature/b. It still tracks origin/feature/a.')
+    expect([has(proj, 'refs/heads/feature/a'), has(proj, 'refs/heads/feature/b'), has(remote, 'refs/heads/feature/a')]).toEqual([false, true, true])
+    expect(git(proj, 'for-each-ref', '--format=%(upstream:short)', 'refs/heads/feature/b')).toBe('origin/feature/a')
+    git(proj, 'branch', 'plain')
+    expect(await repo.renameBranch(proj, at('plain'), 'plain2')).toBe('Renamed plain to plain2.')
+    expect(await repo.renameBranch(proj, at('plain2'), 'plain2')).toBe('plain2 keeps its name.')
+  })
+
+  it('refuses a branch that moved, a name taken by a branch or a tag, one in use, and the folder’s while an agent works there', async () => {
+    git(proj, 'branch', 'x')
+    const shown = at('x')
+    commit(proj, 'b.txt')
+    git(proj, 'branch', '-f', 'x', 'HEAD')
+    await expect(repo.renameBranch(proj, shown, 'y')).rejects.toThrow('x has moved since you were shown it: nothing was renamed. Look at it again.')
+    git(proj, 'branch', 'taken')
+    git(proj, 'tag', 'v1')
+    await expect(repo.renameBranch(proj, at('x'), 'taken')).rejects.toThrow('There’s already a branch taken.')
+    await expect(repo.renameBranch(proj, at('x'), 'v1')).rejects.toThrow('There’s a tag v1')
+    await expect(repo.renameBranch(proj, at('x'), 'bad name')).rejects.toThrow("bad name isn't a valid branch name.")
+    git(proj, 'checkout', '-q', '-b', 'mine')
+    await expect(repo.renameBranch(proj, at('main'), 'trunk')).rejects.toThrow('main is the branch work merges into: it keeps its name.')
+    git(proj, 'worktree', 'add', '-q', join(outer, 'wt'), 'taken')
+    await expect(repo.renameBranch(proj, at('taken'), 'taken2')).rejects.toThrow('taken is checked out in a worktree or slot: it keeps its name.')
+    cardLines = [{ line: 'x', stage: 'doing' }]
+    await expect(repo.renameBranch(proj, at('x'), 'x2')).rejects.toThrow('An open card works on x: it keeps its name.')
+    // The folder's own: refused while an agent works there, renamed (HEAD follows) once it doesn't.
+    agents = [{ id: 'a1', name: 'B1' }]
+    live = { a1: 'working' }
+    await expect(repo.renameBranch(proj, at('mine'), 'ours')).rejects.toThrow('B1 is working in the project folder, on mine: rename it once it has finished.')
+    live = { a1: 'idle' }
+    expect(await repo.renameBranch(proj, at('mine'), 'ours')).toBe('Renamed mine to ours.')
+    expect(git(proj, 'symbolic-ref', 'HEAD')).toBe('refs/heads/ours')
+    expect(asUser).toHaveBeenCalledWith(proj, 'mine', expect.any(Function))
+  })
+
+  it('renames the remote branch it tracks too: the new name pushed and tracked, the old one deleted only as last fetched', async () => {
+    git(proj, 'branch', 'feature/a')
+    git(proj, 'push', '-q', '-u', 'origin', 'feature/a')
+    expect(await repo.renameBranch(proj, at('feature/a'), 'feature/b', true)).toBe('Renamed feature/a to feature/b, here and on origin.')
+    expect([has(remote, 'refs/heads/feature/a'), has(remote, 'refs/heads/feature/b')]).toEqual([false, true])
+    expect(git(proj, 'for-each-ref', '--format=%(upstream:short)', 'refs/heads/feature/b')).toBe('origin/feature/b')
+    expect(has(proj, 'refs/remotes/origin/feature/a')).toBe(false)
+    // Someone pushed to the old name since the last fetch: the lease keeps it there, and the reply says what was done.
+    git(proj, 'branch', 'old')
+    git(proj, 'push', '-q', '-u', 'origin', 'old')
+    git(other, 'fetch', '-q')
+    git(other, 'checkout', '-q', 'old')
+    commit(other, 'theirs.txt')
+    git(other, 'push', '-q', 'origin', 'old')
+    await expect(repo.renameBranch(proj, at('old'), 'new', true)).rejects.toThrow("Renamed old to new and pushed it to origin, where it tracks new now, but origin refused to delete old: it has commits there you haven't fetched")
+    expect([has(remote, 'refs/heads/old'), has(remote, 'refs/heads/new'), has(proj, 'refs/heads/new')]).toEqual([true, true, true])
+  })
+
+  it('refuses a remote rename before anything when it tracks nothing, tracks a branch never deleted, or the remote has the name', async () => {
+    git(proj, 'branch', 'loose')
+    await expect(repo.renameBranch(proj, at('loose'), 'loose2', true)).rejects.toThrow("loose doesn't track a branch on a remote: there's nothing to rename there. Nothing was renamed.")
+    git(proj, 'branch', '--track', 'mainline', 'origin/main')
+    await expect(repo.renameBranch(proj, at('mainline'), 'm2', true)).rejects.toThrow("origin/main is the remote's default branch, the branch work merges into or the default branch: Combwork won't delete it there, so nothing was renamed.")
+    git(proj, 'branch', 'a')
+    git(proj, 'push', '-q', '-u', 'origin', 'a')
+    git(proj, 'push', '-q', 'origin', 'a:refs/heads/b')
+    await expect(repo.renameBranch(proj, at('a'), 'b', true)).rejects.toThrow('origin already has a branch b (as of the last fetch): nothing was renamed.')
+    expect([has(proj, 'refs/heads/loose'), has(proj, 'refs/heads/mainline'), has(proj, 'refs/heads/a')]).toEqual([true, true, true])
+  })
+
+  it('deletes a tag as it was shown, by its whole ref: a branch of its name stays', async () => {
+    git(proj, 'tag', 'light')
+    git(proj, 'tag', '-a', '-m', 'Annotated', 'v1')
+    git(proj, 'branch', 'v1')
+    const tags = (await repo.repoHistory(proj)).tags
+    const v1 = tags.find((t) => t.name === 'v1')!
+    expect(v1.sha).toBe(sha('refs/tags/v1'))
+    expect(v1.sha).not.toBe(sha('refs/heads/v1'))
+    expect(await repo.deleteTag(proj, { name: 'v1', sha: v1.sha })).toBe('Deleted the tag v1.')
+    expect([has(proj, 'refs/tags/v1'), has(proj, 'refs/heads/v1')]).toEqual([false, true])
+    const light = tags.find((t) => t.name === 'light')!
+    commit(proj, 'b.txt')
+    git(proj, 'tag', '-f', 'light')
+    await expect(repo.deleteTag(proj, { name: 'light', sha: light.sha })).rejects.toThrow('The tag light has changed since you were shown it: nothing was deleted. Look at it again.')
+    await expect(repo.deleteTag(proj, { name: 'gone', sha: light.sha })).rejects.toThrow("There's no tag gone.")
+  })
+
+  it('deletes a tag on a remote first, only where it is the same tag: refused there, it stays here too', async () => {
+    git(proj, 'tag', '-a', '-m', 'One', 'v1')
+    git(proj, 'push', '-q', 'origin', 'refs/tags/v1')
+    expect(await repo.deleteTag(proj, { name: 'v1', sha: sha('refs/tags/v1') }, 'origin')).toBe('Deleted the tag v1, here and on origin.')
+    expect([has(proj, 'refs/tags/v1'), has(remote, 'refs/tags/v1')]).toEqual([false, false])
+    // The remote's v2 is another tag: refused, and nothing deleted here.
+    git(proj, 'tag', 'v2')
+    git(other, 'tag', '-a', '-m', 'Theirs', 'v2')
+    git(other, 'push', '-q', 'origin', 'refs/tags/v2')
+    await expect(repo.deleteTag(proj, { name: 'v2', sha: sha('refs/tags/v2') }, 'origin')).rejects.toThrow('origin refused to delete the tag v2')
+    expect([has(proj, 'refs/tags/v2'), has(remote, 'refs/tags/v2')]).toEqual([true, true])
+    await expect(repo.deleteTag(proj, { name: 'v2', sha: sha('refs/tags/v2') }, 'nowhere')).rejects.toThrow("There's no remote nowhere.")
+  })
+
+  it('pushes a tag, never forced: there already, or another tag of its name there refuses', async () => {
+    git(proj, 'tag', 'v1')
+    expect(await repo.pushTag(proj, 'v1', 'origin')).toBe('Pushed the tag v1 to origin.')
+    expect(git(remote, 'rev-parse', 'refs/tags/v1')).toBe(sha('refs/tags/v1'))
+    expect(await repo.pushTag(proj, 'v1', 'origin')).toBe('origin already has the tag v1.')
+    git(proj, 'tag', 'v2')
+    commit(other, 'theirs.txt')
+    git(other, 'tag', 'v2')
+    git(other, 'push', '-q', 'origin', 'refs/tags/v2')
+    await expect(repo.pushTag(proj, 'v2', 'origin')).rejects.toThrow('origin has another tag v2, so the push was refused (Combwork never forces a push).')
+    expect(git(remote, 'rev-parse', 'refs/tags/v2')).not.toBe(sha('refs/tags/v2'))
+    await expect(repo.pushTag(proj, 'nope', 'origin')).rejects.toThrow("There's no tag nope.")
+  })
+})
