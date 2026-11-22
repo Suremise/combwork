@@ -55,9 +55,10 @@ export const isGitModule = (m) => GIT_FILES.has(m) || m.startsWith('src/main/pla
  * A dynamic import or require whose argument isn't one whole string literal (`import('./x')`, `require("./x", o)`): its
  * specifier may be computed, so the file is parsed (HI-3506: a prefilter on the first character alone passed
  * `import('./platform/' + id)` and a template with a substitution). A literal holding `$` or a backslash counts as maybe
- * computed: it only costs a parse.
+ * computed: it only costs a parse. A string, not a regex literal: the test selection's loader gate reads the code
+ * around strings (tests/e2e/relatedTests.mjs' LOADS_CODE).
  */
-const MAYBE_COMPUTED = /(?:import|require)\s*\((?!\s*(?:'[^'\\\r\n]*'|"[^"\\\r\n]*"|`[^`$\\]*`)\s*[,)])/.source
+const MAYBE_COMPUTED = String.raw`(?:import|require)\s*\((?!\s*(?:'[^'\\\r\n]*'|"[^"\\\r\n]*"|${'`'}[^${'`'}$\\]*${'`'})\s*[,)])`
 
 /** A file that could name a Git module: only these are parsed (the rest can't import one). */
 const MAY_NAME_GIT = new RegExp(String.raw`git|worktree|repoLock|folderFence|branchWatch|branchMerge|refHold|require\(|${MAYBE_COMPUTED}`, 'i')
