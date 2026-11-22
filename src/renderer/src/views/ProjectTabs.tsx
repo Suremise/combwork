@@ -46,6 +46,8 @@ import { useScopedLoad } from '../scopedLoad'
 import { oneAtATime, withinTime } from '@shared/coalesce'
 import { addSkill, deleteSkill, DeliveredSwitch, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
 import { CHANGES_ABOUT, unusedName, unusedPickerLabel } from '@shared/unusedWorktrees'
+import { useFileEvents } from '../fileEvents'
+import { scopedReader } from '../scopedReads'
 import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
 import { keyProblemText } from '../projectKeys'
@@ -1086,30 +1088,51 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
 
   const [statusError, setStatusError] = useState<string | null>(null)
   const [diffTry, setDiffTry] = useState(0)
-  // Each answer is for the folder (and base) it was asked about: an older one arriving late is dropped.
+  // Each answer is for the folder (and base) it was asked about: an older one arriving late is dropped, and an older
+  // folder's reads are over once another's begins (scopedReader, HR2's round 1), however the read was asked for.
   const statusFor = useRef('')
-  const statusLoads = useRef(0)
   const key = `${root}\n${base ?? ''}`
-  const load = useCallback(() => {
-    const n = ++statusLoads.current
-    void call('git:status', root, base).then(
-      (s) => {
-        if (n !== statusLoads.current) return
-        statusFor.current = `${root}\n${base ?? ''}`
-        setStatus(s)
-        setStatusError(null)
-        setFile((f) => (f && s.files.some((x) => x.path === f) ? f : s.files[0]?.path ?? null))
-      },
-      (e) => n === statusLoads.current && setStatusError(errorMessage(e))
-    )
-  }, [root, base])
+  const reader = useMemo(
+    () =>
+      scopedReader(
+        (scope) => {
+          const [r, b] = JSON.parse(scope) as [string, string | null]
+          return call('git:status', r, b ?? undefined)
+        },
+        (scope, answer) => {
+          const [r, b] = JSON.parse(scope) as [string, string | null]
+          if (!answer.ok) return setStatusError(errorMessage(answer.error))
+          const s = answer.value
+          statusFor.current = `${r}\n${b ?? ''}`
+          setStatus(s)
+          setStatusError(null)
+          setFile((f) => (f && s.files.some((x) => x.path === f) ? f : s.files[0]?.path ?? null))
+        }
+      ),
+    []
+  )
+  const load = useCallback(() => reader(JSON.stringify([root, base ?? null])), [reader, root, base])
   // Another folder: its files aren't these, so nothing shows until its own status arrives.
   useEffect(() => {
     setStatus(null)
     setStatusError(null)
     setFile(null)
   }, [root, base])
-  useEffect(load, [load, usageVersion])
+  // HI-3505: what git does outside Combwork (a merge stopped in conflict in a terminal, an abort) shows by itself, with
+  // the operation panel that reads on each status: read again as the status bar's git state is (the project's git
+  // changes here, its agents' work, the window's focus, the minute), and on writes in the folder shown (its live file
+  // events), each through `load`: one read at a time, one more after it for what came meanwhile (scopedReader).
+  const gitVersion = useStore((s) => s.gitVersion[owner.path] ?? 0)
+  useEffect(load, [load, usageVersion, gitVersion])
+  useEffect(() => {
+    window.addEventListener('focus', load)
+    const t = setInterval(load, 60_000)
+    return () => {
+      window.removeEventListener('focus', load)
+      clearInterval(t)
+    }
+  }, [load])
+  useFileEvents(root, load)
   // The Files tab's Show changes (HI-2743): the project folder's file, once its status is in.
   const jump = useStore((s) => (s.changesJump?.project === owner.path ? s.changesJump : null))
   useEffect(() => {
