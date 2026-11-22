@@ -26,7 +26,8 @@
 //   its session doesn't start (no SessionStart: Combwork sees it starting; nothing written, its title included, and no MCP
 //   server connected) until fake-start-go-<agent> (HI-1707: never ready; HI-2816). With fake-start-write-<agent>, it first
 //   writes a line of its start to its transcript.
-//   "tool NAME [ARG] [fail]" (a step) calls any tool by its name (ARG its file, URL or command), an error with "fail".
+//   "tool NAME [ARG] [fail]" (a step) calls any tool by its name (ARG its file, URL or command), an error with "fail";
+//   "tool NAME ARG heldby FILE": its result waits until the test makes FILE in its home (a call still running, HI-3508).
 //   "holduntil NAME": the turn doesn't end until the test makes a file NAME in its home (CLAUDE_CONFIG_DIR).
 //   "askwhen NAME": the permission prompt once the test makes a file NAME in its home (#667), not after a set time.
 //   "waitfile NAME" as a step ("waitfile go then cw cw_inbox {}"): the steps after it wait for that file.
@@ -868,7 +869,7 @@ async function runPrompt(text, enter = null) {
     const call = parseToolStep(step)
     if (call) await ownCall(call.tool, call.args)
     if (/\bcheckpoint\b/i.test(step)) await checkpoint()
-    for (const m of step.matchAll(/\btool\s+([\w.-]+)(?:\s+(?!fail\b)(\S+))?(\s+fail\b)?/gi)) await anyTool(m[1], m[2] ?? null, !!m[3])
+    for (const m of step.matchAll(/\btool\s+([\w.-]+)(?:\s+(?!fail\b|heldby\b)(\S+))?(\s+fail\b)?(?:\s+heldby\s+([\w.-]+))?/gi)) await anyTool(m[1], m[2] ?? null, !!m[3], m[4] ?? null)
     const queued = /\bqueued(same)?\s+(\d+)/i.exec(step)
     if (queued) await queuedMessages(Number(queued[2]), !!queued[1])
     const subtools = /\bsubtools\s+(\d+)/i.exec(step)
@@ -1029,12 +1030,17 @@ function envSetupAnswered(answer) {
 /**
  * "tool NAME [ARG] [fail]" (HI-2903, the Activity map's stations): a call of any tool by its name, with PreToolUse and
  * PostToolUse, ARG its file (Read, Edit, Write…), URL (WebFetch) or command (Bash), answered as an error with "fail".
+ * With `heldBy`, its result waits until the test makes that file in its home (two minutes at most, in case it died).
  */
-async function anyTool(name, arg, fail) {
+async function anyTool(name, arg, fail, heldBy = null) {
   const id = `toolu_any_${randomUUID().slice(0, 8)}`
   const input = /^(read|edit|write|multiedit|notebookedit)$/i.test(name) ? { file_path: arg ?? path.join(cwd, 'x.txt') } : /^webfetch$/i.test(name) ? { url: arg ?? 'https://example.com/' } : /^bash$/i.test(name) ? { command: arg ?? 'echo hi' } : arg ? { value: arg } : {}
   await hook('PreToolUse', { tool_name: name, tool_input: input, tool_use_id: id })
   write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name, input }], usage: { input_tokens: 10, output_tokens: 5 } } })
+  if (heldBy) {
+    const go = path.join(process.env.CLAUDE_CONFIG_DIR || '', heldBy)
+    for (const end = Date.now() + 120_000; !fs.existsSync(go) && Date.now() < end; ) await sleep(100)
+  }
   write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: fail ? 'Error: it failed' : 'ok', is_error: fail }] } })
   await hook('PostToolUse', { tool_name: name, tool_input: input, tool_use_id: id })
 }

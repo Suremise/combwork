@@ -165,6 +165,21 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check('…Escape closes the panel first, the call still shown', !!(await lib.until(async () => (await panel('read').count()) === 0 && (await feed.count()) === 1, HUNG_MS, 250)) && (await listSel.count()) === 1, String(await page.evaluate(() => document.activeElement?.className ?? null)))
     await page.keyboard.press('Escape')
     check('…and Escape again, its button gone, clears the call', !!(await lib.until(async () => (await listSel.count()) === 0, HUNG_MS, 250)), String(await page.evaluate(() => document.activeElement?.className ?? null)))
+    // HI-3508: a call shown from the feed while it runs follows it: once it ends and the agent goes on, it is under From
+    // the map as done, its Details with its result, never "working" for good.
+    const detailsText = () => details.innerText().catch(() => '')
+    await lib.sendPrompt(inv, lib.ptyKey(alpha, 'hb1'), 'tool Bash held-run heldby activitymap-held-go then tool Read src/alpha/after.ts', { submitted: async () => (await liveOf('hb1'))?.status === 'working' })
+    // Under way in the list (its own row, Now), so the feed's newest Shell row is this call's.
+    const heldNow = page.locator('.activity-tab:not(.activity-workspace) .activity-list .activity-row[data-key^="tool:"]', { hasText: 'held-run' })
+    const heldRow = feed.locator('button.activity-map-feed-row[data-station="shell"]').first()
+    check('a running call to show in the feed', !!(await lib.until(async () => (await heldNow.count()) === 1 && (await heldRow.count()) === 1, HUNG_MS, 250)), await page.locator('.activity-tab:not(.activity-workspace) .activity-list').innerText().catch(() => ''))
+    await heldRow.click()
+    check('…a click shows it in the list as working, its Details saying so', !!(await lib.until(async () => (await listSel.count()) === 1 && /Status\s+Working/.test(await detailsText()) && /Bash/.test(await detailsText()), HUNG_MS, 250)), await detailsText())
+    fs.writeFileSync(path.join(claudeHome, 'activitymap-held-go'), '')
+    await lib.until(() => idle('hb1'), HUNG_MS, 250)
+    check('…once it ends and the agent goes on: under From the map, done, its Details with its result', !!(await lib.until(async () => (await fromMap.count()) === 1 && (await listSel.count()) === 1 && /Status\s+Done/.test(await detailsText()) && /\bok\b/.test(await detailsText()), HUNG_MS, 250)), `${await fromMap.count()} | ${await detailsText()}`)
+    await page.keyboard.press('Escape')
+    check('…and Escape clears it', !!(await lib.until(async () => (await listSel.count()) === 0 && (await fromMap.count()) === 0, HUNG_MS, 250)))
     // Left open through Frozen and Hidden below: the panel reads and draws nothing of its own either.
     await station('shell').click()
     await lib.until(async () => (await panel('shell').count()) === 1, HUNG_MS, 250)
