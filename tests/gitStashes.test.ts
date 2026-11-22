@@ -159,6 +159,23 @@ describe('the list and Show', () => {
     expect([u.original, u.modified.replace(/\r\n/g, '\n')]).toEqual(['', 'new\n'])
   })
 
+  it('HI-3529: Show of a stash that replaced a file with a folder: the file deleted, the folder\'s file added', async () => {
+    sh(proj, 'rm', '-q', 'a.txt')
+    mkdirSync(join(proj, 'a.txt'))
+    write('a.txt/child', 'new\n')
+    sh(proj, 'add', '-A')
+    sh(proj, 'stash', 'push', '-q', '-m', 'reorganise')
+    const [s] = await list()
+    expect(await S.stashFiles(proj, s.commit)).toEqual([
+      { path: 'a.txt', status: 'D', untracked: false },
+      { path: 'a.txt/child', status: 'A', untracked: false }
+    ])
+    const gone = await S.stashDiff(proj, s.commit, 'a.txt', false)
+    expect([gone.original.replace(/\r\n/g, '\n'), gone.modified, gone.binary]).toEqual(['base\n', '', false])
+    const added = await S.stashDiff(proj, s.commit, 'a.txt/child', false)
+    expect([added.original, added.modified.replace(/\r\n/g, '\n')]).toEqual(['', 'new\n'])
+  })
+
   it('a stash gone meanwhile refuses Show', async () => {
     write('a.txt', 'mine\n')
     sh(proj, 'stash', 'push', '-q')
