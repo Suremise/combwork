@@ -422,6 +422,7 @@
   "service.workspace.platformRepositoryGone": "El repositorio Git de {project} ya no está. Las reglas de Git siguen vigentes, así que sus tarjetas no pueden avanzar hasta que vuelva el repositorio o cambies el proyecto a Ninguno en su pestaña Control de versiones.",
   "service.workspace.platformSettled": "Resuelto: no hay nada que cambiar ahora",
   "service.workspace.platformTitle": "Cambió el control de versiones en {project}",
+  "service.workspace.platformUse": "Usar {platform}",
   "service.workspace.renameAgent": "Cambiar el nombre del agente {agent} del proyecto {project}…",
   "service.workspace.sharedNames": "Ahora los nombres de los agentes son únicos en todo el espacio de trabajo, para poder distinguir cada agente. {shared}: siguen funcionando, pero cambia el nombre de uno de cada grupo; por ejemplo, el del agente {agent} del proyecto {project} a {suggestion}.",
   "service.workspace.stillClosing": "{name} todavía se está cerrando: espera a que termine y vuelve a intentarlo.",

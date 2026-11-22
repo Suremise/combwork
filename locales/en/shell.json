@@ -435,6 +435,10 @@
     "defaultMessage": "Show Unused Worktrees",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category. It isn't in the menus or the palette: notifications and buttons run it by its name."
   },
+  "shell.command.project.usePlatform": {
+    "defaultMessage": "Use the Version Control Combwork Found",
+    "description": "HI-3510: a command, in the Project category: writes the version control Combwork uses in a project into its project.json, where that file names one Combwork doesn't know (such as jj). It isn't in the menus or the palette: the notice about that setting runs it by its name (its button, Use None or Use Git)."
+  },
   "shell.command.session.allowLockedEdit": {
     "defaultMessage": "Allow a Locked Edit",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name."
@@ -942,6 +946,10 @@
   "shell.error.switchModes": {
     "defaultMessage": "Could not switch permission modes",
     "description": "An error's title: switching running agents to their permission mode settings failed."
+  },
+  "shell.error.usePlatform": {
+    "defaultMessage": "Could not set the version control",
+    "description": "HI-3510: an error's title: writing the version control Combwork uses into a project's project.json (the notice's Use None or Use Git) failed."
   },
   "shell.errorBoundary.logs": {
     "defaultMessage": "Open Logs",

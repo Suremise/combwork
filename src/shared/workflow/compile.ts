@@ -163,10 +163,23 @@ export function loadRuleset(data: unknown): LoadResult {
   if (!r || typeof r !== 'object' || typeof r.id !== 'string' || typeof r.version !== 'number' || !r.guards || !r.options || !Array.isArray(r.stages)) return { ok: false, error: 'malformed' }
   for (const [move, ids] of Object.entries(r.guards)) {
     if (!(MOVES as readonly string[]).includes(move)) return { ok: false, error: 'unknownPiece', piece: move }
-    for (const id of ids as string[]) if (!isGuard(id)) return { ok: false, error: 'unknownPiece', piece: id }
+    for (const id of ids as string[]) if (!isGuard(id) && !RETIRED_GUARDS.has(id)) return { ok: false, error: 'unknownPiece', piece: id }
   }
   const readOnly = r.version > RULESET_VERSION
-  return { ok: true, ruleset: r as Ruleset, readOnly }
+  return { ok: true, ruleset: readOnly ? (r as Ruleset) : withoutRetired(r as Ruleset), readOnly }
+}
+
+/**
+ * HI-3510: guards a stored ruleset can name that this Combwork no longer has: `start.platformReady`, which J6 put in
+ * every jj ruleset until HI-2874 let jj cards run (1.6.0 dropped it as it read one). Such a ruleset still loads, without
+ * them, its id, version, options and stages as they were.
+ */
+const RETIRED_GUARDS: ReadonlySet<string> = new Set(['start.platformReady'])
+
+function withoutRetired(r: Ruleset): Ruleset {
+  const named = Object.values(r.guards).some((ids) => (ids as string[]).some((id) => RETIRED_GUARDS.has(id)))
+  if (!named) return r
+  return { ...r, guards: Object.fromEntries(Object.entries(r.guards).map(([move, ids]) => [move, (ids as string[]).filter((id) => !RETIRED_GUARDS.has(id))])) as Ruleset['guards'] }
 }
 
 export const hasStage = (r: Ruleset, id: StageId): boolean => r.stages.some((s) => s.id === id)

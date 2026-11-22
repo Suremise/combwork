@@ -1691,6 +1691,10 @@
     "defaultMessage": "Version control changed in {project}",
     "description": "A notice's title: the version control found in the project {project}'s folder is no longer the one Combwork recorded for it."
   },
+  "service.workspace.platformUse": {
+    "defaultMessage": "Use {platform}",
+    "description": "HI-3510: a button on the notice that a project's project.json names a version control Combwork doesn't know (such as jj, which Combwork no longer has): writes the version control Combwork uses there now, {platform} (None or Git, as the Version Control tab names them), into project.json, so the notice doesn't come back."
+  },
   "service.workspace.renameAgent": {
     "defaultMessage": "Rename {project}'s {agent}…",
     "description": "The notice's button: opens the settings of the agent {agent} of the project {project}, to rename it."

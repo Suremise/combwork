@@ -2337,6 +2337,21 @@ control is still a platform of its own (§16.3.1, the type map below). The last 
 - **No migration** (HI-3468: "just removed"): nothing reads, converts or cleans up what jj left. A
   project.json naming `jj`, workflow options saved for jj, jj slot and copy rows, and the jj `board_meta` keys get no
   handling of their own; jj's folders on disk (its slots, its control workspace) are left as they are.
+- **What jj left is inert** (HI-3510, the decision: no migration, but never an error): read as unknown, never
+  converted. A card or lane whose stored rules name `jj` keeps them; every intent on it (an agent's, the Assistant's,
+  the user's) is refused `platform.removed` (*{card} was started under jj, a version control Combwork no longer has, so
+  its moves can't be checked*), agents told only that its moves stay refused and the user's moves to Todo and Done
+  don't; the window says to move it to Todo (its next start is under the project's rules) or Done, the two moves that
+  still go on. Reconciliation leaves it (one log line), reads through it give nothing, and any other path that asks for
+  its adapter meets `PlatformRemoved`, never a TypeError: the descriptor helpers answer false for an id Combwork doesn't
+  have. A stored `Refused` under a rule this Combwork no longer has shows nothing (`isRule`); requests under jj's
+  integration gates (`RETIRED_GATES`: `advanceStopped`, `advanceUncertain`, `advancePreview`) are never open, any other
+  gate staying a question; a stored ruleset naming the retired guard `start.platformReady` loads without it. A
+  project's saved options apply only under the platform they were saved for (`ownOptions`, as the Workflow form shows
+  them), so jj's are neither applied nor shown, and the settings tool writes a changed option under the platform in
+  force. The notice that project.json names a version control Combwork doesn't know has **Use {platform}** (the one in
+  force, None for a jj folder): it writes that value, only while project.json still names the one the notice was about
+  (checked under the project's lock), and the notice settles; `workflow` is left as it is.
 - **Detection:** a `.jj` folder is another version control, as Mercurial's `.hg` is (§16.3.5): the folder is None,
   a Git project with one beside its `.git` is offered None, and Git isn't offered where one is found. A `.jj` in a
   folder above counts too (HI-3487): a Git repository inside a jj workspace, which 1.6.x read as Git, is now

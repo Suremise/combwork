@@ -422,6 +422,7 @@
   "service.workspace.platformRepositoryGone": "Repozytorium Git projektu {project} zniknęło. Reguły Gita nadal obowiązują, więc jego karty nie mogą iść dalej, dopóki repozytorium nie wróci albo nie przełączysz projektu na Brak w zakładce Kontrola wersji.",
   "service.workspace.platformSettled": "Rozstrzygnięte: teraz nie ma nic do zmiany",
   "service.workspace.platformTitle": "Zmieniła się kontrola wersji w projekcie {project}",
+  "service.workspace.platformUse": "Użyj: {platform}",
   "service.workspace.renameAgent": "Zmień nazwę agenta {agent} w projekcie {project}…",
   "service.workspace.sharedNames": "Nazwy agentów są teraz unikalne w całym obszarze roboczym, więc każdego agenta da się odróżnić. {shared}: nadal działają, ale zmień nazwę jednego z każdej grupy, np. agenta {agent} w projekcie {project} na {suggestion}.",
   "service.workspace.stillClosing": "Obszar roboczy {name} wciąż się zamyka: poczekaj, aż skończy, i spróbuj ponownie.",

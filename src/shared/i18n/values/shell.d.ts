@@ -110,6 +110,7 @@ interface CombworkMessageValues {
   'shell.command.project.tab.templates': undefined
   'shell.command.project.toggleActive': undefined
   'shell.command.project.unusedWorktrees': undefined
+  'shell.command.project.usePlatform': undefined
   'shell.command.session.allowLockedEdit': undefined
   'shell.command.session.applyPermissionModes': undefined
   'shell.command.session.archive': undefined
@@ -237,6 +238,7 @@ interface CombworkMessageValues {
   'shell.error.stopBackground': undefined
   'shell.error.stopLeftAfterClose': undefined
   'shell.error.switchModes': undefined
+  'shell.error.usePlatform': undefined
   'shell.errorBoundary.logs': undefined
   'shell.errorBoundary.named': { view: string }
   'shell.errorBoundary.reload': undefined
