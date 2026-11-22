@@ -12,9 +12,8 @@
 //   cancelled; Git is offered, switched to, its kept options back, and the next card starts under Git's rules.
 // - delta (Git): Mercurial found. The offer, Switch to None…, a new card under None; Git then refused with the reason.
 // - a stale switch (the dialog open while another switch is made) is refused.
-// - eps (HI-3510): a colocated jj project as 1.6.0 left it (project.json and its workflow naming jj). Its notice's Use None
-//   writes None into project.json, the notice settles and doesn't come back. zeta (HI-3524): the same, added to the open
-//   workspace: its notice keeps Use None.
+// - zeta (HI-3524): a Git project whose repository is gone, added to the open workspace: its notice keeps Open Version
+//   Control.
 // - a project inside a larger repository (another workspace): the whole-repository line, and OP-29's refusal.
 // Screenshots of each offer and the warning, both themes, English and German. Dev build, throwaway profile, workspaces
 // and CLAUDE_CONFIG_DIR.
@@ -29,7 +28,6 @@ const fx = q.queueProject('vcswitch')
 const HUNG_MS = lib.timing('hang.step')
 const gamma = path.join(fx.ws, 'gamma')
 const delta = path.join(fx.ws, 'delta')
-const eps = path.join(fx.ws, 'eps')
 const outer = path.join(lib.WORK, 'vcswitch-outer')
 const inner = path.join(outer, 'app')
 /** gamma's own Git options: reviewed by an agent, committed in the project folder. */
@@ -53,10 +51,6 @@ function writeProject(dir, cfg) {
   writeProject(gamma, { platform: 'git', workflow: { platform: 'git', preset: null, options: GAMMA } })
   lib.gitProject(delta, { 'd.txt': 'd\n', '.gitignore': '.combwork/\n' })
   writeProject(delta, { platform: 'git', workflow: { platform: 'git', preset: null, options: {} } })
-  // eps: a colocated jj project as 1.6.0 left it, in the workspace when it opens (as an upgrade finds it).
-  lib.gitProject(eps, { 'e.txt': 'e\n', '.gitignore': '.combwork/\n' })
-  fs.mkdirSync(path.join(eps, '.jj', 'repo'), { recursive: true })
-  writeProject(eps, { platform: 'jj', platformFound: 'jj', workflow: { platform: 'jj', preset: 'pair', options: { finish: 'userIntegrates', folder: 'slots' } } })
   fs.rmSync(outer, { recursive: true, force: true })
   fs.mkdirSync(inner, { recursive: true })
   fs.writeFileSync(path.join(inner, 'index.js'), 'module.exports = 1\n')
@@ -317,34 +311,21 @@ function writeProject(dir, cfg) {
     await page.keyboard.press('Escape')
     await until(async () => (await dialog.count()) === 0, HUNG_MS)
 
-    // --- eps (HI-3510): project.json naming jj, which this Combwork doesn't have. Its notice writes the one in force.
-    // Said as the workspace opened. Read in the bell, which keeps every notice with its buttons: a test window never has
-    // the focus, so whether it also popped up depends on where the notice was routed.
+    // --- zeta (HI-3524): a Git project whose repository is gone, added to the open workspace. Its notice comes once the
+    // window knows zeta, so it keeps Open Version Control rather than reading as about a project gone. Read in the bell,
+    // which keeps every notice with its buttons: a test window never has the focus, so whether it also popped up depends
+    // on where the notice was routed.
     const bell = page.locator('.activitybar button[aria-label="Notifications"]')
     if ((await page.locator('.notif-panel').count()) === 0) await bell.click()
-    const epsJson = () => JSON.parse(fs.readFileSync(path.join(eps, '.combwork', 'project.json'), 'utf8'))
-    const epsToast = page.locator('.notif-panel .notif-item', { hasText: 'Unknown version control setting in eps' })
-    const useNone = epsToast.getByRole('button', { name: 'Use None' })
-    check('eps: its notice says project.json names jj, with Use None', !!(await until(async () => (await useNone.count()) === 1, HUNG_MS)) && /names a version control Combwork doesn.t know \(platform: jj\)/.test(await text(epsToast)), await text(epsToast))
-    await shoot(epsToast, 'former-jj-notice')
-    await useNone.click()
-    check('…Use None writes None into project.json, its workflow left as it was', !!(await until(() => epsJson().platform === 'none', HUNG_MS)) && epsJson().workflow?.platform === 'jj', JSON.stringify(epsJson()))
-    check('…and the notice settles, its button gone', !!(await until(async () => (await useNone.count()) === 0, HUNG_MS)), await text(epsToast))
-    const epsInfo = (await inv('workspace:refresh'))?.projects?.find((x) => x.name === 'eps')
-    check('…read again, eps is None with nothing to say', epsInfo?.platform?.id === 'none' && epsInfo?.platform?.invalid === undefined, JSON.stringify(epsInfo?.platform))
-    // --- zeta (HI-3524): the same, added to the open workspace. Its notice comes once the window knows zeta, so it keeps
-    // Use None rather than reading as about a project gone.
     const zeta = path.join(fx.ws, 'zeta')
-    lib.gitProject(zeta, { 'z.txt': 'z\n', '.gitignore': '.combwork/\n' })
-    fs.mkdirSync(path.join(zeta, '.jj', 'repo'), { recursive: true })
-    writeProject(zeta, { platform: 'jj', platformFound: 'jj', workflow: { platform: 'jj', preset: 'pair', options: { finish: 'userIntegrates', folder: 'slots' } } })
+    fs.mkdirSync(zeta, { recursive: true })
+    fs.writeFileSync(path.join(zeta, 'z.txt'), 'z\n')
+    writeProject(zeta, { platform: 'git', workflow: { platform: 'git', preset: null, options: {} } })
     await inv('workspace:refresh')
-    const zetaToast = page.locator('.notif-panel .notif-item', { hasText: 'Unknown version control setting in zeta' })
-    const zetaNone = zetaToast.getByRole('button', { name: 'Use None' })
-    check('zeta, added to the open workspace: its notice keeps Use None', !!(await until(async () => (await zetaNone.count()) === 1, HUNG_MS)), await text(zetaToast))
+    const zetaToast = page.locator('.notif-panel .notif-item', { hasText: 'Version control changed in zeta' })
+    const zetaOpen = zetaToast.getByRole('button', { name: 'Open Version Control' })
+    check('zeta, added to the open workspace: its notice keeps Open Version Control', !!(await until(async () => (await zetaOpen.count()) === 1, HUNG_MS)), await text(zetaToast))
     check("…and never says zeta isn't in the workspace", !/isn.t in this workspace any more/.test(await text(zetaToast)), await text(zetaToast))
-    await zetaNone.click()
-    check('…Use None writes None into its project.json', !!(await until(() => JSON.parse(fs.readFileSync(path.join(zeta, '.combwork', 'project.json'), 'utf8')).platform === 'none', HUNG_MS)))
     if ((await page.locator('.notif-panel').count()) > 0) await page.locator('.notif-panel button[aria-label="Close"]').click()
     await until(async () => (await page.locator('.notif-panel').count()) === 0, HUNG_MS)
 
