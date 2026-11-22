@@ -404,7 +404,9 @@ the registries: `platform/adapters.ts` and the port lookups `repoPorts.ts`, `wor
 `integrationPorts.ts`, `repoOpsPorts.ts`, `repoReadsPorts.ts`, `revisionReadsPorts.ts`, `releaseReadsPorts.ts` and
 `deliverablesPorts.ts` (the workflow's None paths ask `pathsDeliverables()`, never `none/`). `tests/gitAudit.mjs`'
 `sealBreaks` (check:repo) fails any other import of a folder's file from `src/`, a new folder's at once, a registry's
-re-export of one, and a dynamic import or require whose specifier isn't one whole string literal, anywhere (HI-3506);
+re-export of one (`export import X = require(…)` included), and a dynamic import or require whose specifier isn't one
+whole string literal, anywhere (HI-3506), or a loader it can't follow: `require` handed on, `module.require`,
+`createRequire` (HI-3512);
 tests import a folder's files directly. **Adding a version control** is a folder `src/main/platform/<vc>/` holding its adapter and
 port implementations, its line in `adapters.ts` and in each port registry it implements, and its descriptor in
 `src/shared/platform/descriptors.ts` (its `PlatformId`, its `PLATFORMS` entry), plus its rows in the data keyed by
