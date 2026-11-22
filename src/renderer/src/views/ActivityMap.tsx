@@ -358,6 +358,21 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
   // The station whose panel is open (HI-3498): docked over the feed; its station again, its ✕ or Escape closes it.
   const [panel, setPanel] = useState<MapStation | null>(null)
   const togglePanel = useCallback((s: MapStation) => setPanel((p) => (p === s ? null : s)), [])
+  // The focus stays in the map when what had it goes (HI-3507): an agent's dot (drawn only on the shared map) once it
+  // shows that agent alone, a panel's control once the panel closes. Left on the page's body, Escape never reached the map.
+  const root = useRef<HTMLDivElement>(null)
+  const keepFocus = useCallback(() => root.current?.focus({ preventScroll: true }), [])
+  const pickHere = useCallback(
+    (key: string) => {
+      keepFocus()
+      onPick?.(key)
+    },
+    [keepFocus, onPick]
+  )
+  const closePanel = useCallback(() => {
+    if (root.current?.contains(document.activeElement)) keepFocus()
+    setPanel(null)
+  }, [keepFocus])
   // Each drawing counted as it lands (a layout effect: no write during render), and the pulses then in flight.
   useLayoutEffect(() => {
     mapCounts.renders++
@@ -381,6 +396,8 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
   const names = useMemo(() => new Map(model.agents.map((a) => [a.key, a.name])), [model.agents])
   return (
     <div
+      ref={root}
+      tabIndex={-1}
       className={cx('activity-map', mode === 'shared' && 'shared', !motion && 'still')}
       data-mode={mode}
       data-picked={picked ?? undefined}
@@ -389,7 +406,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
       // of the selection (HI-3180).
       onKeyDown={(e) => {
         if (e.key !== 'Escape') return
-        const done = panel ? (setPanel(null), true) : !!onEscape?.() || (!!picked && (onPick?.(picked), true))
+        const done = panel ? (closePanel(), true) : !!onEscape?.() || (!!picked && (onPick?.(picked), true))
         if (done) e.stopPropagation()
       }}
     >
@@ -444,7 +461,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
               )
             })}
           {MAP_STATIONS.map((s, i) => (
-            <Station key={s} index={i} view={model.stations[s]} name={stationName(s)} colours={colours} ids={ids} open={panel === s} onToggle={togglePanel} names={names} onPick={onPick} arriving={dotComings.arriving} />
+            <Station key={s} index={i} view={model.stations[s]} name={stationName(s)} colours={colours} ids={ids} open={panel === s} onToggle={togglePanel} names={names} onPick={onPick ? pickHere : undefined} arriving={dotComings.arriving} />
           ))}
           {!motion &&
             pulses.map((pl) => {
@@ -482,7 +499,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
           </div>
         )}
       </div>
-      {panel && <StationPanel station={panel} view={model.stations[panel]} model={model} name={stationName(panel)} colourOf={mode === 'shared' ? (k) => colourOf(colours.get(k)) : null} onClose={() => setPanel(null)} onOpenFile={onOpenFile} onShowCall={onShowCall} />}
+      {panel && <StationPanel station={panel} view={model.stations[panel]} model={model} name={stationName(panel)} colourOf={mode === 'shared' ? (k) => colourOf(colours.get(k)) : null} onClose={closePanel} onOpenFile={onOpenFile} onShowCall={onShowCall} />}
       {show.feed && !panel && (
         <div className="activity-map-feed" aria-label={tr(M.feedHeading)}>
           <h4>{tr(M.feedHeading)}</h4>
