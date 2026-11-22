@@ -1415,6 +1415,17 @@ export function bumpGit(path: string): void {
 export const UNUSED_ROOT = 'unused'
 export const unusedRoot = (worktreePath: string): string => `${UNUSED_ROOT}:${worktreePath}`
 
+/**
+ * HI-3470: the project's Version Control → Changes showing one folder: an agent's (its id), a free slot or other unused
+ * worktree (its path), or the project folder (null). From Slots and copies and Branches & remotes, to the operation panel.
+ */
+export function openChangesOf(path: string, of: { agent: string } | { folder: string } | null): void {
+  const root = !of ? '' : 'agent' in of ? of.agent : unusedRoot(of.folder)
+  set((s) => ({ selectedProject: path, changesRoot: { ...s.changesRoot, [path]: root } }))
+  showView('projects')
+  showVersionControl(path, 'changes')
+}
+
 /** Opens a project's Changes tab at its unused worktrees (#353, #400: they live in Changes). */
 export function showUnusedWorktrees(path: string): void {
   set((s) => ({ projectTabs: { ...s.projectTabs, [path]: 'changes' }, vcSection: { ...s.vcSection, [path]: 'changes' }, changesRoot: { ...s.changesRoot, [path]: UNUSED_ROOT } }))

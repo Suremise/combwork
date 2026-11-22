@@ -25,7 +25,7 @@ import { offered, offeredCleanup, repoOp } from '../repoOps'
 import { attempt, releaseHeldSlot } from '../actions'
 import { cancelGitRun, cancelLabel, gitRun, startGitRun } from '../gitRuns'
 import { SLOT_HELD_TEXT } from '../components/SlotsAndCopies'
-import { bumpGit, cardLabelOf, choose, confirm, notify, prompt, set, showVersionControl, UNUSED_ROOT, useStore } from '../store'
+import { bumpGit, cardLabelOf, choose, confirm, notify, openChangesOf, prompt, set, showVersionControl, UNUSED_ROOT, useStore } from '../store'
 import { agentCard, branchCards, type BranchCard } from '@shared/branchCards'
 import { revisionShort } from '@shared/platform/descriptors'
 import { stageName } from '@shared/workflow/stages'
@@ -88,7 +88,8 @@ const M = {
   noCommitsBanner: msg({ id: 'git.branches.noCommits', defaultMessage: "No commits yet, and agents' worktrees need one.", description: 'Banner in Git → Branches & remotes of a repository with no commit.' }),
   tracks: msg({ id: 'git.branches.tracks', defaultMessage: 'tracks {upstream} · <ab>{aheadBehind}</ab>', description: 'Beside the branch checked out: the remote branch it tracks and how far apart they are ("tracks origin/main · ↑2 ↓0"). Keep <ab>…</ab> around the counts.' }),
   tracksNothing: msg({ id: 'git.branches.tracksNothing', defaultMessage: 'tracks no remote branch: Push sets one', description: 'Beside the branch checked out. Push is the button of that name.' }),
-  stateBanner: msg({ id: 'git.branches.stateBanner', defaultMessage: "Git is {state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}} in the project folder. Finish or abort it in a terminal (or ask an agent to): Combwork doesn't.", description: 'Banner in Git → Branches & remotes while git has an operation in progress.' }),
+  stateBanner: msg({ id: 'git.branches.stateBanner', defaultMessage: "Git is {state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}} in the project folder. Continue or abort it in Changes, in a terminal, or ask an agent to.", description: 'Banner in Git → Branches & remotes while git has an operation in progress. HI-3470: Changes (Version Control → Changes, its section’s name: keep it as named there) has a panel that continues or aborts it.' }),
+  openOperation: msg({ id: 'git.branches.openOperation', defaultMessage: 'Open in Changes', description: 'HI-3470: a button in the banner git.branches.stateBanner: shows the project folder in Version Control → Changes, whose panel continues or aborts the operation. Changes is the section’s name: keep it as it is named there.' }),
   fetchedAt: msg({ id: 'git.fetch.at', defaultMessage: 'As of the last fetch, {when}. Combwork never fetches by itself.', description: 'In Git → Branches & remotes, beside Fetch. {when} is how long ago, such as "5m ago".' }),
   neverFetched: msg({ id: 'git.fetch.never', defaultMessage: 'Never fetched. Combwork never fetches by itself.', description: 'In Git → Branches & remotes, beside Fetch.' }),
   fetchTip: msg({ id: 'git.fetch.tip', defaultMessage: 'Fetch every remote: ahead/behind and remote branches as they are now', description: 'Tooltip on the Fetch button.' }),
@@ -497,7 +498,14 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                   <span className="faint">{tr(M.tracksNothing)}</span>
                 ) : null}
               </div>
-              {s.state && <div className="banner warn">{tr(M.stateBanner, { state: gitStateKey(s.state) })}</div>}
+              {s.state && (
+                <div className="banner warn" data-git-state={s.state}>
+                  {tr(M.stateBanner, { state: gitStateKey(s.state) })}{' '}
+                  <button className="btn small" data-action="open-operation" onClick={() => openChangesOf(project.path, null)}>
+                    {tr(M.openOperation)}
+                  </button>
+                </div>
+              )}
               {s.remotes.length > 0 && (
                 <div className="git-fetched faint" data-git-fetched="">
                   {fetched ? tr(M.fetchedAt, { when: fetched }) : tr(M.neverFetched)}

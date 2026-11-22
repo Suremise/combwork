@@ -57,6 +57,7 @@
   "shell.command.folderChanges.settle": "Commit or Set Aside Changes",
   "shell.command.folderChanges.show": "Show Uncommitted Changes",
   "shell.command.git.cancelRun": "Cancel Git Action",
+  "shell.command.git.openOperation": "Show Unfinished Git Operation",
   "shell.command.help.about": "About {app}",
   "shell.command.help.agentSetup": "Provider Setup…",
   "shell.command.help.api": "Agent API Reference",

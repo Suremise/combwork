@@ -569,6 +569,8 @@
   "tips.ui.tryIt": "Ausprobieren",
   "tips.unexpectedClose.text": "Wurde Combwork geschlossen, ohne beendet zu werden (ein Absturz, oder etwas hat es geschlossen), sagt der nächste Start, wann es zuletzt lief und welche Agenten liefen, mit „Alle fortsetzen“. Einstellungen → Sitzungen → Agenten nach unerwartetem Schließen fortsetzen setzt sie von selbst fort.",
   "tips.unexpectedClose.title": "Erfahren, wann Combwork unerwartet geschlossen wurde",
+  "tips.unfinishedGitOperation.text": "Bleibt ein Ordner mitten in einem Merge, Rebase, Cherry-Pick, Revert oder Bisect stehen, zeigt Versionsverwaltung → Änderungen ein Feld: Setze ihn fort, überspringe oder brich ab, und löse jede Datei im Konflikt mit Meine nehmen, Ihre nehmen oder Als gelöst markieren.",
+  "tips.unfinishedGitOperation.title": "Einen halb fertigen Git-Merge oder -Rebase abschließen",
   "tips.unmerged.text": "Der Tab des Agenten zeigt, wie viele Commits noch nicht gemergt sind, „Mergen…“ in seinem ⋯-Menü sagt, was noch fehlt, und Versionsverwaltung → Änderungen zeigt alles, was der Agent seit dem Abzweigen geändert hat.",
   "tips.unmerged.title": "Sehen, was ein Worktree-Agent noch mergen muss",
   "tips.unusedWorktrees.text": "Einen Agenten entfernt, aber seinen Worktree behalten? Versionsverwaltung → Änderungen öffnet sich mit den Worktrees, die kein Agent verwendet, und zeigt, wer sie jeweils angelegt hat: Öffne einen, um seine Arbeit zu sehen und zu mergen, oder entferne die gemergten samt ihren Branches.",

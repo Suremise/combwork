@@ -2247,6 +2247,10 @@
     "defaultMessage": "Open Advanced",
     "description": "A button beside “Reviewers review in review copies”: opens Settings → Advanced."
   },
+  "workflow.slots.openOperation": {
+    "defaultMessage": "Open in Changes",
+    "description": "HI-3470: a button beside a slot's workflow.slots.operationState: shows the slot in Version Control → Changes, whose panel continues or aborts the operation. Changes is the section's name: keep it as it is named there."
+  },
   "workflow.slots.operationHint": {
     "defaultMessage": "Finish it in its folder, or end it there with {command}",
     "description": "HI-3465: beside workflow.slots.operationState: how to free the slot. {command} is the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is). Combwork never runs it itself."

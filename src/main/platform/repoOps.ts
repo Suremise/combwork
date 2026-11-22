@@ -17,6 +17,7 @@ import type { IgnoreTarget } from '../../shared/gitIgnoreRules'
 import type { BranchStart, ResolvedStart } from '../../shared/nextVersion'
 import type { FileGitDone, FolderChangeAction, FolderChangesDone, MergeResult } from '../../shared/types'
 import type { Operation } from '../../shared/platform/descriptors'
+import type { OperationRequest } from '../../shared/gitOperations'
 
 /**
  * Which members each operation may call (HR3's s15): the port is handed out for one operation, typed down to its own
@@ -44,6 +45,7 @@ export interface OpMembers {
   init: 'initCheck' | 'init'
   ignoreRules: 'exclude' | 'untrack' | 'include'
   folderChanges: 'settleChanges' | 'commitIgnore'
+  operationSteps: 'operationStep'
 }
 
 /** The port as handed out for one operation: its own members only. */
@@ -103,4 +105,11 @@ export interface RepoOps {
   settleChanges(projectPath: string, target: string, seen: string, action: FolderChangeAction, shown: string[], label: string, guard?: () => void): Promise<FolderChangesDone>
   /** Files' Commit it: the project folder's top .gitignore, as it is now, committed alone. */
   commitIgnore(projectPath: string): Promise<FolderChangesDone>
+  // HI-3470: an operation left under way in a folder, the user's step at a time.
+  /**
+   * A step of the operation under way in `folder` (the project's, or a worktree of its repository), or a conflicted file
+   * settled, under the repository lock and the folder's fence, only while it is still `req.what` and nothing works there;
+   * `guard` runs there before git does and refuses by throwing. Git's own output.
+   */
+  operationStep(projectPath: string, folder: string, req: OperationRequest, guard?: () => Promise<void> | void): Promise<string>
 }

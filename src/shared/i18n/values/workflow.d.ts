@@ -563,6 +563,7 @@ interface CombworkMessageValues {
   'workflow.slots.off': undefined
   'workflow.slots.on': undefined
   'workflow.slots.openAdvanced': undefined
+  'workflow.slots.openOperation': undefined
   'workflow.slots.operationHint': { command: string | number }
   'workflow.slots.operationState': { what: string | number }
   'workflow.slots.release': undefined

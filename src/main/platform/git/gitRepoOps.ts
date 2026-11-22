@@ -9,6 +9,7 @@ import * as merge from '../../branchMerge'
 import * as wt from '../../worktrees'
 import * as files from '../../filesGit'
 import * as changes from './gitFolderChanges'
+import * as operations from './gitOperationSteps'
 import type { RepoOps } from '../repoOps'
 
 export const gitRepoOps: RepoOps = {
@@ -38,5 +39,6 @@ export const gitRepoOps: RepoOps = {
   untrack: (p, items) => files.gitUntrack(p, items),
   include: (p, items) => files.gitInclude(p, items),
   settleChanges: (p, target, seen, action, shown, label, guard) => changes.settleChanges(p, target, seen, action, shown, label, guard),
-  commitIgnore: (p) => changes.commitIgnore(p)
+  commitIgnore: (p) => changes.commitIgnore(p),
+  operationStep: (p, folder, req, guard) => operations.operationStep(p, folder, req, guard)
 }

@@ -1,6 +1,86 @@
 // HI-3465: a git operation left under way in a slot (a merge, rebase, am, cherry-pick, revert or bisect, as git names it:
 // gitCommands.ts operationSync) and the command that ends it, said beside it in Slots and copies and in the notice
-// Combwork gives once. Combwork never runs it itself: ending an operation is the agent's or the user's choice.
+// Combwork gives once. Combwork never runs it by itself: ending an operation is the agent's or the user's choice
+// (HI-3470: the user's, from Changes' panel, a click at a time).
+
+/** HI-3470: the operations git can have under way in a folder, as git names them (gitCommands.ts GitOperation). */
+export type GitOperationName = 'merge' | 'rebase' | 'am' | 'cherry-pick' | 'revert' | 'bisect'
+
+/** HI-3470: what the panel can do to the operation: carry on, drop the commit it stopped at, or end it (a bisect: reset). */
+export type OperationStep = 'continue' | 'skip' | 'abort'
+
+/** HI-3470: a conflicted file settled: its side from the folder's own work (`mine`), the other side's, or as it is now. */
+export type ConflictPick = 'mine' | 'theirs' | 'resolved'
+
+/** HI-3470: the steps each operation offers, in the panel's order (a bisect only ends: good and bad stay the user's terminal's). */
+export const OPERATION_STEPS: Record<GitOperationName, readonly OperationStep[]> = {
+  merge: ['continue', 'abort'],
+  rebase: ['continue', 'skip', 'abort'],
+  am: ['continue', 'skip', 'abort'],
+  'cherry-pick': ['continue', 'skip', 'abort'],
+  revert: ['continue', 'skip', 'abort'],
+  bisect: ['abort']
+}
+
+export const isOperationName = (v: unknown): v is GitOperationName => typeof v === 'string' && Object.hasOwn(OPERATION_STEPS, v)
+
+/**
+ * HI-3470: in a rebase or an am, git's `--ours` is the line being replayed onto and `--theirs` the commit being applied:
+ * the folder's own work. Mine is that commit there, git's ours everywhere else.
+ */
+export const mineIsTheirs = (what: GitOperationName): boolean => what === 'rebase' || what === 'am'
+
+/** HI-3470: a file git lists as unmerged, and whether each side has it (a side that deleted it hasn't). */
+export interface GitConflict {
+  path: string
+  mine: boolean
+  theirs: boolean
+}
+
+/** HI-3470: the operation under way in a folder, as Changes' panel shows it. */
+export interface GitOperationState {
+  what: GitOperationName
+  /** The commit git stopped at (a merge's: the one merged), short, with its subject; absent when git doesn't say. */
+  at?: { commit: string; subject: string }
+  /** A rebase's or am's place in its list: the step it stopped at, of how many. */
+  step?: { at: number; of: number }
+  conflicts: GitConflict[]
+}
+
+/** HI-3470: the folder's slot, when it is lent to a card or lane: the panel asks the user to confirm first, naming it. */
+export interface OperationLent {
+  slot: string
+  lease: string
+  agent: string
+  card: string | null
+  lane: string | null
+}
+
+/** HI-3470: `git:operation`'s answer: the operation under way, and the slot's lease it would act under. */
+export interface OperationPanelState extends GitOperationState {
+  lent: OperationLent | null
+}
+
+/**
+ * HI-3470: what the panel asks main to do (`git:operationStep`): a step, or a conflicted file settled; `what` is the
+ * operation the user saw (anything else under way now refuses it), `lease` the lent slot's lease they confirmed.
+ */
+export type OperationRequest = { what: GitOperationName; lease?: string } & ({ step: OperationStep } | { file: string; pick: ConflictPick })
+
+/** HI-3470: the git command a step runs, shown in its tooltip as the panel runs it. Commands, never translated. */
+export function operationCommand(what: GitOperationName, step: OperationStep): string {
+  if (what === 'bisect') return 'git bisect reset' // i18n-ignore: a git command
+  return `git ${what} --${step}` // i18n-ignore: a git command
+}
+
+/** HI-3470: a pick's git command, for its tooltip (a side without the file: git rm). Commands, never translated. */
+export function pickCommand(what: GitOperationName, c: GitConflict, pick: ConflictPick): string {
+  if (pick === 'resolved') return `git add -A -- ${c.path}` // i18n-ignore: a git command
+  const has = pick === 'mine' ? c.mine : c.theirs
+  if (!has) return `git rm -- ${c.path}` // i18n-ignore: a git command
+  const ours = (pick === 'mine') !== mineIsTheirs(what)
+  return `git checkout --${ours ? 'ours' : 'theirs'} -- ${c.path}; git add -- ${c.path}` // i18n-ignore: git commands
+}
 
 /**
  * The command that ends an operation in its folder, putting the folder back as it was before it began (a bisect: back

@@ -595,6 +595,8 @@
   "tips.ui.tryIt": "Try it",
   "tips.unexpectedClose.text": "If Combwork was ended without quitting (a crash, or something closed it), the next start says when it was last seen and which agents were running, with Resume All. Settings → Sessions → Resume agents after an unexpected close resumes them by itself.",
   "tips.unexpectedClose.title": "Know when Combwork closed unexpectedly",
+  "tips.unfinishedGitOperation.text": "When a folder is left in the middle of a merge, rebase, cherry-pick, revert or bisect, Version Control → Changes shows a panel: Continue, Skip or Abort it, and settle each file in conflict with Use mine, Use theirs or Mark resolved.",
+  "tips.unfinishedGitOperation.title": "Finish a git merge or rebase left half done",
   "tips.unmerged.text": "The agent's tab shows how many commits aren't merged yet, Merge… in its ⋯ menu says what is left, and Version Control → Changes shows everything the agent changed since it branched.",
   "tips.unmerged.title": "See what a worktree agent has to merge",
   "tips.unusedWorktrees.text": "Removed an agent but kept its worktree? Version Control → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, or remove the merged ones with their branches.",

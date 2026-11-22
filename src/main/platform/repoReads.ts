@@ -13,6 +13,7 @@
 
 import type { BranchDrops, BranchUpdatePlan, CompareLines, GitComparison, GitHistory, GitRepoInfo, GitRepoSummary, LeftoverInfo } from '../../shared/gitRepo'
 import type { SigningInfo } from '../../shared/gitSigning'
+import type { GitOperationState } from '../../shared/gitOperations'
 import type { ResolvedStart, StartPoints } from '../../shared/nextVersion'
 import type { AgentBranchStatus, GitDiff, GitStatus, MergeBranchList, ProjectInfo } from '../../shared/types'
 
@@ -43,6 +44,8 @@ export interface RepoReads {
   changes(root: string, base?: string): Promise<GitStatus>
   /** The Changes tab's diff of one file (HI-2792), as `changes` lists it. */
   changeDiff(root: string, file: string, base?: string): Promise<GitDiff>
+  /** HI-3470: the operation left under way in a working folder (a merge, a rebase…) and its conflicted files; null with none. */
+  operation(root: string): Promise<GitOperationState | null>
   /** The folder's line, head, upstream, remotes and state (repoSummary): cheap, no working-tree scan. */
   summary(root: string): Promise<GitRepoSummary>
   /** The line the project's work merges into, as its options say (none: the default line). */

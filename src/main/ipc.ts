@@ -150,6 +150,7 @@ import { lineRepoReads } from './platform/repoReadsPorts'
 import { checkRepoTools } from './platform/repoPorts'
 import { slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
+import { operationPanel } from './operationPanel'
 import { cancelGitRun, cancellableGit, cancelOwnerOf, withGitCancel, type CancelOwner } from './gitCancel'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer'
@@ -1835,6 +1836,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // An unused worktree too (#400): read only, as the Changes tab opens it.
     'git:status': (root, base) => lineRepoReads().changes(workspace.assertChangesRoot(root), base),
     'git:diff': (root, f, base) => lineRepoReads().changeDiff(workspace.assertChangesRoot(root), f, base),
+    'git:operation': (root) => operationPanel(workspace, root),
     'git:compareLines': async (p) => {
       p = workspace.assertProject(p)
       // The slots as the board records them: a plain read, never the slot pool or the 0.9 migration (it runs as the project opens).

@@ -25,6 +25,7 @@ interface CombworkMessageValues {
   'git.branches.merged': { has: string; revision: string | number }
   'git.branches.noCommits': undefined
   'git.branches.notInTarget': { n: number; target: string | number }
+  'git.branches.openOperation': undefined
   'git.branches.reload': undefined
   'git.branches.remote': { count: number }
   'git.branches.revisionCopied': undefined
@@ -163,6 +164,34 @@ interface CombworkMessageValues {
   'git.newBranch.switchNow': undefined
   'git.newBranch.tip': { commit: string | number }
   'git.newBranch.title': undefined
+  'git.operation.abort': undefined
+  'git.operation.abortMessage': { what: string }
+  'git.operation.abortTitle': { what: string; folder: string | number }
+  'git.operation.at': { commit: string | number; subject: string | number }
+  'git.operation.conflicts': { count: number }
+  'git.operation.continue': undefined
+  'git.operation.done': { step: string; what: string; folder: string | number }
+  'git.operation.endBisect': undefined
+  'git.operation.failed': undefined
+  'git.operation.goOn': undefined
+  'git.operation.lentMessage': { agent: string | number; what: string | number }
+  'git.operation.lentTitle': { slot: string | number; card: string; lane: string | number }
+  'git.operation.mine': undefined
+  'git.operation.mineTip': { swap: string; has: string; command: string | number }
+  'git.operation.open': undefined
+  'git.operation.projectFolder': undefined
+  'git.operation.readFailed': { error: string | number }
+  'git.operation.resolved': undefined
+  'git.operation.resolvedTip': { command: string | number }
+  'git.operation.runs': { command: string | number }
+  'git.operation.skip': undefined
+  'git.operation.skipMessage': undefined
+  'git.operation.skipTitle': { commit: string; what: string | number }
+  'git.operation.step': { at: number; of: number }
+  'git.operation.theirs': undefined
+  'git.operation.theirsTip': { swap: string; has: string; command: string | number }
+  'git.operation.title': { what: string | number; folder: string | number }
+  'git.operation.unresolved': { count: number }
   'git.parentRepo': { folder: string | number }
   'git.problem.agentSetup': undefined
   'git.problem.cantRead': { problem: string | number }

@@ -569,6 +569,8 @@
   "tips.ui.tryIt": "Wypróbuj",
   "tips.unexpectedClose.text": "Jeśli Combwork został zakończony bez wyjścia z niego (awaria albo coś go zamknęło), przy następnym uruchomieniu podaje, kiedy działał ostatnio i którzy agenci działali, z przyciskiem Wznów wszystkich. Ustawienia → Sesje → Wznawiaj agentów po nieoczekiwanym zamknięciu wznawia ich samoczynnie.",
   "tips.unexpectedClose.title": "Dowiedz się, kiedy Combwork zamknął się nieoczekiwanie",
+  "tips.unfinishedGitOperation.text": "Gdy folder zostanie w trakcie scalania, rebase’u, cherry-picka, revertu lub bisectu, Kontrola wersji → Zmiany pokazuje panel: kontynuuj, pomiń lub przerwij, a każdy plik w konflikcie rozwiąż przyciskiem Użyj mojej, Użyj ich lub Oznacz jako rozwiązany.",
+  "tips.unfinishedGitOperation.title": "Dokończ przerwane w połowie scalanie lub rebase w git",
   "tips.unmerged.text": "Zakładka agenta pokazuje, ile commitów nie jest jeszcze scalonych, Scal… w jego menu ⋯ mówi, co zostało, a Kontrola wersji → Zmiany pokazuje wszystko, co agent zmienił od utworzenia gałęzi.",
   "tips.unmerged.title": "Zobacz, co agent w worktree ma do scalenia",
   "tips.unusedWorktrees.text": "Usunięto agenta, ale zachowano jego worktree? Kontrola wersji → Zmiany otwiera się na worktree, których nie używa żaden agent, i pokazuje, kto utworzył każdy z nich: otwórz jeden, żeby zobaczyć jego pracę i ją scalić, albo usuń scalone razem z gałęziami.",

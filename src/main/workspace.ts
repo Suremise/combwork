@@ -221,6 +221,9 @@ const projectFileConfig = (raw: Record<string, unknown>): { cfg: ProjectConfig; 
   viewKeys: Object.keys(viewOf(raw as Partial<ProjectConfig>))
 })
 
+/** A path that is neither a project nor one of its agents' worktrees (assertRoot, changesRootProject). */
+const NOT_ROOT = msg({ id: 'service.workspace.notRoot', defaultMessage: 'Not a project or agent worktree in the open workspace: {path}', description: "An error: {path} is neither one of the open workspace's projects nor the worktree of one of their agents." })
+
 export class WorkspaceService {
   path: string | null = null
   /** Who holds workspace.json's settings to save them whole (fsutil's KeptReadOptions.holder): this workspace, by identity. */
@@ -1316,7 +1319,7 @@ export class WorkspaceService {
   assertRoot(p: string): string {
     if (this.isProjectPath(p)) return resolve(p)
     if (this.roots.has(resolve(p).toLowerCase())) return resolve(p)
-    throw combworkError(msg({ id: 'service.workspace.notRoot', defaultMessage: 'Not a project or agent worktree in the open workspace: {path}', description: "An error: {path} is neither one of the open workspace's projects nor the worktree of one of their agents." }), { path: p }, { kind: 'notFound' })
+    throw combworkError(NOT_ROOT, { path: p }, { kind: 'notFound' })
   }
 
   /**
@@ -1327,6 +1330,19 @@ export class WorkspaceService {
   assertChangesRoot(p: string): string {
     if (this.unusedRoots.has(resolve(p).toLowerCase())) return resolve(p)
     return this.assertRoot(p)
+  }
+
+  /**
+   * HI-3470: a Changes root (assertChangesRoot) and the project whose repository it is in: the project folder itself, an
+   * agent's worktree or slot, or an unused worktree as last listed. Throws as assertChangesRoot does.
+   */
+  changesRootProject(p: string): { folder: string; project: string } {
+    const folder = this.assertChangesRoot(p)
+    if (this.isProjectPath(folder)) return { folder, project: resolve(folder) }
+    const key = folder.toLowerCase()
+    const project = this.unusedRoots.get(key) ?? this.roots.get(key)
+    if (!project) throw combworkError(NOT_ROOT, { path: p }, { kind: 'notFound' })
+    return { folder, project: resolve(project) }
   }
 
   /** A project's unused worktrees as just listed (#400): the ones the Changes tab may read, replacing the last list. */

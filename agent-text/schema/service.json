@@ -592,6 +592,66 @@
       "branch": "plain"
     }
   },
+  "service.gitOperation.agentBusy": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitOperation.busy": {
+    "placeholders": {
+      "folder": "plain",
+      "what": "plain"
+    }
+  },
+  "service.gitOperation.changed": {
+    "placeholders": {
+      "was": "select",
+      "folder": "plain"
+    }
+  },
+  "service.gitOperation.failed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.gitOperation.invalid": {
+    "placeholders": {}
+  },
+  "service.gitOperation.notConflicted": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.gitOperation.notStep": {
+    "placeholders": {}
+  },
+  "service.gitOperation.session": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitOperation.slotChanged": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "service.gitOperation.slotProcess": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "service.gitOperation.slotSession": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "service.gitOperation.unresolved": {
+    "placeholders": {
+      "count": "plural"
+    }
+  },
   "service.gitRepo.addFailed": {
     "placeholders": {
       "remote": "plain",

@@ -7,7 +7,8 @@
 // - HI-3464: with one builder, slot-a's folder deleted and a folder with a file made in its place: the next lend gets a
 //   new slot, slot-a stays gone with Remove… in Slots and copies, which forgets it and leaves the folder as it is.
 // - HI-3465: that slot released with a revert left under way (nothing uncommitted, git's sequencer left): told once,
-//   shown in Slots and copies with `git revert --abort`, not lent; ended there, it is lent again.
+//   shown in Slots and copies with `git revert --abort`, not lent; HI-3470: Open in Changes shows its panel, whose
+//   Abort (confirmed) ends it, and it is lent again.
 // - HI-3467: then released on its card's line with a stale index.lock: git refuses each detach; told once with git's
 //   error and `git switch --detach`, shown in Slots and copies, not lent; the lock gone, it is lent again.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (no agent is started).
@@ -159,7 +160,17 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const opRow = form.locator('.workflow-slots-table tr[data-slot="slot-b"]')
     check('Slots and copies shows slot-b as an unfinished git revert, with the command that ends it', !!(await until(async () => (await opRow.locator('[data-operation="revert"]').count()) === 1, HUNG_MS)) && /Unfinished git revert/.test(await opRow.innerText()) && (await opRow.innerText()).includes('git revert --abort'), await opRow.innerText().catch(() => ''))
     await opRow.screenshot({ path: path.join(fx.shots, 'slotpool-4-operation.png') })
-    g(['revert', '--abort'])
+    // HI-3470: ended from the window: Open in Changes shows slot-b with the panel, whose Abort (confirmed) runs git's.
+    await opRow.locator('[data-action="open-operation"]').click()
+    const opPanel = page.locator('.operation-panel[data-operation="revert"]')
+    check("HI-3470: Open in Changes shows slot-b's panel, its unfinished revert with Continue, Skip and Abort", !!(await until(async () => (await opPanel.count()) === 1, HUNG_MS)) && /Unfinished git revert in slot-b/.test(await opPanel.innerText()) && (await opPanel.locator('[data-step]').count()) === 3, await opPanel.innerText().catch(() => ''))
+    await opPanel.screenshot({ path: path.join(fx.shots, 'slotpool-4b-operation-panel.png') })
+    await opPanel.locator('[data-step="abort"]').click()
+    const abortAsk = page.locator('.dialog', { hasText: 'Abort the git revert in slot-b?' })
+    await abortAsk.waitFor({ timeout: HUNG_MS })
+    await abortAsk.getByRole('button', { name: 'Abort', exact: true }).click()
+    const gitDirB = g(['rev-parse', '--absolute-git-dir']).trim()
+    check('…Abort ends it: the sequencer gone, the panel gone', !!(await until(async () => !fs.existsSync(path.join(gitDirB, 'sequencer')) && (await opPanel.count()) === 0, HUNG_MS)), await page.locator('.toast').allInnerTexts().then((t) => t.join(' | ')).catch(() => ''))
     // A lend refused `busy` while a process is still in the folder (git's own background maintenance after the abort, a
     // process listing not yet caught up): asked again until it isn't, bounded; any other answer is the check's.
     const lendQuiet = async (card) => {

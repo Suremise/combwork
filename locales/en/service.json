@@ -587,6 +587,54 @@
     "defaultMessage": "There's no branch {branch} here any more.",
     "description": "An error comparing two branches in the Changes tab: the branch {branch} was deleted or renamed since the list was read."
   },
+  "service.gitOperation.agentBusy": {
+    "defaultMessage": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",
+    "description": "HI-3470: an error from the panel: an agent ({agent}) works in the folder ({folder}, a path)."
+  },
+  "service.gitOperation.busy": {
+    "defaultMessage": "A run or an agent is working in {folder} ({what}): nothing was done. Try again once it has finished.",
+    "description": "HI-3470: an error from the panel: a run (a test, a build) or an agent's file lock is in the folder ({folder}, a path); {what} names the first one's folder or file."
+  },
+  "service.gitOperation.changed": {
+    "defaultMessage": "Git isn't in the middle of {was, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder} any more: nothing was done. Look again.",
+    "description": "HI-3470: an error from the unfinished git operation panel (Version Control → Changes): the operation the user acted on ({was}, git's word for it) has ended or changed since they looked; {folder} is a path. Nothing was done."
+  },
+  "service.gitOperation.failed": {
+    "defaultMessage": "Git refused: {why}",
+    "description": "HI-3470: an error from the panel: git's own command failed; {why} is git's error line, in English."
+  },
+  "service.gitOperation.invalid": {
+    "defaultMessage": "That step was asked for wrongly: nothing was done.",
+    "description": "HI-3470: an error from the panel: the request was malformed (not reached from the window)."
+  },
+  "service.gitOperation.notConflicted": {
+    "defaultMessage": "{file} isn't in conflict any more: nothing was done. Look again.",
+    "description": "HI-3470: an error from the panel: the conflicted file the user settled ({file}, a path in the repository) was settled meanwhile (in a terminal, say)."
+  },
+  "service.gitOperation.notStep": {
+    "defaultMessage": "That isn't a step git offers for this operation.",
+    "description": "HI-3470: an error from the unfinished git operation panel: a step (Continue, Skip, Abort) the operation has none of. Not reached from the window, which offers only the steps each has."
+  },
+  "service.gitOperation.session": {
+    "defaultMessage": "{agent}'s session is in {folder}: nothing was done. Stop it first, or ask it to finish the operation.",
+    "description": "HI-3470: an error from the unfinished git operation panel (Version Control → Changes): an agent's session ({agent}, its name) runs in the folder ({folder}, a path), so Combwork doesn't touch git there."
+  },
+  "service.gitOperation.slotChanged": {
+    "defaultMessage": "{slot} changed meanwhile (lent, released, or something of Combwork's started in it): nothing was done. Look again.",
+    "description": "HI-3470: an error from the panel: the slot ({slot}) was lent to a card, released, or taken by one of Combwork's own steps (its setup, an archive, a run writing in it) since the user looked, or the lent slot they confirmed is lent under another lease now."
+  },
+  "service.gitOperation.slotProcess": {
+    "defaultMessage": "A process has a file or a folder in {slot} open: nothing was done. Close it (a terminal, an editor) and try again.",
+    "description": "HI-3470: an error from the panel: something has the slot's folder ({slot}) open, so Windows refused to rename it aside for a moment (the check that nothing works there)."
+  },
+  "service.gitOperation.slotSession": {
+    "defaultMessage": "A session is in {slot}: nothing was done. Stop it first.",
+    "description": "HI-3470: an error from the panel: a session runs in the slot ({slot}, such as slot-a; glossary: slot)."
+  },
+  "service.gitOperation.unresolved": {
+    "defaultMessage": "{count, plural, one {# file is} other {# files are}} still in conflict: settle {count, plural, one {it} other {them}} first.",
+    "description": "HI-3470: an error from the panel (and the reason Continue is greyed out): files still in conflict."
+  },
   "service.gitRepo.addFailed": {
     "defaultMessage": "Couldn't add {remote}: {why}",
     "description": "An error adding the remote {remote} in the Git view; {why} is git's own words."

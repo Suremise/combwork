@@ -57,6 +57,7 @@
   "shell.command.folderChanges.settle": "変更をコミットまたは退避",
   "shell.command.folderChanges.show": "未コミットの変更を表示",
   "shell.command.git.cancelRun": "Git操作をキャンセル",
+  "shell.command.git.openOperation": "未完了のGit操作を表示",
   "shell.command.help.about": "{app}について",
   "shell.command.help.agentSetup": "プロバイダーのセットアップ…",
   "shell.command.help.api": "Agent APIリファレンス",

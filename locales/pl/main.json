@@ -370,6 +370,7 @@
   "main.slots.detachFailed.message": "{said, select, yes {Git zgłasza: {error}} other {Git nie może znaleźć {target}.}} Dopóki to się nie uda, Combwork nie wypożycza {slot} innej karcie. Usuń w {folder} to, co przeszkadza, albo sam uruchom tam {command}: Combwork próbuje ponownie za każdym razem, gdy sprawdza swoje sloty, i wypożycza {slot} ponownie, gdy to się uda.",
   "main.slots.detachFailed.title": "Combwork nie może przywrócić {slot} na {target}",
   "main.slots.operation.message": "Combwork nie może wypożyczyć {slot} innej karcie, dopóki to się nie skończy. Dokończ to w {folder} albo zakończ tam poleceniem {command}. Combwork nigdy nie kończy tego sam i wypożycza slot ponownie, gdy nic już w nim nie trwa.",
+  "main.slots.operation.open": "Otwórz w Zmianach",
   "main.slots.operation.title": "{slot} ma niedokończone git {what}",
   "main.storage.claimed": "Folder znów należy do sesji.",
   "main.storage.launchInUse": "jego agent znów należy do projektu albo właśnie się uruchamia",

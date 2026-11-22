@@ -551,6 +551,7 @@
   "workflow.slots.off": "Aus",
   "workflow.slots.on": "An",
   "workflow.slots.openAdvanced": "Erweitert öffnen",
+  "workflow.slots.openOperation": "In Änderungen öffnen",
   "workflow.slots.operationHint": "Schließe es in seinem Ordner ab oder beende es dort mit {command}",
   "workflow.slots.operationState": "Unvollendetes Git-{what}",
   "workflow.slots.release": "Freigeben…",

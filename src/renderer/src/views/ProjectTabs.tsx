@@ -35,6 +35,7 @@ import { useGitRead } from './GitTab'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, SectionNav, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
+import { OperationPanel } from '../components/OperationPanel'
 import { cliReadyOf, ConnectionMark, connectionCli, connectionLine, firstReadyConnection, useConnections } from '../components/ConnectionChoice'
 import { connectionOf } from '@shared/connectionLabel'
 import { useConnectionsInUse } from '../connectionUsage'
@@ -1032,6 +1033,9 @@ function ChangesPicker({ project, value, onChange, unused, looking, listed, comp
   )
 }
 
+/** HI-3470: two picker ids for one folder, whatever their case or slashes (Slots and copies' Open in Changes names a slot's folder as the pool has it). */
+const sameRootId = (a: string, b: string): boolean => a === b || a.replace(/\\/g, '/').toLowerCase() === b.replace(/\\/g, '/').toLowerCase()
+
 export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   const usageVersion = useStore((s) => s.usageVersion[owner.path] ?? 0)
   const rootId = useStore((s) => s.changesRoot[owner.path])
@@ -1063,7 +1067,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   const infoRead = useGitRead('git:leftovers', owner)
   const leftovers = useLeftovers(owner, infoRead.data)
   const listingUnused = shownId === UNUSED_ROOT
-  const spare = shownId.startsWith(`${UNUSED_ROOT}:`) ? (unusedList.find((w) => unusedRoot(w.path) === shownId && (w.branch || w.slot)) ?? null) : null
+  const spare = shownId.startsWith(`${UNUSED_ROOT}:`) ? (unusedList.find((w) => sameRootId(unusedRoot(w.path), shownId) && (w.branch || w.slot)) ?? null) : null
   // An agent's folder's changes (its slot, the slot kept for it or its 0.9 worktree, #1569) are everything on its branch
   // since it left its base branch (only what isn't committed when the base isn't known); an unused one's, since the
   // branch it would merge into.
@@ -1263,6 +1267,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
         <div className="muted" style={{ padding: '0 14px 8px', fontSize: 12 }}>
           <Icon name="git-branch" /> {status.branch} {whose && base ? <span className="faint">{tr(C.sinceLeft, { base: base ?? '' })}</span> : <>{status.ahead > 0 && `↑${status.ahead}`} {status.behind > 0 && `↓${status.behind}`}</>}
         </div>
+        <OperationPanel project={owner} root={root} folder={agent ? (agent.place.name ?? whose) : spare ? (spare.slot ?? unusedName(spare)) : null} reloadKey={status} onChanged={load} />
         <div className="pane-body">
           {status.files.length === 0 && <div className="pane-empty">{agent && own?.branch ? tr(C.noAgentChanges, { branch: own.branch }) : agent ? tr(C.clean) : spare ? tr(C.nothingOn, { branch: unusedName(spare), base: base ?? '' }) : tr(C.clean)}</div>}
           {status.files.map((f) => (

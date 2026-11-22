@@ -1958,6 +1958,38 @@ textarea.input {
   background: rgba(242, 85, 90, 0.12);
   color: var(--error);
 }
+/* HI-3470: Changes' panel for an unfinished git operation, above the file list: a column, its file rows below. */
+.banner.operation-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 14px;
+}
+.operation-panel .operation-steps {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.operation-panel .operation-conflicts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--fg);
+}
+.operation-panel .operation-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.operation-panel .operation-conflict .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.operation-panel .operation-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
 .banner.info {
   background: var(--accent-soft);
   color: var(--fg-strong);

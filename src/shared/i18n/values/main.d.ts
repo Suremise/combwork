@@ -372,6 +372,7 @@ interface CombworkMessageValues {
   'main.slots.detachFailed.message': { said: string; error: string | number; target: string | number; slot: string | number; folder: string | number; command: string | number }
   'main.slots.detachFailed.title': { slot: string | number; target: string | number }
   'main.slots.operation.message': { slot: string | number; folder: string | number; command: string | number }
+  'main.slots.operation.open': undefined
   'main.slots.operation.title': { slot: string | number; what: string | number }
   'main.storage.claimed': undefined
   'main.storage.launchInUse': undefined
