@@ -227,7 +227,7 @@ interface CombworkMessageValues {
   'git.operation.skipMessage': undefined
   'git.operation.skipTitle': { commit: string; what: string | number }
   'git.operation.step': { at: number; of: number }
-  'git.operation.submoduleStaged': { path: string | number; commit: string | number }
+  'git.operation.submoduleStaged': { path: string | number; commit: string | number; command: string }
   'git.operation.theirs': undefined
   'git.operation.theirsTip': { swap: string; has: string; command: string | number }
   'git.operation.title': { what: string | number; folder: string | number }

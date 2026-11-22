@@ -904,8 +904,8 @@
     "description": "HI-3470: under the panel's heading, for a rebase or an am: which commit of the list git stopped at."
   },
   "git.operation.submoduleStaged": {
-    "defaultMessage": "{path} is a submodule: its commit {commit} is staged. Its folder is left as it is: to check that commit out there, run git submodule update -- {path}",
-    "description": "HI-3502: a notice after Use mine or Use theirs on a conflicted submodule: that side's commit ({commit}, a short commit id) is staged, and Combwork doesn't check it out in the submodule's own folder. {path} is the submodule's path; 'git submodule update --' is a git command: keep it as it is."
+    "defaultMessage": "{path} is a submodule: its commit {commit} is staged. Its folder is left as it is: {command, select, none {to check that commit out there, run git submodule update for it in a terminal.} other {to check that commit out there, run {command}}}",
+    "description": "HI-3502: a notice after Use mine or Use theirs on a conflicted submodule: that side's commit ({commit}, a short commit id) is staged, and Combwork doesn't check it out in the submodule's own folder. {path} is the submodule's path. {command} is the git command that checks it out, quoted for a shell (keep it as it is); none: its path can't be quoted the same for every shell, so no command is shown ('git submodule update' is a git command: keep it as it is)."
   },
   "git.operation.theirs": {
     "defaultMessage": "Use theirs",

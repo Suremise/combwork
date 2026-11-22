@@ -9,7 +9,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { timing } from './waits'
 import { commit, gitRepo, sh } from './workflow/harness'
-import { pickCommand, type OperationRequest } from '../src/shared/gitOperations'
+import { pickCommand, shellWord, submoduleUpdateCommand, type OperationRequest } from '../src/shared/gitOperations'
 
 const norm = (p: string): string => resolve(p).toLowerCase()
 /** What the queue counts as building in a folder: none unless a test says. */
@@ -198,8 +198,27 @@ describe('a path git would read as a glob (HI-3501)', () => {
     expect(pickCommand('merge', { path: 'a[1].txt', ...both }, 'resolved')).toBe("git add -A -- ':(literal)a[1].txt'")
     expect(pickCommand('merge', { path: 'app/[id].tsx', ...both }, 'theirs')).toBe("git checkout --theirs -- ':(literal)app/[id].tsx'; git add -- ':(literal)app/[id].tsx'")
     expect(pickCommand('merge', { path: 'd[1].txt', mine: false, theirs: true }, 'mine')).toBe("git rm -- ':(literal)d[1].txt'")
-    expect(pickCommand('merge', { path: "it's here.txt", ...both }, 'resolved')).toBe("git add -A -- 'it'\\''s here.txt'")
+    expect(pickCommand('merge', { path: "it's here.txt", ...both }, 'resolved')).toBe('git add -A -- "it\'s here.txt"')
     expect(pickCommand('merge', { path: 'src/a-b_c.txt', ...both }, 'resolved')).toBe('git add -A -- src/a-b_c.txt')
+  })
+})
+
+describe("a shown command's words read the same in PowerShell and Git Bash (HI-3502, HR2's round 1)", () => {
+  it('a submodule notice names its path literally, one argument, never a second command', () => {
+    expect(submoduleUpdateCommand('vendor/lib')).toBe('git submodule update -- vendor/lib')
+    expect(submoduleUpdateCommand('third party/lib')).toBe("git submodule update -- 'third party/lib'")
+    expect(submoduleUpdateCommand('vendor; Write-Output marker')).toBe("git submodule update -- 'vendor; Write-Output marker'")
+    expect(submoduleUpdateCommand('libs/[id] x')).toBe("git submodule update -- ':(literal)libs/[id] x'")
+    expect(submoduleUpdateCommand("it's lib")).toBe('git submodule update -- "it\'s lib"')
+    // Each shell expands something inside double quotes: with an apostrophe too, nothing pastes the same in both.
+    for (const p of ["it's $HOME", "it's `x", 'it’s $x', "it's \"q\""]) expect(submoduleUpdateCommand(p)).toBeNull()
+  })
+
+  it('quotes a word in single quotes, else double quotes, else not at all', () => {
+    expect(shellWord('a-b_c/d.txt')).toBe('a-b_c/d.txt')
+    expect(shellWord('a b;c&d|e$f`g')).toBe("'a b;c&d|e$f`g'")
+    expect(shellWord('it’s')).toBe('"it’s"')
+    expect(shellWord("it's!")).toBeNull()
   })
 })
 

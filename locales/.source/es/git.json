@@ -225,7 +225,7 @@
   "git.operation.skipMessage": "Its changes are left out, with every conflict settled in it, and git goes on with the next one.",
   "git.operation.skipTitle": "Skip {commit, select, none {this commit} other {{commit}}} of the git {what}?",
   "git.operation.step": "Step {at, number} of {of, number}",
-  "git.operation.submoduleStaged": "{path} is a submodule: its commit {commit} is staged. Its folder is left as it is: to check that commit out there, run git submodule update -- {path}",
+  "git.operation.submoduleStaged": "{path} is a submodule: its commit {commit} is staged. Its folder is left as it is: {command, select, none {to check that commit out there, run git submodule update for it in a terminal.} other {to check that commit out there, run {command}}}",
   "git.operation.theirs": "Use theirs",
   "git.operation.theirsTip": "{swap, select, yes {The other side: the branch being rebased onto (git calls it ours here).} other {The other side: what is being merged, picked or reverted (git calls it theirs).}} {has, select, yes {Takes its version of the file.} submodule {Stages its commit of the submodule.} other {It deleted the file: deletes it.}} Runs {command}",
   "git.operation.title": "Unfinished git {what} in {folder}",

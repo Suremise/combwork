@@ -225,7 +225,7 @@
   "git.operation.skipMessage": "Seine Änderungen bleiben außen vor, mit allen darin gelösten Konflikten, und Git macht mit dem nächsten weiter.",
   "git.operation.skipTitle": "{commit, select, none {Diesen Commit} other {{commit}}} des Git-{what} überspringen?",
   "git.operation.step": "Schritt {at, number} von {of, number}",
-  "git.operation.submoduleStaged": "{path} ist ein Submodul: sein Commit {commit} ist für den Commit bereitgestellt. Sein Ordner bleibt, wie er ist: um diesen Commit dort auszuchecken, führe git submodule update -- {path} aus",
+  "git.operation.submoduleStaged": "{path} ist ein Submodul: sein Commit {commit} ist für den Commit bereitgestellt. Sein Ordner bleibt, wie er ist: {command, select, none {um diesen Commit dort auszuchecken, führe in einem Terminal git submodule update dafür aus.} other {um diesen Commit dort auszuchecken, führe {command} aus}}",
   "git.operation.theirs": "Ihre nehmen",
   "git.operation.theirsTip": "{swap, select, yes {Die andere Seite: der Branch, auf den rebased wird (Git nennt ihn hier „ours“).} other {Die andere Seite: was gemergt, gepickt oder zurückgenommen wird (Git nennt es „theirs“).}} {has, select, yes {Nimmt ihre Fassung der Datei.} submodule {Stellt ihren Commit des Submoduls für den Commit bereit.} other {Sie hat die Datei gelöscht: löscht sie.}} Führt {command} aus",
   "git.operation.title": "Unvollendetes Git-{what} in {folder}",

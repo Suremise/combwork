@@ -88,29 +88,54 @@ export function operationCommand(what: GitOperationName, step: OperationStep): s
 }
 
 /**
- * HI-3501: a conflicted file's path as the tooltip's command names it, so a pasted command touches that file alone: a
- * literal pathspec (`:(literal)a[1].txt`) where git would read it as a glob (`*`, `?`, `[`, `]`, `\`) or as magic (a
- * leading `:`), and single-quoted, as git quotes paths for a shell, where it has anything but plain characters.
+ * HI-3501: a conflicted file's path as a pathspec in a command shown to paste, so it touches that file alone: a literal
+ * pathspec (`:(literal)a[1].txt`) where git would read it as a glob (`*`, `?`, `[`, `]`, `\`) or as magic (a leading
+ * `:`), quoted as shellWord says; null where no quoting reads the same in both shells.
  */
-export function pathArg(path: string): string {
-  return shellWord(/[*?[\]\\]/.test(path) || path.startsWith(':') ? `:(literal)${path}` : path)
+export function pathArg(path: string): string | null {
+  return shellWord(literalSpec(path))
 }
 
-/** A word as a shell takes it: as it is when plain, else single-quoted as git quotes paths for a shell. */
-const shellWord = (w: string): string => (/^[\w./@+=,-]+$/.test(w) ? w : `'${w.replace(/'/g, "'\\''")}'`)
+/** A path as a pathspec that names it alone (pathArg), before quoting. */
+const literalSpec = (path: string): string => (/[*?[\]\\]/.test(path) || path.startsWith(':') ? `:(literal)${path}` : path)
+
+/**
+ * HI-3502 (HR2's round 1): a word as both PowerShell and Git Bash take it, one argument as it is, so a shown command
+ * pastes into either: plain as it is; else in single quotes, where neither expands anything (nor ends a command at `;`
+ * or splits at a space); else, holding an apostrophe, in double quotes when it has nothing either shell expands there
+ * (`$`, a backtick, `\`, `!`, `"`). PowerShell also takes the typographic quotes as quotes. Null when none fits.
+ */
+export function shellWord(w: string): string | null {
+  if (/^[\w./@+=,-]+$/.test(w)) return w
+  if (!/['‘’‚‛]/.test(w)) return `'${w}'`
+  if (!/["$`\\!“”„]/.test(w)) return `"${w}"`
+  return null
+}
+
+/** A word for a tooltip's command: shellWord's, else single-quoted as git quotes paths for a POSIX shell. */
+const tipWord = (w: string | null, raw: string): string => w ?? `'${raw.replace(/'/g, "'\\''")}'`
+
+/**
+ * HI-3502: the command that checks a submodule's staged commit out in its folder, as the notice after a pick shows it
+ * (the path literal: HI-3501); null where no quoting reads the same in both shells. A command, never translated.
+ */
+export function submoduleUpdateCommand(path: string): string | null {
+  const p = pathArg(path)
+  return p === null ? null : `git submodule update -- ${p}` // i18n-ignore: a git command
+}
 
 /**
  * HI-3470: a pick's git command, for its tooltip (a side without the file: git rm). Commands, never translated. The path
  * is literal (pathArg), as the panel runs it (HI-3501: main's pickArgs, `--literal-pathspecs`).
  */
 export function pickCommand(what: GitOperationName, c: GitConflict, pick: ConflictPick): string {
-  const p = pathArg(c.path)
+  const p = tipWord(pathArg(c.path), literalSpec(c.path))
   if (pick === 'resolved') return `git add -A -- ${p}` // i18n-ignore: a git command
   const has = pick === 'mine' ? c.mine : c.theirs
   if (!has) return `git rm -- ${p}` // i18n-ignore: a git command
   // A submodule's side: its commit staged (HI-3502); update-index takes a path, never a pathspec.
   const link = c.submodule?.[pick]
-  if (link) return `git update-index --cacheinfo 160000 ${link} ${shellWord(c.path)}` // i18n-ignore: a git command
+  if (link) return `git update-index --cacheinfo 160000 ${link} ${tipWord(shellWord(c.path), c.path)}` // i18n-ignore: a git command
   const ours = (pick === 'mine') !== mineIsTheirs(what)
   return `git checkout --${ours ? 'ours' : 'theirs'} -- ${p}; git add -- ${p}` // i18n-ignore: git commands
 }

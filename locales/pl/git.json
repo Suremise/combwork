@@ -225,7 +225,7 @@
   "git.operation.skipMessage": "Jego zmiany zostają pominięte, razem z każdym rozwiązanym w nim konfliktem, a git przechodzi do następnego.",
   "git.operation.skipTitle": "Pominąć {commit, select, none {ten commit} other {{commit}}} w git {what}?",
   "git.operation.step": "Krok {at, number} z {of, number}",
-  "git.operation.submoduleStaged": "{path} to submoduł: jego commit {commit} jest przygotowany do commita. Jego folder zostaje bez zmian: aby tam przełączyć się na ten commit, uruchom git submodule update -- {path}",
+  "git.operation.submoduleStaged": "{path} to submoduł: jego commit {commit} jest przygotowany do commita. Jego folder zostaje bez zmian: {command, select, none {aby tam przełączyć się na ten commit, uruchom dla niego git submodule update w terminalu.} other {aby tam przełączyć się na ten commit, uruchom {command}}}",
   "git.operation.theirs": "Użyj ich",
   "git.operation.theirsTip": "{swap, select, yes {Druga strona: gałąź, na którą robisz rebase (git nazywa ją tu ours).} other {Druga strona: to, co jest scalane, wybierane lub cofane (git nazywa to theirs).}} {has, select, yes {Bierze jej wersję pliku.} submodule {Przygotowuje do commita jej commit submodułu.} other {Usunęła plik: usuwa go.}} Uruchamia {command}",
   "git.operation.title": "Niedokończone git {what} w {folder}",

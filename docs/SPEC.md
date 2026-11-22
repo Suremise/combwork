@@ -5846,7 +5846,9 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   never also settles, stages or deletes `a1.txt`. A submodule in conflict (a gitlink) is settled by its commit
   (HI-3502): Use mine or Use theirs stages that side's commit (`git update-index --cacheinfo 160000`), since git's
   `checkout --ours/--theirs` never moves a submodule and `git add` would stage the commit its folder has checked out;
-  the submodule's own folder is left as it is, and a notice says so, with `git submodule update -- <path>`. Slots and copies' *Unfinished git …* row, Branches & remotes' banner and
+  the submodule's own folder is left as it is, and a notice says so, with `git submodule update -- <path>`: its path
+  literal and quoted so the command pastes the same into PowerShell and Git Bash (`shellWord`), or no command where no
+  quoting does (HR2's round 1). Slots and copies' *Unfinished git …* row, Branches & remotes' banner and
   the notice of HI-3465 each have **Open in Changes**. Git's work is a Git port step (`operationSteps`, RepoOps'
   `operationStep`, `platform/git/gitOperationSteps.ts`; RepoReads' `operation`): None lists no such operation.
   **What refuses a step**, each checked as the user clicks, before git runs: a live session whose folder is in it
