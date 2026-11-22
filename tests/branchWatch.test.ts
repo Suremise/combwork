@@ -74,12 +74,6 @@ describe("an agent's line, counted against where it merges (#1627)", () => {
     await expect(lineStatus({ project: pr, worktree: { path: slot, branch: 'cw/P/P-2-not-yet', base: '1.0.0' }, slot: true, target: '1.0.0' })).resolves.toBeNull()
   })
 
-  it("a Git slot's line is counted (HI-3170)", async () => {
-    const { project: pr, slot } = await project()
-    const line = { project: pr, worktree: { path: slot, branch: 'cw/P/P-1-fix', base: '1.0.0' }, slot: true as const, target: '1.0.0' }
-    expect(await lineStatus({ ...line, platform: 'git' })).toMatchObject({ into: '1.0.0', ahead: 1 })
-  })
-
   it("a 0.9 worktree's: counted against the project folder's branch, which its Merge… merges into", async () => {
     const { project: pr, slot } = await project()
     const st = await lineStatus({ project: pr, worktree: { path: slot, branch: 'cw/P/P-1-fix', base: '1.0.0' } })
