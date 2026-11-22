@@ -1004,6 +1004,8 @@ export const UNIT_SCANS = [
   // The translations and the messages they come from (#768): extracted catalogues current, files well formed, the
   // guard against new hard-coded text over every file in src/ and its allowlists.
   { test: 'tests/i18n.test.ts', paths: ['locales/'] },
+  // HI-3504: the confirm buttons beside the dialog's Cancel read differently from it in every language.
+  { test: 'tests/confirmLabels.test.ts', paths: ['locales/'] },
   { test: 'tests/i18n/numbers.test.ts', paths: ['locales/en/'] },
   { test: 'tests/i18nCatalogues.test.ts', paths: ['locales/', 'src/shared/i18n/values/'] },
   { test: 'tests/i18nCatalogues.test.ts', paths: ['src/'], lines: ['msg\\(', '\\btr\\(', 'tRich\\(', 'defaultMessage', 'description', '\\bid:'] },
