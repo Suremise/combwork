@@ -5,7 +5,7 @@
 // session or process in it), only under the lease the user confirmed when it is lent; every folder's step refuses a
 // live session in it, and the port checks again, under the repository lock and the folder's fence, that nothing of
 // Combwork's or an agent's works there and that the operation is still the one the user saw.
-import type { OperationLent, OperationPanelState, OperationRequest } from '../shared/gitOperations'
+import type { OperationLent, OperationPanelState, OperationRequest, OperationStepResult } from '../shared/gitOperations'
 import { isOperationName } from '../shared/gitOperations'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
@@ -64,9 +64,9 @@ function requestOf(raw: unknown): OperationRequest {
 /**
  * `git:operationStep`: the user's step on the operation under way in a Changes root, or a conflicted file settled.
  * Refused while a session is in the folder; a slot's only while its pool holds it for this (SlotPool.forUser), under the
- * lease the user confirmed (`req.lease`) when it is lent; `ops` the port, as repoOpsIpc.ts handed it out. Answers git's output.
+ * lease the user confirmed (`req.lease`) when it is lent; `ops` the port, as repoOpsIpc.ts handed it out. Answers git's output (HI-3503: and whether it stopped again).
  */
-export async function stepOperation(ws: WorkspaceService, root: string, raw: unknown, ops: OpsFor<'operationSteps'>): Promise<string> {
+export async function stepOperation(ws: WorkspaceService, root: string, raw: unknown, ops: OpsFor<'operationSteps'>): Promise<OperationStepResult> {
   const req = requestOf(raw)
   const { folder, project } = ws.changesRootProject(root)
   const noSession = (): void => {

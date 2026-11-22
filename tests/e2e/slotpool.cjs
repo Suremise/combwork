@@ -15,6 +15,8 @@
 //   whose panel lists both with their buttons (Continue waiting); Use theirs settles one; Abort, confirmed, ends it.
 // - HI-3502: a submodule at `third party/lib` merged into conflict: Use theirs stages their commit, its folder left at
 //   mine, and the notice gives `git submodule update -- 'third party/lib'`.
+// - HI-3503: a rebase of two commits in conflict: Continue after step 1 stops at step 2, and the notice says git went
+//   on and stopped again, not that it couldn't.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR (no agent is started).
 // Dev build only (#1578): its slots are lent and released through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
@@ -308,6 +310,45 @@ const clearPopups = async (page) => !!(await until(async () => {
       return true
     }, HUNG_MS))
     check('…Use theirs stages their commit, its folder left at mine; the notice gives the command, its path one quoted argument', noted && ga(['ls-files', '-s', '--', libRel]).split(/\s+/)[1] === subSide && lib.git(libDir, ['rev-parse', 'HEAD']).trim() === subMain, `${noteText} | staged ${ga(['ls-files', '-s', '--', libRel])}`)
+
+    // --- HI-3503: a rebase of two commits, each in conflict. Continue after settling step 1 commits it and stops at
+    // step 2 (git exits 1): the notice says git went on and stopped again, never "Git couldn't do that".
+    ga(['merge', '--abort'])
+    check('…its notifications dismissed', await clearPopups(page))
+    const put = (f, text) => fs.writeFileSync(path.join(fx.alpha, f), `${text}\n`)
+    put('c3.txt', 'c')
+    put('d3.txt', 'd')
+    ga(['add', 'c3.txt', 'd3.txt'])
+    ga(['commit', '-qm', 'c3 and d3'])
+    ga(['switch', '-q', '-c', 'hi3503-topic'])
+    put('c3.txt', 'topic c')
+    ga(['commit', '-qam', 'topic one'])
+    put('d3.txt', 'topic d')
+    ga(['commit', '-qam', 'topic two'])
+    ga(['switch', '-q', 'main'])
+    put('c3.txt', 'main c')
+    put('d3.txt', 'main d')
+    ga(['commit', '-qam', 'main edits c3 d3'])
+    ga(['switch', '-q', 'hi3503-topic'])
+    ga(['rebase', 'main'], false)
+    check('HI-3503: the project folder is mid-rebase at step 1 of 2, c3.txt in conflict', fs.existsSync(path.join(gitDirA, 'rebase-merge')) && ga(['diff', '--name-only', '--diff-filter=U']).trim() === 'c3.txt', ga(['status', '--short']))
+    await page.locator('.git-sections [data-section="branches"]').click()
+    await page.locator('.banner[data-git-state="rebase"] [data-action="open-operation"]').click()
+    const rebasePanel = page.locator('.operation-panel[data-operation="rebase"]')
+    check('…the panel shows step 1 of 2', !!(await until(async () => /Step 1 of 2/.test(await rebasePanel.innerText().catch(() => '')), HUNG_MS)), await rebasePanel.innerText().catch(() => ''))
+    await rebasePanel.locator('[data-conflict="c3.txt"] [data-pick="mine"]').click()
+    await until(async () => !(await rebasePanel.locator('[data-step="continue"]').isDisabled()), HUNG_MS)
+    await rebasePanel.locator('[data-step="continue"]').click()
+    const again = page.locator('.popup', { hasText: 'then stopped again' })
+    let againText = ''
+    const said = !!(await until(async () => {
+      againText = await again.first().innerText().catch(() => '')
+      if (!againText.includes('Git went on with the rebase in the project folder, then stopped again. The panel shows where.')) return false
+      await again.first().screenshot({ path: path.join(fx.shots, 'slotpool-8-stopped-again.png') }).catch(() => undefined)
+      return true
+    }, HUNG_MS))
+    check('…Continue commits step 1 and stops at step 2: the notice says git went on and stopped again; the panel shows step 2', said && !!(await until(async () => /Step 2 of 2/.test(await rebasePanel.innerText().catch(() => '')), HUNG_MS)) && (await page.locator('.popup', { hasText: "Git couldn't do that" }).count()) === 0 && ga(['log', '-1', '--format=%s', 'HEAD']).trim() === 'topic one', againText)
+    ga(['rebase', '--abort'])
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

@@ -17,7 +17,7 @@ import type { IgnoreTarget } from '../../shared/gitIgnoreRules'
 import type { BranchStart, ResolvedStart } from '../../shared/nextVersion'
 import type { FileGitDone, FolderChangeAction, FolderChangesDone, MergeResult } from '../../shared/types'
 import type { Operation } from '../../shared/platform/descriptors'
-import type { OperationRequest } from '../../shared/gitOperations'
+import type { OperationRequest, OperationStepResult } from '../../shared/gitOperations'
 import type { RemotePrune, RepoHealth } from '../../shared/gitHealth'
 import type { StashApplied, StashFile, StashRequest, StashRow } from '../../shared/gitStashes'
 import type { GitDiff } from '../../shared/types'
@@ -114,9 +114,10 @@ export interface RepoOps {
   /**
    * A step of the operation under way in `folder` (the project's, or a worktree of its repository), or a conflicted file
    * settled, under the repository lock and the folder's fence, only while it is still `req.what` and nothing works there;
-   * `guard` runs there before git does and refuses by throwing. Git's own output.
+   * `guard` runs there before git does and refuses by throwing. Git's own output, and whether it went on and stopped
+   * again (HI-3503).
    */
-  operationStep(projectPath: string, folder: string, req: OperationRequest, guard?: () => Promise<void> | void): Promise<string>
+  operationStep(projectPath: string, folder: string, req: OperationRequest, guard?: () => Promise<void> | void): Promise<OperationStepResult>
   // HI-3473: Repository health, the user's click at a time; each refused while anything works on the repository.
   /** The worktree entries a prune would drop and the repository's lock files, each judged stale or not: no remote reached. */
   health(projectPath: string): Promise<RepoHealth>

@@ -225,6 +225,7 @@
   "git.operation.skipMessage": "その変更は、そこで解決したコンフリクトとともに除外され、Gitは次のコミットに進みます。",
   "git.operation.skipTitle": "git {what}の{commit, select, none {このコミット} other {{commit}}}をスキップしますか？",
   "git.operation.step": "ステップ {at, number}/{of, number}",
+  "git.operation.stoppedAgain": "{step, select, skip {{folder}の{what}でGitがコミットを1つスキップし、再び停止しました。} other {{folder}の{what}をGitが続行し、再び停止しました。}}停止した場所はパネルに表示されます。",
   "git.operation.submoduleStaged": "{path}はサブモジュールです：そのコミット{commit}をステージしました。フォルダーはそのままです：{command, select, none {そこでそのコミットをチェックアウトするには、ターミナルでgit submodule updateを実行してください。} other {そこでそのコミットをチェックアウトするには、{command} を実行してください}}",
   "git.operation.theirs": "相手の側を使う",
   "git.operation.theirsTip": "{swap, select, yes {相手の側：リベース先のブランチ（ここではGitはoursと呼びます）。} other {相手の側：マージ、チェリーピック、リバートされる側（Gitはtheirsと呼びます）。}} {has, select, yes {そのファイルの版を使います。} submodule {そのサブモジュールのコミットをステージします。} other {その側はファイルを削除しました：削除します。}} {command} を実行します",

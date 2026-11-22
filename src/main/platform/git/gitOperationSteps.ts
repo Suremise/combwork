@@ -8,7 +8,7 @@
 import { readFile } from 'original-fs/promises'
 import { createHash } from 'crypto'
 import { join } from 'path'
-import { mineIsTheirs, OPERATION_STEPS, type ConflictPick, type GitConflict, type GitOperationName, type GitOperationState, type OperationRequest } from '../../../shared/gitOperations'
+import { mineIsTheirs, OPERATION_STEPS, type ConflictPick, type GitConflict, type GitOperationName, type GitOperationState, type OperationRequest, type OperationStepResult } from '../../../shared/gitOperations'
 import { msg } from '../../../shared/i18n'
 import { combworkError } from '../../combworkError'
 import { changingFolder } from '../../folderFence'
@@ -196,9 +196,10 @@ export function pickArgs(what: GitOperationName, c: GitConflict, pick: ConflictP
  * HI-3470: a step of the operation under way in `folder` (the project's, or a worktree of its repository: the caller
  * checked which), or a conflicted file settled, as `req` asks. Under the repository lock and the folder's fence: the
  * operation still `req.what`, at the stop `req.id` names, nothing of Combwork's or an agent's working there, then `guard` (refusing by throwing).
- * Answers git's own output, trimmed; throws the refusal or git's error, in the window's words.
+ * Answers git's own output, trimmed, and whether a Continue or Skip went on and stopped again (HI-3503); throws the
+ * refusal or git's error, in the window's words.
  */
-export async function operationStep(projectPath: string, folder: string, req: OperationRequest, guard?: () => Promise<void> | void): Promise<string> {
+export async function operationStep(projectPath: string, folder: string, req: OperationRequest, guard?: () => Promise<void> | void): Promise<OperationStepResult> {
   if ('step' in req && !OPERATION_STEPS[req.what].includes(req.step)) throw combworkError(M.notStep, undefined, { kind: 'invalid' })
   return withRepoLock(
     projectPath,
@@ -216,7 +217,8 @@ export async function operationStep(projectPath: string, folder: string, req: Op
         const agent = await busyAgentIn(projectPath, folder)
         if (agent) throw combworkError(M.agentBusy, { agent, folder })
         await guard?.()
-        const run = async (args: string[]): Promise<string> => {
+        /** `wentOn`: for a Continue or Skip, whether git went on to another stop though it exited non-zero (HI-3503). */
+        const run = async (args: string[], wentOn?: () => Promise<boolean>): Promise<OperationStepResult> => {
           const name = args.find((x) => !x.startsWith('--')) ?? '' // the command, past --literal-pathspecs
           log.info(`The user's ${userText(args.join(' '))} in ${userText(folder)}`)
           // A Continue or Skip commits, running the repository's hooks: Commit's own bound (Settings → Advanced,
@@ -226,22 +228,36 @@ export async function operationStep(projectPath: string, folder: string, req: Op
             log.warn(`git ${userText(name)} in ${userText(folder)} ran past its bound and was ended`)
             throw combworkError(M.timedOut, { seconds: Math.round(platformLimits.gitCommitMs() / 1000), folder })
           }
+          const output = `${r.out}\n${r.err}`.trim()
+          if (!r.ok && wentOn && (await wentOn())) {
+            log.info(`git ${userText(name)} in ${userText(folder)} went on and stopped again: ${userText(gitErrorLine(r.err))}`)
+            return { output, stoppedAgain: true }
+          }
           if (!r.ok) {
             log.info(`git ${userText(name)} in ${userText(folder)} failed: ${userText(gitErrorLine(r.err))}`)
             throw combworkError(M.failed, { why: gitErrorLine(`${r.err}\n${r.out}`) || r.err.trim().slice(0, 400) || r.out.trim().slice(0, 400) })
           }
-          return `${r.out}\n${r.err}`.trim()
+          return { output }
         }
         if ('step' in req) {
           if (req.step === 'continue') {
             const left = await conflictsIn(folder, req.what)
             if (left.length) throw combworkError(M.unresolved, { count: left.length })
           }
-          return run(stepArgs(req.what, req.step))
+          // HI-3503: a Continue or Skip that commits its step and then stops at the next conflict exits non-zero: the
+          // same operation, at another stop than the one the user acted on, is git having gone on, not a refusal. A
+          // step git refused leaves the stop as it was.
+          const wentOn = async (): Promise<boolean> => {
+            if (req.step === 'abort' || operationSync(folder) !== req.what) return false
+            const after = gitDirSync(folder)
+            const id = after ? await stopId(folder, after, req.what) : null
+            return id !== null && id !== req.id
+          }
+          return run(stepArgs(req.what, req.step), wentOn)
         }
         const c = (await conflictsIn(folder, req.what)).find((x) => x.path === req.file)
         if (!c) throw combworkError(M.notConflicted, { file: req.file })
-        let out = ''
+        let out: OperationStepResult = { output: '' }
         for (const args of pickArgs(req.what, c, req.pick)) out = await run(args)
         return out
       }),

@@ -225,6 +225,7 @@
   "git.operation.skipMessage": "Ses modifications sont laissées de côté, avec chaque conflit réglé dedans, et git passe au suivant.",
   "git.operation.skipTitle": "Sauter {commit, select, none {ce commit} other {{commit}}} du git {what} ?",
   "git.operation.step": "Étape {at, number} sur {of, number}",
+  "git.operation.stoppedAgain": "{step, select, skip {Git a sauté un commit du {what} dans {folder}, puis s’est de nouveau arrêté.} other {Git a poursuivi le {what} dans {folder}, puis s’est de nouveau arrêté.}} Le panneau montre où.",
   "git.operation.submoduleStaged": "{path} est un sous-module : son commit {commit} est indexé. Son dossier reste tel quel : {command, select, none {pour y extraire ce commit, lance git submodule update pour lui dans un terminal.} other {pour y extraire ce commit, lance {command}}}",
   "git.operation.theirs": "Prendre la leur",
   "git.operation.theirsTip": "{swap, select, yes {L’autre côté : la branche sur laquelle le rebase se fait (git l’appelle ours ici).} other {L’autre côté : ce qui est fusionné, choisi ou annulé (git l’appelle theirs).}} {has, select, yes {Prend sa version du fichier.} submodule {Indexe son commit du sous-module.} other {Il a supprimé le fichier : le supprime.}} Exécute {command}",

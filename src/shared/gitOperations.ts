@@ -81,6 +81,15 @@ export interface OperationPanelState extends GitOperationState {
  */
 export type OperationRequest = { what: GitOperationName; id: string; lease?: string } & ({ step: OperationStep } | { file: string; pick: ConflictPick })
 
+/**
+ * HI-3503: what a step did: git's output, and `stoppedAgain` when a Continue or Skip went on and git stopped at another
+ * stop of the same operation (a rebase's next commit in conflict): git exits non-zero then, though the step went through.
+ */
+export interface OperationStepResult {
+  output: string
+  stoppedAgain?: true
+}
+
 /** HI-3470: the git command a step runs, shown in its tooltip as the panel runs it. Commands, never translated. */
 export function operationCommand(what: GitOperationName, step: OperationStep): string {
   if (what === 'bisect') return 'git bisect reset' // i18n-ignore: a git command

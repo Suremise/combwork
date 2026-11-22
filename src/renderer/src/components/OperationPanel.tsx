@@ -41,6 +41,7 @@ const T = {
   lentMessage: msg({ id: 'git.operation.lentMessage', defaultMessage: "Its builder, {agent}, finds the folder as you leave it. Act on its git {what} anyway?", description: "HI-3470: under git.operation.lentTitle. {agent} is the builder agent's name; {what} git's word for the operation." }),
   goOn: msg({ id: 'git.operation.goOn', defaultMessage: 'Go On', description: 'HI-3470: the button that confirms acting in a lent slot (git.operation.lentTitle).' }),
   done: msg({ id: 'git.operation.done', defaultMessage: "{step, select, continue {Git went on with the {what} in {folder}.} skip {Git skipped a commit of the {what} in {folder}.} other {{what, select, bisect {The bisect in {folder} is ended.} other {The git {what} in {folder} is aborted.}}}}", description: "HI-3470: a notice after the panel's step worked. {what} is git's word for the operation; {folder} a slot's name or git.operation.projectFolder." }),
+  stoppedAgain: msg({ id: 'git.operation.stoppedAgain', defaultMessage: "{step, select, skip {Git skipped a commit of the {what} in {folder}, then stopped again.} other {Git went on with the {what} in {folder}, then stopped again.}} The panel shows where.", description: "HI-3503: a notice after Continue or Skip went through and git stopped at the next commit of the operation (in conflict, say): the panel shows the new stop. {what} is git's word for the operation (keep it as it is); {folder} a slot's name or git.operation.projectFolder." }),
   failed: msg({ id: 'git.operation.failed', defaultMessage: "Git couldn't do that", description: "HI-3470: the title of the error notice when the panel's step or a conflicted file's button failed or was refused." }),
   unreadable: msg({ id: 'git.operation.unreadable', defaultMessage: "Combwork can't read where git stopped here, so it takes no step: finish it in a terminal.", description: "HI-3470 (a reviewer's round 2): under the panel's heading when git's files that say where the operation stopped can't be read; its buttons are greyed out." }),
   readFailed: msg({ id: 'git.operation.readFailed', defaultMessage: "Couldn't read the git operation under way: {error}", description: 'HI-3470: the panel, when reading the operation failed. {error} is why.' })
@@ -87,7 +88,9 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
     bumpGit(project.path)
     read()
     onChanged()
-    if (r !== undefined && done) notify('success', done)
+    // HI-3503: a Continue or Skip that went through and stopped at the next commit is said so, never as refused.
+    if (r?.stoppedAgain && 'step' in req) notify('info', tr(T.stoppedAgain, { step: req.step, what: op.what, folder: where }))
+    else if (r !== undefined && done) notify('success', done)
   }
 
   const step = async (s: OperationStep): Promise<void> => {
