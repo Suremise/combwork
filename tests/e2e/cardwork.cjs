@@ -32,12 +32,14 @@ const check = (name, ok, extra = '') => {
 // around the diff (the card's Work section still coming in) can move the line from under a pointer that stays put, where
 // rightly no + shows: the pointer follows the line, as a user's would, only when the line has moved. A + still missing
 // logs where the line was and is, and what's under the pointer, with a screenshot, so another cause shows itself.
+// Each hover is near the line's start: Monaco makes a line's element a million pixels wide, so its centre is off screen.
 const hoverPlus = async (page, line, plus, name) => {
-  await line.hover()
-  const centre = (b) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 })
+  const into = { x: 20, y: ((await line.boundingBox())?.height ?? 18) / 2 }
+  await line.hover({ position: into })
+  // Where the hover put the pointer (a hover scrolls the line into view first).
   const first = await line.boundingBox()
+  const centre = (b) => ({ x: b.x + into.x, y: b.y + into.y })
   let at = first && centre(first)
-  if (at) await page.mouse.move(at.x, at.y)
   let followed = 0
   const shown = await lib.until(async () => {
     if ((await plus.count()) === 1) return true
