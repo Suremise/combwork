@@ -124,26 +124,6 @@ describe('HI-2709: a dependency edited while the card is in the merge queue', ()
     expect(facts(w, card).some((f) => f.kind === 'Integrated')).toBe(true)
   })
 
-  // HI-3265: a platform's advance (jj's) begun is recorded as AdvanceAttempted, its blockers read in that write: a
-  // dependency added before it settles is refused as one added after IntegrationStarted is; once settled, it's saved.
-  it("added while a platform's advance is unsettled (AdvanceAttempted): refused, naming the merge, and nothing saved; once it settles, saved", async () => {
-    const { w, wt } = await workspace()
-    const blocker = await create(w, 'Blocker')
-    const card = await approved(w, wt)
-    const board = FactStore.forBoard(w, { project: 'p', key: 'p' })
-    await store.boardWrite(w, async () => board.tx((tx) => tx.append(card, { kind: 'AdvanceAttempted', actor: 'combwork', source: 'recorded', data: { plan: 'plan-1', attempt: 'attempt-1' } } as never)))
-    const refused = await dependOn(w, card, [blocker]).then(
-      () => null,
-      (e: unknown) => e
-    )
-    expect(refused).toMatchObject({ kind: 'conflict' })
-    expect(String((refused as Error).message)).toMatch(/is being merged into main now, so it can't wait for .* any more/)
-    expect((await inWorkspace(w, () => tasks.getTask(card)))?.blockedBy).toEqual([])
-    await store.boardWrite(w, async () => board.tx((tx) => tx.append(card, { kind: 'AdvanceResolved', actor: 'combwork', source: 'observed', data: { attempt: 'attempt-1', how: 'nothingMoved' } } as never)))
-    await dependOn(w, card, [blocker])
-    expect((await inWorkspace(w, () => tasks.getTask(card)))?.blockedBy).toEqual([blocker])
-  })
-
   it('added while it is tested, before its advance: saved, and the advance holds it', async () => {
     const { w, repo, wt } = await workspace()
     const blocker = await create(w, 'Blocker')

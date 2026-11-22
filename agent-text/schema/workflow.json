@@ -1,33 +1,4 @@
 {
-  "workflow.advance.note": {
-    "placeholders": {
-      "project": "plain"
-    }
-  },
-  "workflow.advance.previewClosed": {
-    "placeholders": {
-      "clicked": "select",
-      "card": "plain",
-      "why": "select",
-      "cards": "plain"
-    }
-  },
-  "workflow.advance.refused": {
-    "placeholders": {
-      "target": "plain",
-      "card": "plain",
-      "next": "select",
-      "why": "plain",
-      "detail": "plain",
-      "mode": "select"
-    }
-  },
-  "workflow.advance.superseded": {
-    "placeholders": {
-      "card": "plain",
-      "target": "plain"
-    }
-  },
   "workflow.contradiction.combworkMergesNeedsGit": {
     "placeholders": {}
   },
@@ -38,9 +9,6 @@
     "placeholders": {}
   },
   "workflow.contradiction.jjNeedsSlots": {
-    "placeholders": {}
-  },
-  "workflow.contradiction.jjYouIntegrate": {
     "placeholders": {}
   },
   "workflow.contradiction.mergeNeedsSlots": {
@@ -75,68 +43,6 @@
   "workflow.focused.resultsUnread": {
     "placeholders": {
       "why": "plain"
-    }
-  },
-  "workflow.forYou.advanceNote": {
-    "placeholders": {
-      "project": "plain"
-    }
-  },
-  "workflow.forYou.advancePreview": {
-    "placeholders": {
-      "again": "select",
-      "card": "plain",
-      "target": "plain",
-      "expected": "plain",
-      "result": "plain",
-      "style": "select",
-      "commits": "plain",
-      "more": "plural"
-    }
-  },
-  "workflow.forYou.advancePreviewClosed": {
-    "placeholders": {
-      "clicked": "select",
-      "card": "plain",
-      "why": "select",
-      "cards": "plain"
-    }
-  },
-  "workflow.forYou.advanceRefused": {
-    "placeholders": {
-      "target": "plain",
-      "result": "plain",
-      "card": "plain",
-      "why": "select",
-      "detail": "plain",
-      "next": "select",
-      "mode": "select"
-    }
-  },
-  "workflow.forYou.advanceStopped": {
-    "placeholders": {
-      "again": "select",
-      "target": "plain",
-      "result": "plain",
-      "card": "plain",
-      "why": "select",
-      "detail": "plain"
-    }
-  },
-  "workflow.forYou.advanceSuperseded": {
-    "placeholders": {
-      "card": "plain",
-      "target": "plain"
-    }
-  },
-  "workflow.forYou.advanceUncertain": {
-    "placeholders": {
-      "again": "select",
-      "target": "plain",
-      "result": "plain",
-      "card": "plain",
-      "detail": "plain",
-      "op": "select"
     }
   },
   "workflow.forYou.churnLimit": {
@@ -449,12 +355,6 @@
   "workflow.option.finish.desc": {
     "placeholders": {}
   },
-  "workflow.option.finish.jjDesc": {
-    "placeholders": {}
-  },
-  "workflow.option.finish.jjTitle": {
-    "placeholders": {}
-  },
   "workflow.option.finish.title": {
     "placeholders": {}
   },
@@ -515,34 +415,16 @@
   "workflow.option.mergeChecks.desc": {
     "placeholders": {}
   },
-  "workflow.option.mergeChecks.jjDesc": {
-    "placeholders": {}
-  },
-  "workflow.option.mergeChecks.jjTitle": {
-    "placeholders": {}
-  },
   "workflow.option.mergeChecks.title": {
     "placeholders": {}
   },
   "workflow.option.mergeGuards.desc": {
     "placeholders": {}
   },
-  "workflow.option.mergeGuards.jjDesc": {
-    "placeholders": {}
-  },
-  "workflow.option.mergeGuards.jjTitle": {
-    "placeholders": {}
-  },
   "workflow.option.mergeGuards.title": {
     "placeholders": {}
   },
   "workflow.option.mergeInstall.desc": {
-    "placeholders": {}
-  },
-  "workflow.option.mergeInstall.jjDesc": {
-    "placeholders": {}
-  },
-  "workflow.option.mergeInstall.jjTitle": {
     "placeholders": {}
   },
   "workflow.option.mergeInstall.title": {
@@ -641,22 +523,10 @@
   "workflow.option.strict.desc": {
     "placeholders": {}
   },
-  "workflow.option.strict.jjDesc": {
-    "placeholders": {}
-  },
-  "workflow.option.strict.jjTitle": {
-    "placeholders": {}
-  },
   "workflow.option.strict.title": {
     "placeholders": {}
   },
   "workflow.option.style.desc": {
-    "placeholders": {}
-  },
-  "workflow.option.style.jjDesc": {
-    "placeholders": {}
-  },
-  "workflow.option.style.jjTitle": {
     "placeholders": {}
   },
   "workflow.option.style.title": {
@@ -1612,9 +1482,6 @@
       "choice": "select"
     }
   },
-  "workflow.rule.advance.verified": {
-    "placeholders": {}
-  },
   "workflow.rule.approval.given": {
     "placeholders": {}
   },
@@ -1948,9 +1815,6 @@
   "workflow.value.finish.agentMerges": {
     "placeholders": {}
   },
-  "workflow.value.finish.combworkAdvances": {
-    "placeholders": {}
-  },
   "workflow.value.finish.combworkMerges": {
     "placeholders": {}
   },
@@ -1960,12 +1824,6 @@
   "workflow.value.finish.notChecked": {
     "placeholders": {}
   },
-  "workflow.value.finish.previewAdvance": {
-    "placeholders": {}
-  },
-  "workflow.value.finish.userIntegrates": {
-    "placeholders": {}
-  },
   "workflow.value.folder.project": {
     "placeholders": {}
   },
@@ -1973,9 +1831,6 @@
     "placeholders": {}
   },
   "workflow.value.mergeInstall.always": {
-    "placeholders": {}
-  },
-  "workflow.value.mergeInstall.alwaysCandidate": {
     "placeholders": {}
   },
   "workflow.value.mergeInstall.onManifestChange": {

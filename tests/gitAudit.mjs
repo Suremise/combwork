@@ -203,7 +203,6 @@ export const EDGES = [
   { file: 'src/main/platform/historyPorts', module: 'src/main/platform/gitHistory', class: 'registry', names: ['gitHistory'], why: "the history port's map (R6)" },
   { file: 'src/main/slotsApp', module: 'src/main/repoLock', class: 'common', names: ['takeStores'], why: "jj's store lock for its workspace port's writes (HI-2866): the repository lock's one owner (HI-2896), keyed by the store, every platform's" },
   { file: 'src/main/slotsApp', module: 'src/main/git', class: 'registry', names: ['git'], why: "jj's stale-slot recovery composed with the app's deps (HI-2866): J2's recoverStale reads the workspace's files through git, read-only" },
-  { file: 'src/main/jjCards', module: 'src/main/git', class: 'registry', names: ['git'], why: "jj's card work composed with the app's deps (HI-2868): git on jj's Git-backed store (`--git-dir`): its pins, the named revision's resolution, J5's reads" },
   { file: 'src/main/platform/integrationPorts', module: 'src/main/platform/gitIntegration', class: 'registry', names: ['gitIntegration'], why: "the integration port's map (R7, R8)" },
   { file: 'src/main/platform/observe', module: 'src/main/git', class: 'impl', names: ['readRefsOffMain'], why: "the watcher's Git reads (refs off main's thread, git's reflog): ObservePort's Git half, kept with the common watcher (R6)" },
   { file: 'src/main/platform/observe', module: 'src/main/platform/gitIgnoredByKind', class: 'impl', names: ['gitIgnoredByKind', 'EntryKind', 'RecordedKinds'], why: "a Git folder's write record leaves out what Git ignores, each path by every kind it had (HI-3173): ObservePort's Git half, read-only check-ignore" },
@@ -373,10 +372,6 @@ const SWITCH_HOME = (f) => /^src\/(shared\/platform|main\/platform)\//.test(f) |
  * page and the window's jj reads and types.
  */
 export const JJ_HOMES = {
-  'src/main/jjCards': { class: 'compose', why: "jj's card work composed with the app's services (HI-2868): platform code imports no app module" },
-  'src/main/jjSetupStamp': { class: 'compose', why: "what a jj candidate's checks depend on in project.json (HI-3122), jjCards' helper" },
-  'src/main/jjPublish': { class: 'compose', why: "main's host of jj's publish worker (HI-2882)" },
-  'src/main/jjPublishWorker': { class: 'compose', why: "jj's publish worker thread, a build entry beside gitWorker and repoLockWorker" },
   'src/shared/jjViews': { class: 'jjUi', why: "jj's page's view types, as shared/gitRepo is Git's" },
   'src/shared/jjTool': { class: 'jjUi', why: "jj's tool and its tested version, as shared/gitTool is Git's" }
 }
@@ -479,7 +474,6 @@ export const SWITCHES = {
   'src/main/workflow/platformSwitch': { n: 1, class: 'gitUi', why: "the switch to None warns that the folder is still a Git repository (gitFolder, git.vc.switch.gitFolder): Git-facing text" },
   'src/main/workflow/commitMessageStep': { n: 2, class: 'historic', why: "HI-1997's one-time step over G19's stored Git options (in force, or kept as `kept.git`): Git's data alone" },
   'src/shared/workflow/compile': { n: 1, class: 'historic', why: "HI-2874's one-time drop of the retired guard start.platformReady, which only jj rulesets had: jj's data alone" },
-  'src/main/jjSetupStamp': { n: 2, class: 'data', why: "a jj candidate's setup stamp's command id `none` (no setup command, HI-3122): not a platform" },
   'src/main/workflow/storeSwitch': { n: 6, class: 'data', why: "a project's store read (`none`: no repository found), as storeOf and mapStores answer it: not a platform" },
   'src/renderer/src/components/AgentTiles': { n: 1, class: 'data', why: "a CSS grid column token (`none`): not a platform" },
   'src/renderer/src/components/WorkflowOptions': { n: 1, class: 'data', why: "the review option's value `none` (G3), said in None's words where the platform accepts work: not a platform" },
@@ -487,29 +481,6 @@ export const SWITCHES = {
   'src/renderer/src/views/VersionControlHeader': { n: 1, class: 'gitUi', why: "Initialise repository… switches the project to Git by name once Git's page made it one (switchAfterInit): Git's page" }
 }
 
-/**
- * Modules kept at an old path for the tests' imports alone (HI-3140: jj's candidate checks and words moved into the
- * platform layer, reached by the workflow through its reconcile port): no module under src may import one.
- */
-export const COMPAT_ONLY = {
-  'src/main/workflow/jjCandidateChecks': 'src/main/platform/jjCandidateChecks',
-  'src/main/workflow/jjCandidateReturn': 'src/main/platform/jjCandidateReturn'
-}
-
-/** Each import of a COMPAT_ONLY module from src (`file -> module`), static, dynamic or required. */
-export function compatImports(root, over = {}) {
-  const out = []
-  for (const { file, text } of filesOf(root, over)) {
-    const f = file.replace(/\.tsx?$/, '')
-    if (Object.hasOwn(COMPAT_ONLY, f)) continue
-    for (const m of text.matchAll(/(?:\bfrom|\bimport\s*\(|\brequire\s*\(|^\s*import)\s*['"]([^'"]+)['"]/gm)) {
-      if (!m[1].startsWith('.')) continue
-      const module = relative(root, resolve(root, dirname(file), m[1])).replace(/\\/g, '/').replace(/\.(tsx?|js)$/, '')
-      if (Object.hasOwn(COMPAT_ONLY, module)) out.push(`${f} -> ${module}`)
-    }
-  }
-  return out
-}
 
 /** jj's platform modules (platform/jj…): reached from outside the platform layer only by a listed edge (HI-3140). */
 export const isJjModule = (m) => /^src\/main\/platform\/jj[A-Z]\w*$/.test(m)
@@ -518,14 +489,14 @@ export const isJjModule = (m) => /^src\/main\/platform\/jj[A-Z]\w*$/.test(m)
 const MAY_NAME_JJ = new RegExp(String.raw`jj[A-Z]|require\(|import\(\s*[^'"${'`'}\s]`)
 
 /**
- * Each import of a jj platform module from outside the platform layer, jj's homes (JJ_HOMES) and the test-only paths
- * (COMPAT_ONLY): `{ file, module, names }` as gitEdges gives them.
+ * Each import of a jj platform module from outside the platform layer and jj's homes (JJ_HOMES): `{ file, module, names }`
+ * as gitEdges gives them.
  */
 export function jjEdges(root, over = {}) {
   const out = []
   for (const { file, text } of filesOf(root, over)) {
     const f = file.replace(/\.tsx?$/, '')
-    if (f.startsWith('src/main/platform/') || Object.hasOwn(JJ_HOMES, f) || Object.hasOwn(COMPAT_ONLY, f)) continue
+    if (f.startsWith('src/main/platform/') || Object.hasOwn(JJ_HOMES, f)) continue
     const key = `${root}|${file}|jj`
     const kept = parsed.get(key)
     if (kept?.text === text) {
@@ -552,9 +523,7 @@ export const JJ_EDGES = [
   { file: 'src/main/slotsApp', module: 'src/main/platform/jjSlotPrep', class: 'registry', names: ['boardPrepStore'], why: "jj's port's preparation records in the workspace database (HI-2866): composition" },
   { file: 'src/main/slotsApp', module: 'src/main/platform/jjWorkspacePort', class: 'registry', names: ['JjWorkspacePort', 'createJjWorkspacePort', 'generationOf'], why: "jj's workspace port made with the app's dependencies (APP_PORTS' maker) and a slot's generation for Remove…" },
   { file: 'src/main/slotStaleView', module: 'src/main/platform/jjWorkspacePort', class: 'registry', names: ['StaleWhy'], why: "a stale jj slot's reason's type, for the Slots view's read of jj's port (HI-2912)" },
-  { file: 'src/main/workflow/reconcile', module: 'src/main/platform/jjCandidateStep', class: 'impl', names: ['JjCandidateFingerprint', 'JjCandidateOffer', 'JjCandidateStep', 'sameFingerprint'], why: "the candidate pass's fingerprint, offer and step (HI-2871): the reconcile port's own types, and the fingerprint's comparison" },
   { file: 'src/main/workflow/runtime', module: 'src/main/platform/jjPlatform', class: 'registry', names: ['JjCardDeps'], why: "the type of jj's card work's dependencies, which the app gives each project's workflow (setJjCards, HI-2868)" },
-  { file: 'src/main/workflow/service', module: 'src/main/platform/jjPlatform', class: 'registry', names: ['JjCardDeps'], why: "the type of jj's card work's dependencies, which the app gives each project's workflow (setJjCards, HI-2868)" },
   { file: 'src/main/workflow/storeSwitch', module: 'src/main/platform/jjStoreSide', class: 'impl', names: ['fallbackOf', 'retryMoved'], why: "re-exported for storeSwitch's callers and tests (HI-3140 moved jj's side of the store switch)" }
 ]
 
@@ -631,7 +600,6 @@ export function audit(root, over = {}) {
   // HI-3140: an exemption nothing uses any more is stale: a NOT_PLATFORM name no comparison has, a jj home that is gone.
   switches.push(...Object.keys(NOT_PLATFORM).filter((n) => !used.has(n)).map((n) => `NOT_PLATFORM ${n}: no comparison uses it (stale)`))
   switches.push(...Object.keys(JJ_HOMES).filter((f) => !files.has(f)).map((f) => `JJ_HOMES ${f}: no such file (stale)`))
-  const compat = compatImports(root, over)
   // HI-3140: jj's modules reached from outside the platform layer, edge by edge and name by name, as Git's are.
   const jjFound = jjEdges(root, over)
   const jjListed = new Map(JJ_EDGES.map((e) => [key(e), e]))
@@ -645,5 +613,5 @@ export function audit(root, over = {}) {
       return f.names.filter((n) => !e.names.includes(n)).map((n) => `${key(f)}: ${n}`)
     })
   ]
-  return { found, unlisted, stale, extraNames, seams, switches, compat, jj }
+  return { found, unlisted, stale, extraNames, seams, switches, jj }
 }

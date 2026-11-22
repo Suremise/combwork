@@ -164,10 +164,9 @@ export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
     capabilities: ['revisions', 'isolation', 'containment', 'sameness', 'authorship', 'observe'],
     integration: 'user',
     deliverables: 'commits',
-    // HI-2840/HI-3235/HI-3236: Combwork's advance after the merge checks (its adapter's `advance` port), the default; the
-    // same advance once the user clicks Integrate on its preview (`advancePreview`); or the user integrating by hand.
-    finishes: ['combworkAdvances', 'previewAdvance', 'userIntegrates'],
-    defaultFinish: 'combworkAdvances',
+    // Its finishes went with HI-3483: a merge Combwork doesn't check stands in until this descriptor goes (HI-3487).
+    finishes: ['notChecked'],
+    defaultFinish: 'notChecked',
     repository: true,
     defaultTarget: false,
     operations: [],

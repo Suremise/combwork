@@ -346,18 +346,6 @@ interface CombworkMessageValues {
   'board.field.project': undefined
   'board.field.title': undefined
   'board.filter.noProject': undefined
-  'board.forYou.advanceAttest': undefined
-  'board.forYou.advanceAttestTip': undefined
-  'board.forYou.advanceIntegrate': undefined
-  'board.forYou.advanceIntegrateTip': undefined
-  'board.forYou.advanceLeave': undefined
-  'board.forYou.advanceLeaveTip': undefined
-  'board.forYou.advanceNotThisPlan': undefined
-  'board.forYou.advanceNotThisPlanTip': undefined
-  'board.forYou.advanceStartAgain': undefined
-  'board.forYou.advanceStartAgainTip': undefined
-  'board.forYou.advanceUndo': undefined
-  'board.forYou.advanceUndoTip': undefined
   'board.forYou.agree': { action: string }
   'board.forYou.agreeTip': undefined
   'board.forYou.answering': undefined
@@ -1046,7 +1034,6 @@ interface CombworkMessageValues {
   'board.work.base': undefined
   'board.work.branch': undefined
   'board.work.carriedOver': { from: string | number; to: string | number }
-  'board.work.change': { commits: number; change: string | number }
   'board.work.changes': undefined
   'board.work.changes.between': { base: string | number; revision: string | number }
   'board.work.changes.binary': undefined
@@ -1086,7 +1073,6 @@ interface CombworkMessageValues {
   'board.work.comments.tooMany': { max: number }
   'board.work.comments.where': { side: string; from: string | number; same: string; to: string | number }
   'board.work.comments.you': undefined
-  'board.work.doneUnproved': { when: string | number }
   'board.work.failed': { error: string | number }
   'board.work.files': { n: number }
   'board.work.filesNotRead': { note: string; why: string | number }
@@ -1136,8 +1122,6 @@ interface CombworkMessageValues {
   'board.work.target': undefined
   'board.work.title': undefined
   'board.work.verdict': { reviewer: string | number; pass: string; current: string }
-  'board.work.via': { via: string }
-  'board.work.workspace': undefined
   'board.workQueue.advance': { target: string | number }
   'board.workQueue.advancing': { target: string | number }
   'board.workQueue.answerFailed': undefined

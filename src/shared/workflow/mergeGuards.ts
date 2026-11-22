@@ -2,8 +2,8 @@
 // guard is a regular expression (with a case flag), the paths it applies to and skips (globs), and a message saying what
 // to do instead. Only added text lines are matched, never paths and never what the target already has (HI-2617's
 // rule: "no new X" guards check the change; sweeps clean what exists). Not a rule (left out of every ruleset): the merge
-// queue and jj's candidate checks read the guards as the options are when they check, and a result counts only for the
-// guards it was checked with (`guardsKey`).
+// queue reads the guards as the options are when it checks, and a result counts only for the guards it was checked with
+// (`guardsKey`).
 //
 // Here, everything that needs no process: the shape and its bounds, checked when saved without running a pattern; the
 // globs; the unified-diff parser (Git's and jj's git format); the matching, which runs in a worker thread

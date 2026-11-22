@@ -81,16 +81,12 @@ describe('tools by workflow (HI-2694): which are hidden', () => {
     const at = (stage: string, ...sets: WorkflowOptions[]) => ({ stage, sets })
     expect(hiddenForWorkflow([presetOf('solo')], [at('review', presetOf('solo'))])).not.toContain('cw_verdict')
     // The merge report only where its handler takes one from Approved (not checked with no review, say), never under
-    // Committed is done or You integrate, whose cards it refuses in any stage (HI-3008: a jj card's Approved restarted
-    // its builder for it).
+    // Committed is done, whose cards it refuses in any stage.
     const notChecked = { ...presetOf('solo'), finish: 'notChecked' as const, folder: 'slots' as const }
     expect(hidden(notChecked)).toContain('cw_report_merge')
     expect(hiddenForWorkflow([notChecked], [at('approved', notChecked)])).not.toContain('cw_report_merge')
     expect(hiddenForWorkflow([notChecked], [at('merging', notChecked)])).not.toContain('cw_report_merge')
     expect(hiddenForWorkflow([presetOf('solo')], [at('approved', presetOf('solo'))])).toContain('cw_report_merge')
-    const youIntegrate = { ...presetOf('pair'), finish: 'userIntegrates' as const }
-    expect(hiddenForWorkflow([youIntegrate], [at('approved', youIntegrate)])).toEqual(hidden(youIntegrate))
-    expect(hidden(youIntegrate)).toContain('cw_report_merge')
     expect(hiddenForWorkflow([presetOf('solo')], [at('active', presetOf('solo'))])).toEqual(hidden(presetOf('solo')))
     // HI-3014: a stage keeps a tool under its own cards' rules only. The project now not checked (no review, no OK), a
     // Solo card (Committed is done) moved into Approved can't borrow the merge report from it; a not-checked card can.

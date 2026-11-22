@@ -119,7 +119,6 @@
   "pace.panelRestoredMs": { "kind": "pace", "ms": 5000, "note": "a window's Progress panel restored open with its layout within this, else it is opened by its rail (progresslanes, progressgates)" },
   "pace.tick": { "kind": "pace", "ms": 5, "note": "a turn of the event loop, or a clock tick so two timestamps differ" },
   "pace.shortMs": { "kind": "pace", "ms": 30, "note": "a short pause so a race window opens or an interval is measurable" },
-  "budget.jjObservedMs": { "kind": "budget", "ms": 20000, "note": "a move on main observed by the jj workflow within this, after a restart or with Waiting read often (jjreopen)" },
   "budget.mainStallMs": { "kind": "budget", "ms": 1000, "note": "the longest main's thread may be held by a burst of commits merged into a folder's line (mergeburst)" },
   "budget.workspaceOpenMs": { "kind": "budget", "ms": 2000, "note": "an ordinary workspace open answering, its file calls each slowed by seam.fileLagMs (openspeed, HI-1705)" },
   "budget.signAtOnceMs": { "kind": "budget", "ms": 15000, "note": "a packaged agent's signed commit answered at once rather than after the signer's own limit (packaged-sign)" },

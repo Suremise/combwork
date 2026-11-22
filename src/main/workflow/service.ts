@@ -12,7 +12,6 @@
 import { PREFERENCE_DEFAULTS } from '../../shared/workflow/preferences'
 import { createLogger, userText } from '../logger'
 import { SIMPLIFY_GATE } from '../../shared/workflow/facts'
-import type { JjCardDeps } from '../platform/jjPlatform'
 import { basename, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
@@ -123,13 +122,6 @@ async function sayEarlierWork(ws: WorkspaceService, projectPath: string, card: C
 
 export function setSlotStarts(s: SlotStarts | null): void {
   slotStarts = s
-}
-
-/** jj's card work's dependencies for a project (HI-2868: the app's jjCards.ts, set while slots run); none: jj answers nothing. */
-type JjCards = (ws: WorkspaceService, projectPath: string, projectId: () => string) => JjCardDeps
-let jjCards: JjCards | null = null
-export function setJjCards(f: JjCards | null): void {
-  jjCards = f
 }
 
 /** Whether workflow rules are enforced (Settings → Advanced): read at each use, so a change applies at once. */
@@ -258,7 +250,6 @@ export async function optionsFor(ws: WorkspaceService, projectPath: string): Pro
 function make(ws: WorkspaceService, project: { path: string; name: string }, life: AbortSignal, wsPath: string, options: () => WorkflowOptions, finishInherited: () => boolean): Workflow {
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === wsPath
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name, projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? null })
-  let jjDeps: JjCardDeps | undefined
   return new Workflow({
     // The project's cards by their keys (#1294: its key now, #1219's; its name for what has no key, and for card
     // trailers written before, as the adoption's store keyed them).
@@ -289,11 +280,6 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     earlierWork: (card, lines, now) => sayEarlierWork(ws, project.path, card, lines, now),
     // HI-2944: a start's warning of its target's uncommitted changes, in the project's window too.
     targetChanges: (changes) => noticeTargetChanges(ws, project.path, changes),
-    // jj's card work (HI-2868), composed once for the project while slots run.
-    get jj() {
-      jjDeps ??= jjCards?.(ws, project.path, () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? basename(project.path))
-      return jjDeps
-    },
     // Actions run by the actions worker after the commit, never here.
     autoRun: false,
     // HI-2938: a card that passed is reconciled soon (a jj card's candidate is built then; its pass changes no jj

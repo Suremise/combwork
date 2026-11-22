@@ -6,7 +6,6 @@ interface CombworkMessageValues {
   'workflow.contradiction.committedNeedsFolder': undefined
   'workflow.contradiction.focusedNeedsRunner': undefined
   'workflow.contradiction.jjNeedsSlots': undefined
-  'workflow.contradiction.jjYouIntegrate': undefined
   'workflow.contradiction.mergeNeedsSlots': undefined
   'workflow.contradiction.noneHasNoSlots': undefined
   'workflow.contradiction.okWithReview': undefined
@@ -17,13 +16,6 @@ interface CombworkMessageValues {
   'workflow.contradiction.upToDateNeedsSlots': undefined
   'workflow.earlierWork.message': { read: string; n: number; lines: string | number }
   'workflow.earlierWork.title': { read: string; card: string | number; line: string | number }
-  'workflow.forYou.advanceNote': { project: string | number }
-  'workflow.forYou.advancePreview': { again: string; card: string | number; target: string | number; expected: string | number; result: string | number; style: string; commits: string | number; more: number }
-  'workflow.forYou.advancePreviewClosed': { clicked: string; card: string | number; why: string; cards: string | number }
-  'workflow.forYou.advanceRefused': { target: string | number; result: string | number; card: string | number; why: string; detail: string | number; next: string; mode: string }
-  'workflow.forYou.advanceStopped': { again: string; target: string | number; result: string | number; card: string | number; why: string; detail: string | number }
-  'workflow.forYou.advanceSuperseded': { card: string | number; target: string | number }
-  'workflow.forYou.advanceUncertain': { again: string; target: string | number; result: string | number; card: string | number; detail: string | number; op: string }
   'workflow.forYou.churnLimit': { card: string | number; churn: number }
   'workflow.forYou.decidedAfterMerge': { card: string | number }
   'workflow.forYou.focusedSkip': { card: string | number; tests: string | number }
@@ -253,8 +245,6 @@ interface CombworkMessageValues {
   'workflow.option.fileLocks.desc': undefined
   'workflow.option.fileLocks.title': undefined
   'workflow.option.finish.desc': undefined
-  'workflow.option.finish.jjDesc': undefined
-  'workflow.option.finish.jjTitle': undefined
   'workflow.option.finish.title': undefined
   'workflow.option.focusedTests.desc': undefined
   'workflow.option.focusedTests.title': undefined
@@ -275,16 +265,10 @@ interface CombworkMessageValues {
   'workflow.option.maxAgents.desc': undefined
   'workflow.option.maxAgents.title': undefined
   'workflow.option.mergeChecks.desc': undefined
-  'workflow.option.mergeChecks.jjDesc': undefined
-  'workflow.option.mergeChecks.jjTitle': undefined
   'workflow.option.mergeChecks.title': undefined
   'workflow.option.mergeGuards.desc': undefined
-  'workflow.option.mergeGuards.jjDesc': undefined
-  'workflow.option.mergeGuards.jjTitle': undefined
   'workflow.option.mergeGuards.title': undefined
   'workflow.option.mergeInstall.desc': undefined
-  'workflow.option.mergeInstall.jjDesc': undefined
-  'workflow.option.mergeInstall.jjTitle': undefined
   'workflow.option.mergeInstall.title': undefined
   'workflow.option.noSelfReview.desc': undefined
   'workflow.option.noSelfReview.title': undefined
@@ -317,12 +301,8 @@ interface CombworkMessageValues {
   'workflow.option.stopOwnRuns.desc': undefined
   'workflow.option.stopOwnRuns.title': undefined
   'workflow.option.strict.desc': undefined
-  'workflow.option.strict.jjDesc': undefined
-  'workflow.option.strict.jjTitle': undefined
   'workflow.option.strict.title': undefined
   'workflow.option.style.desc': undefined
-  'workflow.option.style.jjDesc': undefined
-  'workflow.option.style.jjTitle': undefined
   'workflow.option.style.title': undefined
   'workflow.option.target.desc': undefined
   'workflow.option.target.title': undefined
@@ -539,7 +519,6 @@ interface CombworkMessageValues {
   'workflow.refused.why.stale': undefined
   'workflow.refused.why.userOk': undefined
   'workflow.roundChoice': { choice: string }
-  'workflow.rule.advance.verified': undefined
   'workflow.rule.approval.given': undefined
   'workflow.rule.card.kind': undefined
   'workflow.rule.done.contained': undefined
@@ -718,16 +697,12 @@ interface CombworkMessageValues {
   'workflow.value.commitMessage.branch': undefined
   'workflow.value.commitMessage.cw': undefined
   'workflow.value.finish.agentMerges': undefined
-  'workflow.value.finish.combworkAdvances': undefined
   'workflow.value.finish.combworkMerges': undefined
   'workflow.value.finish.committed': undefined
   'workflow.value.finish.notChecked': undefined
-  'workflow.value.finish.previewAdvance': undefined
-  'workflow.value.finish.userIntegrates': undefined
   'workflow.value.folder.project': undefined
   'workflow.value.folder.slots': undefined
   'workflow.value.mergeInstall.always': undefined
-  'workflow.value.mergeInstall.alwaysCandidate': undefined
   'workflow.value.mergeInstall.onManifestChange': undefined
   'workflow.value.okBefore.every': undefined
   'workflow.value.okBefore.labels': undefined

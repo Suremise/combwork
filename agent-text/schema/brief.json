@@ -115,9 +115,6 @@
   "brief.rule.finish.agentMerges": {
     "placeholders": {}
   },
-  "brief.rule.finish.combworkAdvances": {
-    "placeholders": {}
-  },
   "brief.rule.finish.combworkMerges": {
     "placeholders": {}
   },
@@ -125,12 +122,6 @@
     "placeholders": {}
   },
   "brief.rule.finish.notChecked": {
-    "placeholders": {}
-  },
-  "brief.rule.finish.previewAdvance": {
-    "placeholders": {}
-  },
-  "brief.rule.finish.userIntegrates": {
     "placeholders": {}
   },
   "brief.rule.off": {

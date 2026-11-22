@@ -1,4 +1,4 @@
-// HI-2840 (no jj in the app's code): a platform's integration modes are its descriptor's
+// HI-2840: a platform's integration modes are its descriptor's
 // `finishes` and `defaultFinish`, and the options form, a new project's options and the contradictions follow them, never a
 // platform's id. Here the descriptors are changed under the workflow's options (a stand-in list for each platform) and
 // every answer moves with them; the real descriptors' own data is pinned beside it. gitAudit.test.ts fails a second
@@ -28,46 +28,34 @@ afterEach(() => {
 })
 
 describe("a platform's integration modes are its descriptor's (HI-2840)", () => {
-  it('declares each platform its finishes and a default among them: Git its four, None acceptance, jj Combwork’s advance (the default, HI-3235), its preview and click (HI-3236) and the user integrating', () => {
+  it('declares each platform its finishes and a default among them: Git its four, None acceptance (jj’s went with HI-3483)', () => {
     expect(Object.fromEntries(PLATFORM_IDS.map((p) => [p, { finishes: PLATFORMS[p].finishes, defaultFinish: PLATFORMS[p].defaultFinish }]))).toEqual({
       git: { finishes: ['combworkMerges', 'agentMerges', 'committed', 'notChecked'], defaultFinish: 'notChecked' },
       none: { finishes: ['accept'], defaultFinish: 'accept' },
-      jj: { finishes: ['combworkAdvances', 'previewAdvance', 'userIntegrates'], defaultFinish: 'combworkAdvances' }
+      jj: { finishes: ['notChecked'], defaultFinish: 'notChecked' }
     })
     for (const p of PLATFORM_IDS) expect(PLATFORMS[p].finishes).toContain(PLATFORMS[p].defaultFinish)
   })
 
   it("offers, defaults to and accepts exactly the descriptor's modes, whatever they are: no answer follows the id", () => {
-    // jj given a second mode beside the user integrating (as HI-2840's stage 2 gives it Combwork's advance), and a default
-    // of it; Git given only the user integrating.
-    stand.modes = { jj: { finishes: ['notChecked', 'userIntegrates'], defaultFinish: 'notChecked' }, git: { finishes: ['userIntegrates'], defaultFinish: 'userIntegrates' } }
-    expect(formFinishes('jj')).toEqual(['notChecked', 'userIntegrates'])
-    expect(formFinishes('git')).toEqual(['userIntegrates'])
-    expect(allOff('jj').finish).toBe('notChecked')
-    expect(allOff('git').finish).toBe('userIntegrates')
-    const finishing = (platform: 'git' | 'jj', finish: Finisher): string[] => contradictions({ ...allOff(platform), finish }).filter((c) => c === 'jjYouIntegrate' || c === 'combworkMergesNeedsGit')
-    // Each declared mode is accepted; one the descriptor doesn't declare is a contradiction, worded for the platform's way.
-    expect(finishing('jj', 'notChecked')).toEqual([])
-    expect(finishing('jj', 'userIntegrates')).toEqual([])
-    expect(finishing('jj', 'agentMerges')).toEqual(['jjYouIntegrate'])
-    expect(finishing('git', 'userIntegrates')).toEqual([])
-    expect(finishing('git', 'combworkMerges')).toEqual(['jjYouIntegrate'])
+    // Git given only Committed is done, and None a merge Combwork doesn't check beside acceptance.
+    stand.modes = { git: { finishes: ['committed'], defaultFinish: 'committed' }, none: { finishes: ['accept', 'notChecked'], defaultFinish: 'notChecked' } }
+    expect(formFinishes('git')).toEqual(['committed'])
+    expect(formFinishes('none')).toEqual(['accept', 'notChecked'])
+    expect(allOff('git').finish).toBe('committed')
+    expect(allOff('none').finish).toBe('notChecked')
+    const finishing = (platform: 'git' | 'none', finish: Finisher): string[] => contradictions({ ...allOff(platform), finish }).filter((c) => c === 'combworkMergesNeedsGit')
+    // Each declared mode is accepted; one the descriptor doesn't declare is a contradiction.
+    expect(finishing('git', 'committed')).toEqual([])
+    expect(finishing('git', 'combworkMerges')).toEqual(['combworkMergesNeedsGit'])
+    expect(finishing('none', 'notChecked')).toEqual([])
+    expect(finishing('none', 'combworkMerges')).toEqual(['combworkMergesNeedsGit'])
   })
 
-  it('words a mode a platform lacks as before: You integrate where the user integrates or chosen where work merges, else acceptance', () => {
-    const finishing = (platform: 'git' | 'jj' | 'none', finish: Finisher): string[] => contradictions({ ...allOff(platform), finish }).filter((c) => c === 'jjYouIntegrate' || c === 'combworkMergesNeedsGit')
+  it('words a mode a platform lacks as acceptance and merging not mixing (HI-2822)', () => {
+    const finishing = (platform: 'git' | 'none', finish: Finisher): string[] => contradictions({ ...allOff(platform), finish }).filter((c) => c === 'combworkMergesNeedsGit')
     expect(finishing('git', 'accept')).toEqual(['combworkMergesNeedsGit'])
-    expect(finishing('git', 'userIntegrates')).toEqual(['jjYouIntegrate'])
     expect(finishing('none', 'combworkMerges')).toEqual(['combworkMergesNeedsGit'])
-    expect(finishing('none', 'userIntegrates')).toEqual(['combworkMergesNeedsGit'])
-    expect(finishing('jj', 'accept')).toEqual(['jjYouIntegrate'])
-    expect(finishing('jj', 'combworkMerges')).toEqual(['jjYouIntegrate'])
-    // HI-3235: Combwork's advance where it isn't declared (Git's queue merges, None accepts).
-    expect(finishing('git', 'combworkAdvances')).toEqual(['jjYouIntegrate'])
-    expect(finishing('none', 'combworkAdvances')).toEqual(['combworkMergesNeedsGit'])
-    expect(finishing('jj', 'userIntegrates')).toEqual([])
-    expect(finishing('jj', 'previewAdvance')).toEqual([])
-    expect(finishing('git', 'previewAdvance')).toEqual(['jjYouIntegrate'])
-    for (const p of ['git', 'none', 'jj'] as const) expect(finishing(p, allOff(p).finish)).toEqual([])
+    for (const p of ['git', 'none'] as const) expect(finishing(p, allOff(p).finish)).toEqual([])
   })
 })
