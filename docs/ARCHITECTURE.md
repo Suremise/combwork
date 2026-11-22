@@ -403,11 +403,14 @@ signer agents' sessions run (`src/main/signer/`: `cw-sign.ts`, built to `out/mai
 the registries: `platform/adapters.ts` and the port lookups `repoPorts.ts`, `workspacePorts.ts`, `historyPorts.ts`,
 `integrationPorts.ts`, `repoOpsPorts.ts`, `repoReadsPorts.ts`, `revisionReadsPorts.ts`, `releaseReadsPorts.ts` and
 `deliverablesPorts.ts` (the workflow's None paths ask `pathsDeliverables()`, never `none/`). `tests/gitAudit.mjs`'
-`sealBreaks` (check:repo) fails any other import of a folder's file from `src/`, a new folder's at once, a registry's
-re-export of one (`export import X = require(…)` included, and an export of what it loads: `export = require(…)`,
-`export const x = await import(…)`, HI-3521), and a dynamic import or require whose specifier isn't one whole string
-literal, anywhere (HI-3506), or a loader it can't follow: `require` handed on, `module.require`, `createRequire`
-(HI-3512), a member of `module` by a built name (HI-3521);
+`sealBreaks` (check:repo) fails any other import of a folder's file from `src/`, a new folder's at once, and a dynamic
+import or require whose specifier isn't one whole string literal, anywhere (HI-3506), or a loader it can't follow:
+`require` handed on, `module.require`, `createRequire` (HI-3512), a member of `module` by a built name (HI-3521). A
+registry's reach is an allow-list (HI-3522): it imports a folder's files only by a static `import … from`, and exports
+only values it builds from them: an imported name may be `new`ed or called, a value in an object literal, or a
+function's result (`[new NoneAdapter()]`, `{ git: gitHistory }`, `return gitIntegration`). Any other reach (a re-export,
+`import X = require(…)`, a dynamic import or require) or any other use of an imported name (exported or aliased as it
+is, in a type, an array, an argument) fails;
 tests import a folder's files directly. **Adding a version control** is a folder `src/main/platform/<vc>/` holding its adapter and
 port implementations, its line in `adapters.ts` and in each port registry it implements, and its descriptor in
 `src/shared/platform/descriptors.ts` (its `PlatformId`, its `PLATFORMS` entry), plus its rows in the data keyed by

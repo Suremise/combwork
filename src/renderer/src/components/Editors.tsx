@@ -135,6 +135,10 @@ export function CodeEditor({
 export function DiffView({ original, modified, language, inline, onEditor }: { original: string; modified: string; language: string; inline?: boolean; onEditor?: (editor: Monaco.editor.IStandaloneDiffEditor | null) => void }) {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<Monaco.editor.IStandaloneDiffEditor | null>(null)
+  // HI-3535: the view model shown, ours to dispose. Monaco's setModel({ original, modified }) keeps a reference of its own
+  // to the view model it makes, so that one is never disposed and never cancels its diff: once its models are disposed, a
+  // diff still in flight (a slow worker, under load) comes back empty and throws "no diff result available" as a page error.
+  const view = useRef<Monaco.editor.IDiffEditorViewModel | null>(null)
   const theme = useEditorTheme()
 
   useEffect(() => {
@@ -158,12 +162,9 @@ export function DiffView({ original, modified, language, inline, onEditor }: { o
       disposed = true
       const e = editor.current
       if (e) onEditor?.(null)
-      if (e) {
-        const m = e.getModel()
-        e.dispose()
-        m?.original.dispose()
-        m?.modified.dispose()
-      }
+      if (e) e.dispose()
+      if (view.current) disposeDiffView(view.current)
+      view.current = null
       editor.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -174,13 +175,11 @@ export function DiffView({ original, modified, language, inline, onEditor }: { o
     void loadMonaco().then(({ monaco }) => {
       const e = editor.current
       if (cancelled || !e) return
-      const old = e.getModel()
-      e.setModel({ original: monaco.editor.createModel(original, language), modified: monaco.editor.createModel(modified, language) })
-      // Monaco may still be diffing the old pair; disposing it straight away throws "has been disposed".
-      setTimeout(() => {
-        old?.original.dispose()
-        old?.modified.dispose()
-      }, 1000)
+      const old = view.current
+      view.current = e.createViewModel({ original: monaco.editor.createModel(original, language), modified: monaco.editor.createModel(modified, language) })
+      e.setModel(view.current)
+      // After the widget lets go of the old view model (it does so on a timer of its own, once setModel's transaction ends).
+      if (old) setTimeout(() => disposeDiffView(old), 0)
     })
     return () => {
       cancelled = true
@@ -193,6 +192,13 @@ export function DiffView({ original, modified, language, inline, onEditor }: { o
   }, [theme, inline])
 
   return <div className="monaco" ref={host} />
+}
+
+/** The view model first, which cancels a diff it is still computing, then the models it diffed (HI-3535). */
+function disposeDiffView(view: Monaco.editor.IDiffEditorViewModel): void {
+  view.dispose()
+  view.model.original.dispose()
+  view.model.modified.dispose()
 }
 
 export { loadMonaco }
