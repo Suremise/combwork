@@ -5,7 +5,7 @@
 // enough (the age rule lowered from an hour to its least, 10 s), ticked, and removes it; Fetch with Prune… asks the remote, lists origin/old with the local branch tracking it,
 // and drops it (origin/kept stays, and so does the local branch). The programs that may hold a lock are set to none, so another lane's git on the machine can't hold it: the rule itself has
 // unit tests (tests/gitHealth.test.ts). Remotes are local bare repositories in the suite's folder, git's global config
-// the suite's own. Screenshots of the section and the lock dialog in both themes. Dev build, throwaway profile and
+// the suite's own. Screenshots of the section and each dialog in both themes. Dev build, throwaway profile and
 // workspace.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
@@ -90,6 +90,12 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await prune.locator('[data-health-prune]').count()) === 1, HUNG_MS)
     const entry = prune.locator('[data-health-prune]')
     check('the entry is listed by its folder, ticked', (await entry.isChecked()) && (await text(prune)).toLowerCase().includes(gone.toLowerCase()), await text(prune))
+    for (const t of ['dark', 'light']) {
+      await theme(t)
+      await page.mouse.move(5, 5)
+      await prune.screenshot({ path: path.join(lib.WORK, `githealth-2-prune-${t}.png`) })
+    }
+    await theme('dark')
     await prune.getByRole('button', { name: 'Prune Ticked', exact: true }).click()
     const pruned = await lib.until(async () => ((await prune.count()) === 0 && !g(alpha, 'worktree', 'list', '--porcelain').toLowerCase().includes('githealth-gone-wt') ? true : null), HUNG_MS)
     check('…dropped: git lists it no more, and the section says none', !!pruned && !!(await lib.until(async () => /None whose folder is gone/.test(await state('worktrees')), HUNG_MS)), `${g(alpha, 'worktree', 'list')} | ${await state('worktrees')}`)
@@ -117,7 +123,7 @@ const check = (name, ok, extra = '') => {
     for (const t of ['dark', 'light']) {
       await theme(t)
       await page.mouse.move(5, 5)
-      await dialog.screenshot({ path: path.join(lib.WORK, `githealth-2-locks-${t}.png`) })
+      await dialog.screenshot({ path: path.join(lib.WORK, `githealth-3-locks-${t}.png`) })
     }
     await theme('dark')
     await dialog.getByRole('button', { name: 'Remove Ticked', exact: true }).click()
@@ -128,6 +134,12 @@ const check = (name, ok, extra = '') => {
     const fetch = page.locator('.dialog', { hasText: 'Fetch with prune' })
     await lib.until(async () => (await fetch.locator('[data-health-fetch-branch="origin/old"]').count()) === 1, HUNG_MS)
     check('origin/old listed, the local branch tracking it named', /old tracks it/.test(await text(fetch.locator('[data-health-fetch-branch="origin/old"]'))) && (await fetch.locator('[data-health-fetch-branch]').count()) === 1, await text(fetch))
+    for (const t of ['dark', 'light']) {
+      await theme(t)
+      await page.mouse.move(5, 5)
+      await fetch.screenshot({ path: path.join(lib.WORK, `githealth-4-fetch-${t}.png`) })
+    }
+    await theme('dark')
     await fetch.getByRole('button', { name: 'Fetch and Prune', exact: true }).click()
     const remotes = () => g(alpha, 'branch', '-r')
     check('…dropped; origin/kept and the local branch stay', !!(await lib.until(async () => ((await fetch.count()) === 0 && !remotes().includes('origin/old') ? true : null), HUNG_MS)) && remotes().includes('origin/kept') && g(alpha, 'branch', '--list', 'old').includes('old'), remotes())
