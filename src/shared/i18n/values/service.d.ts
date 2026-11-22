@@ -166,6 +166,25 @@ interface CombworkMessageValues {
   'service.gitHealth.slotBusy': { slot: string | number; state: string }
   'service.gitHealth.stopped': undefined
   'service.gitHealth.unlisted': { why: string | number }
+  'service.gitMoves.agentBusy': { agent: string | number }
+  'service.gitMoves.busy': { what: string | number }
+  'service.gitMoves.card': { branch: string | number; card: string | number }
+  'service.gitMoves.conflicted': { file: string | number }
+  'service.gitMoves.failed': { why: string | number }
+  'service.gitMoves.inSlot': { branch: string | number; slot: string | number }
+  'service.gitMoves.inTheWay': { count: number }
+  'service.gitMoves.inWorktree': { branch: string | number; folder: string | number }
+  'service.gitMoves.invalid': undefined
+  'service.gitMoves.moved': { branch: string | number }
+  'service.gitMoves.noBranch': { branch: string | number }
+  'service.gitMoves.noCommit': { commit: string | number }
+  'service.gitMoves.operation': { what: string }
+  'service.gitMoves.queue': { card: string | number; branch: string | number }
+  'service.gitMoves.restored': { branch: string | number; to: string | number; from: string | number }
+  'service.gitMoves.same': { branch: string | number }
+  'service.gitMoves.session': { agent: string | number }
+  'service.gitMoves.slotHeld': { branch: string | number }
+  'service.gitMoves.timedOut': { seconds: number }
   'service.gitOperation.agentBusy': { agent: string | number; folder: string | number }
   'service.gitOperation.busy': { folder: string | number; what: string | number }
   'service.gitOperation.changed': { was: string; folder: string | number }

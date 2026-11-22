@@ -636,5 +636,7 @@
   "tips.resumeLongIdle.title": "Długo bezczynna rozmowa pyta przed wznowieniem",
   "tips.resumeLongIdle.text": "Rozmowa bezczynna dłużej niż godzinę najprawdopodobniej straciła pamięć podręczną promptu, więc jej wznowienie może kosztować wiele tokenów. Wznów mówi, jak długo jest bezczynna i jak duża jest, i proponuje zamiast tego Zarchiwizuj i zacznij nową.",
   "tips.stashes.text": "Kontrola wersji → Zmiany → Stashe pokazuje stashe repozytorium, te z Odłóż w Combwork razem z ich kartą: zobacz, co zawiera każdy, a potem go zastosuj, zdejmij (pop) lub usuń.",
-  "tips.stashes.title": "Przeglądaj, stosuj i usuwaj swoje stashe gita"
+  "tips.stashes.title": "Przeglądaj, stosuj i usuwaj swoje stashe gita",
+  "tips.branchMoves.text": "Kontrola wersji → Historia → Przesunięcia pokazuje każde przesunięcie gałęzi, tak jak zapisuje je reflog gita: scalenia kart przez Combwork, commity, rebase’y, resety i ściągnięcia. Przywróć do tego miejsca… cofa gałąź, najpierw pokazując, które commity traci, a które przywraca.",
+  "tips.branchMoves.title": "Cofnij reset, rebase lub scalenie gałęzi"
 }

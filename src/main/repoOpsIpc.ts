@@ -77,5 +77,9 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   'git:dropStash': async (root, commit) => {
     const ops = opsAt('git:dropStash')
     return (await import('./stashPanel')).dropStashAt(workspace, root, commit, ops)
-  }
+  },
+  // HI-3469: History's Moves and Restore to here… (the request checked by the port, gitMoves.ts).
+  'git:moves': (p, branch, page) => opsAt('git:moves').moves(workspace.assertProject(p), typeof branch === 'string' && branch ? branch : null, Number(page) || 1),
+  'git:restorePlan': (p, req) => opsAt('git:restorePlan').restorePlan(workspace.assertProject(p), req),
+  'git:restore': (p, req) => opsAt('git:restore').restore(workspace.assertProject(p), req)
 }

@@ -186,6 +186,38 @@ interface CombworkMessageValues {
   'git.init.yourEmail': undefined
   'git.init.yourName': undefined
   'git.learnMore': undefined
+  'git.moves.about': undefined
+  'git.moves.back': { n: number }
+  'git.moves.branch': undefined
+  'git.moves.cantTitle': { branch: string | number }
+  'git.moves.confirm': undefined
+  'git.moves.dropped': { n: number }
+  'git.moves.failed': undefined
+  'git.moves.heading': undefined
+  'git.moves.inTheWay': undefined
+  'git.moves.loadFailed': { error: string | number }
+  'git.moves.more': { n: number }
+  'git.moves.moveLine': { branch: string | number; from: string | number; to: string | number }
+  'git.moves.noBranch': undefined
+  'git.moves.none': undefined
+  'git.moves.nothing': undefined
+  'git.moves.now': undefined
+  'git.moves.ok': undefined
+  'git.moves.openCard': { card: string | number }
+  'git.moves.option': { kind: string; branch: string | number }
+  'git.moves.pushed': { n: number; upstream: string | number }
+  'git.moves.reload': undefined
+  'git.moves.restore': undefined
+  'git.moves.restoreTip': { branch: string | number; commit: string | number }
+  'git.moves.running': undefined
+  'git.moves.tip': { message: string | number; commit: string | number; when: string | number }
+  'git.moves.title': { branch: string | number; commit: string | number }
+  'git.moves.view': { view: string }
+  'git.moves.viewName': undefined
+  'git.moves.wayBack': undefined
+  'git.moves.what': { kind: string; name: string | number }
+  'git.moves.whereNowhere': { branch: string | number }
+  'git.moves.whereProject': undefined
   'git.newBranch.blocked': { why: string | number }
   'git.newBranch.button': undefined
   'git.newBranch.commitFirst': undefined

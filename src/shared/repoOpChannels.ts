@@ -46,7 +46,11 @@ export const REPO_OP_CHANNELS = {
   'git:stashFiles': 'stashes',
   'git:stashDiff': 'stashes',
   'git:applyStash': 'stashes',
-  'git:dropStash': 'stashes'
+  'git:dropStash': 'stashes',
+  // HI-3469: History's Moves (its reads too: offered only where the platform has it).
+  'git:moves': 'branchMoves',
+  'git:restorePlan': 'branchMoves',
+  'git:restore': 'branchMoves'
 } as const satisfies Partial<Record<CombworkChannel, Operation>>
 
 export type RepoOpChannel = keyof typeof REPO_OP_CHANNELS

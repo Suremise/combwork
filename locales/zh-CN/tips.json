@@ -636,5 +636,7 @@
   "tips.resumeLongIdle.title": "长时间空闲的对话在恢复前会先询问",
   "tips.resumeLongIdle.text": "空闲超过一小时的对话很可能已失去提示词缓存，因此恢复它可能花费大量 Token。“恢复”会说明它已空闲多久、有多大，并提供“归档并新建会话”作为替代。",
   "tips.stashes.text": "版本控制 → 更改 → 储藏列出仓库的储藏，Combwork 搁置的会附上其卡片：查看每个储藏包含的内容，然后应用、弹出或删除它。",
-  "tips.stashes.title": "查看、应用或删除你的 git 储藏"
+  "tips.stashes.title": "查看、应用或删除你的 git 储藏",
+  "tips.branchMoves.text": "“版本控制”→“历史”→“移动记录”按 Git 的 reflog 保存的样子，列出分支每次移动的记录：Combwork 对卡片的合并、提交、变基、重置和拉取。“恢复到此处…”会把分支移回去，并先显示它会丢弃或带回哪些提交。",
+  "tips.branchMoves.title": "撤销分支的重置、变基或合并"
 }

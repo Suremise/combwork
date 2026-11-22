@@ -636,5 +636,7 @@
   "tips.resumeLongIdle.title": "Une conversation inactive depuis longtemps demande avant de reprendre",
   "tips.resumeLongIdle.text": "Une conversation inactive depuis plus d’une heure a très probablement perdu son cache des prompts, donc la reprendre peut coûter beaucoup de jetons. Reprendre indique depuis combien de temps elle est inactive et sa taille, et propose plutôt Archiver et repartir de zéro.",
   "tips.stashes.text": "Gestion de versions → Modifications → Stashes liste les stashes du dépôt, ceux de Mettre de côté de Combwork avec leur carte : affiche ce que chacun contient, puis applique-le, sors-le (pop) ou supprime-le.",
-  "tips.stashes.title": "Voir, appliquer ou supprimer tes stashes git"
+  "tips.stashes.title": "Voir, appliquer ou supprimer tes stashes git",
+  "tips.branchMoves.text": "Gestion de versions → Historique → Mouvements liste chaque fois qu’une branche a bougé, tel que le reflog de git le garde : les fusions de cartes par Combwork, les commits, rebases, resets et pulls. Restaurer à ce point… ramène la branche en arrière, en montrant d’abord quels commits elle perd ou récupère.",
+  "tips.branchMoves.title": "Annuler un reset, un rebase ou une fusion d’une branche"
 }

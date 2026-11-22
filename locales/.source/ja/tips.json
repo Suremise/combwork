@@ -131,6 +131,8 @@
   "tips.branchCards.title": "See which card a branch is for",
   "tips.branchCleanup.text": "Version Control → Branches & remotes groups the branches as In use, Merged and Not merged. Clean Up Merged Branches… deletes the merged ones nothing uses, and offers the merged ones on your remotes apart, never ticked for you.",
   "tips.branchCleanup.title": "Clean up merged branches",
+  "tips.branchMoves.text": "Version Control → History → Moves lists each time a branch moved, as git's reflog keeps it: Combwork's merges of cards, commits, rebases, resets and pulls. Restore to here… moves the branch back, showing first which commits it drops or brings back.",
+  "tips.branchMoves.title": "Undo a reset, rebase or merge of a branch",
   "tips.bringUpToDate.text": "A branch’s merge queue card says when it is behind another of the project’s branches. Bring Up to Date… merges that branch into it through its queue, with its merge checks; the other branch doesn’t change.",
   "tips.bringUpToDate.title": "Bring the next release up to date",
   "tips.cardAttachments.text": "Paste or drop files into a card's description or comment: they are kept with the card when you save or post, shown in it, and listed for the agent that starts it. The pin on a pane's attachment chip copies a file to the agent's card.",

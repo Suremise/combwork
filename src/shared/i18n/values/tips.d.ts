@@ -133,6 +133,8 @@ interface CombworkMessageValues {
   'tips.branchCards.title': undefined
   'tips.branchCleanup.text': undefined
   'tips.branchCleanup.title': undefined
+  'tips.branchMoves.text': undefined
+  'tips.branchMoves.title': undefined
   'tips.bringUpToDate.text': undefined
   'tips.bringUpToDate.title': undefined
   'tips.cardAttachments.text': undefined
