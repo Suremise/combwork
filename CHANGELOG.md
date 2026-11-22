@@ -9,6 +9,7 @@
 
 ### Changed
 
+- **The Activity map looks and moves like part of the window** (HI-3479). The map's cells have depth and a warm glow in both themes. Calls travel curved spokes as glowing dots. A station lights up while a call runs there and fills with honey as it gets busier, and small green cells show the programs and subagents running there now. The context ring fills smoothly. Turning off Windows' animations, or the map's motion in Settings → Advanced, still keeps it still.
 - **The installer names the copy that's still running** (HI-3463). When the installer stops because a copy of Combwork, or of its version before 1.1, won't close, its message now says where that copy runs from and its process ID, or, when Windows won't show where it is (another account's copy, for example), says so with its process ID, and how to end it in Task Manager. A copy left running with no window can be closed without restarting the PC.
 ### Fixed
 

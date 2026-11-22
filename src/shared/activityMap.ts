@@ -242,6 +242,8 @@ export interface MapStationView {
   failed: boolean
   /** Agents with a call here open now (their keys), or waiting (You). */
   here: string[]
+  /** What runs here now (HI-3479): Shell, the agents' processes; Agents, their subagent sessions and background tasks. */
+  running: number
   /** The counts are from a sample: some agent's calls were past MAP_CALLS, or an agent is past the shared map's bound. */
   partial: boolean
   /** Tools: its calls this turn by group. */
@@ -405,7 +407,7 @@ export function agentCalls(a: MapAgentInput, budget = MAP_CALLS): { calls: MapCa
 
 /** The map's model: each station's counts, heat, last label and failure, the feed, and the agents' rings. Pure. */
 export function buildMapModel(agents: readonly MapAgentInput[], at: number): MapModel {
-  const stations = Object.fromEntries(MAP_STATIONS.map((s) => [s, { station: s, status: 'ok', count: 0, heat: 0, last: '', failed: false, here: [], partial: false }])) as unknown as Record<MapStation, MapStationView>
+  const stations = Object.fromEntries(MAP_STATIONS.map((s) => [s, { station: s, status: 'ok', count: 0, heat: 0, last: '', failed: false, here: [], running: 0, partial: false }])) as unknown as Record<MapStation, MapStationView>
   const all: MapCall[] = []
   const views: MapAgentView[] = []
   const loaded = agents.filter((a) => !a.notLoaded)
@@ -429,10 +431,12 @@ export function buildMapModel(agents: readonly MapAgentInput[], at: number): Map
     if (a.blocks > 0) stations.edit.failed = true
     if (a.subagents + a.tasks.length > 0 && !a.notLoaded) {
       stations.agents.count += a.subagents + a.tasks.length
+      stations.agents.running += a.subagents + a.tasks.length
       if (!stations.agents.here.includes(a.key)) stations.agents.here.push(a.key)
     }
     if (a.processes.length && !a.notLoaded) {
       stations.shell.last = a.processes[a.processes.length - 1]
+      stations.shell.running += a.processes.length
       if (!stations.shell.here.includes(a.key)) stations.shell.here.push(a.key)
     }
   }
@@ -460,6 +464,20 @@ export function buildMapModel(agents: readonly MapAgentInput[], at: number): Map
   return { agents: views, stations, feed: sorted.slice(0, FEED_LENGTH), calls: all, sessions }
 }
 
+/** The heat at which a station's load is about two thirds full (HI-3479): it builds quickly, then saturates. */
+export const LOAD_HEAT = 12
+
+/**
+ * How loaded a station looks (HI-3479), 0 to 1: the honey level its hex fills to. Its calls of the last HEAT_MS, rising
+ * quickly and saturating, and at least a quarter for each thing running there (a busy shell, sub-agents), to the brim.
+ * Not counted yet (loading, not reported): empty.
+ */
+export function stationLoad(st: Pick<MapStationView, 'status' | 'heat' | 'running'>): number {
+  if (st.status !== 'ok') return 0
+  const byHeat = 1 - Math.exp(-st.heat / LOAD_HEAT)
+  return Math.min(1, Math.max(byHeat, st.running * 0.25))
+}
+
 /** A pulse: a call going out to its station (started), or coming back (its result landed). */
 export interface MapPulse {
   id: string
@@ -468,6 +486,8 @@ export interface MapPulse {
   station: MapStation
   back: boolean
   failed: boolean
+  /** A return sent with its own going out (a call that started and ended between two reads): it leaves once that one lands (HI-3479). */
+  follows?: boolean
 }
 
 /**
@@ -488,7 +508,7 @@ export function diffPulses(seen: ReadonlyMap<string, boolean> | null, calls: rea
     const was = seen.get(c.key)
     if (was === undefined) {
       pulses.push({ id: next(), callKey: c.key, agentKey: c.agentKey, station: c.station, back: false, failed: c.failed })
-      if (c.done) pulses.push({ id: next(), callKey: c.key, agentKey: c.agentKey, station: c.station, back: true, failed: c.failed })
+      if (c.done) pulses.push({ id: next(), callKey: c.key, agentKey: c.agentKey, station: c.station, back: true, failed: c.failed, follows: true })
     } else if (!was && c.done) pulses.push({ id: next(), callKey: c.key, agentKey: c.agentKey, station: c.station, back: true, failed: c.failed })
   }
   return { pulses: pulses.slice(-MAX_PULSES), seen: now, sessions: nowSessions }
