@@ -5969,7 +5969,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
     “…”* (the stash is kept), with **Use theirs** named **Use the stash's** and its tooltip naming the stash; else that
     no operation is under way, and a neutral other side. Its picks take the panel's refusals and a lent slot's
     confirmation; its stop is HEAD with no operation under way, so a commit or an operation begun since the user
-    looked refuses a click (a file settled meanwhile: its pick's own refusal). Once no file is unmerged the panel goes.
+    looked refuses a click (a file settled meanwhile: its pick's own refusal), and HEAD unreadable shows no stop and
+    refuses every pick. Each pick also names the conflict it saw, its file's unmerged entries hashed (`stages`, HR1's
+    round 1): another conflict of that file in its place (one stash's settled in a terminal, another's applied at
+    the same HEAD) is refused, while other files' picks meanwhile aren't. Once no file is unmerged the panel goes.
   - **Drop** asks first, naming the stash, its files and, for Combwork's, its card, and saying its commit can be
     found in a terminal for a while (`git fsck --unreachable`). Under the repository lock it drops the stash only while
     its place in the list still holds the commit the user saw, read again just before `git stash drop`, and the notice

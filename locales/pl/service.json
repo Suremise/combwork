@@ -139,6 +139,7 @@
   "service.gitOperation.busy": "Uruchomienie lub agent pracuje w folderze {folder} ({what}): nic nie zrobiono. Spróbuj ponownie, gdy skończy.",
   "service.gitOperation.changed": "Git w folderze {folder} nie jest już w trakcie {was, select, merge {scalania} rebase {rebase’u} am {am} cherryPick {cherry-picka} bisect {bisectu} other {revertu}}: nic nie zrobiono. Sprawdź jeszcze raz.",
   "service.gitOperation.failed": "Git odmówił: {why}",
+  "service.gitOperation.fileChanged": "Konflikt w {file} zmienił się, odkąd patrzyłeś: nic nie zrobiono. Sprawdź jeszcze raz.",
   "service.gitOperation.invalid": "Ten krok został źle zlecony: nic nie zrobiono.",
   "service.gitOperation.leftChanged": "{folder} zmienił się, odkąd patrzyłeś (commit albo rozpoczęła się operacja gita): nic nie zrobiono. Sprawdź jeszcze raz.",
   "service.gitOperation.moved": "Git w folderze {folder} poszedł dalej, odkąd sprawdzałeś (do innego commita {what} albo zaczęła się nowa operacja): nic nie zrobiono. Sprawdź jeszcze raz.",

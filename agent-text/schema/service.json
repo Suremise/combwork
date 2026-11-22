@@ -664,6 +664,11 @@
       "why": "plain"
     }
   },
+  "service.gitOperation.fileChanged": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
   "service.gitOperation.invalid": {
     "placeholders": {}
   },

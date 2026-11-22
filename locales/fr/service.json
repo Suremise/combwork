@@ -139,6 +139,7 @@
   "service.gitOperation.busy": "Une exécution ou un agent travaille dans {folder} ({what}) : rien n’a été fait. Réessaie une fois le travail terminé.",
   "service.gitOperation.changed": "Git n’est plus au milieu {was, select, merge {d’une fusion} rebase {d’un rebase} am {d’un am} cherryPick {d’un cherry-pick} bisect {d’un bisect} other {d’un revert}} dans {folder} : rien n’a été fait. Regarde de nouveau.",
   "service.gitOperation.failed": "Git a refusé : {why}",
+  "service.gitOperation.fileChanged": "Le conflit de {file} a changé depuis que tu as regardé : rien n’a été fait. Regarde de nouveau.",
   "service.gitOperation.invalid": "Cette étape a été mal demandée : rien n’a été fait.",
   "service.gitOperation.leftChanged": "{folder} a changé depuis que tu as regardé (un commit, ou une opération git a commencé) : rien n’a été fait. Regarde de nouveau.",
   "service.gitOperation.moved": "Git a avancé dans {folder} depuis que tu as regardé (vers un autre commit du {what}, ou un nouveau a commencé) : rien n’a été fait. Regarde de nouveau.",

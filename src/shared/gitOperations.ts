@@ -49,6 +49,11 @@ export interface GitConflict {
    * `checkout --ours/--theirs` never moves a submodule, so a pick of that side stages its commit instead (pickArgs).
    */
   submodule?: { mine?: string; theirs?: string }
+  /**
+   * HI-3518 (HR1's round 1): the conflict's fingerprint, its unmerged entries (modes, objects, stages) hashed: a pick
+   * names the one the user saw (`seen`), and another conflict of the same file in its place is refused. Opaque.
+   */
+  stages?: string
 }
 
 /** HI-3470: the operation under way in a folder, as Changes' panel shows it (HI-3518: or files left in conflict). */
@@ -89,7 +94,7 @@ export interface OperationPanelState extends GitOperationState {
  * the operation and the stop of it the user saw (anything else under way now refuses it, HR1's round 1), `lease` the lent
  * slot's lease they confirmed.
  */
-export type OperationRequest = { what: PanelKind; id: string; lease?: string } & ({ step: OperationStep } | { file: string; pick: ConflictPick })
+export type OperationRequest = { what: PanelKind; id: string; lease?: string } & ({ step: OperationStep } | { file: string; pick: ConflictPick; seen?: string })
 
 /**
  * HI-3503: what a step did: git's output, and `stoppedAgain` when a Continue or Skip went on and git stopped at another

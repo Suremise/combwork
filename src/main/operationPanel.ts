@@ -63,7 +63,7 @@ function requestOf(raw: unknown): OperationRequest {
   if (!isPanelKind(r.what) || typeof r.id !== 'string' || !r.id) throw combworkError(T.invalid, undefined, { kind: 'invalid' })
   const base = { what: r.what, id: r.id, ...(typeof r.lease === 'string' && r.lease ? { lease: r.lease } : {}) }
   if (r.step === 'continue' || r.step === 'skip' || r.step === 'abort') return { ...base, step: r.step }
-  if (typeof r.file === 'string' && r.file && (r.pick === 'mine' || r.pick === 'theirs' || r.pick === 'resolved')) return { ...base, file: r.file, pick: r.pick }
+  if (typeof r.file === 'string' && r.file && (r.pick === 'mine' || r.pick === 'theirs' || r.pick === 'resolved')) return { ...base, file: r.file, pick: r.pick, ...(typeof r.seen === 'string' && r.seen ? { seen: r.seen } : {}) }
   throw combworkError(T.invalid, undefined, { kind: 'invalid' })
 }
 

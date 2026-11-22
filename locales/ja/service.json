@@ -139,6 +139,7 @@
   "service.gitOperation.busy": "実行またはエージェントが{folder}で作業中です（{what}）。何も行っていません。終わってからもう一度お試しください。",
   "service.gitOperation.changed": "{folder}のGitはもう{was, select, merge {マージ} rebase {リベース} am {am} cherryPick {チェリーピック} bisect {bisect} other {リバート}}の途中ではありません。何も行っていません。もう一度確認してください。",
   "service.gitOperation.failed": "Gitが拒否しました：{why}",
+  "service.gitOperation.fileChanged": "確認した後で、{file}のコンフリクトが変わりました。何も行っていません。もう一度確認してください。",
   "service.gitOperation.invalid": "その手順の要求が正しくありません。何も行っていません。",
   "service.gitOperation.leftChanged": "確認した後で、{folder}が変わりました（コミットされたか、Git操作が始まりました）。何も行っていません。もう一度確認してください。",
   "service.gitOperation.moved": "確認した後で、{folder}のGitが先に進みました（{what}の別のコミットに進んだか、新しく始まりました）。何も行っていません。もう一度確認してください。",

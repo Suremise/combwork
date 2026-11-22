@@ -170,6 +170,7 @@ interface CombworkMessageValues {
   'service.gitOperation.busy': { folder: string | number; what: string | number }
   'service.gitOperation.changed': { was: string; folder: string | number }
   'service.gitOperation.failed': { why: string | number }
+  'service.gitOperation.fileChanged': { file: string | number }
   'service.gitOperation.invalid': undefined
   'service.gitOperation.leftChanged': { folder: string | number }
   'service.gitOperation.moved': { folder: string | number; what: string | number }

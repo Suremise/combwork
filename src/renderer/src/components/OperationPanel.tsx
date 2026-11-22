@@ -111,7 +111,7 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
   const pick = async (c: GitConflict, p: ConflictPick): Promise<void> => {
     // HI-3502: a submodule's side is its commit staged, its folder left as it is: said once it is done.
     const link = p === 'resolved' ? undefined : c.submodule?.[p]
-    if (id) await act(`${p}:${c.path}`, { what: op.what, id, file: c.path, pick: p }, link ? tr(T.submoduleStaged, { path: c.path, commit: link.slice(0, 7), command: submoduleUpdateCommand(c.path) ?? 'none' }) : undefined)
+    if (id) await act(`${p}:${c.path}`, { what: op.what, id, file: c.path, pick: p, ...(c.stages ? { seen: c.stages } : {}) }, link ? tr(T.submoduleStaged, { path: c.path, commit: link.slice(0, 7), command: submoduleUpdateCommand(c.path) ?? 'none' }) : undefined)
   }
   /** A side's word for its tooltip: it has the file, it is a submodule's commit, or it deleted it. */
   const sideHas = (c: GitConflict, side: 'mine' | 'theirs'): string => (c.submodule?.[side] ? 'submodule' : c[side] ? 'yes' : 'no')

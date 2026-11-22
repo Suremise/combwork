@@ -33,6 +33,7 @@ export const OPERATION_TEXT = {
   moved: msg({ id: 'service.gitOperation.moved', defaultMessage: 'Git has moved on in {folder} since you looked (to another commit of the {what}, or a new one began): nothing was done. Look again.', description: "HI-3470 (a reviewer's round 1): an error from the panel: the operation is still of the same kind ({what}, git's word for it: keep it as it is) but git is no longer stopped where the user saw it (a terminal went on, or it was ended and another begun); {folder} is a path. Nothing was done." }),
   unreadable: msg({ id: 'service.gitOperation.unreadable', defaultMessage: "Combwork can't read where git stopped in {folder}, so it can't tell it's still where you saw it: nothing was done. Finish it in a terminal there.", description: "HI-3470 (a reviewer's round 2): an error from the panel: git's files that say where the operation stopped (in the folder's git dir) are missing or can't be read, so Combwork refuses any step; {folder} is a path." }),
   timedOut: msg({ id: 'service.gitOperation.timedOut', defaultMessage: 'Git was still running after {seconds, number} seconds, so Combwork ended it. Look at {folder} before you try again: a hook may have done part of its work.', description: "HI-3470: an error from the panel: git's step (a Continue running the repository's commit hooks, say) ran past Settings → Advanced's longest commit time ({seconds}) and was ended; {folder} is a path." }),
+  fileChanged: msg({ id: 'service.gitOperation.fileChanged', defaultMessage: "{file}'s conflict changed since you looked: nothing was done. Look again.", description: "HI-3518 (a reviewer's round 1): an error from the unfinished git operation panel: the conflicted file the user settled ({file}, a path in the repository) is still in conflict, but not the conflict they saw (it was settled in a terminal and another took its place). Nothing was done." }),
   leftChanged: msg({ id: 'service.gitOperation.leftChanged', defaultMessage: '{folder} changed since you looked (a commit, or a git operation began): nothing was done. Look again.', description: "HI-3518: an error from the panel showing files left in conflict with no git operation under way (after a stash's Apply, say): since the user looked, HEAD moved or a git operation (a merge, a rebase…) began in the folder ({folder}, a path). Nothing was done." })
 }
 const M = OPERATION_TEXT
@@ -58,6 +59,8 @@ export async function conflictsIn(folder: string, what: PanelKind): Promise<GitC
   if (!r.ok) throw combworkError(M.failed, { why: gitErrorLine(r.err) || r.err.trim().slice(0, 400) })
   /** Each path's stages: stage → its object, and whether it is a gitlink (a submodule's commit, mode 160000). */
   const stages = new Map<string, Map<string, { object: string; link: boolean }>>()
+  /** HI-3518 (HR1's round 1): each path's unmerged entries as git lists them, for the conflict's fingerprint. */
+  const rows = new Map<string, string[]>()
   for (const row of r.out.split('\0')) {
     // `<mode> <object> <stage>\t<path>`
     const tab = row.indexOf('\t')
@@ -66,6 +69,7 @@ export async function conflictsIn(folder: string, what: PanelKind): Promise<GitC
     const path = row.slice(tab + 1)
     if (!stages.has(path)) stages.set(path, new Map())
     stages.get(path)!.set(stage, { object, link: mode === '160000' })
+    rows.set(path, [...(rows.get(path) ?? []), row.slice(0, tab)])
   }
   const swap = mineIsTheirs(what)
   return [...stages]
@@ -73,7 +77,8 @@ export async function conflictsIn(folder: string, what: PanelKind): Promise<GitC
       const [mine, theirs] = [s.get(swap ? '3' : '2'), s.get(swap ? '2' : '3')]
       // HI-3502: a side that is a submodule, by its commit (pickArgs stages it: git's checkout never moves one).
       const link = { ...(mine?.link ? { mine: mine.object } : {}), ...(theirs?.link ? { theirs: theirs.object } : {}) }
-      return { path, mine: !!mine, theirs: !!theirs, ...(link.mine || link.theirs ? { submodule: link } : {}) }
+      const seen = createHash('sha256').update((rows.get(path) ?? []).sort().join('\n')).digest('hex').slice(0, 16)
+      return { path, mine: !!mine, theirs: !!theirs, stages: seen, ...(link.mine || link.theirs ? { submodule: link } : {}) }
     })
     .sort((a, b) => a.path.localeCompare(b.path))
 }
@@ -182,10 +187,14 @@ async function leftConflicts(folder: string): Promise<GitOperationState | null> 
   return { what: 'conflicts', id: await leftId(folder), conflicts }
 }
 
-/** HI-3518: the stop of files left in conflict: HEAD, when no operation is under way. */
-async function leftId(folder: string): Promise<string> {
+/**
+ * HI-3518: the stop of files left in conflict: HEAD, when no operation is under way. Null (HR1's round 1) when HEAD can't
+ * be read: the panel then takes no step, as with an operation's unreadable stop.
+ */
+async function leftId(folder: string): Promise<string | null> {
   const head = await git(folder, ['rev-parse', '--verify', '-q', 'HEAD'])
-  return `conflicts|${head.ok ? head.out.trim() : ''}`
+  const sha = head.ok ? head.out.trim() : ''
+  return /^[0-9a-f]{40,64}$/.test(sha) ? `conflicts|${sha}` : null
 }
 
 /** The git command (its arguments) a step runs. */
@@ -228,7 +237,10 @@ export async function operationStep(projectPath: string, folder: string, req: Op
         const what = req.what
         if (what === 'conflicts') {
           // HI-3518: still no operation under way, at the HEAD the user saw (a file settled meanwhile: its pick's own refusal).
-          if (operationSync(folder) || (await leftId(folder)) !== req.id) throw combworkError(M.leftChanged, { folder })
+          if (operationSync(folder)) throw combworkError(M.leftChanged, { folder })
+          const now = await leftId(folder)
+          if (now === null) throw combworkError(M.unreadable, { folder })
+          if (now !== req.id) throw combworkError(M.leftChanged, { folder })
         } else {
           if (operationSync(folder) !== what) throw combworkError(M.changed, { was: what === 'cherry-pick' ? 'cherryPick' : what, folder })
           // The same kind, but is it the stop the user saw? (HR1's round 1: a terminal went on, or another began.)
@@ -285,6 +297,9 @@ export async function operationStep(projectPath: string, folder: string, req: Op
         }
         const c = (await conflictsIn(folder, what)).find((x) => x.path === req.file)
         if (!c) throw combworkError(M.notConflicted, { file: req.file })
+        // HR1's round 1: the conflict the user saw, entry for entry (another one in its place at the same stop refuses;
+        // other files' picks meanwhile don't). Files left in conflict always name it: their stop is only HEAD.
+        if (req.seen !== undefined ? req.seen !== c.stages : what === 'conflicts') throw combworkError(M.fileChanged, { file: req.file })
         let out: OperationStepResult = { output: '' }
         for (const args of pickArgs(req.what, c, req.pick)) out = await run(args)
         return out
