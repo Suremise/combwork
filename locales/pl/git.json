@@ -189,6 +189,7 @@
   "git.operation.theirs": "Użyj ich",
   "git.operation.theirsTip": "{swap, select, yes {Druga strona: gałąź, na którą robisz rebase (git nazywa ją tu ours).} other {Druga strona: to, co jest scalane, wybierane lub cofane (git nazywa to theirs).}} {has, select, yes {Bierze jej wersję pliku.} other {Usunęła plik: usuwa go.}} Uruchamia {command}",
   "git.operation.title": "Niedokończone git {what} w {folder}",
+  "git.operation.unreadable": "Combwork nie może odczytać, gdzie git się tu zatrzymał, więc nie wykonuje żadnego kroku: dokończ to w terminalu.",
   "git.operation.unresolved": "{count, plural, one {# plik jest} few {# pliki są} many {# plików jest} other {# pliku jest}} nadal w konflikcie: najpierw {count, plural, one {go rozwiąż} few {je rozwiąż} many {je rozwiąż} other {je rozwiąż}}.",
   "git.parentRepo": "Ten projekt jest wewnątrz repozytorium git w folderze {folder}, więc zakładka Kontrola wersji tylko go pokazuje: Combwork zmienia wyłącznie własne repozytorium projektu.",
   "git.problem.agentSetup": "Konfiguracja dostawców",

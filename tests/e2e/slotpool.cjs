@@ -30,6 +30,13 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
+/** HI-3470 (HR1's round 2): every notification dismissed by its own close button, so a screenshot shows what is under it. */
+const clearPopups = async (page) => !!(await until(async () => {
+  const close = page.locator('.popup-close')
+  if ((await close.count()) === 0) return true
+  await close.first().click().catch(() => undefined)
+  return false
+}, HUNG_MS))
 
 ;(async () => {
   q.prepare(fx)
@@ -166,6 +173,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await opRow.locator('[data-action="open-operation"]').click()
     const opPanel = page.locator('.operation-panel[data-operation="revert"]')
     check("HI-3470: Open in Changes shows slot-b's panel, its unfinished revert with Continue, Skip and Abort", !!(await until(async () => (await opPanel.count()) === 1, HUNG_MS)) && /Unfinished git revert in slot-b/.test(await opPanel.innerText()) && (await opPanel.locator('[data-step]').count()) === 3, await opPanel.innerText().catch(() => ''))
+    check('…its notifications dismissed for the screenshot', await clearPopups(page))
     await opPanel.screenshot({ path: path.join(fx.shots, 'slotpool-4b-operation-panel.png') })
     await opPanel.locator('[data-step="abort"]').click()
     const abortAsk = page.locator('.dialog', { hasText: 'Abort the git revert in slot-b?' })
@@ -239,6 +247,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const mergePanel = page.locator('.operation-panel[data-operation="merge"]')
     const conflictRows = mergePanel.locator('[data-conflict]')
     check('…the panel lists both files, each with Open, Use mine, Use theirs and Mark resolved; Continue waits for them', !!(await until(async () => (await conflictRows.count()) === 2, HUNG_MS)) && /Unfinished git merge in the project folder/.test(await mergePanel.innerText()) && (await mergePanel.locator('[data-conflict="c1.txt"] [data-pick]').count()) === 4 && (await mergePanel.locator('[data-step="continue"]').isDisabled()), await mergePanel.innerText().catch(() => ''))
+    check('…its notifications dismissed for the screenshot', await clearPopups(page))
     await mergePanel.screenshot({ path: path.join(fx.shots, 'slotpool-6-conflicts.png') })
     await mergePanel.locator('[data-conflict="c1.txt"] [data-pick="theirs"]').click()
     check("…Use theirs settles c1.txt with the side branch's version", !!(await until(async () => (await conflictRows.count()) === 1, HUNG_MS)) && fs.readFileSync(path.join(fx.alpha, 'c1.txt'), 'utf8') === 'side\n', await mergePanel.innerText().catch(() => ''))

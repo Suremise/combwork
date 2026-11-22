@@ -148,6 +148,7 @@
   "service.gitOperation.slotProcess": "{slot}内のファイルまたはフォルダーをプロセスが開いています。何も行っていません。それ（ターミナルやエディター）を閉じてもう一度お試しください。",
   "service.gitOperation.slotSession": "{slot}にセッションがあります。何も行っていません。先に停止してください。",
   "service.gitOperation.timedOut": "Gitが{seconds, number}秒たっても実行中だったため、Combworkが終了させました。もう一度試す前に{folder}を確認してください。フックが処理の一部を済ませている可能性があります。",
+  "service.gitOperation.unreadable": "Combworkは{folder}でGitが停止した位置を読み取れないため、確認したときのままかどうか判断できません。何も行っていません。そこでターミナルを使って完了させてください。",
   "service.gitOperation.unresolved": "{count, plural, other {# 個のファイル}}がまだコンフリクト中です。先に解決してください。",
   "service.gitRepo.addFailed": "{remote}を追加できませんでした：{why}",
   "service.gitRepo.added": "{remote}を追加しました。",

@@ -5846,8 +5846,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   **What refuses a step**, each checked as the user clicks, before git runs: a live session whose folder is in it
   (`sessions.liveStates()`); under the repository lock and the folder's fence, as Commit and Set aside check
   (`assertQuiet`), the operation no longer the one the user saw, or no longer at the stop they saw (a request names it:
-  its kind, HEAD, the commit git stopped at, its step and its sequencer's next command; a terminal that went on, or
-  another of the same kind begun, refuses a confirmation left open: *Git has moved on*), a Combwork run or an agent's file lock there
+  its kind, HEAD and a hash of git's own files for it, such as an am's current patch, a pick's or revert's `*_HEAD` and
+  sequencer, a rebase's todo and done lists; a terminal that went on, or another of the same kind begun, even at the
+  same HEAD, refuses a confirmation left open: *Git has moved on*; where those files can't be read, every step is
+  refused and the panel offers none), a Combwork run or an agent's file lock there
   (`folderBuilders`), an agent working there (`busyAgentIn`); for a slot, the pool's hold (`SlotPool.forUser`, a
   warm-kind operation with no lease): taken only while no operation, job or run's writer holds it and its open lease
   is the one the user confirmed (a slot lent to a card or lane whose builder isn't running asks first, naming them),

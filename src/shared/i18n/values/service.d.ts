@@ -161,6 +161,7 @@ interface CombworkMessageValues {
   'service.gitOperation.slotProcess': { slot: string | number }
   'service.gitOperation.slotSession': { slot: string | number }
   'service.gitOperation.timedOut': { seconds: number; folder: string | number }
+  'service.gitOperation.unreadable': { folder: string | number }
   'service.gitOperation.unresolved': { count: number }
   'service.gitRepo.addFailed': { remote: string | number; why: string | number }
   'service.gitRepo.added': { remote: string | number }

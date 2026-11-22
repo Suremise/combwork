@@ -759,6 +759,10 @@
     "defaultMessage": "Unfinished git {what} in {folder}",
     "description": "HI-3470: the heading of the panel in Version Control → Changes when a git operation was left under way in the folder shown. {what} is git's word for it (merge, rebase, am, cherry-pick, revert, bisect: keep it as it is); {folder} is a slot's name or the project folder (git.operation.projectFolder)."
   },
+  "git.operation.unreadable": {
+    "defaultMessage": "Combwork can't read where git stopped here, so it takes no step: finish it in a terminal.",
+    "description": "HI-3470 (a reviewer's round 2): under the panel's heading when git's files that say where the operation stopped can't be read; its buttons are greyed out."
+  },
   "git.operation.unresolved": {
     "defaultMessage": "{count, plural, one {# file is} other {# files are}} still in conflict: settle {count, plural, one {it} other {them}} first.",
     "description": "HI-3470: why Continue is greyed out (its tooltip): files still in conflict."

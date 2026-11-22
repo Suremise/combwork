@@ -189,6 +189,7 @@
   "git.operation.theirs": "用他们的",
   "git.operation.theirsTip": "{swap, select, yes {另一侧：变基所基于的分支（Git 在这里称它为 ours）。} other {另一侧：正在合并、拣选或还原的内容（Git 称它为 theirs）。}} {has, select, yes {采用这一侧的文件版本。} other {这一侧删除了该文件：将删除它。}} 运行 {command}",
   "git.operation.title": "{folder} 中有未完成的 git {what}",
+  "git.operation.unreadable": "Combwork 无法读取 Git 在这里停在何处，因此不执行任何步骤：请在终端中完成它。",
   "git.operation.unresolved": "还有 {count, plural, other {# 个文件}}有冲突：请先解决。",
   "git.parentRepo": "此项目位于 {folder} 中的 git 仓库内，因此“版本控制”标签页只作显示：Combwork 只更改项目自己的仓库。",
   "git.problem.agentSetup": "配置提供方",

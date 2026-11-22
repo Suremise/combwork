@@ -659,6 +659,11 @@
       "folder": "plain"
     }
   },
+  "service.gitOperation.unreadable": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
   "service.gitOperation.unresolved": {
     "placeholders": {
       "count": "plural"

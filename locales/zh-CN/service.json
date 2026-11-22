@@ -148,6 +148,7 @@
   "service.gitOperation.slotProcess": "有进程打开了 {slot} 中的文件或文件夹：未做任何操作。请关闭它（终端、编辑器）后重试。",
   "service.gitOperation.slotSession": "{slot} 中有会话：未做任何操作。请先停止它。",
   "service.gitOperation.timedOut": "Git 运行 {seconds, number} 秒后仍未结束，因此 Combwork 结束了它。重试前请先查看 {folder}：某个钩子可能已完成了部分工作。",
+  "service.gitOperation.unreadable": "Combwork 无法读取 Git 在 {folder} 中停在何处，因此无法判断它是否仍在你看到的位置：未做任何操作。请在那里的终端中完成它。",
   "service.gitOperation.unresolved": "还有 {count, plural, other {# 个文件}}有冲突：请先解决。",
   "service.gitRepo.addFailed": "无法添加 {remote}：{why}",
   "service.gitRepo.added": "已添加 {remote}。",

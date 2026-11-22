@@ -189,6 +189,7 @@
   "git.operation.theirs": "Usar la suya",
   "git.operation.theirsTip": "{swap, select, yes {El otro lado: la rama sobre la que se hace el rebase (git la llama ours aquí).} other {El otro lado: lo que se fusiona, se elige o se revierte (git lo llama theirs).}} {has, select, yes {Toma su versión del archivo.} other {Borró el archivo: lo borra.}} Ejecuta {command}",
   "git.operation.title": "git {what} sin terminar en {folder}",
+  "git.operation.unreadable": "Combwork no puede leer dónde se detuvo git aquí, así que no da ningún paso: termínalo en una terminal.",
   "git.operation.unresolved": "{count, plural, one {# archivo sigue} many {# archivos siguen} other {# archivos siguen}} en conflicto: {count, plural, one {resuélvelo} many {resuélvelos} other {resuélvelos}} primero.",
   "git.parentRepo": "Este proyecto está dentro del repositorio git de {folder}, así que la pestaña Control de versiones solo lo muestra: Combwork solo modifica el repositorio propio de un proyecto.",
   "git.problem.agentSetup": "Configuración de proveedores",

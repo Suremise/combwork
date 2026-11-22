@@ -273,15 +273,15 @@ describe("the stop the user saw (HR1's round 1)", () => {
     expect(second).toMatchObject({ what: 'rebase', step: { at: 2, of: 2 }, at: { subject: 'side two' }, conflicts: [{ path: 'a.txt' }] })
     expect(second.id).not.toBe(first.id)
     const head = sh(proj, 'rev-parse', 'HEAD')
-    await expect(step({ what: 'rebase', id: first.id, step: 'skip' })).rejects.toThrow('Git has moved on in')
-    await expect(step({ what: 'rebase', id: first.id, file: 'a.txt', pick: 'theirs' })).rejects.toThrow('Git has moved on in')
-    await expect(step({ what: 'rebase', id: first.id, step: 'abort' })).rejects.toThrow('Git has moved on in')
+    await expect(step({ what: 'rebase', id: first.id!, step: 'skip' })).rejects.toThrow('Git has moved on in')
+    await expect(step({ what: 'rebase', id: first.id!, file: 'a.txt', pick: 'theirs' })).rejects.toThrow('Git has moved on in')
+    await expect(step({ what: 'rebase', id: first.id!, step: 'abort' })).rejects.toThrow('Git has moved on in')
     // Nothing done: the second stop as it was, its conflict still there.
     expect(await state()).toEqual(second)
     expect(sh(proj, 'rev-parse', 'HEAD')).toBe(head)
     expect(read('a.txt')).toContain('<<<<<<<')
     // Asked for the stop it shows now, it is done.
-    await step({ what: 'rebase', id: second.id, step: 'skip' })
+    await step({ what: 'rebase', id: second.id!, step: 'skip' })
     expect(await state()).toBeNull()
   })
 
@@ -295,8 +295,101 @@ describe("the stop the user saw (HR1's round 1)", () => {
     sh(proj, 'switch', '-q', 'main')
     expect(() => sh(proj, 'merge', '--no-edit', 'other')).toThrow()
     expect((await state())!.id).not.toBe(first.id)
-    await expect(step({ what: 'merge', id: first.id, step: 'abort' })).rejects.toThrow('Git has moved on in')
+    await expect(step({ what: 'merge', id: first.id!, step: 'abort' })).rejects.toThrow('Git has moved on in')
     expect(existsSync(join(gitDir(), 'MERGE_HEAD'))).toBe(true)
+  })
+})
+
+describe("another operation of the same kind at the same HEAD (HR1's round 2)", () => {
+  /** A one-patch file of a commit on its own branch from main~0 changing a.txt to `text`. */
+  function patchOf(name: string, text: string): string {
+    sh(proj, 'switch', '-q', '-c', name, 'main')
+    commit(proj, { 'a.txt': `${text}\n` }, `${name} edit`)
+    const out = join(base, `patches-${name}-${n}`)
+    sh(proj, 'format-patch', '-q', '-1', '-o', out)
+    sh(proj, 'switch', '-q', 'main')
+    return join(out, readdirSync(out)[0])
+  }
+
+  it('git am: patch A aborted in a terminal and patch B applied, both stopping at a.txt from the same HEAD: a request made for A is refused, B as it was', async () => {
+    const a = patchOf('pa', 'patch A')
+    const b = patchOf('pb', 'patch B')
+    commit(proj, { 'a.txt': 'main\n' }, 'main edit')
+    const head = sh(proj, 'rev-parse', 'HEAD')
+    expect(() => sh(proj, 'am', '-3', a)).toThrow()
+    const first = (await state())!
+    sh(proj, 'am', '--abort')
+    expect(() => sh(proj, 'am', '-3', b)).toThrow()
+    const second = (await state())!
+    // The same kind, HEAD, step and conflicted path: only the patch tells them apart.
+    expect(sh(proj, 'rev-parse', 'HEAD')).toBe(head)
+    expect(second).toMatchObject({ what: 'am', step: first.step, conflicts: first.conflicts })
+    expect(first.id).toBeTruthy()
+    expect(second.id).not.toBe(first.id)
+    const patchNow = readFileSync(join(gitDir(), 'rebase-apply', '0001'), 'utf8')
+    const fileNow = read('a.txt')
+    for (const req of [{ step: 'abort' }, { step: 'continue' }, { step: 'skip' }, { file: 'a.txt', pick: 'theirs' }, { file: 'a.txt', pick: 'resolved' }] as const) {
+      await expect(step({ what: 'am', id: first.id!, ...req })).rejects.toThrow('Git has moved on in')
+    }
+    expect(await state()).toEqual(second)
+    expect(sh(proj, 'rev-parse', 'HEAD')).toBe(head)
+    expect(readFileSync(join(gitDir(), 'rebase-apply', '0001'), 'utf8')).toBe(patchNow)
+    expect(read('a.txt')).toBe(fileNow)
+    expect(sh(proj, 'ls-files', '-u')).not.toBe('')
+  })
+
+  for (const kind of ['cherry-pick', 'revert'] as const) {
+    it(`${kind}: one ended in a terminal and another begun from the same HEAD, stopping at the same path: a request made for the first is refused`, async () => {
+      // Two commits on main (for a revert) or on a branch (for a pick), each conflicting at a.txt.
+      if (kind === 'revert') {
+        commit(proj, { 'a.txt': 'one\n' }, 'one')
+        commit(proj, { 'a.txt': 'two\n' }, 'two')
+        commit(proj, { 'a.txt': 'three\n' }, 'three')
+      }
+      const x = kind === 'revert' ? sh(proj, 'rev-parse', 'HEAD~2') : (sh(proj, 'switch', '-q', '-c', 'x', 'main'), commit(proj, { 'a.txt': 'x\n' }, 'x edit'))
+      const y = kind === 'revert' ? sh(proj, 'rev-parse', 'HEAD~1') : (sh(proj, 'switch', '-q', '-c', 'y', 'main'), commit(proj, { 'a.txt': 'y\n' }, 'y edit'))
+      if (kind === 'cherry-pick') {
+        sh(proj, 'switch', '-q', 'main')
+        commit(proj, { 'a.txt': 'main\n' }, 'main edit')
+      }
+      const head = sh(proj, 'rev-parse', 'HEAD')
+      expect(() => sh(proj, kind, '--no-edit', x)).toThrow()
+      const first = (await state())!
+      sh(proj, kind, '--abort')
+      expect(() => sh(proj, kind, '--no-edit', y)).toThrow()
+      const second = (await state())!
+      expect(second.what).toBe(kind)
+      expect(second.id).not.toBe(first.id)
+      await expect(step({ what: kind, id: first.id!, step: 'abort' })).rejects.toThrow('Git has moved on in')
+      await expect(step({ what: kind, id: first.id!, file: 'a.txt', pick: 'mine' })).rejects.toThrow('Git has moved on in')
+      expect(await state()).toEqual(second)
+      expect(sh(proj, 'rev-parse', 'HEAD')).toBe(head)
+    })
+  }
+
+  it('bisect: a terminal marked a commit since: an End bisect made for the stop before is refused', async () => {
+    const start = sh(proj, 'rev-parse', 'HEAD')
+    for (const i of [1, 2, 3, 4]) commit(proj, { 'x.txt': `${i}\n` }, `x${i}`)
+    sh(proj, 'bisect', 'start', 'HEAD', start)
+    const first = (await state())!
+    sh(proj, 'bisect', 'bad')
+    expect((await state())!.id).not.toBe(first.id)
+    await expect(step({ what: 'bisect', id: first.id!, step: 'abort' })).rejects.toThrow('Git has moved on in')
+    expect((await state())?.what).toBe('bisect')
+  })
+})
+
+describe("git's files that say where it stopped can't be read (HR1's round 2)", () => {
+  it('an am whose current patch is gone: no id, and every step refused, nothing done', async () => {
+    amStopped()
+    const head = sh(proj, 'rev-parse', 'HEAD')
+    rmSync(join(gitDir(), 'rebase-apply', '0001'))
+    const s = await state()
+    expect(s).toMatchObject({ what: 'am', id: null })
+    await expect(step({ what: 'am', id: 'am|x|y', step: 'abort' })).rejects.toThrow("Combwork can't read where git stopped")
+    await expect(step({ what: 'am', id: 'am|x|y', file: 'a.txt', pick: 'mine' })).rejects.toThrow("Combwork can't read where git stopped")
+    expect(sh(proj, 'rev-parse', 'HEAD')).toBe(head)
+    expect(existsSync(join(gitDir(), 'rebase-apply'))).toBe(true)
   })
 })
 

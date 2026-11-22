@@ -189,6 +189,7 @@
   "git.operation.theirs": "相手の側を使う",
   "git.operation.theirsTip": "{swap, select, yes {相手の側：リベース先のブランチ（ここではGitはoursと呼びます）。} other {相手の側：マージ、チェリーピック、リバートされる側（Gitはtheirsと呼びます）。}} {has, select, yes {そのファイルの版を使います。} other {その側はファイルを削除しました：削除します。}} {command} を実行します",
   "git.operation.title": "{folder}に未完了の git {what}",
+  "git.operation.unreadable": "CombworkはここでGitが停止した位置を読み取れないため、操作を行いません。ターミナルで完了させてください。",
   "git.operation.unresolved": "{count, plural, other {# 個のファイル}}がまだコンフリクト中です。先に解決してください。",
   "git.parentRepo": "このプロジェクトは{folder}のGitリポジトリの中にあるため、「バージョン管理」タブは表示のみです。Combworkが変更するのはプロジェクト自身のリポジトリだけです。",
   "git.problem.agentSetup": "プロバイダーのセットアップ",

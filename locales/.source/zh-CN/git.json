@@ -189,6 +189,7 @@
   "git.operation.theirs": "Use theirs",
   "git.operation.theirsTip": "{swap, select, yes {The other side: the branch being rebased onto (git calls it ours here).} other {The other side: what is being merged, picked or reverted (git calls it theirs).}} {has, select, yes {Takes its version of the file.} other {It deleted the file: deletes it.}} Runs {command}",
   "git.operation.title": "Unfinished git {what} in {folder}",
+  "git.operation.unreadable": "Combwork can't read where git stopped here, so it takes no step: finish it in a terminal.",
   "git.operation.unresolved": "{count, plural, one {# file is} other {# files are}} still in conflict: settle {count, plural, one {it} other {them}} first.",
   "git.parentRepo": "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Combwork changes only a project's own repository.",
   "git.problem.agentSetup": "Provider Setup",

@@ -148,6 +148,7 @@
   "service.gitOperation.slotProcess": "Ein Prozess hat eine Datei oder einen Ordner in {slot} geöffnet: Es wurde nichts getan. Schließe ihn (ein Terminal, einen Editor) und versuche es erneut.",
   "service.gitOperation.slotSession": "In {slot} läuft eine Sitzung: Es wurde nichts getan. Beende sie zuerst.",
   "service.gitOperation.timedOut": "Git lief nach {seconds, number} Sekunden noch, also hat Combwork es beendet. Sieh dir {folder} an, bevor du es erneut versuchst: Ein Hook hat vielleicht einen Teil seiner Arbeit getan.",
+  "service.gitOperation.unreadable": "Combwork kann nicht lesen, wo Git in {folder} angehalten hat, und daher nicht erkennen, ob es noch dort ist, wo du es gesehen hast: Es wurde nichts getan. Schließe den Vorgang dort in einem Terminal ab.",
   "service.gitOperation.unresolved": "{count, plural, one {# Datei ist} other {# Dateien sind}} noch im Konflikt: Löse {count, plural, one {sie} other {sie}} zuerst.",
   "service.gitRepo.addFailed": "{remote} konnte nicht hinzugefügt werden: {why}",
   "service.gitRepo.added": "{remote} hinzugefügt.",

@@ -6,6 +6,7 @@
 // folder (folderBuilders), no agent working there (busyAgentIn), then the caller's guard (a slot's own: its pool's hold
 // and quiet check, operationPanel.ts). Git does the work; a step that fails says git's own error.
 import { readFile } from 'original-fs/promises'
+import { createHash } from 'crypto'
 import { join } from 'path'
 import { mineIsTheirs, OPERATION_STEPS, type ConflictPick, type GitConflict, type GitOperationName, type GitOperationState, type OperationRequest } from '../../../shared/gitOperations'
 import { msg } from '../../../shared/i18n'
@@ -30,6 +31,7 @@ export const OPERATION_TEXT = {
   busy: msg({ id: 'service.gitOperation.busy', defaultMessage: 'A run or an agent is working in {folder} ({what}): nothing was done. Try again once it has finished.', description: "HI-3470: an error from the panel: a run (a test, a build) or an agent's file lock is in the folder ({folder}, a path); {what} names the first one's folder or file." }),
   failed: msg({ id: 'service.gitOperation.failed', defaultMessage: 'Git refused: {why}', description: "HI-3470: an error from the panel: git's own command failed; {why} is git's error line, in English." }),
   moved: msg({ id: 'service.gitOperation.moved', defaultMessage: 'Git has moved on in {folder} since you looked (to another commit of the {what}, or a new one began): nothing was done. Look again.', description: "HI-3470 (a reviewer's round 1): an error from the panel: the operation is still of the same kind ({what}, git's word for it: keep it as it is) but git is no longer stopped where the user saw it (a terminal went on, or it was ended and another begun); {folder} is a path. Nothing was done." }),
+  unreadable: msg({ id: 'service.gitOperation.unreadable', defaultMessage: "Combwork can't read where git stopped in {folder}, so it can't tell it's still where you saw it: nothing was done. Finish it in a terminal there.", description: "HI-3470 (a reviewer's round 2): an error from the panel: git's files that say where the operation stopped (in the folder's git dir) are missing or can't be read, so Combwork refuses any step; {folder} is a path." }),
   timedOut: msg({ id: 'service.gitOperation.timedOut', defaultMessage: 'Git was still running after {seconds, number} seconds, so Combwork ended it. Look at {folder} before you try again: a hook may have done part of its work.', description: "HI-3470: an error from the panel: git's step (a Continue running the repository's commit hooks, say) ran past Settings → Advanced's longest commit time ({seconds}) and was ended; {folder} is a path." })
 }
 const M = OPERATION_TEXT
@@ -95,14 +97,53 @@ async function stepOf(dir: string, what: GitOperationName): Promise<{ at: number
 }
 
 /**
- * HR1's round 1: which stop of the operation git is at, to tell the one the user saw from another of the same kind:
- * its kind, HEAD, the commit it stopped at, its step and its sequencer's next command. Git moves at least one of them
- * when it goes on (a commit made, the next one picked) or another begins.
+ * HR1's rounds 1 and 2: git's own files that say where each operation is, in its git dir: hashed into the stop's id, so
+ * one of the same kind at another stop, or another of the same kind begun at the same HEAD (an am of another patch), has
+ * another id. `needs`: the files that must be read for the id to say anything (one group, all of it); `{patch}` is an am's
+ * or an apply-rebase's current numbered patch (`rebase-apply/0001`…, by its `next`).
  */
-async function stopId(folder: string, dir: string, what: GitOperationName, commit: string | null, step: { at: number; of: number } | null): Promise<string> {
+const STOP_FILES: Record<GitOperationName, { files: string[]; needs: string[][] }> = {
+  merge: { files: ['MERGE_HEAD', 'MERGE_MODE'], needs: [['MERGE_HEAD']] },
+  rebase: {
+    files: ['rebase-merge/head-name', 'rebase-merge/onto', 'rebase-merge/orig-head', 'rebase-merge/done', 'rebase-merge/git-rebase-todo', 'rebase-merge/msgnum', 'rebase-merge/end', 'rebase-merge/stopped-sha', 'rebase-apply/head-name', 'rebase-apply/onto', 'rebase-apply/orig-head', 'rebase-apply/next', 'rebase-apply/last', 'rebase-apply/original-commit', '{patch}'],
+    needs: [['rebase-merge/done'], ['rebase-merge/msgnum'], ['rebase-apply/next', '{patch}']]
+  },
+  am: { files: ['rebase-apply/next', 'rebase-apply/last', '{patch}', 'rebase-apply/patch', 'rebase-apply/info', 'rebase-apply/msg', 'rebase-apply/final-commit', 'rebase-apply/original-commit', 'rebase-apply/orig-head', 'rebase-apply/abort-safety'], needs: [['rebase-apply/next', '{patch}']] },
+  'cherry-pick': { files: ['CHERRY_PICK_HEAD', 'sequencer/head', 'sequencer/todo', 'sequencer/abort-safety'], needs: [['CHERRY_PICK_HEAD'], ['sequencer/todo']] },
+  revert: { files: ['REVERT_HEAD', 'sequencer/head', 'sequencer/todo', 'sequencer/abort-safety'], needs: [['REVERT_HEAD'], ['sequencer/todo']] },
+  bisect: { files: ['BISECT_LOG', 'BISECT_START', 'BISECT_EXPECTED_REV', 'BISECT_TERMS'], needs: [['BISECT_LOG']] }
+}
+
+/** A git file's bytes; null when it isn't there or can't be read. */
+async function gitBytes(dir: string, rel: string): Promise<Buffer | null> {
+  try {
+    return await readFile(join(dir, ...rel.split('/')))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * HR1's rounds 1 and 2: which stop of the operation git is at, to tell the one the user saw from another: its kind, HEAD
+ * and a hash of its files (STOP_FILES). Null when the files that say where it is can't be read: no step is taken then.
+ */
+export async function stopId(folder: string, dir: string, what: GitOperationName): Promise<string | null> {
+  const spec = STOP_FILES[what]
+  const next = Number(await gitFile(dir, 'rebase-apply', 'next'))
+  const patch = Number.isInteger(next) && next > 0 ? `rebase-apply/${String(next).padStart(4, '0')}` : null
+  const read = new Map<string, Buffer | null>()
+  for (const f of spec.files) {
+    const rel = f === '{patch}' ? patch : f
+    read.set(f, rel ? await gitBytes(dir, rel) : null)
+  }
+  if (!spec.needs.some((group) => group.every((f) => read.get(f)))) return null
   const head = await git(folder, ['rev-parse', '--verify', '-q', 'HEAD'])
-  const next = (await gitFile(dir, 'sequencer', 'todo'))?.split(/\r?\n/)[0] ?? ''
-  return [what, head.ok ? head.out.trim() : '', commit ?? '', step ? `${step.at}/${step.of}` : '', next].join('|')
+  const hash = createHash('sha256')
+  for (const [f, b] of read) {
+    hash.update(`${f}\0${b ? b.length : -1}\0`)
+    if (b) hash.update(b)
+  }
+  return [what, head.ok ? head.out.trim() : '', hash.digest('hex')].join('|')
 }
 
 /** HI-3470: the operation under way in a folder, with its conflicted files; null with none. */
@@ -110,8 +151,7 @@ export async function operationState(folder: string): Promise<GitOperationState 
   const what = operationSync(folder)
   const dir = what ? gitDirSync(folder) : null
   if (!what || !dir) return null
-  const [conflicts, commit, step] = await Promise.all([conflictsIn(folder, what), stoppedAt(dir, what), stepOf(dir, what)])
-  const id = await stopId(folder, dir, what, commit, step)
+  const [conflicts, commit, step, id] = await Promise.all([conflictsIn(folder, what), stoppedAt(dir, what), stepOf(dir, what), stopId(folder, dir, what)])
   let at: GitOperationState['at']
   if (commit && /^[0-9a-f]{40,64}$/.test(commit)) {
     const r = await git(folder, ['log', '-1', '--format=%h%x00%s', commit, '--'])
@@ -154,7 +194,9 @@ export async function operationStep(projectPath: string, folder: string, req: Op
         if (operationSync(folder) !== req.what) throw combworkError(M.changed, { was: req.what === 'cherry-pick' ? 'cherryPick' : req.what, folder })
         // The same kind, but is it the stop the user saw? (HR1's round 1: a terminal went on, or another began.)
         const dir = gitDirSync(folder)
-        if (!dir || (await stopId(folder, dir, req.what, await stoppedAt(dir, req.what), await stepOf(dir, req.what))) !== req.id) throw combworkError(M.moved, { what: req.what, folder })
+        const now = dir ? await stopId(folder, dir, req.what) : null
+        if (now === null) throw combworkError(M.unreadable, { folder })
+        if (now !== req.id) throw combworkError(M.moved, { what: req.what, folder })
         const { folderBuilders } = await import('../../workflow/queueHost')
         const held = folderBuilders(workspace, folder)
         if (held) throw combworkError(M.busy, { folder, what: held[0] })

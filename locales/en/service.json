@@ -639,6 +639,10 @@
     "defaultMessage": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at {folder} before you try again: a hook may have done part of its work.",
     "description": "HI-3470: an error from the panel: git's step (a Continue running the repository's commit hooks, say) ran past Settings → Advanced's longest commit time ({seconds}) and was ended; {folder} is a path."
   },
+  "service.gitOperation.unreadable": {
+    "defaultMessage": "Combwork can't read where git stopped in {folder}, so it can't tell it's still where you saw it: nothing was done. Finish it in a terminal there.",
+    "description": "HI-3470 (a reviewer's round 2): an error from the panel: git's files that say where the operation stopped (in the folder's git dir) are missing or can't be read, so Combwork refuses any step; {folder} is a path."
+  },
   "service.gitOperation.unresolved": {
     "defaultMessage": "{count, plural, one {# file is} other {# files are}} still in conflict: settle {count, plural, one {it} other {them}} first.",
     "description": "HI-3470: an error from the panel (and the reason Continue is greyed out): files still in conflict."

@@ -191,6 +191,7 @@ interface CombworkMessageValues {
   'git.operation.theirs': undefined
   'git.operation.theirsTip': { swap: string; has: string; command: string | number }
   'git.operation.title': { what: string | number; folder: string | number }
+  'git.operation.unreadable': undefined
   'git.operation.unresolved': { count: number }
   'git.parentRepo': { folder: string | number }
   'git.problem.agentSetup': undefined

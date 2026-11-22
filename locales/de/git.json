@@ -189,6 +189,7 @@
   "git.operation.theirs": "Ihre nehmen",
   "git.operation.theirsTip": "{swap, select, yes {Die andere Seite: der Branch, auf den rebased wird (Git nennt ihn hier „ours“).} other {Die andere Seite: was gemergt, gepickt oder zurückgenommen wird (Git nennt es „theirs“).}} {has, select, yes {Nimmt ihre Fassung der Datei.} other {Sie hat die Datei gelöscht: löscht sie.}} Führt {command} aus",
   "git.operation.title": "Unvollendetes Git-{what} in {folder}",
+  "git.operation.unreadable": "Combwork kann nicht lesen, wo Git hier angehalten hat, und macht daher keinen Schritt: Schließe den Vorgang in einem Terminal ab.",
   "git.operation.unresolved": "{count, plural, one {# Datei ist} other {# Dateien sind}} noch im Konflikt: Löse {count, plural, one {sie} other {sie}} zuerst.",
   "git.parentRepo": "Dieses Projekt liegt im Git-Repository in {folder}, daher zeigt der Tab „Versionsverwaltung“ es nur an: Combwork ändert nur das eigene Repository eines Projekts.",
   "git.problem.agentSetup": "Anbieter-Einrichtung",

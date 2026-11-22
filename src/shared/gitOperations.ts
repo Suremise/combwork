@@ -44,9 +44,10 @@ export interface GitOperationState {
   /**
    * HR1's round 1: which stop of it this is (its kind, HEAD, the commit it stopped at, its step): a request names the one
    * the user saw, and one made when git is at another stop (a terminal went on, or another of the same kind began) is
-   * refused, even of the same kind. Opaque to the window.
+   * refused, even of the same kind. Opaque to the window. Null (HR1's round 2): git's files that say where it is can't be
+   * read, so the panel takes no step.
    */
-  id: string
+  id: string | null
   /** The commit git stopped at (a merge's: the one merged), short, with its subject; absent when git doesn't say. */
   at?: { commit: string; subject: string }
   /** A rebase's or am's place in its list: the step it stopped at, of how many. */

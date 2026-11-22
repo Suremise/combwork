@@ -41,6 +41,7 @@ const T = {
   goOn: msg({ id: 'git.operation.goOn', defaultMessage: 'Go On', description: 'HI-3470: the button that confirms acting in a lent slot (git.operation.lentTitle).' }),
   done: msg({ id: 'git.operation.done', defaultMessage: "{step, select, continue {Git went on with the {what} in {folder}.} skip {Git skipped a commit of the {what} in {folder}.} other {{what, select, bisect {The bisect in {folder} is ended.} other {The git {what} in {folder} is aborted.}}}}", description: "HI-3470: a notice after the panel's step worked. {what} is git's word for the operation; {folder} a slot's name or git.operation.projectFolder." }),
   failed: msg({ id: 'git.operation.failed', defaultMessage: "Git couldn't do that", description: "HI-3470: the title of the error notice when the panel's step or a conflicted file's button failed or was refused." }),
+  unreadable: msg({ id: 'git.operation.unreadable', defaultMessage: "Combwork can't read where git stopped here, so it takes no step: finish it in a terminal.", description: "HI-3470 (a reviewer's round 2): under the panel's heading when git's files that say where the operation stopped can't be read; its buttons are greyed out." }),
   readFailed: msg({ id: 'git.operation.readFailed', defaultMessage: "Couldn't read the git operation under way: {error}", description: 'HI-3470: the panel, when reading the operation failed. {error} is why.' })
 }
 
@@ -97,10 +98,15 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
       )
       if (!ok) return
     }
-    await act(s, { what: op.what, id: op.id, step: s }, tr(T.done, { step: s, what: op.what, folder: where }))
+    if (id) await act(s, { what: op.what, id, step: s }, tr(T.done, { step: s, what: op.what, folder: where }))
   }
-  const pick = (c: GitConflict, p: ConflictPick): Promise<void> => act(`${p}:${c.path}`, { what: op.what, id: op.id, file: c.path, pick: p })
+  const pick = async (c: GitConflict, p: ConflictPick): Promise<void> => {
+    if (id) await act(`${p}:${c.path}`, { what: op.what, id, file: c.path, pick: p })
+  }
   const swap = mineIsTheirs(op.what) ? 'yes' : 'no'
+  // Where git stopped can't be read (HR1's round 2): no step is offered, as main would refuse it.
+  const id = op.id
+  const off = !!busy || !id
   const left = op.conflicts.length
 
   return (
@@ -115,12 +121,17 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
           {op.at && tr(T.at, { commit: op.at.commit, subject: op.at.subject })}
         </div>
       )}
+      {!id && (
+        <div className="hint" data-operation-unreadable="">
+          {tr(T.unreadable)}
+        </div>
+      )}
       <div className="flex operation-steps">
         {OPERATION_STEPS[op.what].map((s) => {
           const blocked = s === 'continue' && left > 0
           return (
             <Tooltip key={s} content={blocked ? tr(T.unresolved, { count: left }) : tr(T.runs, { command: operationCommand(op.what, s) })}>
-              <button className={s === 'continue' ? 'btn small primary' : 'btn small'} data-step={s} disabled={!!busy || blocked} onClick={() => void step(s)}>
+              <button className={s === 'continue' ? 'btn small primary' : 'btn small'} data-step={s} disabled={off || blocked} onClick={() => void step(s)}>
                 {busy === s && <Icon name="loading" spin />} {tr(op.what === 'bisect' ? T.endBisect : STEP_LABEL[s])}
               </button>
             </Tooltip>
@@ -140,17 +151,17 @@ export function OperationPanel({ project, root, folder, reloadKey, onChanged }: 
                   {tr(T.open)}
                 </button>
                 <Tooltip content={tr(T.mineTip, { swap, has: c.mine ? 'yes' : 'no', command: pickCommand(op.what, c, 'mine') })}>
-                  <button className="btn small" data-pick="mine" disabled={!!busy} onClick={() => void pick(c, 'mine')}>
+                  <button className="btn small" data-pick="mine" disabled={off} onClick={() => void pick(c, 'mine')}>
                     {tr(T.mine)}
                   </button>
                 </Tooltip>
                 <Tooltip content={tr(T.theirsTip, { swap, has: c.theirs ? 'yes' : 'no', command: pickCommand(op.what, c, 'theirs') })}>
-                  <button className="btn small" data-pick="theirs" disabled={!!busy} onClick={() => void pick(c, 'theirs')}>
+                  <button className="btn small" data-pick="theirs" disabled={off} onClick={() => void pick(c, 'theirs')}>
                     {tr(T.theirs)}
                   </button>
                 </Tooltip>
                 <Tooltip content={tr(T.resolvedTip, { command: pickCommand(op.what, c, 'resolved') })}>
-                  <button className="btn small" data-pick="resolved" disabled={!!busy} onClick={() => void pick(c, 'resolved')}>
+                  <button className="btn small" data-pick="resolved" disabled={off} onClick={() => void pick(c, 'resolved')}>
                     {tr(T.resolved)}
                   </button>
                 </Tooltip>

@@ -148,6 +148,7 @@
   "service.gitOperation.slotProcess": "Un processus a un fichier ou un dossier de {slot} ouvert : rien n’a été fait. Ferme-le (un terminal, un éditeur) et réessaie.",
   "service.gitOperation.slotSession": "Une session est dans {slot} : rien n’a été fait. Arrête-la d’abord.",
   "service.gitOperation.timedOut": "Git tournait encore après {seconds, number} secondes, alors Combwork l’a arrêté. Regarde {folder} avant de réessayer : un hook a peut-être fait une partie de son travail.",
+  "service.gitOperation.unreadable": "Combwork ne peut pas lire où git s’est arrêté dans {folder}, il ne peut donc pas savoir s’il est toujours là où tu l’as vu : rien n’a été fait. Termine-le là dans un terminal.",
   "service.gitOperation.unresolved": "{count, plural, one {# fichier est} many {# fichiers sont} other {# fichiers sont}} encore en conflit : {count, plural, one {règle-le} many {règle-les} other {règle-les}} d’abord.",
   "service.gitRepo.addFailed": "Impossible d’ajouter le dépôt distant {remote} : {why}",
   "service.gitRepo.added": "Dépôt distant {remote} ajouté.",
