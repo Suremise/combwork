@@ -42,7 +42,7 @@ const status = (rel: string): string => sh(proj, 'status', '--porcelain=v1', '--
 const stashMessages = (): string[] => sh(proj, 'stash', 'list', '--format=%gs').split(/\r?\n/).filter(Boolean).map((s) => stashSubject(s).message)
 const head = (): string => sh(proj, 'rev-parse', 'HEAD').trim()
 const plan = (rel: string, source: RestoreSource, target: string | null = null, picked: string | null = null) => R.restorePlan(proj, rel, source, target, picked)
-const restore = (rel: string, source: RestoreSource, commit: string, guard?: () => void) => inWorkspace(w, () => R.restoreFile(proj, { rel, source, commit }, guard))
+const restore = (rel: string, source: RestoreSource, at: string, guard?: () => void) => inWorkspace(w, () => R.restoreFile(proj, { rel, source, commit: at }, guard))
 
 beforeEach(() => {
   proj = join(w.path!, `proj${++n}`)
