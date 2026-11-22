@@ -169,6 +169,7 @@
   "service.gitOperation.changed": "Git isn't in the middle of {was, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder} any more: nothing was done. Look again.",
   "service.gitOperation.failed": "Git refused: {why}",
   "service.gitOperation.invalid": "That step was asked for wrongly: nothing was done.",
+  "service.gitOperation.leftChanged": "{folder} changed since you looked (a commit, or a git operation began): nothing was done. Look again.",
   "service.gitOperation.moved": "Git has moved on in {folder} since you looked (to another commit of the {what}, or a new one began): nothing was done. Look again.",
   "service.gitOperation.notConflicted": "{file} isn't in conflict any more: nothing was done. Look again.",
   "service.gitOperation.notStep": "That isn't a step git offers for this operation.",

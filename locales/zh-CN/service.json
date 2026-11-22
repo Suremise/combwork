@@ -140,6 +140,7 @@
   "service.gitOperation.changed": "Git 在 {folder} 中已不再处于{was, select, merge {合并} rebase {变基} am {am} cherryPick {拣选（cherry-pick）} bisect {二分查找（bisect）} other {还原（revert）}}过程中：未做任何操作。请重新查看。",
   "service.gitOperation.failed": "Git 拒绝了：{why}",
   "service.gitOperation.invalid": "该步骤的请求有误：未做任何操作。",
+  "service.gitOperation.leftChanged": "自你查看以来，{folder} 已发生变化（有了新提交，或开始了 Git 操作）：未执行任何操作。请重新查看。",
   "service.gitOperation.moved": "在你查看之后，{folder} 中的 Git 已经继续往前（到了 {what} 的另一个提交，或开始了新的操作）：未做任何操作。请重新查看。",
   "service.gitOperation.notConflicted": "{file} 已不再有冲突：未做任何操作。请重新查看。",
   "service.gitOperation.notStep": "对于此操作，Git 不提供该步骤。",

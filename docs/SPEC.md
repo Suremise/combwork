@@ -5962,6 +5962,14 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
     shows such conflicts; it learns which stash they came from through RepoReads' `stashConflict` (the stash last
     applied there with conflicts, its message and the HEAD it went onto, in main's memory, while that HEAD stays and a
     file is still in conflict).
+  - **Files left in conflict** (HI-3518): with unmerged files and no operation under way (such an Apply or Pop, or a
+    terminal's), the panel shows *Files left in conflict in {folder}* (kind `conflicts`): their files with **Open**,
+    **Use mine**, **Use theirs** and **Mark resolved** as an operation's (git's own sides: mine is HEAD), and no
+    Continue, Skip or Abort (a step is refused). Under its heading, where they came from: *From applying the stash
+    “…”* (the stash is kept), with **Use theirs** named **Use the stash's** and its tooltip naming the stash; else that
+    no operation is under way, and a neutral other side. Its picks take the panel's refusals and a lent slot's
+    confirmation; its stop is HEAD with no operation under way, so a commit or an operation begun since the user
+    looked refuses a click (a file settled meanwhile: its pick's own refusal). Once no file is unmerged the panel goes.
   - **Drop** asks first, naming the stash, its files and, for Combwork's, its card, and saying its commit can be
     found in a terminal for a while (`git fsck --unreachable`). Under the repository lock it drops the stash only while
     its place in the list still holds the commit the user saw, read again just before `git stash drop`, and the notice

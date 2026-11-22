@@ -401,6 +401,56 @@ describe('a step that goes on and stops at the next conflict (HI-3503)', () => {
   })
 })
 
+describe('files left in conflict with no operation under way (HI-3518)', () => {
+  /** a.txt and b.txt changed and stashed; then main commits other changes to both: applying the stash conflicts in both. */
+  function stashConflict(): void {
+    writeFileSync(join(proj, 'a.txt'), 'stashed a\n')
+    writeFileSync(join(proj, 'b.txt'), 'stashed b\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'my work')
+    commit(proj, { 'a.txt': 'main a\n', 'b.txt': 'main b\n' }, 'main edits')
+    expect(() => sh(proj, 'stash', 'apply', '-q')).toThrow()
+  }
+
+  it('a conflicting stash apply: its files, mine and the stash as theirs; each pick settles its file; then nothing to show', async () => {
+    stashConflict()
+    const s = await state()
+    expect(s).toMatchObject({ what: 'conflicts', conflicts: [{ path: 'a.txt', mine: true, theirs: true }, { path: 'b.txt', mine: true, theirs: true }] })
+    expect(s!.id).toBe(`conflicts|${sh(proj, 'rev-parse', 'HEAD')}`)
+    expect(s!.step).toBeUndefined()
+    await step({ what: 'conflicts', file: 'a.txt', pick: 'theirs' })
+    expect(read('a.txt')).toBe('stashed a\n')
+    expect((await state())?.conflicts.map((c) => c.path)).toEqual(['b.txt'])
+    await step({ what: 'conflicts', file: 'b.txt', pick: 'mine' })
+    expect(read('b.txt')).toBe('main b\n')
+    // Nothing unmerged is left: no panel. The stash git kept is still there.
+    expect(await state()).toBeNull()
+    expect(sh(proj, 'stash', 'list')).toContain('my work')
+  })
+
+  it('Mark resolved takes the file as edited by hand', async () => {
+    stashConflict()
+    writeFileSync(join(proj, 'a.txt'), 'both a\n')
+    await step({ what: 'conflicts', file: 'a.txt', pick: 'resolved' })
+    expect(sh(proj, 'show', ':a.txt')).toBe('both a')
+    expect((await state())?.conflicts.map((c) => c.path)).toEqual(['b.txt'])
+  })
+
+  it('has no step: Continue, Skip and Abort are refused before git runs', async () => {
+    stashConflict()
+    for (const s of ['continue', 'skip', 'abort'] as const) await expect(step({ what: 'conflicts', step: s })).rejects.toThrow("That isn't a step git offers")
+    expect((await state())?.conflicts).toHaveLength(2)
+  })
+
+  it('refused once HEAD has moved since the user looked, or the request names an operation', async () => {
+    stashConflict()
+    const id = (await state())!.id!
+    await expect(step({ what: 'merge', id, file: 'a.txt', pick: 'mine' })).rejects.toThrow("Git isn't in the middle of a merge")
+    sh(proj, 'update-ref', 'HEAD', 'HEAD~1')
+    await expect(step({ what: 'conflicts', id, file: 'a.txt', pick: 'mine' })).rejects.toThrow('changed since you looked')
+    expect(read('a.txt')).toContain('<<<<<<<')
+  })
+})
+
 describe('a revert or cherry-pick', () => {
   it("the reported case (a stop committed by hand, only the sequencer left): read as a revert with nothing in conflict; Abort ends it, keeping the hand commit", async () => {
     commit(proj, { 'r.txt': 'one\n' }, 'c1')

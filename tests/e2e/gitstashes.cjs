@@ -2,7 +2,8 @@
 // Combwork's Set Aside names its own (with an untracked file) and one plain. The section lists both, Combwork's by its
 // card; Show lists a stash's files, untracked ones included, and a click shows one's diff in place of the folder's;
 // Apply puts a stash in and keeps it, and a second Apply is refused while the folder has changes to its file; Pop puts
-// Combwork's in and drops it; a Pop that conflicts keeps its stash, the file left with git's markers, said in a warning;
+// Combwork's in and drops it; a Pop that conflicts keeps its stash, the file left with git's markers, said in a warning,
+// and (HI-3518) shown in Changes' panel as left in conflict, from that stash, where Use the stash's settles it;
 // Drop (asked first) deletes the last, and the section goes. Screenshots of the section, Show's diff and the Drop
 // question in both themes. Git's global config the suite's own. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -123,8 +124,13 @@ const check = (name, ok, extra = '') => {
     await q.waitFor({ timeout: HUNG_MS })
     await q.getByRole('button', { name: 'Pop', exact: true }).click()
     check('a Pop that conflicts keeps the stash and says which file', !!(await lib.until(async () => /1 file is in conflict in the project folder/.test(await toasts()), HUNG_MS)) && stashes().length === 1 && /<<<<<<</.test(read('b.txt') ?? ''), `${await toasts()} | ${stashes().length}`)
-    g('checkout', '--theirs', '--', 'b.txt')
-    g('add', 'b.txt')
+    // HI-3518: Changes' panel shows the file left in conflict, with no operation under way: where it came from, the
+    // stash's side named on its button, no step. Use the stash's settles it, and with nothing left the panel goes.
+    const left = page.locator('.operation-panel[data-operation="conflicts"]')
+    check("HI-3518: the panel shows the file left in conflict, from the stash, with no step", !!(await lib.until(async () => (await left.locator('[data-conflict="b.txt"]').count()) === 1, HUNG_MS)) && /Files left in conflict in the project folder/.test(await text(left)) && (await text(left)).includes('From applying the stash “my own work”') && (await left.locator('[data-step]').count()) === 0 && (await left.locator('[data-pick="theirs"]').innerText()).includes("Use the stash's"), await text(left).catch(() => ''))
+    await shoot(left, '4-left-conflicts')
+    await left.locator('[data-conflict="b.txt"] [data-pick="theirs"]').click()
+    check("…Use the stash's takes its side and settles the file; nothing left, the panel goes", !!(await lib.until(async () => (await left.count()) === 0, HUNG_MS)) && read('b.txt') === 'b stashed\n' && g('diff', '--name-only', '--diff-filter=U').trim() === '', `${read('b.txt')} | ${await text(left).catch(() => '')}`)
 
     // --- Drop, asked first.
     await row(plain).locator('[data-action="stash-drop"]').click()
