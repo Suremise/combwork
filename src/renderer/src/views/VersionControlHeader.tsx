@@ -256,7 +256,7 @@ export function VersionControlHeader({ project, platform, form, preview, onPrevi
               )
             // Back to None from Git's page, or to Git's page from None: a view, nothing switched or saved. Offered once the
             // tab has read the folder's git (`data-vc-preview`, HI-3429: before that answer the click is the switch).
-            if (onPreview && !needsRepository(platform) && PLATFORM_VIEW[id].previewable) {
+            if (onPreview && !needsRepository(platform)) {
               const button = (
                 <button key={id} type="button" role="radio" aria-checked={false} aria-disabled={false} data-platform={id} data-vc-preview="" onClick={() => onPreview(needsRepository(id))}>
                   {tr(PLATFORM_NAME[id])}

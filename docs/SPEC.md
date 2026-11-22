@@ -2013,7 +2013,7 @@ Everything is visible in the Version Control tab itself, not only through the As
 
 #### 16.3.6 The platform contract (1.4.0)
 
-**Status:** the design the 1.4.0 Git refactor builds against (HI-2783, R0 of HI-2781's plan). [HI-1750 9 Nov]: "we refactor git in 1.4.0 … so that the app can support multiple version control systems properly.
+**Status:** the design the 1.4.0 Git refactor builds against (HI-2783, R0 of HI-2781's plan). [HI-1750]: "we refactor git in 1.4.0 … so that the app can support multiple version control systems properly.
 Then we implement jujutsu in 1.5.0 … properly", in both the colocated and the non-colocated Git-backed modes, with the
 target-advance safety gate and explicit compatibility limits part of doing it properly. Evidence: HI-2781's spike
 (jj 0.47.1, Git 2.56.0, its inventory at `0560a6245`). 1.4.0 changes **no behaviour**: Git and None work exactly as
@@ -2334,7 +2334,7 @@ after it. Combwork supports **Git and None** only, behind the same adapter inter
 control is still a platform of its own (§16.3.1, the type map below). The last commit with jj is the annotated tag
 `jj-support-final` (ARCHITECTURE.md, *Removed: jj*, says what went and how to restore it).
 
-- **No migration** (HI-3468, 21 Nov: "just removed"): nothing reads, converts or cleans up what jj left. A
+- **No migration** (HI-3468: "just removed"): nothing reads, converts or cleans up what jj left. A
   project.json naming `jj`, workflow options saved for jj, jj slot and copy rows, and the jj `board_meta` keys get no
   handling of their own; jj's folders on disk (its slots, its control workspace) are left as they are.
 - **Detection:** a `.jj` folder is another version control, as Mercurial's `.hg` is (§16.3.5): the folder is None,
@@ -2373,7 +2373,7 @@ becomes the port's Git implementation.
 | 5 Operations | `gitRepo.ts` reads, `gitCompare.ts`, `branchWatch.ts` | `RepoReads` (Git: stays) | R2 |
 | 5 Operations | `gitRepo.ts` mutations, `gitInit.ts`, `branchMerge.ts`, `worktrees.ts` `mergeWorktree`, their IPC and renderer dispatch | `RepoOps`, gated by the descriptor's operations | R3 |
 | Workflow facade | `platform/adapter.ts` `PlatformAdapter`, `gitPlatform.ts`, `nonePlatform.ts`, `none.ts` | Unchanged contract, composed over ports 1–4 | R6–R9 |
-| Shared | `shared/platform/descriptors.ts` | `PlatformId` stays `'none' \| 'git'` in 1.4.0; `operations` and gate ids added | R3 (operations), J0 (gates) |
+| Shared | `shared/platform/descriptors.ts` | `PlatformId` stays `'none' \| 'git'` in 1.4.0; `operations` added | R3 (operations) |
 | Audit | Every remaining Git import outside `src/main/platform` and the Git implementations | Classified (implementation, historic migration, or defect) and held by an import rule | R9 |
 
 The shapes, for R1 to start from (R1 built port 1 as `src/main/platform/repoContext.ts`, refined there: `run` answers
@@ -4298,8 +4298,8 @@ moved on.
   with its binding not the card's attempt it marks the card waiting for nothing and binds the launch to nothing, so the
   agent's next change of the card is still refused `attempt.moved`.
 - **Never fenced**: the user, the Assistant, scripts on the workspace token and Combwork itself, its writes that an
-  agent's call set off and that outlive it included (a reconciliation its move scheduled, a candidate's checks: the call's
-  fence is checked in its own writes only, HI-3322). A card with no workflow
+  agent's call set off and that outlive it included (a reconciliation its move scheduled: the call's fence is checked in
+  its own writes only, HI-3322). A card with no workflow
   record (a workspace card) has its launch checked only.
 - **Readiness is written with the Done.** The one write path's choke point for Done (`runtime.write`) writes, on each card
   that waits for the one moving into or out of Done, a `Readiness` fact (`ready`, `after`) whenever it changes, in the same
@@ -5915,7 +5915,7 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   it by hand, its target single-quoted for PowerShell when it holds anything but letters, digits and `._/-`: git allows
   `$`, `&` and quotes in a branch name), and only from then does Slots and copies show *Can't be moved back to …* with git's error: a failure the
   next look doesn't repeat (a lock another git held for a moment) is never told. The first look whose detach works, or
-  that finds the slot otherwise ready, gone or dirty, clears it. jj's slots keep their own path (HI-3468 removes jj).
+  that finds the slot otherwise ready, gone or dirty, clears it.
 - **Operations** (HR1's round 1): warming for a lease and removal own the slot from the write that starts them to the
   write that ends them (`op` on its row: a token every one of their writes checks, and the holder's pid and start).
   Nothing lends, adopts or removes a slot meanwhile; the same card asking again is told it is being set up. Another

@@ -453,24 +453,6 @@ export class FactStore {
     return ofThis(Number(m[2]))
   }
 
-  /**
-   * HI-3367 (HR1's round 1, finding 1): who holds a card key across the workspace's board, not only this project: the card
-   * (and whether it is this project's), null when the key is one a project holds or held and no card has it (gone), and
-   * 'unknown' when the key's form or prefix isn't known here (never taken as gone). A read that fails throws.
-   */
-  ownerOfKey(key: string): { id: number; own: boolean } | null | 'unknown' {
-    const m = /^(.+)-(\d+)$/.exec(key.trim())
-    if (!m) return 'unknown'
-    const prefix = m[1]
-    const keyed = KEY_FORM.test(prefix) ? this.conn.read((db) => (keysHeld(db).some((k) => k.key === normalKey(prefix)) ? { card: cardOfKey(db, prefix, Number(m[2])) } : null)) : null
-    if (keyed) return keyed.card === null ? null : { id: keyed.card, own: this.isOwn(keyed.card) }
-    if (this.scope.key && prefix.toLowerCase() === this.scope.key.toLowerCase()) {
-      const c = this.cardByKey(key)
-      return c ? { id: c.id, own: true } : null
-    }
-    return 'unknown'
-  }
-
   /** HI-3233: whether card `id` is this project's (one of another project's has its work in another repository). */
   isOwn(id: number): boolean {
     return this.conn.read((db) => !!db.prepare('SELECT 1 FROM cards WHERE number = ? AND project = ?').get(id, this.scope.project))
@@ -1012,11 +994,6 @@ export class FactStore {
     return this.conn.read((db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(this.metaKey(key)) as { value: string } | undefined)?.value ?? null)
   }
 
-  /** A workspace-wide board_meta value, unscoped (HI-2799: the platform fence), read in the write under way if there is one. */
-  boardMeta(key: string): string | null {
-    return this.conn.read((db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null)
-  }
-
   setMeta(key: string, value: string): void {
     this.conn.write((db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(this.metaKey(key), value))
   }
@@ -1033,19 +1010,6 @@ export class FactStore {
       const del = db.prepare('DELETE FROM workflow_queue_seen WHERE project = ? AND entry = ?')
       for (const e of entries) del.run(this.scope.project, e)
     })
-  }
-
-  /** The provenance epoch's key: the project's stable id (never its name or key, which a rename changes), else its scope. */
-  private epochKey(): string {
-    return `provenance_epoch:${(this.scope.projectId?.() ?? this.scope.project).toLowerCase()}`
-  }
-
-  /**
-   * The project's provenance epoch (HI-2868): how many submissions and adoptions its cards have had recorded, moved in
-   * each one's own transaction. Read in the write under way if there is one.
-   */
-  provenanceEpoch(): number {
-    return this.conn.read((db) => Number((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(this.epochKey()) as { value: string } | undefined)?.value ?? 0))
   }
 
   private metaKey(key: string): string {
@@ -1066,9 +1030,6 @@ export class FactStore {
         const seq = nextSeq(card)
         const full = { ...f, seq, card, at: at() } as Fact<K>
         w.prepare('INSERT INTO card_facts (card, seq, kind, at, actor, source, ruleset, dedupe, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(card, seq, f.kind, full.at, f.actor, f.source, f.ruleset ?? null, f.dedupe ?? null, JSON.stringify(f.data))
-        // The project's provenance epoch (HI-2868): moved in the same transaction as every accepted submission or adoption,
-        // so an intent that decided on the provenance before it sees it moved in its own write.
-        if (f.kind === 'Submitted' || f.kind === 'Adopted') w.prepare("INSERT INTO board_meta (key, value) VALUES (?, '1') ON CONFLICT (key) DO UPDATE SET value = CAST(value AS INTEGER) + 1").run(this.epochKey())
         return full
       }
       const tx: Tx = {

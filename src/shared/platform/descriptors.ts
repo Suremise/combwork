@@ -75,8 +75,6 @@ export interface PlatformDescriptor {
    * without one, and a project using it whose repository is gone is offered a switch. None works in any folder.
    */
   repository: boolean
-  /** HI-3106: whether an empty target means the repository's default line (Git's default branch); None has no target to resolve. */
-  defaultTarget: boolean
   /** What the window can change in its repository (port 5's operations, HI-2788); None has none. */
   operations: readonly Operation[]
   /** A revision as shown: Git's 7 characters; None's content hash shortened the same way. */
@@ -109,17 +107,11 @@ const short = (id: string): string => id.slice(0, 7)
 
 export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Git answers everything: worktrees for isolation, merges for integration, replay for sameness.
-  git: { id: 'git', name: 'Git', capabilities: ['revisions', 'isolation', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'merge', deliverables: 'commits', finishes: ['combworkMerges', 'agentMerges', 'committed', 'notChecked'], defaultFinish: 'notChecked', repository: true, defaultTarget: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES }, // i18n-ignore: a product name, the same in every language
+  git: { id: 'git', name: 'Git', capabilities: ['revisions', 'isolation', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'merge', deliverables: 'commits', finishes: ['combworkMerges', 'agentMerges', 'committed', 'notChecked'], defaultFinish: 'notChecked', repository: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES }, // i18n-ignore: a product name, the same in every language
   // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
-  none: { id: 'none', name: 'None', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', finishes: ['accept'], defaultFinish: 'accept', repository: false, defaultTarget: false, operations: [], revisionShort: short } // i18n-ignore: a product name, the same in every language
+  none: { id: 'none', name: 'None', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', finishes: ['accept'], defaultFinish: 'accept', repository: false, operations: [], revisionShort: short } // i18n-ignore: a product name, the same in every language
 }
-
-/** Every platform id, in the descriptors' order (HI-3140: the audit and the registries read them from here). */
-export const PLATFORM_IDS = Object.keys(PLATFORMS) as PlatformId[]
-
-/** A platform's product name (HI-3140), or what was given when it names none Combwork has (a row from a later version). */
-export const platformName = (platform: string): string => (isPlatformId(platform) ? PLATFORMS[platform].name : platform)
 
 export const hasCapability = (platform: PlatformId, c: Capability): boolean => PLATFORMS[platform].capabilities.includes(c)
 

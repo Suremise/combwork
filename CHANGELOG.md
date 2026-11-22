@@ -11,13 +11,14 @@
 
 ### Removed
 
-- **jj (Jujutsu) support is removed: Combwork supports Git and None** (HI-3481). A project's Version Control tab and the workflow defaults offer None and Git only, and a folder with a `.jj` repository is reported as another version control, as a Mercurial one is.
+- **jj (Jujutsu) support is removed: Combwork supports Git and None** (HI-3481). A project's Version Control tab and the workflow defaults offer None and Git only, and a folder with a `.jj` repository is reported as another version control, as a Mercurial one is. A project that used jj opens as None, with *Jujutsu found*, and a warning that its project.json names a version control Combwork doesn't know.
 - **A Git repository inside a Jujutsu workspace is reported as Jujutsu found** (HI-3487). A `.jj` folder above the project counts as another version control, as a Mercurial checkout's always did, so such a project is offered None instead of being read as Git.
 
 ### Changed
 
 - **The Activity map looks and moves like part of the window** (HI-3479). The map's cells have depth and a warm glow in both themes. Calls travel curved spokes as glowing dots. A station lights up while a call runs there and fills with honey as it gets busier, and small green cells show the programs and subagents running there now. The context ring fills smoothly. Turning off Windows' animations, or the map's motion in Settings → Advanced, still keeps it still.
 - **The installer names the copy that's still running** (HI-3463). When the installer stops because a copy of Combwork, or of its version before 1.1, won't close, its message now says where that copy runs from and its process ID, or, when Windows won't show where it is (another account's copy, for example), says so with its process ID, and how to end it in Task Manager. A copy left running with no window can be closed without restarting the PC.
+
 ### Fixed
 
 - **The + to comment on a line shows without moving the mouse** (HI-3496). In a card's **Changes**, the **+** beside the line under the mouse showed only once the mouse moved: with the pointer already over the diff when it came up (another file chosen with the keyboard, the diff made again) or when its lines moved under the pointer, there was no **+** until you moved it. It now shows at once for the line under the pointer.

@@ -20,16 +20,15 @@ import type { GitFilesStatus } from '../../shared/types'
 
 /**
  * HI-3003: the slot pool's words for a workspace's failures that name the platform's tool or terms (Git's worktree,
- * branch, switch): a platform that words them its own way gives its messages in `says`, with the same values (`slot`,
- * `what`, `error`); the pool's own (Git's) are said otherwise.
+ * branch, switch), said with the values `slot`, `what` and `error`.
  */
 export type SlotWord = 'branchUnread' | 'filesUnread' | 'lineUnread' | 'switchFailed' | 'createFailed' | 'notListed' | 'removeFailed' | 'noTarget'
 
 /** The platforms a workspace port can be: a project's. */
-export type WorkspacePlatform = PlatformId
+type WorkspacePlatform = PlatformId
 
 /** One of the store's workspaces as the platform lists it: its folder (absolute) and the line it has checked out (null: none, detached). */
-export interface WorkspaceListing {
+interface WorkspaceListing {
   path: string
   line: string | null
   /** HI-3464: registered, but its platform would prune it (no workspace at its folder: one made by hand in its place). */
@@ -43,7 +42,7 @@ export interface WorkspaceCheckout {
 }
 
 /** A folder's line, head and a target line's head, read at once (Git: one rev-parse), each a value or unknown. */
-export interface WorkspaceHeads {
+interface WorkspaceHeads {
   line: Maybe<string | null>
   head: Maybe<string>
   target: Maybe<string | null>
@@ -223,7 +222,7 @@ export interface WorkspacePort {
   /** The line of a step's `err` that says what went wrong (Git: its fatal: or error: line, else the first), for a reason shown. */
   errorLine(err: string): string
 
-  /** Repair after a moved workspace or project (the relocation capability, §16.3.6's gate: relocation); absent where it isn't supported. */
+  /** Repair after a moved workspace or project (the relocation capability, §16.3.6); absent where it isn't supported. */
   relocate?: Relocation
 
 }

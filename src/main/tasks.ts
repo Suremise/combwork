@@ -2502,7 +2502,7 @@ function refuseOtherLaneTarget(wf: Workflow, n: number, target: string | null, d
 
 /**
  * HI-3129: where card `n`, waiting in On Hold or Todo, would start when that isn't the Merges into its dialog shows (its
- * own, else its lane's or the project's): a card put back whose work is kept on another branch or bookmark starts there
+ * own, else its lane's or the project's): a card put back whose work is kept on another branch starts there
  * (its platform's `startTarget`, the start's own rule). `unknown`: where its kept work is can't be read now, so its start
  * is refused until it can. Null: it starts where it shows. Reads only; the card's own Merges into is never changed by it.
  */
@@ -3261,12 +3261,12 @@ export async function noteOnCard(n: number, what: string | StoredText, ws: Works
  * `key`: the comment's id, at most once on the card. Or both (HI-2087): its English as agents read it (`text`, longer
  * than the window's), and the message the window shows (`shown`).
  */
-export async function commentAsCombwork(n: number, said: string | StoredText | { text: string; shown: StoredText }, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string, evenArchived = false): Promise<boolean> {
+export async function commentAsCombwork(n: number, said: string | StoredText | { text: string; shown: StoredText }, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string): Promise<boolean> {
   return boardLock(ws, async () => {
     const card = await getTask(n, ws)
     // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing. An archived card
-    // gets none unless `evenArchived` (HI-3367: a notice that replaces a question it lost).
-    if ((card.archived && !evenArchived) || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
+    // gets none.
+    if (card.archived || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
     // Agents' English beside the window's message (and, where it is worded apart, what it is said from: `agent`).
     if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.combwork, said.text, said.shown, key)
     else addComment(card, BY.combwork, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)

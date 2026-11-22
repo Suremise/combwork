@@ -59,7 +59,7 @@ export interface RunResult {
 }
 
 /** A command's bounds and inputs. Unset, each is the platform runner's own default (Git: git()'s). */
-export interface RunOptions {
+interface RunOptions {
   /** The output kept, in bytes: past it the command is ended and didn't run to an exit (`notRun`). */
   maxOutput?: number
   /** Written to its standard input. */

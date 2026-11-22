@@ -440,7 +440,7 @@ const AB_FAKE_WORK =
 async function abNoVcs(c) {
   const check = await c.inv('workflow:checkPlatform', c.alpha, 'none')
   if (check?.refused) throw new Error(`setup: the switch to None is refused: ${JSON.stringify(check.refused)}`)
-  await c.inv('workflow:setPlatform', c.alpha, 'none', { expected: 'git', token: check?.store?.token })
+  await c.inv('workflow:setPlatform', c.alpha, 'none', { expected: 'git' })
   require('fs').rmSync(require('path').join(c.alpha, '.git'), { recursive: true, force: true })
 }
 /** node --test in alpha: its output's pass and fail counts. */

@@ -33,18 +33,15 @@ export interface PlatformView {
   found?: (d: Detection) => PlatformFact | null
   /** This platform's repository is gone from a project's folder that uses it. */
   gone?: Msg
-  /** Whether the None · Git choice moves to it as a view, nothing switched (None, and Git's page with Initialise repository…). */
-  previewable: boolean
 }
 
 export const PLATFORM_VIEW: Record<PlatformId, PlatformView> = {
-  none: { switchTo: M.switchNone, other: M.other, previewable: true },
+  none: { switchTo: M.switchNone, other: M.other },
   git: {
     switchTo: M.switchGit,
     other: M.otherGit,
     found: (d) => (d.root ? { m: d.subfolder ? M.subfolder : M.repo, values: { root: d.root } } : null),
-    gone: M.gone,
-    previewable: true
+    gone: M.gone
   }
 }
 

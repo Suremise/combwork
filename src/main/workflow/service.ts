@@ -12,7 +12,7 @@
 import { PREFERENCE_DEFAULTS } from '../../shared/workflow/preferences'
 import { createLogger, userText } from '../logger'
 import { SIMPLIFY_GATE } from '../../shared/workflow/facts'
-import { basename, resolve as resolvePath } from 'path'
+import { resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
 import { FOCUSED_PICK_DEFAULT_S, FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
@@ -177,7 +177,7 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
   // Another lifetime's (closed, or another workspace in this window), or the project's platform changed: a new one.
   if (!inst || inst.life !== life || inst.wsPath !== wsPath || inst.resolved.options.platform !== resolved.options.platform) {
     const made: Omit<Instance, 'wf'> & { wf?: Workflow } = { life, wsPath, resolved, syncedAt: Date.now(), sync: Promise.resolve() }
-    made.wf = make(ws, project, life, wsPath, () => made.resolved.options, () => made.resolved.origins.finish === 'platform')
+    made.wf = make(ws, project, life, wsPath, () => made.resolved.options)
     inst = made as Instance
     byProject.set(key, inst)
   }
@@ -224,7 +224,7 @@ export async function optionsFor(ws: WorkspaceService, projectPath: string): Pro
   return wf ? (instances.get(ws)?.get(keyOf(wf.cfg.project))?.resolved ?? null) : null
 }
 
-function make(ws: WorkspaceService, project: { path: string; name: string }, life: AbortSignal, wsPath: string, options: () => WorkflowOptions, finishInherited: () => boolean): Workflow {
+function make(ws: WorkspaceService, project: { path: string; name: string }, life: AbortSignal, wsPath: string, options: () => WorkflowOptions): Workflow {
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === wsPath
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name, projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? null })
   return new Workflow({
@@ -232,12 +232,10 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // trailers written before, as the adoption's store keyed them).
     store,
     project: project.path,
-    projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? basename(project.path),
     get projectKey() {
       return store.projectKey()
     },
     options,
-    finishInherited,
     // HI-3284: the merge guards' limits for submit's early warning, as Settings → Advanced says.
     guardLimits: () => guardLimits(),
     // Slots (#1438, SPEC §16.10): the card's builder's slot, lent by slotCards.ts (none set: no slots).

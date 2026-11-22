@@ -175,7 +175,7 @@ const owners = new AsyncLocalStorage<readonly StoreOwner[]>()
 /** The stores this async context holds now, by key (its live owners'). */
 export const heldStoreKeys = (): Set<string> => new Set((owners.getStore() ?? []).filter((o) => o.live).flatMap((o) => [...o.keys]))
 
-/** A store's key, as every take compares them (platformFence's storeKey: separators one way, case folded). */
+/** A store's key, as every take compares them: separators one way, case folded. */
 export const storeKeyOf = (store: string): string => store.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase()
 
 /**
