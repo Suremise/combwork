@@ -189,6 +189,7 @@ import type { OperationPanelState, OperationRequest, OperationStepResult } from 
 import type { LockAsk, PruneAsk, RemotePrune, RepoHealth } from './gitHealth'
 import type { StashApplied, StashFile, StashList, StashRef, StashRequest } from './gitStashes'
 import type { BranchMoves, RestorePlan, RestoreRequest } from './gitMoves'
+import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from './gitFileRestore'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1170,6 +1171,12 @@ export interface CombworkRequests {
   'git:restorePlan': (projectPath: string, req: RestoreRequest) => RestorePlan
   /** HI-3469: Restore to here…: the branch moved back to that commit, only from the commit the user saw; the notice. */
   'git:restore': (projectPath: string, req: RestoreRequest) => string
+  /** HI-3477: the Files tab's Discard Changes… (source head) and Restore From… (the project's target, or a commit of the file's): what it would do, for its confirm. */
+  'files:gitRestorePlan': (projectPath: string, rel: string, source: RestoreSource, commit?: string | null) => FileRestorePlan
+  /** HI-3477: Restore From → A Commit…'s list: a page of the commits that changed the file, newest first. */
+  'files:gitFileCommits': (projectPath: string, rel: string, page?: number) => FileCommits
+  /** HI-3477: the Discard or Restore its confirm showed: the file's changes stashed first. Refused while anything works in the project folder. */
+  'files:gitRestore': (projectPath: string, req: FileRestoreRequest) => FileRestored
   /** The Changes tab's branch comparison (HI-1824, read-only): what can be compared, two branches, one file of them. */
   'git:compareLines': (projectPath: string) => CompareLines
   /** The Changes tab's leftover branches (HI-1823): every local branch, uncut, with its worktree and commits not in the target. */

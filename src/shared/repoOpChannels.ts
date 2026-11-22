@@ -54,7 +54,11 @@ export const REPO_OP_CHANNELS = {
   // HI-3474: Branches & remotes' Rename…, History's tag Delete and Push….
   'git:renameBranch': 'renameLine',
   'git:deleteTag': 'deleteTag',
-  'git:pushTag': 'pushTag'
+  'git:pushTag': 'pushTag',
+  // HI-3477: the Files tab's Discard Changes… and Restore From… (its reads too: offered only where the platform has it).
+  'files:gitRestorePlan': 'restoreFile',
+  'files:gitFileCommits': 'restoreFile',
+  'files:gitRestore': 'restoreFile'
 } as const satisfies Partial<Record<CombworkChannel, Operation>>
 
 export type RepoOpChannel = keyof typeof REPO_OP_CHANNELS

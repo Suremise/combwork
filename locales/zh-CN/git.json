@@ -522,7 +522,7 @@
   "git.stash.applyTitle": "{pop, select, yes {将储藏弹出到 {folder}？} other {将储藏应用到 {folder}？}}",
   "git.stash.binary": "二进制文件",
   "git.stash.close": "返回文件夹的更改",
-  "git.stash.combwork": "{why, select, merging {Combwork 在合并 {card} 之前搁置} catchUp {Combwork 在用 {card} 更新 {target} 之前搁置} starting {Combwork 在开始 {target} 上的工作之前搁置} other {Combwork 搁置：{text}}}",
+  "git.stash.combwork": "{why, select, merging {Combwork 在合并 {card} 之前搁置} catchUp {Combwork 在用 {card} 更新 {target} 之前搁置} starting {Combwork 在开始 {target} 上的工作之前搁置} discarding {Combwork 在放弃 {file} 的更改之前搁置} restoring {Combwork 在从 {from} 恢复 {file} 之前搁置} other {Combwork 搁置：{text}}}",
   "git.stash.conflicts": "{folder} 中有 {count, plural, other {# 个文件}}存在冲突",
   "git.stash.conflictsDetail": "储藏已保留。请解决 {files}（每个文件都显示了冲突标记），不再需要时再删除该储藏。",
   "git.stash.diffFailed": "无法显示储藏中该文件的更改：{error}",

@@ -4003,6 +4003,8 @@ export interface FileGitInfo {
   repo: boolean
   branch: string | null
   items: FileGitItem[]
+  /** HI-3477: the project's target branch (Restore From's), when it has one. */
+  target?: string | null
 }
 
 /** The file of a rule outside the Files tab's tree, for Why is this ignored?'s viewer: as git names it, its full path, its text, and the rule's line and pattern. */

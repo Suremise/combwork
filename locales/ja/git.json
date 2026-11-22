@@ -522,7 +522,7 @@
   "git.stash.applyTitle": "{pop, select, yes {スタッシュを{folder}にポップしますか？} other {スタッシュを{folder}に適用しますか？}}",
   "git.stash.binary": "バイナリファイル",
   "git.stash.close": "フォルダーの変更に戻る",
-  "git.stash.combwork": "{why, select, merging {{card}のマージ前にCombworkが退避} catchUp {{target}を{card}に合わせて更新する前にCombworkが退避} starting {{target}での作業開始前にCombworkが退避} other {Combworkが退避：{text}}}",
+  "git.stash.combwork": "{why, select, merging {{card}のマージ前にCombworkが退避} catchUp {{target}を{card}に合わせて更新する前にCombworkが退避} starting {{target}での作業開始前にCombworkが退避} discarding {{file}の変更を破棄する前にCombworkが退避} restoring {{file}を{from}から復元する前にCombworkが退避} other {Combworkが退避：{text}}}",
   "git.stash.conflicts": "{folder}で{count, plural, other {#個のファイル}}が競合しています",
   "git.stash.conflictsDetail": "スタッシュは残っています。{files}を解決し（それぞれに競合マーカーがあります）、不要になったらスタッシュを削除してください。",
   "git.stash.diffFailed": "スタッシュ内のファイルの変更を表示できませんでした：{error}",

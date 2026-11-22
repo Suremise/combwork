@@ -522,7 +522,7 @@
   "git.stash.applyTitle": "{pop, select, yes {¿Sacar (pop) el stash en {folder}?} other {¿Aplicar el stash en {folder}?}}",
   "git.stash.binary": "Archivo binario",
   "git.stash.close": "Volver a los cambios de la carpeta",
-  "git.stash.combwork": "{why, select, merging {Apartado por Combwork antes de fusionar {card}} catchUp {Apartado por Combwork antes de poner {target} al día con {card}} starting {Apartado por Combwork antes de empezar a trabajar en {target}} other {Apartado por Combwork: {text}}}",
+  "git.stash.combwork": "{why, select, merging {Apartado por Combwork antes de fusionar {card}} catchUp {Apartado por Combwork antes de poner {target} al día con {card}} starting {Apartado por Combwork antes de empezar a trabajar en {target}} discarding {Apartado por Combwork antes de descartar los cambios de {file}} restoring {Apartado por Combwork antes de restaurar {file} desde {from}} other {Apartado por Combwork: {text}}}",
   "git.stash.conflicts": "{count, plural, one {# archivo está} many {# archivos están} other {# archivos están}} en conflicto en {folder}",
   "git.stash.conflictsDetail": "El stash se conserva. Resuelve {files} (cada uno muestra sus marcas de conflicto) y elimina el stash cuando ya no lo necesites.",
   "git.stash.diffFailed": "No se pudieron mostrar los cambios del archivo en el stash: {error}",

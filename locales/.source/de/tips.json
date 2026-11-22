@@ -246,6 +246,8 @@
   "tips.editTemplates.title": "Edit a template in place",
   "tips.fileLinks.text": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",
   "tips.fileLinks.title": "Ctrl+click a path in the terminal",
+  "tips.fileRestore.text": "Right-click a changed file in the Files tab: Discard Changes… puts it back to the commit checked out, and Restore From takes its version on the target branch or in one of its commits. Both show the diff first, and keep its changes in a stash.",
+  "tips.fileRestore.title": "Undo a file's changes from the Files tab",
   "tips.filesGit.text": "Right-click a file or folder in the Files tab: Exclude from Git adds it to .gitignore (or only to this PC's .git/info/exclude), Stop Tracking takes a committed file out of git but leaves it on disk, and Why Is This Ignored? opens a dimmed file's rule.",
   "tips.filesGit.title": "Keep a file out of git from the Files tab",
   "tips.filesTab.text": "The Files tab browses and edits the project, previews Markdown, CSV, HTML and images, and keeps unsaved edits as you switch.",

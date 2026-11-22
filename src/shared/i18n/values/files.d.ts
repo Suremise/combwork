@@ -145,6 +145,32 @@ interface CombworkMessageValues {
   'files.open': undefined
   'files.openFailed': undefined
   'files.refresh': undefined
+  'files.restore.becomes': { commit: string | number }
+  'files.restore.binary': undefined
+  'files.restore.discard': undefined
+  'files.restore.discardButton': undefined
+  'files.restore.discardMessage': { commit: string | number }
+  'files.restore.discardTitle': { name: string | number }
+  'files.restore.discarded': { name: string | number }
+  'files.restore.discarding': undefined
+  'files.restore.failed': undefined
+  'files.restore.from': undefined
+  'files.restore.fromCommit': undefined
+  'files.restore.fromTarget': { target: string | number }
+  'files.restore.missingInCommit': { commit: string | number }
+  'files.restore.missingMessage': { commit: string | number }
+  'files.restore.missingTitle': { name: string | number; target: string | number }
+  'files.restore.noCommits': undefined
+  'files.restore.now': undefined
+  'files.restore.pickFirst': undefined
+  'files.restore.readFailed': { error: string | number }
+  'files.restore.restoreButton': undefined
+  'files.restore.restoreMessage': { source: string; target: string | number; commit: string | number; changed: string }
+  'files.restore.restoreTitle': { source: string; name: string | number; target: string | number }
+  'files.restore.restored': { name: string | number; commit: string | number }
+  'files.restore.restoring': undefined
+  'files.restore.same': undefined
+  'files.restore.stashedNote': undefined
   'files.reveal': undefined
   'files.revealInExplorer': undefined
   'files.root.place': { agent: string | number; place: string | number }

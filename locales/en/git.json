@@ -1624,8 +1624,8 @@
     "description": "HI-3472: the tooltip of the button above a stash file's diff that goes back to the folder's own changes."
   },
   "git.stash.combwork": {
-    "defaultMessage": "{why, select, merging {Set aside by Combwork before merging {card}} catchUp {Set aside by Combwork before bringing {target} up to date with {card}} starting {Set aside by Combwork before starting work on {target}} other {Set aside by Combwork {text}}}",
-    "description": "HI-3472: a stash's name in the list when Combwork's Set Aside made it (HI-2944: a paused merge's button). {card} is a card's key (HI-12), {target} a branch; other: {text} is Combwork's own English words after \"set aside\". Keep the select keys."
+    "defaultMessage": "{why, select, merging {Set aside by Combwork before merging {card}} catchUp {Set aside by Combwork before bringing {target} up to date with {card}} starting {Set aside by Combwork before starting work on {target}} discarding {Set aside by Combwork before discarding {file}} restoring {Set aside by Combwork before restoring {file} from {from}} other {Set aside by Combwork {text}}}",
+    "description": "HI-3472: a stash's name in the list when Combwork's Set Aside made it (HI-2944: a paused merge's button). {card} is a card's key (HI-12), {target} a branch; discarding and restoring (HI-3477: the Files tab's Discard Changes… and Restore From…): {file} is a file's path, {from} a short commit id; other: {text} is Combwork's own English words after \"set aside\". Keep the select keys."
   },
   "git.stash.conflicts": {
     "defaultMessage": "{count, plural, one {# file is} other {# files are}} in conflict in {folder}",

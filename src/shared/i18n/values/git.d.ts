@@ -407,7 +407,7 @@ interface CombworkMessageValues {
   'git.stash.applyTitle': { pop: string; folder: string | number }
   'git.stash.binary': undefined
   'git.stash.close': undefined
-  'git.stash.combwork': { why: string; card: string | number; target: string | number; text: string | number }
+  'git.stash.combwork': { why: string; card: string | number; target: string | number; file: string | number; from: string | number; text: string | number }
   'git.stash.conflicts': { count: number; folder: string | number }
   'git.stash.conflictsDetail': { files: string | number }
   'git.stash.diffFailed': { error: string | number }

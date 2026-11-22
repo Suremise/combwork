@@ -88,5 +88,18 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   // HI-3469: History's Moves and Restore to here… (the request checked by the port, gitMoves.ts).
   'git:moves': (p, branch, page) => opsAt('git:moves').moves(workspace.assertProject(p), typeof branch === 'string' && branch ? branch : null, Number(page) || 1),
   'git:restorePlan': (p, req) => opsAt('git:restorePlan').restorePlan(workspace.assertProject(p), req),
-  'git:restore': (p, req) => opsAt('git:restore').restore(workspace.assertProject(p), req)
+  'git:restore': (p, req) => opsAt('git:restore').restore(workspace.assertProject(p), req),
+  // HI-3477: the Files tab's Discard Changes… and Restore From…: refused here first, then the project folder's checks (fileRestorePanel.ts).
+  'files:gitRestorePlan': async (p, rel, source, commit) => {
+    const ops = opsAt('files:gitRestorePlan')
+    return (await import('./fileRestorePanel')).restorePlanAt(workspace, p, rel, source, commit, ops)
+  },
+  'files:gitFileCommits': async (p, rel, page) => {
+    const ops = opsAt('files:gitFileCommits')
+    return (await import('./fileRestorePanel')).fileCommitsAt(workspace, p, rel, page, ops)
+  },
+  'files:gitRestore': async (p, req) => {
+    const ops = opsAt('files:gitRestore')
+    return (await import('./fileRestorePanel')).restoreAt(workspace, p, req, ops)
+  }
 }

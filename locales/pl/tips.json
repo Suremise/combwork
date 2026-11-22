@@ -230,6 +230,8 @@
   "tips.editTemplates.title": "Edytuj szablon na miejscu",
   "tips.fileLinks.text": "Ścieżki plików wypisywane przez agenta, np. src/app.ts:42, są linkami: kliknij z Ctrl, żeby otworzyć plik w tym wierszu w zakładce Pliki.",
   "tips.fileLinks.title": "Ctrl+klik na ścieżce w terminalu",
+  "tips.fileRestore.text": "Kliknij prawym przyciskiem zmieniony plik w zakładce Pliki: Odrzuć zmiany… przywraca go do bieżącego commita, a Przywróć z bierze jego wersję z gałęzi docelowej lub z jednego z jego commitów. Obie najpierw pokazują diff i zachowują jego zmiany w stashu.",
+  "tips.fileRestore.title": "Cofnij zmiany w pliku w zakładce Pliki",
   "tips.filesGit.text": "Kliknij prawym przyciskiem plik lub folder w zakładce Pliki: Wyklucz z Gita dodaje go do .gitignore (albo tylko do .git/info/exclude tego komputera), Przestań śledzić usuwa zatwierdzony plik z Gita, ale zostawia go na dysku, a Dlaczego jest ignorowany? otwiera regułę wyszarzonego pliku.",
   "tips.filesGit.title": "Wyklucz plik z Gita w zakładce Pliki",
   "tips.filesTab.text": "Zakładka Pliki pozwala przeglądać i edytować projekt, pokazuje podgląd Markdown, CSV, HTML i obrazów, a niezapisane zmiany zachowuje przy przełączaniu.",

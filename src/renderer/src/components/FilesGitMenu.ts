@@ -5,12 +5,14 @@ import * as actions from '../actions'
 import { call } from '../api'
 import { offered, repoOp } from '../repoOps'
 import { bumpGit, confirm, notify, set, showVersionControl } from '../store'
+import { FILE_RESTORE_TEXT, restoreFile, restoreFromCommit } from './FileRestore'
 import type { MenuEntry } from './ui'
 
 /**
  * The Files tab's Git section (HI-2743): Exclude from git, Stop tracking, Include again, Why is this ignored? and Show
- * changes, on the project folder's files only (never an agent's slot). A short menu, not a git client: no discard, stage
- * or commit. Main does the git (`files:git*`), off main's thread.
+ * changes, on the project folder's files only (never an agent's slot); HI-3477's Discard Changes… and Restore From, of
+ * one file (FileRestore.tsx). A short menu, not a git client: no stage or commit. Main does the git (`files:git*`), off
+ * main's thread.
  */
 export const FILES_GIT_TEXT = {
   section: msg({ id: 'files.git.section', defaultMessage: 'Git', description: "Heading of the Git section of the Files tab's right-click menu (HI-2743). Usually kept as Git." }),
@@ -170,5 +172,17 @@ export function gitMenuEntries(ctx: GitMenuContext): MenuEntry[] {
   if (single?.rule) out.push({ label: tr(T.why), icon: 'question', onClick: () => why(ctx, single) })
   const st = single && !single.isDir ? ctx.status(single.rel) : undefined
   if (st && CHANGED.has(st)) out.push({ label: tr(T.showChanges), icon: 'diff', onClick: () => showChangesOf(project.path, single!.rel) })
+  // HI-3477: one tracked file. Discard for a file changed against the commit checked out; Restore From for any.
+  const file = single && !single.isDir && single.tracked ? single : null
+  if (file && offered('files:gitRestore')) {
+    const R = FILE_RESTORE_TEXT
+    if (st === 'M') out.push({ label: tr(R.discard), icon: 'discard', onClick: () => void restoreFile(project, file.rel, 'head', ctx.reload) })
+    const target = info.target && info.target !== info.branch ? info.target : null
+    const from: MenuEntry[] = [
+      ...(target ? [{ label: tr(R.fromTarget, { target }), icon: 'git-branch', onClick: () => void restoreFile(project, file.rel, 'target', ctx.reload) }] : []),
+      { label: tr(R.fromCommit), icon: 'git-commit', onClick: () => void restoreFromCommit(project, file.rel, st === 'M', ctx.reload) }
+    ]
+    out.push({ label: tr(R.restoreFrom), icon: 'history', more: true, onClick: () => ctx.openMenu(from) })
+  }
   return out.length ? [{ separator: true }, { header: true, label: tr(T.section) }, ...out] : []
 }

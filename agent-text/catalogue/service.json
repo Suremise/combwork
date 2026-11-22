@@ -1244,6 +1244,91 @@
     "note": "An error changing the address of the remote {remote} in the Git view; {why} is git's own words.",
     "audience": "both"
   },
+  "service.gitRestore.agentBusy": {
+    "text": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",
+    "note": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: an agent ({agent}) works in the folder ({folder}, a path).",
+    "audience": "both"
+  },
+  "service.gitRestore.busy": {
+    "text": "A run or an agent is working in {folder} ({what}): nothing was done. Try again once it has finished.",
+    "note": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: a run (a test, a build) or an agent's file lock is in the folder ({folder}, a path); {what} names the first one's folder or file.",
+    "audience": "both"
+  },
+  "service.gitRestore.conflicted": {
+    "text": "{file} is in conflict: nothing was done. Settle it first.",
+    "note": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: the file ({file}, a path) is in conflict.",
+    "audience": "both"
+  },
+  "service.gitRestore.failed": {
+    "text": "Git refused: {why}",
+    "note": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: git's own command failed; {why} is git's error line, in English.",
+    "audience": "both"
+  },
+  "service.gitRestore.invalid": {
+    "text": "That was asked for wrongly: nothing was done.",
+    "note": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: the request was malformed (not reached from the window).",
+    "audience": "both"
+  },
+  "service.gitRestore.missing": {
+    "text": "{file} isn't in {commit}: nothing was done.",
+    "note": "HI-3477: an error from the Files tab's Restore From…: the file ({file}, a path) isn't in the commit chosen or on the target ({commit}, a short commit id).",
+    "audience": "both"
+  },
+  "service.gitRestore.moved": {
+    "text": "The commit checked out changed meanwhile: nothing was done. Look again.",
+    "note": "HI-3477: an error from the Files tab's Discard Changes…: the folder's HEAD moved since the confirm showed the diff (a commit, a switch).",
+    "audience": "both"
+  },
+  "service.gitRestore.noCommit": {
+    "text": "That commit isn't in this repository: nothing was done.",
+    "note": "HI-3477: an error from the Files tab's Restore From → A Commit…: the commit chosen can't be found.",
+    "audience": "both"
+  },
+  "service.gitRestore.noTarget": {
+    "text": "The project's target isn't a branch here: nothing was done.",
+    "note": "HI-3477: an error from the Files tab's Restore From → Target Branch: the project's target branch isn't a branch in this repository.",
+    "audience": "both"
+  },
+  "service.gitRestore.notFile": {
+    "text": "{file} isn't a file in {commit} (a folder or a submodule there): nothing was done.",
+    "note": "HI-3477: an error from the Files tab's Restore From…: at the commit chosen or on the target ({commit}, a short commit id) the path ({file}) is a folder or a submodule, not a file, so it can't be restored as one.",
+    "audience": "both"
+  },
+  "service.gitRestore.notTracked": {
+    "text": "Git doesn't track {file}: nothing was done.",
+    "note": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: the file ({file}, a path) isn't one git tracks.",
+    "audience": "both"
+  },
+  "service.gitRestore.nothing": {
+    "text": "{file} has no uncommitted changes: nothing was done.",
+    "note": "HI-3477: an error from the Files tab's Discard Changes…: the file ({file}, a path) has nothing to discard (committed or discarded meanwhile).",
+    "audience": "both"
+  },
+  "service.gitRestore.operation": {
+    "text": "Git is in the middle of {what, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}: nothing was done. Finish it first (Version Control → Changes).",
+    "note": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: an operation is under way in the folder ({what}, git's word for it; {folder} a path); Changes' panel ends it.",
+    "audience": "both"
+  },
+  "service.gitRestore.request": {
+    "text": "That was asked for wrongly: nothing was done.",
+    "note": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: the request was malformed (not reached from the window).",
+    "audience": "both"
+  },
+  "service.gitRestore.session": {
+    "text": "{agent}'s session is in {folder}: nothing was done. Stop it first.",
+    "note": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: an agent's session ({agent}, its name) runs in the project folder ({folder}, a path), so Combwork doesn't change its files.",
+    "audience": "both"
+  },
+  "service.gitRestore.stashedFailed": {
+    "text": "Git refused: {why}. The file's changes are kept in Version Control → Changes → Stashes.",
+    "note": "HI-3477: an error from the Files tab's Restore From…: the file's changes were stashed, then git's restore failed; {why} is git's error line, in English. Apply in the Stashes list brings them back.",
+    "audience": "both"
+  },
+  "service.gitRestore.timedOut": {
+    "text": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at {file} and Version Control → Changes → Stashes before you try again.",
+    "note": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: git ran past Settings → Advanced's longest commit or set aside time ({seconds}) and was ended; {file} is a path.",
+    "audience": "both"
+  },
   "service.gitStash.agentBusy": {
     "text": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",
     "note": "HI-3472: an error from Stashes' Apply or Pop: an agent ({agent}) works in the folder ({folder}, a path).",

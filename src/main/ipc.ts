@@ -1428,7 +1428,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'files:watch': (p) => files.watchProject(p),
     'files:setUnsaved': (paths) => quitControl.setUnsaved(win(), Array.isArray(paths) ? paths.filter((p) => typeof p === 'string') : []),
     'files:unwatch': (p) => files.unwatchProject(p),
-    'files:gitInfo': (p, items) => filesGit.gitInfo(p, items),
+    // HI-3477: with the project's target, for Restore From → Target Branch.
+    'files:gitInfo': async (p, items) => {
+      const info = await filesGit.gitInfo(p, items)
+      return info.repo ? { ...info, target: await lineRepoReads().workTarget(workspace.assertProject(p)).catch(() => null) } : info
+    },
     'files:gitRuleText': (p, items) => filesGit.ignoreRuleText(p, items),
 
     'attachments:list': (p) => files.listAttachments(p),

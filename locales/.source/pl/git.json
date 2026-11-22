@@ -405,7 +405,7 @@
   "git.stash.applyTitle": "{pop, select, yes {Pop the stash into {folder}?} other {Apply the stash to {folder}?}}",
   "git.stash.binary": "Binary file",
   "git.stash.close": "Back to the folder's changes",
-  "git.stash.combwork": "{why, select, merging {Set aside by Combwork before merging {card}} catchUp {Set aside by Combwork before bringing {target} up to date with {card}} starting {Set aside by Combwork before starting work on {target}} other {Set aside by Combwork {text}}}",
+  "git.stash.combwork": "{why, select, merging {Set aside by Combwork before merging {card}} catchUp {Set aside by Combwork before bringing {target} up to date with {card}} starting {Set aside by Combwork before starting work on {target}} discarding {Set aside by Combwork before discarding {file}} restoring {Set aside by Combwork before restoring {file} from {from}} other {Set aside by Combwork {text}}}",
   "git.stash.conflicts": "{count, plural, one {# file is} other {# files are}} in conflict in {folder}",
   "git.stash.conflictsDetail": "The stash is kept. Settle {files} (each shows its conflict markers), then drop the stash when you no longer need it.",
   "git.stash.diffFailed": "Couldn't show the file's changes in the stash: {error}",

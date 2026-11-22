@@ -16836,3 +16836,48 @@ button.progress-lane-retry {
 .ignore-rule-at { margin-bottom: 8px; font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
 .ignore-rule-file { height: min(50vh, 420px); border: 1px solid var(--border); }
 .ignore-rule-file .monaco { height: 100%; }
+/* HI-3477: the Files tab's Discard Changes… and Restore From…: the confirm's diff, and A Commit…'s list. */
+.file-restore-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.file-restore-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-size: 12px;
+}
+.file-restore-editor {
+  height: 340px;
+  display: flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.file-restore-editor > .monaco,
+.file-restore-editor > .empty-state {
+  flex: 1;
+  min-width: 0;
+}
+.file-restore-commits {
+  max-height: 220px;
+  overflow-y: auto;
+}
+.file-restore-commits > .git-row {
+  width: 100%;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.file-restore-commits > .git-row + .git-row {
+  border-top: 1px solid var(--border-subtle);
+}
+.file-restore-commits > .git-row:hover {
+  background: var(--bg-hover);
+}
+.file-restore-commits > .git-row.current {
+  background: var(--accent-soft);
+}
