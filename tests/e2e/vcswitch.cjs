@@ -290,7 +290,9 @@ function writeProject(dir, cfg) {
     lib.gitProject(eps, { 'e.txt': 'e\n', '.gitignore': '.combwork/\n' })
     fs.mkdirSync(path.join(eps, '.jj', 'repo'), { recursive: true })
     writeProject(eps, { platform: 'jj', platformFound: 'jj', workflow: { platform: 'jj', preset: 'pair', options: { finish: 'userIntegrates', folder: 'slots' } } })
+    // Added as another project, not worked on: made active, as the user would, to be read whole (its platform with it).
     await inv('workspace:refresh')
+    await inv('project:setActive', eps, true)
     const epsJson = () => JSON.parse(fs.readFileSync(path.join(eps, '.combwork', 'project.json'), 'utf8'))
     const epsToast = page.locator('.toast', { hasText: 'Unknown version control setting in eps' })
     const useNone = epsToast.getByRole('button', { name: 'Use None' })
