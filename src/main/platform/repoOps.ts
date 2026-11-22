@@ -21,6 +21,7 @@ import type { OperationRequest, OperationStepResult } from '../../shared/gitOper
 import type { RemotePrune, RepoHealth } from '../../shared/gitHealth'
 import type { StashApplied, StashFile, StashRef, StashRequest, StashRow } from '../../shared/gitStashes'
 import type { GitDiff } from '../../shared/types'
+import type { BranchMoves, RestorePlan } from '../../shared/gitMoves'
 import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from '../../shared/gitFileRestore'
 
 /**
@@ -52,7 +53,11 @@ export interface OpMembers {
   operationSteps: 'operationStep'
   repoHealth: 'health' | 'pruneWorktrees' | 'removeLocks' | 'remotePrunePreview' | 'fetchPrune'
   stashes: 'stashes' | 'stashFiles' | 'stashDiff' | 'applyStash' | 'dropStash'
-  restoreFile: 'restorePlan' | 'fileCommits' | 'restoreFile'
+  branchMoves: 'moves' | 'restorePlan' | 'restore'
+  renameLine: 'renameLine'
+  deleteTag: 'deleteTag'
+  pushTag: 'pushTag'
+  restoreFile: 'fileRestorePlan' | 'fileCommits' | 'restoreFile'
 }
 
 /** The port as handed out for one operation: its own members only. */
@@ -92,8 +97,14 @@ export interface RepoOps {
   push(projectPath: string, remote?: string): Promise<string>
   pushTo(projectPath: string, remote: string, scope: PushScope, line?: string): Promise<string>
   setUpstream(projectPath: string, line: string, remote: string | null, remoteLine: string, pushFirst: boolean): Promise<string>
+  /** HI-3474: a line renamed at the commit shown; with `onRemote`, the remote line it tracks too. */
+  renameLine(projectPath: string, line: BranchAt, to: string, onRemote: boolean): Promise<string>
   // Tags, identity, initialising.
   createTag(projectPath: string, name: string, message: string, pushTo?: string): Promise<string>
+  /** HI-3474: a tag deleted as shown (`sha`, its ref's whole value); with `remote`, there first. */
+  deleteTag(projectPath: string, tag: BranchAt, remote: string | null): Promise<string>
+  /** HI-3474: a tag pushed to a remote, never forced. */
+  pushTag(projectPath: string, name: string, remote: string): Promise<string>
   setIdentity(projectPath: string, name: string, email: string): Promise<string>
   /** Initialise repository's dialog: what initialising would find (a read, for the operation it asks about). */
   initCheck(projectPath: string): Promise<GitInitCheck>
@@ -146,9 +157,19 @@ export interface RepoOps {
   applyStash(projectPath: string, folder: string, req: StashRequest, guard?: () => Promise<void> | void): Promise<StashApplied>
   /** The row of the list dropped (HI-3527: that row, never another holding its commit), under the repository lock. */
   dropStash(projectPath: string, ref: StashRef): Promise<void>
+  // HI-3469: History's Moves (a local branch's reflog) and Restore to here…, the user's click at a time.
+  /** A page of a local branch's moves, newest first (null: the project folder's branch, else the target's). */
+  moves(projectPath: string, branch: string | null, page: number): Promise<BranchMoves>
+  /** What restoring the branch to a commit would do now (the request as sent, checked), and why it can't be done (blocked). */
+  restorePlan(projectPath: string, req: unknown): Promise<RestorePlan>
+  /**
+   * The branch moved from `from` (as the user saw it) to `to`: in the project folder by `git reset --keep`, checked out
+   * nowhere by a compare-and-swap, under its merge slot, the repository lock and the folder's fence; the notice.
+   */
+  restore(projectPath: string, req: unknown): Promise<string>
   // HI-3477: the Files tab's Discard Changes… and Restore From…, of one tracked file in the project folder.
   /** What it would do: the commit its version comes from (`target`: the project's target, by name), the file on disk against it. */
-  restorePlan(projectPath: string, rel: unknown, source: RestoreSource, target: string | null, commit: string | null): Promise<FileRestorePlan>
+  fileRestorePlan(projectPath: string, rel: unknown, source: RestoreSource, target: string | null, commit: string | null): Promise<FileRestorePlan>
   /** A page of the commits that changed the file on the folder's branch, newest first. */
   fileCommits(projectPath: string, rel: unknown, page: unknown): Promise<FileCommits>
   /**

@@ -47,6 +47,14 @@ export const REPO_OP_CHANNELS = {
   'git:stashDiff': 'stashes',
   'git:applyStash': 'stashes',
   'git:dropStash': 'stashes',
+  // HI-3469: History's Moves (its reads too: offered only where the platform has it).
+  'git:moves': 'branchMoves',
+  'git:restorePlan': 'branchMoves',
+  'git:restore': 'branchMoves',
+  // HI-3474: Branches & remotes' Rename…, History's tag Delete and Push….
+  'git:renameBranch': 'renameLine',
+  'git:deleteTag': 'deleteTag',
+  'git:pushTag': 'pushTag',
   // HI-3477: the Files tab's Discard Changes… and Restore From… (its reads too: offered only where the platform has it).
   'files:gitRestorePlan': 'restoreFile',
   'files:gitFileCommits': 'restoreFile',

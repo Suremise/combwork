@@ -587,7 +587,7 @@ export async function repoHistory(root: string, opts: { ref?: string | null; pag
   const page = Math.min(pages, Math.max(1, Math.floor(Number(opts.page) || 1)))
   const [log_, tags] = await Promise.all([
     git(root, ['log', '-n', String(HISTORY_COMMITS), '--skip', String((page - 1) * HISTORY_COMMITS), '--format=%H%x00%h%x00%an%x00%ae%x00%at%x00%D%x00%s%x1e', spec, '--']),
-    git(root, ['for-each-ref', '--sort=-creatordate', '--format=%(refname)%00%(objecttype)%00%(*objectname:short)%00%(objectname:short)%00%(creatordate:unix)%00%(contents:subject)%00%(*subject)', 'refs/tags'])
+    git(root, ['for-each-ref', '--sort=-creatordate', '--format=%(refname)%00%(objecttype)%00%(*objectname:short)%00%(objectname:short)%00%(creatordate:unix)%00%(objectname)%00%(contents:subject)%00%(*subject)', 'refs/tags'])
   ])
   if (!log_.ok) throw commandFailed('git log', log_) // i18n-ignore: a git command, as it is
   if (!tags.ok) throw commandFailed('git for-each-ref', tags) // i18n-ignore: a git command, as it is
@@ -604,10 +604,10 @@ export async function repoHistory(root: string, opts: { ref?: string | null; pag
     // Named whole and cut (HI-2429): git shortens a tag to `tags/<name>` when a branch has its name.
     .map((l) => l.split('\0'))
     .map((f) => [branchOfRef(f[0], 'refs/tags/') ?? '', ...f.slice(1)])
-    .filter((f) => f.length >= 7 && f[0])
+    .filter((f) => f.length >= 8 && f[0])
     .map((f) => {
       const annotated = f[1] === 'tag'
-      return { name: f[0], commit: annotated ? f[2] : f[3], date: Number(f[4]) * 1000, subject: (annotated ? f[5] : f[5] || f[6]) ?? '', annotated }
+      return { name: f[0], commit: annotated ? f[2] : f[3], date: Number(f[4]) * 1000, subject: (annotated ? f[6] : f[6] || f[7]) ?? '', annotated, sha: f[5] }
     })
   const byName = (a: string, b: string): number => a.localeCompare(b, 'en')
   return { commits, tags: all.slice(0, HISTORY_TAGS), moreTags: Math.max(0, all.length - HISTORY_TAGS), ref, defaultRef, target, branches: branches.sort(byName), remoteBranches: remoteBranches.sort(byName), page, pages, total }
@@ -1254,6 +1254,159 @@ export async function createTag(projectPath: string, name: string, message: stri
   })
 }
 
+// ---------------------------------------------------------------------------
+// A branch renamed, a tag deleted or pushed (HI-3474)
+// ---------------------------------------------------------------------------
+
+const R = {
+  same: msg({ id: 'service.gitRepo.branchSameName', defaultMessage: '{branch} keeps its name.', description: 'HI-3474: after Rename… on a branch in Version Control → Branches & remotes, when it was given its own name.' }),
+  moved: msg({ id: 'service.gitRepo.renameMoved', defaultMessage: '{branch} has moved since you were shown it: nothing was renamed. Look at it again.', description: 'HI-3474: an error renaming the branch {branch}: it points at another commit than the one the window showed.' }),
+  inUse: msg({ id: 'service.gitRepo.renameInUse', defaultMessage: "{why, select, target {{branch} is the branch work merges into: it keeps its name.} default {{branch} is the default branch: it keeps its name.} worktree {{branch} is checked out in a worktree or slot: it keeps its name.} other {An open card works on {branch}: it keeps its name.}}", description: "HI-3474: why the branch {branch} can't be renamed: it is the project's target, the default branch, checked out in a worktree or slot, or an open card's branch. Keep the select keys." }),
+  agentHere: msg({ id: 'service.gitRepo.renameAgentHere', defaultMessage: '{agent} is working in the project folder, on {branch}: rename it once it has finished.', description: "HI-3474: an error renaming the branch {branch} checked out in the project folder: the agent {agent} is working there now." }),
+  failed: msg({ id: 'service.gitRepo.renameFailed', defaultMessage: "Couldn't rename {branch}: {why}", description: "HI-3474: an error renaming the branch {branch}; {why} is git's own words." }),
+  renamed: msg({ id: 'service.gitRepo.branchRenamed', defaultMessage: '{tracks, select, yes {Renamed {from} to {to}. It still tracks {upstream}.} other {Renamed {from} to {to}.}}', description: 'HI-3474: after renaming the branch {from} to {to} here only. When {tracks} is yes it still follows the remote branch {upstream} by its old name.' }),
+  noUpstream: msg({ id: 'service.gitRepo.renameNoUpstream', defaultMessage: "{branch} doesn't track a branch on a remote: there's nothing to rename there. Nothing was renamed.", description: 'HI-3474: an error renaming the branch {branch} with Also rename on the remote: it tracks no remote branch.' }),
+  upstreamKept: msg({ id: 'service.gitRepo.renameUpstreamKept', defaultMessage: "{upstream} is the remote's default branch, the branch work merges into or the default branch: Combwork won't delete it there, so nothing was renamed.", description: "HI-3474: an error renaming a branch with Also rename on the remote: the remote branch it tracks ({upstream}, such as origin/main) is one Combwork never deletes." }),
+  remoteTaken: msg({ id: 'service.gitRepo.renameRemoteTaken', defaultMessage: '{remote} already has a branch {to} (as of the last fetch): nothing was renamed.', description: 'HI-3474: an error renaming a branch to {to} with Also rename on the remote: the remote {remote} has a branch of that name.' }),
+  pushFailed: msg({ id: 'service.gitRepo.renamePushFailed', defaultMessage: "Renamed {from} to {to} here, but couldn't push {to} to {remote}: {why} It still tracks {upstream}.", description: "HI-3474: an error after renaming the branch {from} to {to} locally: pushing it to the remote {remote} failed or was refused ({why}, git's words or why), so it still follows {upstream}." }),
+  oldKept: msg({ id: 'service.gitRepo.renameOldKept', defaultMessage: "Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but {remote} refused to delete {old}: it has commits there you haven't fetched, or it doesn't allow deleting branches. Look at it before you delete it.", description: "HI-3474: an error after renaming a branch here and on a remote: the remote {remote} refused to delete the old branch {old} (Combwork deletes it only at the commit last fetched)." }),
+  stopped: msg({ id: 'service.gitRepo.renameStopped', defaultMessage: '{step, select, push {Renamed {from} to {to} here, but the push of {to} to {remote} was stopped: it may have reached {remote}. {to} still tracks {upstream}.} other {Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but deleting {old} there was stopped: it may still be there.}} Refresh to see where things stand.', description: 'HI-3474 (round 1): after the user cancelled renaming a branch on its remote too, once {from} was renamed {to} here: during the push of the new name to the remote {remote} (it still follows {upstream}), or during the deletion of the old name {old} there. Keep the select keys.' }),
+  trackFailed: msg({ id: 'service.gitRepo.renameTrackFailed', defaultMessage: "Renamed {from} to {to} and pushed it to {remote}, but couldn't make it track {remote}/{to}: {why} It still tracks {upstream}, and {old} is still on {remote}.", description: "HI-3474 (round 1): an error renaming a branch here and on a remote: {from} was renamed {to} and pushed to the remote {remote}, but setting it to follow its new name there failed ({why}, git's words); it still follows {upstream}, and the old name {old} wasn't deleted there." }),
+  renamedBoth: msg({ id: 'service.gitRepo.branchRenamedBoth', defaultMessage: 'Renamed {from} to {to}, here and on {remote}.', description: 'HI-3474: after renaming the branch {from} to {to} in the repository and on the remote {remote} (pushed by its new name, the old one deleted there).' }),
+  noTag: msg({ id: 'service.gitRepo.noTag', defaultMessage: "There's no tag {name}.", description: 'HI-3474: an error deleting or pushing a tag in Version Control → History: the repository has no tag called {name}.' }),
+  tagMoved: msg({ id: 'service.gitRepo.tagMoved', defaultMessage: 'The tag {name} has changed since you were shown it: nothing was deleted. Look at it again.', description: 'HI-3474: an error deleting the tag {name}: it points at something else than the window showed.' }),
+  tagRemoteRefused: msg({ id: 'service.gitRepo.tagRemoteRefused', defaultMessage: "{remote} refused to delete the tag {name}: its tag {name} isn't this one, or it has none, or it doesn't allow deleting tags. Nothing was deleted here either.", description: 'HI-3474: an error deleting the tag {name} here and on the remote {remote}: the remote refused (its tag differs or is missing, or it forbids deletions), so the local tag was kept too.' }),
+  tagRemoteFailed: msg({ id: 'service.gitRepo.tagRemoteFailed', defaultMessage: "Couldn't delete the tag {name} on {remote}: {why} Nothing was deleted here either.", description: "HI-3474: an error deleting the tag {name} on the remote {remote}; {why} is git's own words. The local tag was kept." }),
+  tagDeleteFailed: msg({ id: 'service.gitRepo.tagDeleteFailed', defaultMessage: "Couldn't delete the tag {name}: {why}", description: "HI-3474: an error deleting the tag {name}; {why} is git's own words." }),
+  tagDeleted: msg({ id: 'service.gitRepo.tagDeleted', defaultMessage: '{onRemote, select, yes {Deleted the tag {name}, here and on {remote}.} other {Deleted the tag {name}.}}', description: 'HI-3474: after deleting the tag {name} in Version Control → History; when {onRemote} is yes, on the remote {remote} too.' }),
+  tagPushed: msg({ id: 'service.gitRepo.tagPushed', defaultMessage: '{result, select, upToDate {{remote} already has the tag {name}.} other {Pushed the tag {name} to {remote}.}}', description: 'HI-3474: after Push… on a tag in Version Control → History: the tag {name} went to the remote {remote}, or it was there already.' }),
+  tagPushRefused: msg({ id: 'service.gitRepo.tagPushRefused', defaultMessage: '{remote} has another tag {name}, so the push was refused (Combwork never forces a push).', description: 'HI-3474: an error pushing the tag {name}: the remote {remote} has a tag of that name pointing elsewhere.' }),
+  tagPushFailed: msg({ id: 'service.gitRepo.tagPushOnlyFailed', defaultMessage: "Couldn't push the tag {name} to {remote}: {why}", description: "HI-3474: an error pushing the tag {name} to the remote {remote}; {why} is git's own words." })
+}
+
+/**
+ * HI-3474: renames a local branch (`git branch -m`), only at the commit the user was shown and never one in use (the
+ * project's target, the default branch, a worktree's or slot's, an open card's line: `branchUseNow`); the project
+ * folder's own may be, while no agent works there. Under the repository's lock and the branch's merge slot (refused while
+ * a merge into it holds or waits for it). With `onRemote`, the remote branch it tracks is renamed too: the new name pushed
+ * (never forced), the branch set to track it, then the old name deleted there only at the commit last fetched (a lease);
+ * refused before anything when it tracks nothing, its remote branch is one never deleted (`remoteKept`), or the remote
+ * has the new name already. A later step failing says what was done.
+ */
+export async function renameBranch(projectPath: string, branch: BranchAt, to: string, onRemote = false): Promise<string> {
+  projectPath = workspace.assertProject(projectPath)
+  const from = String(branch?.name ?? '')
+  const sha = String(branch?.sha ?? '')
+  to = String(to ?? '').trim()
+  return oneAtATime(projectPath, () =>
+    guarded(projectPath, async () => {
+      await summaryOf(projectPath)
+      if (!(await branchNameOk(projectPath, from))) throw refusal(M.noBranch, { branch: from })
+      const head = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/heads/${from}^{commit}`])
+      if (!head.ok) throw refusal(M.noBranch, { branch: from })
+      if (head.out.trim() !== sha) throw refusal(R.moved, { branch: from })
+      if (to === from) return tr(R.same, { branch: from })
+      const problem = await branchNameProblem(projectPath, to)
+      if (problem) throw problem
+      const now = await branchUseNow(projectPath, from)
+      if (now.why && now.why !== 'current') throw refusal(R.inUse, { why: now.why, branch: from })
+      // An open card's line is kept whatever folder has it checked out (HR1's round 1): `localUse` says the folder's own first.
+      if (now.why === 'current' && cardLines(projectPath).has(from)) throw refusal(R.inUse, { why: 'card', branch: from }) // i18n-ignore: a select's key, never shown
+      if (now.why === 'current') {
+        const busy = (await folderAgents(projectPath)).find((a) => a.status && FOLDER_BUSY.has(a.status))
+        if (busy) throw refusal(R.agentHere, { agent: busy.name, branch: from })
+      }
+      // What it tracks, by whole refs: the remote, its branch there, and the remote-tracking branch that mirrors it.
+      const up = await git(projectPath, ['for-each-ref', '--format=%(upstream)%00%(upstream:remotename)%00%(upstream:remoteref)', `refs/heads/${from}`])
+      if (!up.ok) throw commandFailed('git for-each-ref', up) // i18n-ignore: a git command, as it is
+      const [tracking = '', remote = '', remoteRef = ''] = up.out.trim().split('\0')
+      const upstream = tracking ? upstreamName(tracking) : ''
+      const old = remoteRef.startsWith('refs/heads/') ? remoteRef.slice('refs/heads/'.length) : ''
+      let lease = ''
+      if (onRemote) {
+        if (!remote || remote === '.' || !old || !tracking.startsWith('refs/remotes/')) throw refusal(R.noUpstream, { branch: from })
+        const remoteHead = await git(projectPath, ['symbolic-ref', '-q', `refs/remotes/${remote}/HEAD`])
+        if (remoteKept({ branch: old, remoteHead: remoteHead.ok && remoteHead.out.trim() === tracking }, now)) throw refusal(R.upstreamKept, { upstream })
+        const at = await git(projectPath, ['rev-parse', '--verify', '-q', `${tracking}^{commit}`])
+        if (!at.ok) throw refusal(M.notOnRemote, { remote, branch: old })
+        lease = at.out.trim()
+        if ((await git(projectPath, ['show-ref', '--verify', '-q', `refs/remotes/${remote}/${to}`])).ok) throw refusal(R.remoteTaken, { remote, to })
+      }
+      const r = await mergeSlots.asUser(projectPath, from, () => git(projectPath, ['branch', '-m', from, to]))
+      if (!r.ok) throw failed(R.failed, { branch: from }, r)
+      log.info(`Renamed branch ${userText(from)} to ${userText(to)} in ${userText(projectPath)}`)
+      void checkProject(projectPath)
+      if (!onRemote) return tr(R.renamed, { from, to, tracks: upstream ? 'yes' : 'no', upstream })
+      const p = await net(projectPath, ['push', '--porcelain', '--', remote, `refs/heads/${to}:refs/heads/${to}`])
+      // Stopped or failed from here on, what was done is said (HR1's round 1): the rename here stays.
+      if (p.cancelled) throw refusal(R.stopped, { step: 'push', from, to, remote, upstream, old })
+      if (!p.ok || parsePushPorcelain(p.out).some((x) => x.result === 'refused')) throw refusal(R.pushFailed, { from, to, remote, upstream, why: gitSaid(p) })
+      // Tracks its new name there: set as git would (`--set-upstream-to` needs the remote-tracking branch, which a remote
+      // fetched by other settings may not have).
+      const set = await git(projectPath, ['config', `branch.${to}.merge`, `refs/heads/${to}`])
+      if (!set.ok) throw failed(R.trackFailed, { from, to, remote, upstream, old }, set)
+      const deleteStopped = (): CombworkError => refusal(R.stopped, { step: 'delete', from, to, remote, upstream, old })
+      if (gitRunSignal()?.aborted) throw deleteStopped()
+      const d = await net(projectPath, ['push', '--porcelain', `--force-with-lease=refs/heads/${old}:${lease}`, '--', remote, `:refs/heads/${old}`])
+      if (d.cancelled) throw deleteStopped()
+      const gone = parsePushPorcelain(d.out).some((x) => x.kind === 'branch' && x.name === old && x.result === 'pushed')
+      if (!gone) throw refusal(R.oldKept, { from, to, remote, old })
+      log.info(`Renamed ${userText(remote)}'s ${userText(old)} to ${userText(to)} for ${userText(projectPath)}`)
+      return tr(R.renamedBoth, { from, to, remote })
+    })
+  )
+}
+
+/**
+ * HI-3474: deletes a tag, only as the user was shown it (`sha`, the tag's own object: an annotated tag's, else its
+ * commit), by its whole ref (`update-ref -d refs/tags/<name> <sha>`, so a branch of the same name is never touched). With
+ * `remote`, deleted there first, only where it is that same tag (a lease): refused there, the local tag stays too.
+ */
+export async function deleteTag(projectPath: string, tag: BranchAt, remote?: string | null): Promise<string> {
+  projectPath = workspace.assertProject(projectPath)
+  const name = String(tag?.name ?? '')
+  const sha = String(tag?.sha ?? '')
+  return oneAtATime(projectPath, async () => {
+    const s = await summaryOf(projectPath)
+    if (!name || name.startsWith('-') || !(await refFormatOk(projectPath, [`refs/tags/${name}`]))) throw refusal(M.badName, { kind: 'tag', hasName: name ? 'yes' : 'no', name })
+    const at = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/tags/${name}`])
+    if (!at.ok) throw refusal(R.noTag, { name })
+    if (at.out.trim() !== sha) throw refusal(R.tagMoved, { name })
+    if (remote) {
+      if (!s.remotes.includes(remote)) throw refusal(M.noRemote, { remote })
+      const p = await net(projectPath, ['push', '--porcelain', `--force-with-lease=refs/tags/${name}:${sha}`, '--', remote, `:refs/tags/${name}`])
+      if (p.cancelled) throw stopped('tag')
+      const got = parsePushPorcelain(p.out).find((x) => x.kind === 'tag' && x.name === name)
+      if (got?.result === 'refused') throw refusal(R.tagRemoteRefused, { remote, name })
+      if (!p.ok || got?.result !== 'pushed') throw failed(R.tagRemoteFailed, { remote, name }, p)
+      log.info(`Deleted the tag ${userText(name)} on ${userText(remote)} for ${userText(projectPath)}`)
+    }
+    const r = await git(projectPath, ['update-ref', '-d', `refs/tags/${name}`, sha])
+    if (!r.ok) throw failed(R.tagDeleteFailed, { name }, r)
+    log.info(`Deleted the tag ${userText(name)} of ${userText(projectPath)}`)
+    return tr(R.tagDeleted, { name, onRemote: remote ? 'yes' : 'no', remote: remote ?? '' })
+  })
+}
+
+/** HI-3474: pushes a tag to a remote by its whole ref, never forced: a remote with another tag of that name refuses. */
+export async function pushTag(projectPath: string, name: string, remote: string): Promise<string> {
+  projectPath = workspace.assertProject(projectPath)
+  name = String(name ?? '')
+  remote = String(remote ?? '')
+  return oneAtATime(projectPath, async () => {
+    const s = await summaryOf(projectPath)
+    if (!s.remotes.includes(remote)) throw refusal(M.noRemote, { remote })
+    if (!name || name.startsWith('-') || !(await git(projectPath, ['show-ref', '--verify', '-q', `refs/tags/${name}`])).ok) throw refusal(R.noTag, { name })
+    const p = await net(projectPath, ['push', '--porcelain', '--', remote, `refs/tags/${name}:refs/tags/${name}`])
+    if (p.cancelled) throw stopped('tag')
+    const got = parsePushPorcelain(p.out).find((x) => x.kind === 'tag' && x.name === name)
+    if (got?.result === 'refused') throw refusal(R.tagPushRefused, { remote, name })
+    if (!p.ok || !got) throw failed(R.tagPushFailed, { remote, name }, p)
+    log.info(`Pushed the tag ${userText(name)} of ${userText(projectPath)} to ${userText(remote)}`)
+    return tr(R.tagPushed, { name, remote, result: got.result === 'upToDate' ? 'upToDate' : 'pushed' })
+  })
+}
+
 /** Sets this repository's own commit name and email (`git config --local`); an empty one is removed, so the global one applies. */
 export async function setIdentity(projectPath: string, name: string, email: string): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
@@ -1537,7 +1690,7 @@ export async function busyAgentIn(projectPath: string, folder: string): Promise<
 }
 
 /** Where a branch is checked out: the project folder, another worktree (a slot's, or not), or nowhere (null). */
-async function branchFolder(projectPath: string, branch: string): Promise<Pick<BranchUpdatePlan, 'where' | 'folder' | 'slot'>> {
+export async function branchFolder(projectPath: string, branch: string): Promise<Pick<BranchUpdatePlan, 'where' | 'folder' | 'slot'>> {
   const s = await repoSummary(projectPath)
   if (s.branch === branch) return { where: 'project', folder: projectPath, slot: null }
   const trees = await git(projectPath, ['worktree', 'list', '--porcelain'])

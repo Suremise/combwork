@@ -22,7 +22,7 @@ export async function restorePlanAt(ws: WorkspaceService, projectPath: string, r
   const p = ws.assertProject(projectPath)
   if (!isRestoreSource(source) || (source === 'commit' && !restoreCommitOf(commit))) throw combworkError(T.invalid, undefined, { kind: 'invalid' })
   const target = source === 'target' ? await lineRepoReads().workTarget(p) : null
-  return ops.restorePlan(p, rel, source, target, source === 'commit' ? restoreCommitOf(commit) : null)
+  return ops.fileRestorePlan(p, rel, source, target, source === 'commit' ? restoreCommitOf(commit) : null)
 }
 
 /** `files:gitFileCommits`: A Commit…'s list, a page at a time. */

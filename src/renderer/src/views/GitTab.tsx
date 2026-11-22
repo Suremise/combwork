@@ -1,9 +1,10 @@
 import { Children, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
-import { GIT_VIEW_GUIDE, HISTORY_COMMITS, folderBusy, gitStatusText, gitStatusTip, headText, type GitFolderAction, type GitHistory, type GitRepoSummary } from '@shared/gitRepo'
+import { GIT_VIEW_GUIDE, HISTORY_COMMITS, folderBusy, gitStatusText, gitStatusTip, headText, type GitFolderAction, type GitHistory, type GitRepoSummary, type GitTagRow } from '@shared/gitRepo'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import type { CombworkRequests } from '@shared/api'
+import { REPO_OP_CHANNELS } from '@shared/repoOpChannels'
 import { call, errorMessage } from '../api'
 import { offered, repoOp } from '../repoOps'
 import { gitReader, type GitReadState } from '../gitReads'
@@ -18,6 +19,7 @@ import { projectSlots, useMergeSlots } from '../components/MergeSlots'
 import { BusyButton, Icon, IconButton, LoadFailed, Modal, StaleNote, Tooltip, useBusy } from '../components/ui'
 import { InitRepoButton } from '../components/InitRepo'
 import { Pager } from '../components/DataTable'
+import { HistoryViewSwitch, MovesSection } from '../components/BranchMoves'
 
 /** A message with markup, as React children (keyed, so a list of parts renders without warnings). */
 export const rich = (m: Msg, values: Parameters<typeof tRich<React.ReactNode>>[1]): React.ReactNode[] => Children.toArray(tRich<React.ReactNode>(m, values))
@@ -59,6 +61,21 @@ export const GIT_TEXT = {
   createTagButton: msg({ id: 'git.tags.createButton', defaultMessage: 'Create tag', description: "The Create tag form's button." }),
   tagging: msg({ id: 'git.tags.busy', defaultMessage: 'Tagging…', description: "The Create tag form's button while it runs." }),
   tagNoSpaces: msg({ id: 'git.tags.noSpaces', defaultMessage: 'Tag names have no spaces', description: "Under the Create tag form's name box." }),
+  // A tag's Delete and Push… (HI-3474).
+  deleteTagTip: msg({ id: 'git.tagDelete.tip', defaultMessage: 'Delete the tag {name}…', description: "HI-3474: tooltip on a tag's delete button in Version Control → History. {name} is the tag." }),
+  deleteTagTitle: msg({ id: 'git.tagDelete.title', defaultMessage: 'Delete the tag {name}', description: 'HI-3474: title of the form that deletes the tag {name}.' }),
+  deleteTagAbout: msg({ id: 'git.tagDelete.about', defaultMessage: 'Deletes the tag {name} (on {commit}) here; the commit stays. A remote you choose loses it too, first, and only where it is this same tag: if it refuses, the tag stays here as well.', description: 'HI-3474: the form that deletes the tag {name}, which points at the commit {commit} (a short hash).' }),
+  deleteTagWhere: msg({ id: 'git.tagDelete.where', defaultMessage: 'Delete it', description: "HI-3474: label of the Delete tag form's drop-down: where the tag is deleted." }),
+  deleteTagHere: msg({ id: 'git.tagDelete.here', defaultMessage: 'Here only', description: "HI-3474: a choice of the Delete tag form's drop-down: only in this repository." }),
+  deleteTagAlso: msg({ id: 'git.tagDelete.also', defaultMessage: 'Here and on {remote}', description: "HI-3474: a choice of the Delete tag form's drop-down: in this repository and on the remote {remote}." }),
+  deleteTagButton: msg({ id: 'git.tagDelete.button', defaultMessage: 'Delete', description: "HI-3474: the Delete tag form's button." }),
+  deletingTag: msg({ id: 'git.tagDelete.busy', defaultMessage: 'Deleting…', description: "HI-3474: the Delete tag form's button while it runs." }),
+  pushTagTip: msg({ id: 'git.tagPush.tip', defaultMessage: 'Push the tag {name} to a remote…', description: "HI-3474: tooltip on a tag's push button in Version Control → History. {name} is the tag." }),
+  pushTagTitle: msg({ id: 'git.tagPush.title', defaultMessage: 'Push the tag {name}', description: 'HI-3474: title of the form that pushes the tag {name} to a remote.' }),
+  pushTagAbout: msg({ id: 'git.tagPush.about', defaultMessage: 'Pushes the tag {name} to the remote you choose. Never forced: a remote with another tag of that name refuses it.', description: 'HI-3474: the form that pushes the tag {name}.' }),
+  pushTagRemote: msg({ id: 'git.tagPush.remote', defaultMessage: 'Remote', description: "HI-3474: label of the Push tag form's drop-down of remotes." }),
+  pushTagButton: msg({ id: 'git.tagPush.button', defaultMessage: 'Push', description: "HI-3474: the Push tag form's button." }),
+  pushingTag: msg({ id: 'git.tagPush.busy', defaultMessage: 'Pushing…', description: "HI-3474: the Push tag form's button while it runs." }),
   statusBarTip: msg({ id: 'git.statusBar.tip', defaultMessage: 'Git branch of the selected project', description: "Tooltip on the status bar's git item before git has been read." })
 }
 const M = GIT_TEXT
@@ -87,7 +104,8 @@ export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history' 
   const key = args.length ? JSON.stringify([project.path, ...args]) : project.path
   const [state, setState] = useState<GitReadState<T>>({ for: key, data: null, error: null, loading: true, at: 0 })
   // One read at a time, those asked meanwhile one more after it (#1366, gitReads.ts).
-  const reader = useMemo(() => gitReader<T>((k) => (call as (c: C, ...a: unknown[]) => Promise<T>)(channel, ...(k.startsWith('[') ? (JSON.parse(k) as unknown[]) : [k])), setState, errorMessage), [channel])
+  // A repository operation's read (Repository health's) goes through repoOp too (HI-2788, HI-3538): dispatched only while offered.
+  const reader = useMemo(() => gitReader<T>((k) => ((channel in REPO_OP_CHANNELS ? repoOp : call) as (c: C, ...a: unknown[]) => Promise<T>)(channel,...(k.startsWith('[') ? (JSON.parse(k) as unknown[]) : [k])), setState, errorMessage), [channel])
   const reload = useCallback(() => reader(key), [reader, key])
   useEffect(reload, [reload, version, usage, project.branch])
   // What the user did in a terminal meanwhile (a commit, git init) shows on coming back to the window.
@@ -181,7 +199,15 @@ export function Loading<T>({ read, what, children }: { read: { data: T | null; e
 // History
 // ---------------------------------------------------------------------------
 
+/** History: the branch's commits, or (HI-3469) its moves, a switch in the heading; the project's own choice while Combwork runs. */
 export function HistorySection({ project, summary }: { project: ProjectInfo; summary: GitRepoSummary | null }) {
+  const [shown, setShown] = useState<{ for: string; view: 'commits' | 'moves' }>({ for: project.path, view: 'commits' })
+  const view = shown.for === project.path && offered('git:moves') ? shown.view : 'commits'
+  const onView = (v: 'commits' | 'moves'): void => setShown({ for: project.path, view: v })
+  return view === 'moves' ? <MovesSection project={project} view={view} onView={onView} /> : <CommitsSection project={project} summary={summary} onView={onView} />
+}
+
+function CommitsSection({ project, summary, onView }: { project: ProjectInfo; summary: GitRepoSummary | null; onView: (v: 'commits' | 'moves') => void }) {
   // The branch chosen (null: the default, the project's target) and the page, the project's own (#1643).
   const [pick, setPick] = useState<{ for: string; ref: string | null; page: number }>({ for: project.path, ref: null, page: 1 })
   const mine = pick.for === project.path ? pick : { for: project.path, ref: null, page: 1 }
@@ -221,6 +247,7 @@ export function HistorySection({ project, summary }: { project: ProjectInfo; sum
       {(h: GitHistory) => (
         <div className="git-history" data-git-history="" data-history-ref={h.ref ?? ''} data-history-page={h.page}>
           <h2 className="section git-section-head">
+            <HistoryViewSwitch view="commits" onView={onView} />
             {rich(M.historyOf, { head: picker(h), faint })}
             <span className="git-section-actions">
               <IconButton icon={read.loading ? 'loading' : 'refresh'} spin={read.loading} title={tr(M.readHistoryAgain)} action="reload-history" onClick={read.reload} />
@@ -270,6 +297,10 @@ export function HistorySection({ project, summary }: { project: ProjectInfo; sum
                   <code className="git-hash">{t.commit}</code>
                   <span className="git-subject faint">{t.subject}</span>
                   <span className="git-meta faint">{at(t.date)}</span>
+                  <span className="git-row-actions">
+                    {!!summary?.remotes.length && offered('git:pushTag') ? <IconButton icon="cloud-upload" title={tr(M.pushTagTip, { name: t.name })} action="push-tag" disabled={!!summary.parentRepo} onClick={() => setForm({ make: () => pushTagForm(project, summary, t) })} /> : <span className="git-act-slot" />}
+                    {summary && offered('git:deleteTag') ? <IconButton icon="trash" title={tr(M.deleteTagTip, { name: t.name })} action="delete-tag" disabled={!!summary.parentRepo} onClick={() => setForm({ make: () => deleteTagForm(project, summary, t) })} /> : <span className="git-act-slot" />}
+                  </span>
                 </div>
               ))}
               {h.moreTags > 0 && <p className="hint">{tr(M.olderTags, { count: h.moreTags })}</p>}
@@ -423,6 +454,38 @@ function tagForm(project: ProjectInfo, s: GitRepoSummary | null): FormSpec {
     // HI-3372: its push, when it pushes, cancellable from the dialog.
     cancellable: true,
     submit: (v, op) => repoOp('git:createTag', project.path, v.name.trim(), v.message ?? '', v.push || undefined, op)
+  }
+}
+
+/** HI-3474: Delete…: here only, or on a remote too (there first, as the tag was shown). */
+function deleteTagForm(project: ProjectInfo, s: GitRepoSummary, t: GitTagRow): FormSpec {
+  return {
+    project,
+    title: tr(M.deleteTagTitle, { name: t.name }),
+    icon: 'trash',
+    about: tr(M.deleteTagAbout, { name: t.name, commit: t.commit }),
+    fields: s.remotes.length ? [{ key: 'remote', label: tr(M.deleteTagWhere), initial: '', options: [{ label: tr(M.deleteTagHere), value: '' }, ...s.remotes.map((r) => ({ label: tr(M.deleteTagAlso, { remote: r }), value: r }))] }] : [],
+    confirm: tr(M.deleteTagButton),
+    busyLabel: tr(M.deletingTag),
+    validate: () => null,
+    cancellable: true,
+    submit: (v, op) => repoOp('git:deleteTag', project.path, { name: t.name, sha: t.sha }, v.remote || null, op)
+  }
+}
+
+/** HI-3474: Push…: the tag to a remote, never forced. */
+function pushTagForm(project: ProjectInfo, s: GitRepoSummary, t: GitTagRow): FormSpec {
+  return {
+    project,
+    title: tr(M.pushTagTitle, { name: t.name }),
+    icon: 'cloud-upload',
+    about: tr(M.pushTagAbout, { name: t.name }),
+    fields: [{ key: 'remote', label: tr(M.pushTagRemote), initial: s.remotes.includes('origin') ? 'origin' : s.remotes[0], options: s.remotes.map((r) => ({ label: r, value: r })) }],
+    confirm: tr(M.pushTagButton),
+    busyLabel: tr(M.pushingTag),
+    validate: () => null,
+    cancellable: true,
+    submit: (v, op) => repoOp('git:pushTag', project.path, t.name, v.remote, op)
   }
 }
 

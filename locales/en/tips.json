@@ -527,6 +527,14 @@
     "defaultMessage": "Clean up merged branches",
     "description": "A tip's title."
   },
+  "tips.branchMoves.text": {
+    "defaultMessage": "Version Control → History → Moves lists each time a branch moved, as git's reflog keeps it: Combwork's merges of cards, commits, rebases, resets and pulls. Restore to here… moves the branch back, showing first which commits it drops or brings back.",
+    "description": "A tip (HI-3469). Names of Combwork's menus, views, sections and buttons: keep them as Combwork shows them."
+  },
+  "tips.branchMoves.title": {
+    "defaultMessage": "Undo a reset, rebase or merge of a branch",
+    "description": "A tip's title (HI-3469)."
+  },
   "tips.bringUpToDate.text": {
     "defaultMessage": "A branch’s merge queue card says when it is behind another of the project’s branches. Bring Up to Date… merges that branch into it through its queue, with its merge checks; the other branch doesn’t change.",
     "description": "A tip (HI-2679). Bring Up to Date… is a button on a merge queue's card: keep it as Combwork shows it."
@@ -1963,6 +1971,14 @@
     "defaultMessage": "Remove every agent at once",
     "description": "A tip's title."
   },
+  "tips.renameBranch.text": {
+    "defaultMessage": "Rename… (✎) on a branch in Version Control → Branches & remotes gives it a new name. Choose Rename it there too to rename the remote branch it tracks as well: the old name there is deleted only if nobody pushed to it since your last fetch.",
+    "description": "A tip (HI-3474). Names of Combwork's menus, views, sections, buttons and choices: keep them as Combwork shows them."
+  },
+  "tips.renameBranch.title": {
+    "defaultMessage": "Rename a branch, on its remote too",
+    "description": "A tip's title (HI-3474)."
+  },
   "tips.repositoryHealth.text": {
     "defaultMessage": "When git says \"index.lock: File exists\", or refuses a worktree whose folder was deleted, Version Control → Branches & remotes → Repository health lists what was left behind and clears what you tick.",
     "description": "A tip (HI-3473). The quoted text is git's own error: keep it. Names of Combwork's menus, views and sections: keep them as Combwork shows them."
@@ -2282,6 +2298,14 @@
   "tips.submodulesLfs.title": {
     "defaultMessage": "Submodules and Git LFS in slots",
     "description": "A tip's title (HI-1182). A slot: a folder Combwork lends to a card or a lane. Keep Git LFS (a product's name)."
+  },
+  "tips.tagPushDelete.text": {
+    "defaultMessage": "Each tag in Version Control → History has Push… to send it to a remote, and Delete… to delete it here, or on a remote too so the next fetch doesn’t bring it back.",
+    "description": "A tip (HI-3474). Names of Combwork's menus, views, sections and buttons: keep them as Combwork shows them."
+  },
+  "tips.tagPushDelete.title": {
+    "defaultMessage": "Push or delete a git tag",
+    "description": "A tip's title (HI-3474)."
   },
   "tips.taskbarBadge.text": {
     "defaultMessage": "Combwork's taskbar button shows how many agents need you, and flashes when one asks you something while Combwork is in the background.",
