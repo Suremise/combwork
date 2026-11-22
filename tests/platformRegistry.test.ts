@@ -256,7 +256,9 @@ describe('in ProjectInfo', () => {
     mkdirSync(join(p, '.combwork'), { recursive: true })
     for (const value of ['mercurial', 7]) {
       writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], platform: value }))
-      expect((await info(p)).platform).toEqual({ id: 'none', capabilities: PLATFORMS.none.capabilities, detected: { platform: 'none' }, invalid: String(value) })
+      // A refresh tells the window of delta first (HI-3524): then its reads say what they find.
+      const read = (await inWorkspace(w, () => w.refresh())).projects.find((x) => x.path === p)
+      expect(read?.platform).toEqual({ id: 'none', capabilities: PLATFORMS.none.capabilities, detected: { platform: 'none' }, invalid: String(value) })
       await info(p)
     }
     expect(notices(p).map((t) => t.title)).toEqual(['Unknown version control setting in delta', 'Unknown version control setting in delta'])
@@ -264,6 +266,26 @@ describe('in ProjectInfo', () => {
       ['warning', `delta's project.json names a version control Combwork doesn't know (platform: mercurial). Until it says "git" or "none", Combwork uses what it finds in the folder.`],
       ['warning', `delta's project.json names a version control Combwork doesn't know (platform: 7). Until it says "git" or "none", Combwork uses what it finds in the folder.`]
     ])
+  })
+
+  it('a project added to an open workspace has its notice said after the window is told of it, buttons and all (HI-3524)', async () => {
+    const p = join(ws, 'eps')
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], platform: 'jj' }))
+    // A read before the window knows eps (an Agent API call naming it, or a refresh's own read) says nothing yet: the
+    // folder's watch may report it first, so the order below is what's checked, whichever refresh reports it.
+    expect((await info(p)).platform?.invalid).toBe('jj')
+    await inWorkspace(w, () => w.refresh())
+    await vi.waitFor(() => expect(notices(p)).toHaveLength(1), { timeout: HUNG_MS })
+    const told = events.findIndex((e) => e.type === 'workspace-changed' && !!e.workspace?.projects.some((x) => x.path === p))
+    const said = events.findIndex((e) => e.type === 'toast' && e.toast.source === p)
+    expect(told).toBeGreaterThanOrEqual(0)
+    expect(said).toBeGreaterThan(told)
+    expect(notices(p)[0]).toMatchObject({ level: 'warning', title: 'Unknown version control setting in eps', actions: [{ label: 'Use None', command: 'project.usePlatform', args: [p, 'none', 'jj'] }] })
+    // Said once: the window knowing it now, later reads say nothing more.
+    await info(p)
+    await inWorkspace(w, () => w.refresh())
+    expect(notices(p)).toHaveLength(1)
   })
 
   it("a read of a workspace closed or switched meanwhile says nothing in the next one, which says its own afresh", async () => {

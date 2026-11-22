@@ -1865,10 +1865,18 @@ export class WorkspaceService {
     const ms = performance.now() - started
     if (ms > SLOW_PROJECT_READ_MS) log.info(`reading ${userText(basename(projectPath))} for the window took ${Math.round(ms)} ms: ${parts.map(([w, t]) => `${w} ${Math.round(t)} ms`).join(', ')}`)
     this.readAt.set(info, ticket)
-    // Said only in the lifetime the read is for: a read begun before a close or a switch is another workspace's.
-    if (info.platform && gen === this.generation && this.path) this.sayPlatform(projectPath, info.platform)
+    // Said only in the lifetime the read is for: a read begun before a close or a switch is another workspace's. Only of a
+    // project the window has been told of (HI-3524): a notice about one it doesn't know yet (a folder just added) reads to
+    // it as about a project gone, and loses its buttons; the refresh reporting it says it after its report.
+    if (info.platform && gen === this.generation && this.path) {
+      if (this.cached?.projects.some((p) => p.path.toLowerCase() === projectPath.toLowerCase())) this.sayPlatform(projectPath, info.platform)
+      else this.platformHeld.add(info)
+    }
     return info
   }
+
+  /** Reads whose platform notice waits for the window to be told of their project (HI-3524). */
+  private platformHeld = new WeakSet<ProjectInfo>()
 
   /** The offer each project's platform last had (lower-cased path → its reason, '' for none): each is said once, as it appears. */
   private platformOffers = new Map<string, string>()
@@ -1962,6 +1970,8 @@ export class WorkspaceService {
     for (const project of this.platformOffers.keys()) if (!known.has(project)) this.platformOffers.delete(project)
     this.cached = { path: this.path, name: basename(this.path), config: this.wsConfig, projects, assistant: assistant && { ...assistant, name: ASSISTANT_NAME, active: true, unmanagedMcp: [] }, moved: this.moved }
     this.emit({ type: 'workspace-changed', workspace: this.cached })
+    // The notices held for projects the window has only now been told of (HI-3524), after the report, as the names' are.
+    for (const p of projects) if (p.platform && this.platformHeld.has(p)) this.sayPlatform(p.path, p.platform)
     this.flagDuplicateNames(projects)
     return this.cached
   }
