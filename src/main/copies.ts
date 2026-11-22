@@ -41,6 +41,9 @@ import type { ProviderAdapter } from './providers/types'
 
 const log = createLogger('copies')
 
+/** The workspace lifecycle port copies are made, reset and removed with (SPEC §16.3.6 Port 2, HI-2789's R5). */
+const defaultPort = slotWorkspaces
+
 /** The folder a project's copies are in, under its worktrees folder: fixed, so a reviewer's grant never changes. */
 export const COPIES_DIR = 'copies'
 /** What a lease's operation taken over from a gone holder leaves as the copy's error: stored, so said in the Default. */
@@ -469,9 +472,9 @@ export class CopyPool {
     return this.deps.now?.() ?? Date.now()
   }
 
-  /** The workspace lifecycle port copies are made, reset and removed with (SPEC §16.3.6 Port 2, HI-2789's R5). */
+  /** The pool's port (`defaultPort`). */
   private get port(): WorkspacePort {
-    return slotWorkspaces()
+    return defaultPort()
   }
 
   get closed(): boolean {
