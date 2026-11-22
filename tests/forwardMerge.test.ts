@@ -1070,12 +1070,17 @@ describe("HI-3177: purging a past branch's merge queue history", () => {
 
   it("refuses when the project's targets can't be read, nothing written", async () => {
     const { purgedKey } = await import('../src/main/workflow/queueLogs')
+    const { reconcileNow, reconcilePending } = await import('../src/main/workflow/reconciler')
     const { w, repo } = await pastTwo()
     const wf = (await workflowFor(w, repo))!
     // No target set and git's default unreadable: the targets are unknown.
     await inWorkspace(w, () => w.mutateProjectConfig(repo, (now) => ({ workflow: { ...now.workflow!, options: { ...now.workflow!.options, target: '' } } })))
     // HI-3491: the refresh the config write scheduled reads .git's files; Windows can't rename a folder while one is open.
     await w.refreshesSettled()
+    // HI-3495: the forwards pastTwo merged went to Done, which asks for a reconcile pass 400 ms later; it reads the ref
+    // files in .git, so under load it lands on the rename. It runs now, to its end, and none is left asked for.
+    await reconcileNow(w, repo)
+    expect(reconcilePending(repo)).toBe(false)
     renameSync(join(repo, '.git'), join(repo, '.git-away'))
     try {
       await expect(purge(w, repo, ['1.1.0'])).rejects.toThrow("Nothing was purged: Combwork can't read which branches this project merges into right now.")
