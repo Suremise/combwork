@@ -2338,7 +2338,9 @@ control is still a platform of its own (§16.3.1, the type map below). The last 
   project.json naming `jj`, workflow options saved for jj, jj slot and copy rows, and the jj `board_meta` keys get no
   handling of their own; jj's folders on disk (its slots, its control workspace) are left as they are.
 - **Detection:** a `.jj` folder is another version control, as Mercurial's `.hg` is (§16.3.5): the folder is None,
-  a Git project with one beside its `.git` is offered None, and Git isn't offered where one is found.
+  a Git project with one beside its `.git` is offered None, and Git isn't offered where one is found. A `.jj` in a
+  folder above counts too (HI-3487): a Git repository inside a jj workspace, which 1.6.x read as Git, is now
+  "Jujutsu found", as one inside a Mercurial checkout always was.
 - **Schema steps 28 and 29** (`workspaceIdentityStep`, `jjPublishStep`) stay, because a board's version sequence needs
   them; their tables are left unread.
 - §16.3.4's paper check stays as the record of why the contract has readiness and explicit snapshots.
