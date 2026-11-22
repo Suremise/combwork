@@ -136,8 +136,12 @@ export function shellWord(w: string): string | null {
   return null
 }
 
-/** A word for a tooltip's command: shellWord's, else single-quoted as git quotes paths for a POSIX shell. */
-const tipWord = (w: string | null, raw: string): string => w ?? `'${raw.replace(/'/g, "'\\''")}'`
+/**
+ * A word for a tooltip's command: shellWord's, read alike by PowerShell and Git Bash. Else (HI-3513: an apostrophe with
+ * something both shells expand, where no quoting suits both, probed) quoted for PowerShell, Windows' own shell: in single
+ * quotes, each quote character doubled (PowerShell takes the typographic ones as quotes too).
+ */
+const tipWord = (w: string | null, raw: string): string => w ?? `'${raw.replace(/['‘’‚‛]/g, '$&$&')}'`
 
 /**
  * HI-3502: the command that checks a submodule's staged commit out in its folder, as the notice after a pick shows it
