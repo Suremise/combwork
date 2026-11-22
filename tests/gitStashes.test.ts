@@ -26,6 +26,8 @@ let agent: string | null = null
 vi.mock('../src/main/gitRepo', async (original) => ({ ...(await original<typeof import('../src/main/gitRepo')>()), busyAgentIn: async () => agent }))
 /** HI-3533: another git's work, run once just before Combwork's next `git stash drop` (between its check and its drop). */
 let beforeDrop: (() => void) | null = null
+/** HI-3533 (HR1's round 1): Combwork's next `git stash store` fails, as git's own refusal (a ref that isn't there). */
+let failStore = false
 vi.mock('../src/main/git', async (original) => {
   const real = await original<typeof import('../src/main/git')>()
   return {
@@ -35,6 +37,10 @@ vi.mock('../src/main/git', async (original) => {
         const f = beforeDrop
         beforeDrop = null
         f()
+      }
+      if (failStore && args[0] === 'stash' && args[1] === 'store') {
+        failStore = false
+        return real.git(cwd, ['rev-parse', '--verify', 'refs/cw-test/not-a-ref'])
       }
       return (real.git as (...a: unknown[]) => ReturnType<typeof real.git>)(cwd, args, ...rest)
     }
@@ -85,6 +91,7 @@ beforeEach(() => {
   commit(proj, { 'a.txt': 'base\n', 'b.txt': 'b\n' }, 'files')
   held = null
   beforeDrop = null
+  failStore = false
   agent = null
 })
 
@@ -438,7 +445,7 @@ describe('HI-3533: another git moving the list between the check and the drop', 
       write('b.txt', 'three\n')
       sh(proj, 'stash', 'push', '-q', '-m', 'three')
     }
-    await expect(drop(one)).rejects.toThrow(/Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, [0-9a-f]{40}\. Combwork put it back, at the top of the list: nothing was dropped\. Look again\./)
+    await expect(drop(one)).rejects.toThrow(/^Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, [0-9a-f]{40}\. Combwork put it back, at the top of the list, so nothing is lost\. The stash you chose wasn't dropped\. Look again\.$/)
     expect(beforeDrop).toBeNull()
     // 'two' (moved onto the place git dropped) is listed again, at the top, with its own message; 'one' is still there.
     expect(gitMessages()).toEqual(['two', 'three', 'one'])
@@ -465,8 +472,51 @@ describe('HI-3533: another git moving the list between the check and the drop', 
       write('b.txt', 'three\n')
       sh(proj, 'stash', 'push', '-q', '-m', 'three', '--', 'b.txt')
     }
-    await expect(apply(one, true)).rejects.toThrow("The stash's changes were applied, and it is still in the list.")
+    await expect(apply(one, true)).rejects.toThrow("The stash you chose wasn't dropped, and its changes were applied. Look again.")
     expect(read('a.txt')).toBe('one\n')
+    expect(gitMessages()).toEqual(['two', 'three', 'one'])
+  })
+
+  it("HR1's round 1: another row of the chosen stash's commit, stored meanwhile onto its place, isn't taken for it", async () => {
+    write('a.txt', 'one\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'original')
+    write('a.txt', 'two\n')
+    sh(proj, 'stash', 'push', '-q', '-m', 'two')
+    const [y, x] = stashes()
+    const original: StashRef = { commit: x, index: 1, message: 'original' }
+    // Meanwhile another git lists the chosen commit again with another message (under another top: git lists a commit
+    // again only there), then pushes a stash: that row is now at the chosen one's place. Git drops it and names the
+    // chosen commit.
+    beforeDrop = () => {
+      sh(proj, 'stash', 'store', '-m', 'new row', x)
+      write('b.txt', 'three\n')
+      sh(proj, 'stash', 'push', '-q', '-m', 'three')
+    }
+    await expect(drop(original)).rejects.toThrow(`so git dropped a different stash, ${x}. Combwork put it back`)
+    // The row chosen is still there; the one git dropped is listed again. Its message was only in git's dropped entry,
+    // so it comes back under its commit's own subject (git stash push made it "On main: original").
+    expect(gitMessages()).toEqual(['original', 'three', 'two', 'original'])
+    expect(stashes()[0]).toBe(x)
+    expect(stashes()[2]).toBe(y)
+  })
+
+  it("HR1's round 1: when the stash git dropped can't be put back, the error says so and how, never that nothing was lost", async () => {
+    const one = await setUp()
+    const two = stashes()[0]
+    beforeDrop = () => {
+      write('b.txt', 'three\n')
+      sh(proj, 'stash', 'push', '-q', '-m', 'three')
+    }
+    failStore = true
+    const e = await drop(one).then(
+      () => null,
+      (x: Error) => x.message
+    )
+    expect(e).toBe(`Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, ${two}. Combwork couldn't put it back, so it isn't listed now: git stash store ${two} lists it again (git keeps its changes for a while). The stash you chose wasn't dropped. Look again.`)
+    expect(failStore).toBe(false)
+    expect(gitMessages()).toEqual(['three', 'one'])
+    // The command it names lists it again.
+    sh(proj, 'stash', 'store', '-m', 'two', two)
     expect(gitMessages()).toEqual(['two', 'three', 'one'])
   })
 

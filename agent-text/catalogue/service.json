@@ -1105,8 +1105,8 @@
     "audience": "both"
   },
   "service.gitStash.raced": {
-    "text": "Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, {commit}. {back, select, yes {Combwork put it back, at the top of the list:} other {Combwork couldn't put it back (git stash store {commit} does):}} nothing was dropped.{pop, select, yes { The stash's changes were applied, and it is still in the list.} other {}} Look again.",
-    "note": "HI-3533: an error from Version Control → Changes → Stashes' Drop or Pop: another git (a terminal, an agent) pushed or dropped a stash at the moment Combwork dropped one, so git dropped another ({commit}, its full commit id). back yes: Combwork listed it again; no: it couldn't, and the command (keep git stash store as it is) lists it again. pop yes: it was a Pop, whose apply had already gone in.",
+    "text": "Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, {commit}. {back, select, yes {Combwork put it back, at the top of the list, so nothing is lost.} other {Combwork couldn't put it back, so it isn't listed now: git stash store {commit} lists it again (git keeps its changes for a while).}} The stash you chose wasn't dropped{pop, select, yes {, and its changes were applied} other {}}. Look again.",
+    "note": "HI-3533: an error from Version Control → Changes → Stashes' Drop or Pop: another git (a terminal, an agent) pushed or dropped a stash at the moment Combwork dropped one, so git dropped another ({commit}, its full commit id). back yes: Combwork listed it again; no: it couldn't, so that stash is off the list until the command (keep git stash store as it is) lists it again. pop yes: it was a Pop, whose apply had already gone in.",
     "audience": "both"
   },
   "service.gitStash.session": {

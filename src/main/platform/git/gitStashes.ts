@@ -15,7 +15,8 @@
 // - Drop: under the repository lock, only of the row the user saw: the one at its place while that is still its commit
 //   and message, else the only row that is (another stash moved the places); refused when none is, or several are.
 //   HI-3533: git drops by place, so another git moving the list in between makes it drop another stash: git names the
-//   commit it dropped, and one that isn't the row's is stored back at once (`git stash store`) and the drop refused.
+//   commit it dropped, and unless that is the row's commit and the list has one row fewer of its commit and message,
+//   what git dropped is stored back at once (`git stash store`) and the drop refused.
 import { normalize } from 'path'
 import { combworkStash, stashSubject, type StashApplied, type StashConflict, type StashFile, type StashRef, type StashRequest, type StashRow } from '../../../shared/gitStashes'
 import type { GitDiff } from '../../../shared/types'
@@ -34,7 +35,7 @@ import { platformLimits } from '../limits'
 const log = createLogger('git-stash')
 
 export const STASH_TEXT = {
-  raced: msg({ id: 'service.gitStash.raced', defaultMessage: "Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, {commit}. {back, select, yes {Combwork put it back, at the top of the list:} other {Combwork couldn't put it back (git stash store {commit} does):}} nothing was dropped.{pop, select, yes { The stash's changes were applied, and it is still in the list.} other {}} Look again.", description: "HI-3533: an error from Version Control → Changes → Stashes' Drop or Pop: another git (a terminal, an agent) pushed or dropped a stash at the moment Combwork dropped one, so git dropped another ({commit}, its full commit id). back yes: Combwork listed it again; no: it couldn't, and the command (keep git stash store as it is) lists it again. pop yes: it was a Pop, whose apply had already gone in." }),
+  raced: msg({ id: 'service.gitStash.raced', defaultMessage: "Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, {commit}. {back, select, yes {Combwork put it back, at the top of the list, so nothing is lost.} other {Combwork couldn't put it back, so it isn't listed now: git stash store {commit} lists it again (git keeps its changes for a while).}} The stash you chose wasn't dropped{pop, select, yes {, and its changes were applied} other {}}. Look again.", description: "HI-3533: an error from Version Control → Changes → Stashes' Drop or Pop: another git (a terminal, an agent) pushed or dropped a stash at the moment Combwork dropped one, so git dropped another ({commit}, its full commit id). back yes: Combwork listed it again; no: it couldn't, so that stash is off the list until the command (keep git stash store as it is) lists it again. pop yes: it was a Pop, whose apply had already gone in." }),
   moved: msg({ id: 'service.gitStash.moved', defaultMessage: 'The stashes changed meanwhile, and more than one is like the one you chose: nothing was done. Look again.', description: "HI-3527: an error from Version Control → Changes → Stashes' Apply, Pop or Drop: the list's places moved since the user looked, and several stashes now have the same commit and message as the one they chose, so Combwork can't tell which they meant." }),
   gone: msg({ id: 'service.gitStash.gone', defaultMessage: "That stash isn't in the list any more (dropped or popped meanwhile): nothing was done. Look again.", description: 'HI-3472: an error from Version Control → Changes → Stashes: the stash the user acted on is no longer one of the repository\'s stashes.' }),
   operation: msg({ id: 'service.gitStash.operation', defaultMessage: 'Git is in the middle of {what, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}: nothing was done. Finish it first (the panel above).', description: "HI-3472: an error from Stashes' Apply or Pop: an operation is under way in the folder ({what}, git's word for it; {folder} a path); HI-3470's panel above the list ends it." }),
@@ -264,10 +265,20 @@ async function dropAt(root: string, ref: StashRef): Promise<{ ok: true } | { ok:
   const r = await git(root, ['stash', 'drop', place])
   if (!r.ok) return { ok: false, r }
   const gone = droppedCommit(r.out)
-  if (gone === null) log.warn(`git stash drop didn't say which stash it dropped (expected ${s.commit.slice(0, 12)})`)
-  if (gone === null || gone === s.commit) return { ok: true }
-  // Its message as the list had it; one pushed since isn't in it: its own commit's subject, which git stash push makes the same.
-  const known = rows.find((x) => x.commit === gone)?.subject
+  if (gone === null) {
+    log.warn(`git stash drop didn't say which stash it dropped (expected ${s.commit.slice(0, 12)})`)
+    return { ok: true }
+  }
+  // The row chosen is what git dropped only if git dropped its commit and one fewer row has its commit and message now
+  // (HR1's round 1: another row of the same commit, stored meanwhile, can be what moved onto its place).
+  const after = await listed(root)
+  const count = (list: Listed[], commit: string, subject: string): number => list.filter((x) => x.commit === commit && x.subject === subject).length
+  if (gone === s.commit && count(after, s.commit, s.subject) < count(rows, s.commit, s.subject)) return { ok: true }
+  // Another row was dropped. Its message: that of a row of its commit the list had and has one fewer of now; else (a
+  // row made meanwhile, whose message only git's dropped entry held) its commit's own subject, which git stash push
+  // makes the same.
+  const subjects = [...new Set(rows.filter((x) => x.commit === gone).map((x) => x.subject))]
+  const known = subjects.find((subject) => count(after, gone, subject) < count(rows, gone, subject))
   const own = known ?? (await git(root, ['log', '-1', '--format=%s', gone, '--'])).out.trim()
   const back = await git(root, ['stash', 'store', '-m', own || 'restored', gone])
   log.warn(`Another git moved the stashes while the user dropped ${s.commit.slice(0, 12)}: git dropped ${gone.slice(0, 12)}, ${back.ok ? 'put back' : `not put back (${userText(gitErrorLine(back.err))})`}`)
