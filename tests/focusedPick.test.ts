@@ -13,7 +13,10 @@ import { SUITES } from './e2e/suites.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { isRealCli } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { UNIT_SCANS, diffLinesOf, isUnitTestFile, needsLines, pickLines, pickTests, scanSelects, unchangedSince, unitPicks, under } from './e2e/affected.mjs'
+import { PICK_MAX_TESTS, UNIT_SCANS, diffLinesOf, isUnitTestFile, needsLines, pickLines, pickTests, pickUnitTests, scanSelects, unchangedSince, unitPicks, under } from './e2e/affected.mjs'
+// @ts-expect-error: a plain .mjs module without types
+import { ALL_UNIT } from '../scripts/focusedTests.mjs'
+import { FOCUSED_MAX_TESTS, parsePick } from '../src/shared/workflow/focused'
 // @ts-expect-error: a plain .mjs module without types
 import { narrowRelatedInTree } from './e2e/relatedTests.mjs'
 import { tempDir } from './tempDir'
@@ -119,6 +122,31 @@ describe('UNIT_SCANS: the unit tests that read the repository', () => {
     // Any change at all selects lineEndings (every text file), and a guide's change the tests that read it.
     expect(units({ paths: ['CONTRIBUTING.md'] })).toEqual(['tests/lineEndings.test.ts'])
     expect(units({ paths: ['README.md'] })).toEqual(['tests/lineEndings.test.ts', 'tests/userGuide.test.ts'])
+  })
+})
+
+describe('the unit tests alone (pickUnitTests, --pick --unit: HI-3542)', () => {
+  const related = (n: number): string[] => Array.from({ length: n }, (_, i) => `tests/r${String(i).padStart(3, '0')}.test.ts`)
+
+  it("a change that needs every suite still picks its unit tests, each needing 'unit', and no suite", () => {
+    // HI-1880's change: its shared files need every suite (pickTests' every), which a unit-only pick never says.
+    const paths = ['src/main/fsutil.ts', 'src/main/logger.ts', 'tests/e2e/suites.mjs', 'tests/workerImports.test.ts']
+    expect(pick({ paths })).toMatchObject({ every: true })
+    const picked = pickUnitTests({ paths, vitestRelated: ['tests/logger.test.ts'] }) as Picked
+    expect(picked.every).toBeUndefined()
+    expect(picked.tests!.map((t) => t.test)).toEqual(expect.arrayContaining(['tests/e2esuites.test.ts', 'tests/logger.test.ts', 'tests/workerImports.test.ts']))
+    expect(picked.tests!.every((t) => t.needs.length === 1 && t.needs[0] === 'unit')).toBe(true)
+  })
+
+  it('more than a pick may list is every unit test, as one id; as many as it may list stay a list', () => {
+    expect(PICK_MAX_TESTS).toBe(FOCUSED_MAX_TESTS)
+    const at = pickUnitTests({ paths: [], vitestRelated: related(PICK_MAX_TESTS) }) as Picked
+    expect(at.tests).toHaveLength(PICK_MAX_TESTS)
+    const over = pickUnitTests({ paths: [], vitestRelated: related(PICK_MAX_TESTS + 1) }) as Picked
+    expect(over.tests).toEqual([{ test: ALL_UNIT, needs: ['unit'] }])
+    expect(over.why[0]).toContain(`${PICK_MAX_TESTS + 1} unit test files`)
+    // Combwork reads it as a selection, not "too many" or "every".
+    expect(parsePick(pickLines(over).join('\n'))).toEqual({ state: 'chosen', tests: [{ id: ALL_UNIT, needs: ['unit'] }] })
   })
 })
 
@@ -266,6 +294,25 @@ describe('the picker on the command line (focused.pick)', () => {
     expect(r.stdout).not.toContain('"every"')
     expect(r.stdout).not.toMatch(/"needs":\["(fake|real|packaged)"\]/)
     expect(r.stderr).toContain('src/main/ipc.ts: by its changed parts: no suite')
+  })
+
+  it('--unit picks the unit tests alone (HI-3542): a changed test file and a shared file, never a suite or every', () => {
+    // A clean checkout unchanged since its base: no `vitest list --changed` started (HI-3002), so no packages needed.
+    const repo = tempDir('cw-focused-unit-')
+    const git = (...args: string[]): string => execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'user.name=Combwork Test', '-c', 'user.email=test@example.invalid', ...args], { cwd: repo, env: runContext.baseEnv(), encoding: 'utf8' })
+    git('init', '-q', '-b', 'main')
+    mkdirSync(join(repo, 'src', 'main'), { recursive: true })
+    writeFileSync(join(repo, 'src', 'main', 'sessions.ts'), 'export const x = 1\n')
+    mkdirSync(join(repo, 'tests'))
+    writeFileSync(join(repo, 'tests', 'x.test.ts'), '')
+    git('add', '.')
+    git('commit', '-q', '-m', 'base')
+    const r = spawnSync(process.execPath, [join(root, 'tests', 'e2e', 'affected.mjs'), '--pick', '--unit'], { cwd: repo, input: 'src/main/sessions.ts\ntests/x.test.ts\n', encoding: 'utf8', env: { ...runContext.baseEnv(), CW_FOCUSED_BASE: 'HEAD' } })
+    expect(r.status, r.stderr).toBe(0)
+    const lines = r.stdout.trim().split(/\r?\n/).map((l) => JSON.parse(l) as { test: string; needs: string[] })
+    // The changed test, and the scans any change meets (UNIT_SCANS: lineEndings…), each a unit test.
+    expect(lines.map((l) => l.test)).toContain('tests/x.test.ts')
+    expect(lines.every((l) => l.test.startsWith('tests/') && l.needs.join() === 'unit')).toBe(true)
   })
 
   it('does nothing when imported', () => {

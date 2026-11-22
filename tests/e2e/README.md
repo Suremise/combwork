@@ -524,6 +524,14 @@ files handing the global object on), so 187 of 704 test files can be left out at
 launcher), so every starter counts for now. When the e2e side is
 every suite the pick is still `{"every":true}`, unchanged.
 
+**Unit tests alone** (`--pick --unit`, HI-3542: the merge queue's focused tests here, as the merge checks run no unit
+test) is that unit part and never a suite or `{"every":true}`: no e2e placement can fail it. A test it would name that
+isn't in the checkout is left out, saying so. Over 500 tests (Combwork's longest list, `FOCUSED_MAX_TESTS`) it answers
+`unit:all`, every unit test as one id, which `scripts/focusedTests.mjs` runs as one Vitest run of the whole set (failed
+when a file failed, a file that didn't load included). Measured on 1.7.0's last 25 merges: a change to main-process code
+typically picks about 460 of the 911 test files (the narrowing above keeps most), 6 of 25 picked over 500, and changes to
+renderer or test files a handful. The picks take 5 to 30 s.
+
 **Progress in Combwork.** Run from an agent's session in Combwork, the runner shows in that Combwork's Progress panel: **e2e: N
 suites**, a step per suite, and the time left from how long each suite took before (kept in
 `%LOCALAPPDATA%\combwork-test\progress-timings.json`). `npm test` does the same, a step per test file. It reports to the
