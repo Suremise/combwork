@@ -605,6 +605,7 @@ const addGitProject = async (dir, files) => {
     await form.locator('.workflow-preview [data-action="use-choice"]').click()
     await waitHung(async () => (await row('sharedFolderWarning').count()) === 1 && (await row('review').locator('select').inputValue()) === 'none')
     const g16 = row('sharedFolderWarning').locator('[role="switch"], input[type="checkbox"]').first()
+    await lib.workflowTab(form, 'sharedFolderWarning')
     await g16.click()
     await form.locator('[data-action="save"]').click()
     await save.waitFor({ timeout: HUNG_MS })
