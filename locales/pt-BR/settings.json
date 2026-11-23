@@ -1722,6 +1722,8 @@
   "settings.advanced.cw.git.processNames.title": "Git: os programas que podem manter um bloqueio",
   "settings.advanced.cw.git.staleLockSeconds.desc": "A Saúde do repositório só oferece remover um arquivo de bloqueio do git (como index.lock) depois que ele tem pelo menos esta idade, e apenas enquanto nenhum git que começou antes dele ainda estiver em execução. Um git funcionando normalmente mantém um bloqueio por instantes; aumente isto se um comando git demorado seu (um commit grande, um repack) mantiver um por mais tempo.",
   "settings.advanced.cw.git.staleLockSeconds.title": "Git: a idade a partir da qual um bloqueio é obsoleto",
+  "settings.advanced.cw.github.ghMinutes.desc": "Quanto tempo uma chamada da GitHub CLI (gh) pode levar antes que o Combwork a encerre como travada e diga que ela não respondeu. Aumente em uma conexão lenta ou com um GitHub Enterprise Server que responde devagar.",
+  "settings.advanced.cw.github.ghMinutes.title": "GitHub CLI: tempo máximo de uma chamada",
   "settings.advanced.cw.server.checkInferSeconds.title": "Verificar servidor: tempo limite da solicitação de teste",
   "settings.advanced.cw.server.checkInferSeconds.desc": "Quanto tempo Verificar servidor espera um servidor de modelos responder à solicitação de teste. Um modelo local que ainda não está carregado carrega primeiro, o que em um hardware modesto pode levar minutos; depois desse tempo, a verificação informa que o tempo esgotou."
 }

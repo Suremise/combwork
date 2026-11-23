@@ -143,6 +143,8 @@ export const QUEUE_SIGN_SECONDS = 'cw.queue.signSeconds'
 export const GIT_COMMIT_MINUTES = 'cw.git.commitMinutes'
 /** HI-3372: the last resort for the user's Fetch, Pull and Push (cancellable from the window). */
 export const GIT_NETWORK_MINUTES = 'cw.git.networkMinutes'
+/** HI-3550: the longest one call of the GitHub CLI (gh) takes before Combwork ends it (ghCli.ts). */
+export const GITHUB_GH_MINUTES = 'cw.github.ghMinutes'
 /** HI-3473: how old a lock file of git's must be before Repository health calls it stale. */
 export const GIT_STALE_LOCK_SECONDS = 'cw.git.staleLockSeconds'
 /** HI-3473: the programs that count as a git that may hold a lock (Windows' process names). */
@@ -1033,6 +1035,18 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 30,
     min: 1,
     max: 240,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: GITHUB_GH_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.github.ghMinutes.title', defaultMessage: 'GitHub CLI: longest a call takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (HI-3550): each time Combwork asks the GitHub CLI (gh) something, such as its sign-in in Version Control → Workflow → GitHub. GitHub CLI is a product name." }),
+    desc: msg({ id: 'settings.advanced.cw.github.ghMinutes.desc', defaultMessage: 'How long one call of the GitHub CLI (gh) may run before Combwork ends it as stuck and says it didn’t answer. Raise it on a slow connection or a GitHub Enterprise Server that answers slowly.', description: 'What the advanced setting "GitHub CLI: longest a call takes" does (Settings → Advanced, HI-3550). GitHub CLI and GitHub Enterprise Server are product names; gh is a command name: keep it.' }),
+    kind: 'number',
+    default: 2,
+    min: 1,
+    max: 60,
     unit: 'min',
     applies: 'now'
   },

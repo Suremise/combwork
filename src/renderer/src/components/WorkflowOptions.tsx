@@ -22,6 +22,7 @@ import { loadReleaseOffers, ReleaseOfferRow, useReleaseOffers } from '../release
 import { cx } from '../util'
 import { SlotCopyLevel, SlotsAndCopies } from './SlotsAndCopies'
 import { GithubHosts } from './GithubHosts'
+import { GithubLink } from './GithubLink'
 import { ORIGIN_TEXT } from '../workflowOrigins'
 import { OriginText } from './OriginText'
 import { providerDescriptor } from '@shared/providers'
@@ -857,7 +858,13 @@ function WorkflowEditor({ source, project, at, onDirty }: { source: FormSource; 
   // marked when an option on it differs from what is saved or has something to resolve; a tab with nothing to show isn't
   // offered. Save, Discard and the reasons a save was refused stay below, for every tab.
   const slotsPanel = project ? <SlotsAndCopies project={project} slots={effective.folder === 'slots'} /> : source.level && hasCapability(platform, 'isolation') ? <SlotCopyLevel level={source.level} /> : null
-  const githubHosts = project ? <GithubHosts projectPath={project.path} /> : source.level === 'workspace' && hasOperation(platform, 'push') ? <GithubHosts projectPath={null} /> : null
+  // A project's: its GitHub link (HI-3550: its repository and gh's sign-in), then its hosts.
+  const githubHosts = project ? (
+    <>
+      <GithubLink projectPath={project.path} />
+      <GithubHosts projectPath={project.path} />
+    </>
+  ) : source.level === 'workspace' && hasOperation(platform, 'push') ? <GithubHosts projectPath={null} /> : null
   const unsavedKey = (k: OptionKey): boolean => !same(draft.options[k], form.own[k])
   const problemKey = (k: OptionKey): boolean => (live[k]?.length ?? 0) > 0 || (k === 'stageNames' && stageProblems.length > 0) || (k === 'mergeGuards' && guardProblems(effective.mergeGuards).length > 0) || ((k === 'target' || k === 'otherTargets') && (missingNow?.names.length ?? 0) > 0)
   const tabs = FORM_TABS[platform].flatMap((t) => {

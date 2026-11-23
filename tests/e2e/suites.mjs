@@ -177,6 +177,7 @@ export const SUITES = [
   { name: 'gitremotes' },
   { name: 'gitstashes' },
   { name: 'gitupdate' },
+  { name: 'githublink' },
   { name: 'gitview' },
   { name: 'handovernotice' },
   { name: 'harnessleftovers' },

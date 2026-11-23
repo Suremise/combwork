@@ -262,6 +262,8 @@
   "tips.gitSigning.title": "签名合并无需等待",
   "tips.gitView.text": "在 Git 项目中，“版本控制”标签页显示分支、远程仓库、历史和标签，还可以切换或创建分支、获取、拉取、推送、打标签，以及设置提交身份。状态栏会显示“{example}”：点击即可前往。",
   "tips.gitView.title": "查看和更改项目的 git",
+  "tips.githubRepository.text": "“版本控制”→“工作流程”→“GitHub”显示从远程仓库读取的项目仓库，以及你的 GitHub CLI（gh）是否已在该主机上登录。Combwork 使用你自己的 gh，不存储任何令牌。",
+  "tips.githubRepository.title": "通过你自己的 gh 连接 GitHub 上的项目",
   "tips.gotoProject.text": "按 {key}，输入项目名称中的几个字母。",
   "tips.gotoProject.title": "跳转到项目",
   "tips.group.agents": "智能体",

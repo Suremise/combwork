@@ -1950,6 +1950,8 @@ export interface ProjectConfig {
   slots?: SlotOptions
   /** The project's own GitHub host and Copilot sign-in host (HI-2779), over its workspace's. */
   github?: GithubHostSettings
+  /** HI-3550: the remote whose repository is the project's GitHub link, when several are on its GitHub host (left out: origin, or the only one). */
+  githubRemote?: string
   /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
   copies?: { size?: number }
   /** From before HI-1766 (Project Settings → Card loops): see `fileLocks`. */

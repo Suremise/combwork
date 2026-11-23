@@ -363,7 +363,7 @@ async function readSummary(root: string): Promise<{ summary: GitRepoSummary; git
 const upstreamName = (full: string): string => branchOfRef(full, 'refs/remotes/') ?? branchOfRef(full) ?? full.trim()
 
 /** `git remote -v`: each remote's fetch and push URL (passwords hidden). */
-function parseRemotes(out: string): GitRemote[] {
+export function parseRemotes(out: string): GitRemote[] {
   const by = new Map<string, GitRemote>()
   for (const line of out.split(/\r?\n/)) {
     const m = /^(\S+)\t(.*) \((fetch|push)\)$/.exec(line.trim())

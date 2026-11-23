@@ -1722,6 +1722,8 @@
   "settings.advanced.cw.git.processNames.title": "Git : les programmes qui peuvent détenir un verrou",
   "settings.advanced.cw.git.staleLockSeconds.desc": "La santé du dépôt ne propose de supprimer un fichier de verrou de git (comme index.lock) que s’il date d’au moins cette durée, et seulement tant qu’aucun git démarré avant lui ne tourne encore. Un git qui fonctionne normalement ne détient un verrou que quelques instants ; augmente cette valeur si une longue commande git de ta part (un gros commit, un repack) en détient un plus longtemps.",
   "settings.advanced.cw.git.staleLockSeconds.title": "Git : l’âge à partir duquel un verrou est obsolète",
+  "settings.advanced.cw.github.ghMinutes.desc": "Combien de temps un appel à la CLI GitHub (gh) peut durer avant que Combwork l’arrête comme bloqué et dise qu’elle n’a pas répondu. Augmente-la sur une connexion lente ou avec un GitHub Enterprise Server qui répond lentement.",
+  "settings.advanced.cw.github.ghMinutes.title": "CLI GitHub : durée maximale d’un appel",
   "settings.advanced.cw.server.checkInferSeconds.title": "Vérifier le serveur : délai de la requête de test",
   "settings.advanced.cw.server.checkInferSeconds.desc": "Le temps que Vérifier le serveur attend la réponse d’un serveur de modèles à sa requête de test. Un modèle local pas encore chargé se charge d’abord, ce qui peut prendre des minutes sur un matériel modeste ; passé ce délai, la vérification signale un dépassement de délai."
 }

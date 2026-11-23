@@ -262,6 +262,8 @@
   "tips.gitSigning.title": "Signierte Merges ohne Warten",
   "tips.gitView.text": "In einem Git-Projekt zeigt der Tab „Versionsverwaltung“ Branch, Remotes, Verlauf und Tags des Projekts. Dort kannst du einen Branch wechseln oder anlegen, fetchen, pullen, pushen, taggen und die Commit-Identität festlegen. Die Statusleiste zeigt „{example}“: Ein Klick darauf führt dorthin.",
   "tips.gitView.title": "Git eines Projekts sehen und ändern",
+  "tips.githubRepository.text": "Versionsverwaltung → Workflow → GitHub zeigt das Repository des Projekts, aus seinen Remotes gelesen, und ob deine GitHub CLI (gh) auf diesem Host angemeldet ist. Combwork nutzt dein eigenes gh und speichert kein Token.",
+  "tips.githubRepository.title": "Dein Projekt auf GitHub, über dein eigenes gh",
   "tips.gotoProject.text": "Drück {key} und tippe ein paar Buchstaben seines Namens.",
   "tips.gotoProject.title": "Zu einem Projekt springen",
   "tips.group.agents": "Agenten",

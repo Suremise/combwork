@@ -1123,6 +1123,14 @@
     "defaultMessage": "See and change a project's git",
     "description": "A tip's title."
   },
+  "tips.githubRepository.text": {
+    "defaultMessage": "Version Control → Workflow → GitHub shows the project's repository, read from its remotes, and whether your GitHub CLI (gh) is signed in on that host. Combwork uses your own gh and stores no token.",
+    "description": "A tip (HI-3550). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Workflow's tab GitHub as translated there). GitHub CLI is a product name, gh its command: keep them."
+  },
+  "tips.githubRepository.title": {
+    "defaultMessage": "Your project on GitHub, through your own gh",
+    "description": "A tip's title (HI-3550). GitHub is a product name; gh the GitHub CLI's command name: keep it."
+  },
   "tips.gotoProject.text": {
     "defaultMessage": "Press {key} and type a few letters of its name.",
     "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

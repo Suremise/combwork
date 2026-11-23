@@ -2043,6 +2043,14 @@
     "defaultMessage": "Git: how old a lock must be to be stale",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: Repository health's Remove stale lock in Version Control → Branches & remotes (HI-3473)."
   },
+  "settings.advanced.cw.github.ghMinutes.desc": {
+    "defaultMessage": "How long one call of the GitHub CLI (gh) may run before Combwork ends it as stuck and says it didn’t answer. Raise it on a slow connection or a GitHub Enterprise Server that answers slowly.",
+    "description": "What the advanced setting \"GitHub CLI: longest a call takes\" does (Settings → Advanced, HI-3550). GitHub CLI and GitHub Enterprise Server are product names; gh is a command name: keep it."
+  },
+  "settings.advanced.cw.github.ghMinutes.title": {
+    "defaultMessage": "GitHub CLI: longest a call takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (HI-3550): each time Combwork asks the GitHub CLI (gh) something, such as its sign-in in Version Control → Workflow → GitHub. GitHub CLI is a product name."
+  },
   "settings.advanced.cw.guidance.desc": {
     "defaultMessage": "With Combwork's tools, each project agent gets Combwork's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the combwork server's instructions, Codex after your own developer_instructions. Turned off, agents still get Combwork's tools, without the guidance, from their next session. The Assistant always gets its own: they are its role.",
     "description": "What the advanced setting \"Combwork's guidance for agents\" does (Settings → Advanced, under Combwork). Claude Code, Copilot and Codex are CLIs' names, combwork the name of Combwork's MCP server and developer_instructions a Codex setting: keep them."

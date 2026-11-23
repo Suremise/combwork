@@ -98,5 +98,97 @@
   "github.hosts.saveFailed": {
     "defaultMessage": "Couldn’t save the GitHub host",
     "description": "An error’s title (HI-2779): a GitHub host setting couldn’t be saved (its message says why)."
+  },
+  "github.link.again": {
+    "defaultMessage": "Check Again",
+    "description": "A button in Version Control → Workflow → GitHub (HI-3550): asks the GitHub CLI about its sign-in again, after installing or signing in."
+  },
+  "github.link.checking": {
+    "defaultMessage": "Checking…",
+    "description": "Under “GitHub CLI” (HI-3550) while Combwork asks gh about its sign-in."
+  },
+  "github.link.choose": {
+    "defaultMessage": "Several remotes are on {host}: choose the project’s repository.",
+    "description": "Under “Repository” (HI-3550) when more than one git remote points at a repository on the GitHub host and none is chosen yet. {host} is a host name."
+  },
+  "github.link.chooseFailed": {
+    "defaultMessage": "Couldn’t choose the repository",
+    "description": "An error’s title (HI-3550): the remote chosen as the project’s repository couldn’t be saved; its message says why."
+  },
+  "github.link.chooseOne": {
+    "defaultMessage": "Choose…",
+    "description": "The first entry of the list choosing which git remote’s repository is the project’s (HI-3550), before one is chosen."
+  },
+  "github.link.cli": {
+    "defaultMessage": "GitHub CLI",
+    "description": "A row’s title in Version Control → Workflow → GitHub (HI-3550): the GitHub CLI (gh) and its sign-in. Product name."
+  },
+  "github.link.desc": {
+    "defaultMessage": "Combwork works with GitHub through your own GitHub CLI (gh) and its sign-in, on the GitHub host below. It stores no token.",
+    "description": "Under the heading “Repository on GitHub” (HI-3550): how Combwork reaches GitHub. GitHub CLI is a product name, gh a command: keep them."
+  },
+  "github.link.failed": {
+    "defaultMessage": "The GitHub CLI couldn’t check its sign-in on {host}.",
+    "description": "Under “GitHub CLI” (HI-3550): gh failed in another way; its own words follow. {host} is a host name."
+  },
+  "github.link.ghSays": {
+    "defaultMessage": "gh says: {error}",
+    "description": "After a GitHub CLI problem (HI-3550): gh’s own words, in English as gh writes them. Keep gh."
+  },
+  "github.link.heading": {
+    "defaultMessage": "Repository on GitHub",
+    "description": "A heading in Version Control → Workflow → GitHub (HI-3550): the project’s repository on its GitHub host, and the GitHub CLI’s sign-in there. GitHub is a product name."
+  },
+  "github.link.linked": {
+    "defaultMessage": "On {host}, from the remote {remote}.",
+    "description": "Under the repository’s name (HI-3550): its host and the git remote it was read from. {host} is a host name, {remote} a remote’s name (origin)."
+  },
+  "github.link.missing": {
+    "defaultMessage": "The GitHub CLI isn’t installed. Install it with `winget install GitHub.cli` in a terminal, then sign in and choose Check Again.",
+    "description": "Under “GitHub CLI” (HI-3550): gh isn’t on the PATH. `…` marks a command: keep it exactly. Check Again is the button beside it: as translated there."
+  },
+  "github.link.none": {
+    "defaultMessage": "No remote of this project is on {host}, so it has no GitHub link and Combwork’s GitHub features don’t show. Add one in Branches & remotes, or change the GitHub host below.",
+    "description": "Under “Repository” (HI-3550) when no git remote points at a repository on the GitHub host. {host} is a host name. Branches & remotes is a Version Control section: as translated there."
+  },
+  "github.link.notARemote": {
+    "defaultMessage": "That remote isn’t on this project’s GitHub host any more: choose again.",
+    "description": "An error choosing the repository of a project’s GitHub link (HI-3550, Version Control → Workflow → GitHub): the remote chosen no longer points at a repository on the GitHub host."
+  },
+  "github.link.open": {
+    "defaultMessage": "Open {repo} on {host}",
+    "description": "The tooltip and accessible name of the project’s repository name, a link (HI-3550): opens its page in the browser. {repo} is owner/name, {host} a host name."
+  },
+  "github.link.readFailed": {
+    "defaultMessage": "Couldn’t read the project’s GitHub link: {error}",
+    "description": "Under “Repository on GitHub” (HI-3550) when reading the link failed. {error} says why."
+  },
+  "github.link.remote": {
+    "defaultMessage": "Remote",
+    "description": "The accessible name of the list choosing which git remote’s repository is the project’s (HI-3550)."
+  },
+  "github.link.remoteOption": {
+    "defaultMessage": "{remote}: {repo}",
+    "description": "An entry of the list choosing the project’s repository (HI-3550): a git remote’s name and its repository (owner/name)."
+  },
+  "github.link.repository": {
+    "defaultMessage": "Repository",
+    "description": "A row’s title in Version Control → Workflow → GitHub (HI-3550): the project’s repository on GitHub."
+  },
+  "github.link.signedIn": {
+    "defaultMessage": "Signed in on {host} as {login}.",
+    "description": "Under “GitHub CLI” (HI-3550): gh is signed in on the host. {host} is a host name, {login} a GitHub user name."
+  },
+  "github.link.signedOut": {
+    "defaultMessage": "The GitHub CLI isn’t signed in on {host}. Sign in with `gh auth login --hostname {host}` in a terminal, then choose Check Again. Combwork never signs in for you.",
+    "description": "Under “GitHub CLI” (HI-3550): gh has no working sign-in on the host. {host} is a host name. `…` marks a command: keep it exactly. Check Again is the button beside it: as translated there."
+  },
+  "github.link.timeout": {
+    "defaultMessage": "The GitHub CLI didn’t answer in time. Choose Check Again.",
+    "description": "Under “GitHub CLI” (HI-3550): gh didn’t answer within Settings → Advanced’s limit. Check Again is the button beside it."
+  },
+  "github.link.version": {
+    "defaultMessage": "gh {version}",
+    "description": "After the GitHub CLI’s state (HI-3550): its version. Keep gh."
   }
 }

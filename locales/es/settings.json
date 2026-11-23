@@ -1722,6 +1722,8 @@
   "settings.advanced.cw.git.processNames.title": "Git: los programas que pueden tener un bloqueo",
   "settings.advanced.cw.git.staleLockSeconds.desc": "Salud del repositorio ofrece quitar un archivo de bloqueo de git (como index.lock) solo cuando tiene al menos esta antigüedad, y solo mientras no se ejecute ningún git que se haya iniciado antes que él. Un git que funciona con normalidad mantiene un bloqueo unos instantes; aumenta este valor si un comando largo de git tuyo (un commit grande, un repack) lo mantiene más tiempo.",
   "settings.advanced.cw.git.staleLockSeconds.title": "Git: antigüedad para que un bloqueo sea obsoleto",
+  "settings.advanced.cw.github.ghMinutes.desc": "Cuánto puede durar una llamada a la CLI de GitHub (gh) antes de que Combwork la termine como bloqueada y diga que no respondió. Súbelo con una conexión lenta o un GitHub Enterprise Server que responda despacio.",
+  "settings.advanced.cw.github.ghMinutes.title": "CLI de GitHub: lo máximo que tarda una llamada",
   "settings.advanced.cw.server.checkInferSeconds.title": "Comprobar servidor: tiempo límite de la solicitud de prueba",
   "settings.advanced.cw.server.checkInferSeconds.desc": "Cuánto espera Comprobar servidor a que un servidor de modelos responda a su solicitud de prueba. Un modelo local que aún no está cargado se carga primero, lo que en un equipo modesto puede tardar minutos; pasado este tiempo, la comprobación indica que se agotó el tiempo."
 }
