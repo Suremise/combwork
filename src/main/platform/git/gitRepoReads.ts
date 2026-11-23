@@ -19,6 +19,7 @@ export const gitRepoReads: RepoReads = {
   operation: (root) => operationState(root),
   stashConflict: (root) => stashConflictIn(root),
   summary: (root) => repo.repoSummary(root),
+  remotes: (root) => repo.repoRemotes(root),
   workTarget: (projectPath) => repo.workTargetOf(projectPath),
   info: (root, workTarget) => repo.repoInfo(root, workTarget),
   leftovers: (root, workTarget) => repo.leftoverInfo(root, workTarget),

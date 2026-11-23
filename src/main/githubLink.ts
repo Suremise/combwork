@@ -6,8 +6,7 @@ import { combworkError } from './combworkError'
 import { msg } from '../shared/i18n/msg'
 import { githubRepoOf, githubRepoUrl, type GithubLink, type RemoteUrls } from '../shared/githubRepo'
 import { ghStatus } from './ghCli'
-import { gitReading } from './git'
-import { parseRemotes } from './gitRepo'
+import { lineRepoReads } from './platform/repoReadsPorts'
 import { githubHostsFor } from './githubHosts'
 import { createLogger, userText } from './logger'
 import type { WorkspaceService } from './workspace'
@@ -16,10 +15,9 @@ const log = createLogger('github')
 
 const NOT_A_REMOTE = msg({ id: 'github.link.notARemote', defaultMessage: 'That remote isn’t on this project’s GitHub host any more: choose again.', description: 'An error choosing the repository of a project’s GitHub link (HI-3550, Version Control → Workflow → GitHub): the remote chosen no longer points at a repository on the GitHub host.' })
 
-/** The project's remotes (none when it isn't a repository, or git can't say). */
-async function remotesOf(projectPath: string): Promise<RemoteUrls[]> {
-  const r = await gitReading(projectPath, ['remote', '-v'])
-  return r.ok ? parseRemotes(r.out) : []
+/** The project's remotes, through the repository reads port (none when it isn't a repository, or git can't say). */
+function remotesOf(projectPath: string): Promise<RemoteUrls[]> {
+  return lineRepoReads().remotes(projectPath)
 }
 
 /** The project's chosen remote (project.json `githubRemote`), or null. */

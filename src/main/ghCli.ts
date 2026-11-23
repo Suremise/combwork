@@ -13,9 +13,34 @@ import type { GhState, GhStatus, GithubRepoRef } from '../shared/githubRepo'
 import { advanced } from './advanced'
 import { createLogger, userText } from './logger'
 import { run } from './providers/common'
-import { parseGhStatus } from './providers/copilot/hosts'
 
 const log = createLogger('github')
+
+/** What `gh auth status --active --hostname <host> --json hosts` said of that host (never a token). */
+export interface GhHostStatus {
+  /** success: gh checked its login there; error: it couldn't (why: `error`); timeout; none: no login there. */
+  state: 'success' | 'error' | 'timeout' | 'none' | 'other'
+  login: string | null
+  /** gh's own words for an error, at most 300 characters. */
+  error: string | null
+}
+
+/** gh's reply for exactly `host` (null: unreadable). Another host's entry never stands in. */
+export function parseGhStatus(stdout: string, host: string): GhHostStatus | null {
+  try {
+    const hosts = (JSON.parse(stdout) as { hosts?: Record<string, unknown> }).hosts
+    if (!hosts || typeof hosts !== 'object') return null
+    const key = Object.keys(hosts).find((k) => k.toLowerCase() === host.toLowerCase())
+    const list = key ? hosts[key] : undefined
+    const a = (Array.isArray(list) ? list : []).find((x) => x && typeof x === 'object' && (x as { active?: unknown }).active !== false) as Record<string, unknown> | undefined
+    if (!a) return { state: 'none', login: null, error: null }
+    const state = a.state === 'success' || a.state === 'error' || a.state === 'timeout' ? a.state : 'other'
+    const error = typeof a.error === 'string' && a.error.trim() ? a.error.replace(/\s+/g, ' ').trim().slice(0, 300) : null
+    return { state, login: typeof a.login === 'string' ? a.login : null, error }
+  } catch {
+    return null
+  }
+}
 
 /** The variables that would sign gh in with a token instead of its own login: removed, in any spelling. */
 export const GH_TOKEN_VARS = ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']

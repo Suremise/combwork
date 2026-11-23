@@ -938,6 +938,8 @@ export const UNIT_SCANS = [
   // Every source file: no control character (#1040), no mixed line endings (#149).
   { test: 'tests/controlCharacters.test.ts', lines: ['[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]'] },
   { test: 'tests/lineEndings.test.ts' },
+  // HI-3550: no main or shared code but ghCli.ts starts a program named gh.
+  { test: 'tests/githubLink.test.ts', paths: ['src/main/', 'src/shared/'], lines: ["['\"`]gh(?:\\.exe)?['\"`]"] },
   // HI-3201: no code outside a provider's folders names a provider or imports its folder; the folders match the registry.
   { test: 'tests/providerRegistry.test.ts', adds: true },
   { test: 'tests/providerRegistry.test.ts', paths: ['src/'], lines: ['claude|codex|copilot|antigravity|agy|opencode', 'providers/'] },

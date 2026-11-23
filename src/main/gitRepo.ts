@@ -53,7 +53,7 @@ import { checkProject } from './branchWatch'
 import { samePlace } from './fsutil'
 import type { AgentDef } from '../shared/types'
 import { withRepoLock } from './repoLock'
-import { branchOfRef, git, type GitResult } from './git'
+import { branchOfRef, git, gitReading, type GitResult } from './git'
 import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
 import { linesOf, listOf, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
@@ -363,7 +363,13 @@ async function readSummary(root: string): Promise<{ summary: GitRepoSummary; git
 const upstreamName = (full: string): string => branchOfRef(full, 'refs/remotes/') ?? branchOfRef(full) ?? full.trim()
 
 /** `git remote -v`: each remote's fetch and push URL (passwords hidden). */
-export function parseRemotes(out: string): GitRemote[] {
+/** HI-3550: the remotes with their URLs (redacted), none when git can't say (not a repository). */
+export async function repoRemotes(root: string): Promise<GitRemote[]> {
+  const r = await gitReading(root, ['remote', '-v'])
+  return r.ok ? parseRemotes(r.out) : []
+}
+
+function parseRemotes(out: string): GitRemote[] {
   const by = new Map<string, GitRemote>()
   for (const line of out.split(/\r?\n/)) {
     const m = /^(\S+)\t(.*) \((fetch|push)\)$/.exec(line.trim())
