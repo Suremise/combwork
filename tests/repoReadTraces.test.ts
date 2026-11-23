@@ -5,6 +5,8 @@
 // some run together) and the same answers as the code before the port: the expected traces were recorded at cd19d0e60,
 // before the port (its tests/repoReadCalls.ts calls the functions directly), with
 // `CW_RECORD_REPO_TRACES=1 npx vitest run tests/repoReadTraces.test.ts`, into tests/fixtures/repoReadTraces.json.
+// The History steps were re-recorded for HI-3547: HI-3474's tag Delete works at the value shown, so the tag read asks for
+// each tag's whole `%(objectname)` and answers it as the tag's `sha`; nothing else in those steps changed.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
