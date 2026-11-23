@@ -78,7 +78,7 @@ export const prRefs = (number: number): { head: string; base: string } => ({ hea
  * allow maintainer edits can't take a push. Evidence shown on the card; the push itself (HI-3552) reads GitHub again.
  */
 export function prPushable(s: Pick<GithubSource, 'kind' | 'pr'>): { ok: true } | { ok: false; why: 'fork' } {
-  return s.kind === 'pr' && s.pr?.crossRepository && !s.pr.maintainerCanModify ? { ok: false, why: 'fork' } : { ok: true }
+  return s.kind === 'pr' && s.pr?.crossRepository && !s.pr.maintainerCanModify ? { ok: false, why: 'fork' } : { ok: true } // i18n-ignore: a reason's key, worded where shown
 }
 
 /** The PR identity a start records (Started.pr): what it was started on, read again by everything after it. */

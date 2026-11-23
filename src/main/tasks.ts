@@ -2638,11 +2638,11 @@ export async function setSource(n: number, input: string | null, actor: TaskActo
       kind = 'issue'
       got = await ask(kind)
     }
-    if (!got.ok) throw new TaskConflictError(got.problem === 'failed' ? withValues(SOURCE.notFound, { number: ref.number, repo, why: got.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: got.problem, host: ref.ref.host }))
+    if (!got.ok) throw new TaskConflictError(got.problem === 'failed' ? withValues(SOURCE.notFound, { number: ref.number, repo, why: got.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: got.problem, host: ref.ref.host })) // i18n-ignore: a select key (none), gh's own words otherwise
     const j = (got.json ?? {}) as Record<string, unknown>
     const str = (k: string): string => (typeof j[k] === 'string' ? (j[k] as string) : '')
     source = cleanSource({ kind, ...ref.ref, number: ref.number, url: str('url') || `https://${ref.ref.host}/${repo}/${kind === 'pr' ? 'pull' : 'issues'}/${ref.number}`, title: str('title'), ...(kind === 'pr' ? { pr: { headRef: str('headRefName'), baseRef: str('baseRefName'), crossRepository: j.isCrossRepository === true, maintainerCanModify: j.maintainerCanModify === true } } : {}) }) ?? null
-    if (!source || (kind === 'pr' && (!source.pr?.headRef || !source.pr.baseRef))) throw new TaskConflictError(withValues(SOURCE.notFound, { number: ref.number, repo, why: 'none' }))
+    if (!source || (kind === 'pr' && (!source.pr?.headRef || !source.pr.baseRef))) throw new TaskConflictError(withValues(SOURCE.notFound, { number: ref.number, repo, why: 'none' })) // i18n-ignore: a select key (none)
   }
   const { workflowFor } = await import('./workflow/service')
   const wf = await workflowFor(ws, projectPath).catch(() => null)
