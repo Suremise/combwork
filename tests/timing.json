@@ -47,6 +47,7 @@
   "pace.tipGoneMs": { "kind": "pace", "ms": 5000, "note": "a tooltip gone within this once the mouse has left, else the hover is tried again (lanestages; its own bound covers the tries)" },
   "pace.promptDrawnMs": { "kind": "pace", "ms": 10000, "note": "a prompt pasted into a CLI drawn on its screen within this, else Enter goes anyway, said (lib.sendPrompt, #600, HI-3210)" },
   "lock.beatFreshMs": { "kind": "lock", "ms": 2000, "note": "a test's helper process counts as running while its heartbeat file is newer than this (laneslotretry: it beats every 250 ms)" },
+  "seam.ghCallMs": { "kind": "seam", "ms": 1500, "note": "the bound tests/githubLink.test.ts gives one gh call to a fake gh that never answers: short, so the test sees it ended as not answering" },
   "seam.fileLagMs": { "kind": "seam", "ms": 25, "note": "the delay openspeed gives each of main's file calls while a workspace opens (a slow disk acted out)" },
   "pace.trustSettleMs": { "kind": "pace", "ms": 400, "note": "Claude Code's trust question: \"Yes\" still selected this long later before Enter, so a Down still on its way would have moved it back (lib.chooseTrust, #218)" },
   "pace.pasteWindowMs": { "kind": "pace", "ms": 400, "note": "a CLI takes an Enter within its paste window as a new line: this long after the prompt is written before its Enter (lib.sendPrompt, #527); nothing on screen says when it ends" },

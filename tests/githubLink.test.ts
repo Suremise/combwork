@@ -115,7 +115,7 @@ describe.runIf(windows)('the gh service, on a fake gh', { timeout: timing('test.
     expect(await gh({ host: 'github.com' }, ['api', 'user'], { env: { PATH: nodeDir } })).toEqual({ ok: false, problem: 'missing', detail: null })
     expect(await gh({ host: 'github.com' }, ['api', 'user'], { env: env('four') })).toMatchObject({ ok: false, problem: 'signedOut' })
     expect(await gh({ host: 'github.com' }, ['api', 'user'], { env: env('fail') })).toEqual({ ok: false, problem: 'failed', detail: 'HTTP 404: Not Found (https://api.github.com/repos/x/y)' })
-    expect(await gh({ host: 'github.com' }, ['api', 'user'], { env: env('hang'), timeoutMs: 1500 })).toEqual({ ok: false, problem: 'timeout', detail: null })
+    expect(await gh({ host: 'github.com' }, ['api', 'user'], { env: env('hang'), timeoutMs: timing('seam.ghCallMs') })).toEqual({ ok: false, problem: 'timeout', detail: null })
   })
   it('reads its sign-in on exactly the host asked: signed in as whom, signed out, a login that doesn’t work, not installed', async () => {
     fresh()
