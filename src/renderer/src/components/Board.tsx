@@ -2344,7 +2344,18 @@ export function TaskDialog() {
           <KindField card={card} b={badge} noCode={noCode} setNoCode={setNoCode} readOnly={ro} />
           <ReviewSkipField card={card} b={badge} reviews={projectReviews} skip={skipReview} setSkip={setSkipReview} note={skipNote} setNote={setSkipNote} readOnly={ro} />
           <TargetField card={card} b={badge} targets={projectTargets} value={newTarget} setValue={setNewTarget} readOnly={ro} />
-          {card?.project && <SourceField card={card} readOnly={ro} />}
+          {card?.project && (
+            <SourceField
+              card={card}
+              readOnly={ro}
+              onSet={(c) => {
+                // Its github-pr or github-issue label, shown at once unless the labels box was edited meanwhile.
+                const now = c.labels.join(', ')
+                if (labels === orig.current.labels) setLabels(now)
+                orig.current.labels = now
+              }}
+            />
+          )}
           <label>{tr(msg({ id: 'board.dialog.labels', defaultMessage: 'Labels', description: "A field label in the card dialog: the card's labels." }))}</label>
           <input className="input" placeholder={tr(msg({ id: 'board.dialog.labelsPlaceholder', defaultMessage: 'Comma separated, e.g. bug, ui', description: "Placeholder of the card dialog's labels box: labels separated by commas (bug and ui are examples)." }))} value={labels} readOnly={ro} onChange={(e) => setLabels(e.target.value)} />
           <label>{tr(BLOCKED_FIELD)}</label>

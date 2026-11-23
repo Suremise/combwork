@@ -25,7 +25,7 @@ const T = {
   failed: msg({ id: 'board.dialog.sourceFailed', defaultMessage: 'Couldn’t set the GitHub source', description: 'An error’s title (HI-3551): the card’s GitHub source couldn’t be set or removed; its message says why.' })
 }
 
-export function SourceField({ card, readOnly }: { card: TaskCard; readOnly: boolean }) {
+export function SourceField({ card, readOnly, onSet }: { card: TaskCard; readOnly: boolean; onSet?: (card: TaskCard) => void }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const s = card.source
@@ -35,7 +35,10 @@ export function SourceField({ card, readOnly }: { card: TaskCard; readOnly: bool
     setBusy(true)
     const done = await actions.attempt(tr(T.failed), () => call('tasks:setSource', card.number, value))
     setBusy(false)
-    if (done) setText('')
+    if (done) {
+      setText('')
+      onSet?.(done)
+    }
   }
   if (!s && !editable) return null
   return (
