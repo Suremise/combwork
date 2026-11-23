@@ -176,6 +176,19 @@ describe('the unit tests alone (pickUnitTests, --pick --unit: HI-3542)', () => {
     expect(run(['tests/setup.ts'], null).tests.size).toBe(0)
   })
 
+  it("a deleted or renamed-away module still picks the tests that load it (HR1's round 1); a deleted test isn't picked", () => {
+    const tree: Record<string, string> = {
+      'tests/a.test.ts': "import { a } from '../src/a'\n",
+      'tests/moved.test.ts': "vi.mock('../src/old', () => ({}))\n",
+      'src/new.ts': 'export const n = 1\n'
+    }
+    const files = Object.keys(tree)
+    const read = (f: string) => tree[f] ?? null
+    // src/a.ts deleted; src/old.ts renamed to src/new.ts (both paths given, as Combwork does); tests/gone.test.ts deleted.
+    const r = directUnitTests({ paths: ['src/a.ts', 'src/old.ts', 'src/new.ts', 'tests/gone.test.ts'], files, read, config: null })
+    expect(Object.fromEntries(r.tests)).toEqual({ 'tests/a.test.ts': 'tests/a.test.ts: loads src/a.ts', 'tests/moved.test.ts': 'tests/moved.test.ts: loads src/old.ts' })
+  })
+
   it("this repository's setup files count as every test's (vitest.config.ts)", () => {
     const config = readFileSync(join(root, 'vitest.config.ts'), 'utf8')
     for (const f of ['tests/cliHomes.ts', 'tests/tempRun.ts']) expect(directUnitTests({ paths: [f], files: [], read: () => null, config })).toMatchObject({ all: expect.any(String) })

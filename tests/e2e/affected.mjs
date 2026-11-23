@@ -1288,7 +1288,9 @@ export function directUnitTests({ paths, files, read, config }) {
   const setup = config ? [...config.matchAll(/\b(?:setupFiles|globalSetup)\s*:\s*\[([^\]]*)\]/g)].flatMap((m) => [...m[1].matchAll(/(['"])([^'"]+)\1/g)].map((x) => slashes(x[2]).replace(/^\.\//, ''))) : []
   const shared = [...changed].find((f) => VITEST_CONFIGS.includes(f) || setup.includes(f))
   if (shared) return { all: `${shared}: every unit test loads it` }
-  const known = new Map(files.map(slashes).map((f) => [f.toLowerCase(), f]))
+  // The changed paths resolve too (HR1's HI-3542 round 1): a test still importing a module the change deleted or
+  // renamed away loads it, and now fails to load. Only the checkout's own test files are picked.
+  const known = new Map([...files, ...changed].map(slashes).map((f) => [f.toLowerCase(), f]))
   const tests = new Map()
   for (const f of files.map(slashes).filter(isUnitTestFile)) {
     const text = read(f)
