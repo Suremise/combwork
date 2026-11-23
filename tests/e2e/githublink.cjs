@@ -95,6 +95,30 @@ const calls = () => fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(B
     const cfg = () => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8'))
     check('choosing upstream links upstream-org/widgets, saved in project.json', !!(await until(async () => (await link.getAttribute('data-linked')) === 'upstream-org/widgets' && cfg().githubRemote === 'upstream', HUNG_MS)), JSON.stringify(cfg().githubRemote))
 
+    // --- HR1's round 1: a remote chosen while Check Again's read waits (held in main, CW_TEST_HOLD_IPC). Whichever
+    // finishes, the newest operation ends the wait: Check Again comes back, the choice shown. Then the same with the
+    // choice failing (CW_TEST_FAIL_IPC): said, the link as it was, Check Again back.
+    const again = cli.locator('[data-action="gh-check-again"]')
+    const holdLink = (on) => app.evaluate((_, v) => (v ? (process.env.CW_TEST_HOLD_IPC = 'github:link') : delete process.env.CW_TEST_HOLD_IPC), on)
+    await holdLink(true)
+    await again.click()
+    check('Check Again waits while its read is held', !!(await until(async () => await again.isDisabled(), HUNG_MS)))
+    await repoRow.locator('select').selectOption('origin')
+    check('…a remote chosen meanwhile is saved and shown', !!(await until(async () => (await link.getAttribute('data-linked')) === 'acme/widgets' && cfg().githubRemote === 'origin', HUNG_MS)), JSON.stringify(cfg().githubRemote))
+    await holdLink(false)
+    check('…the held read let through: Check Again back, the choice still shown', !!(await until(async () => (await again.isEnabled()) && (await link.getAttribute('data-linked')) === 'acme/widgets', HUNG_MS)), await text(link))
+    await holdLink(true)
+    await app.evaluate(() => (process.env.CW_TEST_FAIL_IPC = 'github:setRemote*1'))
+    await again.click()
+    await until(async () => await again.isDisabled(), HUNG_MS)
+    await repoRow.locator('select').selectOption('upstream')
+    check('a choice that fails meanwhile is said', !!(await until(async () => (await page.locator('.toast', { hasText: 'Couldn’t choose the repository' }).count()) === 1, HUNG_MS)))
+    await holdLink(false)
+    await app.evaluate(() => delete process.env.CW_TEST_FAIL_IPC)
+    check('…and Check Again comes back, the link as saved (origin)', !!(await until(async () => (await again.isEnabled()) && (await link.getAttribute('data-linked')) === 'acme/widgets', HUNG_MS)) && cfg().githubRemote === 'origin', await text(link))
+    await repoRow.locator('select').selectOption('upstream')
+    await until(async () => (await link.getAttribute('data-linked')) === 'upstream-org/widgets', HUNG_MS)
+
     // --- Signed out: the command to run, then Check Again finds it signed in.
     fs.writeFileSync(stateFile, 'out')
     await cli.locator('[data-action="gh-check-again"]').click()

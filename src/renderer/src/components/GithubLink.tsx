@@ -56,22 +56,27 @@ export function GithubLink({ projectPath }: { projectPath: string }) {
   const [busy, setBusy] = useState(false)
   // Read again when the project's GitHub settings change (its host), from here or elsewhere; only the latest read counts.
   const github = useStore((s) => JSON.stringify([s.workspace?.config.github ?? null, s.workspace?.projects.find((p) => p.path === projectPath)?.config.github ?? null]))
+  // One counter for reads and choices (HR1's round 1): only the newest operation's answer is shown, and it alone ends
+  // busy, whether it succeeds or fails; an older one finishing later changes nothing.
   const latest = useRef(0)
-  const read = (): void => {
-    const n = ++latest.current
+  const start = (): number => {
     setBusy(true)
+    return ++latest.current
+  }
+  const settle = (n: number, apply: () => void): void => {
+    if (n !== latest.current) return
+    apply()
+    setBusy(false)
+  }
+  const read = (): void => {
+    const n = start()
     void call('github:link', projectPath).then(
-      (l) => {
-        if (n !== latest.current) return
-        setLink(l)
-        setError(null)
-        setBusy(false)
-      },
-      (e: unknown) => {
-        if (n !== latest.current) return
-        setError(e instanceof Error ? e.message : String(e))
-        setBusy(false)
-      }
+      (l) =>
+        settle(n, () => {
+          setLink(l)
+          setError(null)
+        }),
+      (e: unknown) => settle(n, () => setError(e instanceof Error ? e.message : String(e)))
     )
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -83,9 +88,10 @@ export function GithubLink({ projectPath }: { projectPath: string }) {
     []
   )
   const choose = async (remote: string | null): Promise<void> => {
-    const n = ++latest.current
+    const n = start()
+    // A refused choice is said by attempt (null); the link shown stays as it was.
     const next = await actions.attempt(tr(T.chooseFailed), () => call('github:setRemote', projectPath, remote))
-    if (next && n === latest.current) setLink(next)
+    settle(n, () => next && setLink(next))
   }
   const host = link?.host ?? ''
   const several = (link?.candidates.length ?? 0) > 1
