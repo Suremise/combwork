@@ -77,6 +77,7 @@ const ancestor = (x, y) => {
     await form.locator('.workflow-preview [data-action="use-choice"]').click()
     const strictRow = form.locator('.workflow-option[data-option="strict"]')
     await waitHung(async () => (await strictRow.count()) === 1)
+    await lib.workflowTab(form, 'strict')
     await strictRow.scrollIntoViewIfNeeded()
     await strictRow.locator('[role="switch"], input[type="checkbox"]').first().click()
     // Combwork's commit message chosen too (G19: Pair's is the branch's own since HI-1997): this lane's merges are checked by their trailers.

@@ -1,5 +1,8 @@
 {
   "tabs.unsaved": "Alterações não salvas",
   "tabs.unsavedNamed": "{tab} (alterações não salvas)",
-  "tabs.withNote": "{tab} ({note})"
+  "tabs.unsavedProblemNamed": "{tab} (alterações não salvas, algo a resolver)",
+  "tabs.withNote": "{tab} ({note})",
+  "tabs.problem": "Há algo a resolver aqui",
+  "tabs.problemNamed": "{tab} (algo a resolver)"
 }

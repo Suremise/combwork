@@ -279,6 +279,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   g(alpha, 'branch', '1.3.0', 'release')
   await inv('workflow:setOptions', alpha, { preset: null, options: { target: '1.3.0' } })
   await page.locator('.git-sections button', { hasText: 'Workflow' }).click()
+  await lib.workflowTab(page, 'target')
   const target = page.locator('.workflow-option[data-option="target"]')
   await target.locator('input.input').fill('2.0.0')
   await target.locator('input.input').press('Enter')

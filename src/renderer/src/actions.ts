@@ -3,7 +3,7 @@ import { basename } from './util'
 import { call, errorMessage } from './api'
 import { agentLimit } from './advanced'
 import { assistantCli, cliReadyOf, firstReadyConnection, offeredConnections } from '@shared/connectionLabel'
-import { agentOf, cancelDialog, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
+import { agentOf, cancelDialog, agentProviderOf, cardLabelOf, choose, openVersionControl, openWorkflowOption, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
 import { AGENT_LIMIT_MAX, MANY_AGENTS, OPEN_WORKFLOW_OPTIONS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
 import { autoProvider, autoProviderPending, isKnownProvider, isProviderEnabled, providerName } from '@shared/providers'
@@ -247,7 +247,7 @@ export async function createProject(): Promise<void> {
   // Its Version Control tab, at "How do you work?" (#1423): no notice for it, the step is in front of the user.
   if (created) {
     set({ presetStepShown: [...get().presetStepShown, created.path] })
-    openVersionControl(created.path, 'workflow')
+    openWorkflowOption(created.path, 'overview')
   }
   notify('success', tr(msg({ id: 'actions.project.created', defaultMessage: 'Project "{name}" created', description: 'A notification: a new project ({name}) was created.' }), { name: name.trim() }))
 }
@@ -483,7 +483,7 @@ export async function quickAddAgent(path: string | null = get().selectedProject,
   const limit = agentLimit(p)
   if (p && p.agents.length >= limit) {
     // At its Maximum agents (HI-2058), the way to raise it; at the most any project has, removing one is the only way.
-    const raise = limit < AGENT_LIMIT_MAX ? [{ label: tr(OPEN_WORKFLOW_OPTIONS), command: 'project.openVersionControl', args: [p.path, 'workflow'] }] : undefined
+    const raise = limit < AGENT_LIMIT_MAX ? [{ label: tr(OPEN_WORKFLOW_OPTIONS), command: 'project.openVersionControl', args: [p.path, 'workflow', 'maxAgents'] }] : undefined
     notify('warning', tr(msg({ id: 'actions.agent.noRoom', defaultMessage: 'No room for another agent', description: "A warning's title: the project has as many agents as it may have." })), raise ? agentLimitText(tr, limit) : tr(msg({ id: 'actions.agent.noRoomMessage', defaultMessage: '{why} Remove one first.', description: 'Under the warning that a project has no room for another agent: {why} says the limit and where it is set.' }), { why: agentLimitText(tr) }), raise)
     return null
   }
@@ -1769,7 +1769,8 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
     }
   })
   if (!ok) {
-    if (openWorkflow) openVersionControl(path, 'workflow')
+    // HI-3549: at Maximum agents, which is what stopped the load.
+    if (openWorkflow) openWorkflowOption(path, 'maxAgents')
     if (setUpGit) {
       set({ templatePending: { path, entry: { scope: entry.scope, file: entry.file, name: entry.name }, ...(from ? { from } : {}) }, vcGitPreview: path })
       openVersionControl(path, 'workflow')
@@ -1789,12 +1790,13 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
       // The Maximum agents it saved, if it did (HI-2083: the form's note says what is saved already).
       const savedMax = got.loaded?.maxAgents
       set({ workflowPrefill: { path, preset: seen.section.preset, template: { name: plan.name, platform: seen.platform, section: { ...seen.section, options: rules }, ...(savedMax !== undefined ? { savedMax } : {}) } } })
-      openVersionControl(path, 'workflow')
+      // HI-3549: on Overview, its preset; the tabs it changed are marked unsaved.
+      openWorkflowOption(path, 'overview')
     }
   } else if (suggested && switchPreset) {
     // Filled in once the form has read the project's options (#1423's way), and left for the user to save.
     set({ workflowPrefill: { path, preset: suggested } })
-    openVersionControl(path, 'workflow')
+    openWorkflowOption(path, 'overview')
   }
 }
 

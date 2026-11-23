@@ -130,6 +130,9 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     // The note says what is saved already (HI-2083): its Maximum agents, with its agents; the rest awaits Save.
     check('…the note says its Maximum agents (12) is saved already and the other options aren’t yet', /Its Maximum agents \(12\) is saved already, with its agents; the other options aren’t saved yet/.test(await text(banner)), await text(banner))
     check('…and nothing else saved yet: its Maximum agents saved with its agents', JSON.stringify(withoutMax(workflowOf(gitb))) === JSON.stringify(withoutMax(gitbBefore === undefined ? undefined : JSON.parse(gitbBefore))) && workflowOf(gitb)?.options?.maxAgents === 12, JSON.stringify(workflowOf(gitb)))
+    // HI-3549: on Overview, its preset; the tabs of the options it filled in marked unsaved, none of them a problem.
+    const vcTab = (id) => page.locator(`.vc-view .workflow-form [role="tab"][data-workflow-tab="${id}"]`)
+    check('…on the Overview tab, Review & checks marked as unsaved, nothing marked as a problem', !!(await until(async () => (await vcTab('overview').getAttribute('aria-selected')) === 'true' && (await vcTab('checks').locator('[data-unsaved]').count()) === 1, lib.timing('hang.ui'))) && (await page.locator('.vc-view .workflow-form [role="tab"] [data-problem]').count()) === 0 && /unsaved changes/.test((await vcTab('checks').getAttribute('aria-label')) ?? ''), await text(page.locator('.vc-view .workflow-form [role="tablist"]')))
     await shoot('3-filled', () => page.locator('.vc-view'))
     await page.locator('.workflow-actions [data-action="save"]').click()
     const confirmSave = page.locator('.dialog', { hasText: 'Save' }).last()
@@ -203,13 +206,26 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     const view = page.locator('[data-template-workflow-view]')
     check("the Templates view shows its workflow under None | Git tabs", !!(await until(async () => (await view.locator('[role="tab"][data-workflow-platform="none"]').count()) === 1 && (await view.locator('[role="tab"][data-workflow-platform="git"]').count()) === 1 && (await view.locator('[data-workflow-section="git"] li[data-option="review"]').count()) === 1, lib.timing('hang.ui'))), await text(view))
     await shoot('6-view', () => page.locator('.template-detail'))
+    // HI-3549: Git's section under the Workflow form's tabs, Overview its preset, each other tab its options.
+    const gitSection = view.locator('[data-workflow-section="git"]')
+    const templateTabs = await gitSection.locator('[role="tab"][data-workflow-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-workflow-tab')))
+    check("HI-3549: the template's Git section in the form's tabs, Overview first", templateTabs[0] === 'overview' && templateTabs.includes('checks'), JSON.stringify(templateTabs))
+    for (const id of templateTabs) {
+      await gitSection.locator(`[role="tab"][data-workflow-tab="${id}"]`).click()
+      await shoot(`6-view-tab-${id}`, () => page.locator('.template-detail'))
+    }
     await page.locator('.template-detail-actions button', { hasText: 'Edit…' }).click()
     const editor = page.locator('.template-editor [data-template-workflow-view]')
     await until(async () => (await editor.count()) === 1, lib.timing('hang.ui'))
     await editor.locator('[role="tab"][data-workflow-platform="none"]').click()
+    check('HI-3549: the editor opens with no tab marked unsaved', (await editor.locator('[role="tab"] [data-unsaved]').count()) === 0)
     await editor.locator('[data-workflow-remove="none"]').click()
+    const platformTab = (p) => editor.locator(`[role="tab"][data-workflow-platform="${p}"]`)
+    check("HI-3549: None's section removed: its tab marked unsaved, Git's not", !!(await until(async () => (await platformTab('none').locator('[data-unsaved]').count()) === 1, lib.timing('hang.ui'))) && (await platformTab('git').locator('[data-unsaved]').count()) === 0)
+    await shoot('6-editor-unsaved', () => page.locator('.template-editor'))
     await page.locator('.template-editor .template-detail-actions button', { hasText: 'Save Template' }).click()
     check("the editor removes None's section, Git's kept", !!(await until(() => JSON.stringify(Object.keys(fileOf('team-a.json').workflow ?? {})) === '["git"]', lib.timing('hang.ui'))), JSON.stringify(fileOf('team-a.json').workflow))
+    check('…saved: no tab marked unsaved', !!(await until(async () => (await editor.locator('[role="tab"] [data-unsaved]').count()) === 0, lib.timing('hang.ui'))))
 
     // --- HR5's round 1, 1: imported with a section Combwork can't use: said, and no preset offered in its place.
     await page.locator('.activitybar [aria-label="Projects"]').click()

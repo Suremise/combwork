@@ -5,7 +5,7 @@
 // (`overlayTemplateWorkflow`): a section naming a target, commands or an identity's name never carries them anywhere.
 
 import { merges, type PlatformId } from '../platform/descriptors'
-import { allOff, contradictions, FOCUSED_RUN, FORM_GROUPS, identityShown, OPTION_TAKES, PRESETS, sameOptionValue, type OptionKey, type PresetId, type WorkflowOptions } from './options'
+import { allOff, contradictions, FOCUSED_RUN, FORM_GROUPS, formTabOf, identityShown, OPTION_TAKES, PRESETS, sameOptionValue, type FormTabId, type OptionKey, type PresetId, type WorkflowOptions } from './options'
 import { stageNameProblems } from './stages'
 
 /**
@@ -73,6 +73,25 @@ export type TemplateWorkflows = Partial<Record<PlatformId, TemplateWorkflow>>
 
 /** The version controls a template's sections are for, in the order they are shown. */
 export const TEMPLATE_PLATFORMS: readonly PlatformId[] = ['none', 'git']
+
+/**
+ * HI-3549: the Workflow form's tabs where a template's section for `platform` differs from the one saved, as the template
+ * editor marks them unsaved: Overview for its preset, or the section added or removed; each other tab for an option on it
+ * set to another value, added or dropped. An option no tab of the platform holds counts on Overview. Empty when the same.
+ */
+export function templateTabsChanged(platform: PlatformId, now: TemplateWorkflow | undefined, saved: TemplateWorkflow | undefined): Set<FormTabId> {
+  const out = new Set<FormTabId>()
+  if (!now && !saved) return out
+  if (!now || !saved) return out.add('overview')
+  if (now.preset !== saved.preset) out.add('overview')
+  const a = now.options as Record<string, unknown>
+  const b = saved.options as Record<string, unknown>
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (JSON.stringify(a[key]) === JSON.stringify(b[key])) continue
+    out.add(formTabOf(platform, key as OptionKey) ?? 'overview')
+  }
+  return out
+}
 
 /** The carried options a platform has (its form's): None has no merging, slots or G17. */
 export const carriedFor = (platform: PlatformId): CarriedKey[] => TEMPLATE_CARRIED.filter((k) => FORM_GROUPS[platform].some((g) => g.options.includes(k)))

@@ -1,5 +1,8 @@
 {
   "tabs.unsaved": "未保存の変更",
   "tabs.unsavedNamed": "{tab}（未保存の変更）",
-  "tabs.withNote": "{tab}（{note}）"
+  "tabs.unsavedProblemNamed": "{tab}（未保存の変更、解決が必要）",
+  "tabs.withNote": "{tab}（{note}）",
+  "tabs.problem": "解決が必要な項目があります",
+  "tabs.problemNamed": "{tab}（解決が必要）"
 }

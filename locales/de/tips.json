@@ -589,6 +589,8 @@
   "tips.viewerTokens.title": "Eine andere App Combwork beobachten lassen",
   "tips.workflowDefaults.text": "Einstellungen → Versionsverwaltung legt die Optionen fest, mit denen jedes Projekt beginnt: Combwork-Standards für jeden Arbeitsbereich und die des offenen Arbeitsbereichs darüber. Die eigenen Optionen eines Projekts gehen weiterhin vor, und beim Speichern siehst du die Projekte, die die Änderung erben.",
   "tips.workflowDefaults.title": "Workflow einmal für alle Projekte festlegen",
+  "tips.workflowOptionTabs.text": "Versionsverwaltung → Workflow hat einen Tab für jeden Teil deines Workflows. Ein Punkt markiert einen Tab mit nicht gespeicherten Änderungen, eine Warnung einen, in dem etwas zu klären ist. Suche in den Einstellungen nach dem Namen einer Option, um sie in den Workflow-Standards zu öffnen.",
+  "tips.workflowOptionTabs.title": "Workflow-Optionen nach Tab finden",
   "tips.workflowOptions.text": "Versionsverwaltung → Workflow legt fest, wer die Arbeit einer Karte reviewt, welche Checks vorher bestehen und wer sie mergt. Wähle eine Voreinstellung oder setze jede Option einzeln: Eine Änderung gilt ab der nächsten Karte, die startet.",
   "tips.workflowOptions.title": "Lege fest, wie Karten zu Erledigt kommen",
   "tips.workflowPresetsWhy.text": "Klicke in Versionsverwaltung → Workflow auf Solo, Paar oder Team: Die Voreinstellung listet jede Option auf, die sie setzt, mit dem Grund, und markiert, was sie ändern würde. Nichts ändert sich, bis du sie verwendest und speicherst.",

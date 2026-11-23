@@ -1,5 +1,8 @@
 {
   "tabs.unsaved": "未保存的更改",
   "tabs.unsavedNamed": "{tab}（未保存的更改）",
-  "tabs.withNote": "{tab}（{note}）"
+  "tabs.unsavedProblemNamed": "{tab}（未保存的更改，需要解决）",
+  "tabs.withNote": "{tab}（{note}）",
+  "tabs.problem": "此处有需要解决的问题",
+  "tabs.problemNamed": "{tab}（需要解决）"
 }

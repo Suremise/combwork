@@ -6,7 +6,7 @@ import { PRESET_SUMMARY, PRESET_TEXT } from '@shared/workflow/optionTexts'
 import { asksPreset, STEP_PRESETS, suggestPreset } from '@shared/workflow/presetStep'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { confirm, notify, openVersionControl, set, showVersionControl, useLanguage, useStore } from '../store'
+import { confirm, focusWorkflowOption, notify, openWorkflowOption, set, showVersionControl, useLanguage, useStore, workflowFormAt } from '../store'
 import { cx } from '../util'
 import { ChoicePreview, optionValueText, problemText } from './WorkflowOptions'
 import { Icon } from './ui'
@@ -88,6 +88,8 @@ export function PresetStep({ project, platform, form }: { project: ProjectInfo; 
   const customise = (): void => {
     set({ workflowPrefill: { path: project.path, preset: shown.id } })
     showVersionControl(project.path, 'workflow')
+    // HI-3549: on Overview, where the preset is.
+    focusWorkflowOption(workflowFormAt(project.path), 'overview')
   }
   const notNow = (): void => {
     void call('workflow:presetNotNow', project.path, platform).catch((e) => notify('error', errorMessage(e)))
@@ -154,7 +156,7 @@ export function NewProjectsNotice() {
   if (!projects.length) return null
   const choose = (): void => {
     set({ presetStepShown: [...shownHere, projects[0].path] })
-    openVersionControl(projects[0].path, 'workflow')
+    openWorkflowOption(projects[0].path, 'overview')
   }
   const notNow = (): void => {
     for (const p of projects) void call('workflow:presetNotNow', p.path, p.platform!.id).catch((e) => notify('error', errorMessage(e)))

@@ -22,6 +22,8 @@ export interface TabItem<T extends string = string> {
   count?: number
   /** The tab's page has changes not saved yet: marked, and said in its accessible name. */
   unsaved?: boolean
+  /** Its page has something to resolve (an option that can't be saved, HI-3549): marked, and said in its accessible name. */
+  problem?: boolean
   /**
    * Dimmed but still chosen as any other (Settings → Advanced's tab of a CLI turned off, HI-1839): why, which is its
    * tooltip and part of its accessible name.
@@ -38,6 +40,9 @@ export interface TabItem<T extends string = string> {
 const T = {
   unsaved: msg({ id: 'tabs.unsaved', defaultMessage: 'Unsaved changes', description: "Tooltip of the dot on a tab whose page has changes not saved yet (Settings → Version Control's Combwork defaults, say), and read out with the tab's name." }),
   named: msg({ id: 'tabs.unsavedNamed', defaultMessage: '{tab} (unsaved changes)', description: "A tab's accessible name while its page has changes not saved yet; {tab} is its name." }),
+  problem: msg({ id: 'tabs.problem', defaultMessage: 'Something here needs resolving', description: "Tooltip of the warning mark on a tab whose page has something to resolve, such as workflow options that can't be saved (HI-3549), and read out with the tab's name." }),
+  problemNamed: msg({ id: 'tabs.problemNamed', defaultMessage: '{tab} (needs resolving)', description: "A tab's accessible name while its page has something to resolve, such as workflow options that can't be saved (HI-3549); {tab} is its name." }),
+  bothNamed: msg({ id: 'tabs.unsavedProblemNamed', defaultMessage: '{tab} (unsaved changes, needs resolving)', description: "A tab's accessible name while its page has changes not saved yet and something to resolve (HI-3549); {tab} is its name." }),
   withNote: msg({ id: 'tabs.withNote', defaultMessage: '{tab} ({note})', description: "A dimmed tab's accessible name: {tab} is its name, {note} why it is dimmed (a CLI turned off, say)." })
 }
 
@@ -92,11 +97,11 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
         {items.map((x) => {
           const selected = x.id === value
           const folded = icons && !selected && !!x.icon
-          const named = x.unsaved ? tr(T.named, { tab: x.label }) : x.label
+          const named = x.unsaved && x.problem ? tr(T.bothNamed, { tab: x.label }) : x.problem ? tr(T.problemNamed, { tab: x.label }) : x.unsaved ? tr(T.named, { tab: x.label }) : x.label
           const name = x.muted ? tr(T.withNote, { tab: named, note: x.muted }) : named
           return (
             <Tooltip key={x.id} content={x.tip ?? (folded ? name : (x.muted ?? null))}>
-              <button type="button" role="tab" id={tabIds(base, x.id).tab} aria-controls={tabIds(base, x.id).panel} aria-selected={selected} {...(x.unsaved || x.muted ? { 'aria-label': name } : {})} tabIndex={selected ? 0 : -1} data-tab={x.id} {...(x.muted ? { 'data-muted': '' } : {})} {...x.attrs} className={cx('cw-tab', selected && 'active', folded && 'icon-only', x.muted && 'muted')} onClick={() => onChange(x.id)}>
+              <button type="button" role="tab" id={tabIds(base, x.id).tab} aria-controls={tabIds(base, x.id).panel} aria-selected={selected} {...(x.unsaved || x.problem || x.muted ? { 'aria-label': name } : {})} tabIndex={selected ? 0 : -1} data-tab={x.id} {...(x.muted ? { 'data-muted': '' } : {})} {...x.attrs} className={cx('cw-tab', selected && 'active', folded && 'icon-only', x.muted && 'muted')} onClick={() => onChange(x.id)}>
                 {tabIcon(x.icon)}
                 <span className="cw-tab-label">{x.label}</span>
                 {x.tag && <span className="cw-tab-tag">{x.tag}</span>}
@@ -104,6 +109,13 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
                 {x.unsaved && (
                   <Tooltip content={tr(T.unsaved)}>
                     <span className="cw-tab-unsaved" data-unsaved="" />
+                  </Tooltip>
+                )}
+                {x.problem && (
+                  <Tooltip content={tr(T.problem)}>
+                    <span className="cw-tab-problem" data-problem="">
+                      <Icon name="warning" />
+                    </span>
                   </Tooltip>
                 )}
               </button>
@@ -120,6 +132,7 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
               {x.tag && <span className="cw-tab-tag">{x.tag}</span>}
               {x.count !== undefined && <span className="cw-tab-count">{fmt.number(x.count)}</span>}
               {x.unsaved && <span className="cw-tab-unsaved" />}
+              {x.problem && <span className="cw-tab-problem"><Icon name="warning" /></span>}
             </span>
           ))}
         </div>

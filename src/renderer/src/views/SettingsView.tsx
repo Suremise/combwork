@@ -1,4 +1,4 @@
-import { WorkflowLevelForm } from '../components/WorkflowOptions'
+import { WorkflowLevelForm, workflowSearchHit } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
 import { CombworkCommands, QuitPoint, WorkspaceCommands, WorkspacePoint } from '../components/CommandsSettings'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
@@ -1024,7 +1024,7 @@ const WORKFLOW_TABS_LABEL = msg({ id: 'settings.workflow.tabs', defaultMessage: 
  * and Save…, the tab last chosen shown. Both forms stay mounted while the section is shown, so switching (or a search
  * offering only one tab) keeps each draft; a tab with one says so. `rows` are the section's rows the search shows.
  */
-function WorkflowDefaultsTabs({ rows, searching }: { rows: SettingDef[]; searching: boolean }) {
+function WorkflowDefaultsTabs({ rows, searching, query }: { rows: SettingDef[]; searching: boolean; query: string }) {
   const workspaceName = useStore((s) => s.workspace?.name ?? null)
   const idBase = useId()
   const [dirty, setDirty] = useState<Record<string, boolean>>({})
@@ -1046,7 +1046,7 @@ function WorkflowDefaultsTabs({ rows, searching }: { rows: SettingDef[]; searchi
               {rowText(d).desc}
               <RowTip d={d} />
             </div>
-            {d.id === WORKFLOW_DEFAULTS_TAB.global ? <WorkflowLevelForm level="global" onDirty={onGlobalDirty} /> : <WorkflowLevelForm level="workspace" onDirty={onWorkspaceDirty} />}
+            {d.id === WORKFLOW_DEFAULTS_TAB.global ? <WorkflowLevelForm level="global" onDirty={onGlobalDirty} query={d.id === shown ? query : ''} /> : <WorkflowLevelForm level="workspace" onDirty={onWorkspaceDirty} query={d.id === shown ? query : ''} />}
           </div>
         </TabPanel>
       ))}
@@ -1077,7 +1077,9 @@ export function SettingsView() {
       if (d.id === 'workflow.workspaceDefaults' && !workspaceName) return false
       if (d.id === 'advanced.values' && (q || modifiedOnly)) return advancedMatches(q, modifiedOnly, advanced)
       // Its English matches as well as what it shows: Settings can be searched in either.
-      if (q && !`${d.title} ${d.desc} ${d.tip} ${d.key}${shownLanguage !== SOURCE_LANGUAGE ? ` ${Object.values(rowText(d)).join(' ')}` : ''}`.toLowerCase().includes(q)) return false
+      // A level's workflow defaults match by their options too (HI-3549): the form then opens the option found.
+      const optionHit = q && (d.id === WORKFLOW_DEFAULTS_TAB.global || d.id === WORKFLOW_DEFAULTS_TAB.workspace) && (!!workflowSearchHit(q, 'git') || !!workflowSearchHit(q, 'none'))
+      if (q && !optionHit && !`${d.title} ${d.desc} ${d.tip} ${d.key}${shownLanguage !== SOURCE_LANGUAGE ? ` ${Object.values(rowText(d)).join(' ')}` : ''}`.toLowerCase().includes(q)) return false
       if (modifiedOnly && (d.type === 'custom' || getValue(settings!, d) === defaultValue(d))) return false
       if (!q && !modifiedOnly && d.section !== section) return false
       return true
@@ -1119,7 +1121,7 @@ export function SettingsView() {
                 {/* Its only row drawn untitled (HI-2107): its tip here, beside the one description. */}
                 {g.items.length === 1 && g.items[0].untitled && <RowTip d={g.items[0]} />}
               </p>
-              {g.id === 'workflow' && <WorkflowDefaultsTabs rows={g.items} searching={!!query.trim() || modifiedOnly} />}
+              {g.id === 'workflow' && <WorkflowDefaultsTabs rows={g.items} searching={!!query.trim() || modifiedOnly} query={query} />}
               {g.id !== 'workflow' && g.items.map((d) => {
                 const modified = (d.type !== 'custom' || ['defaultModel', 'defaultEffort', 'modelFallback', 'effortFallback'].includes(d.key)) && getValue(settings, d) !== defaultValue(d)
                 return d.untitled && g.items.length === 1 ? (
