@@ -26,6 +26,8 @@ const Q = {
   returned: agentMsg({ id: 'queue.line.returned', text: '{who} {returned}', note: '{who}: queue.line.who. {returned}: what came back and what to do next (queue.returned.*).' }),
   left: agentMsg({ id: 'queue.line.left', text: '{who} It left the merge queue: {why, select, decision {a decision since its approval needs it reviewed again} other {its pass is stale}}.', note: "{who}: queue.line.who. {why}: decision (a decision since its approval) or stale (its pass)." }),
   stale: agentMsg({ id: 'queue.line.stale', text: '{who} Its pass is for {approved}, but its line is at {current} (changed since): submit it again for review (cw_submit); it is queued once that is approved.', note: 'HI-1763: approved with a stale pass, never queued (HI-1737 sat so, its lane paused, nobody told). {who}: queue.line.who. {approved}, {current}: short revisions ("—" for none).' }),
+  // HI-3551 (the user's decision, 23 Nov: a fixed factual notice).
+  pullRequest: agentMsg({ id: 'queue.line.pullRequest', text: 'This card finishes through its pull request on GitHub, not by a merge here.', note: "HI-3551: a card that works on a GitHub pull request's branch: whatever the project's finish, it is never merged in this repository (its pull request is). A statement of fact, no instruction." }),
   merged: agentMsg({ id: 'queue.line.merged', text: 'Combwork merged this card.', note: 'A card the merge queue merged.' }),
   notYet: agentMsg({ id: 'queue.line.notYet', text: '{who} Once it is approved, the merge queue merges it and moves it to Done.', note: '{who}: queue.line.who. Not in the queue yet: it goes in once approved.' }),
   waitsApproval: agentMsg({ id: 'queue.paused.approval', text: 'it moves on once the user answers, in For you, whether to update {target} now', note: "What a queue paused for the user's answer waits for (#1406): whether to update a checked-out target now (Resume doesn't stand in for it). {target}: the branch." }),
@@ -101,11 +103,15 @@ export type QueueState =
   /** Approved, but its pass is stale (HI-1763): its line moved on since (`approved` what was passed, `current` its line). */
   | { state: 'stale'; approved: string | null; current: string | null }
   | { state: 'merged' }
+  /** HI-3551: a pull request's card: finished through its pull request, never by a merge here. */
+  | { state: 'pullRequest' }
   /** Not in the queue yet: it goes in once approved. */
   | { state: 'notYet' }
 
 /** The card's queue state when its own ruleset says Combwork merges it, else null (the agent merges, or nobody checks). */
 export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.state(card)): QueueState | null {
+  // HI-3551: whatever the project's finish, a pull request's card is never merged here.
+  if (s.started?.pr && s.stage !== 'done') return { state: 'pullRequest' }
   if (wf.rulesetOf(card, s).options.finish !== 'combworkMerges') return null
   if (s.stage === 'done') return { state: 'merged' }
   const open = openEntry(s)
@@ -289,6 +295,7 @@ function pausedWaits(q: Extract<QueueState, { state: 'paused' }>): string {
  * workflow rules not enforced): nothing refuses, so the agent merges and reports as before 1.0.
  */
 export function queueLine(q: QueueState, enforced = true): string {
+  if (q.state === 'pullRequest') return say(Q.pullRequest)
   if (!enforced) return say(Q.unenforced)
   const who = say(Q.who)
   switch (q.state) {

@@ -94,4 +94,6 @@ export interface StartedPr {
   baseOid: string
   crossRepository: boolean
   maintainerCanModify: boolean
+  /** A fix round's start found GitHub's head with commits the card's line lacks (pushed from outside): kept, never taken in. */
+  headOutside?: true
 }

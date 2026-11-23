@@ -15,6 +15,7 @@ import type { CardRecord } from '../../workflow/factStore'
 import { attributeFolder, reconcileHistory, sharesFolder, type ReconcileHooks } from '../../workflow/reconcile'
 import { snapshot } from '../../workflow/checks'
 import { lineName, type Workflow } from '../../workflow/runtime'
+import { prLineName, prRefs } from '../../../shared/githubSource'
 import { keptLineTarget } from '../../workflow/keptLine'
 import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan, Unmerged, Unsubmitted } from '../adapter'
 import * as G from '../../gitCommands'
@@ -118,7 +119,9 @@ export class GitPlatform implements PlatformAdapter {
    * own (`cw/<project>/<its key>…`), so a restart after a retitle keeps its work; else its name from its title now.
    */
   private async lineFor(card: CardRecord): Promise<Maybe<string>> {
-    const named = lineName(this.wf.cfg.projectKey, card)
+    // HI-3551: a pull request's card is named for its PR, still its own `cw/<project>/<key>…` line.
+    const pr = this.prOf(card)
+    const named = pr ? prLineName(this.wf.cfg.projectKey, card.key, pr.number) : lineName(this.wf.cfg.projectKey, card)
     const s = this.wf.state(card)
     const own = `cw/${this.wf.cfg.projectKey}/${card.key}`
     // Its newest own line still there: the last started first, then the others it had, newest first.
@@ -155,6 +158,9 @@ export class GitPlatform implements PlatformAdapter {
     // A no-code card takes no slot (HI-2335): it changes nothing, so it starts where its agent is (`project`: no folder
     // of its own, its agent left where it runs, a lane's kept slot included), as with no slot here. Code cards go on.
     if (o.folder === 'slots' && this.wf.cfg.slotFor && card.kind === 'no-code') return this.projectPlan(card, o, false)
+    // HI-3551: a pull request's card is built on the PR's branch in a slot of its own, never in the shared folder.
+    const pr = this.prOf(card)
+    if (pr && !(o.folder === 'slots' && this.wf.cfg.slotFor)) return { ...unknown(UNREADABLE.prSlot, { card: card.key }), rule: 'platform.prNeedsSlot', ruleValues: { number: String(pr.number) } }
     if (o.folder === 'slots' && this.wf.cfg.slotFor) {
       // Slots (#1438, SPEC §16.10): the card's own line from the target's head, in the slot its builder is lent (its
       // lane's, kept for the lane, else the card's own). None free: it waits for one (refused `start.slotAvailable`;
@@ -174,6 +180,7 @@ export class GitPlatform implements PlatformAdapter {
         const across = card.kind !== 'no-code' && here.line === null && here.base ? await this.detachedRefusal(card, o, here.base) : null
         return { ...here, target, slotWait: got.wait, ...(across?.rule ? { acrossWait: { rule: across.rule, ...(across.ruleValues ? { ruleValues: across.ruleValues } : {}) } } : {}) }
       }
+      if (pr) return this.prPlan(card, pr, target, got, dry)
       // G21 (HI-1183): a target that follows its remote starts each card from the remote's head (never silently the local one).
       const followed = await this.followedHead(o, target, dry)
       if (isUnknown(followed)) return followed
@@ -201,6 +208,79 @@ export class GitPlatform implements PlatformAdapter {
       return { folder: join(this.wf.cfg.slots ?? join(this.project, CW_DIR, 'slots'), card.key), line, base, target }
     }
     return this.projectPlan(card, o, true)
+  }
+
+  /**
+   * HI-3551: the pull request a card works on: the one its start recorded (Started.pr), which wins once started, else the
+   * card's source while it has never started. Null for any other card.
+   */
+  private prOf(card: CardRecord): { host: string; owner: string; repo: string; number: number; baseRef: string } | null {
+    const started = this.wf.state(card).started?.pr
+    if (started) return started
+    const s = card.source
+    return s?.kind === 'pr' && s.pr ? { host: s.host, owner: s.owner, repo: s.repo, number: s.number, baseRef: s.pr.baseRef } : null
+  }
+
+  /**
+   * HI-3551: a pull request's card on the PR's own branch. Its head (`refs/pull/<n>/head`, a fork's too) and its base
+   * branch are fetched from the project's GitHub remote into Combwork's own refs (never a branch of the user's), and
+   * pinned in the start's evidence. The card's line starts at the PR's head; its base is where that left the PR's base, so
+   * review reads the PR's whole change. A fix round keeps the line, its fixes never reset; GitHub's head having moved to
+   * commits the line lacks is recorded (`headOutside`), never merged in or overwritten.
+   */
+  private async prPlan(card: CardRecord, pr: { host: string; owner: string; repo: string; number: number; baseRef: string }, target: string, got: { folder: string; slot: string; lease: string; fresh?: boolean }, dry: boolean): Promise<Maybe<StartPlan>> {
+    const link = this.wf.cfg.githubLink ? await this.wf.cfg.githubLink() : null
+    const same = !!link && link.host.toLowerCase() === pr.host.toLowerCase() && link.owner.toLowerCase() === pr.owner.toLowerCase() && link.repo.toLowerCase() === pr.repo.toLowerCase()
+    if (!link || !same) return unknown(UNREADABLE.prLink, { number: pr.number, repo: `${pr.owner}/${pr.repo}` })
+    const refs = prRefs(pr.number)
+    const f = await git(this.project, ['fetch', '--no-tags', '--no-write-fetch-head', '--', link.remote, `+refs/pull/${pr.number}/head:${refs.head}`, `+refs/heads/${pr.baseRef}:${refs.base}`], undefined, undefined, { timeout: platformLimits.gitNetworkMs() })
+    if (!f.ok) return withDetail(unknown(UNREADABLE.prFetch, { number: pr.number, base: pr.baseRef, remote: link.remote }), f.err)
+    const head = await G.resolve(this.project, refs.head)
+    if (isUnknown(head)) return head
+    const baseOid = await G.resolve(this.project, refs.base)
+    if (isUnknown(baseOid)) return baseOid
+    if (!head || !baseOid) return unknown(UNREADABLE.prFetch, { number: pr.number, base: pr.baseRef, remote: link.remote })
+    const line = await this.lineFor(card)
+    if (isUnknown(line)) return line
+    const had = await G.lineHead(this.project, line)
+    if (isUnknown(had)) return had
+    // GitHub's head with commits the kept line lacks: pushed from outside, recorded, never taken in by itself.
+    const inLine = had ? await G.isAncestor(this.project, head, had) : true
+    if (isUnknown(inLine)) return inLine
+    const base = await G.mergeBase(this.project, had ?? head, baseOid)
+    if (isUnknown(base)) return base
+    if (!base) return unknown(UNREADABLE.branchedOff, { a: line, b: pr.baseRef })
+    // Its line made at the PR's head (never at the base, as other cards' are), so the slot is prepared on it as a line
+    // that is there already. Never on a dry run.
+    if (!had && !dry) {
+      const made = await git(this.project, ['branch', '--no-track', '--', line, head])
+      if (!made.ok) return withDetail(unknown(UNREADABLE.prFetch, { number: pr.number, base: pr.baseRef, remote: link.remote }), made.err)
+    }
+    const source = card.source?.kind === 'pr' ? card.source.pr : undefined
+    const started = this.wf.state(card).started?.pr
+    return {
+      folder: got.folder,
+      line,
+      base,
+      target,
+      slot: got.slot,
+      lease: got.lease,
+      fresh: got.fresh,
+      carried: true,
+      pr: {
+        host: pr.host,
+        owner: pr.owner,
+        repo: pr.repo,
+        number: pr.number,
+        headRef: started?.headRef ?? source?.headRef ?? '',
+        baseRef: pr.baseRef,
+        headOid: head,
+        baseOid,
+        crossRepository: started?.crossRepository ?? source?.crossRepository ?? false,
+        maintainerCanModify: started?.maintainerCanModify ?? source?.maintainerCanModify ?? false,
+        ...(inLine ? {} : { headOutside: true })
+      }
+    }
   }
 
   /**

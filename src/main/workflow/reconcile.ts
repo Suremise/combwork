@@ -508,6 +508,8 @@ function published(wf: Workflow, card: CardRecord, s: CardState): boolean {
 }
 
 async function integratedOutside(wf: Workflow, H: HistoryPort, card: CardRecord, s: CardState, revision: string, method: 'merge' | 'fastForward' | 'squash' | 'sameTree', outsideRules: string[]): Promise<void> {
+  // HI-3551: a pull request's card is never completed by containment here: its finish is its pull request (HI-3552).
+  if (s.started?.pr) return
   const target = s.started!.target ?? ''
   const th = await H.lineHead(wf.cfg.project, target)
   await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {

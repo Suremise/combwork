@@ -37,6 +37,13 @@ export async function githubRepoFor(ws: WorkspaceService, projectPath: string): 
   return linked ? { host, owner: linked.owner, repo: linked.repo } : null
 }
 
+/** HI-3551: the project's link with its remote's name (a PR card's start fetches the PR from it), or null with none. */
+export async function githubRemoteFor(ws: WorkspaceService, projectPath: string): Promise<{ remote: string; host: string; owner: string; repo: string } | null> {
+  const host = (await githubHostsFor(ws, projectPath, process.env)).repo.host
+  const { linked } = githubRepoOf(await remotesOf(projectPath), host, await chosenRemote(ws, projectPath))
+  return linked ? { remote: linked.remote, host, owner: linked.owner, repo: linked.repo } : null
+}
+
 /** The project's link, as Version Control → Workflow → GitHub shows it, with gh asked about its host now. */
 export async function githubLinkOf(ws: WorkspaceService, projectPath: string): Promise<GithubLink> {
   const resolved = (await githubHostsFor(ws, projectPath, process.env)).repo
