@@ -3208,7 +3208,9 @@ a template load stopped at Maximum agents, a release offer (Work merges into), a
 Combwork defaults (a level's form switching to the option's platform), and Settings search, which now finds the
 defaults by an option's name or description and opens the first match. Choosing a preset (How do you work?, a
 template's suggested preset or workflow) opens Overview. A template's Workflow (`TemplateWorkflowView.tsx`) shows each
-platform's section under the same tabs: Overview its preset, Fill and Remove, each other tab its options.
+platform's section under the same tabs: Overview its preset, Fill and Remove, each other tab its options. In the template
+editor a tab is marked unsaved while its part of the section differs from the template as saved (`templateTabsChanged`:
+Overview for the preset or a section added or removed), and None's or Git's tab while its section does.
 
 **Labels below are the agreed English** [#1117 c "outcome wording first"; OP-2, agreed 20 Oct], translated once
 into the 7 locales per `locales/glossary-1.0.md` §2.6.

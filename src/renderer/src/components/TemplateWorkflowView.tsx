@@ -3,7 +3,7 @@ import { merges, type PlatformId } from '@shared/platform/descriptors'
 import { PLATFORM_NAME } from '@shared/platform/switching'
 import { allOff, FORM_TABS, formTabOf, PRESETS, preset, type FormTabId, type OptionKey, type PresetId } from '@shared/workflow/options'
 import { optionTitle, PRESET_TEXT, TAB_TEXT } from '@shared/workflow/optionTexts'
-import { carriedFor, TEMPLATE_PLATFORMS, templateWorkflowOf, type TemplateWorkflow, type TemplateWorkflows } from '@shared/workflow/templateOptions'
+import { carriedFor, TEMPLATE_PLATFORMS, templateTabsChanged, templateWorkflowOf, type TemplateWorkflow, type TemplateWorkflows } from '@shared/workflow/templateOptions'
 import { msg, tr } from '@shared/i18n'
 import { optionValueText, WORKFLOW_TABS_LABEL } from './WorkflowOptions'
 import { shownTab } from '@shared/tabs'
@@ -32,9 +32,10 @@ const valueOf = (key: OptionKey, v: unknown, platform: PlatformId): string => op
  * it has none; a section that can't be used is said. With `edit` (the template editor): Fill from a preset (its rules,
  * the section's check names kept) and Remove; options one by one are set in a project, then saved as the template.
  * HI-3549: a section in the Workflow form's tabs, as a project's: Overview its preset, Fill and Remove, each other tab
- * its options there (a tab with none isn't shown).
+ * its options there (a tab with none isn't shown). Editing, `edit.saved` is the template as saved: a tab whose part of the
+ * section differs from it is marked unsaved, and so is a version control's tab whose section does.
  */
-export function TemplateWorkflowSection({ workflow, dropped, edit }: { workflow: TemplateWorkflows | undefined; dropped?: PlatformId[]; edit?: { disabled: boolean; onChange: (w: TemplateWorkflows) => void } }) {
+export function TemplateWorkflowSection({ workflow, dropped, edit }: { workflow: TemplateWorkflows | undefined; dropped?: PlatformId[]; edit?: { disabled: boolean; saved?: TemplateWorkflows; onChange: (w: TemplateWorkflows) => void } }) {
   const base = useId()
   const [tab, setTab] = useState<PlatformId>(() => (workflow?.git || !workflow?.none ? 'git' : 'none'))
   const [formTab, setFormTab] = useState<Partial<Record<PlatformId, FormTabId>>>({})
@@ -44,6 +45,8 @@ export function TemplateWorkflowSection({ workflow, dropped, edit }: { workflow:
     else delete next[p]
     edit?.onChange(next)
   }
+  // HI-3549: each version control's tabs that differ from the template as saved (none while only viewing it).
+  const changedTabs = (p: PlatformId): Set<FormTabId> => (edit ? templateTabsChanged(p, workflow?.[p], edit.saved?.[p]) : new Set())
   const fill = (p: PlatformId, choice: string): void => {
     const was = workflow?.[p]
     const chosen = choice === 'allOff' ? null : (choice as PresetId)
@@ -60,7 +63,7 @@ export function TemplateWorkflowSection({ workflow, dropped, edit }: { workflow:
           <Icon name="warning" /> {droppedText(dropped)}
         </p>
       )}
-      <Tabs idBase={base} label={tr(M.platforms)} value={tab} onChange={setTab} items={TEMPLATE_PLATFORMS.map((p) => ({ id: p, label: tr(PLATFORM_NAME[p]), ...(workflow?.[p] ? {} : { tag: tr(M.absent) }), attrs: { 'data-workflow-platform': p } }))} />
+      <Tabs idBase={base} label={tr(M.platforms)} value={tab} onChange={setTab} items={TEMPLATE_PLATFORMS.map((p) => ({ id: p, label: tr(PLATFORM_NAME[p]), ...(workflow?.[p] ? {} : { tag: tr(M.absent) }), unsaved: changedTabs(p).size > 0, attrs: { 'data-workflow-platform': p } }))} />
       {TEMPLATE_PLATFORMS.map((p) => {
         const s = workflow?.[p]
         const keys = carriedFor(p).filter((k) => s?.options[k] !== undefined)
@@ -85,12 +88,15 @@ export function TemplateWorkflowSection({ workflow, dropped, edit }: { workflow:
         // The form's tabs (HI-3549): Overview, then each tab with options this section sets.
         const tabs = FORM_TABS[p].filter((t) => t.id === 'overview' || keys.some((k) => formTabOf(p, k) === t.id))
         const shown = shownTab<FormTabId>(tabs.map((t) => t.id), formTab[p], 'overview')
+        // A change on a tab not shown (its options all gone) is marked on Overview.
+        const changed = changedTabs(p)
+        const unsavedOn = (id: FormTabId): boolean => changed.has(id) || (id === 'overview' && [...changed].some((c) => !tabs.some((t) => t.id === c)))
         const tabBase = `${base}-${p}`
         return (
           <TabPanel key={p} idBase={base} id={p} selected={tab === p} className="template-workflow-panel" data-workflow-section={p}>
             {s ? (
               <>
-                <Tabs idBase={tabBase} label={tr(WORKFLOW_TABS_LABEL)} value={shown} onChange={(id) => setFormTab((m) => ({ ...m, [p]: id }))} items={tabs.map((t) => ({ id: t.id, label: tr(TAB_TEXT[t.id]), attrs: { 'data-workflow-tab': t.id } }))} />
+                <Tabs idBase={tabBase} label={tr(WORKFLOW_TABS_LABEL)} value={shown} onChange={(id) => setFormTab((m) => ({ ...m, [p]: id }))} items={tabs.map((t) => ({ id: t.id, label: tr(TAB_TEXT[t.id]), unsaved: unsavedOn(t.id), attrs: { 'data-workflow-tab': t.id } }))} />
                 {tabs.map((t) => (
                   <TabPanel key={t.id} idBase={tabBase} id={t.id} selected={t.id === shown} className="template-workflow-tab" data-workflow-tab={t.id}>
                     {t.id === 'overview' ? (

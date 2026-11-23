@@ -5,6 +5,8 @@
 import { describe, expect, it } from 'vitest'
 import { FORM_GROUPS, FORM_TABS, formTabOf, isFormTab, type FormTabId, type OptionKey } from '../src/shared/workflow/options'
 import type { PlatformId } from '../src/shared/platform/descriptors'
+import { allOff, preset } from '../src/shared/workflow/options'
+import { templateTabsChanged, templateWorkflowOf } from '../src/shared/workflow/templateOptions'
 
 ;(globalThis as unknown as { window: unknown }).window = { combwork: { invoke: async () => null, on: () => () => {} }, addEventListener: () => {}, matchMedia: () => ({ matches: false, addEventListener: () => {} }) }
 // The renderer's module, typed here by what the test uses: the main process's typecheck doesn't follow renderer code.
@@ -82,5 +84,29 @@ describe('a link to a workflow option (HI-3549)', () => {
     expect(store.get().tabs['settings.workflow']).toBe('workflow.workspaceDefaults')
     // A project's form and a level's are never the same form.
     expect(store.workflowFormAt({ level: 'global', platform: 'git' })).not.toBe(store.workflowFormAt('global'))
+  })
+})
+
+describe("a template's tabs marked unsaved in its editor (HI-3549, HR1's round 1)", () => {
+  const solo = templateWorkflowOf(preset('git', 'solo'), 'solo')
+  it('Fill from another preset marks Overview and each tab whose options it changes', () => {
+    const team = templateWorkflowOf(preset('git', 'team'), 'team')
+    const changed = templateTabsChanged('git', team, solo)
+    expect([...changed].sort()).toEqual(expect.arrayContaining(['checks', 'merging', 'overview', 'where']))
+    // Every option that differs is on a tab marked, and only those tabs are.
+    for (const key of Object.keys(team.options)) {
+      const differs = JSON.stringify((team.options as Record<string, unknown>)[key]) !== JSON.stringify((solo.options as Record<string, unknown>)[key])
+      if (differs) expect(changed.has(formTabOf('git', key as OptionKey)!), key).toBe(true)
+    }
+  })
+  it('back to the saved section, nothing is marked', () => {
+    expect(templateTabsChanged('git', templateWorkflowOf(preset('git', 'solo'), 'solo'), solo).size).toBe(0)
+    expect(templateTabsChanged('none', undefined, undefined).size).toBe(0)
+  })
+  it('a section added or removed marks Overview; one option changed marks only its tab', () => {
+    expect([...templateTabsChanged('none', templateWorkflowOf(allOff('none'), null), undefined)]).toEqual(['overview'])
+    expect([...templateTabsChanged('git', undefined, solo)]).toEqual(['overview'])
+    const rounds = { ...solo, options: { ...solo.options, loopRounds: 7 } }
+    expect([...templateTabsChanged('git', rounds, solo)]).toEqual(['loops'])
   })
 })
