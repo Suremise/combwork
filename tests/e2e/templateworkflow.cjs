@@ -206,6 +206,14 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     const view = page.locator('[data-template-workflow-view]')
     check("the Templates view shows its workflow under None | Git tabs", !!(await until(async () => (await view.locator('[role="tab"][data-workflow-platform="none"]').count()) === 1 && (await view.locator('[role="tab"][data-workflow-platform="git"]').count()) === 1 && (await view.locator('[data-workflow-section="git"] li[data-option="review"]').count()) === 1, lib.timing('hang.ui'))), await text(view))
     await shoot('6-view', () => page.locator('.template-detail'))
+    // HI-3549: Git's section under the Workflow form's tabs, Overview its preset, each other tab its options.
+    const gitSection = view.locator('[data-workflow-section="git"]')
+    const templateTabs = await gitSection.locator('[role="tab"][data-workflow-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-workflow-tab')))
+    check("HI-3549: the template's Git section in the form's tabs, Overview first", templateTabs[0] === 'overview' && templateTabs.includes('checks'), JSON.stringify(templateTabs))
+    for (const id of templateTabs) {
+      await gitSection.locator(`[role="tab"][data-workflow-tab="${id}"]`).click()
+      await shoot(`6-view-tab-${id}`, () => page.locator('.template-detail'))
+    }
     await page.locator('.template-detail-actions button', { hasText: 'Edit…' }).click()
     const editor = page.locator('.template-editor [data-template-workflow-view]')
     await until(async () => (await editor.count()) === 1, lib.timing('hang.ui'))

@@ -316,6 +316,10 @@ const check = (name, ok, extra = '') => {
     check("a stage name that can't be saved marks Loops & stages from Overview, said for screen readers; Save held", !!(await lib.until(async () => (await wsTab('loops').locator('[data-problem]').count()) === 1 && /needs resolving/.test((await wsTab('loops').getAttribute('aria-label')) ?? '') && (await wsTab('overview').locator('[data-problem]').count()) === 0 && (await form.locator('[data-action="save"]').isDisabled()), HUNG_MS)), await text(level.locator('[role="tablist"]').first()))
     await shots('tab-marks', level.locator('[role="tablist"]').first())
     await form.getByRole('button', { name: 'Discard Changes' }).click()
+    for (const id of await level.locator('[role="tab"][data-workflow-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-workflow-tab')))) {
+      await lib.workflowTab(form, id)
+      await shots(`tab-${id}`, level.locator('[role="tablist"]').first())
+    }
     check('…Discard Changes clears both marks', !!(await lib.until(async () => (await level.locator('[role="tab"] [data-problem], [role="tab"] [data-unsaved]').count()) === 0, HUNG_MS)))
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))

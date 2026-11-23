@@ -220,6 +220,17 @@ async function theForm(page, app, inv) {
     await themes('groups-top', section.locator('.workflow-group[data-group="review"]'))
     await lib.workflowTab(section, 'loops')
     await themes('groups-end', section.locator('.workflow-group[data-group="loops"]'))
+    // HI-3549: the form's tabs, each shot in both themes; the tab list a keyboard row (arrows move and focus).
+    const tabIds = () => section.locator('[role="tab"][data-workflow-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-workflow-tab')))
+    check("HI-3549: a Git project's tabs, in order", JSON.stringify(await tabIds()) === JSON.stringify(['overview', 'checks', 'merging', 'where', 'github', 'loops']), JSON.stringify(await tabIds()))
+    check('…a labelled tab list', (await section.locator('[role="tablist"][aria-label="Workflow options"]').count()) === 1)
+    for (const id of await tabIds()) {
+      await lib.workflowTab(section, id)
+      await themes(`tab-${id}`, section.locator('[role="tablist"][aria-label="Workflow options"]'))
+    }
+    await section.locator('[role="tab"][data-workflow-tab="loops"]').focus()
+    await page.keyboard.press('ArrowRight')
+    check('…ArrowRight wraps to Overview, the focus with it', !!(await lib.until(async () => (await section.locator('[role="tab"][data-workflow-tab="overview"]').getAttribute('aria-selected')) === 'true' && (await page.evaluate(() => document.activeElement?.getAttribute('data-workflow-tab'))) === 'overview', HUNG_MS)))
 
     // --- A preset's preview: what it sets and why, what it would change; Use fills the form.
     await lib.workflowTab(section, 'overview')
@@ -583,6 +594,12 @@ async function theForm(page, app, inv) {
     check('…its Card loops from the defaults, Default as their origin', (await row('loopWakes').locator('.workflow-origin').innerText()).includes('Default') && (await row('fileLocks').locator('.workflow-origin').innerText()).includes('Default'))
     await lib.workflowTab(section, 'loops')
     await themes('none-loops', section.locator('.workflow-group[data-group="loops"]'))
+    const noneTabs = await section.locator('[role="tab"][data-workflow-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-workflow-tab')))
+    check("HI-3549: a None project's tabs: no Merging, Where or GitHub", JSON.stringify(noneTabs) === JSON.stringify(['overview', 'checks', 'work', 'loops']), JSON.stringify(noneTabs))
+    for (const id of noneTabs) {
+      await lib.workflowTab(section, id)
+      await themes(`none-tab-${id}`, section.locator('[role="tablist"][aria-label="Workflow options"]'))
+    }
     const noneBase = { combworkWorkflow: 1, platform: 'none', preset: null, options: {} }
     const merging = await pasteIn({ ...noneBase, options: { finish: 'combworkMerges' } })
     check('None: a merge pasted is refused, merging needs Git', !!(await lib.until(async () => (await merging.innerText()).includes('Merging needs Git'), HUNG_MS)), await merging.innerText())
