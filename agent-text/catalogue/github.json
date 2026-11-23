@@ -38,5 +38,10 @@
     "text": "A GitHub host is a name such as github.com, or an https:// address: no other scheme.",
     "note": "An error saving a GitHub host setting (HI-2779): it starts with a scheme other than https:// (http://, ssh://…). Keep github.com and https:// as they are.",
     "audience": "both"
+  },
+  "github.link.notARemote": {
+    "text": "That remote isn’t on this project’s GitHub host any more: choose again.",
+    "note": "An error choosing the repository of a project’s GitHub link (HI-3550, Version Control → Workflow → GitHub): the remote chosen no longer points at a repository on the GitHub host.",
+    "audience": "both"
   }
 }

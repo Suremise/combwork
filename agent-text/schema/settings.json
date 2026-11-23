@@ -1211,6 +1211,12 @@
   "settings.advanced.cw.git.staleLockSeconds.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.github.ghMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.github.ghMinutes.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.guidance.desc": {
     "placeholders": {}
   },
