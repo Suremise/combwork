@@ -273,7 +273,7 @@ function board(sql, ...args) {
     const lang = (await inv('app:info')).language
     // Main reads the language's catalogue, not sent through app.evaluate (HI-3434); English: the window's own.
     const speak = (code) => lib.speakLanguage(app, lang, code === 'en' ? undefined : code)
-    await openWorkflow(fx.alpha)
+    await openWorkflow(fx.alpha, 'where')
     const de = await speak('de')
     check('the section shows in German', !!(await until(async () => (await section.innerText()).includes(de['workflow.slots.heading']), HUNG_MS)))
     await shot('slots-group-de', slotsGroup)

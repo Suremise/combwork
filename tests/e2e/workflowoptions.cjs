@@ -55,6 +55,7 @@ async function theForm(page, app, inv) {
   const dialog = page.locator('.dialog', { hasText: 'Save Workflow Options' })
   /** Previews a choice and uses it. */
   const applyChoice = async (id) => {
+    await lib.workflowTab(section, 'overview')
     await choice(id).click()
     await preview.waitFor({ timeout: HUNG_MS })
     await preview.locator('[data-action="use-choice"]').click()
@@ -183,7 +184,7 @@ async function theForm(page, app, inv) {
     check('…only the selected section in the Tab order', JSON.stringify(await sectionTabs.evaluateAll((els) => els.filter((e) => e.tabIndex === 0).map((e) => e.getAttribute('data-section')))) === '["changes"]')
     await page.keyboard.press('ArrowLeft')
     // Its form read again (it remounts with the section), so the shots show it, not the page before its read answers.
-    check('…ArrowLeft back to Workflow, its form shown again', !!(await lib.until(async () => (await workflowTab.getAttribute('aria-selected')) === 'true' && (await focusedSection()) === 'workflow' && (await panelFor()) === 'workflow' && (await section.locator('.workflow-group[data-group="review"]').isVisible().catch(() => false)), HUNG_MS)))
+    check('…ArrowLeft back to Workflow, its form shown again', !!(await lib.until(async () => (await workflowTab.getAttribute('aria-selected')) === 'true' && (await focusedSection()) === 'workflow' && (await panelFor()) === 'workflow' && (await section.locator('.workflow-group[data-group="presets"]').isVisible().catch(() => false)), HUNG_MS)))
     await themes('section-tabs', page.locator('.git-head'))
     check('the notice is gone, and answered for good',!!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)), `notice shown: ${await notice.count()}, presetsNotice: ${JSON.stringify(await inv('workflow:presetsNotice'))}`)
     await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
@@ -794,6 +795,7 @@ async function theForm(page, app, inv) {
     await h.page.locator('.git-sections [data-section="workflow"]').click()
     const g = await theForm(h.page, h.app, h.inv)
     const sameness = async (value) => {
+      await lib.workflowTab(g.section, 'sameness')
       await g.row('sameness').locator('select').selectOption(value)
       await g.saveAll()
       return lib.until(() => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combwork', 'project.json'), 'utf8')).workflow?.options?.sameness === value, HUNG_MS)

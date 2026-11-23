@@ -271,8 +271,7 @@ const check = (name, ok, extra = '') => {
     check('the workspace’s level inherits it: From Combwork defaults', !!(await lib.until(async () => (await row('dependenciesDone').innerText().catch(() => '')).includes('From Combwork defaults'), HUNG_MS)))
     // Its "From Combwork defaults" opens Combwork defaults' tab, where that value is set; and the copied files' too.
     await lib.workflowTab(form, 'dependenciesDone')
-    // HI-3549: on the Combwork tab of its Combwork form back at Overview, so the link must choose the option's tab itself.
-    await lib.workflowTab(globalLevel, 'overview')
+    // HI-3549: Combwork's form was left on Where cards are built, so the link must choose the option's tab itself.
     await row('dependenciesDone').locator('[data-origin-link="global"]').click()
     check('…a link to Combwork defaults’ tab, at that option: its tab chosen, the row in view', !!(await lib.until(async () => (await selectedTab()) === 'workflow.defaults' && (await combworkRow('dependenciesDone').isVisible()) && (await globalLevel.locator('[role="tab"][data-workflow-tab="merging"]').getAttribute('aria-selected')) === 'true', HUNG_MS)), String(await selectedTab()))
     await tab('workflow.workspaceDefaults').click()
