@@ -114,7 +114,7 @@ const calls = () => fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(B
     check('another repository is refused, saying whose', !!(await until(async () => (await page.locator('.toast', { hasText: 'isn’t on this project’s repository (acme/app on github.com)' }).count()) === 1, HUNG_MS)) && !(await readCard(other)).source)
     await f2.locator('input').fill('#9')
     await f2.locator('[data-action="source-set"]').click()
-    check('#9 (an issue, after no PR of that number) is set, labelled github-issue', !!(await until(async () => { const c = await readCard(other); return c.source?.kind === 'issue' && c.labels.includes('github-issue') }, HUNG_MS)) && (await f2.getAttribute('data-source')) === 'issue:9', JSON.stringify(await readCard(other)) + ' | ' + (await f2.innerText().catch(() => '')))
+    check('#9 (an issue, after no PR of that number) is set, labelled github-issue', !!(await until(async () => { const c = await readCard(other); return c.source?.kind === 'issue' && c.labels.includes('github-issue') && (await f2.getAttribute('data-source').catch(() => null)) === 'issue:9' }, HUNG_MS)), String(await f2.getAttribute('data-source').catch(() => 'none')) + ' | ' + (await f2.innerText().catch(() => '')))
     check('…its label shown in the dialog’s Labels at once', !!(await until(async () => (await d.locator('input[placeholder^="Comma separated"]').inputValue()) === 'github-issue', HUNG_MS)))
     await shoot('3-issue', d)
   } catch (e) {
