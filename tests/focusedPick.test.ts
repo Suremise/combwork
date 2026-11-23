@@ -13,7 +13,7 @@ import { SUITES } from './e2e/suites.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { isRealCli } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { PICK_MAX_TESTS, UNIT_SCANS, diffLinesOf, isUnitTestFile, needsLines, pickLines, pickTests, pickUnitTests, scanSelects, unchangedSince, unitPicks, under } from './e2e/affected.mjs'
+import { PICK_MAX_TESTS, UNIT_SCANS, diffLinesOf, isUnitTestFile, needsLines, pickLines, directUnitTests, pickTests, pickUnitTests, scanSelects, unchangedSince, unitPicks, under } from './e2e/affected.mjs'
 // @ts-expect-error: a plain .mjs module without types
 import { ALL_UNIT } from '../scripts/focusedTests.mjs'
 import { FOCUSED_MAX_TESTS, parsePick } from '../src/shared/workflow/focused'
@@ -126,27 +126,59 @@ describe('UNIT_SCANS: the unit tests that read the repository', () => {
 })
 
 describe('the unit tests alone (pickUnitTests, --pick --unit: HI-3542)', () => {
+  const direct = (tests: string[]) => ({ tests: new Map(tests.map((t) => [t, `${t}: loads it`])) })
   const related = (n: number): string[] => Array.from({ length: n }, (_, i) => `tests/r${String(i).padStart(3, '0')}.test.ts`)
 
   it("a change that needs every suite still picks its unit tests, each needing 'unit', and no suite", () => {
     // HI-1880's change: its shared files need every suite (pickTests' every), which a unit-only pick never says.
     const paths = ['src/main/fsutil.ts', 'src/main/logger.ts', 'tests/e2e/suites.mjs', 'tests/workerImports.test.ts']
     expect(pick({ paths })).toMatchObject({ every: true })
-    const picked = pickUnitTests({ paths, vitestRelated: ['tests/logger.test.ts'] }) as Picked
+    const picked = pickUnitTests({ paths, direct: direct(['tests/logger.test.ts']) }) as Picked
     expect(picked.every).toBeUndefined()
     expect(picked.tests!.map((t) => t.test)).toEqual(expect.arrayContaining(['tests/e2esuites.test.ts', 'tests/logger.test.ts', 'tests/workerImports.test.ts']))
     expect(picked.tests!.every((t) => t.needs.length === 1 && t.needs[0] === 'unit')).toBe(true)
   })
 
-  it('more than a pick may list is every unit test, as one id; as many as it may list stay a list', () => {
+  it('more than a pick may list, or a change every test loads, is every unit test as one id; as many as it may list stay a list', () => {
     expect(PICK_MAX_TESTS).toBe(FOCUSED_MAX_TESTS)
-    const at = pickUnitTests({ paths: [], vitestRelated: related(PICK_MAX_TESTS) }) as Picked
+    const at = pickUnitTests({ paths: [], direct: direct(related(PICK_MAX_TESTS)) }) as Picked
     expect(at.tests).toHaveLength(PICK_MAX_TESTS)
-    const over = pickUnitTests({ paths: [], vitestRelated: related(PICK_MAX_TESTS + 1) }) as Picked
+    const over = pickUnitTests({ paths: [], direct: direct(related(PICK_MAX_TESTS + 1)) }) as Picked
     expect(over.tests).toEqual([{ test: ALL_UNIT, needs: ['unit'] }])
     expect(over.why[0]).toContain(`${PICK_MAX_TESTS + 1} unit test files`)
     // Combwork reads it as a selection, not "too many" or "every".
     expect(parsePick(pickLines(over).join('\n'))).toEqual({ state: 'chosen', tests: [{ id: ALL_UNIT, needs: ['unit'] }] })
+    expect(pickUnitTests({ paths: ['tests/cliHomes.ts'], direct: { all: 'tests/cliHomes.ts: every unit test loads it' } })).toEqual({ tests: [{ test: ALL_UNIT, needs: ['unit'] }], why: [`${ALL_UNIT}: tests/cliHomes.ts: every unit test loads it`] })
+  })
+
+  it('directUnitTests: a test that itself loads a changed file (an import, a mock, a dynamic import), not one reaching it through another', () => {
+    const tree: Record<string, string> = {
+      'src/a.ts': 'export const a = 1\n',
+      'src/b.ts': "import { a } from './a'\nexport const b = a + 1\n",
+      'src/c.ts': 'export const c = 3\n',
+      'tests/a.test.ts': "import { a } from '../src/a'\n",
+      'tests/b.test.ts': "import { b } from '../src/b'\n",
+      'tests/mocks.test.ts': "import { vi } from 'vitest'\nvi.mock('../src/a', () => ({ a: 2 }))\n",
+      'tests/lazy.test.ts': "it('x', async () => { await import('../src/a') })\n",
+      'tests/c.test.ts': "import { c } from '../src/c'\n",
+      'tests/helper.ts': "export { a } from '../src/a'\n",
+      // Types only: erased before it runs, so it loads nothing of src/a.ts.
+      'tests/types.test.ts': "import type { A } from '../src/a'\nimport { type B } from '../src/a'\nexport type { C } from '../src/a'\nimport { c } from '../src/c'\n",
+      'tests/mixed.test.ts': "import { type A, a } from '../src/a'\n"
+    }
+    const run = (paths: string[], config: string | null = "setupFiles: ['tests/setup.ts'],\nglobalSetup: ['./tests/global.ts']") => directUnitTests({ paths, files: Object.keys(tree), read: (f: string) => tree[f] ?? null, config })
+    const r = run(['src/a.ts'])
+    expect([...r.tests.keys()].sort()).toEqual(['tests/a.test.ts', 'tests/lazy.test.ts', 'tests/mixed.test.ts', 'tests/mocks.test.ts'])
+    expect(r.tests.get('tests/a.test.ts')).toBe('tests/a.test.ts: loads src/a.ts')
+    expect([...run(['src/b.ts', 'src/c.ts']).tests.keys()].sort()).toEqual(['tests/b.test.ts', 'tests/c.test.ts', 'tests/types.test.ts'])
+    // Every test loads Vitest's config and its setup files.
+    for (const f of ['tests/setup.ts', 'tests/global.ts', 'vitest.config.ts']) expect(run([f])).toEqual({ all: `${f}: every unit test loads it` })
+    expect(run(['tests/setup.ts'], null).tests.size).toBe(0)
+  })
+
+  it("this repository's setup files count as every test's (vitest.config.ts)", () => {
+    const config = readFileSync(join(root, 'vitest.config.ts'), 'utf8')
+    for (const f of ['tests/cliHomes.ts', 'tests/tempRun.ts']) expect(directUnitTests({ paths: [f], files: [], read: () => null, config })).toMatchObject({ all: expect.any(String) })
   })
 })
 

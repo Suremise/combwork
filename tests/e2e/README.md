@@ -525,12 +525,18 @@ launcher), so every starter counts for now. When the e2e side is
 every suite the pick is still `{"every":true}`, unchanged.
 
 **Unit tests alone** (`--pick --unit`, HI-3542: the merge queue's focused tests here, as the merge checks run no unit
-test) is that unit part and never a suite or `{"every":true}`: no e2e placement can fail it. A test it would name that
-isn't in the checkout is left out, saying so. Over 500 tests (Combwork's longest list, `FOCUSED_MAX_TESTS`) it answers
-`unit:all`, every unit test as one id, which `scripts/focusedTests.mjs` runs as one Vitest run of the whole set (failed
-when a file failed, a file that didn't load included). Measured on 1.7.0's last 25 merges: a change to main-process code
-typically picks about 460 of the 911 test files (the narrowing above keeps most), 6 of 25 picked over 500, and changes to
-renderer or test files a handful. The picks take 5 to 30 s.
+test) is never a suite or `{"every":true}`, and by the user's decision (HI-3542, 22 Nov) **direct importers only**: a
+changed test file, `UNIT_SCANS`' tests, and a test that itself loads a changed file (`directUnitTests`: what
+`relatedTests.mjs`'s `fileLoads` reads it to load, a mock and a dynamic import included, its type-only imports left out).
+Not Vitest's import graph: that picked about 460 of the 911 test files for a typical change to main-process code (48 min
+at the queue's 2 workers). So a break reached through other modules gets through the merge (HI-3520's: `gitRepo.test.ts`
+reached the change 4 imports deep) and is left to the release's full passes. A change to Vitest's config or a setup file
+it names is every unit test; so is a pick of over 500 (Combwork's longest list, `FOCUSED_MAX_TESTS`): it answers
+`unit:all`, which `scripts/focusedTests.mjs` runs as one Vitest run of the whole set (failed when a file failed, a file
+that didn't load included). A test it would name that isn't in the checkout is left out, saying so. Measured on 1.7.0's
+last 25 merges: most pick 2 to 70 tests, a change to `workspace.ts` about 270 (that many mock or load it), and the
+picks take about 7 s. Run at the queue's 2 workers, under the machine's usual load: 25 tests in 62 s, a change to
+`workflow/runtime.ts` (68 tests, the queue's own, 80 to 280 s each) in 14 min, the `workspace.ts` one in 25 min.
 
 **Progress in Combwork.** Run from an agent's session in Combwork, the runner shows in that Combwork's Progress panel: **e2e: N
 suites**, a step per suite, and the time left from how long each suite took before (kept in

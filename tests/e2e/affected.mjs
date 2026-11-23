@@ -16,7 +16,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { createRequire } from 'module'
 import { SCOPE_FILES as PRESENCE_SCOPE } from '../presenceChecks.mjs'
 import { gitChangedLines, gitRevision, splitOf, typeOnlyChange, unitSelection } from './affectedUnits.mjs'
-import { narrowRelatedInTree } from './relatedTests.mjs'
+import { fileLoads, narrowRelatedInTree, parseCode } from './relatedTests.mjs'
 import { ALL_UNIT } from '../../scripts/focusedTests.mjs'
 import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
@@ -1211,19 +1211,6 @@ export function unchangedSince(cwd, base) {
   }
 }
 
-/** The unit picks' inputs in the checkout (cwd) against base: the paths added and deleted, the diff's lines, Vitest's related tests. */
-function unitInputs(cwd, base, paths) {
-  const atBase = new Set(git(cwd, ['ls-tree', '-r', '--name-only', '-z', base]).split('\0').filter(Boolean))
-  const added = paths.filter((p) => !atBase.has(p))
-  const deleted = paths.filter((p) => atBase.has(p) && !existsSync(join(cwd, p)))
-  const diffLines = paths.some(needsLines) ? diffLinesOf(git(cwd, ['diff', '--no-ext-diff', '--no-color', '--no-renames', '-U0', base, '--'])) : {}
-  // Vitest's related tests, narrowed to those loading a file that names what changed (relatedTests.mjs, HI-2677). A
-  // checkout with no change since the base has none for Vitest to relate: its start (seconds, more under load) is
-  // skipped (HI-3002).
-  const related = narrowRelatedInTree({ cwd, base, paths, related: unchangedSince(cwd, base) ? [] : listVitestRelated(cwd, base) })
-  return { added, deleted, diffLines, related }
-}
-
 /** The CLI: gathers pickTests' inputs in the checkout (cwd) and prints its lines. Diagnostics go to stderr. */
 async function pickCli() {
   const cwd = process.cwd()
@@ -1247,7 +1234,14 @@ async function pickCli() {
     for (const l of pickLines(picked)) console.log(l)
     return
   }
-  const { added, deleted, diffLines, related } = unitInputs(cwd, base, paths)
+  const atBase = new Set(git(cwd, ['ls-tree', '-r', '--name-only', '-z', base]).split('\0').filter(Boolean))
+  const added = paths.filter((p) => !atBase.has(p))
+  const deleted = paths.filter((p) => atBase.has(p) && !existsSync(join(cwd, p)))
+  const diffLines = paths.some(needsLines) ? diffLinesOf(git(cwd, ['diff', '--no-ext-diff', '--no-color', '--no-renames', '-U0', base, '--'])) : {}
+  // Vitest's related tests, narrowed to those loading a file that names what changed (relatedTests.mjs, HI-2677). A
+  // checkout with no change since the base has none for Vitest to relate: its start (seconds, more under load) is
+  // skipped (HI-3002).
+  const related = narrowRelatedInTree({ cwd, base, paths, related: unchangedSince(cwd, base) ? [] : listVitestRelated(cwd, base) })
   const picked = pickTests({ paths, added, deleted, diffLines, suites, realNames, packagedNames, vitestRelated: related.keep, units })
   for (const w of related.why) console.error(w)
   for (const w of picked.why) console.error(w)
@@ -1256,33 +1250,88 @@ async function pickCli() {
 
 /**
  * `--pick --unit` (HI-3542): the unit tests alone, as the merge queue's focused tests (its merge checks run no unit
- * test): unitPicks' (a changed test file, Vitest's related tests narrowed, UNIT_SCANS), never an e2e suite, and never
- * "every" (no e2e placement to fail). Combwork passes CW_FOCUSED_BASE: at submit the card's base, at the merge the
- * target before it.
+ * test), never an e2e suite or "every". By the user's decision on HI-3542 (22 Nov), direct importers only: a changed
+ * test file, a test that itself loads a changed file (directUnitTests), and UNIT_SCANS; not Vitest's transitive graph,
+ * which picked about 460 of 911 files for a typical main-process change (tens of minutes at the queue's 2 workers).
+ * A break reached through other modules (HI-3520's, 4 imports deep) is left to the release's full passes. Combwork
+ * passes CW_FOCUSED_BASE: at submit the card's base, at the merge the target before it.
  */
 function pickUnitCli(cwd, base, paths) {
-  const { added, deleted, diffLines, related } = unitInputs(cwd, base, paths)
-  const picked = pickUnitTests({ paths, added, deleted, diffLines, vitestRelated: related.keep })
+  const atBase = new Set(git(cwd, ['ls-tree', '-r', '--name-only', '-z', base]).split('\0').filter(Boolean))
+  const added = paths.filter((p) => !atBase.has(p))
+  const deleted = paths.filter((p) => atBase.has(p) && !existsSync(join(cwd, p)))
+  const diffLines = paths.some(needsLines) ? diffLinesOf(git(cwd, ['diff', '--no-ext-diff', '--no-color', '--no-renames', '-U0', base, '--'])) : {}
+  const files = [...new Set([...git(cwd, ['ls-files', '-z']).split('\0'), ...git(cwd, ['ls-files', '-z', '--others', '--exclude-standard']).split('\0')].filter(Boolean))]
+  const config = existsSync(join(cwd, 'vitest.config.ts')) ? readFileSync(join(cwd, 'vitest.config.ts'), 'utf8') : null
+  const direct = directUnitTests({ paths, files, read: (f) => (existsSync(join(cwd, f)) ? readFileSync(join(cwd, f), 'utf8') : null), config })
+  const picked = pickUnitTests({ paths, added, deleted, diffLines, direct })
   // A test not in the checkout can't run (a UNIT_SCANS entry the checkout doesn't have): left out, saying so.
   const absent = picked.tests.filter((t) => t.test !== ALL_UNIT && !existsSync(join(cwd, t.test)))
   if (absent.length) picked.tests = picked.tests.filter((t) => !absent.includes(t))
   for (const t of absent) console.error(`${t.test}: not in the checkout, left out`)
-  for (const w of related.why) console.error(w)
   for (const w of picked.why) console.error(w)
   for (const l of pickLines(picked)) console.log(l)
+}
+
+/** What every unit test loads (Vitest's config and setup files): a change to one is every unit test. */
+const VITEST_CONFIGS = ['vitest.config.ts', 'vitest.config.mts', 'vitest.config.js', 'vitest.config.mjs']
+
+/**
+ * The unit tests that themselves load a changed file: { all: why } when a change reaches every test (Vitest's config, a
+ * setup or global setup file it names), else { tests: Map test → why }. paths: the changed files; files: the checkout's;
+ * read(f): its text or null; config: vitest.config.ts's text or null. What a test loads is relatedTests.mjs's fileLoads
+ * (literal imports, import(), require, vi.mock and importActual…): a load it can't read (a computed path) selects
+ * nothing, as a direct pick follows only what it can name.
+ */
+export function directUnitTests({ paths, files, read, config }) {
+  const changed = new Set(paths.map(slashes))
+  const setup = config ? [...config.matchAll(/\b(?:setupFiles|globalSetup)\s*:\s*\[([^\]]*)\]/g)].flatMap((m) => [...m[1].matchAll(/(['"])([^'"]+)\1/g)].map((x) => slashes(x[2]).replace(/^\.\//, ''))) : []
+  const shared = [...changed].find((f) => VITEST_CONFIGS.includes(f) || setup.includes(f))
+  if (shared) return { all: `${shared}: every unit test loads it` }
+  const known = new Map(files.map(slashes).map((f) => [f.toLowerCase(), f]))
+  const tests = new Map()
+  for (const f of files.map(slashes).filter(isUnitTestFile)) {
+    const text = read(f)
+    if (text == null) continue
+    const hit = [...fileLoads(withoutTypeImports(text, f), f, known).edges].find((e) => changed.has(e))
+    if (hit) tests.set(f, `${f}: loads ${hit}`)
+  }
+  return { tests }
+}
+
+/**
+ * A file's text with its type-only imports and re-exports blanked (`import type`, `import { type A }`, `export type
+ * { A } from`): erased before a test runs, they load nothing (typecheck checks them). Unparseable text is kept as it is.
+ */
+export function withoutTypeImports(text, file) {
+  let ast
+  try {
+    ast = parseCode(text, file)
+  } catch {
+    return text
+  }
+  const typeOnly = (s) => s.importKind === 'type' || s.exportKind === 'type' || (s.specifiers?.length > 0 && s.specifiers.every((sp) => sp.importKind === 'type' || sp.exportKind === 'type'))
+  const ranges = ast.program.body.filter((s) => (s.type === 'ImportDeclaration' || (s.type === 'ExportNamedDeclaration' && s.source)) && typeOnly(s)).map((s) => [s.start, s.end])
+  let out = text
+  for (const [a, b] of ranges.reverse()) out = out.slice(0, a) + out.slice(a, b).replace(/[^\n]/g, ' ') + out.slice(b)
+  return out
 }
 
 /** The most tests a pick may list: Combwork's FOCUSED_MAX_TESTS (src/shared/workflow/focused.ts; a unit test holds them equal). */
 export const PICK_MAX_TESTS = 500
 
 /**
- * pickTests' unit part alone (`--pick --unit`): { tests: [{ test, needs: ['unit'] }], why }. More than a pick may list is
- * every unit test, as one id (ALL_UNIT): Combwork refuses a longer list, and the builder would have to name them.
+ * pickTests' unit part alone (`--pick --unit`): { tests: [{ test, needs: ['unit'] }], why }: unitPicks' (a changed test
+ * file, UNIT_SCANS) and direct's (directUnitTests). Every unit test, as one id (ALL_UNIT), when direct says so or there
+ * are more than a pick may list: Combwork refuses a longer list, and the builder would have to name them.
  */
-export function pickUnitTests({ paths, added = [], deleted = [], diffLines = {}, vitestRelated = [] }) {
-  const unit = unitPicks({ paths, added, deleted, diffLines, vitestRelated })
+export function pickUnitTests({ paths, added = [], deleted = [], diffLines = {}, direct = { tests: new Map() } }) {
+  const unit = unitPicks({ paths, added, deleted, diffLines })
+  if (direct.all) return { tests: [{ test: ALL_UNIT, needs: ['unit'] }], why: [`${ALL_UNIT}: ${direct.all}`] }
+  for (const [test, why] of direct.tests) if (!unit.has(test)) unit.set(test, why)
+  const sorted = [...unit.keys()].sort()
   if (unit.size > PICK_MAX_TESTS) return { tests: [{ test: ALL_UNIT, needs: ['unit'] }], why: [`${ALL_UNIT}: the change needs ${unit.size} unit test files, more than a pick may list (${PICK_MAX_TESTS})`, ...unit.values()] }
-  return { tests: [...unit.keys()].map((test) => ({ test, needs: ['unit'] })), why: [...unit.values()] }
+  return { tests: sorted.map((test) => ({ test, needs: ['unit'] })), why: sorted.map((t) => unit.get(t)) }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href && process.argv.includes('--pick')) {
