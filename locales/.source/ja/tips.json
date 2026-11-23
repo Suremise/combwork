@@ -280,6 +280,8 @@
   "tips.gitSigning.title": "Signed merges without waiting",
   "tips.gitView.text": "In a Git project, the Version Control tab shows its branch, remotes, history and tags, and lets you switch or create a branch, fetch, pull, push, tag and set its commit identity. The status bar shows \"{example}\": click it to get there.",
   "tips.gitView.title": "See and change a project's git",
+  "tips.githubRepository.text": "Version Control → Workflow → GitHub shows the project's repository, read from its remotes, and whether your GitHub CLI (gh) is signed in on that host. Combwork uses your own gh and stores no token.",
+  "tips.githubRepository.title": "Your project on GitHub, through your own gh",
   "tips.gotoProject.text": "Press {key} and type a few letters of its name.",
   "tips.gotoProject.title": "Jump to a project",
   "tips.group.agents": "Agents",

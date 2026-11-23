@@ -1,0 +1,59 @@
+// A Git project's GitHub link (HI-3550): its GitHub host (HI-2779's setting: the project's, else the workspace's,
+// githubHosts.ts), the repository there from its remotes (shared/githubRepo.ts: origin first, or the one the user
+// chose), and gh's sign-in on that host (ghCli.ts). No link (no remote on the host): no GitHub feature shows.
+
+import { combworkError } from './combworkError'
+import { msg } from '../shared/i18n/msg'
+import { githubRepoOf, githubRepoUrl, type GithubLink, type RemoteUrls } from '../shared/githubRepo'
+import { ghStatus } from './ghCli'
+import { lineRepoReads } from './platform/repoReadsPorts'
+import { githubHostsFor } from './githubHosts'
+import { createLogger, userText } from './logger'
+import type { WorkspaceService } from './workspace'
+
+const log = createLogger('github')
+
+const NOT_A_REMOTE = msg({ id: 'github.link.notARemote', defaultMessage: 'That remote isn’t on this project’s GitHub host any more: choose again.', description: 'An error choosing the repository of a project’s GitHub link (HI-3550, Version Control → Workflow → GitHub): the remote chosen no longer points at a repository on the GitHub host.' })
+
+/** The project's remotes, through the repository reads port (none when it isn't a repository, or git can't say). */
+function remotesOf(projectPath: string): Promise<RemoteUrls[]> {
+  return lineRepoReads().remotes(projectPath)
+}
+
+/** The project's chosen remote (project.json `githubRemote`), or null. */
+async function chosenRemote(ws: WorkspaceService, projectPath: string): Promise<string | null> {
+  try {
+    const v = (await ws.projectConfig(projectPath)).githubRemote
+    return typeof v === 'string' && v.trim() ? v.trim() : null
+  } catch {
+    return null
+  }
+}
+
+/** The project's repository on its GitHub host, without asking gh (the later GitHub cards' first step). */
+export async function githubRepoFor(ws: WorkspaceService, projectPath: string): Promise<{ host: string; owner: string; repo: string } | null> {
+  const host = (await githubHostsFor(ws, projectPath, process.env)).repo.host
+  const { linked } = githubRepoOf(await remotesOf(projectPath), host, await chosenRemote(ws, projectPath))
+  return linked ? { host, owner: linked.owner, repo: linked.repo } : null
+}
+
+/** The project's link, as Version Control → Workflow → GitHub shows it, with gh asked about its host now. */
+export async function githubLinkOf(ws: WorkspaceService, projectPath: string): Promise<GithubLink> {
+  const resolved = (await githubHostsFor(ws, projectPath, process.env)).repo
+  const chosen = await chosenRemote(ws, projectPath)
+  const [remotes, gh] = await Promise.all([remotesOf(projectPath), ghStatus(resolved.host)])
+  const { candidates, linked } = githubRepoOf(remotes, resolved.host, chosen)
+  return { host: resolved.host, hostOrigin: resolved.origin, candidates, linked: linked ? { ...linked, url: githubRepoUrl({ host: resolved.host, owner: linked.owner, repo: linked.repo }) } : null, chosen, gh }
+}
+
+/** The user's choice among the remotes on the host (null: back to origin, or the only one). Refused for another remote. */
+export async function setGithubRemote(ws: WorkspaceService, projectPath: string, remote: string | null): Promise<GithubLink> {
+  if (remote !== null) {
+    const host = (await githubHostsFor(ws, projectPath, process.env)).repo.host
+    const { candidates } = githubRepoOf(await remotesOf(projectPath), host)
+    if (typeof remote !== 'string' || !candidates.some((c) => c.remote === remote)) throw combworkError(NOT_A_REMOTE, undefined, { kind: 'invalid' })
+  }
+  await ws.mutateProjectConfig(projectPath, () => ({ githubRemote: remote ?? undefined }))
+  log.info(`GitHub link of ${userText(projectPath)}: remote ${remote === null ? 'by default' : userText(remote)}`)
+  return githubLinkOf(ws, projectPath)
+}

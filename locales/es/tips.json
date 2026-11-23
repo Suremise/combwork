@@ -262,6 +262,8 @@
   "tips.gitSigning.title": "Fusiones firmadas sin esperas",
   "tips.gitView.text": "En un proyecto Git, la pestaña Control de versiones muestra su rama, sus remotos, su historial y sus etiquetas, y te permite cambiar de rama o crear una, hacer fetch, pull y push, crear etiquetas y configurar su identidad de commit. La barra de estado muestra “{example}”: haz clic para ir allí.",
   "tips.gitView.title": "Ve y cambia el git de un proyecto",
+  "tips.githubRepository.text": "Control de versiones → Flujo de trabajo → GitHub muestra el repositorio del proyecto, leído de sus remotos, y si tu CLI de GitHub (gh) tiene sesión en ese host. Combwork usa tu propio gh y no guarda ningún token.",
+  "tips.githubRepository.title": "Tu proyecto en GitHub, con tu propio gh",
   "tips.gotoProject.text": "Presiona {key} y escribe unas letras de su nombre.",
   "tips.gotoProject.title": "Salta a un proyecto",
   "tips.group.agents": "Agentes",

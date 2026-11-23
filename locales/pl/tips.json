@@ -262,6 +262,8 @@
   "tips.gitSigning.title": "Podpisane scalenia bez czekania",
   "tips.gitView.text": "W projekcie Git zakładka Kontrola wersji pokazuje gałąź, zdalne repozytoria, historię i tagi projektu i pozwala przełączyć lub utworzyć gałąź, pobrać, ściągnąć, wypchnąć, dodać tag i ustawić autora commitów. Pasek stanu pokazuje „{example}”: kliknij, żeby tam przejść.",
   "tips.gitView.title": "Zobacz i zmień gita projektu",
+  "tips.githubRepository.text": "Kontrola wersji → Przepływ pracy → GitHub pokazuje repozytorium projektu, odczytane z jego zdalnych repozytoriów, i czy twoje GitHub CLI (gh) jest zalogowane na tym hoście. Combwork używa twojego gh i nie przechowuje tokenu.",
+  "tips.githubRepository.title": "Twój projekt na GitHubie, przez twoje własne gh",
   "tips.gotoProject.text": "Naciśnij {key} i wpisz kilka liter nazwy projektu.",
   "tips.gotoProject.title": "Przejdź do projektu",
   "tips.group.agents": "Agenci",

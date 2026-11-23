@@ -17,6 +17,7 @@ import type { WorkspaceService } from '../../workspace'
 import { createLogger, userText } from '../../logger'
 import { copilotHome, noAutoUpdate, stripsTokens } from './home'
 import type { CopilotModelsOutcome } from './models'
+import type { GhHostStatus } from '../../ghCli'
 
 const log = createLogger('copilot')
 
@@ -81,32 +82,8 @@ export async function routesInUse(baseEnv: Record<string, string>, given?: reado
 // Evidence
 // -----------------------------------------------------------------------------
 
-/** What `gh auth status --active --hostname <host> --json hosts` said of that host (never a token). */
-export interface GhHostStatus {
-  /** success: gh checked its login there; error: it couldn't (why: `error`); timeout; none: no login there. */
-  state: 'success' | 'error' | 'timeout' | 'none' | 'other'
-  login: string | null
-  /** gh's own words for an error, at most 300 characters. */
-  error: string | null
-}
-
-/** gh's reply for exactly `host` (null: unreadable). Another host's entry never stands in. */
-export function parseGhStatus(stdout: string, host: string): GhHostStatus | null {
-  try {
-    const hosts = (JSON.parse(stdout) as { hosts?: Record<string, unknown> }).hosts
-    if (!hosts || typeof hosts !== 'object') return null
-    const key = Object.keys(hosts).find((k) => k.toLowerCase() === host.toLowerCase())
-    const list = key ? hosts[key] : undefined
-    const a = (Array.isArray(list) ? list : []).find((x) => x && typeof x === 'object' && (x as { active?: unknown }).active !== false) as Record<string, unknown> | undefined
-    if (!a) return { state: 'none', login: null, error: null }
-    const state = a.state === 'success' || a.state === 'error' || a.state === 'timeout' ? a.state : 'other'
-    const error = typeof a.error === 'string' && a.error.trim() ? a.error.replace(/\s+/g, ' ').trim().slice(0, 300) : null
-    return { state, login: typeof a.login === 'string' ? a.login : null, error }
-  } catch {
-    return null
-  }
-}
-
+// gh's own report of a host (HI-3550: with the one gh service, which reads it too).
+export { parseGhStatus, type GhHostStatus } from '../../ghCli'
 /** The stored Copilot login for `host` (config.json's loggedInUsers; an entry without a host is github.com's), else null. */
 export function storedLoginFor(cliConfig: unknown, host: string): string | null {
   const c = cliConfig && typeof cliConfig === 'object' ? (cliConfig as Record<string, unknown>) : {}

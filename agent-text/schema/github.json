@@ -22,5 +22,8 @@
   },
   "github.host.rejected.scheme": {
     "placeholders": {}
+  },
+  "github.link.notARemote": {
+    "placeholders": {}
   }
 }

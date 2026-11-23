@@ -144,6 +144,7 @@ import { rulesNow } from './workflow/rulesets'
 import { poolFor, removeGoneSlot, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
+import { githubLinkOf, setGithubRemote } from './githubLink'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
@@ -1114,6 +1115,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       await setGithubHosts(workspace, at, change)
       return githubHostsForm(workspace, at, process.env)
     },
+    // HI-3550: a Git project's GitHub link (its repository and gh's sign-in on its host), and the remote chosen for it.
+    'github:link': (p) => githubLinkOf(workspace, workspace.assertProject(p)),
+    'github:setRemote': (p, remote) => setGithubRemote(workspace, workspace.assertProject(p), typeof remote === 'string' ? remote : null),
     'slots:levelForm': (level) => slotLevelForm(workspace, level),
     'slots:setLevelDefault': async (level, key, value) => {
       await setSlotDefault(workspace, level, key, value)

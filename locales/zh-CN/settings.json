@@ -1722,6 +1722,8 @@
   "settings.advanced.cw.git.processNames.title": "Git：可能持有锁的程序",
   "settings.advanced.cw.git.staleLockSeconds.desc": "仓库健康只会在 git 的锁文件（如 index.lock）至少达到这个时长，且没有在它之前启动的 git 仍在运行时，才提供移除它的选项。正常工作的 git 只会短暂持有锁；如果你的某个耗时较长的 git 命令（大型提交、repack）持有锁更久，请调大此值。",
   "settings.advanced.cw.git.staleLockSeconds.title": "Git：锁多久算过期",
+  "settings.advanced.cw.github.ghMinutes.desc": "一次 GitHub CLI（gh）调用可以运行多久，之后 Combwork 会将其视为卡住而结束，并提示它未响应。连接较慢或 GitHub Enterprise Server 响应较慢时可调高此值。",
+  "settings.advanced.cw.github.ghMinutes.title": "GitHub CLI：单次调用最长用时",
   "settings.advanced.cw.server.checkInferSeconds.title": "检查服务器：测试请求超时",
   "settings.advanced.cw.server.checkInferSeconds.desc": "“检查服务器”等待模型服务器回应其测试请求的时间。尚未加载的本地模型会先加载，在配置一般的硬件上可能需要几分钟；超过这个时间，检查会报告超时。"
 }

@@ -14,6 +14,7 @@ import type { CommandSpec, UpdateRetry } from '../types'
 import { COPILOT_ENV_STRIP, copilotEnv, stripsTokens } from './home'
 import { GITHUB_COM } from '../../../shared/githubHost'
 import { askCopilotModels } from './models'
+import { ghExec } from '../../ghCli'
 import { checkRoutes, hostEvidence, loggedInOf, parseGhStatus as parseHostGh, readCliConfig, routeContext, routeListing, routeOf, routesInUse, sourceName, type CopilotRoute, type GhHostStatus, type HostCheckDeps } from './hosts'
 import type { ResolvedGithubHosts } from '../../../shared/githubHost'
 import type { CatalogRead } from '../types'
@@ -208,9 +209,12 @@ export function hostDeps(executable: string, version: string | null): HostCheckD
   }
 }
 
-/** `gh auth status --active --hostname <host> --json hosts` in the route's environment: never `gh auth token`. */
-export async function ghHostStatus(host: string, env: Record<string, string>, runGh: typeof run = run): Promise<GhHostStatus | null> {
-  const r = await runGh('gh', ['auth', 'status', '--active', '--hostname', host, '--json', 'hosts'], 10000, env)
+/**
+ * `gh auth status --active --hostname <host> --json hosts` in the route's environment: never `gh auth token`. Through
+ * the one gh service (HI-3550, ghCli.ts), which takes any GitHub token out of it; tests give a runner of their own.
+ */
+export async function ghHostStatus(host: string, env: Record<string, string>, runGh: (args: string[], timeoutMs: number, env: Record<string, string>) => Promise<{ stdout: string; timedOut?: true }> = (args, t, e) => ghExec(args, { env: e, timeoutMs: t })): Promise<GhHostStatus | null> {
+  const r = await runGh(['auth', 'status', '--active', '--hostname', host, '--json', 'hosts'], 10000, env)
   if (r.timedOut) return { state: 'timeout', login: null, error: null }
   return r.stdout.trim() ? parseHostGh(r.stdout, host) : null
 }

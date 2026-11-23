@@ -1722,6 +1722,8 @@
   "settings.advanced.cw.git.processNames.title": "Git: programy, które mogą trzymać blokadę",
   "settings.advanced.cw.git.staleLockSeconds.desc": "Kondycja repozytorium proponuje usunięcie pliku blokady gita (takiego jak index.lock) dopiero, gdy ma on co najmniej tyle czasu, i tylko wtedy, gdy nie działa już żaden git uruchomiony przed nim. Git działający normalnie trzyma blokadę przez chwilę; zwiększ tę wartość, jeśli Twoje długie polecenie gita (duży commit, repack) trzyma ją dłużej.",
   "settings.advanced.cw.git.staleLockSeconds.title": "Git: ile musi mieć blokada, by była nieaktualna",
+  "settings.advanced.cw.github.ghMinutes.desc": "Jak długo może trwać jedno wywołanie GitHub CLI (gh), zanim Combwork zakończy je jako zawieszone i poda, że nie odpowiedziało. Zwiększ przy wolnym połączeniu lub GitHub Enterprise Server, który odpowiada powoli.",
+  "settings.advanced.cw.github.ghMinutes.title": "GitHub CLI: najdłuższy czas wywołania",
   "settings.advanced.cw.server.checkInferSeconds.title": "Sprawdź serwer: limit czasu żądania testowego",
   "settings.advanced.cw.server.checkInferSeconds.desc": "Jak długo „Sprawdź serwer” czeka, aż serwer modeli odpowie na jego żądanie testowe. Lokalny model, który nie jest jeszcze wczytany, najpierw się wczytuje, co na skromnym sprzęcie może trwać minuty; po tym czasie sprawdzenie zgłasza przekroczenie czasu."
 }

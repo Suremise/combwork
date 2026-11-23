@@ -1722,6 +1722,8 @@
   "settings.advanced.cw.git.processNames.title": "Git: die Programme, die eine Sperre halten können",
   "settings.advanced.cw.git.staleLockSeconds.desc": "Der Repository-Zustand bietet an, eine Sperrdatei von git (etwa index.lock) erst zu entfernen, wenn sie mindestens so alt ist und kein git mehr läuft, das vor ihr gestartet wurde. Ein normal arbeitendes git hält eine Sperre nur für Momente; erhöhe den Wert, wenn ein langer git-Befehl von dir (ein großer Commit, ein Repack) sie länger hält.",
   "settings.advanced.cw.git.staleLockSeconds.title": "Git: wie alt eine Sperre sein muss, um veraltet zu sein",
+  "settings.advanced.cw.github.ghMinutes.desc": "Wie lange ein Aufruf der GitHub CLI (gh) laufen darf, bevor Combwork ihn als hängend beendet und meldet, dass sie nicht geantwortet hat. Erhöhe den Wert bei einer langsamen Verbindung oder einem GitHub Enterprise Server, der langsam antwortet.",
+  "settings.advanced.cw.github.ghMinutes.title": "GitHub CLI: längste Dauer eines Aufrufs",
   "settings.advanced.cw.server.checkInferSeconds.title": "Server prüfen: Zeitlimit der Testanfrage",
   "settings.advanced.cw.server.checkInferSeconds.desc": "Wie lange „Server prüfen“ auf die Antwort eines Modellservers auf seine Testanfrage wartet. Ein lokales Modell, das noch nicht geladen ist, lädt zuerst, was auf bescheidener Hardware Minuten dauern kann; nach dieser Zeit meldet die Prüfung eine Zeitüberschreitung."
 }

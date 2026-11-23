@@ -115,7 +115,7 @@ function deps(): HostCheckDeps {
   return {
     executable: COPILOT,
     version: '1.0.106',
-    ghStatus: (host, env) => ghHostStatus(host, env, (_f, args, _t, e) => run(GH, args, 4000, e)),
+    ghStatus: (host, env) => ghHostStatus(host, env, (args, _t, e) => run(GH, args, 4000, e)),
     cliConfig: readCliConfig,
     models: (env) => askCopilotModels(COPILOT, env, 8000)
   }

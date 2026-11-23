@@ -92,6 +92,8 @@ const logged = () => (fs.existsSync(fakeLog) ? fs.readFileSync(fakeLog, 'utf8').
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     await page.locator('.git-sections [data-section="workflow"]').click()
     const group = page.locator('.workflow-github[data-level="project"]')
+    // On the Workflow form's GitHub tab (HI-3549).
+    await lib.workflowTab(page.locator('.vc-view .workflow-form'), 'github')
     await group.waitFor({ timeout: HUNG_MS })
     const host = group.locator('[data-github-option="host"] .workflow-origin')
     const cop = group.locator('[data-github-option="copilot"] .workflow-origin')
@@ -201,6 +203,7 @@ const logged = () => (fs.existsSync(fakeLog) ? fs.readFileSync(fakeLog, 'utf8').
     const settingsGroup = page.locator('.settings-group[data-section="workflow"]')
     await settingsGroup.locator('[role="tab"][data-setting-tab="workflow.workspaceDefaults"]').click()
     const wsGroup = page.locator('.workflow-github[data-level="workspace"]')
+    await lib.workflowTab(settingsGroup.locator('[data-setting="workflow.workspaceDefaults"]'), 'github')
     const wsHost = wsGroup.locator('[data-github-option="host"] .workflow-origin')
     check('Workspace defaults shows the workspace’s own host, set here', !!(await lib.until(async () => (await wsHost.getAttribute('data-host')) === 'tenant.ghe.com' && /Set here/.test(await wsHost.innerText()), HUNG_MS)), await wsHost.innerText().catch(() => ''))
     await shot('workspace-defaults', wsGroup)
