@@ -5,6 +5,7 @@
 // each call is bounded by Settings → Advanced's "GitHub CLI: longest a call takes"; a failure comes back as a kind and
 // gh's own words, for the window to say in plain words. A test puts a fake gh first on the PATH it passes.
 
+import { app } from 'electron'
 import { access } from 'original-fs/promises'
 import { delimiter, join } from 'path'
 import { GITHUB_GH_MINUTES } from '../shared/advanced'
@@ -32,8 +33,19 @@ export function ghEnv(base: Record<string, string | undefined>): Record<string, 
   return { ...out, GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1', GH_PAGER: '' }
 }
 
-/** gh on the environment's PATH, as cmd.exe finds it (gh.exe first, then a .cmd or .bat), or null. */
-export async function findGh(env: Record<string, string | undefined>): Promise<string | null> {
+/**
+ * The test seam (DEV_SEAMS: CW_TEST_GH): a test copy (unpackaged, with a test profile) never runs the gh on its PATH,
+ * which would be the user's own and its sign-in. It runs CW_TEST_GH's file (a suite's fake), or none: gh is missing.
+ * Undefined: not a test copy, so gh is looked for on the PATH (`npm run dev` and the installed app).
+ */
+export function testGhSeam(env: NodeJS.ProcessEnv = process.env, packaged = app.isPackaged): string | null | undefined {
+  if (packaged || !env.CW_USER_DATA) return undefined
+  return env.CW_TEST_GH?.trim() || null
+}
+
+/** gh on the environment's PATH, as cmd.exe finds it (gh.exe first, then a .cmd or .bat), or null; a test copy's seam first. */
+export async function findGh(env: Record<string, string | undefined>, seam: string | null | undefined = testGhSeam()): Promise<string | null> {
+  if (seam !== undefined) return seam
   const path = Object.entries(env).find(([k]) => k.toUpperCase() === 'PATH')?.[1] ?? ''
   for (const dir of path.split(delimiter)) {
     if (!dir) continue

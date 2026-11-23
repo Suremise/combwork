@@ -7,7 +7,7 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { dirname, join, relative } from 'path'
 import { describe, expect, it } from 'vitest'
 import { githubRepoOf, githubRepoUrl, parseGithubRemote } from '../src/shared/githubRepo'
-import { findGh, gh, ghEnv, ghStatus } from '../src/main/ghCli'
+import { findGh, gh, ghEnv, ghStatus, testGhSeam } from '../src/main/ghCli'
 import { ghHostStatus } from '../src/main/providers/copilot/install'
 import { tempDir } from './tempDir'
 import { timing } from './timing.cjs'
@@ -76,6 +76,20 @@ fakeGh(ghDir)
 const env = (mode = 'in', extra: Record<string, string> = {}) => ({ PATH: `${ghDir};${nodeDir}`, SystemRoot: process.env.SystemRoot ?? 'C:\\Windows', FAKE_LOG: log, FAKE_GH_MODE: mode, GH_TOKEN: 'ghp_secret', github_token: 'ghp_other', GH_HOST: 'evil.example', ...extra })
 const calls = (): { args: string[]; env: Record<string, string> }[] => readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l))
 const fresh = (): void => writeFileSync(log, '')
+
+// This file's calls aren't a test copy's: they find the fake on the PATH they give.
+delete process.env.CW_USER_DATA
+
+describe('a test copy never runs the gh on its PATH (CW_TEST_GH)', () => {
+  it('a test copy runs CW_TEST_GH’s fake, or none; anything else looks on the PATH', async () => {
+    expect(testGhSeam({ CW_USER_DATA: 'p', CW_TEST_GH: 'C:/fake/gh.cmd' }, false)).toBe('C:/fake/gh.cmd')
+    expect(testGhSeam({ CW_USER_DATA: 'p' }, false)).toBeNull()
+    expect(testGhSeam({ CW_TEST_GH: 'x' }, false)).toBeUndefined()
+    expect(testGhSeam({ CW_USER_DATA: 'p', CW_TEST_GH: 'x' }, true)).toBeUndefined()
+    // A test copy without a fake: gh is missing, whatever its PATH has.
+    expect(await findGh({ PATH: ghDir }, null)).toBeNull()
+  })
+})
 
 describe.runIf(windows)('the gh service, on a fake gh', { timeout: timing('test.hang') }, () => {
   it('finds gh on the PATH it is given, a .cmd too, and nothing on a PATH without one', async () => {

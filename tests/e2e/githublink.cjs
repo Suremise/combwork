@@ -1,8 +1,9 @@
 // A project's GitHub link (HI-3550) in Version Control → Workflow → GitHub: its repository read from its remotes on the
 // GitHub host (origin first; another remote chosen when several are there; none on another host), and the GitHub CLI's
-// sign-in there (signed in as whom, or the command to run, with Check Again). gh is a fake first on the app's PATH,
-// its answers set by a file, logging every call: each names its host, and none gets a token. No real gh, no sign-in,
-// no network: the remotes are URLs only. Dev build, throwaway profile and workspace; no agent runs.
+// sign-in there (signed in as whom, or the command to run, with Check Again). gh is a fake given by CW_TEST_GH (a test
+// copy never runs the gh on its PATH: the user's own), its answers set by a file, logging every call: each names its
+// host, and none gets a token. No real gh, no sign-in, no network: the remotes are URLs only. Dev build, throwaway
+// profile and workspace; no agent runs. NOT RUN on a packaged build (CW_TEST_GH is a dev seam).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -57,8 +58,8 @@ const calls = () => fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(B
   git('remote', 'add', 'origin', 'https://github.com/acme/widgets.git')
   git('remote', 'add', 'upstream', 'git@github.com:upstream-org/widgets.git')
   git('remote', 'add', 'work', 'https://git.acme.example/team/app.git')
-  // The fake gh first, Node beside it; a token in Combwork's own environment, which gh must never get.
-  const env = lib.withPathFirst({ GH_TOKEN: 'ghp_never_given', GITHUB_TOKEN: 'ghp_never_given' }, [ghDir, path.dirname(process.execPath)])
+  // The fake gh (Node first on the PATH for its .cmd); a token in Combwork's own environment, which gh must never get.
+  const env = lib.withPathFirst({ CW_TEST_GH: path.join(ghDir, 'gh.cmd'), GH_TOKEN: 'ghp_never_given', GITHUB_TOKEN: 'ghp_never_given' }, [path.dirname(process.execPath)])
   const h = await lib.launch({ userData, env })
   const { app, page, inv } = h
   const shoot = async (name, loc) => {
