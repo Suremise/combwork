@@ -738,6 +738,7 @@ async function theForm(page, app, inv) {
     const saveDialogIn = async (code) => {
       const m = (id) => messages[id]
       const style = row('style').locator('select')
+      await lib.workflowTab(section, 'style')
       const from = await style.inputValue()
       const to = from === 'squash' ? 'merge' : 'squash'
       await style.selectOption(to)
