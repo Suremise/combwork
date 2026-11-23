@@ -19,6 +19,7 @@ import { providerMessage } from '../shared/providers'
 import type { CardState } from '../shared/workflow/facts'
 import { isUnknown } from './platform/types'
 import type { CombworkErrorKind, KeptTargetShown, TaskMoveResult } from '../shared/types'
+import { cleanSource, parseSourceRef, sourceLabel, type GithubSource } from '../shared/githubSource'
 import { workflowMessage } from '../shared/workflow/texts'
 import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskChanges, TaskCursor, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, TaskWaiting, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
@@ -230,6 +231,8 @@ function clean(raw: Partial<TaskCard> & { projectId?: unknown }, n: number, ids?
     ...(raw.waitingFor && typeof raw.waitingFor.reason === 'string' && raw.waitingFor.reason.trim() && typeof raw.waitingFor.by === 'string' && typeof raw.waitingFor.at === 'string' ? { waitingFor: { reason: raw.waitingFor.reason, by: raw.waitingFor.by, at: raw.waitingFor.at, ...(typeof raw.waitingFor.ask === 'string' && raw.waitingFor.ask ? { ask: raw.waitingFor.ask } : {}) } } : {}),
     blockedBy: nums(raw.blockedBy),
     links: nums(raw.links),
+    // HI-3551: its GitHub source, when well formed (absent otherwise, so a card's JSON doesn't grow for it).
+    ...(cleanSource(raw.source) ? { source: cleanSource(raw.source)! } : {}),
     comments: Array.isArray(raw.comments) ? raw.comments.filter((c) => c && typeof c.text === 'string') : [],
     history: Array.isArray(raw.history) ? raw.history.filter((h) => h && typeof h.what === 'string') : [],
     archived: raw.archived === true,
@@ -2589,6 +2592,76 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ c
       const before = structuredClone(card)
       note(card, actorName(actor), storedText(HISTORY.target, { own: target ? 'yes' : 'no', target: target ?? '' }))
       await saveCard(ws, n, card, before, () => store.updateCard(n, { target: target ?? undefined }), o.commit)
+      changed(ws)
+      return card
+    })
+  )
+}
+
+/** HI-3551: why a card's GitHub source wasn't set, in the window's words. */
+const SOURCE = {
+  agents: msg({ id: 'tasks.source.agents', defaultMessage: 'Only the user sets a card’s GitHub source.', description: 'HI-3551: an error: an agent or the Assistant tried to set the GitHub pull request or issue a card is about; only the user does, in the card dialog.' }),
+  started: msg({ id: 'tasks.source.started', defaultMessage: '{card}’s GitHub source can’t change once its work has started.', description: 'HI-3551: an error setting or clearing the GitHub pull request or issue of a card that has started (its work is on it). {card} is a card key like HI-12.' }),
+  noProject: msg({ id: 'tasks.source.noProject', defaultMessage: 'A card about the workspace has no GitHub source: only a project’s cards do.', description: 'HI-3551: an error setting the GitHub source of a card that belongs to no project.' }),
+  noLink: msg({ id: 'tasks.source.noLink', defaultMessage: 'This project has no GitHub link: none of its remotes is on its GitHub host (Version Control → Workflow → GitHub).', description: 'HI-3551: an error setting a card’s GitHub source in a project without a GitHub link (HI-3550). Version Control → Workflow → GitHub is a place in the window: as translated there.' }),
+  notGithub: msg({ id: 'tasks.source.notGithub', defaultMessage: 'That isn’t a pull request or issue: give its address (https://…/pull/12 or …/issues/12) or its number (#12).', description: 'HI-3551: an error setting a card’s GitHub source: the text typed isn’t the address of a GitHub pull request or issue, nor a number. Keep the example addresses.' }),
+  otherRepo: msg({ id: 'tasks.source.otherRepo', defaultMessage: 'That pull request or issue isn’t on this project’s repository ({repo} on {host}).', description: 'HI-3551: an error setting a card’s GitHub source: the address is of another repository or host than the project’s GitHub link. {repo} is owner/name, {host} a host name.' }),
+  notFound: msg({ id: 'tasks.source.notFound', defaultMessage: 'The GitHub CLI found no pull request or issue #{number} on {repo}{why, select, none {} other {: {why}}}.', description: 'HI-3551: an error setting a card’s GitHub source: gh couldn’t read it. {number} its number, {repo} owner/name; {why} gh’s own words, or none (keep the select key).' }),
+  gh: msg({ id: 'tasks.source.gh', defaultMessage: 'The GitHub CLI {problem, select, missing {isn’t installed} signedOut {isn’t signed in on {host}} timeout {didn’t answer in time} other {couldn’t read it}}: see Version Control → Workflow → GitHub.', description: 'HI-3551: an error setting a card’s GitHub source: gh couldn’t be asked (problem: not installed, not signed in on the host, no answer in time, or another failure). Keep the select keys. Version Control → Workflow → GitHub is a place in the window: as translated there.' })
+}
+
+/**
+ * HI-3551: sets, replaces or clears (null) the GitHub pull request or issue a card is about: the user's alone, only while
+ * the card has never started (no Started fact) and is in Todo or On Hold. Read once from GitHub through the gh service
+ * (outside the board's lock), on the project's GitHub link only; the card is labelled github-pr or github-issue. Once
+ * started, the start's evidence (Started.pr) carries a PR's identity, whatever the card says after.
+ */
+export async function setSource(n: number, input: string | null, actor: TaskActor): Promise<TaskCard> {
+  if (actor.kind !== 'user') throw new TaskPermissionError(SOURCE.agents)
+  const ws = workspace
+  const first = await getTask(n, ws)
+  if (!first.project) throw new TaskConflictError(SOURCE.noProject)
+  const projectPath = ws.path ? join(ws.path, first.project) : first.project
+  const { githubRepoFor } = await import('./githubLink')
+  const { gh } = await import('./ghCli')
+  let source: GithubSource | null = null
+  if (input !== null) {
+    const link = await githubRepoFor(ws, projectPath)
+    const ref = parseSourceRef(String(input), link)
+    if ('error' in ref) throw new TaskConflictError(ref.error === 'otherRepo' && link ? withValues(SOURCE.otherRepo, { repo: `${link.owner}/${link.repo}`, host: link.host }) : SOURCE[ref.error])
+    const repo = `${ref.ref.owner}/${ref.ref.repo}`
+    const ask = (kind: 'pr' | 'issue') => gh({ repo: ref.ref }, [kind, 'view', String(ref.number), '--json', kind === 'pr' ? 'number,title,url,headRefName,baseRefName,isCrossRepository,maintainerCanModify' : 'number,title,url'], { json: true })
+    let kind: 'pr' | 'issue' = ref.kind ?? 'pr'
+    let got = await ask(kind)
+    // `#n` names either: a pull request first, else an issue (GitHub numbers both alike).
+    if (!got.ok && got.problem === 'failed' && ref.kind === null) {
+      kind = 'issue'
+      got = await ask(kind)
+    }
+    if (!got.ok) throw new TaskConflictError(got.problem === 'failed' ? withValues(SOURCE.notFound, { number: ref.number, repo, why: got.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: got.problem, host: ref.ref.host }))
+    const j = (got.json ?? {}) as Record<string, unknown>
+    const str = (k: string): string => (typeof j[k] === 'string' ? (j[k] as string) : '')
+    source = cleanSource({ kind, ...ref.ref, number: ref.number, url: str('url') || `https://${ref.ref.host}/${repo}/${kind === 'pr' ? 'pull' : 'issues'}/${ref.number}`, title: str('title'), ...(kind === 'pr' ? { pr: { headRef: str('headRefName'), baseRef: str('baseRefName'), crossRepository: j.isCrossRepository === true, maintainerCanModify: j.maintainerCanModify === true } } : {}) }) ?? null
+    if (!source || (kind === 'pr' && (!source.pr?.headRef || !source.pr.baseRef))) throw new TaskConflictError(withValues(SOURCE.notFound, { number: ref.number, repo, why: 'none' }))
+  }
+  const { workflowFor } = await import('./workflow/service')
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  return recordingAs(actor, () =>
+    boardLock(ws, async () => {
+      const card = await getTask(n, ws)
+      if (card.archived) throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
+      // Under the board's lock, where a start is written: never once its work has started (a put back card included).
+      const s = wf ? wf.state(wf.store.card(n)) : null
+      if (s?.started || !['todo', 'hold'].includes(s?.stage ?? card.column)) throw new TaskConflictError(withValues(SOURCE.started, { card: cardRef(n) }))
+      if (JSON.stringify(card.source ?? null) === JSON.stringify(source)) return card
+      const before = structuredClone(card)
+      const label = source ? sourceLabel(source.kind) : null
+      const old = card.source ? sourceLabel(card.source.kind) : null
+      if (source) card.source = source
+      else delete card.source
+      card.labels = [...card.labels.filter((l) => l !== old || l === label), ...(label && !card.labels.includes(label) ? [label] : [])]
+      note(card, actorName(actor), storedText(HISTORY.source, source ? { set: 'yes', kind: source.kind, number: source.number, repo: `${source.owner}/${source.repo}` } : { set: 'no', kind: '', number: 0, repo: '' }))
+      await saveCard(ws, n, card, before)
       changed(ws)
       return card
     })

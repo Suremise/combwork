@@ -587,6 +587,7 @@ export interface CombworkRequests {
   'tasks:setReviewSkip': (n: number, skip: boolean, opts?: { reason?: string }) => TaskCard
   /** Sets the branch a card merges into (HI-2556, its Merges into): one the project lists, or null for its own. */
   'tasks:setTarget': (n: number, target: string | null) => TaskCard
+  'tasks:setSource': (n: number, source: string | null) => TaskCard
   'tasks:keptTarget': (n: number) => KeptTargetShown
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }
