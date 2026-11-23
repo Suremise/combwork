@@ -7,7 +7,7 @@ import { createRequire } from 'module'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
-import { exitCode, parseJobs, recordPathFrom, resultRecords, sortIds, suiteResults, unitResults, withExit } from '../scripts/focusedTests.mjs'
+import { ALL_UNIT, exitCode, parseJobs, recordPathFrom, resultRecords, sortIds, suiteResults, unitResults, withExit } from '../scripts/focusedTests.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { SUITES } from './e2e/suites.mjs'
 import { tempDir } from './tempDir'
@@ -72,6 +72,16 @@ describe("each test's result", () => {
     expect([...(unitResults(null, ['tests/a.test.ts'], root) as Map<string, Result>).values()]).toEqual([{ result: 'failed', why: 'Vitest wrote no report (see its output)' }])
     const r = unitResults({ success: false, testResults: [file('tests/a.test.ts', 'passed', [['one', 'passed']])] }, ['tests/a.test.ts'], root) as Map<string, Result>
     expect(r.get('tests/a.test.ts')).toMatchObject({ result: 'failed', why: expect.stringMatching(/outside the tests/) })
+  })
+
+  it("every unit test (unit:all, HI-3542): one result from the whole report, failed by a file that didn't load", () => {
+    expect(sortIds([ALL_UNIT], { cwd: root, suiteNames })).toMatchObject({ unit: [ALL_UNIT], suites: [], problem: null })
+    const all = (testResults: unknown[], success = true) => (unitResults({ success, testResults }, [ALL_UNIT], root) as Map<string, Result>).get(ALL_UNIT)
+    expect(all([file('tests/a.test.ts', 'passed', [['one', 'passed']]), file('tests/c.test.ts', 'skipped', [['one', 'skipped']])])).toEqual({ result: 'passed' })
+    // A file with no test loaded (an import that throws) is failed by Vitest: it fails the whole id, named.
+    expect(all([file('tests/a.test.ts', 'passed', [['one', 'passed']]), file('tests/d.test.ts', 'failed', [])], false)).toEqual({ result: 'failed', why: 'failed: tests/d.test.ts' })
+    expect(all([file('tests/c.test.ts', 'skipped', [['one', 'skipped']])])).toEqual({ result: 'skipped', why: 'every test was skipped' })
+    expect(all([file('tests/a.test.ts', 'passed', [['one', 'passed']])], false)).toMatchObject({ result: 'failed', why: expect.stringMatching(/outside the tests/) })
   })
 
   it("a suite's from the run record: passed, failed, skipped for the environment, not run, or missing", () => {

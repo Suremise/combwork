@@ -82,10 +82,11 @@ export function startMsysKeeper(bin: string, temp: string, readyMs = timing('msy
 
 /**
  * The run's keeper's `ready`, on the process: Vitest loads its config (which starts it) and its global setup (which awaits
- * it, tests/tempRun.ts) as separate copies of this module, in the same process.
+ * it, tests/tempRun.ts) as separate copies of this module, in the same process. A named member of the global object, read
+ * as `globalThis.name` only (HI-3542): tests/e2e/relatedTests.mjs can't follow the global object used any other way (a
+ * key, an alias) and keeps every test loading this file related to any change, as the focused unit picks found.
  */
-const KEPT = Symbol.for('combwork.test.msysKeeper')
-const store = globalThis as { [KEPT]?: Promise<string | null> }
+type Kept = { combworkMsysKeeper?: Promise<string | null> }
 
 /**
  * The run's keeper (runTemp.mts's startRunTemp starts it, with the temp folder as it was before the run's): a no-op off
@@ -93,7 +94,7 @@ const store = globalThis as { [KEPT]?: Promise<string | null> }
  */
 export function keepMsysTemp(temp: string | undefined): void {
   const bin = temp ? gitMsysBin() : null
-  if (bin && temp) store[KEPT] = startMsysKeeper(bin, temp).ready
+  if (bin && temp) (globalThis as Kept).combworkMsysKeeper = startMsysKeeper(bin, temp).ready
 }
 
 /**
@@ -102,6 +103,6 @@ export function keepMsysTemp(temp: string | undefined): void {
  * run starts nothing (HR1's round 1): its first Git Bash could otherwise still set /tmp to the run's folder.
  */
 export async function msysTempKept(): Promise<void> {
-  const why = await (store[KEPT] ?? null)
+  const why = await ((globalThis as Kept).combworkMsysKeeper ?? null)
   if (why) throw new Error(`Git Bash's /tmp keeper didn't start (HI-3447): ${why}. The run starts nothing: its first Git Bash could set /tmp, for every Git Bash on this PC, to the run's temp folder, which goes with it.`)
 }
