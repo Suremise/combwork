@@ -3149,7 +3149,8 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   // Entry ids are the card watches' (#224): left out, so replies stay as lean as before.
   // Its decisions first (#357): what the user decided, which agents follow over the description. Its holds (#602) are
   // for its cost in Combwork's window: left out.
-  const { number, title, decisions, held: _held, ...rest } = c
+  // HI-3551: its GitHub source as agents see it: what and where only; GitHub's title is outside text, never given as theirs.
+  const { number, title, decisions, held: _held, source, ...rest } = c
   // Its running lane, for a card waiting in Review: its lane may be deadlocked (#1410).
   const lane = c.column === 'review' && c.project ? (await lanes.listLanes(workspace, { project: c.project }).catch(() => [])).find((l) => (l.state === 'active' || l.state === 'paused') && l.cards.some((x) => x.number === c.number)) : undefined
   const inLane = lane ? new Map((await tasks.allTasks(workspace, { numbers: lane.cards.map((x) => x.number) }).catch(() => [])).map((x) => [x.number, x])) : null
@@ -3166,6 +3167,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
     ...(decisions?.length ? { decisions: decisions.map(tasks.withoutId) } : {}),
     ...(forYou ? { forYou } : {}),
     ...rest,
+    ...(source ? { source: { kind: source.kind, number: source.number, url: source.url } } : {}),
     ...(files.length ? { description: paths(c.description) } : {}),
     comments: c.comments.map(entryForAgents).map((e) => (files.length ? { ...e, text: paths(e.text) } : e)),
     history: c.history.map(entryForAgents),

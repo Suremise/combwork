@@ -357,7 +357,9 @@ export function cardRequests(items: readonly { request: string; kind: string; ga
 }
 
 /** A card as the Agent API shows it: with what its agent is doing now, and why it is stalled. */
-export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'> {
+export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held' | 'source'> {
+  /** HI-3551: its GitHub pull request or issue: what and where only (its title on GitHub is outside text, never given). */
+  source?: { kind: 'pr' | 'issue'; number: number; url: string }
   /** The user's decisions, first (#357); without their ids. Absent when there are none. */
   decisions?: Omit<TaskDecision, 'id'>[]
   agent: { id: string; name: string; status: string; backgroundTasks: number } | null

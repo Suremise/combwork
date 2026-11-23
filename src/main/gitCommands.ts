@@ -889,7 +889,10 @@ export async function isolate(repo: string, folder: string, line: string, base: 
     const b = await branch(folder)
     if (!isUnknown(b) && b === line) return folder
   }
-  const r = await git(repo, ['worktree', 'add', '-b', line, folder, base])
+  // HI-3551: a line that is there already (a pull request's, made at its head; a carried one) is checked out as it is.
+  const had = await lineHead(repo, line)
+  if (isUnknown(had)) return had
+  const r = await git(repo, had ? ['worktree', 'add', folder, line] : ['worktree', 'add', '-b', line, folder, base])
   return r.ok ? folder : unknown(U.folderFor, { branch: line })
 }
 
