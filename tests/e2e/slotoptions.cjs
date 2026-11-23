@@ -83,12 +83,13 @@ function board(sql, ...args) {
     const preview = section.locator('.workflow-preview')
     const slotsGroup = section.locator('.workflow-group[data-group="slots"]')
     const dialog = page.locator('.dialog', { hasText: 'Save Workflow Options' })
-    // The project's Version Control tab at Workflow.
-    const openWorkflow = async (p) => {
+    // The project's Version Control tab at Workflow, on one of its tabs (HI-3549).
+    const openWorkflow = async (p, tab = 'overview') => {
       await page.getByText(path.basename(p), { exact: true }).first().click()
       await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
       await page.locator('.git-sections [data-section="workflow"]').click()
       await section.waitFor({ timeout: HUNG_MS })
+      await lib.workflowTab(section, tab)
     }
     const saveAll = async () => {
       await section.locator('[data-action="save"]').click()
@@ -113,13 +114,17 @@ function board(sql, ...args) {
     }
     check('G11 says what a slot is, and the old "builder’s worktree" line is gone', (await row('folder').innerText()).includes('a slot Combwork lends to the card or its lane') && !(await row('folder').innerText()).includes('worktree'), await row('folder').innerText())
     check('G15 and G17 are shown, with slots and a reviewer agent', (await row('slotsUpToDate').count()) === 1 && (await row('reviewerMode').count()) === 1)
+    await lib.workflowTab(section, 'folder')
     await shot('rows-slots', row('folder'))
 
     // --- G11 = project folder: G15 hidden, G17 shown; a shared pool saves there; then G1b = 2 with it.
+    await lib.workflowTab(section, 'finish')
     await row('finish').locator('select').selectOption('notChecked')
+    await lib.workflowTab(section, 'folder')
     await row('folder').locator('select').selectOption('project')
     check('the project folder hides G15', !!(await until(async () => (await row('slotsUpToDate').count()) === 0, HUNG_MS)))
     check('…but shows G17', (await row('reviewerMode').count()) === 1)
+    await lib.workflowTab(section, 'reviewerMode')
     await row('reviewerMode').locator('select').selectOption('pool')
     check('…and nothing contradicts', (await section.locator('.workflow-contradiction').count()) === 0, await section.locator('.workflow-contradiction').allInnerTexts().then((t) => t.join(' | ')))
     await saveAll()
@@ -130,6 +135,7 @@ function board(sql, ...args) {
     check('G1b = 2 with G17 = pool saves, each its own', !!(await until(() => projectJson().workflow.options.reviewers === 2 && projectJson().workflow.options.reviewerMode === 'pool', HUNG_MS)), JSON.stringify(projectJson().workflow.options))
 
     // --- Slots and copies: back to slots; the setup script set here is the one the next warming runs.
+    await lib.workflowTab(section, 'folder')
     await row('folder').locator('select').selectOption('slots')
     await saveAll()
     check('Slots and copies shows the scripts with slots', !!(await until(async () => (await slotsGroup.locator('[data-slot-option="setup"]').count()) === 1, HUNG_MS)))
@@ -218,13 +224,14 @@ function board(sql, ...args) {
     await page.locator('.settings-nav .row', { hasText: 'Version Control' }).first().click()
     await page.locator('[role="tab"][data-setting-tab="workflow.workspaceDefaults"]').click()
     const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
+    await lib.workflowTab(page.locator('[data-setting="workflow.workspaceDefaults"]'), 'where')
     check('Settings → Version Control’s Workspace defaults have the copied files, inheriting Combwork’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/app.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
     const wsJson = () => JSON.parse(fs.readFileSync(path.join(fx.ws, '.combwork', 'workspace.json'), 'utf8'))
     await wsCopy.locator('[data-action="none-copy"]').click()
     check('…set to none there, saved in workspace.json', !!(await until(async () => wsJson().slotDefaults?.copy === '' && (await wsCopy.locator('.workflow-origin').getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(wsJson().slotDefaults))
     await shot('copy-workspace-none', wsCopy)
     await page.keyboard.press('Escape')
-    await openWorkflow(fx.alpha)
+    await openWorkflow(fx.alpha, 'where')
     check('the project then inherits the workspace’s none, From the workspace', !!(await until(async () => (await copyOrigin.getAttribute('data-origin').catch(() => '')) === 'workspace' && (await copyOrigin.innerText()).includes('None'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
     await inv('slots:setLevelDefault', 'workspace', 'copy', null)
     // Combwork's level changing tells the window, which reads the project's copied files again (the workspace's now unset).
@@ -242,7 +249,7 @@ function board(sql, ...args) {
     check('a project with neither submodules nor Git LFS has no Set up submodules and LFS row', (await slotsGroup.locator('[data-slot-option="gitFiles"]').count()) === 0)
 
     // --- Set up submodules and LFS (HI-1182): gamma has a submodule, so the row shows, on, saying so; off is saved.
-    await openWorkflow(gamma)
+    await openWorkflow(gamma, 'where')
     const gitFiles = slotsGroup.locator('[data-slot-option="gitFiles"]')
     check('a project with a submodule shows Set up submodules and LFS, saying how many it has', !!(await until(async () => (await gitFiles.count()) === 1 && (await gitFiles.locator('[data-git-files="submodules"]').innerText().catch(() => '')).includes('1 submodule'), HUNG_MS)), await slotsGroup.innerText().catch(() => ''))
     check('…on by default', (await gitFiles.locator('[role="switch"]').getAttribute('aria-checked')) === 'true')

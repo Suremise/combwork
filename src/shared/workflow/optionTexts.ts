@@ -4,7 +4,7 @@
 
 import { msg, type Msg } from '../i18n/msg'
 import { accepts, type PlatformId } from '../platform/descriptors'
-import type { FormGroupId, OptionKey, PresetId } from './options'
+import type { FormGroupId, FormTabId, OptionKey, PresetId } from './options'
 import type { LaneEvent, WakeLevel } from '../laneEvents'
 
 interface OptionText {
@@ -290,6 +290,17 @@ export const GROUP_TEXT: Record<FormGroupId, Msg> = {
   work: msg({ id: 'workflow.group.work', defaultMessage: 'The work', description: 'A heading of the Workflow section for a project without version control: what a card’s work is, and when cards start.' }),
   loops: msg({ id: 'workflow.group.loops', defaultMessage: 'Card loops', description: 'A heading of the Workflow section: how card loops run, a builder and a reviewer taking cards in turn (glossary: card loop).' }),
   stages: msg({ id: 'workflow.group.stages', defaultMessage: 'Stages', description: 'A heading of the Workflow section: the names of the board’s stages (glossary 2.2: stage).' })
+}
+
+/** The Workflow form's tabs (HI-3549), each named for the groups it holds. */
+export const TAB_TEXT: Record<FormTabId, Msg> = {
+  overview: msg({ id: 'workflow.tab.overview', defaultMessage: 'Overview', description: 'A tab of the Workflow form (Version Control → Workflow, and the workflow defaults in Settings; HI-3549): the preset picker and what it sets.' }),
+  checks: msg({ id: 'workflow.tab.checks', defaultMessage: 'Review & checks', description: 'A tab of the Workflow form (HI-3549): the team size, the review options and the checks that must pass (glossary 2.3: checks).' }),
+  merging: msg({ id: 'workflow.tab.merging', defaultMessage: 'Merging', description: 'A tab of the Workflow form (Git; HI-3549): how and where work is merged.' }),
+  where: msg({ id: 'workflow.tab.where', defaultMessage: 'Where cards are built', description: 'A tab of the Workflow form (Git; HI-3549): the folders cards are built in (slots, glossary 2.5), the commits made there and file locks. As the group heading “Where cards are built”.' }),
+  github: msg({ id: 'workflow.tab.github', defaultMessage: 'GitHub', description: 'A tab of the Workflow form (Git; HI-3549): the GitHub hosts the project or workspace uses. GitHub is a name: keep it.' }),
+  work: msg({ id: 'workflow.tab.work', defaultMessage: 'The work', description: 'A tab of the Workflow form for a project without version control (HI-3549): what a card’s work is, and when cards start. As the group heading “The work”.' }),
+  loops: msg({ id: 'workflow.tab.loops', defaultMessage: 'Loops & stages', description: 'A tab of the Workflow form (HI-3549): how card loops run (glossary: card loop) and the names of the board’s stages (glossary 2.2: stage).' })
 }
 
 /**

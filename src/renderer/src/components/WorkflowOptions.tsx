@@ -1,8 +1,8 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, RetargetPreview, RetargetResult, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import { accepts, hasCapability, hasOperation, merges, type PlatformId } from '@shared/platform/descriptors'
-import { allOff, formFinishes, formFolders, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
-import { GROUP_TEXT, optionDesc, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT, WAKE_EVENT_TEXT, WAKE_LEVEL_TEXT } from '@shared/workflow/optionTexts'
+import { allOff, formFinishes, formFolders, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, FORM_TABS, formShows, formTabOf, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type FormTabId, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
+import { GROUP_TEXT, optionDesc, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, TAB_TEXT, VALUE_TEXT, WAKE_EVENT_TEXT, WAKE_LEVEL_TEXT } from '@shared/workflow/optionTexts'
 import { ASSISTANT_WAKES_DEFAULT, LANE_EVENTS, WAKE_EVENT_ORDER, WAKE_LEVELS, wakeEventsOf, type AssistantWakes, type WakeLevel } from '@shared/laneEvents'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX, FILE_LOCK_MODES } from '@shared/defaults'
 import { ManyAgentsNote } from './ManyAgentsNote'
@@ -17,7 +17,7 @@ import type { StageId } from '@shared/workflow/facts'
 import { shownText } from '@shared/advanced'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { agentProviderOf, cardLabelOf, confirm, notify, openVersionControl, set as setStore, setActivity, useStore } from '../store'
+import { agentProviderOf, cardLabelOf, chooseTab, confirm, focusWorkflowOption, notify, openWorkflowOption, set as setStore, setActivity, useStore, workflowFormAt } from '../store'
 import { loadReleaseOffers, ReleaseOfferRow, useReleaseOffers } from '../releaseOffers'
 import { cx } from '../util'
 import { SlotCopyLevel, SlotsAndCopies } from './SlotsAndCopies'
@@ -32,6 +32,8 @@ import { PLATFORM_NAME } from '@shared/platform/switching'
 import { isVersionBranch } from '@shared/nextVersion'
 import { MissingBranches, missingSaveText, newlyNamed, NextVersionButton, startNextVersion } from './NextVersion'
 import { afterSave, saveOff } from './workflowFormState'
+import { TabPanel, Tabs } from './Tabs'
+import { shownTab } from '@shared/tabs'
 
 /**
  * The Version Control tab's Workflow section (#1418, SPEC §16.6; P4's plain form before it, #1278): the presets, each
@@ -156,8 +158,12 @@ const T = {
   offerUnsaved: msg({ id: 'workflow.form.offerUnsaved', defaultMessage: 'Workflow has changes you haven’t saved, so the release offer wasn’t filled in. Save or discard them, then choose Move… again.', description: 'HI-3155: a notification: Move… or Remove… on a release offer (For you) found unsaved edits in the Workflow section, which it doesn’t overwrite. Move… and Remove… are the offer’s buttons: as translated there.' }),
   offerStale: msg({ id: 'workflow.form.offerStale', defaultMessage: 'Work merges into or Other branches work can merge into changed since the release offer was made, so it wasn’t filled in. The offer is read again.', description: 'HI-3155: a notification: a release offer’s Move… or Remove… found the saved options no longer the ones it was made on. Work merges into and Other branches work can merge into are option names: as translated there.' }),
   changedMeanwhile: msg({ id: 'workflow.form.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.', description: 'A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant); the section reloads them.' }),
+  tabsLabel: msg({ id: 'workflow.form.tabs', defaultMessage: 'Workflow options', description: 'Accessible name of the Workflow form’s tabs (HI-3549): Overview, Review & checks, Merging and the others, each a group of the workflow options.' }),
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
 }
+
+/** The accessible name of the Workflow form's tabs (HI-3549), a template's too. */
+export const WORKFLOW_TABS_LABEL = T.tabsLabel
 
 /** The defaults' platform choice (None · Git) and its line beside it: a platform's own words (HI-2822). */
 const LEVELS = ['none', 'git'] as const
@@ -229,7 +235,26 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
     }),
     [path]
   )
-  return <WorkflowEditor source={source} project={project} />
+  return <WorkflowEditor source={source} project={project} at={workflowFormAt(path)} />
+}
+
+/**
+ * HI-3549: the first option of a level's form for `platform` whose name or description has a Settings search's text, in
+ * the form's order (its English too, as Settings' rows match), or null. G12 is a project's own: no level has it.
+ */
+export function workflowSearchHit(query: string, platform: PlatformId): OptionKey | null {
+  const q = query.trim().toLowerCase()
+  if (!q) return null
+  for (const g of FORM_GROUPS[platform])
+    for (const key of g.options) {
+      if (key === 'identity') continue
+      const title = optionTitle(key, platform)
+      const desc = optionDesc(key, platform)
+      if (!title) continue
+      const text = `${tr(title)} ${title.defaultMessage} ${desc ? `${tr(desc)} ${desc.defaultMessage}` : ''}`.toLowerCase()
+      if (text.includes(q)) return key
+    }
+  return null
 }
 
 /**
@@ -237,9 +262,23 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
  * for None or for Git, in the project form's editor: the same groups and checks, each option inheriting from the level
  * below (the workspace's from Combwork's, Combwork's from every rule off).
  */
-export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; onDirty?: (dirty: boolean) => void }) {
+export function WorkflowLevelForm({ level, onDirty, query = '' }: { level: WorkflowLevel; onDirty?: (dirty: boolean) => void; query?: string }) {
   const [platform, setPlatform] = useState<LevelPlatform>('git')
   const workspacePath = useStore((s) => s.workspace?.path ?? '')
+  // HI-3549: a link to an option of this level for the other platform shows that platform's form, which then opens it.
+  const focusAt = useStore((s) => s.workflowFocus?.at)
+  useEffect(() => {
+    const wanted = LEVELS.find((p) => focusAt === workflowFormAt({ level, platform: p }))
+    if (wanted) setPlatform(wanted)
+  }, [focusAt, level])
+  // HI-3549: a Settings search finding one of this level's options opens it: this platform's first, else the other's.
+  useEffect(() => {
+    const p = workflowSearchHit(query, platform) ? platform : LEVELS.find((x) => workflowSearchHit(query, x))
+    const hit = p ? workflowSearchHit(query, p) : null
+    if (p && hit) focusWorkflowOption(workflowFormAt({ level, platform: p }), hit)
+    // Only as the search changes: choosing the other platform while searching stays the user's choice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, level])
   const source = useMemo(
     (): FormSource => ({
       key: `${level}:${platform}:${level === 'workspace' ? workspacePath : ''}`,
@@ -262,7 +301,7 @@ export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; on
         </div>
         <span className="s-desc">{tr(LEVEL_FOR[platform])}</span>
       </div>
-      <WorkflowEditor source={source} project={null} onDirty={onDirty} />
+      <WorkflowEditor source={source} project={null} at={workflowFormAt({ level, platform })} onDirty={onDirty} />
     </div>
   )
 }
@@ -271,7 +310,16 @@ export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; on
  * The editor: a project's options or a level's defaults (`source`), with `project` for a project's own rows; `onDirty`
  * hears whether its draft is unsaved (Settings → Version Control marks its tab, HI-1837).
  */
-function WorkflowEditor({ source, project, onDirty }: { source: FormSource; project: ProjectInfo | null; onDirty?: (dirty: boolean) => void }) {
+function WorkflowEditor({ source, project, at, onDirty }: { source: FormSource; project: ProjectInfo | null; at: string; onDirty?: (dirty: boolean) => void }) {
+  // HI-3549: the form's tabs: the one chosen remembered per form (`at`), a link to an option choosing its tab.
+  const tabsKey = `workflow-form:${at}`
+  const wantedTab = useStore((s) => s.tabs[tabsKey])
+  const tabsBase = useId()
+  const rootRef = useRef<HTMLDivElement>(null)
+  const focus = useStore((s) => s.workflowFocus)
+  /** The option a link asked for, brought into view once its tab is shown; then marked a moment (`flash`). */
+  const [inView, setInView] = useState<{ option: OptionKey; n: number } | null>(null)
+  const [flash, setFlash] = useState<{ option: OptionKey; n: number } | null>(null)
   // The form as read and its draft, kept with the project they are for: another project's never shows (HR5's round 1).
   const [loaded, setLoaded] = useState<{ for: string; form: WorkflowForm; draft: WorkflowChange } | null>(null)
   const [failed, setFailed] = useState<{ for: string; error: string } | null>(null)
@@ -428,6 +476,25 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   const dirty = !!form && !!draft && (draft.preset !== form.preset || !same(draft.options, form.own))
   dirtyRef.current = dirty
   useEffect(() => onDirty?.(dirty), [onDirty, dirty])
+  // HI-3549: a link to one of this form's options, once the form is read: its tab chosen, then the option brought into view.
+  const formPlatform = form?.platform ?? null
+  useEffect(() => {
+    if (!focus || focus.at !== at || !formPlatform) return
+    setStore({ workflowFocus: null })
+    const tab = focus.option ? formTabOf(formPlatform, focus.option) : (focus.tab ?? null)
+    if (tab) chooseTab(tabsKey, tab)
+    if (focus.option) setInView({ option: focus.option, n: focus.n })
+  }, [focus, at, formPlatform, tabsKey])
+  useEffect(() => {
+    if (!inView) return
+    const row = rootRef.current?.querySelector<HTMLElement>(`.workflow-option[data-option="${CSS.escape(inView.option)}"]`)
+    // Its tab shown first (a row on a hidden tab has no box yet); an option this form doesn't show is left at its tab.
+    if (row && !row.getClientRects().length) return
+    setInView(null)
+    if (!row) return
+    row.scrollIntoView({ block: 'center' })
+    setFlash(inView)
+  }, [inView, wantedTab])
   if (error) return <div className="s-desc error">{tr(T.loadFailed, { error })}</div>
   if (!form || !draft || !effective) return null
   const platform = form.platform
@@ -553,7 +620,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     // HI-3284: each merge guard that can't be saved, as it is typed.
     const guardReasons = key === 'mergeGuards' ? guardProblems(effective.mergeGuards) : []
     return (
-      <div className={cx('setting', 'workflow-option', (reasons.length > 0 || stageReasons.length > 0 || guardReasons.length > 0) && 'contradicted')} key={key} data-option={key}>
+      <div className={cx('setting', 'workflow-option', (reasons.length > 0 || stageReasons.length > 0 || guardReasons.length > 0) && 'contradicted', flash?.option === key && 'linked')} key={flash?.option === key ? `${key}:${flash.n}` : key} data-option={key}>
         <div className="s-text">
           <div className="s-title">
             {key in draft.options && <span className="modified" />}
@@ -562,7 +629,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
           <div className="s-desc">{tr(optionDesc(key, platform) ?? text.desc)}</div>
           {controlNote(key)}
           <div className="s-desc workflow-origin">
-            <OriginText origin={origin} />
+            <OriginText origin={origin} at={{ key, platform }} />
             {key in draft.options && (
               <Tooltip content={tr(T.inheritTip, { value: valueText(key, form.inherited[key]) })}>
                 <button className="btn subtle small workflow-inherit" onClick={() => inheritKey(key)}>
@@ -786,8 +853,27 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   const choiceName = (c: Choice): string => tr(c === 'allOff' ? T.allOff : PRESET_TEXT[c])
   const presetNow = draft.preset ? (custom ? tr(T.startedFrom, { preset: tr(PRESET_TEXT[draft.preset]) }) : tr(PRESET_TEXT[draft.preset])) : tr(T.noPreset)
   const shownChoice = preview ? choiceOptions(preview) : null
+  // HI-3549: the tabs, each its groups' rows as shown now and what sits beside them (the slots panel, the GitHub hosts),
+  // marked when an option on it differs from what is saved or has something to resolve; a tab with nothing to show isn't
+  // offered. Save, Discard and the reasons a save was refused stay below, for every tab.
+  const slotsPanel = project ? <SlotsAndCopies project={project} slots={effective.folder === 'slots'} /> : source.level && hasCapability(platform, 'isolation') ? <SlotCopyLevel level={source.level} /> : null
+  const githubHosts = project ? <GithubHosts projectPath={project.path} /> : source.level === 'workspace' && hasOperation(platform, 'push') ? <GithubHosts projectPath={null} /> : null
+  const unsavedKey = (k: OptionKey): boolean => !same(draft.options[k], form.own[k])
+  const problemKey = (k: OptionKey): boolean => (live[k]?.length ?? 0) > 0 || (k === 'stageNames' && stageProblems.length > 0) || (k === 'mergeGuards' && guardProblems(effective.mergeGuards).length > 0) || ((k === 'target' || k === 'otherTargets') && (missingNow?.names.length ?? 0) > 0)
+  const tabs = FORM_TABS[platform].flatMap((t) => {
+    const groups = FORM_GROUPS[platform].filter((g) => t.groups.includes(g.id))
+    const sections = groups.map((g) => ({ id: g.id, rows: g.options.filter((k) => formShows(k, effective)) })).filter((g) => g.rows.length)
+    const extra = t.id === 'where' ? slotsPanel : t.id === 'github' ? githubHosts : null
+    if (t.id !== 'overview' && !sections.length && !extra) return []
+    // The check commands are kept with the checks that name them.
+    const keys: OptionKey[] = [...groups.flatMap((g) => g.options), ...(t.groups.includes('checks') ? (['commands'] as const) : [])]
+    const unsaved = t.id === 'overview' ? draft.preset !== form.preset : keys.some(unsavedKey)
+    const problem = sections.some((g) => g.rows.some(problemKey))
+    return [{ id: t.id, sections, extra, unsaved, problem, headed: sections.length + (extra ? 1 : 0) > 1 }]
+  })
+  const tab = shownTab<FormTabId>(tabs.map((t) => t.id), wantedTab, 'overview')
   return (
-    <div className="workflow-form" data-platform={platform}>
+    <div className="workflow-form" data-platform={platform} ref={rootRef}>
       {!form.enforced && (
         <div className="banner warn workflow-note" role="status">
           <Icon name="warning" />
@@ -815,42 +901,40 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
           </span>
         </div>
       )}
-      <section className="workflow-group workflow-presets" data-group="presets">
-        <h3 className="workflow-group-h">
-          {tr(T.preset)} <span className="workflow-preset-now" data-preset-now={draft.preset ?? ''}>{presetNow}</span>
-        </h3>
-        <div className="s-desc">{tr(T.presetDesc)}</div>
-        <div className="workflow-choices" role="list" aria-label={tr(T.presetsLabel)}>
-          {choices.map((c) => (
-            <button key={c} type="button" role="listitem" className={cx('workflow-choice', preview === c && 'open', draft.preset === c && !custom && 'current')} data-choice={c} aria-expanded={preview === c} onClick={() => setPreview(preview === c ? null : c)}>
-              <span className="workflow-choice-name">{choiceName(c)}</span>
-              <span className="workflow-choice-summary">{tr(c === 'allOff' ? T.allOffSummary : (PRESET_SUMMARY[platform][c] ?? PRESET_TEXT[c]))}</span>
-            </button>
-          ))}
-        </div>
-        {/* Only where work merges (Git): None has no merged result. */}
-        {merges(platform) && draft.preset && PRESET_NOTE_TEXT[draft.preset] && <div className="s-desc workflow-preset-note">{tr(PRESET_NOTE_TEXT[draft.preset]!)}</div>}
-        {preview && shownChoice && <ChoicePreview choice={preview} name={choiceName(preview)} options={shownChoice} effective={effective} valueText={valueText} onUse={() => choose(preview)} onClose={() => setPreview(null)} />}
-      </section>
-      {FORM_GROUPS[platform].map((g) => {
-        const rows = g.options.filter((k) => formShows(k, effective))
-        if (!rows.length) return null
-        return (
-          <Fragment key={g.id}>
-            <section className="workflow-group" data-group={g.id}>
-              <h3 className="workflow-group-h">{tr(GROUP_TEXT[g.id])}</h3>
-              {rows.map(rowOf)}
+      <Tabs idBase={tabsBase} label={tr(T.tabsLabel)} value={tab} onChange={(id) => chooseTab(tabsKey, id)} items={tabs.map((t) => ({ id: t.id, label: tr(TAB_TEXT[t.id]), unsaved: t.unsaved, problem: t.problem, attrs: { 'data-workflow-tab': t.id } }))} />
+      {tabs.map((t) => (
+        <TabPanel key={t.id} idBase={tabsBase} id={t.id} selected={t.id === tab} className="workflow-tab" data-workflow-tab={t.id}>
+          {t.id === 'overview' && (
+            <>
+              <section className="workflow-group workflow-presets" data-group="presets">
+                <h3 className="workflow-group-h">
+                  {tr(T.preset)} <span className="workflow-preset-now" data-preset-now={draft.preset ?? ''}>{presetNow}</span>
+                </h3>
+                <div className="s-desc">{tr(T.presetDesc)}</div>
+                <div className="workflow-choices" role="list" aria-label={tr(T.presetsLabel)}>
+                  {choices.map((c) => (
+                    <button key={c} type="button" role="listitem" className={cx('workflow-choice', preview === c && 'open', draft.preset === c && !custom && 'current')} data-choice={c} aria-expanded={preview === c} onClick={() => setPreview(preview === c ? null : c)}>
+                      <span className="workflow-choice-name">{choiceName(c)}</span>
+                      <span className="workflow-choice-summary">{tr(c === 'allOff' ? T.allOffSummary : (PRESET_SUMMARY[platform][c] ?? PRESET_TEXT[c]))}</span>
+                    </button>
+                  ))}
+                </div>
+                {/* Only where work merges (Git): None has no merged result. */}
+                {merges(platform) && draft.preset && PRESET_NOTE_TEXT[draft.preset] && <div className="s-desc workflow-preset-note">{tr(PRESET_NOTE_TEXT[draft.preset]!)}</div>}
+                {preview && shownChoice && <ChoicePreview choice={preview} name={choiceName(preview)} options={shownChoice} effective={effective} valueText={valueText} onUse={() => choose(preview)} onClose={() => setPreview(null)} />}
+              </section>
+              {isAllOff(effective) && <NeverOff />}
+            </>
+          )}
+          {t.sections.map((g) => (
+            <section className="workflow-group" data-group={g.id} key={g.id}>
+              {t.headed && <h3 className="workflow-group-h">{tr(GROUP_TEXT[g.id])}</h3>}
+              {g.rows.map(rowOf)}
             </section>
-            {/* A Git project's slots and copies, after where cards are built (a level has none: they're a project's). */}
-            {g.id === 'where' && project && <SlotsAndCopies project={project} slots={effective.folder === 'slots'} />}
-            {g.id === 'where' && !project && source.level && hasCapability(platform, 'isolation') && <SlotCopyLevel level={source.level} />}
-            {/* The GitHub hosts (HI-2779): a Git project's own, and the workspace's default (Combwork's level has none). */}
-            {g.id === 'where' && project && <GithubHosts projectPath={project.path} />}
-            {g.id === 'where' && !project && source.level === 'workspace' && hasOperation(platform, 'push') && <GithubHosts projectPath={null} />}
-          </Fragment>
-        )
-      })}
-      {isAllOff(effective) && <NeverOff />}
+          ))}
+          {t.extra}
+        </TabPanel>
+      ))}
       {problems.length > 0 && (
         <div className="workflow-problems" role="alert">
           <div>{tr(T.cantSave)}</div>
@@ -1263,7 +1347,7 @@ export function PresetsNotice() {
   if (!projects?.length) return null
   const answer = (choose: boolean): void => {
     if (path) answered.current.add(path)
-    if (choose) openVersionControl(projects[0].path, 'workflow')
+    if (choose) openWorkflowOption(projects[0].path, 'overview')
     setProjects(null)
     void call('workflow:presetsNoticeSaid').catch((e) => notify('error', errorMessage(e)))
   }

@@ -3191,6 +3191,25 @@ function of the platform and that state. Workflow hosts P4's form (§16.6.6's Bu
 Project Settings → Workflow kept one row, **Open Version Control**, until HI-1766 removed the section; the hidden
 `project.workflow.*` rows stay for `cw_update_setting` (their path: Version Control → Workflow → the option). The presets notice's **Choose…** opens the first project's tab at Workflow.
 
+**Tabs (HI-3549):** the Workflow form is tabbed, its groups (§16.6.1, §16.6.2) placed on them by `FORM_TABS`
+(`shared/workflow/options.ts`): layout only, no option's meaning, value or default changing. Git: **Overview** (the
+preset picker, its preview and All off's never-off list), **Review & checks** (Team, Review, Checks), **Merging**,
+**Where cards are built** (its group, then Slots and copies), **GitHub** (the GitHub hosts; HI-2843, HI-2844 and
+HI-3541 add their options here) and **Loops & stages** (Card loops, Stages). None: Overview, Review & checks, **The
+work**, Loops & stages. A tab with nothing to show at a level isn't offered (Combwork's level has no GitHub tab); a tab
+holding one group drops its heading. A tab is marked unsaved while an option on it differs from what is saved (the check
+commands with the checks; Overview for the preset) and with a warning while one shows a contradiction, a stage name or
+merge guard that can't be saved, or a branch that doesn't exist yet; the banners above and Save…, Discard Changes and
+the save's refused reasons below are outside the tabs. The chosen tab is remembered per form (`workflow-form:<at>`,
+`workflowFormAt`: a project by path, a level by level and platform). A link to an option (`openWorkflowOption`,
+`showWorkflowDefaults(level, option)`, the store's `workflowFocus`) chooses its tab and brings the row into view,
+marked a moment: the Maximum agents warning and its notice's button (`project.openVersionControl`'s third argument),
+a template load stopped at Maximum agents, a release offer (Work merges into), an origin's From the workspace or From
+Combwork defaults (a level's form switching to the option's platform), and Settings search, which now finds the
+defaults by an option's name or description and opens the first match. Choosing a preset (How do you work?, a
+template's suggested preset or workflow) opens Overview. A template's Workflow (`TemplateWorkflowView.tsx`) shows each
+platform's section under the same tabs: Overview its preset, Fill and Remove, each other tab its options.
+
 **Labels below are the agreed English** [#1117 c "outcome wording first"; OP-2, agreed 20 Oct], translated once
 into the 7 locales per `locales/glossary-1.0.md` §2.6.
 

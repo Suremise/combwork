@@ -201,7 +201,7 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
               <div className="s-desc workflow-origin" data-origin={copyOwn === undefined ? (copyNow?.origin ?? 'default') : copyOwn.trim() ? 'project' : 'none'}>
                 {copyOwn === undefined ? (
                   <>
-                    <OriginText origin={copyOrigin(copyNow?.origin ?? 'default')} />: {copyInherited.trim() || tr(T.none)}
+                    <OriginText origin={copyOrigin(copyNow?.origin ?? 'default')} at={{ key: 'where', platform: 'git' }} />: {copyInherited.trim() || tr(T.none)}
                   </>
                 ) : (
                   tr(copyOwn.trim() ? T.setHere : T.setNone)
@@ -383,7 +383,7 @@ export function SlotCopyLevel({ level }: { level: WorkflowLevel }) {
         <div className="s-desc workflow-origin" data-origin={own === undefined ? inherited.origin : own.trim() ? 'here' : 'none'}>
           {own === undefined ? (
             <>
-              <OriginText origin={copyOrigin(inherited.origin)} />: {inherited.value.trim() || tr(T.none)}
+              <OriginText origin={copyOrigin(inherited.origin)} at={{ key: 'where', platform: 'git' }} />: {inherited.value.trim() || tr(T.none)}
             </>
           ) : (
             tr(own.trim() ? ORIGIN_TEXT.here : T.levelNone)

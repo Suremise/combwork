@@ -589,6 +589,8 @@
   "tips.viewerTokens.title": "Deixe outro app acompanhar o Combwork",
   "tips.workflowDefaults.text": "Configurações → Controle de versão define as opções com que cada projeto começa: os padrões do Combwork, para todos os espaços de trabalho, e os do espaço de trabalho aberto por cima. As opções próprias de um projeto continuam prevalecendo, e ao salvar aparecem os projetos que herdam a mudança.",
   "tips.workflowDefaults.title": "Defina um fluxo de trabalho uma vez para todos os projetos",
+  "tips.workflowOptionTabs.text": "Controle de versão → Fluxo de trabalho tem uma aba para cada parte do seu fluxo. Um ponto marca uma aba com alterações não salvas, e um aviso, uma com algo a resolver. Pesquise o nome de uma opção em Configurações para abri-la nos padrões.",
+  "tips.workflowOptionTabs.title": "Encontre uma opção do fluxo de trabalho pela aba",
   "tips.workflowOptions.text": "Controle de versão → Fluxo de trabalho define quem revisa o trabalho de um cartão, quais verificações passam antes e quem faz o merge. Escolha uma predefinição ou configure cada opção: uma mudança vale a partir do próximo cartão que começar.",
   "tips.workflowOptions.title": "Escolha como os cartões chegam a Concluído",
   "tips.workflowPresetsWhy.text": "Em Controle de versão → Fluxo de trabalho, clique em Solo, Dupla ou Equipe: a predefinição lista cada opção que define e por quê, e marca o que mudaria. Nada muda até você usá-la e salvar.",

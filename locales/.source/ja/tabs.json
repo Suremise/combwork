@@ -1,5 +1,8 @@
 {
+  "tabs.problem": "Something here needs resolving",
+  "tabs.problemNamed": "{tab} (needs resolving)",
   "tabs.unsaved": "Unsaved changes",
   "tabs.unsavedNamed": "{tab} (unsaved changes)",
+  "tabs.unsavedProblemNamed": "{tab} (unsaved changes, needs resolving)",
   "tabs.withNote": "{tab} ({note})"
 }

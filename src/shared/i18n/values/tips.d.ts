@@ -635,6 +635,8 @@ interface CombworkMessageValues {
   'tips.waitingOnPurpose.title': undefined
   'tips.workflowDefaults.text': undefined
   'tips.workflowDefaults.title': undefined
+  'tips.workflowOptionTabs.text': undefined
+  'tips.workflowOptionTabs.title': undefined
   'tips.workflowOptions.text': undefined
   'tips.workflowOptions.title': undefined
   'tips.workflowPresetsWhy.text': undefined

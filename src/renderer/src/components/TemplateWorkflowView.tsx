@@ -1,11 +1,12 @@
 import { useId, useState } from 'react'
 import { merges, type PlatformId } from '@shared/platform/descriptors'
 import { PLATFORM_NAME } from '@shared/platform/switching'
-import { allOff, PRESETS, preset, type OptionKey, type PresetId } from '@shared/workflow/options'
-import { optionTitle, PRESET_TEXT } from '@shared/workflow/optionTexts'
+import { allOff, FORM_TABS, formTabOf, PRESETS, preset, type FormTabId, type OptionKey, type PresetId } from '@shared/workflow/options'
+import { optionTitle, PRESET_TEXT, TAB_TEXT } from '@shared/workflow/optionTexts'
 import { carriedFor, TEMPLATE_PLATFORMS, templateWorkflowOf, type TemplateWorkflow, type TemplateWorkflows } from '@shared/workflow/templateOptions'
 import { msg, tr } from '@shared/i18n'
-import { optionValueText } from './WorkflowOptions'
+import { optionValueText, WORKFLOW_TABS_LABEL } from './WorkflowOptions'
+import { shownTab } from '@shared/tabs'
 import { droppedText } from './TemplateLoadWorkflow'
 import { TabPanel, Tabs } from './Tabs'
 import { Icon } from './ui'
@@ -30,10 +31,13 @@ const valueOf = (key: OptionKey, v: unknown, platform: PlatformId): string => op
  * A template's workflow (HI-1910): a tab per version control (None, Git), each its section's preset and options, or that
  * it has none; a section that can't be used is said. With `edit` (the template editor): Fill from a preset (its rules,
  * the section's check names kept) and Remove; options one by one are set in a project, then saved as the template.
+ * HI-3549: a section in the Workflow form's tabs, as a project's: Overview its preset, Fill and Remove, each other tab
+ * its options there (a tab with none isn't shown).
  */
 export function TemplateWorkflowSection({ workflow, dropped, edit }: { workflow: TemplateWorkflows | undefined; dropped?: PlatformId[]; edit?: { disabled: boolean; onChange: (w: TemplateWorkflows) => void } }) {
   const base = useId()
   const [tab, setTab] = useState<PlatformId>(() => (workflow?.git || !workflow?.none ? 'git' : 'none'))
+  const [formTab, setFormTab] = useState<Partial<Record<PlatformId, FormTabId>>>({})
   const set = (p: PlatformId, s: TemplateWorkflow | null): void => {
     const next = { ...workflow }
     if (s) next[p] = s
@@ -60,44 +64,64 @@ export function TemplateWorkflowSection({ workflow, dropped, edit }: { workflow:
       {TEMPLATE_PLATFORMS.map((p) => {
         const s = workflow?.[p]
         const keys = carriedFor(p).filter((k) => s?.options[k] !== undefined)
+        const editRow = edit && (
+          <div className="template-workflow-edit">
+            <select className="select" aria-label={tr(M.fill)} disabled={edit.disabled} value="" data-workflow-fill={p} onChange={(e) => e.target.value && fill(p, e.target.value)}>
+              <option value="">{tr(M.fillChoose)}</option>
+              {PRESETS[p].map((x) => (
+                <option key={x.id} value={x.id}>
+                  {tr(PRESET_TEXT[x.id])}
+                </option>
+              ))}
+              <option value="allOff">{tr(M.allOff)}</option>
+            </select>
+            {s && (
+              <button type="button" className="btn small subtle" disabled={edit.disabled} data-workflow-remove={p} onClick={() => set(p, null)}>
+                <Icon name="trash" /> {tr(M.remove)}
+              </button>
+            )}
+          </div>
+        )
+        // The form's tabs (HI-3549): Overview, then each tab with options this section sets.
+        const tabs = FORM_TABS[p].filter((t) => t.id === 'overview' || keys.some((k) => formTabOf(p, k) === t.id))
+        const shown = shownTab<FormTabId>(tabs.map((t) => t.id), formTab[p], 'overview')
+        const tabBase = `${base}-${p}`
         return (
           <TabPanel key={p} idBase={base} id={p} selected={tab === p} className="template-workflow-panel" data-workflow-section={p}>
             {s ? (
               <>
-                <p className="muted">{tr(M.fromPreset, { preset: s.preset ? 'yes' : 'none', name: s.preset ? tr(PRESET_TEXT[s.preset]) : '' })}</p>
-                <ul className="template-workflow-list">
-                  {keys.map((k) => {
-                    const title = optionTitle(k, p, s.options.folder)
-                    return title ? (
-                      <li key={k} data-option={k}>
-                        <span className="workflow-preview-option">{tr(title)}</span>: <strong>{valueOf(k, s.options[k], p)}</strong>
-                      </li>
-                    ) : null
-                  })}
-                </ul>
+                <Tabs idBase={tabBase} label={tr(WORKFLOW_TABS_LABEL)} value={shown} onChange={(id) => setFormTab((m) => ({ ...m, [p]: id }))} items={tabs.map((t) => ({ id: t.id, label: tr(TAB_TEXT[t.id]), attrs: { 'data-workflow-tab': t.id } }))} />
+                {tabs.map((t) => (
+                  <TabPanel key={t.id} idBase={tabBase} id={t.id} selected={t.id === shown} className="template-workflow-tab" data-workflow-tab={t.id}>
+                    {t.id === 'overview' ? (
+                      <>
+                        <p className="muted">{tr(M.fromPreset, { preset: s.preset ? 'yes' : 'none', name: s.preset ? tr(PRESET_TEXT[s.preset]) : '' })}</p>
+                        {editRow}
+                      </>
+                    ) : (
+                      <ul className="template-workflow-list">
+                        {keys
+                          .filter((k) => formTabOf(p, k) === t.id)
+                          .map((k) => {
+                            const title = optionTitle(k, p, s.options.folder)
+                            return title ? (
+                              <li key={k} data-option={k}>
+                                <span className="workflow-preview-option">{tr(title)}</span>: <strong>{valueOf(k, s.options[k], p)}</strong>
+                              </li>
+                            ) : null
+                          })}
+                      </ul>
+                    )}
+                  </TabPanel>
+                ))}
               </>
             ) : (
-              <p className="muted" data-workflow-none={p}>
-                {tr(M.none, { platform: tr(PLATFORM_NAME[p]) })}
-              </p>
-            )}
-            {edit && (
-              <div className="template-workflow-edit">
-                <select className="select" aria-label={tr(M.fill)} disabled={edit.disabled} value="" data-workflow-fill={p} onChange={(e) => e.target.value && fill(p, e.target.value)}>
-                  <option value="">{tr(M.fillChoose)}</option>
-                  {PRESETS[p].map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {tr(PRESET_TEXT[x.id])}
-                    </option>
-                  ))}
-                  <option value="allOff">{tr(M.allOff)}</option>
-                </select>
-                {s && (
-                  <button type="button" className="btn small subtle" disabled={edit.disabled} data-workflow-remove={p} onClick={() => set(p, null)}>
-                    <Icon name="trash" /> {tr(M.remove)}
-                  </button>
-                )}
-              </div>
+              <>
+                <p className="muted" data-workflow-none={p}>
+                  {tr(M.none, { platform: tr(PLATFORM_NAME[p]) })}
+                </p>
+                {editRow}
+              </>
             )}
           </TabPanel>
         )

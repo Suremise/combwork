@@ -146,6 +146,7 @@ interface CombworkMessageValues {
   'workflow.form.stageNamesValue': { n: number }
   'workflow.form.startedFrom': { preset: string | number }
   'workflow.form.stepWaitNote': undefined
+  'workflow.form.tabs': undefined
   'workflow.form.templateIdentityOff': undefined
   'workflow.form.templateNoCommand': { count: number; checks: string | number }
   'workflow.form.templateOtherPlatform': { template: string | number; platform: string | number; project: string | number }
@@ -605,6 +606,13 @@ interface CombworkMessageValues {
   'workflow.summary.none.pair': undefined
   'workflow.summary.none.solo': undefined
   'workflow.summary.none.team': undefined
+  'workflow.tab.checks': undefined
+  'workflow.tab.github': undefined
+  'workflow.tab.loops': undefined
+  'workflow.tab.merging': undefined
+  'workflow.tab.overview': undefined
+  'workflow.tab.where': undefined
+  'workflow.tab.work': undefined
   'workflow.unreadable.blockerWork': { card: string | number; what: string | number }
   'workflow.unreadable.branch': { folder: string | number }
   'workflow.unreadable.branchedOff': { a: string | number; b: string | number }

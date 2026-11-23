@@ -2535,6 +2535,14 @@
     "defaultMessage": "Set a workflow once for every project",
     "description": "A tip's title (glossary 2.1: workflow)."
   },
+  "tips.workflowOptionTabs.text": {
+    "defaultMessage": "Version Control → Workflow has a tab per part of your workflow. A dot marks a tab with changes you haven't saved, a warning one with something to resolve. Search Settings for an option's name to open it in the workflow defaults.",
+    "description": "A tip (HI-3549). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (the tab names as translated in the Workflow form)."
+  },
+  "tips.workflowOptionTabs.title": {
+    "defaultMessage": "Find a workflow option by its tab",
+    "description": "A tip's title (HI-3549): Version Control → Workflow's options are on tabs."
+  },
   "tips.workflowOptions.text": {
     "defaultMessage": "Version Control → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

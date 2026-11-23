@@ -579,6 +579,10 @@
     "defaultMessage": "A design left unchecked longer shows its card as stalled; one already posted keeps its wait.",
     "description": "Under the workflow option “Design check wait (minutes)” (Card loops), when a change applies."
   },
+  "workflow.form.tabs": {
+    "defaultMessage": "Workflow options",
+    "description": "Accessible name of the Workflow form’s tabs (HI-3549): Overview, Review & checks, Merging and the others, each a group of the workflow options."
+  },
   "workflow.form.templateIdentityOff": {
     "defaultMessage": "The template turns the project identity on, but this project’s git config has no name and email, so it stays off.",
     "description": "A note atop the Workflow section (HI-1910), with a template's options filled in: it turns the project identity (G12) on, but the project's git config has none. Glossary: identity."
@@ -2414,6 +2418,34 @@
   "workflow.summary.none.team": {
     "defaultMessage": "A reviewer agent, then you, check each card, after the quick checks and the tests pass.",
     "description": "What the Team preset sets up, for a project without version control."
+  },
+  "workflow.tab.checks": {
+    "defaultMessage": "Review & checks",
+    "description": "A tab of the Workflow form (HI-3549): the team size, the review options and the checks that must pass (glossary 2.3: checks)."
+  },
+  "workflow.tab.github": {
+    "defaultMessage": "GitHub",
+    "description": "A tab of the Workflow form (Git; HI-3549): the GitHub hosts the project or workspace uses. GitHub is a name: keep it."
+  },
+  "workflow.tab.loops": {
+    "defaultMessage": "Loops & stages",
+    "description": "A tab of the Workflow form (HI-3549): how card loops run (glossary: card loop) and the names of the board’s stages (glossary 2.2: stage)."
+  },
+  "workflow.tab.merging": {
+    "defaultMessage": "Merging",
+    "description": "A tab of the Workflow form (Git; HI-3549): how and where work is merged."
+  },
+  "workflow.tab.overview": {
+    "defaultMessage": "Overview",
+    "description": "A tab of the Workflow form (Version Control → Workflow, and the workflow defaults in Settings; HI-3549): the preset picker and what it sets."
+  },
+  "workflow.tab.where": {
+    "defaultMessage": "Where cards are built",
+    "description": "A tab of the Workflow form (Git; HI-3549): the folders cards are built in (slots, glossary 2.5), the commits made there and file locks. As the group heading “Where cards are built”."
+  },
+  "workflow.tab.work": {
+    "defaultMessage": "The work",
+    "description": "A tab of the Workflow form for a project without version control (HI-3549): what a card’s work is, and when cards start. As the group heading “The work”."
   },
   "workflow.unreadable.blockerWork": {
     "defaultMessage": "whether {card}'s work is in the target ({what})",

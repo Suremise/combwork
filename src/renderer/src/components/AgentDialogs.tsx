@@ -18,7 +18,7 @@ import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace
 import { call, errorMessage } from '../api'
 import { offered as opOffered, repoOp } from '../repoOps'
 import { projectMergeChoice } from '../mergeChoice'
-import { agentProviderOf, bumpUnused, choose as askChoice, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
+import { agentProviderOf, bumpUnused, choose as askChoice, confirm, focusAfterRemoving, notify, openWorkflowOption, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { ProviderIcon } from './ProviderIcon'
 import { cliReadyOf, ConnectionChoice, connectionCli, firstReadyConnection, noAccountHere, noAccountText, offeredConnections, useConnections } from './ConnectionChoice'
@@ -255,7 +255,7 @@ export function AddAgentDialog() {
           // At its Maximum agents (HI-2058): raised in Version Control → Workflow, which the link opens.
           <div className="banner warn" data-limit="workflow">
             <span>{agentLimitText(tr, limit)}</span>{' '}
-            <button className="btn small" onClick={() => (close(), openVersionControl(project.path, 'workflow'))}>
+            <button className="btn small" onClick={() => (close(), openWorkflowOption(project.path, 'maxAgents'))}>
               {tr(OPEN_WORKFLOW_OPTIONS)}
             </button>
           </div>

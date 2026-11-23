@@ -28,7 +28,7 @@ import { loadActivityView, saveActivityView, type ActivityView } from './activit
 import { currentCard, type ActivityCardAgent } from '@shared/activity'
 import { boardReader } from './boardReads'
 import type { AgentBranchStatus, AgentStart, AssistantPanelSide, BoardFold, BoardState, PageLayout, ProjectStages, QuitScope, QuitUpdate, SessionBulkProgress, SessionLayout, TaskCard, TaskColumn, UpdateState, WorkflowForm, WorkspaceUsage, RecentWorkspace } from '@shared/types'
-import type { PresetId } from '@shared/workflow/options'
+import { isFormTab, type FormTabId, type OptionKey, type PresetId } from '@shared/workflow/options'
 import type { TemplateWorkflow, TemplateWorkflows } from '@shared/workflow/templateOptions'
 import type { PlatformId } from '@shared/platform/descriptors'
 import type {
@@ -493,6 +493,11 @@ interface State {
    */
   /** HI-3155: the workspace's release offers the user hasn't put off (Not now): projects' For you items. */
   releaseOffers: ReleaseOffer[]
+  /**
+   * HI-3549: a link to a workflow option (or to a tab, `tab`): the form it is in (`workflowFormAt`) opens the option's tab and brings it into
+   * view, then clears it. `n` tells two links to the same option apart.
+   */
+  workflowFocus: { at: string; option: OptionKey | null; tab?: FormTabId; n: number } | null
   workflowPrefill: { path: string; preset: PresetId | null; template?: { name: string; platform: PlatformId; section: TemplateWorkflow; savedMax?: number }; offer?: { id: string; basis: { target: string; otherTargets: string[] }; options: { target?: string; otherTargets: string[] } } } | null
   /**
    * A template waiting for its project's Git (HI-1910): its Load dialog's Set up Git… opened Version Control on Git's
@@ -720,6 +725,7 @@ export const useStore = create<State>(() => ({
   changesRoot: {},
   vcSection: {},
   workflowPrefill: null,
+  workflowFocus: null,
   releaseOffers: NO_RELEASE_OFFERS,
   templatePending: null,
   vcGitPreview: null,
@@ -1152,11 +1158,32 @@ export function chooseTab(key: string, id: string): void {
 export const WORKFLOW_DEFAULTS_TABS = 'settings.workflow'
 export const WORKFLOW_DEFAULTS_TAB = { global: 'workflow.defaults', workspace: 'workflow.workspaceDefaults' } as const
 
-/** Opens Settings → Version Control on a level's tab (a "From Combwork defaults" or "From the workspace" origin's link). */
-export function showWorkflowDefaults(level: keyof typeof WORKFLOW_DEFAULTS_TAB): void {
+/**
+ * Opens Settings → Version Control on a level's tab (a "From Combwork defaults" or "From the workspace" origin's link);
+ * with `option` (HI-3549), that option of the level's form for `platform`, on its tab and in view.
+ */
+export function showWorkflowDefaults(level: keyof typeof WORKFLOW_DEFAULTS_TAB, option?: { key: OptionKey | FormTabId; platform: PlatformId }): void {
   chooseTab(WORKFLOW_DEFAULTS_TABS, WORKFLOW_DEFAULTS_TAB[level])
+  if (option) focusWorkflowOption(workflowFormAt({ level, platform: option.platform }), option.key)
   set({ settingsSection: 'workflow', settingsQuery: '', settingsModifiedOnly: false })
   setActivity('settings')
+}
+
+/**
+ * HI-3549: where a Workflow form is, as a link to one of its options names it: a project's by its path, a level's by
+ * the level and the platform it shows. Also the key its chosen tab is remembered by.
+ */
+export const workflowFormAt = (at: string | { level: 'global' | 'workspace'; platform: PlatformId }): string => (typeof at === 'string' ? `project:${at.toLowerCase()}` : `level:${at.level}:${at.platform}`)
+
+/** HI-3549: asks the Workflow form at `at` to open an option's tab and bring the option into view, or (a tab's id) to open that tab. */
+export function focusWorkflowOption(at: string, target: OptionKey | FormTabId): void {
+  set((s) => ({ workflowFocus: { at, ...(isFormTab(target) ? { option: null, tab: target } : { option: target }), n: (s.workflowFocus?.n ?? 0) + 1 } }))
+}
+
+/** HI-3549: a project's Version Control → Workflow at one option: its tab chosen and the option in view. */
+export function openWorkflowOption(path: string, option: OptionKey | FormTabId): void {
+  openVersionControl(path, 'workflow')
+  focusWorkflowOption(workflowFormAt(path), option)
 }
 
 /** Shows or folds the Progress panel, remembered per workspace. */

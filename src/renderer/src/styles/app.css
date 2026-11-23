@@ -1766,6 +1766,11 @@ textarea.input {
   border-radius: 50%;
   background: var(--accent);
 }
+/* A tab whose page has something to resolve (HI-3549): its warning, coloured as the reasons on its page. */
+.cw-tab-problem {
+  display: inline-flex;
+  color: var(--error);
+}
 .cw-tab.icon-only {
   padding: 0 8px;
 }
@@ -16649,6 +16654,14 @@ button.progress-lane-retry {
 .workflow-option.contradicted {
   border-inline-start: 3px solid var(--error);
   padding-inline-start: 8px;
+}
+/* HI-3549: the option a link opened, marked a moment as it comes into view. */
+.workflow-option.linked {
+  animation: tx-flash 1.6s ease-out;
+}
+/* HI-3549: the Workflow form's tabs, above its groups. */
+.workflow-form > .cw-tabs-row {
+  margin-block: 4px 8px;
 }
 .workflow-never-off {
   padding: 8px 12px;

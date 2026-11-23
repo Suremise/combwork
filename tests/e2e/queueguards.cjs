@@ -49,6 +49,7 @@ const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combw
     await page.locator('.git-sections [data-section="workflow"]').click()
     const form = page.locator('.workflow-form')
     const row = form.locator('.workflow-option[data-option="mergeGuards"]')
+    await lib.workflowTab(page, 'mergeGuards')
     check('Merge guards is a row of the Workflow section, none by default, saying it is not secret scanning', !!(await until(async () => (await row.count()) === 1 && /No merge guards/.test(await text(row)) && /isn’t secret scanning/.test(await text(row)), HUNG_MS)), await text(row))
     check('…the example guard offered with a name set in Settings → General', (await row.locator('[data-note="name-guard"]').count()) === 1)
     await row.getByRole('button', { name: 'Add Guard', exact: true }).click()

@@ -633,6 +633,8 @@
   "tips.waitingOnPurpose.title": "A card that waits on purpose",
   "tips.workflowDefaults.text": "Settings → Version Control sets the options every project starts from: Combwork defaults, for every workspace, and the open workspace’s over them. A project’s own options still win, and saving lists the projects that inherit the change.",
   "tips.workflowDefaults.title": "Set a workflow once for every project",
+  "tips.workflowOptionTabs.text": "Version Control → Workflow has a tab per part of your workflow. A dot marks a tab with changes you haven't saved, a warning one with something to resolve. Search Settings for an option's name to open it in the workflow defaults.",
+  "tips.workflowOptionTabs.title": "Find a workflow option by its tab",
   "tips.workflowOptions.text": "Version Control → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
   "tips.workflowOptions.title": "Choose how cards get to Done",
   "tips.workflowPresetsWhy.text": "In Version Control → Workflow, click Solo, Pair or Team: it lists each option it sets and why, and marks what it would change. Nothing changes until you use it and save.",

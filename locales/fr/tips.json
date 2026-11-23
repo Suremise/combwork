@@ -589,6 +589,8 @@
   "tips.viewerTokens.title": "Laisser une autre application observer Combwork",
   "tips.workflowDefaults.text": "Paramètres → Gestion de versions définit les options dont part chaque projet : les valeurs par défaut de Combwork, pour chaque espace de travail, et celles de l’espace de travail ouvert par-dessus. Les options propres d’un projet l’emportent toujours, et l’enregistrement liste les projets qui héritent du changement.",
   "tips.workflowDefaults.title": "Définis un flux de travail une fois pour tous les projets",
+  "tips.workflowOptionTabs.text": "Gestion de versions → Flux de travail a un onglet par partie de ton flux. Un point marque un onglet aux modifications non enregistrées, un avertissement un onglet où quelque chose est à résoudre. Cherche le nom d’une option dans les Paramètres pour l’ouvrir dans les valeurs par défaut.",
+  "tips.workflowOptionTabs.title": "Trouver une option du flux de travail par son onglet",
   "tips.workflowOptions.text": "Gestion de versions → Flux de travail définit qui relit le travail d’une carte, quelles vérifications passent d’abord et qui le fusionne. Choisis un préréglage ou règle chaque option : un changement s’applique à partir de la prochaine carte qui démarre.",
   "tips.workflowOptions.title": "Choisis comment les cartes arrivent à Terminé",
   "tips.workflowPresetsWhy.text": "Dans Gestion de versions → Flux de travail, clique sur Solo, Binôme ou Équipe : le préréglage liste chaque option qu’il règle et pourquoi, et marque ce qu’il changerait. Rien ne change tant que tu ne l’utilises pas et n’enregistres pas.",

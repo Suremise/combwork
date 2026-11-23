@@ -79,6 +79,7 @@ const values = () => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'ut
     await page.locator('.git-sections [data-section="workflow"]').click().catch(() => {})
     const wakeRow = page.locator('.workflow-form .workflow-group[data-group="loops"] .workflow-option[data-option="loopWakes"]')
     const wake = wakeRow.getByRole('switch')
+    await lib.workflowTab(page.locator('.workflow-form'), 'loopWakes')
     check('Card loops: Wake reviewers and builders, on, from the default', !!(await until(async () => (await wake.count()) === 1 && (await wake.getAttribute('aria-checked')) === 'true', HUNG_MS)) && (await own()) === undefined && (await wakeRow.locator('.workflow-origin').innerText()).includes('Default'), await wakeRow.innerText().catch(() => ''))
     const save = async () => {
       await page.locator('.workflow-form [data-action="save"]').click()

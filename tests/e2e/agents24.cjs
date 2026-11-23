@@ -111,7 +111,8 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav .row', { hasText: 'Version Control' }).click()
     await page.locator('.settings-group[data-section="workflow"] [role="tab"][data-setting-tab="workflow.workspaceDefaults"]').click()
-    // One form per version control (None, Git), the one shown has the note.
+    // One form per version control (None, Git), the one shown has the note, on its Review & checks tab (HI-3549).
+    await lib.workflowTab(page.locator('.settings-group[data-section="workflow"] [data-setting="workflow.workspaceDefaults"]'), 'maxAgents')
     const row = page.locator('.workflow-option[data-option="maxAgents"]:visible').first()
     const note = row.locator('[data-note="many-agents"]')
     const noteText = async () => ((await note.count()) ? await note.innerText() : '')

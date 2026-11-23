@@ -574,6 +574,40 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
   ]
 }
 
+/**
+ * The Workflow form's tabs (HI-3549), in order, each the groups it shows: layout only, an option's meaning, value and
+ * default the same in any tab. Overview holds the preset picker, Where cards are built the slots panel beside its
+ * group, and GitHub the GitHub hosts (no option of its own yet). A tab with nothing to show at a level isn't shown.
+ */
+export type FormTabId = 'overview' | 'checks' | 'merging' | 'where' | 'github' | 'work' | 'loops'
+
+export const FORM_TABS: Record<PlatformId, { id: FormTabId; groups: FormGroupId[] }[]> = {
+  git: [
+    { id: 'overview', groups: [] },
+    { id: 'checks', groups: ['team', 'review', 'checks'] },
+    { id: 'merging', groups: ['merging'] },
+    { id: 'where', groups: ['where'] },
+    { id: 'github', groups: [] },
+    { id: 'loops', groups: ['loops', 'stages'] }
+  ],
+  none: [
+    { id: 'overview', groups: [] },
+    { id: 'checks', groups: ['team', 'review', 'checks'] },
+    { id: 'work', groups: ['work'] },
+    { id: 'loops', groups: ['loops', 'stages'] }
+  ]
+}
+
+/** Whether a name is one of the form's tabs (no option is named as one). */
+export const isFormTab = (x: string): x is FormTabId => FORM_TABS.git.some((t) => t.id === x) || FORM_TABS.none.some((t) => t.id === x)
+
+/** The tab of a platform's form that shows an option (`commands` with the checks that name them), or null where it has none. */
+export const formTabOf = (platform: PlatformId, key: OptionKey): FormTabId | null => {
+  const k = key === 'commands' ? 'preChecks' : key
+  const group = FORM_GROUPS[platform].find((g) => g.options.includes(k))?.id
+  return group ? (FORM_TABS[platform].find((t) => t.groups.includes(group))?.id ?? null) : null
+}
+
 /** Whether a platform's form has an option (G17 is Git's alone: None's has none). */
 export const platformHasOption = (platform: PlatformId, key: OptionKey): boolean => FORM_GROUPS[platform].some((g) => g.options.includes(key))
 

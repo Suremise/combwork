@@ -589,6 +589,8 @@
   "tips.viewerTokens.title": "Pozwól innej aplikacji obserwować Combwork",
   "tips.workflowDefaults.text": "Ustawienia → Kontrola wersji określają opcje, od których zaczyna każdy projekt: ustawienia domyślne Combwork, dla każdego obszaru roboczego, i nad nimi te otwartego obszaru roboczego. Własne opcje projektu nadal mają pierwszeństwo, a zapisanie pokazuje projekty, które dziedziczą zmianę.",
   "tips.workflowDefaults.title": "Ustaw przepływ pracy raz dla wszystkich projektów",
+  "tips.workflowOptionTabs.text": "Kontrola wersji → Przepływ pracy ma kartę dla każdej części twojego przepływu. Kropka oznacza kartę z niezapisanymi zmianami, ostrzeżenie kartę z czymś do rozwiązania. Wyszukaj nazwę opcji w Ustawieniach, aby otworzyć ją w ustawieniach domyślnych.",
+  "tips.workflowOptionTabs.title": "Znajdź opcję przepływu pracy po jej karcie",
   "tips.workflowOptions.text": "Kontrola wersji → Przepływ pracy określa, kto recenzuje pracę karty, jakie sprawdzenia muszą przejść najpierw i kto ją scala. Wybierz ustawienie wstępne albo ustaw każdą opcję: zmiana obowiązuje od następnej karty, która się zacznie.",
   "tips.workflowOptions.title": "Wybierz, jak karty dochodzą do Gotowe",
   "tips.workflowPresetsWhy.text": "W Kontrola wersji → Przepływ pracy kliknij Solo, Para albo Zespół: ustawienie wstępne pokaże każdą opcję, którą ustawia, wraz z powodem, i oznaczy, co by zmieniło. Nic się nie zmieni, dopóki go nie użyjesz i nie zapiszesz.",
