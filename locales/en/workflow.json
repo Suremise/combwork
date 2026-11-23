@@ -1683,6 +1683,26 @@
     "defaultMessage": "{where, select, detached {Put the commits on the card's branch: git switch -c {lineArg} if it doesn't exist yet, else git switch {lineArg} and git cherry-pick the commits made off it. Then submit again.} other {{made, select, no {The card's branch doesn't exist yet: make it from where the card started with git switch -c {lineArg} {start}, then git cherry-pick there the card's own commits made on {onArg}. Then submit again.} other {Switch back with git switch {lineArg}, and git cherry-pick there any commits of the card's made on {onArg}. Then submit again.}}}}",
     "description": "HI-3010, HI-3116: the next step after a submit refused because the card’s folder isn’t on its branch, by where it is (where, select: a detached head, or another branch) and, on another branch, whether the card’s branch exists yet (made, select: no, or yes). git switch -c, git switch and git cherry-pick are commands: keep them and their arguments exactly as they are. {lineArg} and {onArg} are branch names as typed in a shell (possibly in quotes); {start} is a commit id."
   },
+  "workflow.refused.platform.prNeedsSlot.change": {
+    "defaultMessage": "Where cards are built is set in Version Control → Workflow.",
+    "description": "HI-3551: where the setting behind this refusal is: the workflow option “Where cards are built”, in Version Control → Workflow (names as translated there)."
+  },
+  "workflow.refused.platform.prNeedsSlot.message": {
+    "defaultMessage": "{card} works on a pull request’s branch (#{number}), which needs a slot of its own; this project builds cards in the project folder.",
+    "description": "HI-3551: a refused start: the card is about a GitHub pull request ({number}) and is built on its branch, which Combwork does only in a slot (a folder of its own), but this project’s workflow builds every card in the shared project folder. {card} is a card key like AM-12. A statement of fact, no instruction."
+  },
+  "workflow.refused.platform.prNeedsSlot.next": {
+    "defaultMessage": "Nothing was started, and the project folder is as it was.",
+    "description": "HI-3551: what follows a refused start of a pull request’s card in a project that builds cards in the project folder: nothing changed. A statement of fact."
+  },
+  "workflow.refused.platform.prNotLocal.message": {
+    "defaultMessage": "{card} finishes through its pull request on GitHub, not by a merge here.",
+    "description": "HI-3551: a refused merge, queue entry or report of a merge of a card that works on a GitHub pull request: its finish is that pull request, never a merge in this repository. {card} is a card key like AM-12. A statement of fact (the user’s decision: a fixed notice)."
+  },
+  "workflow.refused.platform.prNotLocal.next": {
+    "defaultMessage": "Nothing was merged here.",
+    "description": "HI-3551: what follows a refused merge of a pull request’s card: nothing was merged in this repository. A statement of fact."
+  },
   "workflow.refused.platform.slotLeft.message": {
     "defaultMessage": "{unknown, select, yes {Combwork couldn't tell whether {card}'s slot {slot} ({folder}) is still the card's, so it wasn't submitted.} other {{card}'s slot {slot} ({folder}) isn't the card's any more: Combwork ended its lease there, so the work in that folder may be another card's now.}}",
     "description": "HI-3118: a refused submit: the card was started in a slot (a working folder Combwork lends to one card or lane at a time), and Combwork no longer holds that slot for it (its lane ended, say), so the folder may have been lent to another card since. unknown yes: whether it still holds it couldn't be read. {card} is a card key like AM-12; {slot} a slot's name like slot-a; {folder} its path. Translate each branch of the select."
@@ -2542,6 +2562,18 @@
   "workflow.unreadable.pathOutside": {
     "defaultMessage": "the path {path}, which is outside the project",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": a card's path that isn't in its project. {path} is the path."
+  },
+  "workflow.unreadable.prFetch": {
+    "defaultMessage": "pull request #{number} and its base {base} from {remote}",
+    "description": "HI-3551: what Combwork couldn't read, the object of \"Combwork couldn't read …\": fetching a pull request's head and its base branch ({base}) from the project's remote ({remote}) failed. Git's own words follow."
+  },
+  "workflow.unreadable.prLink": {
+    "defaultMessage": "pull request #{number} on {repo}, which isn’t on this project’s GitHub link now",
+    "description": "HI-3551: what Combwork couldn't read, the object of \"Combwork couldn't read …\": the pull request a card works on is on a repository ({repo}, owner/name) that is no longer the project's GitHub link (or the project has none now)."
+  },
+  "workflow.unreadable.prSlot": {
+    "defaultMessage": "a slot for {card}",
+    "description": "HI-3551: what Combwork couldn't give, the object of \"Combwork couldn't read …\": a pull request's card needs a slot of its own. {card} is a card key."
   },
   "workflow.unreadable.remoteBehind": {
     "defaultMessage": "where to start from: {target} has commits that {endpoint} doesn’t (push or pull them first)",

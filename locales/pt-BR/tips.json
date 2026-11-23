@@ -264,6 +264,8 @@
   "tips.gitView.title": "Veja e altere o git de um projeto",
   "tips.githubRepository.text": "Controle de versão → Fluxo de trabalho → GitHub mostra o repositório do projeto, lido dos remotes, e se a sua GitHub CLI (gh) está com login nesse host. O Combwork usa o seu próprio gh e não guarda nenhum token.",
   "tips.githubRepository.title": "Seu projeto no GitHub, pelo seu próprio gh",
+  "tips.githubSource.text": "Dê a um cartão uma origem no GitHub (o endereço ou o #número de um pull request) no diálogo dele: ele trabalha na própria branch desse pull request em um slot, e a revisão lê a mudança inteira. Ele nunca é mesclado aqui.",
+  "tips.githubSource.title": "Um cartão para um pull request",
   "tips.gotoProject.text": "Pressione {key} e digite algumas letras do nome do projeto.",
   "tips.gotoProject.title": "Vá direto para um projeto",
   "tips.group.agents": "Agentes",

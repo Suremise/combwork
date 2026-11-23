@@ -18,7 +18,6 @@ const T = {
   kind: msg({ id: 'board.dialog.sourceKind', defaultMessage: '{kind, select, pr {Pull request} other {Issue}} #{number}', description: 'The card dialog’s GitHub source (HI-3551): its kind and number. Keep the select keys.' }),
   titled: msg({ id: 'board.dialog.sourceTitle', defaultMessage: 'On GitHub: “{title}”', description: 'The card dialog’s GitHub source (HI-3551): its title as GitHub has it (someone else’s words, quoted).' }),
   fork: msg({ id: 'board.dialog.sourceFork', defaultMessage: 'From a fork whose author doesn’t allow maintainer edits: Combwork can’t push fixes to it, so its findings go back as review comments.', description: 'Under a pull request source in the card dialog (HI-3551): the PR comes from a fork that doesn’t let maintainers push to it.' }),
-  outside: msg({ id: 'board.dialog.sourceOutside', defaultMessage: 'The pull request has commits its card’s branch doesn’t (pushed from outside Combwork). Combwork keeps its branch as it is.', description: 'Under a pull request source in the card dialog (HI-3551): GitHub’s head of the PR moved to commits the card’s own branch lacks; Combwork never resets or merges them in by itself.' }),
   placeholder: msg({ id: 'board.dialog.sourcePlaceholder', defaultMessage: 'A pull request or issue: its address or #number', description: 'Placeholder of the card dialog’s GitHub source box (HI-3551).' }),
   set: msg({ id: 'board.dialog.sourceSet', defaultMessage: 'Set', description: 'A button beside the card dialog’s GitHub source box (HI-3551): reads the pull request or issue from GitHub and sets it as the card’s source.' }),
   remove: msg({ id: 'board.dialog.sourceRemove', defaultMessage: 'Remove', description: 'A button beside the card dialog’s GitHub source (HI-3551): removes it (only while the card hasn’t started).' }),
@@ -26,7 +25,7 @@ const T = {
   failed: msg({ id: 'board.dialog.sourceFailed', defaultMessage: 'Couldn’t set the GitHub source', description: 'An error’s title (HI-3551): the card’s GitHub source couldn’t be set or removed; its message says why.' })
 }
 
-export function SourceField({ card, readOnly, headOutside }: { card: TaskCard; readOnly: boolean; headOutside?: boolean }) {
+export function SourceField({ card, readOnly }: { card: TaskCard; readOnly: boolean }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const s = card.source
@@ -55,7 +54,6 @@ export function SourceField({ card, readOnly, headOutside }: { card: TaskCard; r
             )}
             {s.title && <div className="s-desc card-source-title">{tr(T.titled, { title: s.title })}</div>}
             {!prPushable(s).ok && <div className="s-desc warn-text" data-source-note="fork">{tr(T.fork)}</div>}
-            {headOutside && <div className="s-desc warn-text" data-source-note="outside">{tr(T.outside)}</div>}
           </div>
         ) : (
           <div className="flex">

@@ -283,6 +283,15 @@ interface CombworkMessageValues {
   'board.dialog.saveAndStart': undefined
   'board.dialog.savePostsIt': undefined
   'board.dialog.saving': undefined
+  'board.dialog.source': undefined
+  'board.dialog.sourceFailed': undefined
+  'board.dialog.sourceFork': undefined
+  'board.dialog.sourceKind': { kind: string; number: string | number }
+  'board.dialog.sourceOpen': undefined
+  'board.dialog.sourcePlaceholder': undefined
+  'board.dialog.sourceRemove': undefined
+  'board.dialog.sourceSet': undefined
+  'board.dialog.sourceTitle': { title: string | number }
   'board.dialog.start': undefined
   'board.dialog.startButton': undefined
   'board.dialog.startTip': undefined

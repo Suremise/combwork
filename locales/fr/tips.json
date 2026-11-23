@@ -264,6 +264,8 @@
   "tips.gitView.title": "Voir et modifier le git d’un projet",
   "tips.githubRepository.text": "Gestion de versions → Flux de travail → GitHub montre le dépôt du projet, lu depuis ses dépôts distants, et si ta CLI GitHub (gh) est connectée sur cet hôte. Combwork utilise ton propre gh et ne stocke aucun jeton.",
   "tips.githubRepository.title": "Ton projet sur GitHub, par ton propre gh",
+  "tips.githubSource.text": "Donne à une carte une source GitHub (l’adresse ou le #numéro d’une pull request) dans sa boîte de dialogue : elle travaille sur la branche de cette pull request dans un emplacement, et sa relecture lit tout le changement. Elle n’est jamais fusionnée ici.",
+  "tips.githubSource.title": "Une carte pour une pull request",
   "tips.gotoProject.text": "Appuie sur {key} et tape quelques lettres du nom du projet.",
   "tips.gotoProject.title": "Aller à un projet",
   "tips.group.agents": "Agents",

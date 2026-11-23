@@ -1131,6 +1131,14 @@
     "defaultMessage": "Your project on GitHub, through your own gh",
     "description": "A tip's title (HI-3550). GitHub is a product name; gh the GitHub CLI's command name: keep it."
   },
+  "tips.githubSource.text": {
+    "defaultMessage": "Give a card a GitHub source (a pull request's address or #number) in its dialog: it works on that pull request's own branch in a slot, and its review reads the whole change. It is never merged here.",
+    "description": "A tip (HI-3551). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (GitHub source is the card dialog's field)."
+  },
+  "tips.githubSource.title": {
+    "defaultMessage": "A card for a pull request",
+    "description": "A tip's title (HI-3551): a card can be about a GitHub pull request."
+  },
   "tips.gotoProject.text": {
     "defaultMessage": "Press {key} and type a few letters of its name.",
     "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

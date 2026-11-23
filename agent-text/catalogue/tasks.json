@@ -844,6 +844,11 @@
     "note": "A comment Combwork writes on the cards an agent works on, after its CLI's safety classifier stopped a response and the agent moved to another model. {agent}: the agent's name, in bold (keep the ** marks). Then, when it stopped any ({stops}: how many this session), on which model ({model}: its name; none: leave that branch empty) and when ({time}: \"15:12\"); the model it runs on now ({to}) instead of the old one ({from}) since a time ({since}); whether its CLI asks what to do (asks) or it sits idle (idle); its last tool calls before the stop ({tools}: tool names, keep them); and what to do about it in that CLI ({help}: its own sentence, already translated). Only names, never what was stopped.",
     "audience": "both"
   },
+  "tasks.history.source": {
+    "text": "{set, select, yes {Its source: {kind, select, pr {pull request} other {issue}} #{number} on {repo}} other {Its GitHub source removed}}",
+    "note": "A line in a card's history (HI-3551): the GitHub pull request or issue the card is about was set (set yes: its kind, its number and its repository, owner/name) or removed. Keep the select keys.",
+    "audience": "both"
+  },
   "tasks.history.stageRepaired": {
     "text": "Recorded as Done, as the board had it: its workflow still had it in {stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} other {{stage}}}",
     "note": "A line in a card's history, by Combwork (HI-1674): the card was in the Done column, but a move had not reached its workflow, which still had it at an earlier stage ({stage}, select: a board stage; translate each); Combwork recorded it as Done and closed its open questions.",
@@ -907,6 +912,46 @@
   "tasks.history.watchEnded": {
     "text": "Ended {watcher}'s watch on it: {why, select, blocked {the card is blocked} reviewer {{agent} reviews it} reviewTaken {its review was taken from it} reassigned {reassigned to {agent}} unassigned {reassigned to no agent} done {the card is in Done} laneEnded {its lane ended} laneAbandoned {its lane was abandoned} other {{why}}}",
     "note": "A line in a card's history: Combwork stopped the agent {watcher} (its name) waiting for the card to change, because the card is blocked, another agent ({agent}) now reviews it, the review it waited for was taken from it, the card was given to another agent ({agent}) or to none, the card reached the Done column (its work merged), or the card loop (lane) the agent waited in ended or was abandoned ({why}, select: translate each).",
+    "audience": "both"
+  },
+  "tasks.source.agents": {
+    "text": "Only the user sets a card’s GitHub source.",
+    "note": "HI-3551: an error: an agent or the Assistant tried to set the GitHub pull request or issue a card is about; only the user does, in the card dialog.",
+    "audience": "both"
+  },
+  "tasks.source.gh": {
+    "text": "The GitHub CLI {problem, select, missing {isn’t installed} signedOut {isn’t signed in on {host}} timeout {didn’t answer in time} other {couldn’t read it}}: see Version Control → Workflow → GitHub.",
+    "note": "HI-3551: an error setting a card’s GitHub source: gh couldn’t be asked (problem: not installed, not signed in on the host, no answer in time, or another failure). Keep the select keys. Version Control → Workflow → GitHub is a place in the window: as translated there.",
+    "audience": "both"
+  },
+  "tasks.source.noLink": {
+    "text": "This project has no GitHub link: none of its remotes is on its GitHub host (Version Control → Workflow → GitHub).",
+    "note": "HI-3551: an error setting a card’s GitHub source in a project without a GitHub link (HI-3550). Version Control → Workflow → GitHub is a place in the window: as translated there.",
+    "audience": "both"
+  },
+  "tasks.source.noProject": {
+    "text": "A card about the workspace has no GitHub source: only a project’s cards do.",
+    "note": "HI-3551: an error setting the GitHub source of a card that belongs to no project.",
+    "audience": "both"
+  },
+  "tasks.source.notFound": {
+    "text": "The GitHub CLI found no pull request or issue #{number} on {repo}{why, select, none {} other {: {why}}}.",
+    "note": "HI-3551: an error setting a card’s GitHub source: gh couldn’t read it. {number} its number, {repo} owner/name; {why} gh’s own words, or none (keep the select key).",
+    "audience": "both"
+  },
+  "tasks.source.notGithub": {
+    "text": "That isn’t a pull request or issue: give its address (https://…/pull/12 or …/issues/12) or its number (#12).",
+    "note": "HI-3551: an error setting a card’s GitHub source: the text typed isn’t the address of a GitHub pull request or issue, nor a number. Keep the example addresses.",
+    "audience": "both"
+  },
+  "tasks.source.otherRepo": {
+    "text": "That pull request or issue isn’t on this project’s repository ({repo} on {host}).",
+    "note": "HI-3551: an error setting a card’s GitHub source: the address is of another repository or host than the project’s GitHub link. {repo} is owner/name, {host} a host name.",
+    "audience": "both"
+  },
+  "tasks.source.started": {
+    "text": "{card}’s GitHub source can’t change once its work has started.",
+    "note": "HI-3551: an error setting or clearing the GitHub pull request or issue of a card that has started (its work is on it). {card} is a card key like HI-12.",
     "audience": "both"
   },
   "tasks.start.alreadyStarting": {

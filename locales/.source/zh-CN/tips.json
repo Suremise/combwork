@@ -282,6 +282,8 @@
   "tips.gitView.title": "See and change a project's git",
   "tips.githubRepository.text": "Version Control → Workflow → GitHub shows the project's repository, read from its remotes, and whether your GitHub CLI (gh) is signed in on that host. Combwork uses your own gh and stores no token.",
   "tips.githubRepository.title": "Your project on GitHub, through your own gh",
+  "tips.githubSource.text": "Give a card a GitHub source (a pull request's address or #number) in its dialog: it works on that pull request's own branch in a slot, and its review reads the whole change. It is never merged here.",
+  "tips.githubSource.title": "A card for a pull request",
   "tips.gotoProject.text": "Press {key} and type a few letters of its name.",
   "tips.gotoProject.title": "Jump to a project",
   "tips.group.agents": "Agents",

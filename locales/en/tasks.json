@@ -699,6 +699,10 @@
     "defaultMessage": "**{agent}, after a safeguard stop:** {stops, plural, =0 {} other {A safety classifier stopped a response{model, select, none {} other { on {model}}} at {time}{stops, plural, =1 {} other { (# this session)}}. }}It now runs on {to} instead of {from} (since {since}).{state, select, asks { Its CLI asks what to do about it.} idle { Idle after the stop: give it a nudge.} other {}}{hasTools, select, yes { Before it, its last tool calls: {tools}.} other {}}{hasHelp, select, yes { {help}} other {}}",
     "description": "A comment Combwork writes on the cards an agent works on, after its CLI's safety classifier stopped a response and the agent moved to another model. {agent}: the agent's name, in bold (keep the ** marks). Then, when it stopped any ({stops}: how many this session), on which model ({model}: its name; none: leave that branch empty) and when ({time}: \"15:12\"); the model it runs on now ({to}) instead of the old one ({from}) since a time ({since}); whether its CLI asks what to do (asks) or it sits idle (idle); its last tool calls before the stop ({tools}: tool names, keep them); and what to do about it in that CLI ({help}: its own sentence, already translated). Only names, never what was stopped."
   },
+  "tasks.history.source": {
+    "defaultMessage": "{set, select, yes {Its source: {kind, select, pr {pull request} other {issue}} #{number} on {repo}} other {Its GitHub source removed}}",
+    "description": "A line in a card's history (HI-3551): the GitHub pull request or issue the card is about was set (set yes: its kind, its number and its repository, owner/name) or removed. Keep the select keys."
+  },
   "tasks.history.stageRepaired": {
     "defaultMessage": "Recorded as Done, as the board had it: its workflow still had it in {stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} other {{stage}}}",
     "description": "A line in a card's history, by Combwork (HI-1674): the card was in the Done column, but a move had not reached its workflow, which still had it at an earlier stage ({stage}, select: a board stage; translate each); Combwork recorded it as Done and closed its open questions."
@@ -774,6 +778,38 @@
   "tasks.skipped.unsaved": {
     "defaultMessage": "couldn't be saved",
     "description": "Why Archive All left a card on the board (after its number, \"#12 couldn't be saved\"): its file could not be written. Lower case: it follows the number."
+  },
+  "tasks.source.agents": {
+    "defaultMessage": "Only the user sets a card’s GitHub source.",
+    "description": "HI-3551: an error: an agent or the Assistant tried to set the GitHub pull request or issue a card is about; only the user does, in the card dialog."
+  },
+  "tasks.source.gh": {
+    "defaultMessage": "The GitHub CLI {problem, select, missing {isn’t installed} signedOut {isn’t signed in on {host}} timeout {didn’t answer in time} other {couldn’t read it}}: see Version Control → Workflow → GitHub.",
+    "description": "HI-3551: an error setting a card’s GitHub source: gh couldn’t be asked (problem: not installed, not signed in on the host, no answer in time, or another failure). Keep the select keys. Version Control → Workflow → GitHub is a place in the window: as translated there."
+  },
+  "tasks.source.noLink": {
+    "defaultMessage": "This project has no GitHub link: none of its remotes is on its GitHub host (Version Control → Workflow → GitHub).",
+    "description": "HI-3551: an error setting a card’s GitHub source in a project without a GitHub link (HI-3550). Version Control → Workflow → GitHub is a place in the window: as translated there."
+  },
+  "tasks.source.noProject": {
+    "defaultMessage": "A card about the workspace has no GitHub source: only a project’s cards do.",
+    "description": "HI-3551: an error setting the GitHub source of a card that belongs to no project."
+  },
+  "tasks.source.notFound": {
+    "defaultMessage": "The GitHub CLI found no pull request or issue #{number} on {repo}{why, select, none {} other {: {why}}}.",
+    "description": "HI-3551: an error setting a card’s GitHub source: gh couldn’t read it. {number} its number, {repo} owner/name; {why} gh’s own words, or none (keep the select key)."
+  },
+  "tasks.source.notGithub": {
+    "defaultMessage": "That isn’t a pull request or issue: give its address (https://…/pull/12 or …/issues/12) or its number (#12).",
+    "description": "HI-3551: an error setting a card’s GitHub source: the text typed isn’t the address of a GitHub pull request or issue, nor a number. Keep the example addresses."
+  },
+  "tasks.source.otherRepo": {
+    "defaultMessage": "That pull request or issue isn’t on this project’s repository ({repo} on {host}).",
+    "description": "HI-3551: an error setting a card’s GitHub source: the address is of another repository or host than the project’s GitHub link. {repo} is owner/name, {host} a host name."
+  },
+  "tasks.source.started": {
+    "defaultMessage": "{card}’s GitHub source can’t change once its work has started.",
+    "description": "HI-3551: an error setting or clearing the GitHub pull request or issue of a card that has started (its work is on it). {card} is a card key like HI-12."
   },
   "tasks.start.agentBusy": {
     "defaultMessage": "{agent} {status, select, working {is working} starting {is starting} waiting {is waiting for the user} background {is waiting on background tasks it started} other {is waiting on cards (a card watch): it takes no other work until it is woken, or the watch is cancelled (Cancel in its header)}}. Start the card once it's idle, or give it to another agent.",

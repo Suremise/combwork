@@ -131,6 +131,10 @@
     "text": "{who} It is in the merge queue for {target}, which is paused ({reason}, on {card}); {waits}.",
     "note": "{who}: queue.line.who. {reason}: the pause's code (as the window's queue names it). {card}: the card it paused on. {waits}: what it waits for (queue.paused.*), never a step of the agent's own (#1406)."
   },
+  "queue.line.pullRequest": {
+    "text": "This card finishes through its pull request on GitHub, not by a merge here.",
+    "note": "HI-3551: a card that works on a GitHub pull request's branch: whatever the project's finish, it is never merged in this repository (its pull request is). A statement of fact, no instruction."
+  },
   "queue.line.queued": {
     "text": "{who} It is in the merge queue for {target}, position {position}; it moves to Done once merged.",
     "note": "{who}: queue.line.who. {target}: the branch it merges into. {position}: 1 is next, after the one testing now."

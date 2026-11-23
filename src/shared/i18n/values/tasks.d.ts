@@ -176,6 +176,7 @@ interface CombworkMessageValues {
   'tasks.history.reviewStopped': { agent: string | number }
   'tasks.history.reviewerRequest': { text: string | number }
   'tasks.history.safeguardStop': { agent: string | number; stops: number; model: string; time: string | number; to: string | number; from: string | number; since: string | number; state: string; hasTools: string; tools: string | number; hasHelp: string; help: string | number }
+  'tasks.history.source': { set: string; kind: string; number: string | number; repo: string | number }
   'tasks.history.stageRepaired': { stage: string }
   'tasks.history.startsWithout': { card: string | number; reason: string | number }
   'tasks.history.takenFrom': { agent: string | number }
@@ -195,6 +196,14 @@ interface CombworkMessageValues {
   'tasks.skipped.noMatch': undefined
   'tasks.skipped.unreadable': undefined
   'tasks.skipped.unsaved': undefined
+  'tasks.source.agents': undefined
+  'tasks.source.gh': { problem: string; host: string | number }
+  'tasks.source.noLink': undefined
+  'tasks.source.noProject': undefined
+  'tasks.source.notFound': { number: string | number; repo: string | number; why: string }
+  'tasks.source.notGithub': undefined
+  'tasks.source.otherRepo': { repo: string | number; host: string | number }
+  'tasks.source.started': { card: string | number }
   'tasks.start.agentBusy': { agent: string | number; status: string }
   'tasks.start.alreadyStarting': { card: string | number }
   'tasks.start.archived': { card: string | number }
