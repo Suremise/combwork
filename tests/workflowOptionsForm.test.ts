@@ -418,7 +418,7 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
       const shownSomewhere = new Set(PRESETS[platform].flatMap((p) => [preset(platform, p.id, { quick: ['lint'], tests: [] }), allOff(platform)]).flatMap((o) => rows.filter((k) => formShows(k, o))))
       if (platform === 'git') shownSomewhere.add('strict')
       // HI-3552: no preset finishes with a pull request; its draft switch shows when one does.
-      if (platform === 'git') for (const k of rows.filter((k) => formShows(k, { ...allOff(platform), finish: 'pullRequest' }))) shownSomewhere.add(k)
+      if (platform === 'git') for (const key of rows.filter((k) => formShows(k, { ...allOff(platform), finish: 'pullRequest' }))) shownSomewhere.add(key)
       expect(rows.filter((k) => !shownSomewhere.has(k))).toEqual([])
     }
     // G4's sentence says both values (the card's own words).
