@@ -157,6 +157,7 @@ interface CombworkMessageValues {
   'workflow.group.github': undefined
   'workflow.group.loops': undefined
   'workflow.group.merging': undefined
+  'workflow.group.pullRequests': undefined
   'workflow.group.review': undefined
   'workflow.group.stages': undefined
   'workflow.group.team': undefined
@@ -253,6 +254,10 @@ interface CombworkMessageValues {
   'workflow.option.folder.title': undefined
   'workflow.option.followRemote.desc': undefined
   'workflow.option.followRemote.title': undefined
+  'workflow.option.githubFeedback.desc': undefined
+  'workflow.option.githubFeedback.title': undefined
+  'workflow.option.githubFooter.desc': undefined
+  'workflow.option.githubFooter.title': undefined
   'workflow.option.identity.desc': undefined
   'workflow.option.identity.title': undefined
   'workflow.option.loopRounds.desc': undefined
@@ -681,6 +686,9 @@ interface CombworkMessageValues {
   'workflow.value.finish.pullRequest': undefined
   'workflow.value.folder.project': undefined
   'workflow.value.folder.slots': undefined
+  'workflow.value.githubFeedback.agent': undefined
+  'workflow.value.githubFeedback.both': undefined
+  'workflow.value.githubFeedback.user': undefined
   'workflow.value.mergeInstall.always': undefined
   'workflow.value.mergeInstall.onManifestChange': undefined
   'workflow.value.okBefore.every': undefined

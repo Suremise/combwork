@@ -5,7 +5,8 @@
 import { combworkError } from './combworkError'
 import { msg } from '../shared/i18n/msg'
 import { githubRepoOf, githubRepoUrl, type GithubLink, type RemoteUrls } from '../shared/githubRepo'
-import { ghStatus } from './ghCli'
+import type { OpenPr, OpenPrsRead } from '../shared/githubSource'
+import { gh as ghCall, ghStatus } from './ghCli'
 import { lineRepoReads } from './platform/repoReadsPorts'
 import { githubHostsFor } from './githubHosts'
 import { createLogger, userText } from './logger'
@@ -42,6 +43,32 @@ export async function githubRemoteFor(ws: WorkspaceService, projectPath: string)
   const host = (await githubHostsFor(ws, projectPath, process.env)).repo.host
   const { linked } = githubRepoOf(await remotesOf(projectPath), host, await chosenRemote(ws, projectPath))
   return linked ? { remote: linked.remote, host, owner: linked.owner, repo: linked.repo } : null
+}
+
+/** HI-3553: the most open pull requests From GitHub… lists (gh's `pr list --limit`), newest first. */
+export const OPEN_PRS_LIMIT = 100
+
+/**
+ * HI-3553: the open pull requests of the project's GitHub repository (`gh pr list -R … --state open`), each with the
+ * card not archived already about it, for the board's From GitHub…. Their titles are GitHub's, the window's to show.
+ */
+export async function openPrsOf(ws: WorkspaceService, projectPath: string): Promise<OpenPrsRead> {
+  const repo = await githubRepoFor(ws, projectPath)
+  if (!repo) return { repo: null, problem: 'noLink', detail: null }
+  const r = await ghCall({ repo }, ['pr', 'list', '--state', 'open', '--limit', String(OPEN_PRS_LIMIT), '--json', 'number,title,url,author,headRefName,baseRefName,isCrossRepository,isDraft'], { json: true })
+  if (!r.ok) return { repo, problem: r.problem, detail: r.detail }
+  const { prSourceCards } = await import('./boardStore')
+  const cards = new Map(prSourceCards(ws, repo).map((c) => [c.pr, c.n]))
+  const rows = Array.isArray(r.json) ? (r.json as Record<string, unknown>[]) : []
+  const str = (o: Record<string, unknown>, k: string): string => (typeof o[k] === 'string' ? (o[k] as string) : '')
+  const prs = rows
+    .filter((o) => o && typeof o === 'object' && Number.isInteger(o.number) && (o.number as number) > 0)
+    .map((o): OpenPr => {
+      const a = o.author as { login?: unknown } | undefined
+      const number = o.number as number
+      return { number, title: str(o, 'title'), url: str(o, 'url'), author: a && typeof a.login === 'string' ? a.login : null, headRef: str(o, 'headRefName'), baseRef: str(o, 'baseRefName'), crossRepository: o.isCrossRepository === true, draft: o.isDraft === true, card: cards.get(number) ?? null }
+    })
+  return { repo, prs }
 }
 
 /** The project's link, as Version Control → Workflow → GitHub shows it, with gh asked about its host now. */

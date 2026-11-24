@@ -61,7 +61,7 @@ export function canonical(v: unknown): string {
  * guards (HI-3284): the merge queue reads them as the options are when it checks.
  */
 export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
-  const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, prDraft: _draft, followRemote: _follow, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, assistantWakes: _assistantWakes, fileLocks: _locks, maxAgents: _max, simplifyAt: _simplify, churnStopAt: _stop, mergeGuards: _guards, ...rules } = o
+  const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, prDraft: _draft, followRemote: _follow, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, assistantWakes: _assistantWakes, fileLocks: _locks, maxAgents: _max, simplifyAt: _simplify, churnStopAt: _stop, mergeGuards: _guards, githubFeedback: _feedback, githubFooter: _footer, ...rules } = o
   return (reviewerMode === 'pool' ? { ...rules, reviewerMode } : rules) as WorkflowOptions
 }
 

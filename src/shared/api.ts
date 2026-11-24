@@ -173,7 +173,9 @@ import type {
 import type { PlatformId } from './platform/descriptors'
 import type { SlotLevelForm, SlotOptionOrigin } from './slotDefaults'
 import type { GithubHostChange, GithubHostsForm } from './githubHost'
-import type { GithubLink } from './githubRepo'
+import type { GithubLink, GithubRepoRef } from './githubRepo'
+import type { OpenPrsRead } from './githubSource'
+import type { GithubReviewRow, GithubReviewsView } from './githubReviews'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
 import type { CommitMessage, WorkflowOptions } from './workflow/options'
@@ -488,6 +490,13 @@ export interface CombworkRequests {
   'github:set': (projectPath: string | null, change: GithubHostChange) => GithubHostsForm
   'github:link': (projectPath: string) => GithubLink
   'github:setRemote': (projectPath: string, remote: string | null) => GithubLink
+  /** HI-3553: the project's GitHub repository, without asking gh (null: no link); its open pull requests, through gh. */
+  'github:repo': (projectPath: string) => GithubRepoRef | null
+  'github:openPrs': (projectPath: string) => OpenPrsRead
+  /** HI-3559: a pull request's card's reviews to GitHub (Feedback to GitHub), and the user's posting or discarding one. */
+  'github:reviews': (n: number) => GithubReviewsView
+  'github:postReview': (n: number, row: number | null, body: string) => GithubReviewRow
+  'github:discardReview': (n: number, draft: number) => void
   /** Combwork's or the workspace's slot defaults (HI-1765: Settings → Workflow defaults, Git), with what each inherits. */
   'slots:levelForm': (level: WorkflowLevel) => SlotLevelForm
   /** Sets one of a level's slot defaults (an empty string: none), or with null removes it, so it inherits. */
@@ -593,6 +602,8 @@ export interface CombworkRequests {
   'tasks:prStatus': (n: number) => PrView | null
   /** HI-3552: every card's pull request in PR open read again now (the board opened). */
   'tasks:prFollow': () => void
+  /** HI-3553: an open pull request made a card in Todo (the board's From GitHub…), or the card already about it. */
+  'tasks:fromPr': (project: string, number: number, repo: GithubRepoRef, text: { title: string; description: string }) => { card: TaskCard; existing: boolean }
   'tasks:keptTarget': (n: number) => KeptTargetShown
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }

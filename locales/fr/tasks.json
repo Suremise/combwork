@@ -191,6 +191,7 @@
   "tasks.skipped.unsaved": "impossible à enregistrer",
   "tasks.source.agents": "Seul l’utilisateur définit la source GitHub d’une carte.",
   "tasks.source.gh": "La CLI GitHub {problem, select, missing {n’est pas installée} signedOut {n’est pas connectée sur {host}} timeout {n’a pas répondu à temps} other {n’a pas pu la lire}} : voir Gestion de versions → Flux de travail → GitHub.",
+  "tasks.source.linkChanged": "Le dépôt GitHub de ce projet est maintenant {repo}, et non {shown} comme listé : liste à nouveau ses pull requests.",
   "tasks.source.noLink": "Ce projet n’a pas de lien GitHub : aucun de ses dépôts distants n’est sur son hôte GitHub (Gestion de versions → Flux de travail → GitHub).",
   "tasks.source.noProject": "Une carte sur l’espace de travail n’a pas de source GitHub : seules les cartes d’un projet en ont.",
   "tasks.source.notFound": "La CLI GitHub n’a trouvé ni pull request ni issue #{number} sur {repo}{why, select, none {} other { : {why}}}.",

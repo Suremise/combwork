@@ -2,7 +2,7 @@
 // repository's pull request or issue, or #n; another host or repository refused), a saved source read back only when
 // well formed, the label, the PR line's name, and when a PR can't take a push (a fork without maintainer edits).
 import { describe, expect, it } from 'vitest'
-import { cleanSource, parseSourceRef, prLineName, prPushable, prRefs, sameSource, sourceLabel } from '../src/shared/githubSource'
+import { cleanSource, clipBody, outsideAuthor, parseSourceRef, SOURCE_BODY_MAX, prLineName, prPushable, prRefs, sameSource, sourceLabel } from '../src/shared/githubSource'
 
 const link = { host: 'github.com', owner: 'Acme', repo: 'App' }
 
@@ -40,5 +40,31 @@ describe("a card's GitHub source", () => {
     expect(prPushable({ kind: 'pr', pr: { headRef: 'f', baseRef: 'm', crossRepository: true, maintainerCanModify: false } })).toEqual({ ok: false, why: 'fork' })
     expect(prPushable({ kind: 'pr', pr: { headRef: 'f', baseRef: 'm', crossRepository: true, maintainerCanModify: true } })).toEqual({ ok: true })
     expect(prPushable({ kind: 'pr', pr: { headRef: 'f', baseRef: 'm', crossRepository: false, maintainerCanModify: false } })).toEqual({ ok: true })
+  })
+})
+
+describe('a pull request’s author and body (HI-3553)', () => {
+  const pr = { kind: 'pr', host: 'github.com', owner: 'acme', repo: 'app', number: 7, url: 'u', title: 'T', pr: { headRef: 'f', baseRef: 'main', crossRepository: false, maintainerCanModify: true } }
+  it('keeps the author and their standing when well formed', () => {
+    expect(cleanSource({ ...pr, author: { login: 'mona', association: 'MEMBER' } })?.author).toEqual({ login: 'mona', association: 'MEMBER' })
+    expect(cleanSource({ ...pr, author: { login: 'mona' } })?.author).toEqual({ login: 'mona', association: null })
+    expect(cleanSource({ ...pr, author: { login: '' } })).not.toHaveProperty('author')
+    expect(cleanSource({ ...pr, author: 'mona' })).not.toHaveProperty('author')
+  })
+  it('warns only of a pull request whose author isn’t one of the repository’s, or isn’t known to be', () => {
+    const by = (association: string | null) => ({ kind: 'pr' as const, author: { login: 'x', association } })
+    for (const a of ['OWNER', 'MEMBER', 'COLLABORATOR', 'member']) expect(outsideAuthor(by(a))).toBeNull()
+    for (const a of ['CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', 'FIRST_TIMER', 'NONE', 'MANNEQUIN']) expect(outsideAuthor(by(a))).toBe('outside')
+    expect(outsideAuthor(by(null))).toBe('unknown')
+    expect(outsideAuthor({ kind: 'pr' })).toBe('unknown')
+    expect(outsideAuthor({ kind: 'issue', author: { login: 'x', association: 'NONE' } })).toBeNull()
+  })
+  it('keeps a body with \n line ends, no control characters but tab, and at most its limit', () => {
+    expect(clipBody(' a\r\nb\rc\t\u001b[31md\u0000 ')).toBe('a\nb\nc\t[31md')
+    expect(clipBody(null)).toBe('')
+    const long = clipBody('x'.repeat(SOURCE_BODY_MAX + 50))
+    expect(long).toHaveLength(SOURCE_BODY_MAX)
+    expect(long.endsWith('…')).toBe(true)
+    expect(clipBody('x'.repeat(SOURCE_BODY_MAX))).toBe('x'.repeat(SOURCE_BODY_MAX))
   })
 })

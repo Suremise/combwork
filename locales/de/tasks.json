@@ -191,6 +191,7 @@
   "tasks.skipped.unsaved": "konnte nicht gespeichert werden",
   "tasks.source.agents": "Nur der Benutzer setzt die GitHub-Quelle einer Karte.",
   "tasks.source.gh": "Die GitHub CLI {problem, select, missing {ist nicht installiert} signedOut {ist bei {host} nicht angemeldet} timeout {hat nicht rechtzeitig geantwortet} other {konnte es nicht lesen}}: siehe Versionsverwaltung → Workflow → GitHub.",
+  "tasks.source.linkChanged": "Das GitHub-Repository dieses Projekts ist jetzt {repo}, nicht {shown} wie aufgelistet: Liste seine Pull-Requests erneut auf.",
   "tasks.source.noLink": "Dieses Projekt hat keine GitHub-Verknüpfung: Keines seiner Remotes liegt auf seinem GitHub-Host (Versionsverwaltung → Workflow → GitHub).",
   "tasks.source.noProject": "Eine Karte zum Workspace hat keine GitHub-Quelle: nur Karten eines Projekts.",
   "tasks.source.notFound": "Die GitHub CLI hat keinen Pull-Request und kein Issue #{number} in {repo} gefunden{why, select, none {} other {: {why}}}.",

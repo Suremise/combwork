@@ -929,6 +929,11 @@
     "note": "HI-3551: an error setting a card’s GitHub source: gh couldn’t be asked (problem: not installed, not signed in on the host, no answer in time, or another failure). Keep the select keys. Version Control → Workflow → GitHub is a place in the window: as translated there.",
     "audience": "both"
   },
+  "tasks.source.linkChanged": {
+    "text": "This project’s GitHub repository is now {repo}, not {shown} as listed: list its pull requests again.",
+    "note": "HI-3553: an error making a card of a pull request from the board’s From GitHub… list: the project’s GitHub link changed to another repository since the list was shown. {repo} and {shown} are owner/name.",
+    "audience": "both"
+  },
   "tasks.source.noLink": {
     "text": "This project has no GitHub link: none of its remotes is on its GitHub host (Version Control → Workflow → GitHub).",
     "note": "HI-3551: an error setting a card’s GitHub source in a project without a GitHub link (HI-3550). Version Control → Workflow → GitHub is a place in the window: as translated there.",

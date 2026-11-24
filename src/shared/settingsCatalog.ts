@@ -723,6 +723,9 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('prDraft', 'boolean'),
     option('followRemote', 'boolean'),
     option('commitMessage', 'select', [['combwork', V.commitMessage.combwork], ['branch', V.commitMessage.branch]]),
+    // HI-3559: what goes back to GitHub about a pull request's card.
+    option('githubFeedback', 'select', [['both', V.githubFeedback.both], ['agent', V.githubFeedback.agent], ['user', V.githubFeedback.user]]),
+    option('githubFooter', 'boolean'),
     option('okBefore', 'custom'),
     option('folder', 'select', [['slots', V.folder.slots], ['project', V.folder.project]]),
     option('slotsUpToDate', 'boolean'),

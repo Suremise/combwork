@@ -284,10 +284,13 @@ interface CombworkMessageValues {
   'board.dialog.savePostsIt': undefined
   'board.dialog.saving': undefined
   'board.dialog.source': undefined
+  'board.dialog.sourceAuthor': { author: string | number }
+  'board.dialog.sourceCatalogue': undefined
   'board.dialog.sourceFailed': undefined
   'board.dialog.sourceFork': undefined
   'board.dialog.sourceKind': { kind: string; number: string | number }
   'board.dialog.sourceOpen': undefined
+  'board.dialog.sourceOutside': { known: string; author: string | number; repo: string | number }
   'board.dialog.sourcePlaceholder': undefined
   'board.dialog.sourceRemove': undefined
   'board.dialog.sourceSet': undefined
@@ -388,6 +391,27 @@ interface CombworkMessageValues {
   'board.forYou.tipMore': { n: number }
   'board.forYou.tipOpen': undefined
   'board.forYou.todayValue': { today: string; value: string | number }
+  'board.github.carried': { inline: number; both: string; listed: number }
+  'board.github.change': undefined
+  'board.github.checkGithub': undefined
+  'board.github.comments': { n: number }
+  'board.github.discard': undefined
+  'board.github.discardFailed': undefined
+  'board.github.discarded': undefined
+  'board.github.drafted': { reviewer: string | number }
+  'board.github.failed': { error: string | number }
+  'board.github.footer': { footer: string | number }
+  'board.github.label': undefined
+  'board.github.notNow': undefined
+  'board.github.open': undefined
+  'board.github.option': { option: string }
+  'board.github.post': undefined
+  'board.github.postAgain': undefined
+  'board.github.postFailed': undefined
+  'board.github.posted': { when: string | number; by: string }
+  'board.github.posting': undefined
+  'board.github.recovery': { why: string }
+  'board.github.write': undefined
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }
   'board.inbox.assistant': undefined

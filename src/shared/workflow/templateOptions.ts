@@ -47,7 +47,10 @@ export const TEMPLATE_CARRIED = [
   'stageNames',
   'maxAgents',
   // HI-3552: a workflow's choice, as its finish is.
-  'prDraft'
+  'prDraft',
+  // HI-3559: who writes what goes back to GitHub, and the model's footer: a way of working, as the options above.
+  'githubFeedback',
+  'githubFooter'
 ] as const satisfies readonly OptionKey[]
 
 /**

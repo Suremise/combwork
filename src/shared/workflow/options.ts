@@ -28,6 +28,12 @@ export type FolderMode = 'slots' | 'project'
 export type MergeInstall = 'onManifestChange' | 'always'
 /** G19: the message of Combwork's merge commit: Combwork's (`KEY: title` and trailers) or the branch's own. */
 export type CommitMessage = 'combwork' | 'branch'
+/**
+ * HI-3559 (HI-2843's and HI-3541's decisions): who writes what goes back to GitHub about a pull request's card: the agent
+ * (its verdict posted as it is given), the user (written and posted by them), or both (the agent drafts, the user edits
+ * and posts).
+ */
+export type GithubFeedback = 'agent' | 'user' | 'both'
 /** G10: your OK before merging. */
 export interface OkBefore {
   mode: 'never' | 'labels' | 'every'
@@ -173,7 +179,19 @@ export interface WorkflowOptions {
    */
   simplifyAt?: number
   churnStopAt?: number
+  /**
+   * HI-3559: Feedback to GitHub (`GithubFeedback`), absent: both. Not a rule (`GITHUB_OPTIONS`): read as the options are
+   * when a verdict is written, so it applies to cards in flight, and never to a verdict written before.
+   */
+  githubFeedback?: GithubFeedback
+  /** HI-3559: an agent's text posted to GitHub ends "Drafted by <model> in Combwork"; absent: on. Not a rule. */
+  githubFooter?: boolean
 }
+
+/** HI-3559: Feedback to GitHub as these options have it (absent: both). */
+export const githubFeedbackOf = (o: Pick<WorkflowOptions, 'githubFeedback'>): GithubFeedback => o.githubFeedback ?? 'both'
+/** HI-3559: whether an agent's text posted to GitHub carries its footer (absent: on). */
+export const githubFooterOf = (o: Pick<WorkflowOptions, 'githubFooter'>): boolean => o.githubFooter !== false
 
 /** G20's picker and runner, in `commands` (HI-1367): reserved names, never a check's. */
 export const FOCUSED_PICK = 'focused.pick'
@@ -193,6 +211,12 @@ export const BRANCH_OPTIONS: readonly OptionKey[] = ['otherTargets']
  * checks), never set by a preset, never making the options Custom.
  */
 export const GUARD_OPTIONS: readonly OptionKey[] = ['mergeGuards']
+
+/**
+ * HI-3559: what goes back to GitHub, not rules: left out of a ruleset (read as the options are when a verdict is written
+ * or a review posted), never set by a preset, never making the options Custom.
+ */
+export const GITHUB_OPTIONS: readonly OptionKey[] = ['githubFeedback', 'githubFooter']
 
 /**
  * How agents work together, not rules (HI-1766): left out of every ruleset (so a change applies at once and marks
@@ -216,10 +240,10 @@ export const PRESET_PREFERENCES: readonly OptionKey[] = ['maxAgents', 'simplifyA
 const SOLO_CHURN = { simplifyAt: 0, churnStopAt: 0 } as const
 
 /** The options no preset sets (names and preferences): a choice of preset keeps a project's or level's own. */
-export const UNPRESET_OPTIONS: readonly OptionKey[] = [...NAME_OPTIONS, ...BRANCH_OPTIONS, ...GUARD_OPTIONS, ...PREFERENCE_OPTIONS.filter((k) => !PRESET_PREFERENCES.includes(k))]
+export const UNPRESET_OPTIONS: readonly OptionKey[] = [...NAME_OPTIONS, ...BRANCH_OPTIONS, ...GUARD_OPTIONS, ...GITHUB_OPTIONS, ...PREFERENCE_OPTIONS.filter((k) => !PRESET_PREFERENCES.includes(k))]
 
 /** The options that never make a preset Custom: the names and every preference, Maximum agents too. */
-const NOT_CUSTOM: readonly OptionKey[] = [...NAME_OPTIONS, ...BRANCH_OPTIONS, ...GUARD_OPTIONS, ...PREFERENCE_OPTIONS]
+const NOT_CUSTOM: readonly OptionKey[] = [...NAME_OPTIONS, ...BRANCH_OPTIONS, ...GUARD_OPTIONS, ...GITHUB_OPTIONS, ...PREFERENCE_OPTIONS]
 
 /** A preset's or All off's own options, with the draft's own names and preferences kept (HI-1766, #1417). */
 export function withUnpreset(chosen: Partial<WorkflowOptions>, own: Partial<WorkflowOptions>): Partial<WorkflowOptions> {
@@ -540,7 +564,9 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   loopStepWaitMinutes: whole(LOOP_STEP_WAIT_MAX_MINUTES),
   assistantWakes: takesAssistantWakes,
   fileLocks: oneOf<FileLockMode>(['off', 'warn', 'block', 'ask']),
-  maxAgents: whole(AGENT_LIMIT_MAX)
+  maxAgents: whole(AGENT_LIMIT_MAX),
+  githubFeedback: oneOf<GithubFeedback>(['agent', 'user', 'both']),
+  githubFooter: bool
 }
 
 /** The stage ids a project may name (N5), as stages.ts orders them (kept here so options.ts needs nothing of it). */
@@ -553,7 +579,7 @@ export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(O
 const LOOP_OPTIONS: OptionKey[] = ['loopWakes', 'loopRounds', 'simplifyAt', 'churnStopAt', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes']
 
 /** The Workflow section's groups (#1418), each a heading with its options. */
-export type FormGroupId = 'team' | 'review' | 'checks' | 'merging' | 'where' | 'github' | 'work' | 'loops' | 'stages'
+export type FormGroupId = 'team' | 'review' | 'checks' | 'merging' | 'where' | 'pullRequests' | 'githubFeedback' | 'work' | 'loops' | 'stages'
 
 /**
  * The Workflow section's groups for a platform, in order, and their options (SPEC §16.6.1, §16.6.2; #1418). Since P7
@@ -570,7 +596,9 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
     { id: 'merging', options: ['finish', 'style', 'target', 'otherTargets', 'strict', 'pushTarget', 'followRemote', 'commitMessage', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'] },
     // HI-3552: the pull request's options, in the GitHub tab beside its hosts.
-    { id: 'github', options: ['prDraft'] },
+    { id: 'pullRequests', options: ['prDraft'] },
+    // HI-3559: what goes back to GitHub about a pull request's card.
+    { id: 'githubFeedback', options: ['githubFeedback', 'githubFooter'] },
     { id: 'loops', options: LOOP_OPTIONS },
     { id: 'stages', options: ['stageNames'] }
   ],
@@ -587,7 +615,7 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
 /**
  * The Workflow form's tabs (HI-3549), in order, each the groups it shows: layout only, an option's meaning, value and
  * default the same in any tab. Overview holds the preset picker, Where cards are built the slots panel beside its
- * group, and GitHub the GitHub hosts beside its group (HI-3552). A tab with nothing to show at a level isn't shown.
+ * group, and GitHub the project's GitHub link and hosts beside its groups (HI-3552: pull requests; HI-3559: Feedback to GitHub). A tab with nothing to show at a level isn't shown.
  */
 export type FormTabId = 'overview' | 'checks' | 'merging' | 'where' | 'github' | 'work' | 'loops'
 
@@ -597,7 +625,7 @@ export const FORM_TABS: Record<PlatformId, { id: FormTabId; groups: FormGroupId[
     { id: 'checks', groups: ['team', 'review', 'checks'] },
     { id: 'merging', groups: ['merging'] },
     { id: 'where', groups: ['where'] },
-    { id: 'github', groups: ['github'] },
+    { id: 'github', groups: ['pullRequests', 'githubFeedback'] },
     { id: 'loops', groups: ['loops', 'stages'] }
   ],
   none: [
@@ -687,6 +715,8 @@ export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   // G23 (HI-3552): only a pull request's finish opens one.
   if (key === 'prDraft') return o.finish === 'pullRequest'
   if (key === 'sharedFolderWarning') return o.folder === 'project'
+  // HI-3559: the footer is on agents' text, which Feedback to GitHub's User never posts.
+  if (key === 'githubFooter') return platformHasOption(o.platform, key) && githubFeedbackOf(o) !== 'user'
   // G15 depends on G11 alone: only with each card in a slot. G17 whenever a reviewer agent reviews, whatever G11 is
   // (with everyone in the project folder the pool's reviewers read in review copies, #1439).
   if (key === 'slotsUpToDate') return o.folder === 'slots'

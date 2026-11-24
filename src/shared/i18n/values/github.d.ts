@@ -49,4 +49,28 @@ interface CombworkMessageValues {
   'github.link.signedOut': { host: string | number }
   'github.link.timeout': undefined
   'github.link.version': { version: string | number }
+  'github.prs.again': undefined
+  'github.prs.button': undefined
+  'github.prs.cardDesc': { number: string | number; repo: string | number; author: string }
+  'github.prs.cardTitle': { number: string | number; author: string }
+  'github.prs.close': undefined
+  'github.prs.desc': undefined
+  'github.prs.failed': { number: string | number }
+  'github.prs.ghSays': { error: string | number }
+  'github.prs.hasCard': { card: string | number }
+  'github.prs.loading': undefined
+  'github.prs.make': undefined
+  'github.prs.meta': { author: string; head: string | number; base: string | number; fork: string; draft: string }
+  'github.prs.none': { repo: string | number }
+  'github.prs.problem': { problem: string }
+  'github.prs.row': { number: string | number; title: string | number }
+  'github.prs.tip': { repo: string | number }
+  'github.prs.title': { repo: string | number }
+  'github.review.done': { state: string }
+  'github.review.empty': undefined
+  'github.review.noCard': undefined
+  'github.review.noDraft': undefined
+  'github.review.noLink': { repo: string | number }
+  'github.review.notAllowed': { option: string; what: string }
+  'github.review.notPr': undefined
 }

@@ -355,6 +355,18 @@
   "workflow.option.followRemote.title": {
     "placeholders": {}
   },
+  "workflow.option.githubFeedback.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.githubFeedback.title": {
+    "placeholders": {}
+  },
+  "workflow.option.githubFooter.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.githubFooter.title": {
+    "placeholders": {}
+  },
   "workflow.option.identity.desc": {
     "placeholders": {}
   },
@@ -1782,6 +1794,15 @@
     "placeholders": {}
   },
   "workflow.value.folder.slots": {
+    "placeholders": {}
+  },
+  "workflow.value.githubFeedback.agent": {
+    "placeholders": {}
+  },
+  "workflow.value.githubFeedback.both": {
+    "placeholders": {}
+  },
+  "workflow.value.githubFeedback.user": {
     "placeholders": {}
   },
   "workflow.value.mergeInstall.always": {

@@ -144,7 +144,7 @@ import { rulesNow } from './workflow/rulesets'
 import { poolFor, removeGoneSlot, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
-import { githubLinkOf, setGithubRemote } from './githubLink'
+import { githubLinkOf, githubRepoFor, openPrsOf, setGithubRemote } from './githubLink'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
@@ -160,6 +160,7 @@ import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pause
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { revisionDiff } from './workflow/revisionDiff'
 import { addLineComment, changeLineComment, feedbackPreview, sendFeedback } from './workflow/lineComments'
+import { discardGithubReview, githubReviewsView, postGithubReview } from './githubReviews'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
 import { withSkillDelivered } from '../shared/skillDelivery'
@@ -963,6 +964,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'tasks:setTarget': (n, target) => tasks.setTarget(n, typeof target === 'string' ? target.slice(0, 250) : null, { kind: 'user' }),
     // HI-3551: the GitHub pull request or issue a card is about (an address or #n), or null to clear it: the user's alone.
     'tasks:setSource': (n, source) => tasks.setSource(n, typeof source === 'string' && source.trim() ? source.trim().slice(0, 500) : null, { kind: 'user' }),
+    // HI-3553: an open pull request made a card (the board's From GitHub…): the user's alone, read again from GitHub in main.
+    'tasks:fromPr': (project, number, repo, text) => tasks.createFromPr(String(project), Number(number), { host: String(repo?.host ?? ''), owner: String(repo?.owner ?? ''), repo: String(repo?.repo ?? '') }, { title: String(text?.title ?? '').slice(0, 200), description: String(text?.description ?? '').slice(0, 4000) }, { kind: 'user' }),
     'tasks:keptTarget': (n) => tasks.keptTarget(Number(n)),
     // HI-3552: a card's pull request read now (its dialog opened), and every one in PR open (the board opened).
     'tasks:prStatus': async (n) => (await import('./workflow/prHosts')).prStatus(currentWorkspace(), Number(n)),
@@ -1123,6 +1126,12 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // HI-3550: a Git project's GitHub link (its repository and gh's sign-in on its host), and the remote chosen for it.
     'github:link': (p) => githubLinkOf(workspace, workspace.assertProject(p)),
     'github:setRemote': (p, remote) => setGithubRemote(workspace, workspace.assertProject(p), typeof remote === 'string' ? remote : null),
+    'github:repo': (p) => githubRepoFor(workspace, workspace.assertProject(p)),
+    'github:openPrs': (p) => openPrsOf(workspace, workspace.assertProject(p)),
+    // HI-3559: a pull request's card's reviews to GitHub; the user posts a draft (its edit) or their own, or discards a draft.
+    'github:reviews': (n) => githubReviewsView(currentWorkspace(), Number(n)),
+    'github:postReview': (n, row, body) => postGithubReview(currentWorkspace(), Number(n), { row: typeof row === 'number' && Number.isInteger(row) ? row : null, body: typeof body === 'string' ? body.slice(0, 60_000) : '' }, 'user'),
+    'github:discardReview': (n, draft) => discardGithubReview(currentWorkspace(), Number(n), Number(draft)),
     'slots:levelForm': (level) => slotLevelForm(workspace, level),
     'slots:setLevelDefault': async (level, key, value) => {
       await setSlotDefault(workspace, level, key, value)
