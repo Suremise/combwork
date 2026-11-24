@@ -172,13 +172,14 @@ export async function postReviewOn(wf: Workflow, n: number, req: { row: number |
     if (!claim.text && !comments.length) throw combworkError(M.empty)
     const footer = draft && githubFooterOf(wf.cfg.options()) ? githubFooter((await deps.model(draft.reviewer)) ?? 'an AI agent') : null // i18n-ignore: posted to GitHub as written, in English
     sent = await send(wf, card.id, deps, source, claim.submission, claim.text, footer, comments, authority)
-    // HI-3554: posted, a fix card's review also answers each review thread it was made to address, in that thread.
-    if (sent.kind === 'posted') {
-      const threads = (await deps.threads?.().catch(() => [])) ?? []
-      if (threads.length) sent.replies = await replyIn(deps, source, threads, sent.body, authority)
-    }
   } catch (e) {
     sent = { kind: 'failed', error: e instanceof Error ? e.message : String(e) }
+  }
+  // HI-3554: posted, a fix card's review also answers each review thread it was made to address, in that thread. Apart
+  // from the review's own outcome (HR1's round 2): nothing a reply meets makes a posted review failed, or postable again.
+  if (sent.kind === 'posted') {
+    const threads = (await deps.threads?.().catch(() => [])) ?? []
+    if (threads.length) sent.replies = await replyIn(deps, source, threads, sent.body, authority)
   }
   await wf.write(card, null, actor, (w) => {
     if (sent.kind === 'posted') {
@@ -238,8 +239,11 @@ function outcome(r: GhResult): { kind: 'posted'; url: string | null } | { kind: 
 async function replyIn(deps: PostDeps, source: { host: string; owner: string; repo: string; number: number }, threads: number[], body: string, authority: () => string | null): Promise<ThreadReply[]> {
   const out: ThreadReply[] = []
   for (const thread of threads) {
-    const dir = await mkdtemp(join(tmpdir(), 'combwork-reply-'))
+    let dir: string | null = null
+    // Before gh was asked: refused (never sent); a throw from gh itself: it may have been sent.
+    let asked = false
     try {
+      dir = await mkdtemp(join(tmpdir(), 'combwork-reply-'))
       const file = join(dir, 'reply.json')
       await writeFile(file, JSON.stringify({ body }), 'utf8')
       const refused = authority()
@@ -247,10 +251,14 @@ async function replyIn(deps: PostDeps, source: { host: string; owner: string; re
         out.push({ thread, error: refused })
         continue
       }
+      asked = true
       const said = outcome(await deps.gh({ host: source.host }, ['api', '--method', 'POST', `repos/${source.owner}/${source.repo}/pulls/${source.number}/comments/${thread}/replies`, '--input', file]))
       out.push(said.kind === 'posted' ? { thread, url: said.url } : { thread, error: said.error.slice(0, 500), ...(said.kind === 'uncertain' ? { uncertain: true as const } : {}) })
+    } catch (e) {
+      // Each reply's failure is its own (HR1's round 2): kept, the others still sent, the review posted as it was.
+      out.push({ thread, error: (e instanceof Error ? e.message : String(e)).slice(0, 500), ...(asked ? { uncertain: true as const } : {}) })
     } finally {
-      await rm(dir, { recursive: true, force: true }).catch(() => undefined)
+      if (dir) await rm(dir, { recursive: true, force: true }).catch(() => undefined)
     }
   }
   return out

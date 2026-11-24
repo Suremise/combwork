@@ -5,7 +5,7 @@
 
 /** The most of one comment's body kept (characters; the rest cut, marked …). */
 export const FEEDBACK_BODY_MAX = 4000
-/** The most items a pull request's read keeps (the newest), and a fix card carries. */
+/** The most items a pull request's read keeps (the newest by latest activity: a thread's newest reply), and a fix card carries. */
 export const FEEDBACK_MAX_ITEMS = 100
 /** The most replies a thread keeps (the first ones). */
 const REPLIES_MAX = 30
@@ -116,7 +116,10 @@ export function feedbackOf(view: unknown, inline: unknown): FeedbackItem[] {
     root.replies!.push({ login: loginOf(c.user), association: assoc(c.author_association), body, at: str(c.created_at) })
   }
   out.push(...roots.values())
-  return out.sort((a, b) => time(a.at) - time(b.at)).slice(-FEEDBACK_MAX_ITEMS)
+  // Ranked by latest activity (HR1's round 2): a thread by its newest reply kept, so an old thread answered just now is
+  // among the newest; each shows its own time.
+  const active = (i: FeedbackItem): number => Math.max(time(i.at), ...(i.replies ?? []).map((r) => time(r.at)))
+  return out.sort((a, b) => active(a) - active(b)).slice(-FEEDBACK_MAX_ITEMS)
 }
 
 /** A fix card's kept feedback as it is read back (anything damaged dropped): never trusted beyond its shape. */

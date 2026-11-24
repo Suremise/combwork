@@ -209,7 +209,8 @@ describe('a pull request’s comments on its card, and Address feedback (HI-3554
     const asked: string[][] = []
     const run = async (_t: unknown, args: string[]) => {
       asked.push(args)
-      if (args[0] === 'pr') return { ok: true as const, stdout: '', json: { state: 'OPEN', comments: [], reviews: [] } }
+      // With a conversation comment newer than all of them (HR1's round 2: the bound across kinds).
+      if (args[0] === 'pr') return { ok: true as const, stdout: '', json: { state: 'OPEN', comments: [{ id: 'IC_9', author: { login: 'v' }, authorAssociation: 'NONE', body: 'Newest', createdAt: '2026-02-01T00:00:00Z' }], reviews: [] } }
       const one = /\/comments\/(\d+)$/.exec(args[1])
       if (one) return { ok: true as const, stdout: '', json: all[Number(one[1]) - 1] }
       // GitHub's page as asked: newest first only when asked so; its most per page.
@@ -218,9 +219,13 @@ describe('a pull request’s comments on its card, and Address feedback (HI-3554
     }
     const read = await readPrFeedback({ host: 'github.com', owner: 'acme', repo: 'app', number: 7 }, run)
     const ids = 'items' in read ? read.items.map((i) => i.id) : []
-    // The newest comment's thread (t:1, read on its own) with its late reply, and the newest threads up to t:149.
-    expect(ids).toContain('t:149')
-    expect(ids).toContain('t:1')
+    // The newest comment's thread (t:1, read on its own) with its late reply, ranked by that reply, beside the newest
+    // threads and the conversation comment: 100 in all, the oldest activity (t:51) left out.
+    expect(ids).toHaveLength(100)
+    expect(ids.slice(-3)).toEqual(['t:149', 't:1', 'c:IC_9'])
+    expect(ids).not.toContain('t:51')
+    // Shown with its own time, not its reply's.
+    expect('items' in read && read.items.find((i) => i.id === 't:1')?.at).toBe(all[0].created_at)
     expect('items' in read && read.items.find((i) => i.id === 't:1')?.replies?.map((r) => r.body)).toEqual(['c150'])
     expect(asked.map((a) => a[1])).toEqual(['view', `repos/acme/app/pulls/7/comments?sort=created&direction=desc&per_page=${INLINE_MAX}`, 'repos/acme/app/pulls/comments/1'])
   })

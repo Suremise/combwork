@@ -443,4 +443,26 @@ describe('a fix card’s replies in the review threads it addresses (HI-3554, HR
     await expect(postReviewOn(e.wf, one, { row: rows(e, one)[0].draft!.seq }, 'combwork', deps(e, { gh: g4.gh, threads: async () => [11] }))).rejects.toThrow(/already posted/)
     expect(g4.calls).toHaveLength(2)
   })
+
+  it('keeps a posted review posted when a reply throws after an earlier one went: never postable again (HR1’s round 2)', async () => {
+    const e = (env = project('agent'))
+    const card = await reviewed(e)
+    const g = fakeGh()
+    let n = 0
+    const gh = (async (t: GhTarget, a: string[]) => {
+      if (++n === 3) throw new Error('gh vanished')
+      return g.gh(t, a)
+    }) as PostDeps['gh']
+    const row = await postReviewOn(e.wf, card, { row: rows(e, card)[0].draft!.seq }, 'combwork', deps(e, { gh, threads: async () => [11, 15, 16] }))
+    expect(row.state).toBe('posted')
+    expect(row.posted?.url).toBe('https://github.com/acme/app/pull/7#pullrequestreview-1')
+    // 11 replied, 15's call threw (it may have gone: uncertain), 16 still sent.
+    expect(row.posted?.replies).toEqual([
+      { thread: 11, url: 'https://github.com/acme/app/pull/7#pullrequestreview-2' },
+      { thread: 15, error: 'gh vanished', uncertain: true },
+      { thread: 16, url: 'https://github.com/acme/app/pull/7#pullrequestreview-3' }
+    ])
+    await expect(postReviewOn(e.wf, card, { row: rows(e, card)[0].draft!.seq }, 'combwork', deps(e, { gh, threads: async () => [11, 15, 16] }))).rejects.toThrow(/already posted/)
+    expect(n).toBe(4)
+  })
 })
