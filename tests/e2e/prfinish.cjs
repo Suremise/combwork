@@ -93,8 +93,9 @@ const calls = () => fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(B
     check('approved, it is in PR open with its pull request recorded', !!(await until(async () => (await h.kinds(n)).includes('PrOpened') && (await inv('tasks:workBadges')).find((b) => b.card === n)?.stage === 'prOpen', HUNG_MS)), JSON.stringify(await h.kinds(n)))
     check('…gh named the repository on every call, and was given no token', calls().filter((c) => c.args[0] === 'pr').every((c) => c.args.includes('-R') && c.args.includes('github.com/acme/app')) && calls().every((c) => !c.token), JSON.stringify(calls()))
     await q.showBoard(page)
-    const tile = page.locator(`.task-card[data-task="${n}"]`)
+    const tile = page.locator(`.board-column[data-column="prOpen"] .task-card[data-task="${n}"]`)
     const line = tile.locator('.task-pr[data-pr="12"]')
+    check('it is in the PR open column, and only there', !!(await until(async () => (await tile.count()) === 1 && (await page.locator(`.task-card[data-task="${n}"]`).count()) === 1, HUNG_MS)))
     check('its tile shows PR #12 as a link, a draft', !!(await until(async () => (await line.count()) === 1, HUNG_MS)) && /PR #12/.test(await line.innerText()) && /Draft/.test(await line.innerText()), await tile.innerText().catch(() => ''))
     await shoot('3-tile', tile)
 

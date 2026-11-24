@@ -263,6 +263,8 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
   target: '',
   strict: false,
   pushTarget: false,
+  // G23 (HI-3552): a draft by default. In the base so every level can set it (and the form knows where it comes from).
+  prDraft: true,
   followRemote: false,
   // G19 (HI-1997): the branch's own message in every preset, so card titles never reach a history unasked.
   commitMessage: 'branch',

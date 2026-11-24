@@ -885,7 +885,8 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const droppable = (column: BoardColumnId): boolean => {
     // Merging takes no drop (its cards come through the merge queue), and a card in Merging leaves it only by Remove
     // from queue, never by a drag into Approved (#1420).
-    if (column === 'merging' || (column === 'passed' && dragNow.current?.column === 'merging')) return false
+    // HI-3552: PR open the same: its cards come once their pull request opens, and leave by GitHub's merge or close.
+    if (column === 'merging' || column === 'prOpen' || (column === 'passed' && (dragNow.current?.column === 'merging' || dragNow.current?.column === 'prOpen'))) return false
     const d = dropsNow.current
     return !d || d.n !== dragNow.current?.n || !d.columns || d.columns.has(column)
   }
@@ -1027,7 +1028,7 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
     setDrag(null)
     if (!d) return
     // A drop into a stage is its category's move (#1420).
-    const column: TaskColumn = into === 'merging' ? 'passed' : into
+    const column: TaskColumn = into === 'merging' || into === 'prOpen' ? 'passed' : into
     const card = all.find((c) => c.number === d.n)
     if (!card || (card.column === column && d.before === d.n)) return
     // Into Doing from another column: who works on it is asked first, and the card stays put until then (Cancel).
@@ -1065,7 +1066,7 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
     // Merging's cards are the merge queue's: no Archive All there. A column's archives its own stage's cards only, whether
     // or not another stage of its category shows now: a card can move on to Merging while the dialog is open (HR2's
     // #1420 rounds 1 and 2), and main checks each card's stage again.
-    ...(col.id === 'merging' ? [] : [archiveAllItem(all, { column: col.category, stage: col.stage, name: col.name, project, scope, query }, readOnly, stageOf)])
+    ...(col.id === 'merging' || col.id === 'prOpen' ? [] : [archiveAllItem(all, { column: col.category, stage: col.stage, name: col.name, project, scope, query }, readOnly, stageOf)])
   ]
 
   const column = (col: BoardStageColumn) => {

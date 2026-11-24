@@ -45,7 +45,9 @@ export const TEMPLATE_CARRIED = [
   'churnStopAt',
   'assistantWakes',
   'stageNames',
-  'maxAgents'
+  'maxAgents',
+  // HI-3552: a workflow's choice, as its finish is.
+  'prDraft'
 ] as const satisfies readonly OptionKey[]
 
 /**

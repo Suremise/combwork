@@ -1240,7 +1240,7 @@ export interface HiddenProject {
 export type TaskColumn = 'hold' | 'todo' | 'doing' | 'review' | 'passed' | 'done'
 
 /** A column of the board (#1420): a category's, or `merging`, a stage with a column of its own inside Approved. */
-export type BoardColumnId = TaskColumn | 'merging'
+export type BoardColumnId = TaskColumn | 'merging' | 'prOpen'
 
 /** A board as the user left it (a view preference, never in the cards' files): collapsed columns and folded cards. */
 export interface BoardFold {
