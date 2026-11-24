@@ -436,7 +436,7 @@ export const AREAS = [
   // HI-3550: a project's GitHub link and the one gh service (Copilot's sign-in check goes through it too).
   { paths: ['tests/e2e/githublink.cjs', 'src/shared/githubRepo.ts', 'src/main/ghCli.ts', 'src/main/githubLink.ts', 'src/renderer/src/components/GithubLink.tsx'], suites: ['githublink', 'githubhosts'] },
   // HI-3551: a card's GitHub source (the dialog's field; what a PR card does when it starts is the unit tests').
-  { paths: ['tests/e2e/githubsource.cjs', 'src/shared/githubSource.ts', 'src/renderer/src/components/CardSource.tsx', 'src/renderer/src/components/GithubPrs.tsx', 'src/renderer/src/components/CardGithubFeedback.tsx', 'src/main/githubReviews.ts', 'src/shared/githubReviews.ts'], suites: ['githubsource'] },
+  { paths: ['tests/e2e/githubsource.cjs', 'src/shared/githubSource.ts', 'src/renderer/src/components/CardSource.tsx', 'src/renderer/src/components/GithubPrs.tsx', 'src/renderer/src/components/CardGithubFeedback.tsx', 'src/main/githubReviews.ts', 'src/shared/githubReviews.ts', 'src/shared/prAuthorship.ts'], suites: ['githubsource'] },
   { paths: ['tests/e2e/githubhosts.cjs', 'src/shared/githubHost.ts', 'src/main/githubHosts.ts', 'src/main/githubHostChanges.ts', 'src/main/providers/copilot/hosts.ts', 'src/main/providers/copilot/install.ts', 'src/main/providers/copilot/models.ts', 'src/renderer/src/components/GithubHosts.tsx', 'src/shared/githubHostText.ts', 'src/renderer/src/signInHost.ts'], suites: ['githubhosts', 'providers'] },
   { paths: ['src/main/keySteps.ts'], suites: ['codex', 'codex-setup'] },
   { paths: ['src/main/rendererWatch.ts'], suites: ['rendercrash', 'windowhealth'] },
