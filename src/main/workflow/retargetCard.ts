@@ -45,7 +45,7 @@ export const REF_HOLD = { prepareMs: 15_000, closeMs: 5_000 }
 export const moveTestHooks: { checked?: (c: CardMoveCheck) => void | Promise<void> } = {}
 
 /** The stages a card is in flight in (started, not Done): Doing, Review, Passed, Merging. */
-export const IN_FLIGHT_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging']
+export const IN_FLIGHT_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging', 'prOpen']
 
 /** Why a card in flight can't move to another target (said in words where it is shown). */
 export type MoveWhy = 'notStarted' | 'noLine' | 'queued' | 'targetMissing' | 'notInTarget' | 'reviewed' | 'cantCheck' | 'lane' | 'changed' | 'locked'

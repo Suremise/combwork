@@ -2349,7 +2349,7 @@ export async function setReviewSkip(n: number, skip: boolean, actor: TaskActor, 
       if (skip && !rules?.reviews) throw new TaskConflictError(withValues(SKIP.nothing, { card: cardRef(n) }))
       const stage = rules?.stage ?? 'todo'
       if (stage === 'review') throw new TaskConflictError(withValues(SKIP.inReview, { card: cardRef(n) }))
-      if (stage === 'approved' || stage === 'merging' || stage === 'done') throw new TaskConflictError(withValues(SKIP.past, { card: cardRef(n), stage }))
+      if (stage === 'approved' || stage === 'merging' || stage === 'prOpen' || stage === 'done') throw new TaskConflictError(withValues(SKIP.past, { card: cardRef(n), stage }))
       const before = structuredClone(card)
       const how = now.proposed !== null ? (skip ? 'confirmed' : 'kept') : skip ? 'set' : 'removed'
       note(card, actorName(actor), storedText(HISTORY.reviewSkip, { how }))

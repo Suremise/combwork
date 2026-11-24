@@ -24,6 +24,8 @@ interface CombworkMessageValues {
   'workflow.forYou.newDecision': { card: string | number }
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }
+  'workflow.forYou.prOkBefore': { card: string | number }
+  'workflow.forYou.prRetry': { card: string | number; why: string | number }
   'workflow.forYou.queueAdvance': { card: string | number; target: string | number; folder: string | number }
   'workflow.forYou.queueCatchUp': { card: string | number; target: string | number; folder: string | number }
   'workflow.forYou.queuePublish': { card: string | number; result: string | number; endpoint: string | number; target: string | number }
@@ -155,6 +157,7 @@ interface CombworkMessageValues {
   'workflow.group.github': undefined
   'workflow.group.loops': undefined
   'workflow.group.merging': undefined
+  'workflow.group.pullRequests': undefined
   'workflow.group.review': undefined
   'workflow.group.stages': undefined
   'workflow.group.team': undefined
@@ -279,6 +282,8 @@ interface CombworkMessageValues {
   'workflow.option.okBefore.title': undefined
   'workflow.option.otherTargets.desc': undefined
   'workflow.option.otherTargets.title': undefined
+  'workflow.option.prDraft.desc': undefined
+  'workflow.option.prDraft.title': undefined
   'workflow.option.preChecks.desc': undefined
   'workflow.option.preChecks.title': undefined
   'workflow.option.pushTarget.desc': undefined
@@ -309,6 +314,7 @@ interface CombworkMessageValues {
   'workflow.option.style.title': undefined
   'workflow.option.target.desc': undefined
   'workflow.option.target.title': undefined
+  'workflow.prProblem': { problem: string; remote: string | number; owner: string | number; repo: string | number; host: string | number; line: string | number; detail: string | number }
   'workflow.preset.custom': undefined
   'workflow.preset.note.teamFocused': undefined
   'workflow.preset.pair': undefined
@@ -603,6 +609,7 @@ interface CombworkMessageValues {
   'workflow.stage.done': undefined
   'workflow.stage.hold': undefined
   'workflow.stage.merging': undefined
+  'workflow.stage.prOpen': undefined
   'workflow.stage.review': undefined
   'workflow.stage.todo': undefined
   'workflow.stageName.control': { stage: string | number }
@@ -676,6 +683,7 @@ interface CombworkMessageValues {
   'workflow.value.finish.combworkMerges': undefined
   'workflow.value.finish.committed': undefined
   'workflow.value.finish.notChecked': undefined
+  'workflow.value.finish.pullRequest': undefined
   'workflow.value.folder.project': undefined
   'workflow.value.folder.slots': undefined
   'workflow.value.githubFeedback.agent': undefined

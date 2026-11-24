@@ -466,6 +466,8 @@
   "tips.projectTabsKeys.title": "Alt und eine Zahl für jeden Tab",
   "tips.projectTabsSettings.text": "Der letzte Eintrag von „Mehr ▾“ am Ende der Tabs eines Projekts ist „Projekteinstellungen…“, mit seiner Tastenkombination (Alt+0, sofern du sie nicht änderst).",
   "tips.projectTabsSettings.title": "Projekteinstellungen aus „Mehr ▾“",
+  "tips.pullRequestFinish.text": "Stelle „Wer mergt“ unter Versionsverwaltung → Workflow auf „Ein Pull-Request“: Sobald eine Karte genehmigt ist, pusht Combwork sie und öffnet ihren Pull-Request auf GitHub, und die Karte ist erledigt, wenn er dort gemergt wird.",
+  "tips.pullRequestFinish.title": "Karten mit Pull-Requests abschließen",
   "tips.quitWhenDone.text": "Beendest du Combwork, während ein Agent arbeitet, bietet es „Beenden, wenn Agenten fertig sind“ an: Combwork blendet sich aus und beendet sich selbst, sobald sie fertig sind. Unterhaltungen bleiben immer erhalten.",
   "tips.quitWhenDone.title": "Beenden, wenn Agenten fertig sind",
   "tips.recentWorkspaces.text": "Entferne einen Arbeitsbereich aus Datei → Zuletzt geöffnet oder von der Startseite mit seinem ✕ oder per Rechtsklick. „Zuletzt geöffnete leeren“ vergisst alle; Ordner, die nicht mehr da sind, erscheinen als nicht gefunden.",

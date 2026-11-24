@@ -37,7 +37,7 @@ export interface ReconcileHooks {
   unknown?: (what: string) => void
 }
 
-const UNFINISHED = ['active', 'review', 'approved', 'merging']
+const UNFINISHED = ['active', 'review', 'approved', 'merging', 'prOpen']
 /** A shared folder's new commits attributed in one transaction at most (HI-2379): main's thread given back between. */
 export const ATTRIBUTE_BATCH = 100
 

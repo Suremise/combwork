@@ -42,7 +42,7 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   finish: {
     title: msg({ id: 'workflow.option.finish.title', defaultMessage: 'Who merges', description: 'A workflow option (glossary 2.6, G5).' }),
-    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, or whenever it is moved there.', description: 'What the workflow option “Who merges” does (glossary 2.1: merge queue).' }),
+    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, whenever it is moved there, or once its pull request is merged on GitHub.', description: 'What the workflow option “Who merges” does (glossary 2.1: merge queue).' }),
   },
   style: {
     title: msg({ id: 'workflow.option.style.title', defaultMessage: 'Merge style', description: 'A workflow option (glossary 2.6, G6).' }),
@@ -71,6 +71,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   strict: {
     title: msg({ id: 'workflow.option.strict.title', defaultMessage: 'Work is up to date with its target branch before it merges', description: 'A workflow option (glossary 2.6, G8, strict): a card’s work must contain the target branch’s latest commit before it is merged; Combwork’s merge queue brings it up to date itself.' }),
     desc: msg({ id: 'workflow.option.strict.desc', defaultMessage: 'When the target branch has moved on since the review, the merge queue brings the work up to date in its own folder first, and returns the card if that conflicts or makes a different change.', description: 'What the workflow option “Work is up to date with its target branch before it merges” does (glossary 2.1: merge queue; Squash is the merge style’s value).' }),
+  },
+  prDraft: {
+    title: msg({ id: 'workflow.option.prDraft.title', defaultMessage: 'Open pull requests as drafts', description: 'HI-3552: a workflow option (G22), in the GitHub tab, shown when “Who merges” is “A pull request”: the pull request Combwork opens for an approved card is a draft (on, the default) or ready for review (off).' }),
+    desc: msg({ id: 'workflow.option.prDraft.desc', defaultMessage: 'On, each pull request opens as a draft for you to mark ready on GitHub; off, it opens ready for review.', description: 'HI-3552: what the workflow option “Open pull requests as drafts” does. Draft and ready for review are GitHub’s names for a pull request’s two states: use GitHub’s own words in your language where it has them.' })
   },
   pushTarget: {
     title: msg({ id: 'workflow.option.pushTarget.title', defaultMessage: 'Push the target branch after merging', description: 'A workflow option (glossary 2.6, G18): after Combwork’s merge queue merges a card, it pushes the target branch to its remote.' }),
@@ -197,6 +201,7 @@ export const VALUE_TEXT = {
     agentMerges: msg({ id: 'workflow.value.finish.agentMerges', defaultMessage: 'The agent merges, Combwork checks', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     committed: msg({ id: 'workflow.value.finish.committed', defaultMessage: 'Committed is done', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     notChecked: msg({ id: 'workflow.value.finish.notChecked', defaultMessage: 'Not checked', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
+    pullRequest: msg({ id: 'workflow.value.finish.pullRequest', defaultMessage: 'A pull request', description: 'HI-3552: a value of the workflow option “Who merges” (G5): once a card is approved, Combwork pushes its branch and opens a GitHub pull request, and the card is done when it is merged on GitHub.' }),
   },
   style: {
     merge: msg({ id: 'workflow.value.style.merge', defaultMessage: 'Merge commit', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6).' }),
@@ -299,6 +304,7 @@ export const GROUP_TEXT: Record<FormGroupId, Msg> = {
   review: msg({ id: 'workflow.group.review', defaultMessage: 'Review', description: 'A heading of the Version Control tab’s Workflow section: the options about reviewing a card’s work.' }),
   checks: msg({ id: 'workflow.group.checks', defaultMessage: 'Checks', description: 'A heading of the Workflow section: the options about the checks that must pass (glossary 2.3: checks).' }),
   merging: msg({ id: 'workflow.group.merging', defaultMessage: 'Merging', description: 'A heading of the Workflow section (Git): the options about how and where work is merged.' }),
+  pullRequests: msg({ id: 'workflow.group.pullRequests', defaultMessage: 'Pull requests', description: 'HI-3552: a heading of the Workflow section’s GitHub tab: the options about the pull requests Combwork opens.' }),
   where: msg({ id: 'workflow.group.where', defaultMessage: 'Where cards are built', description: 'A heading of the Workflow section (Git): the options about the folders cards are built in and the commits made there (glossary 2.6, G11).' }),
   githubFeedback: msg({ id: 'workflow.group.github', defaultMessage: 'Feedback to GitHub', description: 'A heading of the Workflow section’s GitHub tab (HI-3559): what goes back to a pull request a card was made from.' }),
   work: msg({ id: 'workflow.group.work', defaultMessage: 'The work', description: 'A heading of the Workflow section for a project without version control: what a card’s work is, and when cards start.' }),

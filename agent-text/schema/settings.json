@@ -1217,6 +1217,12 @@
   "settings.advanced.cw.github.ghMinutes.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.github.prFollowMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.github.prFollowMinutes.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.guidance.desc": {
     "placeholders": {}
   },

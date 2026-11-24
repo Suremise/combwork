@@ -91,7 +91,7 @@ const DELETE_WITHIN_MS = 14 * 24 * 60 * 60 * 1000
  */
 export const START_GRACE_MS = 10 * 60 * 1000
 /** Stages in which a started card keeps its slot (put back: Todo; Done: released). On Hold keeps it too. */
-const KEEPS: ReadonlySet<StageId> = new Set<StageId>(['active', 'review', 'approved', 'merging', 'hold'])
+const KEEPS: ReadonlySet<StageId> = new Set<StageId>(['active', 'review', 'approved', 'merging', 'prOpen', 'hold'])
 
 /**
  * Test copies (unpackaged) only: `CW_TEST_SLOT_CRASH=<point>` ends Combwork at once there, no quit handler run, so a suite

@@ -80,6 +80,7 @@ import { startReleaseOffers, stopReleaseOffers } from './workflow/releaseOffer'
 import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
 import { endAllOwnedWork, endOwnedWork, endOwnedWorkNow } from './platform/ownedWork'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
+import { startPrHosts, stopPrHosts } from './workflow/prHosts'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
 import { quitSlotCards, startSlotCards, stopSlotCards } from './slotCards'
@@ -1375,6 +1376,8 @@ app.whenReady().then(async () => {
   WorkspaceService.closingTasks.add((path) => endOwnedWork((owner) => workspaceFor(owner)?.path?.toLowerCase() === path.toLowerCase()))
   // The merge queue (#1348): a host per project and target, started by enqueue actions and as workspaces open.
   startQueueHosts()
+  // HI-3552: the pull request finish's host, started by openPr actions and as workspaces open; its timer reads PR open.
+  startPrHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
   startSlots()
   // Unused Worktrees reads the slots through those pools (#1450, #1519).
@@ -1564,6 +1567,7 @@ app.on('will-quit', () => {
   stopReconciling()
   stopReleaseOffers()
   stopQueueHosts()
+  stopPrHosts()
   stopSlotCards()
   stopLaneBriefs()
   stopSlotMigration()

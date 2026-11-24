@@ -294,6 +294,7 @@ export const SUITES = [
   { name: 'plan', needs: ['claude'], claudeHome: 'own' },
   { name: 'planusage' },
   { name: 'presetstep' },
+  { name: 'prfinish' },
   { name: 'progress', serial: 'window focus' },
   { name: 'progressgates' },
   { name: 'progresslanes' },

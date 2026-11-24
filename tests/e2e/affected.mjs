@@ -437,6 +437,7 @@ export const AREAS = [
   { paths: ['tests/e2e/githublink.cjs', 'src/shared/githubRepo.ts', 'src/main/ghCli.ts', 'src/main/githubLink.ts', 'src/renderer/src/components/GithubLink.tsx'], suites: ['githublink', 'githubhosts'] },
   // HI-3551: a card's GitHub source (the dialog's field; what a PR card does when it starts is the unit tests').
   { paths: ['tests/e2e/githubsource.cjs', 'src/shared/githubSource.ts', 'src/renderer/src/components/CardSource.tsx', 'src/renderer/src/components/GithubPrs.tsx', 'src/renderer/src/components/CardGithubFeedback.tsx', 'src/main/githubReviews.ts', 'src/shared/githubReviews.ts'], suites: ['githubsource'] },
+  { paths: ['tests/e2e/prfinish.cjs', 'src/main/workflow/prHost.ts', 'src/main/workflow/prHosts.ts', 'src/renderer/src/components/CardPullRequest.tsx'], suites: ['prfinish'] },
   { paths: ['tests/e2e/githubhosts.cjs', 'src/shared/githubHost.ts', 'src/main/githubHosts.ts', 'src/main/githubHostChanges.ts', 'src/main/providers/copilot/hosts.ts', 'src/main/providers/copilot/install.ts', 'src/main/providers/copilot/models.ts', 'src/renderer/src/components/GithubHosts.tsx', 'src/shared/githubHostText.ts', 'src/renderer/src/signInHost.ts'], suites: ['githubhosts', 'providers'] },
   { paths: ['src/main/keySteps.ts'], suites: ['codex', 'codex-setup'] },
   { paths: ['src/main/rendererWatch.ts'], suites: ['rendercrash', 'windowhealth'] },
@@ -1156,6 +1157,19 @@ export function unitPicks({ paths, added = [], deleted = [], diffLines = {}, vit
   return new Map([...unit.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
 }
 
+/** An opt-in test file's marker (HI-3558): a line of its own, `// focused: opt-in (why)`. */
+const OPT_IN = /^\/\/ focused: opt-in\b/m
+
+/**
+ * The picked tests less the opt-in unit test files (HI-3558): a file marked OPT_IN (a benchmark that skips without its
+ * setup, such as CW_BOARD_BENCH_DB) skips on every run the queue makes, so a pick naming it would only pause the merge to
+ * ask about a skip by design. read(f): its text or null. { tests, left: the ids left out }.
+ */
+export function withoutOptIn(tests, read) {
+  const left = tests.filter((t) => t.test !== ALL_UNIT && isUnitTestFile(t.test) && OPT_IN.test(read(t.test) ?? '')).map((t) => t.test)
+  return { tests: tests.filter((t) => !left.includes(t.test)), left }
+}
+
 /** The picker's output: one JSON line per test, or {"every":true} alone; nothing for nothing needed. */
 export const pickLines = (picked) => (picked.every ? [JSON.stringify({ every: true })] : picked.tests.map((t) => JSON.stringify(t)))
 
@@ -1253,6 +1267,7 @@ async function pickCli() {
   // skipped (HI-3002).
   const related = narrowRelatedInTree({ cwd, base, paths, related: unchangedSince(cwd, base) ? [] : listVitestRelated(cwd, base) })
   const picked = pickTests({ paths, added, deleted, diffLines, suites, realNames, packagedNames, vitestRelated: related.keep, units })
+  leaveOutOptIn(cwd, picked)
   for (const w of related.why) console.error(w)
   for (const w of picked.why) console.error(w)
   for (const l of pickLines(picked)) console.log(l)
@@ -1279,8 +1294,17 @@ function pickUnitCli(cwd, base, paths) {
   const absent = picked.tests.filter((t) => t.test !== ALL_UNIT && !existsSync(join(cwd, t.test)))
   if (absent.length) picked.tests = picked.tests.filter((t) => !absent.includes(t))
   for (const t of absent) console.error(`${t.test}: not in the checkout, left out`)
+  leaveOutOptIn(cwd, picked)
   for (const w of picked.why) console.error(w)
   for (const l of pickLines(picked)) console.log(l)
+}
+
+/** withoutOptIn on a pick in the checkout (cwd), saying what it left out. */
+function leaveOutOptIn(cwd, picked) {
+  if (picked.every) return
+  const out = withoutOptIn(picked.tests, (f) => (existsSync(join(cwd, f)) ? readFileSync(join(cwd, f), 'utf8') : null))
+  picked.tests = out.tests
+  for (const t of out.left) console.error(`${t}: an opt-in test (its "focused: opt-in" line), skipped without its setup: left out`)
 }
 
 /** What every unit test loads (Vitest's config and setup files): a change to one is every unit test. */

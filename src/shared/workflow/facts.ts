@@ -22,12 +22,12 @@ export const agentActor = (agent: string): Actor => `agent:${agent}`
 export const agentOf = (a: Actor): string | null => (a.startsWith('agent:') ? a.slice(6) : null)
 
 /** Stage ids (§16.5.2). Stable strings; their names are messages, and the user may rename them (OP-30). */
-export type StageId = 'hold' | 'todo' | 'active' | 'review' | 'approved' | 'merging' | 'done'
+export type StageId = 'hold' | 'todo' | 'active' | 'review' | 'approved' | 'merging' | 'prOpen' | 'done'
 
 /** The six fixed categories, by today's column ids (§16.5.1): Active is `doing`, Approved is `passed`. */
 export type Category = 'hold' | 'todo' | 'doing' | 'review' | 'passed' | 'done'
 
-export const STAGE_CATEGORY: Record<StageId, Category> = { hold: 'hold', todo: 'todo', active: 'doing', review: 'review', approved: 'passed', merging: 'passed', done: 'done' }
+export const STAGE_CATEGORY: Record<StageId, Category> = { hold: 'hold', todo: 'todo', active: 'doing', review: 'review', approved: 'passed', merging: 'passed', prOpen: 'passed', done: 'done' }
 
 /** The stage a column stands for, for a card no 1.0 rule has moved yet (its `stage` empty). */
 export const CATEGORY_STAGE: Record<Category, StageId> = { hold: 'hold', todo: 'todo', doing: 'active', review: 'review', passed: 'approved', done: 'done' }
@@ -178,6 +178,12 @@ export const LINE_GATE = 'lineUpdate'
  */
 export const QUEUE_ADVANCE_GATE = 'queueAdvance'
 
+/**
+ * HI-3552: Combwork's question when it couldn't open a card's pull request (or push to it): Approve, it tries again with
+ * a new request; Decline, the card waits in Approved for the user to move it.
+ */
+export const PR_RETRY_GATE = 'prRetry'
+
 /** HI-1697: the merge queue's question before an upgraded project's first merge: its merge style and commit message. */
 export const MERGE_CHOICE_GATE = 'mergeChoice'
 /** HI-1697: the project's board meta recording its answer to that question, first (the file follows: optionsForm.ts). */
@@ -304,8 +310,71 @@ export interface FocusedReturn {
   paths?: string[]
 }
 
+/**
+ * HI-3552: a pull request's finish, asked of Combwork for one approved revision (`PrRequested`): what it pushes (that
+ * exact commit, to `line` on the repository named, never another), and the pull request it opens or found open. The
+ * repository is pinned when asked, so a later change of the project's GitHub link never makes it follow another one.
+ */
+export interface PrRequestData {
+  /** Its id, `<KEY>/pr<seq>`: a retry keeps it; a later cycle's request is a new one. */
+  request: string
+  /** The approved revision pushed, whatever the line holds by then. */
+  revision: string
+  /** Its base branch on GitHub: the card's target. */
+  target: string
+  /** The branch it is pushed to there (the card's line). */
+  line: string
+  host: string
+  owner: string
+  repo: string
+  /** The git remote pushed to, its push address checked against host/owner/repo before each push. */
+  remote: string
+  submission: number
+  /**
+   * When this cycle's first request was made (a retry keeps it): a pull request of this head and base opened since is
+   * this cycle's, found again when a create's reply was lost; one opened before it is an earlier cycle's.
+   */
+  since: string
+}
+
+/** HI-3552: the pull request a request opened, or found already opened for it (`recovered`: its create's reply lost). */
+export interface PrOpenedData {
+  request: string
+  number: number
+  url: string
+  host: string
+  owner: string
+  repo: string
+  head: string
+  base: string
+  /** The commit pushed: the request's revision. */
+  pushed: string
+  draft: boolean
+  recovered?: true
+  /**
+   * A pull request's card (HI-3551): the pull request it is about, followed as it is, with nothing pushed (`pushed`: its
+   * head at the card's start). Pushing its fixes to it is a later card's (the user's split, HI-3552/r12).
+   */
+  notPushed?: true
+}
+
+/** HI-3552: why opening a request's pull request failed this time: the card waits in Approved for Try again. */
+export interface PrOpenFailedData {
+  request: string
+  /** As texts.ts's PR_PROBLEM words each. */
+  problem: 'noLink' | 'pushUrl' | 'push' | 'ghMissing' | 'ghSignedOut' | 'other'
+  /** What gh or git said, its first line (outside text), or null. */
+  detail: string | null
+}
+
 /** The data of each kind (§16.4.2). */
 export interface FactData {
+  /** HI-3552: Combwork asked to push and open the card's pull request (its finish is a pull request). */
+  PrRequested: PrRequestData
+  PrOpened: PrOpenedData
+  PrOpenFailed: PrOpenFailedData
+  /** HI-3552: its pull request closed on GitHub without merging: back to Todo, its branch kept. `by`: unknown is null. */
+  PrClosed: { request: string; number: number; at: string | null; by: string | null }
   Started: StartedData
   Adopted: StartedData
   Submitted: SubmittedData
@@ -417,7 +486,11 @@ export interface FactData {
    * original run, its agent its own).
    */
   FocusedAccepted: { entry: string; revision: string; result: string; test: string; run: string; acceptedBy?: string }
-  Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'combwork' | 'agent' | 'outside'; outsideRules?: string[]; platform?: Record<string, unknown> }
+  /**
+   * HI-3552: `pullRequest` by `github`: merged on GitHub, `result` its merge commit, `revision` the head GitHub merged
+   * (commits pushed from outside included), and `platform` the pull request and the approved revision Combwork pushed.
+   */
+  Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed' | 'pullRequest'; by: 'combwork' | 'agent' | 'outside' | 'github'; outsideRules?: string[]; platform?: Record<string, unknown> }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }
   /**
@@ -593,7 +666,7 @@ export interface AttemptKey {
 }
 
 /** The stages a card is in an attempt in (HI-3194): leaving them for Todo, On Hold or Done ends the attempt. */
-export const ATTEMPT_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging']
+export const ATTEMPT_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging', 'prOpen']
 
 export const sameAttempt = (a: AttemptKey, b: AttemptKey): boolean => a.id === b.id && a.generation === b.generation
 /** Whether attempt key `a` is later than `b`. */
@@ -696,6 +769,16 @@ export interface CardState {
   made: Record<string, Request>
   approvals: FactData['Approval'][]
   entries: QueueEntry[]
+  /**
+   * HI-3552: this cycle's pull request finish: the newest request (a later one replaces it), the pull request it opened
+   * and the last failure since, if any. Null before Combwork is asked to open one, and again in each new cycle.
+   */
+  pullRequest: { requested: PrRequestData & { seq: number }; opened: PrOpenedData | null; failed: PrOpenFailedData | null; closed: FactData['PrClosed'] | null } | null
+  /**
+   * HI-3552: every pull request recorded for the card, over its whole history (kept across cycles): an earlier cycle's,
+   * closed, is never taken for a later request's when its pull request is looked for again (HR1).
+   */
+  prsRecorded: number[]
   integrated: FactData['Integrated'] | null
   accepted: FactData['Accepted'] | null
   /** Rounds: failed verdicts and the user's declines (§16.11.4), over the card's whole history. */
@@ -782,6 +865,8 @@ export const emptyState = (): CardState => ({
   made: {},
   approvals: [],
   entries: [],
+  pullRequest: null,
+  prsRecorded: [],
   integrated: null,
   accepted: null,
   rounds: 0,
@@ -885,7 +970,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4); so do the churn's
         // (HI-3188, §16.11.5), and the churn itself, over the card's whole history.
         const limit = s.requests.filter((r) => PAUSE_GATES.includes(r.gate))
-        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, churn: s.churn, churnStop: s.churnStop, simplifyBase: s.simplifyBase, splitFrom: s.splitFrom, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines, ready: s.ready })
+        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, churn: s.churn, churnStop: s.churnStop, simplifyBase: s.simplifyBase, splitFrom: s.splitFrom, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines, ready: s.ready, prsRecorded: s.prsRecorded })
         s.requests = limit
         for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
@@ -1078,6 +1163,26 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'MergedInPart':
         s.marks.mergedInPart = f.data as FactData['MergedInPart']
         break
+      // HI-3552: a pull request's finish. Each fact counts only for the request it names, the newest.
+      case 'PrRequested':
+        s.pullRequest = { requested: { ...(f.data as PrRequestData), seq: f.seq }, opened: null, failed: null, closed: null }
+        break
+      case 'PrOpened': {
+        const d = f.data as PrOpenedData
+        if (s.pullRequest?.requested.request === d.request) s.pullRequest = { ...s.pullRequest, opened: d, failed: null }
+        if (!s.prsRecorded.includes(d.number)) s.prsRecorded = [...s.prsRecorded, d.number]
+        break
+      }
+      case 'PrOpenFailed': {
+        const d = f.data as PrOpenFailedData
+        if (s.pullRequest?.requested.request === d.request && !s.pullRequest.opened) s.pullRequest = { ...s.pullRequest, failed: d }
+        break
+      }
+      case 'PrClosed': {
+        const d = f.data as FactData['PrClosed']
+        if (s.pullRequest?.requested.request === d.request) s.pullRequest = { ...s.pullRequest, closed: d }
+        break
+      }
       case 'InTarget':
         s.marks.inTarget = f.data as FactData['InTarget']
         break

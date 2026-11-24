@@ -11,7 +11,7 @@
 import { appliesRequest, auditOnly } from '../requestReceipts'
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type StageId, CHURN_GATES, CHURN_LIMIT_GATE, PAUSE_GATES, SIMPLIFY_GATE, churnDue, churnTotal, countsChurn, type PauseChoice } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, PR_RETRY_GATE, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type StageId, CHURN_GATES, CHURN_LIMIT_GATE, PAUSE_GATES, SIMPLIFY_GATE, churnDue, churnTotal, countsChurn, type PauseChoice } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
@@ -367,7 +367,7 @@ export function lineName(projectKey: string, card: Pick<CardRecord, 'key' | 'tit
   return `cw/${projectKey}/${card.key}${slug ? `-${slug}` : ''}`
 }
 
-const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'done']
+const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'prOpen', 'done']
 /**
  * Where file locks were seen (recordLocks, #1481): on that cycle of the agent's current card then, or, when the cards
  * weren't read then (the runtime not made yet this launch), at that time (ISO).
@@ -375,7 +375,7 @@ const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'do
 export type LockSeen = { card: number; cycle: number } | { at: string }
 
 /** The stages in which a card's lock record counts (G16, #1481): started and not finished. */
-const LOCK_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging']
+const LOCK_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging', 'prOpen']
 
 /** A reviewer's intents (§16.7.2): refused outside Review, their next step is the reviewer's (`sideOf`, #1604). */
 const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
@@ -1744,8 +1744,41 @@ export class Workflow {
   }
 
   /** What a finish needs from the platform (gathered before the transaction). */
-  finishInputs(card: CardRecord, s: CardState, r: Ruleset, revision: string | null | undefined): Promise<FinishInputs> {
-    return this.platform(r.options).finishInputs(card, s, r.options, revision)
+  async finishInputs(card: CardRecord, s: CardState, r: Ruleset, revision: string | null | undefined): Promise<FinishInputs> {
+    const fin = await this.platform(r.options).finishInputs(card, s, r.options, revision)
+    // HI-3552: a pull request's finish pins the project's GitHub link as it is now on its request.
+    if (r.options.finish !== 'pullRequest' || card.kind === 'no-code' || s.started?.pr) return fin
+    return { ...fin, github: this.cfg.githubLink ? await this.cfg.githubLink().catch(() => null) : null }
+  }
+
+  /**
+   * HI-3552: a pull request's card (HI-3551) under the pull request finish: it follows the pull request it is about in
+   * PR open, as recorded at its start, with nothing pushed or opened (`notPushed`: pushing its fixes to it is a later
+   * card's, the user's split). Merged there, it is Done; closed, back to Todo.
+   */
+  followExistingPr(w: Write): void {
+    const s = w.state()
+    const pr = s.started?.pr
+    if (!pr || s.pullRequest?.opened) return
+    const request = `${w.card.key}/pr${s.lastSeq + 1}`
+    const revision = s.approved?.revision ?? s.latest?.revision ?? ''
+    w.fact('PrRequested', { request, revision, target: pr.baseRef, line: pr.headRef, host: pr.host, owner: pr.owner, repo: pr.repo, remote: '', submission: s.latest?.id ?? 0, since: s.pullRequest?.requested.since ?? new Date().toISOString() }) // i18n-ignore: a fact's kind and codes, not text
+    w.fact('PrOpened', { request, number: pr.number, url: `https://${pr.host}/${pr.owner}/${pr.repo}/pull/${pr.number}`, host: pr.host, owner: pr.owner, repo: pr.repo, head: pr.headRef, base: pr.baseRef, pushed: pr.headOid, draft: false, notPushed: true }) // i18n-ignore: a fact's kind and codes, not text
+    w.move('prOpen', 'derived')
+  }
+
+  /**
+   * HI-3552: asks Combwork's pull request host (prHost.ts) to push the card's approved revision and open its pull request:
+   * a `PrRequested` pinning that revision, the target, the line and the project's GitHub link as gathered (`fin.github`;
+   * with none, the host says so), and its `openPr` action. The card waits in Approved meanwhile. A retry is a new request
+   * of the same cycle (`since` kept: none opened since); after one was opened (and closed), a new cycle starts its own.
+   */
+  requestPr(w: Write, github: FinishInputs['github']): void {
+    const s = w.state()
+    const request = `${w.card.key}/pr${s.lastSeq + 1}`
+    const link = github ?? null
+    w.fact('PrRequested', { request, revision: s.approved?.revision ?? s.latest?.revision ?? '', target: s.started?.target ?? '', line: s.started?.line ?? '', host: link?.host ?? '', owner: link?.owner ?? '', repo: link?.repo ?? '', remote: link?.remote ?? '', submission: s.latest?.id ?? 0, since: (s.pullRequest && !s.pullRequest.opened ? s.pullRequest.requested.since : null) ?? new Date().toISOString() }) // i18n-ignore: a fact's kind and codes, not text
+    w.action('openPr', { request })
   }
 
   /**
@@ -1896,6 +1929,12 @@ export class Workflow {
     // Passed even where its project's own rules have no such stage (no review, no OK before merging: HR1's round 1).
     if (s.started?.pr) {
       w.move('approved', 'derived')
+      // HI-3552 (the user's split, r12): under the pull request finish it follows its own pull request in PR open, after
+      // the user's OK where G10 asks, its fixes not pushed (a later card's).
+      if (o.finish === 'pullRequest') {
+        if (this.enforced() && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore')) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.prOkBefore, { card: w.card.key }))
+        else this.followExistingPr(w)
+      }
       return
     }
     if (o.finish === 'accept') {
@@ -1932,6 +1971,13 @@ export class Workflow {
           w.fact('Integrated', { revision: s.approved!.revision!, target: s.started!.target ?? '', result: s.approved!.revision!, method: 'committed', by: 'combwork' }) // i18n-ignore: a fact's kind and codes, not text
           w.move('done', 'derived')
         }
+        return
+      case 'pullRequest':
+        // HI-3552: Approved while Combwork pushes it and opens its pull request (with no review too: where a failure
+        // waits), after the user's OK where G10 asks for it, then PR open (prHost.ts).
+        w.move('approved', 'derived')
+        if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.prOkBefore, { card: w.card.key }))
+        else this.requestPr(w, fin.github)
         return
       case 'notChecked':
         // G10 applies here too (decided on #1592): the OK is asked in Approved, and the report of the merge waits for it.
@@ -2562,6 +2608,13 @@ export class Workflow {
         const e = st.entries.find((x) => x.id === req.entry)
         if (e) w.action('enqueue', { target: e.target })
       }
+      if (req.gate === PR_RETRY_GATE) {
+        // HI-3552: Approve tries again, as a new request of this cycle pinned to the link as it is now; Decline leaves the
+        // card waiting in Approved. Its builder hears of it either way.
+        if (answer === 'approved' && st.stage === 'approved' && r.options.finish === 'pullRequest' && !st.pullRequest?.opened) this.requestPr(w, fin.github)
+        this.wake(w, builder, said, 'answer')
+        return null
+      }
       if (req.gate !== 'review' && req.gate !== 'okBefore') {
         // A question an agent asked (or Combwork's own, after a merge): recorded, and the asker told; nothing moves.
         this.wake(w, req.asker ?? builder, said, 'answer')
@@ -2580,6 +2633,8 @@ export class Workflow {
         if (!missing || (missing.missing === 'userOk' && approvedByUser(now, 'review'))) this.finish(w, fin)
       } else if (!missing && st.stage === 'approved') {
         if (r.options.finish === 'combworkMerges') this.enqueue(w)
+        else if (r.options.finish === 'pullRequest' && now.started?.pr) this.followExistingPr(w)
+        else if (r.options.finish === 'pullRequest') this.requestPr(w, fin.github)
         else this.wake(w, builder, stored(W.approvedMerge))
       }
       // Whatever the approval led to (finished, queued, still waiting on another gate), its builder hears of it, once.
@@ -3215,6 +3270,8 @@ export class Workflow {
       let out: GuardRefusal | null
       let startMoved = false
       let releaseMoved = false
+      // HI-3552: moved into Passed under a pull request's finish, its request pins the project's GitHub link as it is now.
+      const prLink = r.options.finish === 'pullRequest' && this.cfg.githubLink ? await this.cfg.githubLink().catch(() => null) : null
       try {
         out = await this.write(card, r, by, (w) => {
           const moved = this.stillAt(w, s0, 'move')
@@ -3251,6 +3308,11 @@ export class Workflow {
           else if (pastReview && ORDER.indexOf(w.current) < ORDER.indexOf(to)) {
             if (to === 'merging' && r.options.finish === 'combworkMerges') this.enqueue(w)
             else w.move(hasStage(r, 'approved') ? 'approved' : to, cause)
+            // HI-3552: the user's move into Passed is their OK: Combwork pushes it and opens its pull request.
+            if (r.options.finish === 'pullRequest' && w.current === 'approved' && !w.state().pullRequest) {
+              if (w.state().started?.pr) this.followExistingPr(w)
+              else this.requestPr(w, prLink)
+            }
           }
           return null
         })
@@ -3679,7 +3741,7 @@ export class Workflow {
   /** A lane's card in flight: started and not Done (Active, Review, Approved or Merging), by the stage the board keeps. */
   private laneCardFlying(n: number): boolean {
     const stage = this.store.card(n).stage
-    return stage === 'active' || stage === 'review' || stage === 'approved' || stage === 'merging'
+    return stage === 'active' || stage === 'review' || stage === 'approved' || stage === 'merging' || stage === 'prOpen'
   }
 
   /**

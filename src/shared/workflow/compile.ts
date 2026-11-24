@@ -61,12 +61,12 @@ export function canonical(v: unknown): string {
  * guards (HI-3284): the merge queue reads them as the options are when it checks.
  */
 export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
-  const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, followRemote: _follow, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, assistantWakes: _assistantWakes, fileLocks: _locks, maxAgents: _max, simplifyAt: _simplify, churnStopAt: _stop, mergeGuards: _guards, githubFeedback: _feedback, githubFooter: _footer, ...rules } = o
+  const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, prDraft: _draft, followRemote: _follow, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, assistantWakes: _assistantWakes, fileLocks: _locks, maxAgents: _max, simplifyAt: _simplify, churnStopAt: _stop, mergeGuards: _guards, githubFeedback: _feedback, githubFooter: _footer, ...rules } = o
   return (reviewerMode === 'pool' ? { ...rules, reviewerMode } : rules) as WorkflowOptions
 }
 
 /** Does any rule need the card's change (so its folder must be clean and its revision ready)? */
-export const needsChange = (o: WorkflowOptions): boolean => deliversCommits(o.platform) && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges')
+export const needsChange = (o: WorkflowOptions): boolean => deliversCommits(o.platform) && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'pullRequest')
 
 /**
  * The stages the options produce (§16.5.2), in board order: Review with any review; Approved when something follows a
@@ -80,11 +80,15 @@ export function producedStages(o: WorkflowOptions): StageId[] {
   // on #1417): where work merges (Git) a merge (Combwork's, the agent's, or one Combwork doesn't check); where it is
   // accepted (None) your OK after the reviewer agent's pass (N1).
   const approves = review || o.okBefore.mode !== 'never'
-  const approved = merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : accepts(o.platform) && o.review === 'agentThenYou'
+  // HI-3552: a pull request's finish always has Approved: where a card waits while its pull request is opened, or after a
+  // failure to open it, review or not.
+  const approved = merging ? (approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked')) || o.finish === 'pullRequest' : accepts(o.platform) && o.review === 'agentThenYou'
   const out: StageId[] = ['hold', 'todo', 'active']
   if (review) out.push('review')
   if (approved) out.push('approved')
   if (merging && o.finish === 'combworkMerges') out.push('merging')
+  // HI-3552: a pull request's finish waits in PR open for GitHub's merge or close.
+  if (merging && o.finish === 'pullRequest') out.push('prOpen')
   out.push('done')
   return out
 }
@@ -105,7 +109,7 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   if (o.stopOwnRuns) g.submit.push('submit.ownRunsStopped')
   // A decision the builder hasn't read holds its submit with any review or a merge step (SPEC §16.5.3, HI-2275): All off
   // and Solo (committed) stay free.
-  if (review || o.finish === 'combworkMerges' || o.finish === 'agentMerges') g.submit.push('submit.decisionsReceived')
+  if (review || o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'pullRequest') g.submit.push('submit.decisionsReceived')
   // The builder's submit after a queue failure holds the same unread decision (HI-2275).
   if (o.finish === 'combworkMerges') g.requeue.push('submit.notDuplicate', 'requeue.allowed', ...(review ? (['integrate.approved'] as const) : []), 'submit.decisionsReceived')
   if (agent) {

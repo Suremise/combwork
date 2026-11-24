@@ -50,7 +50,7 @@ export function reasonArg(v: unknown): string | null {
   return CLEARING_TEXTS.has(s.toLowerCase()) ? null : s
 }
 /** A board column's id (#1420): a category's, or Merging's own. */
-export const isBoardColumn = (v: unknown): v is BoardColumnId => v === 'merging' || isTaskColumn(v)
+export const isBoardColumn = (v: unknown): v is BoardColumnId => v === 'merging' || v === 'prOpen' || isTaskColumn(v)
 
 export const columnLabel = (c: TaskColumn): string => TASK_COLUMNS.find((x) => x.id === c)?.label ?? c
 
@@ -115,7 +115,7 @@ export const COLUMN_IDS: readonly TaskColumn[] = TASK_COLUMNS.map((c) => c.id)
 // agent-protocol: the column ids an error lists as a value ("hold, todo, doing, review, passed or done"); the error's own words are its message's
 export const COLUMN_CHOICES = `${COLUMN_IDS.slice(0, -1).join(', ')} or ${COLUMN_IDS.at(-1)}` // i18n-ignore: the column ids agents' errors list (agent-protocol above)
 /** The board's columns in order: the task columns with Merging after Approved (#1420), as a fold keeps them (#1662). */
-export const BOARD_COLUMN_IDS: readonly BoardColumnId[] = COLUMN_IDS.flatMap((c): BoardColumnId[] => (c === 'passed' ? [c, 'merging'] : [c]))
+export const BOARD_COLUMN_IDS: readonly BoardColumnId[] = COLUMN_IDS.flatMap((c): BoardColumnId[] => (c === 'passed' ? [c, 'merging', 'prOpen'] : [c]))
 
 /** Each column's colour (its heading, and a tint on its cards): grey, slate blue, blue, purple, teal and green. */
 export const DEFAULT_COLUMN_COLORS: Record<TaskColumn, string> = { hold: '#8b8f98', todo: '#7a88b8', doing: '#3b82f6', review: '#a371f7', passed: '#14b8a6', done: '#2ea043' }

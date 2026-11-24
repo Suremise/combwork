@@ -728,6 +728,11 @@
       "column": "select"
     }
   },
+  "tasks.history.prClosed": {
+    "placeholders": {
+      "number": "plain"
+    }
+  },
   "tasks.history.queueGuarded": {
     "placeholders": {
       "count": "plural",

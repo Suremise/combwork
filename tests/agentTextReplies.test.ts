@@ -68,7 +68,7 @@ function replies(): { name: string; text: string }[] {
   add('created bare', R.createdText({ ...change, position: null, project: '', agent: null, changes: [] }))
   add('changed', R.changedText(change))
   add('changed none', R.changedText({ ...change, changes: [], project: '', agent: null }))
-  for (const next of [{ step: 'intents', intents: ['start', 'submit'] }, { step: 'review' }, { step: 'user' }, { step: 'merge' }, { step: 'queue' }, { step: 'done' }] as never[])
+  for (const next of [{ step: 'intents', intents: ['start', 'submit'] }, { step: 'review' }, { step: 'user' }, { step: 'merge' }, { step: 'queue' }, { step: 'pullRequest' }, { step: 'done' }] as never[])
     add(`intent ${JSON.stringify(next)}`, R.intentText({ ok: true, card: 'HI-12', from: 'active', to: 'review', data: { folder: 'x', files: Array.from({ length: 22 }, () => 'greet.js'), base: [] }, next, warnings: ['a warning'], lane: 'lane line' }))
   add('intent still', R.intentText({ ok: true, card: 'HI-12', from: 'review', to: 'review' }))
   add('intent done', R.intentText({ ok: true, card: 'HI-12', from: '', to: '' }))
