@@ -369,6 +369,8 @@
   "main.server.url.userinfo": "Die URL darf keinen Benutzernamen und kein Passwort enthalten: Gib den Schlüssel in seinem eigenen Feld an.",
   "main.slots.detachFailed.message": "{said, select, yes {Git meldet: {error}} other {Git findet {target} nicht.}} Solange das so bleibt, leiht Combwork {slot} keiner anderen Karte. Beseitige in {folder}, was im Weg ist, oder führe dort selbst {command} in PowerShell aus: Combwork versucht es jedes Mal erneut, wenn es seine Slots prüft, und leiht {slot} wieder, sobald es klappt.",
   "main.slots.detachFailed.title": "Combwork kann {slot} nicht zurück auf {target} setzen",
+  "main.slots.leftDirty.message": "{card} wurde {why, select, archived {archiviert} other {ohne Agent zurückgelassen}}, daher hat Combwork seinen Slot freigegeben und seinen Branch behalten. Die Änderungen in {folder} sind nicht auf diesem Branch: Combwork leiht {slot} keiner anderen Karte, bis sie dort committet oder verworfen sind.",
+  "main.slots.leftDirty.title": "{slot} hat Änderungen, die nicht committet sind",
   "main.slots.operation.message": "Combwork kann {slot} keiner anderen Karte leihen, bis es abgeschlossen ist. Schließe es in {folder} ab oder beende es dort mit {command}. Combwork beendet es nie selbst und leiht den Slot wieder, sobald darin nichts mehr läuft.",
   "main.slots.operation.open": "In Änderungen öffnen",
   "main.slots.operation.title": "{slot} hat ein unvollendetes Git-{what}",

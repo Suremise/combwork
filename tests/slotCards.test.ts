@@ -163,6 +163,9 @@ vi.mock('../src/main/slotsApp', async (orig) => ({
   // Its port's preparation keys (HI-3165): none, as Git's.
   poolFor: async () => ({ closed: false, openLeases: () => [], endedSince: () => [], lease: () => null, renames: () => [], ...state.pool })
 }))
+// The window's notices (HI-3556: a freed slot with changes not committed), recorded.
+const told = vi.hoisted(() => [] as { title: string; message: string; id?: string }[])
+vi.mock('../src/main/notify', async (orig) => ({ ...(await orig<object>()), tell: (spec: { title: string; message: string; id?: string }) => (told.push(spec), { id: spec.id ?? 'n', route: 'none' }) }))
 // The repository's lock as it is, each function it runs recorded (HI-3165).
 vi.mock('../src/main/repoLock', async (orig) => {
   const real = await orig<typeof import('../src/main/repoLock')>()
@@ -762,6 +765,67 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: timing('test.ha
     } finally {
       observer.follow([])
     }
+  })
+})
+
+// HI-3556: a held card archived (or left with nobody on it) keeps no slot: the pass ends its lease as a put back card's,
+// naming why, and tells the user when the slot has changes not committed (they stay; the pool lends it to no card).
+describe("an archived card's slot freed by the project's pass (HI-3556)", { timeout: timing('test.hang') }, () => {
+  async function heldInSlot(title: string) {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots' }, { autoRun: false }))
+    state.wf = e.wf
+    const card = e.wf.createCard({ title })
+    const line = lineName('AM', card)
+    const slot = join(tempDir('slot-'), 'slot-a')
+    sh(e.project, 'worktree', 'add', '-q', '-b', line, slot, 'main')
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
+    moved(await e.wf.start(card.key, B1))
+    commit(slot, { 'work.txt': `${title}\n` }, title)
+    moved(await e.wf.move(card.key, 'hold', 'user'))
+    const lease = { id: 'l-1', project: 'project', slot: 'slot-a', kind: 'card', card: card.id, lane: null, agent: 'b1', from: '2026-01-01T00:00:00Z', to: null, why: null, endRev: null }
+    const released: string[] = []
+    state.pool = {
+      openLeases: () => (released.length ? [] : [lease]),
+      slots: () => [{ name: 'slot-a', folder: slot, target: 'main', state: 'lent', op: null, writer: null }],
+      release: async (_id: string, why: string, check?: () => boolean) => (check && !check() ? false : (released.push(why), true))
+    }
+    const ws = { path: e.home, lifetime: { aborted: false }, info: () => ({ projects: [] }), projectConfig: async () => ({ agents: [] }) } as never
+    const board = (sql: string, ...v: (string | number)[]): void => {
+      const db = new DatabaseSync(boardFile(e.home))
+      try {
+        db.prepare(sql).run(...v)
+      } finally {
+        db.close()
+      }
+    }
+    // Its builder's, as the app's start gives it (the harness's runtime start leaves the card's agent alone).
+    board('UPDATE cards SET agent = ? WHERE number = ?', 'b1', card.id)
+    const archive = () => board('UPDATE cards SET archived = 1 WHERE number = ?', card.id)
+    return { e, card, slot, ws, released, archive }
+  }
+
+  it('held, its lease kept; archived, ended as "archived", and with changes not committed the user is told once', async () => {
+    told.length = 0
+    const { e, slot, ws, released, archive } = await heldInSlot('Archived with changes')
+    await settleSlotCards(ws, e.project)
+    expect(released).toEqual([])
+    writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
+    archive()
+    await settleSlotCards(ws, e.project)
+    expect(released).toEqual(['archived'])
+    expect(told).toHaveLength(1)
+    expect(told[0].title).toContain('slot-a')
+    expect(told[0].message).toContain('archived')
+    expect(told[0].message).toContain(slot)
+  })
+
+  it('archived clean: ended, nothing told', async () => {
+    told.length = 0
+    const { e, ws, released, archive } = await heldInSlot('Archived clean')
+    archive()
+    await settleSlotCards(ws, e.project)
+    expect(released).toEqual(['archived'])
+    expect(told).toEqual([])
   })
 })
 

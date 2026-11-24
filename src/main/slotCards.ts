@@ -23,6 +23,8 @@
 // waits.
 
 import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
+import { msg, tr } from '../shared/i18n'
+import { tell } from './notify'
 import { projectAgents } from '../shared/defaults'
 import { cardStartPrompt, type StartTaskMeta } from './cardStartPrompt'
 import { agentWorkflowRole, buildsWork, takesCards } from '../shared/workflow/roles'
@@ -64,7 +66,7 @@ import { getTask } from './tasks'
 import { CombworkError } from './combworkError'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
-import { leaseHoldsIn, withoutWriteFence, type CardRecord } from './workflow/factStore'
+import { cardKeepsSlotIn, leaseHoldsIn, withoutWriteFence, type CardRecord } from './workflow/factStore'
 import type { SlotForStart, Workflow } from './workflow/runtime'
 import { agentRunsGoing, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
@@ -787,13 +789,55 @@ function startedWith(wf: Workflow, l: SlotLease): boolean {
 
 /**
  * Whether a card's current cycle uses a lease of its own (started with it, at a stage that keeps it, and the last card
- * started on it: HI-3353, a lane's lease its lane's end made a card's).
+ * started on it: HI-3353, a lane's lease its lane's end made a card's), while the card can keep a slot (HI-3556: not
+ * archived, and On Hold given to someone; else its lease ends as a put back card's, its line kept).
  */
 export function cardUsesLease(wf: Workflow, l: SlotLease): boolean {
   const card = l.card !== null ? cardOf(wf, l.card) : null
   if (!card) return false
   const s = wf.state(card)
-  return s.started?.lease === l.id && KEEPS.has(s.stage) && lastStartedOn(wf, l.id) === card.id
+  return s.started?.lease === l.id && KEEPS.has(s.stage) && lastStartedOn(wf, l.id) === card.id && keepsSlot(wf, card.id, s.stage)
+}
+
+/** HI-3556: why a card at a stage that keeps a slot keeps none: archived, or given to nobody; null when it keeps it (or can't be read). */
+function leftHow(wf: Workflow, n: number, stage: StageId): 'archived' | 'unassigned' | null {
+  try {
+    return wf.store.isArchived(n) ? 'archived' : wf.store.keepsSlot(n, stage) ? null : 'unassigned'
+  } catch {
+    return null
+  }
+}
+
+/** HI-3556: the warning that a card's slot, freed as it was archived or left with nobody on it, has changes not committed. */
+const LEFT_DIRTY = {
+  title: msg({ id: 'main.slots.leftDirty.title', defaultMessage: "{slot} has changes that aren't committed", description: "HI-3556: a notice's title: a card was archived or taken from its agent, so Combwork freed the slot (a worktree it lends to cards) its builder worked in, and that slot has uncommitted changes. {slot} is the slot's name." }),
+  message: msg({
+    id: 'main.slots.leftDirty.message',
+    defaultMessage: "{card} was {why, select, archived {archived} other {left with nobody on it}}, so Combwork freed its slot and kept its branch. The changes in {folder} aren't on that branch: Combwork lends {slot} to no other card until they're committed or discarded there.",
+    description: "HI-3556: the notice's text below main.slots.leftDirty.title. {card} is the card's key (HI-12), {folder} the slot's folder path, {slot} its name. {why} says what happened to the card: archived, or taken from its agent with nobody given it."
+  })
+}
+
+/**
+ * HI-3556: a card's slot just freed as the card was archived or held with nobody on it (`why`): the user is told when it has
+ * changes that aren't committed (they stay there, and the pool lends the slot to no card until it is clean: slots.ts).
+ */
+async function warnLeftDirty(projectPath: string, pool: SlotPool, wf: Workflow, l: SlotLease, why: 'archived' | 'unassigned'): Promise<void> {
+  const slot = pool.slots().find((s) => s.name === l.slot)
+  if (!slot || l.card === null) return
+  const d = await port().dirty(slot.folder)
+  if (isUnknown(d) || !d.length) return
+  const values = { card: cardOf(wf, l.card)?.key ?? `#${l.card}`, slot: slot.name, folder: slot.folder, why }
+  tell({ kind: 'warning', level: 'warning', title: tr(LEFT_DIRTY.title, values), message: tr(LEFT_DIRTY.message, values), apiTitle: LEFT_DIRTY.title.defaultMessage, projectPath, id: `slot-left:${projectPath}:${slot.name}` })
+}
+
+/** HI-3556: whether a card can keep a slot (FactStore.keepsSlot); one that can't be read does (as cardOf's callers wait). */
+function keepsSlot(wf: Workflow, n: number, stage: StageId): boolean {
+  try {
+    return wf.store.keepsSlot(n, stage)
+  } catch {
+    return true
+  }
 }
 
 /**
@@ -848,7 +892,8 @@ export function laneOverIn(db: DatabaseSync, wf: Workflow, lane: string, lease: 
         throw e
       }
       const s = wf.state(card)
-      if (s.started?.lease === lease && KEEPS.has(s.stage)) cards.push(n)
+      // HI-3556: an archived card, or a held one with nobody on it, keeps no slot.
+      if (s.started?.lease === lease && KEEPS.has(s.stage) && cardKeepsSlotIn(db, n, s.stage)) cards.push(n)
     }
     return { over: true, cards }
   } catch (e) {
@@ -1239,7 +1284,12 @@ async function settleOnce(ws: WorkspaceService, projectPath: string, life: Abort
       // (before the fix, or a race): its slot isn't the card's, so it ends as any lease its card no longer uses.
       const last = lastStartedOn(wf, l.id)
       const movedOn = last !== null && last !== l.card
-      if (await pool.release(l.id, stage === 'done' ? 'done' : movedOn ? 'movedOn' : 'putBack', () => !cardUsesLease(wf, l))) log.info(`#${l.card}'s lease ${l.id} on ${userText(l.slot)} ended (${movedOn ? `#${last} started on it since` : (stage ?? 'gone')})`)
+      // HI-3556: still at a stage that keeps it, but archived, or held with nobody on it.
+      const left = !movedOn && stage !== null && KEEPS.has(stage) ? leftHow(wf, l.card, stage) : null
+      if (await pool.release(l.id, stage === 'done' ? 'done' : movedOn ? 'movedOn' : (left ?? 'putBack'), () => !cardUsesLease(wf, l))) {
+        log.info(`#${l.card}'s lease ${l.id} on ${userText(l.slot)} ended (${movedOn ? `#${last} started on it since` : (left ?? stage ?? 'gone')})`)
+        if (left) await warnLeftDirty(projectPath, pool, wf, l, left)
+      }
     } else if (l.kind === 'lane' && l.lane) {
       const lane = lanes.get(l.lane)
       if (lane && lane.state === 'active') continue

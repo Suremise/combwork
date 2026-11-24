@@ -23,6 +23,11 @@ afterEach(async () => {
   env = null
 })
 
+/** A card given to an agent (or nobody) on the board, as the window's or a tool's change does. */
+function giveTo(e: Env, card: number, agent: string | null): void {
+  workspaceDb(e.home).writer.prepare('UPDATE cards SET agent = ? WHERE number = ?').run(agent, card)
+}
+
 async function lanePool(cap = 1) {
   const e = (env = setup({ ...preset('git', 'pair'), finish: 'agentMerges', preChecks: [], mergeChecks: [], folder: 'slots' as const }, { autoRun: false, enforced: () => enforced }))
   const conn = fileSlotConn(boardFile(e.home))
@@ -211,11 +216,91 @@ describe('a lane over with its card in flight (HI-3118)', { timeout: timing('tes
     const c1 = e.wf.createCard({ title: 'Lane card, held last' })
     const lane = await laneWith([c1.id])
     await startIn(c1, B1, lane.lease.id)
+    // Its builder's, as the app's start gives it (the harness's runtime start leaves the card's agent alone).
+    giveTo(e, c1.id, 'B1')
     moved(await e.wf.move(c1.key, 'hold', 'user'))
     endLane()
     const r = await releaseLane(lane.lease.id)
     expect(r && 'card' in r ? r.card.card : r).toBe(c1.id)
     expect(cardUsesLease(e.wf, store.openLease(lane.slot.name)!)).toBe(true)
+  })
+
+  // HI-3556 (CB3 on CL-357): a held card kept its builder's one slot after the user archived it, or took it from its
+  // agent, so a new lane of that builder's waited for a slot for good.
+  describe('an archived card, or a held one with nobody on it, keeps no slot (HI-3556)', () => {
+    /** A lane card started and held, its lease made its own at the lane's end; B1's next lane refused for it. */
+    const heldWithLease = async () => {
+      const p = await lanePool(1)
+      const { e, store, pool, laneWith, startIn, endLane, releaseLane } = p
+      const c1 = e.wf.createCard({ title: 'Held card' })
+      const lane = await laneWith([c1.id])
+      await startIn(c1, B1, lane.lease.id)
+      giveTo(e, c1.id, 'B1')
+      const work = commit(lane.slot.folder, { 'one.txt': 'one\n' }, 'card 1 work')
+      moved(await e.wf.move(c1.key, 'hold', 'user'))
+      endLane()
+      const r = await releaseLane(lane.lease.id)
+      expect(r && 'card' in r ? r.card.card : r).toBe(c1.id)
+      e.wf.startLane('L2', [e.wf.createCard({ title: 'New lane card' }).id], 'R1')
+      const refused = await pool.lend({ lane: 'L2', agent: 'B1' }, { target: 'main' })
+      expect(!refused.ok && refused.refusal).toMatchObject({ why: 'agentLeased', card: c1.id })
+      return { ...p, c1, lane, work, l: store.openLease(lane.slot.name)! }
+    }
+    /** The release pass's question and release (settleOnce), then B1's new lane lent the slot; the card's line kept. */
+    const freed = async ({ e, pool, l, lane, c1, work }: Awaited<ReturnType<typeof heldWithLease>>) => {
+      expect(cardUsesLease(e.wf, l)).toBe(false)
+      expect(await pool.release(l.id, 'archived', () => !cardUsesLease(e.wf, l))).toBe(true)
+      const again = await pool.lend({ lane: 'L2', agent: 'B1' }, { target: 'main' })
+      expect(again.ok && again.slot.name).toBe(lane.slot.name)
+      expect(sh(e.project, 'rev-parse', e.wf.state(c1.id).started!.line!)).toBe(work)
+    }
+
+    it('archived On Hold: its lease is no longer used, and its builder is lent a new lane\'s slot; its branch stays', async () => {
+      const p = await heldWithLease()
+      expect(cardUsesLease(p.e.wf, p.l)).toBe(true)
+      workspaceDb(p.e.home).writer.prepare('UPDATE cards SET archived = 1 WHERE number = ?').run(p.c1.id)
+      await freed(p)
+    })
+
+    it('held with nobody on it: the same', async () => {
+      const p = await heldWithLease()
+      giveTo(p.e, p.c1.id, null)
+      await freed(p)
+    })
+
+    it('held and given to another agent, it keeps it (HI-3118: its cycle holds it)', async () => {
+      const p = await heldWithLease()
+      giveTo(p.e, p.c1.id, 'B2')
+      expect(cardUsesLease(p.e.wf, p.l)).toBe(true)
+    })
+
+    it('Active with nobody on it, it keeps it (a start by the user may leave nobody on the card); archived, it does not', async () => {
+      const { e, store, laneWith, startIn, endLane, releaseLane } = await lanePool(1)
+      const c1 = e.wf.createCard({ title: 'Active card' })
+      const lane = await laneWith([c1.id])
+      await startIn(c1, B1, lane.lease.id)
+      endLane()
+      const r = await releaseLane(lane.lease.id)
+      expect(r && 'card' in r ? r.card.card : r).toBe(c1.id)
+      const l = store.openLease(lane.slot.name)!
+      expect(cardUsesLease(e.wf, l)).toBe(true)
+      workspaceDb(e.home).writer.prepare('UPDATE cards SET archived = 1 WHERE number = ?').run(c1.id)
+      expect(cardUsesLease(e.wf, l)).toBe(false)
+    })
+
+    it("at the lane's end, an archived card in flight keeps nothing: the lane's lease ends", async () => {
+      const { e, store, laneWith, startIn, endLane, releaseLane } = await lanePool(1)
+      const c1 = e.wf.createCard({ title: 'Lane card' })
+      const lane = await laneWith([c1.id])
+      await startIn(c1, B1, lane.lease.id)
+      giveTo(e, c1.id, 'B1')
+      moved(await e.wf.move(c1.key, 'hold', 'user'))
+      workspaceDb(e.home).writer.prepare('UPDATE cards SET archived = 1 WHERE number = ?').run(c1.id)
+      endLane()
+      const r = await releaseLane(lane.lease.id)
+      expect(r && 'ended' in r ? r.ended : r).toMatchObject({ id: lane.lease.id, why: 'laneEnded' })
+      expect(store.openLease(lane.slot.name)).toBeNull()
+    })
   })
 
   it("a card whose slot's lease Combwork ended can't submit from it, before or after the slot is lent on; the new card can", async () => {
