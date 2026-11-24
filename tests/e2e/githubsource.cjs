@@ -194,8 +194,10 @@ const calls = () => fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(B
     await page.keyboard.press('Escape')
 
     // --- HI-3559: the option in Version Control → Workflow → GitHub.
-    // The board's Workflow link opens alpha's Version Control → Workflow.
-    await page.locator('[data-action="board-workflow"]').click()
+    await page.getByRole('button', { name: 'Projects' }).click()
+    await page.getByText('alpha', { exact: true }).first().click()
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await page.locator('.git-sections [data-section="workflow"]').click()
     const form = page.locator('.workflow-form')
     await lib.workflowTab(form, 'github')
     const group = form.locator('[data-group="github"]')
