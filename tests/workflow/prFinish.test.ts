@@ -12,6 +12,8 @@ import { producedStages } from '../../src/shared/workflow/compile'
 import { PR_RETRY_GATE } from '../../src/shared/workflow/facts'
 import { followPr, openPr, pushesTo, type GhPort, type PrPorts } from '../../src/main/workflow/prHost'
 import { tempDir } from '../tempDir'
+import { intentText } from '../../src/shared/toolReplies'
+import { laneRules } from '../../src/shared/laneBrief'
 import { DatabaseSync } from 'node:sqlite'
 import { boardFile } from '../../src/main/boardStore'
 
@@ -386,6 +388,18 @@ describe('the pull request finish (HI-3552)', () => {
     await followPr(e.wf, card.id, ports)
     expect(e.wf.state(card).stage).toBe('done')
     expect(e.wf.state(card).integrated).toMatchObject({ revision: prHead, result: 'c'.repeat(40), platform: { pr: 7, notPushed: true } })
+  })
+
+  it('tells agents what comes next and what the lane does (fixed notices: no scenario has this finish)', async () => {
+    const e = (env = project())
+    const { ports } = github(e)
+    const { card } = await approved(e)
+    expect(e.wf.nextFor(card.id)).toEqual({ step: 'pullRequest' })
+    await openPr(e.wf, card.id, requestOf(e, card.id), ports)
+    expect(e.wf.nextFor(card.id)).toEqual({ step: 'pullRequest' })
+    const reply = intentText({ ok: true, card: card.key, from: 'approved', to: 'prOpen', next: { step: 'pullRequest' } } as never)
+    expect(reply).toContain('Next: Combwork opens its pull request on GitHub (or follows the one open), and it is done once merged there.')
+    expect(laneRules({ review: 'agent', finish: 'pullRequest', preChecks: [], okBefore: { mode: 'never', labels: [] }, target: 'main' } as never)).toContain('Combwork pushes each approved card and opens its pull request on GitHub; the card is done when it is merged there.')
   })
 
   it('reads a remote’s push addresses as the pinned repository, every one of them', () => {
