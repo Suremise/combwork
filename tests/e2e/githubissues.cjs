@@ -73,11 +73,22 @@ const writes = () => calls().filter((c) => (c.args[0] === 'issue' && !['list', '
   fs.mkdirSync(shots, { recursive: true })
   writeFakeGh()
   lib.gitProject(alpha)
-  const g = (...args) => execFileSync('git', args, { cwd: alpha, env: lib.gitEnv() })
+  const g = (...args) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...args], { cwd: alpha, env: lib.gitEnv() }).toString().trim()
   g('remote', 'add', 'origin', 'https://github.com/acme/app.git')
-  // The release line 1.0.0, tagged v1.0.0 and in main's history: released.
-  g('branch', '1.0.0')
-  g('tag', 'v1.0.0', '1.0.0')
+  // The release line 1.0.0 with #22's and #23's work, tagged v1.0.0 and merged into the main line: released.
+  const mainLine = g('rev-parse', '--abbrev-ref', 'HEAD')
+  g('checkout', '-q', '-b', '1.0.0')
+  const work = (name) => {
+    fs.writeFileSync(path.join(alpha, name), `${name}
+`)
+    g('add', '-A')
+    g('commit', '-qm', name)
+    return g('rev-parse', 'HEAD')
+  }
+  const merged = { 22: work('w22.txt'), 23: work('w23.txt') }
+  g('tag', 'v1.0.0')
+  g('checkout', '-q', mainLine)
+  g('merge', '-q', '--ff-only', '1.0.0')
   const env = lib.withPathFirst({ CW_TEST_GH: path.join(ghDir, 'gh.cmd'), GH_TOKEN: 'ghp_never_given' }, [path.dirname(process.execPath)])
   const h = await lib.launch({ userData, env })
   const { app, page, inv } = h
@@ -94,22 +105,22 @@ const writes = () => calls().filter((c) => (c.args[0] === 'issue' && !['list', '
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
     const ACME = { host: 'github.com', owner: 'acme', repo: 'app' }
-    // #22 and #23 already have cards; #23's and an earlier #21's are Done, integrated into 1.0.0 (their facts written
-    // into the board, as a merge would: no agent runs here).
+    // #22 and #23 already have cards, Done, integrated into 1.0.0 as the commits above (their facts written into the
+    // board, as a merge would: no agent runs here).
     const c22 = (await inv('tasks:fromIssue', 'alpha', 22, ACME, { title: 'Issue #22 by stranger', description: 'Look at it.' })).card.number
     const c23 = (await inv('tasks:fromIssue', 'alpha', 23, ACME, { title: 'Issue #23 by mona', description: 'Fixed.' })).card.number
     const dbFile = path.join(ws, '.combwork', 'combwork.db')
-    const integrate = (n) => {
+    const integrate = (n, result) => {
       const db = new DatabaseSync(dbFile, { timeout: lib.timing('db.busyMs') })
       try {
         const seq = db.prepare('SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM card_facts WHERE card = ?').get(n).n
-        db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, ruleset, dedupe, data) VALUES (?, ?, 'Integrated', ?, 'combwork', 'recorded', NULL, NULL, ?)").run(n, seq, new Date().toISOString(), JSON.stringify({ revision: 'c'.repeat(40), target: '1.0.0', result: 'd'.repeat(40), method: 'merge', by: 'combwork' }))
+        db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, ruleset, dedupe, data) VALUES (?, ?, 'Integrated', ?, 'combwork', 'recorded', NULL, NULL, ?)").run(n, seq, new Date().toISOString(), JSON.stringify({ revision: result, target: '1.0.0', result, method: 'merge', by: 'combwork' }))
       } finally {
         db.close()
       }
     }
-    for (const n of [c22, c23]) {
-      integrate(n)
+    for (const [n, issue] of [[c22, 22], [c23, 23]]) {
+      integrate(n, merged[issue])
       await inv('tasks:move', n, 'done', { confirm: true, reason: 'merged (test)' })
     }
 
@@ -162,7 +173,9 @@ const writes = () => calls().filter((c) => (c.args[0] === 'issue' && !['list', '
     check('…the release a draft: said, and nothing can be closed', (await shipped.locator('[data-shipped-published="no"]').count()) === 1 && (await closeBtn.isDisabled()))
     await shoot('4-draft', shipped)
     // Main refuses it too, whatever the window sends.
-    const refused = await inv('github:closeShippedIssues', alpha, '1.0.0', [22, 23]).then(() => null, (e) => String(e.message ?? e))
+    const shown = await inv('github:shippedIssues', alpha, '1.0.0')
+    const preview = { repo: shown.repo, line: shown.line, tag: shown.tag, commit: shown.commit, issues: shown.issues.map((i) => ({ card: i.card, issue: i.issue })) }
+    const refused = await inv('github:closeShippedIssues', alpha, preview).then(() => null, (e) => String(e.message ?? e))
     check('…and main refuses a close before the release is published, writing nothing', /isn’t published on GitHub yet/.test(refused ?? '') && writes().length === 0, String(refused))
 
     // --- Published: one click closes #22 "Fixed in 1.0.0", #23 left.
