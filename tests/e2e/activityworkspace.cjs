@@ -93,27 +93,45 @@ const AGENTS = [
     const runsMark = async (p, mark) => (await inv('activity:now', p)).launches.flatMap((l) => l.processes).some((x) => (x.command ?? x.label).includes(mark))
     await until(async () => (await runsMark(alpha, 'ALPHAWORK')) && (await runsMark(beta, 'BETAWORK')), HUNG_MS)
 
-    // --- The activity bar's Activity: the tabs grouped by project, hb1 in each, the Assistant its own group.
+    // --- The activity bar's Activity: one strip of every project's agents (HI-3568: no tab groups), each ring named with
+    // its project, hb1 in each and the Assistant's.
     await page.locator('.activity-btn[aria-label="Activity"]').click()
     const view = page.locator('.activity-workspace')
     const head = view.locator('.activity-head')
     const refresh = () => head.getByRole('button', { name: 'Refresh', exact: true }).click()
-    const groups = async () => view.locator('.activity-tab-group').evaluateAll((els) => els.map((g) => `${g.dataset.host}:${[...g.querySelectorAll('.activity-agent-tab')].map((t) => t.dataset.agent).join(',')}`))
+    // The strip's agents by project, in its order: "alpha:hb1" for each project's run of rings.
+    const groups = async () =>
+      view.locator('.activity-map-ring[data-host]:not(.leaving)').evaluateAll((els) => {
+        const out = []
+        for (const e of els) {
+          const last = out.at(-1)
+          if (last && last.host === e.dataset.host) last.ids.push(e.dataset.agentId)
+          else out.push({ host: e.dataset.host, ids: [e.dataset.agentId] })
+        }
+        return out.map((g) => `${g.host}:${g.ids.join(',')}`)
+      })
     const fresh = async (fn) => until(async () => {
       if (await fn()) return true
       await refresh()
       return false
     }, HUNG_MS)
     const assistantName = (await inv('workspace:refresh')).assistant.name
-    check('the workspace level: tabs grouped by project, hb1 in alpha and in beta, the Assistant its own group', !!(await fresh(async () => JSON.stringify(await groups()) === JSON.stringify(['alpha:hb1', 'beta:hb1', `${assistantName}:assistant`]))), JSON.stringify(await groups()))
-    const tabOf = (host, agent) => view.locator(`.activity-agent-tab[data-host="${host}"][data-agent="${agent}"]`)
+    check('the workspace level: one strip, hb1 of alpha and of beta, then the Assistant', !!(await fresh(async () => JSON.stringify(await groups()) === JSON.stringify(['alpha:hb1', 'beta:hb1', `${assistantName}:assistant`]))), JSON.stringify(await groups()))
+    check('…no tab groups, and no tab row (HI-3568)', (await view.locator('.activity-tabs, .activity-tab-group, .activity-agent-tab').count()) === 0)
+    const tabOf = (host, agent) => view.locator(`.activity-map-ring[data-host="${host}"][data-agent-id="${agent}"]`)
     const listText = () => view.locator('.activity-list').innerText().catch(() => '')
+    const rowsText = () => view.locator('.activity-now-row').allInnerTexts()
+    check("…each ring named with its project: alpha's HB1 and beta's HB1 apart", /alpha · HB1/.test(await tabOf('alpha', 'hb1').innerText()) && /beta · HB1/.test(await tabOf('beta', 'hb1').innerText()))
+    if ((await view.locator('.activity-strip-all').getAttribute('aria-pressed')) !== 'true') await view.locator('.activity-strip-all').click()
+    check('nobody picked: a Now row for each agent, named with its project, no agent shown', !!(await until(async () => (await rowsText()).length === 3 && (await rowsText()).some((t) => /alpha · HB1/.test(t)) && (await rowsText()).some((t) => /beta · HB1/.test(t)) && (await rowsText()).some((t) => /Assistant · /.test(t)) && (await view.locator('.activity-part').count()) === 0, HUNG_MS)), JSON.stringify(await rowsText()))
+    await page.mouse.move(5, 5)
+    await shoot('0-workspace-shared-dark')
     await tabOf('beta', 'hb1').click()
-    check("beta's hb1: its own work, never alpha's (the same agent id)", !!(await fresh(async () => /BETAWORK/.test(await listText()) && !/ALPHAWORK/.test(await listText()))) && (await tabOf('beta', 'hb1').getAttribute('aria-selected')) === 'true' && (await tabOf('alpha', 'hb1').getAttribute('aria-selected')) === 'false', await listText())
+    check("beta's hb1: its own work, never alpha's (the same agent id)", !!(await fresh(async () => /BETAWORK/.test(await listText()) && !/ALPHAWORK/.test(await listText()))) && (await tabOf('beta', 'hb1').getAttribute('aria-pressed')) === 'true' && (await tabOf('alpha', 'hb1').getAttribute('aria-pressed')) === 'false', await listText())
     await tabOf('alpha', 'hb1').click()
     check("alpha's hb1: its own", !!(await fresh(async () => /ALPHAWORK/.test(await listText()) && !/BETAWORK/.test(await listText()))), await listText())
     await tabOf(assistantName, 'assistant').click()
-    check("the Assistant's tab: its work under Now", !!(await fresh(async () => (await view.locator('.activity-part').count()) === 1 && (await view.locator('.activity-group[data-group="now"]').count()) === 1)))
+    check("the Assistant picked: its work under Now", !!(await fresh(async () => (await view.locator('.activity-part').count()) === 1 && (await view.locator('.activity-group[data-group="now"]').count()) === 1)))
     check('it opens frozen (Play offered, not pressed)', (await head.locator('.activity-live').getAttribute('aria-pressed')) === 'false')
     await tabOf('beta', 'hb1').click()
     await page.mouse.move(5, 5)

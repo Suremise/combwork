@@ -1,7 +1,7 @@
 {
-  "tips.activityTab.text": "Der Tab „Aktivität“ hat einen Tab pro laufendem Agenten: seine Karte, seinen Durchgang und Tool-Aufruf, seine Hintergrundaufgaben, Subagenten und Prozesse. Er öffnet als Momentaufnahme; „Abspielen“ folgt live. Das Menü ⋯ eines Agenten öffnet ihn für diesen Agenten.",
+  "tips.activityTab.text": "Im Tab „Aktivität“ wählst du in der Leiste unter der Karte einen Agenten für seine Karte, seinen Durchgang und Tool-Aufruf, seine Hintergrundaufgaben, Subagenten und Prozesse; „Alle“ zeigt den aktuellen Schritt jedes Agenten. Er öffnet als Momentaufnahme; „Abspielen“ folgt live. Das Menü ⋯ eines Agenten öffnet ihn für diesen Agenten.",
   "tips.activityTab.title": "Sehen, was jeder Agent ausführt",
-  "tips.activityWorkspace.text": "„Aktivität“ in der Aktivitätsleiste zeigt die laufenden Agenten aller Projekte zusammen, ihre Tabs nach Projekt gruppiert. Eine Karte in Arbeit öffnet sie für die Agenten, die an dieser Karte arbeiten, und ein Lauf oder eine Lane im Fortschrittspanel für ihre Agenten („In Aktivität anzeigen“).",
+  "tips.activityWorkspace.text": "„Aktivität“ in der Aktivitätsleiste zeigt die laufenden Agenten aller Projekte zusammen, in einer Leiste zum Auswählen. Eine Karte in Arbeit öffnet sie für die Agenten, die an dieser Karte arbeiten, und ein Lauf oder eine Lane im Fortschrittspanel für ihre Agenten („In Aktivität anzeigen“).",
   "tips.activityWorkspace.title": "Alles, was läuft, an einem Ort",
   "tips.advancedSettings.text": "Nach dem Update eines Coding-Agenten erkennt Combwork dessen Vertrauensfrage oder Anmeldefehler nicht mehr? Unter Einstellungen → Erweitert stehen die Texte und Felder, nach denen Combwork sucht, und seine Timeouts: Ändere einen Wert (der Standard steht daneben) oder bearbeite advanced.json.",
   "tips.advancedSettings.title": "Eine CLI-Änderung selbst beheben",

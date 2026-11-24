@@ -35,6 +35,7 @@
 
 ### Changed
 
+- **Activity has one agent picker: the strip under the map** (HI-3568). The row of agent tabs across the top is gone, in a project's Activity tab and in Activity across the workspace. Pick an agent in the strip (its ring, its row, or its dot on the map) and both the map and the panel beside it show that agent. **All**, or the picked ring again, or Escape, shows every agent: the shared map, and each agent's current step in a short row you can click. The strip stays with the map's Feed or Context turned off, and above the list with the map off.
 - **The Activity map looks and moves like part of the window** (HI-3479). The map's cells have depth and a warm glow in both themes. Calls travel curved spokes as glowing dots. A station lights up while a call runs there and fills with honey as it gets busier, and small green cells show the programs and subagents running there now. The context ring fills smoothly. Turning off Windows' animations, or the map's motion in Settings → Advanced, still keeps it still.
 - **The installer names the copy that's still running** (HI-3463). When the installer stops because a copy of Combwork, or of its version before 1.1, won't close, its message now says where that copy runs from and its process ID, or, when Windows won't show where it is (another account's copy, for example), says so with its process ID, and how to end it in Task Manager. A copy left running with no window can be closed without restarting the PC.
 

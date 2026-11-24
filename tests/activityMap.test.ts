@@ -5,7 +5,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAP_STATIONS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationLoad, stationOf, stationPanel, PANEL_ROWS, mapCallNode, mapPickNode, mapSessionKey, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapPick, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAP_STATIONS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, pickedAgent, stationLastShown, stationLoad, stationOf, stationPanel, PANEL_ROWS, mapCallNode, mapPickNode, mapSessionKey, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapPick, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
@@ -600,17 +600,21 @@ describe('an agent shown alone from the strip is read (HI-3180, HR1’s round 1)
   })
 })
 
-describe('one shown agent: the map shows the current tab’s alone (HI-3186)', () => {
+describe('one selection: the agent picked in the strip (HI-3568)', () => {
   const two = [{ key: 'mb1' }, { key: 'mr1' }]
-  it('is the tab’s agent, whichever it is, so the tab and the strip mark the same one', () => {
-    expect(shownAlone(true, 'shared', two, 'mb1')).toBe('mb1')
-    expect(shownAlone(true, 'shared', two, 'mr1')).toBe('mr1')
+  it('is the agent kept in the view, whichever it is, so the map and the panel show the same one', () => {
+    expect(pickedAgent('shared', two, 'mb1')).toBe('mb1')
+    expect(pickedAgent('shared', two, 'mr1')).toBe('mr1')
   })
-  it('is none while the whole selection is shown, in one agent’s map, or for a tab the map hasn’t', () => {
-    expect(shownAlone(false, 'shared', two, 'mb1')).toBeNull()
-    expect(shownAlone(true, 'single', two, 'mb1')).toBeNull()
-    expect(shownAlone(true, 'shared', two, null)).toBeNull()
-    expect(shownAlone(true, 'shared', two, 'gone')).toBeNull()
+  it('is none in the shared view: no pick, or one a filter leaves out or that left, never the first in its place', () => {
+    expect(pickedAgent('shared', two, null)).toBeNull()
+    expect(pickedAgent('shared', two, undefined)).toBeNull()
+    expect(pickedAgent('shared', two, 'gone')).toBeNull()
+    expect(pickedAgent('shared', [], 'mb1')).toBeNull()
+  })
+  it('is the one agent of an Agents filter on one, whatever was kept', () => {
+    expect(pickedAgent('single', [{ key: 'mr1' }], 'mb1')).toBe('mr1')
+    expect(pickedAgent('single', [], 'mb1')).toBeNull()
   })
   it('says whether an agent has a running session, for the map’s plain line in place of its graph', () => {
     const m = buildMapModel([agent('mb1'), agent('mr1', { state: 'idle', doing: null, sessionKey: null })], Date.now())
