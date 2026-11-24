@@ -604,7 +604,7 @@ Combwork only ever ends processes the agent's session started: never one you sta
 - **Frozen when it opens**: the view is a snapshot of when you opened it, so nothing moves while you read it. A pill counts what changed since (*12 updates · Refresh*). **Refresh** takes a new snapshot. **Play** follows the agents live (a process that ends fades out); **Pause** freezes it again.
 - **The agent's own processes** (its CLI and Combwork's connection to it) are hidden: tick **Show the agent's own processes** beside **Processes** to see them.
 - When a card's builder and reviewer are both on it, picking either shows both, each under its name.
-- **Hide finished** (on unless you turn it off) hides the agents with nothing running. **Agents ▾** and **Cards ▾** (tick several, or **All**) narrow the strip to those agents, or to the agents working on those cards; with one agent ticked, that agent is the pick. The tab remembers them, and the agent picked, for each project.
+- **Hide finished** (on unless you turn it off) hides the agents with nothing running. **Agents ▾** and **Cards ▾** (tick several, or **All**) narrow the strip to those agents, or to the agents working on those cards; with one agent ticked, that agent is the pick, and choosing again there shows every agent of the selection. The tab remembers them, and the agent picked, for each project.
 
 - Click a row to see its details: its status, its input exactly (a prompt, a tool call's input, a command line, with secrets hidden as in Combwork's log) and what it did last.
 - **Activity** in an agent's **⋯** menu opens the tab on that agent. A card's **Activity** opens Activity across the workspace instead, on the agents working on it (below).

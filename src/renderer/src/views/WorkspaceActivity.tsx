@@ -464,8 +464,9 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
       }),
     [entries, drawn.contexts, readEntries]
   )
-  // The map's sessions, and with no pick the rows' (HI-3568: each agent's Now, the map off too).
-  const mapRead = useMemo(() => (mapOn || !picked ? mapSessions(readEntries, mode) : []), [mapOn, picked, readEntries, mode])
+  const mapRead = useMemo(() => (mapOn ? mapSessions(readEntries, mode) : []), [mapOn, readEntries, mode])
+  // With no pick, the rows' (HI-3568: each agent's Now): the list's own, read as it shows them, the map off too.
+  const rowsRead = useMemo(() => (picked ? [] : mapSessions(readEntries, mode)), [picked, readEntries, mode])
   // The strip's, a dot's or a row's pick (HI-3568): that agent, its map and its details; null, the shared view.
   const pick = useCallback(
     (key: string | null) => {
@@ -484,15 +485,15 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   // Turns for the tab shown (its agent's session and running subagents), and the map's agents' sessions.
   const shownSessions = useMemo(() => {
     const path = current?.host.path
-    const listed = path ? parts.flatMap((p) => [...(p.session ? [{ path, id: p.session.session.id, live: true }] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' && !n.gone ? [{ path, id: n.session.id, live: n.live }] : []))]) : []
+    const listed = [...(path ? parts.flatMap((p) => [...(p.session ? [{ path, id: p.session.session.id, live: true }] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' && !n.gone ? [{ path, id: n.session.id, live: n.live }] : []))]) : []), ...rowsRead]
     const have = new Set(listed.map((x) => sk(x.path, x.id)))
     return [...listed, ...mapRead.filter((x) => !have.has(sk(x.path, x.id)))]
-  }, [parts, current?.host.path, mapRead])
+  }, [parts, current?.host.path, rowsRead, mapRead])
   shownSessionsRef.current = shownSessions
   // Turns read only for the map, dropped once neither it nor the list shows their session (a filter changed, the map off).
   // Which those are is known as it renders, so a read starting or answering after this render is checked against it.
   const listPath = current?.host.path
-  const listedKeys = new Set(listPath ? parts.flatMap((p) => [...(p.session ? [sk(listPath, p.session.session.id)] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' ? [sk(listPath, n.session.id)] : []))]) : [])
+  const listedKeys = new Set([...(listPath ? parts.flatMap((p) => [...(p.session ? [sk(listPath, p.session.session.id)] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' ? [sk(listPath, n.session.id)] : []))]) : []), ...rowsRead.map((x) => sk(x.path, x.id))])
   const mapOnlyNow = new Set(mapRead.map((x) => sk(x.path, x.id)).filter((k) => !listedKeys.has(k)))
   mapOnlyRef.current = mapOnlyNow
   const mapOnlyKey = [...mapOnlyNow].join(',')
@@ -539,7 +540,8 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     }
     const choose = (next: readonly (string | number)[]): void => {
       // Picking agents by hand ends the card's filter.
-      setView(what === 'agents' ? { agents: next as string[], forCard: undefined } : { cards: next as number[] })
+      // The selection chosen again: every agent of it shown again (HI-3180), no pick (HI-3568).
+      setView(what === 'agents' ? { agents: next as string[], forCard: undefined, tab: undefined } : { cards: next as number[] })
       show(next)
     }
     show(what === 'agents' ? (view.agents ?? []) : (view.cards ?? []))

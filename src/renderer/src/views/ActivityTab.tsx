@@ -373,9 +373,10 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   // held ones (from those, what came while frozen was sent as a burst).
   const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at: input.at })
   const strip = useMemo(() => mapStrip(entries, drawn.contexts, readEntries), [entries, drawn.contexts, readEntries])
-  // The sessions the map reads beyond the list's (the shared map's agents' running sessions), and with no pick the rows'
-  // (HI-3568: each agent's Now, the map off too).
-  const mapRead = useMemo(() => (mapOn || !picked ? mapSessions(readEntries, mode) : []), [mapOn, picked, readEntries, mode])
+  // The sessions the map reads beyond the list's (the shared map's agents' running sessions): none with the map off.
+  const mapRead = useMemo(() => (mapOn ? mapSessions(readEntries, mode) : []), [mapOn, readEntries, mode])
+  // With no pick, the rows' (HI-3568: each agent's Now): the list's own, read as it shows them, the map off too.
+  const rowsRead = useMemo(() => (picked ? [] : mapSessions(readEntries, mode)), [picked, readEntries, mode])
   // The strip's, a dot's or a row's pick (HI-3568): that agent, its map and its details; null, the shared view.
   const pick = useCallback(
     (key: string | null) => {
@@ -388,14 +389,14 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   // The turns of each session shown: read once there (the tick reads live ones again: HR6's round 1, a running
   // subagent's too), and the map's.
   const shownSessions = useMemo(() => {
-    const listed = parts.flatMap((p) => [...(p.session ? [{ id: p.session.session.id, live: true }] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' && !n.gone ? [{ id: n.session.id, live: n.live }] : []))])
+    const listed = [...parts.flatMap((p) => [...(p.session ? [{ id: p.session.session.id, live: true }] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' && !n.gone ? [{ id: n.session.id, live: n.live }] : []))]), ...rowsRead.map((x) => ({ id: x.id, live: x.live }))]
     const have = new Set(listed.map((x) => x.id))
     return [...listed, ...mapRead.filter((x) => !have.has(x.id)).map((x) => ({ id: x.id, live: x.live }))]
-  }, [parts, mapRead])
+  }, [parts, rowsRead, mapRead])
   shownSessionsRef.current = shownSessions
   // Turns read only for the map, dropped once neither it nor the list shows their session (a filter changed, the map off).
   // Which those are is known as it renders, so a read starting or answering after this render is checked against it.
-  const listedIds = new Set(parts.flatMap((p) => [...(p.session ? [p.session.session.id] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' ? [n.session.id] : []))]))
+  const listedIds = new Set([...parts.flatMap((p) => [...(p.session ? [p.session.session.id] : []), ...p.subagents.flatMap((n) => (n.kind === 'session' ? [n.session.id] : []))]), ...rowsRead.map((x) => x.id)])
   const mapOnlyNow = new Set(mapRead.map((x) => x.id).filter((id) => !listedIds.has(id)))
   const droppable = useRef(new Set<string>())
   mapOnlyRef.current = mapOnlyNow
@@ -436,7 +437,8 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
       menu.openAt(r.left, r.bottom + 2, items)
     }
     const choose = (next: readonly (string | number)[]): void => {
-      setView(what === 'agents' ? { agents: next as string[] } : { cards: next as number[] })
+      // The selection chosen again (Agents ▾, even the same): every agent of it shown again (HI-3180), no pick (HI-3568).
+      setView(what === 'agents' ? { agents: next as string[], tab: undefined } : { cards: next as number[] })
       show(next)
     }
     show(what === 'agents' ? (view.agents ?? []) : (view.cards ?? []))
