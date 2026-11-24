@@ -202,10 +202,12 @@ const calls = () => fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(B
     await lib.workflowTab(form, 'github')
     const group = form.locator('[data-group="githubFeedback"]')
     check('the GitHub tab has Feedback to GitHub (Both) and the footer’s switch', !!(await until(async () => (await group.locator('.workflow-option[data-option="githubFeedback"] select').inputValue().catch(() => '')) === 'both' && (await group.locator('.workflow-option[data-option="githubFooter"]').count()) === 1, HUNG_MS)), await group.innerText().catch(() => ''))
+    // The earlier refusals' notices dismissed, so the shot shows the group as it is.
+    await until(async () => (await page.locator('.toast').count()) === 0 || void (await page.locator('.toast .icon-btn[aria-label="Dismiss"], .toast button[title="Dismiss"]').first().click({ timeout: 1000 }).catch(() => undefined)), HUNG_MS)
+    await shoot('9-option', group)
     await group.locator('.workflow-option[data-option="githubFeedback"] select').selectOption('user')
     check('…You hides the footer’s switch (it is on agents’ text only)', !!(await until(async () => (await group.locator('.workflow-option[data-option="githubFooter"]').count()) === 0, HUNG_MS)))
     await group.locator('.workflow-option[data-option="githubFeedback"] select').selectOption('both')
-    await shoot('9-option', group)
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
     await page.screenshot({ path: at('failed.png') }).catch(() => {})
