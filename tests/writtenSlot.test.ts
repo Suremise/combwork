@@ -26,9 +26,10 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const { boardFile, boardRead, boardWrite, boardWriteOp } = await import('../src/main/boardStore')
 const { SlotStore, fileSlotConn } = await import('../src/main/slots')
 const { leaseForStart, lendLane } = await import('../src/main/slotCards')
-const { holder, laneEndOf, poolFor } = await import('../src/main/slotsApp')
+const { holder, laneEndOf, laneEndsSettled, poolFor } = await import('../src/main/slotsApp')
 const { sessions } = await import('../src/main/sessions')
 const { tellListeners } = await import('../src/main/events')
+const { config } = await import('../src/main/config')
 const { setAgentBusy } = await import('../src/main/workflow/lineUpdates')
 const tasks = await import('../src/main/tasks')
 const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
@@ -37,6 +38,11 @@ const HUNG_MS = timing('wait.hang')
 const cleanups: (() => Promise<void> | void)[] = []
 afterEach(async () => {
   for (const c of cleanups.splice(0).reverse()) await c()
+  // A lane's gentle end left waiting by a test ends with its workspace: its last log within the test, never after the
+  // file's teardown has begun (HI-3567: Vitest fails the run on a console log still pending then).
+  await laneEndsSettled()
+  // And the settings' pending save (a workspace opened is recorded), written now rather than 300 ms after the file ended.
+  await config.flush()
   running.clear()
 })
 

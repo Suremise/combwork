@@ -533,7 +533,8 @@ at the queue's 2 workers). So a break reached through other modules gets through
 reached the change 4 imports deep) and is left to the release's full passes. A change to Vitest's config or a setup file
 it names is every unit test; so is a pick of over 500 (Combwork's longest list, `FOCUSED_MAX_TESTS`): it answers
 `unit:all`, which `scripts/focusedTests.mjs` runs as one Vitest run of the whole set (failed when a file failed, a file
-that didn't load included). A test it would name that isn't in the checkout is left out, saying so. So is an **opt-in**
+that didn't load included). An unhandled error Vitest attributes to a file (a log or rejection after its tests,
+HI-3567) fails that file alone, naming the error; one it can't put on a file it ran fails every file that passed. A test it would name that isn't in the checkout is left out, saying so. So is an **opt-in**
 test file (HI-3558), one with a line `// focused: opt-in (why)`: a benchmark or trial that skips without its setup
 (`boardBench`, `cardSearchBench`: `CW_BOARD_BENCH_DB`; `workflow/workspaceCopyTrial`: `CW_TRIAL_WS`) would skip at every merge and pause the queue to ask about a skip
 by design. Mark only a file whose every test skips without its opt-in; any other skip still pauses. Measured on 1.7.0's

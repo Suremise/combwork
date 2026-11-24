@@ -74,6 +74,29 @@ describe("each test's result", () => {
     expect(r.get('tests/a.test.ts')).toMatchObject({ result: 'failed', why: expect.stringMatching(/outside the tests/) })
   })
 
+  it('an unhandled error Vitest attributes to a file fails that file alone, the rest keeping their results (HI-3567)', () => {
+    const report = { success: false, testResults: [file('tests/a.test.ts', 'passed', [['one', 'passed']]), file('tests/B.test.ts', 'passed', [['one', 'passed']]), file('tests/c.test.ts', 'skipped', [['one', 'skipped']])] }
+    const ids = ['tests/a.test.ts', 'tests/B.test.ts', 'tests/c.test.ts']
+    const teardown = { file: at('tests/b.test.ts'), name: 'EnvironmentTeardownError', message: '[vitest-worker]: Closing rpc while "onUserConsoleLog" was pending' }
+    const r = unitResults(report, ids, root, [teardown]) as Map<string, Result>
+    expect(Object.fromEntries(r)).toEqual({
+      'tests/a.test.ts': { result: 'passed' },
+      'tests/B.test.ts': { result: 'failed', why: 'an unhandled error while it ran (Vitest attributes it to this file): EnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending' },
+      'tests/c.test.ts': { result: 'skipped', why: 'every test in it was skipped' }
+    })
+    // Vitest's exit (1) no longer fails the rest: the results have a failure to explain it.
+    expect(withExit(r, 1, 'Vitest')).toBe(r)
+    // unit:all names the file.
+    const all = (unitResults(report, [ALL_UNIT], root, [teardown]) as Map<string, Result>).get(ALL_UNIT)
+    expect(all).toEqual({ result: 'failed', why: expect.stringMatching(/^an unhandled error while tests\/b\.test\.ts ran .*EnvironmentTeardownError/) })
+    // One not put on a file it ran (none, an unknown file, or no record of them at all): every passing file fails, as before.
+    for (const unhandled of [[teardown, { file: null, name: 'Error', message: 'x' }], [{ ...teardown, file: at('tests/z.test.ts') }], [], null]) {
+      const u = unitResults(report, ids, root, unhandled) as Map<string, Result>
+      expect([u.get('tests/a.test.ts'), u.get('tests/B.test.ts')], JSON.stringify(unhandled)).toEqual([0, 1].map(() => ({ result: 'failed', why: expect.stringMatching(/outside the tests/) })))
+      expect(u.get('tests/c.test.ts')).toEqual({ result: 'skipped', why: 'every test in it was skipped' })
+    }
+  })
+
   it("every unit test (unit:all, HI-3542): one result from the whole report, failed by a file that didn't load", () => {
     expect(sortIds([ALL_UNIT], { cwd: root, suiteNames })).toMatchObject({ unit: [ALL_UNIT], suites: [], problem: null })
     const all = (testResults: unknown[], success = true) => (unitResults({ success, testResults }, [ALL_UNIT], root) as Map<string, Result>).get(ALL_UNIT)

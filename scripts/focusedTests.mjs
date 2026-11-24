@@ -15,7 +15,7 @@ import { spawn } from 'child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { dirname, join, relative, resolve, isAbsolute } from 'path'
-import { pathToFileURL } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 
 const runContext = createRequire(import.meta.url)('../tests/e2e/runContext.cjs')
 
@@ -63,10 +63,12 @@ const slashes = (p) => p.replace(/\\/g, '/')
 
 /**
  * Each unit test file's result from Vitest's JSON report (null: there is none): a Map id → { result, why? }. A file the
- * report doesn't name is failed; one whose every test was skipped is skipped; a run Vitest says failed outside any file
- * (an unhandled error) fails the files that passed, as it can't say which caused it.
+ * report doesn't name is failed; one whose every test was skipped is skipped. A run Vitest says failed outside any file
+ * (an unhandled error) fails the files Vitest attributes its errors to (HI-3567: `unhandled`, vitestUnhandled.mjs's
+ * rows), the rest keeping their results; when one isn't attributed to a file it ran (or none were given), it fails the
+ * files that passed, as it can't say which caused it.
  */
-export function unitResults(report, ids, cwd) {
+export function unitResults(report, ids, cwd, unhandled = null) {
   const out = new Map()
   if (!report || !Array.isArray(report.testResults)) {
     for (const id of ids) out.set(id, { result: 'failed', why: 'Vitest wrote no report (see its output)' })
@@ -92,9 +94,29 @@ export function unitResults(report, ids, cwd) {
     else out.set(id, { result: 'skipped', why: 'every test in it was skipped' })
   }
   if (report.success === false && ![...out.values()].some((r) => r.result === 'failed')) {
-    for (const [id, r] of out) if (r.result === 'passed') out.set(id, { result: 'failed', why: 'Vitest reported a failure outside the tests (an unhandled error: see its output)' })
+    const blamed = blamedFiles(unhandled, idOf, new Set(report.testResults.map((t) => idOf(t.name))))
+    if (blamed) {
+      const why = (errors) => `an unhandled error while it ran (Vitest attributes it to this file): ${errors.map((e) => `${e.name}: ${e.message}`).join('; ')}`
+      for (const id of ids) if (id !== ALL_UNIT && blamed.has(id.toLowerCase())) out.set(id, { result: 'failed', why: why(blamed.get(id.toLowerCase())) })
+      if (out.has(ALL_UNIT)) out.set(ALL_UNIT, { result: 'failed', why: `an unhandled error while ${[...blamed.keys()].join(', ')} ran (Vitest attributes it to that file): ${[...blamed.values()].flat().map((e) => `${e.name}: ${e.message}`).join('; ')}` })
+    } else for (const [id, r] of out) if (r.result === 'passed') out.set(id, { result: 'failed', why: 'Vitest reported a failure outside the tests (an unhandled error: see its output)' })
   }
   return out
+}
+
+/**
+ * The run's unhandled errors by the file Vitest attributes each to (HI-3567): a Map id → its errors, or null when they
+ * can't all be put on a file it ran (none recorded, one with no file, or a file not in the report).
+ */
+function blamedFiles(unhandled, idOf, ran) {
+  if (!Array.isArray(unhandled) || !unhandled.length) return null
+  const blamed = new Map()
+  for (const e of unhandled) {
+    const id = typeof e?.file === 'string' && e.file ? idOf(e.file) : null
+    if (!id || !ran.has(id)) return null
+    blamed.set(id, [...(blamed.get(id) ?? []), { name: String(e.name ?? 'Error'), message: String(e.message ?? '') }])
+  }
+  return blamed
 }
 
 /**
@@ -181,14 +203,18 @@ async function runUnit(cwd, ids, jobs) {
     // Node runs Vitest's own script (no npx, no shell); the environment is the run context's allowlist, as a test's child.
     // ALL_UNIT: no file named, so Vitest runs its whole set (the files named beside it are in it).
     const files = ids.includes(ALL_UNIT) ? [] : ids
-    const r = await run(process.execPath, [vitest, 'run', `--maxWorkers=${jobs}`, '--reporter=default', '--reporter=json', `--outputFile.json=${report}`, ...files], { cwd, env: runContext.baseEnv() })
-    let parsed = null
-    try {
-      parsed = JSON.parse(readFileSync(report, 'utf8'))
-    } catch {
-      parsed = null
+    // Its unhandled errors, each with the file Vitest attributes it to (HI-3567), by a reporter of this script's own.
+    const unhandledFile = join(dir, 'unhandled.json')
+    const unhandledReporter = join(dirname(fileURLToPath(import.meta.url)), 'vitestUnhandled.mjs')
+    const r = await run(process.execPath, [vitest, 'run', `--maxWorkers=${jobs}`, '--reporter=default', '--reporter=json', `--reporter=${unhandledReporter}`, `--outputFile.json=${report}`, ...files], { cwd, env: { ...runContext.baseEnv(), CW_FOCUSED_UNHANDLED: unhandledFile } })
+    const readJson = (file) => {
+      try {
+        return JSON.parse(readFileSync(file, 'utf8'))
+      } catch {
+        return null
+      }
     }
-    return withExit(unitResults(parsed, ids, cwd), r.code, 'Vitest')
+    return withExit(unitResults(readJson(report), ids, cwd, readJson(unhandledFile)), r.code, 'Vitest')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
