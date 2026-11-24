@@ -12,6 +12,8 @@ import { producedStages } from '../../src/shared/workflow/compile'
 import { PR_RETRY_GATE } from '../../src/shared/workflow/facts'
 import { followPr, openPr, pushesTo, type GhPort, type PrPorts } from '../../src/main/workflow/prHost'
 import { tempDir } from '../tempDir'
+import { DatabaseSync } from 'node:sqlite'
+import { boardFile } from '../../src/main/boardStore'
 
 let env: Env | null = null
 afterEach(() => {
@@ -339,6 +341,9 @@ describe('the pull request finish (HI-3552)', () => {
     let s = e.wf.state(card)
     expect(s.stage).toBe('todo')
     expect(s.pullRequest?.closed).toMatchObject({ number: 12, at: '2026-11-24T10:00:00Z', by: null })
+    // A comment says so on the card, written with the move.
+    const moveBack = e.store.facts(card.id).filter((f) => f.kind === 'Moved').at(-1)!
+    expect(e.store.hasAction(card.id, 'comment', moveBack.seq)).toBe(true)
     expect(sh(e.project, 'rev-parse', '--verify', line)).toBeTruthy()
     // Started again: a new cycle, its old pull request's replies never move it.
     moved(await e.wf.start(card.key, B1))
@@ -347,6 +352,40 @@ describe('the pull request finish (HI-3552)', () => {
     s = e.wf.state(card)
     expect(s.stage).toBe('active')
     expect(s.pullRequest).toBeNull()
+  })
+
+  it('a pull request’s card (HI-3551) follows its own pull request, pushing nothing (the user’s split)', async () => {
+    const e = (env = project())
+    const { bare, gh, ports } = github(e)
+    // GitHub's pull request #7: a branch of its own and refs/pull/7/head on the bare repository.
+    const clone = tempDir('gh-pr-')
+    sh(clone, 'clone', '-q', '-b', 'main', bare, '.')
+    sh(clone, 'switch', '-q', '-c', 'feature')
+    const prHead = commit(clone, { 'pr.txt': 'from the pull request\n' }, 'PR work')
+    sh(clone, 'push', '-q', 'origin', 'HEAD:refs/pull/7/head', 'HEAD:refs/heads/feature')
+    const card = e.wf.createCard({ title: 'PR 7' })
+    const db = new DatabaseSync(boardFile(e.home))
+    try {
+      db.prepare(`UPDATE cards SET extra = json_set(COALESCE(extra, '{}'), '$.source', json(?)) WHERE number = ?`).run(JSON.stringify({ kind: 'pr', host: 'github.com', owner: 'acme', repo: 'app', number: 7, url: 'https://github.com/acme/app/pull/7', title: 't', pr: { headRef: 'feature', baseRef: 'main', crossRepository: false, maintainerCanModify: true } }), card.id)
+    } finally {
+      db.close()
+    }
+    moved(await e.wf.start(card.key, B1))
+    commit(e.wf.state(card).started!.folder, { 'fix.txt': 'a fix\n' }, 'A fix')
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('prOpen')
+    expect(s.pullRequest?.opened).toMatchObject({ number: 7, url: 'https://github.com/acme/app/pull/7', head: 'feature', base: 'main', pushed: prHead, notPushed: true })
+    expect(kinds(e, card.id)).not.toContain('IntegrationRequested')
+    // Nothing pushed, nothing opened: GitHub's branch is as it was.
+    expect(sh(bare, 'rev-parse', 'feature')).toBe(prHead)
+    expect(gh.creates()).toBe(0)
+    gh.prs.push({ number: 7, url: 'https://github.com/acme/app/pull/7', state: 'MERGED', isDraft: false, createdAt: '2026-11-01T00:00:00Z', headRefName: 'feature', baseRefName: 'main', isCrossRepository: false, headRefOid: prHead, mergeCommit: { oid: 'c'.repeat(40) }, closedAt: null, title: 't', body: '' })
+    await followPr(e.wf, card.id, ports)
+    expect(e.wf.state(card).stage).toBe('done')
+    expect(e.wf.state(card).integrated).toMatchObject({ revision: prHead, result: 'c'.repeat(40), platform: { pr: 7, notPushed: true } })
   })
 
   it('reads a remote’s push addresses as the pinned repository, every one of them', () => {

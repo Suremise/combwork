@@ -25,6 +25,7 @@ const T = {
   outside: msg({ id: 'board.pr.outside', defaultMessage: 'Commits were pushed to it outside Combwork: they stay as they are.', description: 'HI-3552: the card dialog’s pull request: its branch on GitHub has commits Combwork didn’t push (someone else’s). Combwork never overwrites them.' }),
   stale: msg({ id: 'board.pr.stale', defaultMessage: 'GitHub didn’t answer just now: this is as last read.', description: 'HI-3552: the card dialog’s pull request: reading it from GitHub failed this time, so what is shown is older (or unknown).' }),
   reading: msg({ id: 'board.pr.reading', defaultMessage: 'Reading it from GitHub…', description: 'HI-3552: the card dialog’s pull request while Combwork asks GitHub for its state.' }),
+  notPushed: msg({ id: 'board.pr.notPushed', defaultMessage: 'Combwork follows this pull request but doesn’t push the card’s fixes to it yet.', description: 'HI-3552: in the card dialog, for a card about an existing GitHub pull request (its GitHub source) waiting in PR open: Combwork follows the pull request to merged or closed, but the fixes made on the card aren’t pushed to it (a later version does that).' }),
   closed: msg({ id: 'board.pr.closed', defaultMessage: 'Its pull request was closed on GitHub without merging; its branch is kept.', description: 'HI-3552: on a card moved back to Todo because its GitHub pull request was closed without being merged. Its branch stays for a later start.' })
 }
 
@@ -108,6 +109,11 @@ export function PrStatus({ card, b }: { card: number; b: WorkBadge | null | unde
       {view?.outside && (
         <div className="s-desc" data-pr-outside>
           {tr(T.outside)}
+        </div>
+      )}
+      {p.notPushed && (
+        <div className="s-desc" data-pr-not-pushed>
+          {tr(T.notPushed)}
         </div>
       )}
       {view?.stale && <div className="s-desc faint">{tr(T.stale)}</div>}

@@ -22,11 +22,17 @@ import { parseGithubRemote } from '../../shared/githubRepo'
 import { PR_RETRY_GATE, type CardState, type PrOpenedData, type PrOpenFailedData, type PrRequestData } from '../../shared/workflow/facts'
 import { FOR_YOU, PR_PROBLEM, workflowText } from '../../shared/workflow/texts'
 import { checksAtRevision, type Workflow } from './runtime'
+import { agentMsg, say } from '../../shared/agentText'
+import { inDefaultDialect } from '../../shared/agentText/asyncScope'
+import { HISTORY, storedText } from '../../shared/taskHistory'
 import type { PrView } from '../../shared/githubSource'
 
 export type { PrView }
 
 const log = createLogger('workflow')
+
+/** The card's comment when its pull request closed without merging (HI-3552), as agents read it. */
+const CLOSED = agentMsg({ id: 'runtime.pr.closed', text: 'Pull request #{number} was closed on GitHub without being merged: the card is back in Todo, its branch kept for its next start.', note: 'HI-3552: the comment on a card whose GitHub pull request was closed without merging. A statement of fact.' })
 
 /** What runs gh: `gh` in the app, a stand-in in tests. */
 export type GhPort = (target: GhTarget, args: string[], opts?: { json?: boolean; input?: string }) => Promise<GhResult>
@@ -237,11 +243,12 @@ async function following(wf: Workflow, cardId: number, run: GhPort): Promise<PrV
     if (now.stage !== 'prOpen' || now.pullRequest?.opened?.request !== p.request) return
     if (state === 'merged') {
       // What GitHub merged (its head, outside commits and all) and its merge commit; what Combwork pushed beside it.
-      w.fact('Integrated', { revision: v.headRefOid || p.pushed, target: p.base, result: v.mergeCommit?.oid ?? v.headRefOid ?? p.pushed, method: 'pullRequest', by: 'github', platform: { pr: p.number, url: p.url, pushed: p.pushed } }) // i18n-ignore: a fact's kind and codes, not text
+      w.fact('Integrated', { revision: v.headRefOid || p.pushed, target: p.base, result: v.mergeCommit?.oid ?? v.headRefOid ?? p.pushed, method: 'pullRequest', by: 'github', platform: { pr: p.number, url: p.url, ...(p.notPushed ? { notPushed: true } : { pushed: p.pushed }) } }) // i18n-ignore: a fact's kind and codes, not text
       w.move('done', 'derived')
     } else {
       w.fact('PrClosed', { request: p.request, number: p.number, at: v.closedAt, by: null }) // i18n-ignore: a fact's kind, not text
       w.move('todo', 'derived')
+      w.action('comment', { text: inDefaultDialect(() => say(CLOSED, { number: p.number })), shown: storedText(HISTORY.prClosed, { number: p.number }) })
     }
   })
   return view

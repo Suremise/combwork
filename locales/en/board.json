@@ -2627,6 +2627,10 @@
     "defaultMessage": "No checks",
     "description": "HI-3552: the card dialog’s pull request: GitHub runs no checks on it."
   },
+  "board.pr.notPushed": {
+    "defaultMessage": "Combwork follows this pull request but doesn’t push the card’s fixes to it yet.",
+    "description": "HI-3552: in the card dialog, for a card about an existing GitHub pull request (its GitHub source) waiting in PR open: Combwork follows the pull request to merged or closed, but the fixes made on the card aren’t pushed to it (a later version does that)."
+  },
   "board.pr.number": {
     "defaultMessage": "PR #{number}",
     "description": "HI-3552: on a card in PR open (board tile and dialog): its GitHub pull request’s number, a link to it. PR is short for pull request."

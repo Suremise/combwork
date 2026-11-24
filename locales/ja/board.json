@@ -655,6 +655,7 @@
   "board.pr.failed": "プルリクエストは開かれていません：「要対応」を確認してください",
   "board.pr.heading": "プルリクエスト",
   "board.pr.noChecks": "チェックなし",
+  "board.pr.notPushed": "Combwork はこのプルリクエストを追跡しますが、カードの修正はまだプッシュしません。",
   "board.pr.number": "PR #{number}",
   "board.pr.open": "GitHub で開く",
   "board.pr.opening": "プルリクエストを開いています…",

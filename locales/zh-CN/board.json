@@ -655,6 +655,7 @@
   "board.pr.failed": "拉取请求未打开：请查看“待你处理”",
   "board.pr.heading": "拉取请求",
   "board.pr.noChecks": "无检查",
+  "board.pr.notPushed": "Combwork 会跟踪此拉取请求，但尚不会把卡片的修复推送到其中。",
   "board.pr.number": "PR #{number}",
   "board.pr.open": "在 GitHub 上打开",
   "board.pr.opening": "正在打开其拉取请求…",

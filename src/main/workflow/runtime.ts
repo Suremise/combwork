@@ -1732,6 +1732,22 @@ export class Workflow {
   }
 
   /**
+   * HI-3552: a pull request's card (HI-3551) under the pull request finish: it follows the pull request it is about in
+   * PR open, as recorded at its start, with nothing pushed or opened (`notPushed`: pushing its fixes to it is a later
+   * card's, the user's split). Merged there, it is Done; closed, back to Todo.
+   */
+  followExistingPr(w: Write): void {
+    const s = w.state()
+    const pr = s.started?.pr
+    if (!pr || s.pullRequest?.opened) return
+    const request = `${w.card.key}/pr${s.lastSeq + 1}`
+    const revision = s.approved?.revision ?? s.latest?.revision ?? ''
+    w.fact('PrRequested', { request, revision, target: pr.baseRef, line: pr.headRef, host: pr.host, owner: pr.owner, repo: pr.repo, remote: '', submission: s.latest?.id ?? 0, since: s.pullRequest?.requested.since ?? new Date().toISOString() }) // i18n-ignore: a fact's kind and codes, not text
+    w.fact('PrOpened', { request, number: pr.number, url: `https://${pr.host}/${pr.owner}/${pr.repo}/pull/${pr.number}`, host: pr.host, owner: pr.owner, repo: pr.repo, head: pr.headRef, base: pr.baseRef, pushed: pr.headOid, draft: false, notPushed: true }) // i18n-ignore: a fact's kind and codes, not text
+    w.move('prOpen', 'derived')
+  }
+
+  /**
    * HI-3552: asks Combwork's pull request host (prHost.ts) to push the card's approved revision and open its pull request:
    * a `PrRequested` pinning that revision, the target, the line and the project's GitHub link as gathered (`fin.github`;
    * with none, the host says so), and its `openPr` action. The card waits in Approved meanwhile. A retry is a new request
@@ -1893,6 +1909,12 @@ export class Workflow {
     // Passed even where its project's own rules have no such stage (no review, no OK before merging: HR1's round 1).
     if (s.started?.pr) {
       w.move('approved', 'derived')
+      // HI-3552 (the user's split, r12): under the pull request finish it follows its own pull request in PR open, after
+      // the user's OK where G10 asks, its fixes not pushed (a later card's).
+      if (o.finish === 'pullRequest') {
+        if (this.enforced() && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore')) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.prOkBefore, { card: w.card.key }))
+        else this.followExistingPr(w)
+      }
       return
     }
     if (o.finish === 'accept') {
@@ -2583,7 +2605,7 @@ export class Workflow {
         if (!missing || (missing.missing === 'userOk' && approvedByUser(now, 'review'))) this.finish(w, fin)
       } else if (!missing && st.stage === 'approved') {
         if (r.options.finish === 'combworkMerges') this.enqueue(w)
-        else if (r.options.finish === 'pullRequest' && !now.started?.pr) this.requestPr(w, fin.github)
+        else if (r.options.finish === 'pullRequest') now.started?.pr ? this.followExistingPr(w) : this.requestPr(w, fin.github)
         else this.wake(w, builder, stored(W.approvedMerge))
       }
       // Whatever the approval led to (finished, queued, still waiting on another gate), its builder hears of it, once.
@@ -3258,7 +3280,7 @@ export class Workflow {
             if (to === 'merging' && r.options.finish === 'combworkMerges') this.enqueue(w)
             else w.move(hasStage(r, 'approved') ? 'approved' : to, cause)
             // HI-3552: the user's move into Passed is their OK: Combwork pushes it and opens its pull request.
-            if (r.options.finish === 'pullRequest' && w.current === 'approved' && !w.state().started?.pr && !w.state().pullRequest) this.requestPr(w, prLink)
+            if (r.options.finish === 'pullRequest' && w.current === 'approved' && !w.state().pullRequest) w.state().started?.pr ? this.followExistingPr(w) : this.requestPr(w, prLink)
           }
           return null
         })

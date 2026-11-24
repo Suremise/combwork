@@ -351,6 +351,11 @@ export interface PrOpenedData {
   pushed: string
   draft: boolean
   recovered?: true
+  /**
+   * A pull request's card (HI-3551): the pull request it is about, followed as it is, with nothing pushed (`pushed`: its
+   * head at the card's start). Pushing its fixes to it is a later card's (the user's split, HI-3552/r12).
+   */
+  notPushed?: true
 }
 
 /** HI-3552: why opening a request's pull request failed this time: the card waits in Approved for Try again. */

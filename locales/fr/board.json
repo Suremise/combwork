@@ -655,6 +655,7 @@
   "board.pr.failed": "Pull request non ouverte : voir Pour toi",
   "board.pr.heading": "Pull request",
   "board.pr.noChecks": "Aucune vérification",
+  "board.pr.notPushed": "Combwork suit cette pull request, mais n’y pousse pas encore les corrections de la carte.",
   "board.pr.number": "PR #{number}",
   "board.pr.open": "Ouvrir sur GitHub",
   "board.pr.opening": "Ouverture de sa pull request…",
