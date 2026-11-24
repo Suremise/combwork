@@ -1,7 +1,7 @@
 {
-  "tips.activityTab.text": "L’onglet Activité a un onglet par agent en cours : sa carte, son tour et son appel d’outil, ses tâches en arrière-plan, sous-agents et processus. Il s’ouvre comme un instantané ; Lecture le suit en direct. Le menu ⋯ d’un agent l’ouvre sur cet agent.",
+  "tips.activityTab.text": "Dans l’onglet Activité, choisis un agent dans le bandeau sous la carte pour voir sa carte, son tour et son appel d’outil, ses tâches en arrière-plan, sous-agents et processus ; Tous montre l’étape en cours de chaque agent. Il s’ouvre comme un instantané ; Lecture le suit en direct. Le menu ⋯ d’un agent l’ouvre sur cet agent.",
   "tips.activityTab.title": "Voir ce que chaque agent exécute",
-  "tips.activityWorkspace.text": "Activité, dans la barre d’activité, montre ensemble les agents en cours de chaque projet, leurs onglets groupés par projet. Une carte en cours l’ouvre sur les agents qui travaillent sur cette carte, et une exécution ou un couloir du panneau Progression sur ses agents (Afficher dans Activité).",
+  "tips.activityWorkspace.text": "Activité, dans la barre d’activité, montre ensemble les agents en cours de chaque projet, dans un bandeau où en choisir un. Une carte en cours l’ouvre sur les agents qui travaillent sur cette carte, et une exécution ou un couloir du panneau Progression sur ses agents (Afficher dans Activité).",
   "tips.activityWorkspace.title": "Tout ce qui s’exécute, au même endroit",
   "tips.advancedSettings.text": "Après une mise à jour d’un agent de code, Combwork ne voit plus sa question de confiance ou ses erreurs de connexion ? Paramètres → Avancé contient les textes et les champs que Combwork recherche, et ses délais : modifie-en un, avec la valeur par défaut à côté, ou édite advanced.json.",
   "tips.advancedSettings.title": "Corriger toi-même un changement de CLI",

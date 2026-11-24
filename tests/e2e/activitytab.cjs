@@ -99,22 +99,38 @@ function transcript(sid, startMin) {
     const commandRuns = async () => (await inv('activity:now', alpha)).launches.flatMap((l) => l.processes).some((p) => /setTimeout/.test(p.command ?? p.label))
     await lib.until(commandRuns, HUNG_MS, 250)
 
-    // --- The tab: HB1's tab only (the others have nothing running), its card in progress and what runs in it.
+    // --- The tab: HB1 alone in the strip (the others have nothing running), its card in progress and what runs in it.
     await page.locator('.tab', { hasText: 'Activity' }).click()
     const head = page.locator('.activity-head')
     const node = (kind, text) => page.locator(`.activity-row.act-${kind}`, text ? { hasText: text } : {})
-    const tabsShown = async () => page.locator('.activity-agent-tab').evaluateAll((els) => els.map((e) => e.dataset.agent))
+    // The strip (HI-3568): the one picker, All then a ring per agent; no row of agent tabs above.
+    const projectTab = '.activity-tab:not(.activity-workspace)'
+    const ring = (id) => page.locator(`${projectTab} .activity-map-ring[data-agent="${id}"]`)
+    const allEntry = page.locator(`${projectTab} .activity-strip-all`)
+    const tabsShown = async () => page.locator(`${projectTab} .activity-map-ring[data-agent]:not(.leaving)`).evaluateAll((els) => els.map((e) => e.dataset.agent))
+    const pressed = async () => page.locator(`${projectTab} .activity-map-strip button[aria-pressed="true"]`).evaluateAll((els) => els.map((e) => e.dataset.agent ?? 'all'))
+    // Picks an agent in the strip, unless it is picked already (a click on the picked one shows every agent again).
+    const pickAgent = async (id) => {
+      if ((await ring(id).getAttribute('aria-pressed').catch(() => null)) !== 'true') await ring(id).click()
+      await lib.until(async () => (await ring(id).getAttribute('aria-pressed').catch(() => null)) === 'true', HUNG_MS, 100)
+    }
     const refresh = () => head.getByRole('button', { name: 'Refresh', exact: true }).click()
     const list = page.locator('.activity-list')
+    const nowRow = (id) => page.locator(`${projectTab} .activity-now-row[data-agent="${id}"]`)
+    check('no row of agent tabs above (HI-3568)', !!(await lib.until(async () => (await ring('hb1').count()) === 1, HUNG_MS, 250)) && (await page.locator('.activity-tabs, .activity-agent-tab, .activity-tab-group').count()) === 0)
+    check('the shared view picks nobody: All pressed, no ring', JSON.stringify(await pressed()) === '["all"]', JSON.stringify(await pressed()))
+    check("…and the panel has each agent's Now in a row: HB1's, its state mark, its card's key and its current step", !!(await lib.until(async () => (await nowRow('hb1').count()) === 1 && /\w+-\d+/.test(await nowRow('hb1').innerText()) && !/Not running/.test(await nowRow('hb1').innerText()), HUNG_MS, 250)) && (await nowRow('hb1').locator('.state-mark').count()) === 1 && (await page.locator(`${projectTab} .activity-map`).getAttribute('data-mode')) === 'shared', await nowRow('hb1').innerText().catch(() => ''))
+    await page.mouse.move(5, 5)
+    await shoot('0-shared-rows-dark')
+    await nowRow('hb1').click()
+    check("a row's click picks its agent: its ring pressed (All not), its map alone, its work in the panel", !!(await lib.until(async () => JSON.stringify(await pressed()) === '["hb1"]' && (await page.locator(`${projectTab} .activity-map`).getAttribute('data-mode')) === 'single' && (await nowRow('hb1').count()) === 0, HUNG_MS, 250)), JSON.stringify(await pressed()))
     // The snapshot is of the tab's opening: refreshed (as a user would) until it has the command.
     check('the tab opens with what runs: the command among the processes', !!(await lib.until(async () => {
       if ((await node('process', 'setTimeout').count()) > 0) return true
       await refresh()
       return false
     }, HUNG_MS, 500)))
-    check('a tab per agent with something running: HB1 only (Hide finished, on by default)', JSON.stringify(await tabsShown()) === '["hb1"]', JSON.stringify(await tabsShown()))
-    const hb1Tab = page.locator('.activity-agent-tab[data-agent="hb1"]')
-    check("…with its state mark and its card's key", (await hb1Tab.locator('.state-mark').count()) === 1 && /\w+-\d+/.test(await hb1Tab.innerText()), await hb1Tab.innerText())
+    check('a ring per agent with something running: HB1 only (Hide finished, on by default)', JSON.stringify(await tabsShown()) === '["hb1"]', JSON.stringify(await tabsShown()))
     const cardHead = page.locator('.activity-card-head')
     check('its card in progress is the header, a link to it; no card or agent rows', /Card one/.test(await cardHead.innerText()) && (await cardHead.locator('.activity-card-key').count()) === 1 && (await page.locator('.activity-row.act-card, .activity-row.act-agent').count()) === 0, await cardHead.innerText())
     const groups = async () => page.locator('.activity-group').evaluateAll((els) => els.map((e) => e.dataset.group))
@@ -201,13 +217,12 @@ function transcript(sid, startMin) {
     await inv('session:start', alpha, { agentId: 'hb2' })
     await lib.until(async () => ['ready', 'finished'].includes((await liveOf('hb2'))?.status), HUNG_MS)
     await lib.sendPrompt(inv, lib.ptyKey(alpha, 'hb2'), 'work 60', { submitted: async () => (await liveOf('hb2'))?.status === 'working' })
-    const hb2Tab = page.locator('.activity-agent-tab[data-agent="hb2"]')
-    check("a running agent's tab comes with a new snapshot", !!(await lib.until(async () => {
-      if ((await hb2Tab.count()) === 1) return true
+    check("a running agent's ring comes with a new snapshot", !!(await lib.until(async () => {
+      if ((await ring('hb2').count()) === 1) return true
       await refresh()
       return false
     }, HUNG_MS, 500)))
-    await hb2Tab.click()
+    await pickAgent('hb2')
     check('…a solo agent: its session as the header, no card; working with no tool call: Thinking…', !!(await lib.until(async () => {
       if ((await page.locator('[data-doing="thinking"]').count()) === 1 && !/Card one/.test(await cardHead.innerText().catch(() => ''))) return true
       await refresh()
@@ -216,10 +231,10 @@ function transcript(sid, startMin) {
     await page.mouse.move(5, 5)
     await shoot('3-solo-dark')
 
-    // --- Hide finished off: every agent has a tab; one not running says so.
+    // --- Hide finished off: every agent has a ring; one not running says so.
     await head.locator('.activity-hide input').uncheck()
-    check('Hide finished off: a tab for every agent, in pane order', !!(await lib.until(async () => JSON.stringify(await tabsShown()) === JSON.stringify(AGENTS.map((a) => a.id)), HUNG_MS, 250)), JSON.stringify(await tabsShown()))
-    await page.locator('.activity-agent-tab[data-agent="hr3"]').click()
+    check('Hide finished off: a ring for every agent, in pane order', !!(await lib.until(async () => JSON.stringify(await tabsShown()) === JSON.stringify(AGENTS.map((a) => a.id)), HUNG_MS, 250)), JSON.stringify(await tabsShown()))
+    await pickAgent('hr3')
     check('…an agent not running: Not running', !!(await lib.until(async () => /Not running/.test(await list.innerText().catch(() => '')), HUNG_MS, 250)), await list.innerText().catch(() => ''))
     await page.mouse.move(5, 5)
     await shoot('4-all-agents-dark')
@@ -231,7 +246,7 @@ function transcript(sid, startMin) {
     await lib.agentMenu(page, 'HR1')
     await lib.menuEntry(page, 'Activity').click()
     const agentsPick = head.locator('.activity-pick').first()
-    check("Activity in an agent's menu: its tab alone, filtered, frozen", !!(await lib.until(async () => /1 agent/.test(await agentsPick.innerText().catch(() => '')) && JSON.stringify(await tabsShown()) === '["hr1"]', HUNG_MS, 250)) && (await live.getAttribute('aria-pressed')) === 'false', JSON.stringify(await tabsShown()))
+    check("Activity in an agent's menu: that agent alone, filtered, picked (no All), frozen", !!(await lib.until(async () => /1 agent/.test(await agentsPick.innerText().catch(() => '')) && JSON.stringify(await tabsShown()) === '["hr1"]' && JSON.stringify(await pressed()) === '["hr1"]', HUNG_MS, 250)) && (await allEntry.count()) === 0 && (await live.getAttribute('aria-pressed')) === 'false', JSON.stringify(await pressed()))
     await agentsPick.click()
     await lib.menuEntry(page, 'All').click()
     await page.keyboard.press('Escape')
@@ -252,12 +267,12 @@ function transcript(sid, startMin) {
     await cardOne.click()
     await dialogActivity.click()
     // The workspace level (HI-1664), on its builder; the project's tab is as it was.
-    const wsTab = page.locator('.activity-workspace .activity-agent-tab[data-agent="hb1"]')
-    check("the card dialog's Activity: the workspace level on its builder, frozen", !!(await lib.until(async () => /Card \w+-\d+/.test(await page.locator('.activity-workspace .activity-for-card').innerText().catch(() => '')) && (await wsTab.getAttribute('aria-selected').catch(() => null)) === 'true', HUNG_MS, 250)) && (await page.locator('.activity-workspace .activity-live').getAttribute('aria-pressed')) === 'false')
+    const wsPicked = page.locator('.activity-workspace .activity-map-ring[aria-pressed="true"]')
+    check("the card dialog's Activity: the workspace level on its builder, frozen", !!(await lib.until(async () => /Card \w+-\d+/.test(await page.locator('.activity-workspace .activity-for-card').innerText().catch(() => '')) && /HB1/.test(await wsPicked.innerText().catch(() => '')), HUNG_MS, 250)) && (await page.locator('.activity-workspace .activity-live').getAttribute('aria-pressed')) === 'false')
     await page.locator('.activity-btn[aria-label="Projects"]').click()
     await page.locator('.tab', { hasText: 'Activity' }).click()
     check("…and the project's tab is unchanged: all agents, all cards", !!(await lib.until(async () => /All agents/.test(await agentsPick.innerText().catch(() => '')) && /All cards/.test(await head.locator('.activity-pick').nth(1).innerText().catch(() => '')), HUNG_MS, 250)))
-    await hb1Tab.click()
+    await pickAgent('hb1')
 
     // --- A long title (HI-1884): the row stays one line, the key and the column whole, only the title cut with "…" and
     // whole in its tooltip; at the normal width and a narrow one, in both themes.
@@ -288,10 +303,16 @@ function transcript(sid, startMin) {
     // --- Light theme.
     await inv('settings:update', { appearance: { theme: 'light' } })
     await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === 'light', HUNG_MS)
-    await hb1Tab.click()
+    await pickAgent('hb1')
     await page.mouse.move(5, 5)
     await lib.until(async () => /Card one/.test(await cardHead.innerText().catch(() => '')) && (await node('process').count()) > 0, HUNG_MS, 250)
     await shoot('5-light')
+    // The shared view in light (HI-3568): All, each agent's Now in a row.
+    await allEntry.click()
+    await lib.until(async () => (await nowRow('hb1').count()) === 1, HUNG_MS, 250)
+    await page.mouse.move(5, 5)
+    await shoot('5-shared-rows-light')
+    await pickAgent('hb1')
     await oneLine('light')
     await inv('session:stop', alpha, 'hb1').catch(() => undefined)
     await inv('session:stop', alpha, 'hb2').catch(() => undefined)

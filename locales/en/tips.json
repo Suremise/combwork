@@ -24,15 +24,15 @@
     "description": "A tip's title (HI-3499): from the Activity map to the Activity list beside it."
   },
   "tips.activityTab.text": {
-    "defaultMessage": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
-    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+    "defaultMessage": "In the Activity tab, pick an agent in the strip under the map for its card, turn, tool call, background tasks, subagents and processes; All shows each agent's current step. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
+    "description": "A tip (HI-3568: the strip of agents, each a ring, is the one picker; All is its first entry). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.activityTab.title": {
     "defaultMessage": "See what each agent is running",
     "description": "A tip's title."
   },
   "tips.activityWorkspace.text": {
-    "defaultMessage": "Activity, in the activity bar, shows every project's running agents together, their tabs grouped by project. A card in progress opens it on the agents working on that card, and a run or a lane in the Progress panel on its agents (Show in Activity).",
+    "defaultMessage": "Activity, in the activity bar, shows every project's running agents together, in one strip to pick from. A card in progress opens it on the agents working on that card, and a run or a lane in the Progress panel on its agents (Show in Activity).",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.activityWorkspace.title": {

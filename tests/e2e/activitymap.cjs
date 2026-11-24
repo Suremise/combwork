@@ -300,78 +300,94 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
 
     // --- All agents: one shared map, a ring each; HB2's call among HB1's.
     check('all agents: one shared map', !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)))
-    const rings = page.locator('.activity-map-ring')
+    const rings = page.locator('.activity-tab:not(.activity-workspace) .activity-map-ring')
     check('…with a context ring per agent', !!(await lib.until(async () => (await rings.count()) === 2, HUNG_MS, 250)), String(await rings.count()))
     await head.getByRole('button', { name: 'Play', exact: true }).click().catch(() => undefined)
     await turn('hb2', 'window 100000 then context 40000 then tool Read src/beta/z.ts then tool Bash')
     check("HB2's calls count on the shared map beside HB1's", !!(await lib.until(async () => /beta\/z\.ts/.test(await feed.innerText().catch(() => '')), HUNG_MS, 250)))
     check('…each agent its own colour in the feed', (await feed.locator('.activity-map-dot').count()) > 0)
     await shoot('3-shared-dark')
-    // HI-3180: a click on a ring shows that agent's map, the selection and the strip staying, so a
-    // click switches to another; that one again, or Escape, shows them all.
+    // HI-3180, HI-3568: a click on a ring picks that agent, its map alone and its work in the panel, the selection and
+    // the strip staying, so a click switches to another; that one again, All, or Escape, shows them all.
     const pickText = () => head.locator('.activity-pick').first().innerText()
     const selection = await pickText()
-    const centre = () => page.locator('.activity-map-centre').evaluate((e) => e.textContent).catch(() => '')
-    const shownAlone = async (name) => (await map.getAttribute('data-mode').catch(() => null)) === 'single' && new RegExp(name).test(await centre())
-    const marked = () => rings.evaluateAll((els) => els.filter((e) => e.getAttribute('aria-current') === 'true').map((e) => e.textContent))
+    const centre = () => page.locator('.activity-tab:not(.activity-workspace) .activity-map-centre').evaluate((e) => e.textContent).catch(() => '')
+    const marked = () => rings.evaluateAll((els) => els.filter((e) => e.getAttribute('aria-pressed') === 'true').map((e) => e.textContent))
+    const allOn = async () => (await page.locator('.activity-tab:not(.activity-workspace) .activity-strip-all').getAttribute('aria-pressed').catch(() => null)) === 'true'
+    // The panel beside the map: the picked agent's part, or with none each agent's Now row (HI-3568).
+    const parts = () => page.locator('.activity-tab:not(.activity-workspace) .activity-part').evaluateAll((els) => els.map((e) => e.dataset.part))
+    const rowsShown = () => page.locator('.activity-tab:not(.activity-workspace) .activity-now-row').evaluateAll((els) => els.map((e) => e.dataset.agent))
+    const shownAlone = async (name) => (await map.getAttribute('data-mode').catch(() => null)) === 'single' && new RegExp(name).test(await centre()) && (await marked()).length === 1 && new RegExp(name).test((await marked())[0]) && !(await allOn()) && (await rowsShown()).length === 0 && (await parts()).includes(name.toLowerCase())
+    const sharedNow = async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared' && (await marked()).length === 0 && (await allOn()) && (await parts()).length === 0 && (await rowsShown()).length > 0
+    const both = async () => JSON.stringify({ strip: await marked(), all: await allOn(), mode: await map.getAttribute('data-mode').catch(() => null), centre: await centre(), parts: await parts(), rows: await rowsShown() })
+    check('the shared view: All pressed, no ring, a Now row per agent and no agent shown in the panel', !!(await lib.until(async () => (await sharedNow()) && JSON.stringify(await rowsShown()) === '["hb1","hb2"]', HUNG_MS, 250)), await both())
+    check('…and no row of agent tabs (HI-3568)', (await page.locator('.activity-tabs, .activity-agent-tab').count()) === 0)
     await rings.filter({ hasText: 'HB2' }).click()
-    check("a click on HB2's ring shows its map alone", !!(await lib.until(() => shownAlone('HB2'), HUNG_MS, 250)))
-    check('…the selection kept: the same Agents ▾, the same tabs', (await pickText()) === selection && (await page.locator('.activity-tab:not(.activity-workspace) .activity-agent-tab').count()) === 2, `${await pickText()} (was ${selection})`)
+    check("a click on HB2's ring picks it: its map alone, its work in the panel", !!(await lib.until(() => shownAlone('HB2'), HUNG_MS, 250)), await both())
+    check('…the selection kept: the same Agents ▾', (await pickText()) === selection, `${await pickText()} (was ${selection})`)
     check('…the strip still lists both agents, HB2 marked', (await rings.count()) === 2 && JSON.stringify((await marked()).map((t) => /HB2/.test(t))) === '[true]', JSON.stringify(await marked()))
     await shoot('3b-strip-picked-dark')
     await rings.filter({ hasText: 'HB1' }).click()
     check('a click on another ring switches to it, the selection still kept', !!(await lib.until(() => shownAlone('HB1'), HUNG_MS, 250)) && (await pickText()) === selection && (await rings.count()) === 2)
     await rings.filter({ hasText: 'HB1' }).click()
-    check('…the same ring again: every agent again, the shared map', !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)) && (await marked()).length === 0)
+    check('…the same ring again: every agent again, the shared map and the rows', !!(await lib.until(() => sharedNow(), HUNG_MS, 250)), await both())
     await rings.filter({ hasText: 'HB2' }).click()
     await lib.until(() => shownAlone('HB2'), HUNG_MS, 250)
     await page.keyboard.press('Escape')
-    check('…and Escape does too', !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)))
+    check('…and Escape does too', !!(await lib.until(() => sharedNow(), HUNG_MS, 250)), await both())
     await rings.filter({ hasText: 'HB2' }).click()
     await lib.until(() => shownAlone('HB2'), HUNG_MS, 250)
-
-    // --- One shown agent (HI-3186): the tab and the strip always mark the same agent, a click in either switching both.
-    const tabs = page.locator('.activity-tab:not(.activity-workspace) .activity-agent-tab')
-    const tabOn = () => tabs.evaluateAll((els) => els.filter((e) => e.getAttribute('aria-selected') === 'true').map((e) => e.getAttribute('data-agent')))
-    const agree = async (id, name) => JSON.stringify(await tabOn()) === JSON.stringify([id]) && JSON.stringify(await marked()) !== '[]' && (await marked()).every((t) => new RegExp(name).test(t)) && (await marked()).length === 1
-    const both = async () => JSON.stringify({ tab: await tabOn(), strip: await marked(), mode: await map.getAttribute('data-mode').catch(() => null), centre: await centre() })
-    check("a ring's click makes its agent the tab too: HB2's tab and ring marked, HB2's map", !!(await lib.until(async () => (await agree('hb2', 'HB2')) && (await shownAlone('HB2')), HUNG_MS, 250)), await both())
-    await tabs.filter({ hasText: 'HB1' }).click()
-    check("a tab's click while one is shown alone shows that one: HB1's tab and ring marked, HB1's map", !!(await lib.until(async () => (await agree('hb1', 'HB1')) && (await shownAlone('HB1')), HUNG_MS, 250)), await both())
-    await rings.filter({ hasText: 'HB2' }).click()
-    check('…and a ring again moves both back to HB2', !!(await lib.until(async () => (await agree('hb2', 'HB2')) && (await shownAlone('HB2')), HUNG_MS, 250)), await both())
-    await rings.filter({ hasText: 'HB2' }).click()
-    check("…the shown ring again: the shared map, nothing marked in the strip, HB2's tab kept", !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared' && (await marked()).length === 0 && JSON.stringify(await tabOn()) === '["hb2"]', HUNG_MS, 250)), await both())
-    await tabs.filter({ hasText: 'HB1' }).click()
-    check("…a tab's click with every agent shown leaves the shared map", !!(await lib.until(async () => JSON.stringify(await tabOn()) === '["hb1"]', HUNG_MS, 250)) && (await map.getAttribute('data-mode').catch(() => null)) === 'shared' && (await marked()).length === 0, await both())
-    await rings.filter({ hasText: 'HB2' }).click()
-    await lib.until(() => shownAlone('HB2'), HUNG_MS, 250)
+    await page.locator('.activity-tab:not(.activity-workspace) .activity-strip-all').click()
+    check('…and All does too', !!(await lib.until(() => sharedNow(), HUNG_MS, 250)), await both())
+    // A Now row's click picks its agent as its ring does (HI-3568).
+    await page.locator('.activity-tab:not(.activity-workspace) .activity-now-row[data-agent="hb1"]').click()
+    check("a Now row's click picks its agent: HB1's ring marked, its map and its work", !!(await lib.until(() => shownAlone('HB1'), HUNG_MS, 250)), await both())
+    // (An agent's dot on the shared map picks it too: the ten agents' part below.)
     await page.keyboard.press('Escape')
-    check("…Escape: the shared map, HB2's tab kept", !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared' && JSON.stringify(await tabOn()) === '["hb2"]', HUNG_MS, 250)), await both())
-    // Hide finished on, HB1 finished (idle) and HB2 shown alone (idle too, but the tab chosen): HB2 stays shown and marked.
+    await lib.until(() => sharedNow(), HUNG_MS, 250)
+    // The strip with the map's parts turned off (HI-3568): Context off, no percentages but the picker stays; Feed off, the
+    // same; the map off, it moves above the list and still picks.
+    const toggle = (k) => head.locator(`.activity-map-toggle[data-toggle="${k}"]`)
+    await toggle('context').click()
+    check('Context off: the strip stays, its rings without a percentage', !!(await lib.until(async () => (await rings.count()) === 2 && (await rings.locator('.faint').count()) === 0, HUNG_MS, 250)) && (await allOn()))
+    await toggle('feed').click()
+    check('…Feed off too: the strip stays', !!(await lib.until(async () => (await rings.count()) === 2 && (await page.locator('.activity-tab:not(.activity-workspace) .activity-map-feed').count()) === 0, HUNG_MS, 250)))
+    await shoot('3d-context-feed-off-dark')
+    await toggle('map').click()
+    const bar = page.locator('.activity-tab:not(.activity-workspace) .activity-strip-bar')
+    check('the map off: the strip above the list, All pressed, a Now row per agent', !!(await lib.until(async () => (await map.count()) === 0 && (await bar.locator('.activity-map-ring').count()) === 2 && (await allOn()) && JSON.stringify(await rowsShown()) === '["hb1","hb2"]', HUNG_MS, 250)), await both())
+    await bar.locator('.activity-map-ring', { hasText: 'HB2' }).click()
+    check("…a ring's click there picks HB2: its work in the panel, no rows", !!(await lib.until(async () => JSON.stringify(await marked()) !== '[]' && /HB2/.test((await marked())[0]) && (await parts()).includes('hb2') && (await rowsShown()).length === 0, HUNG_MS, 250)), await both())
+    await shoot('3e-map-off-picked-dark')
+    await page.keyboard.press('Escape')
+    check('…Escape there: every agent again', !!(await lib.until(async () => (await allOn()) && (await rowsShown()).length === 2, HUNG_MS, 250)), await both())
+    for (const k of ['map', 'feed', 'context']) await toggle(k).click()
+    await lib.until(() => sharedNow(), HUNG_MS, 250)
+    // Hide finished on, HB1 finished (idle) and HB2 picked (idle too): HB2 stays listed, picked and shown alone.
     await rings.filter({ hasText: 'HB2' }).click()
     await lib.until(() => shownAlone('HB2'), HUNG_MS, 250)
     await head.locator('.activity-hide input').check()
-    check('Hide finished on: the agent shown stays the tab, marked and shown alone', !!(await lib.until(async () => (await tabs.count()) === 1 && (await agree('hb2', 'HB2')) && (await shownAlone('HB2')), HUNG_MS, 250)), await both())
+    check('Hide finished on: the agent picked stays, marked and shown alone', !!(await lib.until(async () => (await rings.count()) === 1 && (await shownAlone('HB2')), HUNG_MS, 250)), await both())
     await head.locator('.activity-hide input').uncheck()
-    await lib.until(async () => (await tabs.count()) === 2, HUNG_MS, 250)
-    // An agent that isn't running (never started, as in MR1): its tab shows a plain line in the graph's place, never
-    // another agent's graph, and the strip still lists the working agents, one click away.
+    await lib.until(async () => (await rings.count()) === 2, HUNG_MS, 250)
+    // An agent that isn't running (never started, as in MR1): picked, a plain line in the graph's place, never another
+    // agent's graph, and the strip still lists the working agents, one click away.
     const hr1 = await lib.addAgent(inv, alpha, { location: 'project', name: 'HR1' })
-    await lib.until(async () => (await tabs.count()) === 3, HUNG_MS, 250)
-    await tabs.filter({ hasText: 'HR1' }).click()
+    await lib.until(async () => (await rings.count()) === 3, HUNG_MS, 250)
+    await rings.filter({ hasText: 'HR1' }).click()
     const idleLine = page.locator('.activity-tab:not(.activity-workspace) .activity-map-idle')
     const hr1Shown = async () => (await idleLine.getAttribute('data-agent').catch(() => null)) === hr1.id && /HR1/.test(await idleLine.innerText().catch(() => '')) && (await page.locator('.activity-tab:not(.activity-workspace) .activity-map-svg').count()) === 0
-    check("HR1, never started, chosen while HB2 was shown alone: its tab and ring marked, a plain line in the graph's place", !!(await lib.until(async () => (await agree(hr1.id, 'HR1')) && (await hr1Shown()), HUNG_MS, 250)), `${await both()} ${await idleLine.innerText().catch(() => '')}`)
+    check("HR1, never started, picked while HB2 was: its ring marked, a plain line in the graph's place", !!(await lib.until(async () => (await marked()).length === 1 && /HR1/.test((await marked())[0]) && (await hr1Shown()), HUNG_MS, 250)), `${await both()} ${await idleLine.innerText().catch(() => '')}`)
     check('…the strip still lists HB1 and HB2 beside it', (await rings.count()) === 3 && (await rings.filter({ hasText: 'HB1' }).count()) === 1 && (await rings.filter({ hasText: 'HB2' }).count()) === 1)
     await shoot('3c-not-running-dark')
     await rings.filter({ hasText: 'HB2' }).click()
-    check("…one click on HB2's ring shows HB2's map and tab", !!(await lib.until(async () => (await agree('hb2', 'HB2')) && (await shownAlone('HB2')), HUNG_MS, 250)), await both())
-    // HR1 the tab when it goes: no tab is kept after it, so Hide finished below hides every finished agent again.
-    await tabs.filter({ hasText: 'HR1' }).click()
+    check("…one click on HB2's ring shows HB2's map and work", !!(await lib.until(() => shownAlone('HB2'), HUNG_MS, 250)), await both())
+    // HR1 picked when it goes: no pick is kept after it (never the first agent in its place), so Hide finished below
+    // hides every finished agent again.
+    await rings.filter({ hasText: 'HR1' }).click()
     await lib.until(() => hr1Shown(), HUNG_MS, 250)
     await inv('agents:remove', alpha, hr1.id, { deleteWorktree: false })
-    await lib.until(async () => (await tabs.count()) === 2, HUNG_MS, 250)
+    check('a picked agent removed: no pick, the shared view (never another agent in its place)', !!(await lib.until(async () => (await rings.count()) === 2 && (await sharedNow()), HUNG_MS, 250)), await both())
 
     // --- Hide finished, as the list has it, on a frozen snapshot that has settled (nothing new comes in to redraw it, HR2's
     // round 2): both agents idle, no map; off again, the map is back.
@@ -391,7 +407,7 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await lib.until(async () => (await head.getByRole('button', { name: 'Play', exact: true }).count()) === 1 && (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
     await head.locator('.activity-hide input').check()
     const hidden = !!(await lib.until(async () => (await map.count()) === 0 && (await page.locator('.activity-tab .pane-empty').count()) === 1, HUNG_MS, 250))
-    const shownState = async () => JSON.stringify({ map: await map.count(), mode: await map.getAttribute('data-mode').catch(() => null), empty: await page.locator('.activity-tab .pane-empty').count(), tabs: await page.locator('.activity-tab:not(.activity-workspace) .activity-agent-tab').allInnerTexts(), live: (await inv('session:live')).map((x) => [x.agentId, x.status]), now: await inv('activity:now', alpha) })
+    const shownState = async () => JSON.stringify({ map: await map.count(), mode: await map.getAttribute('data-mode').catch(() => null), empty: await page.locator('.activity-tab .pane-empty').count(), rings: await rings.allInnerTexts(), live: (await inv('session:live')).map((x) => [x.agentId, x.status]), now: await inv('activity:now', alpha) })
     check('the project tab, frozen, Hide finished on and both agents idle: no map, as the list shows nothing', hidden, hidden ? '' : await shownState())
     await head.locator('.activity-hide input').uncheck()
     check('…Hide finished off, still frozen: the shared map again', !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)) && (await head.getByRole('button', { name: 'Play', exact: true }).count()) === 1)
@@ -404,20 +420,26 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check('the workspace view, Hide finished on and both agents idle: no map', !!(await lib.until(async () => (await wsMap.count()) === 0 && (await page.locator('.activity-workspace .pane-empty').count()) === 1, HUNG_MS, 250)))
     await wsHead.locator('.activity-hide input').uncheck()
     check('…Hide finished off: one shared map of the workspace, a ring per agent', !!(await lib.until(async () => (await wsMap.getAttribute('data-mode').catch(() => null)) === 'shared' && (await page.locator('.activity-workspace .activity-map-ring').count()) === 2, HUNG_MS, 250)))
-    // HI-3186 in the workspace view (the user's screenshot): a ring's click marks its tab, a tab's click its ring and map.
+    // HI-3568 in the workspace view: one pick drives its map and its panel; no tab groups.
     const wsRings = page.locator('.activity-workspace .activity-map-ring')
-    const wsTabOn = () => page.locator('.activity-workspace .activity-agent-tab[aria-selected="true"]').allInnerTexts()
-    const wsMarked = () => wsRings.evaluateAll((els) => els.filter((e) => e.getAttribute('aria-current') === 'true').map((e) => e.textContent))
+    const wsMarked = () => wsRings.evaluateAll((els) => els.filter((e) => e.getAttribute('aria-pressed') === 'true').map((e) => e.textContent))
     const wsCentre = () => page.locator('.activity-workspace .activity-map-centre').evaluate((e) => e.textContent).catch(() => '')
-    const wsAgree = async (name) => (await wsTabOn()).length === 1 && new RegExp(name).test((await wsTabOn())[0]) && (await wsMarked()).length === 1 && new RegExp(name).test((await wsMarked())[0]) && (await wsMap.getAttribute('data-mode').catch(() => null)) === 'single' && new RegExp(name).test(await wsCentre())
-    const wsBoth = async () => JSON.stringify({ tab: await wsTabOn(), strip: await wsMarked(), centre: await wsCentre() })
+    const wsRows = () => page.locator('.activity-workspace .activity-now-row').allInnerTexts()
+    const wsParts = () => page.locator('.activity-workspace .activity-part').evaluateAll((els) => els.map((e) => e.dataset.part))
+    const wsAgree = async (name) => (await wsMarked()).length === 1 && new RegExp(name).test((await wsMarked())[0]) && (await wsMap.getAttribute('data-mode').catch(() => null)) === 'single' && new RegExp(name).test(await wsCentre()) && (await wsRows()).length === 0 && (await wsParts()).includes(name.toLowerCase())
+    const wsBoth = async () => JSON.stringify({ strip: await wsMarked(), centre: await wsCentre(), rows: await wsRows(), parts: await wsParts() })
+    check('the workspace view: no tab groups; nobody picked, a Now row per agent named with its project', (await page.locator('.activity-workspace .activity-tabs, .activity-workspace .activity-tab-group').count()) === 0 && !!(await lib.until(async () => (await wsMarked()).length === 0 && (await wsRows()).length === 2 && (await wsRows()).every((t) => /alpha · HB\d/.test(t)), HUNG_MS, 250)), await wsBoth())
     await wsRings.filter({ hasText: 'HB2' }).click()
-    check("the workspace view: a ring's click marks HB2's tab and ring, HB2's map", !!(await lib.until(() => wsAgree('HB2'), HUNG_MS, 250)), await wsBoth())
-    await page.locator('.activity-workspace .activity-agent-tab').filter({ hasText: 'HB1' }).click()
-    check("…a tab's click moves the ring's mark and the map to HB1", !!(await lib.until(() => wsAgree('HB1'), HUNG_MS, 250)), await wsBoth())
+    check("…a ring's click picks HB2: its ring marked, its map, its work in the panel", !!(await lib.until(() => wsAgree('HB2'), HUNG_MS, 250)), await wsBoth())
+    await wsRings.filter({ hasText: 'HB1' }).click()
+    check('…another ring switches both to HB1', !!(await lib.until(() => wsAgree('HB1'), HUNG_MS, 250)), await wsBoth())
     await shoot('5b-workspace-one-shown-dark')
     await wsRings.filter({ hasText: 'HB1' }).click()
-    check("…HB1's ring again: the shared map, HB1's tab kept", !!(await lib.until(async () => (await wsMap.getAttribute('data-mode').catch(() => null)) === 'shared' && (await wsMarked()).length === 0 && /HB1/.test((await wsTabOn())[0] ?? ''), HUNG_MS, 250)), await wsBoth())
+    check("…HB1's ring again: the shared map, nothing picked, the rows", !!(await lib.until(async () => (await wsMap.getAttribute('data-mode').catch(() => null)) === 'shared' && (await wsMarked()).length === 0 && (await wsRows()).length === 2, HUNG_MS, 250)), await wsBoth())
+    await page.locator('.activity-workspace .activity-now-row', { hasText: 'HB2' }).click()
+    check("…a row's click picks HB2", !!(await lib.until(() => wsAgree('HB2'), HUNG_MS, 250)), await wsBoth())
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await wsMarked()).length === 0, HUNG_MS, 250)
     await gated('the workspace view', '.activity-workspace')
     await page.locator('.activity-btn[aria-label="Projects"]').click()
     await lib.until(async () => (await head.count()) === 1, HUNG_MS, 250)
@@ -594,6 +616,10 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       await lib.menuEntry(page, 'All').click()
       await page.keyboard.press('Escape')
       if ((await vHead.locator('.activity-hide input').isChecked())) await vHead.locator('.activity-hide input').uncheck()
+      // The shared view: nobody picked (HI-3568).
+      const vAll = page.locator(`${v.scope} .activity-strip-all`)
+      await lib.until(async () => (await vAll.count()) === 1, HUNG_MS, 250)
+      if ((await vAll.getAttribute('aria-pressed')) !== 'true') await vAll.click()
       // A station's agent dot drawn on a frozen map (it opens frozen) arrives with no animation (HR1's round 1).
       const vDots = page.locator(`${v.scope} .activity-map-here`)
       // An animation declared at all (a short one could end before it is looked at), or one running.
@@ -606,15 +632,15 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       const lastRing = v.label === 'the workspace view' ? vRings.filter({ hasText: 'HB11' }) : page.locator(`${v.scope} ${v.ring}`)
       check(`${v.label}: ten agents, the shared map, HB11 past the eight it reads`, !!(await lib.until(async () => (await vMap.getAttribute('data-mode').catch(() => null)) === 'shared' && (await vRings.count()) >= 10 && (await lastRing.getAttribute('data-load').catch(() => null)) === 'notLoaded', HUNG_MS, 250)), `${await vRings.count()} ${await lastRing.getAttribute('data-load').catch(() => null)}`)
       const vPick = await vHead.locator('.activity-pick').first().innerText()
-      const vTab = await page.locator(`${v.scope} .activity-agent-tab[aria-selected="true"]`).innerText().catch(() => '')
+      const vTab = await page.locator(`${v.scope} .activity-map-ring[aria-pressed="true"]`).innerText().catch(() => '')
       await lastRing.click()
       const vStation = (s) => page.locator(`${v.scope} .activity-map-station[data-station="${s}"] title`)
       const vCentre = () => page.locator(`${v.scope} .activity-map-centre`).evaluate((e) => e.textContent).catch(() => '')
       check(`…a click on HB11 shows its map, read: its call and its context (55 %)`, !!(await lib.until(async () => (await vMap.getAttribute('data-mode').catch(() => null)) === 'single' && /HB11/.test(await vCentre()) && ((await vStation('read').textContent().catch(() => '')) ?? '').includes('late/eleven.ts') && (await page.locator(`${v.scope} .activity-map-context`).getAttribute('data-pct').catch(() => null)) === '55', HUNG_MS, 250)), `${await vCentre()} | ${await vStation('read').textContent().catch(() => '')} | ${await page.locator(`${v.scope} .activity-map-context`).getAttribute('data-pct').catch(() => null)}`)
-      check('…its ring read now, marked; the other rings still listed', (await lastRing.getAttribute('data-load')) === 'loaded' && (await lastRing.getAttribute('aria-current')) === 'true' && (await vRings.count()) >= 10)
-      // The selection kept; the list's tab is HB11's now, the one agent shown (HI-3186: the tab and the strip agree).
-      const vTabNow = () => page.locator(`${v.scope} .activity-agent-tab[aria-selected="true"]`).innerText().catch(() => '')
-      check("…the selection unchanged, and the list's tab is HB11's", (await vHead.locator('.activity-pick').first().innerText()) === vPick && !!(await lib.until(async () => /HB11/.test(await vTabNow()), HUNG_MS, 250)), `${await vHead.locator('.activity-pick').first().innerText()} / ${vTab} → ${await vTabNow()}`)
+      check('…its ring read now, marked; the other rings still listed', (await lastRing.getAttribute('data-load')) === 'loaded' && (await lastRing.getAttribute('aria-pressed')) === 'true' && (await vRings.count()) >= 10)
+      // The selection kept; the list is HB11's now, the one agent picked (HI-3568: one pick for the map and the list).
+      const vTabNow = async () => `${await page.locator(`${v.scope} .activity-map-ring[aria-pressed="true"]`).innerText().catch(() => '')}|${await page.locator(`${v.scope} .activity-list .activity-part`).first().getAttribute('data-part').catch(() => '')}`
+      check("…the selection unchanged, and the list is HB11's", (await vHead.locator('.activity-pick').first().innerText()) === vPick && !!(await lib.until(async () => new RegExp(`HB11[\\s\\S]*\\|${last.id}$`).test(await vTabNow()), HUNG_MS, 250)), `${await vHead.locator('.activity-pick').first().innerText()} / ${vTab} → ${await vTabNow()}`)
       edits++
       // Its context as before, so the next view reads the same 55 % (a turn without one reports none: 0 %).
       await turn(last.id, `window 100000 then context 55000 then tool Edit src/late/edit${edits}.ts`)

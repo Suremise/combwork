@@ -163,11 +163,13 @@ export function mapReadOrder<E extends { key: string }>(entries: readonly E[], s
 }
 
 /**
- * The agent the map shows alone (HI-3180), or null for the whole selection: always the current tab's (HI-3186), so the
- * tab row and the strip mark one shown agent. Only in a shared map, and only while that agent is among its entries.
+ * The agent picked in the strip (HI-3568), or null for the shared view: one selection for the map and the panel beside
+ * it. The Agents filter on one agent picks it; otherwise the agent kept in the view (`tab`) while it is among the map's
+ * entries, so a pick a filter leaves out, or an agent gone, is no pick (never the first agent in its place).
  */
-export function shownAlone(on: boolean, mode: 'single' | 'shared', entries: readonly { key: string }[], tab: string | null): string | null {
-  return on && mode === 'shared' && tab !== null && entries.some((e) => e.key === tab) ? tab : null
+export function pickedAgent(mode: 'single' | 'shared', entries: readonly { key: string }[], tab: string | null | undefined): string | null {
+  if (mode === 'single') return entries[0]?.key ?? null
+  return tab && entries.some((e) => e.key === tab) ? tab : null
 }
 
 /** The keys of the agents the map reads (HI-3180): the first MAP_AGENTS in its read order (`mapReadOrder`). */

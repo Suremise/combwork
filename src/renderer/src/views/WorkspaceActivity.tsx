@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ACTIVITY_HOURS, activityTabs, buildActivityView, keepGoneList, type ActivityAgent, type ActivityCard, type ActivityInput, type ActivityNode, type ActivityNow, type ActivityTabInfo, type ActivityTurns } from '@shared/activity'
+import { ACTIVITY_HOURS, buildActivityView, keepGoneList, type ActivityAgent, type ActivityCard, type ActivityInput, type ActivityNode, type ActivityNow, type ActivityTurns } from '@shared/activity'
 import { agentState } from '@shared/agentState'
 import { cardLabel } from '@shared/projectKeys'
 import type { ProjectInfo, SessionListItem, TaskCard } from '@shared/types'
@@ -8,12 +8,11 @@ import { msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { NO_PROJECTS, activityAgentKey, cardActivityAgents, openActivity, set, useStore, workspaceActivityKey } from '../store'
 import { Icon, IconButton, InfoTip, statusText, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
-import { StateMark } from '../components/StateMark'
 import { loadActivityView, loadMapShow, saveActivityView, saveMapShow, type ActivityView, type MapShow } from '../activityView'
-import { ActivityMap, MapToggles, mapSessions, openMapFile, showMapCall, usePickedCall, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
-import { liveIn, mapContextEntries, mapMode, mapReadOrder, shownAlone, type MapCallRef, type MapContext, type MapPick } from '@shared/activityMap'
+import { ActivityMap, AgentStrip, MapToggles, mapSessions, openMapFile, showMapCall, usePickedCall, mapStrip, mapTabs, noteMapTurns, useActivityMap, useMapContexts, type MapEntry } from './ActivityMap'
+import { liveIn, mapContextEntries, mapMode, mapReadOrder, pickedAgent, type MapCallRef, type MapContext, type MapPick } from '@shared/activityMap'
 import { cx } from '../util'
-import { ACTIVITY_M, Details, FADE_MS, LIST_EVERY, markOf, NO_NOW, PartView, TICK_MS, TURNS_AT_ONCE, usePageVisible } from './ActivityTab'
+import { ACTIVITY_M, Details, FADE_MS, LIST_EVERY, NO_NOW, NowRows, nowRow, PartView, TICK_MS, TURNS_AT_ONCE, usePageVisible } from './ActivityTab'
 
 /** Session lists read at once (each a host's records, HI-1664: only the hosts shown, every few ticks). */
 const LISTS_AT_ONCE = 2
@@ -72,8 +71,8 @@ const runs = (h: ProjectInfo): boolean => h.agents.some((a) => !!a.live)
 
 /**
  * Activity's workspace level (HI-1664): the same "what's running now" as a project's Activity tab (HI-1743), across every
- * session host of the workspace with an agent running (its projects, and the Assistant), its agents' tabs grouped by
- * project. Opened from a card (its agents now), from the Progress panel (a lane's or a run's agents), or the activity bar.
+ * session host of the workspace with an agent running (its projects, and the Assistant), its agents in one strip, the
+ * one picker (HI-3568). Opened from a card (its agents now), from the Progress panel (a lane's or a run's agents), or the activity bar.
  * Frozen as it opens, nothing past; nothing read or drawn while hidden. A tick reads what runs now in every host shown in
  * one call (never one per host or agent), their session lists every few ticks, and turns only for the tab shown.
  */
@@ -131,6 +130,8 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const [members, setMembers] = useState(0)
   const hostsRef = useRef(hosts)
   hostsRef.current = hosts
+  const assistantRef = useRef(assistant)
+  assistantRef.current = assistant
 
   // The hosts the view is about: those with an agent running, and with an agents filter, those it names an agent of.
   // Opened for a card, its agents alone: none when nobody works on it (never every agent).
@@ -347,7 +348,7 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     return newLists.length || newTurns.length || newCtx.length ? { ...held, lists: new Map([...held.lists, ...newLists]), turns: new Map([...held.turns, ...newTurns]), contexts: new Map([...held.contexts, ...newCtx]) } : held
   }, [held, reads])
 
-  // --- The tabs, by host, and the one shown.
+  // --- The agents, by host, and the one picked (HI-3568).
   // The time the drawn reads are of: taken again with them.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const at = useMemo(() => Date.now(), [drawn])
@@ -367,19 +368,28 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
       })
     )
   }, [drawn, shownHosts, at])
-  const groups = useMemo(
-    () =>
-      shownHosts.flatMap((h) => {
-        const input = inputs.get(hk(h.path))!
-        const keep = h.agents.find((a) => activityAgentKey(h.path, a.id) === view.tab)?.id
-        const tabs = activityTabs(input, { agents: inFilter(h), cards: view.cards, hideFinished: view.hideFinished }, keep)
-        return tabs.length ? [{ host: h, input, tabs }] : []
-      }),
-    [shownHosts, inputs, inFilter, view.tab, view.cards, view.hideFinished]
-  )
-  const all = groups.flatMap((g) => g.tabs.map((t) => ({ host: g.host, input: g.input, tab: t, key: activityAgentKey(g.host.path, t.agentId) })))
-  const current = all.find((x) => x.key === view.tab) ?? all[0] ?? null
+  // --- The map (HI-2903) and the strip (HI-3568): exactly one agent in the filter, its map; else the shared map of the
+  // agents the filters show, or the one picked; every key host-qualified (an agent's activityAgentKey, a session's sk).
+  const mode = mapMode(view.agents)
+  // Its agents: by the list's filters (Agents, Cards, Hide finished, the pick kept).
+  const entries = useMemo<MapEntry[]>(() => {
+    const out = shownHosts.flatMap((h) => {
+      const input = inputs.get(hk(h.path))!
+      const keep = h.agents.find((a) => activityAgentKey(h.path, a.id) === view.tab)?.id
+      return mapTabs(input, { agents: inFilter(h), cards: view.cards, hideFinished: view.hideFinished }, 'shared', keep).map((t): MapEntry => ({ key: activityAgentKey(h.path, t.agentId), path: h.path, agentId: t.agentId, name: t.name, tab: t, input, live: h.agents.find((a) => a.id === t.agentId)?.live ?? null }))
+    })
+    return mode === 'single' ? out.slice(0, 1) : out
+  }, [mode, shownHosts, inputs, inFilter, view.cards, view.hideFinished, view.tab])
+  // One selection for the map and the panel (HI-3568): the agent picked (by host and id), or none (the shared view).
+  const picked = pickedAgent(mode, entries, view.tab)
+  const current = useMemo(() => {
+    const e = picked ? entries.find((x) => x.key === picked) : undefined
+    const host = e ? shownHosts.find((h) => h.path === e.path) : undefined
+    return e && host ? { host, input: e.input, tab: e.tab, key: e.key } : null
+  }, [picked, entries, shownHosts])
   const content = useMemo(() => (current ? buildActivityView(current.input, current.tab.agentId, { showOwn: !!view.showOwn }) : { card: null, parts: [] }), [current, view.showOwn])
+  // The shared view with no pick (HI-3568): each agent's Now in a row.
+  const nowRows = useMemo(() => (picked ? [] : entries.map((x) => nowRow(x.input, x.tab, x.key))), [picked, entries])
 
   // Live, what ended fades out where it was, then leaves; frozen, nothing changes.
   const goneAt = useRef(new Map<string, number>())
@@ -417,28 +427,11 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     return () => clearTimeout(t)
   }, [fading, parts])
 
-  // --- The map (HI-2903): exactly one agent in the filter, its map; else the shared map of the agents the tabs show,
-  // every key host-qualified (an agent's activityAgentKey, a session's sk).
-  const mode = mapMode(view.agents)
-  // Its agents: the list's own tabs, by the same filters (Agents, Cards, Hide finished, the tab kept).
-  const entries = useMemo<MapEntry[]>(() => {
-    const out = shownHosts.flatMap((h) => {
-      const input = inputs.get(hk(h.path))!
-      const keep = h.agents.find((a) => activityAgentKey(h.path, a.id) === view.tab)?.id
-      return mapTabs(input, { agents: inFilter(h), cards: view.cards, hideFinished: view.hideFinished }, 'shared', keep).map((t): MapEntry => ({ key: activityAgentKey(h.path, t.agentId), path: h.path, agentId: t.agentId, name: t.name, tab: t, input, live: h.agents.find((a) => a.id === t.agentId)?.live ?? null }))
-    })
-    return mode === 'single' ? out.slice(0, 1) : out
-  }, [mode, shownHosts, inputs, inFilter, view.cards, view.hideFinished, view.tab])
-  // One agent of the selection shown alone (HI-3180), always the current tab's (HI-3186): see the
-  // project's tab.
-  const [showAlone, setShowAlone] = useState(false)
-  // The selection chosen again (Agents ▾, even the same): all of it shown again.
-  useEffect(() => setShowAlone(false), [view.agents])
-  const alone = shownAlone(showAlone, mode, entries, current?.key ?? null)
-  const drawnMode = alone ? 'single' : mode
-  const drawnEntries = useMemo(() => (alone ? entries.filter((e) => e.key === alone) : entries), [entries, alone])
-  // What the map reads turns and contexts for: the one shown alone first (HR1's round 1), then the rest.
-  const readEntries = useMemo(() => mapReadOrder(entries, alone), [entries, alone])
+  // The picked agent drawn alone (HI-3180, HI-3568); the strip still lists the selection.
+  const drawnMode = picked ? 'single' : mode
+  const drawnEntries = useMemo(() => (picked ? entries.filter((x) => x.key === picked) : entries), [entries, picked])
+  // What the map reads turns and contexts for: the one picked first (HR1's round 1), then the rest.
+  const readEntries = useMemo(() => mapReadOrder(entries, picked), [entries, picked])
   // Each agent's live state as the hosts have it now, keyed by what its ring depends on (HI-2929: a setup ending, local
   // limits or a model set later). Not the entries' own: shownHosts is taken in only when a status or session changes.
   const forContexts = mapContextEntries(readEntries, (e) => liveIn(hosts, e.path, e.agentId))
@@ -460,19 +453,33 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     [setView]
   )
   // Animated once live and the snapshot released (HI-2939): see the project's tab.
-  const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}|${alone ?? ''}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at })
-  const strip = useMemo(() => (alone ? mapStrip(entries, drawn.contexts, readEntries) : undefined), [alone, entries, drawn.contexts, readEntries])
-  const mapRead = useMemo(() => (mapOn ? mapSessions(readEntries, mode) : []), [mapOn, readEntries, mode])
-  // The strip's click (HI-3186): another agent becomes the tab, shown alone; the one shown alone shows them all again.
-  const pickMapAgent = useCallback(
-    (key: string) => {
-      if (alone === key) return setShowAlone(false)
-      setSelected(null)
-      setView({ tab: key })
-      setShowAlone(true)
-    },
-    [alone, setView]
+  const map = useActivityMap({ active, animate: active && live && !held && mapOn, scope: `${fresh}|${drawnMode}|${filterKey}`, entries: mapOn ? drawnEntries : NO_ENTRIES, contexts: drawn.contexts, mode: drawnMode, at })
+  // Each ring named with its project (HI-3568): two projects' agents of one name are told apart.
+  const strip = useMemo(
+    () =>
+      mapStrip(entries, drawn.contexts, readEntries).map((a) => {
+        const host = hostsRef.current.find((h) => h.path === entries.find((x) => x.key === a.key)?.path)
+        const where = host ? (host === assistantRef.current ? tr(M.assistant) : host.name) : null
+        return where ? { ...a, label: tr(M.agentIn, { agent: a.name, project: where }), host: host!.name } : a
+      }),
+    [entries, drawn.contexts, readEntries]
   )
+  // The map's sessions, and with no pick the rows' (HI-3568: each agent's Now, the map off too).
+  const mapRead = useMemo(() => (mapOn || !picked ? mapSessions(readEntries, mode) : []), [mapOn, picked, readEntries, mode])
+  // The strip's, a dot's or a row's pick (HI-3568): that agent, its map and its details; null, the shared view.
+  const pick = useCallback(
+    (key: string | null) => {
+      setSelected(null)
+      setView({ tab: key ?? undefined })
+    },
+    [setView]
+  )
+  // A row's name: its project's and its own (the Assistant's as such).
+  const nameOf = useCallback((key: string, agent: string) => {
+    const e = entriesNow.current.find((x) => x.key === key)
+    const host = e ? hostsRef.current.find((x) => x.path === e.path) : undefined
+    return host ? tr(M.agentIn, { agent, project: host === assistantRef.current ? tr(M.assistant) : host.name }) : agent
+  }, [])
 
   // Turns for the tab shown (its agent's session and running subagents), and the map's agents' sessions.
   const shownSessions = useMemo(() => {
@@ -518,19 +525,19 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   const menu = useContextMenu()
   const openPick = (e: React.MouseEvent<HTMLElement>, what: 'agents' | 'cards'): void => {
     const r = e.currentTarget.getBoundingClientRect()
-    const show = (picked: readonly (string | number)[]): void => {
+    const show = (ticked: readonly (string | number)[]): void => {
       const choices: [string | number, string][] =
         what === 'agents'
           ? hostsRef.current.filter(runs).flatMap((h) => h.agents.map((a): [string, string] => [activityAgentKey(h.path, a.id), tr(M.agentIn, { agent: a.name, project: h.name })]))
           : tasks.filter((c) => !c.archived && (c.column === 'doing' || c.column === 'review')).map((c) => [c.number, `${cardLabel(c)} ${c.title}`])
       const items: MenuEntry[] = [
-        { label: tr(ACTIVITY_M.all), icon: picked.length ? undefined : 'check', onClick: () => pick([]) },
+        { label: tr(ACTIVITY_M.all), icon: ticked.length ? undefined : 'check', onClick: () => choose([]) },
         { separator: true },
-        ...choices.map(([id, label]): MenuEntry => ({ label, icon: picked.includes(id) ? 'check' : undefined, onClick: () => pick(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]) }))
+        ...choices.map(([id, label]): MenuEntry => ({ label, icon: ticked.includes(id) ? 'check' : undefined, onClick: () => choose(ticked.includes(id) ? ticked.filter((x) => x !== id) : [...ticked, id]) }))
       ]
       menu.openAt(r.left, r.bottom + 2, items)
     }
-    const pick = (next: readonly (string | number)[]): void => {
+    const choose = (next: readonly (string | number)[]): void => {
       // Picking agents by hand ends the card's filter.
       setView(what === 'agents' ? { agents: next as string[], forCard: undefined } : { cards: next as number[] })
       show(next)
@@ -547,7 +554,9 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
     <div
       className="activity-tab activity-workspace"
       onKeyDown={(e) => {
-        if (e.key === 'Escape' && clearPick()) e.stopPropagation()
+        if (e.key !== 'Escape') return
+        // A call the map showed first, then the pick (HI-3568: the shared view again), the map off too.
+        if (clearPick() || (picked && mode === 'shared' && (pick(null), true))) e.stopPropagation()
       }}
     >
       <div className="activity-main">
@@ -584,44 +593,22 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
             <IconButton icon="refresh" title={tr(ACTIVITY_M.refresh)} onClick={refresh} />
           </div>
         </div>
-        {groups.length > 0 && (
-          <div className="activity-tabs activity-tab-groups" role="tablist" aria-label={tr(ACTIVITY_M.tabsLabel)}>
-            {groups.map((g) => (
-              <div key={g.host.path} className="activity-tab-group" role="presentation" data-host={g.host.name}>
-                <span className="activity-tab-group-name faint">{g.host === assistant ? tr(M.assistant) : g.host.name}</span>
-                {g.tabs.map((t: ActivityTabInfo) => {
-                  const key = activityAgentKey(g.host.path, t.agentId)
-                  const on = key === current?.key
-                  return (
-                    <button
-                      key={key}
-                      role="tab"
-                      className={cx('activity-agent-tab', on && 'active')}
-                      aria-selected={on}
-                      data-agent={t.agentId}
-                      data-host={g.host.name}
-                      title={t.card ? `${t.name} · ${t.card.label} ${t.card.title}` : t.name}
-                      onClick={() => {
-                        setSelected(null)
-                        setView({ tab: key })
-                      }}
-                    >
-                      <StateMark state={markOf(t.state)} />
-                      <span className="activity-agent-tab-name">{t.name}</span>
-                      {t.card && <span className="faint activity-agent-tab-card">{t.card.label}</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            ))}
+        {/* The strip, the one picker (HI-3568): above the list with the map off, under the map otherwise. */}
+        {!mapOn && strip.length > 0 && (
+          <div className="activity-strip-bar">
+            <AgentStrip agents={strip} picked={picked} single={mode === 'single'} onPick={pick} showContext={false} live={false} />
           </div>
         )}
         <div className={cx('activity-body', mapOn && entries.length > 0 && 'with-map')}>
-          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={workspaceName} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pickMapAgent} strip={strip} picked={alone} onOpenFile={openFile} onShowCall={showCall} onEscape={clearPick} live={map.animate} />}
-        {!parts.length || !current ? (
+          {mapOn && entries.length > 0 && <ActivityMap mode={drawnMode} title={workspaceName} model={map.model} pulses={map.pulses} endPulse={map.endPulse} show={mapShow} onPick={pick} strip={strip} picked={picked} single={mode === 'single'} onOpenFile={openFile} onShowCall={showCall} onEscape={clearPick} live={map.animate} />}
+        {nowRows.length > 0 ? (
+          <div className="activity-list">
+            <NowRows rows={nowRows} onPick={pick} nameOf={nameOf} />
+          </div>
+        ) : !parts.length || !current ? (
           <div className="pane-empty">{reading ? null : forCardLabel ? tr(M.cardNobody, { card: forCardLabel }) : tr(filtered ? ACTIVITY_M.emptyFiltered : M.empty)}</div>
         ) : (
-          <div className="activity-list" role="tabpanel">
+          <div className="activity-list">
             {card ? (
               <div className="activity-card-head">
                 <button className="link activity-card-key" title={tr(ACTIVITY_M.openCard)} onClick={() => set({ taskOpen: card.number })}>
@@ -688,15 +675,15 @@ export function WorkspaceActivityPanel() {
 export const SHOW_IN_ACTIVITY = msg({ id: 'activity.workspace.showIn', defaultMessage: 'Show in Activity', description: "A button in a Progress panel run's details, and an entry of a lane's menu: opens Activity's workspace level on that run's agent (or the lane's builder and reviewer), what it runs now." })
 
 const M = {
-  heading: msg({ id: 'activity.workspace.heading', defaultMessage: 'Activity', description: "Activity's workspace level (the activity bar's Activity view): what every project's agents run now, their tabs grouped by project." }),
+  heading: msg({ id: 'activity.workspace.heading', defaultMessage: 'Activity', description: "Activity's workspace level (the activity bar's Activity view): what every project's agents run now." }),
   panelTip: msg({ id: 'activity.workspace.panelTip', defaultMessage: "What the workspace's agents run now. The whole workspace shows every project's running agents together; a project opens its own Activity tab.", description: "The info tip beside the Activity view's sidebar heading." }),
   noWorkspace: msg({ id: 'activity.workspace.noWorkspace', defaultMessage: 'Open a workspace to see what its agents run.', description: "The Activity view's sidebar with no workspace open." }),
   whole: msg({ id: 'activity.workspace.whole', defaultMessage: 'Whole workspace', description: "A row of the Activity view's sidebar: every project's running agents together (as Performance's Whole workspace)." }),
   wholeTip: msg({ id: 'activity.workspace.wholeTip', defaultMessage: "Every project's running agents, grouped by project, and the Assistant when it runs.", description: "Tooltip of the Activity view's Whole workspace row." }),
   projects: msg({ id: 'activity.workspace.projects', defaultMessage: 'Projects', description: "A section heading in the Activity view's sidebar, over a row per project." }),
   projectTip: msg({ id: 'activity.workspace.projectTip', defaultMessage: "Open {project}'s Activity tab.", description: "Tooltip of a project's row in the Activity view's sidebar: opens that project's own Activity tab. {project} is its name." }),
-  assistant: msg({ id: 'activity.workspace.assistant', defaultMessage: 'Assistant', description: "The Assistant's group heading among the Activity view's agent tabs (its tabs grouped by project; the Combwork Assistant is its own group)." }),
-  agentIn: msg({ id: 'activity.workspace.agentIn', defaultMessage: '{project} · {agent}', description: "An entry of the Activity view's Agents menu: an agent ({agent}) and its project ({project})." }),
+  assistant: msg({ id: 'activity.workspace.assistant', defaultMessage: 'Assistant', description: "In place of a project's name for the Combwork Assistant's agent in the Activity view's rows (HI-3568: \"Assistant · its agent\")." }),
+  agentIn: msg({ id: 'activity.workspace.agentIn', defaultMessage: '{project} · {agent}', description: "An entry of the Activity view's Agents menu, and an agent's row in its shared view (HI-3568): an agent ({agent}) and its project ({project})." }),
   empty: msg({ id: 'activity.workspace.empty', defaultMessage: 'Nothing is running in this workspace. Start an agent to see what it runs here.', description: "Activity's workspace level when no agent of any project runs anything." }),
   forCard: msg({ id: 'activity.workspace.forCard', defaultMessage: 'Card {card}', description: "A chip above Activity's workspace level when it was opened from a card, naming the filter (not saying anyone works on it): only the agents working on that card ({card}: its key, such as HI-12) now have tabs." }),
   clearCard: msg({ id: 'activity.workspace.clearCard', defaultMessage: 'Show every agent', description: "Tooltip of the button on Activity's \"Working on HI-12\" chip: drops the card's filter." }),

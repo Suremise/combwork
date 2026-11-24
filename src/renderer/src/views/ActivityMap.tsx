@@ -335,14 +335,13 @@ export interface ActivityMapProps {
   pulses: MapPulse[]
   endPulse: (id: string) => void
   show: MapShow
-  /** The strip's click: show this agent's map, the others still listed (HI-3180), or all again for the one shown. */
-  onPick?: (key: string) => void
-  /**
-   * The agents of the selection while one of them is shown alone (HI-3180): the strip keeps listing
-   * them, that one marked (`picked`), so a click switches to another. Without it, the strip lists the shared map's.
-   */
-  strip?: readonly MapStripAgent[]
+  /** Picks an agent (HI-3568: its map and its details), or none (null: the shared view): the strip's and the dots' click. */
+  onPick?: (key: string | null) => void
+  /** The strip's agents (HI-3568), the selection's, the one picked marked (`picked`): always listed, the one picker. */
+  strip: readonly MapStripAgent[]
   picked?: string | null
+  /** The Agents filter on one agent (HI-3568): it is the pick, and the strip has no All. */
+  single?: boolean
   /** A file a Read or Edit panel lists, opened in Files (HI-3498): its agent's key and its path as the agent named it. */
   onOpenFile?: (agentKey: string, path: string) => void
   /** A feed row's or a panel row's call, shown in the list (HI-3499). */
@@ -353,24 +352,77 @@ export interface ActivityMapProps {
   live?: boolean
 }
 
-/** An agent in the strip: its ring, its name and its context. */
-export type MapStripAgent = Pick<MapModel['agents'][number], 'key' | 'name' | 'context' | 'load'>
+/**
+ * An agent in the strip: its ring, its name and its context; on the workspace level (HI-3568) `label` names it with its
+ * project and `host` is that project's name, so two projects' agents of one name are told apart.
+ */
+export type MapStripAgent = Pick<MapModel['agents'][number], 'key' | 'name' | 'context' | 'load'> & { agentId?: string; label?: string; host?: string }
 
 /**
- * The strip's agents for the selection (HI-3180) while one of them is shown alone, in the selection's order: those the
- * map reads (`read`, its read order: the one shown first, HR1's round 1) read or still loading, the rest not shown.
+ * The strip's agents (HI-3180, HI-3568): the selection's, in its order, whether one is picked or not: those the map reads
+ * (`read`, its read order: the one picked first, HR1's round 1) read or still loading, the rest not shown.
  */
 export function mapStrip(entries: readonly MapEntry[], contexts: ReadonlyMap<string, MapContext | null>, read: readonly MapEntry[]): MapStripAgent[] {
   const reads = mapReadKeys(read)
   return entries.map((e) => {
     const sid = e.input.agents.find((x) => x.id === e.agentId)?.live?.sessionId ?? null
     const load: MapStripAgent['load'] = !reads.has(e.key) ? 'notLoaded' : !sid || e.input.turns.get(sid) ? 'loaded' : 'loading'
-    return { key: e.key, name: e.name, context: contexts.get(e.key) ?? null, load }
+    return { key: e.key, agentId: e.agentId, name: e.name, context: contexts.get(e.key) ?? null, load }
   })
 }
 
-/** The map: stations, spokes, pulses, the centre, the feed and (shared) the agents' context rings. */
-export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulses, endPulse, show, onPick, strip, picked = null, onOpenFile, onShowCall, onEscape, live = false }: ActivityMapProps) {
+/**
+ * The agents' strip (HI-3180, HI-3568): the one picker of the Activity views, under the map, or above the list with the
+ * map off. All first (the shared view, pressed while no agent is picked), then a ring per agent of the selection: a click
+ * picks it, the picked one's again (or All) shows every agent. Context off, the rings say no percentage. The Agents filter
+ * on one agent: that agent, picked, and no All.
+ */
+export const AgentStrip = memo(function AgentStrip({ agents, picked, single, onPick, showContext, live }: { agents: readonly MapStripAgent[]; picked: string | null; single: boolean; onPick: (key: string | null) => void; showContext: boolean; live: boolean }) {
+  const motion = useMotion()
+  // Agents arriving in the strip and leaving it (HI-3499), eased only while the map moves.
+  const comings = useComings(agents, live && motion)
+  if (!agents.length) return null
+  return (
+    <div className="activity-map-strip" role="group" aria-label={tr(M.stripLabel)}>
+      {!single && (
+        <button className={cx('activity-strip-all', picked === null && 'picked')} aria-pressed={picked === null} title={tr(M.allTip)} onClick={() => onPick(null)}>
+          <span className="activity-map-ring-name">{tr(M.all)}</span>
+        </button>
+      )}
+      {agents.map((a, i) => {
+        const on = a.key === picked
+        const load = showContext ? a.load : 'loaded'
+        return (
+          <button
+            key={a.key}
+            className={cx('activity-map-ring', on && 'picked', comings.arriving.has(a.key) && 'arriving')}
+            data-agent={a.key}
+            data-host={a.host}
+            data-agent-id={a.agentId}
+            data-load={a.load}
+            aria-pressed={on}
+            title={tr(M.ringTip, { name: a.label ?? a.name, pct: a.context?.pct ?? 0, known: a.context?.pct != null ? 'yes' : 'no', load: showContext ? a.load : 'hidden', picked: on ? (single ? 'filter' : 'yes') : 'no' })} // i18n-ignore: a select's key, never shown
+            onClick={() => !single && onPick(on ? null : a.key)}
+          >
+            <Ring pct={showContext ? (a.context?.pct ?? null) : null} colour={colourOf(i)} hatched={load !== 'loaded'} />
+            <span className="activity-map-ring-name">{a.label ?? a.name}</span>
+            {showContext && <span className="faint">{a.load === 'notLoaded' ? tr(M.notLoaded) : a.context?.pct != null ? tr(M.pct, { pct: a.context.pct }) : '—'}</span>}
+          </button>
+        )
+      })}
+      {/* An agent that left (HI-3499): its ring fades out where the strip ends, then goes. */}
+      {comings.leaving.map(({ item: a, index }) => (
+        <span key={`leaving:${a.key}`} className="activity-map-ring leaving" data-agent={a.key} aria-hidden="true" onAnimationEnd={() => comings.gone(a.key)}>
+          <Ring pct={showContext ? (a.context?.pct ?? null) : null} colour={colourOf(index)} hatched={showContext && a.load !== 'loaded'} />
+          <span className="activity-map-ring-name">{a.label ?? a.name}</span>
+        </span>
+      ))}
+    </div>
+  )
+})
+
+/** The map: stations, spokes, pulses, the centre, the feed and the agents' strip. */
+export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulses, endPulse, show, onPick, strip, picked = null, single = false, onOpenFile, onShowCall, onEscape, live = false }: ActivityMapProps) {
   const motion = useMotion()
   const ids = useMapIds()
   // The station whose panel is open (HI-3498): docked over the feed; its station again, its ✕ or Escape closes it.
@@ -383,9 +435,9 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
   const pickHere = useCallback(
     (key: string) => {
       keepFocus()
-      onPick?.(key)
+      if (!single) onPick?.(key === picked ? null : key)
     },
-    [keepFocus, onPick]
+    [keepFocus, onPick, picked, single]
   )
   const closePanel = useCallback(() => {
     if (root.current?.contains(document.activeElement)) keepFocus()
@@ -403,10 +455,6 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
   const stationName = (s: MapStation): string => tr(M.station, { station: s })
   // Beside the list (a wide view), its width is the user's (HI-3179): a split dragged as the app's others, kept.
   const width = usePaneSize(MAP_PANE.key, MAP_PANE.width)
-  // The strip: the selection's agents while one is shown alone (HI-3180), else the shared map's.
-  const ringAgents: readonly MapStripAgent[] = strip ?? (mode === 'shared' ? model.agents : [])
-  // Agents arriving in the strip and leaving it (HI-3499), eased only while the map moves.
-  const comings = useComings(ringAgents, live && motion)
   // The agents' dots arriving at stations (HI-3499, HR1's round 1): eased only as they come while the map moves, never
   // on a frozen map's opening or redrawing, nor all at once as it goes live.
   const dots = useMemo(() => MAP_STATIONS.flatMap((s) => model.stations[s].here.map((k) => ({ key: dotKey(s, k) }))), [model.stations])
@@ -421,10 +469,10 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
       data-picked={picked ?? undefined}
       style={{ '--activity-map-width': `${width}px` } as React.CSSProperties}
       // Escape: an open panel closes first (HI-3498), then a call shown in the list (HI-3499), then back to every agent
-      // of the selection (HI-3180).
+      // of the selection (HI-3180, HI-3568: no pick).
       onKeyDown={(e) => {
         if (e.key !== 'Escape') return
-        const done = panel ? (closePanel(), true) : !!onEscape?.() || (!!picked && (onPick?.(picked), true))
+        const done = panel ? (closePanel(), true) : !!onEscape?.() || (!!picked && !single && (onPick?.(null), true))
         if (done) e.stopPropagation()
       }}
     >
@@ -489,33 +537,7 @@ export const ActivityMap = memo(function ActivityMap({ mode, title, model, pulse
           {one ? <Centre agent={one} showContext={show.context} ids={ids} /> : <SharedCentre title={title} agents={model.agents.length} working={working} waiting={waiting} ids={ids} />}
         </svg>
         )}
-        {show.context && ringAgents.length > 0 && (
-          <div className="activity-map-strip" role="list" aria-label={tr(M.stripLabel)}>
-            {ringAgents.map((a, i) => (
-              <button
-                key={a.key}
-                role="listitem"
-                className={cx('activity-map-ring', a.key === picked && 'picked', comings.arriving.has(a.key) && 'arriving')}
-                data-agent={a.key}
-                data-load={a.load}
-                aria-current={a.key === picked ? 'true' : undefined}
-                title={tr(M.ringTip, { name: a.name, pct: a.context?.pct ?? 0, known: a.context?.pct != null ? 'yes' : 'no', load: a.load, shown: a.key === picked ? 'yes' : 'no' })} // i18n-ignore: a select's key, never shown
-                onClick={() => onPick?.(a.key)}
-              >
-                <Ring pct={a.context?.pct ?? null} colour={colourOf(i)} hatched={a.load !== 'loaded'} />
-                <span className="activity-map-ring-name">{a.name}</span>
-                <span className="faint">{a.load === 'notLoaded' ? tr(M.notLoaded) : a.context?.pct != null ? tr(M.pct, { pct: a.context.pct }) : '—'}</span>
-              </button>
-            ))}
-            {/* An agent that left (HI-3499): its ring fades out where the strip ends, then goes. */}
-            {comings.leaving.map(({ item: a, index }) => (
-              <span key={`leaving:${a.key}`} className="activity-map-ring leaving" data-agent={a.key} aria-hidden="true" onAnimationEnd={() => comings.gone(a.key)}>
-                <Ring pct={a.context?.pct ?? null} colour={colourOf(index)} hatched={a.load !== 'loaded'} />
-                <span className="activity-map-ring-name">{a.name}</span>
-              </span>
-            ))}
-          </div>
-        )}
+        {onPick && <AgentStrip agents={strip} picked={picked} single={single} onPick={onPick} showContext={show.context} live={live} />}
       </div>
       {panel && <StationPanel station={panel} view={model.stations[panel]} model={model} name={stationName(panel)} colourOf={mode === 'shared' ? (k) => colourOf(colours.get(k)) : null} onClose={closePanel} onOpenFile={onOpenFile} onShowCall={onShowCall} />}
       {show.feed && !panel && (
@@ -939,9 +961,11 @@ const M = {
   contextUnknown: msg({ id: 'activity.map.contextUnknown', defaultMessage: 'Context —', description: "In the centre of the Activity map when the agent's context isn't known (no usage yet, or no window reported)." }),
   pct: msg({ id: 'activity.map.pct', defaultMessage: '{pct, number}%', description: "Beside an agent's ring on the Activity map's shared view: how full its context is, in percent." }),
   notLoaded: msg({ id: 'activity.map.notLoaded', defaultMessage: 'not shown', description: "Beside an agent's ring on the Activity map's shared view when it is past the agents the map reads (eight): its calls aren't on the map. Lower case." }),
-  ringTip: msg({ id: 'activity.map.ringTipShown', defaultMessage: '{name}: {load, select, notLoaded {past the eight agents the map reads, so its calls aren’t shown} loading {its calls are being read} other {{known, select, no {context not known} other {context {pct, number}%}}}}. {shown, select, yes {Shown on the map: click to show every agent again (or press Escape).} other {Click to show its map; the others stay listed here.}}', description: "Hover of an agent's ring in the Activity map's strip of the agents selected (HI-3180). {name} is the agent; {pct} its context in percent; known no: its context isn't known; shown yes: the map shows this agent alone now (a click shows all of them again), else it shows them all or another one. Keep the select keys." }),
+  ringTip: msg({ id: 'activity.map.ringTipPick', defaultMessage: '{load, select, notLoaded {{name}: past the eight agents the map reads, so its calls aren’t shown.} loading {{name}: its calls are being read.} hidden {{name}.} other {{known, select, no {{name}: context not known.} other {{name}: context {pct, number}%.}}}} {picked, select, yes {Picked: click again (or press Escape) to show every agent.} filter {Shown alone by the Agents filter.} other {Click to show its map and what it does now.}}', description: "Hover of an agent's ring in the Activity strip (HI-3568), the agents' one picker. {name} is the agent; {pct} its context in percent; known no: its context isn't known; load hidden: the context rings are turned off, so only its name. picked yes: this agent is picked (its map and its details shown; a click shows every agent again); filter: the Agents filter is on this one agent; else a click picks it. Keep the select keys." }),
+  all: msg({ id: 'activity.map.all', defaultMessage: 'All', description: "The first entry of the Activity strip of agents (HI-3568): the shared view, every agent on the map and each one's current step in a row; pressed while no agent is picked." }),
+  allTip: msg({ id: 'activity.map.allTip', defaultMessage: 'Show every agent: the shared map, and what each one does now.', description: 'Hover of the All entry at the start of the Activity strip of agents (HI-3568).' }),
   notRunning: msg({ id: 'activity.map.notRunning', defaultMessage: '{name} isn’t running, so there’s nothing to show on the map.', description: "The Activity map in place of one agent's graph when that agent has no running session (HI-3186): never started since Combwork opened, or stopped. {name} is the agent. The strip of the other agents stays below it." }),
-  stripLabel: msg({ id: 'activity.map.stripLabel', defaultMessage: "Agents' context", description: "The Activity map's strip of the agents' context rings, for screen readers." }),
+  stripLabel: msg({ id: 'activity.map.stripPick', defaultMessage: 'Agents', description: "The Activity strip of agents (HI-3568), each a ring with its context: picks the agent whose map and details show, for screen readers." }),
   feedHeading: msg({ id: 'activity.map.feedHeading', defaultMessage: 'Last actions', description: "The heading of the Activity map's feed: the agents' latest tool calls." }),
   noCalls: msg({ id: 'activity.map.noCalls', defaultMessage: 'No tool calls yet.', description: "The Activity map's feed when the agents shown have made no tool call in the turns read." }),
   partial: msg({ id: 'activity.map.partial', defaultMessage: 'From the latest calls read: not the whole history.', description: "Under the Activity map's feed when its counts are a sample (an agent made more calls than the map counts, or more agents run than it reads)." }),

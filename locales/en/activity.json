@@ -93,7 +93,7 @@
   },
   "activity.heading": {
     "defaultMessage": "Activity",
-    "description": "The Activity tab's heading: what the project's agents are running now, a tab per agent."
+    "description": "The Activity tab's heading: what the project's agents are running now."
   },
   "activity.hideFinished": {
     "defaultMessage": "Hide finished",
@@ -130,6 +130,14 @@
   "activity.map.agentsWorking": {
     "defaultMessage": "{agents, plural, one {# agent} other {# agents}} · {working, number} working",
     "description": "In the centre of the Activity map's shared view: how many agents it shows, and how many of them work."
+  },
+  "activity.map.all": {
+    "defaultMessage": "All",
+    "description": "The first entry of the Activity strip of agents (HI-3568): the shared view, every agent on the map and each one's current step in a row; pressed while no agent is picked."
+  },
+  "activity.map.allTip": {
+    "defaultMessage": "Show every agent: the shared map, and what each one does now.",
+    "description": "Hover of the All entry at the start of the Activity strip of agents (HI-3568)."
   },
   "activity.map.callGone": {
     "defaultMessage": "That call isn’t in what Activity has read now",
@@ -247,9 +255,9 @@
     "defaultMessage": "Prompt",
     "description": "On the Activity map and its feed: a prompt the agent was given (at the You station), named by this word only, never its text."
   },
-  "activity.map.ringTipShown": {
-    "defaultMessage": "{name}: {load, select, notLoaded {past the eight agents the map reads, so its calls aren’t shown} loading {its calls are being read} other {{known, select, no {context not known} other {context {pct, number}%}}}}. {shown, select, yes {Shown on the map: click to show every agent again (or press Escape).} other {Click to show its map; the others stay listed here.}}",
-    "description": "Hover of an agent's ring in the Activity map's strip of the agents selected (HI-3180). {name} is the agent; {pct} its context in percent; known no: its context isn't known; shown yes: the map shows this agent alone now (a click shows all of them again), else it shows them all or another one. Keep the select keys."
+  "activity.map.ringTipPick": {
+    "defaultMessage": "{load, select, notLoaded {{name}: past the eight agents the map reads, so its calls aren’t shown.} loading {{name}: its calls are being read.} hidden {{name}.} other {{known, select, no {{name}: context not known.} other {{name}: context {pct, number}%.}}}} {picked, select, yes {Picked: click again (or press Escape) to show every agent.} filter {Shown alone by the Agents filter.} other {Click to show its map and what it does now.}}",
+    "description": "Hover of an agent's ring in the Activity strip (HI-3568), the agents' one picker. {name} is the agent; {pct} its context in percent; known no: its context isn't known; load hidden: the context rings are turned off, so only its name. picked yes: this agent is picked (its map and its details shown; a click shows every agent again); filter: the Agents filter is on this one agent; else a click picks it. Keep the select keys."
   },
   "activity.map.runningKind": {
     "defaultMessage": "{kind, select, subagent {Subagent} other {{type, select, command {Command} monitor {Monitor} subagent {Subagent task} workflow {Workflow} other {Background task}}}}",
@@ -279,9 +287,9 @@
     "defaultMessage": "{station}: {status, select, notReported {not reported} other {loading…}}",
     "description": "Hover of a station on the Activity map before it has counts. {station} is its name; {status} is notReported when the agent's CLI doesn't report that kind of call (not an observed zero), else its calls are still being read. Keep the select keys."
   },
-  "activity.map.stripLabel": {
-    "defaultMessage": "Agents' context",
-    "description": "The Activity map's strip of the agents' context rings, for screen readers."
+  "activity.map.stripPick": {
+    "defaultMessage": "Agents",
+    "description": "The Activity strip of agents (HI-3568), each a ring with its context: picks the agent whose map and details show, for screen readers."
   },
   "activity.map.toggleContext": {
     "defaultMessage": "Context",
@@ -318,6 +326,10 @@
   "activity.nowHeading": {
     "defaultMessage": "Now",
     "description": "A heading in the Activity tab, over what an agent is doing in its turn now: its prompt, then the tool call under way (or thinking, or writing)."
+  },
+  "activity.nowRowTip": {
+    "defaultMessage": "Show {name}: its map and what it does now",
+    "description": "Hover of an agent's row in the Activity panel's shared view (HI-3568: no agent picked, each agent's current step in a row): a click picks that agent, as its ring in the strip does. {name} is the agent (on the workspace level, with its project)."
   },
   "activity.openCard": {
     "defaultMessage": "Open Card",
@@ -423,10 +435,6 @@
     "defaultMessage": "Subagents and background tasks",
     "description": "A heading in the Activity tab, over an agent's subagents and the background tasks it left running (a command, a monitor)."
   },
-  "activity.tabsLabel": {
-    "defaultMessage": "Agents",
-    "description": "The Activity tab's row of agent tabs (one per running agent), for screen readers."
-  },
   "activity.task": {
     "defaultMessage": "{type, select, subagent {Background subagent} command {Background command} monitor {Monitor} workflow {Workflow} other {Background task}}",
     "description": "A background task node in the Activity tree: what kind it is."
@@ -445,11 +453,11 @@
   },
   "activity.workspace.agentIn": {
     "defaultMessage": "{project} · {agent}",
-    "description": "An entry of the Activity view's Agents menu: an agent ({agent}) and its project ({project})."
+    "description": "An entry of the Activity view's Agents menu, and an agent's row in its shared view (HI-3568): an agent ({agent}) and its project ({project})."
   },
   "activity.workspace.assistant": {
     "defaultMessage": "Assistant",
-    "description": "The Assistant's group heading among the Activity view's agent tabs (its tabs grouped by project; the Combwork Assistant is its own group)."
+    "description": "In place of a project's name for the Combwork Assistant's agent in the Activity view's rows (HI-3568: \"Assistant · its agent\")."
   },
   "activity.workspace.cardNobody": {
     "defaultMessage": "Nobody is working on {card} now. The card has its history.",
@@ -469,7 +477,7 @@
   },
   "activity.workspace.heading": {
     "defaultMessage": "Activity",
-    "description": "Activity's workspace level (the activity bar's Activity view): what every project's agents run now, their tabs grouped by project."
+    "description": "Activity's workspace level (the activity bar's Activity view): what every project's agents run now."
   },
   "activity.workspace.noWorkspace": {
     "defaultMessage": "Open a workspace to see what its agents run.",
