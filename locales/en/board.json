@@ -1131,6 +1131,14 @@
     "defaultMessage": "GitHub source",
     "description": "A field label in the card dialog (HI-3551): the GitHub pull request or issue the card is about."
   },
+  "board.dialog.sourceAuthor": {
+    "defaultMessage": "Opened by {author}",
+    "description": "The card dialog’s GitHub source (HI-3553): who opened the pull request or issue on GitHub. {author} is a GitHub user name."
+  },
+  "board.dialog.sourceCatalogue": {
+    "defaultMessage": "Open the MCP Catalogue",
+    "description": "A button beside the card dialog’s outside-author warning (HI-3553): shows the MCP view’s Catalogue tab, where the Windows Sandbox server is."
+  },
   "board.dialog.sourceFailed": {
     "defaultMessage": "Couldn’t set the GitHub source",
     "description": "An error’s title (HI-3551): the card’s GitHub source couldn’t be set or removed; its message says why."
@@ -1146,6 +1154,10 @@
   "board.dialog.sourceOpen": {
     "defaultMessage": "Open on GitHub",
     "description": "Tooltip of the card dialog’s GitHub source link (HI-3551): opens the pull request or issue in the browser."
+  },
+  "board.dialog.sourceOutside": {
+    "defaultMessage": "{known, select, yes {{author} isn’t a member of {repo}} other {Combwork couldn’t tell whether {author} is a member of {repo}}}: this project’s checks run the pull request’s code on this PC, with your files and sign-ins. To run it apart from them, use Windows Sandbox: its server is in the MCP catalogue.",
+    "description": "A warning under a pull request source in the card dialog (HI-3553, a warning, never a rule): its author isn’t one of the repository’s members (or GitHub couldn’t say), so its checks would run a stranger’s code. {author} a GitHub user name, {repo} owner/name. Keep the select keys. Windows Sandbox and MCP are product names."
   },
   "board.dialog.sourcePlaceholder": {
     "defaultMessage": "A pull request or issue: its address or #number",

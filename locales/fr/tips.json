@@ -262,6 +262,8 @@
   "tips.gitSigning.title": "Des fusions signées sans attendre",
   "tips.gitView.text": "Dans un projet Git, l’onglet Gestion de versions affiche la branche, les dépôts distants, l’historique et les tags du projet, et te permet de changer de branche ou d’en créer une, de faire un fetch, un pull ou un push, de créer un tag et de définir l’identité des commits. La barre d’état affiche « {example} » : clique dessus pour y aller.",
   "tips.gitView.title": "Voir et modifier le git d’un projet",
+  "tips.githubPrs.text": "Choisis un projet dans le tableau des tâches et clique sur Depuis GitHub… pour lister ses pull requests ouvertes : Créer une carte en fait une carte dans À faire, relue comme toute autre. Ce qu’elle dit sur GitHub n’atteint les agents que cité.",
+  "tips.githubPrs.title": "Relire une pull request entrante",
   "tips.githubRepository.text": "Gestion de versions → Flux de travail → GitHub montre le dépôt du projet, lu depuis ses dépôts distants, et si ta CLI GitHub (gh) est connectée sur cet hôte. Combwork utilise ton propre gh et ne stocke aucun jeton.",
   "tips.githubRepository.title": "Ton projet sur GitHub, par ton propre gh",
   "tips.githubSource.text": "Donne à une carte une source GitHub (l’adresse ou le #numéro d’une pull request) dans sa boîte de dialogue : elle travaille sur la branche de cette pull request dans un emplacement, et sa relecture lit tout le changement. Elle n’est jamais fusionnée ici.",

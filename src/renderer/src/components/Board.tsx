@@ -21,6 +21,7 @@ import { KindField, KindMark, KindProposal } from './CardKind'
 import { ReviewSkipField, ReviewSkipMark, ReviewSkipProposal, useProjectReviews } from './CardReviewSkip'
 import { TargetField, TargetMark, useProjectTargets } from './CardTarget'
 import { SourceField } from './CardSource'
+import { FromGithubButton } from './GithubPrs'
 import { askedByNow, useForYou } from '../forYou'
 import { useTeamPause, workspacePaused } from '../teamPause'
 import type { ForYouItem } from '@shared/workflow/workView'
@@ -1372,6 +1373,8 @@ export function BoardToolbar({
   useLanguage()
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const count = useStore((s) => (s.tasks ?? NO_TASKS).filter((c) => c.archived && (project === null || c.project.toLowerCase() === project.toLowerCase())).length)
+  // HI-3553: one project's board offers its open pull requests (From GitHub…) when it has a GitHub repository.
+  const projectPath = useStore((s) => (project ? (s.workspace?.projects.find((p) => p.name.toLowerCase() === project.toLowerCase() && p.isGitRepo)?.path ?? null) : null))
   // How many cards an older version saved are set aside (#1044): the ⋯ menu offers them while any are. Read again as the board
   // changes, and as their dialog closes: a discard there changes no card, so the board alone wouldn't say (HI-1860).
   const tasks = useStore((s) => s.tasks)
@@ -1406,6 +1409,7 @@ export function BoardToolbar({
       </label>
       <BoardWorkflowLink project={project} />
       <div className="grow" />
+      {project && projectPath && <FromGithubButton project={project} projectPath={projectPath} readOnly={readOnly} />}
       <button className="btn primary" disabled={!!readOnly} title={readOnly ?? undefined} onClick={() => set({ taskOpen: { project: project ?? '' } })}>
         <Icon name="add" /> {tr(NEW_CARD)}
       </button>

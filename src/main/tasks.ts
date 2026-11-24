@@ -19,7 +19,7 @@ import { providerMessage } from '../shared/providers'
 import type { CardState } from '../shared/workflow/facts'
 import { isUnknown } from './platform/types'
 import type { CombworkErrorKind, KeptTargetShown, TaskMoveResult } from '../shared/types'
-import { cleanSource, parseSourceRef, sourceLabel, type GithubSource } from '../shared/githubSource'
+import { cleanSource, clipBody, parseSourceRef, sourceLabel, type GithubSource } from '../shared/githubSource'
 import { workflowMessage } from '../shared/workflow/texts'
 import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskChanges, TaskCursor, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, TaskWaiting, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
@@ -233,6 +233,8 @@ function clean(raw: Partial<TaskCard> & { projectId?: unknown }, n: number, ids?
     links: nums(raw.links),
     // HI-3551: its GitHub source, when well formed (absent otherwise, so a card's JSON doesn't grow for it).
     ...(cleanSource(raw.source) ? { source: cleanSource(raw.source)! } : {}),
+    // HI-3553: its source's body on GitHub, only beside a source (outside text, cut to its most).
+    ...(cleanSource(raw.source) && clipBody(raw.sourceBody) ? { sourceBody: clipBody(raw.sourceBody) } : {}),
     comments: Array.isArray(raw.comments) ? raw.comments.filter((c) => c && typeof c.text === 'string') : [],
     history: Array.isArray(raw.history) ? raw.history.filter((h) => h && typeof h.what === 'string') : [],
     archived: raw.archived === true,
@@ -2622,28 +2624,64 @@ export async function setSource(n: number, input: string | null, actor: TaskActo
   const first = await getTask(n, ws)
   if (!first.project) throw new TaskConflictError(SOURCE.noProject)
   const projectPath = ws.path ? join(ws.path, first.project) : first.project
+  const read = input !== null ? await readSource(ws, projectPath, String(input)) : null
+  return writeSource(ws, projectPath, n, read, actor)
+}
+
+/** The fields gh's `pr view` and `issue view` are asked for (HI-3553: with the author and body). */
+const SOURCE_FIELDS = { pr: 'number,title,url,headRefName,baseRefName,isCrossRepository,maintainerCanModify,author,body', issue: 'number,title,url,author,body' } as const
+
+/**
+ * HI-3551, HI-3553: a pull request or issue on the project's GitHub link, read through the gh service (outside the
+ * board's lock): an address, or `#n` (a PR first, else an issue; `kind` forces one). A PR's author's association with
+ * the repository comes from GitHub's REST answer (gh's `pr view` doesn't give it): unknown when that read fails.
+ */
+async function readSource(ws: WorkspaceService, projectPath: string, input: string, only?: 'pr'): Promise<{ source: GithubSource; body: string }> {
   const { githubRepoFor } = await import('./githubLink')
   const { gh } = await import('./ghCli')
-  let source: GithubSource | null = null
-  if (input !== null) {
-    const link = await githubRepoFor(ws, projectPath)
-    const ref = parseSourceRef(String(input), link)
-    if ('error' in ref) throw new TaskConflictError(ref.error === 'otherRepo' && link ? withValues(SOURCE.otherRepo, { repo: `${link.owner}/${link.repo}`, host: link.host }) : SOURCE[ref.error])
-    const repo = `${ref.ref.owner}/${ref.ref.repo}`
-    const ask = (kind: 'pr' | 'issue') => gh({ repo: ref.ref }, [kind, 'view', String(ref.number), '--json', kind === 'pr' ? 'number,title,url,headRefName,baseRefName,isCrossRepository,maintainerCanModify' : 'number,title,url'], { json: true })
-    let kind: 'pr' | 'issue' = ref.kind ?? 'pr'
-    let got = await ask(kind)
-    // `#n` names either: a pull request first, else an issue (GitHub numbers both alike).
-    if (!got.ok && got.problem === 'failed' && ref.kind === null) {
-      kind = 'issue'
-      got = await ask(kind)
-    }
-    if (!got.ok) throw new TaskConflictError(got.problem === 'failed' ? withValues(SOURCE.notFound, { number: ref.number, repo, why: got.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: got.problem, host: ref.ref.host })) // i18n-ignore: a select key (none), gh's own words otherwise
-    const j = (got.json ?? {}) as Record<string, unknown>
-    const str = (k: string): string => (typeof j[k] === 'string' ? (j[k] as string) : '')
-    source = cleanSource({ kind, ...ref.ref, number: ref.number, url: str('url') || `https://${ref.ref.host}/${repo}/${kind === 'pr' ? 'pull' : 'issues'}/${ref.number}`, title: str('title'), ...(kind === 'pr' ? { pr: { headRef: str('headRefName'), baseRef: str('baseRefName'), crossRepository: j.isCrossRepository === true, maintainerCanModify: j.maintainerCanModify === true } } : {}) }) ?? null
-    if (!source || (kind === 'pr' && (!source.pr?.headRef || !source.pr.baseRef))) throw new TaskConflictError(withValues(SOURCE.notFound, { number: ref.number, repo, why: 'none' })) // i18n-ignore: a select key (none)
+  const link = await githubRepoFor(ws, projectPath)
+  const ref = parseSourceRef(input, link)
+  if ('error' in ref) throw new TaskConflictError(ref.error === 'otherRepo' && link ? withValues(SOURCE.otherRepo, { repo: `${link.owner}/${link.repo}`, host: link.host }) : SOURCE[ref.error])
+  const repo = `${ref.ref.owner}/${ref.ref.repo}`
+  const ask = (kind: 'pr' | 'issue') => gh({ repo: ref.ref }, [kind, 'view', String(ref.number), '--json', SOURCE_FIELDS[kind]], { json: true })
+  let kind: 'pr' | 'issue' = only ?? ref.kind ?? 'pr'
+  let got = await ask(kind)
+  // `#n` names either: a pull request first, else an issue (GitHub numbers both alike).
+  if (!got.ok && got.problem === 'failed' && ref.kind === null && !only) {
+    kind = 'issue'
+    got = await ask(kind)
   }
+  if (!got.ok) throw new TaskConflictError(got.problem === 'failed' ? withValues(SOURCE.notFound, { number: ref.number, repo, why: got.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: got.problem, host: ref.ref.host })) // i18n-ignore: a select key (none), gh's own words otherwise
+  const j = (got.json ?? {}) as Record<string, unknown>
+  const str = (k: string): string => (typeof j[k] === 'string' ? (j[k] as string) : '')
+  const login = j.author && typeof j.author === 'object' && typeof (j.author as { login?: unknown }).login === 'string' ? (j.author as { login: string }).login : ''
+  // A PR's author's standing in the repository: the REST answer's author_association, on the same host (gh api names it).
+  const association = kind === 'pr' && login ? await gh({ host: ref.ref.host }, ['api', `repos/${repo}/pulls/${ref.number}`, '--jq', '.author_association']).then((r) => (r.ok && /^[A-Z_]{1,40}$/.test(r.stdout.trim()) ? r.stdout.trim() : null)) : null
+  const source = cleanSource({ kind, ...ref.ref, number: ref.number, url: str('url') || `https://${ref.ref.host}/${repo}/${kind === 'pr' ? 'pull' : 'issues'}/${ref.number}`, title: str('title'), ...(kind === 'pr' ? { pr: { headRef: str('headRefName'), baseRef: str('baseRefName'), crossRepository: j.isCrossRepository === true, maintainerCanModify: j.maintainerCanModify === true } } : {}), ...(login ? { author: { login, association } } : {}) })
+  if (!source || (kind === 'pr' && (!source.pr?.headRef || !source.pr.baseRef))) throw new TaskConflictError(withValues(SOURCE.notFound, { number: ref.number, repo, why: 'none' })) // i18n-ignore: a select key (none)
+  return { source, body: clipBody(j.body) }
+}
+
+/**
+ * HI-3553: an open pull request on the project's GitHub link made a card in Todo (the board's From GitHub…), the user's
+ * alone: its title and description the window's (in the user's language), its source and body read from GitHub again
+ * here. A PR some card not archived is already about isn't made twice: that card comes back, `existing`.
+ */
+export async function createFromPr(project: string, number: number, words: { title: string; description: string }, actor: TaskActor): Promise<{ card: TaskCard; existing: boolean }> {
+  if (actor.kind !== 'user') throw new TaskPermissionError(SOURCE.agents)
+  const ws = workspace
+  const projectPath = ws.path ? join(ws.path, project) : project
+  const read = await readSource(ws, projectPath, `#${number}`, 'pr')
+  const { prSourceCards } = await import('./boardStore')
+  const had = prSourceCards(ws, read.source).find((c) => c.pr === read.source.number)
+  if (had) return { card: await getTask(had.n, ws), existing: true }
+  const card = await createTask({ title: words.title, description: words.description, project, labels: [sourceLabel('pr')] }, actor)
+  return { card: await writeSource(ws, projectPath, card.number, read, actor), existing: false }
+}
+
+/** HI-3551: sets (or clears, null) a card's source read from GitHub, under the board's lock, while its work hasn't started. */
+async function writeSource(ws: WorkspaceService, projectPath: string, n: number, read: { source: GithubSource; body: string } | null, actor: TaskActor): Promise<TaskCard> {
+  const source = read?.source ?? null
   const { workflowFor } = await import('./workflow/service')
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   return recordingAs(actor, () =>
@@ -2653,12 +2691,15 @@ export async function setSource(n: number, input: string | null, actor: TaskActo
       // Under the board's lock, where a start is written: never once its work has started (a put back card included).
       const s = wf ? wf.state(wf.store.card(n)) : null
       if (s?.started || !['todo', 'hold'].includes(s?.stage ?? card.column)) throw new TaskConflictError(withValues(SOURCE.started, { card: cardRef(n) }))
-      if (JSON.stringify(card.source ?? null) === JSON.stringify(source)) return card
+      if (JSON.stringify(card.source ?? null) === JSON.stringify(source) && (card.sourceBody ?? '') === (read?.body ?? '')) return card
       const before = structuredClone(card)
       const label = source ? sourceLabel(source.kind) : null
       const old = card.source ? sourceLabel(card.source.kind) : null
       if (source) card.source = source
       else delete card.source
+      // HI-3553: GitHub's body beside it (outside text), gone with it.
+      if (read?.body) card.sourceBody = read.body
+      else delete card.sourceBody
       card.labels = [...card.labels.filter((l) => l !== old || l === label), ...(label && !card.labels.includes(label) ? [label] : [])]
       note(card, actorName(actor), storedText(HISTORY.source, source ? { set: 'yes', kind: source.kind, number: source.number, repo: `${source.owner}/${source.repo}` } : { set: 'no', kind: '', number: 0, repo: '' }))
       await saveCard(ws, n, card, before)

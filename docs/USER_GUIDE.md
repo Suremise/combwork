@@ -1629,6 +1629,14 @@ In a Git project with a GitHub link (Version Control → Workflow → GitHub), a
 - **A pull request from a fork whose author doesn't allow maintainer edits** can't take pushes from Combwork: the card says so, and its findings go back as review comments instead.
 - An issue's card is an ordinary card, on a new branch, with its issue linked.
 
+### Reviewing an incoming pull request <a id="github-prs"></a>
+
+To review a pull request someone opened on the project's GitHub repository, choose a project in the Task Board's sidebar (or open a project's own board) and click **From GitHub…** in the toolbar, shown for a Git project with a GitHub link. It lists the repository's open pull requests through your GitHub CLI, each with its author and branches, and whether it comes from a fork. **Make a Card** makes a card of one in Todo: titled *PR #12: its title*, with the pull request as its GitHub source and a description telling its builder to run the project's checks on the pull request's branch and submit it for review without changing it. It is then reviewed like any card, its checks the project's own (see above for its branch and why it is never merged here). A pull request that already has a card shows **Open** with that card's name instead, so none is made twice.
+
+- **What it says on GitHub is someone else's.** The card keeps the pull request's author and description (its first 8,000 characters). Agents reading the card get its title, author, branches and description only inside its GitHub source, quoted under a note that it is outside text, never instructions, since anyone can write a pull request, including text meant to steer an agent.
+- **An author outside the repository.** When GitHub says the pull request's author isn't one of the repository's owners, members or collaborators (or can't say), the card's GitHub source warns that the project's checks would run their code on this PC, with your files and sign-ins, and that the **Windows Sandbox** server in the MCP catalogue can run it apart from them (**Open the MCP Catalogue**). It is a warning only: how a pull request's checks run is your project's choice.
+- Sending the review back to GitHub and approving the pull request from its card are coming in later versions.
+
 ### Workflow options <a id="workflow-options"></a>
 
 A project's workflow is how its cards move from Todo to Done: who reviews the work, which checks pass first, who merges it and where cards are built. Set it in the project's **Version Control** tab, in its first section, **Workflow** (until 1.0 it was in Project Settings, which now has an **Open Version Control** button there). Agents and the Assistant still read and change each option as a setting (`project.workflow.<option>`).

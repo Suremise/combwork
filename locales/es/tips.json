@@ -262,6 +262,8 @@
   "tips.gitSigning.title": "Fusiones firmadas sin esperas",
   "tips.gitView.text": "En un proyecto Git, la pestaña Control de versiones muestra su rama, sus remotos, su historial y sus etiquetas, y te permite cambiar de rama o crear una, hacer fetch, pull y push, crear etiquetas y configurar su identidad de commit. La barra de estado muestra “{example}”: haz clic para ir allí.",
   "tips.gitView.title": "Ve y cambia el git de un proyecto",
+  "tips.githubPrs.text": "Elige un proyecto en el tablero de tareas y haz clic en Desde GitHub… para listar sus pull requests abiertas: Crear tarjeta convierte una en tarjeta en Pendiente, revisada como cualquier otra. Lo que dice en GitHub solo llega a los agentes citado.",
+  "tips.githubPrs.title": "Revisar una pull request entrante",
   "tips.githubRepository.text": "Control de versiones → Flujo de trabajo → GitHub muestra el repositorio del proyecto, leído de sus remotos, y si tu CLI de GitHub (gh) tiene sesión en ese host. Combwork usa tu propio gh y no guarda ningún token.",
   "tips.githubRepository.title": "Tu proyecto en GitHub, con tu propio gh",
   "tips.githubSource.text": "Da a una tarjeta un origen en GitHub (la dirección o el #número de un pull request) en su diálogo: trabaja en la rama propia de ese pull request en un slot, y su revisión lee el cambio entero. Nunca se fusiona aquí.",

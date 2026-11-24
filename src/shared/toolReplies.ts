@@ -7,6 +7,7 @@
  */
 import type { LiveSessionState, MergeSlotInfo, StoredText, TaskCard, TaskColumn, TaskDecision } from './types'
 import { storedForAgents } from './taskHistory'
+import type { SourceForAgents } from './githubSource'
 import { holderText, minutes, slotLine } from './mergeSlot'
 import { columnLabel, commentSummary } from './tasks'
 import { cardName, cardRef, namedBy, namesFrom, namesOf } from './projectKeys'
@@ -357,9 +358,9 @@ export function cardRequests(items: readonly { request: string; kind: string; ga
 }
 
 /** A card as the Agent API shows it: with what its agent is doing now, and why it is stalled. */
-export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held' | 'source'> {
-  /** HI-3551: its GitHub pull request or issue: what and where only (its title on GitHub is outside text, never given). */
-  source?: { kind: 'pr' | 'issue'; number: number; url: string }
+export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held' | 'source' | 'sourceBody'> {
+  /** HI-3551: its GitHub pull request or issue; HI-3553: GitHub's own words only inside it, quoted under a note (outsideText). */
+  source?: SourceForAgents
   /** The user's decisions, first (#357); without their ids. Absent when there are none. */
   decisions?: Omit<TaskDecision, 'id'>[]
   agent: { id: string; name: string; status: string; backgroundTasks: number } | null

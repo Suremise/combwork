@@ -1123,6 +1123,14 @@
     "defaultMessage": "See and change a project's git",
     "description": "A tip's title."
   },
+  "tips.githubPrs.text": {
+    "defaultMessage": "Choose a project on the Task Board and click From GitHub… to list its open pull requests: Make a Card makes one a card in Todo, reviewed like any other. What it says on GitHub reaches agents only quoted.",
+    "description": "A tip (HI-3553). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (From GitHub… and Make a Card are the board's buttons)."
+  },
+  "tips.githubPrs.title": {
+    "defaultMessage": "Review an incoming pull request",
+    "description": "A tip's title (HI-3553): a card can be made of an open pull request on the project's GitHub repository."
+  },
   "tips.githubRepository.text": {
     "defaultMessage": "Version Control → Workflow → GitHub shows the project's repository, read from its remotes, and whether your GitHub CLI (gh) is signed in on that host. Combwork uses your own gh and stores no token.",
     "description": "A tip (HI-3550). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Workflow's tab GitHub as translated there). GitHub CLI is a product name, gh its command: keep them."

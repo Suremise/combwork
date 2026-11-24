@@ -262,6 +262,8 @@
   "tips.gitSigning.title": "Signierte Merges ohne Warten",
   "tips.gitView.text": "In einem Git-Projekt zeigt der Tab „Versionsverwaltung“ Branch, Remotes, Verlauf und Tags des Projekts. Dort kannst du einen Branch wechseln oder anlegen, fetchen, pullen, pushen, taggen und die Commit-Identität festlegen. Die Statusleiste zeigt „{example}“: Ein Klick darauf führt dorthin.",
   "tips.gitView.title": "Git eines Projekts sehen und ändern",
+  "tips.githubPrs.text": "Wähle auf dem Task-Board ein Projekt und klicke auf Von GitHub…, um seine offenen Pull-Requests aufzulisten: Karte erstellen macht aus einem eine Karte in Offen, die wie jede andere reviewt wird. Was auf GitHub steht, erreicht Agenten nur zitiert.",
+  "tips.githubPrs.title": "Einen eingehenden Pull-Request reviewen",
   "tips.githubRepository.text": "Versionsverwaltung → Workflow → GitHub zeigt das Repository des Projekts, aus seinen Remotes gelesen, und ob deine GitHub CLI (gh) auf diesem Host angemeldet ist. Combwork nutzt dein eigenes gh und speichert kein Token.",
   "tips.githubRepository.title": "Dein Projekt auf GitHub, über dein eigenes gh",
   "tips.githubSource.text": "Gib einer Karte in ihrem Dialog eine GitHub-Quelle (die Adresse oder #Nummer eines Pull-Requests): Sie arbeitet in einem Slot auf dem eigenen Branch dieses Pull-Requests, und ihr Review liest die ganze Änderung. Hier wird sie nie gemergt.",

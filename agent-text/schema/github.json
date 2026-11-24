@@ -25,5 +25,8 @@
   },
   "github.link.notARemote": {
     "placeholders": {}
+  },
+  "github.source.outsideText": {
+    "placeholders": {}
   }
 }

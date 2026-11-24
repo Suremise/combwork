@@ -284,10 +284,13 @@ interface CombworkMessageValues {
   'board.dialog.savePostsIt': undefined
   'board.dialog.saving': undefined
   'board.dialog.source': undefined
+  'board.dialog.sourceAuthor': { author: string | number }
+  'board.dialog.sourceCatalogue': undefined
   'board.dialog.sourceFailed': undefined
   'board.dialog.sourceFork': undefined
   'board.dialog.sourceKind': { kind: string; number: string | number }
   'board.dialog.sourceOpen': undefined
+  'board.dialog.sourceOutside': { known: string; author: string | number; repo: string | number }
   'board.dialog.sourcePlaceholder': undefined
   'board.dialog.sourceRemove': undefined
   'board.dialog.sourceSet': undefined
