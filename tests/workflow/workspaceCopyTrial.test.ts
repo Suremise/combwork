@@ -7,6 +7,7 @@
 // conversation text), into CW_TRIAL_REPORT (else report.txt in its temp folder). Nothing is written in the original,
 // and no real profile is used.
 //   CW_TRIAL_WS=<workspace> CW_TRIAL_REPORT=<file> npx vitest run tests/workflow/workspaceCopyTrial.test.ts
+// focused: opt-in (HI-3569: skipped without CW_TRIAL_WS, so the focused-test picker leaves it out)
 import { execFileSync } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
