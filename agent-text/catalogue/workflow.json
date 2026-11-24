@@ -397,6 +397,26 @@
     "note": "A workflow option (glossary 2.6, G21): the target branch is the one it tracks on its remote; Combwork’s merge queue fetches it before each test merge and publishes each merge there first.",
     "audience": "both"
   },
+  "workflow.option.githubFeedback.desc": {
+    "text": "What goes back to a pull request a card was made from, posted through your GitHub CLI as your own account, always as a comment review (approving and merging stay yours): each reviewer agent’s verdict as it is given, the reviews you write on the card, or the agent’s verdict drafted on the card for you to edit and post.",
+    "note": "What the workflow option “Feedback to GitHub” does (HI-3559). GitHub CLI is a product name; a comment review is GitHub’s kind of review that neither approves nor requests changes.",
+    "audience": "both"
+  },
+  "workflow.option.githubFeedback.title": {
+    "text": "Feedback to GitHub",
+    "note": "A workflow option (HI-3559): who writes the review Combwork posts on a pull request a card was made from (GitHub tab).",
+    "audience": "both"
+  },
+  "workflow.option.githubFooter.desc": {
+    "text": "An agent’s review, posted as your account, ends with a line naming the model that drafted it, such as “Drafted by Opus 5.5 in Combwork”, which reviews you write yourself never carry.",
+    "note": "What the workflow option “Say which model drafted it” does (HI-3559). Keep the quoted line in English: it is posted to GitHub as written (Opus 5.5 is an example of a model’s name).",
+    "audience": "both"
+  },
+  "workflow.option.githubFooter.title": {
+    "text": "Say which model drafted it",
+    "note": "A workflow option (HI-3559): text an agent wrote, posted to GitHub, ends with a line naming the model.",
+    "audience": "both"
+  },
   "workflow.option.identity.desc": {
     "text": "Commits are made with the name and email from the project’s git config (else your global one).",
     "note": "What the workflow option “Commits use the project’s identity” does.",
@@ -1995,6 +2015,21 @@
   "workflow.value.folder.slots": {
     "text": "Each card in its own folder",
     "note": "A value of the workflow option “Where cards are built” (glossary 2.6, G11). The folder is a slot, a worktree Combwork lends to the card or its lane (glossary 2.5: slot).",
+    "audience": "both"
+  },
+  "workflow.value.githubFeedback.agent": {
+    "text": "The agent: its verdict is posted as it is given",
+    "note": "A value of the workflow option “Feedback to GitHub” (HI-3559): each reviewer agent’s verdict on a pull request’s card is posted to GitHub automatically.",
+    "audience": "both"
+  },
+  "workflow.value.githubFeedback.both": {
+    "text": "Both: the agent drafts, you edit and post",
+    "note": "A value of the workflow option “Feedback to GitHub” (HI-3559): a reviewer agent’s verdict is drafted on the card, and the user edits it and posts it with one button.",
+    "audience": "both"
+  },
+  "workflow.value.githubFeedback.user": {
+    "text": "You: you write and post it on the card",
+    "note": "A value of the workflow option “Feedback to GitHub” (HI-3559): nothing is posted unless the user writes a review on the card and posts it.",
     "audience": "both"
   },
   "workflow.value.mergeInstall.always": {

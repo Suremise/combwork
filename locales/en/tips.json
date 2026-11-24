@@ -1123,6 +1123,14 @@
     "defaultMessage": "See and change a project's git",
     "description": "A tip's title."
   },
+  "tips.githubFeedback.text": {
+    "defaultMessage": "A pull request’s card posts its review to GitHub as a comment from your account: by default a reviewer agent’s verdict is drafted on the card for you to edit and post. Choose who writes it in Version Control → Workflow → GitHub.",
+    "description": "A tip (HI-3559). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Version Control → Workflow → GitHub is a place in the window)."
+  },
+  "tips.githubFeedback.title": {
+    "defaultMessage": "Feedback to GitHub",
+    "description": "A tip's title (HI-3559): a pull request's card posts its review to GitHub."
+  },
   "tips.githubPrs.text": {
     "defaultMessage": "Choose a project on the Task Board and click From GitHub… to list its open pull requests: Make a Card makes one a card in Todo, reviewed like any other. What it says on GitHub reaches agents only quoted.",
     "description": "A tip (HI-3553). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (From GitHub… and Make a Card are the board's buttons)."

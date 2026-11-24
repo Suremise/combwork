@@ -1559,6 +1559,90 @@
     "defaultMessage": "{today, select, yes {{value} (as until now)} other {{value}}}",
     "description": "A choice in the merge queue's question before an upgraded project's first merge (HI-1697, For you): a value of a workflow option ({value}), marked when it is how Combwork merged until now. Keep the select keys as they are."
   },
+  "board.github.carried": {
+    "defaultMessage": "{inline, plural, =0 {} one {# line comment on the diff} other {# line comments on the diff}}{both, select, yes {, } other {}}{listed, plural, =0 {} one {# listed in it} other {# listed in it}}",
+    "description": "Under a posted review (HI-3559): how many of the user’s line comments sit on the pull request’s diff, and how many are listed in its text (lines GitHub’s diff doesn’t show). Keep the select key."
+  },
+  "board.github.change": {
+    "defaultMessage": "Change…",
+    "description": "A button under “Feedback to GitHub” in the card dialog (HI-3559): opens the option in Version Control → Workflow → GitHub."
+  },
+  "board.github.checkGithub": {
+    "defaultMessage": "Check on GitHub first",
+    "description": "A link beside the notice that a review may have been posted (HI-3559): opens the pull request on GitHub, to look before posting it again."
+  },
+  "board.github.comments": {
+    "defaultMessage": "{n, plural, one {With your # open line comment on this revision.} other {With your # open line comments on this revision.}}",
+    "description": "Under a review draft or the box for a review of the user’s own (HI-3559): the user’s open line comments it carries to GitHub."
+  },
+  "board.github.discard": {
+    "defaultMessage": "Discard",
+    "description": "A button on a review draft (HI-3559): drops it, never posted."
+  },
+  "board.github.discardFailed": {
+    "defaultMessage": "Couldn’t discard the draft",
+    "description": "An error’s title (HI-3559): a review draft couldn’t be discarded; its message says why."
+  },
+  "board.github.discarded": {
+    "defaultMessage": "Discarded draft",
+    "description": "A review draft the user discarded (HI-3559)."
+  },
+  "board.github.drafted": {
+    "defaultMessage": "Drafted from {reviewer}’s verdict",
+    "description": "Over a review draft in the card dialog (HI-3559): which reviewer agent’s verdict it is. {reviewer} is an agent’s name."
+  },
+  "board.github.failed": {
+    "defaultMessage": "Not posted: {error}",
+    "description": "A review that couldn’t be posted to GitHub (HI-3559). {error} says why (often the GitHub CLI’s own words, in English)."
+  },
+  "board.github.footer": {
+    "defaultMessage": "Ends with “{footer}”.",
+    "description": "Under a review draft (HI-3559): the line it ends with on GitHub, naming the model (quoted in English as posted)."
+  },
+  "board.github.label": {
+    "defaultMessage": "Feedback to GitHub",
+    "description": "A field label in the card dialog of a pull request’s card (HI-3559): the reviews posted to that pull request."
+  },
+  "board.github.notNow": {
+    "defaultMessage": "Not posted: Feedback to GitHub doesn’t post agents’ drafts now.",
+    "description": "Under a review draft the project’s option no longer lets be posted (HI-3559)."
+  },
+  "board.github.open": {
+    "defaultMessage": "Open on GitHub",
+    "description": "A link on a posted review (HI-3559): opens it on GitHub."
+  },
+  "board.github.option": {
+    "defaultMessage": "{option, select, agent {Each reviewer agent’s verdict is posted as it is given.} user {Only reviews you write here are posted.} other {A reviewer agent’s verdict is drafted here for you to edit and post.}} Posted as your GitHub account, always as a comment review.",
+    "description": "Under “Feedback to GitHub” in a pull request card’s dialog (HI-3559): what the project’s Feedback to GitHub option does. Keep the select keys. A comment review neither approves nor requests changes."
+  },
+  "board.github.post": {
+    "defaultMessage": "Post to GitHub",
+    "description": "A button in the card dialog (HI-3559): posts the review (a draft as edited, or the user’s own) to the pull request on GitHub."
+  },
+  "board.github.postAgain": {
+    "defaultMessage": "Post Again",
+    "description": "A button on a review that wasn’t posted to GitHub (HI-3559): tries again."
+  },
+  "board.github.postFailed": {
+    "defaultMessage": "Couldn’t post to GitHub",
+    "description": "An error’s title (HI-3559): a review couldn’t be posted; its message says why."
+  },
+  "board.github.posted": {
+    "defaultMessage": "Posted {when} by {by, select, combwork {Combwork} other {you}}",
+    "description": "A review posted to GitHub (HI-3559): when (a date and time), and by Combwork (an automatic one) or the user. Keep the select keys."
+  },
+  "board.github.posting": {
+    "defaultMessage": "Being posted to GitHub…",
+    "description": "A review in the card dialog (HI-3559) while it is posted."
+  },
+  "board.github.recovery": {
+    "defaultMessage": "{why, select, abandoned {Combwork didn’t post this: Combwork closed before it did. Post it now, or discard it.} stale {This may not have been posted: Combwork closed while posting it.} other {This may have been posted: GitHub’s answer didn’t come, or couldn’t be read.}}",
+    "description": "A notice on a review in a pull request card’s dialog (HI-3559) that wasn’t posted, or may or may not have been: an automatic post that never ran, one Combwork closed in the middle of, or one GitHub may have taken. Keep the select keys."
+  },
+  "board.github.write": {
+    "defaultMessage": "Write a review",
+    "description": "The placeholder of the box in a pull request card’s dialog where the user writes a review of their own to post (HI-3559)."
+  },
   "board.inbox.asks": {
     "defaultMessage": "Asks you something",
     "description": "An agent in the attention inbox has asked the user a question."

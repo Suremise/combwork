@@ -174,6 +174,7 @@ import type { SlotLevelForm, SlotOptionOrigin } from './slotDefaults'
 import type { GithubHostChange, GithubHostsForm } from './githubHost'
 import type { GithubLink, GithubRepoRef } from './githubRepo'
 import type { OpenPrsRead } from './githubSource'
+import type { GithubReviewRow, GithubReviewsView } from './githubReviews'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
 import type { CommitMessage, WorkflowOptions } from './workflow/options'
@@ -491,6 +492,10 @@ export interface CombworkRequests {
   /** HI-3553: the project's GitHub repository, without asking gh (null: no link); its open pull requests, through gh. */
   'github:repo': (projectPath: string) => GithubRepoRef | null
   'github:openPrs': (projectPath: string) => OpenPrsRead
+  /** HI-3559: a pull request's card's reviews to GitHub (Feedback to GitHub), and the user's posting or discarding one. */
+  'github:reviews': (n: number) => GithubReviewsView
+  'github:postReview': (n: number, row: number | null, body: string) => GithubReviewRow
+  'github:discardReview': (n: number, draft: number) => void
   /** Combwork's or the workspace's slot defaults (HI-1765: Settings → Workflow defaults, Git), with what each inherits. */
   'slots:levelForm': (level: WorkflowLevel) => SlotLevelForm
   /** Sets one of a level's slot defaults (an empty string: none), or with null removes it, so it inherits. */

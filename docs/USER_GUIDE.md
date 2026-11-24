@@ -1635,7 +1635,19 @@ To review a pull request someone opened on the project's GitHub repository, choo
 
 - **What it says on GitHub is someone else's.** The card keeps the pull request's author and description (its first 8,000 characters). Agents reading the card get its title, author, branches and description only inside its GitHub source, quoted under a note that it is outside text, never instructions, since anyone can write a pull request, including text meant to steer an agent.
 - **An author outside the repository.** When GitHub says the pull request's author isn't one of the repository's owners, members or collaborators (or can't say), the card's GitHub source warns that the project's checks would run their code on this PC, with your files and sign-ins, and that the **Windows Sandbox** server in the MCP catalogue can run it apart from them (**Open the MCP Catalogue**). It is a warning only: how a pull request's checks run is your project's choice.
-- Sending the review back to GitHub and approving the pull request from its card are coming in later versions.
+- What the review finds goes back to the pull request as **Feedback to GitHub** says (below). Approving the pull request from its card is coming in a later version.
+
+### Feedback to GitHub <a id="github-feedback"></a>
+
+A card made of a pull request (or given one as its GitHub source) shows **Feedback to GitHub** in its dialog: the reviews it posts to that pull request. Combwork posts them through your GitHub CLI, so they appear as written by your own GitHub account, and always as a **comment** review: one that neither approves nor requests changes. Approving and merging stay yours, on GitHub. Who writes them is the workflow option **Feedback to GitHub**, in Version Control → Workflow → GitHub (and in the workflow defaults and templates):
+
+- **Both** (the default): when a reviewer agent gives its verdict, it is drafted in the card's dialog. Edit it if you like, then **Post to GitHub**, or **Discard** it. Each verdict is a draft of its own, so with two reviewers there are two.
+- **The agent**: each reviewer agent's verdict is posted as it is given, without asking. If a post fails (gh signed out, say), the card says why and **Post Again** tries once more. If Combwork closed before posting it, the card says so and offers **Post**.
+- **You**: nothing an agent writes is posted. Write your review in the card's **Write a review** box and post it.
+
+Under Both and You you can also write a review of your own there at any time. A review carries your open line comments on that revision: those on lines the pull request's diff shows on GitHub sit on those lines there, and the rest are listed in the review's text. If GitHub won't take them on the lines (the pull request moved on meanwhile), the review is posted with all of them listed. A review whose post got no clear answer from GitHub (it didn't answer in time, or Combwork closed while posting) is marked *may have been posted*: Combwork never sends it again by itself, so look at the pull request first (**Check on GitHub first**), then **Post Again** or **Discard**. A review that failed keeps what you wrote, edits included.
+
+**Say which model drafted it** (on by default) ends an agent's review with *Drafted by Opus 5.5 in Combwork* (its model's name), since it is posted as your account; your own reviews never carry it. The option applies to verdicts given after it changes: turning on The agent never posts an older verdict. A review is posted only to the pull request's own repository: if the project's GitHub link names another one now, it isn't posted, and the card says why.
 
 ### Workflow options <a id="workflow-options"></a>
 

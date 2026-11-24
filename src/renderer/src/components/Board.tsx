@@ -22,6 +22,7 @@ import { ReviewSkipField, ReviewSkipMark, ReviewSkipProposal, useProjectReviews 
 import { TargetField, TargetMark, useProjectTargets } from './CardTarget'
 import { SourceField } from './CardSource'
 import { FromGithubButton } from './GithubPrs'
+import { GithubFeedbackField } from './CardGithubFeedback'
 import { askedByNow, useForYou } from '../forYou'
 import { useTeamPause, workspacePaused } from '../teamPause'
 import type { ForYouItem } from '@shared/workflow/workView'
@@ -2360,6 +2361,8 @@ export function TaskDialog() {
               }}
             />
           )}
+          {/* HI-3559: a pull request's card's reviews to GitHub. */}
+          {card?.source?.kind === 'pr' && <GithubFeedbackField card={card} />}
           <label>{tr(msg({ id: 'board.dialog.labels', defaultMessage: 'Labels', description: "A field label in the card dialog: the card's labels." }))}</label>
           <input className="input" placeholder={tr(msg({ id: 'board.dialog.labelsPlaceholder', defaultMessage: 'Comma separated, e.g. bug, ui', description: "Placeholder of the card dialog's labels box: labels separated by commas (bug and ui are examples)." }))} value={labels} readOnly={ro} onChange={(e) => setLabels(e.target.value)} />
           <label>{tr(BLOCKED_FIELD)}</label>

@@ -45,7 +45,10 @@ export const TEMPLATE_CARRIED = [
   'churnStopAt',
   'assistantWakes',
   'stageNames',
-  'maxAgents'
+  'maxAgents',
+  // HI-3559: who writes what goes back to GitHub, and the model's footer: a way of working, as the options above.
+  'githubFeedback',
+  'githubFooter'
 ] as const satisfies readonly OptionKey[]
 
 /**

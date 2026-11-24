@@ -603,6 +603,10 @@
     "defaultMessage": "Checks",
     "description": "A heading of the Workflow section: the options about the checks that must pass (glossary 2.3: checks)."
   },
+  "workflow.group.github": {
+    "defaultMessage": "Feedback to GitHub",
+    "description": "A heading of the Workflow section’s GitHub tab (HI-3559): what goes back to a pull request a card was made from."
+  },
   "workflow.group.loops": {
     "defaultMessage": "Card loops",
     "description": "A heading of the Workflow section: how card loops run, a builder and a reviewer taking cards in turn (glossary: card loop)."
@@ -994,6 +998,22 @@
   "workflow.option.followRemote.title": {
     "defaultMessage": "The target branch follows its remote",
     "description": "A workflow option (glossary 2.6, G21): the target branch is the one it tracks on its remote; Combwork’s merge queue fetches it before each test merge and publishes each merge there first."
+  },
+  "workflow.option.githubFeedback.desc": {
+    "defaultMessage": "What goes back to a pull request a card was made from, posted through your GitHub CLI as your own account, always as a comment review (approving and merging stay yours): each reviewer agent’s verdict as it is given, the reviews you write on the card, or the agent’s verdict drafted on the card for you to edit and post.",
+    "description": "What the workflow option “Feedback to GitHub” does (HI-3559). GitHub CLI is a product name; a comment review is GitHub’s kind of review that neither approves nor requests changes."
+  },
+  "workflow.option.githubFeedback.title": {
+    "defaultMessage": "Feedback to GitHub",
+    "description": "A workflow option (HI-3559): who writes the review Combwork posts on a pull request a card was made from (GitHub tab)."
+  },
+  "workflow.option.githubFooter.desc": {
+    "defaultMessage": "An agent’s review, posted as your account, ends with a line naming the model that drafted it, such as “Drafted by Opus 5.5 in Combwork”, which reviews you write yourself never carry.",
+    "description": "What the workflow option “Say which model drafted it” does (HI-3559). Keep the quoted line in English: it is posted to GitHub as written (Opus 5.5 is an example of a model’s name)."
+  },
+  "workflow.option.githubFooter.title": {
+    "defaultMessage": "Say which model drafted it",
+    "description": "A workflow option (HI-3559): text an agent wrote, posted to GitHub, ends with a line naming the model."
   },
   "workflow.option.identity.desc": {
     "defaultMessage": "Commits are made with the name and email from the project’s git config (else your global one).",
@@ -2686,6 +2706,18 @@
   "workflow.value.folder.slots": {
     "defaultMessage": "Each card in its own folder",
     "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11). The folder is a slot, a worktree Combwork lends to the card or its lane (glossary 2.5: slot)."
+  },
+  "workflow.value.githubFeedback.agent": {
+    "defaultMessage": "The agent: its verdict is posted as it is given",
+    "description": "A value of the workflow option “Feedback to GitHub” (HI-3559): each reviewer agent’s verdict on a pull request’s card is posted to GitHub automatically."
+  },
+  "workflow.value.githubFeedback.both": {
+    "defaultMessage": "Both: the agent drafts, you edit and post",
+    "description": "A value of the workflow option “Feedback to GitHub” (HI-3559): a reviewer agent’s verdict is drafted on the card, and the user edits it and posts it with one button."
+  },
+  "workflow.value.githubFeedback.user": {
+    "defaultMessage": "You: you write and post it on the card",
+    "description": "A value of the workflow option “Feedback to GitHub” (HI-3559): nothing is posted unless the user writes a review on the card and posts it."
   },
   "workflow.value.mergeInstall.always": {
     "defaultMessage": "Before every merge",
