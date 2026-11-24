@@ -1655,6 +1655,10 @@
     "defaultMessage": "Not posted: Feedback to GitHub doesn’t post agents’ drafts now.",
     "description": "Under a review draft the project’s option no longer lets be posted (HI-3559)."
   },
+  "board.github.notReplied": {
+    "defaultMessage": "{n, plural, one {# review thread wasn’t replied to} other {# review threads weren’t replied to}}{uncertain, select, yes { or may have been: check on GitHub} other {}}: {error}",
+    "description": "HI-3554: under a posted review of a fix card made by Address feedback: some of the review threads it addresses didn’t get its reply ({n}, how many); uncertain yes: GitHub may have taken one (no clear answer). {error} says why, often the GitHub CLI’s own words in English. Combwork doesn’t send them again by itself. Keep the select keys."
+  },
   "board.github.open": {
     "defaultMessage": "Open on GitHub",
     "description": "A link on a posted review (HI-3559): opens it on GitHub."
@@ -1686,6 +1690,10 @@
   "board.github.recovery": {
     "defaultMessage": "{why, select, abandoned {Combwork didn’t post this: Combwork closed before it did. Post it now, or discard it.} stale {This may not have been posted: Combwork closed while posting it.} other {This may have been posted: GitHub’s answer didn’t come, or couldn’t be read.}}",
     "description": "A notice on a review in a pull request card’s dialog (HI-3559) that wasn’t posted, or may or may not have been: an automatic post that never ran, one Combwork closed in the middle of, or one GitHub may have taken. Keep the select keys."
+  },
+  "board.github.replied": {
+    "defaultMessage": "{n, plural, one {Also replied in # review thread} other {Also replied in # review threads}}",
+    "description": "HI-3554: under a posted review of a fix card made by Address feedback: the review was also posted as a reply in each review thread it was made to address ({n}, how many)."
   },
   "board.github.write": {
     "defaultMessage": "Write a review",
@@ -2802,6 +2810,74 @@
   "board.pr.stale": {
     "defaultMessage": "GitHub didn’t answer just now: this is as last read.",
     "description": "HI-3552: the card dialog’s pull request: reading it from GitHub failed this time, so what is shown is older (or unknown)."
+  },
+  "board.prFeedback.address": {
+    "defaultMessage": "Address feedback ({n, number})",
+    "description": "HI-3554: a button in the card dialog: makes a fix card of the ticked pull request comments ({n}, how many), working on the pull request’s branch. Nothing is sent to an agent until that card is started."
+  },
+  "board.prFeedback.as": {
+    "defaultMessage": "{as, select, owner {owner} member {member} collaborator {collaborator} outside {outside contributor} other {standing unknown}}",
+    "description": "HI-3554: beside a comment’s author in the card dialog: how GitHub relates them to the repository: its owner, a member of its organisation, a collaborator, someone from outside it, or GitHub didn’t say. Keep the select keys."
+  },
+  "board.prFeedback.cardDesc": {
+    "defaultMessage": "Address the comments chosen from pull request #{number} on {repo} (made from {card}). They are with the card’s GitHub source, quoted as someone else’s words.",
+    "description": "HI-3554: the description of a fix card made by Address feedback: what to do. {number} the pull request’s number, {repo} owner/name, {card} the card it was made from (a key like HI-12)."
+  },
+  "board.prFeedback.cardTitle": {
+    "defaultMessage": "Address feedback on PR #{number}",
+    "description": "HI-3554: the title of a fix card made by Address feedback ({number}, the pull request’s number). PR is short for pull request."
+  },
+  "board.prFeedback.failed": {
+    "defaultMessage": "No fix card was made",
+    "description": "HI-3554: the title of an error after Address feedback in the card dialog."
+  },
+  "board.prFeedback.kind": {
+    "defaultMessage": "{kind, select, review {Review{state, select, APPROVED {: approved} CHANGES_REQUESTED {: changes requested} other {}}} thread {On {path}{line, select, none {} other {, line {line}}}} other {Comment}}",
+    "description": "HI-3554: what a pull request comment is, in the card dialog: a review’s own text (with its verdict: approved or changes requested), an inline review thread on a file ({path}, at {line}, a number), or a conversation comment. Keep the select keys and {path} as it is."
+  },
+  "board.prFeedback.label": {
+    "defaultMessage": "Pull request comments",
+    "description": "HI-3554: a field label in the card dialog: the comments, reviews and review threads on the card’s GitHub pull request."
+  },
+  "board.prFeedback.made": {
+    "defaultMessage": "Made {card} to address them.",
+    "description": "HI-3554: in the card dialog after Address feedback: the fix card made in Todo ({card}, its key like HI-12)."
+  },
+  "board.prFeedback.none": {
+    "defaultMessage": "No comments on pull request #{number} yet.",
+    "description": "HI-3554: the card dialog: the card’s GitHub pull request has no comments, reviews with text, or review threads. {number} its number."
+  },
+  "board.prFeedback.notOpen": {
+    "defaultMessage": "Pull request #{number} isn’t open: its feedback can’t be addressed here.",
+    "description": "HI-3554: the card dialog: the pull request was merged or closed, so Address feedback is off. {number} its number."
+  },
+  "board.prFeedback.openMade": {
+    "defaultMessage": "Open it",
+    "description": "HI-3554: a button beside “Made HI-12 to address them.”: opens that fix card."
+  },
+  "board.prFeedback.outsideNote": {
+    "defaultMessage": "Anyone can comment on a public repository: the fix card’s agent reads these quoted as someone else’s words, never as instructions.",
+    "description": "HI-3554: a note under the Address feedback button in the card dialog: the chosen comments reach the fix card’s agent only as quoted outside text."
+  },
+  "board.prFeedback.pick": {
+    "defaultMessage": "Address this one",
+    "description": "HI-3554: the tick box tooltip on a pull request comment in the card dialog: whether Address feedback includes it."
+  },
+  "board.prFeedback.problem": {
+    "defaultMessage": "Its comments couldn’t be read: {problem, select, missing {the GitHub CLI isn’t installed} signedOut {the GitHub CLI isn’t signed in on {host}} timeout {the GitHub CLI didn’t answer in time} other {{detail}}}.",
+    "description": "HI-3554: the card dialog: reading the pull request’s comments with the GitHub CLI (gh) failed. Keep the select keys. {host} a GitHub host name; {detail} gh’s own words (English)."
+  },
+  "board.prFeedback.reading": {
+    "defaultMessage": "Reading them from GitHub…",
+    "description": "HI-3554: the card dialog’s pull request comments while Combwork asks GitHub for them."
+  },
+  "board.prFeedback.refresh": {
+    "defaultMessage": "Refresh",
+    "description": "HI-3554: a button in the card dialog: read the pull request’s comments from GitHub again."
+  },
+  "board.prFeedback.replies": {
+    "defaultMessage": "{n, plural, one {# reply} other {# replies}}",
+    "description": "HI-3554: under an inline review thread in the card dialog: how many replies it has."
   },
   "board.progress.agentGone": {
     "defaultMessage": "{agent} has been removed from {project}.",

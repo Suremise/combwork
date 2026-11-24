@@ -973,6 +973,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // HI-3552: a card's pull request read now (its dialog opened), and every one in PR open (the board opened).
     'tasks:prStatus': async (n) => (await import('./workflow/prHosts')).prStatus(currentWorkspace(), Number(n)),
     'tasks:prFollow': async () => void (await import('./workflow/prHosts')).followAll(currentWorkspace()),
+    // HI-3554: a card's pull request's comments (its dialog opened), and Address feedback: the user's alone, read again in main.
+    'tasks:prFeedback': async (n) => (await import('./prFeedback')).prFeedbackOf(currentWorkspace(), Number(n)),
+    'tasks:addressFeedback': (n, target, ids, text) => tasks.createFromFeedback(Number(n), { host: String(target?.host ?? ''), owner: String(target?.owner ?? ''), repo: String(target?.repo ?? ''), number: Number(target?.number) }, Array.isArray(ids) ? ids.filter((i): i is string => typeof i === 'string').slice(0, 200) : [], { title: String(text?.title ?? '').slice(0, 200), description: String(text?.description ?? '').slice(0, 4000) }, { kind: 'user' }),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': async (n, patch, more) => {
       const user = { kind: 'user' } as const

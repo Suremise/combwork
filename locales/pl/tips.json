@@ -438,6 +438,8 @@
   "tips.permissionMode.title": "Przełącz tryb uprawnień",
   "tips.planLimitsProviders.text": "Pasek stanu pokazuje, ile planu zużyto, także dla Antigravity i Copilot: tygodniowe przydziały Antigravity dla Gemini i dla innych modeli oraz miesięczne żądania premium i czaty Copilot. Najedź na niego kursorem, aby zobaczyć, kiedy każdy z nich się odnowi.",
   "tips.planLimitsProviders.title": "Limity każdego planu na pasku stanu",
+  "tips.prComments.text": "Karta pull requesta pokazuje jego komentarze, recenzje i wątki recenzji na GitHubie, z tym, kto napisał każdy z nich. Zaznacz te, którymi trzeba się zająć, i kliknij Zajmij się uwagami: przejmie je karta poprawek na gałęzi pull requesta, cytowane jako słowa kogoś innego.",
+  "tips.prComments.title": "Zajmij się komentarzami do pull requesta",
   "tips.progressCard.text": "Uruchomienie w panelu Postęp pokazuje pod agentem kartę i rewizję, na której działało, na przykład #1061 · a3f2c1d: kliknij kartę, żeby ją otworzyć, albo rewizję, żeby ją skopiować.",
   "tips.progressCard.title": "Dla której karty było to uruchomienie?",
   "tips.progressCheck.text": "Uruchomienie dla karty jest zapisywane jako sprawdzenie rewizji karty. Jego szczegóły w panelu Postęp mówią „Liczy się jako sprawdzenie” albo dlaczego nie: nie uruchomiono go jako tego sprawdzenia, folder miał zmiany bez commita albo w trakcie działania zmieniły się pliki.",

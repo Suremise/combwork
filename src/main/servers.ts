@@ -3152,7 +3152,8 @@ export async function taskView(c: TaskCard, agents =new Map<string, Promise<Retu
   // for its cost in Combwork's window: left out.
   // HI-3551: its GitHub source as agents see it: what and where; HI-3553: GitHub's own words (title, author, body) only
   // inside it, quoted under a note saying they are someone else's and never instructions.
-  const { number, title, decisions, held: _held, source, sourceBody, ...rest } = c
+  // HI-3554: a fix card's chosen pull request feedback, likewise only inside it.
+  const { number, title, decisions, held: _held, source, sourceBody, sourceFeedback, ...rest } = c
   // Its running lane, for a card waiting in Review: its lane may be deadlocked (#1410).
   const lane = c.column === 'review' && c.project ? (await lanes.listLanes(workspace, { project: c.project }).catch(() => [])).find((l) => (l.state === 'active' || l.state === 'paused') && l.cards.some((x) => x.number === c.number)) : undefined
   const inLane = lane ? new Map((await tasks.allTasks(workspace, { numbers: lane.cards.map((x) => x.number) }).catch(() => [])).map((x) => [x.number, x])) : null
@@ -3169,7 +3170,7 @@ export async function taskView(c: TaskCard, agents =new Map<string, Promise<Retu
     ...(decisions?.length ? { decisions: decisions.map(tasks.withoutId) } : {}),
     ...(forYou ? { forYou } : {}),
     ...rest,
-    ...(source ? { source: sourceForAgents(source, sourceBody, say(OUTSIDE_TEXT_NOTE)) } : {}),
+    ...(source ? { source: sourceForAgents(source, sourceBody, say(OUTSIDE_TEXT_NOTE), sourceFeedback) } : {}),
     ...(files.length ? { description: paths(c.description) } : {}),
     comments: c.comments.map(entryForAgents).map((e) => (files.length ? { ...e, text: paths(e.text) } : e)),
     history: c.history.map(entryForAgents),

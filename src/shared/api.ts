@@ -1,4 +1,5 @@
 import type { PrView } from './githubSource'
+import type { FeedbackTarget, PrFeedbackRead } from './prFeedback'
 import type { FeedbackExpect, LineCommentView } from './workflow/lineComments'
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
@@ -608,6 +609,10 @@ export interface CombworkRequests {
   'tasks:setSource': (n: number, source: string | null) => TaskCard
   /** HI-3552: a card's pull request in PR open, read from GitHub now (or its last read); null: none. */
   'tasks:prStatus': (n: number) => PrView | null
+  /** HI-3554: the comments, reviews and threads of a card's pull request (its source's, or the one it opened), read now. */
+  'tasks:prFeedback': (n: number) => PrFeedbackRead
+  /** HI-3554: Address feedback: the chosen comments of card n's pull request made a fix card in Todo. */
+  'tasks:addressFeedback': (n: number, target: FeedbackTarget, ids: string[], text: { title: string; description: string }) => TaskCard
   /** HI-3552: every card's pull request in PR open read again now (the board opened). */
   'tasks:prFollow': () => void
   /** HI-3553: an open pull request made a card in Todo (the board's From GitHub…), or the card already about it. */

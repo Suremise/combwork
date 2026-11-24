@@ -33,7 +33,7 @@ export interface GithubReviewRow {
    * before posting again; discarded.
    */
   state: 'draft' | 'posting' | 'posted' | 'failed' | 'uncertain' | 'discarded'
-  posted?: { url: string | null; body: string; comments: string[]; inline: number; listed: number; at: string }
+  posted?: { url: string | null; body: string; comments: string[]; inline: number; listed: number; at: string; replies: ThreadReply[] }
   error?: string
 }
 
@@ -49,6 +49,20 @@ export interface GithubReviewsView {
   url: string
   /** HI-3560: when the user last approved the pull request from the card (null: never). */
   approved: string | null
+}
+
+/** HI-3554: a fix card's reply on one review thread it addresses: posted (its url), refused (`error`), or maybe posted (`uncertain`). */
+export interface ThreadReply {
+  thread: number
+  url?: string | null
+  error?: string
+  uncertain?: true
+}
+
+/** The replies a Posted fact holds, as read back (anything damaged dropped). */
+function repliesOf(raw: unknown): ThreadReply[] {
+  if (!Array.isArray(raw)) return []
+  return (raw as Record<string, unknown>[]).filter((r) => r && Number.isInteger(r.thread)).map((r) => ({ thread: r.thread as number, ...(typeof r.url === 'string' || r.url === null ? { url: r.url as string | null } : {}), ...(typeof r.error === 'string' ? { error: r.error } : {}), ...(r.uncertain === true ? { uncertain: true as const } : {}) }))
 }
 
 /** The card's reviews to and on GitHub, oldest first. */
@@ -84,7 +98,7 @@ export function foldGithubReviews(facts: readonly FactLike[]): GithubReviewRow[]
       const row = byPosting.get(Number(d.posting))
       if (!row || row.posting?.seq !== Number(d.posting)) continue
       row.state = 'posted'
-      row.posted = { url: typeof d.url === 'string' ? d.url : null, body: String(d.body ?? ''), comments: Array.isArray(d.comments) ? d.comments.map(String) : [], inline: Number(d.inline) || 0, listed: Number(d.listed) || 0, at: f.at }
+      row.posted = { url: typeof d.url === 'string' ? d.url : null, body: String(d.body ?? ''), comments: Array.isArray(d.comments) ? d.comments.map(String) : [], inline: Number(d.inline) || 0, listed: Number(d.listed) || 0, at: f.at, replies: repliesOf(d.replies) }
     } else if (f.kind === 'GithubReviewFailed') {
       const row = byPosting.get(Number(d.posting))
       if (!row || row.posting?.seq !== Number(d.posting) || row.state === 'posted') continue

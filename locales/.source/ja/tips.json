@@ -466,6 +466,8 @@
   "tips.permissionMode.title": "Switch permission mode",
   "tips.planLimitsProviders.text": "The status bar shows how much of your plan is used for Antigravity and Copilot too: Antigravity's weekly quotas for Gemini and for other models, Copilot's monthly premium requests and chats. Hover it for when each resets.",
   "tips.planLimitsProviders.title": "Every plan's limits in the status bar",
+  "tips.prComments.text": "A pull request’s card shows its comments, reviews and review threads on GitHub, with who wrote each. Tick the ones to act on and click Address feedback: a fix card on the pull request’s branch takes them, quoted as someone else’s words.",
+  "tips.prComments.title": "Address a pull request’s comments",
   "tips.progressCard.text": "A run in the Progress panel shows the card and the revision it ran on under the agent, such as #1061 · a3f2c1d: click the card to open it, or the revision to copy it.",
   "tips.progressCard.title": "Which card was that run for?",
   "tips.progressCheck.text": "A run for a card is recorded as a check of the card's revision. Its details in the Progress panel say Counts as check, or why not: it wasn't started as the check, the folder had uncommitted changes, or files changed while it ran.",

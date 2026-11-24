@@ -24,6 +24,7 @@ import { SourceField } from './CardSource'
 import { PrLine, PrStatus } from './CardPullRequest'
 import { FromGithubButton } from './GithubPrs'
 import { GithubFeedbackField } from './CardGithubFeedback'
+import { PrFeedbackField } from './CardPrFeedback'
 import { askedByNow, useForYou } from '../forYou'
 import { useTeamPause, workspacePaused } from '../teamPause'
 import type { ForYouItem } from '@shared/workflow/workView'
@@ -2371,6 +2372,8 @@ export function TaskDialog() {
           )}
           {/* HI-3559: a pull request's card's reviews to GitHub. */}
           {card?.source?.kind === 'pr' && <GithubFeedbackField card={card} />}
+          {/* HI-3554: its pull request's comments, and Address feedback. */}
+          {card?.project && <PrFeedbackField card={card} b={badge} />}
           <label>{tr(msg({ id: 'board.dialog.labels', defaultMessage: 'Labels', description: "A field label in the card dialog: the card's labels." }))}</label>
           <input className="input" placeholder={tr(msg({ id: 'board.dialog.labelsPlaceholder', defaultMessage: 'Comma separated, e.g. bug, ui', description: "Placeholder of the card dialog's labels box: labels separated by commas (bug and ui are examples)." }))} value={labels} readOnly={ro} onChange={(e) => setLabels(e.target.value)} />
           <label>{tr(BLOCKED_FIELD)}</label>

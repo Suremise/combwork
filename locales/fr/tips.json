@@ -438,6 +438,8 @@
   "tips.permissionMode.title": "Changer de mode d’autorisation",
   "tips.planLimitsProviders.text": "La barre d’état montre aussi la part utilisée de ton forfait pour Antigravity et Copilot : les quotas hebdomadaires d’Antigravity pour Gemini et pour les autres modèles, les requêtes premium et les chats mensuels de Copilot. Survole-la pour voir quand chacun est remis à zéro.",
   "tips.planLimitsProviders.title": "Les limites de chaque forfait dans la barre d’état",
+  "tips.prComments.text": "La carte d’une pull request montre ses commentaires, revues et fils de revue sur GitHub, avec qui a écrit chacun. Coche ceux à traiter et clique sur Traiter les retours : une carte de correction sur la branche de la pull request les reprend, cités comme les mots de quelqu’un d’autre.",
+  "tips.prComments.title": "Traiter les commentaires d’une pull request",
   "tips.progressCard.text": "Une exécution du panneau Progression montre sous l’agent la carte et la révision sur laquelle elle a tourné, par exemple #1061 · a3f2c1d : clique sur la carte pour l’ouvrir, ou sur la révision pour la copier.",
   "tips.progressCard.title": "Pour quelle carte était cette exécution ?",
   "tips.progressCheck.text": "Une exécution pour une carte est enregistrée comme vérification de la révision de la carte. Ses détails dans le panneau Progression indiquent « Compte comme vérification », ou pourquoi pas : elle n’a pas été lancée comme cette vérification, le dossier avait des modifications non commitées, ou des fichiers ont changé pendant l’exécution.",

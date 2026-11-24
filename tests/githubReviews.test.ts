@@ -24,7 +24,7 @@ describe('Feedback to GitHub’s reviews (HI-3559)', () => {
       [6, 'posting', 'user'],
       [7, 'discarded', null]
     ])
-    expect(rows[0].posted).toEqual({ url: 'u', body: 'Finding 1', comments: ['lc-1'], inline: 1, listed: 0, at })
+    expect(rows[0].posted).toEqual({ url: 'u', body: 'Finding 1', comments: ['lc-1'], inline: 1, listed: 0, at, replies: [] })
     expect(rows[0].error).toBeUndefined()
   })
 

@@ -2,6 +2,7 @@
 
 import type { SessionEnd } from './sessionEnd'
 import type { GithubSource } from './githubSource'
+import type { FeedbackItem } from './prFeedback'
 import type { JournalSettings } from './journal'
 import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
@@ -1320,6 +1321,11 @@ export interface TaskCard {
   source?: GithubSource
   /** HI-3553: its source's body on GitHub (at most SOURCE_BODY_MAX): outside text, given to agents only quoted under a note. */
   sourceBody?: string
+  /**
+   * HI-3554: a fix card's pull request feedback, the comments the user chose to address ("Address feedback"), beside its
+   * source: outside text, given to agents only quoted under the source's note. Absent for most.
+   */
+  sourceFeedback?: FeedbackItem[]
   /**
    * Doc sections the agent reads first (#818): references by file and heading, never by line (`docs/PLAN.md#setup`,
    * `shared:plans/notes.md#open-questions`; shared/docRefs.ts). Absent when none.
