@@ -1567,6 +1567,10 @@
     "defaultMessage": "Change…",
     "description": "A button under “Feedback to GitHub” in the card dialog (HI-3559): opens the option in Version Control → Workflow → GitHub."
   },
+  "board.github.checkGithub": {
+    "defaultMessage": "Check on GitHub first",
+    "description": "A link beside the notice that a review may have been posted (HI-3559): opens the pull request on GitHub, to look before posting it again."
+  },
   "board.github.comments": {
     "defaultMessage": "{n, plural, one {With your # open line comment on this revision.} other {With your # open line comments on this revision.}}",
     "description": "Under a review draft or the box for a review of the user’s own (HI-3559): the user’s open line comments it carries to GitHub."
@@ -1630,6 +1634,10 @@
   "board.github.posting": {
     "defaultMessage": "Being posted to GitHub…",
     "description": "A review in the card dialog (HI-3559) while it is posted."
+  },
+  "board.github.recovery": {
+    "defaultMessage": "{why, select, abandoned {Combwork didn’t post this: Combwork closed before it did. Post it now, or discard it.} stale {This may not have been posted: Combwork closed while posting it.} other {This may have been posted: GitHub’s answer didn’t come, or couldn’t be read.}}",
+    "description": "A notice on a review in a pull request card’s dialog (HI-3559) that wasn’t posted, or may or may not have been: an automatic post that never ran, one Combwork closed in the middle of, or one GitHub may have taken. Keep the select keys."
   },
   "board.github.write": {
     "defaultMessage": "Write a review",

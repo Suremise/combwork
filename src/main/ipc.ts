@@ -1127,7 +1127,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'github:openPrs': (p) => openPrsOf(workspace, workspace.assertProject(p)),
     // HI-3559: a pull request's card's reviews to GitHub; the user posts a draft (its edit) or their own, or discards a draft.
     'github:reviews': (n) => githubReviewsView(currentWorkspace(), Number(n)),
-    'github:postReview': (n, draft, body) => postGithubReview(currentWorkspace(), Number(n), { draft: typeof draft === 'number' && Number.isInteger(draft) ? draft : null, body: typeof body === 'string' ? body.slice(0, 60_000) : '' }, 'user'),
+    'github:postReview': (n, row, body) => postGithubReview(currentWorkspace(), Number(n), { row: typeof row === 'number' && Number.isInteger(row) ? row : null, body: typeof body === 'string' ? body.slice(0, 60_000) : '' }, 'user'),
     'github:discardReview': (n, draft) => discardGithubReview(currentWorkspace(), Number(n), Number(draft)),
     'slots:levelForm': (level) => slotLevelForm(workspace, level),
     'slots:setLevelDefault': async (level, key, value) => {

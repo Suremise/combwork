@@ -393,6 +393,7 @@ interface CombworkMessageValues {
   'board.forYou.todayValue': { today: string; value: string | number }
   'board.github.carried': { inline: number; both: string; listed: number }
   'board.github.change': undefined
+  'board.github.checkGithub': undefined
   'board.github.comments': { n: number }
   'board.github.discard': undefined
   'board.github.discardFailed': undefined
@@ -409,6 +410,7 @@ interface CombworkMessageValues {
   'board.github.postFailed': undefined
   'board.github.posted': { when: string | number; by: string }
   'board.github.posting': undefined
+  'board.github.recovery': { why: string }
   'board.github.write': undefined
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }

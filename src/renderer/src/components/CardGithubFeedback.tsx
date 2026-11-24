@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
-import { githubFooter, type GithubReviewRow, type GithubReviewsView } from '@shared/githubReviews'
+import { githubFooter, type GithubReviewsView } from '@shared/githubReviews'
 import type { TaskCard } from '@shared/types'
 import * as actions from '../actions'
 import { call } from '../api'
@@ -33,20 +33,21 @@ const T = {
   notNow: msg({ id: 'board.github.notNow', defaultMessage: 'Not posted: Feedback to GitHub doesn’t post agents’ drafts now.', description: 'Under a review draft the project’s option no longer lets be posted (HI-3559).' }),
   write: msg({ id: 'board.github.write', defaultMessage: 'Write a review', description: 'The placeholder of the box in a pull request card’s dialog where the user writes a review of their own to post (HI-3559).' }),
   postFailed: msg({ id: 'board.github.postFailed', defaultMessage: 'Couldn’t post to GitHub', description: 'An error’s title (HI-3559): a review couldn’t be posted; its message says why.' }),
+  recovery: msg({ id: 'board.github.recovery', defaultMessage: '{why, select, abandoned {Combwork didn’t post this: Combwork closed before it did. Post it now, or discard it.} stale {This may not have been posted: Combwork closed while posting it.} other {This may have been posted: GitHub’s answer didn’t come, or couldn’t be read.}}', description: 'A notice on a review in a pull request card’s dialog (HI-3559) that wasn’t posted, or may or may not have been: an automatic post that never ran, one Combwork closed in the middle of, or one GitHub may have taken. Keep the select keys.' }),
+  checkGithub: msg({ id: 'board.github.checkGithub', defaultMessage: 'Check on GitHub first', description: 'A link beside the notice that a review may have been posted (HI-3559): opens the pull request on GitHub, to look before posting it again.' }),
   discardFailed: msg({ id: 'board.github.discardFailed', defaultMessage: 'Couldn’t discard the draft', description: 'An error’s title (HI-3559): a review draft couldn’t be discarded; its message says why.' })
 }
 
-/** Whether the user can post this row now, as main checks it again. */
-const postable = (v: GithubReviewsView, r: GithubReviewRow): boolean =>
-  !!r.draft && (r.state === 'draft' || r.state === 'failed') && (v.feedback === 'both' || (v.feedback === 'agent' && r.draft.auto && r.state === 'failed'))
+type ViewRow = GithubReviewsView['rows'][number]
 
-function Row({ card, v, r, onDone }: { card: number; v: GithubReviewsView & { rows: (GithubReviewRow & { reviewerName: string | null; model: string | null })[] }; r: GithubReviewsView['rows'][number]; onDone: () => void }) {
-  const [text, setText] = useState(r.draft?.body ?? '')
+function Row({ card, v, r, onDone }: { card: number; v: GithubReviewsView; r: ViewRow; onDone: () => void }) {
+  // The text of its latest attempt, else its draft's (HR1's round 1, finding 3): kept as the row changes state, never reset.
+  const [text, setText] = useState(r.text)
   const [busy, setBusy] = useState(false)
-  const can = postable(v, r)
+  const can = r.can
   const post = async (): Promise<void> => {
     setBusy(true)
-    await actions.attempt(tr(T.postFailed), () => call('github:postReview', card, r.draft?.seq ?? null, text))
+    await actions.attempt(tr(T.postFailed), () => call('github:postReview', card, r.id, text))
     setBusy(false)
     onDone()
   }
@@ -57,6 +58,30 @@ function Row({ card, v, r, onDone }: { card: number; v: GithubReviewsView & { ro
     setBusy(false)
     onDone()
   }
+  const buttons = (can.post || can.discard) && (
+    <div className="flex">
+      {can.post && (
+        <button type="button" className="btn small primary" data-action="review-post" disabled={busy || !text.trim()} onClick={() => void post()}>
+          <Icon name={busy ? 'loading' : 'github'} spin={busy} /> {tr(r.state === 'draft' ? T.post : T.postAgain)}
+        </button>
+      )}
+      {can.discard && (
+        <button type="button" className="btn small subtle" data-action="review-discard" disabled={busy} onClick={() => void discard()}>
+          {tr(T.discard)}
+        </button>
+      )}
+    </div>
+  )
+  const recovery = can.recovery && (
+    <div className="warn-text" data-review-recovery={can.recovery}>
+      {tr(T.recovery, { why: can.recovery })}{' '}
+      {can.recovery !== 'abandoned' && (
+        <a href={v.url} onClick={(e) => (e.preventDefault(), void call('app:openExternal', v.url))}>
+          {tr(T.checkGithub)}
+        </a>
+      )}
+    </div>
+  )
   return (
     <div className="github-review" data-review={r.id} data-state={r.state}>
       {r.draft && <div className="s-desc">{tr(T.drafted, { reviewer: r.reviewerName ?? r.draft.reviewer })}</div>}
@@ -73,7 +98,7 @@ function Row({ card, v, r, onDone }: { card: number; v: GithubReviewsView & { ro
           <div className="github-review-body">{r.posted.body}</div>
           {r.posted.inline + r.posted.listed > 0 && <div className="s-desc">{tr(T.carried, { inline: r.posted.inline, listed: r.posted.listed, both: r.posted.inline && r.posted.listed ? 'yes' : 'no' })}</div>}
         </>
-      ) : r.state === 'posting' ? (
+      ) : r.state === 'posting' && can.recovery !== 'stale' ? (
         <div className="muted">
           <Icon name="loading" spin /> {tr(T.posting)}
         </div>
@@ -82,20 +107,10 @@ function Row({ card, v, r, onDone }: { card: number; v: GithubReviewsView & { ro
       ) : (
         <>
           {r.state === 'failed' && <div className="warn-text" data-review-error="">{tr(T.failed, { error: r.error ?? '' })}</div>}
-          <textarea className="input github-review-text" value={text} readOnly={!can || v.feedback === 'agent'} disabled={busy} onChange={(e) => setText(e.target.value)} />
+          {recovery}
+          <textarea className="input github-review-text" value={text} readOnly={!can.post} disabled={busy} onChange={(e) => setText(e.target.value)} />
           {v.footer && r.draft && r.model && <div className="s-desc">{tr(T.footer, { footer: githubFooter(r.model) })}</div>}
-          {can ? (
-            <div className="flex">
-              <button type="button" className="btn small primary" data-action="review-post" disabled={busy || !text.trim()} onClick={() => void post()}>
-                <Icon name={busy ? 'loading' : 'github'} spin={busy} /> {tr(r.state === 'failed' ? T.postAgain : T.post)}
-              </button>
-              <button type="button" className="btn small subtle" data-action="review-discard" disabled={busy} onClick={() => void discard()}>
-                {tr(T.discard)}
-              </button>
-            </div>
-          ) : (
-            <div className="s-desc">{tr(T.notNow)}</div>
-          )}
+          {buttons || <div className="s-desc">{tr(T.notNow)}</div>}
         </>
       )}
     </div>
@@ -127,7 +142,8 @@ export function GithubFeedbackField({ card }: { card: TaskCard }) {
     setBusy(true)
     const done = await actions.attempt(tr(T.postFailed), () => call('github:postReview', card.number, null, own))
     setBusy(false)
-    if (done?.state === 'posted') setOwn('')
+    // Its row keeps the text now, posted or not (a failed one shows it with Post Again).
+    if (done) setOwn('')
     refresh()
   }
   return (
@@ -143,7 +159,7 @@ export function GithubFeedbackField({ card }: { card: TaskCard }) {
           )}
         </div>
         {[...view.rows].reverse().map((r) => (
-          <Row key={`${r.id}:${r.state}`} card={card.number} v={view} r={r} onDone={refresh} />
+          <Row key={r.id} card={card.number} v={view} r={r} onDone={refresh} />
         ))}
         {view.canWrite && (
           <div className="github-review" data-review="own">

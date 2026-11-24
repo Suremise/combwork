@@ -13,7 +13,7 @@ import { mkdtemp, rm, writeFile } from 'original-fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { combworkError } from './combworkError'
-import { gh } from './ghCli'
+import { gh, type GhResult } from './ghCli'
 import { createLogger, userText } from './logger'
 import { platformIdOf } from './platform/registry'
 import { revisionReadsOf } from './platform/revisionReadsPorts'
@@ -29,8 +29,8 @@ import type { RevisionReads } from './platform/revisionReads'
 import { msg } from '../shared/i18n'
 import { modelLabel, projectAgents } from '../shared/defaults'
 import { providerDescriptor } from '../shared/providers'
-import { foldGithubReviews, githubFooter, inHunks, inlineOf, listedComments, REVIEW_BODY_MAX, reviewBody, type DiffHunk, type GithubReviewRow, type GithubReviewsView, type InlineComment } from '../shared/githubReviews'
-import { githubFeedbackOf, githubFooterOf, type GithubFeedback } from '../shared/workflow/options'
+import { boundedBody, foldGithubReviews, githubFooter, inHunks, inlineOf, listedComments, rowActions, stillAllowed, type DiffHunk, type GithubReviewRow, type GithubReviewsView, type InlineComment } from '../shared/githubReviews'
+import { githubFeedbackOf, githubFooterOf } from '../shared/workflow/options'
 import type { Fact } from '../shared/workflow/facts'
 import type { LineCommentView } from '../shared/workflow/lineComments'
 
@@ -46,8 +46,6 @@ const M = {
   noLink: msg({ id: 'github.review.noLink', defaultMessage: 'This project’s GitHub link no longer names {repo}, the pull request’s repository (Version Control → Workflow → GitHub).', description: 'HI-3559: an error posting a review: the project’s GitHub repository changed since the card’s pull request was set. {repo} is owner/name. Version Control → Workflow → GitHub is a place in the window.' })
 }
 
-/** A posting claimed longer ago than this with no result (a close or a crash mid-post) can be posted again. */
-const STUCK_MS = 10 * 60_000
 
 async function cardOf(ws: WorkspaceService, n: number) {
   const projectPath = projectPathOf(ws, n)
@@ -79,23 +77,18 @@ export async function githubReviewsView(ws: WorkspaceService, n: number): Promis
   const latest = wf.state(card).latest?.id ?? null
   const openComments = latest === null ? 0 : lineCommentsOf(ws, n).filter((c) => c.state === 'open' && c.submission === latest).length
   const feedback = githubFeedbackOf(o)
-  return { feedback, footer: githubFooterOf(o), rows: rows.map((r) => ({ ...r, reviewerName: r.draft ? (who.get(r.draft.reviewer)?.name ?? null) : null, model: r.draft ? (who.get(r.draft.reviewer)?.model ?? null) : null })), openComments, canWrite: feedback !== 'agent', url: source.url }
+  return { feedback, footer: githubFooterOf(o), rows: rows.map((r) => ({ ...r, reviewerName: r.draft ? (who.get(r.draft.reviewer)?.name ?? null) : null, model: r.draft ? (who.get(r.draft.reviewer)?.model ?? null) : null, can: rowActions(feedback, 'user', r, { now: Date.now(), pending: !!r.draft && pendingPost(wf, card.id, r.draft.seq) }) })), openComments, canWrite: feedback !== 'agent', url: source.url }
 }
 
-/** Whether the option lets `by` post this (a draft, or the user's own review). */
-function allowed(feedback: GithubFeedback, by: 'user' | 'combwork', row: GithubReviewRow | null): boolean {
-  if (by === 'combwork') return !!row?.draft?.auto && feedback === 'agent'
-  if (!row?.draft) return feedback !== 'agent'
-  // Both: the user edits and posts a draft; Agent's own, posted by Combwork, only again by the user once it failed.
-  return feedback === 'both' || (feedback === 'agent' && row.draft.auto && (row.state === 'failed' || row.state === 'posting'))
-}
+/** Whether an automatic post of draft `draft` still waits to run (its action pending): no Post button for it meanwhile. */
+const pendingPost = (wf: Workflow, card: number, draft: number): boolean => wf.store.pendingActions().some((a) => a.card === card && a.kind === 'postGithubReview' && Number(a.payload.draft) === draft)
 
 /**
- * Posts a review to the card's pull request: draft `draft` (its fact's seq; the user's edit of its text in `body`), or
- * the user's own (draft null). Claimed, posted, and its result written; the row as it ends. Refused (thrown) when the
- * option doesn't allow it, it was posted or discarded, or is being posted.
+ * Posts a review to the card's pull request: row `row` (a draft's seq, or an own review's id to post it again; `body` the
+ * text as the user has it now), or a new review of the user's (null). Claimed, posted, and its result written; the row as
+ * it ends. Refused (thrown) when the option doesn't allow it, or it was posted or discarded, or is being posted.
  */
-export async function postGithubReview(ws: WorkspaceService, n: number, req: { draft: number | null; body?: string }, by: 'user' | 'combwork'): Promise<GithubReviewRow> {
+export async function postGithubReview(ws: WorkspaceService, n: number, req: { row: number | null; body?: string }, by: 'user' | 'combwork'): Promise<GithubReviewRow> {
   const { wf, projectPath } = await cardOf(ws, n)
   const row = await postReviewOn(wf, n, req, by, {
     link: async () => (await import('./githubLink')).githubRepoFor(ws, projectPath),
@@ -120,71 +113,112 @@ export interface PostDeps {
   reads: RevisionReads | null
   projectPath: string
   gh: typeof gh
+  /** The time now (tests: a posting's age). */
+  now?: () => number
 }
 
+/** What came of sending: posted, refused by GitHub or never sent (safe to post again), or maybe on GitHub (check first). */
+type Sent = { kind: 'posted'; url: string | null; body: string; comments: string[]; inline: number; listed: number } | { kind: 'failed'; error: string } | { kind: 'uncertain'; error: string }
+
 /** postGithubReview on card `n` of `wf`, with what it reads outside the facts given. */
-export async function postReviewOn(wf: Workflow, n: number, req: { draft: number | null; body?: string }, by: 'user' | 'combwork', deps: PostDeps): Promise<GithubReviewRow> {
+export async function postReviewOn(wf: Workflow, n: number, req: { row: number | null; body?: string }, by: 'user' | 'combwork', deps: PostDeps): Promise<GithubReviewRow> {
   const card = wf.store.card(n)
   const source = card.source
   if (source?.kind !== 'pr') throw combworkError(M.notPr)
-  const o = wf.cfg.options()
-  const feedback = githubFeedbackOf(o)
-  // Claimed under the store's lock: the draft as it is, the option as it is now, and nothing posting it already.
-  const claim = await wf.write(card, null, by === 'combwork' ? 'combwork' : 'user', (w) => {
+  const now = deps.now ?? Date.now
+  const actor = by === 'combwork' ? 'combwork' : 'user'
+  // Claimed under the store's lock, with the option read there too (HR1's round 1, finding 1): the row as it is, nothing
+  // posting it already, and the text it sends kept with the claim (finding 3), so a failure keeps the user's edit.
+  const claim = await wf.write(card, null, actor, (w) => {
+    const feedback = githubFeedbackOf(wf.cfg.options())
     const rows = foldGithubReviews(w.tx.facts(card.id))
-    const row = req.draft === null ? null : (rows.find((r) => r.draft?.seq === req.draft) ?? null)
-    if (req.draft !== null && !row) throw combworkError(M.noDraft)
-    if (!allowed(feedback, by, row)) throw combworkError(M.notAllowed, { option: feedback, what: req.draft === null ? 'own' : 'draft' })
+    const row = req.row === null ? null : (rows.find((r) => r.id === req.row) ?? null)
+    if (req.row !== null && !row) throw combworkError(M.noDraft)
     if (row?.state === 'posted' || row?.state === 'discarded') throw combworkError(M.done, { state: row.state })
-    if (row?.state === 'posting' && (by === 'combwork' || Date.now() - Date.parse(row.posting!.at) < STUCK_MS)) throw combworkError(M.done, { state: 'posting' })
-    // Combwork posts an Agent draft once, as its action runs: one that failed waits for the user.
-    if (by === 'combwork' && row?.state !== 'draft') throw combworkError(M.done, { state: 'posting' })
-    const submission = row?.draft?.submission ?? w.state().latest?.id ?? null
-    const posting = w.fact('GithubReviewPosting', { draft: req.draft, by, submission })
-    return { posting: posting.seq, row, submission }
+    const can = rowActions(feedback, by, row, { now: now(), pending: !!row?.draft && pendingPost(wf, card.id, row.draft.seq) })
+    if (!can.post) {
+      if (row?.state === 'posting') throw combworkError(M.done, { state: 'posting' })
+      throw combworkError(M.notAllowed, { option: feedback, what: row?.draft ? 'draft' : 'own' })
+    }
+    const text = (req.body ?? row?.text ?? '').trim()
+    const submission = row?.draft?.submission ?? row?.posting?.submission ?? w.state().latest?.id ?? null
+    const posting = w.fact('GithubReviewPosting', { draft: row?.draft?.seq ?? null, ...(row && !row.draft ? { own: row.id } : {}), by, submission, body: text })
+    return { posting: posting.seq, row, submission, text }
   })
   const draft = claim.row?.draft ?? null
-  const text = (req.body ?? draft?.body ?? '').trim()
-  let error: string | null = null
-  let done: { url: string | null; body: string; comments: string[]; inline: number; listed: number } | null = null
+  // Before each write to GitHub, with nothing awaited between it and the call: the option as it is now still allows it,
+  // and this claim is still the row's latest (finding 1).
+  const authority = (): string | null => {
+    const row = foldGithubReviews(wf.store.facts(card.id)).find((r) => r.posting?.seq === claim.posting) ?? null
+    const feedback = githubFeedbackOf(wf.cfg.options())
+    return stillAllowed(feedback, by, row, claim.posting) ? null : combworkError(M.notAllowed, { option: feedback, what: draft ? 'draft' : 'own' }).message
+  }
+  let sent: Sent
   try {
     // The repository the card's pull request is on must still be the project's link: never posted elsewhere.
     const link = await deps.link()
     if (!link || link.host.toLowerCase() !== source.host.toLowerCase() || link.owner.toLowerCase() !== source.owner.toLowerCase() || link.repo.toLowerCase() !== source.repo.toLowerCase()) throw combworkError(M.noLink, { repo: `${source.owner}/${source.repo}` })
     const comments = claim.submission === null ? [] : deps.comments().filter((c) => c.state === 'open' && c.submission === claim.submission)
-    if (!text && !comments.length) throw combworkError(M.empty)
-    const footer = draft && githubFooterOf(o) ? githubFooter((await deps.model(draft.reviewer)) ?? 'an AI agent') : null // i18n-ignore: posted to GitHub as written, in English
-    done = await send(wf, card.id, deps, source, claim.submission, text, footer, comments)
+    if (!claim.text && !comments.length) throw combworkError(M.empty)
+    const footer = draft && githubFooterOf(wf.cfg.options()) ? githubFooter((await deps.model(draft.reviewer)) ?? 'an AI agent') : null // i18n-ignore: posted to GitHub as written, in English
+    sent = await send(wf, card.id, deps, source, claim.submission, claim.text, footer, comments, authority)
   } catch (e) {
-    error = e instanceof Error ? e.message : String(e)
+    sent = { kind: 'failed', error: e instanceof Error ? e.message : String(e) }
   }
-  await wf.write(card, null, by === 'combwork' ? 'combwork' : 'user', (w) => {
-    if (done) w.fact('GithubReviewPosted', { posting: claim.posting, ...done })
-    else w.fact('GithubReviewFailed', { posting: claim.posting, error: (error ?? '').slice(0, 1000) })
+  await wf.write(card, null, actor, (w) => {
+    if (sent.kind === 'posted') {
+      const { kind: _kind, ...done } = sent
+      w.fact('GithubReviewPosted', { posting: claim.posting, ...done })
+    } else w.fact('GithubReviewFailed', { posting: claim.posting, error: sent.error.slice(0, 1000), ...(sent.kind === 'uncertain' ? { uncertain: true as const } : {}) })
   })
-  if (!done) log.info(`#${n}'s review not posted to GitHub: ${userText(error ?? '')}`)
+  if (sent.kind !== 'posted') log.info(`#${n}'s review ${sent.kind === 'uncertain' ? 'may not have been' : 'not'} posted to GitHub: ${userText(sent.error)}`)
   const rows = foldGithubReviews(wf.store.facts(card.id))
   return rows.find((r) => r.posting?.seq === claim.posting)!
 }
 
-/** Discards a draft (never posted): the user's, while it isn't posted or being posted. */
+/** Discards a draft (never posted): the user's, while it isn't posted or being posted (one stuck in posting, after a while). */
 export async function discardGithubReview(ws: WorkspaceService, n: number, draftSeq: number): Promise<void> {
   const { wf, card } = await cardOf(ws, n)
   await wf.write(card, null, 'user', (w) => {
     const row = foldGithubReviews(w.tx.facts(card.id)).find((r) => r.draft?.seq === draftSeq)
     if (!row) throw combworkError(M.noDraft)
-    if (row.state !== 'draft' && row.state !== 'failed') throw combworkError(M.done, { state: row.state === 'posting' ? 'posting' : row.state })
+    const can = rowActions(githubFeedbackOf(wf.cfg.options()), 'user', row, { now: Date.now(), pending: pendingPost(wf, card.id, draftSeq) })
+    if (!can.discard) throw combworkError(M.done, { state: row.state === 'posted' || row.state === 'discarded' ? row.state : 'posting' })
     w.fact('GithubReviewDiscarded', { draft: draftSeq })
   })
   boardChanged(ws)
 }
 
+/** gh's answer to a review's POST, read (HR1's round 1, finding 2): only a refusal GitHub said it made is safe to send again. */
+function outcome(r: GhResult): { kind: 'posted'; url: string | null } | { kind: 'refused'; inline: boolean; error: string } | { kind: 'uncertain'; error: string } {
+  if (r.ok) {
+    try {
+      const j = JSON.parse(r.stdout) as { html_url?: unknown; id?: unknown }
+      if (j && typeof j === 'object') return { kind: 'posted', url: typeof j.html_url === 'string' ? j.html_url : null }
+    } catch {
+      // Below: GitHub took it, by gh's exit, but its answer can't be read.
+    }
+    return { kind: 'uncertain', error: M_UNREADABLE }
+  }
+  const error = r.detail ?? r.problem
+  // Not sent at all: no gh, or no sign-in.
+  if (r.problem === 'missing' || r.problem === 'signedOut') return { kind: 'refused', inline: false, error }
+  // GitHub's own refusal (a 4xx): nothing made. 422 is its refusal of the request's contents, the inline comments too.
+  if (r.problem === 'failed' && /\bHTTP 4\d\d\b/.test(error)) return { kind: 'refused', inline: /\bHTTP 422\b/.test(error), error }
+  // Anything else (no answer in time, a server error, a broken connection): it may have been made.
+  return { kind: 'uncertain', error }
+}
+
+/** Said when gh took a review but its answer couldn't be read (English: gh's own words are too, in the same field). */
+const M_UNREADABLE = 'GitHub’s answer couldn’t be read: check the pull request before posting again.' // i18n-ignore: stored beside gh's own English words, shown as they are
+
 /**
  * The review made and sent: the line comments that can sit on GitHub's diff inline (the reviewed revision is the pull
  * request's head as its start fetched it, and the lines are in a hunk of that file's change), the rest listed in the body.
- * GitHub refusing it with inline comments (its head moved meanwhile, a line it won't take) sends it again with all listed.
+ * GitHub refusing it as unprocessable (422) with inline comments sends it again with all listed; any other failure isn't
+ * sent again. Each write is made only while `authority` holds, checked just before it.
  */
-async function send(wf: Workflow, cardId: number, deps: PostDeps, source: { host: string; owner: string; repo: string; number: number }, submission: number | null, text: string, footer: string | null, comments: LineCommentView[]): Promise<{ url: string | null; body: string; comments: string[]; inline: number; listed: number }> {
+async function send(wf: Workflow, cardId: number, deps: PostDeps, source: { host: string; owner: string; repo: string; number: number }, submission: number | null, text: string, footer: string | null, comments: LineCommentView[], authority: () => string | null): Promise<Sent> {
   const facts = wf.store.facts(cardId)
   const sub = facts.find((f): f is Fact<'Submitted'> => f.kind === 'Submitted' && f.seq === submission)?.data
   const pr = wf.state(wf.store.card(cardId)).started?.pr
@@ -199,36 +233,39 @@ async function send(wf: Workflow, cardId: number, deps: PostDeps, source: { host
   }
   const post = async (on: LineCommentView[]) => {
     const listed = comments.filter((c) => !on.includes(c))
-    let body = reviewBody(text, listedComments(listed), footer)
-    if (body.length > REVIEW_BODY_MAX) body = `${body.slice(0, REVIEW_BODY_MAX - 1)}…`
+    const body = boundedBody(text, listedComments(listed), footer)
     const payload: { body: string; event: 'COMMENT'; commit_id?: string; comments?: InlineComment[] } = { body, event: 'COMMENT', ...(on.length ? { commit_id: sub!.revision!, comments: on.map(inlineOf) } : {}) }
     const dir = await mkdtemp(join(tmpdir(), 'combwork-review-'))
     try {
       const file = join(dir, 'review.json')
       await writeFile(file, JSON.stringify(payload), 'utf8')
-      const r = await deps.gh({ host: source.host }, ['api', '--method', 'POST', `repos/${source.owner}/${source.repo}/pulls/${source.number}/reviews`, '--input', file], { json: true })
-      return { r, body, listed }
+      const refused = authority()
+      if (refused) return { body, listed, said: { kind: 'refused' as const, inline: false, error: refused } }
+      const r = await deps.gh({ host: source.host }, ['api', '--method', 'POST', `repos/${source.owner}/${source.repo}/pulls/${source.number}/reviews`, '--input', file])
+      return { body, listed, said: outcome(r) }
     } finally {
       await rm(dir, { recursive: true, force: true }).catch(() => undefined)
     }
   }
   let sent = await post(inline)
-  if (!sent.r.ok && inline.length && sent.r.problem === 'failed') sent = await post([])
-  if (!sent.r.ok) throw new Error(sent.r.detail ?? sent.r.problem)
-  const j = (sent.r.json ?? {}) as { html_url?: unknown }
-  const on = comments.length - sent.listed.length
-  return { url: typeof j.html_url === 'string' ? j.html_url : null, body: sent.body, comments: comments.map((c) => c.id), inline: on, listed: sent.listed.length }
+  if (sent.said.kind === 'refused' && sent.said.inline && inline.length) sent = await post([])
+  if (sent.said.kind === 'refused') return { kind: 'failed', error: sent.said.error }
+  if (sent.said.kind === 'uncertain') return { kind: 'uncertain', error: sent.said.error }
+  return { kind: 'posted', url: sent.said.url, body: sent.body, comments: comments.map((c) => c.id), inline: comments.length - sent.listed.length, listed: sent.listed.length }
 }
 
 let started = false
 
-/** Registers the `postGithubReview` action (index.ts, once): an Agent verdict's draft, posted by Combwork once its write commits. */
+/**
+ * Registers the `postGithubReview` action (index.ts, once): an Agent verdict's draft, posted by Combwork once its write
+ * commits, never sent again by itself. One that never ran (a close before it) shows Post on the card (rowActions).
+ */
 export function startGithubReviews(): void {
   if (started) return
   started = true
   onAction('postGithubReview', async (a, ws) => {
-    const draft = Number(a.payload.draft)
-    if (!Number.isInteger(draft)) return
-    await postGithubReview(ws, a.card, { draft }, 'combwork').catch((e: unknown) => log.info(`#${a.card}'s review not posted to GitHub: ${userText(e instanceof Error ? e.message : String(e))}`))
+    const row = Number(a.payload.draft)
+    if (!Number.isInteger(row)) return
+    await postGithubReview(ws, a.card, { row }, 'combwork').catch((e: unknown) => log.info(`#${a.card}'s review not posted to GitHub: ${userText(e instanceof Error ? e.message : String(e))}`))
   })
 }

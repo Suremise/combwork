@@ -494,7 +494,7 @@ export interface CombworkRequests {
   'github:openPrs': (projectPath: string) => OpenPrsRead
   /** HI-3559: a pull request's card's reviews to GitHub (Feedback to GitHub), and the user's posting or discarding one. */
   'github:reviews': (n: number) => GithubReviewsView
-  'github:postReview': (n: number, draft: number | null, body: string) => GithubReviewRow
+  'github:postReview': (n: number, row: number | null, body: string) => GithubReviewRow
   'github:discardReview': (n: number, draft: number) => void
   /** Combwork's or the workspace's slot defaults (HI-1765: Settings → Workflow defaults, Git), with what each inherits. */
   'slots:levelForm': (level: WorkflowLevel) => SlotLevelForm
