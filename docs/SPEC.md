@@ -6479,10 +6479,11 @@ Whether a conversation may resume there is its **hold** (none: it may):
   the builder's run there is stopped at its idle moment as any ended lease's is. **An archived card keeps no slot, nor
   does one On Hold with nobody on it** (HI-3556: CL-357, archived On Hold, held its builder's one slot, so that builder's
   new lane waited for a slot for good, and nothing but bringing it back and putting it back freed it). Read from the
-  card's row (`cardKeepsSlotIn`: `archived`, and `agent` for a held card), in `cardUsesLease` and the lane's end: its lease
-  ends as a put back card's (`archived` / `unassigned`), its line kept, its builder's run stopped at its idle moment, and a
-  lane waiting for that slot starts. With changes not committed there, the user is told (a warning naming the card, slot
-  and folder); they stay, and the pool lends the slot to no card until it is clean. Only On Hold for nobody: a start by
+  card's row (`cardKeepsSlotIn`: `archived`, and `agent` for a held card), in `cardUsesLease`, the lane's end and an
+  adopted worktree's carried lease kept for that card (#1441): its lease ends as a put back card's (`archived` /
+  `unassigned`; a lane's, `laneEnded`), its line kept, its builder's run stopped at its idle moment, and a lane waiting
+  for that slot starts. With changes not committed there, the user is told on each of those paths (a warning naming the
+  card, slot and folder); they stay, and the pool lends the slot to no card until it is clean. Only On Hold for nobody: a start by
   the user or the Assistant may leave an Active card with nobody on it while its builder works. A card given to another
   agent keeps its slot, as above. A lane running again is left alone. **A Git submit** from a card started on a slot's lease is refused (`platform.slotLeft`) unless that lease is
   open now, on that slot at the card's folder, and the card's own or a lane's listing the card; unreadable, refused
