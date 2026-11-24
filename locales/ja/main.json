@@ -369,6 +369,8 @@
   "main.server.url.userinfo": "URLにはユーザー名やパスワードを含められません。キーは専用の欄に入力してください。",
   "main.slots.detachFailed.message": "{said, select, yes {Git のエラー: {error}} other {Git が {target} を見つけられません。}} 戻せるまで、Combwork は {slot} を他のカードに貸し出しません。{folder} で妨げになっているものを直すか、そこで自分で PowerShell から {command} を実行してください。Combwork はスロットを確認するたびに再試行し、成功すれば {slot} を再び貸し出します。",
   "main.slots.detachFailed.title": "Combwork は {slot} を {target} に戻せません",
+  "main.slots.leftDirty.message": "{card} が{why, select, archived {アーカイブされた} other {担当者なしになった}}ため、Combwork はそのスロットを解放し、ブランチは残しました。{folder} の変更はそのブランチにありません。そこでコミットするか破棄するまで、Combwork は {slot} を他のカードに貸し出しません。",
+  "main.slots.leftDirty.title": "{slot} にコミットされていない変更があります",
   "main.slots.operation.message": "完了するまで、Combwork は {slot} を他のカードに貸し出せません。{folder} で完了させるか、そこで {command} を実行して終了してください。Combwork が自分で終了させることはなく、何も進行中でなくなればスロットを再び貸し出します。",
   "main.slots.operation.open": "変更で開く",
   "main.slots.operation.title": "{slot} に未完了の git {what} があります",

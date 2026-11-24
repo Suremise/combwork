@@ -369,6 +369,8 @@
   "main.server.url.userinfo": "The URL can't hold a user name or password: give the key in its own field.",
   "main.slots.detachFailed.message": "{said, select, yes {Git said: {error}} other {Git can't find {target}.}} Until it can, Combwork doesn't lend {slot} to another card. Put right what's in the way in {folder}, or run {command} there yourself, in PowerShell: Combwork tries again whenever it looks at its slots, and lends {slot} again once that works.",
   "main.slots.detachFailed.title": "Combwork can't move {slot} back to {target}",
+  "main.slots.leftDirty.message": "{card} was {why, select, archived {archived} other {left with nobody on it}}, so Combwork freed its slot and kept its branch. The changes in {folder} aren't on that branch: Combwork lends {slot} to no other card until they're committed or discarded there.",
+  "main.slots.leftDirty.title": "{slot} has changes that aren't committed",
   "main.slots.operation.message": "Combwork can't lend {slot} to another card until it's finished. Finish it in {folder}, or end it there with {command}. Combwork never ends it itself, and lends the slot again once nothing is under way in it.",
   "main.slots.operation.open": "Open in Changes",
   "main.slots.operation.title": "{slot} has an unfinished git {what}",

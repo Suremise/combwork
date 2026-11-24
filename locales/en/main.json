@@ -1479,6 +1479,14 @@
     "defaultMessage": "Combwork can't move {slot} back to {target}",
     "description": "HI-3467: a notice's title: Combwork tried more than once to put a free slot (a worktree it lends to cards) back at the head of its target branch {target} for its next card, and git refused each time, so the slot isn't lent. {slot} is the slot's name."
   },
+  "main.slots.leftDirty.message": {
+    "defaultMessage": "{card} was {why, select, archived {archived} other {left with nobody on it}}, so Combwork freed its slot and kept its branch. The changes in {folder} aren't on that branch: Combwork lends {slot} to no other card until they're committed or discarded there.",
+    "description": "HI-3556: the notice's text below main.slots.leftDirty.title. {card} is the card's key (HI-12), {folder} the slot's folder path, {slot} its name. {why} says what happened to the card: archived, or taken from its agent with nobody given it."
+  },
+  "main.slots.leftDirty.title": {
+    "defaultMessage": "{slot} has changes that aren't committed",
+    "description": "HI-3556: a notice's title: a card was archived or taken from its agent, so Combwork freed the slot (a worktree it lends to cards) its builder worked in, and that slot has uncommitted changes. {slot} is the slot's name."
+  },
   "main.slots.operation.message": {
     "defaultMessage": "Combwork can't lend {slot} to another card until it's finished. Finish it in {folder}, or end it there with {command}. Combwork never ends it itself, and lends the slot again once nothing is under way in it.",
     "description": "HI-3465: the notice's text below main.slots.operation.title. {slot} is the slot's name, {folder} its folder's path, {command} the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is)."

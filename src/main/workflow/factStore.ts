@@ -327,6 +327,18 @@ export function leaseHoldsIn(db: DatabaseSync, lease: string, slot: string, fold
   return !!r.lane && !!db.prepare('SELECT 1 FROM lane_cards WHERE lane = ? AND card = ? UNION ALL SELECT 1 FROM lane_pending WHERE lane = ? AND card = ?').get(r.lane, card, r.lane, card) // i18n-ignore: SQL
 }
 
+/**
+ * HI-3556: whether card `card`, at `stage`, can still keep a slot, read on `db`: not archived, and On Hold, given to an
+ * agent. An archived card, or a held one given to nobody, keeps none (its lease ends as a put back card's: its line stays,
+ * the slot is freed), so it never holds its builder's one slot from a lane. Only On Hold for nobody: a start by the user
+ * or the Assistant may leave an Active card with nobody on it while its builder works. Given to another agent, it keeps
+ * it (HI-3118: its cycle holds it, not its builder).
+ */
+export function cardKeepsSlotIn(db: DatabaseSync, card: number, stage: StageId): boolean {
+  const r = db.prepare('SELECT agent, archived FROM cards WHERE number = ?').get(card) as { agent: string | null; archived: number } | undefined // i18n-ignore: SQL
+  return !!r && r.archived === 0 && (stage !== 'hold' || !!r.agent)
+}
+
 /** For tests: runs once a read of cards' records has read their rows, before their lists (another connection committing there). */
 export const factStoreTestHooks: { afterCards: (() => void) | null } = { afterCards: null }
 
@@ -471,6 +483,11 @@ export class FactStore {
   /** Whether a card is archived (a gone card counts as archived: its pins may go). */
   isArchived(id: number): boolean {
     return this.conn.read((db) => ((db.prepare('SELECT archived FROM cards WHERE number = ?').get(id) as { archived: number } | undefined)?.archived ?? 1) === 1)
+  }
+
+  /** HI-3556: whether a card at `stage` can still keep its builder's slot (cardKeepsSlotIn). False for a card the board has no row of. */
+  keepsSlot(id: number, stage: StageId): boolean {
+    return this.conn.read((db) => cardKeepsSlotIn(db, id, stage))
   }
 
   /** This project's cards (not archived), in number order. */

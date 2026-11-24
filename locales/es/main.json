@@ -369,6 +369,8 @@
   "main.server.url.userinfo": "La URL no puede contener un nombre de usuario ni una contraseña: indica la clave en su propio campo.",
   "main.slots.detachFailed.message": "{said, select, yes {Git dice: {error}} other {Git no encuentra {target}.}} Mientras no pueda, Combwork no presta {slot} a otra tarjeta. Corrige lo que lo impide en {folder}, o ejecuta allí {command} tú mismo, en PowerShell: Combwork lo vuelve a intentar cada vez que revisa sus slots, y vuelve a prestar {slot} en cuanto funcione.",
   "main.slots.detachFailed.title": "Combwork no puede devolver {slot} a {target}",
+  "main.slots.leftDirty.message": "{card} se {why, select, archived {archivó} other {quedó sin nadie asignado}}, así que Combwork liberó su slot y conservó su rama. Los cambios de {folder} no están en esa rama: Combwork no presta {slot} a otra tarjeta hasta que se confirmen o se descarten allí.",
+  "main.slots.leftDirty.title": "{slot} tiene cambios sin confirmar",
   "main.slots.operation.message": "Combwork no puede prestar {slot} a otra tarjeta hasta que termine. Termínalo en {folder}, o detenlo allí con {command}. Combwork nunca lo detiene por su cuenta, y vuelve a prestar el slot cuando no quede nada en curso en él.",
   "main.slots.operation.open": "Abrir en Cambios",
   "main.slots.operation.title": "{slot} tiene un git {what} sin terminar",
