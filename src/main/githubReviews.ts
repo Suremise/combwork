@@ -178,15 +178,21 @@ export async function postReviewOn(wf: Workflow, n: number, req: { row: number |
 
 /** Discards a draft (never posted): the user's, while it isn't posted or being posted (one stuck in posting, after a while). */
 export async function discardGithubReview(ws: WorkspaceService, n: number, draftSeq: number): Promise<void> {
-  const { wf, card } = await cardOf(ws, n)
+  const { wf } = await cardOf(ws, n)
+  await discardReviewOn(wf, n, draftSeq)
+  boardChanged(ws)
+}
+
+/** discardGithubReview on card `n` of `wf` (`now`: a posting's age, for tests). */
+export async function discardReviewOn(wf: Workflow, n: number, draftSeq: number, now: () => number = Date.now): Promise<void> {
+  const card = wf.store.card(n)
   await wf.write(card, null, 'user', (w) => {
     const row = foldGithubReviews(w.tx.facts(card.id)).find((r) => r.draft?.seq === draftSeq)
     if (!row) throw combworkError(M.noDraft)
-    const can = rowActions(githubFeedbackOf(wf.cfg.options()), 'user', row, { now: Date.now(), pending: pendingPost(wf, card.id, draftSeq) })
+    const can = rowActions(githubFeedbackOf(wf.cfg.options()), 'user', row, { now: now(), pending: pendingPost(wf, card.id, draftSeq) })
     if (!can.discard) throw combworkError(M.done, { state: row.state === 'posted' || row.state === 'discarded' ? row.state : 'posting' })
     w.fact('GithubReviewDiscarded', { draft: draftSeq })
   })
-  boardChanged(ws)
 }
 
 /** gh's answer to a review's POST, read (HR1's round 1, finding 2): only a refusal GitHub said it made is safe to send again. */

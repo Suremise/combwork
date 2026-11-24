@@ -90,7 +90,8 @@ export function foldGithubReviews(facts: readonly FactLike[]): GithubReviewRow[]
       row.error = String(d.error ?? '')
     } else if (f.kind === 'GithubReviewDiscarded') {
       const row = byDraft.get(Number(d.draft))
-      if (row && (row.state === 'draft' || row.state === 'failed' || row.state === 'uncertain')) row.state = 'discarded'
+      // A posting never finished is discarded too, once the user may (rowActions: a stale one); a result written after still shows.
+      if (row && (row.state === 'draft' || row.state === 'failed' || row.state === 'uncertain' || row.state === 'posting')) row.state = 'discarded'
     }
   }
   return rows

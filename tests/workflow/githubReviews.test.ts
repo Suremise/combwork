@@ -11,7 +11,7 @@ import { join } from 'path'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { allOff, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { boardFile } from '../../src/main/boardStore'
-import { postReviewOn, type PostDeps } from '../../src/main/githubReviews'
+import { discardReviewOn, postReviewOn, type PostDeps } from '../../src/main/githubReviews'
 import { gitRevisionReads } from '../../src/main/platform/git/gitRevisionReads'
 import { foldGithubReviews, REVIEW_BODY_MAX, rowActions, STUCK_MS } from '../../src/shared/githubReviews'
 import type { GhResult, GhTarget } from '../../src/main/ghCli'
@@ -316,5 +316,24 @@ describe('Feedback to GitHub’s boundaries (HI-3559, HR1’s round 1)', () => {
     expect(body.length).toBeLessThanOrEqual(REVIEW_BODY_MAX)
     expect(body.endsWith('\n\n---\n_Drafted by Opus 5.5 in Combwork_')).toBe(true)
     expect(body).toContain('x…')
+  })
+})
+
+describe('Feedback to GitHub’s stale discard (HI-3559, HR1’s round 2)', () => {
+  it('a posting that never finished, discarded once stale, is discarded: no Post or Discard left, posting refused', async () => {
+    const e = (env = project('agent'))
+    const card = await reviewed(e)
+    const first = rows(e, card)[0].draft!
+    await e.wf.write(e.store.card(card), null, 'combwork', (w) => w.fact('GithubReviewPosting', { draft: first.seq, by: 'combwork', submission: first.submission, body: first.body }))
+    // Recent: being posted, not the user's to discard.
+    await expect(discardReviewOn(e.wf, card, first.seq)).rejects.toThrow(/already being posted/)
+    const later = Date.now() + STUCK_MS + 1000
+    await discardReviewOn(e.wf, card, first.seq, () => later)
+    const row = rows(e, card)[0]
+    expect(row.state).toBe('discarded')
+    expect(rowActions('agent', 'user', row, { now: later, pending: false })).toEqual({ post: false, discard: false, recovery: null })
+    const g = fakeGh()
+    await expect(postReviewOn(e.wf, card, { row: first.seq }, 'user', deps(e, { gh: g.gh, now: () => later }))).rejects.toThrow(/discarded/)
+    expect(g.calls).toEqual([])
   })
 })
