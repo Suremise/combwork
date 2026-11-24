@@ -49,7 +49,7 @@ const ISSUES = {
   23: { title: 'An old crash', author: 'mona', association: 'OWNER', labels: ['bug'], state: 'CLOSED' }
 }
 // HR1's round 1: GitHub's own v1.0.0, where the project has it (the tag pushed).
-if (args[0] === 'api' && args[1] === 'repos/acme/app/git/ref/tags/v1.0.0') out({ ref: 'refs/tags/v1.0.0', object: { type: 'commit', sha: require('child_process').execFileSync('git', ['-C', ${JSON.stringify(alpha)}, 'rev-parse', 'v1.0.0^{commit}']).toString().trim() } })
+if (args[0] === 'api' && args[1] === 'repos/acme/app/git/ref/tags/v1.0.0') out({ ref: 'refs/tags/v1.0.0', object: { type: 'commit', sha: JSON.parse(fs.readFileSync(${JSON.stringify(path.join(ghDir, 'tags.json'))}, 'utf8'))['v1.0.0'] } })
 if (args[0] === 'api') { const m = /^repos\\/acme\\/app\\/issues\\/(\\d+)$/.exec(args[1]); if (m && ISSUES[m[1]] && args.includes('--hostname')) out(ISSUES[m[1]].association + '\\n'); fail('HTTP 404: Not Found') }
 const repo = args[args.indexOf('-R') + 1]
 if (repo !== 'github.com/acme/app') fail('wrong repository: ' + repo)
@@ -93,6 +93,8 @@ const writes = () => calls().filter((c) => (c.args[0] === 'issue' && !['list', '
   }
   const merged = { 22: work('w22.txt'), 23: work('w23.txt') }
   g('tag', 'v1.0.0')
+  // GitHub's v1.0.0 is the project's own (the tag pushed): the fake gh answers it from here.
+  fs.writeFileSync(path.join(ghDir, 'tags.json'), JSON.stringify({ 'v1.0.0': g('rev-parse', 'v1.0.0^{commit}') }))
   g('checkout', '-q', mainLine)
   g('merge', '-q', '--ff-only', '1.0.0')
   const env = lib.withPathFirst({ CW_TEST_GH: path.join(ghDir, 'gh.cmd'), GH_TOKEN: 'ghp_never_given' }, [path.dirname(process.execPath)])
