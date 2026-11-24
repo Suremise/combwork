@@ -4594,7 +4594,13 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
      card with its output. A test **skipped** for its environment pauses the queue (`focusedSkip`) and asks the card's
      reviewer agent (`cw_focused_skip`) and the user under For you (`FOCUSED_SKIP_GATE`), the user able to answer
      first; the request and its decision are bound to the entry, the tests, the target's head and the merged tree, so
-     the entry is tested again and takes that decision only for exactly that result (a moved target is asked again).
+     it holds only for exactly that result (a moved target is asked again). **Approved (HI-3564)**, for the entry's latest
+     `focused tests` run (passed with skips, counted, its result's tree the request's): the pause lifts and the entry goes
+     straight to step 6 on that test merge and its checks, as Ask each time's Approve does (no second test merge or check
+     run: the focused tests are the last check), through the last checks before the advance (still approved, the guards
+     as checked, the focused proof standing, the target still at the request's head, else tested again). Declined, or not
+     that run's (follow mode too, whose advance needs the fetch it kept), the entry is tested again from its test merge
+     and takes the decision there. A check's log is full at 2 MB: it says so at once in a line, while the run goes on.
 6. **Advance the target only on green** (§16.9.2), after writing `IntegrationStarted` (§16.4.5). If the target moved
    since the test (it isn't at the expected revision), the entry goes back to step 2 against the new head; after
    **3** such retests in a row the entry pauses ("main moves faster than its checks: retest or merge by hand") [HB3's
