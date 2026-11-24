@@ -64,6 +64,7 @@
   "github.prs.row": "#{number} {title}",
   "github.prs.tip": "Crear una tarjeta de una pull request abierta en {repo}",
   "github.prs.title": "Pull requests abiertas en {repo}",
+  "github.review.approveChanged": "Esta tarjeta ahora trata de otra pull request distinta de la #{number} en {repo}, la que confirmaste: no se aprobó nada. Vuelve a mirarla.",
   "github.review.approveFailed": "La CLI de GitHub no pudo aprobar la pull request #{number}{why, select, none {} other {: {why}}}.",
   "github.review.done": "Esa revisión {state, select, posted {ya se publicó} discarded {se descartó} other {ya se está publicando}}.",
   "github.review.empty": "Una revisión necesita texto o algún comentario de línea tuyo.",

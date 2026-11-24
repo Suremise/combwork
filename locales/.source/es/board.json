@@ -398,7 +398,7 @@
   "board.github.approveConfirm": "Approve",
   "board.github.approveFailed": "Couldn’t approve the pull request",
   "board.github.approveMessage": "Combwork approves it on GitHub through your GitHub CLI, as your own account. Merging it stays yours, on GitHub: Combwork never merges a pull request.",
-  "board.github.approveTitle": "Approve pull request #{number}?",
+  "board.github.approveTitle": "Approve pull request #{number} on {repo}?",
   "board.github.approved": "You approved it on GitHub {when}. Merging stays on GitHub.",
   "board.github.carried": "{inline, plural, =0 {} one {# line comment on the diff} other {# line comments on the diff}}{both, select, yes {, } other {}}{listed, plural, =0 {} one {# listed in it} other {# listed in it}}",
   "board.github.change": "Change…",

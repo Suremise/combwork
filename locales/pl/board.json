@@ -398,7 +398,7 @@
   "board.github.approveConfirm": "Zatwierdź",
   "board.github.approveFailed": "Nie udało się zatwierdzić pull requesta",
   "board.github.approveMessage": "Combwork zatwierdza go na GitHubie przez twoje GitHub CLI, z twojego własnego konta. Scalenie zostaje twoje, na GitHubie: Combwork nigdy nie scala pull requestów.",
-  "board.github.approveTitle": "Zatwierdzić pull request #{number}?",
+  "board.github.approveTitle": "Zatwierdzić pull request #{number} w {repo}?",
   "board.github.approved": "Zatwierdzono go na GitHubie {when}. Scalanie zostaje na GitHubie.",
   "board.github.carried": "{inline, plural, =0 {} one {# komentarz do linii w diffie} few {# komentarze do linii w diffie} many {# komentarzy do linii w diffie} other {# komentarza do linii w diffie}}{both, select, yes {, } other {}}{listed, plural, =0 {} one {# wymieniony w treści} few {# wymienione w treści} many {# wymienionych w treści} other {# wymienionego w treści}}",
   "board.github.change": "Zmień…",

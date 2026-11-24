@@ -398,7 +398,7 @@
   "board.github.approveConfirm": "批准",
   "board.github.approveFailed": "无法批准拉取请求",
   "board.github.approveMessage": "Combwork 会通过你的 GitHub CLI，以你自己的账户在 GitHub 上批准它。合并仍由你在 GitHub 上完成：Combwork 从不合并拉取请求。",
-  "board.github.approveTitle": "批准拉取请求 #{number}？",
+  "board.github.approveTitle": "批准 {repo} 上的拉取请求 #{number}？",
   "board.github.approved": "你于 {when} 在 GitHub 上批准了它。合并仍在 GitHub 上完成。",
   "board.github.carried": "{inline, plural, =0 {} other {差异上的 # 条行评论}}{both, select, yes {，} other {}}{listed, plural, =0 {} other {正文中列出 # 条}}",
   "board.github.change": "更改…",

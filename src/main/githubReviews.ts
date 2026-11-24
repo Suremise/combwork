@@ -29,7 +29,8 @@ import type { RevisionReads } from './platform/revisionReads'
 import { msg } from '../shared/i18n'
 import { modelLabel, projectAgents } from '../shared/defaults'
 import { providerDescriptor } from '../shared/providers'
-import { boundedBody, foldGithubReviews, githubFooter, inHunks, inlineOf, listedComments, rowActions, stillAllowed, type DiffHunk, type GithubReviewRow, type GithubReviewsView, type InlineComment } from '../shared/githubReviews'
+import { sameSource } from '../shared/githubSource'
+import { approvalOf, boundedBody, foldGithubReviews, githubFooter, inHunks, inlineOf, listedComments, rowActions, stillAllowed, type DiffHunk, type GithubReviewRow, type GithubReviewsView, type InlineComment } from '../shared/githubReviews'
 import { githubFeedbackOf, githubFooterOf } from '../shared/workflow/options'
 import type { Fact } from '../shared/workflow/facts'
 import type { LineCommentView } from '../shared/workflow/lineComments'
@@ -43,6 +44,7 @@ const M = {
   noDraft: msg({ id: 'github.review.noDraft', defaultMessage: 'That draft is no longer on this card.', description: 'HI-3559: an error posting or discarding a review draft that isn’t on the card any more.' }),
   done: msg({ id: 'github.review.done', defaultMessage: 'That review was {state, select, posted {already posted} discarded {discarded} other {already being posted}}.', description: 'HI-3559: an error posting or discarding a review that was already posted, discarded, or is being posted. Keep the select keys.' }),
   empty: msg({ id: 'github.review.empty', defaultMessage: 'A review needs some text, or a line comment of yours to carry.', description: 'HI-3559: an error posting a review to GitHub with no text and no line comments.' }),
+  approveChanged: msg({ id: 'github.review.approveChanged', defaultMessage: 'This card is now about another pull request than #{number} on {repo}, the one you confirmed: nothing was approved. Look at it again.', description: 'HI-3560: an error approving a card’s pull request: the card’s GitHub source changed while the user was asked (another window), so the pull request they confirmed isn’t the card’s now. {number} its number, {repo} owner/name.' }),
   approveFailed: msg({ id: 'github.review.approveFailed', defaultMessage: 'The GitHub CLI couldn’t approve pull request #{number}{why, select, none {} other {: {why}}}.', description: 'HI-3560: an error approving a card’s pull request on GitHub from its dialog. {number} its number; {why} the GitHub CLI’s own words (in English), or none (keep the select key).' }),
   noLink: msg({ id: 'github.review.noLink', defaultMessage: 'This project’s GitHub link no longer names {repo}, the pull request’s repository (Version Control → Workflow → GitHub).', description: 'HI-3559: an error posting a review: the project’s GitHub repository changed since the card’s pull request was set. {repo} is owner/name. Version Control → Workflow → GitHub is a place in the window.' })
 }
@@ -78,7 +80,8 @@ export async function githubReviewsView(ws: WorkspaceService, n: number): Promis
   const latest = wf.state(card).latest?.id ?? null
   const openComments = latest === null ? 0 : lineCommentsOf(ws, n).filter((c) => c.state === 'open' && c.submission === latest).length
   const feedback = githubFeedbackOf(o)
-  const approved = facts.findLast((f) => f.kind === 'GithubPrApproved')?.at ?? null
+  // HI-3560 (HR1's round 1): only an approval of the pull request the card is about now.
+  const approved = approvalOf(facts, source)
   return { approved, feedback, footer: githubFooterOf(o), rows: rows.map((r) => ({ ...r, reviewerName: r.draft ? (who.get(r.draft.reviewer)?.name ?? null) : null, model: r.draft ? (who.get(r.draft.reviewer)?.model ?? null) : null, can: rowActions(feedback, 'user', r, { now: Date.now(), pending: !!r.draft && pendingPost(wf, card.id, r.draft.seq) }) })), openComments, canWrite: feedback !== 'agent', url: source.url }
 }
 
@@ -268,23 +271,40 @@ async function send(wf: Workflow, cardId: number, deps: PostDeps, source: { host
  * Only while the project's GitHub link still names the pull request's repository. Merging stays the user's, on GitHub:
  * Combwork never merges it. Written as a fact once GitHub took it; gh's words thrown otherwise.
  */
-export async function approveGithubPr(ws: WorkspaceService, n: number): Promise<void> {
+export async function approveGithubPr(ws: WorkspaceService, n: number, target: PrTarget): Promise<void> {
   const { wf, projectPath } = await cardOf(ws, n)
-  await approveOn(wf, n, { link: async () => (await import('./githubLink')).githubRepoFor(ws, projectPath), gh })
+  await approveOn(wf, n, target, { link: async () => (await import('./githubLink')).githubRepoFor(ws, projectPath), gh })
   boardChanged(ws)
 }
 
-/** approveGithubPr on card `n` of `wf`, with the link and gh given. */
-export async function approveOn(wf: Workflow, n: number, deps: Pick<PostDeps, 'link' | 'gh'>): Promise<void> {
-  const card = wf.store.card(n)
-  const source = card.source
-  if (source?.kind !== 'pr') throw combworkError(M.notPr)
+/** The pull request the user confirmed approving (HR1's round 1): its repository on its host, and its number. */
+export interface PrTarget {
+  host: string
+  owner: string
+  repo: string
+  number: number
+}
+
+/**
+ * approveGithubPr on card `n` of `wf`, with the link and gh given: only the pull request the user confirmed (`target`),
+ * while the card is still about it (checked first, and again after the link's read, just before gh is asked), and
+ * recorded with its whole identity.
+ */
+export async function approveOn(wf: Workflow, n: number, target: PrTarget, deps: Pick<PostDeps, 'link' | 'gh'>): Promise<void> {
+  const still = (): void => {
+    const source = wf.store.card(n).source
+    if (source?.kind !== 'pr') throw combworkError(M.notPr)
+    if (!sameSource(source, { kind: 'pr', ...target })) throw combworkError(M.approveChanged, { number: target.number, repo: `${target.owner}/${target.repo}` })
+  }
+  still()
   const link = await deps.link()
-  if (!link || link.host.toLowerCase() !== source.host.toLowerCase() || link.owner.toLowerCase() !== source.owner.toLowerCase() || link.repo.toLowerCase() !== source.repo.toLowerCase()) throw combworkError(M.noLink, { repo: `${source.owner}/${source.repo}` })
-  const r = await deps.gh({ repo: source }, ['pr', 'review', String(source.number), '--approve'])
-  if (!r.ok) throw combworkError(M.approveFailed, { number: source.number, why: r.detail ?? 'none' }) // i18n-ignore: a select key (none), gh's own words otherwise
-  await wf.write(card, null, 'user', (w) => {
-    w.fact('GithubPrApproved', { number: source.number })
+  if (!link || link.host.toLowerCase() !== target.host.toLowerCase() || link.owner.toLowerCase() !== target.owner.toLowerCase() || link.repo.toLowerCase() !== target.repo.toLowerCase()) throw combworkError(M.noLink, { repo: `${target.owner}/${target.repo}` })
+  // The card's source again, nothing awaited between this and gh: a change meanwhile approves nothing.
+  still()
+  const r = await deps.gh({ repo: { host: target.host, owner: target.owner, repo: target.repo } }, ['pr', 'review', String(target.number), '--approve'])
+  if (!r.ok) throw combworkError(M.approveFailed, { number: target.number, why: r.detail ?? 'none' }) // i18n-ignore: a select key (none), gh's own words otherwise
+  await wf.write(wf.store.card(n), null, 'user', (w) => {
+    w.fact('GithubPrApproved', { host: target.host, owner: target.owner, repo: target.repo, number: target.number })
   })
 }
 

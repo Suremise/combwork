@@ -398,7 +398,7 @@
   "board.github.approveConfirm": "Aprovar",
   "board.github.approveFailed": "Não foi possível aprovar o pull request",
   "board.github.approveMessage": "O Combwork o aprova no GitHub pela sua GitHub CLI, com a sua própria conta. Fazer o merge continua com você, no GitHub: o Combwork nunca faz merge de um pull request.",
-  "board.github.approveTitle": "Aprovar o pull request #{number}?",
+  "board.github.approveTitle": "Aprovar o pull request #{number} em {repo}?",
   "board.github.approved": "Você o aprovou no GitHub em {when}. O merge continua no GitHub.",
   "board.github.carried": "{inline, plural, =0 {} one {# comentário de linha no diff} many {# comentários de linha no diff} other {# comentários de linha no diff}}{both, select, yes {, } other {}}{listed, plural, =0 {} one {# listado nela} many {# listados nela} other {# listados nela}}",
   "board.github.change": "Alterar…",

@@ -64,6 +64,7 @@
   "github.prs.row": "#{number} {title}",
   "github.prs.tip": "{repo} のオープンなプルリクエストからカードを作成",
   "github.prs.title": "{repo} のオープンなプルリクエスト",
+  "github.review.approveChanged": "このカードは、あなたが確認した {repo} の #{number} とは別のプルリクエストについてのものになりました。何も承認されていません。もう一度確認してください。",
   "github.review.approveFailed": "GitHub CLI はプルリクエスト #{number} を承認できませんでした{why, select, none {} other {: {why}}}。",
   "github.review.done": "そのレビューは{state, select, posted {すでに投稿されています} discarded {破棄されています} other {すでに投稿中です}}。",
   "github.review.empty": "レビューには本文か、あなたの行コメントが必要です。",

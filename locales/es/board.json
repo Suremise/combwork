@@ -398,7 +398,7 @@
   "board.github.approveConfirm": "Aprobar",
   "board.github.approveFailed": "No se pudo aprobar la pull request",
   "board.github.approveMessage": "Combwork la aprueba en GitHub con tu CLI de GitHub, como tu propia cuenta. Fusionarla sigue siendo cosa tuya, en GitHub: Combwork nunca fusiona una pull request.",
-  "board.github.approveTitle": "¿Aprobar la pull request #{number}?",
+  "board.github.approveTitle": "¿Aprobar la pull request #{number} en {repo}?",
   "board.github.approved": "La aprobaste en GitHub el {when}. La fusión sigue en GitHub.",
   "board.github.carried": "{inline, plural, =0 {} one {# comentario de línea en el diff} many {# comentarios de línea en el diff} other {# comentarios de línea en el diff}}{both, select, yes {, } other {}}{listed, plural, =0 {} one {# listado en ella} many {# listados en ella} other {# listados en ella}}",
   "board.github.change": "Cambiar…",

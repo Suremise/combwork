@@ -398,7 +398,7 @@
   "board.github.approveConfirm": "Freigeben",
   "board.github.approveFailed": "Der Pull-Request konnte nicht freigegeben werden",
   "board.github.approveMessage": "Combwork gibt ihn über deine GitHub CLI mit deinem eigenen Konto auf GitHub frei. Das Mergen bleibt deine Sache, auf GitHub: Combwork mergt nie einen Pull-Request.",
-  "board.github.approveTitle": "Pull-Request #{number} freigeben?",
+  "board.github.approveTitle": "Pull-Request #{number} auf {repo} freigeben?",
   "board.github.approved": "Du hast ihn am {when} auf GitHub freigegeben. Das Mergen bleibt auf GitHub.",
   "board.github.carried": "{inline, plural, =0 {} one {# Zeilenkommentar im Diff} other {# Zeilenkommentare im Diff}}{both, select, yes {, } other {}}{listed, plural, =0 {} one {# darin aufgelistet} other {# darin aufgelistet}}",
   "board.github.change": "Ändern…",

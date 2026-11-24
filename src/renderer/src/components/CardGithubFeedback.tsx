@@ -36,7 +36,7 @@ const T = {
   recovery: msg({ id: 'board.github.recovery', defaultMessage: '{why, select, abandoned {Combwork didn’t post this: Combwork closed before it did. Post it now, or discard it.} stale {This may not have been posted: Combwork closed while posting it.} other {This may have been posted: GitHub’s answer didn’t come, or couldn’t be read.}}', description: 'A notice on a review in a pull request card’s dialog (HI-3559) that wasn’t posted, or may or may not have been: an automatic post that never ran, one Combwork closed in the middle of, or one GitHub may have taken. Keep the select keys.' }),
   checkGithub: msg({ id: 'board.github.checkGithub', defaultMessage: 'Check on GitHub first', description: 'A link beside the notice that a review may have been posted (HI-3559): opens the pull request on GitHub, to look before posting it again.' }),
   approve: msg({ id: 'board.github.approve', defaultMessage: 'Approve on GitHub…', description: 'A button in a pull request card’s Feedback to GitHub (HI-3560): approves the pull request on GitHub as the user, after asking. Merging stays on GitHub.' }),
-  approveTitle: msg({ id: 'board.github.approveTitle', defaultMessage: 'Approve pull request #{number}?', description: 'The title of the question before approving a card’s pull request on GitHub (HI-3560). {number} is its number.' }),
+  approveTitle: msg({ id: 'board.github.approveTitle', defaultMessage: 'Approve pull request #{number} on {repo}?', description: 'The title of the question before approving a card’s pull request on GitHub (HI-3560). {number} is its number, {repo} its repository (owner/name).' }),
   approveMessage: msg({ id: 'board.github.approveMessage', defaultMessage: 'Combwork approves it on GitHub through your GitHub CLI, as your own account. Merging it stays yours, on GitHub: Combwork never merges a pull request.', description: 'The question before approving a card’s pull request on GitHub (HI-3560).' }),
   approveConfirm: msg({ id: 'board.github.approveConfirm', defaultMessage: 'Approve', description: 'The button of the question before approving a pull request on GitHub (HI-3560).' }),
   approved: msg({ id: 'board.github.approved', defaultMessage: 'You approved it on GitHub {when}. Merging stays on GitHub.', description: 'In a pull request card’s Feedback to GitHub (HI-3560): when the user approved the pull request from the card (a date and time).' }),
@@ -146,9 +146,12 @@ export function GithubFeedbackField({ card }: { card: TaskCard }) {
   const refresh = (): void => setAsked((n) => n + 1)
   // HI-3560: the user's accept, asked first; merging stays on GitHub.
   const approve = async (): Promise<void> => {
-    if (!(await confirm({ title: tr(T.approveTitle, { number: card.source!.number }), message: tr(T.approveMessage), confirmLabel: tr(T.approveConfirm) }))) return
+    // The pull request asked about is the one approved (HR1's round 1): main refuses it once the card is about another.
+    const s = card.source!
+    const target = { host: s.host, owner: s.owner, repo: s.repo, number: s.number }
+    if (!(await confirm({ title: tr(T.approveTitle, { number: s.number, repo: `${s.owner}/${s.repo}` }), message: tr(T.approveMessage), confirmLabel: tr(T.approveConfirm) }))) return
     setBusy(true)
-    await actions.attempt(tr(T.approveFailed), () => call('github:approvePr', card.number))
+    await actions.attempt(tr(T.approveFailed), () => call('github:approvePr', card.number, target))
     setBusy(false)
     refresh()
   }

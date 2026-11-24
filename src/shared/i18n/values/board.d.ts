@@ -400,7 +400,7 @@ interface CombworkMessageValues {
   'board.github.approveConfirm': undefined
   'board.github.approveFailed': undefined
   'board.github.approveMessage': undefined
-  'board.github.approveTitle': { number: string | number }
+  'board.github.approveTitle': { number: string | number; repo: string | number }
   'board.github.approved': { when: string | number }
   'board.github.carried': { inline: number; both: string; listed: number }
   'board.github.change': undefined

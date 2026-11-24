@@ -398,7 +398,7 @@
   "board.github.approveConfirm": "承認",
   "board.github.approveFailed": "プルリクエストを承認できませんでした",
   "board.github.approveMessage": "Combwork があなたの GitHub CLI を通じて、あなた自身のアカウントで GitHub 上で承認します。マージは引き続き GitHub であなたが行います。Combwork がプルリクエストをマージすることはありません。",
-  "board.github.approveTitle": "プルリクエスト #{number} を承認しますか？",
+  "board.github.approveTitle": "{repo} のプルリクエスト #{number} を承認しますか？",
   "board.github.approved": "{when} に GitHub で承認しました。マージは GitHub で行います。",
   "board.github.carried": "{inline, plural, =0 {} other {差分上の行コメント # 件}}{both, select, yes {、} other {}}{listed, plural, =0 {} other {本文に記載 # 件}}",
   "board.github.change": "変更…",

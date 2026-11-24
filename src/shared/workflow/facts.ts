@@ -584,7 +584,7 @@ export interface FactData {
    * HI-3560: the user approved the card's pull request on GitHub from its dialog (`gh pr review --approve`), as their own
    * account. Merging it stays theirs, on GitHub.
    */
-  GithubPrApproved: { number: number }
+  GithubPrApproved: { host: string; owner: string; repo: string; number: number }
 }
 
 /**

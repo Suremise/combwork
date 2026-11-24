@@ -1596,8 +1596,8 @@
     "description": "The question before approving a card’s pull request on GitHub (HI-3560)."
   },
   "board.github.approveTitle": {
-    "defaultMessage": "Approve pull request #{number}?",
-    "description": "The title of the question before approving a card’s pull request on GitHub (HI-3560). {number} is its number."
+    "defaultMessage": "Approve pull request #{number} on {repo}?",
+    "description": "The title of the question before approving a card’s pull request on GitHub (HI-3560). {number} is its number, {repo} its repository (owner/name)."
   },
   "board.github.approved": {
     "defaultMessage": "You approved it on GitHub {when}. Merging stays on GitHub.",

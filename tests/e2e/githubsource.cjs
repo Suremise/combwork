@@ -201,7 +201,7 @@ const calls = () => fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(B
     check('#7’s card says Claude wrote it (its commit’s Co-Authored-By) and suggests another provider’s reviewers', !!(await until(async () => (await written.getAttribute('data-written-by').catch(() => null)) !== null && /Written by Claude Opus 5\.5 \(Claude Code\), as its commits’ Co-Authored-By says\. Suggested: reviewers that run another provider than Claude Code/.test(await written.innerText()), HUNG_MS)), await written.innerText().catch(() => ''))
     await shoot('10-written-by', d.locator('.card-source'))
     await fb.locator('[data-action="approve-pr"]').click()
-    const ask = page.locator('.dialog', { hasText: 'Approve pull request #7?' })
+    const ask = page.locator('.dialog', { hasText: 'Approve pull request #7 on acme/app?' })
     check('Approve on GitHub… asks first, saying merging stays on GitHub', !!(await until(async () => (await ask.count()) === 1, HUNG_MS)) && /Combwork never merges a pull request/.test(await ask.innerText()))
     await shoot('11-approve-ask', ask)
     await ask.getByRole('button', { name: 'Approve', exact: true }).click()
