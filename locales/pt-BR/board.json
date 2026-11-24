@@ -1002,6 +1002,7 @@
   "board.stalled.noAgent": "Em Fazendo, mas nenhum agente está com ele.",
   "board.stalled.notRunning": "O agente {agent} não está em execução.",
   "board.stalled.notWatching": "O agente {agent} não está observando {card}: o turno terminou sem uma observação de cartão.",
+  "board.stalled.notWatchingUncounted": "O agente {agent} não está observando {card}: o turno terminou sem uma observação de cartão, depois que o Combwork parou de contar suas tarefas em segundo plano. Ele talvez ainda esteja esperando uma delas: verifique essa etapa. Se ela terminou, peça a {agent} que continue.",
   "board.stalled.removed": "O agente {agent} foi removido.",
   "board.stalled.removedUnnamed": "O agente foi removido.",
   "board.stalled.reviewVerdictWait": "O agente {agent} começou a revisar {card}, mas não deu veredito e apenas o observa há {waited}.",

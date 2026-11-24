@@ -1005,6 +1005,7 @@ interface CombworkMessageValues {
   'board.stalled.noAgent': undefined
   'board.stalled.notRunning': { agent: string | number }
   'board.stalled.notWatching': { agent: string | number; card: string | number }
+  'board.stalled.notWatchingUncounted': { agent: string | number; card: string | number }
   'board.stalled.removed': { agent: string | number }
   'board.stalled.removedUnnamed': undefined
   'board.stalled.reviewVerdictWait': { agent: string | number; card: string | number; waited: string | number }

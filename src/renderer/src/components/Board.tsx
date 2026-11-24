@@ -119,7 +119,7 @@ type StallKind = 'nobody' | 'forward' | 'not-watching' | 'wake-untaken' | 'revie
 
 /** The agents as every card's stall reads them: those that may loop on a card, and those watching cards. */
 function stallAgentsOf(projects: ProjectInfo[]) {
-  const loopers = projects.flatMap((p) => p.agents.map((a) => ({ name: a.name, project: p.name, notWatching: a.live?.notWatching, untaken: !!a.live?.untakenLine })))
+  const loopers = projects.flatMap((p) => p.agents.map((a) => ({ name: a.name, project: p.name, notWatching: a.live?.notWatching, untaken: !!a.live?.untakenLine, uncounted: a.live?.tasksUncounted })))
   const watchers = projects.flatMap((p) => p.agents.flatMap((a) => (a.live?.watch?.cards.length ? [{ name: a.name, project: p.name, agentId: a.id, cards: a.live.watch.cards, watchSince: a.live.watch.since, status: a.live.status, silentMinutes: agentRuntime(a.live).silentMinutes }] : [])))
   return { loopers, watchers }
 }

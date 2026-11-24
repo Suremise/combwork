@@ -187,6 +187,9 @@ describe('what a lane watch counts (#531)', () => {
       expect(mergeStallReason(lane({ cards: [{ ...passed, mark: card({ c: 'done' }) }] }), idle, late)).toBeNull()
       // A blocked card is told as blocked: the builder asked the user, as card-loop says.
       expect(mergeStallReason(lane({ cards: [{ ...passed, mark: card({ c: 'passed', b: true }) }] }), idle, late)).toBeNull()
+      // HI-3561: a card in Combwork's merge queue: the lane waits on the queue, not its builder.
+      expect(mergeStallReason(lane({ queued: true }), idle, late)).toBeNull()
+      expect(mergeStallReason(lane({ queued: true }), null, late)).toBeNull()
       for (const state of ['ended', 'abandoned', 'gone'] as const) expect(mergeStallReason(lane({ state }), idle, late), state).toBeNull()
       // A card changed lately (a comment on it) starts the time again.
       expect(mergeStallReason(lane({ cards: [{ ...passed, updatedAt: new Date(late - 60_000).toISOString() }] }), idle, late)).toBeNull()

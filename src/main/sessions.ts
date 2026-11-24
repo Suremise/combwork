@@ -6363,6 +6363,7 @@ class SessionManager {
     }
     const had = l.state.backgroundTasks
     l.state.backgroundTasks = l.tasks?.size || undefined
+    l.state.tasksUncounted = l.tasksDropped?.size || undefined
     // When they last ended (HI-1993): a review waiting on them starts its stall clock again from then.
     if (had && !l.state.backgroundTasks) l.state.backgroundEndedAt = new Date().toISOString()
     return dropped.length > 0
@@ -6425,6 +6426,7 @@ class SessionManager {
     l.tasksOffset = 0
     l.tasksMemo = undefined
     l.state.backgroundTasks = undefined
+    l.state.tasksUncounted = undefined
   }
 
   /**

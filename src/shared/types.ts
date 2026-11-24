@@ -2935,6 +2935,11 @@ export interface LiveSessionState {
   backgroundTasks?: number
   /** When its background tasks last ended (ISO: the count went to none), so a review waiting on them starts its clock then (HI-1993). */
   backgroundEndedAt?: string
+  /**
+   * HI-3561: its background tasks Combwork stopped counting after the time limit, not seen to end since. Its turn ended
+   * with no card watch, it may still be waiting on one (a subagent's long run), or one ended without waking it.
+   */
+  tasksUncounted?: number
   /** The running conversation's transcript size in bytes, once the provider has written one. */
   transcriptBytes?: number
   /** The start of its latest reply, as its last turn's end reported it (shared/tiles.ts replyStart): its tile's last lines (#976). */

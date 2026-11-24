@@ -1002,6 +1002,7 @@
   "board.stalled.noAgent": "W kolumnie Aktywne, ale nie ma jej żaden agent.",
   "board.stalled.notRunning": "{agent} nie działa.",
   "board.stalled.notWatching": "{agent} nie obserwuje karty {card}: tura skończyła się bez obserwowania karty.",
+  "board.stalled.notWatchingUncounted": "{agent} nie obserwuje karty {card}: tura skończyła się bez obserwowania karty, po tym jak Combwork przestał liczyć jego zadania w tle. Może nadal czekać na jedno z nich: sprawdź ten krok. Jeśli się zakończył, poproś agenta {agent}, by kontynuował.",
   "board.stalled.removed": "Usunięto agenta {agent}.",
   "board.stalled.removedUnnamed": "Usunięto jej agenta.",
   "board.stalled.reviewVerdictWait": "Agent {agent} zaczął recenzować kartę {card}, ale nie wydał werdyktu i od {waited} tylko ją obserwuje.",

@@ -41,6 +41,7 @@ import { cardNamesOf, withCardNames } from './projectKeys'
 import { namedBy } from '../shared/projectKeys'
 import { projectPreferences } from './workflow/preferences'
 import { forYouOfCards } from './workflow/cardWork'
+import { FactStore } from './workflow/factStore'
 import type { ForYouItem } from '../shared/workflow/workView'
 import { NOTICE_PREFIX } from '../shared/doorbell'
 import { API } from './apiText'
@@ -1768,10 +1769,24 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
     const builder = ws.path ? (sessions.liveFor(join(ws.path, l.project), l.builder.id) ?? null) : null
     // A builder queued to resume after a restart (HI-1707) isn't a stall meanwhile.
     const resuming = !builder && !!ws.path && isResuming(join(ws.path, l.project), l.builder.id)
-    const mergeStall = resuming ? null : mergeStallReason({ state: l.state, builder: l.builder.name, cards: changed }, builder)
+    // HI-3561: one of its cards in the merge queue (Merging): Combwork merges it, so no merge slot is the builder's to claim.
+    const mergeStall = resuming ? null : mergeStallReason({ state: l.state, builder: l.builder.name, cards: changed, queued: mergeDue(Object.values(marks)) && inMergeQueue(ws, l.project, cardsOf(l).map((c) => c.number).filter((n) => marks[n]?.c === 'passed')) }, builder)
     out.push({ id: l.id, label, short: l.name?.trim() || pair, project: l.project, mark: { state: l.state, mergeDue: mergeDue(Object.values(marks)), ...(mergeStall ? { ms: true } : {}), cards: marks }, cards, mergeStall, status: l.status, mergeCommit: l.mergeCommit })
   }
   return out
+}
+
+/** HI-3561: whether any of these cards of the project is in Combwork's merge queue (its stage Merging), as its facts say. */
+function inMergeQueue(ws: WorkspaceService, project: string, cards: readonly number[]): boolean {
+  if (!cards.length) return false
+  const store = FactStore.forBoard(ws, { project, key: '' })
+  return cards.some((n) => {
+    try {
+      return store.card(n).stage === 'merging'
+    } catch {
+      return false
+    }
+  })
 }
 
 /**

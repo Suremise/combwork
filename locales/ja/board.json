@@ -1002,6 +1002,7 @@
   "board.stalled.noAgent": "「進行中」ですが、担当エージェントがいません。",
   "board.stalled.notRunning": "{agent}は実行されていません。",
   "board.stalled.notWatching": "{agent}は{card}を監視していません。カードの監視なしでターンが終了しました。",
+  "board.stalled.notWatchingUncounted": "{agent}は{card}を監視していません。Combworkがバックグラウンドタスクの数を数えるのをやめた後、カードの監視なしでターンが終了しました。まだそのいずれかを待っている可能性があります。その手順を確認してください。終了している場合は、{agent}に続けるよう依頼してください。",
   "board.stalled.removed": "{agent}は削除されました。",
   "board.stalled.removedUnnamed": "担当エージェントは削除されました。",
   "board.stalled.reviewVerdictWait": "{agent}は{card}のレビューを開始しましたが、判定を出さず、{waited}間監視しているだけです。",

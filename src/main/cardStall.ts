@@ -179,7 +179,7 @@ function liveOf(wsPath: string): { name: string; project: string; agentId: strin
   return sessions
     .liveStates()
     .filter((s) => workspaceOf(s.projectPath).path?.toLowerCase() === ws)
-    .map((s) => ({ name: s.agentName ?? s.agentId, project: basename(s.projectPath), agentId: s.agentId, notWatching: s.notWatching, untaken: !!s.untakenLine, cards: s.watch?.cards ?? [], watchSince: s.watch?.since, watchesMore: !!(s.watch?.usage || s.watch?.lanes || s.watch?.agents?.length), status: s.status, silentMinutes: agentRuntime(s).silentMinutes, backgroundTasks: s.backgroundTasks, backgroundEndedAt: s.backgroundEndedAt, provider: s.provider, ...(s.safeguard ? { safeguard: s.safeguard } : {}) }))
+    .map((s) => ({ name: s.agentName ?? s.agentId, project: basename(s.projectPath), agentId: s.agentId, notWatching: s.notWatching, untaken: !!s.untakenLine, uncounted: s.tasksUncounted, cards: s.watch?.cards ?? [], watchSince: s.watch?.since, watchesMore: !!(s.watch?.usage || s.watch?.lanes || s.watch?.agents?.length), status: s.status, silentMinutes: agentRuntime(s).silentMinutes, backgroundTasks: s.backgroundTasks, backgroundEndedAt: s.backgroundEndedAt, provider: s.provider, ...(s.safeguard ? { safeguard: s.safeguard } : {}) }))
 }
 
 export type { StallAgent }
