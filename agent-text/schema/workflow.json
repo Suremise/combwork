@@ -1637,6 +1637,12 @@
       "remote": "plain"
     }
   },
+  "workflow.unreadable.prLeftover": {
+    "placeholders": {
+      "line": "plain",
+      "number": "plain"
+    }
+  },
   "workflow.unreadable.prLink": {
     "placeholders": {
       "number": "plain",
