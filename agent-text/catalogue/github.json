@@ -54,6 +54,11 @@
     "note": "HI-3555: an error from Close Shipped Issues…: the branch chosen isn’t released yet (HI-3148’s reading: a tag named after it in its history, and merged into the default branch). {line} is a branch name such as 1.7.0.",
     "audience": "both"
   },
+  "github.issues.tagMismatch": {
+    "text": "The release {tag} on GitHub names another commit than this repository’s {tag}: fetch its tags, or look at the release, before closing its issues.",
+    "note": "HI-3555: an error from Close Shipped Issues…: the published release’s tag on GitHub and the project’s own tag of that name are at different commits, so what it shipped can’t be told and nothing was closed. {tag} is the tag, such as v1.7.0.",
+    "audience": "both"
+  },
   "github.link.notARemote": {
     "text": "That remote isn’t on this project’s GitHub host any more: choose again.",
     "note": "An error choosing the repository of a project’s GitHub link (HI-3550, Version Control → Workflow → GitHub): the remote chosen no longer points at a repository on the GitHub host.",

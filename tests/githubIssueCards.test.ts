@@ -7,7 +7,7 @@
 // are those whose integrated result is in its tagged commit and in no earlier release's; a close authorises the preview
 // shown and nothing else, only once the release is published, each issue read back so a retry never comments twice.
 import { execFileSync } from 'child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -28,7 +28,12 @@ const ISSUES = (): Record<number, Issue> => ({
   ...Object.fromEntries([24, 25, 26, 27, 28].map((n) => [n, { title: `Issue ${n}`, author: 'mona', association: 'MEMBER', labels: [], assignees: [], state: 'OPEN' as const, comments: [] }]))
 })
 /** GitHub's side: the issues, each release's draft state by tag, and how a close of an issue goes ('fail': refused, nothing changed; 'commentThenFail': commented, not closed; 'lost': closed, its reply lost). */
-type GithubState = { issues: Record<number, Issue>; releases: Record<string, boolean>; modes: Record<number, 'fail' | 'commentThenFail' | 'lost'>; viewModes: Record<number, 'relink' | 'hold'>; repoPath?: string }
+/**
+ * GitHub's side: the issues, each release's draft state by tag, how a close of an issue goes, a view held or relinking
+ * the project, and the tags GitHub has: by default the project's own (pushed), else `remoteTags`' commit; `annotated`
+ * ones answer as a tag object to peel.
+ */
+type GithubState = { issues: Record<number, Issue>; releases: Record<string, boolean>; modes: Record<number, 'fail' | 'commentThenFail' | 'lost'>; viewModes: Record<number, 'relink' | 'hold'>; repoPath?: string; remoteTags: Record<string, string>; annotated: string[] }
 /** A held view writes `held`, then answers once `go` is there (or its bound passes): a read held while the test changes things. */
 const held = join(base, 'gh', 'held')
 const go = join(base, 'gh', 'go')
@@ -66,6 +71,15 @@ writeFileSync(
     "  if (mode === 'lost') fail('connection reset')",
     "  out('')",
     '}',
+    "const tagRef = /^repos\\/acme\\/app\\/git\\/ref\\/tags\\/(.+)$/.exec(args[1] || '')",
+    "if (args[0] === 'api' && tagRef && args.includes('--hostname')) {",
+    "  const t = tagRef[1]; let sha = S.remoteTags[t]",
+    "  if (!sha) { try { sha = require('child_process').execFileSync('git', ['-C', S.repoPath, 'rev-parse', '--verify', '-q', t + '^{commit}']).toString().trim() } catch { fail('HTTP 404: Not Found') } }",
+    "  if (S.annotated.includes(t)) out({ ref: 'refs/tags/' + t, object: { type: 'tag', sha: 'f'.repeat(32) + sha.slice(0, 8) } })",
+    "  out({ ref: 'refs/tags/' + t, object: { type: 'commit', sha } })",
+    "}",
+    "const tagObj = /^repos\\/acme\\/app\\/git\\/tags\\/f{32}([0-9a-f]{8})$/.exec(args[1] || '')",
+    "if (args[0] === 'api' && tagObj) out({ object: { type: 'commit', sha: require('child_process').execFileSync('git', ['-C', S.repoPath, 'rev-parse', tagObj[1]]).toString().trim() } })",
     "const api = /^repos\\/acme\\/app\\/issues\\/(\\d+)$/.exec(args[1] || '')",
     "if (args[0] === 'api' && api && S.issues[api[1]]) out(S.issues[api[1]].association + '\\n')",
     "if (args[0] === 'release' && args[1] === 'view' && args[2] in S.releases) out({ isDraft: S.releases[args[2]], url: 'https://github.com/acme/app/releases/tag/' + args[2] })",
@@ -108,7 +122,9 @@ afterAll(async () => {
 })
 beforeEach(() => {
   writeFileSync(callLog, '')
-  writeFileSync(stateFile, JSON.stringify({ issues: ISSUES(), releases: {}, modes: {}, viewModes: {} } satisfies GithubState))
+  rmSync(held, { force: true })
+  rmSync(go, { force: true })
+  writeFileSync(stateFile, JSON.stringify({ issues: ISSUES(), releases: {}, modes: {}, viewModes: {}, remoteTags: {}, annotated: [] } satisfies GithubState))
 })
 
 const user = { kind: 'user' } as const
@@ -267,6 +283,8 @@ describe('closing shipped issues at publish (HI-3555)', () => {
     const notDone = (await inWorkspace(w, () => tasks.createTask({ title: 'Not done', project: 'p' }, user))).number
     await store.boardWrite(w, async () => facts.tx((tx) => void tx.append(notDone, { kind: 'Integrated', actor: 'combwork', source: 'recorded', data: { revision: 'x', target: '1.0.0', result: git(repo, 'rev-parse', 'v1.0.0'), method: 'merge', by: 'combwork' } } as never)))
     writeFileSync(callLog, '')
+    // GitHub has the project's tags (pushed) unless a test says otherwise.
+    setGithub((s) => (s.repoPath = repo))
     return { w, repo, cards }
   }
   const shippedOf = async (w: WS, repo: string, line: string): Promise<Extract<ShippedIssuesRead, { issues: unknown }>> => {
@@ -278,6 +296,10 @@ describe('closing shipped issues at publish (HI-3555)', () => {
 
   it('takes a release’s shipped cards from its tagged commit: not what came after it, nor what an earlier release shipped', async () => {
     const { w, repo, cards } = await history()
+    // The earlier releases published on GitHub (each tag there where the project has it).
+    setGithub((s) => {
+      for (const t of ['v1.0.0', 'v1.1.0', 'v1.1.1']) s.releases[t] = false
+    })
     expect((await inWorkspace(w, () => releasedLines(w, repo, ACME))).map((l) => [l.line, l.tag, l.commit === git(repo, 'rev-parse', `${l.tag}^{commit}`)]).sort()).toEqual([
       ['1.0.0', 'v1.0.0', true],
       ['1.1.0', 'v1.1.0', true],
@@ -290,7 +312,7 @@ describe('closing shipped issues at publish (HI-3555)', () => {
       [22, cards[22], 'open'],
       [23, cards[23], 'closed']
     ])
-    expect(r100).toMatchObject({ tag: 'v1.0.0', version: '1.0.0', published: false })
+    expect(r100).toMatchObject({ tag: 'v1.0.0', version: '1.0.0', published: true })
     // #24 merged into 1.0.0 after its tag: it shipped in 1.1.0, whose tag holds it; 1.0.0's cards aren't 1.1.0's.
     expect((await shippedOf(w, repo, '1.1.0')).issues.map((i) => i.issue)).toEqual([24, 25])
     // The patch: #26 merged into main and #27 into 1.1.1, both in v1.1.1 and in no earlier tag.
@@ -388,6 +410,62 @@ describe('closing shipped issues at publish (HI-3555)', () => {
     expect(github().issues[21].comments).toEqual(['Fixed in 1.0.0'])
   })
 
+  it('takes nothing away for an earlier tag that isn’t a published release: an RC left a draft (HR1’s round 1)', async () => {
+    const { w, repo } = await history()
+    git(repo, 'tag', 'v1.0.0-rc.1', 'v1.0.0~1')
+    setGithub((s) => {
+      s.releases['v1.0.0-rc.1'] = true
+      s.releases['v1.0.0'] = false
+    })
+    expect((await shippedOf(w, repo, '1.0.0')).issues.map((i) => i.issue)).toEqual([21, 22, 23])
+    // The RC published (its tag on GitHub where the project has it): what it shipped is its own, not 1.0.0's.
+    setGithub((s) => (s.releases['v1.0.0-rc.1'] = false))
+    expect((await shippedOf(w, repo, '1.0.0-rc.1')).issues.map((i) => i.issue)).toEqual([21, 22])
+    expect((await shippedOf(w, repo, '1.0.0')).issues.map((i) => i.issue)).toEqual([23])
+    expect(writes()).toEqual([])
+  })
+
+  it('reads the published release at GitHub’s own tag: annotated tags peeled, a tag at another commit there refused (HR1’s round 1)', async () => {
+    const { w, repo } = await history()
+    setGithub((s) => {
+      s.releases['v1.0.0'] = false
+      s.annotated = ['v1.0.0']
+    })
+    const shown = await shippedOf(w, repo, '1.0.0')
+    expect(shown.issues.map((i) => i.issue)).toEqual([21, 22, 23])
+    expect(calls()).toContainEqual(['api', `repos/acme/app/git/tags/${'f'.repeat(32)}${shown.commit.slice(0, 8)}`, '--hostname', 'github.com'])
+    // GitHub's v1.0.0 is at an earlier commit than the project's (the local tag moved after it was published): refused.
+    setGithub((s) => {
+      s.annotated = []
+      s.remoteTags['v1.0.0'] = git(repo, 'rev-parse', 'v1.0.0~1')
+    })
+    expect(await inWorkspace(w, () => shippedIssuesOf(w, repo, '1.0.0'))).toMatchObject({ problem: 'tagMismatch' })
+    await expect(inWorkspace(w, () => closeShippedIssues(w, repo, previewOf(shown)))).rejects.toThrow('The release v1.0.0 on GitHub names another commit than this repository’s v1.0.0')
+    expect(writes()).toEqual([])
+  })
+
+  it('keeps a queued close to the workspace that asked: closed and reopened meanwhile, it writes nothing (HR1’s round 1)', async () => {
+    const { w, repo } = await history()
+    setGithub((s) => (s.releases['v1.0.0'] = false))
+    const shown = await shippedOf(w, repo, '1.0.0')
+    writeFileSync(callLog, '')
+    // The first close's read of #21 held; a second queued behind it; the workspace closed and opened again.
+    setGithub((s) => (s.viewModes[21] = 'hold'))
+    const first = inWorkspace(w, () => closeShippedIssues(w, repo, previewOf(shown)))
+    await vi.waitFor(() => expect(existsSync(held)).toBe(true), { timeout: timing('wait.hang') })
+    const second = inWorkspace(w, () => closeShippedIssues(w, repo, previewOf(shown))).then(
+      (r) => r,
+      (e: unknown) => (e instanceof Error ? e.message : String(e))
+    )
+    const at = w.path!
+    await w.close()
+    await w.open(at)
+    writeFileSync(go, '')
+    expect(await first).toEqual([])
+    expect(await second).toMatch(/What 1\.0\.0 shipped has changed/)
+    expect(writes()).toEqual([])
+  })
+
   it('checks its authority again before each write: a link changed or a workspace closed meanwhile stops what is left (HR1 on s16)', async () => {
     const { w, repo, cards } = await history()
     setGithub((s) => {
@@ -425,6 +503,6 @@ describe('closing shipped issues at publish (HI-3555)', () => {
 
   it('takes a missing release as not published', async () => {
     const r = await githubIssues(ACME).published('v9.9.9')
-    expect(r).toEqual({ ok: true, published: false, url: null })
+    expect(r).toEqual({ ok: true, published: false, url: null, commit: null })
   })
 })

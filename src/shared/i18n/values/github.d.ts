@@ -50,6 +50,7 @@ interface CombworkMessageValues {
   'github.issues.row': { number: string | number; title: string | number }
   'github.issues.search': undefined
   'github.issues.shipped': undefined
+  'github.issues.tagMismatch': { tag: string | number }
   'github.link.again': undefined
   'github.link.checking': undefined
   'github.link.choose': { host: string | number }

@@ -42,6 +42,9 @@ export interface OpenIssue {
 /** Why an issue source couldn't be asked: gh's state, or the project has no link to ask on. */
 export type IssueProblem = Exclude<GhState, 'signedIn'> | 'noLink'
 
+/** HR1's round 1: the release's tag on GitHub names another commit than the repository's own tag of that name. */
+export type ReleaseProblem = IssueProblem | 'notReleased' | 'tagMismatch'
+
 /** What the Issues tab shows: the repository and its open issues, or why they couldn't be listed (gh's own words). */
 export type OpenIssuesRead = { repo: GithubRepoRef; issues: OpenIssue[] } | { repo: GithubRepoRef | null; problem: IssueProblem; detail: string | null }
 
@@ -64,8 +67,11 @@ export interface IssueSource {
   list(q: IssueQuery): Promise<{ ok: true; issues: Omit<OpenIssue, 'card'>[] } | { ok: false; problem: Exclude<GhState, 'signedIn'>; detail: string | null }>
   /** The issue, its state, and its comments' bodies (the close's read-back: a comment an earlier attempt posted). */
   read(number: number): Promise<{ ok: true; issue: IssueRead; state: 'open' | 'closed'; comments: string[] } | { ok: false; problem: Exclude<GhState, 'signedIn'>; detail: string | null }>
-  /** Whether `tag`'s release is published (not a draft); null when it can't be told (none, or the source couldn't say). */
-  published(tag: string): Promise<{ ok: true; published: boolean; url: string | null } | { ok: false; problem: Exclude<GhState, 'signedIn'>; detail: string | null }>
+  /**
+   * Whether `tag`'s release is published (not a draft; none: not published), and (HR1's round 1) the commit the tag names
+   * on the source itself, peeled (lightweight or annotated), null when it has no such tag. Unreadable: not ok.
+   */
+  published(tag: string): Promise<{ ok: true; published: boolean; url: string | null; commit: string | null } | { ok: false; problem: Exclude<GhState, 'signedIn'>; detail: string | null }>
   /** Closes it as completed, with `comment` first when given (null: closed without one). */
   close(number: number, comment: string | null): Promise<IssueCloseResult>
 }
@@ -125,7 +131,7 @@ export interface ShippedPreview {
 /** What Close Shipped Issues… shows for a line: its release on GitHub, and its shipped issues. */
 export type ShippedIssuesRead =
   | (Omit<ShippedPreview, 'issues'> & { version: string; published: boolean; releaseUrl: string | null; issues: ShippedIssue[] })
-  | { repo: GithubRepoRef | null; problem: IssueProblem | 'notReleased'; detail: string | null }
+  | { repo: GithubRepoRef | null; problem: ReleaseProblem; detail: string | null }
 
 /**
  * Each issue's outcome of a close, read back from GitHub: closed now, already closed, failed (still open, the source's

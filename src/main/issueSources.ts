@@ -55,9 +55,19 @@ export function githubIssues(repo: GithubRepoRef): IssueSource {
     },
     async published(tag) {
       const r = await gh({ repo }, ['release', 'view', tag, '--json', 'isDraft,url'], { json: true })
-      if (!r.ok) return r.problem === 'failed' ? { ok: true, published: false, url: null } : r
+      if (!r.ok) return r.problem === 'failed' ? { ok: true, published: false, url: null, commit: null } : r
       const j = (r.json ?? {}) as Record<string, unknown>
-      return { ok: true, published: j.isDraft === false, url: str(j, 'url') || null }
+      // HR1's round 1: the commit GitHub's own tag names, peeled through annotated tag objects (a few at most).
+      const ref = await gh({ host: repo.host }, ['api', `repos/${name}/git/ref/tags/${tag}`], { json: true })
+      if (!ref.ok && ref.problem !== 'failed') return ref
+      let object = ref.ok ? ((ref.json as { object?: { type?: unknown; sha?: unknown } } | null)?.object ?? null) : null
+      for (let i = 0; object && object.type === 'tag' && typeof object.sha === 'string' && i < 4; i++) {
+        const t = await gh({ host: repo.host }, ['api', `repos/${name}/git/tags/${object.sha}`], { json: true })
+        if (!t.ok) return t.problem === 'failed' ? { ok: false, problem: 'failed', detail: t.detail } : t
+        object = (t.json as { object?: { type?: unknown; sha?: unknown } } | null)?.object ?? null
+      }
+      const commit = object && object.type === 'commit' && typeof object.sha === 'string' && /^[0-9a-f]{40}$/i.test(object.sha) ? object.sha.toLowerCase() : null
+      return { ok: true, published: j.isDraft === false, url: str(j, 'url') || null, commit }
     },
     async close(number, comment) {
       const r = await gh({ repo }, ['issue', 'close', String(number), '--reason', 'completed', ...(comment === null ? [] : ['--comment', comment])])
@@ -88,6 +98,7 @@ export async function openIssuesOf(ws: WorkspaceService, projectPath: string, q:
 const T = {
   notReleased: msg({ id: 'github.issues.notReleased', defaultMessage: '{line} isn’t released: no tag v{line} or {line} in its history, merged into the default branch.', description: 'HI-3555: an error from Close Shipped Issues…: the branch chosen isn’t released yet (HI-3148’s reading: a tag named after it in its history, and merged into the default branch). {line} is a branch name such as 1.7.0.' }),
   notPublished: msg({ id: 'github.issues.notPublished', defaultMessage: 'The release {tag} isn’t published on GitHub yet: publish it first, then close its issues.', description: 'HI-3555: an error from Close Shipped Issues…: the release isn’t published on GitHub (a draft, or none), and issues are closed only once it is. {tag} is the release’s tag, such as v1.7.0.' }),
+  tagMismatch: msg({ id: 'github.issues.tagMismatch', defaultMessage: 'The release {tag} on GitHub names another commit than this repository’s {tag}: fetch its tags, or look at the release, before closing its issues.', description: 'HI-3555: an error from Close Shipped Issues…: the published release’s tag on GitHub and the project’s own tag of that name are at different commits, so what it shipped can’t be told and nothing was closed. {tag} is the tag, such as v1.7.0.' }),
   changed: msg({ id: 'github.issues.changed', defaultMessage: 'What {line} shipped has changed since it was shown: look at it again.', description: 'HI-3555: an error from Close Shipped Issues…: the repository, the release’s tag or the cards it shipped changed after the list was shown, so nothing was closed. {line} is a branch name such as 1.7.0.' })
 }
 
@@ -176,7 +187,8 @@ export async function releasedLines(ws: WorkspaceService, projectPath: string, r
  * line, that is itself in this one), so a later release never takes what an earlier one shipped. A containment that
  * can't be read leaves the card out (never closed on doubt). By card number.
  */
-async function shippedCards(ws: WorkspaceService, projectPath: string, p: { reads: Reads; history: History }, repo: GithubRepoRef, release: ReleasedLine, lines: ReleasedLine[]): Promise<IssueCard[]> {
+async function shippedCards(ws: WorkspaceService, projectPath: string, p: { reads: Reads; history: History }, src: IssueSource, release: ReleasedLine, lines: ReleasedLine[]): Promise<IssueCard[]> {
+  const repo = src.repo
   const known = new Map<string, boolean | null>()
   const contains = async (commit: string, a: string): Promise<boolean | null> => {
     const k = `${a}>${commit}`
@@ -186,13 +198,25 @@ async function shippedCards(ws: WorkspaceService, projectPath: string, p: { read
     }
     return known.get(k)!
   }
-  const tags = new Map<string, string | null>(lines.map((l) => [l.line, l.commit]))
-  const tagOf = async (line: string): Promise<string | null> => {
+  const tags = new Map<string, { tag: string; commit: string } | null>(lines.map((l) => [l.line, { tag: l.tag, commit: l.commit }]))
+  const tagOf = async (line: string): Promise<{ tag: string; commit: string } | null> => {
     if (!tags.has(line)) {
       const t = await p.reads.tagged!(projectPath, line)
-      tags.set(line, !isUnknown(t) && t ? t.commit : null)
+      tags.set(line, !isUnknown(t) && t ? { tag: t.tag, commit: t.commit } : null)
     }
     return tags.get(line)!
+  }
+  /**
+   * HR1's round 1: an earlier release counts only once GitHub proves it published, its tag there at the same commit (a
+   * draft, an RC never published, a tag GitHub hasn't: not a release, so it takes nothing away). Null: can't be told.
+   */
+  const releasedBefore = new Map<string, boolean | null>()
+  const isReleasedBefore = async (t: { tag: string; commit: string }): Promise<boolean | null> => {
+    if (!releasedBefore.has(t.tag)) {
+      const r = await src.published(t.tag)
+      releasedBefore.set(t.tag, !r.ok ? null : !r.published ? false : r.commit === t.commit.toLowerCase() ? true : null)
+    }
+    return releasedBefore.get(t.tag)!
   }
   const out: IssueCard[] = []
   next: for (const c of await issueCards(ws, projectPath, repo)) {
@@ -206,15 +230,21 @@ async function shippedCards(ws: WorkspaceService, projectPath: string, p: { read
     const others = new Set<string>([...c.integrated.map((i) => i.target), ...lines.map((l) => l.line)])
     others.delete(release.line)
     for (const o of others) {
-      const commit = await tagOf(o)
-      if (!commit || commit === release.commit) continue
-      const earlier = await contains(release.commit, commit)
+      const t = await tagOf(o)
+      if (!t || t.commit === release.commit) continue
+      const earlier = await contains(release.commit, t.commit)
       if (earlier === null) continue next
       if (!earlier) continue
+      let inIt = false
       for (const i of c.integrated) {
-        const r = await contains(commit, i.result)
-        if (r !== false) continue next
+        const r = await contains(t.commit, i.result)
+        if (r === null) continue next
+        inIt ||= r
       }
+      if (!inIt) continue
+      // In an earlier tag: left out if that release is published, kept if it isn't, left out on doubt.
+      const shipped = await isReleasedBefore(t)
+      if (shipped !== false) continue next
     }
     out.push(c)
   }
@@ -231,8 +261,10 @@ export async function shippedIssuesOf(ws: WorkspaceService, projectPath: string,
   if (!p || !rel) return { repo: src.repo, problem: 'notReleased', detail: null }
   const pub = await src.published(rel.tag)
   if (!pub.ok) return { repo: src.repo, problem: pub.problem, detail: pub.detail }
+  // HR1's round 1: a published release is judged by GitHub's own tag, which must be the commit containment is read at.
+  if (pub.published && pub.commit !== rel.commit.toLowerCase()) return { repo: src.repo, problem: 'tagMismatch', detail: null }
   const issues: ShippedIssue[] = []
-  for (const c of await shippedCards(ws, projectPath, p, src.repo, rel, lines)) {
+  for (const c of await shippedCards(ws, projectPath, p, src, rel, lines)) {
     const r = await src.read(c.issue)
     issues.push({ card: c.card, issue: c.issue, url: c.url, state: r.ok ? r.state : 'unknown' })
   }
@@ -254,9 +286,11 @@ const closing = new Map<string, Promise<unknown>>()
 export async function closeShippedIssues(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<CloseOutcome[]> {
   const preview = cleanPreview(raw)
   if (!preview) throw combworkError(T.changed, { line: '?' }, { kind: 'invalid' })
+  // HR1's round 1: the caller's workspace, taken now, before the turn waits: one closed meanwhile stays closed, even reopened.
+  const owner = { life: ws.lifetime, path: ws.path }
   const key = projectPath.toLowerCase()
   const before = closing.get(key) ?? Promise.resolve()
-  const turn = before.catch(() => undefined).then(() => closeLocked(ws, projectPath, preview))
+  const turn = before.catch(() => undefined).then(() => closeLocked(ws, projectPath, preview, owner))
   closing.set(key, turn)
   try {
     return await turn
@@ -265,9 +299,8 @@ export async function closeShippedIssues(ws: WorkspaceService, projectPath: stri
   }
 }
 
-async function closeLocked(ws: WorkspaceService, projectPath: string, preview: ShippedPreview): Promise<CloseOutcome[]> {
-  const life = ws.lifetime
-  const open = (): boolean => !life.aborted && ws.lifetime === life
+async function closeLocked(ws: WorkspaceService, projectPath: string, preview: ShippedPreview, owner: { life: AbortSignal; path: string | null }): Promise<CloseOutcome[]> {
+  const open = (): boolean => !owner.life.aborted && ws.lifetime === owner.life && ws.path === owner.path
   const { line } = preview
   const src = await issueSourceFor(ws, projectPath)
   const p = await portsOf(ws, projectPath)
@@ -277,11 +310,14 @@ async function closeLocked(ws: WorkspaceService, projectPath: string, preview: S
   const lines = await releasedLines(ws, projectPath, src.repo)
   const rel = lines.find((r) => r.line === line)
   if (!rel) throw combworkError(T.notReleased, { line }, { kind: 'conflict' })
-  const now: ShippedPreview = { repo: src.repo, line, tag: rel.tag, commit: rel.commit, issues: (await shippedCards(ws, projectPath, p, src.repo, rel, lines)).map((c) => ({ card: c.card, issue: c.issue })) }
+  const now: ShippedPreview = { repo: src.repo, line, tag: rel.tag, commit: rel.commit, issues: (await shippedCards(ws, projectPath, p, src, rel, lines)).map((c) => ({ card: c.card, issue: c.issue })) }
   if (!samePreview(now, preview)) throw combworkError(T.changed, { line }, { kind: 'conflict' })
-  // The release guard asks the repository every write names (the link is the preview's, checked just above).
+  // The release guard asks the repository every write names (the link is the preview's, checked just above), and
+  // (HR1's round 1) GitHub's own tag must name the preview's commit.
   const pub = await src.published(rel.tag)
   if (!pub.ok || !pub.published) throw combworkError(T.notPublished, { tag: rel.tag }, { kind: 'conflict' })
+  if (pub.commit !== preview.commit.toLowerCase()) throw combworkError(T.tagMismatch, { tag: rel.tag }, { kind: 'conflict' })
+  if (!open()) throw combworkError(T.changed, { line }, { kind: 'conflict' })
   const comment = fixedInComment(versionOfLine(line))
   const out: CloseOutcome[] = []
   const seen = new Set<number>()
@@ -296,6 +332,8 @@ async function closeLocked(ws: WorkspaceService, projectPath: string, preview: S
     if (!link || !sameRepo(link, preview.repo) || !open()) return false
     const t = await p.reads.tagged!(projectPath, line)
     if (isUnknown(t) || !t || t.tag !== preview.tag || t.commit !== preview.commit || !open()) return false
+    const pubNow = await src.published(preview.tag)
+    if (!pubNow.ok || !pubNow.published || pubNow.commit !== preview.commit.toLowerCase() || !open()) return false
     const { getTask } = await import('./tasks')
     const c = await getTask(card, ws).catch(() => null)
     return !!c && c.column === 'done' && c.source?.kind === 'issue' && c.source.number === issue && sameRepo(c.source, preview.repo) && open()

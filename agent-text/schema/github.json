@@ -38,6 +38,11 @@
       "line": "plain"
     }
   },
+  "github.issues.tagMismatch": {
+    "placeholders": {
+      "tag": "plain"
+    }
+  },
   "github.link.notARemote": {
     "placeholders": {}
   },
