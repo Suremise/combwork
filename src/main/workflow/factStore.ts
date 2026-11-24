@@ -20,6 +20,7 @@ import { KEY_FORM, normalKey } from '../../shared/projectKeys'
 import { samePath } from '../../shared/movePaths'
 import type { WorkspaceService } from '../workspace'
 import type { Actor, CardKind, Category, Fact, FactKind, NewFact, StageId } from '../../shared/workflow/facts'
+import { cleanSource, type GithubSource } from '../../shared/githubSource'
 import { CATEGORY_STAGE, STAGE_CATEGORY } from '../../shared/workflow/facts'
 import type { Ruleset } from '../../shared/workflow/compile'
 import { loadRuleset } from '../../shared/workflow/compile'
@@ -58,6 +59,8 @@ export interface CardRecord {
   rounds?: number
   /** A card from before 1.0 (§16.4.1). */
   preWorkflow?: boolean
+  /** HI-3551: its GitHub source as the board has it now; the start records a PR's identity (Started.pr), which wins after. */
+  source?: GithubSource
   stage: StageId
   /** The board's column. */
   category: Category
@@ -303,8 +306,19 @@ interface CardCols {
   kind: CardKind
   target: string | null
   paths_declared: number
+  source: string | null
 }
-const COLS = 'number, title, col, stage, pre_workflow, kind, target, paths_declared'
+/** HI-3551: a card's source as its row's extra holds it (JSON text), when well formed. */
+function sourceOf(raw: string | null): GithubSource | undefined {
+  if (!raw) return undefined
+  try {
+    return cleanSource(JSON.parse(raw))
+  } catch {
+    return undefined
+  }
+}
+// HI-3551: the card's GitHub source, from its document's extra (a field the board keeps there).
+const COLS = "number, title, col, stage, pre_workflow, kind, target, paths_declared, CASE WHEN json_valid(extra) THEN json_extract(extra, '$.source') END AS source"
 
 /**
  * A project's store: `project` its name on the board (its cards' `project`); `projectId` (#1294) its id now, whose key
@@ -424,6 +438,7 @@ export class FactStore {
         ...(lanes.has(r.number) ? { rounds: lanes.get(r.number)!.rounds } : {}),
         ...(lanes.get(r.number)?.pool === 1 && !lanes.get(r.number)!.reviewer ? { reviewerPool: true as const } : {}),
         ...(r.pre_workflow ? { preWorkflow: true } : {}),
+        ...(sourceOf(r.source) ? { source: sourceOf(r.source)! } : {}),
         stage: r.stage ?? CATEGORY_STAGE[r.col] ?? 'todo',
         category: r.col
       }))

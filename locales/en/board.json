@@ -1127,6 +1127,42 @@
     "defaultMessage": "Saving…",
     "description": "A button while the card (or a decision) is being saved."
   },
+  "board.dialog.source": {
+    "defaultMessage": "GitHub source",
+    "description": "A field label in the card dialog (HI-3551): the GitHub pull request or issue the card is about."
+  },
+  "board.dialog.sourceFailed": {
+    "defaultMessage": "Couldn’t set the GitHub source",
+    "description": "An error’s title (HI-3551): the card’s GitHub source couldn’t be set or removed; its message says why."
+  },
+  "board.dialog.sourceFork": {
+    "defaultMessage": "From a fork whose author doesn’t allow maintainer edits: Combwork can’t push fixes to it, so its findings go back as review comments.",
+    "description": "Under a pull request source in the card dialog (HI-3551): the PR comes from a fork that doesn’t let maintainers push to it."
+  },
+  "board.dialog.sourceKind": {
+    "defaultMessage": "{kind, select, pr {Pull request} other {Issue}} #{number}",
+    "description": "The card dialog’s GitHub source (HI-3551): its kind and number. Keep the select keys."
+  },
+  "board.dialog.sourceOpen": {
+    "defaultMessage": "Open on GitHub",
+    "description": "Tooltip of the card dialog’s GitHub source link (HI-3551): opens the pull request or issue in the browser."
+  },
+  "board.dialog.sourcePlaceholder": {
+    "defaultMessage": "A pull request or issue: its address or #number",
+    "description": "Placeholder of the card dialog’s GitHub source box (HI-3551)."
+  },
+  "board.dialog.sourceRemove": {
+    "defaultMessage": "Remove",
+    "description": "A button beside the card dialog’s GitHub source (HI-3551): removes it (only while the card hasn’t started)."
+  },
+  "board.dialog.sourceSet": {
+    "defaultMessage": "Set",
+    "description": "A button beside the card dialog’s GitHub source box (HI-3551): reads the pull request or issue from GitHub and sets it as the card’s source."
+  },
+  "board.dialog.sourceTitle": {
+    "defaultMessage": "On GitHub: “{title}”",
+    "description": "The card dialog’s GitHub source (HI-3551): its title as GitHub has it (someone else’s words, quoted)."
+  },
   "board.dialog.start": {
     "defaultMessage": "Start…",
     "description": "Button in the card dialog: asks which agent starts the card."

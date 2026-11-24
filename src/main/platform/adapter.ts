@@ -5,6 +5,7 @@
 // P2 spike (#1118): the interface the spike proves; P3 builds it into main.
 
 import type { PlatformId } from '../../shared/platform/descriptors'
+import type { StartedPr } from '../../shared/githubSource'
 import type { CardState, CheckRanData, FileChange, Manifest } from '../../shared/workflow/facts'
 import type { GuardInputs, GuardRefusal } from '../../shared/workflow/guards'
 import type { WorkflowOptions } from '../../shared/workflow/options'
@@ -42,6 +43,8 @@ export interface StartPlan {
   baselineGen?: number
   /** What only this platform records of the start (`Started.platform`, HI-2868). */
   platform?: Record<string, unknown>
+  /** HI-3551: a pull request's card: the PR it works on, its head and base as fetched for this start. */
+  pr?: StartedPr
 }
 
 /** A submission's platform side: the revision with its fixed endpoints, key and files, and the guards' platform inputs. */

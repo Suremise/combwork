@@ -853,6 +853,14 @@
       "help": "plain"
     }
   },
+  "tasks.history.source": {
+    "placeholders": {
+      "set": "select",
+      "kind": "select",
+      "number": "plain",
+      "repo": "plain"
+    }
+  },
   "tasks.history.stageRepaired": {
     "placeholders": {
       "stage": "select"
@@ -913,6 +921,42 @@
       "watcher": "plain",
       "why": "select",
       "agent": "plain"
+    }
+  },
+  "tasks.source.agents": {
+    "placeholders": {}
+  },
+  "tasks.source.gh": {
+    "placeholders": {
+      "problem": "select",
+      "host": "plain"
+    }
+  },
+  "tasks.source.noLink": {
+    "placeholders": {}
+  },
+  "tasks.source.noProject": {
+    "placeholders": {}
+  },
+  "tasks.source.notFound": {
+    "placeholders": {
+      "number": "plain",
+      "repo": "plain",
+      "why": "select"
+    }
+  },
+  "tasks.source.notGithub": {
+    "placeholders": {}
+  },
+  "tasks.source.otherRepo": {
+    "placeholders": {
+      "repo": "plain",
+      "host": "plain"
+    }
+  },
+  "tasks.source.started": {
+    "placeholders": {
+      "card": "plain"
     }
   },
   "tasks.start.alreadyStarting": {

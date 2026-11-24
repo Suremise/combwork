@@ -284,6 +284,8 @@ interface CombworkMessageValues {
   'tips.gitView.title': undefined
   'tips.githubRepository.text': undefined
   'tips.githubRepository.title': undefined
+  'tips.githubSource.text': undefined
+  'tips.githubSource.title': undefined
   'tips.gotoProject.text': { key: string | number }
   'tips.gotoProject.title': undefined
   'tips.group.agents': undefined

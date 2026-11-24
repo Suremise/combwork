@@ -1,6 +1,7 @@
 // Types shared by the main process, preload bridge and renderer.
 
 import type { SessionEnd } from './sessionEnd'
+import type { GithubSource } from './githubSource'
 import type { JournalSettings } from './journal'
 import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
@@ -1315,6 +1316,8 @@ export interface TaskCard {
   blockedBy: number[]
   /** Related cards. */
   links: number[]
+  /** HI-3551: the GitHub pull request or issue it is about (set by the user while it has never started); absent for most. */
+  source?: GithubSource
   /**
    * Doc sections the agent reads first (#818): references by file and heading, never by line (`docs/PLAN.md#setup`,
    * `shared:plans/notes.md#open-questions`; shared/docRefs.ts). Absent when none.

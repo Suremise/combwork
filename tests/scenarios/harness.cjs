@@ -642,6 +642,8 @@ async function runScenario(sc, providerKey, opts = {}) {
       CW_TEST_TOKEN_LOG: tokenLog,
       CW_TEST_MERGE_SLOT_LOG: slotLog,
       CW_TEST_START_VIEW_LOG: startViewLog,
+      // HI-3551: Combwork's GitHub CLI is the scenarios' fake (fake-gh/gh.cmd), never the user's own gh or its sign-in.
+      CW_TEST_GH: path.join(__dirname, 'fake-gh', 'gh.cmd'),
       CLAUDE_CONFIG_DIR: providerKey === 'claude-code' ? CLAUDE_TEST_HOME : fakeHome,
       CODEX_HOME: providerKey === 'fake-codex' ? fakeCodexHome : lib.CODEX_HOME,
       // The real Codex runs its commands in Windows PowerShell, not the Store's PowerShell 7 (#584, lib.cjs).

@@ -38,6 +38,7 @@ import { releaseReadsOf } from '../platform/releaseReadsPorts'
 import { stillAsRead, unreleasedFor, type ReleaseReads } from '../platform/releaseReads'
 import { declaresPaths, hasCapability, needsRepository, PLATFORMS, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
+import { sameSource, type StartedPr } from '../../shared/githubSource'
 import { finishAccepts, recordFinish } from './finish'
 import { writeReadiness } from './dependencyReadiness'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
@@ -239,6 +240,8 @@ export interface WorkflowConfig {
    * English). `dry`: only whether one could be, nothing lent. Null: no slot here (the rules off, the builder a reviewer).
    */
   slotFor?: (card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
+  /** HI-3551: the project's GitHub link (its remote, host and repository), null with none: a PR card's start fetches from it. */
+  githubLink?: () => Promise<{ remote: string; host: string; owner: string; repo: string } | null>
   /**
    * HI-3148: the released line a running lane's starts may go onto, by the user's or the Assistant's override given with
    * the lane's start (its record's, for its fixed Merges into while it runs), or null: none. Synchronous (the lanes as
@@ -1309,6 +1312,12 @@ export class Workflow {
           baselineMoved = true
           return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
         }
+        // HI-3551: the pull request the gather fetched is still the card's (its source, read here under the store's lock),
+        // or it has none still: a source set, changed or cleared meanwhile is gathered again. A restart keeps its recorded PR.
+        if (!from.started?.pr && !prStillSame(this.store.card(card.id).source, g.data.pr)) {
+          evidenceMoved = true
+          return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
+        }
         // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
         // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
         // then refused: the boundary passed either way), then the start is checked against it.
@@ -1457,7 +1466,10 @@ export class Workflow {
     w.fact('Started', g.data) // i18n-ignore: a fact's kind and codes, not text
     w.move('active', cause)
     // A slot's (#1438): its lease's, and whether it is brought up to date (G15).
-    if (g.data.folder !== 'project' && !g.existing) w.action('prepareSlot', { folder: g.data.folder, line: g.data.line, base: g.data.base, ...(g.data.lease ? { slot: g.data.slot, lease: g.data.lease, upToDate: g.o.slotsUpToDate, builder: g.data.builder } : {}) })
+    // HI-3551: a pull request's line is made at the PR's head (its base is where that left the PR's base), only now that
+    // its start is written, and never brought up to date with the target: its history is the PR's.
+    const pr = g.data.pr
+    if (g.data.folder !== 'project' && !g.existing) w.action('prepareSlot', { folder: g.data.folder, line: g.data.line, base: pr ? pr.headOid : g.data.base, ...(g.data.lease ? { slot: g.data.slot, lease: g.data.lease, upToDate: pr ? false : g.o.slotsUpToDate, builder: g.data.builder } : {}) })
   }
 
   /** The card's state as it would be once a gathered start is written (a drag gathers its submission on it). */
@@ -1829,6 +1841,8 @@ export class Workflow {
   /** Puts a card in the merge queue: a new entry (`IntegrationRequested`). */
   enqueue(w: Write, requeue?: 'transient' | 'retry'): void {
     const s = w.state()
+    // HI-3551: a pull request's card is never queued to merge here, by any path: its finish is its pull request.
+    if (s.started?.pr) return
     const target = s.started?.target ?? ''
     w.fact('IntegrationRequested', { entry: `${w.card.key}/e${s.lastSeq + 1}`, revision: s.approved?.revision ?? s.latest?.revision ?? '', key: s.latest?.key ?? null, target, style: w.ruleset!.options.style, ...(requeue ? { requeue } : {}) })
     w.move('merging', 'derived')
@@ -1855,6 +1869,13 @@ export class Workflow {
     if (w.card.kind === 'no-code') {
       w.fact('Accepted', { submission: s.latest!.id }) // i18n-ignore: a fact's kind and codes, not text
       w.move('done', 'derived')
+      return
+    }
+    // HI-3551: a pull request's card finishes through its pull request (HI-3552), never by a merge here, whatever the
+    // project's finish: its pass kept, it waits in Passed. No queue entry, no agent's merge, nothing marked integrated.
+    // Passed even where its project's own rules have no such stage (no review, no OK before merging: HR1's round 1).
+    if (s.started?.pr) {
+      w.move('approved', 'derived')
       return
     }
     if (o.finish === 'accept') {
@@ -2595,6 +2616,8 @@ export class Workflow {
     if (isRefusal(card)) return card
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
+    // HI-3551: a pull request's card is never reported merged here: its finish is its pull request (a fixed notice).
+    if (s.started?.pr) return this.refuse(card, actor, 'report merge', { rule: 'platform.prNotLocal', values: { card: card.key } }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     // Under Combwork merges (the card's own ruleset) the queue merges, never a report: refused saying where it is (#1354).
     const combwork = r.options.finish === 'combworkMerges'
     const queued = this.combworkMergesRefusal(card, s)
@@ -3898,3 +3921,10 @@ export type { RuleId }
 
 /** HI-3377: the longest cw_submit's early merge-guards warning matches (the merge's own check takes the setting's time). */
 const SUBMIT_GUARDS_MS = 10_000
+
+/** HI-3551: whether a gathered start's pull request (none for an ordinary card) is still what the card's source says: the same PR, or no PR source at all. */
+export function prStillSame(source: CardRecord['source'], gathered: StartedPr | undefined): boolean {
+  const pr = source?.kind === 'pr' ? source : null
+  if (!pr || !gathered) return !pr && !gathered
+  return sameSource(pr, { kind: 'pr', host: gathered.host, owner: gathered.owner, repo: gathered.repo, number: gathered.number })
+}

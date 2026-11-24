@@ -86,6 +86,8 @@ const STATES: QueueState[] = [
   { state: 'left', why: 'decision' },
   { state: 'stale', approved: 'abc1234def', current: null },
   { state: 'merged' },
+  // HI-3551: a pull request's card, never merged here.
+  { state: 'pullRequest' },
   { state: 'notYet' }
 ]
 /** What the tests pass in, which isn't Combwork's wording: names, codes, paths and the queue's fixed words. */

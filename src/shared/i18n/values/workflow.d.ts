@@ -422,6 +422,11 @@ interface CombworkMessageValues {
   'workflow.refused.platform.noUpstream.next': { how: string; remote: string | number; target: string | number; publish: string | number; track1: string | number; track2: string | number }
   'workflow.refused.platform.offLine.message': { card: string | number; line: string | number; where: string; head: string | number; on: string | number }
   'workflow.refused.platform.offLine.next': { where: string; lineArg: string | number; made: string; start: string | number; onArg: string | number }
+  'workflow.refused.platform.prNeedsSlot.change': undefined
+  'workflow.refused.platform.prNeedsSlot.message': { card: string | number; number: string | number }
+  'workflow.refused.platform.prNeedsSlot.next': undefined
+  'workflow.refused.platform.prNotLocal.message': { card: string | number }
+  'workflow.refused.platform.prNotLocal.next': undefined
   'workflow.refused.platform.slotLeft.message': { unknown: string; card: string | number; slot: string | number; folder: string | number }
   'workflow.refused.platform.slotLeft.next': { unknown: string }
   'workflow.refused.platform.targetGone.message': { card: string | number; target: string | number }
@@ -637,6 +642,10 @@ interface CombworkMessageValues {
   'workflow.unreadable.ignored': { folder: string | number }
   'workflow.unreadable.line': { branch: string | number }
   'workflow.unreadable.pathOutside': { path: string | number }
+  'workflow.unreadable.prFetch': { number: string | number; base: string | number; remote: string | number }
+  'workflow.unreadable.prLeftover': { line: string | number; number: string | number }
+  'workflow.unreadable.prLink': { number: string | number; repo: string | number }
+  'workflow.unreadable.prSlot': { card: string | number }
   'workflow.unreadable.remoteBehind': { target: string | number; endpoint: string | number }
   'workflow.unreadable.remoteHead': { branch: string | number; endpoint: string | number; target: string | number }
   'workflow.unreadable.remoteSetup': { target: string | number }

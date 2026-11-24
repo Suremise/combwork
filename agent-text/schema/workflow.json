@@ -988,6 +988,26 @@
       "onArg": "plain"
     }
   },
+  "workflow.refused.platform.prNeedsSlot.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.platform.prNeedsSlot.message": {
+    "placeholders": {
+      "card": "plain",
+      "number": "plain"
+    }
+  },
+  "workflow.refused.platform.prNeedsSlot.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.platform.prNotLocal.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.platform.prNotLocal.next": {
+    "placeholders": {}
+  },
   "workflow.refused.platform.slotLeft.message": {
     "placeholders": {
       "unknown": "select",
@@ -1608,6 +1628,30 @@
   "workflow.unreadable.pathOutside": {
     "placeholders": {
       "path": "plain"
+    }
+  },
+  "workflow.unreadable.prFetch": {
+    "placeholders": {
+      "number": "plain",
+      "base": "plain",
+      "remote": "plain"
+    }
+  },
+  "workflow.unreadable.prLeftover": {
+    "placeholders": {
+      "line": "plain",
+      "number": "plain"
+    }
+  },
+  "workflow.unreadable.prLink": {
+    "placeholders": {
+      "number": "plain",
+      "repo": "plain"
+    }
+  },
+  "workflow.unreadable.prSlot": {
+    "placeholders": {
+      "card": "plain"
     }
   },
   "workflow.unreadable.remoteBehind": {

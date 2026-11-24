@@ -6,6 +6,7 @@
 // In the app since P3: combwork.db's `card_facts` (main/workflow/factStore.ts), folded wherever a card's state is read.
 
 import type { ConflictsRecord } from './conflicts'
+import type { StartedPr } from '../githubSource'
 import type { GuardReport } from './mergeGuards'
 import type { FocusedChoice, FocusedTest } from './focused'
 import type { GitlinkSide } from '../gitlink'
@@ -71,6 +72,12 @@ export interface StartedData {
   adoptedFrom?: 'doing' | 'review' | 'passed'
   passedBefore1_0?: boolean
   platform?: Record<string, unknown>
+  /**
+   * HI-3551: the pull request a card works on, as its start fetched it. Everything after the start reads the PR's
+   * identity from here, never from the card (whose source can't change once started): its finish is the PR, never a
+   * merge here.
+   */
+  pr?: StartedPr
 }
 
 export interface SubmittedData {

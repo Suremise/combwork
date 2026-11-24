@@ -122,6 +122,8 @@ const SAMPLE: RefusalValues = {
   // done.noCodeUnmerged (HI-3410): the first commits its line has that its target lacks, and how many more.
   commits: 'a1b2c3d The driver; e4f5a6b Its tests',
   more: 1,
+  // platform.prNeedsSlot (HI-3551): the pull request's number.
+  number: '7',
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',
   cause: 'passes',
