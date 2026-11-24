@@ -11683,6 +11683,27 @@ body.pane-resizing-v .monaco-editor {
 .github-pr .btn {
   flex: none;
 }
+/* HI-3555: From GitHub…'s Issues tab (its filters above the list) and Close Shipped Issues' choice of branch. */
+.github-issues-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.github-issues-filters .input {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.github-issues-filters .btn {
+  flex: none;
+}
+.github-shipped-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
 /* HI-3559: a pull request card's Feedback to GitHub. */
 .github-feedback {
   display: flex;

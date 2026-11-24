@@ -289,6 +289,7 @@
   "board.dialog.sourceKind": "{kind, select, pr {Pull request} other {Issue}} #{number}",
   "board.dialog.sourceOpen": "Ouvrir sur GitHub",
   "board.dialog.sourceOutside": "{known, select, yes {{author} n’est pas membre de {repo}} other {Combwork n’a pas pu savoir si {author} est membre de {repo}}} : les vérifications de ce projet exécutent le code de la pull request sur ce PC, avec tes fichiers et tes connexions. Pour l’exécuter à l’écart, utilise Windows Sandbox : son serveur est dans le catalogue MCP.",
+  "board.dialog.sourceOutsideIssue": "{known, select, yes {{author} n’est pas membre de {repo}} other {Combwork n’a pas pu savoir si {author} est membre de {repo}}} : ce que dit cette issue, ce sont les mots de quelqu’un d’autre, qui n’atteignent les agents que cités comme tels.",
   "board.dialog.sourcePlaceholder": "Une pull request ou une issue : son adresse ou #numéro",
   "board.dialog.sourceRemove": "Retirer",
   "board.dialog.sourceSet": "Définir",

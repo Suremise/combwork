@@ -932,6 +932,12 @@
       "host": "plain"
     }
   },
+  "tasks.source.issueLinkChanged": {
+    "placeholders": {
+      "repo": "plain",
+      "shown": "plain"
+    }
+  },
   "tasks.source.linkChanged": {
     "placeholders": {
       "repo": "plain",

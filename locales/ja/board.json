@@ -289,6 +289,7 @@
   "board.dialog.sourceKind": "{kind, select, pr {プルリクエスト} other {Issue}} #{number}",
   "board.dialog.sourceOpen": "GitHub で開く",
   "board.dialog.sourceOutside": "{known, select, yes {{author} は {repo} のメンバーではありません} other {{author} が {repo} のメンバーかどうか Combwork は確認できませんでした}}。このプロジェクトのチェックは、プルリクエストのコードをこの PC 上で、あなたのファイルやサインインとともに実行します。それらから切り離して実行するには Windows Sandbox を使ってください。そのサーバーは MCP カタログにあります。",
+  "board.dialog.sourceOutsideIssue": "{known, select, yes {{author} は {repo} のメンバーではありません} other {{author} が {repo} のメンバーかどうか Combwork は確認できませんでした}}。この Issue の内容は他人の言葉であり、そのように引用された形でのみエージェントに届きます。",
   "board.dialog.sourcePlaceholder": "プルリクエストまたは Issue：アドレスか #番号",
   "board.dialog.sourceRemove": "削除",
   "board.dialog.sourceSet": "設定",

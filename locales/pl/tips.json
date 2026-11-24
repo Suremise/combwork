@@ -264,6 +264,8 @@
   "tips.gitView.title": "Zobacz i zmień gita projektu",
   "tips.githubFeedback.text": "Karta pull requesta publikuje swoją recenzję na GitHubie jako komentarz z twojego konta: domyślnie werdykt agenta recenzującego trafia na kartę jako szkic do edycji i publikacji. Kto ją pisze, wybierzesz w Kontrola wersji → Przepływ pracy → GitHub.",
   "tips.githubFeedback.title": "Informacja zwrotna do GitHuba",
+  "tips.githubIssues.text": "Z GitHuba… na tablicy zadań ma zakładkę Issues: Utwórz kartę robi z issue kartę w Do zrobienia, z jego etykietami. Po opublikowaniu wydania Zamknij wydane issues… zamyka issues naprawione przez jego karty jednym kliknięciem.",
+  "tips.githubIssues.title": "Pracuj nad issue z GitHuba i zamknij je po wydaniu",
   "tips.githubPrs.text": "Wybierz projekt na tablicy zadań i kliknij Z GitHuba…, aby wylistować jego otwarte pull requesty: Utwórz kartę robi z jednego kartę w Do zrobienia, recenzowaną jak każda inna. To, co jest na GitHubie, trafia do agentów tylko w cytacie.",
   "tips.githubPrs.title": "Zrecenzuj przychodzący pull request",
   "tips.githubRepository.text": "Kontrola wersji → Przepływ pracy → GitHub pokazuje repozytorium projektu, odczytane z jego zdalnych repozytoriów, i czy twoje GitHub CLI (gh) jest zalogowane na tym hoście. Combwork używa twojego gh i nie przechowuje tokenu.",

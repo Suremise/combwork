@@ -264,6 +264,8 @@
   "tips.gitView.title": "プロジェクトのGitを確認・変更",
   "tips.githubFeedback.text": "プルリクエストのカードは、レビューをあなたのアカウントからのコメントとして GitHub に投稿します。既定では、レビュー担当エージェントの判定がカードに下書きされ、あなたが編集して投稿します。誰が書くかは「バージョン管理」→「ワークフロー」→「GitHub」で選べます。",
   "tips.githubFeedback.title": "GitHub へのフィードバック",
+  "tips.githubIssues.text": "タスクボードの「GitHub から…」には「Issue」タブがあります。「カードを作成」で Issue がラベル付きで未着手のカードになります。リリースが公開されたら、「リリース済みの Issue をクローズ…」でそのカードが修正した Issue をワンクリックでクローズできます。",
+  "tips.githubIssues.title": "GitHub の Issue に取り組み、リリースされたらクローズする",
   "tips.githubPrs.text": "タスクボードでプロジェクトを選び、「GitHub から…」をクリックするとオープンなプルリクエストが一覧されます。「カードを作成」で未着手にカードが作られ、ほかのカードと同じようにレビューされます。GitHub 上の内容は引用としてのみエージェントに届きます。",
   "tips.githubPrs.title": "受け取ったプルリクエストをレビューする",
   "tips.githubRepository.text": "「バージョン管理」→「ワークフロー」→「GitHub」に、リモートから読み取ったプロジェクトのリポジトリと、あなたの GitHub CLI（gh）がそのホストにサインインしているかが表示されます。Combwork はあなた自身の gh を使い、トークンは保存しません。",

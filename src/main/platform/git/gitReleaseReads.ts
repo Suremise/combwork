@@ -65,5 +65,20 @@ export const gitReleaseReads: ReleaseReads = {
       return merged ? { tag: name, into, date: t.date } : null
     }
     return null
+  },
+  async tagged(projectPath, line) {
+    for (const name of releaseTagNames(line)) {
+      const t = await tag(projectPath, name)
+      if (isUnknown(t)) return t
+      if (!t) continue
+      const into = await G.mainBranch(projectPath)
+      if (isUnknown(into)) return into
+      const mainHead = into ? await G.lineHead(projectPath, into) : null
+      if (isUnknown(mainHead)) return mainHead
+      const inMain = mainHead ? await G.isAncestor(projectPath, t.commit, mainHead) : false
+      if (isUnknown(inMain)) return inMain
+      return { tag: name, commit: t.commit, inMain }
+    }
+    return null
   }
 }

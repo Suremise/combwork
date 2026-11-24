@@ -289,6 +289,7 @@
   "board.dialog.sourceKind": "{kind, select, pr {Pull-Request} other {Issue}} #{number}",
   "board.dialog.sourceOpen": "Auf GitHub öffnen",
   "board.dialog.sourceOutside": "{known, select, yes {{author} ist kein Mitglied von {repo}} other {Combwork konnte nicht feststellen, ob {author} Mitglied von {repo} ist}}: Die Prüfungen dieses Projekts führen den Code des Pull-Requests auf diesem PC aus, mit deinen Dateien und Anmeldungen. Um ihn getrennt davon auszuführen, nutze Windows Sandbox: Ihr Server ist im MCP-Katalog.",
+  "board.dialog.sourceOutsideIssue": "{known, select, yes {{author} ist kein Mitglied von {repo}} other {Combwork konnte nicht feststellen, ob {author} Mitglied von {repo} ist}}: Was dieses Issue sagt, sind die Worte anderer und erreicht Agenten nur als solche zitiert.",
   "board.dialog.sourcePlaceholder": "Ein Pull-Request oder Issue: seine Adresse oder #Nummer",
   "board.dialog.sourceRemove": "Entfernen",
   "board.dialog.sourceSet": "Setzen",

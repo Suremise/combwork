@@ -190,6 +190,7 @@
   "tasks.skipped.unsaved": "nie dało się jej zapisać",
   "tasks.source.agents": "Źródło karty na GitHubie ustawia tylko użytkownik.",
   "tasks.source.gh": "GitHub CLI {problem, select, missing {nie jest zainstalowane} signedOut {nie jest zalogowane na {host}} timeout {nie odpowiedziało na czas} other {nie mogło go odczytać}}: zobacz Kontrola wersji → Przepływ pracy → GitHub.",
+  "tasks.source.issueLinkChanged": "Repozytorium GitHub tego projektu to teraz {repo}, a nie {shown}, jak na liście: wylistuj jego issues ponownie.",
   "tasks.source.linkChanged": "Repozytorium GitHub tego projektu to teraz {repo}, a nie {shown}, jak na liście: wylistuj jego pull requesty ponownie.",
   "tasks.source.noLink": "Ten projekt nie ma połączenia z GitHubem: żadne z jego zdalnych repozytoriów nie jest na jego hoście GitHub (Kontrola wersji → Przepływ pracy → GitHub).",
   "tasks.source.noProject": "Karta dotycząca obszaru roboczego nie ma źródła na GitHubie: mają je tylko karty projektu.",

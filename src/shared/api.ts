@@ -174,6 +174,7 @@ import type { SlotLevelForm, SlotOptionOrigin } from './slotDefaults'
 import type { GithubHostChange, GithubHostsForm } from './githubHost'
 import type { GithubLink, GithubRepoRef } from './githubRepo'
 import type { OpenPrsRead } from './githubSource'
+import type { CloseOutcome, IssueQuery, OpenIssuesRead, ReleasedLine, ShippedIssuesRead, ShippedPreview } from './issueSource'
 import type { GithubReviewRow, GithubReviewsView } from './githubReviews'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
@@ -492,6 +493,11 @@ export interface CombworkRequests {
   /** HI-3553: the project's GitHub repository, without asking gh (null: no link); its open pull requests, through gh. */
   'github:repo': (projectPath: string) => GithubRepoRef | null
   'github:openPrs': (projectPath: string) => OpenPrsRead
+  /** HI-3555: the project's open issues (narrowed by search, label, assignee); the released lines and a line's shipped issues; their close. */
+  'github:openIssues': (projectPath: string, query: IssueQuery) => OpenIssuesRead
+  'github:releasedLines': (projectPath: string) => ReleasedLine[]
+  'github:shippedIssues': (projectPath: string, line: string) => ShippedIssuesRead
+  'github:closeShippedIssues': (projectPath: string, preview: ShippedPreview) => CloseOutcome[]
   /** HI-3559: a pull request's card's reviews to GitHub (Feedback to GitHub), and the user's posting or discarding one. */
   'github:reviews': (n: number) => GithubReviewsView
   'github:postReview': (n: number, row: number | null, body: string) => GithubReviewRow
@@ -599,6 +605,8 @@ export interface CombworkRequests {
   'tasks:setSource': (n: number, source: string | null) => TaskCard
   /** HI-3553: an open pull request made a card in Todo (the board's From GitHub…), or the card already about it. */
   'tasks:fromPr': (project: string, number: number, repo: GithubRepoRef, text: { title: string; description: string }) => { card: TaskCard; existing: boolean }
+  /** HI-3555: an open issue made a card in Todo (From GitHub…'s Issues), or the card already about it. */
+  'tasks:fromIssue': (project: string, number: number, repo: GithubRepoRef, text: { title: string; description: string }) => { card: TaskCard; existing: boolean }
   'tasks:keptTarget': (n: number) => KeptTargetShown
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }

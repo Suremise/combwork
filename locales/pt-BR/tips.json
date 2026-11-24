@@ -264,6 +264,8 @@
   "tips.gitView.title": "Veja e altere o git de um projeto",
   "tips.githubFeedback.text": "O cartão de um pull request publica a revisão no GitHub como comentário da sua conta: por padrão, o veredito de um agente revisor fica como rascunho no cartão para você editar e publicar. Escolha quem a escreve em Controle de versão → Fluxo de trabalho → GitHub.",
   "tips.githubFeedback.title": "Feedback ao GitHub",
+  "tips.githubIssues.text": "Do GitHub… no quadro de tarefas tem uma aba Issues: Criar cartão transforma uma issue em cartão em A fazer, com os rótulos dela. Quando uma versão é publicada, Fechar issues entregues… fecha as issues que os cartões dela corrigiram, com um clique.",
+  "tips.githubIssues.title": "Trabalhe em uma issue do GitHub e feche-a quando for entregue",
   "tips.githubPrs.text": "Escolha um projeto no quadro de tarefas e clique em Do GitHub… para listar os pull requests abertos: Criar cartão transforma um deles em cartão em A fazer, revisado como qualquer outro. O que ele diz no GitHub só chega aos agentes citado.",
   "tips.githubPrs.title": "Revisar um pull request recebido",
   "tips.githubRepository.text": "Controle de versão → Fluxo de trabalho → GitHub mostra o repositório do projeto, lido dos remotes, e se a sua GitHub CLI (gh) está com login nesse host. O Combwork usa o seu próprio gh e não guarda nenhum token.",

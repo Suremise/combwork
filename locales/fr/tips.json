@@ -264,6 +264,8 @@
   "tips.gitView.title": "Voir et modifier le git d’un projet",
   "tips.githubFeedback.text": "La carte d’une pull request publie sa relecture sur GitHub en commentaire depuis ton compte : par défaut, le verdict d’un agent relecteur est mis en brouillon sur la carte pour que tu le modifies et le publies. Choisis qui l’écrit dans Gestion de versions → Flux de travail → GitHub.",
   "tips.githubFeedback.title": "Retours vers GitHub",
+  "tips.githubIssues.text": "Depuis GitHub… dans le tableau des tâches a un onglet Issues : Créer une carte fait d’une issue une carte dans À faire, avec ses labels. Une fois une version publiée, Fermer les issues livrées… ferme les issues que ses cartes ont corrigées, en un clic.",
+  "tips.githubIssues.title": "Travailler sur une issue GitHub, et la fermer une fois livrée",
   "tips.githubPrs.text": "Choisis un projet dans le tableau des tâches et clique sur Depuis GitHub… pour lister ses pull requests ouvertes : Créer une carte en fait une carte dans À faire, relue comme toute autre. Ce qu’elle dit sur GitHub n’atteint les agents que cité.",
   "tips.githubPrs.title": "Relire une pull request entrante",
   "tips.githubRepository.text": "Gestion de versions → Flux de travail → GitHub montre le dépôt du projet, lu depuis ses dépôts distants, et si ta CLI GitHub (gh) est connectée sur cet hôte. Combwork utilise ton propre gh et ne stocke aucun jeton.",

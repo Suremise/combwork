@@ -1131,6 +1131,14 @@
     "defaultMessage": "Feedback to GitHub",
     "description": "A tip's title (HI-3559): a pull request's card posts its review to GitHub."
   },
+  "tips.githubIssues.text": {
+    "defaultMessage": "From GitHub… on the Task Board has an Issues tab: Make a Card makes an issue a card in Todo, with its labels. Once a release is published, Close Shipped Issues… closes the issues its cards fixed, in one click.",
+    "description": "A tip (HI-3555). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (From GitHub…, Issues, Make a Card and Close Shipped Issues… are the board's)."
+  },
+  "tips.githubIssues.title": {
+    "defaultMessage": "Work on a GitHub issue, and close it when it ships",
+    "description": "A tip's title (HI-3555): a card can be made of an open GitHub issue, and the issue closed once its release is published."
+  },
   "tips.githubPrs.text": {
     "defaultMessage": "Choose a project on the Task Board and click From GitHub… to list its open pull requests: Make a Card makes one a card in Todo, reviewed like any other. What it says on GitHub reaches agents only quoted.",
     "description": "A tip (HI-3553). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (From GitHub… and Make a Card are the board's buttons)."

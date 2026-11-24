@@ -33,6 +33,12 @@ export interface ReleaseReads {
    * without a process), is unknown: never taken as unchanged.
    */
   watch(projectPath: string, line: string): Promise<(() => string | null) | null>
+  /**
+   * HI-3555: `line`'s release tag (the first of `releaseTagNames` there), the commit it peels to and whether that commit
+   * is in the repository's main line, whether or not the line itself still exists (a release branch deleted after its
+   * release); null: no such tag. Absent: a platform that can't say, so nothing is taken as shipped on it.
+   */
+  tagged?(projectPath: string, line: string): Promise<Maybe<{ tag: string; commit: string; inMain: boolean } | null>>
 }
 
 /** The checker's answer now matches `first`, a readable one (unknown never matches). */

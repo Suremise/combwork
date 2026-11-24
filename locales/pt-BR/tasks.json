@@ -190,6 +190,7 @@
   "tasks.skipped.unsaved": "não pôde ser salvo",
   "tasks.source.agents": "Só o usuário define a origem no GitHub de um cartão.",
   "tasks.source.gh": "A GitHub CLI {problem, select, missing {não está instalada} signedOut {não está com login em {host}} timeout {não respondeu a tempo} other {não conseguiu ler}}: veja Controle de versão → Fluxo de trabalho → GitHub.",
+  "tasks.source.issueLinkChanged": "O repositório do GitHub deste projeto agora é {repo}, não {shown} como listado: liste as issues de novo.",
   "tasks.source.linkChanged": "O repositório do GitHub deste projeto agora é {repo}, não {shown} como listado: liste os pull requests de novo.",
   "tasks.source.noLink": "Este projeto não tem vínculo com o GitHub: nenhum dos seus remotes está no host do GitHub (Controle de versão → Fluxo de trabalho → GitHub).",
   "tasks.source.noProject": "Um cartão sobre o espaço de trabalho não tem origem no GitHub: só os cartões de um projeto têm.",

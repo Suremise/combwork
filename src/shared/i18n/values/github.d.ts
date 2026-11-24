@@ -1,6 +1,10 @@
 // Generated from locales/en/github.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface CombworkMessageValues {
+  'github.from.issuesTitle': { repo: string | number }
+  'github.from.tabIssues': undefined
+  'github.from.tabPrs': undefined
+  'github.from.tabs': undefined
   'github.host.rejected.credentials': undefined
   'github.host.rejected.empty': undefined
   'github.host.rejected.invalid': undefined
@@ -26,6 +30,26 @@ interface CombworkMessageValues {
   'github.hosts.proxyOption': undefined
   'github.hosts.sameOption': undefined
   'github.hosts.saveFailed': undefined
+  'github.issues.assignee': undefined
+  'github.issues.cardDesc': { number: string | number; repo: string | number; author: string }
+  'github.issues.cardTitle': { number: string | number; author: string }
+  'github.issues.changed': { line: string | number }
+  'github.issues.desc': undefined
+  'github.issues.failed': { number: string | number }
+  'github.issues.find': undefined
+  'github.issues.ghSays': { error: string | number }
+  'github.issues.hasCard': { card: string | number }
+  'github.issues.label': undefined
+  'github.issues.loading': undefined
+  'github.issues.make': undefined
+  'github.issues.meta': { author: string; labels: string; assignees: string }
+  'github.issues.none': { repo: string | number }
+  'github.issues.notPublished': { tag: string | number }
+  'github.issues.notReleased': { line: string | number }
+  'github.issues.problem': { problem: string }
+  'github.issues.row': { number: string | number; title: string | number }
+  'github.issues.search': undefined
+  'github.issues.shipped': undefined
   'github.link.again': undefined
   'github.link.checking': undefined
   'github.link.choose': { host: string | number }
@@ -73,4 +97,17 @@ interface CombworkMessageValues {
   'github.review.noLink': { repo: string | number }
   'github.review.notAllowed': { option: string; what: string }
   'github.review.notPr': undefined
+  'github.shipped.cancel': undefined
+  'github.shipped.close': { count: number }
+  'github.shipped.desc': { version: string | number }
+  'github.shipped.failed': undefined
+  'github.shipped.line': undefined
+  'github.shipped.loading': undefined
+  'github.shipped.noLines': undefined
+  'github.shipped.none': { line: string | number }
+  'github.shipped.outcome': { outcome: string; detail: string | number }
+  'github.shipped.published': { published: string; tag: string | number }
+  'github.shipped.row': { issue: string | number; card: string | number }
+  'github.shipped.state': { state: string }
+  'github.shipped.title': undefined
 }

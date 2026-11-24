@@ -145,6 +145,7 @@ import { poolFor, removeGoneSlot, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { githubLinkOf, githubRepoFor, openPrsOf, setGithubRemote } from './githubLink'
+import { closeShippedIssues, issueSourceFor, openIssuesOf, releasedLines, shippedIssuesOf } from './issueSources'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
@@ -966,6 +967,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'tasks:setSource': (n, source) => tasks.setSource(n, typeof source === 'string' && source.trim() ? source.trim().slice(0, 500) : null, { kind: 'user' }),
     // HI-3553: an open pull request made a card (the board's From GitHub…): the user's alone, read again from GitHub in main.
     'tasks:fromPr': (project, number, repo, text) => tasks.createFromPr(String(project), Number(number), { host: String(repo?.host ?? ''), owner: String(repo?.owner ?? ''), repo: String(repo?.repo ?? '') }, { title: String(text?.title ?? '').slice(0, 200), description: String(text?.description ?? '').slice(0, 4000) }, { kind: 'user' }),
+    // HI-3555: an open issue made a card (From GitHub…'s Issues): the user's alone, read again through the issue source in main.
+    'tasks:fromIssue': (project, number, repo, text) => tasks.createFromIssue(String(project), Number(number), { host: String(repo?.host ?? ''), owner: String(repo?.owner ?? ''), repo: String(repo?.repo ?? '') }, { title: String(text?.title ?? '').slice(0, 200), description: String(text?.description ?? '').slice(0, 4000) }, { kind: 'user' }),
     'tasks:keptTarget': (n) => tasks.keptTarget(Number(n)),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': async (n, patch, more) => {
@@ -1125,6 +1128,15 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'github:setRemote': (p, remote) => setGithubRemote(workspace, workspace.assertProject(p), typeof remote === 'string' ? remote : null),
     'github:repo': (p) => githubRepoFor(workspace, workspace.assertProject(p)),
     'github:openPrs': (p) => openPrsOf(workspace, workspace.assertProject(p)),
+    // HI-3555: the project's open issues (narrowed), and the close at publish: a released line's shipped issues, closed by the user's click.
+    'github:openIssues': (p, q) => openIssuesOf(workspace, workspace.assertProject(p), q),
+    'github:releasedLines': async (p) => {
+      const at = workspace.assertProject(p)
+      const src = await issueSourceFor(workspace, at)
+      return src ? releasedLines(workspace, at, src.repo) : []
+    },
+    'github:shippedIssues': (p, line) => shippedIssuesOf(workspace, workspace.assertProject(p), String(line ?? '')),
+    'github:closeShippedIssues': (p, preview) => closeShippedIssues(workspace, workspace.assertProject(p), preview),
     // HI-3559: a pull request's card's reviews to GitHub; the user posts a draft (its edit) or their own, or discards a draft.
     'github:reviews': (n) => githubReviewsView(currentWorkspace(), Number(n)),
     'github:postReview': (n, row, body) => postGithubReview(currentWorkspace(), Number(n), { row: typeof row === 'number' && Number.isInteger(row) ? row : null, body: typeof body === 'string' ? body.slice(0, 60_000) : '' }, 'user'),

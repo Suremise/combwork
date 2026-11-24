@@ -190,6 +190,7 @@
   "tasks.skipped.unsaved": "无法保存",
   "tasks.source.agents": "只有用户才能设置卡片的 GitHub 来源。",
   "tasks.source.gh": "GitHub CLI {problem, select, missing {未安装} signedOut {未在 {host} 上登录} timeout {未及时响应} other {无法读取}}：请查看“版本控制”→“工作流程”→“GitHub”。",
+  "tasks.source.issueLinkChanged": "本项目的 GitHub 仓库现在是 {repo}，而不是列表中的 {shown}：请重新列出其 Issue。",
   "tasks.source.linkChanged": "本项目的 GitHub 仓库现在是 {repo}，而不是列表中的 {shown}：请重新列出其拉取请求。",
   "tasks.source.noLink": "此项目没有 GitHub 关联：它的远程仓库都不在其 GitHub 主机上（“版本控制”→“工作流程”→“GitHub”）。",
   "tasks.source.noProject": "关于工作区的卡片没有 GitHub 来源：只有项目的卡片才有。",

@@ -39,6 +39,21 @@
     "note": "An error saving a GitHub host setting (HI-2779): it starts with a scheme other than https:// (http://, ssh://…). Keep github.com and https:// as they are.",
     "audience": "both"
   },
+  "github.issues.changed": {
+    "text": "What {line} shipped has changed since it was shown: look at it again.",
+    "note": "HI-3555: an error from Close Shipped Issues…: the cards shipped in the release, or the repository, changed after the list was shown, so nothing was closed. {line} is a branch name such as 1.7.0.",
+    "audience": "both"
+  },
+  "github.issues.notPublished": {
+    "text": "The release {tag} isn’t published on GitHub yet: publish it first, then close its issues.",
+    "note": "HI-3555: an error from Close Shipped Issues…: the release isn’t published on GitHub (a draft, or none), and issues are closed only once it is. {tag} is the release’s tag, such as v1.7.0.",
+    "audience": "both"
+  },
+  "github.issues.notReleased": {
+    "text": "{line} isn’t released: no tag v{line} or {line} in its history, merged into the default branch.",
+    "note": "HI-3555: an error from Close Shipped Issues…: the branch chosen isn’t released yet (HI-3148’s reading: a tag named after it in its history, and merged into the default branch). {line} is a branch name such as 1.7.0.",
+    "audience": "both"
+  },
   "github.link.notARemote": {
     "text": "That remote isn’t on this project’s GitHub host any more: choose again.",
     "note": "An error choosing the repository of a project’s GitHub link (HI-3550, Version Control → Workflow → GitHub): the remote chosen no longer points at a repository on the GitHub host.",
