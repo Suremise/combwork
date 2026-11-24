@@ -482,6 +482,26 @@
       "max": "number"
     }
   },
+  "tasks.feedback.changed": {
+    "placeholders": {
+      "card": "plain",
+      "number": "plain",
+      "repo": "plain"
+    }
+  },
+  "tasks.feedback.gone": {
+    "placeholders": {
+      "number": "plain"
+    }
+  },
+  "tasks.feedback.none": {
+    "placeholders": {}
+  },
+  "tasks.feedback.notOpen": {
+    "placeholders": {
+      "number": "plain"
+    }
+  },
   "tasks.history.answerTold": {
     "placeholders": {
       "agent": "plain"
