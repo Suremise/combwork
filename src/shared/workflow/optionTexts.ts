@@ -300,7 +300,7 @@ export const GROUP_TEXT: Record<FormGroupId, Msg> = {
   checks: msg({ id: 'workflow.group.checks', defaultMessage: 'Checks', description: 'A heading of the Workflow section: the options about the checks that must pass (glossary 2.3: checks).' }),
   merging: msg({ id: 'workflow.group.merging', defaultMessage: 'Merging', description: 'A heading of the Workflow section (Git): the options about how and where work is merged.' }),
   where: msg({ id: 'workflow.group.where', defaultMessage: 'Where cards are built', description: 'A heading of the Workflow section (Git): the options about the folders cards are built in and the commits made there (glossary 2.6, G11).' }),
-  github: msg({ id: 'workflow.group.github', defaultMessage: 'Feedback to GitHub', description: 'A heading of the Workflow section’s GitHub tab (HI-3559): what goes back to a pull request a card was made from.' }),
+  githubFeedback: msg({ id: 'workflow.group.github', defaultMessage: 'Feedback to GitHub', description: 'A heading of the Workflow section’s GitHub tab (HI-3559): what goes back to a pull request a card was made from.' }),
   work: msg({ id: 'workflow.group.work', defaultMessage: 'The work', description: 'A heading of the Workflow section for a project without version control: what a card’s work is, and when cards start.' }),
   loops: msg({ id: 'workflow.group.loops', defaultMessage: 'Card loops', description: 'A heading of the Workflow section: how card loops run, a builder and a reviewer taking cards in turn (glossary: card loop).' }),
   stages: msg({ id: 'workflow.group.stages', defaultMessage: 'Stages', description: 'A heading of the Workflow section: the names of the board’s stages (glossary 2.2: stage).' })

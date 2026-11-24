@@ -200,7 +200,7 @@ const calls = () => fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(B
     await page.locator('.git-sections [data-section="workflow"]').click()
     const form = page.locator('.workflow-form')
     await lib.workflowTab(form, 'github')
-    const group = form.locator('[data-group="github"]')
+    const group = form.locator('[data-group="githubFeedback"]')
     check('the GitHub tab has Feedback to GitHub (Both) and the footer’s switch', !!(await until(async () => (await group.locator('.workflow-option[data-option="githubFeedback"] select').inputValue().catch(() => '')) === 'both' && (await group.locator('.workflow-option[data-option="githubFooter"]').count()) === 1, HUNG_MS)), await group.innerText().catch(() => ''))
     await group.locator('.workflow-option[data-option="githubFeedback"] select').selectOption('user')
     check('…You hides the footer’s switch (it is on agents’ text only)', !!(await until(async () => (await group.locator('.workflow-option[data-option="githubFooter"]').count()) === 0, HUNG_MS)))

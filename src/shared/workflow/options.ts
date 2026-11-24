@@ -571,7 +571,7 @@ export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(O
 const LOOP_OPTIONS: OptionKey[] = ['loopWakes', 'loopRounds', 'simplifyAt', 'churnStopAt', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes']
 
 /** The Workflow section's groups (#1418), each a heading with its options. */
-export type FormGroupId = 'team' | 'review' | 'checks' | 'merging' | 'where' | 'github' | 'work' | 'loops' | 'stages'
+export type FormGroupId = 'team' | 'review' | 'checks' | 'merging' | 'where' | 'githubFeedback' | 'work' | 'loops' | 'stages'
 
 /**
  * The Workflow section's groups for a platform, in order, and their options (SPEC §16.6.1, §16.6.2; #1418). Since P7
@@ -588,7 +588,7 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
     { id: 'merging', options: ['finish', 'style', 'target', 'otherTargets', 'strict', 'pushTarget', 'followRemote', 'commitMessage', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'] },
     // HI-3559: what goes back to GitHub about a pull request's card.
-    { id: 'github', options: ['githubFeedback', 'githubFooter'] },
+    { id: 'githubFeedback', options: ['githubFeedback', 'githubFooter'] },
     { id: 'loops', options: LOOP_OPTIONS },
     { id: 'stages', options: ['stageNames'] }
   ],
@@ -615,7 +615,7 @@ export const FORM_TABS: Record<PlatformId, { id: FormTabId; groups: FormGroupId[
     { id: 'checks', groups: ['team', 'review', 'checks'] },
     { id: 'merging', groups: ['merging'] },
     { id: 'where', groups: ['where'] },
-    { id: 'github', groups: ['github'] },
+    { id: 'github', groups: ['githubFeedback'] },
     { id: 'loops', groups: ['loops', 'stages'] }
   ],
   none: [
