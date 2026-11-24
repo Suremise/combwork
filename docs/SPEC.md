@@ -4583,6 +4583,11 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    **3** such retests in a row the entry pauses ("main moves faster than its checks: retest or merge by hand") [HB3's
    round 1 finding 19].
 7. Record `Integrated` (the result revision, method), move the card to Done, release its slot, end the lane if done.
+   **Its history line (HI-3557):** a move no intent writes the board's line for (this Done, a return to Active) gets its
+   *Moved to …* line by Combwork in the same board change (the runtime's `noteMove`, only when the column changes), so
+   the history shows it and the lane's stall check (`columnSince`) counts from it, not from the move to Approved. An
+   intent's own move keeps its one line. The merge commit's date is the test merge's (step 4), made before the checks:
+   the target moves, and the card goes Done, when they pass.
    **Push after merging (G18, built [#1179]):** with *Push the target branch after merging* on (the project's options
    as they are then: G18 is in no ruleset), the same write records that the target's push is owed (store meta
    `queue.pushOwed:<target>`: the result, card and entry), in recovery's `Integrated` after a restart too, so the card
