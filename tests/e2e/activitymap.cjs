@@ -263,11 +263,15 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     check('…and kept', (await page.evaluate(() => localStorage.getItem('combwork.activity.map'))) === JSON.stringify({ map: true, feed: false, context: true }))
     await toggles.locator('[data-toggle="feed"]').click()
 
-    // --- A read only the map wants (HB2's session: the list shows HB1's tab), held in main (CW_TEST_HOLD_IPC) while the map
-    // is turned off: released, it applies nothing, and no map read starts with the map off (HR2's round 1).
+    // --- A read only the map wants (HB2's session: HB1 picked, the list shows HB1's work; HI-3568: with no pick the rows
+    // want every agent's), held in main (CW_TEST_HOLD_IPC) while the map is turned off: released, it applies nothing, and
+    // no map read starts with the map off (HR2's round 1).
     const heldTurns = () => app.evaluate(() => globalThis.__cwHeldIpc?.['activity:turns'] ?? 0)
     const gated = async (where, scope) => {
       const mapIn = page.locator(`${scope} .activity-map`)
+      const hb1Ring = page.locator(`${scope} .activity-map-ring`, { hasText: 'HB1' }).first()
+      if ((await hb1Ring.getAttribute('aria-pressed')) !== 'true') await hb1Ring.click()
+      await lib.until(async () => (await hb1Ring.getAttribute('aria-pressed')) === 'true', HUNG_MS, 100)
       const mapToggle = page.locator(`${scope} .activity-map-toggles [data-toggle="map"]`)
       await mapToggle.click()
       await lib.until(async () => (await mapIn.count()) === 0, HUNG_MS, 250)
@@ -291,12 +295,14 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
       check(`${where}: …and no map read starts while the map is off`, c2.turnReads === c1.turnReads, JSON.stringify([c1, c2]))
       await mapToggle.click()
       await lib.until(async () => (await mapIn.count()) === 1, HUNG_MS, 250)
+      await page.locator(`${scope} .activity-strip-all`).click()
+      await lib.until(async () => (await mapIn.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
     }
     await head.locator('.activity-pick').first().click()
     await lib.menuEntry(page, 'All').click()
     await page.keyboard.press('Escape')
     await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)
-    await gated('the project tab', '.activity-tab')
+    await gated('the project tab', '.activity-tab:not(.activity-workspace)')
 
     // --- All agents: one shared map, a ring each; HB2's call among HB1's.
     check('all agents: one shared map', !!(await lib.until(async () => (await map.getAttribute('data-mode').catch(() => null)) === 'shared', HUNG_MS, 250)))
@@ -342,8 +348,8 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     // A Now row's click picks its agent as its ring does (HI-3568).
     await page.locator('.activity-tab:not(.activity-workspace) .activity-now-row[data-agent="hb1"]').click()
     check("a Now row's click picks its agent: HB1's ring marked, its map and its work", !!(await lib.until(() => shownAlone('HB1'), HUNG_MS, 250)), await both())
-    // (An agent's dot on the shared map picks it too: the ten agents' part below.)
-    await page.keyboard.press('Escape')
+    // (An agent's dot on the shared map picks it too: the ten agents' part below.) The row clicked is gone, so All.
+    await page.locator('.activity-tab:not(.activity-workspace) .activity-strip-all').click()
     await lib.until(() => sharedNow(), HUNG_MS, 250)
     // The strip with the map's parts turned off (HI-3568): Context off, no percentages but the picker stays; Feed off, the
     // same; the map off, it moves above the list and still picks.
