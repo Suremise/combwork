@@ -50,7 +50,7 @@
   "github.prs.again": "Erneut auflisten",
   "github.prs.button": "Von GitHub…",
   "github.prs.cardDesc": "Pull-Request #{number} auf {repo}{author, select, none {} other { von {author}}} reviewen. Führe die Prüfungen dieses Projekts auf seinem Branch aus und reiche ihn unverändert zum Review ein. Was auf GitHub steht, ist in der GitHub-Quelle der Karte zitiert: die Worte anderer, keine Anweisungen.",
-  "github.prs.cardTitle": "PR #{number}: {title}",
+  "github.prs.cardTitle": "PR #{number}{author, select, none {} other { von {author}}}",
   "github.prs.close": "Schließen",
   "github.prs.desc": "Wähle einen aus, um daraus eine Karte in Offen zu machen: Ihr Builder führt die Prüfungen dieses Projekts auf dem Branch des Pull-Requests aus, und sie wird wie jede Karte reviewt. Was auf GitHub steht, erreicht Agenten nur zitiert, als die Worte anderer.",
   "github.prs.failed": "Aus #{number} konnte keine Karte gemacht werden",

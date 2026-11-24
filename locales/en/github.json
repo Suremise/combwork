@@ -204,8 +204,8 @@
     "description": "The description of a card made of a pull request (HI-3553), which its builder and reviewers read: what to do with it. {repo} is owner/name, {author} a GitHub user name. Keep the select keys. GitHub source is the card dialog’s field: as translated there."
   },
   "github.prs.cardTitle": {
-    "defaultMessage": "PR #{number}: {title}",
-    "description": "The title of a card made of a pull request (HI-3553): its number and its title on GitHub. PR: pull request, as short as the language has it."
+    "defaultMessage": "PR #{number}{author, select, none {} other { by {author}}}",
+    "description": "The title of a card made of a pull request (HI-3553): its number and its author (a GitHub user name). Never its title on GitHub (the user’s decision on r36: someone else’s words stay out of the card’s title). PR: pull request, as short as the language has it. Keep the select key."
   },
   "github.prs.close": {
     "defaultMessage": "Close",

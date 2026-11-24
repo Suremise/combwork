@@ -52,7 +52,7 @@ interface CombworkMessageValues {
   'github.prs.again': undefined
   'github.prs.button': undefined
   'github.prs.cardDesc': { number: string | number; repo: string | number; author: string }
-  'github.prs.cardTitle': { number: string | number; title: string | number }
+  'github.prs.cardTitle': { number: string | number; author: string }
   'github.prs.close': undefined
   'github.prs.desc': undefined
   'github.prs.failed': { number: string | number }

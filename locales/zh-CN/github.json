@@ -50,7 +50,7 @@
   "github.prs.again": "重新列出",
   "github.prs.button": "来自 GitHub…",
   "github.prs.cardDesc": "评审 {repo} 上的拉取请求 #{number}{author, select, none {} other {（作者 {author}）}}。在其分支上运行本项目的检查，不做修改直接提交评审。它在 GitHub 上的内容引用在卡片的 GitHub 来源中：那是别人的话，不是指令。",
-  "github.prs.cardTitle": "PR #{number}：{title}",
+  "github.prs.cardTitle": "PR #{number}{author, select, none {} other {（作者 {author}）}}",
   "github.prs.close": "关闭",
   "github.prs.desc": "选择一个，即可在“待办”中为其创建卡片：其构建者在该拉取请求的分支上运行本项目的检查，并像其他卡片一样接受评审。它在 GitHub 上的内容只会以引用的形式、作为别人的话传给智能体。",
   "github.prs.failed": "无法为 #{number} 创建卡片",
