@@ -59,6 +59,10 @@
     "text": "{agent} isn't watching {card}: its turn ended with no card watch.",
     "note": "#376: the agent looping on the card ended its turn with no card watch, so nothing wakes it."
   },
+  "stall.loop.notWatchingUncounted": {
+    "text": "{agent} isn't watching {card}: its turn ended with no card watch, and Combwork stopped counting its background tasks after their time limit. It may still be waiting on one (a subagent's long run), or one ended without waking it.",
+    "note": "HI-3561: as notWatching, while background tasks the agent started were dropped from its count after the time limit (Settings) and haven't been seen to end: it may be waiting on its own subagent, or that step ended without waking it."
+  },
   "stall.loop.wakeUntaken": {
     "text": "{agent} hasn't taken the wake Combwork typed for {card}: it waits in its prompt.",
     "note": "#777: the agent watched the card, and its wake waits untaken in its prompt (its CLI didn't take the line)."
