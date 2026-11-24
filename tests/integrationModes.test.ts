@@ -29,9 +29,9 @@ afterEach(() => {
 })
 
 describe("a platform's integration modes are its descriptor's (HI-2840)", () => {
-  it('declares each platform its finishes and a default among them: Git its four, None acceptance', () => {
+  it('declares each platform its finishes and a default among them: Git its five, None acceptance', () => {
     expect(Object.fromEntries(PLATFORM_IDS.map((p) => [p, { finishes: PLATFORMS[p].finishes, defaultFinish: PLATFORMS[p].defaultFinish }]))).toEqual({
-      git: { finishes: ['combworkMerges', 'agentMerges', 'committed', 'notChecked'], defaultFinish: 'notChecked' },
+      git: { finishes: ['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'pullRequest'], defaultFinish: 'notChecked' },
       none: { finishes: ['accept'], defaultFinish: 'accept' }
     })
     for (const p of PLATFORM_IDS) expect(PLATFORMS[p].finishes).toContain(PLATFORMS[p].defaultFinish)
