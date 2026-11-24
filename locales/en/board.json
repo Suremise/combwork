@@ -1151,6 +1151,10 @@
     "defaultMessage": "{kind, select, pr {Pull request} other {Issue}} #{number}",
     "description": "The card dialog’s GitHub source (HI-3551): its kind and number. Keep the select keys."
   },
+  "board.dialog.sourceModelUnknown": {
+    "defaultMessage": "Author’s model unknown: the pull request doesn’t say which AI, if any, wrote it.",
+    "description": "Under a pull request source in the card dialog (HI-3560, a hint only): the pull request names no AI model in its commits’ Co-Authored-By trailers or its description."
+  },
   "board.dialog.sourceOpen": {
     "defaultMessage": "Open on GitHub",
     "description": "Tooltip of the card dialog’s GitHub source link (HI-3551): opens the pull request or issue in the browser."
@@ -1171,13 +1175,29 @@
     "defaultMessage": "Remove",
     "description": "A button beside the card dialog’s GitHub source (HI-3551): removes it (only while the card hasn’t started)."
   },
+  "board.dialog.sourceReviewers": {
+    "defaultMessage": "Reviewers…",
+    "description": "A button beside the reviewer suggestion under a pull request source (HI-3560): opens the project’s review options (Version Control → Workflow)."
+  },
   "board.dialog.sourceSet": {
     "defaultMessage": "Set",
     "description": "A button beside the card dialog’s GitHub source box (HI-3551): reads the pull request or issue from GitHub and sets it as the card’s source."
   },
+  "board.dialog.sourceSuggestMore": {
+    "defaultMessage": "Suggested: be more cautious, and have two reviewers pass it.",
+    "description": "Under “Author’s model unknown” (HI-3560, a suggestion, never a rule): with nothing said about who wrote the pull request, review it with two reviewers."
+  },
+  "board.dialog.sourceSuggestOther": {
+    "defaultMessage": "Suggested: reviewers that run another provider than {provider}{n, plural, =0 {} other {, such as {agents}}}.",
+    "description": "Under who wrote a pull request (HI-3560, a suggestion, never a rule): have it reviewed by agents of another provider (coding agent) than the one that wrote it. {provider} is a provider’s name (Claude Code); {agents} names this project’s reviewer agents that run another one; {n} how many."
+  },
   "board.dialog.sourceTitle": {
     "defaultMessage": "On GitHub: “{title}”",
     "description": "The card dialog’s GitHub source (HI-3551): its title as GitHub has it (someone else’s words, quoted)."
+  },
+  "board.dialog.sourceWrittenBy": {
+    "defaultMessage": "Written by {name}{provider, select, none {} other { ({provider})}}, as {from, select, trailer {its commits’ Co-Authored-By says} other {its description says}}.",
+    "description": "Under a pull request source in the card dialog (HI-3560, a hint only): the AI model that wrote the pull request, as the pull request itself says. {name} is the name it gave (a model’s, as written, e.g. Claude Opus 5.5), {provider} the coding agent that runs it (Claude Code) or none. Co-Authored-By is a commit trailer’s name: keep it. Keep the select keys."
   },
   "board.dialog.start": {
     "defaultMessage": "Start…",
@@ -1562,6 +1582,30 @@
   "board.forYou.todayValue": {
     "defaultMessage": "{today, select, yes {{value} (as until now)} other {{value}}}",
     "description": "A choice in the merge queue's question before an upgraded project's first merge (HI-1697, For you): a value of a workflow option ({value}), marked when it is how Combwork merged until now. Keep the select keys as they are."
+  },
+  "board.github.approve": {
+    "defaultMessage": "Approve on GitHub…",
+    "description": "A button in a pull request card’s Feedback to GitHub (HI-3560): approves the pull request on GitHub as the user, after asking. Merging stays on GitHub."
+  },
+  "board.github.approveConfirm": {
+    "defaultMessage": "Approve",
+    "description": "The button of the question before approving a pull request on GitHub (HI-3560)."
+  },
+  "board.github.approveFailed": {
+    "defaultMessage": "Couldn’t approve the pull request",
+    "description": "An error’s title (HI-3560): approving the pull request on GitHub failed; its message says why."
+  },
+  "board.github.approveMessage": {
+    "defaultMessage": "Combwork approves it on GitHub through your GitHub CLI, as your own account. Merging it stays yours, on GitHub: Combwork never merges a pull request.",
+    "description": "The question before approving a card’s pull request on GitHub (HI-3560)."
+  },
+  "board.github.approveTitle": {
+    "defaultMessage": "Approve pull request #{number} on {repo}?",
+    "description": "The title of the question before approving a card’s pull request on GitHub (HI-3560). {number} is its number, {repo} its repository (owner/name)."
+  },
+  "board.github.approved": {
+    "defaultMessage": "You approved it on GitHub {when}. Merging stays on GitHub.",
+    "description": "In a pull request card’s Feedback to GitHub (HI-3560): when the user approved the pull request from the card (a date and time)."
   },
   "board.github.carried": {
     "defaultMessage": "{inline, plural, =0 {} one {# line comment on the diff} other {# line comments on the diff}}{both, select, yes {, } other {}}{listed, plural, =0 {} one {# listed in it} other {# listed in it}}",

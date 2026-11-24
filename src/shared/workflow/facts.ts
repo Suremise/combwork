@@ -653,6 +653,11 @@ export interface FactData {
   GithubReviewFailed: { posting: number; error: string; uncertain?: true }
   /** The user discarded a draft: never posted. */
   GithubReviewDiscarded: { draft: number }
+  /**
+   * HI-3560: the user approved the card's pull request on GitHub from its dialog (`gh pr review --approve`), as their own
+   * account. Merging it stays theirs, on GitHub.
+   */
+  GithubPrApproved: { host: string; owner: string; repo: string; number: number }
 }
 
 /**

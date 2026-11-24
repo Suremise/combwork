@@ -4,6 +4,7 @@
 
 import { agentMsg } from './agentText/msg'
 import type { GhState, GithubRepoRef } from './githubRepo'
+import type { PrAuthorship } from './prAuthorship'
 
 /** What gh's `pr view` said of a pull request when its card's source was set (evidence, never a permission). */
 export interface GithubPrFacts {
@@ -26,6 +27,8 @@ export interface GithubSource extends GithubRepoRef {
   pr?: GithubPrFacts
   /** HI-3553: who opened it, as GitHub said when it was set (a hint, never a permission). */
   author?: GithubAuthor
+  /** HI-3560: the AI that wrote a pull request, as it says (prAuthorship); null: it doesn't say; absent: not read (set before). */
+  wroteBy?: PrAuthorship | null
 }
 
 /** HI-3553: the author of a pull request or issue, and how GitHub relates them to the repository. */
@@ -160,7 +163,9 @@ export function cleanSource(raw: unknown): GithubSource | undefined {
   if (kind === 'pr' && !pr) return undefined
   const a = r.author as Record<string, unknown> | undefined
   const author = a && typeof a.login === 'string' && a.login.trim() ? { login: a.login, association: typeof a.association === 'string' && a.association ? a.association : null } : undefined
-  return { kind, host, owner, repo, number: r.number as number, url, title: str('title') ?? '', ...(pr ? { pr } : {}), ...(author ? { author } : {}) }
+  const w = r.wroteBy as Record<string, unknown> | null | undefined
+  const wroteBy: PrAuthorship | null | undefined = w === null ? null : w && typeof w.name === 'string' && w.name.trim() && (w.from === 'trailer' || w.from === 'body') ? { name: w.name.slice(0, 80), provider: typeof w.provider === 'string' ? w.provider : null, from: w.from } : undefined
+  return { kind, host, owner, repo, number: r.number as number, url, title: str('title') ?? '', ...(pr ? { pr } : {}), ...(author ? { author } : {}), ...(kind === 'pr' && wroteBy !== undefined ? { wroteBy } : {}) }
 }
 
 /** The label a card made from GitHub carries, so a lane is given such cards like any others. */

@@ -89,6 +89,8 @@
   "github.prs.row": "#{number} {title}",
   "github.prs.tip": "Eine Karte aus einem offenen Pull-Request oder Issue auf {repo} erstellen",
   "github.prs.title": "Offene Pull-Requests auf {repo}",
+  "github.review.approveChanged": "Diese Karte betrifft jetzt einen anderen Pull-Request als #{number} auf {repo}, den du bestätigt hast: Es wurde nichts freigegeben. Sieh sie dir noch einmal an.",
+  "github.review.approveFailed": "Die GitHub CLI konnte Pull-Request #{number} nicht freigeben{why, select, none {} other {: {why}}}.",
   "github.review.done": "Dieses Review wurde {state, select, posted {bereits gepostet} discarded {verworfen} other {wird bereits gepostet}}.",
   "github.review.empty": "Ein Review braucht Text oder einen deiner Zeilenkommentare.",
   "github.review.noCard": "Die Arbeit dieser Karte kann nicht gelesen werden, daher kann sie nicht auf GitHub posten.",

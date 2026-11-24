@@ -89,6 +89,8 @@
   "github.prs.row": "#{number} {title}",
   "github.prs.tip": "为 {repo} 上打开的拉取请求或 Issue 创建卡片",
   "github.prs.title": "{repo} 上打开的拉取请求",
+  "github.review.approveChanged": "此卡片现在对应的拉取请求已不是你确认的 {repo} 上的 #{number}：没有批准任何内容。请重新查看。",
+  "github.review.approveFailed": "GitHub CLI 无法批准拉取请求 #{number}{why, select, none {} other {：{why}}}。",
   "github.review.done": "该评审{state, select, posted {已经发布} discarded {已被丢弃} other {正在发布}}。",
   "github.review.empty": "评审需要正文，或附带你的行评论。",
   "github.review.noCard": "无法读取此卡片的工作，因此无法发布到 GitHub。",

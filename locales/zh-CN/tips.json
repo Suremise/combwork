@@ -262,6 +262,8 @@
   "tips.gitSigning.title": "签名合并无需等待",
   "tips.gitView.text": "在 Git 项目中，“版本控制”标签页显示分支、远程仓库、历史和标签，还可以切换或创建分支、获取、拉取、推送、打标签，以及设置提交身份。状态栏会显示“{example}”：点击即可前往。",
   "tips.gitView.title": "查看和更改项目的 git",
+  "tips.githubApprove.text": "如果拉取请求有说明，其卡片会显示是哪个 AI 编写的，并建议使用其他提供方的评审者。“在 GitHub 上批准…”会以你的账户批准它；合并仍在 GitHub 上完成。",
+  "tips.githubApprove.title": "从卡片批准拉取请求",
   "tips.githubFeedback.text": "拉取请求的卡片会以你的账户评论的形式将评审发布到 GitHub：默认情况下，评审智能体的结论会在卡片上生成草稿，由你编辑后发布。在“版本控制”→“工作流程”→“GitHub”中选择由谁撰写。",
   "tips.githubFeedback.title": "反馈到 GitHub",
   "tips.githubIssues.text": "任务看板上的“来自 GitHub…”有一个“Issue”标签页：“创建卡片”会在“待办”中将 Issue 变为带有其标签的卡片。版本发布后，“关闭已发布的 Issue…”会一键关闭其卡片修复的 Issue。",

@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { msg, tr } from '@shared/i18n'
-import { outsideAuthor, prPushable } from '@shared/githubSource'
+import { fmt, msg, tr } from '@shared/i18n'
+import { outsideAuthor, prPushable, type GithubSource } from '@shared/githubSource'
+import { providerDescriptor } from '@shared/providers'
+import { agentWorkflowRole, reviewsWork } from '@shared/workflow/roles'
 import type { TaskCard } from '@shared/types'
 import * as actions from '../actions'
 import { call } from '../api'
-import { set, showView } from '../store'
+import { agentProviderOf, openWorkflowOption, set, showView, useStore } from '../store'
 import { Icon } from './ui'
 
 /**
@@ -27,6 +29,11 @@ const T = {
   outside: msg({ id: 'board.dialog.sourceOutside', defaultMessage: '{known, select, yes {{author} isn’t a member of {repo}} other {Combwork couldn’t tell whether {author} is a member of {repo}}}: this project’s checks run the pull request’s code on this PC, with your files and sign-ins. To run it apart from them, use Windows Sandbox: its server is in the MCP catalogue.', description: 'A warning under a pull request source in the card dialog (HI-3553, a warning, never a rule): its author isn’t one of the repository’s members (or GitHub couldn’t say), so its checks would run a stranger’s code. {author} a GitHub user name, {repo} owner/name. Keep the select keys. Windows Sandbox and MCP are product names.' }),
   outsideIssue: msg({ id: 'board.dialog.sourceOutsideIssue', defaultMessage: '{known, select, yes {{author} isn’t a member of {repo}} other {Combwork couldn’t tell whether {author} is a member of {repo}}}: what this issue says is someone else’s words, and reaches agents only quoted as such.', description: 'A warning under an issue source in the card dialog (HI-3555, a warning, never a rule): its author isn’t one of the repository’s members (or GitHub couldn’t say), so its text is a stranger’s. {author} a GitHub user name, {repo} owner/name. Keep the select keys.' }),
   catalogue: msg({ id: 'board.dialog.sourceCatalogue', defaultMessage: 'Open the MCP Catalogue', description: 'A button beside the card dialog’s outside-author warning (HI-3553): shows the MCP view’s Catalogue tab, where the Windows Sandbox server is.' }),
+  writtenBy: msg({ id: 'board.dialog.sourceWrittenBy', defaultMessage: 'Written by {name}{provider, select, none {} other { ({provider})}}, as {from, select, trailer {its commits’ Co-Authored-By says} other {its description says}}.', description: 'Under a pull request source in the card dialog (HI-3560, a hint only): the AI model that wrote the pull request, as the pull request itself says. {name} is the name it gave (a model’s, as written, e.g. Claude Opus 5.5), {provider} the coding agent that runs it (Claude Code) or none. Co-Authored-By is a commit trailer’s name: keep it. Keep the select keys.' }),
+  unknown: msg({ id: 'board.dialog.sourceModelUnknown', defaultMessage: 'Author’s model unknown: the pull request doesn’t say which AI, if any, wrote it.', description: 'Under a pull request source in the card dialog (HI-3560, a hint only): the pull request names no AI model in its commits’ Co-Authored-By trailers or its description.' }),
+  suggestOther: msg({ id: 'board.dialog.sourceSuggestOther', defaultMessage: 'Suggested: reviewers that run another provider than {provider}{n, plural, =0 {} other {, such as {agents}}}.', description: 'Under who wrote a pull request (HI-3560, a suggestion, never a rule): have it reviewed by agents of another provider (coding agent) than the one that wrote it. {provider} is a provider’s name (Claude Code); {agents} names this project’s reviewer agents that run another one; {n} how many.' }),
+  suggestMore: msg({ id: 'board.dialog.sourceSuggestMore', defaultMessage: 'Suggested: be more cautious, and have two reviewers pass it.', description: 'Under “Author’s model unknown” (HI-3560, a suggestion, never a rule): with nothing said about who wrote the pull request, review it with two reviewers.' }),
+  reviewers: msg({ id: 'board.dialog.sourceReviewers', defaultMessage: 'Reviewers…', description: 'A button beside the reviewer suggestion under a pull request source (HI-3560): opens the project’s review options (Version Control → Workflow).' }),
   failed: msg({ id: 'board.dialog.sourceFailed', defaultMessage: 'Couldn’t set the GitHub source', description: 'An error’s title (HI-3551): the card’s GitHub source couldn’t be set or removed; its message says why.' })
 }
 
@@ -64,6 +71,7 @@ export function SourceField({ card, readOnly, onSet }: { card: TaskCard; readOnl
             )}
             {s.title && <div className="s-desc card-source-title">{tr(T.titled, { title: s.title })}</div>}
             {s.author && <div className="s-desc" data-source-author={s.author.login}>{tr(T.author, { author: s.author.login })}</div>}
+            {s.kind === 'pr' && <WrittenBy project={card.project} s={s} />}
             {!prPushable(s).ok && <div className="s-desc warn-text" data-source-note="fork">{tr(T.fork)}</div>}
             {outside && (
               <div className="s-desc warn-text" data-source-note="outside" data-outside={outside}>
@@ -86,5 +94,29 @@ export function SourceField({ card, readOnly, onSet }: { card: TaskCard; readOnl
         )}
       </div>
     </>
+  )
+}
+
+/**
+ * HI-3560 (HI-3541's decision, HI-3553/r9 point 6: a hint only, never required, never a gate): who wrote a pull request,
+ * as it says (its commits' Co-Authored-By, else its description), and a suggestion for its review: reviewers that run
+ * another provider than its author's, naming this project's that do; with nothing said, two reviewers. The user chooses.
+ */
+function WrittenBy({ project, s }: { project: string; s: GithubSource }) {
+  const info = useStore((st) => st.workspace?.projects.find((p) => p.name.toLowerCase() === project.toLowerCase()) ?? null)
+  const by = s.wroteBy ?? null
+  const provider = by?.provider ? providerDescriptor(by.provider).name : null
+  // This project's reviewer agents that run another provider than the author's.
+  const others = by?.provider ? (info?.agents ?? []).filter((a) => reviewsWork(agentWorkflowRole(a)) && agentProviderOf(a) !== by.provider).map((a) => a.name) : []
+  return (
+    <div className="s-desc card-source-written" data-written-by={by ? (by.provider ?? 'other') : 'unknown'}>
+      {by ? tr(T.writtenBy, { name: by.name, provider: provider ?? 'none', from: by.from }) : tr(T.unknown)}{' '}
+      {provider ? tr(T.suggestOther, { provider, n: others.length, agents: fmt.list(others) }) : tr(T.suggestMore)}{' '}
+      {info && (
+        <button type="button" className="btn small subtle" data-action="open-reviewers" onClick={() => openWorkflowOption(info.path, 'reviewers')}>
+          {tr(T.reviewers)}
+        </button>
+      )}
+    </div>
   )
 }

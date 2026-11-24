@@ -262,6 +262,8 @@
   "tips.gitSigning.title": "Merges assinados sem espera",
   "tips.gitView.text": "Em um projeto Git, a aba Controle de versão mostra o branch, os remotes, o histórico e as tags, e permite trocar ou criar um branch, fazer fetch, pull e push, criar tags e definir a identidade de commit. A barra de status mostra “{example}”: clique nela para ir até lá.",
   "tips.gitView.title": "Veja e altere o git de um projeto",
+  "tips.githubApprove.text": "O cartão de um pull request diz qual IA o escreveu, quando o pull request diz, e sugere revisores de outro provedor. Aprovar no GitHub… o aprova com a sua conta; o merge continua no GitHub.",
+  "tips.githubApprove.title": "Aprovar um pull request pelo cartão",
   "tips.githubFeedback.text": "O cartão de um pull request publica a revisão no GitHub como comentário da sua conta: por padrão, o veredito de um agente revisor fica como rascunho no cartão para você editar e publicar. Escolha quem a escreve em Controle de versão → Fluxo de trabalho → GitHub.",
   "tips.githubFeedback.title": "Feedback ao GitHub",
   "tips.githubIssues.text": "Do GitHub… no quadro de tarefas tem uma aba Issues: Criar cartão transforma uma issue em cartão em A fazer, com os rótulos dela. Quando uma versão é publicada, Fechar issues entregues… fecha as issues que os cartões dela corrigiram, com um clique.",
