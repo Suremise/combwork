@@ -682,7 +682,7 @@ interface CombworkMessageValues {
   'board.pr.failed': undefined
   'board.pr.heading': undefined
   'board.pr.noChecks': undefined
-  'board.pr.notPushedWhy': { why: string }
+  'board.pr.notPushedWhy': { why: string; rule: string | number }
   'board.pr.number': { number: string | number }
   'board.pr.open': undefined
   'board.pr.opening': undefined

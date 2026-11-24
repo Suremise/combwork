@@ -501,7 +501,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     ...reviewSkipView(facts),
     folder: started?.folder ?? null,
     line: started?.line ?? null,
-    pullRequest: s.pullRequest ? { number: s.pullRequest.opened?.number ?? null, url: s.pullRequest.opened?.url ?? null, repo: `${s.pullRequest.requested.owner}/${s.pullRequest.requested.repo}`, draft: s.pullRequest.opened?.draft ?? null, failed: s.pullRequest.failed?.problem ?? null, closed: s.pullRequest.closed?.at ?? (s.pullRequest.closed ? '' : null), ...(s.pullRequest.opened?.notPushed ? { notPushed: s.pullRequest.opened.notPushedWhy ?? 'other' } : {}) } : null,
+    pullRequest: s.pullRequest ? { number: s.pullRequest.opened?.number ?? null, url: s.pullRequest.opened?.url ?? null, repo: `${s.pullRequest.requested.owner}/${s.pullRequest.requested.repo}`, draft: s.pullRequest.opened?.draft ?? null, failed: s.pullRequest.failed?.problem ?? null, closed: s.pullRequest.closed?.at ?? (s.pullRequest.closed ? '' : null), ...(s.pullRequest.opened?.notPushed ? { notPushed: s.pullRequest.opened.notPushedWhy ?? 'other', ...(s.pullRequest.opened.notPushedWhy === 'rewrite' ? { notPushedRule: s.pullRequest.opened.notPushedDetail ?? '' } : {}) } : {}) } : null,
     ...(notReady ? { notReady: { slot: notReady.slot, why: notReady.why } } : {}),
     lines: s.lines,
     base: started?.base ?? null,
@@ -579,6 +579,8 @@ export interface WorkPullRequest {
    * PrNotPushedWhy; `other` for a record from before it).
    */
   notPushed?: string
+  /** HI-3562: the git url rewrite's config key, when that is why. */
+  notPushedRule?: string
 }
 
 export interface WorkBadge {

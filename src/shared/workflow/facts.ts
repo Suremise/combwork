@@ -370,10 +370,11 @@ export interface PrOpenedData {
 /**
  * HI-3562: why a pull request's card's fixes weren't pushed to its pull request (it still follows it, in PR open): a fork
  * whose author doesn't allow maintainer edits; commits on GitHub's head the approved commit lacks (pushed from outside,
- * never overwritten); the push refused (the branch moved since it was read); the pull request no longer open; or its head
- * not the branch or repository the card started on.
+ * never overwritten); the push refused (the branch moved since it was read); the pull request no longer open; its head
+ * not the branch or repository the card started on; a git url rewrite applying to a fork's address (`notPushedDetail` the
+ * rule's key), or git's url rewrites unreadable (HI-3562's round-2 decision: Combwork doesn't push through a rewrite).
  */
-export type PrNotPushedWhy = 'fork' | 'outside' | 'refused' | 'notOpen' | 'changed'
+export type PrNotPushedWhy = 'fork' | 'outside' | 'refused' | 'notOpen' | 'changed' | 'rewrite' | 'config'
 
 /** HI-3552: why opening a request's pull request failed this time: the card waits in Approved for Try again. */
 export interface PrOpenFailedData {

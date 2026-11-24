@@ -10,7 +10,7 @@ import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { allOff, contradictions, formShows, formTabOf, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { producedStages } from '../../src/shared/workflow/compile'
 import { PR_RETRY_GATE } from '../../src/shared/workflow/facts'
-import { followPr, forkAddress, notPushedNotice, openPr, prViewOf, pushAddressOf, pushesTo, urlRewrites, type GhPort, type PrPorts } from '../../src/main/workflow/prHost'
+import { followPr, forkAddress, notPushedNotice, openPr, prViewOf, pushesTo, urlRewrites, type GhPort, type PrPorts } from '../../src/main/workflow/prHost'
 import { tempDir } from '../tempDir'
 import { intentText } from '../../src/shared/toolReplies'
 import { laneRules } from '../../src/shared/laneBrief'
@@ -594,60 +594,43 @@ describe('the pull request finish (HI-3552)', () => {
     expect(sh(bare, 'rev-parse', 'feature')).toBe(theirs)
   })
 
-  // HR1, round 1: a fork's route is read as git pushes (pushInsteadOf too, which ls-remote --get-url left out), on the real
-  // path, and the push goes by that same route: a rewrite elsewhere is refused, nothing pushed anywhere.
-  it('reads a fork’s push route as git pushes it, pushInsteadOf included, and pushes nowhere it doesn’t check', async () => {
-    const e = (env = project())
-    const { bare, gh, ports } = github(e)
-    const head = { host: 'github.com', owner: 'someone', repo: 'app' }
-    expect(await forkAddress(e.project, head)).toEqual({ target: 'https://github.com/someone/app.git', urls: ['https://github.com/someone/app.git'] })
-    const { card, prHead, headBare } = await prCard(e, bare, gh, { fork: true, canModify: true })
-    const elsewhere = tempDir('gh-elsewhere-')
-    sh(elsewhere, 'init', '-q', '--bare')
-    const to = elsewhere.replace(/\\/g, '/')
-    sh(e.project, 'config', `url.${to}/.pushInsteadOf`, 'https://github.com/someone/')
-    expect((await forkAddress(e.project, head)).urls).toEqual([`${to}/app.git`])
-    // Production's forkAddress (no stand-in): refused, asked to try again; neither the fork nor the rewrite's target gets it.
-    const { forkTarget: _none, ...real } = { ...ports, forkTarget: undefined }
-    await openPr(e.wf, card.id, requestOf(e, card.id), real)
-    const s = e.wf.state(card)
-    expect(s.stage).toBe('approved')
-    expect(s.pullRequest?.failed?.problem).toBe('pushUrl')
-    expect(sh(headBare, 'rev-parse', 'feature')).toBe(prHead)
-    expect(sh(elsewhere, 'for-each-ref')).toBe('')
+  // HR1's rounds 1 and 2, and the round-2 decision: Combwork doesn't push a fork's address through a git url rewrite. Any
+  // insteadOf or pushInsteadOf that applies to it (read NUL-delimited, so a base with spaces is read whole), or git's
+  // rewrites unreadable, refuses the push: nothing pushed anywhere, the card in PR open saying which rule. On the real
+  // forkAddress path, no stand-in.
+  it('pushes a fork’s fixes through no git url rewrite: one that applies refuses the push, naming it', async () => {
+    for (const kind of ['pushInsteadOf', 'insteadOf'] as const) {
+      const e = (env = project())
+      const { bare, gh, ports } = github(e)
+      const { card, prHead, headBare } = await prCard(e, bare, gh, { fork: true, canModify: true })
+      // A base with spaces for the push rewrite (a local folder), a plain one for the fetch rewrite.
+      const elsewhere = join(tempDir('gh-elsewhere-'), kind === 'pushInsteadOf' ? 'destination with spaces' : 'plain')
+      sh(e.project, 'init', '-q', '--bare', join(elsewhere, 'app.git'))
+      const key = `url.${elsewhere.replace(/\\/g, '/')}/.${kind}`
+      sh(e.project, 'config', key, 'https://github.com/someone/')
+      expect(await forkAddress(e.project, { host: 'github.com', owner: 'someone', repo: 'app' }), kind).toEqual({ target: 'https://github.com/someone/app.git', urls: null, rewrite: key.replace(/\.(pushInsteadOf|insteadOf)$/, (m) => m.toLowerCase()) })
+      await openPr(e.wf, card.id, requestOf(e, card.id), { ...ports, forkTarget: undefined })
+      const s = e.wf.state(card)
+      expect(s.stage, kind).toBe('prOpen')
+      expect(s.pullRequest?.opened, kind).toMatchObject({ notPushed: true, notPushedWhy: 'rewrite', pushed: prHead })
+      expect(s.pullRequest?.opened?.notPushedDetail?.toLowerCase(), kind).toBe(key.toLowerCase())
+      expect(sh(headBare, 'rev-parse', 'feature'), kind).toBe(prHead)
+      expect(sh(join(elsewhere, 'app.git'), 'for-each-ref'), kind).toBe('')
+      expect(commentOf(e, card.id), kind).toBe(true)
+      env.close()
+      env = null
+    }
   })
 
-  // HR1, round 1: what is checked is where git itself pushes an address: proved against real pushes through local rewrites
-  // (pushInsteadOf over insteadOf, the longest prefix of each).
-  it('works out where git pushes an address as git does', () => {
-    const base = tempDir('gh-rewrite-')
-    const at = (name: string): string => {
-      const dir = join(base, name, 'app.git')
-      sh(base, 'init', '-q', '--bare', dir)
-      return join(base, name).replace(/\\/g, '/')
-    }
-    const viaPush = at('push')
-    const viaLonger = at('longer')
-    const viaFetch = at('fetch')
-    const repo = tempDir('gh-rewrite-repo-')
-    sh(repo, 'init', '-q', '-b', 'main')
-    const tip = commit(repo, { 'a.txt': 'a\n' }, 'A')
-    const url = 'https://github.com/someone/app.git'
-    const landed = (): string[] => ['push', 'longer', 'fetch'].filter((n) => sh(join(base, n, 'app.git'), 'for-each-ref', '--format=%(refname)').includes('refs/heads/main'))
-    const config = (): ReturnType<typeof urlRewrites> => urlRewrites(sh(repo, 'config', '--get-regexp', '^url\\..*insteadof$'))
-    const push = (): void => void sh(repo, 'push', '-q', url, `${tip}:refs/heads/main`)
-    // insteadOf alone: git pushes there.
-    sh(repo, 'config', `url.${viaFetch}/.insteadOf`, 'https://github.com/someone/')
-    expect(pushAddressOf(url, config())).toBe(`${viaFetch}/app.git`)
-    push()
-    expect(landed()).toEqual(['fetch'])
-    // pushInsteadOf wins over insteadOf for a push; of two, the longer prefix.
-    sh(repo, 'config', `url.${viaPush}/.pushInsteadOf`, 'https://github.com/')
-    sh(repo, 'config', `url.${viaLonger}/.pushInsteadOf`, 'https://github.com/someone/')
-    expect(pushAddressOf(url, config())).toBe(`${viaLonger}/app.git`)
-    push()
-    expect(landed()).toEqual(['longer', 'fetch'])
-    expect(pushAddressOf('https://example.com/x.git', config())).toBe('https://example.com/x.git')
+  it('reads git’s url rewrites whole or not at all, and finds none to refuse when none applies', async () => {
+    expect(urlRewrites('url.C:/a b/c/.pushinsteadof\nhttps://github.com/x/\0url.git@h:.insteadof\nhttps://h/\0')).toEqual([{ key: 'url.C:/a b/c/.pushinsteadof', prefix: 'https://github.com/x/' }, { key: 'url.git@h:.insteadof', prefix: 'https://h/' }])
+    expect(urlRewrites('')).toEqual([])
+    // An entry that can't be read is never taken for none.
+    expect(urlRewrites('url.x.insteadof https://h/\0')).toBeNull()
+    const e = (env = project())
+    // A rule for another address applies to nothing here: the push goes to the fork's own address, the one checked.
+    sh(e.project, 'config', 'url.ssh://git@example.com/.insteadOf', 'https://example.com/')
+    expect(await forkAddress(e.project, { host: 'github.com', owner: 'someone', repo: 'app' })).toEqual({ target: 'https://github.com/someone/app.git', urls: ['https://github.com/someone/app.git'] })
   })
 
   // HR1, round 1: a merged or closed pull request whose fork was deleted has no head repository: followed all the same.
@@ -678,6 +661,8 @@ describe('the pull request finish (HI-3552)', () => {
     expect(notPushedNotice('AM-1', 7, 'refused')).toBe(`AM-1's fixes weren't pushed to pull request #7: the push was refused, its branch having moved since it was read${tail}`)
     expect(notPushedNotice('AM-1', 7, 'notOpen')).toBe(`AM-1's fixes weren't pushed to pull request #7: it isn't open on GitHub${tail}`)
     expect(notPushedNotice('AM-1', 7, 'changed')).toBe(`AM-1's fixes weren't pushed to pull request #7: its head isn't the branch the card started on${tail}`)
+    expect(notPushedNotice('AM-1', 7, 'rewrite', 'url.C:/a b/.pushinsteadof')).toBe(`AM-1's fixes weren't pushed to pull request #7: a git url rewrite, url.C:/a b/.pushinsteadof, applies to its fork's address, and Combwork doesn't push through one${tail}`)
+    expect(notPushedNotice('AM-1', 7, 'config')).toBe(`AM-1's fixes weren't pushed to pull request #7: git's url rewrites couldn't be read, and Combwork doesn't push without them${tail}`)
   })
 
   it('pushes nothing where a push address isn’t the pull request’s head repository, and asks to try again', async () => {

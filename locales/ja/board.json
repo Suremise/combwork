@@ -679,7 +679,7 @@
   "board.pr.failed": "プルリクエストは開かれていません：「要対応」を確認してください",
   "board.pr.heading": "プルリクエスト",
   "board.pr.noChecks": "チェックなし",
-  "board.pr.notPushedWhy": "カードの修正はプッシュされませんでした: {why, select, fork {作成者がメンテナーのプッシュを許可していないフォークからのものです} outside {そのブランチには、承認されたコミットにない外部からプッシュされたコミットがあります} refused {ブランチが動いたため、プッシュが拒否されました} notOpen {オープンではありませんでした} changed {その head はカードが開始したブランチではありません} other {Combwork はプッシュしませんでした}}。",
+  "board.pr.notPushedWhy": "カードの修正はプッシュされませんでした: {why, select, fork {作成者がメンテナーのプッシュを許可していないフォークからのものです} outside {そのブランチには、承認されたコミットにない外部からプッシュされたコミットがあります} refused {ブランチが動いたため、プッシュが拒否されました} notOpen {オープンではありませんでした} changed {その head はカードが開始したブランチではありません} rewrite {git の URL 書き換え {rule} がフォークのアドレスに適用されるため、Combwork はそれを経由してプッシュしません} config {git の URL 書き換えを読み取れませんでした} other {Combwork はプッシュしませんでした}}。",
   "board.pr.number": "PR #{number}",
   "board.pr.open": "GitHub で開く",
   "board.pr.opening": "プルリクエストを開いています…",

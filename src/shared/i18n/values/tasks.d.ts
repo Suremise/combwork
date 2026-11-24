@@ -156,7 +156,7 @@ interface CombworkMessageValues {
   'tasks.history.notified': { event: string; lane: string | number; hasWhy: string; why: string | number }
   'tasks.history.placed': { place: number; column: string }
   'tasks.history.prClosed': { number: string | number }
-  'tasks.history.prNotPushed': { number: string | number; why: string }
+  'tasks.history.prNotPushed': { number: string | number; why: string; rule: string | number }
   'tasks.history.queueGuarded': { count: number; guards: string | number; others: number }
   'tasks.history.queueGuardedIncomplete': { why: string; guard: string | number }
   'tasks.history.queueGuardedJoin': { first: string | number; rest: string | number }

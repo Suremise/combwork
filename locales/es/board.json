@@ -679,7 +679,7 @@
   "board.pr.failed": "Pull request no abierto: consulta Para ti",
   "board.pr.heading": "Pull request",
   "board.pr.noChecks": "Sin comprobaciones",
-  "board.pr.notPushedWhy": "Las correcciones de la tarjeta no se enviaron a ella: {why, select, fork {viene de un fork cuyo autor no permite que los mantenedores hagan push} outside {su rama tiene commits enviados desde fuera que le faltan al commit aprobado} refused {el push se rechazó porque su rama se movió} notOpen {no estaba abierta} changed {su head no es la rama en la que empezó la tarjeta} other {Combwork no las envió}}.",
+  "board.pr.notPushedWhy": "Las correcciones de la tarjeta no se enviaron a ella: {why, select, fork {viene de un fork cuyo autor no permite que los mantenedores hagan push} outside {su rama tiene commits enviados desde fuera que le faltan al commit aprobado} refused {el push se rechazó porque su rama se movió} notOpen {no estaba abierta} changed {su head no es la rama en la que empezó la tarjeta} rewrite {una reescritura de URL de git, {rule}, se aplica a la dirección de su fork, y Combwork no hace push a través de una} config {no se pudieron leer las reescrituras de URL de git} other {Combwork no las envió}}.",
   "board.pr.number": "PR #{number}",
   "board.pr.open": "Abrir en GitHub",
   "board.pr.opening": "Abriendo su pull request…",

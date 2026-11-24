@@ -55,51 +55,54 @@ export async function remotePushUrls(project: string, remote: string): Promise<s
   return got.ok ? got.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : null
 }
 
-/** Where a push goes (HI-3562): the remote or address git is given, and the addresses git pushes that to (null: unread). */
+/**
+ * Where a push goes (HI-3562): the remote or address git is given and the addresses git pushes that to (null: unread);
+ * or, for a fork, `rewrite`: a git url rewrite that applies to its address (or `unreadable`), and nothing is pushed.
+ */
 export interface PushRoute {
   target: string
   urls: string[] | null
+  rewrite?: string
 }
 
-/** A `url.<base>.insteadOf` or `.pushInsteadOf` rule: an address starting with `prefix` is rewritten to start with `base`. */
+/** A `url.<base>.insteadOf` or `.pushInsteadOf` rule: its config key (`url.<base>.<kind>`) and the prefix it rewrites. */
 export interface UrlRewrite {
-  base: string
+  key: string
   prefix: string
-  push: boolean
 }
 
-/** The rewrite rules of `git config --get-regexp '^url\..*insteadof$'`'s lines (`url.<base>.<kind> <prefix>`). */
-export function urlRewrites(out: string): UrlRewrite[] {
+/**
+ * The rewrite rules of `git config --null --get-regexp '^url\..*\.(pushinsteadof|insteadof)$'` (each `<key>\n<prefix>\0`:
+ * a base may hold spaces, HR1's round 2), or null when any entry can't be read: a rule left unread is never taken for none.
+ */
+export function urlRewrites(out: string): UrlRewrite[] | null {
   const rules: UrlRewrite[] = []
-  for (const line of out.split(/\r?\n/)) {
-    const at = line.indexOf(' ')
-    const m = at > 0 ? /^url\.(.+)\.(pushinsteadof|insteadof)$/i.exec(line.slice(0, at)) : null
-    if (m) rules.push({ base: m[1], prefix: line.slice(at + 1), push: m[2].toLowerCase() === 'pushinsteadof' })
+  for (const entry of out.split('\0')) {
+    if (!entry) continue
+    const at = entry.indexOf('\n')
+    if (at <= 0 || !/^url\..+\.(pushinsteadof|insteadof)$/i.test(entry.slice(0, at))) return null
+    rules.push({ key: entry.slice(0, at), prefix: entry.slice(at + 1) })
   }
   return rules
 }
 
 /**
- * The address git pushes to when given `url` (HR1's round 1): the longest matching pushInsteadOf, else the longest
- * matching insteadOf, applied once, as git does for an address with no push URL of its own.
+ * HI-3562: a fork's head repository, pushed to by its address on its host (no remote of the project's is one). Combwork
+ * doesn't work out where a git url rewrite (insteadOf or pushInsteadOf) would send it (the round-2 decision): when one
+ * applies to that address, or git's configuration can't be read, nothing is pushed (`rewrite`, naming the rule), and the
+ * user can push by hand. Else the push goes to that address itself, the one checked.
  */
-export function pushAddressOf(url: string, rules: readonly UrlRewrite[]): string {
-  const longest = (push: boolean): UrlRewrite | undefined => rules.filter((r) => r.push === push && url.startsWith(r.prefix)).sort((a, b) => b.prefix.length - a.prefix.length)[0]
-  const r = longest(true) ?? longest(false)
-  return r ? r.base + url.slice(r.prefix.length) : url
-}
+/** PushRoute's `rewrite` when git's url rewrites couldn't be read (no rule's key is: each starts `url.`). */
+export const UNREADABLE = 'unreadable'
 
-/**
- * HI-3562: a fork's head repository, pushed to by its address on its host (no remote of the project's is one). What is
- * checked is where git pushes that address: its rewrites read from git's configuration, pushInsteadOf first (HR1's round
- * 1: `ls-remote --get-url` applies only insteadOf), so a rewrite elsewhere fails the check and nothing is pushed.
- */
 export async function forkAddress(project: string, head: { host: string; owner: string; repo: string }): Promise<PushRoute> {
   const target = `https://${head.host}/${head.owner}/${head.repo}.git`
-  const got = await git(project, ['config', '--get-regexp', '^url\\..*insteadof$'])
-  // Exit 1: none set. Anything else unread: nothing is pushed.
-  if (!got.ok && got.code !== 1) return { target, urls: null }
-  return { target, urls: [pushAddressOf(target, urlRewrites(got.ok ? got.out : ''))] }
+  const got = await git(project, ['config', '--null', '--get-regexp', '^url\\..*\\.(pushinsteadof|insteadof)$'])
+  // Exit 1: none set.
+  const rules = got.ok ? urlRewrites(got.out) : got.code === 1 ? [] : null
+  if (!rules) return { target, urls: null, rewrite: UNREADABLE }
+  const applies = rules.find((r) => target.startsWith(r.prefix))
+  return applies ? { target, urls: null, rewrite: applies.key } : { target, urls: [target] }
 }
 
 const PORTS: PrPorts = { gh, pushUrls: remotePushUrls, forkTarget: forkAddress }
@@ -314,6 +317,7 @@ async function pushingBack(wf: Workflow, cardId: number, r: PrRequestData, src: 
   // fork's own address; every push address that repository.
   const at: PushRoute = fork ? await (ports.forkTarget ?? forkAddress)(project, head) : { target: r.remote, urls: await ports.pushUrls(project, r.remote) }
   if (!alive()) return
+  if (at.rewrite) return at.rewrite === UNREADABLE ? kept('config') : kept('rewrite', at.rewrite)
   if (!pushesTo(at.urls, head)) return fail('pushUrl')
   if (!(await holds(wf, cardId, r.request, alive))) return
   // That exact commit to its head branch, never forced: a branch that moved since it was read refuses it.
@@ -330,12 +334,12 @@ async function pushingBack(wf: Workflow, cardId: number, r: PrRequestData, src: 
 /** The card's comment when its fixes weren't pushed back to its pull request (HI-3562), as agents read it. */
 const NOT_PUSHED = agentMsg({
   id: 'runtime.pr.notPushed',
-  text: "{card}'s fixes weren't pushed to pull request #{number}: {why, select, fork {it is from a fork whose author doesn't allow maintainers to push to it} outside {its branch on GitHub has commits the approved commit lacks, pushed from outside} refused {the push was refused, its branch having moved since it was read} notOpen {it isn't open on GitHub} other {its head isn't the branch the card started on}}. Nothing was pushed; the card follows the pull request in PR open.",
-  note: "HI-3562: the comment on a pull request's card whose approved fixes Combwork couldn't push to the pull request it is about. {why}: fork, outside, refused, notOpen or changed. A statement of fact."
+  text: "{card}'s fixes weren't pushed to pull request #{number}: {why, select, fork {it is from a fork whose author doesn't allow maintainers to push to it} outside {its branch on GitHub has commits the approved commit lacks, pushed from outside} refused {the push was refused, its branch having moved since it was read} notOpen {it isn't open on GitHub} rewrite {a git url rewrite, {rule}, applies to its fork's address, and Combwork doesn't push through one} config {git's url rewrites couldn't be read, and Combwork doesn't push without them} other {its head isn't the branch the card started on}}. Nothing was pushed; the card follows the pull request in PR open.",
+  note: "HI-3562: the comment on a pull request's card whose approved fixes Combwork couldn't push to the pull request it is about. {why}: fork, outside, refused, notOpen, changed, rewrite (then {rule}, the git config key of the url rewrite, the user's own) or config. A statement of fact."
 })
 
 /** The comment's text for agents (in the default dialect, as a card comment is stored), by why (HI-3562). */
-export const notPushedNotice = (card: string, number: number, why: PrNotPushedWhy): string => inDefaultDialect(() => say(NOT_PUSHED, { card, number, why }))
+export const notPushedNotice = (card: string, number: number, why: PrNotPushedWhy, rule = ''): string => inDefaultDialect(() => say(NOT_PUSHED, { card, number, why, rule }))
 
 /** Records the request's pull request and moves the card to PR open: once, while it is still that request's. */
 async function opened(wf: Workflow, cardId: number, r: PrRequestData, pr: { number: number; url: string; draft: boolean; recovered?: boolean; pushed?: string; notPushed?: PrNotPushedWhy; detail?: string | null }, alive: Alive): Promise<void> {
@@ -346,7 +350,8 @@ async function opened(wf: Workflow, cardId: number, r: PrRequestData, pr: { numb
     w.fact('PrOpened', data) // i18n-ignore: a fact's kind, not text
     w.move('prOpen', 'derived')
     const why = pr.notPushed
-    if (why) w.action('comment', { text: notPushedNotice(w.card.key, pr.number, why), shown: storedText(HISTORY.prNotPushed, { number: pr.number, why }) })
+    const rule = why === 'rewrite' ? (pr.detail ?? '') : ''
+    if (why) w.action('comment', { text: notPushedNotice(w.card.key, pr.number, why, rule), shown: storedText(HISTORY.prNotPushed, { number: pr.number, why, rule }) })
   })
   log.info(`#${cardId}'s pull request #${pr.number} is open${pr.recovered ? ' (found again)' : ''}${pr.notPushed ? `, nothing pushed (${pr.notPushed})` : ''}`)
 }

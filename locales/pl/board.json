@@ -679,7 +679,7 @@
   "board.pr.failed": "Pull request nie jest otwarty: zobacz Dla Ciebie",
   "board.pr.heading": "Pull request",
   "board.pr.noChecks": "Brak sprawdzeń",
-  "board.pr.notPushedWhy": "Poprawki karty nie zostały do niego wypchnięte: {why, select, fork {pochodzi z forka, którego autor nie pozwala opiekunom wypychać} outside {jego gałąź ma commity wypchnięte z zewnątrz, których brakuje zatwierdzonemu commitowi} refused {push został odrzucony, bo jego gałąź się przesunęła} notOpen {nie był otwarty} changed {jego head nie jest gałęzią, na której karta się zaczęła} other {Combwork ich nie wypchnął}}.",
+  "board.pr.notPushedWhy": "Poprawki karty nie zostały do niego wypchnięte: {why, select, fork {pochodzi z forka, którego autor nie pozwala opiekunom wypychać} outside {jego gałąź ma commity wypchnięte z zewnątrz, których brakuje zatwierdzonemu commitowi} refused {push został odrzucony, bo jego gałąź się przesunęła} notOpen {nie był otwarty} changed {jego head nie jest gałęzią, na której karta się zaczęła} rewrite {przepisanie adresu URL w git, {rule}, dotyczy adresu jego forka, a Combwork nie wypycha przez przepisanie} config {nie udało się odczytać przepisań adresów URL w git} other {Combwork ich nie wypchnął}}.",
   "board.pr.number": "PR #{number}",
   "board.pr.open": "Otwórz na GitHubie",
   "board.pr.opening": "Otwieranie jej pull requestu…",

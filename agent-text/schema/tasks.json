@@ -736,7 +736,8 @@
   "tasks.history.prNotPushed": {
     "placeholders": {
       "number": "plain",
-      "why": "select"
+      "why": "select",
+      "rule": "plain"
     }
   },
   "tasks.history.queueGuarded": {

@@ -52,7 +52,8 @@
     "placeholders": {
       "card": "plain",
       "number": "plain",
-      "why": "select"
+      "why": "select",
+      "rule": "plain"
     }
   },
   "runtime.repair.boardDone": {
