@@ -679,7 +679,7 @@
   "board.pr.failed": "Pull request non ouverte : voir Pour toi",
   "board.pr.heading": "Pull request",
   "board.pr.noChecks": "Aucune vérification",
-  "board.pr.notPushed": "Combwork suit cette pull request, mais n’y pousse pas encore les corrections de la carte.",
+  "board.pr.notPushedWhy": "Les corrections de la carte n’y ont pas été poussées : {why, select, fork {elle vient d’un fork dont l’auteur n’autorise pas les mainteneurs à pousser} outside {sa branche a des commits poussés de l’extérieur qui manquent au commit approuvé} refused {le push a été refusé, sa branche ayant bougé} notOpen {elle n’était pas ouverte} changed {sa tête n’est pas la branche sur laquelle la carte a démarré} other {Combwork ne les a pas poussées}}.",
   "board.pr.number": "PR #{number}",
   "board.pr.open": "Ouvrir sur GitHub",
   "board.pr.opening": "Ouverture de sa pull request…",

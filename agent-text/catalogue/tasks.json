@@ -744,6 +744,11 @@
     "note": "HI-3552: a comment Combwork writes on a card whose GitHub pull request (number {number}) was closed without merging: the card moved back to Todo, and its branch stays, so starting it again carries on from its work.",
     "audience": "both"
   },
+  "tasks.history.prNotPushed": {
+    "text": "The card’s fixes weren’t pushed to pull request #{number}: {why, select, fork {it is from a fork whose author doesn’t allow maintainers to push to it} outside {its branch on GitHub has commits the approved one lacks, pushed from outside} refused {the push was refused: its branch moved since it was read} notOpen {it isn’t open on GitHub} other {its head isn’t the branch the card started on}}. Nothing was pushed; the card follows the pull request in PR open.",
+    "note": "HI-3562: a comment Combwork writes on a card about an existing GitHub pull request (number {number}) when it couldn’t push the card’s approved fixes to it. {why} (select: translate each; keep the keys): a fork whose author doesn’t allow maintainer edits; commits on the pull request’s branch that someone else pushed, which Combwork never overwrites; GitHub refused the push because the branch moved; the pull request is no longer open; its head branch changed. \"PR open\" is the board stage: as translated there.",
+    "audience": "both"
+  },
   "tasks.history.queueGuarded": {
     "text": "Came back from the merge queue: {count, plural, one {a merge guard matched lines it adds} other {# merge guards matched lines it adds}}. {guards}{others, plural, =0 {} one { One more guard matched too.} other { # more guards matched too.}} The card’s Work section shows the run.",
     "note": "A comment Combwork writes on a card when the merge queue sends it back because merge guards matched (HI-3284: patterns the project refuses in the lines a merge adds). {count}: how many guards matched; {guards}: the first of them, each as tasks.history.queueGuardedOne, joined by tasks.history.queueGuardedJoin (already translated); {others}: how many more matched, not listed. \"Merge queue\" and \"Work section\" are Combwork’s terms.",

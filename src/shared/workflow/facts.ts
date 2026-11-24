@@ -331,6 +331,12 @@ export interface PrRequestData {
   remote: string
   submission: number
   /**
+   * HI-3562: a pull request's card (HI-3551) pushing its fixes back to the pull request it is about, opening none: its
+   * number and head branch as its start recorded them. `line` is then that head branch, `target` its base, and the
+   * repository the base one (the pull request's identity); the head repository (a fork's) is read from GitHub again.
+   */
+  source?: { number: number; headRef: string }
+  /**
    * When this cycle's first request was made (a retry keeps it): a pull request of this head and base opened since is
    * this cycle's, found again when a create's reply was lost; one opened before it is an earlier cycle's.
    */
@@ -352,11 +358,22 @@ export interface PrOpenedData {
   draft: boolean
   recovered?: true
   /**
-   * A pull request's card (HI-3551): the pull request it is about, followed as it is, with nothing pushed (`pushed`: its
-   * head at the card's start). Pushing its fixes to it is a later card's (the user's split, HI-3552/r12).
+   * A pull request's card (HI-3551): the pull request it is about, followed with nothing pushed (`pushed`: GitHub's head
+   * as read). HI-3562: why (`notPushedWhy`); a fact without one is from before HI-3562, which pushed nothing.
    */
   notPushed?: true
+  notPushedWhy?: PrNotPushedWhy
+  /** What git or GitHub said, its first line (outside text), where it says why. */
+  notPushedDetail?: string
 }
+
+/**
+ * HI-3562: why a pull request's card's fixes weren't pushed to its pull request (it still follows it, in PR open): a fork
+ * whose author doesn't allow maintainer edits; commits on GitHub's head the approved commit lacks (pushed from outside,
+ * never overwritten); the push refused (the branch moved since it was read); the pull request no longer open; or its head
+ * not the branch or repository the card started on.
+ */
+export type PrNotPushedWhy = 'fork' | 'outside' | 'refused' | 'notOpen' | 'changed'
 
 /** HI-3552: why opening a request's pull request failed this time: the card waits in Approved for Try again. */
 export interface PrOpenFailedData {

@@ -501,7 +501,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     ...reviewSkipView(facts),
     folder: started?.folder ?? null,
     line: started?.line ?? null,
-    pullRequest: s.pullRequest ? { number: s.pullRequest.opened?.number ?? null, url: s.pullRequest.opened?.url ?? null, repo: `${s.pullRequest.requested.owner}/${s.pullRequest.requested.repo}`, draft: s.pullRequest.opened?.draft ?? null, failed: s.pullRequest.failed?.problem ?? null, closed: s.pullRequest.closed?.at ?? (s.pullRequest.closed ? '' : null), ...(s.pullRequest.opened?.notPushed ? { notPushed: true } : {}) } : null,
+    pullRequest: s.pullRequest ? { number: s.pullRequest.opened?.number ?? null, url: s.pullRequest.opened?.url ?? null, repo: `${s.pullRequest.requested.owner}/${s.pullRequest.requested.repo}`, draft: s.pullRequest.opened?.draft ?? null, failed: s.pullRequest.failed?.problem ?? null, closed: s.pullRequest.closed?.at ?? (s.pullRequest.closed ? '' : null), ...(s.pullRequest.opened?.notPushed ? { notPushed: s.pullRequest.opened.notPushedWhy ?? 'other' } : {}) } : null,
     ...(notReady ? { notReady: { slot: notReady.slot, why: notReady.why } } : {}),
     lines: s.lines,
     base: started?.base ?? null,
@@ -574,8 +574,11 @@ export interface WorkPullRequest {
   failed: string | null
   /** Closed on GitHub without merging: when ('' unknown), or null. */
   closed: string | null
-  /** A pull request's card (HI-3551) following its own pull request: its fixes aren't pushed to it. */
-  notPushed?: boolean
+  /**
+   * A pull request's card (HI-3551) following its own pull request with its fixes not pushed to it: why (HI-3562: facts.ts's
+   * PrNotPushedWhy; `other` for a record from before it).
+   */
+  notPushed?: string
 }
 
 export interface WorkBadge {

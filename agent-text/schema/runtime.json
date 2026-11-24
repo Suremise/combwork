@@ -48,6 +48,13 @@
       "number": "plain"
     }
   },
+  "runtime.pr.notPushed": {
+    "placeholders": {
+      "card": "plain",
+      "number": "plain",
+      "why": "select"
+    }
+  },
   "runtime.repair.boardDone": {
     "placeholders": {
       "stage": "plain"

@@ -122,6 +122,11 @@ export const HISTORY = {
     defaultMessage: 'Pull request #{number} was closed on GitHub without being merged: the card is back in Todo, its branch kept for its next start.',
     description: 'HI-3552: a comment Combwork writes on a card whose GitHub pull request (number {number}) was closed without merging: the card moved back to Todo, and its branch stays, so starting it again carries on from its work.'
   }),
+  prNotPushed: msg({
+    id: 'tasks.history.prNotPushed',
+    defaultMessage: 'The card’s fixes weren’t pushed to pull request #{number}: {why, select, fork {it is from a fork whose author doesn’t allow maintainers to push to it} outside {its branch on GitHub has commits the approved one lacks, pushed from outside} refused {the push was refused: its branch moved since it was read} notOpen {it isn’t open on GitHub} other {its head isn’t the branch the card started on}}. Nothing was pushed; the card follows the pull request in PR open.',
+    description: 'HI-3562: a comment Combwork writes on a card about an existing GitHub pull request (number {number}) when it couldn’t push the card’s approved fixes to it. {why} (select: translate each; keep the keys): a fork whose author doesn’t allow maintainer edits; commits on the pull request’s branch that someone else pushed, which Combwork never overwrites; GitHub refused the push because the branch moved; the pull request is no longer open; its head branch changed. "PR open" is the board stage: as translated there.'
+  }),
   forwardResolving: msg({
     id: 'tasks.history.forwardResolving',
     defaultMessage: 'Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.',

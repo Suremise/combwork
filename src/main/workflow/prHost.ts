@@ -19,7 +19,7 @@ import { git } from '../git'
 import { createLogger, userText } from '../logger'
 import { platformLimits } from '../platform/limits'
 import { parseGithubRemote } from '../../shared/githubRepo'
-import { PR_RETRY_GATE, type CardState, type PrOpenedData, type PrOpenFailedData, type PrRequestData } from '../../shared/workflow/facts'
+import { PR_RETRY_GATE, type CardState, type PrNotPushedWhy, type PrOpenedData, type PrOpenFailedData, type PrRequestData } from '../../shared/workflow/facts'
 import { FOR_YOU, PR_PROBLEM, workflowText } from '../../shared/workflow/texts'
 import { checksAtRevision, type Workflow } from './runtime'
 import type { CardRecord } from './factStore'
@@ -27,7 +27,7 @@ import { notApproved } from '../../shared/workflow/guards'
 import { agentMsg, say } from '../../shared/agentText'
 import { inDefaultDialect } from '../../shared/agentText/asyncScope'
 import { HISTORY, storedText } from '../../shared/taskHistory'
-import type { PrView } from '../../shared/githubSource'
+import { prRefs, type PrView } from '../../shared/githubSource'
 
 export type { PrView }
 
@@ -39,10 +39,14 @@ const CLOSED = agentMsg({ id: 'runtime.pr.closed', text: 'Pull request #{number}
 /** What runs gh: `gh` in the app, a stand-in in tests. */
 export type GhPort = (target: GhTarget, args: string[], opts?: { json?: boolean; input?: string }) => Promise<GhResult>
 
-/** What the host reaches outside: gh, and the push addresses of a remote (git's, insteadOf applied; tests' stand-ins). */
+/**
+ * What the host reaches outside: gh, the push addresses of a remote (git's, insteadOf applied), and where a fork's head
+ * repository is pushed to (HI-3562): tests' stand-ins.
+ */
 export interface PrPorts {
   gh: GhPort
   pushUrls: (project: string, remote: string) => Promise<string[] | null>
+  forkTarget?: (project: string, head: { host: string; owner: string; repo: string }) => Promise<{ target: string; urls: string[] | null }>
 }
 
 /** A remote's push addresses as git would push to them (`insteadOf` and `pushInsteadOf` applied), or null unread. */
@@ -51,7 +55,17 @@ export async function remotePushUrls(project: string, remote: string): Promise<s
   return got.ok ? got.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : null
 }
 
-const PORTS: PrPorts = { gh, pushUrls: remotePushUrls }
+/**
+ * HI-3562: a fork's head repository, pushed to by its address on its host (no remote of the project's is one): the
+ * address as git would use it (`ls-remote --get-url`, insteadOf applied), checked like a remote's push addresses.
+ */
+export async function forkAddress(project: string, head: { host: string; owner: string; repo: string }): Promise<{ target: string; urls: string[] | null }> {
+  const target = `https://${head.host}/${head.owner}/${head.repo}.git`
+  const got = await git(project, ['ls-remote', '--get-url', '--', target])
+  return { target, urls: got.ok ? got.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : null }
+}
+
+const PORTS: PrPorts = { gh, pushUrls: remotePushUrls, forkTarget: forkAddress }
 
 /** A pull request as gh lists it (the fields asked for). */
 interface Listed {
@@ -66,6 +80,22 @@ interface Listed {
 
 const LIST_FIELDS = 'number,url,createdAt,headRefName,baseRefName,isCrossRepository,isDraft'
 const VIEW_FIELDS = 'number,url,state,isDraft,reviewDecision,statusCheckRollup,headRefOid,mergeCommit,mergedAt,closedAt'
+/** HI-3562: a pull request's head as GitHub has it now, read before a push back. */
+const HEAD_FIELDS = 'number,url,state,isDraft,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository,maintainerCanModify'
+
+/** The pull request's head as gh views it (HEAD_FIELDS). */
+interface HeadViewed {
+  number: number
+  url: string
+  state: string
+  isDraft: boolean
+  headRefName: string
+  headRefOid: string
+  headRepository: { name?: string } | null
+  headRepositoryOwner: { login?: string } | null
+  isCrossRepository: boolean
+  maintainerCanModify: boolean
+}
 
 /**
  * Whether the run's owner still holds it (prHosts.ts: its workspace's lifetime, as the merge queue's host and the action
@@ -167,6 +197,7 @@ async function opening(wf: Workflow, cardId: number, request: string, ports: PrP
   if (!r) return
   const fail = (problem: PrOpenFailedData['problem'], detail: string | null = null): Promise<void> => failed(wf, cardId, request, { request, problem, detail }, alive)
   if (!r.host || !r.remote) return fail('noLink')
+  if (r.source) return pushingBack(wf, cardId, r, r.source, ports, alive, fail)
   // Found already (a create whose reply was lost, another Combwork's): recorded, never opened again.
   const earlier = wf.state(cardId).prsRecorded
   const found = await findOpened(run, r, earlier)
@@ -198,16 +229,84 @@ async function opening(wf: Workflow, cardId: number, request: string, ports: PrP
   return fail(ghProblem(made), made.detail)
 }
 
-/** Records the request's pull request and moves the card to PR open: once, while it is still that request's. */
-async function opened(wf: Workflow, cardId: number, r: PrRequestData, pr: { number: number; url: string; draft: boolean; recovered?: boolean }, alive: Alive): Promise<void> {
+/**
+ * HI-3562: a pull request's card's fixes pushed back to the pull request it is about (the request's `source`), opening
+ * none. The pull request is read again with gh, naming its base repository (its identity): open, still on the head branch
+ * the card started on, and its head repository (a fork's) letting maintainers push. The push goes to that repository
+ * (its push addresses checked as a remote's are), and only when GitHub's head (fetched when it isn't here) is in the
+ * approved commit, so nothing pushed from outside is overwritten; never forced, so a branch moved since refuses it. Where
+ * it can't push, nothing is pushed and the card says why (`notPushedWhy`, and a comment), still following the pull
+ * request in PR open. gh unreadable, a push address elsewhere or git failing otherwise: a failure, asked to try again.
+ */
+async function pushingBack(wf: Workflow, cardId: number, r: PrRequestData, src: NonNullable<PrRequestData['source']>, ports: PrPorts, alive: Alive, fail: (problem: PrOpenFailedData['problem'], detail?: string | null) => Promise<void>): Promise<void> {
+  const project = wf.cfg.project
+  const got = await ports.gh(pinned(r), ['pr', 'view', String(src.number), '--json', HEAD_FIELDS], { json: true })
   if (!alive()) return
-  const data: PrOpenedData = { request: r.request, number: pr.number, url: pr.url, host: r.host, owner: r.owner, repo: r.repo, head: r.line, base: r.target, pushed: r.revision, draft: pr.draft, ...(pr.recovered ? { recovered: true as const } : {}) }
+  if (!got.ok) return fail(ghProblem(got), got.detail)
+  const v = (got.json && typeof got.json === 'object' ? got.json : null) as HeadViewed | null
+  const headOwner = v?.headRepositoryOwner?.login
+  const headName = v?.headRepository?.name
+  if (!v || v.number !== src.number || !/^[0-9a-f]{40}$/.test(String(v.headRefOid)) || !headOwner || !headName) return fail('other', firstLine(got.stdout))
+  const url = v.url || `https://${r.host}/${r.owner}/${r.repo}/pull/${src.number}`
+  const kept = (why: PrNotPushedWhy, detail: string | null = null): Promise<void> => opened(wf, cardId, r, { number: src.number, url, draft: !!v.isDraft, pushed: v.headRefOid, notPushed: why, detail }, alive)
+  if (v.state !== 'OPEN') return kept('notOpen')
+  const head = { host: r.host, owner: headOwner, repo: headName }
+  const fork = !sameRepo(head, r)
+  if (v.headRefName !== src.headRef || fork !== !!v.isCrossRepository) return kept('changed')
+  if (fork && !v.maintainerCanModify) return kept('fork')
+  // GitHub's head here (fetched from the pull request's own ref when it isn't), and in the approved commit.
+  const here = async (): Promise<boolean> => (await git(project, ['cat-file', '-e', `${v.headRefOid}^{commit}`])).ok
+  if (!(await here())) {
+    const ref = prRefs(src.number).head
+    const f = await git(project, ['fetch', '--no-tags', '--no-write-fetch-head', '--', r.remote, `+refs/pull/${src.number}/head:${ref}`], undefined, undefined, { timeout: platformLimits.gitNetworkMs() })
+    if (!alive()) return
+    if (!f.ok) return fail('push', firstLine(f.err) ?? firstLine(f.out))
+    // Moved again since it was read: read it again on the next try.
+    if (!(await here())) return fail('other', null)
+  }
+  const inApproved = await git(project, ['merge-base', '--is-ancestor', v.headRefOid, r.revision])
+  if (!alive()) return
+  if (!inApproved.ok) return inApproved.code === 1 ? kept('outside') : fail('other', firstLine(inApproved.err))
+  if (v.headRefOid === r.revision) return opened(wf, cardId, r, { number: src.number, url, draft: !!v.isDraft, pushed: r.revision }, alive)
+  // Where it goes, read just before the push: the pull request's own repository through the project's remote, or the
+  // fork's own address; every push address that repository.
+  const at = fork ? await (ports.forkTarget ?? forkAddress)(project, head) : { target: r.remote, urls: await ports.pushUrls(project, r.remote) }
+  if (!alive()) return
+  if (!pushesTo(at.urls, head)) return fail('pushUrl')
+  if (!(await holds(wf, cardId, r.request, alive))) return
+  // That exact commit to its head branch, never forced: a branch that moved since it was read refuses it.
+  const push = await git(project, ['push', '--porcelain', '--', at.target, `${r.revision}:refs/heads/${src.headRef}`], undefined, undefined, { timeout: platformLimits.gitNetworkMs() })
+  if (!alive()) return
+  if (!push.ok) {
+    const said = `${push.out}\n${push.err}`
+    if (/\[rejected\]|non-fast-forward|fetch first|\(stale info\)/i.test(said)) return kept('refused', firstLine(push.err) ?? firstLine(push.out))
+    return fail('push', firstLine(push.err) ?? firstLine(push.out))
+  }
+  return opened(wf, cardId, r, { number: src.number, url, draft: !!v.isDraft, pushed: r.revision }, alive)
+}
+
+/** The card's comment when its fixes weren't pushed back to its pull request (HI-3562), as agents read it. */
+const NOT_PUSHED = agentMsg({
+  id: 'runtime.pr.notPushed',
+  text: "{card}'s fixes weren't pushed to pull request #{number}: {why, select, fork {it is from a fork whose author doesn't allow maintainers to push to it} outside {its branch on GitHub has commits the approved commit lacks, pushed from outside} refused {the push was refused, its branch having moved since it was read} notOpen {it isn't open on GitHub} other {its head isn't the branch the card started on}}. Nothing was pushed; the card follows the pull request in PR open.",
+  note: "HI-3562: the comment on a pull request's card whose approved fixes Combwork couldn't push to the pull request it is about. {why}: fork, outside, refused, notOpen or changed. A statement of fact."
+})
+
+/** The comment's text for agents (in the default dialect, as a card comment is stored), by why (HI-3562). */
+export const notPushedNotice = (card: string, number: number, why: PrNotPushedWhy): string => inDefaultDialect(() => say(NOT_PUSHED, { card, number, why }))
+
+/** Records the request's pull request and moves the card to PR open: once, while it is still that request's. */
+async function opened(wf: Workflow, cardId: number, r: PrRequestData, pr: { number: number; url: string; draft: boolean; recovered?: boolean; pushed?: string; notPushed?: PrNotPushedWhy; detail?: string | null }, alive: Alive): Promise<void> {
+  if (!alive()) return
+  const data: PrOpenedData = { request: r.request, number: pr.number, url: pr.url, host: r.host, owner: r.owner, repo: r.repo, head: r.line, base: r.target, pushed: pr.pushed ?? r.revision, draft: pr.draft, ...(pr.recovered ? { recovered: true as const } : {}), ...(pr.notPushed ? { notPushed: true as const, notPushedWhy: pr.notPushed, ...(pr.detail ? { notPushedDetail: pr.detail } : {}) } : {}) }
   await wf.write(wf.store.card(cardId), null, 'combwork', (w) => {
     if (!alive() || !waiting(w.state(), r.request)) return
     w.fact('PrOpened', data) // i18n-ignore: a fact's kind, not text
     w.move('prOpen', 'derived')
+    const why = pr.notPushed
+    if (why) w.action('comment', { text: notPushedNotice(w.card.key, pr.number, why), shown: storedText(HISTORY.prNotPushed, { number: pr.number, why }) })
   })
-  log.info(`#${cardId}'s pull request #${pr.number} is open${pr.recovered ? ' (found again)' : ''}`)
+  log.info(`#${cardId}'s pull request #${pr.number} is open${pr.recovered ? ' (found again)' : ''}${pr.notPushed ? `, nothing pushed (${pr.notPushed})` : ''}`)
 }
 
 async function failed(wf: Workflow, cardId: number, request: string, d: PrOpenFailedData, alive: Alive): Promise<void> {
