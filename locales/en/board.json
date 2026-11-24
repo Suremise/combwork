@@ -1163,6 +1163,10 @@
     "defaultMessage": "{known, select, yes {{author} isn’t a member of {repo}} other {Combwork couldn’t tell whether {author} is a member of {repo}}}: this project’s checks run the pull request’s code on this PC, with your files and sign-ins. To run it apart from them, use Windows Sandbox: its server is in the MCP catalogue.",
     "description": "A warning under a pull request source in the card dialog (HI-3553, a warning, never a rule): its author isn’t one of the repository’s members (or GitHub couldn’t say), so its checks would run a stranger’s code. {author} a GitHub user name, {repo} owner/name. Keep the select keys. Windows Sandbox and MCP are product names."
   },
+  "board.dialog.sourceOutsideIssue": {
+    "defaultMessage": "{known, select, yes {{author} isn’t a member of {repo}} other {Combwork couldn’t tell whether {author} is a member of {repo}}}: what this issue says is someone else’s words, and reaches agents only quoted as such.",
+    "description": "A warning under an issue source in the card dialog (HI-3555, a warning, never a rule): its author isn’t one of the repository’s members (or GitHub couldn’t say), so its text is a stranger’s. {author} a GitHub user name, {repo} owner/name. Keep the select keys."
+  },
   "board.dialog.sourcePlaceholder": {
     "defaultMessage": "A pull request or issue: its address or #number",
     "description": "Placeholder of the card dialog’s GitHub source box (HI-3551)."

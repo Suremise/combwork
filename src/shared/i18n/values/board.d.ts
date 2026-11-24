@@ -292,6 +292,7 @@ interface CombworkMessageValues {
   'board.dialog.sourceModelUnknown': undefined
   'board.dialog.sourceOpen': undefined
   'board.dialog.sourceOutside': { known: string; author: string | number; repo: string | number }
+  'board.dialog.sourceOutsideIssue': { known: string; author: string | number; repo: string | number }
   'board.dialog.sourcePlaceholder': undefined
   'board.dialog.sourceRemove': undefined
   'board.dialog.sourceReviewers': undefined

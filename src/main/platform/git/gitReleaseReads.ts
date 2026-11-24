@@ -5,7 +5,7 @@
 import { git } from '../../git'
 import * as G from '../../gitCommands'
 import { refSync } from '../../gitRefs'
-import { releaseTagNames, type ReleaseInfo, type ReleaseReads } from '../releaseReads'
+import { lineOfTag, releaseTagNames, type ReleaseInfo, type ReleaseReads } from '../releaseReads'
 import { isUnknown, unknown, withDetail, type Maybe } from '../types'
 import { UNREADABLE as U } from '../../../shared/workflow/texts'
 
@@ -63,6 +63,30 @@ export const gitReleaseReads: ReleaseReads = {
       const merged = await G.isAncestor(projectPath, head, mainHead)
       if (isUnknown(merged)) return merged
       return merged ? { tag: name, into, date: t.date } : null
+    }
+    return null
+  },
+  async releaseTagLines(projectPath) {
+    const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', 'refs/tags/'])
+    if (!r.ok) return withDetail(unknown(U.line, { branch: 'refs/tags' }), r.err)
+    const lines = r.out.split(/\r?\n/).flatMap((ref) => {
+      const l = ref.startsWith('refs/tags/') ? lineOfTag(ref.slice('refs/tags/'.length)) : null
+      return l ? [l] : []
+    })
+    return [...new Set(lines)]
+  },
+  async tagged(projectPath, line) {
+    for (const name of releaseTagNames(line)) {
+      const t = await tag(projectPath, name)
+      if (isUnknown(t)) return t
+      if (!t) continue
+      const into = await G.mainBranch(projectPath)
+      if (isUnknown(into)) return into
+      const mainHead = into ? await G.lineHead(projectPath, into) : null
+      if (isUnknown(mainHead)) return mainHead
+      const inMain = mainHead ? await G.isAncestor(projectPath, t.commit, mainHead) : false
+      if (isUnknown(inMain)) return inMain
+      return { tag: name, commit: t.commit, inMain }
     }
     return null
   }

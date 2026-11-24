@@ -290,6 +290,7 @@
   "board.dialog.sourceModelUnknown": "Modelo do autor desconhecido: o pull request não diz qual IA o escreveu, se alguma.",
   "board.dialog.sourceOpen": "Abrir no GitHub",
   "board.dialog.sourceOutside": "{known, select, yes {{author} não é membro de {repo}} other {O Combwork não conseguiu saber se {author} é membro de {repo}}}: as verificações deste projeto executam o código do pull request neste PC, com seus arquivos e logins. Para executá-lo separado deles, use o Windows Sandbox: o servidor dele está no catálogo MCP.",
+  "board.dialog.sourceOutsideIssue": "{known, select, yes {{author} não é membro de {repo}} other {O Combwork não conseguiu saber se {author} é membro de {repo}}}: o que esta issue diz são palavras de outra pessoa, que só chegam aos agentes citadas como tal.",
   "board.dialog.sourcePlaceholder": "Um pull request ou issue: o endereço ou o #número",
   "board.dialog.sourceRemove": "Remover",
   "board.dialog.sourceReviewers": "Revisores…",

@@ -35,8 +35,8 @@ export interface GithubSource extends GithubRepoRef {
 export interface GithubAuthor {
   login: string
   /**
-   * GitHub's `author_association` for a pull request (OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR, FIRST_TIME_CONTRIBUTOR,
-   * FIRST_TIMER, NONE…); null when gh couldn't say, or for an issue.
+   * GitHub's `author_association` for a pull request or (HI-3555) an issue (OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR,
+   * FIRST_TIME_CONTRIBUTOR, FIRST_TIMER, NONE…); null when gh couldn't say.
    */
   association: string | null
 }
@@ -46,11 +46,10 @@ const MEMBERS = ['OWNER', 'MEMBER', 'COLLABORATOR']
 
 /**
  * HI-3553 (HI-3541's decision: a warning, never a rule): whether a pull request's author is outside the repository, so
- * its checks would run a stranger's code on this PC. 'outside': GitHub said so; 'unknown': it couldn't be read; null: a
- * member, or not a pull request.
+ * its checks would run a stranger's code on this PC; HI-3555: an issue's the same way, its words a stranger's. 'outside':
+ * GitHub said so; 'unknown': it couldn't be read; null: a member.
  */
 export function outsideAuthor(s: Pick<GithubSource, 'kind' | 'author'>): 'outside' | 'unknown' | null {
-  if (s.kind !== 'pr') return null
   const a = s.author?.association
   if (!a) return 'unknown'
   return MEMBERS.includes(a.toUpperCase()) ? null : 'outside'
@@ -86,7 +85,7 @@ export interface SourceForAgents {
     note: string
     title: string
     author: string | null
-    /** False: GitHub says the author isn't one of the repository's members; null: unknown or an issue. */
+    /** False: GitHub says the author isn't one of the repository's members; null: unknown. */
     authorIsMember: boolean | null
     /** A pull request's base branch (on GitHub) and head branch (its own). */
     base?: string
@@ -106,7 +105,7 @@ export function sourceForAgents(s: GithubSource, body: string | undefined, note:
       note,
       title: s.title,
       author: s.author?.login ?? null,
-      authorIsMember: s.kind !== 'pr' || outside === 'unknown' ? null : outside === null,
+      authorIsMember: outside === 'unknown' ? null : outside === null,
       ...(s.pr ? { base: s.pr.baseRef, head: s.pr.headRef } : {}),
       body: body ?? ''
     }

@@ -266,6 +266,8 @@
   "tips.githubApprove.title": "Einen Pull-Request von seiner Karte freigeben",
   "tips.githubFeedback.text": "Die Karte eines Pull-Requests postet ihr Review auf GitHub als Kommentar von deinem Konto: Standardmäßig wird das Urteil eines Review-Agenten auf der Karte als Entwurf abgelegt, den du bearbeitest und postest. Wer es schreibt, wählst du unter Versionsverwaltung → Workflow → GitHub.",
   "tips.githubFeedback.title": "Feedback an GitHub",
+  "tips.githubIssues.text": "Von GitHub… auf dem Task-Board hat einen Tab Issues: Karte erstellen macht aus einem Issue eine Karte in Offen, mit seinen Labels. Sobald ein Release veröffentlicht ist, schließt Ausgelieferte Issues schließen… die Issues, die seine Karten behoben haben, mit einem Klick.",
+  "tips.githubIssues.title": "An einem GitHub-Issue arbeiten und es schließen, wenn es ausgeliefert ist",
   "tips.githubPrs.text": "Wähle auf dem Task-Board ein Projekt und klicke auf Von GitHub…, um seine offenen Pull-Requests aufzulisten: Karte erstellen macht aus einem eine Karte in Offen, die wie jede andere reviewt wird. Was auf GitHub steht, erreicht Agenten nur zitiert.",
   "tips.githubPrs.title": "Einen eingehenden Pull-Request reviewen",
   "tips.githubRepository.text": "Versionsverwaltung → Workflow → GitHub zeigt das Repository des Projekts, aus seinen Remotes gelesen, und ob deine GitHub CLI (gh) auf diesem Host angemeldet ist. Combwork nutzt dein eigenes gh und speichert kein Token.",

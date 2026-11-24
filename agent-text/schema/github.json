@@ -23,6 +23,26 @@
   "github.host.rejected.scheme": {
     "placeholders": {}
   },
+  "github.issues.changed": {
+    "placeholders": {
+      "line": "plain"
+    }
+  },
+  "github.issues.notPublished": {
+    "placeholders": {
+      "tag": "plain"
+    }
+  },
+  "github.issues.notReleased": {
+    "placeholders": {
+      "line": "plain"
+    }
+  },
+  "github.issues.tagMismatch": {
+    "placeholders": {
+      "tag": "plain"
+    }
+  },
   "github.link.notARemote": {
     "placeholders": {}
   },

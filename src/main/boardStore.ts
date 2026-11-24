@@ -1510,6 +1510,18 @@ export function prSourceCards(ws: WorkspaceService, repo: { host: string; owner:
   })
 }
 
+/**
+ * HI-3555: the cards whose GitHub source is an issue of `owner/repo` on `host`: each card's number, the issue's, and
+ * whether the card is archived (an issue's import looks only at cards not archived; its close at publish at all).
+ */
+export function issueSourceCards(ws: WorkspaceService, repo: { host: string; owner: string; repo: string }): { n: number; issue: number; archived: boolean }[] {
+  return readSnapshot(ws, (b, db) => {
+    const src = (path: string): string => `json_extract(${b.legacy ? 'doc' : 'extra'}, '$.source.${path}')` // i18n-ignore: SQL
+    const sql = `SELECT number AS n, ${src('number')} AS issue, archived FROM cards WHERE ${src('kind')} = 'issue' AND lower(${src('host')}) = lower(?) AND lower(${src('owner')}) = lower(?) AND lower(${src('repo')}) = lower(?)` // i18n-ignore: SQL
+    return (db.prepare(sql).all(repo.host, repo.owner, repo.repo) as { n: number; issue: unknown; archived: number }[]).filter((r) => Number.isInteger(r.issue)).map((r) => ({ n: r.n, issue: r.issue as number, archived: !!r.archived }))
+  })
+}
+
 /** Whether there is a card of that number. */
 export function hasCard(ws: WorkspaceService, n: number): boolean {
   const { db } = readConn(ws)

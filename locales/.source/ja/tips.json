@@ -284,6 +284,8 @@
   "tips.githubApprove.title": "Approve a pull request from its card",
   "tips.githubFeedback.text": "A pull request’s card posts its review to GitHub as a comment from your account: by default a reviewer agent’s verdict is drafted on the card for you to edit and post. Choose who writes it in Version Control → Workflow → GitHub.",
   "tips.githubFeedback.title": "Feedback to GitHub",
+  "tips.githubIssues.text": "From GitHub… on the Task Board has an Issues tab: Make a Card makes an issue a card in Todo, with its labels. Once a release is published, Close Shipped Issues… closes the issues its cards fixed, in one click.",
+  "tips.githubIssues.title": "Work on a GitHub issue, and close it when it ships",
   "tips.githubPrs.text": "Choose a project on the Task Board and click From GitHub… to list its open pull requests: Make a Card makes one a card in Todo, reviewed like any other. What it says on GitHub reaches agents only quoted.",
   "tips.githubPrs.title": "Review an incoming pull request",
   "tips.githubRepository.text": "Version Control → Workflow → GitHub shows the project's repository, read from its remotes, and whether your GitHub CLI (gh) is signed in on that host. Combwork uses your own gh and stores no token.",

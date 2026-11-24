@@ -286,6 +286,8 @@ interface CombworkMessageValues {
   'tips.githubApprove.title': undefined
   'tips.githubFeedback.text': undefined
   'tips.githubFeedback.title': undefined
+  'tips.githubIssues.text': undefined
+  'tips.githubIssues.title': undefined
   'tips.githubPrs.text': undefined
   'tips.githubPrs.title': undefined
   'tips.githubRepository.text': undefined

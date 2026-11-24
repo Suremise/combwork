@@ -290,6 +290,7 @@
   "board.dialog.sourceModelUnknown": "作者的模型未知：拉取请求没有说明是哪个 AI 编写的（如果有）。",
   "board.dialog.sourceOpen": "在 GitHub 上打开",
   "board.dialog.sourceOutside": "{known, select, yes {{author} 不是 {repo} 的成员} other {Combwork 无法确定 {author} 是否为 {repo} 的成员}}：本项目的检查会在这台电脑上运行该拉取请求的代码，并能访问你的文件和登录信息。若要将其隔离运行，请使用 Windows Sandbox：它的服务器在 MCP 目录中。",
+  "board.dialog.sourceOutsideIssue": "{known, select, yes {{author} 不是 {repo} 的成员} other {Combwork 无法确定 {author} 是否为 {repo} 的成员}}：此 Issue 的内容是别人的话，只会以引用的形式传给智能体。",
   "board.dialog.sourcePlaceholder": "拉取请求或 Issue：其地址或 #编号",
   "board.dialog.sourceRemove": "移除",
   "board.dialog.sourceReviewers": "评审者…",

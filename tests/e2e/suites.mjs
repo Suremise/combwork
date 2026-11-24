@@ -171,6 +171,7 @@ export const SUITES = [
   { name: 'gitdirect' },
   { name: 'githealth' },
   { name: 'githubhosts' },
+  { name: 'githubissues' },
   { name: 'githublink' },
   { name: 'githubsource' },
   { name: 'gitinit' },

@@ -290,6 +290,7 @@
   "board.dialog.sourceModelUnknown": "Model autora nieznany: pull request nie mówi, która AI go napisała, jeśli w ogóle.",
   "board.dialog.sourceOpen": "Otwórz na GitHubie",
   "board.dialog.sourceOutside": "{known, select, yes {{author} nie jest członkiem {repo}} other {Combwork nie mógł ustalić, czy {author} jest członkiem {repo}}}: kontrole tego projektu uruchamiają kod pull requesta na tym komputerze, z twoimi plikami i logowaniami. Aby uruchomić go z dala od nich, użyj Windows Sandbox: jego serwer jest w katalogu MCP.",
+  "board.dialog.sourceOutsideIssue": "{known, select, yes {{author} nie jest członkiem {repo}} other {Combwork nie mógł ustalić, czy {author} jest członkiem {repo}}}: to, co mówi to issue, to słowa kogoś innego, które trafiają do agentów tylko w cytacie.",
   "board.dialog.sourcePlaceholder": "Pull request lub issue: jego adres lub #numer",
   "board.dialog.sourceRemove": "Usuń",
   "board.dialog.sourceReviewers": "Recenzenci…",

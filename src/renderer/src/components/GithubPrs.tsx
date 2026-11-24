@@ -5,6 +5,8 @@ import type { OpenPr, OpenPrsRead } from '@shared/githubSource'
 import * as actions from '../actions'
 import { call } from '../api'
 import { cardLabelOf, get, loadTasks, set, useStore } from '../store'
+import { IssuesPane } from './GithubIssues'
+import { Tabs } from './Tabs'
 import { CodeText, Icon, Modal } from './ui'
 
 /**
@@ -15,7 +17,11 @@ import { CodeText, Icon, Modal } from './ui'
 
 const T = {
   button: msg({ id: 'github.prs.button', defaultMessage: 'From GitHub…', description: 'A button in the board’s toolbar (HI-3553), for a project with a GitHub repository: lists its open pull requests, to make a card of one.' }),
-  tip: msg({ id: 'github.prs.tip', defaultMessage: 'Make a card of an open pull request on {repo}', description: 'Tooltip of the board’s From GitHub… button (HI-3553). {repo} is owner/name.' }),
+  tip: msg({ id: 'github.prs.tip', defaultMessage: 'Make a card of an open pull request or issue on {repo}', description: 'Tooltip of the board’s From GitHub… button (HI-3553, HI-3555). {repo} is owner/name.' }),
+  tabs: msg({ id: 'github.from.tabs', defaultMessage: 'Pull requests or issues', description: 'Accessible name of the From GitHub… dialog’s tabs (HI-3555): Pull requests and Issues.' }),
+  tabPrs: msg({ id: 'github.from.tabPrs', defaultMessage: 'Pull requests', description: 'A tab of the From GitHub… dialog (HI-3555): the repository’s open pull requests.' }),
+  tabIssues: msg({ id: 'github.from.tabIssues', defaultMessage: 'Issues', description: 'A tab of the From GitHub… dialog (HI-3555): the repository’s open issues.' }),
+  issuesTitle: msg({ id: 'github.from.issuesTitle', defaultMessage: 'Open issues on {repo}', description: 'The title of the From GitHub… dialog on its Issues tab (HI-3555). {repo} is owner/name.' }),
   title: msg({ id: 'github.prs.title', defaultMessage: 'Open pull requests on {repo}', description: 'The title of the From GitHub… dialog (HI-3553). {repo} is owner/name.' }),
   desc: msg({ id: 'github.prs.desc', defaultMessage: 'Choose one to make a card of it in Todo: its builder runs this project’s checks on the pull request’s branch, and it is reviewed like any card. What it says on GitHub reaches agents only quoted, as someone else’s words.', description: 'Under the From GitHub… dialog’s title (HI-3553): what choosing a pull request does.' }),
   loading: msg({ id: 'github.prs.loading', defaultMessage: 'Asking GitHub…', description: 'In the From GitHub… dialog (HI-3553) while gh lists the open pull requests.' }),
@@ -72,6 +78,9 @@ export function FromGithubButton({ project, projectPath, readOnly }: { project: 
 function OpenPrsDialog({ project, projectPath, onClose }: { project: string; projectPath: string; onClose: () => void }) {
   const [read, setRead] = useState<OpenPrsRead | null>(null)
   const [asked, setAsked] = useState(0)
+  // HI-3555: the dialog's tabs, its pull requests (HI-3553) and its issues.
+  const [tab, setTab] = useState<'prs' | 'issues'>('prs')
+  const linked = useGithubRepo(projectPath)
   const [making, setMaking] = useState<number | null>(null)
   useEffect(() => {
     let live = true
@@ -102,15 +111,17 @@ function OpenPrsDialog({ project, projectPath, onClose }: { project: string; pro
   }
   return (
     <Modal
-      title={repo ? tr(T.title, { repo: repoName(repo) }) : tr(T.button)}
+      title={tab === 'issues' && linked ? tr(T.issuesTitle, { repo: repoName(linked) }) : repo ? tr(T.title, { repo: repoName(repo) }) : tr(T.button)}
       icon="git-pull-request"
       wide
       onClose={onClose}
       footer={
         <>
-          <button className="btn subtle" data-action="prs-again" disabled={!read || making !== null} onClick={() => setAsked((n) => n + 1)}>
-            {tr(T.again)}
-          </button>
+          {tab === 'prs' && (
+            <button className="btn subtle" data-action="prs-again" disabled={!read || making !== null} onClick={() => setAsked((n) => n + 1)}>
+              {tr(T.again)}
+            </button>
+          )}
           <span className="grow" />
           <button className="btn" onClick={onClose}>
             {tr(T.close)}
@@ -118,6 +129,11 @@ function OpenPrsDialog({ project, projectPath, onClose }: { project: string; pro
         </>
       }
     >
+      <Tabs<'prs' | 'issues'> label={tr(T.tabs)} value={tab} onChange={setTab} items={[{ id: 'prs', label: tr(T.tabPrs), icon: 'git-pull-request', attrs: { 'data-from-tab': 'prs' } }, { id: 'issues', label: tr(T.tabIssues), icon: 'issues', attrs: { 'data-from-tab': 'issues' } }]} />
+      {tab === 'issues' ? (
+        <IssuesPane project={project} projectPath={projectPath} onOpen={open} />
+      ) : (
+      <>
       <p className="s-desc">{tr(T.desc)}</p>
       {!read ? (
         <div className="muted" data-prs="loading">
@@ -154,6 +170,8 @@ function OpenPrsDialog({ project, projectPath, onClose }: { project: string; pro
             </li>
           ))}
         </ul>
+      )}
+      </>
       )}
     </Modal>
   )

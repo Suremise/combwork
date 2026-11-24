@@ -2616,6 +2616,7 @@ const SOURCE = {
   otherRepo: msg({ id: 'tasks.source.otherRepo', defaultMessage: 'That pull request or issue isn’t on this project’s repository ({repo} on {host}).', description: 'HI-3551: an error setting a card’s GitHub source: the address is of another repository or host than the project’s GitHub link. {repo} is owner/name, {host} a host name.' }),
   notFound: msg({ id: 'tasks.source.notFound', defaultMessage: 'The GitHub CLI found no pull request or issue #{number} on {repo}{why, select, none {} other {: {why}}}.', description: 'HI-3551: an error setting a card’s GitHub source: gh couldn’t read it. {number} its number, {repo} owner/name; {why} gh’s own words, or none (keep the select key).' }),
   linkChanged: msg({ id: 'tasks.source.linkChanged', defaultMessage: 'This project’s GitHub repository is now {repo}, not {shown} as listed: list its pull requests again.', description: 'HI-3553: an error making a card of a pull request from the board’s From GitHub… list: the project’s GitHub link changed to another repository since the list was shown. {repo} and {shown} are owner/name.' }),
+  issueLinkChanged: msg({ id: 'tasks.source.issueLinkChanged', defaultMessage: 'This project’s GitHub repository is now {repo}, not {shown} as listed: list its issues again.', description: 'HI-3555: an error making a card of an issue from the board’s From GitHub… Issues list: the project’s GitHub link changed to another repository since the list was shown. {repo} and {shown} are owner/name.' }),
   gh: msg({ id: 'tasks.source.gh', defaultMessage: 'The GitHub CLI {problem, select, missing {isn’t installed} signedOut {isn’t signed in on {host}} timeout {didn’t answer in time} other {couldn’t read it}}: see Version Control → Workflow → GitHub.', description: 'HI-3551: an error setting a card’s GitHub source: gh couldn’t be asked (problem: not installed, not signed in on the host, no answer in time, or another failure). Keep the select keys. Version Control → Workflow → GitHub is a place in the window: as translated there.' })
 }
 
@@ -2642,8 +2643,8 @@ function wroteByOf(j: Record<string, unknown>): PrAuthorship | null {
   return prAuthorship(messages, typeof j.body === 'string' ? j.body : '', PROVIDERS.map((p) => ({ id: p.id, name: p.name, assistant: p.assistant, company: p.company })))
 }
 
-/** The fields gh's `pr view` and `issue view` are asked for (HI-3553: with the author and body; HI-3560: the commits, for who wrote it). */
-const SOURCE_FIELDS = { pr: 'number,title,url,headRefName,baseRefName,isCrossRepository,maintainerCanModify,author,body,commits', issue: 'number,title,url,author,body' } as const
+/** The fields gh's `pr view` is asked for (HI-3553: with the author and body; HI-3560: the commits, for who wrote it); an issue is read through the issue source (HI-3555). */
+const SOURCE_FIELDS = { pr: 'number,title,url,headRefName,baseRefName,isCrossRepository,maintainerCanModify,author,body,commits' } as const
 
 /**
  * HI-3551, HI-3553: a pull request or issue on the project's GitHub link, read through the gh service (outside the
@@ -2657,20 +2658,25 @@ async function readSource(ws: WorkspaceService, projectPath: string, input: stri
   const ref = parseSourceRef(input, link)
   if ('error' in ref) throw new TaskConflictError(ref.error === 'otherRepo' && link ? withValues(SOURCE.otherRepo, { repo: `${link.owner}/${link.repo}`, host: link.host }) : SOURCE[ref.error])
   const repo = `${ref.ref.owner}/${ref.ref.repo}`
-  const ask = (kind: 'pr' | 'issue') => gh({ repo: ref.ref }, [kind, 'view', String(ref.number), '--json', SOURCE_FIELDS[kind]], { json: true })
+  const ask = (kind: 'pr') => gh({ repo: ref.ref }, [kind, 'view', String(ref.number), '--json', SOURCE_FIELDS[kind]], { json: true })
   let kind: 'pr' | 'issue' = only ?? ref.kind ?? 'pr'
-  let got = await ask(kind)
+  const got = kind === 'pr' ? await ask('pr') : null
   // `#n` names either: a pull request first, else an issue (GitHub numbers both alike).
-  if (!got.ok && got.problem === 'failed' && ref.kind === null && !only) {
-    kind = 'issue'
-    got = await ask(kind)
+  if (got && !got.ok && got.problem === 'failed' && ref.kind === null && !only) kind = 'issue'
+  // HI-3555 (HR1 on s9): an issue is read through the issue source's seam, as From GitHub…'s Issues reads it.
+  if (kind === 'issue') {
+    const { githubIssues } = await import('./issueSources')
+    const r = await githubIssues(ref.ref).read(ref.number)
+    if (!r.ok) throw new TaskConflictError(r.problem === 'failed' ? withValues(SOURCE.notFound, { number: ref.number, repo, why: r.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: r.problem, host: ref.ref.host })) // i18n-ignore: a select key (none), gh's own words otherwise
+    return { source: r.issue.source, body: r.issue.body }
   }
+  if (!got) throw new TaskConflictError(withValues(SOURCE.notFound, { number: ref.number, repo, why: 'none' })) // i18n-ignore: a select key (none)
   if (!got.ok) throw new TaskConflictError(got.problem === 'failed' ? withValues(SOURCE.notFound, { number: ref.number, repo, why: got.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: got.problem, host: ref.ref.host })) // i18n-ignore: a select key (none), gh's own words otherwise
   const j = (got.json ?? {}) as Record<string, unknown>
   const str = (k: string): string => (typeof j[k] === 'string' ? (j[k] as string) : '')
   const login = j.author && typeof j.author === 'object' && typeof (j.author as { login?: unknown }).login === 'string' ? (j.author as { login: string }).login : ''
-  // A PR's author's standing in the repository: the REST answer's author_association, on the same host (gh api names it).
-  const association = kind === 'pr' && login ? await gh({ host: ref.ref.host }, ['api', `repos/${repo}/pulls/${ref.number}`, '--jq', '.author_association']).then((r) => (r.ok && /^[A-Z_]{1,40}$/.test(r.stdout.trim()) ? r.stdout.trim() : null)) : null
+  // The author's standing in the repository: the REST answer's author_association, on the same host (gh api names it).
+  const association = login ? await gh({ host: ref.ref.host }, ['api', `repos/${repo}/${kind === 'pr' ? 'pulls' : 'issues'}/${ref.number}`, '--jq', '.author_association']).then((r) => (r.ok && /^[A-Z_]{1,40}$/.test(r.stdout.trim()) ? r.stdout.trim() : null)) : null
   const source = cleanSource({ kind, ...ref.ref, number: ref.number, url: str('url') || `https://${ref.ref.host}/${repo}/${kind === 'pr' ? 'pull' : 'issues'}/${ref.number}`, title: str('title'), ...(kind === 'pr' ? { pr: { headRef: str('headRefName'), baseRef: str('baseRefName'), crossRepository: j.isCrossRepository === true, maintainerCanModify: j.maintainerCanModify === true } } : {}), ...(login ? { author: { login, association } } : {}), ...(kind === 'pr' ? { wroteBy: wroteByOf(j) } : {}) })
   if (!source || (kind === 'pr' && (!source.pr?.headRef || !source.pr.baseRef))) throw new TaskConflictError(withValues(SOURCE.notFound, { number: ref.number, repo, why: 'none' })) // i18n-ignore: a select key (none)
   return { source, body: clipBody(j.body) }
@@ -2696,6 +2702,37 @@ export async function createFromPr(project: string, number: number, expect: { ho
       const had = prSourceCards(ws, read.source).find((c) => c.pr === read.source.number)
       if (had) return { card: await getTask(had.n, ws), existing: true }
       const card = await createTaskLocked({ title: words.title, description: words.description, project, labels: [sourceLabel('pr')], source: read }, actor)
+      return { card, existing: false }
+    })
+  )
+}
+
+/**
+ * HI-3555: an open issue on the project's issue source (its GitHub link) made a card in Todo (From GitHub…'s Issues),
+ * the user's alone, as createFromPr does for a pull request: its title and description the window's, its source, body
+ * and labels read again here through the seam (issueSources.ts), labelled with the issue's labels and github-issue. An
+ * issue some card not archived is already about isn't made twice (that card comes back, `existing`). Nothing is written
+ * to GitHub.
+ */
+export async function createFromIssue(project: string, number: number, expect: { host: string; owner: string; repo: string }, words: { title: string; description: string }, actor: TaskActor): Promise<{ card: TaskCard; existing: boolean }> {
+  if (actor.kind !== 'user') throw new TaskPermissionError(SOURCE.agents)
+  const ws = workspace
+  const projectPath = ws.path ? join(ws.path, project) : project
+  const { issueSourceFor } = await import('./issueSources')
+  const src = await issueSourceFor(ws, projectPath)
+  if (!src) throw new TaskConflictError(SOURCE.noLink)
+  const shown = `${expect.owner}/${expect.repo}`
+  if (!sameSource({ kind: 'issue', number, ...src.repo }, { kind: 'issue', number, ...expect })) throw new TaskConflictError(withValues(SOURCE.issueLinkChanged, { shown, repo: `${src.repo.owner}/${src.repo.repo}` }))
+  const got = await src.read(number)
+  const repo = `${src.repo.owner}/${src.repo.repo}`
+  if (!got.ok) throw new TaskConflictError(got.problem === 'failed' ? withValues(SOURCE.notFound, { number, repo, why: got.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: got.problem, host: src.repo.host })) // i18n-ignore: a select key (none), gh's own words otherwise
+  const { issueSourceCards } = await import('./boardStore')
+  const labels = [...got.issue.labels.filter((l) => l !== sourceLabel('issue')), sourceLabel('issue')]
+  return recording(actor, null, () =>
+    boardLock(ws, async () => {
+      const had = issueSourceCards(ws, src.repo).find((c) => !c.archived && c.issue === number)
+      if (had) return { card: await getTask(had.n, ws), existing: true }
+      const card = await createTaskLocked({ title: words.title, description: words.description, project, labels, source: { source: got.issue.source, body: got.issue.body } }, actor)
       return { card, existing: false }
     })
   )

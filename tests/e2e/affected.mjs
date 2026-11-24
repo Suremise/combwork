@@ -435,6 +435,7 @@ export const AREAS = [
   // GitHub hosts and Copilot's sign-in per host (HI-2779).
   // HI-3550: a project's GitHub link and the one gh service (Copilot's sign-in check goes through it too).
   { paths: ['tests/e2e/githublink.cjs', 'src/shared/githubRepo.ts', 'src/main/ghCli.ts', 'src/main/githubLink.ts', 'src/renderer/src/components/GithubLink.tsx'], suites: ['githublink', 'githubhosts'] },
+  { paths: ['tests/e2e/githubissues.cjs', 'src/shared/issueSource.ts', 'src/main/issueSources.ts', 'src/renderer/src/components/GithubIssues.tsx', 'src/renderer/src/components/GithubPrs.tsx'], suites: ['githubissues'] },
   // HI-3551: a card's GitHub source (the dialog's field; what a PR card does when it starts is the unit tests').
   { paths: ['tests/e2e/githubsource.cjs', 'src/shared/githubSource.ts', 'src/renderer/src/components/CardSource.tsx', 'src/renderer/src/components/GithubPrs.tsx', 'src/renderer/src/components/CardGithubFeedback.tsx', 'src/main/githubReviews.ts', 'src/shared/githubReviews.ts', 'src/shared/prAuthorship.ts'], suites: ['githubsource'] },
   { paths: ['tests/e2e/prfinish.cjs', 'src/main/workflow/prHost.ts', 'src/main/workflow/prHosts.ts', 'src/renderer/src/components/CardPullRequest.tsx'], suites: ['prfinish'] },

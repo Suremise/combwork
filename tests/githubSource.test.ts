@@ -51,13 +51,15 @@ describe('a pull request’s author and body (HI-3553)', () => {
     expect(cleanSource({ ...pr, author: { login: '' } })).not.toHaveProperty('author')
     expect(cleanSource({ ...pr, author: 'mona' })).not.toHaveProperty('author')
   })
-  it('warns only of a pull request whose author isn’t one of the repository’s, or isn’t known to be', () => {
+  it('warns of a pull request or issue whose author isn’t one of the repository’s, or isn’t known to be', () => {
     const by = (association: string | null) => ({ kind: 'pr' as const, author: { login: 'x', association } })
     for (const a of ['OWNER', 'MEMBER', 'COLLABORATOR', 'member']) expect(outsideAuthor(by(a))).toBeNull()
     for (const a of ['CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', 'FIRST_TIMER', 'NONE', 'MANNEQUIN']) expect(outsideAuthor(by(a))).toBe('outside')
     expect(outsideAuthor(by(null))).toBe('unknown')
     expect(outsideAuthor({ kind: 'pr' })).toBe('unknown')
-    expect(outsideAuthor({ kind: 'issue', author: { login: 'x', association: 'NONE' } })).toBeNull()
+    // HI-3555: an issue's author the same way.
+    expect(outsideAuthor({ kind: 'issue', author: { login: 'x', association: 'NONE' } })).toBe('outside')
+    expect(outsideAuthor({ kind: 'issue', author: { login: 'x', association: 'MEMBER' } })).toBeNull()
   })
   it('keeps a body with \n line ends, no control characters but tab, and at most its limit', () => {
     expect(clipBody(' a\r\nb\rc\t\u001b[31md\u0000 ')).toBe('a\nb\nc\t[31md')

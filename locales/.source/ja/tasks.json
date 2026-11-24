@@ -197,6 +197,7 @@
   "tasks.skipped.unsaved": "couldn't be saved",
   "tasks.source.agents": "Only the user sets a card’s GitHub source.",
   "tasks.source.gh": "The GitHub CLI {problem, select, missing {isn’t installed} signedOut {isn’t signed in on {host}} timeout {didn’t answer in time} other {couldn’t read it}}: see Version Control → Workflow → GitHub.",
+  "tasks.source.issueLinkChanged": "This project’s GitHub repository is now {repo}, not {shown} as listed: list its issues again.",
   "tasks.source.linkChanged": "This project’s GitHub repository is now {repo}, not {shown} as listed: list its pull requests again.",
   "tasks.source.noLink": "This project has no GitHub link: none of its remotes is on its GitHub host (Version Control → Workflow → GitHub).",
   "tasks.source.noProject": "A card about the workspace has no GitHub source: only a project’s cards do.",
