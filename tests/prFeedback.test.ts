@@ -160,7 +160,7 @@ describe('a pull request’s comments on its card, and Address feedback (HI-3554
     // A card about nothing on GitHub has none, and gh isn't asked.
     const plain = await inWorkspace(w, () => tasks.createTask({ title: 'A card', project: 'p' }, user))
     writeFileSync(callLog, '')
-    expect(await inWorkspace(w, () => prFeedbackOf(w, plain.number))).toEqual({ target: null, problem: 'none', detail: null })
+    expect(await inWorkspace(w, () => prFeedbackOf(w, plain.number))).toEqual({ target: null, problem: 'noPr', detail: null })
     expect(calls()).toEqual([])
     // A card in PR open: the pull request it opened; in another stage, none.
     const prOpened = { host: 'github.com', owner: 'acme', repo: 'app', number: 12 } as never

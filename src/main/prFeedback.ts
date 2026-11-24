@@ -50,6 +50,6 @@ export async function prFeedbackOf(ws: WorkspaceService, n: number): Promise<PrF
   const { getTask } = await import('./tasks')
   const card = await getTask(n, ws)
   const target = await cardFeedbackTarget(ws, card)
-  if (!target) return { target: null, problem: 'none', detail: null }
+  if (!target) return { target: null, problem: 'noPr', detail: null }
   return readPrFeedback(target)
 }

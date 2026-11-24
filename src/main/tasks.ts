@@ -2773,7 +2773,7 @@ export async function createFromFeedback(n: number, target: FeedbackTarget, ids:
   if (!wanted.size) throw new TaskConflictError(FEEDBACK.none)
   await still()
   const read = await readPrFeedback(target)
-  if ('problem' in read) throw new TaskConflictError(read.problem === 'failed' || read.problem === 'none' ? withValues(SOURCE.notFound, { number: target.number, repo, why: read.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: read.problem, host: target.host })) // i18n-ignore: a select key (none), gh's own words otherwise
+  if ('problem' in read) throw new TaskConflictError(read.problem === 'failed' || read.problem === 'noPr' ? withValues(SOURCE.notFound, { number: target.number, repo, why: read.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: read.problem, host: target.host })) // i18n-ignore: a select key (none), gh's own words otherwise
   if (!read.open) throw new TaskConflictError(withValues(FEEDBACK.notOpen, { number: target.number }))
   const picked = read.items.filter((i) => wanted.has(i.id))
   if (!picked.length) throw new TaskConflictError(withValues(FEEDBACK.gone, { number: target.number }))

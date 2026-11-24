@@ -49,7 +49,7 @@ export interface FeedbackTarget {
 }
 
 /** What the card dialog shows: the pull request's feedback as read now, or why it couldn't be read (gh's own words). */
-export type PrFeedbackRead = { target: FeedbackTarget; open: boolean; items: FeedbackItem[]; at: number } | { target: FeedbackTarget | null; problem: 'missing' | 'signedOut' | 'timeout' | 'failed' | 'none'; detail: string | null }
+export type PrFeedbackRead = { target: FeedbackTarget; open: boolean; items: FeedbackItem[]; at: number } | { target: FeedbackTarget | null; problem: 'missing' | 'signedOut' | 'timeout' | 'failed' | 'noPr'; detail: string | null }
 
 /** How the card shows GitHub's association: the repository's own people by their role, anyone else as from outside. */
 export function associationLabel(a: string | null | undefined): 'owner' | 'member' | 'collaborator' | 'outside' | 'unknown' {

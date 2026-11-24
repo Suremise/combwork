@@ -113,7 +113,7 @@ export function PrFeedbackField({ card, b }: { card: TaskCard; b: WorkBadge | nu
       </>
     )
   if ('problem' in read) {
-    if (read.problem === 'none') return null
+    if (read.problem === 'noPr') return null
     return (
       <>
         <label>{tr(T.label)}</label>
