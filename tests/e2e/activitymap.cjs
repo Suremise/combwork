@@ -348,9 +348,18 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     // A Now row's click picks its agent as its ring does (HI-3568).
     await page.locator('.activity-tab:not(.activity-workspace) .activity-now-row[data-agent="hb1"]').click()
     check("a Now row's click picks its agent: HB1's ring marked, its map and its work", !!(await lib.until(() => shownAlone('HB1'), HUNG_MS, 250)), await both())
-    // (An agent's dot on the shared map picks it too: the ten agents' part below.) The row clicked is gone, so All.
-    await page.locator('.activity-tab:not(.activity-workspace) .activity-strip-all').click()
-    await lib.until(() => sharedNow(), HUNG_MS, 250)
+    // The row goes as its agent is picked: the focus moves to that agent's ring, never the page's body (HR1's round 1),
+    // so Escape still shows every agent. (An agent's dot on the shared map picks it too: the ten agents' part below.)
+    const focusedAgent = () => page.evaluate(() => document.activeElement?.getAttribute('data-agent') ?? document.activeElement?.tagName ?? null)
+    check("…the focus on HB1's ring, not the page's body", (await focusedAgent()) === 'hb1', String(await focusedAgent()))
+    await page.keyboard.press('Escape')
+    check('…and Escape after a row\'s pick shows every agent again', !!(await lib.until(() => sharedNow(), HUNG_MS, 250)), await both())
+    // From the keyboard: a row focused and Enter picks; Escape, every agent again.
+    await page.locator('.activity-tab:not(.activity-workspace) .activity-now-row[data-agent="hb2"]').focus()
+    await page.keyboard.press('Enter')
+    check("a row's Enter picks HB2, the focus on its ring", !!(await lib.until(async () => (await shownAlone('HB2')) && (await focusedAgent()) === 'hb2', HUNG_MS, 250)), `${await both()} ${await focusedAgent()}`)
+    await page.keyboard.press('Escape')
+    check('…and Escape: every agent again', !!(await lib.until(() => sharedNow(), HUNG_MS, 250)), await both())
     // The strip with the map's parts turned off (HI-3568): Context off, no percentages but the picker stays; Feed off, the
     // same; the map off, it moves above the list and still picks.
     const toggle = (k) => head.locator(`.activity-map-toggle[data-toggle="${k}"]`)
@@ -367,6 +376,10 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await shoot('3e-map-off-picked-dark')
     await page.keyboard.press('Escape')
     check('…Escape there: every agent again', !!(await lib.until(async () => (await allOn()) && (await rowsShown()).length === 2, HUNG_MS, 250)), await both())
+    await page.locator('.activity-tab:not(.activity-workspace) .activity-now-row[data-agent="hb1"]').click()
+    check("…a row's click there picks HB1, the focus on its ring", !!(await lib.until(async () => (await parts()).includes('hb1') && (await rowsShown()).length === 0 && (await focusedAgent()) === 'hb1', HUNG_MS, 250)), `${await both()} ${await focusedAgent()}`)
+    await page.keyboard.press('Escape')
+    check('…and Escape after it: every agent again, the map off', !!(await lib.until(async () => (await allOn()) && (await rowsShown()).length === 2, HUNG_MS, 250)), await both())
     for (const k of ['map', 'feed', 'context']) await toggle(k).click()
     await lib.until(() => sharedNow(), HUNG_MS, 250)
     // Hide finished on, HB1 finished (idle) and HB2 picked (idle too): HB2 stays listed, picked and shown alone.
@@ -445,7 +458,17 @@ const AGENTS = ['HB1', 'HB2'].map((n) => ({ id: n.toLowerCase(), name: n, provid
     await page.locator('.activity-workspace .activity-now-row', { hasText: 'HB2' }).click()
     check("…a row's click picks HB2", !!(await lib.until(() => wsAgree('HB2'), HUNG_MS, 250)), await wsBoth())
     await page.keyboard.press('Escape')
-    await lib.until(async () => (await wsMarked()).length === 0, HUNG_MS, 250)
+    check('…and Escape after a row\'s pick: nothing picked, the rows again', !!(await lib.until(async () => (await wsMarked()).length === 0 && (await wsRows()).length === 2, HUNG_MS, 250)), await wsBoth())
+    // The map off in the workspace view: a row's pick, then Escape.
+    const wsMapToggle = wsHead.locator('.activity-map-toggle[data-toggle="map"]')
+    await wsMapToggle.click()
+    await lib.until(async () => (await wsMap.count()) === 0 && (await wsRows()).length === 2, HUNG_MS, 250)
+    await page.locator('.activity-workspace .activity-now-row', { hasText: 'HB1' }).click()
+    check("…the map off: a row's click picks HB1", !!(await lib.until(async () => (await wsMarked()).length === 1 && /HB1/.test((await wsMarked())[0]) && (await wsParts()).includes('hb1'), HUNG_MS, 250)), await wsBoth())
+    await page.keyboard.press('Escape')
+    check('…and Escape after it: nothing picked, the rows again', !!(await lib.until(async () => (await wsMarked()).length === 0 && (await wsRows()).length === 2, HUNG_MS, 250)), await wsBoth())
+    await wsMapToggle.click()
+    await lib.until(async () => (await wsMap.count()) === 1, HUNG_MS, 250)
     await gated('the workspace view', '.activity-workspace')
     await page.locator('.activity-btn[aria-label="Projects"]').click()
     await lib.until(async () => (await head.count()) === 1, HUNG_MS, 250)

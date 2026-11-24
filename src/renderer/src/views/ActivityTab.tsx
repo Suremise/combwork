@@ -450,6 +450,8 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
   return (
     <div
       className="activity-tab"
+      // Focusable (HI-3568): where the focus goes when what had it leaves, so Escape still reaches the view.
+      tabIndex={-1}
       onKeyDown={(e) => {
         if (e.key !== 'Escape') return
         // A call the map showed first, then the pick (HI-3568: the shared view again), the map off too.
@@ -558,6 +560,17 @@ const stepText = (p: ActivityPart | null): string => {
 }
 
 /**
+ * A row's pick (HI-3568, HR1's round 1): the row goes as its agent is picked, so the focus moves to that agent's ring in
+ * the strip (else the view itself), never left on the page's body, where Escape reaches no view.
+ */
+function pickRow(row: HTMLElement, key: string, onPick: (key: string) => void): void {
+  const root = row.closest<HTMLElement>('.activity-tab')
+  onPick(key)
+  const ring = root ? [...root.querySelectorAll<HTMLElement>('.activity-map-ring[data-agent]')].find((r) => r.dataset.agent === key) : undefined
+  ;(ring ?? root)?.focus({ preventScroll: true })
+}
+
+/**
  * The shared view's panel with no agent picked (HI-3568): each agent's Now in a short row (its state, name, card and
  * current step), a click picking that agent, as its ring does. `nameOf` names a row's agent (the workspace level's, with
  * its project).
@@ -572,7 +585,7 @@ export function NowRows({ rows, onPick, nameOf }: { rows: readonly NowRowInfo[];
         const name = nameOf ? nameOf(key, t.name) : t.name
         const step = stepText(part)
         return (
-          <button key={key} className="activity-now-row" data-agent={t.agentId} data-key={key} title={tr(M.nowRowTip, { name })} onClick={() => onPick(key)}>
+          <button key={key} className="activity-now-row" data-agent={t.agentId} data-key={key} title={tr(M.nowRowTip, { name })} onClick={(ev) => pickRow(ev.currentTarget, key, onPick)}>
             <StateMark state={markOf(t.state)} />
             <span className="activity-now-row-name">{name}</span>
             {t.card && (

@@ -8469,6 +8469,10 @@ button.agent-place:hover {
   height: 100%;
   min-height: 0;
 }
+/* Focused only to keep Escape in the view (HI-3568): no ring of its own. */
+.activity-tab:focus {
+  outline: none;
+}
 .activity-main {
   flex: 1;
   min-width: 0;

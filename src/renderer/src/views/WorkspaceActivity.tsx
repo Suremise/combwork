@@ -555,6 +555,8 @@ export const WorkspaceActivityView = memo(function WorkspaceActivityView({ works
   return (
     <div
       className="activity-tab activity-workspace"
+      // Focusable (HI-3568): where the focus goes when what had it leaves, so Escape still reaches the view.
+      tabIndex={-1}
       onKeyDown={(e) => {
         if (e.key !== 'Escape') return
         // A call the map showed first, then the pick (HI-3568: the shared view again), the map off too.
