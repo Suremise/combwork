@@ -10,7 +10,7 @@ import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { allOff, contradictions, formShows, formTabOf, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { producedStages } from '../../src/shared/workflow/compile'
 import { PR_RETRY_GATE } from '../../src/shared/workflow/facts'
-import { followPr, notPushedNotice, openPr, prViewOf, pushesTo, type GhPort, type PrPorts } from '../../src/main/workflow/prHost'
+import { followPr, forkAddress, notPushedNotice, openPr, prViewOf, pushAddressOf, pushesTo, urlRewrites, type GhPort, type PrPorts } from '../../src/main/workflow/prHost'
 import { tempDir } from '../tempDir'
 import { intentText } from '../../src/shared/toolReplies'
 import { laneRules } from '../../src/shared/laneBrief'
@@ -55,7 +55,8 @@ interface FakePr {
   title: string
   body: string
   /** HI-3562: its head repository (a fork's) and whether maintainers may push there; its head read live from `headBare`. */
-  headOwner?: string
+  /** null: its head repository is gone (a deleted fork): gh gives no head repository or owner. */
+  headOwner?: string | null
   headRepo?: string
   maintainerCanModify?: boolean
   headBare?: string
@@ -89,7 +90,7 @@ function fakeGithub(bare: string) {
       const p = prs.find((x) => x.number === Number(args[2]))
       if (!p) return { ok: false, problem: 'failed', detail: 'no pull requests found' }
       const headRefOid = p.headBare ? sh(p.headBare, 'rev-parse', `refs/heads/${p.headRefName}`) : p.headRefOid
-      return { ok: true, stdout: '', json: { number: p.number, url: p.url, state: p.state, isDraft: p.isDraft, reviewDecision: 'REVIEW_REQUIRED', statusCheckRollup: [{ conclusion: 'SUCCESS' }, { status: 'IN_PROGRESS' }], headRefOid, mergeCommit: p.mergeCommit, mergedAt: null, closedAt: p.closedAt, headRefName: p.headRefName, headRepository: { name: p.headRepo ?? 'app' }, headRepositoryOwner: { login: p.headOwner ?? 'acme' }, isCrossRepository: p.isCrossRepository, maintainerCanModify: p.maintainerCanModify ?? false } }
+      return { ok: true, stdout: '', json: { number: p.number, url: p.url, state: p.state, isDraft: p.isDraft, reviewDecision: 'REVIEW_REQUIRED', statusCheckRollup: [{ conclusion: 'SUCCESS' }, { status: 'IN_PROGRESS' }], headRefOid, mergeCommit: p.mergeCommit, mergedAt: null, closedAt: p.closedAt, headRefName: p.headRefName, headRepository: p.headOwner === null ? null : { name: p.headRepo ?? 'app' }, headRepositoryOwner: p.headOwner === null ? null : { login: p.headOwner ?? 'acme' }, isCrossRepository: p.isCrossRepository, maintainerCanModify: p.maintainerCanModify ?? false } }
     }
     return { ok: false, problem: 'failed', detail: `unknown: ${args.join(' ')}` }
   }
@@ -591,6 +592,82 @@ describe('the pull request finish (HI-3552)', () => {
     expect(s.stage).toBe('prOpen')
     expect(s.pullRequest?.opened).toMatchObject({ notPushed: true, notPushedWhy: 'refused', pushed: prHead })
     expect(sh(bare, 'rev-parse', 'feature')).toBe(theirs)
+  })
+
+  // HR1, round 1: a fork's route is read as git pushes (pushInsteadOf too, which ls-remote --get-url left out), on the real
+  // path, and the push goes by that same route: a rewrite elsewhere is refused, nothing pushed anywhere.
+  it('reads a fork’s push route as git pushes it, pushInsteadOf included, and pushes nowhere it doesn’t check', async () => {
+    const e = (env = project())
+    const { bare, gh, ports } = github(e)
+    const head = { host: 'github.com', owner: 'someone', repo: 'app' }
+    expect(await forkAddress(e.project, head)).toEqual({ target: 'https://github.com/someone/app.git', urls: ['https://github.com/someone/app.git'] })
+    const { card, prHead, headBare } = await prCard(e, bare, gh, { fork: true, canModify: true })
+    const elsewhere = tempDir('gh-elsewhere-')
+    sh(elsewhere, 'init', '-q', '--bare')
+    const to = elsewhere.replace(/\\/g, '/')
+    sh(e.project, 'config', `url.${to}/.pushInsteadOf`, 'https://github.com/someone/')
+    expect((await forkAddress(e.project, head)).urls).toEqual([`${to}/app.git`])
+    // Production's forkAddress (no stand-in): refused, asked to try again; neither the fork nor the rewrite's target gets it.
+    const { forkTarget: _none, ...real } = { ...ports, forkTarget: undefined }
+    await openPr(e.wf, card.id, requestOf(e, card.id), real)
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('approved')
+    expect(s.pullRequest?.failed?.problem).toBe('pushUrl')
+    expect(sh(headBare, 'rev-parse', 'feature')).toBe(prHead)
+    expect(sh(elsewhere, 'for-each-ref')).toBe('')
+  })
+
+  // HR1, round 1: what is checked is where git itself pushes an address: proved against real pushes through local rewrites
+  // (pushInsteadOf over insteadOf, the longest prefix of each).
+  it('works out where git pushes an address as git does', () => {
+    const base = tempDir('gh-rewrite-')
+    const at = (name: string): string => {
+      const dir = join(base, name, 'app.git')
+      sh(base, 'init', '-q', '--bare', dir)
+      return join(base, name).replace(/\\/g, '/')
+    }
+    const viaPush = at('push')
+    const viaLonger = at('longer')
+    const viaFetch = at('fetch')
+    const repo = tempDir('gh-rewrite-repo-')
+    sh(repo, 'init', '-q', '-b', 'main')
+    const tip = commit(repo, { 'a.txt': 'a\n' }, 'A')
+    const url = 'https://github.com/someone/app.git'
+    const landed = (): string[] => ['push', 'longer', 'fetch'].filter((n) => sh(join(base, n, 'app.git'), 'for-each-ref', '--format=%(refname)').includes('refs/heads/main'))
+    const config = (): ReturnType<typeof urlRewrites> => urlRewrites(sh(repo, 'config', '--get-regexp', '^url\\..*insteadof$'))
+    const push = (): void => void sh(repo, 'push', '-q', url, `${tip}:refs/heads/main`)
+    // insteadOf alone: git pushes there.
+    sh(repo, 'config', `url.${viaFetch}/.insteadOf`, 'https://github.com/someone/')
+    expect(pushAddressOf(url, config())).toBe(`${viaFetch}/app.git`)
+    push()
+    expect(landed()).toEqual(['fetch'])
+    // pushInsteadOf wins over insteadOf for a push; of two, the longer prefix.
+    sh(repo, 'config', `url.${viaPush}/.pushInsteadOf`, 'https://github.com/')
+    sh(repo, 'config', `url.${viaLonger}/.pushInsteadOf`, 'https://github.com/someone/')
+    expect(pushAddressOf(url, config())).toBe(`${viaLonger}/app.git`)
+    push()
+    expect(landed()).toEqual(['longer', 'fetch'])
+    expect(pushAddressOf('https://example.com/x.git', config())).toBe('https://example.com/x.git')
+  })
+
+  // HR1, round 1: a merged or closed pull request whose fork was deleted has no head repository: followed all the same.
+  it('follows a merged or closed pull request whose fork is gone, pushing nothing and inventing no push', async () => {
+    for (const state of ['CLOSED', 'MERGED'] as const) {
+      const e = (env = project())
+      const { bare, gh, ports } = github(e)
+      const { card, prHead, headBare } = await prCard(e, bare, gh, { fork: true, canModify: true })
+      Object.assign(gh.prs[0], { state, headOwner: null, headBare: undefined, headRefOid: prHead, ...(state === 'MERGED' ? { mergeCommit: { oid: 'd'.repeat(40) } } : { closedAt: '2026-11-24T10:00:00Z' }) })
+      await openPr(e.wf, card.id, requestOf(e, card.id), { ...ports, forkTarget: forkAt(headBare) })
+      expect(e.wf.state(card).stage, state).toBe('prOpen')
+      expect(e.wf.state(card).pullRequest?.opened, state).toMatchObject({ number: 7, notPushed: true, notPushedWhy: 'notOpen', pushed: prHead })
+      expect(sh(headBare, 'rev-parse', 'feature'), state).toBe(prHead)
+      await followPr(e.wf, card.id, ports)
+      const s = e.wf.state(card)
+      expect(s.stage, state).toBe(state === 'MERGED' ? 'done' : 'todo')
+      if (state === 'MERGED') expect(s.integrated, state).toMatchObject({ result: 'd'.repeat(40), platform: { pr: 7, notPushed: true } })
+      env.close()
+      env = null
+    }
   })
 
   // A fixed notice that only reports (HI-3394): no scenario has this finish; its exact text for each reason.

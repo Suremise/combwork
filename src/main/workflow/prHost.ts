@@ -46,7 +46,7 @@ export type GhPort = (target: GhTarget, args: string[], opts?: { json?: boolean;
 export interface PrPorts {
   gh: GhPort
   pushUrls: (project: string, remote: string) => Promise<string[] | null>
-  forkTarget?: (project: string, head: { host: string; owner: string; repo: string }) => Promise<{ target: string; urls: string[] | null }>
+  forkTarget?: (project: string, head: { host: string; owner: string; repo: string }) => Promise<PushRoute>
 }
 
 /** A remote's push addresses as git would push to them (`insteadOf` and `pushInsteadOf` applied), or null unread. */
@@ -55,14 +55,51 @@ export async function remotePushUrls(project: string, remote: string): Promise<s
   return got.ok ? got.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : null
 }
 
+/** Where a push goes (HI-3562): the remote or address git is given, and the addresses git pushes that to (null: unread). */
+export interface PushRoute {
+  target: string
+  urls: string[] | null
+}
+
+/** A `url.<base>.insteadOf` or `.pushInsteadOf` rule: an address starting with `prefix` is rewritten to start with `base`. */
+export interface UrlRewrite {
+  base: string
+  prefix: string
+  push: boolean
+}
+
+/** The rewrite rules of `git config --get-regexp '^url\..*insteadof$'`'s lines (`url.<base>.<kind> <prefix>`). */
+export function urlRewrites(out: string): UrlRewrite[] {
+  const rules: UrlRewrite[] = []
+  for (const line of out.split(/\r?\n/)) {
+    const at = line.indexOf(' ')
+    const m = at > 0 ? /^url\.(.+)\.(pushinsteadof|insteadof)$/i.exec(line.slice(0, at)) : null
+    if (m) rules.push({ base: m[1], prefix: line.slice(at + 1), push: m[2].toLowerCase() === 'pushinsteadof' })
+  }
+  return rules
+}
+
 /**
- * HI-3562: a fork's head repository, pushed to by its address on its host (no remote of the project's is one): the
- * address as git would use it (`ls-remote --get-url`, insteadOf applied), checked like a remote's push addresses.
+ * The address git pushes to when given `url` (HR1's round 1): the longest matching pushInsteadOf, else the longest
+ * matching insteadOf, applied once, as git does for an address with no push URL of its own.
  */
-export async function forkAddress(project: string, head: { host: string; owner: string; repo: string }): Promise<{ target: string; urls: string[] | null }> {
+export function pushAddressOf(url: string, rules: readonly UrlRewrite[]): string {
+  const longest = (push: boolean): UrlRewrite | undefined => rules.filter((r) => r.push === push && url.startsWith(r.prefix)).sort((a, b) => b.prefix.length - a.prefix.length)[0]
+  const r = longest(true) ?? longest(false)
+  return r ? r.base + url.slice(r.prefix.length) : url
+}
+
+/**
+ * HI-3562: a fork's head repository, pushed to by its address on its host (no remote of the project's is one). What is
+ * checked is where git pushes that address: its rewrites read from git's configuration, pushInsteadOf first (HR1's round
+ * 1: `ls-remote --get-url` applies only insteadOf), so a rewrite elsewhere fails the check and nothing is pushed.
+ */
+export async function forkAddress(project: string, head: { host: string; owner: string; repo: string }): Promise<PushRoute> {
   const target = `https://${head.host}/${head.owner}/${head.repo}.git`
-  const got = await git(project, ['ls-remote', '--get-url', '--', target])
-  return { target, urls: got.ok ? got.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : null }
+  const got = await git(project, ['config', '--get-regexp', '^url\\..*insteadof$'])
+  // Exit 1: none set. Anything else unread: nothing is pushed.
+  if (!got.ok && got.code !== 1) return { target, urls: null }
+  return { target, urls: [pushAddressOf(target, urlRewrites(got.ok ? got.out : ''))] }
 }
 
 const PORTS: PrPorts = { gh, pushUrls: remotePushUrls, forkTarget: forkAddress }
@@ -244,18 +281,23 @@ async function pushingBack(wf: Workflow, cardId: number, r: PrRequestData, src: 
   if (!alive()) return
   if (!got.ok) return fail(ghProblem(got), got.detail)
   const v = (got.json && typeof got.json === 'object' ? got.json : null) as HeadViewed | null
-  const headOwner = v?.headRepositoryOwner?.login
-  const headName = v?.headRepository?.name
-  if (!v || v.number !== src.number || !/^[0-9a-f]{40}$/.test(String(v.headRefOid)) || !headOwner || !headName) return fail('other', firstLine(got.stdout))
+  if (!v || v.number !== src.number) return fail('other', firstLine(got.stdout))
   const url = v.url || `https://${r.host}/${r.owner}/${r.repo}/pull/${src.number}`
-  const kept = (why: PrNotPushedWhy, detail: string | null = null): Promise<void> => opened(wf, cardId, r, { number: src.number, url, draft: !!v.isDraft, pushed: v.headRefOid, notPushed: why, detail }, alive)
+  const oid = /^[0-9a-f]{40}$/.test(String(v.headRefOid)) ? v.headRefOid : null
+  // `pushed` with nothing pushed: GitHub's head as read, else the head the card started on (its fork deleted, say).
+  const kept = (why: PrNotPushedWhy, detail: string | null = null): Promise<void> => opened(wf, cardId, r, { number: src.number, url, draft: !!v.isDraft, pushed: oid ?? wf.state(cardId).started?.pr?.headOid ?? '', notPushed: why, detail }, alive)
+  // Merged or closed (HR1's round 1): followed as it is, whatever is left of its head (a deleted fork has none).
   if (v.state !== 'OPEN') return kept('notOpen')
+  // Open: a push is possible, so its head must be whole.
+  const headOwner = v.headRepositoryOwner?.login
+  const headName = v.headRepository?.name
+  if (!oid || !headOwner || !headName) return fail('other', firstLine(got.stdout))
   const head = { host: r.host, owner: headOwner, repo: headName }
   const fork = !sameRepo(head, r)
   if (v.headRefName !== src.headRef || fork !== !!v.isCrossRepository) return kept('changed')
   if (fork && !v.maintainerCanModify) return kept('fork')
   // GitHub's head here (fetched from the pull request's own ref when it isn't), and in the approved commit.
-  const here = async (): Promise<boolean> => (await git(project, ['cat-file', '-e', `${v.headRefOid}^{commit}`])).ok
+  const here = async (): Promise<boolean> => (await git(project, ['cat-file', '-e', `${oid}^{commit}`])).ok
   if (!(await here())) {
     const ref = prRefs(src.number).head
     const f = await git(project, ['fetch', '--no-tags', '--no-write-fetch-head', '--', r.remote, `+refs/pull/${src.number}/head:${ref}`], undefined, undefined, { timeout: platformLimits.gitNetworkMs() })
@@ -264,13 +306,13 @@ async function pushingBack(wf: Workflow, cardId: number, r: PrRequestData, src: 
     // Moved again since it was read: read it again on the next try.
     if (!(await here())) return fail('other', null)
   }
-  const inApproved = await git(project, ['merge-base', '--is-ancestor', v.headRefOid, r.revision])
+  const inApproved = await git(project, ['merge-base', '--is-ancestor', oid, r.revision])
   if (!alive()) return
   if (!inApproved.ok) return inApproved.code === 1 ? kept('outside') : fail('other', firstLine(inApproved.err))
-  if (v.headRefOid === r.revision) return opened(wf, cardId, r, { number: src.number, url, draft: !!v.isDraft, pushed: r.revision }, alive)
+  if (oid === r.revision) return opened(wf, cardId, r, { number: src.number, url, draft: !!v.isDraft, pushed: r.revision }, alive)
   // Where it goes, read just before the push: the pull request's own repository through the project's remote, or the
   // fork's own address; every push address that repository.
-  const at = fork ? await (ports.forkTarget ?? forkAddress)(project, head) : { target: r.remote, urls: await ports.pushUrls(project, r.remote) }
+  const at: PushRoute = fork ? await (ports.forkTarget ?? forkAddress)(project, head) : { target: r.remote, urls: await ports.pushUrls(project, r.remote) }
   if (!alive()) return
   if (!pushesTo(at.urls, head)) return fail('pushUrl')
   if (!(await holds(wf, cardId, r.request, alive))) return
