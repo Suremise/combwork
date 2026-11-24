@@ -2605,7 +2605,8 @@ export class Workflow {
         if (!missing || (missing.missing === 'userOk' && approvedByUser(now, 'review'))) this.finish(w, fin)
       } else if (!missing && st.stage === 'approved') {
         if (r.options.finish === 'combworkMerges') this.enqueue(w)
-        else if (r.options.finish === 'pullRequest') now.started?.pr ? this.followExistingPr(w) : this.requestPr(w, fin.github)
+        else if (r.options.finish === 'pullRequest' && now.started?.pr) this.followExistingPr(w)
+        else if (r.options.finish === 'pullRequest') this.requestPr(w, fin.github)
         else this.wake(w, builder, stored(W.approvedMerge))
       }
       // Whatever the approval led to (finished, queued, still waiting on another gate), its builder hears of it, once.
@@ -3280,7 +3281,10 @@ export class Workflow {
             if (to === 'merging' && r.options.finish === 'combworkMerges') this.enqueue(w)
             else w.move(hasStage(r, 'approved') ? 'approved' : to, cause)
             // HI-3552: the user's move into Passed is their OK: Combwork pushes it and opens its pull request.
-            if (r.options.finish === 'pullRequest' && w.current === 'approved' && !w.state().pullRequest) w.state().started?.pr ? this.followExistingPr(w) : this.requestPr(w, prLink)
+            if (r.options.finish === 'pullRequest' && w.current === 'approved' && !w.state().pullRequest) {
+              if (w.state().started?.pr) this.followExistingPr(w)
+              else this.requestPr(w, prLink)
+            }
           }
           return null
         })
