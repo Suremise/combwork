@@ -1,5 +1,6 @@
 import { COMPARE_COMMITS, COMPARE_FILES, type CompareFile, type CompareLines, type GitCommitRow, type GitComparison } from '../shared/gitRepo'
 import type { GitDiff } from '../shared/types'
+import { parseHunks, type DiffHunk } from '../shared/githubReviews'
 import { resolve as resolvePath } from 'path'
 import { msg } from '../shared/i18n'
 import { failure as commandFailed, git, gitlinkChange, isBinary, MAX_DIFF_BYTES, tooLargeDiff } from './git'
@@ -151,6 +152,16 @@ export async function compareBranches(root: string, baseName: string, headName: 
  * folder, or the other way round), is an empty side; a file it lists whose blob can't be read (a store missing the
  * object) is an error, never an empty side (HI-3218's round 1; Compare's too, HI-3227).
  */
+/**
+ * HI-3559: one file's hunks from commit `from` to `to` (`git diff -U3`, as GitHub shows a pull request's diff), read from
+ * their headers alone: where a review's line comment can sit. A binary change has none.
+ */
+export async function commitHunks(root: string, from: string, to: string, file: string): Promise<DiffHunk[]> {
+  const r = await git(root, ['--literal-pathspecs', 'diff', '--no-color', '--no-ext-diff', '--no-renames', '-U3', from, to, '--', String(file ?? '').replace(/\\/g, '/')], MAX_DIFF_BYTES * 2)
+  if (!r.ok) throw commandFailed('git diff', r) // i18n-ignore: a git command, as it is
+  return parseHunks(r.out)
+}
+
 async function fileAt(root: string, rev: string, file: string): Promise<{ buf: Buffer } | { size: number }> {
   const listed = await git(root, ['--literal-pathspecs', 'ls-tree', '-l', '--full-tree', '-z', rev, '--', file])
   if (!listed.ok) throw commandFailed('git ls-tree', listed) // i18n-ignore: a git command, as it is

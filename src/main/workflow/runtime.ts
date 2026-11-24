@@ -15,7 +15,7 @@ import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisio
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
-import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
+import { FOCUSED_PICK, githubFeedbackOf, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import { reviewsInProgress, submissionReviewers } from '../../shared/workflow/reviewerPool'
 import { ACCEPT_MAX, chosenTests, focusedCheckName, reviewProved, standingFocusedRun, validTestId, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
 import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
@@ -2318,7 +2318,7 @@ export class Workflow {
       if (bad) return args.startReview ? undo(bad) : bad
       const st = w.state()
       acceptance = args.accept?.length ? (args.pass ? acceptedRuns(st.checks, sub?.revision ?? null, args.accept, r.options.commands) : { accepted: [], warnings: [say(W.acceptOnPass)] }) : { accepted: [], warnings: [] }
-      w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment, ...(acceptance.accepted.length ? { accepted: acceptance.accepted } : {}) }) // i18n-ignore: a fact's kind and codes, not text
+      const given = w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment, ...(acceptance.accepted.length ? { accepted: acceptance.accepted } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       // HI-1734: a code card passing with nothing to merge is proposed no code, as an agent's proposal is (the user
       // confirms; then it finishes with nothing to merge). HI-1449 sat in Approved for two days. Once only: not after a
       // proposal or a decision of its kind (`merged` was only read without either).
@@ -2326,6 +2326,14 @@ export class Workflow {
       // A verdict frees its pooled reviewer for the next card, and with G1b = 2 a pass asks for the second (#1443); a loose
       // card's too (HI-2046).
       if (card.reviewerPool || !card.lane) w.action('assignReviewer', { submission: subId! })
+      // HI-3559 (Feedback to GitHub): a reviewer agent's verdict on a pull request's card, drafted as its review there under
+      // the option as it is now (never for a verdict written before it changed); Agent's posted by Combwork, through an
+      // action run once this write commits.
+      const feedback = githubFeedbackOf(this.cfg.options())
+      if (agent && card.source?.kind === 'pr' && feedback !== 'user') {
+        const draft = w.fact('GithubReviewDrafted', { verdict: given.seq, submission: subId!, revision: sub?.revision ?? null, reviewer: agent, body: args.comment, auto: feedback === 'agent' })
+        if (feedback === 'agent') w.action('postGithubReview', { draft: draft.seq }, draft.seq)
+      }
       if (!args.pass) {
         w.move('active', 'intent')
         this.wake(w, st.started?.builder, stored(W.failedReview, { card: card.key }))

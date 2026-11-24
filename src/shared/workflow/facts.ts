@@ -556,6 +556,26 @@ export interface FactData {
    * refused); `items` in the order sent, which the batch read keeps.
    */
   FeedbackSent: { batch: string; submission: number; round: number; items: { id: string; version: number }[] }
+  /**
+   * HI-3559 (Feedback to GitHub): a reviewer agent's verdict (fact `verdict`) on a pull request's card, drafted as the review
+   * to post there, written with the verdict under the option then (`auto`: Agent, posted by Combwork through an action;
+   * else Both, for the user to edit and post). `body` is the verdict's comment as the agent wrote it.
+   */
+  GithubReviewDrafted: { verdict: number; submission: number; revision: string | null; reviewer: string; body: string; auto: boolean }
+  /**
+   * A review being posted to the card's pull request: a draft's (`draft`, its fact's seq) or the user's own (null), claimed
+   * before gh is asked, so it is posted once. `by`: who posts it (Combwork for an automatic one, else the user).
+   */
+  GithubReviewPosting: { draft: number | null; by: 'combwork' | 'user'; submission: number | null }
+  /**
+   * The posting (its fact's seq) done: GitHub's review (its `url`, when gh gave it), the body as posted (footer included),
+   * and the user's line comments it carried, `inline` on the PR's diff or `listed` in the body.
+   */
+  GithubReviewPosted: { posting: number; url: string | null; body: string; comments: string[]; inline: number; listed: number }
+  /** The posting failed: gh's own words (or why it wasn't tried). The draft can be posted again. */
+  GithubReviewFailed: { posting: number; error: string }
+  /** The user discarded a draft: never posted. */
+  GithubReviewDiscarded: { draft: number }
 }
 
 /**

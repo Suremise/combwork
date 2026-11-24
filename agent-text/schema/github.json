@@ -26,6 +26,34 @@
   "github.link.notARemote": {
     "placeholders": {}
   },
+  "github.review.done": {
+    "placeholders": {
+      "state": "select"
+    }
+  },
+  "github.review.empty": {
+    "placeholders": {}
+  },
+  "github.review.noCard": {
+    "placeholders": {}
+  },
+  "github.review.noDraft": {
+    "placeholders": {}
+  },
+  "github.review.noLink": {
+    "placeholders": {
+      "repo": "plain"
+    }
+  },
+  "github.review.notAllowed": {
+    "placeholders": {
+      "option": "select",
+      "what": "select"
+    }
+  },
+  "github.review.notPr": {
+    "placeholders": {}
+  },
   "github.source.outsideText": {
     "placeholders": {}
   }

@@ -66,4 +66,11 @@ interface CombworkMessageValues {
   'github.prs.row': { number: string | number; title: string | number }
   'github.prs.tip': { repo: string | number }
   'github.prs.title': { repo: string | number }
+  'github.review.done': { state: string }
+  'github.review.empty': undefined
+  'github.review.noCard': undefined
+  'github.review.noDraft': undefined
+  'github.review.noLink': { repo: string | number }
+  'github.review.notAllowed': { option: string; what: string }
+  'github.review.notPr': undefined
 }

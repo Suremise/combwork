@@ -160,6 +160,7 @@ import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pause
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { revisionDiff } from './workflow/revisionDiff'
 import { addLineComment, changeLineComment, feedbackPreview, sendFeedback } from './workflow/lineComments'
+import { discardGithubReview, githubReviewsView, postGithubReview } from './githubReviews'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
 import { withSkillDelivered } from '../shared/skillDelivery'
@@ -1124,6 +1125,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'github:setRemote': (p, remote) => setGithubRemote(workspace, workspace.assertProject(p), typeof remote === 'string' ? remote : null),
     'github:repo': (p) => githubRepoFor(workspace, workspace.assertProject(p)),
     'github:openPrs': (p) => openPrsOf(workspace, workspace.assertProject(p)),
+    // HI-3559: a pull request's card's reviews to GitHub; the user posts a draft (its edit) or their own, or discards a draft.
+    'github:reviews': (n) => githubReviewsView(currentWorkspace(), Number(n)),
+    'github:postReview': (n, draft, body) => postGithubReview(currentWorkspace(), Number(n), { draft: typeof draft === 'number' && Number.isInteger(draft) ? draft : null, body: typeof body === 'string' ? body.slice(0, 60_000) : '' }, 'user'),
+    'github:discardReview': (n, draft) => discardGithubReview(currentWorkspace(), Number(n), Number(draft)),
     'slots:levelForm': (level) => slotLevelForm(workspace, level),
     'slots:setLevelDefault': async (level, key, value) => {
       await setSlotDefault(workspace, level, key, value)

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, RetargetPreview, RetargetResult, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import { accepts, hasCapability, hasOperation, merges, type PlatformId } from '@shared/platform/descriptors'
-import { allOff, formFinishes, formFolders, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, FORM_TABS, formShows, formTabOf, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type FormTabId, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
+import { allOff, formFinishes, formFolders, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, FORM_TABS, formShows, formTabOf, githubFeedbackOf, githubFooterOf, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type FormTabId, type GithubFeedback, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionDesc, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, TAB_TEXT, VALUE_TEXT, WAKE_EVENT_TEXT, WAKE_LEVEL_TEXT } from '@shared/workflow/optionTexts'
 import { ASSISTANT_WAKES_DEFAULT, LANE_EVENTS, WAKE_EVENT_ORDER, WAKE_LEVELS, wakeEventsOf, type AssistantWakes, type WakeLevel } from '@shared/laneEvents'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX, FILE_LOCK_MODES } from '@shared/defaults'
@@ -730,6 +730,19 @@ function WorkflowEditor({ source, project, at, onDirty }: { source: FormSource; 
         return select('style', [['merge', tr(V.style.merge)], ['squash', tr(V.style.squash)], ['rebase', tr(V.style.rebase)]])
       case 'commitMessage':
         return select('commitMessage', [['combwork', tr(V.commitMessage.combwork)], ['branch', tr(V.commitMessage.branch)]])
+      // HI-3559: absent is Both, and the footer on (githubFeedbackOf, githubFooterOf).
+      case 'githubFeedback':
+        return (
+          <select className="select" value={githubFeedbackOf(effective)} onChange={(e) => set('githubFeedback', e.target.value as GithubFeedback)}>
+            {(['both', 'agent', 'user'] as const).map((v) => (
+              <option key={v} value={v}>
+                {tr(V.githubFeedback[v])}
+              </option>
+            ))}
+          </select>
+        )
+      case 'githubFooter':
+        return <Switch checked={githubFooterOf(effective)} onChange={(v) => set('githubFooter', v)} />
       case 'folder':
         // The platform's folders (HI-3140: formFolders).
         return select('folder', formFolders(platform).map((f) => [f, tr(V.folder[f])]))

@@ -24,7 +24,7 @@ import { agentText, linesOf, withValues, type Text } from '../../shared/advanced
 import { msg } from '../../shared/i18n/msg'
 import { tr } from '../../shared/i18n'
 import { MERGE_ANSWER, OPTION_TEXT, VALUE_TEXT } from '../../shared/workflow/optionTexts'
-import { allOff, BRANCH_OPTIONS, FOCUSED_PICK, GUARD_OPTIONS, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, BRANCH_OPTIONS, FOCUSED_PICK, GITHUB_OPTIONS, GUARD_OPTIONS, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import { merges, type PlatformId } from '../../shared/platform/descriptors'
@@ -223,7 +223,7 @@ export function keptNames<T extends Partial<WorkflowOptions>>(options: T): T {
 }
 
 /** Whether a change of these options applies at once (#1417): only names (N5), the branches lanes and cards may pick (HI-2556), or the merge guards (HI-3284) changed, which aren't rules. */
-export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k) || (BRANCH_OPTIONS as readonly string[]).includes(k) || (GUARD_OPTIONS as readonly string[]).includes(k))
+export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k) || (BRANCH_OPTIONS as readonly string[]).includes(k) || (GUARD_OPTIONS as readonly string[]).includes(k) || (GITHUB_OPTIONS as readonly string[]).includes(k))
 
 /** The options a save would set, their problems, and what changes from the options in force now. */
 function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<WorkflowOptions>, change: WorkflowChange, folder: string) {

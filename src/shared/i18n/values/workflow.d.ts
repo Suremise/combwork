@@ -152,6 +152,7 @@ interface CombworkMessageValues {
   'workflow.form.templateOtherPlatform': { template: string | number; platform: string | number; project: string | number }
   'workflow.form.use': { preset: string | number }
   'workflow.group.checks': undefined
+  'workflow.group.github': undefined
   'workflow.group.loops': undefined
   'workflow.group.merging': undefined
   'workflow.group.review': undefined
@@ -250,6 +251,10 @@ interface CombworkMessageValues {
   'workflow.option.folder.title': undefined
   'workflow.option.followRemote.desc': undefined
   'workflow.option.followRemote.title': undefined
+  'workflow.option.githubFeedback.desc': undefined
+  'workflow.option.githubFeedback.title': undefined
+  'workflow.option.githubFooter.desc': undefined
+  'workflow.option.githubFooter.title': undefined
   'workflow.option.identity.desc': undefined
   'workflow.option.identity.title': undefined
   'workflow.option.loopRounds.desc': undefined
@@ -673,6 +678,9 @@ interface CombworkMessageValues {
   'workflow.value.finish.notChecked': undefined
   'workflow.value.folder.project': undefined
   'workflow.value.folder.slots': undefined
+  'workflow.value.githubFeedback.agent': undefined
+  'workflow.value.githubFeedback.both': undefined
+  'workflow.value.githubFeedback.user': undefined
   'workflow.value.mergeInstall.always': undefined
   'workflow.value.mergeInstall.onManifestChange': undefined
   'workflow.value.okBefore.every': undefined

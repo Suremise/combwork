@@ -1,0 +1,162 @@
+import { useEffect, useState } from 'react'
+import { msg, tr } from '@shared/i18n'
+import { formatDateTime } from '@shared/dates'
+import { githubFooter, type GithubReviewRow, type GithubReviewsView } from '@shared/githubReviews'
+import type { TaskCard } from '@shared/types'
+import * as actions from '../actions'
+import { call } from '../api'
+import { openWorkflowOption, useStore } from '../store'
+import { Icon } from './ui'
+
+/**
+ * Feedback to GitHub on a pull request's card (HI-3559): the reviews it posts to its pull request, always a comment review
+ * through the user's GitHub CLI. Under Both an agent's verdict is drafted here for the user to edit and post; under You the
+ * user writes their own; under The agent each verdict is posted as it is given, and one that failed can be posted again.
+ */
+
+const T = {
+  label: msg({ id: 'board.github.label', defaultMessage: 'Feedback to GitHub', description: 'A field label in the card dialog of a pull request’s card (HI-3559): the reviews posted to that pull request.' }),
+  option: msg({ id: 'board.github.option', defaultMessage: '{option, select, agent {Each reviewer agent’s verdict is posted as it is given.} user {Only reviews you write here are posted.} other {A reviewer agent’s verdict is drafted here for you to edit and post.}} Posted as your GitHub account, always as a comment review.', description: 'Under “Feedback to GitHub” in a pull request card’s dialog (HI-3559): what the project’s Feedback to GitHub option does. Keep the select keys. A comment review neither approves nor requests changes.' }),
+  change: msg({ id: 'board.github.change', defaultMessage: 'Change…', description: 'A button under “Feedback to GitHub” in the card dialog (HI-3559): opens the option in Version Control → Workflow → GitHub.' }),
+  drafted: msg({ id: 'board.github.drafted', defaultMessage: 'Drafted from {reviewer}’s verdict', description: 'Over a review draft in the card dialog (HI-3559): which reviewer agent’s verdict it is. {reviewer} is an agent’s name.' }),
+  footer: msg({ id: 'board.github.footer', defaultMessage: 'Ends with “{footer}”.', description: 'Under a review draft (HI-3559): the line it ends with on GitHub, naming the model (quoted in English as posted).' }),
+  comments: msg({ id: 'board.github.comments', defaultMessage: '{n, plural, one {With your # open line comment on this revision.} other {With your # open line comments on this revision.}}', description: 'Under a review draft or the box for a review of the user’s own (HI-3559): the user’s open line comments it carries to GitHub.' }),
+  post: msg({ id: 'board.github.post', defaultMessage: 'Post to GitHub', description: 'A button in the card dialog (HI-3559): posts the review (a draft as edited, or the user’s own) to the pull request on GitHub.' }),
+  postAgain: msg({ id: 'board.github.postAgain', defaultMessage: 'Post Again', description: 'A button on a review that wasn’t posted to GitHub (HI-3559): tries again.' }),
+  discard: msg({ id: 'board.github.discard', defaultMessage: 'Discard', description: 'A button on a review draft (HI-3559): drops it, never posted.' }),
+  posting: msg({ id: 'board.github.posting', defaultMessage: 'Being posted to GitHub…', description: 'A review in the card dialog (HI-3559) while it is posted.' }),
+  posted: msg({ id: 'board.github.posted', defaultMessage: 'Posted {when} by {by, select, combwork {Combwork} other {you}}', description: 'A review posted to GitHub (HI-3559): when (a date and time), and by Combwork (an automatic one) or the user. Keep the select keys.' }),
+  open: msg({ id: 'board.github.open', defaultMessage: 'Open on GitHub', description: 'A link on a posted review (HI-3559): opens it on GitHub.' }),
+  carried: msg({ id: 'board.github.carried', defaultMessage: '{inline, plural, =0 {} one {# line comment on the diff} other {# line comments on the diff}}{both, select, yes {, } other {}}{listed, plural, =0 {} one {# listed in it} other {# listed in it}}', description: 'Under a posted review (HI-3559): how many of the user’s line comments sit on the pull request’s diff, and how many are listed in its text (lines GitHub’s diff doesn’t show). Keep the select key.' }),
+  failed: msg({ id: 'board.github.failed', defaultMessage: 'Not posted: {error}', description: 'A review that couldn’t be posted to GitHub (HI-3559). {error} says why (often the GitHub CLI’s own words, in English).' }),
+  discarded: msg({ id: 'board.github.discarded', defaultMessage: 'Discarded draft', description: 'A review draft the user discarded (HI-3559).' }),
+  notNow: msg({ id: 'board.github.notNow', defaultMessage: 'Not posted: Feedback to GitHub doesn’t post agents’ drafts now.', description: 'Under a review draft the project’s option no longer lets be posted (HI-3559).' }),
+  write: msg({ id: 'board.github.write', defaultMessage: 'Write a review', description: 'The placeholder of the box in a pull request card’s dialog where the user writes a review of their own to post (HI-3559).' }),
+  postFailed: msg({ id: 'board.github.postFailed', defaultMessage: 'Couldn’t post to GitHub', description: 'An error’s title (HI-3559): a review couldn’t be posted; its message says why.' }),
+  discardFailed: msg({ id: 'board.github.discardFailed', defaultMessage: 'Couldn’t discard the draft', description: 'An error’s title (HI-3559): a review draft couldn’t be discarded; its message says why.' })
+}
+
+/** Whether the user can post this row now, as main checks it again. */
+const postable = (v: GithubReviewsView, r: GithubReviewRow): boolean =>
+  !!r.draft && (r.state === 'draft' || r.state === 'failed') && (v.feedback === 'both' || (v.feedback === 'agent' && r.draft.auto && r.state === 'failed'))
+
+function Row({ card, v, r, onDone }: { card: number; v: GithubReviewsView & { rows: (GithubReviewRow & { reviewerName: string | null; model: string | null })[] }; r: GithubReviewsView['rows'][number]; onDone: () => void }) {
+  const [text, setText] = useState(r.draft?.body ?? '')
+  const [busy, setBusy] = useState(false)
+  const can = postable(v, r)
+  const post = async (): Promise<void> => {
+    setBusy(true)
+    await actions.attempt(tr(T.postFailed), () => call('github:postReview', card, r.draft?.seq ?? null, text))
+    setBusy(false)
+    onDone()
+  }
+  const discard = async (): Promise<void> => {
+    if (!r.draft) return
+    setBusy(true)
+    await actions.attempt(tr(T.discardFailed), () => call('github:discardReview', card, r.draft!.seq))
+    setBusy(false)
+    onDone()
+  }
+  return (
+    <div className="github-review" data-review={r.id} data-state={r.state}>
+      {r.draft && <div className="s-desc">{tr(T.drafted, { reviewer: r.reviewerName ?? r.draft.reviewer })}</div>}
+      {r.state === 'posted' && r.posted ? (
+        <>
+          <div className="github-review-head">
+            <Icon name="check" /> {tr(T.posted, { when: formatDateTime(r.posted.at), by: r.posting?.by ?? 'user' })}
+            {r.posted.url && (
+              <a href={r.posted.url} onClick={(e) => (e.preventDefault(), void call('app:openExternal', r.posted!.url!))}>
+                {tr(T.open)}
+              </a>
+            )}
+          </div>
+          <div className="github-review-body">{r.posted.body}</div>
+          {r.posted.inline + r.posted.listed > 0 && <div className="s-desc">{tr(T.carried, { inline: r.posted.inline, listed: r.posted.listed, both: r.posted.inline && r.posted.listed ? 'yes' : 'no' })}</div>}
+        </>
+      ) : r.state === 'posting' ? (
+        <div className="muted">
+          <Icon name="loading" spin /> {tr(T.posting)}
+        </div>
+      ) : r.state === 'discarded' ? (
+        <div className="muted">{tr(T.discarded)}</div>
+      ) : (
+        <>
+          {r.state === 'failed' && <div className="warn-text" data-review-error="">{tr(T.failed, { error: r.error ?? '' })}</div>}
+          <textarea className="input github-review-text" value={text} readOnly={!can || v.feedback === 'agent'} disabled={busy} onChange={(e) => setText(e.target.value)} />
+          {v.footer && r.draft && r.model && <div className="s-desc">{tr(T.footer, { footer: githubFooter(r.model) })}</div>}
+          {can ? (
+            <div className="flex">
+              <button type="button" className="btn small primary" data-action="review-post" disabled={busy || !text.trim()} onClick={() => void post()}>
+                <Icon name={busy ? 'loading' : 'github'} spin={busy} /> {tr(r.state === 'failed' ? T.postAgain : T.post)}
+              </button>
+              <button type="button" className="btn small subtle" data-action="review-discard" disabled={busy} onClick={() => void discard()}>
+                {tr(T.discard)}
+              </button>
+            </div>
+          ) : (
+            <div className="s-desc">{tr(T.notNow)}</div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+/** A pull request's card's Feedback to GitHub, in its dialog. */
+export function GithubFeedbackField({ card }: { card: TaskCard }) {
+  const [view, setView] = useState<GithubReviewsView | null>(null)
+  const [asked, setAsked] = useState(0)
+  const [own, setOwn] = useState('')
+  const [busy, setBusy] = useState(false)
+  // Read again as the board changes (a verdict drafted, a post's result).
+  const tasks = useStore((s) => s.tasks)
+  const projectPath = useStore((s) => s.workspace?.projects.find((p) => p.name.toLowerCase() === card.project.toLowerCase())?.path ?? null)
+  useEffect(() => {
+    let live = true
+    call('github:reviews', card.number).then(
+      (v) => live && setView(v),
+      () => live && setView(null)
+    )
+    return () => {
+      live = false
+    }
+  }, [card.number, tasks, asked])
+  if (card.source?.kind !== 'pr' || !view) return null
+  const refresh = (): void => setAsked((n) => n + 1)
+  const postOwn = async (): Promise<void> => {
+    setBusy(true)
+    const done = await actions.attempt(tr(T.postFailed), () => call('github:postReview', card.number, null, own))
+    setBusy(false)
+    if (done?.state === 'posted') setOwn('')
+    refresh()
+  }
+  return (
+    <>
+      <label>{tr(T.label)}</label>
+      <div className="github-feedback" data-feedback={view.feedback}>
+        <div className="s-desc">
+          {tr(T.option, { option: view.feedback })}{' '}
+          {projectPath && (
+            <button type="button" className="btn small subtle" data-action="feedback-option" onClick={() => openWorkflowOption(projectPath, 'githubFeedback')}>
+              {tr(T.change)}
+            </button>
+          )}
+        </div>
+        {[...view.rows].reverse().map((r) => (
+          <Row key={`${r.id}:${r.state}`} card={card.number} v={view} r={r} onDone={refresh} />
+        ))}
+        {view.canWrite && (
+          <div className="github-review" data-review="own">
+            <textarea className="input github-review-text" placeholder={tr(T.write)} value={own} disabled={busy} onChange={(e) => setOwn(e.target.value)} />
+            {view.openComments > 0 && <div className="s-desc">{tr(T.comments, { n: view.openComments })}</div>}
+            <div className="flex">
+              <button type="button" className="btn small" data-action="review-post-own" disabled={busy || (!own.trim() && !view.openComments)} onClick={() => void postOwn()}>
+                <Icon name={busy ? 'loading' : 'github'} spin={busy} /> {tr(T.post)}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
