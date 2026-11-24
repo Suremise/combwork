@@ -93,30 +93,42 @@ export function unitResults(report, ids, cwd, unhandled = null) {
     } else if (t.status === 'passed' && (t.assertionResults ?? []).some((a) => a.status === 'passed')) out.set(id, { result: 'passed' })
     else out.set(id, { result: 'skipped', why: 'every test in it was skipped' })
   }
-  if (report.success === false && ![...out.values()].some((r) => r.result === 'failed')) {
-    const blamed = blamedFiles(unhandled, idOf, new Set(report.testResults.map((t) => idOf(t.name))))
-    if (blamed) {
-      const why = (errors) => `an unhandled error while it ran (Vitest attributes it to this file): ${errors.map((e) => `${e.name}: ${e.message}`).join('; ')}`
-      for (const id of ids) if (id !== ALL_UNIT && blamed.has(id.toLowerCase())) out.set(id, { result: 'failed', why: why(blamed.get(id.toLowerCase())) })
-      if (out.has(ALL_UNIT)) out.set(ALL_UNIT, { result: 'failed', why: `an unhandled error while ${[...blamed.keys()].join(', ')} ran (Vitest attributes it to that file): ${[...blamed.values()].flat().map((e) => `${e.name}: ${e.message}`).join('; ')}` })
-    } else for (const [id, r] of out) if (r.result === 'passed') out.set(id, { result: 'failed', why: 'Vitest reported a failure outside the tests (an unhandled error: see its output)' })
+  if (report.success === false) {
+    // Each error put on its file, whatever else failed (HR1's HI-3567 round 1 finding): a file failing its assertions
+    // and blamed for an error too keeps both.
+    const failedBefore = [...out.values()].some((r) => r.result === 'failed')
+    const { blamed, unattributed } = blamedFiles(unhandled, idOf, new Set(report.testResults.map((t) => idOf(t.name))))
+    const said = (errors) => errors.map((e) => `${e.name}: ${e.message}`).join('; ')
+    const withError = (r, why) => (r?.result === 'failed' ? { result: 'failed', why: `${r.why}; and ${why}` } : { result: 'failed', why })
+    for (const id of ids) {
+      if (id === ALL_UNIT || !blamed.has(id.toLowerCase())) continue
+      out.set(id, withError(out.get(id), `an unhandled error while it ran (Vitest attributes it to this file): ${said(blamed.get(id.toLowerCase()))}`))
+    }
+    if (out.has(ALL_UNIT) && blamed.size) out.set(ALL_UNIT, withError(out.get(ALL_UNIT), `an unhandled error while ${[...blamed.keys()].join(', ')} ran (Vitest attributes it to that file): ${said([...blamed.values()].flat())}`))
+    // An error put on no file it ran (or none recorded) explains the failed run only if nothing else does: then every
+    // file that passed is failed, as it can't say which caused it.
+    if (unattributed && !failedBefore) for (const [id, r] of out) if (r.result === 'passed') out.set(id, { result: 'failed', why: 'Vitest reported a failure outside the tests (an unhandled error: see its output)' })
   }
   return out
 }
 
 /**
- * The run's unhandled errors by the file Vitest attributes each to (HI-3567): a Map id → its errors, or null when they
- * can't all be put on a file it ran (none recorded, one with no file, or a file not in the report).
+ * The run's unhandled errors by the file Vitest attributes each to (HI-3567): blamed, a Map id → its errors; and
+ * unattributed, true when one can't be put on a file it ran (no file, a file not in the report) or none were recorded.
  */
 function blamedFiles(unhandled, idOf, ran) {
-  if (!Array.isArray(unhandled) || !unhandled.length) return null
   const blamed = new Map()
+  if (!Array.isArray(unhandled) || !unhandled.length) return { blamed, unattributed: true }
+  let unattributed = false
   for (const e of unhandled) {
     const id = typeof e?.file === 'string' && e.file ? idOf(e.file) : null
-    if (!id || !ran.has(id)) return null
+    if (!id || !ran.has(id)) {
+      unattributed = true
+      continue
+    }
     blamed.set(id, [...(blamed.get(id) ?? []), { name: String(e.name ?? 'Error'), message: String(e.message ?? '') }])
   }
-  return blamed
+  return { blamed, unattributed }
 }
 
 /**
