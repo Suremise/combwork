@@ -112,7 +112,7 @@ export interface Env {
 }
 
 /** A scenario's world: Git (a repository) or None (a folder), with these options. */
-export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId }, extra: { releaseGrant?: (lane: string) => string | null; runsOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean; queueLive?: (target: string) => QueueLive; checksSettled?: () => Promise<void>; focused?: WorkflowConfig['focused']; hooks?: WorkflowConfig['hooks']; reviewersPresent?: WorkflowConfig['reviewersPresent']; releaseReads?: WorkflowConfig['releaseReads']; guardLimits?: WorkflowConfig['guardLimits']; slotFor?: WorkflowConfig['slotFor']; githubLink?: WorkflowConfig['githubLink'] } = {}): Env {
+export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId }, extra: { releaseGrant?: (lane: string) => string | null; runsOf?: (a: string) => string[]; autoRun?: boolean; files?: Record<string, string>; enforced?: () => boolean; queueLive?: (target: string) => QueueLive; checksSettled?: () => Promise<void>; focused?: WorkflowConfig['focused']; hooks?: WorkflowConfig['hooks']; reviewersPresent?: WorkflowConfig['reviewersPresent']; releaseReads?: WorkflowConfig['releaseReads']; guardLimits?: WorkflowConfig['guardLimits']; slotFor?: WorkflowConfig['slotFor']; githubLink?: WorkflowConfig['githubLink']; noteMove?: WorkflowConfig['noteMove'] } = {}): Env {
   const home = tempDir('wf-')
   const project = join(home, 'project')
   if (options.platform === 'git') gitRepo(project)
@@ -149,6 +149,7 @@ export function setup(options: Partial<WorkflowOptions> & { platform: PlatformId
       ...(extra.guardLimits ? { guardLimits: extra.guardLimits } : {}),
       ...(extra.slotFor ? { slotFor: extra.slotFor } : {}),
       ...(extra.githubLink ? { githubLink: extra.githubLink } : {}),
+      ...(extra.noteMove ? { noteMove: extra.noteMove } : {}),
       // The P2 scenarios run the P4 runtime: reconciliation acts on what it observes (#1217: the app's P3 records only).
       reconcileActs: true,
       effects: { wake: (agent, card, why) => wakes.push({ agent, card: card.key, why }), notify: (card, text, shown) => notes.push({ card: card.key, text, ...(shown ? { shown } : {}) }) }

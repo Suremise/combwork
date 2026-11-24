@@ -311,6 +311,12 @@ export interface WorkflowConfig {
    * After a write that moved a card, once it is committed: from and to (HI-2938: the app asks for its reconciliation here).
    */
   moved?: (card: CardRecord, from: StageId, to: StageId) => void
+  /**
+   * HI-3557: a move no intent wrote the board's line for (the merge queue's Done, its return to Active), in the write's own
+   * board change: its history's "Moved to …" line, which the lane's stall check counts from (columnSince). The app's
+   * notes it when the column changes; a failure is logged and never undoes the move.
+   */
+  noteMove?: (card: CardRecord, from: StageId, to: StageId) => Promise<void>
   /** Test seams: called between gathering and the transaction. */
   hooks?: { beforeWrite?: (move: string) => void | Promise<void>; unsubmittedRead?: () => void | Promise<void> }
   /**
@@ -487,6 +493,11 @@ export class Write {
   readonly woken: string[] = []
   /** A builder's reported merge result nothing checked (Not checked), for the card's finish (HI-2014): a claim, never containment. */
   claimed: string | null = null
+  /**
+   * HI-3557: the board's line for this write's move is written (an intent's own card, its 0.9 fields saved with the move).
+   * Unset, a move the write made is noted on the card by the runtime (`noteMove`), in the same board change.
+   */
+  boardNoted = false
   /** The card's stage when the write began. */
   readonly was: StageId
   constructor(
@@ -839,6 +850,15 @@ export class Workflow {
       if (also && w && (w as Write).written.length) await also.written(w)
       const done = w as Write | null
       if (done && done.current !== done.was) movedTo = { from: done.was, to: done.current }
+      // HI-3557: a move no intent noted on the board (the queue's Done) gets its history line in this same change, so the
+      // card's history and the stall check see it as it lands, never the move before it.
+      if (done && done.current !== done.was && !done.boardNoted && this.cfg.noteMove) {
+        try {
+          await this.cfg.noteMove(card, done.was, done.current)
+        } catch (e) {
+          log.warn(`noting ${card.key}'s move to ${done.current} on the board`, e)
+        }
+      }
       if (done) asked.push(...done.written.filter((f) => f.kind === 'ApprovalRequested' && CHURN_GATES.includes((f.data as FactData['ApprovalRequested']).gate)).map((f) => (f.data as FactData['ApprovalRequested']).request))
       return r
     })

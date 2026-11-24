@@ -61,6 +61,17 @@ describe('the merge queue in the app (#1348)', () => {
     expect(gits.some((g) => g.startsWith('update-ref refs/heads/main '))).toBe(true)
   })
 
+  it("HI-3557: the queue's Done is noted on the board in its own write (noteMove), merging to done, once", async () => {
+    const notes: { card: string; from: string; to: string; stage: string }[] = []
+    const e = (env = setup({ ...preset('git', 'team', { quick: ['quick'], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, commands: { quick: 'npm run quick' } }, { noteMove: async (card, from, to) => void notes.push({ card: card.key, from, to, stage: e.wf.state(card).stage }) }))
+    detach(e)
+    const { card } = await queued(e)
+    notes.length = 0
+    expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
+    // Called as the Done is committed (the stage already done when it runs), and for nothing else the merge wrote.
+    expect(notes).toEqual([{ card: card.key, from: 'merging', to: 'done', stage: 'done' }])
+  })
+
   it('the lease lost inside the lock, after IntegrationStarted: no swap; the next runner recovers it (rerun) and merges', async () => {
     const e = team()
     detach(e)

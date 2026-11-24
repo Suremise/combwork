@@ -2048,6 +2048,8 @@ export async function runIntent<R>(
           // Only this intent's own card's writes: another card's write made under its context (something it set off,
           // scheduled from inside it) is that card's business, never this card's 0.9 fields (#1287).
           if (w.card.id !== n) return
+          // HI-3557: its move's board line is this hook's (updateTaskAs below), not the runtime's noteMove.
+          w.boardNoted = true
           const own = w.written.filter((f) => f.kind !== 'Refused')
           const extra = zero9(w, first)
           first = false
