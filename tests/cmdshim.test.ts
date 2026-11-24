@@ -187,4 +187,19 @@ describe('a check run through a .cmd at a path with spaces and non-ASCII letters
     expect(r.stdout.trim()).toBe('version 1.5.0 --version')
     expect((await run(cmd, ['two words'])).stdout.trim()).toBe('version 1.5.0 "two words"')
   })
+
+  // HI-3552 (HR1): gh's pull request is opened with the card's title as an argument; through a gh.cmd, a title with a
+  // quote and `&` ran the rest as a command of cmd.exe's.
+  it.runIf(windows)('passes quotes and cmd.exe’s characters as data: a card title runs nothing', async () => {
+    const dir = join(base, 'gh tool é')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'echo.cjs'), "let i = ''\nprocess.stdin.on('data', (d) => (i += d)).on('end', () => process.stdout.write(JSON.stringify({ args: process.argv.slice(2), input: i })))\n")
+    const cmd = join(dir, 'gh.cmd')
+    writeFileSync(cmd, '@node "%~dp0echo.cjs" %*\r\n')
+    const titles = ['AM-1: harmless" & echo HI_3552_SHELL_MARKER & rem "', 'a&b|c<d>e^f', '"&echo odd', '""&echo pair', 'x\\"y', '%PATH% 100% !x!', '(x86) k=v;w,z', 'tail\\']
+    const r = await run(cmd, ['pr', 'create', ...titles.flatMap((t) => ['--title', t])], 15000, { SystemRoot: process.env.SystemRoot ?? 'C:\\Windows', PATH: dirname(process.execPath) }, 'body "with" & stuff\n')
+    expect(r.code, r.stderr).toBe(0)
+    expect(r.stdout).not.toContain('HI_3552_SHELL_MARKER\r')
+    expect(JSON.parse(r.stdout)).toEqual({ args: ['pr', 'create', ...titles.flatMap((t) => ['--title', t])], input: 'body "with" & stuff\n' })
+  })
 })

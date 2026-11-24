@@ -739,6 +739,11 @@
     "note": "A line in a card's history: an agent put the column's cards in order, and this card is now at place {place} (an ordinal: 2nd, 3rd). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each.",
     "audience": "both"
   },
+  "tasks.history.prClosed": {
+    "text": "Pull request #{number} was closed on GitHub without being merged: the card is back in Todo, its branch kept for its next start.",
+    "note": "HI-3552: a comment Combwork writes on a card whose GitHub pull request (number {number}) was closed without merging: the card moved back to Todo, and its branch stays, so starting it again carries on from its work.",
+    "audience": "both"
+  },
   "tasks.history.queueGuarded": {
     "text": "Came back from the merge queue: {count, plural, one {a merge guard matched lines it adds} other {# merge guards matched lines it adds}}. {guards}{others, plural, =0 {} one { One more guard matched too.} other { # more guards matched too.}} The card’s Work section shows the run.",
     "note": "A comment Combwork writes on a card when the merge queue sends it back because merge guards matched (HI-3284: patterns the project refuses in the lines a merge adds). {count}: how many guards matched; {guards}: the first of them, each as tasks.history.queueGuardedOne, joined by tasks.history.queueGuardedJoin (already translated); {others}: how many more matched, not listed. \"Merge queue\" and \"Work section\" are Combwork’s terms.",

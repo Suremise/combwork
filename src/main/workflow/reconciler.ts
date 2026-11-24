@@ -35,7 +35,7 @@ export const RECONCILE_DEBOUNCE_MS = 400
 /** Window focus reconciles again at most this often. */
 const FOCUS_MS = 10_000
 /** The stages whose cards are reconciled on every run; Done cards only when their target moved. */
-const UNFINISHED = ['active', 'review', 'approved', 'merging']
+const UNFINISHED = ['active', 'review', 'approved', 'merging', 'prOpen']
 
 /** A project being followed: its workspace as it was, what is waiting to be reconciled, and its run. */
 interface Followed {

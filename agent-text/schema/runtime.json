@@ -43,6 +43,11 @@
       "card": "plain"
     }
   },
+  "runtime.pr.closed": {
+    "placeholders": {
+      "number": "plain"
+    }
+  },
   "runtime.repair.boardDone": {
     "placeholders": {
       "stage": "plain"

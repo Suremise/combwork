@@ -970,6 +970,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // HI-3555: an open issue made a card (From GitHub…'s Issues): the user's alone, read again through the issue source in main.
     'tasks:fromIssue': (project, number, repo, text) => tasks.createFromIssue(String(project), Number(number), { host: String(repo?.host ?? ''), owner: String(repo?.owner ?? ''), repo: String(repo?.repo ?? '') }, { title: String(text?.title ?? '').slice(0, 200), description: String(text?.description ?? '').slice(0, 4000) }, { kind: 'user' }),
     'tasks:keptTarget': (n) => tasks.keptTarget(Number(n)),
+    // HI-3552: a card's pull request read now (its dialog opened), and every one in PR open (the board opened).
+    'tasks:prStatus': async (n) => (await import('./workflow/prHosts')).prStatus(currentWorkspace(), Number(n)),
+    'tasks:prFollow': async () => void (await import('./workflow/prHosts')).followAll(currentWorkspace()),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': async (n, patch, more) => {
       const user = { kind: 'user' } as const

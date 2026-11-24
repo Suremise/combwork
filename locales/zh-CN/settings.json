@@ -1724,6 +1724,8 @@
   "settings.advanced.cw.git.staleLockSeconds.title": "Git：锁多久算过期",
   "settings.advanced.cw.github.ghMinutes.desc": "一次 GitHub CLI（gh）调用可以运行多久，之后 Combwork 会将其视为卡住而结束，并提示它未响应。连接较慢或 GitHub Enterprise Server 响应较慢时可调高此值。",
   "settings.advanced.cw.github.ghMinutes.title": "GitHub CLI：单次调用最长用时",
+  "settings.advanced.cw.github.prFollowMinutes.desc": "当卡片在“PR 已打开”中等待时，Combwork 会按此频率读取它们在 GitHub 上的拉取请求，打开其看板或卡片时也会读取：GitHub 无法自行告知 Combwork 拉取请求何时被合并或关闭。",
+  "settings.advanced.cw.github.prFollowMinutes.title": "拉取请求：读取其状态的频率",
   "settings.advanced.cw.server.checkInferSeconds.title": "检查服务器：测试请求超时",
   "settings.advanced.cw.server.checkInferSeconds.desc": "“检查服务器”等待模型服务器回应其测试请求的时间。尚未加载的本地模型会先加载，在配置一般的硬件上可能需要几分钟；超过这个时间，检查会报告超时。"
 }

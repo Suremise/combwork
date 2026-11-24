@@ -1,3 +1,4 @@
+import type { PrView } from './githubSource'
 import type { FeedbackExpect, LineCommentView } from './workflow/lineComments'
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
@@ -603,6 +604,10 @@ export interface CombworkRequests {
   /** Sets the branch a card merges into (HI-2556, its Merges into): one the project lists, or null for its own. */
   'tasks:setTarget': (n: number, target: string | null) => TaskCard
   'tasks:setSource': (n: number, source: string | null) => TaskCard
+  /** HI-3552: a card's pull request in PR open, read from GitHub now (or its last read); null: none. */
+  'tasks:prStatus': (n: number) => PrView | null
+  /** HI-3552: every card's pull request in PR open read again now (the board opened). */
+  'tasks:prFollow': () => void
   /** HI-3553: an open pull request made a card in Todo (the board's From GitHub…), or the card already about it. */
   'tasks:fromPr': (project: string, number: number, repo: GithubRepoRef, text: { title: string; description: string }) => { card: TaskCard; existing: boolean }
   /** HI-3555: an open issue made a card in Todo (From GitHub…'s Issues), or the card already about it. */

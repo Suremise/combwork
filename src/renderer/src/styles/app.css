@@ -11560,6 +11560,26 @@ body.pane-resizing-v .monaco-editor {
   gap: 4px;
   align-items: flex-start;
 }
+/* HI-3552: a card's pull request: its number as a link, or that it isn't open yet. */
+.task-pr {
+  font-size: 12px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.task-pr.task-stalled {
+  align-items: flex-start;
+}
+.card-pr {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 8px;
+}
+.card-pr .flex {
+  gap: 6px;
+  align-items: center;
+}
 .task-meta {
   display: flex;
   flex-wrap: wrap;

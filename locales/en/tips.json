@@ -1987,6 +1987,14 @@
     "defaultMessage": "Project Settings from More ▾",
     "description": "A tip's title (HI-1840). More ▾ is the button's name with its arrow."
   },
+  "tips.pullRequestFinish.text": {
+    "defaultMessage": "Set Who merges to A pull request in Version Control → Workflow: once a card is approved, Combwork pushes it and opens its pull request on GitHub, and the card is Done when it’s merged there.",
+    "description": "A tip (HI-3552). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Who merges and its value A pull request as translated in the Workflow form)."
+  },
+  "tips.pullRequestFinish.title": {
+    "defaultMessage": "Finish cards with pull requests",
+    "description": "A tip's title (HI-3552): a project's cards can be finished through GitHub pull requests."
+  },
   "tips.quitWhenDone.text": {
     "defaultMessage": "Quitting while an agent works offers Quit when agents finish: Combwork hides and quits by itself once they're done. Conversations are always kept.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

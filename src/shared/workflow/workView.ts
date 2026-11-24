@@ -277,6 +277,11 @@ export interface WorkView {
   /** The line it works on (Git: its branch); null for None. */
   line: string | null
   /**
+   * HI-3552: this cycle's pull request finish, once asked: the pull request opened (its number, link and repository, a
+   * draft or not), or why the last try didn't open it; null before it is asked, or in another finish.
+   */
+  pullRequest?: WorkPullRequest | null
+  /**
    * HI-2913: its slot couldn't be prepared for this cycle (a `SlotPrepareFailed` for its lease, no `SlotPrepared` after
    * it): the slot, and why (English, as its builder was told). The window shows the card not ready there rather than
    * started.
@@ -496,6 +501,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     ...reviewSkipView(facts),
     folder: started?.folder ?? null,
     line: started?.line ?? null,
+    pullRequest: s.pullRequest ? { number: s.pullRequest.opened?.number ?? null, url: s.pullRequest.opened?.url ?? null, repo: `${s.pullRequest.requested.owner}/${s.pullRequest.requested.repo}`, draft: s.pullRequest.opened?.draft ?? null, failed: s.pullRequest.failed?.problem ?? null, closed: s.pullRequest.closed?.at ?? (s.pullRequest.closed ? '' : null), ...(s.pullRequest.opened?.notPushed ? { notPushed: true } : {}) } : null,
     ...(notReady ? { notReady: { slot: notReady.slot, why: notReady.why } } : {}),
     lines: s.lines,
     base: started?.base ?? null,
@@ -557,6 +563,21 @@ export const currentRevision = (v: WorkView): string | null => v.approved?.revis
 export const checksOn = (v: WorkView, revision: string): WorkCheck[] => v.checks.filter((c) => c.revision === revision)
 
 /** What a card's badges on the board need of its work (`workBadge`): little, for every live card at once. */
+/** HI-3552: a card's pull request as its view and badge keep it (from its facts; GitHub's live state is prHost's). */
+export interface WorkPullRequest {
+  number: number | null
+  url: string | null
+  /** owner/repo, as pinned on its request. */
+  repo: string
+  draft: boolean | null
+  /** Why the last try didn't open it (facts.ts's PrOpenFailedData problem), or null. */
+  failed: string | null
+  /** Closed on GitHub without merging: when ('' unknown), or null. */
+  closed: string | null
+  /** A pull request's card (HI-3551) following its own pull request: its fixes aren't pushed to it. */
+  notPushed?: boolean
+}
+
 export interface WorkBadge {
   card: number
   stage: StageId
@@ -612,6 +633,8 @@ export interface WorkBadge {
   stages: StageId[] | null
   /** The line it works on this cycle (Git: its branch, from its Started or Adopted; #1424); null for None or none. */
   line: string | null
+  /** HI-3552: its pull request (WorkView's); absent: none. */
+  pullRequest?: WorkPullRequest | null
   /** Every line it has started on, this cycle's and earlier ones' (HI-1823): while it is open, none is a leftover. */
   lines: string[]
   /**
@@ -697,13 +720,14 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     kind: v.kind,
     kindProposed: v.kindProposed,
     ...(v.cardTarget ? { target: v.cardTarget } : {}),
-    ...(v.target && (v.stage === 'active' || v.stage === 'review' || v.stage === 'approved' || v.stage === 'merging') ? { startedOn: v.target } : {}),
+    ...(v.target && (v.stage === 'active' || v.stage === 'review' || v.stage === 'approved' || v.stage === 'merging' || v.stage === 'prOpen') ? { startedOn: v.target } : {}),
     reviewSkip: v.reviewSkip,
     reviewSkipProposed: v.reviewSkipProposed,
     decisionSince: !!latest && v.decisions.generation > latest.generation,
     oldRules: onOldRules(v, current),
     stages: stagesOf ? keptStages(v, stagesOf) : null,
     line: v.line,
+    pullRequest: v.pullRequest,
     lines: v.lines,
     underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
     startedAt: v.startedAt,

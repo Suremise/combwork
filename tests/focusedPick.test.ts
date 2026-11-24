@@ -13,7 +13,7 @@ import { SUITES } from './e2e/suites.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { isRealCli } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { PICK_MAX_TESTS, UNIT_SCANS, diffLinesOf, isUnitTestFile, needsLines, pickLines, directUnitTests, pickTests, pickUnitTests, scanSelects, unchangedSince, unitPicks, under } from './e2e/affected.mjs'
+import { PICK_MAX_TESTS, UNIT_SCANS, diffLinesOf, isUnitTestFile, needsLines, pickLines, directUnitTests, pickTests, pickUnitTests, scanSelects, unchangedSince, unitPicks, under, withoutOptIn } from './e2e/affected.mjs'
 // @ts-expect-error: a plain .mjs module without types
 import { ALL_UNIT } from '../scripts/focusedTests.mjs'
 import { FOCUSED_MAX_TESTS, parsePick } from '../src/shared/workflow/focused'
@@ -149,6 +149,16 @@ describe('the unit tests alone (pickUnitTests, --pick --unit: HI-3542)', () => {
     // Combwork reads it as a selection, not "too many" or "every".
     expect(parsePick(pickLines(over).join('\n'))).toEqual({ state: 'chosen', tests: [{ id: ALL_UNIT, needs: ['unit'] }] })
     expect(pickUnitTests({ paths: ['tests/cliHomes.ts'], direct: { all: 'tests/cliHomes.ts: every unit test loads it' } })).toEqual({ tests: [{ test: ALL_UNIT, needs: ['unit'] }], why: [`${ALL_UNIT}: tests/cliHomes.ts: every unit test loads it`] })
+  })
+
+  it('withoutOptIn (HI-3558): the opt-in benchmarks are left out; a test that skips for another reason, unmarked, stays', () => {
+    const read = (f: string): string | null => (existsSync(join(root, f)) ? readFileSync(join(root, f), 'utf8') : null)
+    const ids = ['tests/boardBench.test.ts', 'tests/cardSearchBench.test.ts', 'tests/boardStore.test.ts', ALL_UNIT, 'board']
+    const out = withoutOptIn(ids.map((test) => ({ test, needs: ['unit'] })), read) as { tests: { test: string }[]; left: string[] }
+    expect(out.left).toEqual(['tests/boardBench.test.ts', 'tests/cardSearchBench.test.ts'])
+    expect(out.tests.map((t) => t.test)).toEqual(['tests/boardStore.test.ts', ALL_UNIT, 'board'])
+    // The marker is a line of its own, not a mention of it.
+    expect(withoutOptIn([{ test: 'tests/a.test.ts', needs: ['unit'] }], () => "it('reads // focused: opt-in', () => {})\n").left).toEqual([])
   })
 
   it('directUnitTests: a test that itself loads a changed file (an import, a mock, a dynamic import), not one reaching it through another', () => {
@@ -350,13 +360,17 @@ describe('the picker on the command line (focused.pick)', () => {
     writeFileSync(join(repo, 'src', 'main', 'sessions.ts'), 'export const x = 1\n')
     mkdirSync(join(repo, 'tests'))
     writeFileSync(join(repo, 'tests', 'x.test.ts'), '')
+    writeFileSync(join(repo, 'tests', 'bench.test.ts'), '// A benchmark.\n// focused: opt-in (skipped without its setup)\n')
     git('add', '.')
     git('commit', '-q', '-m', 'base')
-    const r = spawnSync(process.execPath, [join(root, 'tests', 'e2e', 'affected.mjs'), '--pick', '--unit'], { cwd: repo, input: 'src/main/sessions.ts\ntests/x.test.ts\n', encoding: 'utf8', env: { ...runContext.baseEnv(), CW_FOCUSED_BASE: 'HEAD' } })
+    const r = spawnSync(process.execPath, [join(root, 'tests', 'e2e', 'affected.mjs'), '--pick', '--unit'], { cwd: repo, input: 'src/main/sessions.ts\ntests/x.test.ts\ntests/bench.test.ts\n', encoding: 'utf8', env: { ...runContext.baseEnv(), CW_FOCUSED_BASE: 'HEAD' } })
     expect(r.status, r.stderr).toBe(0)
     const lines = r.stdout.trim().split(/\r?\n/).map((l) => JSON.parse(l) as { test: string; needs: string[] })
-    // The changed test, and the scans any change meets (UNIT_SCANS: lineEndings…), each a unit test.
+    // The changed test, and the scans any change meets (UNIT_SCANS: lineEndings…), each a unit test; the opt-in
+    // benchmark changed beside it left out, saying so (HI-3558).
     expect(lines.map((l) => l.test)).toContain('tests/x.test.ts')
+    expect(lines.map((l) => l.test)).not.toContain('tests/bench.test.ts')
+    expect(r.stderr).toContain('tests/bench.test.ts: an opt-in test')
     expect(lines.every((l) => l.test.startsWith('tests/') && l.needs.join() === 'unit')).toBe(true)
   })
 
