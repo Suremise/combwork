@@ -19,6 +19,9 @@ const log = createLogger('github')
 
 const sameRepo = (a: GithubRepoRef, b: GithubRepoRef): boolean => `${a.host}/${a.owner}/${a.repo}`.toLowerCase() === `${b.host}/${b.owner}/${b.repo}`.toLowerCase()
 
+/** gh's words for a release or ref GitHub says isn't there (`release not found`, `HTTP 404`): positive evidence, unlike other failures. */
+const NOT_FOUND = /release not found|HTTP 404|\(404\)|Not Found/i
+
 const str = (o: Record<string, unknown>, k: string): string => (typeof o[k] === 'string' ? (o[k] as string) : '')
 const loginOf = (v: unknown): string | null => (v && typeof v === 'object' && typeof (v as { login?: unknown }).login === 'string' ? (v as { login: string }).login : null)
 const namesOf = (v: unknown, key: 'name' | 'login'): string[] => (Array.isArray(v) ? v.map((x) => (x && typeof x === 'object' && typeof (x as Record<string, unknown>)[key] === 'string' ? ((x as Record<string, unknown>)[key] as string) : '')).filter(Boolean) : [])
@@ -55,11 +58,14 @@ export function githubIssues(repo: GithubRepoRef): IssueSource {
     },
     async published(tag) {
       const r = await gh({ repo }, ['release', 'view', tag, '--json', 'isDraft,url'], { json: true })
-      if (!r.ok) return r.problem === 'failed' ? { ok: true, published: false, url: null, commit: null } : r
+      // HR1's round 2: only GitHub saying there is no such release is "not published"; any other failure (a 502, a rate
+      // limit, a refusal, an answer that can't be read) can't tell, and stays unreadable.
+      if (!r.ok) return r.problem === 'failed' && NOT_FOUND.test(r.detail ?? '') ? { ok: true, published: false, url: null, commit: null } : r
       const j = (r.json ?? {}) as Record<string, unknown>
+      if (typeof j.isDraft !== 'boolean') return { ok: false, problem: 'failed', detail: null }
       // HR1's round 1: the commit GitHub's own tag names, peeled through annotated tag objects (a few at most).
       const ref = await gh({ host: repo.host }, ['api', `repos/${name}/git/ref/tags/${tag}`], { json: true })
-      if (!ref.ok && ref.problem !== 'failed') return ref
+      if (!ref.ok && !(ref.problem === 'failed' && NOT_FOUND.test(ref.detail ?? ''))) return ref
       let object = ref.ok ? ((ref.json as { object?: { type?: unknown; sha?: unknown } } | null)?.object ?? null) : null
       for (let i = 0; object && object.type === 'tag' && typeof object.sha === 'string' && i < 4; i++) {
         const t = await gh({ host: repo.host }, ['api', `repos/${name}/git/tags/${object.sha}`], { json: true })

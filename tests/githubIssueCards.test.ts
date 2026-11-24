@@ -33,7 +33,7 @@ const ISSUES = (): Record<number, Issue> => ({
  * the project, and the tags GitHub has: by default the project's own (pushed), else `remoteTags`' commit; `annotated`
  * ones answer as a tag object to peel.
  */
-type GithubState = { issues: Record<number, Issue>; releases: Record<string, boolean>; modes: Record<number, 'fail' | 'commentThenFail' | 'lost'>; viewModes: Record<number, 'relink' | 'hold'>; repoPath?: string; remoteTags: Record<string, string>; annotated: string[] }
+type GithubState = { issues: Record<number, Issue>; releases: Record<string, boolean>; modes: Record<number, 'fail' | 'commentThenFail' | 'lost'>; viewModes: Record<number, 'relink' | 'hold'>; repoPath?: string; remoteTags: Record<string, string>; annotated: string[]; releaseErrors: Record<string, string> }
 /** A held view writes `held`, then answers once `go` is there (or its bound passes): a read held while the test changes things. */
 const held = join(base, 'gh', 'held')
 const go = join(base, 'gh', 'go')
@@ -82,6 +82,7 @@ writeFileSync(
     "if (args[0] === 'api' && tagObj) out({ object: { type: 'commit', sha: require('child_process').execFileSync('git', ['-C', S.repoPath, 'rev-parse', tagObj[1]]).toString().trim() } })",
     "const api = /^repos\\/acme\\/app\\/issues\\/(\\d+)$/.exec(args[1] || '')",
     "if (args[0] === 'api' && api && S.issues[api[1]]) out(S.issues[api[1]].association + '\\n')",
+    "if (args[0] === 'release' && args[1] === 'view' && S.releaseErrors[args[2]]) { if (S.releaseErrors[args[2]] === 'malformed') out({ url: 'https://github.com/acme/app/releases' }); fail(S.releaseErrors[args[2]]) }",
     "if (args[0] === 'release' && args[1] === 'view' && args[2] in S.releases) out({ isDraft: S.releases[args[2]], url: 'https://github.com/acme/app/releases/tag/' + args[2] })",
     "fail('HTTP 404: Not Found')"
   ].join('\n')
@@ -124,7 +125,7 @@ beforeEach(() => {
   writeFileSync(callLog, '')
   rmSync(held, { force: true })
   rmSync(go, { force: true })
-  writeFileSync(stateFile, JSON.stringify({ issues: ISSUES(), releases: {}, modes: {}, viewModes: {}, remoteTags: {}, annotated: [] } satisfies GithubState))
+  writeFileSync(stateFile, JSON.stringify({ issues: ISSUES(), releases: {}, modes: {}, viewModes: {}, remoteTags: {}, annotated: [], releaseErrors: {} } satisfies GithubState))
 })
 
 const user = { kind: 'user' } as const
@@ -422,6 +423,24 @@ describe('closing shipped issues at publish (HI-3555)', () => {
     setGithub((s) => (s.releases['v1.0.0-rc.1'] = false))
     expect((await shippedOf(w, repo, '1.0.0-rc.1')).issues.map((i) => i.issue)).toEqual([21, 22])
     expect((await shippedOf(w, repo, '1.0.0')).issues.map((i) => i.issue)).toEqual([23])
+    expect(writes()).toEqual([])
+  })
+
+  it('leaves a card out when an earlier release can’t be read: a server error or a malformed answer is no proof it wasn’t published (HR1’s round 2)', async () => {
+    const { w, repo } = await history()
+    setGithub((s) => {
+      s.releases['v1.0.0'] = false
+      s.releases['v1.1.0'] = false
+    })
+    expect((await shippedOf(w, repo, '1.1.0')).issues.map((i) => i.issue)).toEqual([24, 25])
+    for (const error of ['HTTP 502: Bad Gateway', 'malformed']) {
+      setGithub((s) => (s.releaseErrors['v1.0.0'] = error))
+      // 1.0.0's issues aren't 1.1.0's, whatever 1.0.0's read says; and 1.0.0 itself can't be listed.
+      expect((await shippedOf(w, repo, '1.1.0')).issues.map((i) => i.issue)).toEqual([24, 25])
+      expect(await inWorkspace(w, () => shippedIssuesOf(w, repo, '1.0.0'))).toMatchObject({ problem: 'failed' })
+    }
+    // Only GitHub saying there's no such release is "not published".
+    expect(await githubIssues(ACME).published('v1.0.0')).toMatchObject({ ok: false, problem: 'failed' })
     expect(writes()).toEqual([])
   })
 
