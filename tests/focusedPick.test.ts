@@ -167,9 +167,10 @@ describe('the unit tests alone (pickUnitTests, --pick --unit: HI-3542)', () => {
 
   it('withoutOptIn (HI-3558): the opt-in benchmarks are left out; a test that skips for another reason, unmarked, stays', () => {
     const read = (f: string): string | null => (existsSync(join(root, f)) ? readFileSync(join(root, f), 'utf8') : null)
-    const ids = ['tests/boardBench.test.ts', 'tests/cardSearchBench.test.ts', 'tests/boardStore.test.ts', ALL_UNIT, 'board']
+    // HI-3569: the workspace-copy trial, skipped without CW_TRIAL_WS, is marked too.
+    const ids = ['tests/boardBench.test.ts', 'tests/cardSearchBench.test.ts', 'tests/workflow/workspaceCopyTrial.test.ts', 'tests/boardStore.test.ts', ALL_UNIT, 'board']
     const out = withoutOptIn(ids.map((test) => ({ test, needs: ['unit'] })), read) as { tests: { test: string }[]; left: string[] }
-    expect(out.left).toEqual(['tests/boardBench.test.ts', 'tests/cardSearchBench.test.ts'])
+    expect(out.left).toEqual(['tests/boardBench.test.ts', 'tests/cardSearchBench.test.ts', 'tests/workflow/workspaceCopyTrial.test.ts'])
     expect(out.tests.map((t) => t.test)).toEqual(['tests/boardStore.test.ts', ALL_UNIT, 'board'])
     // The marker is a line of its own, not a mention of it.
     expect(withoutOptIn([{ test: 'tests/a.test.ts', needs: ['unit'] }], () => "it('reads // focused: opt-in', () => {})\n").left).toEqual([])
