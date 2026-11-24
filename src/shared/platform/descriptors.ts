@@ -120,7 +120,7 @@ const short = (id: string): string => id.slice(0, 7)
 
 export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Git answers everything: worktrees for isolation, merges for integration, replay for sameness.
-  git: { id: 'git', name: 'Git', capabilities: ['revisions', 'isolation', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'merge', deliverables: 'commits', finishes: ['combworkMerges', 'agentMerges', 'committed', 'notChecked'], defaultFinish: 'notChecked', repository: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES }, // i18n-ignore: a product name, the same in every language
+  git: { id: 'git', name: 'Git', capabilities: ['revisions', 'isolation', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'merge', deliverables: 'commits', finishes: ['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'pullRequest'], defaultFinish: 'notChecked', repository: true, operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES }, // i18n-ignore: a product name, the same in every language
   // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
   none: { id: 'none', name: 'None', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], integration: 'accept', deliverables: 'paths', finishes: ['accept'], defaultFinish: 'accept', repository: false, operations: [], revisionShort: short } // i18n-ignore: a product name, the same in every language

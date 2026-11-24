@@ -11,9 +11,10 @@ import type { CardState } from './facts'
  * - `user`: the user's OK or acceptance, asked under For you;
  * - `merge`: its builder merges it and reports the merge (the agent merges, or merges aren't checked);
  * - `queue`: Combwork's merge queue merges it;
+ * - `pullRequest` (HI-3552): Combwork opens its pull request on GitHub, or follows the one open, to Done when merged there;
  * - `done`: nothing more.
  */
-export type NextStep = { step: 'intents'; intents: string[] } | { step: 'review' | 'user' | 'merge' | 'queue' | 'done' }
+export type NextStep = { step: 'intents'; intents: string[] } | { step: 'review' | 'user' | 'merge' | 'queue' | 'pullRequest' | 'done' }
 
 /**
  * The step a card has next, from its state and the ruleset it works under. The user is next only while Combwork has asked
@@ -33,9 +34,12 @@ export function nextStep(s: CardState, r: Ruleset): NextStep | null {
       if (s.stale) return { step: 'intents', intents: ['submit'] } // i18n-ignore: an intent's name, agent-facing
       if (asked) return { step: 'user' }
       if (r.options.finish === 'agentMerges' || r.options.finish === 'notChecked') return { step: 'merge' }
+      if (r.options.finish === 'pullRequest') return { step: 'pullRequest' }
       return r.options.finish === 'combworkMerges' ? { step: 'queue' } : { step: 'user' }
     case 'merging':
       return { step: 'queue' }
+    case 'prOpen':
+      return { step: 'pullRequest' }
     case 'done':
       return { step: 'done' }
     default:

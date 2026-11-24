@@ -9,15 +9,15 @@ import { CATEGORY_STAGE, STAGE_CATEGORY, type StageId } from '../../shared/workf
 import { STAGE_ORDER, stageName, stagesShown, type StageNames } from '../../shared/workflow/stages'
 import { TASK_COLUMNS, type Tr } from '../../shared/tasks'
 
-/** The column a stage is shown in: its category's, except Merging's own. */
-export const columnOfStage = (s: StageId): BoardColumnId => (s === 'merging' ? 'merging' : STAGE_CATEGORY[s])
+/** The column a stage is shown in: its category's, except Merging's and PR open's own (HI-3552). */
+export const columnOfStage = (s: StageId): BoardColumnId => (s === 'merging' ? 'merging' : s === 'prOpen' ? 'prOpen' : STAGE_CATEGORY[s])
 
 export interface BoardStageColumn {
   id: BoardColumnId
   stage: StageId
   category: TaskColumn
   name: string
-  /** Cards enter Merging only through the merge queue: no drop there. */
+  /** Cards enter Merging only through the merge queue, PR open only once their pull request opens: no drop there. */
   dropTarget: boolean
 }
 
@@ -63,7 +63,7 @@ export function boardLayout(projects: readonly BoardProject[], cards: readonly B
     return stageName(stage, alike && first ? { [stage]: first } : null, tr)
   }
   return TASK_COLUMNS.flatMap(({ id: category }) => {
-    const columns = STAGE_ORDER.filter((s) => shown.has(s) && STAGE_CATEGORY[s] === category).map((stage) => ({ id: columnOfStage(stage), stage, category, name: name(stage), dropTarget: stage !== 'merging' }))
+    const columns = STAGE_ORDER.filter((s) => shown.has(s) && STAGE_CATEGORY[s] === category).map((stage) => ({ id: columnOfStage(stage), stage, category, name: name(stage), dropTarget: stage !== 'merging' && stage !== 'prOpen' }))
     return columns.length ? [{ category, columns }] : []
   })
 }

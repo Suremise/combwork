@@ -1724,6 +1724,8 @@
   "settings.advanced.cw.git.staleLockSeconds.title": "Git : l’âge à partir duquel un verrou est obsolète",
   "settings.advanced.cw.github.ghMinutes.desc": "Combien de temps un appel à la CLI GitHub (gh) peut durer avant que Combwork l’arrête comme bloqué et dise qu’elle n’a pas répondu. Augmente-la sur une connexion lente ou avec un GitHub Enterprise Server qui répond lentement.",
   "settings.advanced.cw.github.ghMinutes.title": "CLI GitHub : durée maximale d’un appel",
+  "settings.advanced.cw.github.prFollowMinutes.desc": "Tant que des cartes attendent dans PR ouverte, Combwork lit leurs pull requests sur GitHub à cet intervalle, et aussi quand leur tableau ou leur carte s’ouvre : GitHub ne peut pas prévenir lui-même Combwork quand l’une d’elles est fusionnée ou fermée.",
+  "settings.advanced.cw.github.prFollowMinutes.title": "Pull requests : fréquence de lecture de leur état",
   "settings.advanced.cw.server.checkInferSeconds.title": "Vérifier le serveur : délai de la requête de test",
   "settings.advanced.cw.server.checkInferSeconds.desc": "Le temps que Vérifier le serveur attend la réponse d’un serveur de modèles à sa requête de test. Un modèle local pas encore chargé se charge d’abord, ce qui peut prendre des minutes sur un matériel modeste ; passé ce délai, la vérification signale un dépassement de délai."
 }

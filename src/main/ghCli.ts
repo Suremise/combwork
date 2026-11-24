@@ -109,22 +109,23 @@ const firstWords = (s: string): string | null => {
  * Runs gh with `args`, exactly as given, in `env` without its tokens: the low-level step every call goes through.
  * Copilot's sign-in check uses it with its agents' environment (its GH_HOST kept); everything else uses `gh()`.
  */
-export async function ghExec(args: string[], opts: { env: Record<string, string | undefined>; timeoutMs?: number }): Promise<{ stdout: string; stderr: string; code: number; missing?: true; timedOut?: true }> {
+export async function ghExec(args: string[], opts: { env: Record<string, string | undefined>; timeoutMs?: number; input?: string }): Promise<{ stdout: string; stderr: string; code: number; missing?: true; timedOut?: true }> {
   const env = ghEnv(opts.env)
   const exe = await findGh(env)
   if (!exe) return { stdout: '', stderr: '', code: 1, missing: true }
-  const r = await run(exe, args, opts.timeoutMs ?? ghTimeoutMs(), env)
+  const r = await run(exe, args, opts.timeoutMs ?? ghTimeoutMs(), env, opts.input)
   return { stdout: r.stdout, stderr: r.stderr, code: r.code, ...(r.timedOut ? { timedOut: true as const } : {}) }
 }
 
 /**
  * A gh call about a host or a repository: `args` (a gh command, such as `['pr', 'list']`), the target added as gh
  * takes it, and `--json`'s output parsed when `json` is set. Combwork's own environment, without GH_HOST (the target
- * names the host) or any token.
+ * names the host) or any token. `input` (HI-3552): text on gh's standard input, such as `--body-file -`'s body, never
+ * on its command line.
  */
-export async function gh(target: GhTarget, args: string[], opts: { json?: boolean; env?: Record<string, string | undefined>; timeoutMs?: number } = {}): Promise<GhResult> {
+export async function gh(target: GhTarget, args: string[], opts: { json?: boolean; env?: Record<string, string | undefined>; timeoutMs?: number; input?: string } = {}): Promise<GhResult> {
   const where = 'repo' in target ? ['-R', `${target.repo.host}/${target.repo.owner}/${target.repo.repo}`] : ['--hostname', target.host]
-  const r = await ghExec([...args, ...where], { env: withoutHost(opts.env ?? process.env), timeoutMs: opts.timeoutMs })
+  const r = await ghExec([...args, ...where], { env: withoutHost(opts.env ?? process.env), timeoutMs: opts.timeoutMs, input: opts.input })
   if (r.missing) return { ok: false, problem: 'missing', detail: null }
   if (r.timedOut) return { ok: false, problem: 'timeout', detail: null }
   if (r.code !== 0) {

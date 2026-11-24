@@ -2051,6 +2051,14 @@
     "defaultMessage": "GitHub CLI: longest a call takes",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (HI-3550): each time Combwork asks the GitHub CLI (gh) something, such as its sign-in in Version Control → Workflow → GitHub. GitHub CLI is a product name."
   },
+  "settings.advanced.cw.github.prFollowMinutes.desc": {
+    "defaultMessage": "While cards wait in PR open, Combwork reads their pull requests on GitHub this often, and also when their board or card opens: GitHub can’t tell Combwork itself when one is merged or closed.",
+    "description": "What the advanced setting \"Pull requests: how often their state is read\" does (Settings → Advanced, HI-3552). PR open is a stage of the board: use its translation."
+  },
+  "settings.advanced.cw.github.prFollowMinutes.title": {
+    "defaultMessage": "Pull requests: how often their state is read",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (HI-3552): while cards wait in PR open, how often Combwork asks GitHub (through gh) whether their pull requests were merged or closed, and their checks and reviews."
+  },
   "settings.advanced.cw.guidance.desc": {
     "defaultMessage": "With Combwork's tools, each project agent gets Combwork's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the combwork server's instructions, Codex after your own developer_instructions. Turned off, agents still get Combwork's tools, without the guidance, from their next session. The Assistant always gets its own: they are its role.",
     "description": "What the advanced setting \"Combwork's guidance for agents\" does (Settings → Advanced, under Combwork). Claude Code, Copilot and Codex are CLIs' names, combwork the name of Combwork's MCP server and developer_instructions a Codex setting: keep them."

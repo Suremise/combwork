@@ -12,6 +12,8 @@ import { storedLineText } from '../taskHistory'
 /** What Combwork asks the user (For you, §16.8.5): `ApprovalRequested`'s text and the notification with it. */
 export const FOR_YOU = {
   review: msg({ id: 'workflow.forYou.review', defaultMessage: '{card} waits for your review', description: 'A For you request: the card waits for the user to review it (Version Control → Work is reviewed before it is merged: You). {card} is a card key like AM-12.' }),
+  prOkBefore: msg({ id: 'workflow.forYou.prOkBefore', defaultMessage: '{card} is approved: OK to push it and open its pull request?', description: "HI-3552: a For you request: the card passed review and waits for the user's OK before Combwork pushes its branch and opens its GitHub pull request (the project's finish is a pull request; glossary 2.3: approval). {card} is a card key like AM-12." }),
+  prRetry: msg({ id: 'workflow.forYou.prRetry', defaultMessage: '{card}’s pull request isn’t open: {why} Approve to try again.', description: 'HI-3552: a For you request (Approve): Combwork couldn’t push the card’s branch or open its GitHub pull request. {why} is the reason, a whole sentence (workflow.prProblem). Approve tries again; Decline leaves the card waiting in Passed. {card} is a card key like AM-12.' }),
   okBefore: msg({ id: 'workflow.forYou.okBefore', defaultMessage: '{card} is approved: OK to merge?', description: "A For you request: the card passed review and waits for the user's OK before it merges (glossary 2.3: approval). {card} is a card key like AM-12." }),
   passedReview: msg({ id: 'workflow.forYou.passedReview', defaultMessage: '{card} passed review: your OK?', description: "A For you request: reviewer agents passed the card, and the user reviews after them (A reviewer agent, then you). {card} is a card key like AM-12." }),
   newDecision: msg({ id: 'workflow.forYou.newDecision', defaultMessage: '{card} has a new decision: your review again?', description: 'A For you request: the user decided something new on a card in Review, so their review is asked again. {card} is a card key like AM-12.' }),
@@ -49,6 +51,18 @@ export const APPROVE_NOTE = msg({ id: 'workflow.approveNote', defaultMessage: '{
 export const SIMPLIFY_CHOICE = msg({ id: 'workflow.simplifyChoice', defaultMessage: '{choice, select, carryOn {Worth handling: carry on} simplify {Simplify} cutScope {Cut scope with follow-ups} other {{choice}}}', description: "One of the user's three choices when a card reaches its simplify check (HI-3188): what still comes up is worth handling (carry on), simplify (drop what isn't worth it), or cut the card's scope and put the rest on follow-up cards. Translate each choice; keep the codes before the braces." })
 
 export const ROUND_CHOICE = msg({ id: 'workflow.roundChoice', defaultMessage: '{choice, select, carryOn {Carry on} split {Split it} accept {Accept with follow-ups} takeOver {Take it over} other {{choice}}}', description: "One of the user's four choices when a card reaches its card loop's round limit: carry on with more review rounds, split the card into smaller ones, accept the work as it is with follow-up cards, or take the work over themselves. Translate each choice; keep the codes before the braces." })
+
+/**
+ * HI-3552: why Combwork couldn't push a card or open its pull request, a whole sentence (the {why} of workflow.forYou.prRetry
+ * and the card's pull request line). {detail} is what git or gh said (outside text, quoted); the rest are names.
+ */
+export const PR_PROBLEM = msg({
+  id: 'workflow.prProblem',
+  defaultMessage:
+    '{problem, select, noLink {The project has no GitHub link: choose its remote in Version Control → Workflow → GitHub.} pushUrl {Its remote {remote} doesn’t push to {owner}/{repo} on {host}, the repository its pull request is for, so nothing was pushed.} push {Git didn’t push {line} to {remote}: “{detail}”.} ghMissing {GitHub’s CLI, gh, isn’t installed: install it, then try again.} ghSignedOut {gh isn’t signed in to {host}: run gh auth login --hostname {host}, then try again.} other {GitHub didn’t open it: “{detail}”.}}',
+  description:
+    'HI-3552: why the card’s pull request isn’t open, a whole sentence. noLink: the project has no GitHub link (Version Control → Workflow → GitHub tab). pushUrl: the git remote {remote} would push somewhere other than the pull request’s repository {owner}/{repo} on the host {host}. push: git refused or failed to push the branch {line}. ghMissing: gh, GitHub’s command line tool, is missing. ghSignedOut: gh isn’t signed in; keep the command as it is. other: gh failed. {detail} is git’s or gh’s own words, as they are. Keep the select keys; translate each choice.'
+})
 
 /**
  * What a platform couldn't read (§16.3.1), the {what} of "Combwork couldn't read {what}" (workflow.refused.platform.unknown):
@@ -158,10 +172,10 @@ export const SLOT_NOTICES = {
   resumeFailed: msg({ id: 'service.slots.resumeFailed', defaultMessage: "Combwork couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Combwork gives it {card}.", description: "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Combwork's resumes of the agent's last conversation there failed three times, so it stopped trying. Once the user resumes the agent, or starts it, Combwork hands it the card. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the last failure's reason, in English." })
 }
 
-const BY_ID = new Map<string, Msg>([...Object.values(FOR_YOU), FOR_YOU_KIND, ROUND_CHOICE, ...Object.values(UNREADABLE), ...Object.values(MOVE_NAMES), ...Object.values(RULE_NAMES), ...Object.values(SLOT_NOTICES)].map((m) => [m.id, m]))
+const BY_ID = new Map<string, Msg>([...Object.values(FOR_YOU), FOR_YOU_KIND, ROUND_CHOICE, PR_PROBLEM, ...Object.values(UNREADABLE), ...Object.values(MOVE_NAMES), ...Object.values(RULE_NAMES), ...Object.values(SLOT_NOTICES)].map((m) => [m.id, m]))
 
 /** The workflow's message of an id: null for one this Combwork doesn't know (a record from a newer one). */
-// agent-text: FOR_YOU, FOR_YOU_KIND, ROUND_CHOICE, UNREADABLE, MOVE_NAMES, RULE_NAMES, SLOT_NOTICES (stored by id in history and refusals, said when read)
+// agent-text: FOR_YOU, FOR_YOU_KIND, ROUND_CHOICE, PR_PROBLEM, UNREADABLE, MOVE_NAMES, RULE_NAMES, SLOT_NOTICES (stored by id in history and refusals, said when read)
 export const workflowMessage = (id: string): Msg | null => BY_ID.get(id) ?? null
 
 /** A workflow message and its values as they are kept in a fact: its id and values, never its English. */

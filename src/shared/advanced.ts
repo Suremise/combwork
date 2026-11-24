@@ -145,6 +145,8 @@ export const GIT_COMMIT_MINUTES = 'cw.git.commitMinutes'
 export const GIT_NETWORK_MINUTES = 'cw.git.networkMinutes'
 /** HI-3550: the longest one call of the GitHub CLI (gh) takes before Combwork ends it (ghCli.ts). */
 export const GITHUB_GH_MINUTES = 'cw.github.ghMinutes'
+/** HI-3552: how often Combwork reads the pull requests of cards in PR open, in minutes. */
+export const GITHUB_PR_FOLLOW_MINUTES = 'cw.github.prFollowMinutes'
 /** HI-3473: how old a lock file of git's must be before Repository health calls it stale. */
 export const GIT_STALE_LOCK_SECONDS = 'cw.git.staleLockSeconds'
 /** HI-3473: the programs that count as a git that may hold a lock (Windows' process names). */
@@ -1047,6 +1049,18 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 2,
     min: 1,
     max: 60,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: GITHUB_PR_FOLLOW_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.github.prFollowMinutes.title', defaultMessage: 'Pull requests: how often their state is read', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (HI-3552): while cards wait in PR open, how often Combwork asks GitHub (through gh) whether their pull requests were merged or closed, and their checks and reviews." }),
+    desc: msg({ id: 'settings.advanced.cw.github.prFollowMinutes.desc', defaultMessage: 'While cards wait in PR open, Combwork reads their pull requests on GitHub this often, and also when their board or card opens: GitHub can’t tell Combwork itself when one is merged or closed.', description: 'What the advanced setting "Pull requests: how often their state is read" does (Settings → Advanced, HI-3552). PR open is a stage of the board: use its translation.' }),
+    kind: 'number',
+    default: 5,
+    min: 1,
+    max: 240,
     unit: 'min',
     applies: 'now'
   },

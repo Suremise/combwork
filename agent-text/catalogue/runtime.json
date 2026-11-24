@@ -47,6 +47,10 @@
     "text": "{cards} can start without {card}'s work in the target: it is Done by an override, not merged.",
     "note": "A move's warning: cards waiting on this one can start, but its work isn't in their target. {cards}: their keys."
   },
+  "runtime.pr.closed": {
+    "text": "Pull request #{number} was closed on GitHub without being merged: the card is back in Todo, its branch kept for its next start.",
+    "note": "HI-3552: the comment on a card whose GitHub pull request was closed without merging. A statement of fact."
+  },
   "runtime.repair.boardDone": {
     "text": "the board had it in Done while its stage was {stage}",
     "note": "A repair's reason, stored on the card's Moved fact: the board's column and the card's stage disagreed. {stage}: the stage id."

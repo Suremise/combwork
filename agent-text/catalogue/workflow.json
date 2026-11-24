@@ -117,6 +117,16 @@
     "note": "A For you request: reviewer agents passed the card, and the user reviews after them (A reviewer agent, then you). {card} is a card key like AM-12.",
     "audience": "both"
   },
+  "workflow.forYou.prOkBefore": {
+    "text": "{card} is approved: OK to push it and open its pull request?",
+    "note": "HI-3552: a For you request: the card passed review and waits for the user's OK before Combwork pushes its branch and opens its GitHub pull request (the project's finish is a pull request; glossary 2.3: approval). {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.forYou.prRetry": {
+    "text": "{card}’s pull request isn’t open: {why} Approve to try again.",
+    "note": "HI-3552: a For you request (Approve): Combwork couldn’t push the card’s branch or open its GitHub pull request. {why} is the reason, a whole sentence (workflow.prProblem). Approve tries again; Decline leaves the card waiting in Passed. {card} is a card key like AM-12.",
+    "audience": "both"
+  },
   "workflow.forYou.queueAdvance": {
     "text": "{card} is tested and ready to merge: update {target} in {folder} now?",
     "note": "A For you request (Approve, §16.9.2): the merge queue has merged and checked the card's work, and waits for the user's OK before it updates the branch {target}, which is checked out in the folder {folder} (its files change there). Settings → Advanced → Merge into a checked-out branch: Ask each time. {card} is a card key like AM-12.",
@@ -358,7 +368,7 @@
     "audience": "both"
   },
   "workflow.option.finish.desc": {
-    "text": "When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, or whenever it is moved there.",
+    "text": "When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, whenever it is moved there, or once its pull request is merged on GitHub.",
     "note": "What the workflow option “Who merges” does (glossary 2.1: merge queue).",
     "audience": "both"
   },
@@ -537,6 +547,16 @@
     "note": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). The user’s name for it.",
     "audience": "both"
   },
+  "workflow.option.prDraft.desc": {
+    "text": "On, each pull request opens as a draft for you to mark ready on GitHub; off, it opens ready for review.",
+    "note": "HI-3552: what the workflow option “Open pull requests as drafts” does. Draft and ready for review are GitHub’s names for a pull request’s two states: use GitHub’s own words in your language where it has them.",
+    "audience": "both"
+  },
+  "workflow.option.prDraft.title": {
+    "text": "Open pull requests as drafts",
+    "note": "HI-3552: a workflow option (G22), in the GitHub tab, shown when “Who merges” is “A pull request”: the pull request Combwork opens for an approved card is a draft (on, the default) or ready for review (off).",
+    "audience": "both"
+  },
   "workflow.option.preChecks.desc": {
     "text": "A card goes to review only once each of these named commands has passed on its work.",
     "note": "What the workflow option “Checks pass before review” does.",
@@ -685,6 +705,11 @@
   "workflow.option.target.title": {
     "text": "Work merges into",
     "note": "A workflow option (glossary 2.6, G7): the target branch.",
+    "audience": "both"
+  },
+  "workflow.prProblem": {
+    "text": "{problem, select, noLink {The project has no GitHub link: choose its remote in Version Control → Workflow → GitHub.} pushUrl {Its remote {remote} doesn’t push to {owner}/{repo} on {host}, the repository its pull request is for, so nothing was pushed.} push {Git didn’t push {line} to {remote}: “{detail}”.} ghMissing {GitHub’s CLI, gh, isn’t installed: install it, then try again.} ghSignedOut {gh isn’t signed in to {host}: run gh auth login --hostname {host}, then try again.} other {GitHub didn’t open it: “{detail}”.}}",
+    "note": "HI-3552: why the card’s pull request isn’t open, a whole sentence. noLink: the project has no GitHub link (Version Control → Workflow → GitHub tab). pushUrl: the git remote {remote} would push somewhere other than the pull request’s repository {owner}/{repo} on the host {host}. push: git refused or failed to push the branch {line}. ghMissing: gh, GitHub’s command line tool, is missing. ghSignedOut: gh isn’t signed in; keep the command as it is. other: gh failed. {detail} is git’s or gh’s own words, as they are. Keep the select keys; translate each choice.",
     "audience": "both"
   },
   "workflow.refused.approval.given.change": {
@@ -1737,6 +1762,11 @@
     "note": "A stage of the board inside Approved (glossary 2.2: Merging): cards in Combwork's merge queue.",
     "audience": "both"
   },
+  "workflow.stage.prOpen": {
+    "text": "PR open",
+    "note": "HI-3552: a stage of the board inside Passed: cards whose finish is a GitHub pull request, opened and waiting for it to be merged or closed on GitHub. “PR” is a pull request.",
+    "audience": "both"
+  },
   "workflow.stage.review": {
     "text": "Review",
     "note": "A stage of the board (glossary 2.2: Review): cards waiting for, or in, review.",
@@ -2005,6 +2035,11 @@
   "workflow.value.finish.notChecked": {
     "text": "Not checked",
     "note": "A value of the workflow option “Who merges” (glossary 2.6, G5).",
+    "audience": "both"
+  },
+  "workflow.value.finish.pullRequest": {
+    "text": "A pull request",
+    "note": "HI-3552: a value of the workflow option “Who merges” (G5): once a card is approved, Combwork pushes its branch and opens a GitHub pull request, and the card is done when it is merged on GitHub.",
     "audience": "both"
   },
   "workflow.value.folder.project": {

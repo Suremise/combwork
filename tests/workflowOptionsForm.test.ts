@@ -417,6 +417,8 @@ describe("the Version Control tab's Workflow section (#1418)", () => {
       // Each row shows where it applies: the options of every preset and all-off together show them all.
       const shownSomewhere = new Set(PRESETS[platform].flatMap((p) => [preset(platform, p.id, { quick: ['lint'], tests: [] }), allOff(platform)]).flatMap((o) => rows.filter((k) => formShows(k, o))))
       if (platform === 'git') shownSomewhere.add('strict')
+      // HI-3552: no preset finishes with a pull request; its draft switch shows when one does.
+      if (platform === 'git') for (const key of rows.filter((k) => formShows(k, { ...allOff(platform), finish: 'pullRequest' }))) shownSomewhere.add(key)
       expect(rows.filter((k) => !shownSomewhere.has(k))).toEqual([])
     }
     // G4's sentence says both values (the card's own words).
@@ -748,7 +750,7 @@ describe("the Assistant's settings tool (#1278)", () => {
     expect(e).toMatchObject({ scope: 'project', workflow: 'finish', inherits: true })
     expect(checkSettingValue(e, 'The agent merges, Combwork checks')).toEqual({ value: 'agentMerges' })
     expect(checkSettingValue(e, 'combworkMerges')).toEqual({ value: 'combworkMerges' })
-    expect(checkSettingValue(e, 'typo')).toMatchObject({ error: expect.stringMatching(/takes one of: combworkMerges, agentMerges, committed, notChecked, or null to inherit/) })
+    expect(checkSettingValue(e, 'typo')).toMatchObject({ error: expect.stringMatching(/takes one of: combworkMerges, agentMerges, committed, notChecked, pullRequest, or null to inherit/) })
     expect(checkSettingValue(settingEntry('project.workflow.mergeChecks')!, ['lint', 'test'])).toEqual({ value: ['lint', 'test'] })
     expect(checkSettingValue(settingEntry('project.workflow.mergeChecks')!, 'lint')).toMatchObject({ error: expect.stringMatching(/a list of check names the merge queue runs/) })
     expect(checkSettingValue(settingEntry('project.workflow.mergeInstall')!, 'Before every merge')).toEqual({ value: 'always' })
