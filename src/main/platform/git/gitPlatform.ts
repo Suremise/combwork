@@ -180,7 +180,7 @@ export class GitPlatform implements PlatformAdapter {
         const across = card.kind !== 'no-code' && here.line === null && here.base ? await this.detachedRefusal(card, o, here.base) : null
         return { ...here, target, slotWait: got.wait, ...(across?.rule ? { acrossWait: { rule: across.rule, ...(across.ruleValues ? { ruleValues: across.ruleValues } : {}) } } : {}) }
       }
-      if (pr) return this.prPlan(card, pr, target, got, dry)
+      if (pr) return this.prPlan(card, pr, target, got)
       // G21 (HI-1183): a target that follows its remote starts each card from the remote's head (never silently the local one).
       const followed = await this.followedHead(o, target, dry)
       if (isUnknown(followed)) return followed
@@ -228,7 +228,7 @@ export class GitPlatform implements PlatformAdapter {
    * review reads the PR's whole change. A fix round keeps the line, its fixes never reset; GitHub's head having moved to
    * commits the line lacks is recorded (`headOutside`), never merged in or overwritten.
    */
-  private async prPlan(card: CardRecord, pr: { host: string; owner: string; repo: string; number: number; baseRef: string }, target: string, got: { folder: string; slot: string; lease: string; fresh?: boolean }, dry: boolean): Promise<Maybe<StartPlan>> {
+  private async prPlan(card: CardRecord, pr: { host: string; owner: string; repo: string; number: number; baseRef: string }, target: string, got: { folder: string; slot: string; lease: string; fresh?: boolean }): Promise<Maybe<StartPlan>> {
     const link = this.wf.cfg.githubLink ? await this.wf.cfg.githubLink() : null
     const same = !!link && link.host.toLowerCase() === pr.host.toLowerCase() && link.owner.toLowerCase() === pr.owner.toLowerCase() && link.repo.toLowerCase() === pr.repo.toLowerCase()
     if (!link || !same) return unknown(UNREADABLE.prLink, { number: pr.number, repo: `${pr.owner}/${pr.repo}` })
@@ -244,18 +244,18 @@ export class GitPlatform implements PlatformAdapter {
     if (isUnknown(line)) return line
     const had = await G.lineHead(this.project, line)
     if (isUnknown(had)) return had
+    // Kept work is only a line a written start of this card had (HR1's round 1): one there with none behind it (left by
+    // anything else) is never taken for its work, nor overwritten.
+    const s = this.wf.state(card)
+    if (had && s.started?.line !== line && !s.lines.includes(line)) return unknown(UNREADABLE.prLeftover, { line, number: pr.number })
     // GitHub's head with commits the kept line lacks: pushed from outside, recorded, never taken in by itself.
     const inLine = had ? await G.isAncestor(this.project, head, had) : true
     if (isUnknown(inLine)) return inLine
     const base = await G.mergeBase(this.project, had ?? head, baseOid)
     if (isUnknown(base)) return base
     if (!base) return unknown(UNREADABLE.branchedOff, { a: line, b: pr.baseRef })
-    // Its line made at the PR's head (never at the base, as other cards' are), so the slot is prepared on it as a line
-    // that is there already. Never on a dry run.
-    if (!had && !dry) {
-      const made = await git(this.project, ['branch', '--no-track', '--', line, head])
-      if (!made.ok) return withDetail(unknown(UNREADABLE.prFetch, { number: pr.number, base: pr.baseRef, remote: link.remote }), made.err)
-    }
+    // Its line is made at the PR's head by the slot's preparation, once the start is written (applyStart): nothing of it
+    // is made here, so a start refused or gathered again leaves no branch behind.
     const source = card.source?.kind === 'pr' ? card.source.pr : undefined
     const started = this.wf.state(card).started?.pr
     return {
@@ -266,7 +266,7 @@ export class GitPlatform implements PlatformAdapter {
       slot: got.slot,
       lease: got.lease,
       fresh: got.fresh,
-      carried: true,
+      ...(had ? { carried: true } : {}),
       pr: {
         host: pr.host,
         owner: pr.owner,

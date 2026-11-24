@@ -626,6 +626,7 @@
   "workflow.unreadable.ignored": "文件夹 {folder} 中 Git 忽略的内容",
   "workflow.unreadable.line": "分支 {branch}",
   "workflow.unreadable.pathOutside": "路径 {path}（它位于项目之外）",
+  "workflow.unreadable.prLeftover": "已存在但并非由拉取请求 #{number} 的任何开始创建的分支 {line}",
   "workflow.unreadable.prFetch": "从 {remote} 获取的拉取请求 #{number} 及其基础分支 {base}",
   "workflow.unreadable.prLink": "{repo} 上的拉取请求 #{number}（它现在不是此项目的 GitHub 关联）",
   "workflow.unreadable.prSlot": "{card} 的槽位",

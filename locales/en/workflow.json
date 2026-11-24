@@ -2567,6 +2567,10 @@
     "defaultMessage": "pull request #{number} and its base {base} from {remote}",
     "description": "HI-3551: what Combwork couldn't read, the object of \"Combwork couldn't read …\": fetching a pull request's head and its base branch ({base}) from the project's remote ({remote}) failed. Git's own words follow."
   },
+  "workflow.unreadable.prLeftover": {
+    "defaultMessage": "the branch {line}, which is there already but no start of pull request #{number} made",
+    "description": "HI-3551: what Combwork couldn't use, the object of \"Combwork couldn't read …\": a branch with the name a pull request's card would work on exists, but no recorded start of this card made it, so it isn't taken for the card's work nor overwritten. {line} is a branch name, {number} the pull request's number."
+  },
   "workflow.unreadable.prLink": {
     "defaultMessage": "pull request #{number} on {repo}, which isn’t on this project’s GitHub link now",
     "description": "HI-3551: what Combwork couldn't read, the object of \"Combwork couldn't read …\": the pull request a card works on is on a repository ({repo}, owner/name) that is no longer the project's GitHub link (or the project has none now)."

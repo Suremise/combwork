@@ -626,6 +626,7 @@
   "workflow.unreadable.ignored": "die von Git ignorierten Dateien in {folder}",
   "workflow.unreadable.line": "den Branch {branch}",
   "workflow.unreadable.pathOutside": "den Pfad {path} (er liegt außerhalb des Projekts)",
+  "workflow.unreadable.prLeftover": "den Branch {line}, der schon da ist, aber von keinem Start des Pull-Requests #{number} angelegt wurde",
   "workflow.unreadable.prFetch": "den Pull-Request #{number} und seine Basis {base} von {remote}",
   "workflow.unreadable.prLink": "den Pull-Request #{number} in {repo}, das jetzt nicht die GitHub-Verknüpfung dieses Projekts ist",
   "workflow.unreadable.prSlot": "einen Slot für {card}",

@@ -1466,7 +1466,10 @@ export class Workflow {
     w.fact('Started', g.data) // i18n-ignore: a fact's kind and codes, not text
     w.move('active', cause)
     // A slot's (#1438): its lease's, and whether it is brought up to date (G15).
-    if (g.data.folder !== 'project' && !g.existing) w.action('prepareSlot', { folder: g.data.folder, line: g.data.line, base: g.data.base, ...(g.data.lease ? { slot: g.data.slot, lease: g.data.lease, upToDate: g.o.slotsUpToDate, builder: g.data.builder } : {}) })
+    // HI-3551: a pull request's line is made at the PR's head (its base is where that left the PR's base), only now that
+    // its start is written, and never brought up to date with the target: its history is the PR's.
+    const pr = g.data.pr
+    if (g.data.folder !== 'project' && !g.existing) w.action('prepareSlot', { folder: g.data.folder, line: g.data.line, base: pr ? pr.headOid : g.data.base, ...(g.data.lease ? { slot: g.data.slot, lease: g.data.lease, upToDate: pr ? false : g.o.slotsUpToDate, builder: g.data.builder } : {}) })
   }
 
   /** The card's state as it would be once a gathered start is written (a drag gathers its submission on it). */
@@ -1870,8 +1873,9 @@ export class Workflow {
     }
     // HI-3551: a pull request's card finishes through its pull request (HI-3552), never by a merge here, whatever the
     // project's finish: its pass kept, it waits in Passed. No queue entry, no agent's merge, nothing marked integrated.
+    // Passed even where its project's own rules have no such stage (no review, no OK before merging: HR1's round 1).
     if (s.started?.pr) {
-      if (hasStage(r, 'approved')) w.move('approved', 'derived')
+      w.move('approved', 'derived')
       return
     }
     if (o.finish === 'accept') {

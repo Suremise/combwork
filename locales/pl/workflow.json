@@ -626,6 +626,7 @@
   "workflow.unreadable.ignored": "tego, co Git ignoruje w folderze {folder}",
   "workflow.unreadable.line": "gałęzi {branch}",
   "workflow.unreadable.pathOutside": "ścieżki {path}, która leży poza projektem",
+  "workflow.unreadable.prLeftover": "gałęzi {line}, która już istnieje, ale nie utworzył jej żaden start pull requestu #{number}",
   "workflow.unreadable.prFetch": "pull requestu #{number} i jego bazy {base} z {remote}",
   "workflow.unreadable.prLink": "pull requestu #{number} w {repo}, które nie jest teraz połączeniem tego projektu z GitHubem",
   "workflow.unreadable.prSlot": "slotu dla {card}",

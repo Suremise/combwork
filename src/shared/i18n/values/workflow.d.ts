@@ -643,6 +643,7 @@ interface CombworkMessageValues {
   'workflow.unreadable.line': { branch: string | number }
   'workflow.unreadable.pathOutside': { path: string | number }
   'workflow.unreadable.prFetch': { number: string | number; base: string | number; remote: string | number }
+  'workflow.unreadable.prLeftover': { line: string | number; number: string | number }
   'workflow.unreadable.prLink': { number: string | number; repo: string | number }
   'workflow.unreadable.prSlot': { card: string | number }
   'workflow.unreadable.remoteBehind': { target: string | number; endpoint: string | number }

@@ -626,6 +626,7 @@
   "workflow.unreadable.ignored": "{folder}でGitが無視するもの",
   "workflow.unreadable.line": "ブランチ{branch}",
   "workflow.unreadable.pathOutside": "プロジェクト外のパス{path}",
+  "workflow.unreadable.prLeftover": "既に存在するが、プルリクエスト #{number} のどの開始でも作られていないブランチ {line}",
   "workflow.unreadable.prFetch": "{remote} からのプルリクエスト #{number} とそのベース {base}",
   "workflow.unreadable.prLink": "{repo} のプルリクエスト #{number}（現在このプロジェクトの GitHub 連携ではありません）",
   "workflow.unreadable.prSlot": "{card} 用のスロット",

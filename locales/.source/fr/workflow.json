@@ -641,6 +641,7 @@
   "workflow.unreadable.line": "the branch {branch}",
   "workflow.unreadable.pathOutside": "the path {path}, which is outside the project",
   "workflow.unreadable.prFetch": "pull request #{number} and its base {base} from {remote}",
+  "workflow.unreadable.prLeftover": "the branch {line}, which is there already but no start of pull request #{number} made",
   "workflow.unreadable.prLink": "pull request #{number} on {repo}, which isn’t on this project’s GitHub link now",
   "workflow.unreadable.prSlot": "a slot for {card}",
   "workflow.unreadable.remoteBehind": "where to start from: {target} has commits that {endpoint} doesn’t (push or pull them first)",

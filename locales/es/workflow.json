@@ -626,6 +626,7 @@
   "workflow.unreadable.ignored": "lo que Git ignora en {folder}",
   "workflow.unreadable.line": "la rama {branch}",
   "workflow.unreadable.pathOutside": "la ruta {path}, que está fuera del proyecto",
+  "workflow.unreadable.prLeftover": "la rama {line}, que ya existe pero no la creó ningún inicio del pull request #{number}",
   "workflow.unreadable.prFetch": "el pull request #{number} y su base {base} desde {remote}",
   "workflow.unreadable.prLink": "el pull request #{number} en {repo}, que ahora no es el enlace con GitHub de este proyecto",
   "workflow.unreadable.prSlot": "un slot para {card}",

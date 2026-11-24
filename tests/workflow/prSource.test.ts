@@ -173,6 +173,76 @@ describe('a pull request card (HI-3551)', () => {
     expect(started?.pr?.number ?? null).not.toBe(7)
   })
 
+  it('HR1 round 1: a start refused after its gather leaves no branch; the PR moving on, the first start is on its new head', async () => {
+    let home = ''
+    let swap: (() => void) | null = null
+    const e = (env = setup(
+      { ...allOff('git'), platform: 'git', review: 'agent', noSelfReview: true, target: 'main', finish: 'combworkMerges', folder: 'slots' },
+      {
+        slotFor: async (card) => ({ folder: join(home, 'slots', card.key), slot: `slot-${card.key}`, lease: `L-${card.key}`, fresh: true }),
+        githubLink: async () => ({ remote: 'origin', host: 'github.com', owner: 'acme', repo: 'app' }),
+        hooks: { beforeWrite: async () => swap?.() }
+      }
+    ))
+    home = e.home
+    github(e)
+    const card = e.wf.createCard({ title: 'PR 7' })
+    giveSource(e, card.id, SOURCE())
+    swap = () => {
+      swap = null
+      giveSource(e, card.id, SOURCE(8))
+    }
+    await e.wf.start(card.key, B1)
+    expect(e.wf.state(card).started).toBeFalsy()
+    // Nothing of #7's line was made by the refused start.
+    expect(() => sh(e.project, 'rev-parse', '--verify', '-q', 'refs/heads/cw/AM/AM-1-pr-7')).toThrow()
+    // #7 moves on, and the card names it again: its first start is on the new head.
+    const clone = tempDir('gh-again-')
+    sh(clone, 'clone', '-q', '-b', 'main', sh(e.project, 'remote', 'get-url', 'origin'), '.')
+    sh(clone, 'fetch', '-q', 'origin', 'refs/pull/7/head')
+    sh(clone, 'switch', '-q', '--detach', 'FETCH_HEAD')
+    commit(clone, { 'later.txt': 'later\n' }, 'Later')
+    sh(clone, 'push', '-q', 'origin', 'HEAD:refs/pull/7/head')
+    const newest = sh(clone, 'rev-parse', 'HEAD')
+    giveSource(e, card.id, SOURCE())
+    moved(await e.wf.start(card.key, B1))
+    expect(e.wf.state(card).started!.pr!.headOid).toBe(newest)
+    expect(sh(e.wf.state(card).started!.folder, 'rev-parse', 'HEAD')).toBe(newest)
+  })
+
+  it('a branch of its name with no start of it behind it is never taken for its work, nor overwritten', async () => {
+    const e = (env = project('combworkMerges'))
+    github(e)
+    const card = e.wf.createCard({ title: 'PR 7' })
+    giveSource(e, card.id, SOURCE())
+    sh(e.project, 'branch', 'cw/AM/AM-1-pr-7', 'main')
+    const r = await e.wf.start(card.key, B1)
+    expect(isRefusal(r) && r.rule).toBe('platform.unknown')
+    expect(isRefusal(r) && r.message).toMatch(/cw\/AM\/AM-1-pr-7, which is there already but no start of pull request #7 made/)
+    expect(sh(e.project, 'rev-parse', 'cw/AM/AM-1-pr-7')).toBe(sh(e.project, 'rev-parse', 'main'))
+  })
+
+  it('HR1 round 1: with no review (no Passed in its project’s rules), it still passes into Passed, never merged', async () => {
+    for (const finish of ['agentMerges', 'notChecked', 'combworkMerges'] as const) {
+      let home = ''
+      const e = (env = setup({ ...allOff('git'), platform: 'git', review: 'none', target: 'main', finish, folder: 'slots' }, { slotFor: async (card) => ({ folder: join(home, 'slots', card.key), slot: `slot-${card.key}`, lease: `L-${card.key}`, fresh: true }), githubLink: async () => ({ remote: 'origin', host: 'github.com', owner: 'acme', repo: 'app' }) }))
+      home = e.home
+      github(e)
+      const card = e.wf.createCard({ title: `PR ${finish}` })
+      giveSource(e, card.id, SOURCE())
+      moved(await e.wf.start(card.key, B1))
+      commit(e.wf.state(card).started!.folder, { 'fix.txt': 'a fix\n' }, 'A fix')
+      moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+      expect(e.wf.state(card).stage, finish).toBe('approved')
+      expect(kinds(e, card.id), finish).not.toContain('IntegrationRequested')
+      expect(kinds(e, card.id), finish).not.toContain('Integrated')
+      const report = await e.wf.reportMerge(card.key, B1)
+      expect(isRefusal(report) && report.rule, finish).toBe('platform.prNotLocal')
+      e.close()
+      env = null
+    }
+  })
+
   it('a start whose source changed meanwhile is gathered again: never started on a PR it no longer names', () => {
     const src = SOURCE()
     const pr = { host: 'github.com', owner: 'acme', repo: 'app', number: 7, headRef: 'feature', baseRef: 'main', headOid: 'a', baseOid: 'b', crossRepository: false, maintainerCanModify: true }
