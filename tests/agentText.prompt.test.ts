@@ -74,7 +74,8 @@ function stalls(): { name: string; text: string | null }[] {
     { name: 'start failed', text: startFailedReason(doing as never, { name: 'B1', running: false, failed: 'no CLI' }) },
     { name: 'reviewer not running', text: reviewStalled({ review: { agent: 'r', agentName: 'R1' }, archived: false } as never, { name: 'R1', running: false }) },
     { name: 'wake untaken', text: notWatchingReason(doing as never, [{ name: 'B1', project: 'alpha', notWatching: [9], untaken: true }]) },
-    { name: 'not watching', text: notWatchingReason(doing as never, [{ name: 'B1', project: 'alpha', notWatching: [9] }]) }
+    { name: 'not watching', text: notWatchingReason(doing as never, [{ name: 'B1', project: 'alpha', notWatching: [9] }]) },
+    { name: 'not watching, background tasks uncounted (HI-3561)', text: notWatchingReason(doing as never, [{ name: 'B1', project: 'alpha', notWatching: [9], uncounted: 1 }]) }
   ]
   // HI-2754: the stall's agent idle after its latest turn was stopped by its provider's safety filter, said beside the
   // reason as cardStall says it.
