@@ -287,6 +287,38 @@ describe('run by the merge queue at the merged result', () => {
     expect(o2).toMatchObject({ outcome: 'integrated' })
   })
 
+  it('HI-3564: approved, it advances on the test merge and checks it was asked about: no second test merge or check run', async () => {
+    const e = team(picker([{ test: 'board', needs: ['fake'] }]), runner({ board: 'skipped' }).command)
+    const { card } = await built(e)
+    await approved(e, card)
+    const q = queue(e)
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'paused', reason: 'focusedSkip' })
+    const checks = e.wf.state(card).checks.filter((c) => c.name === 'focused tests')
+    expect(checks).toHaveLength(1)
+    const req = e.wf.state(card).requests.find((r) => r.gate === 'focusedSkip')!
+    moved(await e.wf.focusedSkip(card.key, R1, req.request, true, 'the usage limit, not the work'))
+    const [o] = await q.drain('main')
+    // The target advanced to exactly the result that was tested (its commit, not a new test merge's), nothing run again.
+    expect(o).toMatchObject({ outcome: 'integrated', result: checks[0].revision, retests: 0 })
+    expect(sh(e.project, 'rev-parse', 'main')).toBe(checks[0].revision)
+    expect(e.wf.state(card).checks.filter((c) => c.name === 'focused tests')).toHaveLength(1)
+    expect(e.wf.state(card).stage).toBe('done')
+  })
+
+  it('HI-3564: declined, nothing advances on it: the entry is tested again and returned for the skip', async () => {
+    const e = team(picker([{ test: 'board', needs: ['fake'] }]), runner({ board: 'skipped' }).command)
+    const { card } = await built(e)
+    await approved(e, card)
+    const q = queue(e)
+    const before = sh(e.project, 'rev-parse', 'main')
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'paused', reason: 'focusedSkip' })
+    const req = e.wf.state(card).requests.find((r) => r.gate === 'focusedSkip')!
+    moved(await e.wf.focusedSkip(card.key, R1, req.request, false, 'it needs the run'))
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'returned' })
+    expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
+    expect(e.wf.state(card).checks.filter((c) => c.name === 'focused tests')).toHaveLength(2)
+  })
+
   it("the result's own change to a submitted path is picked again there; a pick that can't choose returns the card", async () => {
     const e = team(picker([{ test: 'board', needs: ['fake'] }]), runner().command)
     const { card } = await built(e, { 'README.md': 'card\n' + readFileSync(join(e.project, 'README.md'), 'utf8') })
@@ -368,6 +400,8 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
     expect(o).toMatchObject({ outcome: 'paused', reason: 'focusedSkip' })
     const again = e.wf.state(card).requests.find((r) => r.gate === 'focusedSkip')!
     expect(again.request).not.toBe(first.request)
+    // HI-3564: the approval resumed on its test merge, found the target moved, and tested it again (a second run).
+    expect(e.wf.state(card).checks.filter((c) => c.name === 'focused tests')).toHaveLength(2)
     expect(e.kinds(card.id)).not.toContain('Integrated')
   })
 

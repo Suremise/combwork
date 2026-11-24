@@ -10,7 +10,7 @@ import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harn
 import { allOff, preset, takesOption } from '../../src/shared/workflow/options'
 import { resolveOptions } from '../../src/main/workflow/rulesets'
 import { MAX_RETESTS } from '../../src/main/workflow/mergeQueue'
-import { checkEnv, classifyCheckFailure, installPlan, MAX_LOG_BYTES, networkCodeIn, programFound, progressRuns, queueChecks, TAIL_LINES, TailCodes, TEMPFAIL, transientCause, type LogIo, type QueueRuns } from '../../src/main/workflow/queueChecks'
+import { BoundedLog, checkEnv, classifyCheckFailure, FILE_IO, installPlan, MAX_LOG_BYTES, networkCodeIn, programFound, progressRuns, queueChecks, TAIL_LINES, TailCodes, TEMPFAIL, transientCause, type LogIo, type QueueRuns } from '../../src/main/workflow/queueChecks'
 import { advancedDef, QUEUE_NETWORK_CODES } from '../../src/shared/advanced'
 import { runDetails } from '../../src/shared/progress'
 import { tr } from '../../src/shared/i18n'
@@ -389,6 +389,21 @@ describe("the runner's own runs, outside the queue", () => {
     expect(log).toContain('bytes of output not kept')
     expect(log.endsWith('THE END')).toBe(true)
     expect(log.length).toBeLessThan(MAX_LOG_BYTES + 100_000)
+  })
+
+  it('HI-3564: a log that reaches MAX_LOG_BYTES says so at once, while the run goes on; once, the end still kept', () => {
+    const path = join(tempDir('qc-log-'), 'run.log')
+    const log = new BoundedLog(path, FILE_IO)
+    log.write(Buffer.from('a'.repeat(MAX_LOG_BYTES)))
+    expect(readFileSync(path, 'utf8')).not.toContain('the log is full')
+    log.write(Buffer.from('more'))
+    log.write(Buffer.from('THE END'))
+    const during = readFileSync(path, 'utf8')
+    expect(during.endsWith(`[… the log is full (${MAX_LOG_BYTES} bytes): the run goes on, and only its last output is written when it ends …]\n`)).toBe(true)
+    log.close()
+    const after = readFileSync(path, 'utf8')
+    expect(after.split('the log is full')).toHaveLength(2)
+    expect(after.endsWith('moreTHE END')).toBe(true)
   })
 
   it('a setup command with no clean form runs as written after node_modules is removed (a junction as a link, never through)', async () => {
