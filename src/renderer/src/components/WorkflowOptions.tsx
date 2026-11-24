@@ -756,6 +756,9 @@ function WorkflowEditor({ source, project, at, onDirty }: { source: FormSource; 
       case 'pushTarget':
         // G21 (HI-1183): a target that follows its remote is pushed: shown on, and set by G21.
         return <Switch checked={effective.pushTarget || effective.followRemote} disabled={effective.followRemote} onChange={(v) => set('pushTarget', v)} />
+      case 'prDraft':
+        // G22 (HI-3552): unset is a draft.
+        return <Switch checked={effective.prDraft !== false} onChange={(v) => set('prDraft', v)} />
       case 'stopOwnRuns':
       case 'slotsUpToDate':
       case 'strict':

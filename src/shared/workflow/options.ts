@@ -17,8 +17,8 @@ import { takesGuards, type MergeGuard } from './mergeGuards'
 
 /** G1 / N1: who checks the work before it's done. */
 export type ReviewBy = 'none' | 'agent' | 'agentThenYou' | 'you'
-/** G5: who finishes a code card. None's only way is acceptance. */
-export type Finisher = 'combworkMerges' | 'agentMerges' | 'committed' | 'notChecked' | 'accept'
+/** G5: who finishes a code card. None's only way is acceptance. HI-3552: a pull request, Git's fifth. */
+export type Finisher = 'combworkMerges' | 'agentMerges' | 'committed' | 'notChecked' | 'pullRequest' | 'accept'
 
 /** A finish whose merge someone reports (the agent's excepted): a merge Combwork doesn't check. */
 export const userReportsMerge = (f: Finisher): boolean => f === 'notChecked'
@@ -48,6 +48,11 @@ export interface WorkflowOptions {
   sameness: 'change' | 'exact'
   /** G5 (Git); None is always `accept`. */
   finish: Finisher
+  /**
+   * G22 (HI-3552): the pull request a card's finish opens is a draft (unset: a draft, the default) or ready for review.
+   * Not a rule, as G18: left out of every ruleset (`ruleOptions`), read when Combwork opens the pull request.
+   */
+  prDraft?: boolean
   /** G6. */
   style: 'merge' | 'squash' | 'rebase'
   /** G7: the target line; empty means the repository's default branch. */
@@ -458,7 +463,7 @@ export function contradictions(o: WorkflowOptions, where: ContradictionPlace = {
   if (!finishes.includes(o.finish)) out.push('combworkMergesNeedsGit')
   if (!hasCapability(o.platform, 'isolation') && o.folder !== 'project') out.push('noneHasNoSlots')
   if (merging) {
-    if ((o.finish === 'combworkMerges' || o.finish === 'agentMerges') && o.folder !== 'slots') out.push('mergeNeedsSlots')
+    if ((o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'pullRequest') && o.folder !== 'slots') out.push('mergeNeedsSlots')
     if (o.finish === 'committed' && o.folder !== 'project') out.push('committedNeedsFolder')
     // G15 depends on G11 alone (#1445): only a slot is brought up to date.
     if (o.slotsUpToDate && o.folder !== 'slots') out.push('upToDateNeedsSlots')
@@ -501,7 +506,8 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   preChecks: strings,
   otherTargets: (v) => strings(v) && (v as string[]).every((b) => b.trim() === b && b.length > 0) && new Set(v as string[]).size === (v as string[]).length,
   sameness: oneOf<WorkflowOptions['sameness']>(['change', 'exact']),
-  finish: oneOf<Finisher>(['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept']),
+  finish: oneOf<Finisher>(['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'pullRequest', 'accept']),
+  prDraft: bool,
   style: oneOf<WorkflowOptions['style']>(['merge', 'squash', 'rebase']),
   target: (v) => typeof v === 'string',
   targetOwn: (v) => v === true,
@@ -536,7 +542,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
 }
 
 /** The stage ids a project may name (N5), as stages.ts orders them (kept here so options.ts needs nothing of it). */
-const STAGE_IDS: readonly StageId[] = ['hold', 'todo', 'active', 'review', 'approved', 'merging', 'done']
+const STAGE_IDS: readonly StageId[] = ['hold', 'todo', 'active', 'review', 'approved', 'merging', 'prOpen', 'done']
 
 /** Whether a value is one its option takes (false for anything that isn't an option). */
 export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(OPTION_TAKES, key) && OPTION_TAKES[key as OptionKey](v)
@@ -545,7 +551,7 @@ export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(O
 const LOOP_OPTIONS: OptionKey[] = ['loopWakes', 'loopRounds', 'simplifyAt', 'churnStopAt', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes']
 
 /** The Workflow section's groups (#1418), each a heading with its options. */
-export type FormGroupId = 'team' | 'review' | 'checks' | 'merging' | 'where' | 'work' | 'loops' | 'stages'
+export type FormGroupId = 'team' | 'review' | 'checks' | 'merging' | 'where' | 'github' | 'work' | 'loops' | 'stages'
 
 /**
  * The Workflow section's groups for a platform, in order, and their options (SPEC §16.6.1, §16.6.2; #1418). Since P7
@@ -561,6 +567,8 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
     { id: 'checks', options: ['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall', 'mergeGuards'] },
     { id: 'merging', options: ['finish', 'style', 'target', 'otherTargets', 'strict', 'pushTarget', 'followRemote', 'commitMessage', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'] },
+    // HI-3552: the pull request's options, in the GitHub tab beside its hosts.
+    { id: 'github', options: ['prDraft'] },
     { id: 'loops', options: LOOP_OPTIONS },
     { id: 'stages', options: ['stageNames'] }
   ],
@@ -577,7 +585,7 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
 /**
  * The Workflow form's tabs (HI-3549), in order, each the groups it shows: layout only, an option's meaning, value and
  * default the same in any tab. Overview holds the preset picker, Where cards are built the slots panel beside its
- * group, and GitHub the GitHub hosts (no option of its own yet). A tab with nothing to show at a level isn't shown.
+ * group, and GitHub the GitHub hosts beside its group (HI-3552). A tab with nothing to show at a level isn't shown.
  */
 export type FormTabId = 'overview' | 'checks' | 'merging' | 'where' | 'github' | 'work' | 'loops'
 
@@ -587,7 +595,7 @@ export const FORM_TABS: Record<PlatformId, { id: FormTabId; groups: FormGroupId[
     { id: 'checks', groups: ['team', 'review', 'checks'] },
     { id: 'merging', groups: ['merging'] },
     { id: 'where', groups: ['where'] },
-    { id: 'github', groups: [] },
+    { id: 'github', groups: ['github'] },
     { id: 'loops', groups: ['loops', 'stages'] }
   ],
   none: [
@@ -672,6 +680,10 @@ export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   if (key === 'followRemote') return o.finish === 'combworkMerges'
   // G19 (HI-1697): only the merge queue makes a merge's commit, and Rebase makes none (the branch's commits land).
   if (key === 'commitMessage') return o.finish === 'combworkMerges' && o.style !== 'rebase'
+  // G6 (HI-3552): GitHub merges a pull request, in its own button's style.
+  if (key === 'style') return o.finish !== 'pullRequest'
+  // G22 (HI-3552): only a pull request's finish opens one.
+  if (key === 'prDraft') return o.finish === 'pullRequest'
   if (key === 'sharedFolderWarning') return o.folder === 'project'
   // G15 depends on G11 alone: only with each card in a slot. G17 whenever a reviewer agent reviews, whatever G11 is
   // (with everyone in the project folder the pool's reviewers read in review copies, #1439).

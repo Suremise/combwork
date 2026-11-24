@@ -12,7 +12,7 @@ import { agentText, englishText, withValues, type Text } from '../advanced'
 import { CATEGORY_STAGE, STAGE_CATEGORY, type Category, type StageId } from './facts'
 
 /** Every stage, in board order (§16.5.2). */
-export const STAGE_ORDER: readonly StageId[] = ['hold', 'todo', 'active', 'review', 'approved', 'merging', 'done']
+export const STAGE_ORDER: readonly StageId[] = ['hold', 'todo', 'active', 'review', 'approved', 'merging', 'prOpen', 'done']
 
 export const isStageId = (v: unknown): v is StageId => typeof v === 'string' && (STAGE_ORDER as readonly string[]).includes(v)
 
@@ -34,6 +34,7 @@ export const STAGE_TEXT: Record<StageId, Msg> = {
   review: msg({ id: 'workflow.stage.review', defaultMessage: 'Review', description: 'A stage of the board (glossary 2.2: Review): cards waiting for, or in, review.' }),
   approved: msg({ id: 'workflow.stage.approved', defaultMessage: 'Approved', description: 'A stage of the board (glossary 2.2: Approved, was Passed): cards whose work passed review (or your OK) and isn’t merged yet.' }),
   merging: msg({ id: 'workflow.stage.merging', defaultMessage: 'Merging', description: "A stage of the board inside Approved (glossary 2.2: Merging): cards in Combwork's merge queue." }),
+  prOpen: msg({ id: 'workflow.stage.prOpen', defaultMessage: 'PR open', description: 'HI-3552: a stage of the board inside Passed: cards whose finish is a GitHub pull request, opened and waiting for it to be merged or closed on GitHub. “PR” is a pull request.' }),
   done: msg({ id: 'workflow.stage.done', defaultMessage: 'Done', description: 'A stage of the board (glossary 2.2: Done): cards whose work is merged, or accepted.' })
 }
 

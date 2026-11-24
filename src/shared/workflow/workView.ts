@@ -697,7 +697,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     kind: v.kind,
     kindProposed: v.kindProposed,
     ...(v.cardTarget ? { target: v.cardTarget } : {}),
-    ...(v.target && (v.stage === 'active' || v.stage === 'review' || v.stage === 'approved' || v.stage === 'merging') ? { startedOn: v.target } : {}),
+    ...(v.target && (v.stage === 'active' || v.stage === 'review' || v.stage === 'approved' || v.stage === 'merging' || v.stage === 'prOpen') ? { startedOn: v.target } : {}),
     reviewSkip: v.reviewSkip,
     reviewSkipProposed: v.reviewSkipProposed,
     decisionSince: !!latest && v.decisions.generation > latest.generation,

@@ -54,6 +54,7 @@ const B = {
   finishAgent: agentMsg({ id: 'brief.rule.finish.agentMerges', text: 'The builder merges each approved card (merge-ready), then reports it with cw_report_merge; Combwork checks it is in.', note: 'Finish: the builder merges.' }),
   finishCommitted: agentMsg({ id: 'brief.rule.finish.committed', text: 'A card is done once its work is committed.', note: 'Finish: committed is done.' }),
   finishNotChecked: agentMsg({ id: 'brief.rule.finish.notChecked', text: 'Combwork does not check merges: report each one with cw_report_merge.', note: "Finish: merges aren't checked." }),
+  finishPullRequest: agentMsg({ id: 'brief.rule.finish.pullRequest', text: 'Combwork pushes each approved card and opens its pull request on GitHub; the card is done when it is merged there.', note: 'Finish (HI-3552): a pull request, which only Combwork pushes and opens. A statement of fact.' }),
   finishAccept: agentMsg({ id: 'brief.rule.finish.accept', text: 'An approved card is accepted where it is (no merge).', note: 'Finish: accepted where it is.' }),
   okEvery: agentMsg({ id: 'brief.rule.okBefore.every', text: "Every card waits for the user's OK before it is merged (Combwork asks them).", note: "The user's OK before every merge." }),
   okLabels: agentMsg({ id: 'brief.rule.okBefore.labels', text: "Cards labelled {labels} wait for the user's OK before they are merged (Combwork asks them).", note: 'The user\'s OK before merging cards with these labels, joined ("ui and api").' }),
@@ -90,7 +91,7 @@ export function laneRules(o: LaneBriefInput['options']): string[] {
   const out: string[] = []
   out.push(say({ none: B.reviewNone, agent: B.reviewAgent, agentThenYou: B.reviewAgentThenYou, you: B.reviewYou }[o.review]))
   if (o.preChecks.length) out.push(say(B.preChecks, { checks: agentList(o.preChecks) }))
-  out.push(say({ combworkMerges: B.finishCombwork, agentMerges: B.finishAgent, committed: B.finishCommitted, notChecked: B.finishNotChecked, accept: B.finishAccept }[o.finish]))
+  out.push(say({ combworkMerges: B.finishCombwork, agentMerges: B.finishAgent, committed: B.finishCommitted, notChecked: B.finishNotChecked, pullRequest: B.finishPullRequest, accept: B.finishAccept }[o.finish]))
   if (o.okBefore.mode === 'every') out.push(say(B.okEvery))
   if (o.okBefore.mode === 'labels' && o.okBefore.labels.length) out.push(say(B.okLabels, { labels: agentList(o.okBefore.labels) }))
   return out

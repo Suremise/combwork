@@ -54,7 +54,7 @@ const log = createLogger('workflow')
 export const PRESETS_NOTICE_KEY = 'workflow.presetsNotice'
 
 /** The stages a card in flight is in: started, not yet Done (or parked). */
-const IN_FLIGHT = new Set(['active', 'review', 'approved', 'merging'])
+const IN_FLIGHT = new Set(['active', 'review', 'approved', 'merging', 'prOpen'])
 
 /** A project of the workspace by its folder, with its platform (the Assistant's home has none). */
 function projectOf(ws: WorkspaceService, projectPath: string): { path: string; name: string; platform: PlatformId } {
