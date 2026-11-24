@@ -41,7 +41,7 @@
   },
   "github.issues.changed": {
     "text": "What {line} shipped has changed since it was shown: look at it again.",
-    "note": "HI-3555: an error from Close Shipped Issues…: the cards shipped in the release, or the repository, changed after the list was shown, so nothing was closed. {line} is a branch name such as 1.7.0.",
+    "note": "HI-3555: an error from Close Shipped Issues…: the repository, the release’s tag or the cards it shipped changed after the list was shown, so nothing was closed. {line} is a branch name such as 1.7.0.",
     "audience": "both"
   },
   "github.issues.notPublished": {

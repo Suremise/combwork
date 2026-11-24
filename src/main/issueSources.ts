@@ -286,10 +286,8 @@ async function closeLocked(ws: WorkspaceService, projectPath: string, preview: S
     if (seen.has(issue)) continue
     seen.add(issue)
     const at = (outcome: CloseOutcome['outcome'], detail: string | null = null): number => out.push({ issue, card, outcome, detail })
-    if (!open()) {
-      at('unknown', 'workspace closed')
-      continue
-    }
+    // The workspace closed meanwhile: nothing more is written (its window is gone with it).
+    if (!open()) break
     const read = await src.read(issue)
     if (!read.ok) {
       at('unknown', read.detail ?? read.problem)
