@@ -750,6 +750,11 @@ export interface CardState {
    * and the last failure since, if any. Null before Combwork is asked to open one, and again in each new cycle.
    */
   pullRequest: { requested: PrRequestData & { seq: number }; opened: PrOpenedData | null; failed: PrOpenFailedData | null; closed: FactData['PrClosed'] | null } | null
+  /**
+   * HI-3552: every pull request recorded for the card, over its whole history (kept across cycles): an earlier cycle's,
+   * closed, is never taken for a later request's when its pull request is looked for again (HR1).
+   */
+  prsRecorded: number[]
   integrated: FactData['Integrated'] | null
   accepted: FactData['Accepted'] | null
   /** Rounds: failed verdicts and the user's declines (§16.11.4), over the card's whole history. */
@@ -837,6 +842,7 @@ export const emptyState = (): CardState => ({
   approvals: [],
   entries: [],
   pullRequest: null,
+  prsRecorded: [],
   integrated: null,
   accepted: null,
   rounds: 0,
@@ -940,7 +946,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         // A question at the round limit outlives the cycle: it waits for the user's answer (§16.11.4); so do the churn's
         // (HI-3188, §16.11.5), and the churn itself, over the card's whole history.
         const limit = s.requests.filter((r) => PAUSE_GATES.includes(r.gate))
-        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, churn: s.churn, churnStop: s.churnStop, simplifyBase: s.simplifyBase, splitFrom: s.splitFrom, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines, ready: s.ready })
+        Object.assign(s, { ...emptyState(), stage: s.stage, generation: s.generation, received: s.received, commentGeneration: s.commentGeneration, receivedComments: s.receivedComments, rounds: s.rounds, moreRounds: s.moreRounds, churn: s.churn, churnStop: s.churnStop, simplifyBase: s.simplifyBase, splitFrom: s.splitFrom, builders: s.builders, overrides: s.overrides, blocked: s.blocked, resolves: s.resolves, lastSeq: s.lastSeq, lines: s.lines, ready: s.ready, prsRecorded: s.prsRecorded })
         s.requests = limit
         for (const r of limit) s.made[r.request] = r
         s.cycle = f.seq
@@ -1140,6 +1146,7 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'PrOpened': {
         const d = f.data as PrOpenedData
         if (s.pullRequest?.requested.request === d.request) s.pullRequest = { ...s.pullRequest, opened: d, failed: null }
+        if (!s.prsRecorded.includes(d.number)) s.prsRecorded = [...s.prsRecorded, d.number]
         break
       }
       case 'PrOpenFailed': {

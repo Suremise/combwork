@@ -22,6 +22,8 @@ import { parseGithubRemote } from '../../shared/githubRepo'
 import { PR_RETRY_GATE, type CardState, type PrOpenedData, type PrOpenFailedData, type PrRequestData } from '../../shared/workflow/facts'
 import { FOR_YOU, PR_PROBLEM, workflowText } from '../../shared/workflow/texts'
 import { checksAtRevision, type Workflow } from './runtime'
+import type { CardRecord } from './factStore'
+import { notApproved } from '../../shared/workflow/guards'
 import { agentMsg, say } from '../../shared/agentText'
 import { inDefaultDialect } from '../../shared/agentText/asyncScope'
 import { HISTORY, storedText } from '../../shared/taskHistory'
@@ -65,13 +67,26 @@ interface Listed {
 const LIST_FIELDS = 'number,url,createdAt,headRefName,baseRefName,isCrossRepository,isDraft'
 const VIEW_FIELDS = 'number,url,state,isDraft,reviewDecision,statusCheckRollup,headRefOid,mergeCommit,mergedAt,closedAt'
 
-const running = new Map<string, Promise<unknown>>()
-/** One run per card and kind in this process at a time: a second asks for the same run's result. */
-function once<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const was = running.get(key) as Promise<T> | undefined
-  if (was) return was
-  const p = fn().finally(() => running.delete(key))
-  running.set(key, p)
+/**
+ * Whether the run's owner still holds it (prHosts.ts: its workspace's lifetime, as the merge queue's host and the action
+ * worker take it, and the host not stopped): checked after every wait, before each effect and in each write, so a
+ * workspace closed or switched (or the host stopped) meanwhile pushes, opens, writes and keeps nothing more.
+ */
+export type Alive = () => boolean
+const ALWAYS: Alive = () => true
+
+const running = new Map<string, { p: Promise<unknown>; alive: Alive }>()
+/**
+ * One run per card and kind in this process at a time: a second asks for the same run's result, unless that run's owner
+ * has gone (it stops at its next check), when the new owner's starts.
+ */
+function once<T>(key: string, alive: Alive, fn: () => Promise<T>): Promise<T> {
+  const was = running.get(key)
+  if (was && was.alive()) return was.p as Promise<T>
+  const p = fn().finally(() => {
+    if (running.get(key)?.p === p) running.delete(key)
+  })
+  running.set(key, { p, alive })
   return p
 }
 const keyOf = (wf: Workflow, kind: string, card: number): string => `${kind}:${wf.cfg.project.toLowerCase()}#${card}`
@@ -87,6 +102,21 @@ function waiting(s: CardState, request: string): PrRequestData | null {
   return p.requested
 }
 
+/**
+ * The request's authority (HR1, s9 point 1): still waiting, its submission the card's newest, and the card approved at
+ * the current decision generation, not stale (the merge queue's own test, stillApproved and startAdvance, §16.9.1). A
+ * decision, a new submission, a pass gone stale or an approval revoked since the request takes it away.
+ */
+function authority(wf: Workflow, card: CardRecord, s: CardState, request: string): PrRequestData | null {
+  const r = waiting(s, request)
+  if (!r || s.latest?.id !== r.submission) return null
+  const rules = wf.rulesetOf(card, s)
+  return (rules.options.review === 'none' ? !s.stale : !notApproved(s, rules, card.labels)) ? r : null
+}
+
+/** The request's authority read in the workflow's lock, on the facts as they are now: before each push and create. */
+const holds = (wf: Workflow, cardId: number, request: string, alive: Alive): Promise<boolean> => (alive() ? wf.write(wf.store.card(cardId), null, 'combwork', (w) => alive() && !!authority(wf, w.card, w.state(), request)) : Promise.resolve(false))
+
 /** The pull request's body: the card, its builder's summary, the passing verdict, the checks that passed, the card's key. */
 export function prBody(wf: Workflow, s: CardState, card: { key: string; title: string }, r: PrRequestData): string {
   const sub = s.submissions.find((x) => x.id === r.submission) ?? s.latest
@@ -101,12 +131,15 @@ export function prBody(wf: Workflow, s: CardState, card: { key: string; title: s
   return out.join('\n')
 }
 
-/** The pull request of this request's head and base on its repository, opened since its cycle's first request, if any. */
-async function findOpened(run: GhPort, r: PrRequestData): Promise<Listed | null | GhResult> {
+/**
+ * The pull request of this request's head and base on its repository, opened since its cycle's first request, if any:
+ * never one recorded for the card before (`earlier`: an earlier cycle's, closed), whenever it was created.
+ */
+async function findOpened(run: GhPort, r: PrRequestData, earlier: readonly number[]): Promise<Listed | null | GhResult> {
   const got = await run(pinned(r), ['pr', 'list', '--head', r.line, '--base', r.target, '--state', 'all', '--limit', '20', '--json', LIST_FIELDS], { json: true })
   if (!got.ok) return got
   const since = Date.parse(r.since)
-  const ours = (Array.isArray(got.json) ? (got.json as Listed[]) : []).filter((p) => p && !p.isCrossRepository && p.headRefName === r.line && p.baseRefName === r.target && Date.parse(p.createdAt) >= since - 60_000)
+  const ours = (Array.isArray(got.json) ? (got.json as Listed[]) : []).filter((p) => p && !p.isCrossRepository && p.headRefName === r.line && p.baseRefName === r.target && !earlier.includes(p.number) && Date.parse(p.createdAt) >= since - 60_000)
   return ours.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))[0] ?? null
 }
 
@@ -124,56 +157,63 @@ const ghProblem = (g: Exclude<GhResult, { ok: true }>): PrOpenFailedData['proble
  * Opens a request's pull request (the `openPr` action, and a workspace opening with one left waiting): see the top. Does
  * nothing for a request that is no longer the card's newest waiting one.
  */
-export function openPr(wf: Workflow, cardId: number, request: string, ports: PrPorts = PORTS): Promise<void> {
-  return once(keyOf(wf, 'open', cardId), () => opening(wf, cardId, request, ports))
+export function openPr(wf: Workflow, cardId: number, request: string, ports: PrPorts = PORTS, alive: Alive = ALWAYS): Promise<void> {
+  return once(keyOf(wf, 'open', cardId), alive, () => opening(wf, cardId, request, ports, alive))
 }
 
-async function opening(wf: Workflow, cardId: number, request: string, ports: PrPorts): Promise<void> {
+async function opening(wf: Workflow, cardId: number, request: string, ports: PrPorts, alive: Alive): Promise<void> {
   const run = ports.gh
-  const r = waiting(wf.state(cardId), request)
+  const r = alive() ? authority(wf, wf.store.card(cardId), wf.state(cardId), request) : null
   if (!r) return
-  const fail = (problem: PrOpenFailedData['problem'], detail: string | null = null): Promise<void> => failed(wf, cardId, request, { request, problem, detail })
+  const fail = (problem: PrOpenFailedData['problem'], detail: string | null = null): Promise<void> => failed(wf, cardId, request, { request, problem, detail }, alive)
   if (!r.host || !r.remote) return fail('noLink')
   // Found already (a create whose reply was lost, another Combwork's): recorded, never opened again.
-  const found = await findOpened(run, r)
+  const earlier = wf.state(cardId).prsRecorded
+  const found = await findOpened(run, r, earlier)
   if (found && 'ok' in found) return fail(ghProblem(found as Exclude<GhResult, { ok: true }>), (found as { detail?: string | null }).detail ?? null)
-  if (found) return opened(wf, cardId, r, { number: found.number, url: found.url, draft: !!found.isDraft, recovered: true })
-  if (!pushesTo(await ports.pushUrls(wf.cfg.project, r.remote), r)) return fail('pushUrl')
-  // Still the request it was (a decision, a new submission or a move may have come meanwhile): else nothing is pushed.
-  if (!waiting(wf.state(cardId), request)) return
+  if (found) return opened(wf, cardId, r, { number: found.number, url: found.url, draft: !!found.isDraft, recovered: true }, alive)
+  const urls = await ports.pushUrls(wf.cfg.project, r.remote)
+  if (!alive()) return
+  if (!pushesTo(urls, r)) return fail('pushUrl')
+  // Still the request it was, with its authority (a decision, a new submission, a move or a revoked approval may have
+  // come meanwhile), read in the lock: else nothing is pushed.
+  if (!(await holds(wf, cardId, request, alive))) return
   // That exact commit, never the line as it is now; never forced, so commits there from outside refuse it.
   const push = await git(wf.cfg.project, ['push', '--porcelain', '--', r.remote, `${r.revision}:refs/heads/${r.line}`], undefined, undefined, { timeout: platformLimits.gitNetworkMs() })
   if (!push.ok) return fail('push', firstLine(push.err) ?? firstLine(push.out))
-  if (!waiting(wf.state(cardId), request)) return
+  if (!(await holds(wf, cardId, request, alive))) return
   const card = wf.store.card(cardId)
   const draft = wf.cfg.options().prDraft !== false
   const made = await run(pinned(r), ['pr', 'create', '--head', r.line, '--base', r.target, '--title', `${card.key}: ${card.title}`, '--body-file', '-', ...(draft ? ['--draft'] : [])], { input: prBody(wf, wf.state(cardId), card, r) })
   if (made.ok) {
     const url = made.stdout.trim().split(/\r?\n/).reverse().find((l) => /\/pull\/\d+/.test(l))?.trim() ?? ''
     const number = Number(/\/pull\/(\d+)/.exec(url)?.[1] ?? NaN)
-    if (Number.isInteger(number)) return opened(wf, cardId, r, { number, url, draft })
+    if (Number.isInteger(number)) return opened(wf, cardId, r, { number, url, draft }, alive)
   }
   // Its reply lost or unreadable: the pull request may be open all the same. Found, it is recorded; else it failed.
-  const again = await findOpened(run, r)
-  if (again && !('ok' in again)) return opened(wf, cardId, r, { number: again.number, url: again.url, draft: !!again.isDraft, recovered: true })
+  const again = await findOpened(run, r, earlier)
+  if (!alive()) return
+  if (again && !('ok' in again)) return opened(wf, cardId, r, { number: again.number, url: again.url, draft: !!again.isDraft, recovered: true }, alive)
   if (made.ok) return fail('other', firstLine(made.stdout))
   return fail(ghProblem(made), made.detail)
 }
 
 /** Records the request's pull request and moves the card to PR open: once, while it is still that request's. */
-async function opened(wf: Workflow, cardId: number, r: PrRequestData, pr: { number: number; url: string; draft: boolean; recovered?: boolean }): Promise<void> {
+async function opened(wf: Workflow, cardId: number, r: PrRequestData, pr: { number: number; url: string; draft: boolean; recovered?: boolean }, alive: Alive): Promise<void> {
+  if (!alive()) return
   const data: PrOpenedData = { request: r.request, number: pr.number, url: pr.url, host: r.host, owner: r.owner, repo: r.repo, head: r.line, base: r.target, pushed: r.revision, draft: pr.draft, ...(pr.recovered ? { recovered: true as const } : {}) }
   await wf.write(wf.store.card(cardId), null, 'combwork', (w) => {
-    if (!waiting(w.state(), r.request)) return
+    if (!alive() || !waiting(w.state(), r.request)) return
     w.fact('PrOpened', data) // i18n-ignore: a fact's kind, not text
     w.move('prOpen', 'derived')
   })
   log.info(`#${cardId}'s pull request #${pr.number} is open${pr.recovered ? ' (found again)' : ''}`)
 }
 
-async function failed(wf: Workflow, cardId: number, request: string, d: PrOpenFailedData): Promise<void> {
+async function failed(wf: Workflow, cardId: number, request: string, d: PrOpenFailedData, alive: Alive): Promise<void> {
+  if (!alive()) return
   await wf.write(wf.store.card(cardId), null, 'combwork', (w) => {
-    const r = waiting(w.state(), request)
+    const r = alive() ? waiting(w.state(), request) : null
     if (!r) return
     w.fact('PrOpenFailed', d) // i18n-ignore: a fact's kind, not text
     const why = workflowText(PR_PROBLEM, { problem: d.problem, remote: r.remote, owner: r.owner, repo: r.repo, host: r.host, line: r.line, detail: d.detail ?? '' })
@@ -183,9 +223,17 @@ async function failed(wf: Workflow, cardId: number, request: string, d: PrOpenFa
   log.info(`#${cardId}'s pull request wasn't opened: ${d.problem} ${userText(d.detail ?? '')}`)
 }
 
-const views = new Map<string, PrView>()
-/** The last read of a card's pull request in this process, or null. */
-export const prViewOf = (wf: Workflow, cardId: number): PrView | null => views.get(keyOf(wf, 'view', cardId)) ?? null
+/** The last read of each card's pull request in this process, with the request whose pull request it read. */
+const views = new Map<string, { request: string; view: PrView }>()
+/** The last read of a card's pull request in this process, or null: only of the one it is on now (none in another cycle). */
+export function prViewOf(wf: Workflow, cardId: number): PrView | null {
+  const key = keyOf(wf, 'view', cardId)
+  const was = views.get(key)
+  if (!was) return null
+  if (was.request === wf.state(cardId).pullRequest?.opened?.request) return was.view
+  views.delete(key)
+  return null
+}
 
 interface Viewed {
   number: number
@@ -215,32 +263,36 @@ function checksOf(roll: Viewed['statusCheckRollup']): PrView['checks'] {
  * Reads a card's pull request in PR open and follows it (see the top): its view kept for the card, a merge or close
  * written. Null for a card with none to follow.
  */
-export function followPr(wf: Workflow, cardId: number, ports: Pick<PrPorts, 'gh'> = PORTS): Promise<PrView | null> {
-  return once(keyOf(wf, 'follow', cardId), () => following(wf, cardId, ports.gh))
+export function followPr(wf: Workflow, cardId: number, ports: Pick<PrPorts, 'gh'> = PORTS, alive: Alive = ALWAYS): Promise<PrView | null> {
+  return once(keyOf(wf, 'follow', cardId), alive, () => following(wf, cardId, ports.gh, alive))
 }
 
-async function following(wf: Workflow, cardId: number, run: GhPort): Promise<PrView | null> {
+async function following(wf: Workflow, cardId: number, run: GhPort, alive: Alive): Promise<PrView | null> {
   const s = wf.state(cardId)
   const p = s.pullRequest?.opened
-  if (s.stage !== 'prOpen' || !p) return null
+  if (!alive() || s.stage !== 'prOpen' || !p) return null
   const key = keyOf(wf, 'view', cardId)
   const got = await run(pinned(p), ['pr', 'view', String(p.number), '--json', VIEW_FIELDS], { json: true })
+  // A reply for a pull request the card isn't on now (a later cycle's, a move meanwhile), or for an owner gone (its
+  // workspace closed or switched, the host stopped): kept nowhere, written nowhere.
+  const after = wf.state(cardId)
+  if (!alive() || after.stage !== 'prOpen' || after.pullRequest?.opened?.request !== p.request) return null
   if (!got.ok || !got.json || typeof got.json !== 'object') {
-    const was = views.get(key)
+    const was = prViewOf(wf, cardId)
     const view: PrView = was ? { ...was, stale: true } : { number: p.number, url: p.url, host: p.host, owner: p.owner, repo: p.repo, state: 'unknown', draft: p.draft, review: null, checks: { passed: 0, failed: 0, pending: 0 }, outside: false, at: Date.now(), stale: true }
-    views.set(key, view)
+    views.set(key, { request: p.request, view })
     return view
   }
   const v = got.json as Viewed
   const state = v.state === 'MERGED' ? 'merged' : v.state === 'CLOSED' ? 'closed' : 'open'
   const review = v.reviewDecision === 'APPROVED' ? 'approved' : v.reviewDecision === 'CHANGES_REQUESTED' ? 'changesRequested' : v.reviewDecision === 'REVIEW_REQUIRED' ? 'required' : null
   const view: PrView = { number: p.number, url: v.url || p.url, host: p.host, owner: p.owner, repo: p.repo, state, draft: !!v.isDraft, review, checks: checksOf(v.statusCheckRollup), outside: !!v.headRefOid && v.headRefOid !== p.pushed, at: Date.now() }
-  views.set(key, view)
+  views.set(key, { request: p.request, view })
   if (state === 'open') return view
   await wf.write(wf.store.card(cardId), null, 'outside', (w) => {
     const now = w.state()
     // Still this pull request (the request read), in PR open: else a later cycle's, and nothing is written.
-    if (now.stage !== 'prOpen' || now.pullRequest?.opened?.request !== p.request) return
+    if (!alive() || now.stage !== 'prOpen' || now.pullRequest?.opened?.request !== p.request) return
     if (state === 'merged') {
       // What GitHub merged (its head, outside commits and all) and its merge commit; what Combwork pushed beside it.
       w.fact('Integrated', { revision: v.headRefOid || p.pushed, target: p.base, result: v.mergeCommit?.oid ?? v.headRefOid ?? p.pushed, method: 'pullRequest', by: 'github', platform: { pr: p.number, url: p.url, ...(p.notPushed ? { notPushed: true } : { pushed: p.pushed }) } }) // i18n-ignore: a fact's kind and codes, not text

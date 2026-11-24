@@ -11,7 +11,7 @@ import { createLogger } from '../logger'
 import { openWorkspaces, type WorkspaceService } from '../workspace'
 import { onAction } from './actionWorker'
 import { workflowFor } from './service'
-import { followPr, openPr, prViewOf, type PrView } from './prHost'
+import { followPr, openPr, prViewOf, type Alive, type PrView } from './prHost'
 import { GITHUB_PR_FOLLOW_MINUTES } from '../../shared/advanced'
 
 const log = createLogger('workflow')
@@ -23,18 +23,33 @@ function projectOf(ws: WorkspaceService, card: number): string | null {
   return ws.info()?.projects.find((p) => p.name.toLowerCase() === name.toLowerCase())?.path ?? null
 }
 
+/** The host's runs since it started: stopping it (a quit) ends every run's ownership. */
+let hostRun = 0
+
+/**
+ * A run's owner (HR1): the workspace as it is now, for its lifetime (the merge queue's host and the action worker's
+ * test), while this host runs. Closed, switched or stopped, its runs push, open, write and keep nothing more.
+ */
+function ownerOf(ws: WorkspaceService): Alive {
+  const life = ws.lifetime
+  const path = ws.path
+  const run = hostRun
+  return () => run === hostRun && stop !== null && !life.aborted && ws.lifetime === life && ws.path === path
+}
+
 /** Each project of an open workspace with cards waiting on a pull request: those in Approved asked, and in PR open. */
 async function sweep(ws: WorkspaceService, opening: boolean): Promise<void> {
   if (!ws.path || boardReadOnly(ws)) return
+  const alive = ownerOf(ws)
   for (const p of ws.info()?.projects ?? []) {
     if (!p.platform) continue
     const wf = await workflowFor(ws, p.path).catch(() => null)
-    if (!wf) continue
+    if (!wf || !alive()) continue
     for (const card of wf.store.cards()) {
-      if (card.stage === 'prOpen') void followPr(wf, card.id).catch((e) => log.warn(`reading #${card.id}'s pull request`, e))
+      if (card.stage === 'prOpen') void followPr(wf, card.id, undefined, alive).catch((e) => log.warn(`reading #${card.id}'s pull request`, e))
       else if (opening && card.stage === 'approved') {
         const r = wf.state(card).pullRequest
-        if (r && !r.opened && !r.failed) void openPr(wf, card.id, r.requested.request).catch((e) => log.warn(`opening #${card.id}'s pull request`, e))
+        if (r && !r.opened && !r.failed) void openPr(wf, card.id, r.requested.request, undefined, alive).catch((e) => log.warn(`opening #${card.id}'s pull request`, e))
       }
     }
   }
@@ -45,10 +60,12 @@ let stop: (() => void) | null = null
 /** Starts the pull request host (index.ts, once). */
 export function startPrHosts(): void {
   if (stop) return
+  hostRun++
   onAction('openPr', async (a, ws) => {
+    const alive = ownerOf(ws)
     const project = projectOf(ws, a.card)
     const wf = project ? await workflowFor(ws, project) : null
-    if (wf) void openPr(wf, a.card, String(a.payload.request ?? '')).catch((e) => log.warn(`opening #${a.card}'s pull request`, e))
+    if (wf && alive()) void openPr(wf, a.card, String(a.payload.request ?? ''), undefined, alive).catch((e) => log.warn(`opening #${a.card}'s pull request`, e))
   })
   const seen = new WeakSet<AbortSignal>()
   const off = onCombworkEvent((e) => {
@@ -73,6 +90,7 @@ export function startPrHosts(): void {
   }
   tick()
   stop = () => {
+    hostRun++
     off()
     if (timer) clearTimeout(timer)
     timer = null
@@ -90,10 +108,11 @@ export function stopPrHosts(): void {
  * last read when a read is going on. Null for a card with none in PR open.
  */
 export async function prStatus(ws: WorkspaceService, card: number): Promise<PrView | null> {
+  const alive = ownerOf(ws)
   const project = projectOf(ws, card)
   const wf = project ? await workflowFor(ws, project) : null
-  if (!wf) return null
-  return (await followPr(wf, card).catch(() => null)) ?? prViewOf(wf, card)
+  if (!wf || !alive()) return null
+  return (await followPr(wf, card, undefined, alive).catch(() => null)) ?? (alive() ? prViewOf(wf, card) : null)
 }
 
 /** Reads every card's pull request in PR open in a workspace now (its board opened). */

@@ -10,7 +10,7 @@ import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { allOff, contradictions, formShows, formTabOf, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { producedStages } from '../../src/shared/workflow/compile'
 import { PR_RETRY_GATE } from '../../src/shared/workflow/facts'
-import { followPr, openPr, pushesTo, type GhPort, type PrPorts } from '../../src/main/workflow/prHost'
+import { followPr, openPr, prViewOf, pushesTo, type GhPort, type PrPorts } from '../../src/main/workflow/prHost'
 import { tempDir } from '../tempDir'
 import { intentText } from '../../src/shared/toolReplies'
 import { laneRules } from '../../src/shared/laneBrief'
@@ -310,6 +310,104 @@ describe('the pull request finish (HI-3552)', () => {
     expect(() => sh(bare, 'rev-parse', '--verify', '--quiet', e.wf.state(card).started!.line!)).toThrow()
   })
 
+  // HR1, round 1: the request's authority is read in the lock before each push and create, as the merge queue's advance
+  // reads its own: a decision since the pass (its generation newer than the verdict's) or an approval gone stale while gh
+  // or git was waited for takes it away, though the card is still in Approved with its request waiting.
+  it('pushes and opens nothing once the request has lost its authority while a step was waited for', async () => {
+    for (const lose of ['decision', 'stale'] as const) {
+      const e = (env = project())
+      const { bare, gh, ports } = github(e)
+      const { card, revision } = await approved(e)
+      const take = (): Promise<unknown> =>
+        e.wf.write(e.store.card(card.id), null, 'user', (w) => {
+          const s = w.state()
+          if (lose === 'decision') w.fact('Decision', { decision: `${card.key}/d${s.generation + 1}`, generation: s.generation + 1, text: 'Not like that.' })
+          else w.fact('Stale', { approved: revision, current: 'f'.repeat(40), why: 'change' })
+        })
+      // A decision while gh lists; a pass gone stale while the push addresses are read.
+      if (lose === 'decision') gh.o.before = async (args) => void (args[1] === 'list' && (gh.o.before = null, await take()))
+      const at: PrPorts = lose === 'stale' ? { ...ports, pushUrls: async (p, r) => (await take(), ports.pushUrls(p, r)) } : ports
+      await openPr(e.wf, card.id, requestOf(e, card.id), at)
+      const s = e.wf.state(card)
+      expect(s.stage, lose).toBe('approved')
+      expect(s.pullRequest?.opened ?? null, lose).toBeNull()
+      expect(gh.creates(), lose).toBe(0)
+      expect(() => sh(bare, 'rev-parse', '--verify', '--quiet', s.started!.line!), lose).toThrow()
+      env.close()
+      env = null
+    }
+  })
+
+  // HR1, round 1: a pull request an earlier cycle opened (closed since) is never taken for a later cycle's, however soon
+  // after it the card is passed again: the new cycle pushes and opens its own.
+  it('closed, started again and passed again: opens a new pull request rather than finding the closed one', async () => {
+    const e = (env = project())
+    const { bare, gh, ports } = github(e)
+    const { card } = await approved(e)
+    await openPr(e.wf, card.id, requestOf(e, card.id), ports)
+    gh.prs[0].state = 'CLOSED'
+    gh.prs[0].closedAt = new Date().toISOString()
+    await followPr(e.wf, card.id, ports)
+    expect(e.wf.state(card).stage).toBe('todo')
+    moved(await e.wf.start(card.key, B1))
+    const again = commit(e.wf.state(card).started!.folder, { 'fix.txt': 'a better fix\n' }, 'A better fix')
+    moved(await e.wf.submit(card.key, B1, { summary: 'Fixed it properly.' }))
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'Now it is right.' }))
+    expect(e.wf.state(card).stage).toBe('approved')
+    await openPr(e.wf, card.id, requestOf(e, card.id), ports)
+    const s = e.wf.state(card)
+    expect(gh.creates()).toBe(2)
+    expect(s.stage).toBe('prOpen')
+    expect(s.pullRequest?.opened).toMatchObject({ number: 13, pushed: again })
+    expect(s.pullRequest?.opened?.recovered).toBeUndefined()
+    expect(s.prsRecorded).toEqual([12, 13])
+    expect(sh(bare, 'rev-parse', s.started!.line!)).toBe(again)
+    // Followed, it stays open: the closed one's state never sends it back to Todo.
+    expect(await followPr(e.wf, card.id, ports)).toMatchObject({ number: 13, state: 'open' })
+    expect(e.wf.state(card).stage).toBe('prOpen')
+  })
+
+  // HR1, round 1: a run belongs to its workspace's lifetime (prHosts.ts's owner): closed or switched while gh or git is
+  // waited for, it pushes, opens, writes and keeps nothing more; the reopened workspace's run takes the card up.
+  it('stops a run whose workspace closed while it waited, and the next owner’s run opens it once', async () => {
+    const e = (env = project())
+    const { bare, gh, ports } = github(e)
+    const { card, revision } = await approved(e)
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    let first = true
+    gh.o.before = async (args) => {
+      if (args[1] === 'list' && first) {
+        first = false
+        await held
+      }
+    }
+    let open = true
+    const closing = openPr(e.wf, card.id, requestOf(e, card.id), ports, () => open)
+    open = false
+    // The reopened workspace's sweep: its own run, not the closed one's result.
+    await openPr(e.wf, card.id, requestOf(e, card.id), ports, () => true)
+    release()
+    await closing
+    expect(gh.creates()).toBe(1)
+    expect(kinds(e, card.id).filter((k) => k === 'PrOpened' || k === 'PrOpenFailed')).toEqual(['PrOpened'])
+    expect(sh(bare, 'rev-parse', e.wf.state(card).started!.line!)).toBe(revision)
+
+    // Following: a read held while the workspace closes keeps no view and moves nothing, merged or not.
+    const view = await followPr(e.wf, card.id, ports)
+    expect(view?.state).toBe('open')
+    gh.prs[0].state = 'MERGED'
+    gh.prs[0].mergeCommit = { oid: 'e'.repeat(40) }
+    let alive = true
+    gh.o.before = async () => {
+      alive = false
+    }
+    expect(await followPr(e.wf, card.id, ports, () => alive)).toBeNull()
+    expect(e.wf.state(card).stage).toBe('prOpen')
+    expect(prViewOf(e.wf, card.id)).toEqual(view)
+  })
+
   it('follows it: merged on GitHub (outside commits too) → Done with GitHub’s merge commit; what was pushed kept', async () => {
     const e = (env = project())
     const { bare, gh, ports } = github(e)
@@ -354,6 +452,8 @@ describe('the pull request finish (HI-3552)', () => {
     s = e.wf.state(card)
     expect(s.stage).toBe('active')
     expect(s.pullRequest).toBeNull()
+    // Its last read was of that cycle's pull request: kept for none now.
+    expect(prViewOf(e.wf, card.id)).toBeNull()
   })
 
   it('a pull request’s card (HI-3551) follows its own pull request, pushing nothing (the user’s split)', async () => {

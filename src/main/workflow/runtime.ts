@@ -1751,13 +1751,13 @@ export class Workflow {
    * HI-3552: asks Combwork's pull request host (prHost.ts) to push the card's approved revision and open its pull request:
    * a `PrRequested` pinning that revision, the target, the line and the project's GitHub link as gathered (`fin.github`;
    * with none, the host says so), and its `openPr` action. The card waits in Approved meanwhile. A retry is a new request
-   * of the same cycle (`since` kept); a new cycle's first request starts its own.
+   * of the same cycle (`since` kept: none opened since); after one was opened (and closed), a new cycle starts its own.
    */
   requestPr(w: Write, github: FinishInputs['github']): void {
     const s = w.state()
     const request = `${w.card.key}/pr${s.lastSeq + 1}`
     const link = github ?? null
-    w.fact('PrRequested', { request, revision: s.approved?.revision ?? s.latest?.revision ?? '', target: s.started?.target ?? '', line: s.started?.line ?? '', host: link?.host ?? '', owner: link?.owner ?? '', repo: link?.repo ?? '', remote: link?.remote ?? '', submission: s.latest?.id ?? 0, since: s.pullRequest?.requested.since ?? new Date().toISOString() }) // i18n-ignore: a fact's kind and codes, not text
+    w.fact('PrRequested', { request, revision: s.approved?.revision ?? s.latest?.revision ?? '', target: s.started?.target ?? '', line: s.started?.line ?? '', host: link?.host ?? '', owner: link?.owner ?? '', repo: link?.repo ?? '', remote: link?.remote ?? '', submission: s.latest?.id ?? 0, since: (s.pullRequest && !s.pullRequest.opened ? s.pullRequest.requested.since : null) ?? new Date().toISOString() }) // i18n-ignore: a fact's kind and codes, not text
     w.action('openPr', { request })
   }
 
