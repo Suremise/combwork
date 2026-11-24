@@ -5,7 +5,7 @@
 // for github.com/acme/app: it lists a pull request already open for the card's branch, so Combwork records it rather
 // than pushing (the remote is a github.com address only, never reached: no network). What a push and a create do, and
 // every failure, is tests/workflow/prFinish.test.ts's. Dev build, throwaway profile and workspace, the fake agents.
-// NOT RUN on a packaged build (CW_TEST_GH is a dev seam).
+// Dev build only (CW_TEST_GH is a dev seam a packaged build ignores).
 const lib = require('./lib.cjs')
 const q = require('./queueFixture.cjs')
 const fs = require('fs')
@@ -55,7 +55,7 @@ const calls = () => fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(B
   writeFakeGh()
   // The project's GitHub link: origin a github.com address only (nothing is fetched or pushed in this suite).
   lib.git(fx.alpha, ['remote', 'add', 'origin', 'https://github.com/acme/app.git'])
-  const port = Number(lib.port(47939))
+  const port = Number(lib.port(47938))
   const env = lib.withPathFirst({ CW_TEST_GH: path.join(ghDir, 'gh.cmd'), GH_TOKEN: 'ghp_never_given' }, [path.dirname(process.execPath)])
   const h = await q.startCombwork(fx, { port, env })
   const { page, inv } = h
