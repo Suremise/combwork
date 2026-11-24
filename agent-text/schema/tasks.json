@@ -733,6 +733,13 @@
       "number": "plain"
     }
   },
+  "tasks.history.prNotPushed": {
+    "placeholders": {
+      "number": "plain",
+      "why": "select",
+      "rule": "plain"
+    }
+  },
   "tasks.history.queueGuarded": {
     "placeholders": {
       "count": "plural",

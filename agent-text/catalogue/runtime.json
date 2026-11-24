@@ -51,6 +51,10 @@
     "text": "Pull request #{number} was closed on GitHub without being merged: the card is back in Todo, its branch kept for its next start.",
     "note": "HI-3552: the comment on a card whose GitHub pull request was closed without merging. A statement of fact."
   },
+  "runtime.pr.notPushed": {
+    "text": "{card}'s fixes weren't pushed to pull request #{number}: {why, select, fork {it is from a fork whose author doesn't allow maintainers to push to it} outside {its branch on GitHub has commits the approved commit lacks, pushed from outside} refused {the push was refused, its branch having moved since it was read} notOpen {it isn't open on GitHub} rewrite {a git url rewrite, {rule}, applies to its fork's address, and Combwork doesn't push through one} config {git's url rewrites couldn't be read, and Combwork doesn't push without them} other {its head isn't the branch the card started on}}. Nothing was pushed; the card follows the pull request in PR open.",
+    "note": "HI-3562: the comment on a pull request's card whose approved fixes Combwork couldn't push to the pull request it is about. {why}: fork, outside, refused, notOpen, changed, rewrite (then {rule}, the git config key of the url rewrite, the user's own) or config. A statement of fact."
+  },
   "runtime.repair.boardDone": {
     "text": "the board had it in Done while its stage was {stage}",
     "note": "A repair's reason, stored on the card's Moved fact: the board's column and the card's stage disagreed. {stage}: the stage id."

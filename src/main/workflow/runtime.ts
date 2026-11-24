@@ -1747,24 +1747,8 @@ export class Workflow {
   async finishInputs(card: CardRecord, s: CardState, r: Ruleset, revision: string | null | undefined): Promise<FinishInputs> {
     const fin = await this.platform(r.options).finishInputs(card, s, r.options, revision)
     // HI-3552: a pull request's finish pins the project's GitHub link as it is now on its request.
-    if (r.options.finish !== 'pullRequest' || card.kind === 'no-code' || s.started?.pr) return fin
+    if (r.options.finish !== 'pullRequest' || card.kind === 'no-code') return fin
     return { ...fin, github: this.cfg.githubLink ? await this.cfg.githubLink().catch(() => null) : null }
-  }
-
-  /**
-   * HI-3552: a pull request's card (HI-3551) under the pull request finish: it follows the pull request it is about in
-   * PR open, as recorded at its start, with nothing pushed or opened (`notPushed`: pushing its fixes to it is a later
-   * card's, the user's split). Merged there, it is Done; closed, back to Todo.
-   */
-  followExistingPr(w: Write): void {
-    const s = w.state()
-    const pr = s.started?.pr
-    if (!pr || s.pullRequest?.opened) return
-    const request = `${w.card.key}/pr${s.lastSeq + 1}`
-    const revision = s.approved?.revision ?? s.latest?.revision ?? ''
-    w.fact('PrRequested', { request, revision, target: pr.baseRef, line: pr.headRef, host: pr.host, owner: pr.owner, repo: pr.repo, remote: '', submission: s.latest?.id ?? 0, since: s.pullRequest?.requested.since ?? new Date().toISOString() }) // i18n-ignore: a fact's kind and codes, not text
-    w.fact('PrOpened', { request, number: pr.number, url: `https://${pr.host}/${pr.owner}/${pr.repo}/pull/${pr.number}`, host: pr.host, owner: pr.owner, repo: pr.repo, head: pr.headRef, base: pr.baseRef, pushed: pr.headOid, draft: false, notPushed: true }) // i18n-ignore: a fact's kind and codes, not text
-    w.move('prOpen', 'derived')
   }
 
   /**
@@ -1772,11 +1756,21 @@ export class Workflow {
    * a `PrRequested` pinning that revision, the target, the line and the project's GitHub link as gathered (`fin.github`;
    * with none, the host says so), and its `openPr` action. The card waits in Approved meanwhile. A retry is a new request
    * of the same cycle (`since` kept: none opened since); after one was opened (and closed), a new cycle starts its own.
+   * HI-3562: a pull request's card (HI-3551) asks instead to push its fixes back to the pull request it is about
+   * (`source`): its head branch and base, that pull request's repository (pushed through the link's remote only when the
+   * link is that repository), and none opened.
    */
   requestPr(w: Write, github: FinishInputs['github']): void {
     const s = w.state()
     const request = `${w.card.key}/pr${s.lastSeq + 1}`
     const link = github ?? null
+    const pr = s.started?.pr
+    if (pr) {
+      const same = !!link && link.host.toLowerCase() === pr.host.toLowerCase() && link.owner.toLowerCase() === pr.owner.toLowerCase() && link.repo.toLowerCase() === pr.repo.toLowerCase()
+      w.fact('PrRequested', { request, revision: s.approved?.revision ?? s.latest?.revision ?? '', target: pr.baseRef, line: pr.headRef, host: pr.host, owner: pr.owner, repo: pr.repo, remote: same ? link!.remote : '', submission: s.latest?.id ?? 0, since: s.pullRequest?.requested.since ?? new Date().toISOString(), source: { number: pr.number, headRef: pr.headRef } }) // i18n-ignore: a fact's kind and codes, not text
+      w.action('openPr', { request })
+      return
+    }
     w.fact('PrRequested', { request, revision: s.approved?.revision ?? s.latest?.revision ?? '', target: s.started?.target ?? '', line: s.started?.line ?? '', host: link?.host ?? '', owner: link?.owner ?? '', repo: link?.repo ?? '', remote: link?.remote ?? '', submission: s.latest?.id ?? 0, since: (s.pullRequest && !s.pullRequest.opened ? s.pullRequest.requested.since : null) ?? new Date().toISOString() }) // i18n-ignore: a fact's kind and codes, not text
     w.action('openPr', { request })
   }
@@ -1929,11 +1923,11 @@ export class Workflow {
     // Passed even where its project's own rules have no such stage (no review, no OK before merging: HR1's round 1).
     if (s.started?.pr) {
       w.move('approved', 'derived')
-      // HI-3552 (the user's split, r12): under the pull request finish it follows its own pull request in PR open, after
-      // the user's OK where G10 asks, its fixes not pushed (a later card's).
+      // HI-3552, HI-3562: under the pull request finish, after the user's OK where G10 asks, Combwork pushes its fixes
+      // back to its own pull request (opening none) and it follows that pull request in PR open.
       if (o.finish === 'pullRequest') {
         if (this.enforced() && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore')) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.prOkBefore, { card: w.card.key }))
-        else this.followExistingPr(w)
+        else this.requestPr(w, fin.github)
       }
       return
     }
@@ -2633,7 +2627,6 @@ export class Workflow {
         if (!missing || (missing.missing === 'userOk' && approvedByUser(now, 'review'))) this.finish(w, fin)
       } else if (!missing && st.stage === 'approved') {
         if (r.options.finish === 'combworkMerges') this.enqueue(w)
-        else if (r.options.finish === 'pullRequest' && now.started?.pr) this.followExistingPr(w)
         else if (r.options.finish === 'pullRequest') this.requestPr(w, fin.github)
         else this.wake(w, builder, stored(W.approvedMerge))
       }
@@ -3310,8 +3303,7 @@ export class Workflow {
             else w.move(hasStage(r, 'approved') ? 'approved' : to, cause)
             // HI-3552: the user's move into Passed is their OK: Combwork pushes it and opens its pull request.
             if (r.options.finish === 'pullRequest' && w.current === 'approved' && !w.state().pullRequest) {
-              if (w.state().started?.pr) this.followExistingPr(w)
-              else this.requestPr(w, prLink)
+              this.requestPr(w, prLink)
             }
           }
           return null

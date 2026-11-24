@@ -691,7 +691,7 @@
   "board.pr.failed": "Pull request não aberto: veja Para você",
   "board.pr.heading": "Pull request",
   "board.pr.noChecks": "Sem verificações",
-  "board.pr.notPushed": "O Combwork acompanha esta pull request, mas ainda não faz push das correções do cartão para ela.",
+  "board.pr.notPushedWhy": "As correções do cartão não foram enviadas a ele: {why, select, fork {vem de um fork cujo autor não permite que mantenedores enviem} outside {seu branch tem commits enviados de fora que faltam ao commit aprovado} refused {o push foi recusado, pois seu branch mudou} notOpen {ele não estava aberto} changed {seu head não é o branch em que o cartão começou} rewrite {uma reescrita de URL do git, {rule}, se aplica ao endereço do fork, e o Combwork não envia por meio de uma} config {não foi possível ler as reescritas de URL do git} other {o Combwork não as enviou}}.",
   "board.pr.number": "PR #{number}",
   "board.pr.open": "Abrir no GitHub",
   "board.pr.opening": "Abrindo o pull request dele…",

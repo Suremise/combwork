@@ -10,7 +10,7 @@ import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { allOff, contradictions, formShows, formTabOf, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { producedStages } from '../../src/shared/workflow/compile'
 import { PR_RETRY_GATE } from '../../src/shared/workflow/facts'
-import { followPr, openPr, prViewOf, pushesTo, type GhPort, type PrPorts } from '../../src/main/workflow/prHost'
+import { followPr, forkAddress, notPushedNotice, openPr, prViewOf, pushesTo, urlRewrites, type GhPort, type PrPorts } from '../../src/main/workflow/prHost'
 import { tempDir } from '../tempDir'
 import { intentText } from '../../src/shared/toolReplies'
 import { laneRules } from '../../src/shared/laneBrief'
@@ -54,6 +54,12 @@ interface FakePr {
   closedAt: string | null
   title: string
   body: string
+  /** HI-3562: its head repository (a fork's) and whether maintainers may push there; its head read live from `headBare`. */
+  /** null: its head repository is gone (a deleted fork): gh gives no head repository or owner. */
+  headOwner?: string | null
+  headRepo?: string
+  maintainerCanModify?: boolean
+  headBare?: string
 }
 
 /** GitHub as gh answers it for acme/app, its branches the bare repository's. */
@@ -83,7 +89,8 @@ function fakeGithub(bare: string) {
     if (args[0] === 'pr' && args[1] === 'view') {
       const p = prs.find((x) => x.number === Number(args[2]))
       if (!p) return { ok: false, problem: 'failed', detail: 'no pull requests found' }
-      return { ok: true, stdout: '', json: { number: p.number, url: p.url, state: p.state, isDraft: p.isDraft, reviewDecision: 'REVIEW_REQUIRED', statusCheckRollup: [{ conclusion: 'SUCCESS' }, { status: 'IN_PROGRESS' }], headRefOid: p.headRefOid, mergeCommit: p.mergeCommit, mergedAt: null, closedAt: p.closedAt } }
+      const headRefOid = p.headBare ? sh(p.headBare, 'rev-parse', `refs/heads/${p.headRefName}`) : p.headRefOid
+      return { ok: true, stdout: '', json: { number: p.number, url: p.url, state: p.state, isDraft: p.isDraft, reviewDecision: 'REVIEW_REQUIRED', statusCheckRollup: [{ conclusion: 'SUCCESS' }, { status: 'IN_PROGRESS' }], headRefOid, mergeCommit: p.mergeCommit, mergedAt: null, closedAt: p.closedAt, headRefName: p.headRefName, headRepository: p.headOwner === null ? null : { name: p.headRepo ?? 'app' }, headRepositoryOwner: p.headOwner === null ? null : { login: p.headOwner ?? 'acme' }, isCrossRepository: p.isCrossRepository, maintainerCanModify: p.maintainerCanModify ?? false } }
     }
     return { ok: false, problem: 'failed', detail: `unknown: ${args.join(' ')}` }
   }
@@ -456,38 +463,223 @@ describe('the pull request finish (HI-3552)', () => {
     expect(prViewOf(e.wf, card.id)).toBeNull()
   })
 
-  it('a pull request’s card (HI-3551) follows its own pull request, pushing nothing (the user’s split)', async () => {
-    const e = (env = project())
-    const { bare, gh, ports } = github(e)
-    // GitHub's pull request #7: a branch of its own and refs/pull/7/head on the bare repository.
+  /**
+   * HI-3562: a pull request's card (HI-3551) whose pull request #7 is on `feature`, GitHub's head of it: on the base
+   * repository's bare (same repository) or a fork's bare (`someone/app`, its maintainers allowed to push or not), with
+   * refs/pull/7/head on the base one as GitHub keeps it. Started, a fix committed, submitted and passed: in Approved, its
+   * push back asked.
+   */
+  async function prCard(e: Env, bare: string, gh: ReturnType<typeof fakeGithub>, o: { fork?: boolean; canModify?: boolean } = {}) {
     const clone = tempDir('gh-pr-')
     sh(clone, 'clone', '-q', '-b', 'main', bare, '.')
     sh(clone, 'switch', '-q', '-c', 'feature')
     const prHead = commit(clone, { 'pr.txt': 'from the pull request\n' }, 'PR work')
-    sh(clone, 'push', '-q', 'origin', 'HEAD:refs/pull/7/head', 'HEAD:refs/heads/feature')
+    sh(clone, 'push', '-q', 'origin', 'HEAD:refs/pull/7/head')
+    let headBare = bare
+    if (o.fork) {
+      headBare = tempDir('gh-fork-')
+      sh(headBare, 'init', '-q', '--bare')
+      sh(clone, 'push', '-q', headBare, 'HEAD:refs/heads/feature')
+    } else sh(clone, 'push', '-q', 'origin', 'HEAD:refs/heads/feature')
+    const fork = !!o.fork
+    const canModify = o.canModify ?? true
+    gh.prs.push({ number: 7, url: 'https://github.com/acme/app/pull/7', state: 'OPEN', isDraft: false, createdAt: '2026-11-01T00:00:00Z', headRefName: 'feature', baseRefName: 'main', isCrossRepository: fork, headRefOid: prHead, mergeCommit: null, closedAt: null, title: 't', body: '', headOwner: fork ? 'someone' : 'acme', headRepo: 'app', maintainerCanModify: canModify, headBare })
     const card = e.wf.createCard({ title: 'PR 7' })
     const db = new DatabaseSync(boardFile(e.home))
     try {
-      db.prepare(`UPDATE cards SET extra = json_set(COALESCE(extra, '{}'), '$.source', json(?)) WHERE number = ?`).run(JSON.stringify({ kind: 'pr', host: 'github.com', owner: 'acme', repo: 'app', number: 7, url: 'https://github.com/acme/app/pull/7', title: 't', pr: { headRef: 'feature', baseRef: 'main', crossRepository: false, maintainerCanModify: true } }), card.id)
+      db.prepare(`UPDATE cards SET extra = json_set(COALESCE(extra, '{}'), '$.source', json(?)) WHERE number = ?`).run(JSON.stringify({ kind: 'pr', host: 'github.com', owner: 'acme', repo: 'app', number: 7, url: 'https://github.com/acme/app/pull/7', title: 't', pr: { headRef: 'feature', baseRef: 'main', crossRepository: fork, maintainerCanModify: canModify } }), card.id)
     } finally {
       db.close()
     }
     moved(await e.wf.start(card.key, B1))
-    commit(e.wf.state(card).started!.folder, { 'fix.txt': 'a fix\n' }, 'A fix')
+    const revision = commit(e.wf.state(card).started!.folder, { 'fix.txt': 'a fix\n' }, 'A fix')
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
     moved(await e.wf.startReview(card.key, R1))
     moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
-    const s = e.wf.state(card)
+    return { card, revision, prHead, headBare, clone }
+  }
+  const forkAt = (headBare: string, urls = ['https://github.com/someone/app.git']) => async () => ({ target: headBare, urls })
+  // The comment is written with the move to PR open.
+  const commentOf = (e: Env, card: number): boolean => e.store.hasAction(card, 'comment', e.store.facts(card).filter((f) => f.kind === 'Moved').at(-1)!.seq)
+
+  it('a pull request’s card pushes its approved fixes to its own pull request’s branch (same repository), opening none', async () => {
+    const e = (env = project())
+    const { bare, gh, ports } = github(e)
+    const { card, revision, prHead } = await prCard(e, bare, gh)
+    let s = e.wf.state(card)
+    expect(s.stage).toBe('approved')
+    expect(s.pullRequest?.requested).toMatchObject({ revision, target: 'main', line: 'feature', host: 'github.com', owner: 'acme', repo: 'app', remote: 'origin', source: { number: 7, headRef: 'feature' } })
+    expect(e.store.hasAction(card.id, 'openPr', e.store.facts(card.id).find((f) => f.kind === 'PrRequested')!.seq)).toBe(true)
+    // The card's line moves on after the approval: what was approved is what is pushed.
+    commit(s.started!.folder, { 'later.txt': 'not approved\n' }, 'Later')
+    await openPr(e.wf, card.id, requestOf(e, card.id), ports)
+    s = e.wf.state(card)
     expect(s.stage).toBe('prOpen')
-    expect(s.pullRequest?.opened).toMatchObject({ number: 7, url: 'https://github.com/acme/app/pull/7', head: 'feature', base: 'main', pushed: prHead, notPushed: true })
-    expect(kinds(e, card.id)).not.toContain('IntegrationRequested')
-    // Nothing pushed, nothing opened: GitHub's branch is as it was.
-    expect(sh(bare, 'rev-parse', 'feature')).toBe(prHead)
+    expect(s.pullRequest?.opened).toMatchObject({ number: 7, url: 'https://github.com/acme/app/pull/7', head: 'feature', base: 'main', pushed: revision })
+    expect(s.pullRequest?.opened?.notPushed).toBeUndefined()
+    expect(sh(bare, 'rev-parse', 'feature')).toBe(revision)
+    expect(sh(e.project, 'merge-base', '--is-ancestor', prHead, revision)).toBe('')
+    // GitHub read again naming the base repository; nothing opened.
+    expect(gh.calls.filter((c) => c.args[1] === 'view').every((c) => c.repo === 'github.com/acme/app')).toBe(true)
     expect(gh.creates()).toBe(0)
-    gh.prs.push({ number: 7, url: 'https://github.com/acme/app/pull/7', state: 'MERGED', isDraft: false, createdAt: '2026-11-01T00:00:00Z', headRefName: 'feature', baseRefName: 'main', isCrossRepository: false, headRefOid: prHead, mergeCommit: { oid: 'c'.repeat(40) }, closedAt: null, title: 't', body: '' })
+    gh.prs[0].state = 'MERGED'
+    gh.prs[0].mergeCommit = { oid: 'c'.repeat(40) }
     await followPr(e.wf, card.id, ports)
     expect(e.wf.state(card).stage).toBe('done')
-    expect(e.wf.state(card).integrated).toMatchObject({ revision: prHead, result: 'c'.repeat(40), platform: { pr: 7, notPushed: true } })
+    expect(e.wf.state(card).integrated).toMatchObject({ revision, result: 'c'.repeat(40), platform: { pr: 7, pushed: revision } })
+  })
+
+  it('pushes to a fork’s branch whose author allows maintainer edits, by the fork’s own address', async () => {
+    const e = (env = project())
+    const { bare, gh, ports } = github(e)
+    const { card, revision, headBare } = await prCard(e, bare, gh, { fork: true, canModify: true })
+    await openPr(e.wf, card.id, requestOf(e, card.id), { ...ports, forkTarget: forkAt(headBare) })
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('prOpen')
+    expect(s.pullRequest?.opened).toMatchObject({ number: 7, pushed: revision })
+    expect(sh(headBare, 'rev-parse', 'feature')).toBe(revision)
+    // The base repository's own branches are untouched.
+    expect(() => sh(bare, 'rev-parse', '--verify', '--quiet', 'refs/heads/feature')).toThrow()
+  })
+
+  it('pushes nothing to a fork whose author doesn’t allow maintainer edits: PR open, saying why', async () => {
+    const e = (env = project())
+    const { bare, gh, ports } = github(e)
+    const { card, prHead, headBare } = await prCard(e, bare, gh, { fork: true, canModify: false })
+    await openPr(e.wf, card.id, requestOf(e, card.id), { ...ports, forkTarget: forkAt(headBare) })
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('prOpen')
+    expect(s.pullRequest?.opened).toMatchObject({ number: 7, notPushed: true, notPushedWhy: 'fork', pushed: prHead })
+    expect(sh(headBare, 'rev-parse', 'feature')).toBe(prHead)
+    expect(commentOf(e, card.id)).toBe(true)
+  })
+
+  it('never overwrites commits pushed to GitHub’s head from outside, fetching that head when it isn’t here', async () => {
+    const e = (env = project())
+    const { bare, gh, ports } = github(e)
+    const { card, prHead, clone } = await prCard(e, bare, gh)
+    // Someone pushes to the pull request after the card started: an object the project hasn't got.
+    sh(clone, 'reset', '-q', '--hard', prHead)
+    const outside = commit(clone, { 'theirs.txt': 'their change\n' }, 'Theirs')
+    sh(clone, 'push', '-q', 'origin', 'HEAD:refs/heads/feature', '+HEAD:refs/pull/7/head')
+    expect(() => sh(e.project, 'cat-file', '-e', `${outside}^{commit}`)).toThrow()
+    await openPr(e.wf, card.id, requestOf(e, card.id), ports)
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('prOpen')
+    expect(s.pullRequest?.opened).toMatchObject({ notPushed: true, notPushedWhy: 'outside', pushed: outside })
+    expect(sh(e.project, 'cat-file', '-t', outside)).toBe('commit')
+    expect(sh(bare, 'rev-parse', 'feature')).toBe(outside)
+    expect(commentOf(e, card.id)).toBe(true)
+  })
+
+  it('a branch that moves between the check and the push refuses it, nothing forced: PR open, saying why', async () => {
+    const e = (env = project())
+    const { bare, gh, ports } = github(e)
+    const { card, prHead, clone } = await prCard(e, bare, gh)
+    let theirs = ''
+    const moving: PrPorts = {
+      ...ports,
+      pushUrls: async (p, r) => {
+        // Checked already (GitHub's head in the approved commit); someone pushes just now.
+        sh(clone, 'reset', '-q', '--hard', prHead)
+        theirs = commit(clone, { 'theirs.txt': 'just now\n' }, 'Just now')
+        sh(clone, 'push', '-q', 'origin', 'HEAD:refs/heads/feature')
+        return ports.pushUrls(p, r)
+      }
+    }
+    await openPr(e.wf, card.id, requestOf(e, card.id), moving)
+    const s = e.wf.state(card)
+    expect(s.stage).toBe('prOpen')
+    expect(s.pullRequest?.opened).toMatchObject({ notPushed: true, notPushedWhy: 'refused', pushed: prHead })
+    expect(sh(bare, 'rev-parse', 'feature')).toBe(theirs)
+  })
+
+  // HR1's rounds 1 and 2, and the round-2 decision: Combwork doesn't push a fork's address through a git url rewrite. Any
+  // insteadOf or pushInsteadOf that applies to it (read NUL-delimited, so a base with spaces is read whole), or git's
+  // rewrites unreadable, refuses the push: nothing pushed anywhere, the card in PR open saying which rule. On the real
+  // forkAddress path, no stand-in.
+  it('pushes a fork’s fixes through no git url rewrite: one that applies refuses the push, naming it', async () => {
+    for (const kind of ['pushInsteadOf', 'insteadOf'] as const) {
+      const e = (env = project())
+      const { bare, gh, ports } = github(e)
+      const { card, prHead, headBare } = await prCard(e, bare, gh, { fork: true, canModify: true })
+      // A base with spaces for the push rewrite (a local folder), a plain one for the fetch rewrite.
+      const elsewhere = join(tempDir('gh-elsewhere-'), kind === 'pushInsteadOf' ? 'destination with spaces' : 'plain')
+      sh(e.project, 'init', '-q', '--bare', join(elsewhere, 'app.git'))
+      const key = `url.${elsewhere.replace(/\\/g, '/')}/.${kind}`
+      sh(e.project, 'config', key, 'https://github.com/someone/')
+      expect(await forkAddress(e.project, { host: 'github.com', owner: 'someone', repo: 'app' }), kind).toEqual({ target: 'https://github.com/someone/app.git', urls: null, rewrite: key.replace(/\.(pushInsteadOf|insteadOf)$/, (m) => m.toLowerCase()) })
+      await openPr(e.wf, card.id, requestOf(e, card.id), { ...ports, forkTarget: undefined })
+      const s = e.wf.state(card)
+      expect(s.stage, kind).toBe('prOpen')
+      expect(s.pullRequest?.opened, kind).toMatchObject({ notPushed: true, notPushedWhy: 'rewrite', pushed: prHead })
+      expect(s.pullRequest?.opened?.notPushedDetail?.toLowerCase(), kind).toBe(key.toLowerCase())
+      expect(sh(headBare, 'rev-parse', 'feature'), kind).toBe(prHead)
+      expect(sh(join(elsewhere, 'app.git'), 'for-each-ref'), kind).toBe('')
+      expect(commentOf(e, card.id), kind).toBe(true)
+      env.close()
+      env = null
+    }
+  })
+
+  it('reads git’s url rewrites whole or not at all, and finds none to refuse when none applies', async () => {
+    expect(urlRewrites('url.C:/a b/c/.pushinsteadof\nhttps://github.com/x/\0url.git@h:.insteadof\nhttps://h/\0')).toEqual([{ key: 'url.C:/a b/c/.pushinsteadof', prefix: 'https://github.com/x/' }, { key: 'url.git@h:.insteadof', prefix: 'https://h/' }])
+    expect(urlRewrites('')).toEqual([])
+    // An entry that can't be read is never taken for none.
+    expect(urlRewrites('url.x.insteadof https://h/\0')).toBeNull()
+    const e = (env = project())
+    // A rule for another address applies to nothing here: the push goes to the fork's own address, the one checked.
+    sh(e.project, 'config', 'url.ssh://git@example.com/.insteadOf', 'https://example.com/')
+    expect(await forkAddress(e.project, { host: 'github.com', owner: 'someone', repo: 'app' })).toEqual({ target: 'https://github.com/someone/app.git', urls: ['https://github.com/someone/app.git'] })
+  })
+
+  // HR1, round 1: a merged or closed pull request whose fork was deleted has no head repository: followed all the same.
+  it('follows a merged or closed pull request whose fork is gone, pushing nothing and inventing no push', async () => {
+    for (const state of ['CLOSED', 'MERGED'] as const) {
+      const e = (env = project())
+      const { bare, gh, ports } = github(e)
+      const { card, prHead, headBare } = await prCard(e, bare, gh, { fork: true, canModify: true })
+      Object.assign(gh.prs[0], { state, headOwner: null, headBare: undefined, headRefOid: prHead, ...(state === 'MERGED' ? { mergeCommit: { oid: 'd'.repeat(40) } } : { closedAt: '2026-11-24T10:00:00Z' }) })
+      await openPr(e.wf, card.id, requestOf(e, card.id), { ...ports, forkTarget: forkAt(headBare) })
+      expect(e.wf.state(card).stage, state).toBe('prOpen')
+      expect(e.wf.state(card).pullRequest?.opened, state).toMatchObject({ number: 7, notPushed: true, notPushedWhy: 'notOpen', pushed: prHead })
+      expect(sh(headBare, 'rev-parse', 'feature'), state).toBe(prHead)
+      await followPr(e.wf, card.id, ports)
+      const s = e.wf.state(card)
+      expect(s.stage, state).toBe(state === 'MERGED' ? 'done' : 'todo')
+      if (state === 'MERGED') expect(s.integrated, state).toMatchObject({ result: 'd'.repeat(40), platform: { pr: 7, notPushed: true } })
+      env.close()
+      env = null
+    }
+  })
+
+  // A fixed notice that only reports (HI-3394): no scenario has this finish; its exact text for each reason.
+  it('says on the card why its fixes weren’t pushed, in words agents read', () => {
+    const tail = '. Nothing was pushed; the card follows the pull request in PR open.'
+    expect(notPushedNotice('AM-1', 7, 'fork')).toBe(`AM-1's fixes weren't pushed to pull request #7: it is from a fork whose author doesn't allow maintainers to push to it${tail}`)
+    expect(notPushedNotice('AM-1', 7, 'outside')).toBe(`AM-1's fixes weren't pushed to pull request #7: its branch on GitHub has commits the approved commit lacks, pushed from outside${tail}`)
+    expect(notPushedNotice('AM-1', 7, 'refused')).toBe(`AM-1's fixes weren't pushed to pull request #7: the push was refused, its branch having moved since it was read${tail}`)
+    expect(notPushedNotice('AM-1', 7, 'notOpen')).toBe(`AM-1's fixes weren't pushed to pull request #7: it isn't open on GitHub${tail}`)
+    expect(notPushedNotice('AM-1', 7, 'changed')).toBe(`AM-1's fixes weren't pushed to pull request #7: its head isn't the branch the card started on${tail}`)
+    expect(notPushedNotice('AM-1', 7, 'rewrite', 'url.C:/a b/.pushinsteadof')).toBe(`AM-1's fixes weren't pushed to pull request #7: a git url rewrite, url.C:/a b/.pushinsteadof, applies to its fork's address, and Combwork doesn't push through one${tail}`)
+    expect(notPushedNotice('AM-1', 7, 'config')).toBe(`AM-1's fixes weren't pushed to pull request #7: git's url rewrites couldn't be read, and Combwork doesn't push without them${tail}`)
+  })
+
+  it('pushes nothing where a push address isn’t the pull request’s head repository, and asks to try again', async () => {
+    for (const fork of [false, true]) {
+      const e = (env = project())
+      const { bare, gh, ports } = github(e)
+      const { card, prHead, headBare } = await prCard(e, bare, gh, { fork })
+      const wrong: PrPorts = fork ? { ...ports, forkTarget: forkAt(headBare, ['https://github.com/someone/app.git', 'https://github.com/elsewhere/app.git']) } : { ...ports, pushUrls: async () => ['https://github.com/acme/app.git', 'https://github.com/elsewhere/app.git'] }
+      await openPr(e.wf, card.id, requestOf(e, card.id), wrong)
+      const s = e.wf.state(card)
+      expect(s.stage, String(fork)).toBe('approved')
+      expect(s.pullRequest?.failed?.problem, String(fork)).toBe('pushUrl')
+      expect(s.requests.some((q) => q.gate === PR_RETRY_GATE), String(fork)).toBe(true)
+      expect(sh(headBare, 'rev-parse', 'feature'), String(fork)).toBe(prHead)
+      env.close()
+      env = null
+    }
   })
 
   it('tells agents what comes next and what the lane does (fixed notices: no scenario has this finish)', async () => {

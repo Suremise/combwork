@@ -691,7 +691,7 @@
   "board.pr.failed": "拉取请求未打开：请查看“待你处理”",
   "board.pr.heading": "拉取请求",
   "board.pr.noChecks": "无检查",
-  "board.pr.notPushed": "Combwork 会跟踪此拉取请求，但尚不会把卡片的修复推送到其中。",
+  "board.pr.notPushedWhy": "卡片的修复没有推送到它：{why, select, fork {它来自一个作者不允许维护者推送的复刻} outside {它的分支有从外部推送、而已批准提交中没有的提交} refused {推送被拒绝，因为它的分支已移动} notOpen {它没有处于打开状态} changed {它的 head 不是卡片开始时的分支} rewrite {一条 git URL 重写规则 {rule} 适用于其复刻的地址，Combwork 不会通过重写推送} config {无法读取 git 的 URL 重写规则} other {Combwork 没有推送它们}}。",
   "board.pr.number": "PR #{number}",
   "board.pr.open": "在 GitHub 上打开",
   "board.pr.opening": "正在打开其拉取请求…",
