@@ -87,7 +87,7 @@ describe("the queue's Done in the card's history (HI-3557)", () => {
     // The lane's next card, its builder only watching: not stalled as the Done lands, stalled once it has waited.
     const now = Date.parse(line.at)
     const lane = { state: 'running', cards: [{ number: card, column: 'done', movedAt: columnSince(t) }, { number: card + 1, column: 'todo', movedAt: null }] } as unknown as Parameters<typeof laneNextWaitReason>[1]
-    const next = { number: card + 1, column: 'todo', archived: false, blocked: null }
+    const next = { number: card + 1, column: 'todo' as const, archived: false, blocked: null }
     const builder = { name: 'Builder', status: 'watching' }
     expect(laneNextWaitReason(next, lane, builder, now + 1000)).toBeNull()
     expect(laneNextWaitReason(next, lane, builder, now + LANE_NEXT_STALL_MS + 60_000)).toMatch(/went Done 16 min ago/)
