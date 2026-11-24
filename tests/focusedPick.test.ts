@@ -13,7 +13,7 @@ import { SUITES } from './e2e/suites.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { isRealCli } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { PICK_MAX_TESTS, UNIT_SCANS, diffLinesOf, isUnitTestFile, needsLines, pickLines, directUnitTests, pickTests, pickUnitTests, scanSelects, unchangedSince, unitPicks, under, withoutOptIn } from './e2e/affected.mjs'
+import { PICK_MAX_TESTS, UNIT_SCANS, diffLinesOf, isUnitTestFile, needsLines, pickLines, directUnitTests, pickTests, pickUnitTests, scanSelects, unchangedSince, unitPicks, under, withoutOptIn, namedUnitTests } from './e2e/affected.mjs'
 // @ts-expect-error: a plain .mjs module without types
 import { ALL_UNIT } from '../scripts/focusedTests.mjs'
 import { FOCUSED_MAX_TESTS, parsePick } from '../src/shared/workflow/focused'
@@ -149,6 +149,20 @@ describe('the unit tests alone (pickUnitTests, --pick --unit: HI-3542)', () => {
     // Combwork reads it as a selection, not "too many" or "every".
     expect(parsePick(pickLines(over).join('\n'))).toEqual({ state: 'chosen', tests: [{ id: ALL_UNIT, needs: ['unit'] }] })
     expect(pickUnitTests({ paths: ['tests/cliHomes.ts'], direct: { all: 'tests/cliHomes.ts: every unit test loads it' } })).toEqual({ tests: [{ test: ALL_UNIT, needs: ['unit'] }], why: [`${ALL_UNIT}: tests/cliHomes.ts: every unit test loads it`] })
+  })
+
+  it('namedUnitTests (--narrow, HI-3565): the tests named for a changed source file, in any folder, never an importer', () => {
+    const files = ['src/main/tasks.ts', 'src/main/servers.ts', 'scripts/focusedTests.mjs', 'tests/tasks.test.ts', 'tests/i18n/tasks.test.ts', 'tests/taskStartSlot.test.ts', 'tests/focusedTests.test.ts', 'tests/e2e/tasks.test.ts', 'tests/lineEndings.test.ts']
+    const paths = ['src/main/tasks.ts', 'src/main/servers.ts', 'scripts/focusedTests.mjs', 'docs/tasks.md', 'tests/lineEndings.test.ts']
+    const named = namedUnitTests({ paths, files }) as { tests: Map<string, string>; all?: string }
+    expect(named.all).toBeUndefined()
+    // servers.ts has no test of its name: it picks none (no importer), and a doc or a test file names none either.
+    expect([...named.tests.keys()].sort()).toEqual(['tests/focusedTests.test.ts', 'tests/i18n/tasks.test.ts', 'tests/tasks.test.ts'])
+    expect(named.tests.get('tests/tasks.test.ts')).toBe('tests/tasks.test.ts: named for src/main/tasks.ts')
+    // With the changed test files and UNIT_SCANS, a central file's change is a handful of tests, not the hundreds loading it.
+    const picked = pickUnitTests({ paths: ['src/main/tasks.ts'], direct: namedUnitTests({ paths: ['src/main/tasks.ts'], files: globSync('tests/**/*.test.ts', { cwd: root }).map((f) => f.replace(/\\/g, '/')) }) }) as Picked
+    expect(picked.tests!.map((t) => t.test)).toContain('tests/tasks.test.ts')
+    expect(picked.tests!.length).toBeLessThan(10)
   })
 
   it('withoutOptIn (HI-3558): the opt-in benchmarks are left out; a test that skips for another reason, unmarked, stays', () => {
@@ -372,6 +386,20 @@ describe('the picker on the command line (focused.pick)', () => {
     expect(lines.map((l) => l.test)).not.toContain('tests/bench.test.ts')
     expect(r.stderr).toContain('tests/bench.test.ts: an opt-in test')
     expect(lines.every((l) => l.test.startsWith('tests/') && l.needs.join() === 'unit')).toBe(true)
+    // An importer and a test named for the change: --unit picks the importer, --narrow (HI-3565) the named test alone.
+    writeFileSync(join(repo, 'tests', 'loads.test.ts'), "import { x } from '../src/main/sessions'\nexport const y = x\n")
+    writeFileSync(join(repo, 'tests', 'sessions.test.ts'), '')
+    git('add', '.')
+    git('commit', '-q', '-m', 'tests')
+    const picked = (...flags: string[]): string[] => {
+      const out = spawnSync(process.execPath, [join(root, 'tests', 'e2e', 'affected.mjs'), '--pick', '--unit', ...flags], { cwd: repo, input: 'src/main/sessions.ts\n', encoding: 'utf8', env: { ...runContext.baseEnv(), CW_FOCUSED_BASE: 'HEAD' } })
+      expect(out.status, out.stderr).toBe(0)
+      return out.stdout.trim().split(/\r?\n/).filter(Boolean).map((l) => (JSON.parse(l) as { test: string }).test)
+    }
+    expect(picked()).toContain('tests/loads.test.ts')
+    const narrow = picked('--narrow')
+    expect(narrow).toContain('tests/sessions.test.ts')
+    expect(narrow).not.toContain('tests/loads.test.ts')
   })
 
   it('does nothing when imported', () => {
