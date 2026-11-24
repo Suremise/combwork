@@ -30,7 +30,8 @@ import { msg } from '../shared/i18n'
 import { modelLabel, projectAgents } from '../shared/defaults'
 import { providerDescriptor } from '../shared/providers'
 import { sameSource } from '../shared/githubSource'
-import { approvalOf, boundedBody, foldGithubReviews, githubFooter, inHunks, inlineOf, listedComments, rowActions, stillAllowed, type DiffHunk, type GithubReviewRow, type GithubReviewsView, type InlineComment } from '../shared/githubReviews'
+import { approvalOf, boundedBody, foldGithubReviews, githubFooter, inHunks, inlineOf, listedComments, rowActions, stillAllowed, type DiffHunk, type GithubReviewRow, type GithubReviewsView, type InlineComment, type ThreadReply } from '../shared/githubReviews'
+import { threadsOf } from '../shared/prFeedback'
 import { githubFeedbackOf, githubFooterOf } from '../shared/workflow/options'
 import type { Fact } from '../shared/workflow/facts'
 import type { LineCommentView } from '../shared/workflow/lineComments'
@@ -101,7 +102,9 @@ export async function postGithubReview(ws: WorkspaceService, n: number, req: { r
     model: async (agent) => (await modelOf(ws, projectPath, agent)).model,
     reads: revisionReadsOf(platformIdOf(projectPath, (await ws.projectConfig(projectPath).catch(() => null))?.platform)),
     projectPath,
-    gh
+    gh,
+    // HI-3554: a fix card's chosen review threads (its source's feedback), each replied to with the review.
+    threads: async () => threadsOf((await (await import('./tasks')).getTask(n, ws)).sourceFeedback)
   })
   boardChanged(ws)
   return row
@@ -120,10 +123,12 @@ export interface PostDeps {
   gh: typeof gh
   /** The time now (tests: a posting's age). */
   now?: () => number
+  /** HI-3554: the review threads (their first comments' ids) the card was made to address; none when absent. */
+  threads?: () => Promise<number[]>
 }
 
 /** What came of sending: posted, refused by GitHub or never sent (safe to post again), or maybe on GitHub (check first). */
-type Sent = { kind: 'posted'; url: string | null; body: string; comments: string[]; inline: number; listed: number } | { kind: 'failed'; error: string } | { kind: 'uncertain'; error: string }
+type Sent = { kind: 'posted'; url: string | null; body: string; comments: string[]; inline: number; listed: number; replies?: ThreadReply[] } | { kind: 'failed'; error: string } | { kind: 'uncertain'; error: string }
 
 /** postGithubReview on card `n` of `wf`, with what it reads outside the facts given. */
 export async function postReviewOn(wf: Workflow, n: number, req: { row: number | null; body?: string }, by: 'user' | 'combwork', deps: PostDeps): Promise<GithubReviewRow> {
@@ -167,6 +172,11 @@ export async function postReviewOn(wf: Workflow, n: number, req: { row: number |
     if (!claim.text && !comments.length) throw combworkError(M.empty)
     const footer = draft && githubFooterOf(wf.cfg.options()) ? githubFooter((await deps.model(draft.reviewer)) ?? 'an AI agent') : null // i18n-ignore: posted to GitHub as written, in English
     sent = await send(wf, card.id, deps, source, claim.submission, claim.text, footer, comments, authority)
+    // HI-3554: posted, a fix card's review also answers each review thread it was made to address, in that thread.
+    if (sent.kind === 'posted') {
+      const threads = (await deps.threads?.().catch(() => [])) ?? []
+      if (threads.length) sent.replies = await replyIn(deps, source, threads, sent.body, authority)
+    }
   } catch (e) {
     sent = { kind: 'failed', error: e instanceof Error ? e.message : String(e) }
   }
@@ -218,6 +228,32 @@ function outcome(r: GhResult): { kind: 'posted'; url: string | null } | { kind: 
   if (r.problem === 'failed' && /\bHTTP 4\d\d\b/.test(error)) return { kind: 'refused', inline: /\bHTTP 422\b/.test(error), error }
   // Anything else (no answer in time, a server error, a broken connection): it may have been made.
   return { kind: 'uncertain', error }
+}
+
+/**
+ * HI-3554 (the card's requirement, the Assistant on round 1): one reply per chosen review thread, on its first comment
+ * (`POST …/pulls/<n>/comments/<id>/replies`, gh naming the host), its text the review's as posted, under the same
+ * authority as the review (checked just before each). Each one's outcome kept; none is sent again by itself.
+ */
+async function replyIn(deps: PostDeps, source: { host: string; owner: string; repo: string; number: number }, threads: number[], body: string, authority: () => string | null): Promise<ThreadReply[]> {
+  const out: ThreadReply[] = []
+  for (const thread of threads) {
+    const dir = await mkdtemp(join(tmpdir(), 'combwork-reply-'))
+    try {
+      const file = join(dir, 'reply.json')
+      await writeFile(file, JSON.stringify({ body }), 'utf8')
+      const refused = authority()
+      if (refused) {
+        out.push({ thread, error: refused })
+        continue
+      }
+      const said = outcome(await deps.gh({ host: source.host }, ['api', '--method', 'POST', `repos/${source.owner}/${source.repo}/pulls/${source.number}/comments/${thread}/replies`, '--input', file]))
+      out.push(said.kind === 'posted' ? { thread, url: said.url } : { thread, error: said.error.slice(0, 500), ...(said.kind === 'uncertain' ? { uncertain: true as const } : {}) })
+    } finally {
+      await rm(dir, { recursive: true, force: true }).catch(() => undefined)
+    }
+  }
+  return out
 }
 
 /** Said when gh took a review but its answer couldn't be read (English: gh's own words are too, in the same field). */

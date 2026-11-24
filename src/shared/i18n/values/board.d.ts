@@ -415,6 +415,7 @@ interface CombworkMessageValues {
   'board.github.footer': { footer: string | number }
   'board.github.label': undefined
   'board.github.notNow': undefined
+  'board.github.notReplied': { n: number; uncertain: string; error: string | number }
   'board.github.open': undefined
   'board.github.option': { option: string }
   'board.github.post': undefined
@@ -423,6 +424,7 @@ interface CombworkMessageValues {
   'board.github.posted': { when: string | number; by: string }
   'board.github.posting': undefined
   'board.github.recovery': { why: string }
+  'board.github.replied': { n: number }
   'board.github.write': undefined
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }

@@ -1655,6 +1655,10 @@
     "defaultMessage": "Not posted: Feedback to GitHub doesn’t post agents’ drafts now.",
     "description": "Under a review draft the project’s option no longer lets be posted (HI-3559)."
   },
+  "board.github.notReplied": {
+    "defaultMessage": "{n, plural, one {# review thread wasn’t replied to} other {# review threads weren’t replied to}}{uncertain, select, yes { or may have been: check on GitHub} other {}}: {error}",
+    "description": "HI-3554: under a posted review of a fix card made by Address feedback: some of the review threads it addresses didn’t get its reply ({n}, how many); uncertain yes: GitHub may have taken one (no clear answer). {error} says why, often the GitHub CLI’s own words in English. Combwork doesn’t send them again by itself. Keep the select keys."
+  },
   "board.github.open": {
     "defaultMessage": "Open on GitHub",
     "description": "A link on a posted review (HI-3559): opens it on GitHub."
@@ -1686,6 +1690,10 @@
   "board.github.recovery": {
     "defaultMessage": "{why, select, abandoned {Combwork didn’t post this: Combwork closed before it did. Post it now, or discard it.} stale {This may not have been posted: Combwork closed while posting it.} other {This may have been posted: GitHub’s answer didn’t come, or couldn’t be read.}}",
     "description": "A notice on a review in a pull request card’s dialog (HI-3559) that wasn’t posted, or may or may not have been: an automatic post that never ran, one Combwork closed in the middle of, or one GitHub may have taken. Keep the select keys."
+  },
+  "board.github.replied": {
+    "defaultMessage": "{n, plural, one {Also replied in # review thread} other {Also replied in # review threads}}",
+    "description": "HI-3554: under a posted review of a fix card made by Address feedback: the review was also posted as a reply in each review thread it was made to address ({n}, how many)."
   },
   "board.github.write": {
     "defaultMessage": "Write a review",

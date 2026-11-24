@@ -136,8 +136,16 @@ export function cleanFeedback(raw: unknown): FeedbackItem[] {
   return out
 }
 
+/** HI-3554: the review threads among a fix card's chosen feedback: their first comments' ids, which replies answer. */
+export function threadsOf(items: readonly FeedbackItem[] | undefined): number[] {
+  return (items ?? []).filter((i) => i.kind === 'thread').map((i) => Number(i.id.slice(2))).filter((n) => Number.isInteger(n) && n > 0)
+}
+
 /** One item as an agent reads it, inside its card's outsideText: who (and whether a member), where, and their words. */
 export interface FeedbackForAgents {
+  /** Its id as the card keeps it (c:, r: or t: and GitHub's id); a thread's `thread` is its first comment's id, which a reply answers. */
+  id: string
+  thread?: number
   kind: FeedbackItem['kind']
   author: string | null
   /** False: GitHub says they aren't one of the repository's members; null: unknown. */
@@ -157,6 +165,8 @@ const member = (a: string | null): boolean | null => {
 /** A fix card's feedback for an agent's read (HI-3554): quoted data beside the source's body, under its outside-text note. */
 export function feedbackForAgents(items: readonly FeedbackItem[]): FeedbackForAgents[] {
   return items.map((i) => ({
+    id: i.id,
+    ...(i.kind === 'thread' && threadsOf([i]).length ? { thread: threadsOf([i])[0] } : {}),
     kind: i.kind,
     author: i.login,
     authorIsMember: member(i.association),

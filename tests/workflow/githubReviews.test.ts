@@ -393,3 +393,54 @@ describe('approving a pull request from its card (HI-3560)', () => {
     expect(approvalOf(e.store.facts(card), { ...PR7, repo: 'other' })).toBeNull()
   })
 })
+
+describe('a fix card’s replies in the review threads it addresses (HI-3554, HR1’s round 1)', () => {
+  it('posts the review, then one reply in each chosen thread on the pull request’s repository and host, nothing elsewhere', async () => {
+    const e = (env = project('agent'))
+    const card = await reviewed(e)
+    const g = fakeGh()
+    const row = await postReviewOn(e.wf, card, { row: rows(e, card)[0].draft!.seq }, 'combwork', deps(e, { gh: g.gh, threads: async () => [11, 15] }))
+    expect(row.state).toBe('posted')
+    expect(g.calls.map((c) => c.args[3])).toEqual(['repos/acme/app/pulls/7/reviews', 'repos/acme/app/pulls/7/comments/11/replies', 'repos/acme/app/pulls/7/comments/15/replies'])
+    for (const c of g.calls.slice(1)) {
+      expect(c.args).toEqual(expect.arrayContaining(['api', '--method', 'POST', '--hostname', 'github.com']))
+      // The review's text as posted, its footer too.
+      expect(c.review).toEqual({ body: 'Finding 1: the parser drops the last line.\n\n---\n_Drafted by Opus 5.5 in Combwork_' })
+    }
+    expect(row.posted?.replies).toEqual([
+      { thread: 11, url: 'https://github.com/acme/app/pull/7#pullrequestreview-2' },
+      { thread: 15, url: 'https://github.com/acme/app/pull/7#pullrequestreview-3' }
+    ])
+  })
+
+  it('replies in no thread without a chosen one, nor when the review isn’t posted or the option stops it; a failed reply is kept, never sent again', async () => {
+    const e = (env = project('agent'))
+    // None chosen (a pull request's own card): the review alone.
+    const plain = await reviewed(e)
+    const g = fakeGh()
+    await postReviewOn(e.wf, plain, { row: rows(e, plain)[0].draft!.seq }, 'combwork', deps(e, { gh: g.gh, threads: async () => [] }))
+    expect(g.calls).toHaveLength(1)
+    // The review refused by GitHub: no reply.
+    const refused = await reviewed(e)
+    const g2 = fakeGh([{ ok: false, problem: 'failed', detail: 'HTTP 403: Forbidden' }])
+    const r2 = await postReviewOn(e.wf, refused, { row: rows(e, refused)[0].draft!.seq }, 'combwork', deps(e, { gh: g2.gh, threads: async () => [11] }))
+    expect(r2.state).toBe('failed')
+    expect(g2.calls).toHaveLength(1)
+    // The option changed to You after the review went: no reply sent, said why.
+    const stopped = await reviewed(e)
+    const g3 = fakeGh()
+    const r3 = await postReviewOn(e.wf, stopped, { row: rows(e, stopped)[0].draft!.seq }, 'combwork', deps(e, { gh: (async (t: GhTarget, a: string[]) => { const r = await g3.gh(t, a); e.options.githubFeedback = 'user'; return r }) as PostDeps['gh'], threads: async () => [11] }))
+    expect(r3.state).toBe('posted')
+    expect(g3.calls).toHaveLength(1)
+    expect(r3.posted?.replies).toEqual([{ thread: 11, error: expect.stringMatching(/Feedback to GitHub is “You”/) }])
+    // A reply GitHub refuses: kept with its words, the review posted; never sent again.
+    e.options.githubFeedback = 'agent'
+    const one = await reviewed(e)
+    const g4 = fakeGh([{ ok: true, stdout: JSON.stringify({ id: 1, html_url: 'https://github.com/acme/app/pull/7#pullrequestreview-1' }), json: null }, { ok: false, problem: 'failed', detail: 'HTTP 404: Not Found' }])
+    const r4 = await postReviewOn(e.wf, one, { row: rows(e, one)[0].draft!.seq }, 'combwork', deps(e, { gh: g4.gh, threads: async () => [11] }))
+    expect(r4.state).toBe('posted')
+    expect(r4.posted?.replies).toEqual([{ thread: 11, error: 'HTTP 404: Not Found' }])
+    await expect(postReviewOn(e.wf, one, { row: rows(e, one)[0].draft!.seq }, 'combwork', deps(e, { gh: g4.gh, threads: async () => [11] }))).rejects.toThrow(/already posted/)
+    expect(g4.calls).toHaveLength(2)
+  })
+})

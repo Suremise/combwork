@@ -28,6 +28,8 @@ const T = {
   posted: msg({ id: 'board.github.posted', defaultMessage: 'Posted {when} by {by, select, combwork {Combwork} other {you}}', description: 'A review posted to GitHub (HI-3559): when (a date and time), and by Combwork (an automatic one) or the user. Keep the select keys.' }),
   open: msg({ id: 'board.github.open', defaultMessage: 'Open on GitHub', description: 'A link on a posted review (HI-3559): opens it on GitHub.' }),
   carried: msg({ id: 'board.github.carried', defaultMessage: '{inline, plural, =0 {} one {# line comment on the diff} other {# line comments on the diff}}{both, select, yes {, } other {}}{listed, plural, =0 {} one {# listed in it} other {# listed in it}}', description: 'Under a posted review (HI-3559): how many of the user’s line comments sit on the pull request’s diff, and how many are listed in its text (lines GitHub’s diff doesn’t show). Keep the select key.' }),
+  replied: msg({ id: 'board.github.replied', defaultMessage: '{n, plural, one {Also replied in # review thread} other {Also replied in # review threads}}', description: 'HI-3554: under a posted review of a fix card made by Address feedback: the review was also posted as a reply in each review thread it was made to address ({n}, how many).' }),
+  notReplied: msg({ id: 'board.github.notReplied', defaultMessage: '{n, plural, one {# review thread wasn’t replied to} other {# review threads weren’t replied to}}{uncertain, select, yes { or may have been: check on GitHub} other {}}: {error}', description: 'HI-3554: under a posted review of a fix card made by Address feedback: some of the review threads it addresses didn’t get its reply ({n}, how many); uncertain yes: GitHub may have taken one (no clear answer). {error} says why, often the GitHub CLI’s own words in English. Combwork doesn’t send them again by itself. Keep the select keys.' }),
   failed: msg({ id: 'board.github.failed', defaultMessage: 'Not posted: {error}', description: 'A review that couldn’t be posted to GitHub (HI-3559). {error} says why (often the GitHub CLI’s own words, in English).' }),
   discarded: msg({ id: 'board.github.discarded', defaultMessage: 'Discarded draft', description: 'A review draft the user discarded (HI-3559).' }),
   notNow: msg({ id: 'board.github.notNow', defaultMessage: 'Not posted: Feedback to GitHub doesn’t post agents’ drafts now.', description: 'Under a review draft the project’s option no longer lets be posted (HI-3559).' }),
@@ -103,6 +105,17 @@ function Row({ card, v, r, onDone }: { card: number; v: GithubReviewsView; r: Vi
           </div>
           <div className="github-review-body">{r.posted.body}</div>
           {r.posted.inline + r.posted.listed > 0 && <div className="s-desc">{tr(T.carried, { inline: r.posted.inline, listed: r.posted.listed, both: r.posted.inline && r.posted.listed ? 'yes' : 'no' })}</div>}
+          {/* HI-3554: a fix card's replies in the review threads it addresses. */}
+          {r.posted.replies.some((x) => !x.error) && (
+            <div className="s-desc" data-replied={r.posted.replies.filter((x) => !x.error).length}>
+              {tr(T.replied, { n: r.posted.replies.filter((x) => !x.error).length })}
+            </div>
+          )}
+          {r.posted.replies.some((x) => x.error) && (
+            <div className="s-desc" data-not-replied={r.posted.replies.filter((x) => x.error).length}>
+              {tr(T.notReplied, { n: r.posted.replies.filter((x) => x.error).length, uncertain: r.posted.replies.some((x) => x.uncertain) ? 'yes' : 'no', error: r.posted.replies.find((x) => x.error)?.error ?? '' })}
+            </div>
+          )}
         </>
       ) : r.state === 'posting' && can.recovery !== 'stale' ? (
         <div className="muted">

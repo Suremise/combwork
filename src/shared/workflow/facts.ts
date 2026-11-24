@@ -7,6 +7,7 @@
 
 import type { ConflictsRecord } from './conflicts'
 import type { StartedPr } from '../githubSource'
+import type { ThreadReply } from '../githubReviews'
 import type { GuardReport } from './mergeGuards'
 import type { FocusedChoice, FocusedTest } from './focused'
 import type { GitlinkSide } from '../gitlink'
@@ -663,7 +664,8 @@ export interface FactData {
    * The posting (its fact's seq) done: GitHub's review (its `url`, when gh gave it), the body as posted (footer included),
    * and the user's line comments it carried, `inline` on the PR's diff or `listed` in the body.
    */
-  GithubReviewPosted: { posting: number; url: string | null; body: string; comments: string[]; inline: number; listed: number }
+  /** HI-3554: `replies`, a fix card's reply on each review thread it was made to address (its root comment's id): posted (its url), or why not. */
+  GithubReviewPosted: { posting: number; url: string | null; body: string; comments: string[]; inline: number; listed: number; replies?: ThreadReply[] }
   /**
    * The posting failed: gh's own words (or why it wasn't sent). `uncertain`: it may have reached GitHub (no answer in time,
    * or an answer that can't be read), so it is never posted again by itself; the user checks GitHub first.
