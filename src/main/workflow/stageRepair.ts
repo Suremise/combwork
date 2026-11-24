@@ -64,6 +64,8 @@ export async function repairStages(ws: WorkspaceService): Promise<StageRepair> {
         // repair, left whole for the next open. The stage it names is the one the write found.
         const note = async (w: Write): Promise<void> => {
           if (w.card.id !== c.number) return
+          // Its own line says the move (HI-3557: not the runtime's "Moved to" too).
+          w.boardNoted = true
           await stageRepairTestHooks.beforeNote?.(c.number)
           await noteOnCard(c.number, storedText(HISTORY.stageRepaired, { stage: w.was }), ws)
         }

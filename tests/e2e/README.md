@@ -533,10 +533,25 @@ at the queue's 2 workers). So a break reached through other modules gets through
 reached the change 4 imports deep) and is left to the release's full passes. A change to Vitest's config or a setup file
 it names is every unit test; so is a pick of over 500 (Combwork's longest list, `FOCUSED_MAX_TESTS`): it answers
 `unit:all`, which `scripts/focusedTests.mjs` runs as one Vitest run of the whole set (failed when a file failed, a file
-that didn't load included). A test it would name that isn't in the checkout is left out, saying so. Measured on 1.7.0's
+that didn't load included). A test it would name that isn't in the checkout is left out, saying so. So is an **opt-in**
+test file (HI-3558), one with a line `// focused: opt-in (why)`: a benchmark that skips without its setup
+(`boardBench`, `cardSearchBench`: `CW_BOARD_BENCH_DB`) would skip at every merge and pause the queue to ask about a skip
+by design. Mark only a file whose every test skips without its opt-in; any other skip still pauses. Measured on 1.7.0's
 last 25 merges: most pick 2 to 70 tests, a change to `workspace.ts` about 270 (that many mock or load it), and the
 picks take about 7 s. Run at the queue's 2 workers, under the machine's usual load: 25 tests in 62 s, a change to
 `workflow/runtime.ts` (68 tests, the queue's own, 80 to 280 s each) in 14 min, the `workspace.ts` one in 25 min.
+
+**The merge's pick is narrow** (`--pick --unit --narrow`, HI-3565, the project's `focused.pick`): on 24 Nov the 1.7.0
+queue spent about 5½ hours on 5 cards, 92% of it in focused tests, as a card touching `tasks.ts` or `servers.ts` picked
+192 to 359 files that load them (25 to 40 min a run). `--narrow` keeps the changed test files and `UNIT_SCANS`' tests,
+and puts the tests **named for** a changed source file (`namedUnitTests`: `src/main/tasks.ts` → `tests/tasks.test.ts`,
+`tests/i18n/tasks.test.ts`, in any folder but `tests/e2e`) in place of `directUnitTests`' importers. It follows no import
+and never answers `unit:all` for a config change. A change to `tasks.ts` and `servers.ts` picks 5 files; on 1.7.0's
+last 25 merges it picked 1 to 55 (5 for most), the big ones a card's own changed test files. **Where the wider sets
+run:** the full unit set in CI (`npm test`, on every push to main and every pull request: `.github/workflows/ci.yml`)
+and at the checkpoints (a version's full passes, each RC: RELEASING.md, What a release checks), and the import-following
+pick (`--pick --unit` without `--narrow`) for anyone who wants it on a branch. So a break only an importer's test sees
+gets through the merge and is caught there.
 
 **Progress in Combwork.** Run from an agent's session in Combwork, the runner shows in that Combwork's Progress panel: **e2e: N
 suites**, a step per suite, and the time left from how long each suite took before (kept in

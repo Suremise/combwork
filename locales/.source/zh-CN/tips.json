@@ -280,6 +280,8 @@
   "tips.gitSigning.title": "Signed merges without waiting",
   "tips.gitView.text": "In a Git project, the Version Control tab shows its branch, remotes, history and tags, and lets you switch or create a branch, fetch, pull, push, tag and set its commit identity. The status bar shows \"{example}\": click it to get there.",
   "tips.gitView.title": "See and change a project's git",
+  "tips.githubApprove.text": "A pull request’s card says which AI wrote it, when the pull request says so, and suggests reviewers on another provider. Approve on GitHub… approves it as your account; merging stays on GitHub.",
+  "tips.githubApprove.title": "Approve a pull request from its card",
   "tips.githubFeedback.text": "A pull request’s card posts its review to GitHub as a comment from your account: by default a reviewer agent’s verdict is drafted on the card for you to edit and post. Choose who writes it in Version Control → Workflow → GitHub.",
   "tips.githubFeedback.title": "Feedback to GitHub",
   "tips.githubPrs.text": "Choose a project on the Task Board and click From GitHub… to list its open pull requests: Make a Card makes one a card in Todo, reviewed like any other. What it says on GitHub reaches agents only quoted.",

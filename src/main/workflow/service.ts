@@ -11,7 +11,9 @@
 
 import { PREFERENCE_DEFAULTS } from '../../shared/workflow/preferences'
 import { createLogger, userText } from '../logger'
-import { SIMPLIFY_GATE } from '../../shared/workflow/facts'
+import { SIMPLIFY_GATE, STAGE_CATEGORY } from '../../shared/workflow/facts'
+import { HISTORY, storedText } from '../../shared/taskHistory'
+import { noteOnCard } from '../tasks'
 import { resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
@@ -273,6 +275,12 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
           for (const { dep, p } of elsewhere) m.reconcileCard(at, dep, p)
         }).catch(() => undefined)
       }
+    },
+    // HI-3557: a move no intent noted (the merge queue's Done, its return to Active): its history line, by Combwork, in the
+    // write's own board change. Only a change of column: a stage within one (Approved to Merging) isn't a move on the board.
+    noteMove: async (card, from, to) => {
+      if (STAGE_CATEGORY[from] === STAGE_CATEGORY[to] || !alive()) return
+      await noteOnCard(card.id, storedText(HISTORY.moved, { column: STAGE_CATEGORY[to] }), ws)
     },
     // HI-3188: the churn's levels as the project's preferences say now, and a simplify check told to the Assistant first.
     // The resolved options (read afresh by each workflowFor) carry the preferences, the defaults filled in.

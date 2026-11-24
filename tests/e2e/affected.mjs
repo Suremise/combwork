@@ -436,7 +436,7 @@ export const AREAS = [
   // HI-3550: a project's GitHub link and the one gh service (Copilot's sign-in check goes through it too).
   { paths: ['tests/e2e/githublink.cjs', 'src/shared/githubRepo.ts', 'src/main/ghCli.ts', 'src/main/githubLink.ts', 'src/renderer/src/components/GithubLink.tsx'], suites: ['githublink', 'githubhosts'] },
   // HI-3551: a card's GitHub source (the dialog's field; what a PR card does when it starts is the unit tests').
-  { paths: ['tests/e2e/githubsource.cjs', 'src/shared/githubSource.ts', 'src/renderer/src/components/CardSource.tsx', 'src/renderer/src/components/GithubPrs.tsx', 'src/renderer/src/components/CardGithubFeedback.tsx', 'src/main/githubReviews.ts', 'src/shared/githubReviews.ts'], suites: ['githubsource'] },
+  { paths: ['tests/e2e/githubsource.cjs', 'src/shared/githubSource.ts', 'src/renderer/src/components/CardSource.tsx', 'src/renderer/src/components/GithubPrs.tsx', 'src/renderer/src/components/CardGithubFeedback.tsx', 'src/main/githubReviews.ts', 'src/shared/githubReviews.ts', 'src/shared/prAuthorship.ts'], suites: ['githubsource'] },
   { paths: ['tests/e2e/prfinish.cjs', 'src/main/workflow/prHost.ts', 'src/main/workflow/prHosts.ts', 'src/renderer/src/components/CardPullRequest.tsx'], suites: ['prfinish'] },
   { paths: ['tests/e2e/githubhosts.cjs', 'src/shared/githubHost.ts', 'src/main/githubHosts.ts', 'src/main/githubHostChanges.ts', 'src/main/providers/copilot/hosts.ts', 'src/main/providers/copilot/install.ts', 'src/main/providers/copilot/models.ts', 'src/renderer/src/components/GithubHosts.tsx', 'src/shared/githubHostText.ts', 'src/renderer/src/signInHost.ts'], suites: ['githubhosts', 'providers'] },
   { paths: ['src/main/keySteps.ts'], suites: ['codex', 'codex-setup'] },
@@ -1157,6 +1157,19 @@ export function unitPicks({ paths, added = [], deleted = [], diffLines = {}, vit
   return new Map([...unit.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
 }
 
+/** An opt-in test file's marker (HI-3558): a line of its own, `// focused: opt-in (why)`. */
+const OPT_IN = /^\/\/ focused: opt-in\b/m
+
+/**
+ * The picked tests less the opt-in unit test files (HI-3558): a file marked OPT_IN (a benchmark that skips without its
+ * setup, such as CW_BOARD_BENCH_DB) skips on every run the queue makes, so a pick naming it would only pause the merge to
+ * ask about a skip by design. read(f): its text or null. { tests, left: the ids left out }.
+ */
+export function withoutOptIn(tests, read) {
+  const left = tests.filter((t) => t.test !== ALL_UNIT && isUnitTestFile(t.test) && OPT_IN.test(read(t.test) ?? '')).map((t) => t.test)
+  return { tests: tests.filter((t) => !left.includes(t.test)), left }
+}
+
 /** The picker's output: one JSON line per test, or {"every":true} alone; nothing for nothing needed. */
 export const pickLines = (picked) => (picked.every ? [JSON.stringify({ every: true })] : picked.tests.map((t) => JSON.stringify(t)))
 
@@ -1254,6 +1267,7 @@ async function pickCli() {
   // skipped (HI-3002).
   const related = narrowRelatedInTree({ cwd, base, paths, related: unchangedSince(cwd, base) ? [] : listVitestRelated(cwd, base) })
   const picked = pickTests({ paths, added, deleted, diffLines, suites, realNames, packagedNames, vitestRelated: related.keep, units })
+  leaveOutOptIn(cwd, picked)
   for (const w of related.why) console.error(w)
   for (const w of picked.why) console.error(w)
   for (const l of pickLines(picked)) console.log(l)
@@ -1265,7 +1279,8 @@ async function pickCli() {
  * test file, a test that itself loads a changed file (directUnitTests), and UNIT_SCANS; not Vitest's transitive graph,
  * which picked about 460 of 911 files for a typical main-process change (tens of minutes at the queue's 2 workers).
  * A break reached through other modules (HI-3520's, 4 imports deep) is left to the release's full passes. Combwork
- * passes CW_FOCUSED_BASE: at submit the card's base, at the merge the target before it.
+ * passes CW_FOCUSED_BASE: at submit the card's base, at the merge the target before it. `--narrow` (HI-3565, the
+ * project's focused.pick): the tests named for a changed file (namedUnitTests) in place of those loading it.
  */
 function pickUnitCli(cwd, base, paths) {
   const atBase = new Set(git(cwd, ['ls-tree', '-r', '--name-only', '-z', base]).split('\0').filter(Boolean))
@@ -1274,14 +1289,48 @@ function pickUnitCli(cwd, base, paths) {
   const diffLines = paths.some(needsLines) ? diffLinesOf(git(cwd, ['diff', '--no-ext-diff', '--no-color', '--no-renames', '-U0', base, '--'])) : {}
   const files = [...new Set([...git(cwd, ['ls-files', '-z']).split('\0'), ...git(cwd, ['ls-files', '-z', '--others', '--exclude-standard']).split('\0')].filter(Boolean))]
   const config = existsSync(join(cwd, 'vitest.config.ts')) ? readFileSync(join(cwd, 'vitest.config.ts'), 'utf8') : null
-  const direct = directUnitTests({ paths, files, read: (f) => (existsSync(join(cwd, f)) ? readFileSync(join(cwd, f), 'utf8') : null), config })
+  const direct = process.argv.includes('--narrow') ? namedUnitTests({ paths, files }) : directUnitTests({ paths, files, read: (f) => (existsSync(join(cwd, f)) ? readFileSync(join(cwd, f), 'utf8') : null), config })
   const picked = pickUnitTests({ paths, added, deleted, diffLines, direct })
   // A test not in the checkout can't run (a UNIT_SCANS entry the checkout doesn't have): left out, saying so.
   const absent = picked.tests.filter((t) => t.test !== ALL_UNIT && !existsSync(join(cwd, t.test)))
   if (absent.length) picked.tests = picked.tests.filter((t) => !absent.includes(t))
   for (const t of absent) console.error(`${t.test}: not in the checkout, left out`)
+  leaveOutOptIn(cwd, picked)
   for (const w of picked.why) console.error(w)
   for (const l of pickLines(picked)) console.log(l)
+}
+
+/** withoutOptIn on a pick in the checkout (cwd), saying what it left out. */
+function leaveOutOptIn(cwd, picked) {
+  if (picked.every) return
+  const out = withoutOptIn(picked.tests, (f) => (existsSync(join(cwd, f)) ? readFileSync(join(cwd, f), 'utf8') : null))
+  picked.tests = out.tests
+  for (const t of out.left) console.error(`${t}: an opt-in test (its "focused: opt-in" line), skipped without its setup: left out`)
+}
+
+/** A source file's code extensions, for namedUnitTests. */
+const CODE_FILE = /\.(?:ts|tsx|mts|cts|js|mjs|cjs)$/
+
+/**
+ * `--narrow` (HI-3565): the unit tests named for a changed source file, in place of directUnitTests' importers: the test
+ * files whose name is its name (src/main/tasks.ts → tests/tasks.test.ts, tests/i18n/tasks.test.ts), in any folder under
+ * tests/ but e2e. No import is followed: a card touching a central file (tasks.ts, servers.ts) picks a handful of files,
+ * not the hundreds that load it, which CI on every push of the release branch and the checkpoints run instead.
+ * { tests: Map test → why }, as directUnitTests', never `all`. paths: the changed files; files: the checkout's.
+ */
+export function namedUnitTests({ paths, files }) {
+  const byName = new Map()
+  for (const f of files.map(slashes).filter(isUnitTestFile)) {
+    const name = f.slice(f.lastIndexOf('/') + 1).replace(/\.test\.ts$/, '').toLowerCase()
+    byName.set(name, [...(byName.get(name) ?? []), f])
+  }
+  const tests = new Map()
+  for (const p of paths.map(slashes)) {
+    if (isUnitTestFile(p) || !CODE_FILE.test(p)) continue
+    const name = p.slice(p.lastIndexOf('/') + 1).replace(CODE_FILE, '').toLowerCase()
+    for (const t of byName.get(name) ?? []) if (!tests.has(t)) tests.set(t, `${t}: named for ${p}`)
+  }
+  return { tests }
 }
 
 /** What every unit test loads (Vitest's config and setup files): a change to one is every unit test. */

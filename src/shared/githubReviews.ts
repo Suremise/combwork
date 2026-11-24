@@ -47,6 +47,8 @@ export interface GithubReviewsView {
   /** Whether the user can write a review of their own now (not under Agent). */
   canWrite: boolean
   url: string
+  /** HI-3560: when the user last approved the pull request from the card (null: never). */
+  approved: string | null
 }
 
 /** The card's reviews to and on GitHub, oldest first. */
@@ -95,6 +97,16 @@ export function foldGithubReviews(facts: readonly FactLike[]): GithubReviewRow[]
     }
   }
   return rows
+}
+
+/**
+ * HI-3560 (HR1's round 1): when the user last approved, from the card, the pull request it is about now (`source`), its
+ * identity compared whole; an approval of another one (the card's source changed since) isn't this one's. Null: never.
+ */
+export function approvalOf(facts: readonly FactLike[], source: { host: string; owner: string; repo: string; number: number }): string | null {
+  const same = (d: Record<string, unknown>): boolean =>
+    typeof d.host === 'string' && typeof d.owner === 'string' && typeof d.repo === 'string' && d.number === source.number && d.host.toLowerCase() === source.host.toLowerCase() && d.owner.toLowerCase() === source.owner.toLowerCase() && d.repo.toLowerCase() === source.repo.toLowerCase()
+  return facts.findLast((f) => f.kind === 'GithubPrApproved' && same(f.data as Record<string, unknown>))?.at ?? null
 }
 
 /** A posting claimed this long ago with no result (Combwork closed mid-post) is shown as maybe posted, and can be posted again. */
