@@ -26,6 +26,12 @@
   "github.link.notARemote": {
     "placeholders": {}
   },
+  "github.review.approveFailed": {
+    "placeholders": {
+      "number": "plain",
+      "why": "select"
+    }
+  },
   "github.review.done": {
     "placeholders": {
       "state": "select"

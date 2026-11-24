@@ -64,6 +64,7 @@
   "github.prs.row": "#{number} {title}",
   "github.prs.tip": "Make a card of an open pull request on {repo}",
   "github.prs.title": "Open pull requests on {repo}",
+  "github.review.approveFailed": "The GitHub CLI couldn’t approve pull request #{number}{why, select, none {} other {: {why}}}.",
   "github.review.done": "That review was {state, select, posted {already posted} discarded {discarded} other {already being posted}}.",
   "github.review.empty": "A review needs some text, or a line comment of yours to carry.",
   "github.review.noCard": "This card’s work can’t be read, so it can’t post to GitHub.",

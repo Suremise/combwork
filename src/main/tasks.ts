@@ -15,7 +15,8 @@ import type { RefHold } from './platform/repoContext'
 import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, storedIds, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
-import { providerMessage } from '../shared/providers'
+import { providerMessage, PROVIDERS } from '../shared/providers'
+import { prAuthorship, type PrAuthorship } from '../shared/prAuthorship'
 import type { CardState } from '../shared/workflow/facts'
 import { isUnknown } from './platform/types'
 import type { CombworkErrorKind, KeptTargetShown, TaskMoveResult } from '../shared/types'
@@ -2632,8 +2633,15 @@ export async function setSource(n: number, input: string | null, actor: TaskActo
   return writeSource(ws, projectPath, n, read, actor)
 }
 
-/** The fields gh's `pr view` and `issue view` are asked for (HI-3553: with the author and body). */
-const SOURCE_FIELDS = { pr: 'number,title,url,headRefName,baseRefName,isCrossRepository,maintainerCanModify,author,body', issue: 'number,title,url,author,body' } as const
+/** HI-3560: who wrote a pull request, as gh's `pr view` gives its commits' messages and body (prAuthorship), against Combwork's providers' names. */
+function wroteByOf(j: Record<string, unknown>): PrAuthorship | null {
+  const commits = Array.isArray(j.commits) ? (j.commits as Record<string, unknown>[]) : []
+  const messages = commits.map((c) => [c?.messageHeadline, c?.messageBody].filter((x): x is string => typeof x === 'string').join('\n\n'))
+  return prAuthorship(messages, typeof j.body === 'string' ? j.body : '', PROVIDERS.map((p) => ({ id: p.id, name: p.name, assistant: p.assistant, company: p.company })))
+}
+
+/** The fields gh's `pr view` and `issue view` are asked for (HI-3553: with the author and body; HI-3560: the commits, for who wrote it). */
+const SOURCE_FIELDS = { pr: 'number,title,url,headRefName,baseRefName,isCrossRepository,maintainerCanModify,author,body,commits', issue: 'number,title,url,author,body' } as const
 
 /**
  * HI-3551, HI-3553: a pull request or issue on the project's GitHub link, read through the gh service (outside the
@@ -2661,7 +2669,7 @@ async function readSource(ws: WorkspaceService, projectPath: string, input: stri
   const login = j.author && typeof j.author === 'object' && typeof (j.author as { login?: unknown }).login === 'string' ? (j.author as { login: string }).login : ''
   // A PR's author's standing in the repository: the REST answer's author_association, on the same host (gh api names it).
   const association = kind === 'pr' && login ? await gh({ host: ref.ref.host }, ['api', `repos/${repo}/pulls/${ref.number}`, '--jq', '.author_association']).then((r) => (r.ok && /^[A-Z_]{1,40}$/.test(r.stdout.trim()) ? r.stdout.trim() : null)) : null
-  const source = cleanSource({ kind, ...ref.ref, number: ref.number, url: str('url') || `https://${ref.ref.host}/${repo}/${kind === 'pr' ? 'pull' : 'issues'}/${ref.number}`, title: str('title'), ...(kind === 'pr' ? { pr: { headRef: str('headRefName'), baseRef: str('baseRefName'), crossRepository: j.isCrossRepository === true, maintainerCanModify: j.maintainerCanModify === true } } : {}), ...(login ? { author: { login, association } } : {}) })
+  const source = cleanSource({ kind, ...ref.ref, number: ref.number, url: str('url') || `https://${ref.ref.host}/${repo}/${kind === 'pr' ? 'pull' : 'issues'}/${ref.number}`, title: str('title'), ...(kind === 'pr' ? { pr: { headRef: str('headRefName'), baseRef: str('baseRefName'), crossRepository: j.isCrossRepository === true, maintainerCanModify: j.maintainerCanModify === true } } : {}), ...(login ? { author: { login, association } } : {}), ...(kind === 'pr' ? { wroteBy: wroteByOf(j) } : {}) })
   if (!source || (kind === 'pr' && (!source.pr?.headRef || !source.pr.baseRef))) throw new TaskConflictError(withValues(SOURCE.notFound, { number: ref.number, repo, why: 'none' })) // i18n-ignore: a select key (none)
   return { source, body: clipBody(j.body) }
 }

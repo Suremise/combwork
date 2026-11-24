@@ -5,7 +5,7 @@ import { githubFooter, type GithubReviewsView } from '@shared/githubReviews'
 import type { TaskCard } from '@shared/types'
 import * as actions from '../actions'
 import { call } from '../api'
-import { openWorkflowOption, useStore } from '../store'
+import { confirm, openWorkflowOption, useStore } from '../store'
 import { Icon } from './ui'
 
 /**
@@ -35,6 +35,12 @@ const T = {
   postFailed: msg({ id: 'board.github.postFailed', defaultMessage: 'Couldn’t post to GitHub', description: 'An error’s title (HI-3559): a review couldn’t be posted; its message says why.' }),
   recovery: msg({ id: 'board.github.recovery', defaultMessage: '{why, select, abandoned {Combwork didn’t post this: Combwork closed before it did. Post it now, or discard it.} stale {This may not have been posted: Combwork closed while posting it.} other {This may have been posted: GitHub’s answer didn’t come, or couldn’t be read.}}', description: 'A notice on a review in a pull request card’s dialog (HI-3559) that wasn’t posted, or may or may not have been: an automatic post that never ran, one Combwork closed in the middle of, or one GitHub may have taken. Keep the select keys.' }),
   checkGithub: msg({ id: 'board.github.checkGithub', defaultMessage: 'Check on GitHub first', description: 'A link beside the notice that a review may have been posted (HI-3559): opens the pull request on GitHub, to look before posting it again.' }),
+  approve: msg({ id: 'board.github.approve', defaultMessage: 'Approve on GitHub…', description: 'A button in a pull request card’s Feedback to GitHub (HI-3560): approves the pull request on GitHub as the user, after asking. Merging stays on GitHub.' }),
+  approveTitle: msg({ id: 'board.github.approveTitle', defaultMessage: 'Approve pull request #{number}?', description: 'The title of the question before approving a card’s pull request on GitHub (HI-3560). {number} is its number.' }),
+  approveMessage: msg({ id: 'board.github.approveMessage', defaultMessage: 'Combwork approves it on GitHub through your GitHub CLI, as your own account. Merging it stays yours, on GitHub: Combwork never merges a pull request.', description: 'The question before approving a card’s pull request on GitHub (HI-3560).' }),
+  approveConfirm: msg({ id: 'board.github.approveConfirm', defaultMessage: 'Approve', description: 'The button of the question before approving a pull request on GitHub (HI-3560).' }),
+  approved: msg({ id: 'board.github.approved', defaultMessage: 'You approved it on GitHub {when}. Merging stays on GitHub.', description: 'In a pull request card’s Feedback to GitHub (HI-3560): when the user approved the pull request from the card (a date and time).' }),
+  approveFailed: msg({ id: 'board.github.approveFailed', defaultMessage: 'Couldn’t approve the pull request', description: 'An error’s title (HI-3560): approving the pull request on GitHub failed; its message says why.' }),
   discardFailed: msg({ id: 'board.github.discardFailed', defaultMessage: 'Couldn’t discard the draft', description: 'An error’s title (HI-3559): a review draft couldn’t be discarded; its message says why.' })
 }
 
@@ -138,6 +144,14 @@ export function GithubFeedbackField({ card }: { card: TaskCard }) {
   }, [card.number, tasks, asked])
   if (card.source?.kind !== 'pr' || !view) return null
   const refresh = (): void => setAsked((n) => n + 1)
+  // HI-3560: the user's accept, asked first; merging stays on GitHub.
+  const approve = async (): Promise<void> => {
+    if (!(await confirm({ title: tr(T.approveTitle, { number: card.source!.number }), message: tr(T.approveMessage), confirmLabel: tr(T.approveConfirm) }))) return
+    setBusy(true)
+    await actions.attempt(tr(T.approveFailed), () => call('github:approvePr', card.number))
+    setBusy(false)
+    refresh()
+  }
   const postOwn = async (): Promise<void> => {
     setBusy(true)
     const done = await actions.attempt(tr(T.postFailed), () => call('github:postReview', card.number, null, own))
@@ -161,6 +175,13 @@ export function GithubFeedbackField({ card }: { card: TaskCard }) {
         {[...view.rows].reverse().map((r) => (
           <Row key={r.id} card={card.number} v={view} r={r} onDone={refresh} />
         ))}
+        <div className="flex github-approve" data-approved={view.approved ? 'yes' : 'no'}>
+          {view.approved && <span className="s-desc">{tr(T.approved, { when: formatDateTime(view.approved) })}</span>}
+          <span className="grow" />
+          <button type="button" className="btn small" data-action="approve-pr" disabled={busy} onClick={() => void approve()}>
+            <Icon name="check" /> {tr(T.approve)}
+          </button>
+        </div>
         {view.canWrite && (
           <div className="github-review" data-review="own">
             <textarea className="input github-review-text" placeholder={tr(T.write)} value={own} disabled={busy} onChange={(e) => setOwn(e.target.value)} />

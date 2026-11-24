@@ -160,7 +160,7 @@ import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pause
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { revisionDiff } from './workflow/revisionDiff'
 import { addLineComment, changeLineComment, feedbackPreview, sendFeedback } from './workflow/lineComments'
-import { discardGithubReview, githubReviewsView, postGithubReview } from './githubReviews'
+import { approveGithubPr, discardGithubReview, githubReviewsView, postGithubReview } from './githubReviews'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
 import { withSkillDelivered } from '../shared/skillDelivery'
@@ -1129,6 +1129,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'github:reviews': (n) => githubReviewsView(currentWorkspace(), Number(n)),
     'github:postReview': (n, row, body) => postGithubReview(currentWorkspace(), Number(n), { row: typeof row === 'number' && Number.isInteger(row) ? row : null, body: typeof body === 'string' ? body.slice(0, 60_000) : '' }, 'user'),
     'github:discardReview': (n, draft) => discardGithubReview(currentWorkspace(), Number(n), Number(draft)),
+    // HI-3560: the user approves the card's pull request on GitHub (asked first in the window).
+    'github:approvePr': (n) => approveGithubPr(currentWorkspace(), Number(n)),
     'slots:levelForm': (level) => slotLevelForm(workspace, level),
     'slots:setLevelDefault': async (level, key, value) => {
       await setSlotDefault(workspace, level, key, value)

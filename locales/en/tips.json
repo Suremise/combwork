@@ -1123,6 +1123,14 @@
     "defaultMessage": "See and change a project's git",
     "description": "A tip's title."
   },
+  "tips.githubApprove.text": {
+    "defaultMessage": "A pull request’s card says which AI wrote it, when the pull request says so, and suggests reviewers on another provider. Approve on GitHub… approves it as your account; merging stays on GitHub.",
+    "description": "A tip (HI-3560). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Approve on GitHub… is the card dialog's button)."
+  },
+  "tips.githubApprove.title": {
+    "defaultMessage": "Approve a pull request from its card",
+    "description": "A tip's title (HI-3560): a pull request's card can approve it on GitHub."
+  },
   "tips.githubFeedback.text": {
     "defaultMessage": "A pull request’s card posts its review to GitHub as a comment from your account: by default a reviewer agent’s verdict is drafted on the card for you to edit and post. Choose who writes it in Version Control → Workflow → GitHub.",
     "description": "A tip (HI-3559). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Version Control → Workflow → GitHub is a place in the window)."

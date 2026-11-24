@@ -43,6 +43,7 @@ const M = {
   noDraft: msg({ id: 'github.review.noDraft', defaultMessage: 'That draft is no longer on this card.', description: 'HI-3559: an error posting or discarding a review draft that isn’t on the card any more.' }),
   done: msg({ id: 'github.review.done', defaultMessage: 'That review was {state, select, posted {already posted} discarded {discarded} other {already being posted}}.', description: 'HI-3559: an error posting or discarding a review that was already posted, discarded, or is being posted. Keep the select keys.' }),
   empty: msg({ id: 'github.review.empty', defaultMessage: 'A review needs some text, or a line comment of yours to carry.', description: 'HI-3559: an error posting a review to GitHub with no text and no line comments.' }),
+  approveFailed: msg({ id: 'github.review.approveFailed', defaultMessage: 'The GitHub CLI couldn’t approve pull request #{number}{why, select, none {} other {: {why}}}.', description: 'HI-3560: an error approving a card’s pull request on GitHub from its dialog. {number} its number; {why} the GitHub CLI’s own words (in English), or none (keep the select key).' }),
   noLink: msg({ id: 'github.review.noLink', defaultMessage: 'This project’s GitHub link no longer names {repo}, the pull request’s repository (Version Control → Workflow → GitHub).', description: 'HI-3559: an error posting a review: the project’s GitHub repository changed since the card’s pull request was set. {repo} is owner/name. Version Control → Workflow → GitHub is a place in the window.' })
 }
 
@@ -77,7 +78,8 @@ export async function githubReviewsView(ws: WorkspaceService, n: number): Promis
   const latest = wf.state(card).latest?.id ?? null
   const openComments = latest === null ? 0 : lineCommentsOf(ws, n).filter((c) => c.state === 'open' && c.submission === latest).length
   const feedback = githubFeedbackOf(o)
-  return { feedback, footer: githubFooterOf(o), rows: rows.map((r) => ({ ...r, reviewerName: r.draft ? (who.get(r.draft.reviewer)?.name ?? null) : null, model: r.draft ? (who.get(r.draft.reviewer)?.model ?? null) : null, can: rowActions(feedback, 'user', r, { now: Date.now(), pending: !!r.draft && pendingPost(wf, card.id, r.draft.seq) }) })), openComments, canWrite: feedback !== 'agent', url: source.url }
+  const approved = facts.findLast((f) => f.kind === 'GithubPrApproved')?.at ?? null
+  return { approved, feedback, footer: githubFooterOf(o), rows: rows.map((r) => ({ ...r, reviewerName: r.draft ? (who.get(r.draft.reviewer)?.name ?? null) : null, model: r.draft ? (who.get(r.draft.reviewer)?.model ?? null) : null, can: rowActions(feedback, 'user', r, { now: Date.now(), pending: !!r.draft && pendingPost(wf, card.id, r.draft.seq) }) })), openComments, canWrite: feedback !== 'agent', url: source.url }
 }
 
 /** Whether an automatic post of draft `draft` still waits to run (its action pending): no Post button for it meanwhile. */
@@ -258,6 +260,32 @@ async function send(wf: Workflow, cardId: number, deps: PostDeps, source: { host
   if (sent.said.kind === 'refused') return { kind: 'failed', error: sent.said.error }
   if (sent.said.kind === 'uncertain') return { kind: 'uncertain', error: sent.said.error }
   return { kind: 'posted', url: sent.said.url, body: sent.body, comments: comments.map((c) => c.id), inline: comments.length - sent.listed.length, listed: sent.listed.length }
+}
+
+/**
+ * HI-3560 (HI-3541's decision: the user's accept): approves the card's pull request on GitHub as the user's own account
+ * (`gh pr review <n> --approve -R host/owner/repo`), a fork's too; the user's alone (IPC), asked first in the window.
+ * Only while the project's GitHub link still names the pull request's repository. Merging stays the user's, on GitHub:
+ * Combwork never merges it. Written as a fact once GitHub took it; gh's words thrown otherwise.
+ */
+export async function approveGithubPr(ws: WorkspaceService, n: number): Promise<void> {
+  const { wf, projectPath } = await cardOf(ws, n)
+  await approveOn(wf, n, { link: async () => (await import('./githubLink')).githubRepoFor(ws, projectPath), gh })
+  boardChanged(ws)
+}
+
+/** approveGithubPr on card `n` of `wf`, with the link and gh given. */
+export async function approveOn(wf: Workflow, n: number, deps: Pick<PostDeps, 'link' | 'gh'>): Promise<void> {
+  const card = wf.store.card(n)
+  const source = card.source
+  if (source?.kind !== 'pr') throw combworkError(M.notPr)
+  const link = await deps.link()
+  if (!link || link.host.toLowerCase() !== source.host.toLowerCase() || link.owner.toLowerCase() !== source.owner.toLowerCase() || link.repo.toLowerCase() !== source.repo.toLowerCase()) throw combworkError(M.noLink, { repo: `${source.owner}/${source.repo}` })
+  const r = await deps.gh({ repo: source }, ['pr', 'review', String(source.number), '--approve'])
+  if (!r.ok) throw combworkError(M.approveFailed, { number: source.number, why: r.detail ?? 'none' }) // i18n-ignore: a select key (none), gh's own words otherwise
+  await wf.write(card, null, 'user', (w) => {
+    w.fact('GithubPrApproved', { number: source.number })
+  })
 }
 
 let started = false

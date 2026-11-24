@@ -262,6 +262,8 @@
   "tips.gitSigning.title": "Signierte Merges ohne Warten",
   "tips.gitView.text": "In einem Git-Projekt zeigt der Tab „Versionsverwaltung“ Branch, Remotes, Verlauf und Tags des Projekts. Dort kannst du einen Branch wechseln oder anlegen, fetchen, pullen, pushen, taggen und die Commit-Identität festlegen. Die Statusleiste zeigt „{example}“: Ein Klick darauf führt dorthin.",
   "tips.gitView.title": "Git eines Projekts sehen und ändern",
+  "tips.githubApprove.text": "Die Karte eines Pull-Requests sagt, welche KI ihn geschrieben hat, wenn der Pull-Request das sagt, und schlägt Reviewer eines anderen Anbieters vor. Auf GitHub freigeben… gibt ihn mit deinem Konto frei; das Mergen bleibt auf GitHub.",
+  "tips.githubApprove.title": "Einen Pull-Request von seiner Karte freigeben",
   "tips.githubFeedback.text": "Die Karte eines Pull-Requests postet ihr Review auf GitHub als Kommentar von deinem Konto: Standardmäßig wird das Urteil eines Review-Agenten auf der Karte als Entwurf abgelegt, den du bearbeitest und postest. Wer es schreibt, wählst du unter Versionsverwaltung → Workflow → GitHub.",
   "tips.githubFeedback.title": "Feedback an GitHub",
   "tips.githubPrs.text": "Wähle auf dem Task-Board ein Projekt und klicke auf Von GitHub…, um seine offenen Pull-Requests aufzulisten: Karte erstellen macht aus einem eine Karte in Offen, die wie jede andere reviewt wird. Was auf GitHub steht, erreicht Agenten nur zitiert.",

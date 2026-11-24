@@ -496,6 +496,8 @@ export interface CombworkRequests {
   'github:reviews': (n: number) => GithubReviewsView
   'github:postReview': (n: number, row: number | null, body: string) => GithubReviewRow
   'github:discardReview': (n: number, draft: number) => void
+  /** HI-3560: approves the card's pull request on GitHub as the user's account. */
+  'github:approvePr': (n: number) => void
   /** Combwork's or the workspace's slot defaults (HI-1765: Settings → Workflow defaults, Git), with what each inherits. */
   'slots:levelForm': (level: WorkflowLevel) => SlotLevelForm
   /** Sets one of a level's slot defaults (an empty string: none), or with null removes it, so it inherits. */

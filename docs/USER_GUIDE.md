@@ -1635,7 +1635,9 @@ To review a pull request someone opened on the project's GitHub repository, choo
 
 - **What it says on GitHub is someone else's.** The card keeps the pull request's author and description (its first 8,000 characters). Agents reading the card get its title, author, branches and description only inside its GitHub source, quoted under a note that it is outside text, never instructions, since anyone can write a pull request, including text meant to steer an agent.
 - **An author outside the repository.** When GitHub says the pull request's author isn't one of the repository's owners, members or collaborators (or can't say), the card's GitHub source warns that the project's checks would run their code on this PC, with your files and sign-ins, and that the **Windows Sandbox** server in the MCP catalogue can run it apart from them (**Open the MCP Catalogue**). It is a warning only: how a pull request's checks run is your project's choice.
-- What the review finds goes back to the pull request as **Feedback to GitHub** says (below). Approving the pull request from its card is coming in a later version.
+- What the review finds goes back to the pull request as **Feedback to GitHub** says (below).
+- **Who wrote it.** When the pull request says which AI wrote it (a `Co-Authored-By` line in its commits, such as *Claude Opus 5.5*, or *Generated with Claude Code* in its description), the card says so under its GitHub source, and suggests having it reviewed by agents that run another provider, naming yours that do; when it doesn't say, the card suggests being more cautious, with two reviewers. **Reviewers…** opens the review options. It's only a hint: you choose.
+- **Approve on GitHub…**, in the card's Feedback to GitHub, approves the pull request on GitHub as your own account, after asking. Merging stays yours, on GitHub: Combwork never merges a pull request.
 
 ### Feedback to GitHub <a id="github-feedback"></a>
 

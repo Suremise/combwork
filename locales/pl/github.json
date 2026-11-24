@@ -64,6 +64,7 @@
   "github.prs.row": "#{number} {title}",
   "github.prs.tip": "Utwórz kartę z otwartego pull requesta w {repo}",
   "github.prs.title": "Otwarte pull requesty w {repo}",
+  "github.review.approveFailed": "GitHub CLI nie mogło zatwierdzić pull requesta #{number}{why, select, none {} other {: {why}}}.",
   "github.review.done": "Ta recenzja {state, select, posted {została już opublikowana} discarded {została odrzucona} other {jest już publikowana}}.",
   "github.review.empty": "Recenzja potrzebuje tekstu albo twojego komentarza do linii.",
   "github.review.noCard": "Nie można odczytać pracy tej karty, więc nie może publikować na GitHubie.",

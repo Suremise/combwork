@@ -47,6 +47,8 @@ export interface GithubReviewsView {
   /** Whether the user can write a review of their own now (not under Agent). */
   canWrite: boolean
   url: string
+  /** HI-3560: when the user last approved the pull request from the card (null: never). */
+  approved: string | null
 }
 
 /** The card's reviews to and on GitHub, oldest first. */

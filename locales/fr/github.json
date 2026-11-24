@@ -64,6 +64,7 @@
   "github.prs.row": "#{number} {title}",
   "github.prs.tip": "Faire une carte d’une pull request ouverte sur {repo}",
   "github.prs.title": "Pull requests ouvertes sur {repo}",
+  "github.review.approveFailed": "La CLI GitHub n’a pas pu approuver la pull request #{number}{why, select, none {} other { : {why}}}.",
   "github.review.done": "Cette relecture {state, select, posted {a déjà été publiée} discarded {a été abandonnée} other {est déjà en cours de publication}}.",
   "github.review.empty": "Une relecture a besoin de texte, ou d’un de tes commentaires de ligne.",
   "github.review.noCard": "Le travail de cette carte ne peut pas être lu : elle ne peut pas publier sur GitHub.",

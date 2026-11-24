@@ -64,6 +64,7 @@
   "github.prs.row": "#{number} {title}",
   "github.prs.tip": "Criar um cartão de um pull request aberto em {repo}",
   "github.prs.title": "Pull requests abertos em {repo}",
+  "github.review.approveFailed": "A GitHub CLI não conseguiu aprovar o pull request #{number}{why, select, none {} other {: {why}}}.",
   "github.review.done": "Essa revisão {state, select, posted {já foi publicada} discarded {foi descartada} other {já está sendo publicada}}.",
   "github.review.empty": "Uma revisão precisa de texto ou de algum comentário de linha seu.",
   "github.review.noCard": "O trabalho deste cartão não pode ser lido, então ele não pode publicar no GitHub.",

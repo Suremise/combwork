@@ -262,6 +262,8 @@
   "tips.gitSigning.title": "Des fusions signées sans attendre",
   "tips.gitView.text": "Dans un projet Git, l’onglet Gestion de versions affiche la branche, les dépôts distants, l’historique et les tags du projet, et te permet de changer de branche ou d’en créer une, de faire un fetch, un pull ou un push, de créer un tag et de définir l’identité des commits. La barre d’état affiche « {example} » : clique dessus pour y aller.",
   "tips.gitView.title": "Voir et modifier le git d’un projet",
+  "tips.githubApprove.text": "La carte d’une pull request dit quelle IA l’a écrite, quand la pull request le dit, et suggère des relecteurs d’un autre fournisseur. Approuver sur GitHub… l’approuve sous ton compte ; la fusion reste sur GitHub.",
+  "tips.githubApprove.title": "Approuver une pull request depuis sa carte",
   "tips.githubFeedback.text": "La carte d’une pull request publie sa relecture sur GitHub en commentaire depuis ton compte : par défaut, le verdict d’un agent relecteur est mis en brouillon sur la carte pour que tu le modifies et le publies. Choisis qui l’écrit dans Gestion de versions → Flux de travail → GitHub.",
   "tips.githubFeedback.title": "Retours vers GitHub",
   "tips.githubPrs.text": "Choisis un projet dans le tableau des tâches et clique sur Depuis GitHub… pour lister ses pull requests ouvertes : Créer une carte en fait une carte dans À faire, relue comme toute autre. Ce qu’elle dit sur GitHub n’atteint les agents que cité.",
