@@ -198,6 +198,7 @@ interface CombworkMessageValues {
   'tasks.skipped.unsaved': undefined
   'tasks.source.agents': undefined
   'tasks.source.gh': { problem: string; host: string | number }
+  'tasks.source.linkChanged': { repo: string | number; shown: string | number }
   'tasks.source.noLink': undefined
   'tasks.source.noProject': undefined
   'tasks.source.notFound': { number: string | number; repo: string | number; why: string }

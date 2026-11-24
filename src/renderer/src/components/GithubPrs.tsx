@@ -93,7 +93,7 @@ function OpenPrsDialog({ project, projectPath, onClose }: { project: string; pro
     if (!repo) return
     setMaking(pr.number)
     const text = { title: tr(T.cardTitle, { number: pr.number, title: pr.title }), description: tr(T.cardDesc, { number: pr.number, repo: repoName(repo), author: pr.author ?? 'none' }) } // i18n-ignore: a select key (none)
-    const done = await actions.attempt(tr(T.failed, { number: pr.number }), () => call('tasks:fromPr', project, pr.number, text))
+    const done = await actions.attempt(tr(T.failed, { number: pr.number }), () => call('tasks:fromPr', project, pr.number, repo, text))
     setMaking(null)
     if (!done) return
     // The dialog fills its fields from the board's copy of the card: read the board first, so a card just made is in it.

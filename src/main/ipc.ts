@@ -964,7 +964,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // HI-3551: the GitHub pull request or issue a card is about (an address or #n), or null to clear it: the user's alone.
     'tasks:setSource': (n, source) => tasks.setSource(n, typeof source === 'string' && source.trim() ? source.trim().slice(0, 500) : null, { kind: 'user' }),
     // HI-3553: an open pull request made a card (the board's From GitHub…): the user's alone, read again from GitHub in main.
-    'tasks:fromPr': (project, number, text) => tasks.createFromPr(String(project), Number(number), { title: String(text?.title ?? '').slice(0, 200), description: String(text?.description ?? '').slice(0, 4000) }, { kind: 'user' }),
+    'tasks:fromPr': (project, number, repo, text) => tasks.createFromPr(String(project), Number(number), { host: String(repo?.host ?? ''), owner: String(repo?.owner ?? ''), repo: String(repo?.repo ?? '') }, { title: String(text?.title ?? '').slice(0, 200), description: String(text?.description ?? '').slice(0, 4000) }, { kind: 'user' }),
     'tasks:keptTarget': (n) => tasks.keptTarget(Number(n)),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': async (n, patch, more) => {

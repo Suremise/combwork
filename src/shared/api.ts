@@ -593,7 +593,7 @@ export interface CombworkRequests {
   'tasks:setTarget': (n: number, target: string | null) => TaskCard
   'tasks:setSource': (n: number, source: string | null) => TaskCard
   /** HI-3553: an open pull request made a card in Todo (the board's From GitHub…), or the card already about it. */
-  'tasks:fromPr': (project: string, number: number, text: { title: string; description: string }) => { card: TaskCard; existing: boolean }
+  'tasks:fromPr': (project: string, number: number, repo: GithubRepoRef, text: { title: string; description: string }) => { card: TaskCard; existing: boolean }
   'tasks:keptTarget': (n: number) => KeptTargetShown
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }

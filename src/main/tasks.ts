@@ -19,7 +19,7 @@ import { providerMessage } from '../shared/providers'
 import type { CardState } from '../shared/workflow/facts'
 import { isUnknown } from './platform/types'
 import type { CombworkErrorKind, KeptTargetShown, TaskMoveResult } from '../shared/types'
-import { cleanSource, clipBody, parseSourceRef, sourceLabel, type GithubSource } from '../shared/githubSource'
+import { cleanSource, clipBody, parseSourceRef, sameSource, sourceLabel, type GithubSource } from '../shared/githubSource'
 import { workflowMessage } from '../shared/workflow/texts'
 import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskChanges, TaskCursor, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, TaskWaiting, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
@@ -1539,7 +1539,7 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
 export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultMessage: 'A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).', description: "An error said to the Combwork Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names." })
 
 async function createTaskLocked(
-  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string; target?: string | null; followUpOf?: number },
+  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string; target?: string | null; followUpOf?: number; source?: { source: GithubSource; body: string } },
   actor: TaskActor,
   opts: { commit?: () => void; pinTarget?: boolean } = {}
 ): Promise<TaskCard> {
@@ -1596,6 +1596,8 @@ async function createTaskLocked(
     blocked: input.blocked?.trim() ? text(input.blocked.trim(), 1000, 'blockedReason') : null,
     blockedBy,
     links,
+    // HI-3553: made with its GitHub source (From GitHub…), in the same save: never an ordinary card first.
+    ...(input.source ? { source: input.source.source, ...(input.source.body ? { sourceBody: input.source.body } : {}) } : {}),
     ...(context.length ? { context } : {}),
     ...(problems.length ? { contextProblems: problems } : {}),
     comments: [],
@@ -1603,7 +1605,8 @@ async function createTaskLocked(
       entryOf(now, by, storedText(HISTORY.created, { column })),
       ...(kind === 'no-code' ? [entryOf(now, by, storedText(HISTORY.kind, { how: proposes ? 'proposed' : 'made', kind }))] : []),
       ...(skipReason !== null ? [entryOf(now, by, storedText(HISTORY.reviewSkip, { how: actor.kind === 'agent' ? 'proposed' : 'set' }))] : []),
-      ...(target ? [entryOf(now, by, storedText(HISTORY.target, { own: 'yes', target }))] : [])
+      ...(target ? [entryOf(now, by, storedText(HISTORY.target, { own: 'yes', target }))] : []),
+      ...(input.source ? [entryOf(now, by, storedText(HISTORY.source, { set: 'yes', kind: input.source.source.kind, number: input.source.source.number, repo: `${input.source.source.owner}/${input.source.source.repo}` }))] : [])
     ],
     archived: false,
     createdAt: now,
@@ -2609,6 +2612,7 @@ const SOURCE = {
   notGithub: msg({ id: 'tasks.source.notGithub', defaultMessage: 'That isn’t a pull request or issue: give its address (https://…/pull/12 or …/issues/12) or its number (#12).', description: 'HI-3551: an error setting a card’s GitHub source: the text typed isn’t the address of a GitHub pull request or issue, nor a number. Keep the example addresses.' }),
   otherRepo: msg({ id: 'tasks.source.otherRepo', defaultMessage: 'That pull request or issue isn’t on this project’s repository ({repo} on {host}).', description: 'HI-3551: an error setting a card’s GitHub source: the address is of another repository or host than the project’s GitHub link. {repo} is owner/name, {host} a host name.' }),
   notFound: msg({ id: 'tasks.source.notFound', defaultMessage: 'The GitHub CLI found no pull request or issue #{number} on {repo}{why, select, none {} other {: {why}}}.', description: 'HI-3551: an error setting a card’s GitHub source: gh couldn’t read it. {number} its number, {repo} owner/name; {why} gh’s own words, or none (keep the select key).' }),
+  linkChanged: msg({ id: 'tasks.source.linkChanged', defaultMessage: 'This project’s GitHub repository is now {repo}, not {shown} as listed: list its pull requests again.', description: 'HI-3553: an error making a card of a pull request from the board’s From GitHub… list: the project’s GitHub link changed to another repository since the list was shown. {repo} and {shown} are owner/name.' }),
   gh: msg({ id: 'tasks.source.gh', defaultMessage: 'The GitHub CLI {problem, select, missing {isn’t installed} signedOut {isn’t signed in on {host}} timeout {didn’t answer in time} other {couldn’t read it}}: see Version Control → Workflow → GitHub.', description: 'HI-3551: an error setting a card’s GitHub source: gh couldn’t be asked (problem: not installed, not signed in on the host, no answer in time, or another failure). Keep the select keys. Version Control → Workflow → GitHub is a place in the window: as translated there.' })
 }
 
@@ -2665,18 +2669,26 @@ async function readSource(ws: WorkspaceService, projectPath: string, input: stri
 /**
  * HI-3553: an open pull request on the project's GitHub link made a card in Todo (the board's From GitHub…), the user's
  * alone: its title and description the window's (in the user's language), its source and body read from GitHub again
- * here. A PR some card not archived is already about isn't made twice: that card comes back, `existing`.
+ * here. `expect` is the repository the window listed it from: a link changed since is refused, so a number is never
+ * taken for another repository's PR. Under the board's lock, a PR some card not archived is already about isn't made
+ * twice (that card comes back, `existing`), and the card is made with its source in one save.
  */
-export async function createFromPr(project: string, number: number, words: { title: string; description: string }, actor: TaskActor): Promise<{ card: TaskCard; existing: boolean }> {
+export async function createFromPr(project: string, number: number, expect: { host: string; owner: string; repo: string }, words: { title: string; description: string }, actor: TaskActor): Promise<{ card: TaskCard; existing: boolean }> {
   if (actor.kind !== 'user') throw new TaskPermissionError(SOURCE.agents)
   const ws = workspace
   const projectPath = ws.path ? join(ws.path, project) : project
   const read = await readSource(ws, projectPath, `#${number}`, 'pr')
+  const shown = `${expect.owner}/${expect.repo}`
+  if (!sameSource(read.source, { kind: 'pr', number, host: expect.host, owner: expect.owner, repo: expect.repo })) throw new TaskConflictError(withValues(SOURCE.linkChanged, { shown, repo: `${read.source.owner}/${read.source.repo}` }))
   const { prSourceCards } = await import('./boardStore')
-  const had = prSourceCards(ws, read.source).find((c) => c.pr === read.source.number)
-  if (had) return { card: await getTask(had.n, ws), existing: true }
-  const card = await createTask({ title: words.title, description: words.description, project, labels: [sourceLabel('pr')] }, actor)
-  return { card: await writeSource(ws, projectPath, card.number, read, actor), existing: false }
+  return recording(actor, null, () =>
+    boardLock(ws, async () => {
+      const had = prSourceCards(ws, read.source).find((c) => c.pr === read.source.number)
+      if (had) return { card: await getTask(had.n, ws), existing: true }
+      const card = await createTaskLocked({ title: words.title, description: words.description, project, labels: [sourceLabel('pr')], source: read }, actor)
+      return { card, existing: false }
+    })
+  )
 }
 
 /** HI-3551: sets (or clears, null) a card's source read from GitHub, under the board's lock, while its work hasn't started. */
