@@ -289,12 +289,17 @@ interface CombworkMessageValues {
   'board.dialog.sourceFailed': undefined
   'board.dialog.sourceFork': undefined
   'board.dialog.sourceKind': { kind: string; number: string | number }
+  'board.dialog.sourceModelUnknown': undefined
   'board.dialog.sourceOpen': undefined
   'board.dialog.sourceOutside': { known: string; author: string | number; repo: string | number }
   'board.dialog.sourcePlaceholder': undefined
   'board.dialog.sourceRemove': undefined
+  'board.dialog.sourceReviewers': undefined
   'board.dialog.sourceSet': undefined
+  'board.dialog.sourceSuggestMore': undefined
+  'board.dialog.sourceSuggestOther': { provider: string | number; n: number; agents: string | number }
   'board.dialog.sourceTitle': { title: string | number }
+  'board.dialog.sourceWrittenBy': { name: string | number; provider: string; from: string }
   'board.dialog.start': undefined
   'board.dialog.startButton': undefined
   'board.dialog.startTip': undefined
@@ -391,6 +396,12 @@ interface CombworkMessageValues {
   'board.forYou.tipMore': { n: number }
   'board.forYou.tipOpen': undefined
   'board.forYou.todayValue': { today: string; value: string | number }
+  'board.github.approve': undefined
+  'board.github.approveConfirm': undefined
+  'board.github.approveFailed': undefined
+  'board.github.approveMessage': undefined
+  'board.github.approveTitle': { number: string | number; repo: string | number }
+  'board.github.approved': { when: string | number }
   'board.github.carried': { inline: number; both: string; listed: number }
   'board.github.change': undefined
   'board.github.checkGithub': undefined

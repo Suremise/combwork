@@ -11,9 +11,9 @@ import { join } from 'path'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { allOff, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { boardFile } from '../../src/main/boardStore'
-import { discardReviewOn, postReviewOn, type PostDeps } from '../../src/main/githubReviews'
+import { approveOn, discardReviewOn, postReviewOn, type PostDeps } from '../../src/main/githubReviews'
 import { gitRevisionReads } from '../../src/main/platform/git/gitRevisionReads'
-import { foldGithubReviews, REVIEW_BODY_MAX, rowActions, STUCK_MS } from '../../src/shared/githubReviews'
+import { approvalOf, foldGithubReviews, REVIEW_BODY_MAX, rowActions, STUCK_MS } from '../../src/shared/githubReviews'
 import type { GhResult, GhTarget } from '../../src/main/ghCli'
 import type { GithubSource } from '../../src/shared/githubSource'
 import type { LineCommentView } from '../../src/shared/workflow/lineComments'
@@ -335,5 +335,61 @@ describe('Feedback to GitHub’s stale discard (HI-3559, HR1’s round 2)', () =
     const g = fakeGh()
     await expect(postReviewOn(e.wf, card, { row: first.seq }, 'user', deps(e, { gh: g.gh, now: () => later }))).rejects.toThrow(/discarded/)
     expect(g.calls).toEqual([])
+  })
+})
+
+/** The pull request the user confirmed approving: #7 on acme/app. */
+const PR7 = { host: 'github.com', owner: 'acme', repo: 'app', number: 7 }
+
+describe('approving a pull request from its card (HI-3560)', () => {
+  it('approves it on GitHub, naming its repository, and records it; never merges', async () => {
+    const e = (env = project('both'))
+    const card = await reviewed(e, true, 'Looks right.')
+    const calls: string[][] = []
+    const gh = (async (target: GhTarget, args: string[]): Promise<GhResult> => {
+      calls.push([...args, ...('repo' in target ? ['-R', `${target.repo.host}/${target.repo.owner}/${target.repo.repo}`] : [])])
+      return { ok: true, stdout: '', json: null }
+    }) as PostDeps['gh']
+    await approveOn(e.wf, card, PR7, { link: async () => LINK, gh })
+    expect(calls).toEqual([['pr', 'review', '7', '--approve', '-R', 'github.com/acme/app']])
+    expect(e.store.facts(card).filter((f) => f.kind === 'GithubPrApproved').map((f) => f.data)).toEqual([{ host: 'github.com', owner: 'acme', repo: 'app', number: 7 }])
+    expect(calls.flat().some((a) => /merge/.test(a))).toBe(false)
+  })
+
+  it('refuses a changed link without asking gh, and says gh’s words when it fails, recording nothing', async () => {
+    const e = (env = project('both'))
+    const card = await reviewed(e)
+    let asked = 0
+    const failing = (async (): Promise<GhResult> => (asked++, { ok: false, problem: 'failed', detail: 'HTTP 422: Can not approve your own pull request' })) as PostDeps['gh']
+    await expect(approveOn(e.wf, card, PR7, { link: async () => ({ ...LINK, repo: 'next' }), gh: failing })).rejects.toThrow(/no longer names acme\/app/)
+    expect(asked).toBe(0)
+    await expect(approveOn(e.wf, card, PR7, { link: async () => LINK, gh: failing })).rejects.toThrow('The GitHub CLI couldn’t approve pull request #7: HTTP 422: Can not approve your own pull request.')
+    expect(e.store.facts(card).some((f) => f.kind === 'GithubPrApproved')).toBe(false)
+  })
+
+  it('approves only the pull request the user confirmed: a source changed while asked, or while the link is read, approves nothing (HR1’s round 1)', async () => {
+    const e = (env = project('both'))
+    const card = await reviewed(e)
+    let asked = 0
+    const gh = (async (): Promise<GhResult> => (asked++, { ok: true, stdout: '', json: null })) as PostDeps['gh']
+    // Another window made the card about #8 while #7 was being confirmed.
+    giveSource(e, card, { ...SOURCE, number: 8, url: 'https://github.com/acme/app/pull/8' })
+    await expect(approveOn(e.wf, card, PR7, { link: async () => LINK, gh })).rejects.toThrow('This card is now about another pull request than #7 on acme/app, the one you confirmed: nothing was approved. Look at it again.')
+    // …or did so while the link was read, after the first check.
+    giveSource(e, card, SOURCE)
+    await expect(approveOn(e.wf, card, PR7, { link: async () => (giveSource(e, card, { ...SOURCE, number: 8, url: 'https://github.com/acme/app/pull/8' }), LINK), gh })).rejects.toThrow(/another pull request than #7/)
+    expect(asked).toBe(0)
+    expect(e.store.facts(card).some((f) => f.kind === 'GithubPrApproved')).toBe(false)
+  })
+
+  it('shows an approval only for the pull request the card is about now (HR1’s round 1)', async () => {
+    const e = (env = project('both'))
+    const card = await reviewed(e)
+    const gh = (async (): Promise<GhResult> => ({ ok: true, stdout: '', json: null })) as PostDeps['gh']
+    await approveOn(e.wf, card, PR7, { link: async () => LINK, gh })
+    expect(approvalOf(e.store.facts(card), PR7)).not.toBeNull()
+    // The source replaced by #8: #7's approval isn't #8's.
+    expect(approvalOf(e.store.facts(card), { ...PR7, number: 8 })).toBeNull()
+    expect(approvalOf(e.store.facts(card), { ...PR7, repo: 'other' })).toBeNull()
   })
 })

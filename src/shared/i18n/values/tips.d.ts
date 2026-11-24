@@ -282,6 +282,8 @@ interface CombworkMessageValues {
   'tips.gitSigning.title': undefined
   'tips.gitView.text': { example: string | number }
   'tips.gitView.title': undefined
+  'tips.githubApprove.text': undefined
+  'tips.githubApprove.title': undefined
   'tips.githubFeedback.text': undefined
   'tips.githubFeedback.title': undefined
   'tips.githubPrs.text': undefined

@@ -259,6 +259,14 @@
     "defaultMessage": "Open pull requests on {repo}",
     "description": "The title of the From GitHub… dialog (HI-3553). {repo} is owner/name."
   },
+  "github.review.approveChanged": {
+    "defaultMessage": "This card is now about another pull request than #{number} on {repo}, the one you confirmed: nothing was approved. Look at it again.",
+    "description": "HI-3560: an error approving a card’s pull request: the card’s GitHub source changed while the user was asked (another window), so the pull request they confirmed isn’t the card’s now. {number} its number, {repo} owner/name."
+  },
+  "github.review.approveFailed": {
+    "defaultMessage": "The GitHub CLI couldn’t approve pull request #{number}{why, select, none {} other {: {why}}}.",
+    "description": "HI-3560: an error approving a card’s pull request on GitHub from its dialog. {number} its number; {why} the GitHub CLI’s own words (in English), or none (keep the select key)."
+  },
   "github.review.done": {
     "defaultMessage": "That review was {state, select, posted {already posted} discarded {discarded} other {already being posted}}.",
     "description": "HI-3559: an error posting or discarding a review that was already posted, discarded, or is being posted. Keep the select keys."
