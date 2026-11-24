@@ -570,7 +570,13 @@ export interface LaneEndDeps {
  * note, its states or its quit is dropped (its epoch is over: what it finds later acts on nothing). Only one quit runs at
  * a time: the forced one waits for one already typing (bounded by its own typing) rather than start a second.
  */
-export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
+export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string>; settled: () => Promise<void> } {
+  /** Its work still running (a look, a forced quit, a retire): settled() waits for it, done or not (HI-3567). */
+  const pending = new Set<Promise<unknown>>()
+  const track = (p: Promise<unknown>): void => {
+    pending.add(p)
+    void p.finally(() => pending.delete(p)).catch(() => undefined)
+  }
   let over = false
   let looking = false
   let again = false
@@ -596,7 +602,7 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
   const lost = (): void => {
     if (over) return
     finish('the run or its lease is gone: nothing ended') // i18n-ignore: for the log
-    void d.retire('its lane end lost its run').catch(() => undefined) // i18n-ignore: for the log
+    track(d.retire('its lane end lost its run').catch(() => undefined)) // i18n-ignore: for the log
   }
   /** The one quit at a time. */
   const quitOnce = (why: string, force: boolean): Promise<'sent' | 'held' | 'gone'> => {
@@ -635,7 +641,7 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
         d.log(`its lane's note wasn't made: ${(e as Error).message}`)
       }
       // Made after its end was over (the fence lost, or ended forced, meanwhile): retired, as the end retired none.
-      if (over) return void d.retire('its lane end was over before its note was made').catch(() => undefined) // i18n-ignore: for the log
+      if (over) return track(d.retire('its lane end was over before its note was made').catch(() => undefined)) // i18n-ignore: for the log
       if (dropped()) return
       if (!d.fenced()) return lost()
     }
@@ -658,26 +664,28 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
     if (over) return
     // The fence and the deadline first, whatever a look awaits.
     if (!d.fenced()) return lost()
-    if (d.now() >= d.deadline) return void forced()
+    if (d.now() >= d.deadline) return track(forced())
     if (looking) {
       again = true
       return
     }
     looking = true
-    void (async () => {
-      try {
-        // finish() sets `over` (and the deadline `epoch`): read through a call, as the loop can't see that.
-        const ended = (): boolean => over
-        do {
-          again = false
-          await step()
-        } while (again && !ended())
-      } catch (e) {
-        d.log(`a look failed: ${(e as Error).message}`)
-      } finally {
-        looking = false
-      }
-    })()
+    track(
+      (async () => {
+        try {
+          // finish() sets `over` (and the deadline `epoch`): read through a call, as the loop can't see that.
+          const ended = (): boolean => over
+          do {
+            again = false
+            await step()
+          } while (again && !ended())
+        } catch (e) {
+          d.log(`a look failed: ${(e as Error).message}`)
+        } finally {
+          looking = false
+        }
+      })()
+    )
   }
   unwatch = d.watch(look)
   const tick = (): void => {
@@ -688,11 +696,16 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
   timers.push(setTimeout(tick, LANE_END_RECHECK_MS))
   timers.push(setTimeout(look, Math.max(0, d.deadline - d.now()) + 50))
   look()
-  return { done }
+  /** Once it is over and nothing it started still runs (a look awaiting a note, a retire): its last log written. */
+  const settled = async (): Promise<void> => {
+    await done
+    while (pending.size) await Promise.allSettled([...pending])
+  }
+  return { done, settled }
 }
 
 /** The lane leases being ended now (by id): a second end of the same lease joins the first, never makes another note. */
-const laneEnds = new Map<string, { done: Promise<string> }>()
+const laneEnds = new Map<string, { done: Promise<string>; settled: () => Promise<void> }>()
 
 /** A lane lease's gentle end under way (tests): how it ends (its log's last word), or null when none is. */
 export const laneEndOf = (lease: string): Promise<string> | null => laneEnds.get(lease)?.done ?? null
@@ -752,9 +765,12 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
       const offDeliveries = onDeliveriesChanged((host, agents) => {
         if (host.toLowerCase() === projectPath.toLowerCase() && agents.has(w.agent)) look()
       })
+      // Its workspace closing ends it at once (the fence lost), not at the next recheck after (HI-3567).
+      life.addEventListener('abort', look)
       return () => {
         offEvents()
         offDeliveries()
+        life.removeEventListener('abort', look)
       }
     },
     now: () => Date.now(),
@@ -762,7 +778,17 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
     log: (line) => log.info(`Lane ${userText(lease.lane ?? '')}'s end, ${label} (lease ${lease.id}): ${line}`)
   })
   laneEnds.set(lease.id, waiter)
+  unsettled.add(waiter)
   void waiter.done.finally(() => laneEnds.delete(lease.id))
+  void waiter.settled().finally(() => unsettled.delete(waiter))
+}
+
+/** Every gentle end begun and not yet settled (HI-3567: a test's teardown waits for them, so none logs after it). */
+const unsettled = new Set<{ settled: () => Promise<void> }>()
+
+/** Tests: once every gentle end under way is over and nothing it started still runs (each logged its last line). */
+export async function laneEndsSettled(): Promise<void> {
+  while (unsettled.size) await Promise.allSettled([...unsettled].map((w) => w.settled()))
 }
 
 let timer: NodeJS.Timeout | null = null
