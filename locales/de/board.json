@@ -1002,6 +1002,7 @@
   "board.stalled.noAgent": "In Arbeit, aber kein Agent hat die Karte.",
   "board.stalled.notRunning": "Agent {agent} läuft nicht.",
   "board.stalled.notWatching": "Agent {agent} beobachtet {card} nicht: Der Durchgang endete ohne Kartenbeobachtung.",
+  "board.stalled.notWatchingUncounted": "Agent {agent} beobachtet {card} nicht: Der Durchgang endete ohne Kartenbeobachtung, nachdem Combwork aufgehört hat, seine Hintergrundaufgaben zu zählen. Vielleicht wartet er noch auf eine davon: Prüfe diesen Schritt. Ist er beendet, bitte {agent}, weiterzumachen.",
   "board.stalled.removed": "Agent {agent} wurde entfernt.",
   "board.stalled.removedUnnamed": "Der Agent wurde entfernt.",
   "board.stalled.reviewVerdictWait": "Agent {agent} hat das Review von {card} begonnen, aber kein Urteil abgegeben und beobachtet die Karte seit {waited} nur noch.",

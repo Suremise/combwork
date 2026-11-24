@@ -1002,6 +1002,7 @@
   "board.stalled.noAgent": "En curso, pero ningún agente la tiene.",
   "board.stalled.notRunning": "El agente {agent} no está en ejecución.",
   "board.stalled.notWatching": "El agente {agent} no vigila la tarjeta {card}: su turno terminó sin vigilar la tarjeta.",
+  "board.stalled.notWatchingUncounted": "El agente {agent} no vigila la tarjeta {card}: su turno terminó sin vigilar la tarjeta, después de que Combwork dejara de contar sus tareas en segundo plano. Puede que siga esperando a una de ellas: revisa ese paso. Si ya terminó, pide a {agent} que continúe.",
   "board.stalled.removed": "Se quitó el agente {agent}.",
   "board.stalled.removedUnnamed": "Se quitó su agente.",
   "board.stalled.reviewVerdictWait": "El agente {agent} empezó a revisar la tarjeta {card}, pero no ha dado ningún veredicto y desde hace {waited} solo la vigila.",

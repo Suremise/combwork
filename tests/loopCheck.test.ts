@@ -46,6 +46,14 @@ describe('cards in play for a loop agent (#376)', () => {
     expect(notWatchingReason(card(779, { column: 'passed' }), agents)).toBeNull()
   })
 
+  it('HI-3561: its background tasks dropped from the count, not seen to end: the stall says it may be waiting on one', () => {
+    const agents = [{ name: 'CB3', project: 'alpha', notWatching: [368], uncounted: 1 }]
+    expect(notWatchingReason(card(368, { column: 'review' }), agents)).toBe("CB3 isn't watching #368: its turn ended with no card watch, and Combwork stopped counting its background tasks after their time limit. It may still be waiting on one (a subagent's long run): check that step. If it has ended, nothing wakes CB3: ask it to carry on.")
+    // In the window's words (tr), the same case.
+    expect(notWatchingReason(card(368, { column: 'review' }), agents, (m, ...v) => `${m.id} ${JSON.stringify(v)}`)).toMatch(/^board\.stalled\.notWatchingUncounted /)
+    expect(notWatchingReason(card(368, { column: 'review' }), [{ ...agents[0], uncounted: undefined }])).toBe("CB3 isn't watching #368: its turn ended with no card watch.")
+  })
+
   it("an agent whose turn ended with background tasks running is not flagged where they wake it; where they don't (Codex), it is (#521)", () => {
     expect(unwatched({ provider: 'claude-code', status: 'finished' })).toBe(true)
     expect(unwatched({ provider: 'claude-code', status: 'ready' })).toBe(true)

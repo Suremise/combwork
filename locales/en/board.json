@@ -4015,6 +4015,10 @@
     "defaultMessage": "{agent} isn't watching {card}: its turn ended with no card watch.",
     "description": "Why a card in a card loop is stalled: the agent looping on it stopped without waiting for the card to change. {agent} is its name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none. A card watch is what wakes an agent when a card changes."
   },
+  "board.stalled.notWatchingUncounted": {
+    "defaultMessage": "{agent} isn't watching {card}: its turn ended with no card watch, after Combwork stopped counting its background tasks. It may still be waiting on one: check that step. If it has ended, ask {agent} to carry on.",
+    "description": "Why a card in a card loop is stalled (HI-3561): the agent looping on it stopped without a card watch, while background tasks it started (a subagent, a long command) ran past the time limit in Settings, after which Combwork stops counting them. It may still be waiting on one, or one ended without waking it. {agent} is its name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none."
+  },
   "board.stalled.removed": {
     "defaultMessage": "{agent} was removed.",
     "description": "Why a card's work or review is stalled: its agent was removed from the project. {agent} is the agent's name."

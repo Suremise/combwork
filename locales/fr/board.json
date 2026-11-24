@@ -1002,6 +1002,7 @@
   "board.stalled.noAgent": "Dans En cours, mais aucun agent ne l’a.",
   "board.stalled.notRunning": "L’agent {agent} ne tourne pas.",
   "board.stalled.notWatching": "L’agent {agent} ne surveille pas {card} : son tour s’est terminé sans surveillance de carte.",
+  "board.stalled.notWatchingUncounted": "L’agent {agent} ne surveille pas {card} : son tour s’est terminé sans surveillance de carte, après que Combwork a cessé de compter ses tâches en arrière-plan. Il attend peut-être encore l’une d’elles : vérifiez cette étape. Si elle est terminée, demandez à {agent} de continuer.",
   "board.stalled.removed": "L’agent {agent} a été retiré.",
   "board.stalled.removedUnnamed": "Son agent a été retiré.",
   "board.stalled.reviewVerdictWait": "L’agent {agent} a commencé à relire {card} mais n’a donné aucun verdict, et se contente de la surveiller depuis {waited}.",

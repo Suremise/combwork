@@ -188,6 +188,7 @@ const ST = {
   notRunning: agentMsg({ id: 'stall.agent.notRunning', text: "{agent} isn't running.", note: "The card's agent (or reviewer) has no session running." }),
   wakeUntaken: agentMsg({ id: 'stall.loop.wakeUntaken', text: "{agent} hasn't taken the wake Combwork typed for {card}: it waits in its prompt.", note: "#777: the agent watched the card, and its wake waits untaken in its prompt (its CLI didn't take the line)." }),
   notWatching: agentMsg({ id: 'stall.loop.notWatching', text: "{agent} isn't watching {card}: its turn ended with no card watch.", note: '#376: the agent looping on the card ended its turn with no card watch, so nothing wakes it.' }),
+  notWatchingUncounted: agentMsg({ id: 'stall.loop.notWatchingUncounted', text: "{agent} isn't watching {card}: its turn ended with no card watch, and Combwork stopped counting its background tasks after their time limit. It may still be waiting on one (a subagent's long run): check that step. If it has ended, nothing wakes {agent}: ask it to carry on.", note: "HI-3561: as notWatching, while background tasks the agent started were dropped from its count after the time limit (Settings) and haven't been seen to end: it may be waiting on its own subagent, or that step ended without waking it." }),
   reviewWait: agentMsg({
     id: 'stall.review.wait',
     text: "{agent} is watching {card} but hasn't started reviewing it{state, select, silent { (it shows working, but has been silent for {silentMinutes} min: state unknown)} busy { (it is working on something else)} other {}}: in Review for {waited}.",
@@ -289,6 +290,8 @@ export interface NotWatchingAgent {
   project: string
   notWatching?: number[]
   untaken?: boolean
+  /** HI-3561: its background tasks dropped from its count after the time limit, not seen to end (`tasksUncounted`). */
+  uncounted?: number
 }
 
 /** The agent of the card's project that left it with no live watch (notWatching), if any: what its stall names. */
@@ -311,6 +314,11 @@ export function notWatchingReason(card: Pick<TaskCard, 'number' | 'column' | 'ar
   if (a.untaken) {
     if (tr) return tr(msg({ id: 'board.stalled.wakeUntaken', defaultMessage: "{agent} hasn't taken the wake Combwork typed for {card}: it waits in its prompt.", description: 'Why a card in a card loop is stalled: the agent watched the card, and Combwork typed its wake line into the agent\'s terminal, but the agent\'s CLI never sent it. {agent} is its name, {card} the card\'s name: its key, such as AM-12, or #12 for a card with none.' }), { agent: a.name, card: cardLabel(card) })
     return say(ST.wakeUntaken, { agent: a.name, card: cardName(card) })
+  }
+  // HI-3561: its background tasks went past the time limit uncounted: it may be waiting on one, or one ended unheard.
+  if (a.uncounted) {
+    if (tr) return tr(msg({ id: 'board.stalled.notWatchingUncounted', defaultMessage: "{agent} isn't watching {card}: its turn ended with no card watch, after Combwork stopped counting its background tasks. It may still be waiting on one: check that step. If it has ended, ask {agent} to carry on.", description: 'Why a card in a card loop is stalled (HI-3561): the agent looping on it stopped without a card watch, while background tasks it started (a subagent, a long command) ran past the time limit in Settings, after which Combwork stops counting them. It may still be waiting on one, or one ended without waking it. {agent} is its name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none.' }), { agent: a.name, card: cardLabel(card) })
+    return say(ST.notWatchingUncounted, { agent: a.name, card: cardName(card) })
   }
   if (tr) return tr(msg({ id: 'board.stalled.notWatching', defaultMessage: "{agent} isn't watching {card}: its turn ended with no card watch.", description: 'Why a card in a card loop is stalled: the agent looping on it stopped without waiting for the card to change. {agent} is its name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none. A card watch is what wakes an agent when a card changes.' }), { agent: a.name, card: cardLabel(card) })
   return say(ST.notWatching, { agent: a.name, card: cardName(card) })

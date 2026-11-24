@@ -1003,6 +1003,7 @@
   "board.stalled.noAgent": "In Active, but no agent has it.",
   "board.stalled.notRunning": "{agent} isn't running.",
   "board.stalled.notWatching": "{agent} isn't watching {card}: its turn ended with no card watch.",
+  "board.stalled.notWatchingUncounted": "{agent} isn't watching {card}: its turn ended with no card watch, after Combwork stopped counting its background tasks. It may still be waiting on one: check that step. If it has ended, ask {agent} to carry on.",
   "board.stalled.removed": "{agent} was removed.",
   "board.stalled.removedUnnamed": "Its agent was removed.",
   "board.stalled.reviewVerdictWait": "{agent} started reviewing {card} but has given no verdict, and has only been watching it for {waited}.",
