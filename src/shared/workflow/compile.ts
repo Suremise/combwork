@@ -80,7 +80,9 @@ export function producedStages(o: WorkflowOptions): StageId[] {
   // on #1417): where work merges (Git) a merge (Combwork's, the agent's, or one Combwork doesn't check); where it is
   // accepted (None) your OK after the reviewer agent's pass (N1).
   const approves = review || o.okBefore.mode !== 'never'
-  const approved = merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked' || o.finish === 'pullRequest') : accepts(o.platform) && o.review === 'agentThenYou'
+  // HI-3552: a pull request's finish always has Approved: where a card waits while its pull request is opened, or after a
+  // failure to open it, review or not.
+  const approved = merging ? (approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked')) || o.finish === 'pullRequest' : accepts(o.platform) && o.review === 'agentThenYou'
   const out: StageId[] = ['hold', 'todo', 'active']
   if (review) out.push('review')
   if (approved) out.push('approved')

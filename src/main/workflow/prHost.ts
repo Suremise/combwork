@@ -22,6 +22,9 @@ import { parseGithubRemote } from '../../shared/githubRepo'
 import { PR_RETRY_GATE, type CardState, type PrOpenedData, type PrOpenFailedData, type PrRequestData } from '../../shared/workflow/facts'
 import { FOR_YOU, PR_PROBLEM, workflowText } from '../../shared/workflow/texts'
 import { checksAtRevision, type Workflow } from './runtime'
+import type { PrView } from '../../shared/githubSource'
+
+export type { PrView }
 
 const log = createLogger('workflow')
 
@@ -172,25 +175,6 @@ async function failed(wf: Workflow, cardId: number, request: string, d: PrOpenFa
     wf.askUser(w, 'approve', PR_RETRY_GATE, workflowText(FOR_YOU.prRetry, { card: w.card.key, why: why as unknown as string }))
   })
   log.info(`#${cardId}'s pull request wasn't opened: ${d.problem} ${userText(d.detail ?? '')}`)
-}
-
-/** A pull request as the card shows it (not stored): read from GitHub now, or the last read, with when. */
-export interface PrView {
-  number: number
-  url: string
-  host: string
-  owner: string
-  repo: string
-  state: 'open' | 'merged' | 'closed' | 'unknown'
-  draft: boolean
-  /** GitHub's review decision: approved, changes requested, review required, or none. */
-  review: 'approved' | 'changesRequested' | 'required' | null
-  checks: { passed: number; failed: number; pending: number }
-  /** GitHub's head isn't the commit Combwork pushed: commits pushed there from outside (shown, never undone). */
-  outside: boolean
-  /** When it was read (ms); `stale`: the last read failed, so this is older. */
-  at: number
-  stale?: true
 }
 
 const views = new Map<string, PrView>()

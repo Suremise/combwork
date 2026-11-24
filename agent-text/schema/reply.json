@@ -467,6 +467,9 @@
   "reply.next.merge": {
     "placeholders": {}
   },
+  "reply.next.pullRequest": {
+    "placeholders": {}
+  },
   "reply.next.queue": {
     "placeholders": {}
   },

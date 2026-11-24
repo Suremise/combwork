@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { join } from 'path'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
-import { allOff, type WorkflowOptions } from '../../src/shared/workflow/options'
+import { allOff, contradictions, formShows, formTabOf, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { producedStages } from '../../src/shared/workflow/compile'
 import { PR_RETRY_GATE } from '../../src/shared/workflow/facts'
 import { followPr, openPr, pushesTo, type GhPort, type PrPorts } from '../../src/main/workflow/prHost'
@@ -115,8 +115,14 @@ const kinds = (e: Env, card: number): string[] => e.store.facts(card).map((f) =>
 
 describe('the pull request finish (HI-3552)', () => {
   it('produces Approved and PR open, needs slots, and offers no merge style', () => {
+    expect(contradictions({ ...allOff('git'), finish: 'pullRequest', folder: 'project' })).toContain('mergeNeedsSlots')
+    expect(formShows('style', { ...allOff('git'), finish: 'pullRequest', folder: 'slots' })).toBe(false)
+    expect(formShows('prDraft', { ...allOff('git'), finish: 'pullRequest', folder: 'slots' })).toBe(true)
+    expect(formShows('prDraft', { ...allOff('git'), finish: 'combworkMerges', folder: 'slots' })).toBe(false)
+    expect(formTabOf('git', 'prDraft')).toBe('github')
     expect(producedStages({ ...allOff('git'), finish: 'pullRequest', folder: 'slots', review: 'agent', noSelfReview: true })).toEqual(['hold', 'todo', 'active', 'review', 'approved', 'prOpen', 'done'])
-    expect(producedStages({ ...allOff('git'), finish: 'pullRequest', folder: 'slots' })).toEqual(['hold', 'todo', 'active', 'prOpen', 'done'])
+    // Approved with no review too: where a card waits while its pull request opens, or after a failure.
+    expect(producedStages({ ...allOff('git'), finish: 'pullRequest', folder: 'slots' })).toEqual(['hold', 'todo', 'active', 'approved', 'prOpen', 'done'])
   })
 
   it('pushes the approved commit (not the line as it is now) and opens a draft pull request, then PR open', async () => {
@@ -134,7 +140,7 @@ describe('the pull request finish (HI-3552)', () => {
     const now = e.wf.state(card)
     expect(now.stage).toBe('prOpen')
     expect(now.pullRequest?.opened).toMatchObject({ number: 12, url: 'https://github.com/acme/app/pull/12', host: 'github.com', owner: 'acme', repo: 'app', head: s.started!.line, base: 'main', pushed: revision, draft: true })
-    expect(sh(bare, 'rev-parse', s.started!.line)).toBe(revision)
+    expect(sh(bare, 'rev-parse', s.started!.line!)).toBe(revision)
     const pr = gh.prs[0]
     expect(pr).toMatchObject({ isDraft: true, title: `${card.key}: Fix the parser`, baseRefName: 'main' })
     // The body on gh's standard input: the card, its summary, the verdict's first line, its key; never on the command line.
@@ -170,6 +176,19 @@ describe('the pull request finish (HI-3552)', () => {
     await openPr(e.wf, card.id, requestOf(e, card.id), ports)
     expect(e.wf.state(card).stage).toBe('prOpen')
     expect(gh.creates()).toBe(1)
+  })
+
+  it('opens one for a card the user moves into Passed (their OK)', async () => {
+    const e = (env = project())
+    const { ports } = github(e)
+    const card = e.wf.createCard({ title: 'Moved' })
+    moved(await e.wf.start(card.key, B1))
+    commit(e.wf.state(card).started!.folder, { 'a.txt': 'a\n' }, 'A')
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    moved(await e.wf.move(card.key, 'approved', 'user', { confirm: true, reason: 'looked at it myself' }))
+    expect(e.wf.state(card).pullRequest?.requested.request).toBeTruthy()
+    await openPr(e.wf, card.id, requestOf(e, card.id), ports)
+    expect(e.wf.state(card).stage).toBe('prOpen')
   })
 
   it('with no review and no OK, still waits in Approved while its pull request opens', async () => {
@@ -225,7 +244,7 @@ describe('the pull request finish (HI-3552)', () => {
     const s = e.wf.state(card)
     expect(s.stage).toBe('approved')
     expect(s.pullRequest?.failed).toMatchObject({ problem: 'pushUrl' })
-    expect(() => sh(bare, 'rev-parse', '--verify', '--quiet', s.started!.line)).toThrow()
+    expect(() => sh(bare, 'rev-parse', '--verify', '--quiet', s.started!.line!)).toThrow()
     expect(gh.creates()).toBe(0)
     const ask = s.requests.find((r) => r.gate === PR_RETRY_GATE)!
     expect(ask.text).toContain('doesn’t push to acme/app on github.com')
@@ -259,7 +278,7 @@ describe('the pull request finish (HI-3552)', () => {
     const e = (env = project())
     const { bare, gh, ports } = github(e)
     const { card } = await approved(e)
-    const line = e.wf.state(card).started!.line
+    const line = e.wf.state(card).started!.line!
     // Someone pushed to the branch on GitHub first.
     const clone = tempDir('gh-other-')
     sh(clone, 'clone', '-q', '-b', 'main', bare, '.')
@@ -284,7 +303,7 @@ describe('the pull request finish (HI-3552)', () => {
     await openPr(e.wf, card.id, requestOf(e, card.id), ports)
     expect(e.wf.state(card).stage).toBe('active')
     expect(gh.creates()).toBe(0)
-    expect(() => sh(bare, 'rev-parse', '--verify', '--quiet', e.wf.state(card).started!.line)).toThrow()
+    expect(() => sh(bare, 'rev-parse', '--verify', '--quiet', e.wf.state(card).started!.line!)).toThrow()
   })
 
   it('follows it: merged on GitHub (outside commits too) → Done with GitHub’s merge commit; what was pushed kept', async () => {
@@ -312,7 +331,7 @@ describe('the pull request finish (HI-3552)', () => {
     const e = (env = project())
     const { gh, ports } = github(e)
     const { card } = await approved(e)
-    const line = e.wf.state(card).started!.line
+    const line = e.wf.state(card).started!.line!
     await openPr(e.wf, card.id, requestOf(e, card.id), ports)
     gh.prs[0].state = 'CLOSED'
     gh.prs[0].closedAt = '2026-11-24T10:00:00Z'

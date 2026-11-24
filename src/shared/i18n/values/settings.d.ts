@@ -514,6 +514,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.git.staleLockSeconds.title': undefined
   'settings.advanced.cw.github.ghMinutes.desc': undefined
   'settings.advanced.cw.github.ghMinutes.title': undefined
+  'settings.advanced.cw.github.prFollowMinutes.desc': undefined
+  'settings.advanced.cw.github.prFollowMinutes.title': undefined
   'settings.advanced.cw.guidance.desc': undefined
   'settings.advanced.cw.guidance.title': undefined
   'settings.advanced.cw.heapSnapshotNearLimit.desc': undefined

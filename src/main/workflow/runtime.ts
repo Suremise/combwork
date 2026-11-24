@@ -3219,6 +3219,8 @@ export class Workflow {
       let out: GuardRefusal | null
       let startMoved = false
       let releaseMoved = false
+      // HI-3552: moved into Passed under a pull request's finish, its request pins the project's GitHub link as it is now.
+      const prLink = r.options.finish === 'pullRequest' && this.cfg.githubLink ? await this.cfg.githubLink().catch(() => null) : null
       try {
         out = await this.write(card, r, by, (w) => {
           const moved = this.stillAt(w, s0, 'move')
@@ -3255,6 +3257,8 @@ export class Workflow {
           else if (pastReview && ORDER.indexOf(w.current) < ORDER.indexOf(to)) {
             if (to === 'merging' && r.options.finish === 'combworkMerges') this.enqueue(w)
             else w.move(hasStage(r, 'approved') ? 'approved' : to, cause)
+            // HI-3552: the user's move into Passed is their OK: Combwork pushes it and opens its pull request.
+            if (r.options.finish === 'pullRequest' && w.current === 'approved' && !w.state().started?.pr && !w.state().pullRequest) this.requestPr(w, prLink)
           }
           return null
         })

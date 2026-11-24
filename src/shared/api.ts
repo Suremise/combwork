@@ -1,3 +1,4 @@
+import type { PrView } from './githubSource'
 import type { FeedbackExpect, LineCommentView } from './workflow/lineComments'
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
@@ -588,6 +589,10 @@ export interface CombworkRequests {
   /** Sets the branch a card merges into (HI-2556, its Merges into): one the project lists, or null for its own. */
   'tasks:setTarget': (n: number, target: string | null) => TaskCard
   'tasks:setSource': (n: number, source: string | null) => TaskCard
+  /** HI-3552: a card's pull request in PR open, read from GitHub now (or its last read); null: none. */
+  'tasks:prStatus': (n: number) => PrView | null
+  /** HI-3552: every card's pull request in PR open read again now (the board opened). */
+  'tasks:prFollow': () => void
   'tasks:keptTarget': (n: number) => KeptTargetShown
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }

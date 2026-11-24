@@ -964,6 +964,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // HI-3551: the GitHub pull request or issue a card is about (an address or #n), or null to clear it: the user's alone.
     'tasks:setSource': (n, source) => tasks.setSource(n, typeof source === 'string' && source.trim() ? source.trim().slice(0, 500) : null, { kind: 'user' }),
     'tasks:keptTarget': (n) => tasks.keptTarget(Number(n)),
+    // HI-3552: a card's pull request read now (its dialog opened), and every one in PR open (the board opened).
+    'tasks:prStatus': async (n) => (await import('./workflow/prHosts')).prStatus(currentWorkspace(), Number(n)),
+    'tasks:prFollow': async () => void (await import('./workflow/prHosts')).followAll(currentWorkspace()),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': async (n, patch, more) => {
       const user = { kind: 'user' } as const

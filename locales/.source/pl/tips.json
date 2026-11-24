@@ -490,6 +490,8 @@
   "tips.projectTabsKeys.title": "Alt and a number for each tab",
   "tips.projectTabsSettings.text": "The last item of More ▾, at the end of a project's tabs, is Project Settings…, with its shortcut (Alt+0 unless you change it).",
   "tips.projectTabsSettings.title": "Project Settings from More ▾",
+  "tips.pullRequestFinish.text": "Set Who merges to A pull request in Version Control → Workflow: once a card is approved, Combwork pushes it and opens its pull request on GitHub, and the card is Done when it’s merged there.",
+  "tips.pullRequestFinish.title": "Finish cards with pull requests",
   "tips.quitWhenDone.text": "Quitting while an agent works offers Quit when agents finish: Combwork hides and quits by itself once they're done. Conversations are always kept.",
   "tips.quitWhenDone.title": "Quit when agents finish",
   "tips.recentWorkspaces.text": "Remove a workspace from File → Open Recent or the welcome page with its ✕, or right-click it. Clear Recently Opened forgets them all; folders that are gone show as not found.",

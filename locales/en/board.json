@@ -2603,6 +2603,58 @@
     "defaultMessage": "Workspace",
     "description": "A row of the Board sidebar: shows the cards of no project (about the whole workspace)."
   },
+  "board.pr.checks": {
+    "defaultMessage": "Checks: {passed, number} passed, {failed, number} failed, {pending, number} running",
+    "description": "HI-3552: the card dialog’s pull request: GitHub’s checks on it, how many passed, failed, and haven’t finished."
+  },
+  "board.pr.closed": {
+    "defaultMessage": "Its pull request was closed on GitHub without merging; its branch is kept.",
+    "description": "HI-3552: on a card moved back to Todo because its GitHub pull request was closed without being merged. Its branch stays for a later start."
+  },
+  "board.pr.draft": {
+    "defaultMessage": "Draft",
+    "description": "HI-3552: beside a card’s pull request number: GitHub has it as a draft (GitHub’s word: use its own in your language where it has one)."
+  },
+  "board.pr.failed": {
+    "defaultMessage": "Pull request not open: see For you",
+    "description": "HI-3552: on a card waiting in Passed: Combwork couldn’t push it or open its pull request; the For you request says why and offers to try again."
+  },
+  "board.pr.heading": {
+    "defaultMessage": "Pull request",
+    "description": "HI-3552: a heading in the card dialog: the card’s GitHub pull request."
+  },
+  "board.pr.noChecks": {
+    "defaultMessage": "No checks",
+    "description": "HI-3552: the card dialog’s pull request: GitHub runs no checks on it."
+  },
+  "board.pr.number": {
+    "defaultMessage": "PR #{number}",
+    "description": "HI-3552: on a card in PR open (board tile and dialog): its GitHub pull request’s number, a link to it. PR is short for pull request."
+  },
+  "board.pr.open": {
+    "defaultMessage": "Open on GitHub",
+    "description": "HI-3552: tooltip of a card’s pull request link: opens it in the browser."
+  },
+  "board.pr.opening": {
+    "defaultMessage": "Opening its pull request…",
+    "description": "HI-3552: on a card waiting in Passed: Combwork is pushing it and opening its pull request on GitHub."
+  },
+  "board.pr.outside": {
+    "defaultMessage": "Commits were pushed to it outside Combwork: they stay as they are.",
+    "description": "HI-3552: the card dialog’s pull request: its branch on GitHub has commits Combwork didn’t push (someone else’s). Combwork never overwrites them."
+  },
+  "board.pr.reading": {
+    "defaultMessage": "Reading it from GitHub…",
+    "description": "HI-3552: the card dialog’s pull request while Combwork asks GitHub for its state."
+  },
+  "board.pr.review": {
+    "defaultMessage": "{state, select, approved {Approved on GitHub} changesRequested {Changes requested on GitHub} required {Waiting for a review on GitHub} other {No review asked on GitHub}}",
+    "description": "HI-3552: the card dialog’s pull request: GitHub’s review decision on it. Keep the select keys."
+  },
+  "board.pr.stale": {
+    "defaultMessage": "GitHub didn’t answer just now: this is as last read.",
+    "description": "HI-3552: the card dialog’s pull request: reading it from GitHub failed this time, so what is shown is older (or unknown)."
+  },
   "board.progress.agentGone": {
     "defaultMessage": "{agent} has been removed from {project}.",
     "description": "Why a Progress panel run's agent can't be shown: the agent ({agent}) was removed from its project ({project})."

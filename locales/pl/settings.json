@@ -1724,6 +1724,8 @@
   "settings.advanced.cw.git.staleLockSeconds.title": "Git: ile musi mieć blokada, by była nieaktualna",
   "settings.advanced.cw.github.ghMinutes.desc": "Jak długo może trwać jedno wywołanie GitHub CLI (gh), zanim Combwork zakończy je jako zawieszone i poda, że nie odpowiedziało. Zwiększ przy wolnym połączeniu lub GitHub Enterprise Server, który odpowiada powoli.",
   "settings.advanced.cw.github.ghMinutes.title": "GitHub CLI: najdłuższy czas wywołania",
+  "settings.advanced.cw.github.prFollowMinutes.desc": "Gdy karty czekają w etapie PR otwarty, Combwork odczytuje ich pull requesty na GitHubie z tą częstotliwością, a także przy otwarciu ich tablicy lub karty: GitHub sam nie może powiadomić Combwork, gdy któryś zostanie scalony lub zamknięty.",
+  "settings.advanced.cw.github.prFollowMinutes.title": "Pull requesty: jak często odczytywać ich stan",
   "settings.advanced.cw.server.checkInferSeconds.title": "Sprawdź serwer: limit czasu żądania testowego",
   "settings.advanced.cw.server.checkInferSeconds.desc": "Jak długo „Sprawdź serwer” czeka, aż serwer modeli odpowie na jego żądanie testowe. Lokalny model, który nie jest jeszcze wczytany, najpierw się wczytuje, co na skromnym sprzęcie może trwać minuty; po tym czasie sprawdzenie zgłasza przekroczenie czasu."
 }

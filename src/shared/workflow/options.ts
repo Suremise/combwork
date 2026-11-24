@@ -49,7 +49,7 @@ export interface WorkflowOptions {
   /** G5 (Git); None is always `accept`. */
   finish: Finisher
   /**
-   * G22 (HI-3552): the pull request a card's finish opens is a draft (unset: a draft, the default) or ready for review.
+   * G23 (HI-3552): the pull request a card's finish opens is a draft (unset: a draft, the default) or ready for review.
    * Not a rule, as G18: left out of every ruleset (`ruleOptions`), read when Combwork opens the pull request.
    */
   prDraft?: boolean
@@ -682,7 +682,7 @@ export function formShows(key: OptionKey, o: WorkflowOptions): boolean {
   if (key === 'commitMessage') return o.finish === 'combworkMerges' && o.style !== 'rebase'
   // G6 (HI-3552): GitHub merges a pull request, in its own button's style.
   if (key === 'style') return o.finish !== 'pullRequest'
-  // G22 (HI-3552): only a pull request's finish opens one.
+  // G23 (HI-3552): only a pull request's finish opens one.
   if (key === 'prDraft') return o.finish === 'pullRequest'
   if (key === 'sharedFolderWarning') return o.folder === 'project'
   // G15 depends on G11 alone: only with each card in a slot. G17 whenever a reviewer agent reviews, whatever G11 is

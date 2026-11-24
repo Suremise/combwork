@@ -21,6 +21,7 @@ import { KindField, KindMark, KindProposal } from './CardKind'
 import { ReviewSkipField, ReviewSkipMark, ReviewSkipProposal, useProjectReviews } from './CardReviewSkip'
 import { TargetField, TargetMark, useProjectTargets } from './CardTarget'
 import { SourceField } from './CardSource'
+import { PrLine, PrStatus } from './CardPullRequest'
 import { askedByNow, useForYou } from '../forYou'
 import { useTeamPause, workspacePaused } from '../teamPause'
 import type { ForYouItem } from '@shared/workflow/workView'
@@ -787,6 +788,7 @@ const CardTile = memo(function CardTile({
           </Tooltip>
         )}
         <ReviewLine c={c} reviewer={reviewer} projectPath={projectPath} />
+        <PrLine b={work} />
         {(!!forYou?.length || work?.kind === 'no-code' || work?.kindProposed === 'no-code' || !!work?.reviewSkip || (work?.reviewSkipProposed ?? null) !== null || !!work?.target) && (
           <div className="task-for-you-row">
             <ForYouChip items={forYou} />
@@ -847,6 +849,10 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const movedNames = useStore((s) => s.movedCardNames)
   // Each card's work badges (#1224), read with the board.
   const workBadges = useWorkBadges()
+  // HI-3552: the board opening reads the pull requests of its cards in PR open (GitHub can't tell Combwork).
+  useEffect(() => {
+    void call('tasks:prFollow').catch(() => {})
+  }, [])
   // The lanes, for a card held up by its lane's deadlock (#1410).
   useLanes()
   // What waits for the user on each card (#1276): its chip, and the For you filter.
@@ -2344,6 +2350,7 @@ export function TaskDialog() {
           <KindField card={card} b={badge} noCode={noCode} setNoCode={setNoCode} readOnly={ro} />
           <ReviewSkipField card={card} b={badge} reviews={projectReviews} skip={skipReview} setSkip={setSkipReview} note={skipNote} setNote={setSkipNote} readOnly={ro} />
           <TargetField card={card} b={badge} targets={projectTargets} value={newTarget} setValue={setNewTarget} readOnly={ro} />
+          {card && <PrStatus card={card.number} b={badge} />}
           {card?.project && (
             <SourceField
               card={card}

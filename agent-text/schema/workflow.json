@@ -112,6 +112,17 @@
       "card": "plain"
     }
   },
+  "workflow.forYou.prOkBefore": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.forYou.prRetry": {
+    "placeholders": {
+      "card": "plain",
+      "why": "plain"
+    }
+  },
   "workflow.forYou.queueAdvance": {
     "placeholders": {
       "card": "plain",
@@ -416,6 +427,12 @@
   "workflow.option.otherTargets.title": {
     "placeholders": {}
   },
+  "workflow.option.prDraft.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.prDraft.title": {
+    "placeholders": {}
+  },
   "workflow.option.preChecks.desc": {
     "placeholders": {}
   },
@@ -505,6 +522,17 @@
   },
   "workflow.option.target.title": {
     "placeholders": {}
+  },
+  "workflow.prProblem": {
+    "placeholders": {
+      "problem": "select",
+      "remote": "plain",
+      "owner": "plain",
+      "repo": "plain",
+      "host": "plain",
+      "line": "plain",
+      "detail": "plain"
+    }
   },
   "workflow.refused.approval.given.change": {
     "placeholders": {}
@@ -1480,6 +1508,9 @@
   "workflow.stage.merging": {
     "placeholders": {}
   },
+  "workflow.stage.prOpen": {
+    "placeholders": {}
+  },
   "workflow.stage.review": {
     "placeholders": {}
   },
@@ -1742,6 +1773,9 @@
     "placeholders": {}
   },
   "workflow.value.finish.notChecked": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.pullRequest": {
     "placeholders": {}
   },
   "workflow.value.folder.project": {

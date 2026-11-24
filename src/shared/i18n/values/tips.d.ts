@@ -492,6 +492,8 @@ interface CombworkMessageValues {
   'tips.projectTabsKeys.title': undefined
   'tips.projectTabsSettings.text': undefined
   'tips.projectTabsSettings.title': undefined
+  'tips.pullRequestFinish.text': undefined
+  'tips.pullRequestFinish.title': undefined
   'tips.quitWhenDone.text': undefined
   'tips.quitWhenDone.title': undefined
   'tips.recentWorkspaces.text': undefined

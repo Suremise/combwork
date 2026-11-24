@@ -174,6 +174,7 @@ export const SUITES = [
   { name: 'githublink' },
   { name: 'githubsource' },
   { name: 'gitinit' },
+  { name: 'prfinish' },
   { name: 'gitmissing' },
   { name: 'gitmoves' },
   { name: 'gitremotes' },

@@ -1629,6 +1629,16 @@ In a Git project with a GitHub link (Version Control → Workflow → GitHub), a
 - **A pull request from a fork whose author doesn't allow maintainer edits** can't take pushes from Combwork: the card says so, and its findings go back as review comments instead.
 - An issue's card is an ordinary card, on a new branch, with its issue linked.
 
+### Finishing a card with a pull request <a id="pull-request-finish"></a>
+
+In a Git project with a GitHub link, **Who merges → A pull request** (Version Control → Workflow → Merging) finishes each card through a pull request on GitHub instead of a merge here. Choosing it is your standing OK for Combwork, never an agent, to push a card's branch and open its pull request once the card is approved; nothing is asked card by card unless **Your OK before merging** asks for it. It needs each card in a slot of its own.
+
+- **When a card passes** (and after your OK, where you asked for one), Combwork pushes the exact commit that was approved to the card's branch on the project's GitHub repository, never forced, and opens a pull request into the card's target branch. Its title is the card's key and title; its description has the builder's summary, the reviewer's verdict, the checks that passed and the card's key. **Open pull requests as drafts** (the GitHub tab, on by default) opens it as a draft for you to mark ready on GitHub; off, it opens ready for review.
+- **The card waits in PR open** (in Passed) with the pull request's number as a link. Its dialog shows what GitHub says now: the checks that passed, failed or are still running, the review, and commits pushed to it from outside Combwork, which are never overwritten. GitHub can't tell Combwork when something changes, so Combwork reads it when the board or the card opens, and every few minutes while a card waits (Settings → Advanced, **Pull requests: how often their state is read**).
+- **Merged on GitHub**, the card moves to Done, with the merge commit recorded. **Closed without merging**, it goes back to Todo, its branch kept, so starting it again carries on from its work.
+- **If Combwork can't push or open it** (no GitHub link, gh missing or not signed in, the remote pushing somewhere other than the project's repository, or the branch on GitHub having commits Combwork's push would overwrite), the card stays in Passed and **For you** says why, with Approve to try again. A pull request opened earlier but not recorded (Combwork closed meanwhile) is found again rather than opened twice.
+- Combwork only pushes to a remote whose every push address is the project's GitHub repository, and talks to GitHub only through your own GitHub CLI and its sign-in.
+
 ### Workflow options <a id="workflow-options"></a>
 
 A project's workflow is how its cards move from Todo to Done: who reviews the work, which checks pass first, who merges it and where cards are built. Set it in the project's **Version Control** tab, in its first section, **Workflow** (until 1.0 it was in Project Settings, which now has an **Open Version Control** button there). Agents and the Assistant still read and change each option as a setting (`project.workflow.<option>`).

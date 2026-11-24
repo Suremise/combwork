@@ -462,6 +462,8 @@
   "tips.projectTabsKeys.title": "Alt y un número para cada pestaña",
   "tips.projectTabsSettings.text": "El último elemento de Más ▾, al final de las pestañas de un proyecto, es Configuración del proyecto…, con su atajo (Alt+0 si no lo cambias).",
   "tips.projectTabsSettings.title": "La configuración del proyecto desde Más ▾",
+  "tips.pullRequestFinish.text": "Pon Quién fusiona en Un pull request en Control de versiones → Flujo de trabajo: cuando se aprueba una tarjeta, Combwork hace push de ella y abre su pull request en GitHub, y la tarjeta pasa a Hecho cuando se fusiona allí.",
+  "tips.pullRequestFinish.title": "Terminar tarjetas con pull requests",
   "tips.quitWhenDone.text": "Si sales mientras un agente trabaja, se ofrece Salir cuando terminen los agentes: Combwork se oculta y sale solo cuando terminan. Las conversaciones siempre se conservan.",
   "tips.quitWhenDone.title": "Salir cuando terminen los agentes",
   "tips.recentWorkspaces.text": "Quita un espacio de trabajo de Archivo → Abrir reciente o de la página de bienvenida con su ✕, o haciendo clic derecho en él. Borrar los abiertos recientemente los olvida todos; las carpetas que ya no existen aparecen como no encontradas.",

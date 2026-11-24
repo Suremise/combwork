@@ -652,6 +652,19 @@ interface CombworkMessageValues {
   'board.panel.refresh': undefined
   'board.panel.stalledInfo': undefined
   'board.panel.workspace': undefined
+  'board.pr.checks': { passed: number; failed: number; pending: number }
+  'board.pr.closed': undefined
+  'board.pr.draft': undefined
+  'board.pr.failed': undefined
+  'board.pr.heading': undefined
+  'board.pr.noChecks': undefined
+  'board.pr.number': { number: string | number }
+  'board.pr.open': undefined
+  'board.pr.opening': undefined
+  'board.pr.outside': undefined
+  'board.pr.reading': undefined
+  'board.pr.review': { state: string }
+  'board.pr.stale': undefined
   'board.progress.agentGone': { agent: string | number; project: string | number }
   'board.progress.allAgents': undefined
   'board.progress.allProjects': undefined
