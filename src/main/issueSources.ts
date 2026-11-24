@@ -158,6 +158,9 @@ export async function releasedLines(ws: WorkspaceService, projectPath: string, r
   const t = await projectTargets(ws, projectPath).catch(() => null)
   const lines = new Set<string>(t ? [t.default, ...t.others] : [])
   for (const c of await issueCards(ws, projectPath, repo)) for (const i of c.integrated) lines.add(i.target)
+  // HR1 on s16: the release tags themselves, so a release no option or card names (a patch tagged on main) is found.
+  const tagged = p.reads.releaseTagLines ? await p.reads.releaseTagLines(projectPath) : []
+  if (!isUnknown(tagged)) for (const l of tagged) lines.add(l)
   const out: ReleasedLine[] = []
   for (const line of lines) {
     const r = await releaseOf(p, projectPath, line)
@@ -282,12 +285,26 @@ async function closeLocked(ws: WorkspaceService, projectPath: string, preview: S
   const comment = fixedInComment(versionOfLine(line))
   const out: CloseOutcome[] = []
   const seen = new Set<number>()
-  for (const { card, issue } of [...now.issues].sort((a, b) => a.issue - b.issue || a.card - b.card)) {
-    if (seen.has(issue)) continue
-    seen.add(issue)
+  /**
+   * HR1 on s16: the batch's check is no lasting authority. Before each write, after the reads that came before it: the
+   * same workspace still open, the link still the preview's repository, the line's tag still at the preview's commit,
+   * and the card still Done about that issue there. Otherwise this issue and those after it are stopped, unwritten.
+   */
+  const stillSo = async (card: number, issue: number): Promise<boolean> => {
+    if (!open()) return false
+    const link = await githubRepoFor(ws, projectPath).catch(() => null)
+    if (!link || !sameRepo(link, preview.repo) || !open()) return false
+    const t = await p.reads.tagged!(projectPath, line)
+    if (isUnknown(t) || !t || t.tag !== preview.tag || t.commit !== preview.commit || !open()) return false
+    const { getTask } = await import('./tasks')
+    const c = await getTask(card, ws).catch(() => null)
+    return !!c && c.column === 'done' && c.source?.kind === 'issue' && c.source.number === issue && sameRepo(c.source, preview.repo) && open()
+  }
+  const order = [...now.issues].sort((a, b) => a.issue - b.issue || a.card - b.card).filter((x, i, all) => all.findIndex((y) => y.issue === x.issue) === i)
+  for (const [k, { card, issue }] of order.entries()) {
     const at = (outcome: CloseOutcome['outcome'], detail: string | null = null): number => out.push({ issue, card, outcome, detail })
-    // The workspace closed meanwhile: nothing more is written (its window is gone with it).
-    if (!open()) break
+    if (!seen.size && !open()) break
+    seen.add(issue)
     const read = await src.read(issue)
     if (!read.ok) {
       at('unknown', read.detail ?? read.problem)
@@ -296,6 +313,11 @@ async function closeLocked(ws: WorkspaceService, projectPath: string, preview: S
     if (read.state === 'closed') {
       at('alreadyClosed')
       continue
+    }
+    if (!(await stillSo(card, issue))) {
+      // The workspace closed: nothing more is written, its window gone with it. Anything else: the rest say stopped.
+      if (open()) for (const x of order.slice(k)) out.push({ issue: x.issue, card: x.card, outcome: 'stopped', detail: null })
+      break
     }
     const r = await src.close(issue, read.comments.some((c) => c.trim() === comment) ? null : comment)
     if (r.ok) {

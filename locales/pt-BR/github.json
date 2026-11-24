@@ -103,7 +103,7 @@
   "github.shipped.loading": "Consultando o GitHub…",
   "github.shipped.noLines": "Nenhum branch deste projeto foi lançado ainda: uma versão é uma tag com o nome do branch (v1.7.0 ou 1.7.0), mesclado no branch padrão.",
   "github.shipped.none": "Nenhum cartão vinculado a uma issue do GitHub foi entregue em {line}.",
-  "github.shipped.outcome": "{outcome, select, closed {fechada} alreadyClosed {já fechada} unknown {não se sabe se foi fechada: {detail}} other {não fechada: {detail}}}",
+  "github.shipped.outcome": "{outcome, select, closed {fechada} alreadyClosed {já fechada} unknown {não se sabe se foi fechada: {detail}} stopped {não fechada: algo mudou nesse meio-tempo, veja de novo} other {não fechada: {detail}}}",
   "github.shipped.published": "{published, select, yes {A versão {tag} está publicada no GitHub.} other {A versão {tag} ainda não foi publicada no GitHub: as issues dela poderão ser fechadas quando for.}}",
   "github.shipped.row": "Issue #{issue} · {card}",
   "github.shipped.state": "{state, select, open {aberta} closed {já fechada} other {estado desconhecido}}",

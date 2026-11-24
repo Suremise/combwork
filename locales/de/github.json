@@ -103,7 +103,7 @@
   "github.shipped.loading": "GitHub wird gefragt…",
   "github.shipped.noLines": "Noch kein Branch dieses Projekts ist veröffentlicht: Ein Release ist ein Tag, der nach seinem Branch benannt ist (v1.7.0 oder 1.7.0), in den Standard-Branch gemergt.",
   "github.shipped.none": "Keine mit einem GitHub-Issue verknüpfte Karte wurde in {line} ausgeliefert.",
-  "github.shipped.outcome": "{outcome, select, closed {geschlossen} alreadyClosed {bereits geschlossen} unknown {unklar, ob geschlossen: {detail}} other {nicht geschlossen: {detail}}}",
+  "github.shipped.outcome": "{outcome, select, closed {geschlossen} alreadyClosed {bereits geschlossen} unknown {unklar, ob geschlossen: {detail}} stopped {nicht geschlossen: Inzwischen hat sich etwas geändert, sieh erneut nach} other {nicht geschlossen: {detail}}}",
   "github.shipped.published": "{published, select, yes {Das Release {tag} ist auf GitHub veröffentlicht.} other {Das Release {tag} ist auf GitHub noch nicht veröffentlicht: Seine Issues können geschlossen werden, sobald es das ist.}}",
   "github.shipped.row": "Issue #{issue} · {card}",
   "github.shipped.state": "{state, select, open {offen} closed {bereits geschlossen} other {Zustand unbekannt}}",

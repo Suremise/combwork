@@ -103,7 +103,7 @@
   "github.shipped.loading": "Pytanie GitHuba…",
   "github.shipped.noLines": "Żadna gałąź tego projektu nie jest jeszcze wydana: wydanie to tag nazwany od jego gałęzi (v1.7.0 lub 1.7.0), scalonej z gałęzią domyślną.",
   "github.shipped.none": "Żadna karta powiązana z issue na GitHubie nie została wydana w {line}.",
-  "github.shipped.outcome": "{outcome, select, closed {zamknięte} alreadyClosed {już zamknięte} unknown {nie wiadomo, czy zamknięte: {detail}} other {niezamknięte: {detail}}}",
+  "github.shipped.outcome": "{outcome, select, closed {zamknięte} alreadyClosed {już zamknięte} unknown {nie wiadomo, czy zamknięte: {detail}} stopped {niezamknięte: w międzyczasie coś się zmieniło, spójrz jeszcze raz} other {niezamknięte: {detail}}}",
   "github.shipped.published": "{published, select, yes {Wydanie {tag} jest opublikowane na GitHubie.} other {Wydanie {tag} nie jest jeszcze opublikowane na GitHubie: jego issues będzie można zamknąć, gdy będzie.}}",
   "github.shipped.row": "Issue #{issue} · {card}",
   "github.shipped.state": "{state, select, open {otwarte} closed {już zamknięte} other {stan nieznany}}",

@@ -43,7 +43,7 @@ const S = {
   none: msg({ id: 'github.shipped.none', defaultMessage: 'No card linked to a GitHub issue shipped in {line}.', description: 'In the Close Shipped Issues dialog (HI-3555) when no card with a GitHub issue merged into the chosen released branch. {line} is a branch such as 1.7.0.' }),
   row: msg({ id: 'github.shipped.row', defaultMessage: 'Issue #{issue} · {card}', description: 'A row of the Close Shipped Issues dialog (HI-3555): a GitHub issue and the card that fixed it. {card} is a card key like HI-12.' }),
   state: msg({ id: 'github.shipped.state', defaultMessage: '{state, select, open {open} closed {already closed} other {state unknown}}', description: 'Beside a row of the Close Shipped Issues dialog (HI-3555): the issue’s state on GitHub now. Keep the select keys.' }),
-  outcome: msg({ id: 'github.shipped.outcome', defaultMessage: '{outcome, select, closed {closed} alreadyClosed {already closed} unknown {couldn’t tell whether it closed: {detail}} other {not closed: {detail}}}', description: 'Beside a row of the Close Shipped Issues dialog (HI-3555) after closing, as read back from GitHub: what happened to that issue (closed, already closed, couldn’t be read back, or still open). {detail} is why (gh’s own words). Keep the select keys.' }),
+  outcome: msg({ id: 'github.shipped.outcome', defaultMessage: '{outcome, select, closed {closed} alreadyClosed {already closed} unknown {couldn’t tell whether it closed: {detail}} stopped {not closed: something changed meanwhile, look again} other {not closed: {detail}}}', description: 'Beside a row of the Close Shipped Issues dialog (HI-3555) after closing, as read back from GitHub: what happened to that issue (closed, already closed, couldn’t be read back, not tried because the repository, the release’s tag or its card changed while closing, or still open). {detail} is why (gh’s own words). Keep the select keys.' }),
   close: msg({ id: 'github.shipped.close', defaultMessage: '{count, plural, one {Close # Issue} other {Close # Issues}}', description: 'The Close Shipped Issues dialog’s button (HI-3555): closes the open issues listed on GitHub, each with “Fixed in <version>”.' }),
   cancel: msg({ id: 'github.shipped.cancel', defaultMessage: 'Close', description: 'The Close Shipped Issues dialog’s button that closes the dialog (HI-3555), closing nothing on GitHub.' }),
   failed: msg({ id: 'github.shipped.failed', defaultMessage: 'Couldn’t close the shipped issues', description: 'An error’s title (HI-3555): Close Shipped Issues was refused or failed; its message says why.' }),
@@ -275,7 +275,7 @@ export function ShippedIssuesDialog({ projectPath, onClose }: { projectPath: str
                             {tr(S.row, { issue: i.issue, card: cardLabelOf(get(), i.card) })}
                           </a>
                         </div>
-                        <span className={o?.outcome === 'failed' || o?.outcome === 'unknown' ? 'warn-text' : 'faint'}>{o ? tr(S.outcome, { outcome: o.outcome, detail: o.detail ?? '' }) : tr(S.state, { state: i.state })}</span>
+                        <span className={o?.outcome === 'failed' || o?.outcome === 'unknown' || o?.outcome === 'stopped' ? 'warn-text' : 'faint'}>{o ? tr(S.outcome, { outcome: o.outcome, detail: o.detail ?? '' }) : tr(S.state, { state: i.state })}</span>
                       </li>
                     )
                   })}

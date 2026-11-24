@@ -103,7 +103,7 @@
   "github.shipped.loading": "正在询问 GitHub…",
   "github.shipped.noLines": "本项目还没有已发布的分支：发布是指有一个以其分支命名的标签（v1.7.0 或 1.7.0），且该分支已合并到默认分支。",
   "github.shipped.none": "{line} 中没有发布关联 GitHub Issue 的卡片。",
-  "github.shipped.outcome": "{outcome, select, closed {已关闭} alreadyClosed {此前已关闭} unknown {无法确定是否已关闭：{detail}} other {未关闭：{detail}}}",
+  "github.shipped.outcome": "{outcome, select, closed {已关闭} alreadyClosed {此前已关闭} unknown {无法确定是否已关闭：{detail}} stopped {未关闭：期间有内容发生了变化，请重新查看} other {未关闭：{detail}}}",
   "github.shipped.published": "{published, select, yes {版本 {tag} 已在 GitHub 上发布。} other {版本 {tag} 尚未在 GitHub 上发布：发布后即可关闭其 Issue。}}",
   "github.shipped.row": "Issue #{issue} · {card}",
   "github.shipped.state": "{state, select, open {打开} closed {已关闭} other {状态未知}}",

@@ -103,7 +103,7 @@
   "github.shipped.loading": "Interrogation de GitHub…",
   "github.shipped.noLines": "Aucune branche de ce projet n’est encore publiée : une version est un tag nommé d’après sa branche (v1.7.0 ou 1.7.0), fusionnée dans la branche par défaut.",
   "github.shipped.none": "Aucune carte liée à une issue GitHub n’a été livrée dans {line}.",
-  "github.shipped.outcome": "{outcome, select, closed {fermée} alreadyClosed {déjà fermée} unknown {impossible de savoir si elle est fermée : {detail}} other {non fermée : {detail}}}",
+  "github.shipped.outcome": "{outcome, select, closed {fermée} alreadyClosed {déjà fermée} unknown {impossible de savoir si elle est fermée : {detail}} stopped {non fermée : quelque chose a changé entre-temps, regarde à nouveau} other {non fermée : {detail}}}",
   "github.shipped.published": "{published, select, yes {La version {tag} est publiée sur GitHub.} other {La version {tag} n’est pas encore publiée sur GitHub : ses issues pourront être fermées une fois qu’elle le sera.}}",
   "github.shipped.row": "Issue #{issue} · {card}",
   "github.shipped.state": "{state, select, open {ouverte} closed {déjà fermée} other {état inconnu}}",

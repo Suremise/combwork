@@ -103,7 +103,7 @@
   "github.shipped.loading": "GitHub に問い合わせ中…",
   "github.shipped.noLines": "このプロジェクトのブランチはまだリリースされていません。リリースとは、ブランチ名のタグ（v1.7.0 または 1.7.0）があり、既定のブランチにマージされていることです。",
   "github.shipped.none": "{line} でリリースされた、GitHub の Issue にリンクしたカードはありません。",
-  "github.shipped.outcome": "{outcome, select, closed {クローズしました} alreadyClosed {クローズ済み} unknown {クローズされたか不明: {detail}} other {クローズできませんでした: {detail}}}",
+  "github.shipped.outcome": "{outcome, select, closed {クローズしました} alreadyClosed {クローズ済み} unknown {クローズされたか不明: {detail}} stopped {クローズしていません: 途中で何かが変わりました。もう一度確認してください} other {クローズできませんでした: {detail}}}",
   "github.shipped.published": "{published, select, yes {リリース {tag} は GitHub で公開されています。} other {リリース {tag} はまだ GitHub で公開されていません。公開されると Issue をクローズできます。}}",
   "github.shipped.row": "Issue #{issue} · {card}",
   "github.shipped.state": "{state, select, open {オープン} closed {クローズ済み} other {状態不明}}",

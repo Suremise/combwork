@@ -103,7 +103,7 @@
   "github.shipped.loading": "Preguntando a GitHub…",
   "github.shipped.noLines": "Aún no hay ninguna rama de este proyecto publicada: una versión es una etiqueta con el nombre de su rama (v1.7.0 o 1.7.0), fusionada en la rama predeterminada.",
   "github.shipped.none": "Ninguna tarjeta vinculada a una issue de GitHub se incluyó en {line}.",
-  "github.shipped.outcome": "{outcome, select, closed {cerrada} alreadyClosed {ya cerrada} unknown {no se sabe si se cerró: {detail}} other {no cerrada: {detail}}}",
+  "github.shipped.outcome": "{outcome, select, closed {cerrada} alreadyClosed {ya cerrada} unknown {no se sabe si se cerró: {detail}} stopped {no cerrada: algo cambió mientras tanto, vuelve a mirar} other {no cerrada: {detail}}}",
   "github.shipped.published": "{published, select, yes {La versión {tag} está publicada en GitHub.} other {La versión {tag} aún no está publicada en GitHub: sus issues se podrán cerrar cuando lo esté.}}",
   "github.shipped.row": "Issue #{issue} · {card}",
   "github.shipped.state": "{state, select, open {abierta} closed {ya cerrada} other {estado desconocido}}",

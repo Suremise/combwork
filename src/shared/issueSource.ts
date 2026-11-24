@@ -129,12 +129,13 @@ export type ShippedIssuesRead =
 
 /**
  * Each issue's outcome of a close, read back from GitHub: closed now, already closed, failed (still open, the source's
- * words), or unknown (it couldn't be read back: never taken as closed).
+ * words), unknown (it couldn't be read back: never taken as closed), or stopped (not written: something it rests on
+ * changed while the close went on).
  */
 export interface CloseOutcome {
   issue: number
   card: number
-  outcome: 'closed' | 'alreadyClosed' | 'failed' | 'unknown'
+  outcome: 'closed' | 'alreadyClosed' | 'failed' | 'unknown' | 'stopped'
   detail: string | null
 }
 

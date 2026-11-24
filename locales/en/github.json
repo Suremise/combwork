@@ -416,8 +416,8 @@
     "description": "In the Close Shipped Issues dialog (HI-3555) when no card with a GitHub issue merged into the chosen released branch. {line} is a branch such as 1.7.0."
   },
   "github.shipped.outcome": {
-    "defaultMessage": "{outcome, select, closed {closed} alreadyClosed {already closed} unknown {couldn’t tell whether it closed: {detail}} other {not closed: {detail}}}",
-    "description": "Beside a row of the Close Shipped Issues dialog (HI-3555) after closing, as read back from GitHub: what happened to that issue (closed, already closed, couldn’t be read back, or still open). {detail} is why (gh’s own words). Keep the select keys."
+    "defaultMessage": "{outcome, select, closed {closed} alreadyClosed {already closed} unknown {couldn’t tell whether it closed: {detail}} stopped {not closed: something changed meanwhile, look again} other {not closed: {detail}}}",
+    "description": "Beside a row of the Close Shipped Issues dialog (HI-3555) after closing, as read back from GitHub: what happened to that issue (closed, already closed, couldn’t be read back, not tried because the repository, the release’s tag or its card changed while closing, or still open). {detail} is why (gh’s own words). Keep the select keys."
   },
   "github.shipped.published": {
     "defaultMessage": "{published, select, yes {The release {tag} is published on GitHub.} other {The release {tag} isn’t published on GitHub yet: its issues can be closed once it is.}}",

@@ -103,7 +103,7 @@
   "github.shipped.loading": "Asking GitHub…",
   "github.shipped.noLines": "No branch of this project is released yet: a release is a tag named after its branch (v1.7.0 or 1.7.0), merged into the default branch.",
   "github.shipped.none": "No card linked to a GitHub issue shipped in {line}.",
-  "github.shipped.outcome": "{outcome, select, closed {closed} alreadyClosed {already closed} unknown {couldn’t tell whether it closed: {detail}} other {not closed: {detail}}}",
+  "github.shipped.outcome": "{outcome, select, closed {closed} alreadyClosed {already closed} unknown {couldn’t tell whether it closed: {detail}} stopped {not closed: something changed meanwhile, look again} other {not closed: {detail}}}",
   "github.shipped.published": "{published, select, yes {The release {tag} is published on GitHub.} other {The release {tag} isn’t published on GitHub yet: its issues can be closed once it is.}}",
   "github.shipped.row": "Issue #{issue} · {card}",
   "github.shipped.state": "{state, select, open {open} closed {already closed} other {state unknown}}",
