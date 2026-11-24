@@ -468,6 +468,8 @@ interface CombworkMessageValues {
   'tips.permissionMode.title': undefined
   'tips.planLimitsProviders.text': undefined
   'tips.planLimitsProviders.title': undefined
+  'tips.prComments.text': undefined
+  'tips.prComments.title': undefined
   'tips.progressCard.text': undefined
   'tips.progressCard.title': undefined
   'tips.progressCheck.text': undefined

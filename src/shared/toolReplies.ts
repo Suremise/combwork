@@ -359,7 +359,7 @@ export function cardRequests(items: readonly { request: string; kind: string; ga
 }
 
 /** A card as the Agent API shows it: with what its agent is doing now, and why it is stalled. */
-export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held' | 'source' | 'sourceBody'> {
+export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held' | 'source' | 'sourceBody' | 'sourceFeedback'> {
   /** HI-3551: its GitHub pull request or issue; HI-3553: GitHub's own words only inside it, quoted under a note (outsideText). */
   source?: SourceForAgents
   /** The user's decisions, first (#357); without their ids. Absent when there are none. */

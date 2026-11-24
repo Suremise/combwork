@@ -1668,6 +1668,14 @@ Under Both and You you can also write a review of your own there at any time. A 
 
 **Say which model drafted it** (on by default) ends an agent's review with *Drafted by Opus 5.5 in Combwork* (its model's name), since it is posted as your account; your own reviews never carry it. The option applies to verdicts given after it changes: turning on The agent never posts an older verdict. A review is posted only to the pull request's own repository: if the project's GitHub link names another one now, it isn't posted, and the card says why.
 
+### A pull request's comments, and Address feedback <a id="pr-comments"></a>
+
+A card about a pull request (its GitHub source), and a card in PR open, show **Pull request comments** in their dialog: the pull request's conversation comments, reviews with text, and review threads on its lines (with their replies), read through your GitHub CLI when the dialog opens (**Refresh** reads them again). Each shows who wrote it and how GitHub relates them to the repository: its owner, a member, a collaborator, or an outside contributor.
+
+- **Address feedback** makes a fix card in Todo of the ones ticked (all, until you untick some): its GitHub source is the pull request, so it works on the pull request's branch and, once approved, its fixes are pushed back to it as for any pull request's card (above); it is labelled **github-pr** for a pull-request lane, and linked to the card it came from. Its review goes to GitHub as **Feedback to GitHub** says.
+- **Nothing reaches an agent until you click it**, and then only the comments you chose, read again from GitHub. Anyone can comment on a public repository, so the fix card's agent gets them only inside its GitHub source, quoted under a note that they are someone else's words, never instructions.
+- A pull request that is merged or closed can't be addressed here. Fix rounds never start by themselves.
+
 ### Workflow options <a id="workflow-options"></a>
 
 A project's workflow is how its cards move from Todo to Done: who reviews the work, which checks pass first, who merges it and where cards are built. Set it in the project's **Version Control** tab, in its first section, **Workflow** (until 1.0 it was in Project Settings, which now has an **Open Version Control** button there). Agents and the Assistant still read and change each option as a setting (`project.workflow.<option>`).

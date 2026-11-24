@@ -107,6 +107,10 @@ interface CombworkMessageValues {
   'tasks.error.waitingNotActive': { card: string | number; active: string | number }
   'tasks.error.waitingNotYours': { card: string | number }
   'tasks.error.waitingTooLong': { max: number }
+  'tasks.feedback.changed': { card: string | number; number: string | number; repo: string | number }
+  'tasks.feedback.gone': { number: string | number }
+  'tasks.feedback.none': undefined
+  'tasks.feedback.notOpen': { number: string | number }
   'tasks.history.answerTold': { agent: string | number }
   'tasks.history.answerUntold': { agent: string | number }
   'tasks.history.answerUntoldNeed': { agent: string | number; action: string }

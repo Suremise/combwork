@@ -423,6 +423,22 @@
     "defaultMessage": "The waiting reason is too long (at most {max, number} characters).",
     "description": "An error (HI-2618): the reason a card waits on purpose is longer than it may be; {max} is the most characters it takes."
   },
+  "tasks.feedback.changed": {
+    "defaultMessage": "{card} is now about another pull request than #{number} on {repo}: no fix card was made. Read its feedback again.",
+    "description": "HI-3554: an error from Address feedback in the card dialog: the card’s pull request changed (its GitHub source, or the one it opened) since its feedback was shown. {card} a card key like HI-12, {number} the pull request’s number, {repo} owner/name."
+  },
+  "tasks.feedback.gone": {
+    "defaultMessage": "None of the chosen comments is on pull request #{number} now: no fix card was made. Read its feedback again.",
+    "description": "HI-3554: an error from Address feedback: GitHub, read again, no longer has any of the comments the user ticked (deleted or edited away). {number} the pull request’s number."
+  },
+  "tasks.feedback.none": {
+    "defaultMessage": "Choose at least one comment to address.",
+    "description": "HI-3554: an error from Address feedback when no comment is ticked."
+  },
+  "tasks.feedback.notOpen": {
+    "defaultMessage": "Pull request #{number} isn’t open on GitHub: no fix card was made.",
+    "description": "HI-3554: an error from Address feedback: the pull request was merged or closed, so a fix card for it would have nowhere to push. {number} its number."
+  },
   "tasks.history.answerTold": {
     "defaultMessage": "Told agent {agent} of your answer",
     "description": "A line in a card's history: Combwork told the agent {agent} (its name) of the user's answer to a request for them (For you: an approval, a reply, a decision, a choice at the round limit). A noun before the name (glossary §1 rule 4)."

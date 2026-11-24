@@ -702,6 +702,23 @@ interface CombworkMessageValues {
   'board.pr.reading': undefined
   'board.pr.review': { state: string }
   'board.pr.stale': undefined
+  'board.prFeedback.address': { n: number }
+  'board.prFeedback.as': { as: string }
+  'board.prFeedback.cardDesc': { number: string | number; repo: string | number; card: string | number }
+  'board.prFeedback.cardTitle': { number: string | number }
+  'board.prFeedback.failed': undefined
+  'board.prFeedback.kind': { kind: string; state: string; path: string | number; line: string }
+  'board.prFeedback.label': undefined
+  'board.prFeedback.made': { card: string | number }
+  'board.prFeedback.none': { number: string | number }
+  'board.prFeedback.notOpen': { number: string | number }
+  'board.prFeedback.openMade': undefined
+  'board.prFeedback.outsideNote': undefined
+  'board.prFeedback.pick': undefined
+  'board.prFeedback.problem': { problem: string; host: string | number; detail: string | number }
+  'board.prFeedback.reading': undefined
+  'board.prFeedback.refresh': undefined
+  'board.prFeedback.replies': { n: number }
   'board.progress.agentGone': { agent: string | number; project: string | number }
   'board.progress.allAgents': undefined
   'board.progress.allProjects': undefined

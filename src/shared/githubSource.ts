@@ -5,6 +5,7 @@
 import { agentMsg } from './agentText/msg'
 import type { GhState, GithubRepoRef } from './githubRepo'
 import type { PrAuthorship } from './prAuthorship'
+import { feedbackForAgents, type FeedbackForAgents, type FeedbackItem } from './prFeedback'
 
 /** What gh's `pr view` said of a pull request when its card's source was set (evidence, never a permission). */
 export interface GithubPrFacts {
@@ -91,11 +92,13 @@ export interface SourceForAgents {
     base?: string
     head?: string
     body: string
+    /** HI-3554: a fix card's pull request comments the user chose to address, each with its author (and whether a member). */
+    feedback?: FeedbackForAgents[]
   }
 }
 
 /** A card's source for an agent's read: `note` is OUTSIDE_TEXT_NOTE as said in the agent's dialect. */
-export function sourceForAgents(s: GithubSource, body: string | undefined, note: string): SourceForAgents {
+export function sourceForAgents(s: GithubSource, body: string | undefined, note: string, feedback?: readonly FeedbackItem[]): SourceForAgents {
   const outside = outsideAuthor(s)
   return {
     kind: s.kind,
@@ -107,7 +110,8 @@ export function sourceForAgents(s: GithubSource, body: string | undefined, note:
       author: s.author?.login ?? null,
       authorIsMember: outside === 'unknown' ? null : outside === null,
       ...(s.pr ? { base: s.pr.baseRef, head: s.pr.headRef } : {}),
-      body: body ?? ''
+      body: body ?? '',
+      ...(feedback?.length ? { feedback: feedbackForAgents(feedback) } : {})
     }
   }
 }

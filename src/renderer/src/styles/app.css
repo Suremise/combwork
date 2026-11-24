@@ -11725,7 +11725,8 @@ body.pane-resizing-v .monaco-editor {
   margin: 8px 0;
 }
 /* HI-3559: a pull request card's Feedback to GitHub. */
-.github-feedback {
+.github-feedback,
+.pr-feedback {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -11754,6 +11755,14 @@ body.pane-resizing-v .monaco-editor {
   max-height: 160px;
   overflow: auto;
   font-size: 12px;
+}
+/* HI-3554: a pull request's comments on its card: a thread's replies under its first comment. */
+.pr-feedback-replies {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-inline-start: 12px;
+  border-inline-start: 2px solid var(--border);
 }
 .kind-proposal {
   display: flex;
