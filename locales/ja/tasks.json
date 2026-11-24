@@ -190,6 +190,7 @@
   "tasks.skipped.unsaved": "保存不可",
   "tasks.source.agents": "カードの GitHub のソースを設定できるのはユーザーだけです。",
   "tasks.source.gh": "GitHub CLI が{problem, select, missing {インストールされていません} signedOut {{host} にサインインしていません} timeout {時間内に応答しませんでした} other {読み取れませんでした}}。「バージョン管理」→「ワークフロー」→「GitHub」を確認してください。",
+  "tasks.source.linkChanged": "このプロジェクトの GitHub リポジトリは、一覧した {shown} ではなく {repo} になっています。プルリクエストを再取得してください。",
   "tasks.source.noLink": "このプロジェクトには GitHub との連携がありません。どのリモートも GitHub ホスト上にありません（「バージョン管理」→「ワークフロー」→「GitHub」）。",
   "tasks.source.noProject": "ワークスペースについてのカードには GitHub のソースはありません。プロジェクトのカードだけです。",
   "tasks.source.notFound": "GitHub CLI は {repo} にプルリクエストまたは Issue #{number} を見つけられませんでした{why, select, none {} other {：{why}}}。",

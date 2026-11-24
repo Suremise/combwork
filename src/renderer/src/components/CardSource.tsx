@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { msg, tr } from '@shared/i18n'
-import { prPushable } from '@shared/githubSource'
+import { outsideAuthor, prPushable } from '@shared/githubSource'
 import type { TaskCard } from '@shared/types'
 import * as actions from '../actions'
 import { call } from '../api'
+import { set, showView } from '../store'
 import { Icon } from './ui'
 
 /**
@@ -22,6 +23,9 @@ const T = {
   set: msg({ id: 'board.dialog.sourceSet', defaultMessage: 'Set', description: 'A button beside the card dialog’s GitHub source box (HI-3551): reads the pull request or issue from GitHub and sets it as the card’s source.' }),
   remove: msg({ id: 'board.dialog.sourceRemove', defaultMessage: 'Remove', description: 'A button beside the card dialog’s GitHub source (HI-3551): removes it (only while the card hasn’t started).' }),
   open: msg({ id: 'board.dialog.sourceOpen', defaultMessage: 'Open on GitHub', description: 'Tooltip of the card dialog’s GitHub source link (HI-3551): opens the pull request or issue in the browser.' }),
+  author: msg({ id: 'board.dialog.sourceAuthor', defaultMessage: 'Opened by {author}', description: 'The card dialog’s GitHub source (HI-3553): who opened the pull request or issue on GitHub. {author} is a GitHub user name.' }),
+  outside: msg({ id: 'board.dialog.sourceOutside', defaultMessage: '{known, select, yes {{author} isn’t a member of {repo}} other {Combwork couldn’t tell whether {author} is a member of {repo}}}: this project’s checks run the pull request’s code on this PC, with your files and sign-ins. To run it apart from them, use Windows Sandbox: its server is in the MCP catalogue.', description: 'A warning under a pull request source in the card dialog (HI-3553, a warning, never a rule): its author isn’t one of the repository’s members (or GitHub couldn’t say), so its checks would run a stranger’s code. {author} a GitHub user name, {repo} owner/name. Keep the select keys. Windows Sandbox and MCP are product names.' }),
+  catalogue: msg({ id: 'board.dialog.sourceCatalogue', defaultMessage: 'Open the MCP Catalogue', description: 'A button beside the card dialog’s outside-author warning (HI-3553): shows the MCP view’s Catalogue tab, where the Windows Sandbox server is.' }),
   failed: msg({ id: 'board.dialog.sourceFailed', defaultMessage: 'Couldn’t set the GitHub source', description: 'An error’s title (HI-3551): the card’s GitHub source couldn’t be set or removed; its message says why.' })
 }
 
@@ -41,6 +45,8 @@ export function SourceField({ card, readOnly, onSet }: { card: TaskCard; readOnl
     }
   }
   if (!s && !editable) return null
+  // HI-3553 (HI-3541's decision: a warning, never a rule): a pull request whose author is outside the repository.
+  const outside = s ? outsideAuthor(s) : null
   return (
     <>
       <label>{tr(T.label)}</label>
@@ -56,7 +62,16 @@ export function SourceField({ card, readOnly, onSet }: { card: TaskCard; readOnl
               </button>
             )}
             {s.title && <div className="s-desc card-source-title">{tr(T.titled, { title: s.title })}</div>}
+            {s.author && <div className="s-desc" data-source-author={s.author.login}>{tr(T.author, { author: s.author.login })}</div>}
             {!prPushable(s).ok && <div className="s-desc warn-text" data-source-note="fork">{tr(T.fork)}</div>}
+            {outside && (
+              <div className="s-desc warn-text" data-source-note="outside" data-outside={outside}>
+                <Icon name="warning" /> {tr(T.outside, { known: outside === 'outside' ? 'yes' : 'no', author: s.author?.login ?? '?', repo: `${s.owner}/${s.repo}` })}{' '}
+                <button type="button" className="btn small subtle" data-action="open-mcp-catalogue" onClick={() => (showView('mcp'), set({ mcpTab: 'catalogue' }))}>
+                  {tr(T.catalogue)}
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex">

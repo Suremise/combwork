@@ -1498,6 +1498,18 @@ export function askWaitMarks(ws: WorkspaceService): { n: number; ref: string }[]
   })
 }
 
+/**
+ * HI-3553: the cards not archived whose GitHub source (kept in a card's extra) is a pull request of `owner/repo` on
+ * `host`: each card's number and the PR's. Names compared as GitHub does, case aside.
+ */
+export function prSourceCards(ws: WorkspaceService, repo: { host: string; owner: string; repo: string }): { n: number; pr: number }[] {
+  return readSnapshot(ws, (b, db) => {
+    const src = (path: string): string => `json_extract(${b.legacy ? 'doc' : 'extra'}, '$.source.${path}')` // i18n-ignore: SQL
+    const sql = `SELECT number AS n, ${src('number')} AS pr FROM cards WHERE archived = 0 AND ${src('kind')} = 'pr' AND lower(${src('host')}) = lower(?) AND lower(${src('owner')}) = lower(?) AND lower(${src('repo')}) = lower(?)` // i18n-ignore: SQL
+    return (db.prepare(sql).all(repo.host, repo.owner, repo.repo) as { n: number; pr: unknown }[]).filter((r) => Number.isInteger(r.pr)) as { n: number; pr: number }[]
+  })
+}
+
 /** Whether there is a card of that number. */
 export function hasCard(ws: WorkspaceService, n: number): boolean {
   const { db } = readConn(ws)

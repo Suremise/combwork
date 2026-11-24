@@ -1318,6 +1318,8 @@ export interface TaskCard {
   links: number[]
   /** HI-3551: the GitHub pull request or issue it is about (set by the user while it has never started); absent for most. */
   source?: GithubSource
+  /** HI-3553: its source's body on GitHub (at most SOURCE_BODY_MAX): outside text, given to agents only quoted under a note. */
+  sourceBody?: string
   /**
    * Doc sections the agent reads first (#818): references by file and heading, never by line (`docs/PLAN.md#setup`,
    * `shared:plans/notes.md#open-questions`; shared/docRefs.ts). Absent when none.
