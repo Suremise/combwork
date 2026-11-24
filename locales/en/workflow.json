@@ -91,6 +91,14 @@
     "defaultMessage": "{card} passed review: your OK?",
     "description": "A For you request: reviewer agents passed the card, and the user reviews after them (A reviewer agent, then you). {card} is a card key like AM-12."
   },
+  "workflow.forYou.prOkBefore": {
+    "defaultMessage": "{card} is approved: OK to push it and open its pull request?",
+    "description": "HI-3552: a For you request: the card passed review and waits for the user's OK before Combwork pushes its branch and opens its GitHub pull request (the project's finish is a pull request; glossary 2.3: approval). {card} is a card key like AM-12."
+  },
+  "workflow.forYou.prRetry": {
+    "defaultMessage": "{card}’s pull request isn’t open: {why} Approve to try again.",
+    "description": "HI-3552: a For you request (Approve): Combwork couldn’t push the card’s branch or open its GitHub pull request. {why} is the reason, a whole sentence (workflow.prProblem). Approve tries again; Decline leaves the card waiting in Passed. {card} is a card key like AM-12."
+  },
   "workflow.forYou.queueAdvance": {
     "defaultMessage": "{card} is tested and ready to merge: update {target} in {folder} now?",
     "description": "A For you request (Approve, §16.9.2): the merge queue has merged and checked the card's work, and waits for the user's OK before it updates the branch {target}, which is checked out in the folder {folder} (its files change there). Settings → Advanced → Merge into a checked-out branch: Ask each time. {card} is a card key like AM-12."
@@ -615,6 +623,10 @@
     "defaultMessage": "Merging",
     "description": "A heading of the Workflow section (Git): the options about how and where work is merged."
   },
+  "workflow.group.pullRequests": {
+    "defaultMessage": "Pull requests",
+    "description": "HI-3552: a heading of the Workflow section’s GitHub tab: the options about the pull requests Combwork opens."
+  },
   "workflow.group.review": {
     "defaultMessage": "Review",
     "description": "A heading of the Version Control tab’s Workflow section: the options about reviewing a card’s work."
@@ -968,7 +980,7 @@
     "description": "A workflow option (glossary 2.6, N7): what happens when two agents in the same folder edit the same file."
   },
   "workflow.option.finish.desc": {
-    "defaultMessage": "When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, or whenever it is moved there.",
+    "defaultMessage": "When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, whenever it is moved there, or once its pull request is merged on GitHub.",
     "description": "What the workflow option “Who merges” does (glossary 2.1: merge queue)."
   },
   "workflow.option.finish.title": {
@@ -1111,6 +1123,14 @@
     "defaultMessage": "Other branches work can merge into",
     "description": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). The user’s name for it."
   },
+  "workflow.option.prDraft.desc": {
+    "defaultMessage": "On, each pull request opens as a draft for you to mark ready on GitHub; off, it opens ready for review.",
+    "description": "HI-3552: what the workflow option “Open pull requests as drafts” does. Draft and ready for review are GitHub’s names for a pull request’s two states: use GitHub’s own words in your language where it has them."
+  },
+  "workflow.option.prDraft.title": {
+    "defaultMessage": "Open pull requests as drafts",
+    "description": "HI-3552: a workflow option (G22), in the GitHub tab, shown when “Who merges” is “A pull request”: the pull request Combwork opens for an approved card is a draft (on, the default) or ready for review (off)."
+  },
   "workflow.option.preChecks.desc": {
     "defaultMessage": "A card goes to review only once each of these named commands has passed on its work.",
     "description": "What the workflow option “Checks pass before review” does."
@@ -1230,6 +1250,10 @@
   "workflow.option.target.title": {
     "defaultMessage": "Work merges into",
     "description": "A workflow option (glossary 2.6, G7): the target branch."
+  },
+  "workflow.prProblem": {
+    "defaultMessage": "{problem, select, noLink {The project has no GitHub link: choose its remote in Version Control → Workflow → GitHub.} pushUrl {Its remote {remote} doesn’t push to {owner}/{repo} on {host}, the repository its pull request is for, so nothing was pushed.} push {Git didn’t push {line} to {remote}: “{detail}”.} ghMissing {GitHub’s CLI, gh, isn’t installed: install it, then try again.} ghSignedOut {gh isn’t signed in to {host}: run gh auth login --hostname {host}, then try again.} other {GitHub didn’t open it: “{detail}”.}}",
+    "description": "HI-3552: why the card’s pull request isn’t open, a whole sentence. noLink: the project has no GitHub link (Version Control → Workflow → GitHub tab). pushUrl: the git remote {remote} would push somewhere other than the pull request’s repository {owner}/{repo} on the host {host}. push: git refused or failed to push the branch {line}. ghMissing: gh, GitHub’s command line tool, is missing. ghSignedOut: gh isn’t signed in; keep the command as it is. other: gh failed. {detail} is git’s or gh’s own words, as they are. Keep the select keys; translate each choice."
   },
   "workflow.preset.custom": {
     "defaultMessage": "Custom",
@@ -2407,6 +2431,10 @@
     "defaultMessage": "Merging",
     "description": "A stage of the board inside Approved (glossary 2.2: Merging): cards in Combwork's merge queue."
   },
+  "workflow.stage.prOpen": {
+    "defaultMessage": "PR open",
+    "description": "HI-3552: a stage of the board inside Passed: cards whose finish is a GitHub pull request, opened and waiting for it to be merged or closed on GitHub. “PR” is a pull request."
+  },
   "workflow.stage.review": {
     "defaultMessage": "Review",
     "description": "A stage of the board (glossary 2.2: Review): cards waiting for, or in, review."
@@ -2698,6 +2726,10 @@
   "workflow.value.finish.notChecked": {
     "defaultMessage": "Not checked",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.finish.pullRequest": {
+    "defaultMessage": "A pull request",
+    "description": "HI-3552: a value of the workflow option “Who merges” (G5): once a card is approved, Combwork pushes its branch and opens a GitHub pull request, and the card is done when it is merged on GitHub."
   },
   "workflow.value.folder.project": {
     "defaultMessage": "Everyone in the project folder",

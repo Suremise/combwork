@@ -60,6 +60,8 @@ export interface FinishInputs {
   currentRevision?: Maybe<string>
   /** HI-3410: a no-code card's own line holding commits its target lacks (Git only); null: none. */
   unmerged?: Maybe<Unmerged | null>
+  /** HI-3552: a pull request's finish: the project's GitHub link now (its remote and repository), pinned on the request; null: none. */
+  github?: { remote: string; host: string; owner: string; repo: string } | null
 }
 
 /**

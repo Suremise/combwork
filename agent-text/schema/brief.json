@@ -124,6 +124,9 @@
   "brief.rule.finish.notChecked": {
     "placeholders": {}
   },
+  "brief.rule.finish.pullRequest": {
+    "placeholders": {}
+  },
   "brief.rule.off": {
     "placeholders": {}
   },

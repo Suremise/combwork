@@ -206,3 +206,22 @@ export interface StartedPr {
   /** A fix round's start found GitHub's head with commits the card's line lacks (pushed from outside): kept, never taken in. */
   headOutside?: true
 }
+
+/** A pull request as the card shows it (not stored): read from GitHub now, or the last read, with when. */
+export interface PrView {
+  number: number
+  url: string
+  host: string
+  owner: string
+  repo: string
+  state: 'open' | 'merged' | 'closed' | 'unknown'
+  draft: boolean
+  /** GitHub's review decision: approved, changes requested, review required, or none. */
+  review: 'approved' | 'changesRequested' | 'required' | null
+  checks: { passed: number; failed: number; pending: number }
+  /** GitHub's head isn't the commit Combwork pushed: commits pushed there from outside (shown, never undone). */
+  outside: boolean
+  /** When it was read (ms); `stale`: the last read failed, so this is older. */
+  at: number
+  stale?: true
+}

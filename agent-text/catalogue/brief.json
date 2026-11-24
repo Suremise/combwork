@@ -103,6 +103,10 @@
     "text": "Combwork does not check merges: report each one with cw_report_merge.",
     "note": "Finish: merges aren't checked."
   },
+  "brief.rule.finish.pullRequest": {
+    "text": "Combwork pushes each approved card and opens its pull request on GitHub; the card is done when it is merged there.",
+    "note": "Finish (HI-3552): a pull request, which only Combwork pushes and opens. A statement of fact."
+  },
   "brief.rule.off": {
     "text": "Workflow rules are off in this project: the cards move as you put them (cw_update_task).",
     "note": "The only rule while workflow rules are off."

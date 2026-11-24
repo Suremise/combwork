@@ -512,6 +512,8 @@
   "settings.advanced.cw.git.staleLockSeconds.title": "Git: how old a lock must be to be stale",
   "settings.advanced.cw.github.ghMinutes.desc": "How long one call of the GitHub CLI (gh) may run before Combwork ends it as stuck and says it didn’t answer. Raise it on a slow connection or a GitHub Enterprise Server that answers slowly.",
   "settings.advanced.cw.github.ghMinutes.title": "GitHub CLI: longest a call takes",
+  "settings.advanced.cw.github.prFollowMinutes.desc": "While cards wait in PR open, Combwork reads their pull requests on GitHub this often, and also when their board or card opens: GitHub can’t tell Combwork itself when one is merged or closed.",
+  "settings.advanced.cw.github.prFollowMinutes.title": "Pull requests: how often their state is read",
   "settings.advanced.cw.guidance.desc": "With Combwork's tools, each project agent gets Combwork's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the combwork server's instructions, Codex after your own developer_instructions. Turned off, agents still get Combwork's tools, without the guidance, from their next session. The Assistant always gets its own: they are its role.",
   "settings.advanced.cw.guidance.title": "Combwork's guidance for agents",
   "settings.advanced.cw.heapSnapshotNearLimit.desc": "When Combwork's main process nears its memory limit, it writes a snapshot of its memory to the heap folder in Combwork's profile before it closes, to find out what filled it. A snapshot can be several gigabytes, holds whatever Combwork had in memory (card text, transcripts, possibly tokens) and stays on this PC; Combwork keeps the newest two. Takes effect when Combwork restarts.",

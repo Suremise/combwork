@@ -1724,6 +1724,8 @@
   "settings.advanced.cw.git.staleLockSeconds.title": "Git：ロックが古いとみなす経過時間",
   "settings.advanced.cw.github.ghMinutes.desc": "GitHub CLI（gh）の 1 回の呼び出しが、Combwork に停止したとみなされて終了され、応答がなかったと表示されるまでに実行できる時間。接続が遅い場合や、応答の遅い GitHub Enterprise Server では値を上げてください。",
   "settings.advanced.cw.github.ghMinutes.title": "GitHub CLI: 1 回の呼び出しの最長時間",
+  "settings.advanced.cw.github.prFollowMinutes.desc": "カードが「PRオープン」で待っている間、Combwork はこの間隔で GitHub 上のプルリクエストを読み取ります。ボードやカードを開いたときにも読み取ります。マージやクローズを GitHub から Combwork に直接知らせることはできないためです。",
+  "settings.advanced.cw.github.prFollowMinutes.title": "プルリクエスト：状態を読み取る間隔",
   "settings.advanced.cw.server.checkInferSeconds.title": "サーバーの確認：テストリクエストのタイムアウト",
   "settings.advanced.cw.server.checkInferSeconds.desc": "「サーバーの確認」が、モデルサーバーからテストリクエストへの応答を待つ時間です。まだ読み込まれていないローカルモデルは先に読み込まれ、性能の控えめなハードウェアでは数分かかることがあります。この時間を過ぎると、確認はタイムアウトを報告します。"
 }

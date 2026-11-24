@@ -468,6 +468,8 @@
   "tips.projectTabsKeys.title": "各タブにAltと数字",
   "tips.projectTabsSettings.text": "プロジェクトのタブの最後にある「その他 ▾」の最後の項目は「プロジェクト設定…」で、ショートカットも表示されます（変更しない限りAlt+0）。",
   "tips.projectTabsSettings.title": "「その他 ▾」からプロジェクト設定へ",
+  "tips.pullRequestFinish.text": "「バージョン管理」→「ワークフロー」で「マージする人」を「プルリクエスト」にすると、カードが承認されたときに Combwork がプッシュして GitHub でプルリクエストを開き、そこでマージされるとカードは完了になります。",
+  "tips.pullRequestFinish.title": "プルリクエストでカードを仕上げる",
   "tips.quitWhenDone.text": "エージェントの作業中に終了しようとすると「エージェントの完了後に終了」が表示されます。Combworkは非表示になり、作業が終わると自動で終了します。会話は常に保持されます。",
   "tips.quitWhenDone.title": "エージェントの完了後に終了",
   "tips.recentWorkspaces.text": "「ファイル」→「最近使った項目を開く」やようこそページで、ワークスペースを「✕」で削除するか、右クリックします。「最近開いた項目をクリア」ですべて消去されます。なくなったフォルダーは「見つかりません」と表示されます。",

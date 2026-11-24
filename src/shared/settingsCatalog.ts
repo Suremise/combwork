@@ -710,7 +710,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('preChecks', 'custom'),
     option('commands', 'custom'),
     option('sameness', 'select', [['change', V.sameness.change], ['exact', V.sameness.exact]]),
-    option('finish', 'select', [['combworkMerges', V.finish.combworkMerges], ['agentMerges', V.finish.agentMerges], ['committed', V.finish.committed], ['notChecked', V.finish.notChecked]]),
+    option('finish', 'select', [['combworkMerges', V.finish.combworkMerges], ['agentMerges', V.finish.agentMerges], ['committed', V.finish.committed], ['notChecked', V.finish.notChecked], ['pullRequest', V.finish.pullRequest]]),
     option('style', 'select', [['merge', V.style.merge], ['squash', V.style.squash], ['rebase', V.style.rebase]]),
     option('target', 'text'),
     option('otherTargets', 'custom'),
@@ -720,6 +720,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('mergeGuards', 'custom'),
     option('strict', 'boolean'),
     option('pushTarget', 'boolean'),
+    option('prDraft', 'boolean'),
     option('followRemote', 'boolean'),
     option('commitMessage', 'select', [['combwork', V.commitMessage.combwork], ['branch', V.commitMessage.branch]]),
     // HI-3559: what goes back to GitHub about a pull request's card.

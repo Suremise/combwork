@@ -117,6 +117,11 @@ export const HISTORY = {
     defaultMessage: 'Came back from the merge queue: the merge guards couldn’t finish checking the lines it adds ({why, select, timedOut {guard “{guard}” ran past its time limit} tooLarge {the merge adds more than they check} unreadable {its changes couldn’t be read} malformed {its changes couldn’t be followed} matchesEmpty {guard “{guard}” matches an empty line} invalid {guard “{guard}” has an invalid pattern} cancelled {the check was stopped} other {their check ended}}), so it wasn’t merged. The card’s Work section shows the run.',
     description: 'A comment Combwork writes on a card when the merge queue sends it back because its merge guards check could not finish (HI-3284), which never lets a merge through. {why} (select: translate each; keep the keys): a guard (its name, {guard}, the user’s own text) ran past the time limit; the merge adds more text or lines than the limits; the changes could not be read or parsed; a guard’s pattern matches the empty string or does not compile; the check was stopped; another failure. "Merge queue" and "Work section" are Combwork’s terms.'
   }),
+  prClosed: msg({
+    id: 'tasks.history.prClosed',
+    defaultMessage: 'Pull request #{number} was closed on GitHub without being merged: the card is back in Todo, its branch kept for its next start.',
+    description: 'HI-3552: a comment Combwork writes on a card whose GitHub pull request (number {number}) was closed without merging: the card moved back to Todo, and its branch stays, so starting it again carries on from its work.'
+  }),
   forwardResolving: msg({
     id: 'tasks.history.forwardResolving',
     defaultMessage: 'Ended here, nothing merged: Resolve on a builder made {card} for a builder to merge {from} ({source}) into {to} and resolve the conflict there. Follow {card}.',
