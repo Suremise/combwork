@@ -169,7 +169,9 @@ const isIn = (repo, commit, ref) => {
     })
     await h.page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
     await h.page.locator('.git-sections [data-section="workflow"]').click()
-    await waitHung(async () => (await h.page.locator('[data-action="next-version"]').count()) === 1 && !(await h.page.locator('[data-action="next-version"]').isDisabled()))
+    // HI-3572: the button is on the Merging tab, beside Work merges into (HI-3549): chosen first, then shown.
+    await lib.workflowTab(h.page, 'target')
+    await waitHung(async () => (await h.page.locator('[data-action="next-version"]').isVisible()) && !(await h.page.locator('[data-action="next-version"]').isDisabled()))
     await h.page.locator('[data-action="next-version"]').click()
     const nv = h.page.locator('.dialog', { hasText: 'Start the next version' })
     await waitHung(async () => (await nv.locator('[data-field="name"]').inputValue().catch(() => '')) === '1.6.0')
