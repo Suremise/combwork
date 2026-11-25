@@ -62,7 +62,32 @@ function lastStart(log) {
   let at = -1
   for (let i = lines.length - 1; i >= 0 && at < 0; i--) if (START_LINE.test(lines[i])) at = i
   if (at < 0) return null
-  return { version: START_LINE.exec(lines[at])[1], unexpected: lines.slice(at + 1).find((l) => l.includes(UNEXPECTED_LINE)) ?? null }
+  const after = lines.slice(at + 1)
+  // The time of its last line (the log's lines start with an ISO time): how far that start's log is written.
+  const times = after.map((l) => Date.parse(l.slice(0, 24))).filter((t) => !Number.isNaN(t))
+  return { version: START_LINE.exec(lines[at])[1], unexpected: after.find((l) => l.includes(UNEXPECTED_LINE)) ?? null, lastAt: times.length ? Math.max(...times) : null }
 }
 
-module.exports = { sha, connectionSnapshot, connectionDiffers, copyDiffers, lastStart, START_LINE, UNEXPECTED_LINE }
+/**
+ * Whether the start the installer's --force-run made has looked at the last run (HI-3578, HR1's round 1), and what it
+ * found. `marker` is the profile's running.json (parsed), `running` the pids of the install folder's main processes,
+ * `before` the release before's version (mark's record). Ready only once all of these hold, in this order of a start:
+ * - the marker is that start's: its process runs, and its version isn't the release before's (startRunMarker writes it
+ *   after checkLastRun, so the last run has been looked at);
+ * - the log's latest start is that version (the release before's own start doesn't count);
+ * - that start's log is written past the marker's start (startedAt, set after checkLastRun): the log is written in
+ *   order, so a line saying the last run ended without quitting would be in it by then.
+ * Then clean is whether that start found no unexpected close. Not ready: `waiting` says for what.
+ */
+function forceRunStart({ log, marker, running, before }) {
+  if (!before) return { ready: false, waiting: "the release before's version (mark's record has none)" }
+  if (!marker?.pid || !(running ?? []).includes(marker.pid)) return { ready: false, waiting: `a running.json of a running Combwork (marker ${JSON.stringify(marker?.pid ?? null)}, running ${JSON.stringify(running ?? [])})` }
+  if (!marker.app || marker.app === before) return { ready: false, waiting: `the upgraded version's marker (it says ${JSON.stringify(marker.app ?? null)}; the release before is ${before})` }
+  const start = lastStart(log)
+  if (start?.version !== marker.app) return { ready: false, waiting: `combwork.log's start of ${marker.app} (its latest start: ${start ? start.version : 'none'})` }
+  const since = Date.parse(marker.startedAt)
+  if (Number.isNaN(since) || start.lastAt === null || start.lastAt < since) return { ready: false, waiting: `combwork.log written past the marker's start (${marker.startedAt})` }
+  return { ready: true, clean: !start.unexpected, start }
+}
+
+module.exports = { sha, connectionSnapshot, connectionDiffers, copyDiffers, lastStart, forceRunStart, START_LINE, UNEXPECTED_LINE }

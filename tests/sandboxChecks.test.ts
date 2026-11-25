@@ -458,6 +458,7 @@ test("the report's upgrade requirements follow the era: from 1.0 as before, from
 // notice came only from the driver force-stopping that copy, whose marker closeRunningApp now removes.
 test('the upgraded start is read from combwork.log: its version, and the line saying the last run ended without quitting', () => {
   const { lastStart, START_LINE, UNEXPECTED_LINE } = require('./sandbox/inside/kept.cjs')
+  const src = (f: string): string => fs.readFileSync(path.resolve(__dirname, '..', 'src', f), 'utf8')
   const older = [
     '2026-11-25T13:23:02.644Z [INFO] [main] Combwork 1.6.0 starting (Electron 44.10.0; your text marked)',
     "2026-11-25T13:23:19.343Z [INFO] [restart] The installer asked Combwork to close for an install (C:\\x\\Combwork.exe): closing",
@@ -465,14 +466,38 @@ test('the upgraded start is read from combwork.log: its version, and the line sa
   ]
   const upgraded = '2026-11-25T13:23:36.146Z [INFO] [main] Combwork 1.7.0-rc.1 starting (Electron 44.10.0; your text marked)'
   const unexpected = '2026-11-25T13:24:12.392Z [WARN] [lastRun] The last run of Combwork ended without quitting: last seen 2026-11-25T13:23:36.154Z (Combwork 1.7.0-rc.1, started 2026-11-25T13:23:36.147Z); 0 agent(s) were running; no crash dump'
-  assert.deepStrictEqual(lastStart([...older, upgraded, '2026-11-25T13:23:38.013Z [INFO] [profile] profile: start notices done'].join('\r\n')), { version: '1.7.0-rc.1', unexpected: null })
-  assert.deepStrictEqual(lastStart([...older, upgraded, unexpected].join('\n')), { version: '1.7.0-rc.1', unexpected })
+  assert.deepStrictEqual(lastStart([...older, upgraded, '2026-11-25T13:23:38.013Z [INFO] [profile] profile: start notices done'].join('\r\n')), { version: '1.7.0-rc.1', unexpected: null, lastAt: Date.parse('2026-11-25T13:23:38.013Z') })
+  assert.deepStrictEqual(lastStart([...older, upgraded, unexpected].join('\n')), { version: '1.7.0-rc.1', unexpected, lastAt: Date.parse('2026-11-25T13:24:12.392Z') })
   // Only the latest start counts: an earlier start's line is not the upgraded one's.
-  assert.deepStrictEqual(lastStart([older[0], unexpected, ...older.slice(1), upgraded].join('\n')), { version: '1.7.0-rc.1', unexpected: null })
+  assert.deepStrictEqual(lastStart([older[0], unexpected, ...older.slice(1), upgraded].join('\n')), { version: '1.7.0-rc.1', unexpected: null, lastAt: null })
   assert.strictEqual(lastStart(''), null)
   assert.strictEqual(lastStart(null), null)
+  assert.strictEqual(lastStart([...older, upgraded].join('\n')).lastAt, null)
+
+  // HR1's round 1: judged only once the upgraded start has looked at the last run, never on the release before's start.
+  const { forceRunStart } = require('./sandbox/inside/kept.cjs')
+  const marker = { version: 1, pid: 9020, startedAt: '2026-11-25T13:23:36.147Z', lastSeen: '2026-11-25T13:23:36.154Z', app: '1.7.0-rc.1' }
+  const past = '2026-11-25T13:23:36.181Z [INFO] [servers] Hook server listening on http://127.0.0.1:49672/hook'
+  const at = (log: string[], m: Json | null = marker, running = [9020], before = '1.6.0') => forceRunStart({ log: log.join('\n'), marker: m, running, before })
+  // Only the release before's clean start in the log (a slow --force-run start): not ready, so never clean.
+  assert.strictEqual(at(older, null, []).ready, false)
+  assert.strictEqual(at(older, { ...marker, pid: 7000, app: '1.6.0' }, [9020]).ready, false)
+  assert.strictEqual(at(older).ready, false, "the release before's start is not the upgraded one")
+  // The release before's marker, its process gone or still running: not the upgraded start's.
+  assert.strictEqual(at([...older, upgraded, past], { ...marker, app: '1.6.0' }).ready, false)
+  assert.strictEqual(at([...older, upgraded, past], marker, [8000]).ready, false)
+  // The upgraded start logged, its marker written, but its log not yet past the marker's start: wait.
+  assert.strictEqual(at([...older, upgraded]).ready, false)
+  // Ready: clean, or the unexpected close it logged (written before the marker's start, in order).
+  assert.deepStrictEqual(at([...older, upgraded, past]), { ready: true, clean: true, start: { version: '1.7.0-rc.1', unexpected: null, lastAt: Date.parse('2026-11-25T13:23:36.181Z') } })
+  const found = '2026-11-25T13:23:36.146Z [WARN] [lastRun] The last run of Combwork ended without quitting: last seen 2026-11-25T13:15:00.000Z (Combwork 1.6.0, started 2026-11-25T13:10:00.000Z); 0 agent(s) were running; no crash dump'
+  assert.deepStrictEqual(at([...older, upgraded, found, past]).clean, false)
+  // No release before's version to tell the starts apart: never ready.
+  assert.strictEqual(at([...older, upgraded, past], marker, [9020], '').ready, false)
+  // The order it relies on: checkLastRun before startRunMarker (which sets the marker's startedAt) in index.ts.
+  const idx = (s: string): number => src('main/index.ts').indexOf(s)
+  assert.ok(idx('checkLastRun()') > 0 && idx('checkLastRun()') < idx('startRunMarker()'))
   // What it reads is what Combwork writes, and the driver's marker name is Combwork's.
-  const src = (f: string): string => fs.readFileSync(path.resolve(__dirname, '..', 'src', f), 'utf8')
   assert.ok(src('main/lastRun.ts').includes(UNEXPECTED_LINE), 'lastRun.ts logs the unexpected close')
   const index = src('main/index.ts')
   assert.ok(index.includes("createLogger('main')") && index.includes('log.info(`Combwork ${app.getVersion()} starting'), 'index.ts logs the start as the driver reads it')
