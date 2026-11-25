@@ -59,6 +59,8 @@ const check = (name, ok, extra = '') => {
   try {
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
+    // Every terminal's output as it comes, for counting Copilot's dialogs (dialogsIn, HI-3573).
+    await lib.recordPtyOutput(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, lib.timing('hang.step'), 500)
     check('Copilot found', !!info?.found, JSON.stringify(info && { found: info.found, path: info.path }))
@@ -74,9 +76,12 @@ const check = (name, ok, extra = '') => {
     const reach = (id, wanted, ms = 30000) => lib.until(async () => wanted.includes(await status(id)), ms, 300)
     // Copilot's dialogs end with this line. Combwork shows waiting (Copilot's Notification hook) a moment before Copilot
     // draws the dialog, and a key pressed before that is lost under load (#541): a key for a dialog waits for one drawn
-    // since the prompt that asks for it (the terminal's buffer keeps the earlier dialogs' lines).
+    // since the prompt that asks for it. Counted in what Copilot printed (lib.ptyOutput, recorded from before any agent
+    // starts), never the replay (pty:buffer): once the output passes the replay's raw tail, the replay is the screen
+    // redrawn, and an earlier dialog drawn over (C's folder trust) leaves it, so the count could stay put as the next one
+    // is drawn (HI-3573).
     const DIALOG = /enter to select · esc to cancel/g
-    const dialogsIn = async (k) => (lib.plainText(await inv('pty:buffer', k).catch(() => '')).match(DIALOG) ?? []).length
+    const dialogsIn = async (k) => (lib.plainText(await lib.ptyOutput(page, k)).match(DIALOG) ?? []).length
     const dialogsAtSend = new Map()
     // How long Copilot may take to draw a dialog after Combwork shows it waiting: generous, for a loaded machine.
     const DIALOG_DRAWN_MS = lib.timing('hang.ui')
@@ -86,6 +91,9 @@ const check = (name, ok, extra = '') => {
         const shown = lib.plainText(await inv('pty:buffer', k).catch(() => '')).slice(-400)
         throw new Error(`no dialog drawn in ${k} within ${DIALOG_DRAWN_MS} ms of its prompt (${before} before it, ${await dialogsIn(k)} now), so no key was sent: ${shown}`)
       }
+      // Evidence for HI-3573: the replay's own count, which the wait used before, lagging what was printed.
+      const replayed = (lib.plainText(await inv('pty:buffer', k).catch(() => '')).match(DIALOG) ?? []).length
+      if (replayed < (await dialogsIn(k))) console.log(`dialogs in ${k}: ${await dialogsIn(k)} printed, ${replayed} in the replay`)
       await inv('pty:write', k, keys)
     }
     // Submitted once the agent shows one of `accept` after the prompt: a status it already had before (the last turn's
