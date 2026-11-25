@@ -112,7 +112,9 @@ const { until, within, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesSta
 // tests	iming.cjs and tests	iming.json are there, at their defaults (the host's CW_TEST_TIMING doesn't reach inside).
 const { timing } = require(path.join(__dirname, '..', '..', 'timing.cjs'))
 // What an upgrade must keep of the seeded data, compared by content (kept.cjs, unit-tested with tampered data).
-const { connectionSnapshot, connectionDiffers, copyDiffers } = require(path.join(__dirname, 'kept.cjs'))
+const { connectionSnapshot, connectionDiffers, copyDiffers, forceRunStart } = require(path.join(__dirname, 'kept.cjs'))
+// The run's marker in the profile (src/shared/unexpectedClose.ts RUN_MARKER; a unit test holds them equal).
+const RUN_MARKER = 'running.json'
 // The names upgrade's record's version (src/main/nameUpgrade.ts NAMES_VERSION; a unit test holds them equal).
 const NAMES_VERSION = 4
 const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: timing('spawn.hang') }).trim()
@@ -126,10 +128,28 @@ const BRIDGES = step === 'mark' ? ['combwork', OLD_BRIDGE] : ['combwork']
 let bridge
 const inv = (channel, ...args) => page.evaluate(([b, c, a]) => window[b].invoke(c, ...a), [bridge, channel, args])
 
-/** Combwork instances already running from the install folder (the installer's --force-run starts one): closed by PID. */
+/** The pids of the install folder's main Combwork processes (not a renderer or helper: no --type=). */
+function mainPids() {
+  const out = ps(`@(Get-CimInstance Win32_Process -Filter "Name='${path.basename(CW_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${CW_EXE.replace(/'/g, "''")}' -and $_.CommandLine -notmatch '--type=' } | ForEach-Object { $_.ProcessId }) -join ','`)
+  return out ? out.split(',').map(Number).filter(Boolean) : []
+}
+
+/**
+ * Combwork instances already running from the install folder (the installer's --force-run starts one): closed by PID.
+ * Closing its window doesn't quit Combwork (it goes on in the tray), so they are force-stopped, which leaves the run's
+ * marker behind: the next start would show the notice that Combwork closed unexpectedly for what the driver did
+ * (HI-3578). A marker of a process this stopped is removed, and the fact says so; any other marker is left.
+ */
 function closeRunningApp() {
-  const out = ps(`$p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(CW_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${CW_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { $g = Get-Process -Id $x.ProcessId -ErrorAction SilentlyContinue; if ($g -and $g.MainWindowHandle -ne 0) { [void]$g.CloseMainWindow() } }; Start-Sleep -Seconds 3; $p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(CW_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${CW_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }; @($p).Count`)
-  return Number(out) || 0
+  const out = ps(`$p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(CW_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${CW_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { $g = Get-Process -Id $x.ProcessId -ErrorAction SilentlyContinue; if ($g -and $g.MainWindowHandle -ne 0) { [void]$g.CloseMainWindow() } }; Start-Sleep -Seconds 3; $p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(CW_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${CW_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }; @($p | ForEach-Object { $_.ProcessId }) -join ','`)
+  const stopped = out ? out.split(',').map(Number).filter(Boolean) : []
+  const marker = path.join(PROFILE, RUN_MARKER)
+  const pid = readJson(marker)?.pid
+  if (stopped.includes(pid)) {
+    fs.rmSync(marker, { force: true })
+    res.facts.markerRemoved = { pid, why: 'its process was force-stopped by the driver' }
+  }
+  return stopped.length
 }
 
 async function launch(opts = {}) {
@@ -888,6 +908,21 @@ const steps = {
   },
 
   async 'after-upgrade'() {
+    // HI-3578: the release before quit cleanly for the install (the installer asked it to close, as it does for the
+    // updater's own Restart and Update too), so the start --force-run made found no unexpected close. Read before the
+    // driver closes that copy. From 1.1 on, where it was seen to (the Sandbox's run of 1.6.0 → 1.7.0-rc.1). Only once
+    // that start is known to have looked at the last run (forceRunStart, HR1's round 1): the release before's own
+    // clean start in the log never counts.
+    if (FROM_COMBWORK) {
+      const before = markRecord()?.facts?.version
+      let last = null
+      const seen = await until(async () => {
+        last = forceRunStart({ log: readText(path.join(PROFILE, 'logs', 'combwork.log')), marker: readJson(path.join(PROFILE, RUN_MARKER)), running: mainPids(), before })
+        return last.ready ? last : null
+      }, timing('hang.step'), 500)
+      res.facts.forceRunStart = seen ? seen.start : { waiting: last?.waiting }
+      check('4.clean-close', 'The release before quit cleanly for the install: the upgraded app started with no notice that Combwork closed unexpectedly', seen?.clean, seen ? seen.start.unexpected : `never ready: waiting for ${last?.waiting}`)
+    }
     res.facts.closedForceRun = closeRunningApp()
     // From 1.1 on, with Git and the fake on its PATH, as mark started the release before (the seeded project is a git one).
     await launch(FROM_COMBWORK ? { env: userEnv().env, cwd: process.env.USERPROFILE } : {})
