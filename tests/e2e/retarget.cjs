@@ -300,7 +300,9 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     check('HI-3240: B11 and R11 are idle before their lane starts', !!(await waitHung(async () => (await laneIdle(b11.id)) && (await laneIdle(r11.id)))), JSON.stringify((await inv('session:live')).filter((s) => [b11.id, r11.id].includes(s.agentId)).map((s) => s.status)))
     const lane11 = (await inv('lanes:start', fx.alpha, { builder: b11.id, reviewer: r11.id, cards: [n11] })).lane
     check('HI-3113: a lane started on the project’s own 1.3.0 names no branch of its own', !!lane11?.id && !lane11.target, JSON.stringify(lane11?.target))
-    await waitHung(async () => (await page.locator('[data-action="next-version"]').count()) === 1 && !(await page.locator('[data-action="next-version"]').isDisabled()))
+    // HI-3572: the button is on the Merging tab (HI-3549), chosen here rather than left from earlier; then shown.
+    await lib.workflowTab(page, 'target')
+    await waitHung(async () => (await page.locator('[data-action="next-version"]').isVisible()) && !(await page.locator('[data-action="next-version"]').isDisabled()))
     await page.locator('[data-action="next-version"]').click()
     const nv = page.locator('.dialog', { hasText: 'Start the next version' })
     await waitHung(async () => (await nv.locator('[data-field="name"]').inputValue().catch(() => '')) === '1.4.0')
