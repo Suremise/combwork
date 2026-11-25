@@ -84,7 +84,8 @@ const LAST_IGNORED_MAX = 500
 /** Folders whose listing failed to check what is ignored: a re-list pending, and how many in a row so far. */
 const relists = new Map<string, { pending: boolean; count: number }>()
 export const RELIST_MAX = 3
-const RELIST_MS = 500
+/** A re-list's delay (exported for tests: a failing look outlasts it, HI-3577). */
+export const RELIST_MS = 500
 
 function rememberIgnored(key: string, ignored: Map<string, IgnoreRule>): void {
   relists.delete(key)
