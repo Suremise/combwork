@@ -453,6 +453,36 @@ test("the report's upgrade requirements follow the era: from 1.0 as before, from
   assert.deepStrictEqual(names('1.0'), [["The profile folders moved: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, none of the 1.0 app's left", true], ["The installer's record is in %LOCALAPPDATA%\\Combwork", false]])
 })
 
+// HI-3578: after an upgrade over a running release, the start --force-run made found no unexpected close (4.clean-close).
+// The Sandbox's run of 1.6.0 → 1.7.0-rc.1: the release before was asked to close for the install and quit cleanly; the
+// notice came only from the driver force-stopping that copy, whose marker closeRunningApp now removes.
+test('the upgraded start is read from combwork.log: its version, and the line saying the last run ended without quitting', () => {
+  const { lastStart, START_LINE, UNEXPECTED_LINE } = require('./sandbox/inside/kept.cjs')
+  const older = [
+    '2026-11-25T13:23:02.644Z [INFO] [main] Combwork 1.6.0 starting (Electron 44.10.0; your text marked)',
+    "2026-11-25T13:23:19.343Z [INFO] [restart] The installer asked Combwork to close for an install (C:\\x\\Combwork.exe): closing",
+    '2026-11-25T13:23:19.377Z [INFO] [lastRun] Removed the running marker: Combwork is quitting'
+  ]
+  const upgraded = '2026-11-25T13:23:36.146Z [INFO] [main] Combwork 1.7.0-rc.1 starting (Electron 44.10.0; your text marked)'
+  const unexpected = '2026-11-25T13:24:12.392Z [WARN] [lastRun] The last run of Combwork ended without quitting: last seen 2026-11-25T13:23:36.154Z (Combwork 1.7.0-rc.1, started 2026-11-25T13:23:36.147Z); 0 agent(s) were running; no crash dump'
+  assert.deepStrictEqual(lastStart([...older, upgraded, '2026-11-25T13:23:38.013Z [INFO] [profile] profile: start notices done'].join('\r\n')), { version: '1.7.0-rc.1', unexpected: null })
+  assert.deepStrictEqual(lastStart([...older, upgraded, unexpected].join('\n')), { version: '1.7.0-rc.1', unexpected })
+  // Only the latest start counts: an earlier start's line is not the upgraded one's.
+  assert.deepStrictEqual(lastStart([older[0], unexpected, ...older.slice(1), upgraded].join('\n')), { version: '1.7.0-rc.1', unexpected: null })
+  assert.strictEqual(lastStart(''), null)
+  assert.strictEqual(lastStart(null), null)
+  // What it reads is what Combwork writes, and the driver's marker name is Combwork's.
+  const src = (f: string): string => fs.readFileSync(path.resolve(__dirname, '..', 'src', f), 'utf8')
+  assert.ok(src('main/lastRun.ts').includes(UNEXPECTED_LINE), 'lastRun.ts logs the unexpected close')
+  const index = src('main/index.ts')
+  assert.ok(index.includes("createLogger('main')") && index.includes('log.info(`Combwork ${app.getVersion()} starting'), 'index.ts logs the start as the driver reads it')
+  assert.ok(START_LINE.test(upgraded))
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  assert.strictEqual(/const RUN_MARKER = '([^']+)'/.exec(drive)?.[1], /export const RUN_MARKER = '([^']+)'/.exec(src('shared/unexpectedClose.ts'))?.[1])
+  // Required of every upgrade from 1.1 on (the report fails a driver that didn't make it).
+  assert.ok(UPGRADE_IDS.combwork.after.includes('4.clean-close'))
+})
+
 // HR1's HI-2727 round 1: the seeded connection and skill copy compared by content, never by their files' names alone.
 test('the kept connection and skill copy are compared by content: emptied or changed files that keep their names fail', () => {
   const { connectionSnapshot, connectionDiffers, copyDiffers } = require('./sandbox/inside/kept.cjs')

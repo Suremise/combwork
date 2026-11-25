@@ -47,4 +47,22 @@ function copyDiffers(expected, files) {
   return Object.entries(expected).flatMap(([name, text]) => (typeof files?.[name] !== 'string' ? [`${name} is gone`] : sha(files[name]) !== sha(text) ? [`${name} changed`] : []))
 }
 
-module.exports = { sha, connectionSnapshot, connectionDiffers, copyDiffers }
+/** combwork.log's line as a run starts (src/main/index.ts), and the one a start writes when the last run left its marker (lastRun.ts). */
+const START_LINE = /\[main\] Combwork (\S+) starting\b/
+const UNEXPECTED_LINE = 'The last run of Combwork ended without quitting'
+
+/**
+ * What the latest start in a profile's combwork.log found of the run before it (HI-3578): its version, and its line
+ * saying the last run ended without quitting (the notice that Combwork closed unexpectedly), or null for a clean one.
+ * Null when the log has no start. After an upgrade over a running release, before anything else starts it, the latest
+ * start is the one the installer's --force-run made: the release before was asked to close for the install, and quits.
+ */
+function lastStart(log) {
+  const lines = String(log ?? '').split(/\r?\n/)
+  let at = -1
+  for (let i = lines.length - 1; i >= 0 && at < 0; i--) if (START_LINE.test(lines[i])) at = i
+  if (at < 0) return null
+  return { version: START_LINE.exec(lines[at])[1], unexpected: lines.slice(at + 1).find((l) => l.includes(UNEXPECTED_LINE)) ?? null }
+}
+
+module.exports = { sha, connectionSnapshot, connectionDiffers, copyDiffers, lastStart, START_LINE, UNEXPECTED_LINE }
