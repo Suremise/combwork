@@ -37,9 +37,7 @@ import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
 import { initUsageMoves } from './usageMoves'
 import { checkRepoTools } from './platform/repoPorts'
-import { handoverSession, combworkInstructions, withLatestHandover, withPlatformRule, wrapsLongCommands } from '../shared/combworkGuidance'
-import { detect } from './platform/registry'
-import { ruleKeyOf } from '../shared/platform/descriptors'
+import { handoverSession, combworkInstructions, withLatestHandover, wrapsLongCommands } from '../shared/combworkGuidance'
 import { handoversFor } from './notes'
 import { assistantInstructions } from './modes'
 import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
@@ -82,14 +80,15 @@ import { startReleaseOffers, stopReleaseOffers } from './workflow/releaseOffer'
 import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
 import { endAllOwnedWork, endOwnedWork, endOwnedWorkNow } from './platform/ownedWork'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
+import { startPrHosts, stopPrHosts } from './workflow/prHosts'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
 import { quitSlotCards, startSlotCards, stopSlotCards } from './slotCards'
-import { stopPublishWorker } from './jjPublish'
 import { startFinishPath } from './finishPath'
 import { startLaneBriefs, stopLaneBriefs } from './laneBriefs'
 import { startSlotMigration, stopSlotMigration } from './slotMigration'
 import { startReviewerPool, stopReviewerPool } from './reviewerPool'
+import { startGithubReviews } from './githubReviews'
 import { startFreshNudges } from './freshStarts'
 import { startCopies, stopCopies } from './copiesApp'
 import { startReviewCopies, stopReviewCopies } from './reviewCopies'
@@ -1092,7 +1091,7 @@ app.whenReady().then(async () => {
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
-  // HI-3372: the version-control ports' bounds (a commit, a fetch or push, the queue's network, jj) from those settings.
+  // HI-3372: the version-control ports' bounds (a commit, a fetch or push, the queue's network) from those settings.
   applyAdvancedLimits()
   // HI-3374: the databases' wait for another program's lock, before any of them opens (it applies from here on).
   setDbBusyMs(advanced.get<number>('cw.db.busySeconds') * 1000)
@@ -1283,10 +1282,7 @@ app.whenReady().then(async () => {
       // Naming only the skills its agents get (#1431).
       const pc = await workspace.projectConfig(projectPath)
       const off = new Set([...offNames(workspace.config.skillDelivery), ...offNames(pc.skillDelivery)])
-      // A jj project's agents get the jj rule after the contract (HI-2800), as cw-mcp.ts gives Claude Code.
-      // A jj repository with no Git working copy gets its own variant (HI-2896). The platform's key (HI-3140).
-      const rule = ruleKeyOf(pc.platform, () => detect(projectPath))
-      return withLatestHandover(withPlatformRule(combworkInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), rule), latest?.relPath)
+      return withLatestHandover(combworkInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), latest?.relPath)
     })
   // The Assistant's state view at each start and after each compaction, while its journal is on (#1032).
   sessions.startContext = async (state, source) => {
@@ -1380,6 +1376,8 @@ app.whenReady().then(async () => {
   WorkspaceService.closingTasks.add((path) => endOwnedWork((owner) => workspaceFor(owner)?.path?.toLowerCase() === path.toLowerCase()))
   // The merge queue (#1348): a host per project and target, started by enqueue actions and as workspaces open.
   startQueueHosts()
+  // HI-3552: the pull request finish's host, started by openPr actions and as workspaces open; its timer reads PR open.
+  startPrHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
   startSlots()
   // Unused Worktrees reads the slots through those pools (#1450, #1519).
@@ -1397,6 +1395,8 @@ app.whenReady().then(async () => {
   // Agents' worktrees adopted as slots at the 1.0 upgrade (#1441): which projects are migrated, and their retired homes.
   startSlotMigration()
   startReviewerPool()
+  // HI-3559: Feedback to GitHub's automatic posts (an Agent verdict's draft).
+  startGithubReviews()
   // The nudge to start fresh when a project's work has finished (#1437).
   startFreshNudges()
   // Review and check copies (#1435): returning ones looked at again every 30 s, idle ones tidied every hour.
@@ -1566,8 +1566,8 @@ app.on('will-quit', () => {
   stopObserving()
   stopReconciling()
   stopReleaseOffers()
-  void stopPublishWorker()
   stopQueueHosts()
+  stopPrHosts()
   stopSlotCards()
   stopLaneBriefs()
   stopSlotMigration()

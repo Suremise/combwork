@@ -2027,6 +2027,38 @@
     "defaultMessage": "Git: longest a fetch, pull or push takes",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the Fetch, Pull and Push actions in Version Control (HI-3372)."
   },
+  "settings.advanced.cw.git.processNames.desc": {
+    "defaultMessage": "The program names (as Task Manager's Details tab shows them) this regular expression finds count as a git that may hold a lock: while one that started before a lock file still runs, Repository health won't remove that lock. The default finds git.exe and git's remote helpers (git-remote-https.exe and the like). Add another program only if it writes git's lock files itself.",
+    "description": "What the advanced setting \"Git: the programs that may hold a lock\" does (Settings → Advanced, HI-3473). git.exe and git-remote-https.exe are program names: keep them. Task Manager's Details tab: as Windows names it."
+  },
+  "settings.advanced.cw.git.processNames.title": {
+    "defaultMessage": "Git: the programs that may hold a lock",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a regular expression: Repository health's Remove stale lock (HI-3473)."
+  },
+  "settings.advanced.cw.git.staleLockSeconds.desc": {
+    "defaultMessage": "Repository health offers to remove a lock file of git's (such as index.lock) only once it is at least this old, and only while no git that started before it still runs. A git working normally holds a lock for moments; raise this if a long git command of yours (a large commit, a repack) holds one longer.",
+    "description": "What the advanced setting \"Git: how old a lock must be to be stale\" does (Settings → Advanced, HI-3473). index.lock is a file name: keep it."
+  },
+  "settings.advanced.cw.git.staleLockSeconds.title": {
+    "defaultMessage": "Git: how old a lock must be to be stale",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: Repository health's Remove stale lock in Version Control → Branches & remotes (HI-3473)."
+  },
+  "settings.advanced.cw.github.ghMinutes.desc": {
+    "defaultMessage": "How long one call of the GitHub CLI (gh) may run before Combwork ends it as stuck and says it didn’t answer. Raise it on a slow connection or a GitHub Enterprise Server that answers slowly.",
+    "description": "What the advanced setting \"GitHub CLI: longest a call takes\" does (Settings → Advanced, HI-3550). GitHub CLI and GitHub Enterprise Server are product names; gh is a command name: keep it."
+  },
+  "settings.advanced.cw.github.ghMinutes.title": {
+    "defaultMessage": "GitHub CLI: longest a call takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (HI-3550): each time Combwork asks the GitHub CLI (gh) something, such as its sign-in in Version Control → Workflow → GitHub. GitHub CLI is a product name."
+  },
+  "settings.advanced.cw.github.prFollowMinutes.desc": {
+    "defaultMessage": "While cards wait in PR open, Combwork reads their pull requests on GitHub this often, and also when their board or card opens: GitHub can’t tell Combwork itself when one is merged or closed.",
+    "description": "What the advanced setting \"Pull requests: how often their state is read\" does (Settings → Advanced, HI-3552). PR open is a stage of the board: use its translation."
+  },
+  "settings.advanced.cw.github.prFollowMinutes.title": {
+    "defaultMessage": "Pull requests: how often their state is read",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (HI-3552): while cards wait in PR open, how often Combwork asks GitHub (through gh) whether their pull requests were merged or closed, and their checks and reviews."
+  },
   "settings.advanced.cw.guidance.desc": {
     "defaultMessage": "With Combwork's tools, each project agent gets Combwork's guidance: how to use the tools, the board and handovers, and its project's latest handover. Claude Code and Copilot get it as the combwork server's instructions, Codex after your own developer_instructions. Turned off, agents still get Combwork's tools, without the guidance, from their next session. The Assistant always gets its own: they are its role.",
     "description": "What the advanced setting \"Combwork's guidance for agents\" does (Settings → Advanced, under Combwork). Claude Code, Copilot and Codex are CLIs' names, combwork the name of Combwork's MCP server and developer_instructions a Codex setting: keep them."
@@ -2082,14 +2114,6 @@
   "settings.advanced.cw.input.hiddenSeconds.title": {
     "defaultMessage": "Input box hidden: wait",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"120 s\"). The input box: where a coding agent's terminal takes what is typed to it."
-  },
-  "settings.advanced.cw.jj.commandSeconds.desc": {
-    "defaultMessage": "How long one jj command Combwork runs may take, a snapshot of a large working copy included, before Combwork ends it: a read then counts as unknown, and a change made during a merge is left for you to settle. Raise it for a very large repository or a slow disk.",
-    "description": "What the advanced setting \"jj: longest a command takes\" does, and when to change it (Settings → Advanced, HI-3372). jj is the Jujutsu version control tool."
-  },
-  "settings.advanced.cw.jj.commandSeconds.title": {
-    "defaultMessage": "jj: longest a command takes",
-    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. jj is the Jujutsu version control tool: keep its name (HI-3372)."
   },
   "settings.advanced.cw.journal.builds.desc": {
     "defaultMessage": "When Combwork's own installer is built from its source code (npm run dist, or npm run release), Combwork writes the build into the Assistant's journal as its own entry: the version, the commit, what kind of build it was and where the installer is. Only a successful build is written, and only while the journal is on with events in its scope. Turned off, builds aren't written, and a build left for Combwork while it was closed is dropped when the workspace opens.",

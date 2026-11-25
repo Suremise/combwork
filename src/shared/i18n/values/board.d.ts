@@ -283,6 +283,24 @@ interface CombworkMessageValues {
   'board.dialog.saveAndStart': undefined
   'board.dialog.savePostsIt': undefined
   'board.dialog.saving': undefined
+  'board.dialog.source': undefined
+  'board.dialog.sourceAuthor': { author: string | number }
+  'board.dialog.sourceCatalogue': undefined
+  'board.dialog.sourceFailed': undefined
+  'board.dialog.sourceFork': undefined
+  'board.dialog.sourceKind': { kind: string; number: string | number }
+  'board.dialog.sourceModelUnknown': undefined
+  'board.dialog.sourceOpen': undefined
+  'board.dialog.sourceOutside': { known: string; author: string | number; repo: string | number }
+  'board.dialog.sourceOutsideIssue': { known: string; author: string | number; repo: string | number }
+  'board.dialog.sourcePlaceholder': undefined
+  'board.dialog.sourceRemove': undefined
+  'board.dialog.sourceReviewers': undefined
+  'board.dialog.sourceSet': undefined
+  'board.dialog.sourceSuggestMore': undefined
+  'board.dialog.sourceSuggestOther': { provider: string | number; n: number; agents: string | number }
+  'board.dialog.sourceTitle': { title: string | number }
+  'board.dialog.sourceWrittenBy': { name: string | number; provider: string; from: string }
   'board.dialog.start': undefined
   'board.dialog.startButton': undefined
   'board.dialog.startTip': undefined
@@ -346,18 +364,6 @@ interface CombworkMessageValues {
   'board.field.project': undefined
   'board.field.title': undefined
   'board.filter.noProject': undefined
-  'board.forYou.advanceAttest': undefined
-  'board.forYou.advanceAttestTip': undefined
-  'board.forYou.advanceIntegrate': undefined
-  'board.forYou.advanceIntegrateTip': undefined
-  'board.forYou.advanceLeave': undefined
-  'board.forYou.advanceLeaveTip': undefined
-  'board.forYou.advanceNotThisPlan': undefined
-  'board.forYou.advanceNotThisPlanTip': undefined
-  'board.forYou.advanceStartAgain': undefined
-  'board.forYou.advanceStartAgainTip': undefined
-  'board.forYou.advanceUndo': undefined
-  'board.forYou.advanceUndoTip': undefined
   'board.forYou.agree': { action: string }
   'board.forYou.agreeTip': undefined
   'board.forYou.answering': undefined
@@ -391,6 +397,35 @@ interface CombworkMessageValues {
   'board.forYou.tipMore': { n: number }
   'board.forYou.tipOpen': undefined
   'board.forYou.todayValue': { today: string; value: string | number }
+  'board.github.approve': undefined
+  'board.github.approveConfirm': undefined
+  'board.github.approveFailed': undefined
+  'board.github.approveMessage': undefined
+  'board.github.approveTitle': { number: string | number; repo: string | number }
+  'board.github.approved': { when: string | number }
+  'board.github.carried': { inline: number; both: string; listed: number }
+  'board.github.change': undefined
+  'board.github.checkGithub': undefined
+  'board.github.comments': { n: number }
+  'board.github.discard': undefined
+  'board.github.discardFailed': undefined
+  'board.github.discarded': undefined
+  'board.github.drafted': { reviewer: string | number }
+  'board.github.failed': { error: string | number }
+  'board.github.footer': { footer: string | number }
+  'board.github.label': undefined
+  'board.github.notNow': undefined
+  'board.github.notReplied': { n: number; uncertain: string; error: string | number }
+  'board.github.open': undefined
+  'board.github.option': { option: string }
+  'board.github.post': undefined
+  'board.github.postAgain': undefined
+  'board.github.postFailed': undefined
+  'board.github.posted': { when: string | number; by: string }
+  'board.github.posting': undefined
+  'board.github.recovery': { why: string }
+  'board.github.replied': { n: number }
+  'board.github.write': undefined
   'board.inbox.asks': undefined
   'board.inbox.asksWhat': { message: string | number }
   'board.inbox.assistant': undefined
@@ -655,6 +690,37 @@ interface CombworkMessageValues {
   'board.panel.refresh': undefined
   'board.panel.stalledInfo': undefined
   'board.panel.workspace': undefined
+  'board.pr.checks': { passed: number; failed: number; pending: number }
+  'board.pr.closed': undefined
+  'board.pr.draft': undefined
+  'board.pr.failed': undefined
+  'board.pr.heading': undefined
+  'board.pr.noChecks': undefined
+  'board.pr.notPushedWhy': { why: string; rule: string | number }
+  'board.pr.number': { number: string | number }
+  'board.pr.open': undefined
+  'board.pr.opening': undefined
+  'board.pr.outside': undefined
+  'board.pr.reading': undefined
+  'board.pr.review': { state: string }
+  'board.pr.stale': undefined
+  'board.prFeedback.address': { n: number }
+  'board.prFeedback.as': { as: string }
+  'board.prFeedback.cardDesc': { number: string | number; repo: string | number; card: string | number }
+  'board.prFeedback.cardTitle': { number: string | number }
+  'board.prFeedback.failed': undefined
+  'board.prFeedback.kind': { kind: string; state: string; path: string | number; line: string }
+  'board.prFeedback.label': undefined
+  'board.prFeedback.made': { card: string | number }
+  'board.prFeedback.none': { number: string | number }
+  'board.prFeedback.notOpen': { number: string | number }
+  'board.prFeedback.openMade': undefined
+  'board.prFeedback.outsideNote': undefined
+  'board.prFeedback.pick': undefined
+  'board.prFeedback.problem': { problem: string; host: string | number; detail: string | number }
+  'board.prFeedback.reading': undefined
+  'board.prFeedback.refresh': undefined
+  'board.prFeedback.replies': { n: number }
   'board.progress.agentGone': { agent: string | number; project: string | number }
   'board.progress.allAgents': undefined
   'board.progress.allProjects': undefined
@@ -958,6 +1024,7 @@ interface CombworkMessageValues {
   'board.stalled.noAgent': undefined
   'board.stalled.notRunning': { agent: string | number }
   'board.stalled.notWatching': { agent: string | number; card: string | number }
+  'board.stalled.notWatchingUncounted': { agent: string | number; card: string | number }
   'board.stalled.removed': { agent: string | number }
   'board.stalled.removedUnnamed': undefined
   'board.stalled.reviewVerdictWait': { agent: string | number; card: string | number; waited: string | number }
@@ -1046,7 +1113,6 @@ interface CombworkMessageValues {
   'board.work.base': undefined
   'board.work.branch': undefined
   'board.work.carriedOver': { from: string | number; to: string | number }
-  'board.work.change': { commits: number; change: string | number }
   'board.work.changes': undefined
   'board.work.changes.between': { base: string | number; revision: string | number }
   'board.work.changes.binary': undefined
@@ -1086,7 +1152,6 @@ interface CombworkMessageValues {
   'board.work.comments.tooMany': { max: number }
   'board.work.comments.where': { side: string; from: string | number; same: string; to: string | number }
   'board.work.comments.you': undefined
-  'board.work.doneUnproved': { when: string | number }
   'board.work.failed': { error: string | number }
   'board.work.files': { n: number }
   'board.work.filesNotRead': { note: string; why: string | number }
@@ -1101,7 +1166,7 @@ interface CombworkMessageValues {
   'board.work.noRevision': undefined
   'board.work.none': undefined
   'board.work.notRead': { note: string; why: string | number }
-  'board.work.notReady': { slot: string | number; stale: string; why: string | number }
+  'board.work.notReady': { slot: string | number; why: string | number }
   'board.work.openComments': { n: number }
   'board.work.openFile': { path: string | number }
   'board.work.outsideCombwork': undefined
@@ -1136,8 +1201,6 @@ interface CombworkMessageValues {
   'board.work.target': undefined
   'board.work.title': undefined
   'board.work.verdict': { reviewer: string | number; pass: string; current: string }
-  'board.work.via': { via: string }
-  'board.work.workspace': undefined
   'board.workQueue.advance': { target: string | number }
   'board.workQueue.advancing': { target: string | number }
   'board.workQueue.answerFailed': undefined

@@ -68,7 +68,7 @@ interface Host {
 
 /**
  * Repair's steps on the store's workspaces (HI-2792: the relocation capability of the platform slots are made with, Git's
- * worktrees in 1.4.0; §16.3.6's gate: relocation). Each its git command or file read as before (platform/gitRelocation.ts).
+ * worktrees in 1.4.0; §16.3.6). Each its git command or file read as before (platform/git/gitRelocation.ts).
  */
 function relocation(): Relocation {
   const r = slotRelocation()

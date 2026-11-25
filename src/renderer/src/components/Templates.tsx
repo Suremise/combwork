@@ -607,7 +607,7 @@ function TemplateEditor({ t, project, onDone }: { t: TemplateEntry; project?: Pr
           </tbody>
         </table>
         <p className="hint">{Children.toArray(tRich<React.ReactNode>(M.editorHint, { b: bold }))}</p>
-        <TemplateWorkflowSection workflow={draft.workflow} dropped={t.workflowDropped} edit={{ disabled: busy, onChange: (workflow) => put({ workflow }) }} />
+        <TemplateWorkflowSection workflow={draft.workflow} dropped={t.workflowDropped} edit={{ disabled: busy, saved: edit0.saved.workflow, onChange: (workflow) => put({ workflow }) }} />
       </div>
     </div>
   )

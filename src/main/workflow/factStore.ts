@@ -20,6 +20,7 @@ import { KEY_FORM, normalKey } from '../../shared/projectKeys'
 import { samePath } from '../../shared/movePaths'
 import type { WorkspaceService } from '../workspace'
 import type { Actor, CardKind, Category, Fact, FactKind, NewFact, StageId } from '../../shared/workflow/facts'
+import { cleanSource, type GithubSource } from '../../shared/githubSource'
 import { CATEGORY_STAGE, STAGE_CATEGORY } from '../../shared/workflow/facts'
 import type { Ruleset } from '../../shared/workflow/compile'
 import { loadRuleset } from '../../shared/workflow/compile'
@@ -58,6 +59,8 @@ export interface CardRecord {
   rounds?: number
   /** A card from before 1.0 (§16.4.1). */
   preWorkflow?: boolean
+  /** HI-3551: its GitHub source as the board has it now; the start records a PR's identity (Started.pr), which wins after. */
+  source?: GithubSource
   stage: StageId
   /** The board's column. */
   category: Category
@@ -155,11 +158,6 @@ export interface Tx {
   putCard(card: CardRecord): void
   meta(key: string): string | null
   setMeta(key: string, value: string): void
-  /**
-   * Raw statements in this transaction (HI-2882: an Integrated jj card's obligation and retained-bundle rows, written with
-   * its fact, so the fact never exists without them).
-   */
-  sql(fn: (db: DatabaseSync) => void): void
   /** A commit seen on a shared folder's line, and whose it is: false when it was already recorded. */
   recordFolderCommit(folder: string, sha: string, card: number | null, how: string): boolean
 }
@@ -308,8 +306,19 @@ interface CardCols {
   kind: CardKind
   target: string | null
   paths_declared: number
+  source: string | null
 }
-const COLS = 'number, title, col, stage, pre_workflow, kind, target, paths_declared'
+/** HI-3551: a card's source as its row's extra holds it (JSON text), when well formed. */
+function sourceOf(raw: string | null): GithubSource | undefined {
+  if (!raw) return undefined
+  try {
+    return cleanSource(JSON.parse(raw))
+  } catch {
+    return undefined
+  }
+}
+// HI-3551: the card's GitHub source, from its document's extra (a field the board keeps there).
+const COLS = "number, title, col, stage, pre_workflow, kind, target, paths_declared, CASE WHEN json_valid(extra) THEN json_extract(extra, '$.source') END AS source"
 
 /**
  * A project's store: `project` its name on the board (its cards' `project`); `projectId` (#1294) its id now, whose key
@@ -330,6 +339,18 @@ export function leaseHoldsIn(db: DatabaseSync, lease: string, slot: string, fold
   if (r.kind === 'carried') return true
   if (r.kind === 'card') return r.card === card
   return !!r.lane && !!db.prepare('SELECT 1 FROM lane_cards WHERE lane = ? AND card = ? UNION ALL SELECT 1 FROM lane_pending WHERE lane = ? AND card = ?').get(r.lane, card, r.lane, card) // i18n-ignore: SQL
+}
+
+/**
+ * HI-3556: whether card `card`, at `stage`, can still keep a slot, read on `db`: not archived, and On Hold, given to an
+ * agent. An archived card, or a held one given to nobody, keeps none (its lease ends as a put back card's: its line stays,
+ * the slot is freed), so it never holds its builder's one slot from a lane. Only On Hold for nobody: a start by the user
+ * or the Assistant may leave an Active card with nobody on it while its builder works. Given to another agent, it keeps
+ * it (HI-3118: its cycle holds it, not its builder).
+ */
+export function cardKeepsSlotIn(db: DatabaseSync, card: number, stage: StageId): boolean {
+  const r = db.prepare('SELECT agent, archived FROM cards WHERE number = ?').get(card) as { agent: string | null; archived: number } | undefined // i18n-ignore: SQL
+  return !!r && r.archived === 0 && (stage !== 'hold' || !!r.agent)
 }
 
 /** For tests: runs once a read of cards' records has read their rows, before their lists (another connection committing there). */
@@ -417,6 +438,7 @@ export class FactStore {
         ...(lanes.has(r.number) ? { rounds: lanes.get(r.number)!.rounds } : {}),
         ...(lanes.get(r.number)?.pool === 1 && !lanes.get(r.number)!.reviewer ? { reviewerPool: true as const } : {}),
         ...(r.pre_workflow ? { preWorkflow: true } : {}),
+        ...(sourceOf(r.source) ? { source: sourceOf(r.source)! } : {}),
         stage: r.stage ?? CATEGORY_STAGE[r.col] ?? 'todo',
         category: r.col
       }))
@@ -458,24 +480,6 @@ export class FactStore {
     return ofThis(Number(m[2]))
   }
 
-  /**
-   * HI-3367 (HR1's round 1, finding 1): who holds a card key across the workspace's board, not only this project: the card
-   * (and whether it is this project's), null when the key is one a project holds or held and no card has it (gone), and
-   * 'unknown' when the key's form or prefix isn't known here (never taken as gone). A read that fails throws.
-   */
-  ownerOfKey(key: string): { id: number; own: boolean } | null | 'unknown' {
-    const m = /^(.+)-(\d+)$/.exec(key.trim())
-    if (!m) return 'unknown'
-    const prefix = m[1]
-    const keyed = KEY_FORM.test(prefix) ? this.conn.read((db) => (keysHeld(db).some((k) => k.key === normalKey(prefix)) ? { card: cardOfKey(db, prefix, Number(m[2])) } : null)) : null
-    if (keyed) return keyed.card === null ? null : { id: keyed.card, own: this.isOwn(keyed.card) }
-    if (this.scope.key && prefix.toLowerCase() === this.scope.key.toLowerCase()) {
-      const c = this.cardByKey(key)
-      return c ? { id: c.id, own: true } : null
-    }
-    return 'unknown'
-  }
-
   /** HI-3233: whether card `id` is this project's (one of another project's has its work in another repository). */
   isOwn(id: number): boolean {
     return this.conn.read((db) => !!db.prepare('SELECT 1 FROM cards WHERE number = ? AND project = ?').get(id, this.scope.project))
@@ -494,6 +498,11 @@ export class FactStore {
   /** Whether a card is archived (a gone card counts as archived: its pins may go). */
   isArchived(id: number): boolean {
     return this.conn.read((db) => ((db.prepare('SELECT archived FROM cards WHERE number = ?').get(id) as { archived: number } | undefined)?.archived ?? 1) === 1)
+  }
+
+  /** HI-3556: whether a card at `stage` can still keep its builder's slot (cardKeepsSlotIn). False for a card the board has no row of. */
+  keepsSlot(id: number, stage: StageId): boolean {
+    return this.conn.read((db) => cardKeepsSlotIn(db, id, stage))
   }
 
   /** This project's cards (not archived), in number order. */
@@ -1017,11 +1026,6 @@ export class FactStore {
     return this.conn.read((db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(this.metaKey(key)) as { value: string } | undefined)?.value ?? null)
   }
 
-  /** A workspace-wide board_meta value, unscoped (HI-2799: the platform fence), read in the write under way if there is one. */
-  boardMeta(key: string): string | null {
-    return this.conn.read((db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null)
-  }
-
   setMeta(key: string, value: string): void {
     this.conn.write((db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(this.metaKey(key), value))
   }
@@ -1038,19 +1042,6 @@ export class FactStore {
       const del = db.prepare('DELETE FROM workflow_queue_seen WHERE project = ? AND entry = ?')
       for (const e of entries) del.run(this.scope.project, e)
     })
-  }
-
-  /** The provenance epoch's key: the project's stable id (never its name or key, which a rename changes), else its scope. */
-  private epochKey(): string {
-    return `provenance_epoch:${(this.scope.projectId?.() ?? this.scope.project).toLowerCase()}`
-  }
-
-  /**
-   * The project's provenance epoch (HI-2868): how many submissions and adoptions its cards have had recorded, moved in
-   * each one's own transaction. Read in the write under way if there is one.
-   */
-  provenanceEpoch(): number {
-    return this.conn.read((db) => Number((db.prepare('SELECT value FROM board_meta WHERE key = ?').get(this.epochKey()) as { value: string } | undefined)?.value ?? 0))
   }
 
   private metaKey(key: string): string {
@@ -1071,9 +1062,6 @@ export class FactStore {
         const seq = nextSeq(card)
         const full = { ...f, seq, card, at: at() } as Fact<K>
         w.prepare('INSERT INTO card_facts (card, seq, kind, at, actor, source, ruleset, dedupe, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(card, seq, f.kind, full.at, f.actor, f.source, f.ruleset ?? null, f.dedupe ?? null, JSON.stringify(f.data))
-        // The project's provenance epoch (HI-2868): moved in the same transaction as every accepted submission or adoption,
-        // so an intent that decided on the provenance before it (jj's attribution) sees it moved in its own write.
-        if (f.kind === 'Submitted' || f.kind === 'Adopted') w.prepare("INSERT INTO board_meta (key, value) VALUES (?, '1') ON CONFLICT (key) DO UPDATE SET value = CAST(value AS INTEGER) + 1").run(this.epochKey())
         return full
       }
       const tx: Tx = {
@@ -1100,7 +1088,6 @@ export class FactStore {
         },
         meta: (k) => this.meta(k),
         setMeta: (k, v) => this.setMeta(k, v),
-        sql: (statements) => this.conn.write(() => statements(w as DatabaseSync)),
         recordFolderCommit: (folder, sha, card, how) => this.recordFolderCommit(folder, sha, card, how)
       }
       return fn(tx)

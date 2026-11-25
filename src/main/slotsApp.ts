@@ -13,6 +13,9 @@ import { type ChildProcess } from 'child_process'
 import { mkdirSync } from 'original-fs'
 import { basename, join } from 'path'
 import { agentMsg, inDefaultDialect, inDialectOf, say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { gitDetachCommand, gitOperationEnd } from '../shared/gitOperations'
+import { msg, tr } from '../shared/i18n'
+import { tell } from './notify'
 import { app } from 'electron'
 import { advanced } from './advanced'
 import { brokerWorkingIn, processSupervisor } from './agentProcesses'
@@ -27,34 +30,20 @@ import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
 import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
-import { builderCountOf, folderThere, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type RecoverOutcome, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
+import { builderCountOf, DETACH_FAILED, operationTold, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
 import { onCombworkEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
 import { goneWriterCleared, goneWriterSettles, goneWriterStill, setRetiredHomes, setWriterHost, writerCleared, writerHeld, writerOver } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
-import type { WorkspaceFilesOutcome, WorkspacePort } from './platform/workspacePort'
-import { registerWorkspacePort, workspacePortForPlatform, workspacePortOf } from './platform/workspacePorts'
-import { createJjWorkspacePort, generationOf, type JjWorkspacePort } from './platform/jjWorkspacePort'
-import { isUnknown } from './platform/types'
-import { SlotStaleView } from './slotStaleView'
-import { recoverStale } from './platform/jjRecovery'
-import { storeGitGated } from './platform/jjRunner'
-import { git } from './git'
-import { boardPrepStore } from './platform/jjSlotPrep'
-import { historyFor } from './platform/historyPorts'
-import { takeStores } from './repoLock'
-import { trash } from './trash'
-import { holdLaunches } from './launchHolds'
-import { hasCapability, isPlatformId, ownsWorkspaces, type PlatformId } from '../shared/platform/descriptors'
+import type { WorkspaceFilesOutcome } from './platform/workspacePort'
 import { endLeaseJob, journalPath, LeaseJob, leaseJobGone, retireSeal, startLauncher, sweepSeals } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
 import { workflowFor } from './workflow/service'
 import { projectAgents } from '../shared/defaults'
 import { agentMax } from './projectAgents'
 import { openEntry } from '../shared/workflow/facts'
-import { doneUnproved } from '../shared/workflow/workView'
 import { LANES_END_WAIT_MINUTES, LANES_GENTLE_END, SLOTS_REMOVE_IDLE, SLOTS_SETUP_MINUTES } from '../shared/advanced'
 import type { SlotTestOp, SlotView } from '../shared/types'
 
@@ -141,6 +130,22 @@ export function sweepSealsOf(root: string, o: { once?: boolean } = {}): void {
     .then((n) => n && log.info(`removed ${n} sealed journal(s) whose jobs are gone in ${userText(dir)}`))
     .catch((e) => log.warn(`sweeping the sealed journals of ${userText(dir)}`, e))
     .finally(() => sweeping.delete(key))
+}
+
+/** HI-3465: the notice, told once, of a git operation left under way in a free slot. */
+const OPERATION = {
+  title: msg({ id: 'main.slots.operation.title', defaultMessage: '{slot} has an unfinished git {what}', description: "HI-3465: a notice's title: a git operation was left under way in a slot (a worktree Combwork lends to cards), so Combwork can't lend it. {slot} is the slot's name; {what} is git's word for the operation (merge, rebase, am, cherry-pick, revert or bisect: keep it as it is)." }),
+  message: msg({ id: 'main.slots.operation.message', defaultMessage: "Combwork can't lend {slot} to another card until it's finished. Finish it in {folder}, or end it there with {command}. Combwork never ends it itself, and lends the slot again once nothing is under way in it.", description: "HI-3465: the notice's text below main.slots.operation.title. {slot} is the slot's name, {folder} its folder's path, {command} the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is)." }),
+  open: msg({ id: 'main.slots.operation.open', defaultMessage: 'Open in Changes', description: "HI-3470: the notice's button (main.slots.operation.title): shows the slot in Version Control → Changes, whose panel continues or aborts the operation. Changes is the section's name: keep it as it is named there." })
+}
+
+/**
+ * HI-3467: the notice, told once, of a free slot whose detach at its target failed again (git's error kept in English,
+ * never translated: it is git's own). The way out: put right what git names, or detach it by hand (`detachCommand`).
+ */
+const DETACH = {
+  title: msg({ id: 'main.slots.detachFailed.title', defaultMessage: "Combwork can't move {slot} back to {target}", description: "HI-3467: a notice's title: Combwork tried more than once to put a free slot (a worktree it lends to cards) back at the head of its target branch {target} for its next card, and git refused each time, so the slot isn't lent. {slot} is the slot's name." }),
+  message: msg({ id: 'main.slots.detachFailed.message', defaultMessage: "{said, select, yes {Git said: {error}} other {Git can't find {target}.}} Until it can, Combwork doesn't lend {slot} to another card. Put right what's in the way in {folder}, or run {command} there yourself, in PowerShell: Combwork tries again whenever it looks at its slots, and lends {slot} again once that works.", description: "HI-3467: the notice's text below main.slots.detachFailed.title. {error} is git's own error line, in English (keep it as it is); said: yes when git gave one, else no (the branch {target} isn't there): keep the select keys. {slot} is the slot's name, {folder} its folder's path, {command} the git command that does it by hand (git switch --detach main: keep it as it is), quoted for PowerShell (HI-3516: a branch name with & or ; would run something else in cmd), so keep PowerShell named." })
 }
 
 /** A slot run's errors (dialects, HI-2447): its end's error, kept on the slot by the pool (said in the Default there). */
@@ -276,131 +281,6 @@ function renamerFor(ws: WorkspaceService, projectPath: string): SlotRenamer {
   }
 }
 
-/**
- * A store's repository lock (HI-2866), as jj's port takes it around each write: the one owner every platform's takes go
- * through (repoLock.ts `takeStores`, HI-2896), so a take inside one this context holds (live) runs straight through,
- * whichever platform named the store.
- */
-export function storeLock<T>(store: string, fn: () => Promise<T>): Promise<T> {
-  return takeStores([{ store, folder: store }], fn, { quiet: true })
-}
-
-/**
- * jj's workspace port with the app's dependencies (HI-2866), registered once: its control workspace beside the project's
- * slots with its record in the workspace database, the project folder's quiet (no session, no process), the store's
- * lock, the Recycle Bin, the slots' bindings in the workspace database (jjSlotPrep.ts), and §16.3.2's containment on
- * the store for a slot's reuse.
- */
-export function jjPort(): JjWorkspacePort {
-  const known = workspacePortOf('jj')
-  if (known) return known as JjWorkspacePort
-  const port = createJjWorkspacePort({
-    control: (repo) => {
-      const ws = workspaceFor(repo)
-      const folder = join(ws ? ws.worktreesRoot : join(repo, '..'), basename(repo), '.cw-jj-control')
-      const journal = ws ? new SlotStore(boardConn(ws), basename(repo)).journal(`jj_control:${repo.toLowerCase()}`) : { read: () => ({ unreadable: true }), write: async () => undefined, clear: async () => undefined }
-      return { folder, journal }
-    },
-    // HI-3046: a colocated slot's Git worktree receipt, by its folder, beside the control's record.
-    gitLink: (repo, folder) => {
-      const ws = workspaceFor(repo)
-      return ws ? new SlotStore(boardConn(ws), basename(repo)).journal(`jj_gitlink:${folder.toLowerCase()}`) : { read: () => ({ unreadable: true }), write: async () => undefined, clear: async () => undefined }
-    },
-    // HI-2887 (r9: automatic): the project folder held against agent launches while its control is made.
-    projectHold: (repo) => holdLaunches(repo),
-    // (a) on HI-2887: a lost control is made again automatically, under the same hold.
-    remakeAllowed: () => true,
-    made: (repo, ws) => log.info(`Made jj's control workspace for ${userText(basename(repo))} at ${userText(ws)}: the project folder's working copy recorded once`),
-    lock: storeLock,
-    trash: async (p) => void (await trash(p)),
-    prep: (store) => {
-      const ws = workspaceFor(store)
-      return ws ? boardPrepStore(boardConn(ws)) : null
-    },
-    contains: (store, target, change, at) => historyFor('git').contains(store, target, change, at),
-    // HI-2924: the user's own Done on exactly that card cycle, its integration not proved.
-    doneByUser: async (store, b) => {
-      const ws = workspaceFor(store)
-      if (!ws || b.card === null || !b.key) return false
-      try {
-        const projectPath = (await import('./slotCards')).projectOfCard(ws, b.card)
-        const wf = projectPath ? await workflowFor(ws, projectPath) : null
-        return !!wf && !!doneUnproved(wf.store.facts(b.card), wf.state(b.card), b.key)
-      } catch {
-        return false
-      }
-    }
-  })
-  registerWorkspacePort('jj', port)
-  return port
-}
-
-/**
- * The workspace ports the app composes with its own dependencies, by platform (HI-3140): each made and registered the
- * first time a project needs it (its platform, or a row left by a switch). Git's needs none (workspacePorts.ts has it).
- */
-const APP_PORTS: Partial<Record<PlatformId, () => WorkspacePort>> = { jj: jjPort }
-
-/**
- * A stale jj slot recovered, the user's explicit action (HI-2866; the window's Recover…, J9c): J2's `recoverStale` under
- * the pool's operation of the slot, the preserved bytes outside every workspace (the project's worktrees folder's
- * `.cw-recovery`). A protocol code when refused. A slot a lease still holds (HI-2913) goes through slotCards' `recoverHeldSlot`:
- * let through only for a card whose preparation there failed.
- */
-export async function recoverStaleSlot(ws: WorkspaceService, projectPath: string, name: string): Promise<RecoverOutcome> {
-  const pool = await poolFor(ws, projectPath)
-  const run: Parameters<SlotPool['recoverStale']>[1] = async (s, fence, journal, quietNow) => {
-    const r = await recoverStale(
-      { port: jjPort(), git: (cwd, args) => storeGitGated(cwd, args, () => git(cwd, args)), preserveRoot: join(ws.worktreesRoot, basename(projectPath), '.cw-recovery', s.name), trash: async (p) => void (await trash(p)) },
-      { repo: projectPath, folder: s.folder, identity: s.identity!, journal, fence, quiet: quietNow }
-    )
-    // Files jj leaves out for its size limit (HI-2973) are back on disk but in no commit: the slot's next record lists
-    // them as uncommitted, so it is kept, never reused or removed with them in it.
-    if (r.ok && r.leftOut.length) log.info(`Slot ${userText(s.name)} recovered with files jj leaves out for snapshot.max-new-file-size: ${userText(r.leftOut.slice(0, 10).join(', '))}`)
-    // What it did, for the window (HI-2996): the copies it wrote beside, the deletions it kept, a divergent commit kept.
-    return r.ok ? { ok: true, recovered: { restored: r.restored.length, copies: r.copies, asides: r.asides, keptDeleted: [...r.deletedLocally, ...r.kept], divergent: r.x } } : { ok: false, why: r.why, ...(r.divergent ? { divergent: r.divergent } : {}) }
-  }
-  const held = pool.openLease(name)
-  const out = held ? await (await import('./slotCards')).recoverHeldSlot(ws, projectPath, pool, name, held, run) : await pool.recoverStale(name, run)
-  if (!out.ok) log.info(`Slot ${userText(name)} wasn't recovered${held ? ` (held by lease ${held.id})` : ''}: ${userText(out.why)}`)
-  return out
-}
-
-/** Each project's platform as last read (HI-2866): which port its pools make new slots and copies with. */
-const platforms = new Map<string, PlatformId>()
-const platformKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}
-${projectPath.toLowerCase()}`
-async function readPlatform(ws: WorkspaceService, projectPath: string): Promise<void> {
-  const cfg = await ws.projectConfig(projectPath).catch(() => null)
-  const p = cfg?.platform && isPlatformId(cfg.platform) ? cfg.platform : null
-  // HI-2936: a project switched from jj keeps its idle jj slots and copies: their port is registered while any is left,
-  // so its pools settle, keep or remove them by jj (R2.6), never failing a Git lending for want of it. HI-3140: by the
-  // platforms whose ports the app composes (APP_PORTS), the project's own and each one its rows still name.
-  const needed = new Set<PlatformId>(p ? [p] : [])
-  if (cfg) for (const q of rowPlatforms(ws, cfg.id ?? basename(projectPath))) needed.add(q)
-  for (const q of needed) APP_PORTS[q]?.()
-  platforms.set(platformKey(ws, projectPath), p && hasCapability(p, 'isolation') ? p : 'git')
-}
-/**
- * The platforms a project's slot and copy rows name beyond Git's (HI-2936, HI-3140: a row records its platform only
- * beyond Git's, the column's default); none when the board can't be read.
- */
-function rowPlatforms(ws: WorkspaceService, project: string): PlatformId[] {
-  if (!ws.path) return []
-  try {
-    const rows = boardConn(ws).read((db) => db.prepare('SELECT platform FROM slots WHERE project = ? AND platform IS NOT NULL UNION SELECT platform FROM copies WHERE project = ? AND platform IS NOT NULL').all(project, project)) as { platform: unknown }[] // i18n-ignore: SQL
-    return rows.map((r) => r.platform).filter(isPlatformId)
-  } catch {
-    return []
-  }
-}
-/** The port a project's new slots and copies are made with now (Git's unless the project uses jj). */
-export function projectWorkspaces(ws: WorkspaceService, projectPath: string): WorkspacePort {
-  return workspacePortForPlatform(platforms.get(platformKey(ws, projectPath)) ?? 'git')
-}
-/** Reads a project's platform again (before a lending). */
-export const refreshProjectWorkspaces = (ws: WorkspaceService, projectPath: string): Promise<void> => readPlatform(ws, projectPath)
-
 const pools = new Map<string, { life: AbortSignal; pool: Promise<SlotPool> }>()
 const poolKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
 
@@ -417,13 +297,10 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
   if (known && known.life === ws.lifetime && !known.life.aborted) return known.pool
   const pool = (async () => {
     const cfg = await ws.projectConfig(projectPath)
-    await readPlatform(ws, projectPath)
     const root = join(ws.worktreesRoot, basename(projectPath))
     const store = new SlotStore(boardConn(ws), cfg.id ?? basename(projectPath))
     const made: SlotPool = new SlotPool({
       store,
-      workspacesFor: () => projectWorkspaces(ws, projectPath),
-      refreshPorts: () => readPlatform(ws, projectPath),
       project: projectPath,
       root,
       options: async () => slotOptionsOf(await ws.projectConfig(projectPath), slotLevelsOf(config.settings, ws)),
@@ -465,6 +342,17 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       },
       // A finished card's slot asked about only once its settle is over (HI-2170): the slots' pass looks again.
       looked: () => slotFreed(ws, projectPath),
+      // HI-3465: a git operation left under way in a free slot, told once (the pool records it); Slots and copies shows it.
+      operationFound: (slot, folder, what, failed) => {
+        // HI-3467: a detach that failed again, with git's own error and the command that does it by hand.
+        if (what === DETACH_FAILED && failed) {
+          const values = { slot, folder, target: failed.target, error: failed.error, said: failed.error ? 'yes' : 'no', command: gitDetachCommand(failed.target) }
+          tell({ kind: 'warning', level: 'warning', title: tr(DETACH.title, values), message: tr(DETACH.message, values), apiTitle: DETACH.title.defaultMessage, projectPath, id: `slot-operation:${projectPath}:${slot}` })
+          return
+        }
+        const values = { slot, what, folder, command: gitOperationEnd(what) ?? what }
+        tell({ kind: 'warning', level: 'warning', title: tr(OPERATION.title, values), message: tr(OPERATION.message, values), apiTitle: OPERATION.title.defaultMessage, projectPath, id: `slot-operation:${projectPath}:${slot}`, actions: [{ label: tr(OPERATION.open), command: 'git.openOperation', args: [projectPath, folder] }] })
+      },
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
       renamer: renamerFor(ws, projectPath)
     })
@@ -682,7 +570,13 @@ export interface LaneEndDeps {
  * note, its states or its quit is dropped (its epoch is over: what it finds later acts on nothing). Only one quit runs at
  * a time: the forced one waits for one already typing (bounded by its own typing) rather than start a second.
  */
-export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
+export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string>; settled: () => Promise<void> } {
+  /** Its work still running (a look, a forced quit, a retire): settled() waits for it, done or not (HI-3567). */
+  const pending = new Set<Promise<unknown>>()
+  const track = (p: Promise<unknown>): void => {
+    pending.add(p)
+    void p.finally(() => pending.delete(p)).catch(() => undefined)
+  }
   let over = false
   let looking = false
   let again = false
@@ -708,7 +602,7 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
   const lost = (): void => {
     if (over) return
     finish('the run or its lease is gone: nothing ended') // i18n-ignore: for the log
-    void d.retire('its lane end lost its run').catch(() => undefined) // i18n-ignore: for the log
+    track(d.retire('its lane end lost its run').catch(() => undefined)) // i18n-ignore: for the log
   }
   /** The one quit at a time. */
   const quitOnce = (why: string, force: boolean): Promise<'sent' | 'held' | 'gone'> => {
@@ -747,7 +641,7 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
         d.log(`its lane's note wasn't made: ${(e as Error).message}`)
       }
       // Made after its end was over (the fence lost, or ended forced, meanwhile): retired, as the end retired none.
-      if (over) return void d.retire('its lane end was over before its note was made').catch(() => undefined) // i18n-ignore: for the log
+      if (over) return track(d.retire('its lane end was over before its note was made').catch(() => undefined)) // i18n-ignore: for the log
       if (dropped()) return
       if (!d.fenced()) return lost()
     }
@@ -770,26 +664,28 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
     if (over) return
     // The fence and the deadline first, whatever a look awaits.
     if (!d.fenced()) return lost()
-    if (d.now() >= d.deadline) return void forced()
+    if (d.now() >= d.deadline) return track(forced())
     if (looking) {
       again = true
       return
     }
     looking = true
-    void (async () => {
-      try {
-        // finish() sets `over` (and the deadline `epoch`): read through a call, as the loop can't see that.
-        const ended = (): boolean => over
-        do {
-          again = false
-          await step()
-        } while (again && !ended())
-      } catch (e) {
-        d.log(`a look failed: ${(e as Error).message}`)
-      } finally {
-        looking = false
-      }
-    })()
+    track(
+      (async () => {
+        try {
+          // finish() sets `over` (and the deadline `epoch`): read through a call, as the loop can't see that.
+          const ended = (): boolean => over
+          do {
+            again = false
+            await step()
+          } while (again && !ended())
+        } catch (e) {
+          d.log(`a look failed: ${(e as Error).message}`)
+        } finally {
+          looking = false
+        }
+      })()
+    )
   }
   unwatch = d.watch(look)
   const tick = (): void => {
@@ -800,11 +696,16 @@ export function waitForLaneEnd(d: LaneEndDeps): { done: Promise<string> } {
   timers.push(setTimeout(tick, LANE_END_RECHECK_MS))
   timers.push(setTimeout(look, Math.max(0, d.deadline - d.now()) + 50))
   look()
-  return { done }
+  /** Once it is over and nothing it started still runs (a look awaiting a note, a retire): its last log written. */
+  const settled = async (): Promise<void> => {
+    await done
+    while (pending.size) await Promise.allSettled([...pending])
+  }
+  return { done, settled }
 }
 
 /** The lane leases being ended now (by id): a second end of the same lease joins the first, never makes another note. */
-const laneEnds = new Map<string, { done: Promise<string> }>()
+const laneEnds = new Map<string, { done: Promise<string>; settled: () => Promise<void> }>()
 
 /** A lane lease's gentle end under way (tests): how it ends (its log's last word), or null when none is. */
 export const laneEndOf = (lease: string): Promise<string> | null => laneEnds.get(lease)?.done ?? null
@@ -864,9 +765,12 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
       const offDeliveries = onDeliveriesChanged((host, agents) => {
         if (host.toLowerCase() === projectPath.toLowerCase() && agents.has(w.agent)) look()
       })
+      // Its workspace closing ends it at once (the fence lost), not at the next recheck after (HI-3567).
+      life.addEventListener('abort', look)
       return () => {
         offEvents()
         offDeliveries()
+        life.removeEventListener('abort', look)
       }
     },
     now: () => Date.now(),
@@ -874,7 +778,17 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
     log: (line) => log.info(`Lane ${userText(lease.lane ?? '')}'s end, ${label} (lease ${lease.id}): ${line}`)
   })
   laneEnds.set(lease.id, waiter)
+  unsettled.add(waiter)
   void waiter.done.finally(() => laneEnds.delete(lease.id))
+  void waiter.settled().finally(() => unsettled.delete(waiter))
+}
+
+/** Every gentle end begun and not yet settled (HI-3567: a test's teardown waits for them, so none logs after it). */
+const unsettled = new Set<{ settled: () => Promise<void> }>()
+
+/** Tests: once every gentle end under way is over and nothing it started still runs (each logged its last line). */
+export async function laneEndsSettled(): Promise<void> {
+  while (unsettled.size) await Promise.allSettled([...unsettled].map((w) => w.settled()))
 }
 
 let timer: NodeJS.Timeout | null = null
@@ -964,75 +878,37 @@ export function stopSlots(): void {
   WorkspaceService.closingTasks.delete(forgetPools)
 }
 
-/** Each pool's view of its jj slots' staleness (HI-2912): gone with the pool, so a workspace opened again starts afresh. */
-const staleViews = new WeakMap<SlotPool, SlotStaleView>()
-function staleViewOf(pool: SlotPool): SlotStaleView {
-  let v = staleViews.get(pool)
-  if (!v) {
-    v = new SlotStaleView({
-      row: (name) => pool.slots().find((x) => x.name === name) ?? null,
-      owes: (name) => pool.owedOf(name) !== null,
-      read: async (folder) => {
-        const r = await jjPort().staleWhy(folder)
-        return isUnknown(r) ? null : r
-      },
-      generation: generationOf
-    })
-    staleViews.set(pool, v)
-  }
-  return v
-}
-
 /**
  * A pool's slots as the window reads them (`slots:list`). A writer is held (#1506) when its run isn't live here and its
  * Combwork is this one or one known to have gone: Release Slot… is offered for it.
  */
 export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
   const slots = pool.slots()
-  const view = staleViewOf(pool)
-  view.keepOnly(slots.map((s) => s.name))
   return Promise.all(
     slots.map(async (s) => {
       const l = pool.openLease(s.name)
       const w = s.writer
       const held = !!w && (await writerHeld(w))
-      // A jj slot (HI-2869): stale only when J2's read says so (never a guess); its Recover… is the user's. Not read while
-      // the pool works on the slot or it owes a settle (HI-2912, slotStaleView.ts): its last answer for that folder.
-      const jj = ownsWorkspaces(s.platform)
-      const stale = jj ? await view.staleOf(s.name) : false
-      // Kept for a card (HI-2995), dirty; or with its folder gone (HI-3032), or there but its workspace no longer listed
-      // (HI-3097, `forgotten`): its record, for Remove….
-      const record = jj && (s.state === 'dirty' || s.state === 'gone') ? pool.keptRecord(s.name) : null
-      const keptFor = record?.card ?? null
-      const keptGone = record && s.state === 'gone' ? { generation: record.generation, commit: pool.keptCommit(s.name), ...((await folderThere(s.folder)) ? { forgotten: true as const } : {}) } : null
-      // HI-3103: kept for no card, its workspace forgotten outside Combwork, its folder there: its generation, for Remove….
-      const forgotten = jj && !l && s.identity?.generation && (await pool.forgottenFree(s)) ? { generation: s.identity.generation } : null
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj && s.platform ? { platform: s.platform } : {}), ...(stale ? { stale: true as const, ...(stale === 'abandoned' ? { staleWhy: 'abandoned' as const } : {}) } : {}), ...(keptFor !== null ? { keptFor, ...(record?.edit ? { keptEdit: true as const } : {}) } : {}), ...(keptGone ? { keptGone } : {}), ...(forgotten ? { forgotten } : {}) }
+      // HI-3464: free and gone (its folder missing, or there but not a worktree): Remove… forgets it.
+      const goneFree = !l && pool.goneRemovable(s)
+      // HI-3465: a git operation left under way in it, as its last settle found it (free slots only: a lease's is its agent's).
+      // HI-3467: or its detach at the target failing, once that has repeated (as the user is told).
+      const recorded = !l ? pool.operation(s.name) : null
+      const operation = operationTold(recorded) ? recorded : null
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(goneFree ? { goneFree: true as const } : {}), ...(operation ? { operation: { what: operation.what, since: operation.since, ...(operation.what === DETACH_FAILED ? { error: operation.error ?? '', ...(s.target ? { target: s.target } : {}) } : {}) } } : {}) }
     })
   )
 }
 
 /**
- * A slot kept for a card with its folder gone, removed by the user (HI-3032, Slots and copies' Remove…): only the one the
- * window showed (`generation`, `card`), checked again under the removal (SlotPool.removeKeptGone).
+ * A free slot whose folder is gone or not a worktree, forgotten by the user (HI-3464, Slots and copies' Remove…): checked
+ * again under the removal (SlotPool.removeGone); a folder in its place is left as it is.
  */
-export async function removeKeptSlot(ws: WorkspaceService, projectPath: string, name: string, card: number, generation: string, forgotten: boolean): Promise<{ ok: true } | { ok: false; why: string }> {
+export async function removeGoneSlot(ws: WorkspaceService, projectPath: string, name: string): Promise<{ ok: true } | { ok: false; why: string }> {
   const pool = await poolFor(ws, projectPath)
-  const r = await pool.removeKeptGone(name, { card, generation }, forgotten)
+  const r = await pool.removeGone(name)
   if (r.ok) return r
-  log.info(`Slot ${userText(name)}, kept for #${card}, wasn't removed: ${r.why === 'kept' ? r.kept.why : r.why}`)
-  return { ok: false, why: r.why === 'kept' ? r.kept.why : r.why }
-}
-
-/**
- * A slot kept for no card whose workspace the user forgot, removed by the user (HI-3103, Slots and copies' Remove…): only
- * the one the window showed (`generation`), checked again under the removal (SlotPool.removeForgotten).
- */
-export async function removeForgottenSlot(ws: WorkspaceService, projectPath: string, name: string, generation: string): Promise<{ ok: true } | { ok: false; why: string }> {
-  const pool = await poolFor(ws, projectPath)
-  const r = await pool.removeForgotten(name, generation)
-  if (r.ok) return r
-  log.info(`Slot ${userText(name)}, its workspace forgotten, wasn't removed: ${r.why === 'kept' ? r.kept.why : r.why}`)
+  log.info(`Slot ${userText(name)}, gone, wasn't removed: ${r.why === 'kept' ? r.kept.why : r.why}`)
   return { ok: false, why: r.why === 'kept' ? r.kept.why : r.why }
 }
 

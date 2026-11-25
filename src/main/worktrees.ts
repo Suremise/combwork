@@ -99,16 +99,19 @@ export async function listWorktrees(cwd: string): Promise<{ path: string; branch
   return (await listWorktreesOrNull(cwd)) ?? []
 }
 
-/** `listWorktrees`, or null when git can't list them (#734: a failed listing isn't an empty one). */
-export async function listWorktreesOrNull(cwd: string): Promise<{ path: string; branch: string | null }[] | null> {
+/**
+ * `listWorktrees`, or null when git can't list them (#734: a failed listing isn't an empty one). `prunable` (HI-3464): git
+ * says its registration would be pruned (its folder, or the `.git` in it, is missing: a folder made by hand in its place).
+ */
+export async function listWorktreesOrNull(cwd: string): Promise<{ path: string; branch: string | null; prunable?: true }[] | null> {
   const r = await git(cwd, ['worktree', 'list', '--porcelain'])
   if (!r.ok) return null
-  const out: { path: string; branch: string | null }[] = []
+  const out: { path: string; branch: string | null; prunable?: true }[] = []
   for (const block of r.out.split(/\r?\n\r?\n/)) {
     const path = /^worktree (.+)$/m.exec(block)?.[1]
     if (!path) continue
     const branch = /^branch refs\/heads\/(.+)$/m.exec(block)?.[1] ?? null
-    out.push({ path: resolve(path.trim()), branch: branch?.trim() ?? null })
+    out.push({ path: resolve(path.trim()), branch: branch?.trim() ?? null, ...(/^prunable\b/m.test(block) ? { prunable: true as const } : {}) })
   }
   return out
 }

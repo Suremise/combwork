@@ -12,6 +12,8 @@
 //   cancelled; Git is offered, switched to, its kept options back, and the next card starts under Git's rules.
 // - delta (Git): Mercurial found. The offer, Switch to None…, a new card under None; Git then refused with the reason.
 // - a stale switch (the dialog open while another switch is made) is refused.
+// - zeta (HI-3524): a Git project whose repository is gone, added to the open workspace: its notice keeps Open Version
+//   Control.
 // - a project inside a larger repository (another workspace): the whole-repository line, and OP-29's refusal.
 // Screenshots of each offer and the warning, both themes, English and German. Dev build, throwaway profile, workspaces
 // and CLAUDE_CONFIG_DIR.
@@ -94,7 +96,21 @@ function writeProject(dir, cfg) {
     const base = (await inv('app:info')).language
     // The window is told German by code; main reads its catalogue, not sent through app.evaluate (HI-3434).
     const speak = (code) => lib.speakLanguage(app, base, code)
-    const confirmSwitch = async () => {
+    const apiToken = JSON.parse(fs.readFileSync(path.join(fx.userData, 'agent-api.json'), 'utf8')).token
+    const liveIn = async (dir) => (await inv('session:live')).filter((s) => s.projectPath.toLowerCase() === dir.toLowerCase() && s.status !== 'stopped')
+    /**
+     * Every agent running in a project quiet (HI-3526): no turn running, its composer free, nothing waiting to be typed into
+     * it (lib.agentQuiet). A switch whose tools differ restarts an idle agent at once but asks in the window about a working
+     * one (HI-2694, as a user switching then is asked), and that question covers what the suite clicks next. Under load a
+     * reviewer's wake (R1's card event) or a lane's first card (GL's) was still running at the switch.
+     */
+    const projectQuiet = async (dir) => {
+      for (const s of await liveIn(dir)) if (s.turn?.state === 'running' || !(await lib.agentQuiet(PORT, path.basename(dir), s, apiToken))) return false
+      return true
+    }
+    /** The open switch dialog's Switch, once `dir`'s agents are quiet (projectQuiet). */
+    const confirmSwitch = async (dir) => {
+      check(`${path.basename(dir)}'s agents quiet before the switch`, !!(await until(() => projectQuiet(dir), HUNG_MS)), JSON.stringify((await liveIn(dir)).map((s) => ({ agent: s.agentName, status: s.status, turn: s.turn, composer: s.runtime?.composer }))))
       await dialog.getByRole('button', { name: 'Switch', exact: true }).click()
       return !!(await until(async () => (await dialog.count()) === 0, HUNG_MS))
     }
@@ -118,7 +134,7 @@ function writeProject(dir, cfg) {
       return alphaKeys.every((k) => w.includes(k)) && /Their merge queue carries on/.test(w) && /still a Git repository/.test(w) && /From its next card, alpha uses None/.test(w) ? w : null
     }, HUNG_MS)), await text(dialog))
     await shoot(dialog, 'warning-git-to-none')
-    check('Switch: saved', await confirmSwitch())
+    check('Switch: saved', await confirmSwitch(fx.alpha))
     check('alpha is None: the header, project.json', !!(await until(async () => (await head.locator('[data-platform="none"][aria-checked="true"]').count()) === 1, HUNG_MS)) && (await inv('workflow:form', fx.alpha)).platform === 'none')
     check('…with no switch back offered: None was chosen knowing the folder is a Git repository', (await offer.count()) === 0)
     check("…and the old Git queue's section stays", !!(await until(async () => (await sections()).includes('queue'), HUNG_MS)), JSON.stringify(await sections()))
@@ -154,10 +170,22 @@ function writeProject(dir, cfg) {
     const c3 = (await inv('tasks:create', { title: 'Gamma next', project: 'gamma' })).number
     check('gamma: a card in flight under Git', (await q.intent(h, g1, c1, 'start')).status === 200 && (await startedUnder(c1)) === 'git')
     // A lane of its own builder, registered by it (the cw_lane tool's route): no agent is started again, so G1 keeps
-    // its session and token.
+    // its session and token. The lane starts its first card on GL, typed into GL as a task (laneStarts), a turn the suite
+    // waits to be over (HI-3526): a switch while it runs finds GL working, and the window then asks whether to restart GL
+    // for the new workflow (HI-2694, as a user switching then is asked); under load the turn outlasted the steps below, and
+    // that question covered Git's choice. A turn begun after the lane, over, and GL quiet: whether the lane typed it into
+    // GL's conversation (fresh, as here) or gave GL a new one (HI-2232), its turn id is new.
     const gl = await q.agent(fx, h, 'GL', { project: gamma })
+    const glLive = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === gamma.toLowerCase() && s.agentId === gl.id)
+    check('gamma: GL quiet before its lane', !!(await until(async () => lib.agentQuiet(PORT, 'gamma', await glLive(), apiToken), HUNG_MS)), JSON.stringify(await glLive()))
+    const glTurnBefore = (await glLive())?.turn?.id
     const lane = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${gl.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'gamma', reviewer: 'GR', cards: [c2], name: 'gamma lane' }) })
     check('gamma: a lane runs', lane.status === 200, `${lane.status} ${await lane.text().catch(() => '')}`)
+    const glDone = async () => {
+      const s = await glLive()
+      return !!s?.turn?.id && s.turn.id !== glTurnBefore && s.turn.state === 'over' && lib.agentQuiet(PORT, 'gamma', s, apiToken)
+    }
+    check("gamma: GL's turn on the lane's first card is over", !!(await until(glDone, HUNG_MS)), JSON.stringify((await glLive())?.turn))
     // The tab open on gamma while its repository goes (#1492): coming back to the window, the tab reads git again and the
     // header follows it, with no workspace refresh asked for here.
     await toTab('gamma')
@@ -202,7 +230,7 @@ function writeProject(dir, cfg) {
       return /gamma lane/.test(w) && w.includes(c1Key) && !/merge queue carries on/.test(w) ? w : null
     }, HUNG_MS)), await text(dialog))
     await shoot(dialog, 'warning-gone')
-    check('Switch to None: saved', await confirmSwitch())
+    check('Switch to None: saved', await confirmSwitch(gamma))
     check('…the offer gone', !!(await until(async () => (await offer.count()) === 0, HUNG_MS)))
     check('the card in flight keeps its stage and Git rules', (await column(c1)) === 'doing' && (await startedUnder(c1)) === 'git' && !(await h.kinds(c1)).includes('Override'))
     // None has no merge to report (HI-2694): cw_report_merge, left out under Git's options, is G1's again, so the idle G1
@@ -237,7 +265,7 @@ function writeProject(dir, cfg) {
     await offer.locator('[data-action="vc-offer-switch"]').click()
     check('the warning says the Git options it had come back', !!(await until(async () => /The Git options it had before come back/.test(await text(dialog)), HUNG_MS)), await text(dialog))
     await shoot(dialog, 'warning-to-git')
-    check('Switch: saved', await confirmSwitch())
+    check('Switch: saved', await confirmSwitch(gamma))
     const gcfg = await inv('workflow:form', gamma)
     check("gamma is Git again, with its own options back", gcfg.platform === 'git' && Object.entries(GAMMA).every(([k, v]) => JSON.stringify(gcfg.own[k]) === JSON.stringify(v)), JSON.stringify(gcfg.own))
     const c4 = (await inv('tasks:create', { title: 'Gamma after init', project: 'gamma' })).number
@@ -263,7 +291,7 @@ function writeProject(dir, cfg) {
     await shoot(page.locator('[data-vc-head]'), 'notnow-other')
     await head.locator('[data-platform="none"]').click()
     await until(async () => (await dialog.count()) === 1, HUNG_MS)
-    check('Switch to None: saved', await confirmSwitch())
+    check('Switch to None: saved', await confirmSwitch(delta))
     const d1 = await q.agent(fx, h, 'D1', { project: delta })
     const dc = (await inv('tasks:create', { title: 'Delta under None', project: 'delta' })).number
     check("a new card starts under None's rules", (await q.intent(h, d1, dc, 'start')).status === 200 && (await startedUnder(dc)) === 'none')
@@ -276,11 +304,30 @@ function writeProject(dir, cfg) {
     await toTab('alpha')
     await head.locator('[data-platform="git"]').click()
     await until(async () => (await dialog.count()) === 1, HUNG_MS)
+    check("alpha's agents quiet before the other switch", !!(await until(() => projectQuiet(fx.alpha), HUNG_MS)))
     await inv('workflow:setPlatform', fx.alpha, 'git', { expected: 'none' })
     await dialog.getByRole('button', { name: 'Switch', exact: true }).click()
     check('a stale switch is refused in the dialog', !!(await until(async () => /Changed meanwhile: this project uses Git now/.test(await text(dialog.locator('.dialog-error'))), HUNG_MS)), await text(dialog))
     await page.keyboard.press('Escape')
     await until(async () => (await dialog.count()) === 0, HUNG_MS)
+
+    // --- zeta (HI-3524): a Git project whose repository is gone, added to the open workspace. Its notice comes once the
+    // window knows zeta, so it keeps Open Version Control rather than reading as about a project gone. Read in the bell,
+    // which keeps every notice with its buttons: a test window never has the focus, so whether it also popped up depends
+    // on where the notice was routed.
+    const bell = page.locator('.activitybar button[aria-label="Notifications"]')
+    if ((await page.locator('.notif-panel').count()) === 0) await bell.click()
+    const zeta = path.join(fx.ws, 'zeta')
+    fs.mkdirSync(zeta, { recursive: true })
+    fs.writeFileSync(path.join(zeta, 'z.txt'), 'z\n')
+    writeProject(zeta, { platform: 'git', workflow: { platform: 'git', preset: null, options: {} } })
+    await inv('workspace:refresh')
+    const zetaToast = page.locator('.notif-panel .notif-item', { hasText: 'Version control changed in zeta' })
+    const zetaOpen = zetaToast.getByRole('button', { name: 'Open Version Control' })
+    check('zeta, added to the open workspace: its notice keeps Open Version Control', !!(await until(async () => (await zetaOpen.count()) === 1, HUNG_MS)), await text(zetaToast))
+    check("…and never says zeta isn't in the workspace", !/isn.t in this workspace any more/.test(await text(zetaToast)), await text(zetaToast))
+    if ((await page.locator('.notif-panel').count()) > 0) await page.locator('.notif-panel button[aria-label="Close"]').click()
+    await until(async () => (await page.locator('.notif-panel').count()) === 0, HUNG_MS)
 
     // --- A project inside a larger repository (OP-29).
     await lib.openWorkspace(inv, page, outer)

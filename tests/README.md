@@ -160,8 +160,8 @@ can't become a default. Each entry says its kind:
 - **`hang`**: generous, it only bounds a hung run: `test.hang` (a unit test, `vitest.config.ts`' testTimeout),
   `wait.hang` (a unit test's wait), `spawn.hang`, `hang.ui` (an e2e wait for the window, and Playwright's default),
   `hang.step` (a step of Combwork's), `hang.slow`, `app.readyMs`, `suite.limitMs` and the rest. A unit test's come in
-  steps for what it drives: `test.hang`, `test.hangReal` (real git or processes at length), `test.hangRealJj` (the real
-  jj), `test.hangStress`; the same for `wait.*` and `spawn.*`; `db.busyMs` is a test's SQLite busy timeout.
+  steps for what it drives: `test.hang`, `test.hangReal` (real git or processes at length), `test.hangRealLong` (a large
+  board copied or timed, a stress run of real git), `test.hangStress`; the same for `wait.*` and `spawn.*`; `db.busyMs` is a test's SQLite busy timeout.
 - **`budget`**: narrow on purpose: a performance check, its number the point (`budget.promptEndMs`: an end that must come
   well before the slow path's own limit; `budget.scanMs`: a scan that must stay linear; one of its own where a check has
   its own number). A budget must stay under what it guards: a check that something ends before a 60 s wait never reads

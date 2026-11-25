@@ -9,7 +9,6 @@ import * as electron from 'electron'
 import type { CombworkEvent, ProjectConfig } from '../src/shared/types'
 import { PLATFORMS, revisionShort } from '../src/shared/platform/descriptors'
 import { detect, foundKey, projectPlatform } from '../src/main/platform/registry'
-import { jjOf } from '../src/main/vcsDetect'
 import { git, gitTestHooks } from '../src/main/git'
 import { checkGit } from '../src/main/gitTool'
 import { excludeCopies } from '../src/main/providers/common'
@@ -48,71 +47,47 @@ describe('detection, per case of §16.3.5', () => {
     expect(detect(p)).toEqual({ platform: 'git', root, subfolder: true })
   })
 
-  it('Mercurial is None, naming what was found; a .jj alone is jj without a colocated Git repository (HI-2799)', () => {
+  it('Mercurial is None, naming what was found', () => {
     const p = tempDir('cw-platform-other-')
     mkdirSync(join(p, '.hg'))
     expect(detect(p)).toEqual({ platform: 'none', other: 'Mercurial' })
-    const j = tempDir('cw-platform-jj-')
-    mkdirSync(join(j, '.jj'))
-    expect(detect(j)).toEqual({ platform: 'jj', root: j, jj: { colocated: false } })
   })
 
-  it('a colocated jj+git repository is jj (HI-2799), offered, never taken by itself', () => {
-    const p = tempDir('cw-platform-jjgit-')
-    gitInit(p)
-    mkdirSync(join(p, '.jj'))
-    expect(detect(p)).toEqual({ platform: 'jj', root: p, jj: { colocated: true } })
-    // A project with nothing recorded takes None, not jj; a None or Git project is offered jj.
-    expect(projectPlatform(p, undefined).id).toBe('none')
-    expect(projectPlatform(p, undefined).offer).toBeUndefined()
-    expect(projectPlatform(p, 'none').offer).toEqual({ offer: 'jj', why: 'jjFound' })
-    expect(projectPlatform(p, 'git').offer).toEqual({ offer: 'jj', why: 'jjFound' })
-    // A jj project whose .jj is gone is offered Git back, where Git is.
-    const g = tempDir('cw-platform-jjgone-')
-    gitInit(g)
-    expect(projectPlatform(g, 'jj').offer).toEqual({ offer: 'git', why: 'jjGone' })
+  it('a colocated Mercurial+git repository is another version control: a Git project is offered None', () => {
+    const h = tempDir('cw-platform-hggit-')
+    gitInit(h)
+    mkdirSync(join(h, '.hg'))
+    expect(detect(h)).toEqual({ platform: 'none', other: 'Mercurial' })
+    expect(foundKey(detect(h))).toBe('other:Mercurial')
+    expect(projectPlatform(h, undefined).id).toBe('none')
+    expect(projectPlatform(h, 'none').offer).toBeUndefined()
+    expect(projectPlatform(h, 'git').offer).toEqual({ offer: 'none', why: 'otherFound' })
   })
 
-  it('a non-colocated jj repository is offered jj too (HI-2896), and its found key is not the earlier jj:separate', () => {
-    const j = tempDir('cw-platform-jjsep-')
-    mkdirSync(join(j, '.jj'))
-    expect(projectPlatform(j, 'none').offer).toEqual({ offer: 'jj', why: 'jjFound' })
-    expect(foundKey(detect(j))).toBe('jj:noncolocated')
-    // A user who chose None while jj couldn't be switched to there (jj:separate recorded) is offered jj once.
-    expect(projectPlatform(j, 'none', 'jj:separate').offer).toEqual({ offer: 'jj', why: 'jjFound' })
-    expect(projectPlatform(j, 'none', 'jj:noncolocated').offer).toBeUndefined()
-  })
-
-  it('a non-colocated jj repository inside a Git working tree is found there (inGit) and not offered (HI-2896)', () => {
-    const top = tempDir('cw-platform-jjingit-')
+  it('a Mercurial checkout inside a Git working tree is the other version control, nearest', () => {
+    const top = tempDir('cw-platform-hgingit-')
     gitInit(top)
-    const j = join(top, 'inner')
-    mkdirSync(join(j, '.jj'), { recursive: true })
-    expect(detect(j)).toEqual({ platform: 'jj', root: j, jj: { colocated: false, inGit: top } })
-    expect(projectPlatform(j, 'none').offer).toBeUndefined()
-    expect(projectPlatform(j, 'git').offer).toEqual({ offer: 'none', why: 'otherFound' })
-    // Colocated inside another Git repository: its own .git is nearer, so not inGit.
-    gitInit(j)
-    expect(detect(j)).toEqual({ platform: 'jj', root: j, jj: { colocated: true } })
+    const h = join(top, 'inner')
+    mkdirSync(join(h, '.hg'), { recursive: true })
+    expect(detect(h)).toEqual({ platform: 'none', other: 'Mercurial' })
+    expect(projectPlatform(h, 'none').offer).toBeUndefined()
+    expect(projectPlatform(h, 'git').offer).toEqual({ offer: 'none', why: 'otherFound' })
   })
 
-  it('a Git repository inside a non-colocated jj workspace is Git’s, the nearest marker: no jj offer (HI-2976)', () => {
-    const outer = tempDir('cw-platform-gitinjj-')
-    mkdirSync(join(outer, '.jj'), { recursive: true })
+  it('a Git repository inside a Mercurial checkout reads as Mercurial found', () => {
+    const outer = tempDir('cw-platform-gitinhg-')
+    mkdirSync(join(outer, '.hg'), { recursive: true })
     const inner = join(outer, 'inner')
     mkdirSync(join(inner, 'deep'), { recursive: true })
     gitInit(inner)
-    expect(jjOf(inner)).toBeNull()
-    expect(detect(inner)).toEqual({ platform: 'git', root: inner })
-    expect(detect(join(inner, 'deep'))).toEqual({ platform: 'git', root: inner, subfolder: true })
-    expect(projectPlatform(inner, 'git').offer).toBeUndefined()
-    expect(projectPlatform(inner, 'none').offer).toEqual({ offer: 'git', why: 'gitFound' })
-    // Outside the Git repository, still in the jj workspace: jj's.
-    expect(detect(outer)).toEqual({ platform: 'jj', root: outer, jj: { colocated: false } })
-    // Another system nearer than the .jj still decides as before (None, its name).
-    mkdirSync(join(outer, 'hg', '.hg'), { recursive: true })
-    expect(jjOf(join(outer, 'hg'))).toBeNull()
-    expect(detect(join(outer, 'hg'))).toEqual({ platform: 'none', other: 'Mercurial' })
+    // Another version control at any level above decides, whatever git is nearer (otherVcsOf).
+    expect(detect(inner)).toEqual({ platform: 'none', other: 'Mercurial' })
+    expect(detect(join(inner, 'deep'))).toEqual({ platform: 'none', other: 'Mercurial' })
+    expect(projectPlatform(inner, 'git').offer).toEqual({ offer: 'none', why: 'otherFound' })
+    expect(projectPlatform(inner, 'none').offer).toBeUndefined()
+    // Another system nearer than the .hg names itself.
+    mkdirSync(join(outer, 'svn', '.svn'), { recursive: true })
+    expect(detect(join(outer, 'svn'))).toEqual({ platform: 'none', other: 'Subversion' })
   })
 })
 
@@ -260,7 +235,9 @@ describe('in ProjectInfo', () => {
     mkdirSync(join(p, '.combwork'), { recursive: true })
     for (const value of ['mercurial', 7]) {
       writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], platform: value }))
-      expect((await info(p)).platform).toEqual({ id: 'none', capabilities: PLATFORMS.none.capabilities, detected: { platform: 'none' }, invalid: String(value) })
+      // A refresh tells the window of delta first (HI-3524): then its reads say what they find.
+      const read = (await inWorkspace(w, () => w.refresh())).projects.find((x) => x.path === p)
+      expect(read?.platform).toEqual({ id: 'none', capabilities: PLATFORMS.none.capabilities, detected: { platform: 'none' }, invalid: String(value) })
       await info(p)
     }
     expect(notices(p).map((t) => t.title)).toEqual(['Unknown version control setting in delta', 'Unknown version control setting in delta'])
@@ -268,6 +245,26 @@ describe('in ProjectInfo', () => {
       ['warning', `delta's project.json names a version control Combwork doesn't know (platform: mercurial). Until it says "git" or "none", Combwork uses what it finds in the folder.`],
       ['warning', `delta's project.json names a version control Combwork doesn't know (platform: 7). Until it says "git" or "none", Combwork uses what it finds in the folder.`]
     ])
+  })
+
+  it('a project added to an open workspace has its notice said after the window is told of it, buttons and all (HI-3524)', async () => {
+    const p = join(ws, 'eps')
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], platform: 'git' }))
+    // A read before the window knows eps (an Agent API call naming it, or a refresh's own read) says nothing yet: the
+    // folder's watch may report it first, so the order below is what's checked, whichever refresh reports it.
+    expect((await info(p)).platform?.offer).toEqual({ offer: 'none', why: 'repositoryGone' })
+    await inWorkspace(w, () => w.refresh())
+    await vi.waitFor(() => expect(notices(p)).toHaveLength(1), { timeout: HUNG_MS })
+    const told = events.findIndex((e) => e.type === 'workspace-changed' && !!e.workspace?.projects.some((x) => x.path === p))
+    const said = events.findIndex((e) => e.type === 'toast' && e.toast.source === p)
+    expect(told).toBeGreaterThanOrEqual(0)
+    expect(said).toBeGreaterThan(told)
+    expect(notices(p)[0]).toMatchObject({ level: 'info', title: 'Version control changed in eps', actions: [{ label: 'Open Version Control', command: 'project.openVersionControl', args: [p] }] })
+    // Said once: the window knowing it now, later reads say nothing more.
+    await info(p)
+    await inWorkspace(w, () => w.refresh())
+    expect(notices(p)).toHaveLength(1)
   })
 
   it("a read of a workspace closed or switched meanwhile says nothing in the next one, which says its own afresh", async () => {

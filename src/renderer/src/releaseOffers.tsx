@@ -9,7 +9,7 @@ import { msg, tr } from '@shared/i18n'
 import { offerApplies, offerOptions } from '@shared/releaseOffer'
 import type { ReleaseOffer } from '@shared/types'
 import { call, errorMessage } from './api'
-import { get, notify, openVersionControl, set, useStore, NO_RELEASE_OFFERS } from './store'
+import { get, notify, openWorkflowOption, set, useStore, NO_RELEASE_OFFERS } from './store'
 import { startNextVersion } from './components/NextVersion'
 
 const M = {
@@ -68,7 +68,8 @@ async function stillCurrent(o: ReleaseOffer): Promise<boolean> {
 async function applyOffer(o: ReleaseOffer): Promise<void> {
   if (!(await stillCurrent(o))) return
   set({ workflowPrefill: { path: o.projectPath, preset: null, offer: { id: o.id, basis: o.basis, options: offerOptions(o) } } })
-  openVersionControl(o.projectPath, 'workflow')
+  // HI-3549: on Merging's tab, Work merges into in view, behind its Save….
+  openWorkflowOption(o.projectPath, 'target')
 }
 
 async function startOffer(o: ReleaseOffer): Promise<void> {

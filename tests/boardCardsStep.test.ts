@@ -265,7 +265,7 @@ describe('the cards step (#1209)', () => {
   })
 
   const golden = process.env.CW_BOARD_GOLDEN_DB
-  it.skipIf(!golden)("a live board's copy: every reader gives the same bytes after the upgrade", { timeout: timing('test.hangRealJj') }, async () => {
+  it.skipIf(!golden)("a live board's copy: every reader gives the same bytes after the upgrade", { timeout: timing('test.hangRealLong') }, async () => {
     const ws = workspace()
     const file = store.boardFile(ws)
     mkdirSync(join(ws, '.combwork'), { recursive: true })

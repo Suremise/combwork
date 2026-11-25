@@ -2,11 +2,11 @@
 // guard is a regular expression (with a case flag), the paths it applies to and skips (globs), and a message saying what
 // to do instead. Only added text lines are matched, never paths and never what the target already has (HI-2617's
 // rule: "no new X" guards check the change; sweeps clean what exists). Not a rule (left out of every ruleset): the merge
-// queue and jj's candidate checks read the guards as the options are when they check, and a result counts only for the
-// guards it was checked with (`guardsKey`).
+// queue reads the guards as the options are when it checks, and a result counts only for the guards it was checked with
+// (`guardsKey`).
 //
 // Here, everything that needs no process: the shape and its bounds, checked when saved without running a pattern; the
-// globs; the unified-diff parser (Git's and jj's git format); the matching, which runs in a worker thread
+// globs; the unified-diff parser (Git's format); the matching, which runs in a worker thread
 // (mergeGuardsWorker.ts), never on main's thread; and the report, for agents and the window.
 
 import { msg, type Msg } from '../i18n/msg'
@@ -308,7 +308,7 @@ function sidePath(raw: string): string | null {
 }
 
 /**
- * The lines a unified diff adds, by file (Git's `git diff -U0` and jj's `jj diff --git`): files with no added text lines
+ * The lines a unified diff adds, by file (Git's `git diff -U0`): files with no added text lines
  * are left out (a deletion, a pure rename, a binary file). CRLF's carriage return is dropped from a line, as is the
  * `\ No newline at end of file` marker. Anything it can't follow (a hunk's line that isn't one, a hunk with no file) is
  * incomplete; so is a diff past `maxLines` added lines.

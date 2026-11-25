@@ -2,7 +2,7 @@
 // behind revisions, sameness, containment, attribution and check credit) and the watcher behind observation and the
 // write record. Plain contracts: no platform's code is imported here, so a caller holding a HistoryPort or an
 // ObservePort never reaches a version control's module itself. Each platform with history implements them in its own
-// module (Git: gitHistory.ts, over platform/git.ts and git(), and observe.ts's observer); historyPorts.ts finds one by
+// module (Git: gitHistory.ts, over gitCommands.ts and git(), and observe.ts's observer); historyPorts.ts finds one by
 // platform, and never switches on a platform id.
 //
 // 1.4.0 changes no behaviour (§16.3.6's rule 1): every member's Git implementation is the code its callers ran before,
@@ -217,8 +217,6 @@ export type ObserveEvent =
   | { kind: 'lineMoved'; project: string; line: string; from: string | null; to: string | null }
   | { kind: 'folderMoved'; project: string; folder: string; from: string | null; to: string | null }
   | { kind: 'written'; project: string; folder: string; paths: string[] }
-  /** HI-2882: something a platform keeps (jj's retained bundles) may have changed, or its minute's tick: its adapter decides. */
-  | { kind: 'invalidated'; project: string; what: string }
 
 export interface Disposable {
   dispose(): void

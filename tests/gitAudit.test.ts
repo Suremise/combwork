@@ -2,13 +2,14 @@
 // module from outside Git's implementation is a classified edge in tests/gitAudit.mjs, taking only the names it lists,
 // and every "platform with lines" seam is counted per caller. A new edge, a new name across a constrained one, a new seam
 // call in a listed file, or a listed edge that is gone fails here, naming it; so does a switch on a platform's id
-// (`platform === 'git'`) outside the descriptors, adapters and registry that SWITCHES doesn't justify (HI-2822).
+// (`platform === 'git'`) outside the descriptors, adapters and registry that SWITCHES doesn't justify (HI-2822), and an
+// import of a platform's folder (src/main/platform/<vc>/) from outside it that isn't a registry's (HI-3489).
 // scripts/gitInventory.mjs prints the audit.
-import { existsSync, readFileSync } from 'fs'
+import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types, shared with scripts/gitInventory.mjs
-import { audit, EDGES, JJ_EDGES, JJ_HOMES, modeDeclarations, NOT_PLATFORM, platformIdsIn, SEAMS, SWITCHES } from './gitAudit.mjs'
+import { audit, EDGES, modeDeclarations, NOT_PLATFORM, platformFolders, platformIdsIn, REGISTRIES, sealBreaks, SEAMS, sources, SWITCHES } from './gitAudit.mjs'
 import { timing } from './timing.cjs'
 
 // A bound for a hung test (HI-3349): each audit reads the whole source tree, and a full unit run on a loaded machine
@@ -16,7 +17,7 @@ import { timing } from './timing.cjs'
 vi.setConfig({ testTimeout: timing('test.hang') })
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
-type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; compat: string[]; jj: string[] }
+type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[]; sealed: string[] }
 const root = join(__dirname, '..')
 const run = (over: Record<string, string> = {}): Audit => audit(root, over)
 const text = (file: string): string => readFileSync(join(root, file), 'utf8')
@@ -24,7 +25,169 @@ const text = (file: string): string => readFileSync(join(root, file), 'utf8')
 describe('the Git/None cutover audit', () => {
   it('classifies every Git import outside Git\'s implementation, and counts every seam', () => {
     const a = run()
-    expect({ unlisted: a.unlisted, stale: a.stale, extraNames: a.extraNames, seams: a.seams, switches: a.switches }).toEqual({ unlisted: [], stale: [], extraNames: [], seams: [], switches: [] })
+    expect({ unlisted: a.unlisted, stale: a.stale, extraNames: a.extraNames, seams: a.seams, switches: a.switches, sealed: a.sealed }).toEqual({ unlisted: [], stale: [], extraNames: [], seams: [], switches: [], sealed: [] })
+  })
+
+  // HI-3489: each version control's folder (src/main/platform/<vc>/) is imported only from inside it and by the registries.
+  it("seals each platform's folder: only the registries import it from outside, and tests aren't read", () => {
+    const sealed = (over: Record<string, string>): string[] => sealBreaks(root, over)
+    expect(platformFolders(root)).toEqual(['git', 'none'])
+    expect(REGISTRIES).toContain('src/main/platform/adapters')
+    const sessions = 'src/main/sessions.ts'
+    // An outside file, however it imports: a named import, a type, a re-export, a dynamic import, a require.
+    for (const line of ["import { NoneAdapter } from './platform/none/none'", "import type { NoneAdapter } from './platform/none/none'", "export { NoneAdapter } from './platform/none/none'", "const n = () => import('./platform/none/none')", "const n = require('./platform/none/none')", "type N = import('./platform/none/none').NoneAdapter", 'import "./platform/none/none.ts"'])
+      expect(sealed({ [sessions]: `${line}\n${text(sessions)}` }), line).toEqual(['src/main/sessions -> src/main/platform/none/none'])
+    expect(sealed({ [sessions]: `import { gitHistory } from './platform/git/gitHistory'\n${text(sessions)}` })).toEqual(['src/main/sessions -> src/main/platform/git/gitHistory'])
+    // A computed specifier outside the folders could load one.
+    expect(sealed({ [sessions]: `${text(sessions)}\nconst m = './platform/no' + 'ne/none'\nconst later = () => import(m)\n` })).toEqual(['src/main/sessions -> (computed specifier)'])
+    // The seam beside the folders is outside them too, and so is another platform's folder.
+    const seam = 'src/main/platform/workspacePort.ts'
+    expect(sealed({ [seam]: `import { NonePlatform } from './none/nonePlatform'\n${text(seam)}` })).toEqual(['src/main/platform/workspacePort -> src/main/platform/none/nonePlatform'])
+    const gitFile = 'src/main/platform/git/gitPlatform.ts'
+    const nonePlatformFile = 'src/main/platform/none/nonePlatform.ts'
+    expect(sealed({ [gitFile]: `import { NoneAdapter } from '../none/none'\n${text(gitFile)}` })).toEqual(['src/main/platform/git/gitPlatform -> src/main/platform/none/none'])
+    // A computed specifier inside a platform's folder can't be proved to stay there (HI-3489 round 1: one in git/ loading
+    // ../none/none, spelled by char codes, went unseen).
+    const charCodes = 'const target = String.fromCharCode(46,46,47,110,111,110,101,47,110,111,110,101)\nvoid import(target)\n'
+    expect(sealed({ [gitFile]: `${text(gitFile)}\n${charCodes}` })).toEqual(['src/main/platform/git/gitPlatform -> (computed specifier)'])
+    expect(sealed({ [nonePlatformFile]: `${text(nonePlatformFile)}\nconst m = './no' + 'ne'\nconst later = () => require(m)\n` })).toEqual(['src/main/platform/none/nonePlatform -> (computed specifier)'])
+    // A registry may: the adapters' map names every platform's adapter. A folder's own files import each other.
+    const adapters = 'src/main/platform/adapters.ts'
+    expect(sealed({ [adapters]: `import { NoneAdapter } from './none/none'\n${text(adapters)}` })).toEqual([])
+    const nonePlatform = 'src/main/platform/none/nonePlatform.ts'
+    expect(sealed({ [nonePlatform]: `import { NONE_MAX_FILES } from './none'\n${text(nonePlatform)}` })).toEqual([])
+    // A test imports a platform's files directly: not read.
+    expect(sealed({ 'tests/sealProbe.test.ts': "import { NoneAdapter } from '../src/main/platform/none/none'\n" })).toEqual([])
+    // A new platform's folder is sealed as soon as it is there.
+    expect(sealed({ 'src/main/platform/hg/hgPlatform.ts': 'export const hg = 1\n', [sessions]: `import { hg } from './platform/hg/hgPlatform'\n${text(sessions)}` })).toEqual(['src/main/sessions -> src/main/platform/hg/hgPlatform'])
+    // And the audit reports it.
+    expect(run({ [sessions]: `import { NoneAdapter } from './platform/none/none'\n${text(sessions)}` }).sealed).toEqual(['src/main/sessions -> src/main/platform/none/none'])
+  })
+
+  // HI-3506: the prefilter passed a computed specifier that starts with a literal, so its file was never parsed. The probe
+  // is a new file naming neither folder as a word (`/git`, `/none`), as such a line passes wherever that holds.
+  it('fails a computed specifier that starts with a string literal, wherever it is', () => {
+    const probe = 'src/main/sealProbe.ts'
+    const sealed = (body: string): string[] => sealBreaks(root, { [probe]: body })
+    const computed = {
+      'a literal and a variable': "export const f = (id: string) => import('./platform/' + id + '/nonePlatform')\n",
+      'a template with a substitution': 'export const f = (d: string) => require(`./platform/${d}/gitPlatform`)\n',
+      'joined pieces': "export const f = () => require('./platform/' + ['no', 'ne'].join('') + '/noneBaseline')\n",
+      'a space before the parenthesis': "export const f = (id: string) => import ('./platform/' + id)\n"
+    }
+    for (const [form, body] of Object.entries(computed)) {
+      expect(sealed(body), form).toEqual(['src/main/sealProbe -> (computed specifier)'])
+      // The Git audit's prefilter had the same hole for import().
+      expect(run({ [probe]: body }).unlisted, form).toEqual(['src/main/sealProbe -> (computed specifier)'])
+    }
+    // A whole literal, with options or without, a plain template among them, is read as the module it names.
+    for (const body of ["export const f = () => import('./sessions')\n", 'export const f = () => import("./sessions", { with: {} })\n', 'export const f = () => require(`./sessions`)\n'])
+      expect(sealed(body), body).toEqual([])
+  })
+
+  // HI-3512: only `import(…)` and a call of `require` itself were read as loaders, so `require` under another name,
+  // `module.require` and `createRequire` loaded a platform's file (or a Git module) unseen.
+  it('fails require handed on, module.require and createRequire, wherever they are', () => {
+    const probe = 'src/main/sealProbe.ts'
+    const loaders = (spec: string): Record<string, string> => ({
+      'require handed on': `const r = require\nexport const f = () => r('${spec}')\n`,
+      'require in an object': `const o = { require }\nexport const f = () => o.require('${spec}')\n`,
+      'module.require': `export const f = () => module.require('${spec}')\n`,
+      "module['require']": `export const f = () => module['require']('${spec}')\n`,
+      'createRequire called at once': `import { createRequire } from 'node:module'\nexport const f = () => createRequire(import.meta.url)('${spec}')\n`,
+      'createRequire kept under another name': `import { createRequire as cr } from 'module'\nconst load = cr(import.meta.url)\nexport const f = () => load('${spec}')\n`,
+      'createRequire through a namespace': `import * as m from 'node:module'\nexport const f = () => m.createRequire(import.meta.url)('${spec}')\n`
+    })
+    for (const [form, body] of Object.entries(loaders('./platform/none/none'))) expect(sealBreaks(root, { [probe]: body }), form).toEqual(['src/main/sealProbe -> (computed specifier)'])
+    // The Git audit can't see the module either: the loader is its unlisted edge.
+    for (const [form, body] of Object.entries(loaders('./git'))) expect(run({ [probe]: body }).unlisted, form).toEqual(['src/main/sealProbe -> (computed specifier)'])
+    // A name that only looks like one loads nothing: typeof, a key, a member named so, a direct literal require.
+    for (const body of ["export const has = typeof require === 'function'\n", 'export const o = { require: 1 }\nexport type T = { require: number }\n', "export const s = require('./sessions')\n"])
+      expect(sealBreaks(root, { [probe]: body }), body).toEqual([])
+    // A registry's ImportEquals, exported or not, isn't a static import (HI-3522's allow-list).
+    const adapters = 'src/main/platform/adapters.ts'
+    for (const line of ["export import NoneMod = require('./none/none')", "import NoneMod = require('./none/none')"])
+      expect(sealBreaks(root, { [adapters]: `${line}\n${text(adapters)}` }), line).toEqual(['src/main/platform/adapters -> src/main/platform/none/none (not a static import)'])
+  })
+
+  // HI-3521: a registry's export of a load wasn't a re-export, and only a literal 'require' member was read.
+  it("fails a registry exporting what it loads, and a member of module by a built name", () => {
+    const adapters = 'src/main/platform/adapters.ts'
+    const passedOn = ['src/main/platform/adapters -> src/main/platform/none/none (not a static import)']
+    // `export =` and `export default` each stand alone (a file holds one), so each replaces the registry's text.
+    for (const body of ["export = require('./none/none')\n", "export default require('./none/none')\n", "export default (await import('./none/none'))\n"]) expect(sealBreaks(root, { [adapters]: body }), body).toEqual(passedOn)
+    for (const line of ["export const none = require('./none/none')", "export const { NoneAdapter } = await import('./none/none')", "export const none = require('./none/none') as unknown"])
+      expect(sealBreaks(root, { [adapters]: `${line}\n${text(adapters)}` }), line).toEqual(passedOn)
+    // Loading it unexported isn't a static import either (HI-3522's allow-list).
+    expect(sealBreaks(root, { [adapters]: `const none = require('./none/none')\n${text(adapters)}` })).toEqual(passedOn)
+    // A member of module by a built name could be require: outside the folders, and in a registry.
+    const probe = 'src/main/sealProbe.ts'
+    const built = (spec: string): string => `const k = 'req' + 'uire'\nexport const f = () => module[k]('${spec}')\nexport const g = () => module['req' + 'uire']\n`
+    expect(sealBreaks(root, { [probe]: built('./platform/none/none') })).toEqual(['src/main/sealProbe -> (computed specifier)'])
+    expect(run({ [probe]: built('./git') }).unlisted).toEqual(['src/main/sealProbe -> (computed specifier)'])
+    expect(sealBreaks(root, { [adapters]: `${text(adapters)}\nexport const later = () => module['req' + 'uire']('./no' + 'ne/none')\n` })).toEqual(['src/main/platform/adapters -> (computed specifier)'])
+    // Another object's built member is no loader of its own; module's literal ones other than require aren't either.
+    expect(sealBreaks(root, { [probe]: "const k = 'a' + 'b'\nexport const f = (o: Record<string, number>) => o[k]\nexport const id = module['id']\n" })).toEqual([])
+  })
+
+  it('reads .mts sources, the renderer\'s @root alias, and a registry passing a platform\'s files on', () => {
+    expect(sources(root)).toContain('src/main/progressReporters/report.mts')
+    expect(sealBreaks(root, { 'src/main/sealProbe.mts': "import { NoneAdapter } from './platform/none/none'\n" })).toEqual(['src/main/sealProbe -> src/main/platform/none/none'])
+    expect(sealBreaks(root, { 'src/renderer/src/sealProbe.ts': "import type { NoneAdapter } from '@root/src/main/platform/none/none'\n" })).toEqual(['src/renderer/src/sealProbe -> src/main/platform/none/none'])
+    // A registry imports a platform's files, but a re-export would hand them to everyone importing the registry.
+    const adapters = 'src/main/platform/adapters.ts'
+    for (const line of ["export * from './none/none'", "export * as none from './none/none'", "export { NoneAdapter } from './none/none'"])
+      expect(sealBreaks(root, { [adapters]: `${line}\n${text(adapters)}` }), line).toEqual(['src/main/platform/adapters -> src/main/platform/none/none (not a static import)'])
+    expect(sealBreaks(root, { [adapters]: `${text(adapters)}\nconst m = './no' + 'ne/none'\nconst later = () => import(m)\n` })).toEqual(['src/main/platform/adapters -> (computed specifier)'])
+  })
+
+  // HI-3522: a registry passed a platform's file on through a name it imported. The seal became an allow-list: a static
+  // import with a literal specifier, and exports built from what it imports; every other reach breaks it.
+  // Round 1: the export side was a list of passthrough shapes too; now a bound name is refused anywhere but where
+  // builtFrom allows it (new, a call, an object literal's value, a function's result).
+  it('allows a registry only static imports of a platform, and only builds from them', () => {
+    const adapters = 'src/main/platform/adapters.ts'
+    const passed = ['src/main/platform/adapters -> src/main/platform/none/none (passed on)']
+    const named = "import { NoneAdapter } from './none/none'"
+    const whole = "import * as none from './none/none'"
+    // `export default` and `export =` stand alone (a file holds one), so each replaces the registry's text.
+    const forms: Record<string, string> = {
+      'export { name }': `${named}\nexport { NoneAdapter }\n${text(adapters)}`,
+      'export { name as other }': `${named}\nexport { NoneAdapter as X }\n${text(adapters)}`,
+      'export type { name }': `import type { NoneAdapter } from './none/none'\nexport type { NoneAdapter }\n${text(adapters)}`,
+      'export { namespace }': `${whole}\nexport { none }\n${text(adapters)}`,
+      'export default namespace': `${whole}\nexport default none\n`,
+      'export = namespace': `${whole}\nexport = none\n`,
+      'export const of namespace': `${whole}\nexport const n = none\n${text(adapters)}`,
+      'export const of a member': `${whole}\nexport const n = none.NoneAdapter\n${text(adapters)}`,
+      'export const destructured': `${whole}\nexport const { NoneAdapter } = none\n${text(adapters)}`,
+      'export const chosen': `${named}\nexport const n = Math.random() ? NoneAdapter : null\n${text(adapters)}`,
+      'a local alias exported': `${whole}\nexport { m }\nconst m = none\n${text(adapters)}`,
+      'a default import exported': `import none from './none/none'\nexport default none\n`,
+      'assigned to a let': `${whole}\nlet alias\nalias = none\nexport { alias }\n${text(adapters)}`,
+      'a comma expression': `${whole}\ndeclare function initialise(): void\nexport const alias = (initialise(), none)\n${text(adapters)}`,
+      'a type alias': `import type { NoneAdapter } from './none/none'\nexport type PlatformAlias = NoneAdapter\n${text(adapters)}`,
+      'a namespace member type': `${whole}\nexport type PlatformAlias = none.NoneAdapter\n${text(adapters)}`,
+      'in an array': `${named}\nexport const all = [NoneAdapter]\n${text(adapters)}`,
+      'as an argument': `${named}\nexport const kept = Object.freeze(NoneAdapter)\n${text(adapters)}`,
+      'a namespace in an object': `${whole}\nexport const ports = { none }\n${text(adapters)}`
+    }
+    for (const [form, body] of Object.entries(forms)) expect(sealBreaks(root, { [adapters]: body }), form).toEqual(passed)
+    // `import NoneMod = require(…)` then `export { NoneMod }`: the ImportEquals alone breaks it.
+    expect(sealBreaks(root, { [adapters]: `import NoneMod = require('./none/none')\nexport { NoneMod }\n${text(adapters)}` })).toEqual(['src/main/platform/adapters -> src/main/platform/none/none (not a static import)'])
+    // A value built from what it imports is what a registry is for (the tree's registries: new, an object literal's
+    // value, a function's result); so is passing on a name from elsewhere.
+    for (const body of [
+      `${named}\nconst PORTS = { none: NoneAdapter }\nexport const portOf = () => PORTS.none\nexport function only() {\n  return NoneAdapter\n}\n${text(adapters)}`,
+      `${named}\nexport const adapters = [new NoneAdapter()]\n${text(adapters)}`,
+      `${whole}\nexport const ports = { none: none.NoneAdapter }\nexport const make = () => new none.NoneAdapter()\n${text(adapters)}`,
+      `${whole}\nconst made = new none.NoneAdapter()\nexport { made }\n${text(adapters)}`,
+      `import { msg } from '../../shared/i18n/msg'\nexport { msg }\n${text(adapters)}`
+    ])
+      expect(sealBreaks(root, { [adapters]: body }), body).toEqual([])
+    // Outside the registries, an import of the folder breaks the seal as before, exported or not.
+    const probe = 'src/main/sealProbe.ts'
+    expect(sealBreaks(root, { [probe]: "import { NoneAdapter } from './platform/none/none'\nexport { NoneAdapter }\n" })).toEqual(['src/main/sealProbe -> src/main/platform/none/none'])
   })
 
   it('gives each edge a class and a reason; a historic one its legacy operation, a defect its card', () => {
@@ -41,7 +204,7 @@ describe('the Git/None cutover audit', () => {
   it('fails a new Git import in a file whose listed edge is to another module (sessions.ts: the fence, not git)', () => {
     const file = 'src/main/sessions.ts'
     expect(run({ [file]: `import { git } from './git'\n${text(file)}` }).unlisted).toEqual(['src/main/sessions -> src/main/git'])
-    expect(run({ [file]: `import * as G from './platform/git'\nG.head('x')\n${text(file)}` }).unlisted).toEqual(['src/main/sessions -> src/main/platform/git'])
+    expect(run({ [file]: `import * as G from './gitCommands'\nG.head('x')\n${text(file)}` }).unlisted).toEqual(['src/main/sessions -> src/main/gitCommands'])
   })
 
   it('fails a new Git import however it is written: double quotes, indented, a side effect, a re-export, a require (HR1, round 1)', () => {
@@ -108,21 +271,21 @@ describe('the Git/None cutover audit', () => {
     // field of that name holding no mode (a count, another word) is not one.
     const runtime = 'src/main/workflow/runtime.ts'
     const form = 'src/renderer/src/components/WorkflowOptions.tsx'
-    const adapter = 'src/main/platform/jjPlatform.ts'
+    const adapter = 'src/main/platform/git/gitPlatform.ts'
     const over: Record<string, string> = {
       [runtime]: `${text(runtime)}
-const modes = { finishes: ['userIntegrates'] as const }
+const modes = { finishes: ['committed'] as const }
 `,
       [form]: `${text(form)}
 const told = { finishes: 3, defaultFinish: 'later' }
 const row = { defaultFinish: ('notChecked' satisfies string) }
 `,
       [adapter]: `${text(adapter)}
-class Modes { 'finishes' = ['userIntegrates'] }
+class Modes { 'finishes' = ['agentMerges'] }
 `
     }
     const lines = (f: string): number => over[f].split(/\n/).length - 1
-    expect(modeDeclarations(root, over)).toEqual([`src/main/platform/jjPlatform.ts:${lines(adapter)} finishes`, `src/main/workflow/runtime.ts:${lines(runtime)} finishes`, `src/renderer/src/components/WorkflowOptions.tsx:${lines(form)} defaultFinish`])
+    expect(modeDeclarations(root, over)).toEqual([`src/main/platform/git/gitPlatform.ts:${lines(adapter)} finishes`, `src/main/workflow/runtime.ts:${lines(runtime)} finishes`, `src/renderer/src/components/WorkflowOptions.tsx:${lines(form)} defaultFinish`])
   })
 
   it("fails a switch on a platform's id outside the descriptors, adapters and registry, and one more in a justified file (HI-2822)", () => {
@@ -146,16 +309,16 @@ const r = (platform: string) => platform === 'none'
     const added = (code: string): string[] => run({ [options]: `${text(options)}\n${code}\n` }).switches
     const one = ["src/shared/workflow/options: 1 switches on a platform's id, listed 0"]
     for (const code of [
-      "const a = (p: { platform: string }) => p.platform === 'jj'",
+      "const a = (p: { platform: string }) => p.platform === 'git'",
       "const b = (p: string) => 'git' !== p",
       'const c = (to: string) => to === "none"',
       "const d = (id: string) => id === 'none'",
       'const e = (to: string) => to == `none`',
-      "const f = (p: string) => { switch (p) { case 'jj': return 1 } return 0 }",
-      "const g = (d: object) => 'jj' in d",
-      "const h = (x: string) => revisionShort('jj', x)",
+      "const f = (p: string) => { switch (p) { case 'git': return 1 } return 0 }",
+      "const g = (d: object) => 'git' in d",
+      "const h = (x: string) => revisionShort('git', x)",
       "const i = PLATFORMS['git'].name",
-      'const j = PLATFORMS.jj.name'
+      'const j = PLATFORMS.none.name'
     ])
       expect(added(code), code).toEqual(one)
     // Allowed: another enum's `none` by its field's name, a comparison of two variables, prose and other strings, a
@@ -163,9 +326,9 @@ const r = (platform: string) => platform === 'none'
     for (const code of [
       "const k = (o: { review: string }) => o.review === 'none'",
       'const l = (a: string, b: string) => a === b',
-      "// a comment saying platform === 'jj'\nconst m = 'jj is a platform'",
-      "const n = () => registerWorkspacePort('jj', port)",
-      'const o2: Record<string, number> = { jj: 1, git: 2, none: 3 }',
+      "// a comment saying platform === 'git'\nconst m = 'git is a platform'",
+      "const n = () => registerWorkspacePort('git', port)",
+      'const o2: Record<string, number> = { git: 2, none: 3 }',
       "const q = (b: object) => 'none' in b"
     ])
       expect(added(code), code).toEqual([])
@@ -174,20 +337,20 @@ const r = (platform: string) => platform === 'none'
   it("fails a switch in a new file with nothing else naming a platform, and one wrapped in parentheses or a cast (HR1's round 1)", () => {
     const fresh = 'src/shared/newPlatformUse.ts'
     const one = ["src/shared/newPlatformUse: 1 switches on a platform's id, listed 0"]
-    for (const code of ['export const x = PLATFORMS.jj.name', "export const y = (p: string) => p === ('jj')", "export const z = (p: string) => p === ('jj' as const)", "export const w = (p: string) => ('git' satisfies string) !== p", "export const v = (d: object) => ('jj') in d"])
+    for (const code of ['export const x = PLATFORMS.git.name', "export const y = (p: string) => p === ('git')", "export const z = (p: string) => p === ('none' as const)", "export const w = (p: string) => ('git' satisfies string) !== p", "export const v = (d: object) => ('git') in d"])
       expect(run({ [fresh]: `${code}\n` }).switches, code).toEqual(one)
     // Controls: a plain string and a parenthesized one compared to another enum, in a file of their own.
-    for (const code of ["export const u = (o: { review: string }) => o.review === ('none')", "export const t = 'jj' + 'git'"]) expect(run({ [fresh]: `${code}\n` }).switches, code).toEqual([])
+    for (const code of ["export const u = (o: { review: string }) => o.review === ('none')", "export const t = 'none' + 'git'"]) expect(run({ [fresh]: `${code}\n` }).switches, code).toEqual([])
   })
 
   it("reads every platform id from PlatformId's union however it is written, and fails when it can't (HR1's round 1)", () => {
     const desc = 'src/shared/platform/descriptors.ts'
     const t = text(desc)
     const was = /export type PlatformId = [^\r\n]+/.exec(t)![0]
-    expect(platformIdsIn(desc, t)).toEqual(['none', 'git', 'jj'])
-    for (const union of ['export type PlatformId = "git" | "none" | "jj" | "hg"', "export type PlatformId =\n  | 'none'\n  | \"git\"\n  | 'jj'\n  | 'hg'"]) {
+    expect(platformIdsIn(desc, t)).toEqual(['none', 'git'])
+    for (const union of ['export type PlatformId = "git" | "none" | "hg"', "export type PlatformId =\n  | 'none'\n  | \"git\"\n  | 'hg'"]) {
       const four = t.replace(was, union)
-      expect(platformIdsIn(desc, four).sort(), union).toEqual(['git', 'hg', 'jj', 'none'])
+      expect(platformIdsIn(desc, four).sort(), union).toEqual(['git', 'hg', 'none'])
       // The new id is scanned for at once: a switch on it in shared code fails.
       expect(run({ [desc]: four, 'src/shared/hgUse.ts': "export const h = (p: string) => p === 'hg'\n" }).switches).toEqual(["src/shared/hgUse: 1 switches on a platform's id, listed 0"])
     }
@@ -195,52 +358,19 @@ const r = (platform: string) => platform === 'none'
     expect(() => platformIdsIn(desc, t.replace(was, 'export type Platform = "git"'))).toThrow(/PlatformId/)
   })
 
-  it("exempts a composition only by its data: a switch elsewhere in slotsApp, or on another id in a jj home, fails (HI-3140)", () => {
+  it('exempts a composition only by its data: a switch elsewhere in slotsApp fails (HI-3140)', () => {
     const app = 'src/main/slotsApp.ts'
-    expect(run({ [app]: `${text(app)}\nconst x = (p: string) => p === 'jj'\n` }).switches).toEqual(["src/main/slotsApp: 1 switches on a platform's id, listed 0"])
-    const cards = 'src/main/jjCards.ts'
-    expect(run({ [cards]: `${text(cards)}\nconst y = (p: string) => p === 'jj'\n` }).switches).toEqual([])
-    expect(run({ [cards]: `${text(cards)}\nconst z = (p: string) => p === 'git'\n` }).switches).toEqual(["src/main/jjCards: 1 switches on a platform's id, listed 0"])
+    expect(run({ [app]: `${text(app)}\nconst x = (p: string) => p === 'git'\n` }).switches).toEqual(["src/main/slotsApp: 1 switches on a platform's id, listed 0"])
   })
 
-  it('fails an exemption nothing uses any more: a NOT_PLATFORM name, a jj home, a listed switch (HI-3140)', () => {
+  it('fails an exemption nothing uses any more: a NOT_PLATFORM name, a listed switch (HI-3140)', () => {
     const tiles = 'src/renderer/src/components/AgentTiles.tsx'
     expect(run({ [tiles]: text(tiles).replace("x !== 'none'", "x !== 'auto'") }).switches).toEqual(["src/renderer/src/components/AgentTiles: 0 switches on a platform's id, listed 1"])
     const scan = 'src/renderer/src/components/Antivirus.tsx'
     const noScan = text(scan).replace(/status\.scan === 'none'/g, 'status.scan === null').replace(/case 'none':/g, "case 'off':")
     expect(run({ [scan]: noScan }).switches).toEqual(['NOT_PLATFORM scan: no comparison uses it (stale)'])
-    expect(Object.keys(JJ_HOMES as Record<string, unknown>).every((f) => existsSync(join(root, `${f}.ts`)) || existsSync(join(root, `${f}.tsx`)))).toBe(true)
     expect(Object.values(SWITCHES as Record<string, { class?: string }>).filter((s) => !['data', 'historic', 'gitUi', 'schema'].includes(s.class ?? '')).length).toBe(0)
     expect(Object.values(NOT_PLATFORM as Record<string, string>).every((why) => !!why)).toBe(true)
-  })
-
-  it("fails a production import of a path kept only for the tests (HI-3140: jj's candidate modules moved to the platform layer)", () => {
-    expect(run().compat).toEqual([])
-    const reconcile = 'src/main/workflow/reconcile.ts'
-    expect(run({ [reconcile]: `import { checksKeyOf } from './jjCandidateChecks'\n${text(reconcile)}` }).compat).toEqual(['src/main/workflow/reconcile -> src/main/workflow/jjCandidateChecks'])
-    const win = 'src/main/jjWindow.ts'
-    expect(run({ [win]: `${text(win)}\nconst later = () => import("./workflow/jjCandidateReturn")\n` }).compat).toEqual(['src/main/jjWindow -> src/main/workflow/jjCandidateReturn'])
-    const service = 'src/main/workflow/service.ts'
-    expect(run({ [service]: `${text(service)}\nconst words = require('./jjCandidateReturn')\n` }).compat).toEqual(['src/main/workflow/service -> src/main/workflow/jjCandidateReturn'])
-    // The moved modules themselves, by their new paths: not this check's (the jj edges' below).
-    expect(run({ [reconcile]: `import type { ChecksJournal } from '../platform/jjCandidateChecks'\n${text(reconcile)}` }).compat).toEqual([])
-  })
-
-  it("lists each jj module reached from outside the platform layer, edge by edge and name by name (HI-3140)", () => {
-    expect(run().jj).toEqual([])
-    const edges = JJ_EDGES as Edge[]
-    expect(edges.filter((e) => !['impl', 'registry', 'jjUi', 'defect'].includes(e.class) || !e.why || !e.names?.length || (e.class === 'defect' && !e.card)).map((e) => `${e.file} -> ${e.module}`)).toEqual([])
-    // A new edge from the workflow (the moved candidate modules, by their new path), a name beyond its list, one gone.
-    const reconcile = 'src/main/workflow/reconcile.ts'
-    expect(run({ [reconcile]: `import { checksKeyOf } from '../platform/jjCandidateChecks'\n${text(reconcile)}` }).jj).toEqual(['src/main/workflow/reconcile -> src/main/platform/jjCandidateChecks: unlisted'])
-    const t = text(reconcile)
-    expect(t).toContain('type JjCandidateStep } from')
-    expect(run({ [reconcile]: t.replace('type JjCandidateStep } from', 'type JjCandidateStep, candidateNow } from') }).jj).toEqual(['src/main/workflow/reconcile -> src/main/platform/jjCandidateStep: candidateNow'])
-    const diag = 'src/main/diagnostics.ts'
-    expect(run({ [diag]: text(diag).replace(/^import \{ jjRunner \} from '\.\/platform\/jjRunner'\r?\n/m, '') }).jj).toEqual(['src/main/diagnostics -> src/main/platform/jjRunner: stale'])
-    // jj's homes and the platform layer itself are not edges.
-    const cards = 'src/main/jjCards.ts'
-    expect(run({ [cards]: `import { checksKeyOf } from './platform/jjCandidateChecks'\n${text(cards)}` }).jj).toEqual([])
   })
 
   it('fails a new seam call in a listed file, and one in a file with none', () => {

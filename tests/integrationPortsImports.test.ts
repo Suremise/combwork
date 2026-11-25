@@ -32,7 +32,7 @@ describe("the merge queue's candidate through the integration port", () => {
       ['the merge base', /'merge-base',\s*a,\s*b/]
     ]
     expect(commands.filter(([, re]) => re.test(text)).map(([what]) => what)).toEqual([])
-    expect(importsOf('src/main/workflow/mergeQueue.ts')).not.toContain('src/main/platform/gitIntegration')
+    expect(importsOf('src/main/workflow/mergeQueue.ts')).not.toContain('src/main/platform/git/gitIntegration')
     expect(importsOf('src/main/workflow/mergeQueue.ts')).not.toContain('src/main/workflow/conflictRead')
   })
 
@@ -50,7 +50,7 @@ describe("the merge queue's candidate through the integration port", () => {
     ]
     for (const [file, what, re] of rules) if (re.test(read(file))) found.push(`${file}: ${what}`)
     expect(found).toEqual([])
-    for (const file of ['src/main/workflow/queueHost.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueControls.ts']) expect(importsOf(file), file).not.toContain('src/main/platform/gitIntegration')
+    for (const file of ['src/main/workflow/queueHost.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueControls.ts']) expect(importsOf(file), file).not.toContain('src/main/platform/git/gitIntegration')
   })
 
   it("the port's contract imports no platform's code, only types", () => {
@@ -69,24 +69,6 @@ describe("the merge queue's candidate through the integration port", () => {
       }
     }
     walk('src')
-    expect(files.filter((f) => importsOf(f).includes('src/main/platform/gitIntegration'))).toEqual(['src/main/platform/integrationPorts.ts'])
-  })
-
-  it("HI-3235: jj's advance (J1's probe promoted) is the jj adapter's alone: only src/main/platform imports it, and it imports no port or fact writer", () => {
-    const files: string[] = []
-    const walk = (dir: string): void => {
-      for (const e of readdirSync(join(root, dir))) {
-        const p = `${dir}/${e}`
-        if (statSync(join(root, p)).isDirectory()) walk(p)
-        else if (/\.tsx?$/.test(e)) files.push(p)
-      }
-    }
-    walk('src')
-    // Its facts are the workflow's (advanceHost.ts, through the adapter's AdvanceHost): the workflow, the queue and the
-    // window never reach jj's advance, only the adapter's optional ports (HI-2840's decision: no jj in the app's code).
-    expect(files.filter((f) => importsOf(f).includes('src/main/platform/jjAdvance')).filter((f) => !f.startsWith('src/main/platform/'))).toEqual([])
-    expect(files.filter((f) => importsOf(f).includes('src/main/platform/jjAdvance'))).toEqual(['src/main/platform/jjPlatform.ts'])
-    // HI-3374: and retryBounds (no imports of its own: its rename's retry bound).
-    expect(importsOf('src/main/platform/jjAdvance.ts').sort()).toEqual(['src/main/platform/jjRunner', 'src/main/platform/repoContext', 'src/main/retryBounds'])
+    expect(files.filter((f) => importsOf(f).includes('src/main/platform/git/gitIntegration'))).toEqual(['src/main/platform/integrationPorts.ts'])
   })
 })

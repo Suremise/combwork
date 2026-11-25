@@ -7,6 +7,7 @@
  */
 import type { LiveSessionState, MergeSlotInfo, StoredText, TaskCard, TaskColumn, TaskDecision } from './types'
 import { storedForAgents } from './taskHistory'
+import type { SourceForAgents } from './githubSource'
 import { holderText, minutes, slotLine } from './mergeSlot'
 import { columnLabel, commentSummary } from './tasks'
 import { cardName, cardRef, namedBy, namesFrom, namesOf } from './projectKeys'
@@ -36,6 +37,7 @@ const R = {
   nextReview: agentMsg({ id: 'reply.next.review', text: "Next: a reviewer's verdict.", note: 'What comes next on a card (#1530): it waits for a review.' }),
   nextUser: agentMsg({ id: 'reply.next.user', text: "Next: the user's OK, asked under For you: wait for it.", note: "What comes next on a card (#1530): the user's approval, asked under For you." }),
   nextMerge: agentMsg({ id: 'reply.next.merge', text: 'Next: its builder merges it, then reports the merge (cw_report_merge).', note: 'What comes next on a card (#1530): its builder merges it.' }),
+  nextPullRequest: agentMsg({ id: 'reply.next.pullRequest', text: 'Next: Combwork opens its pull request on GitHub (or follows the one open), and it is done once merged there.', note: 'What comes next on a card (#1530; HI-3552): its finish is a GitHub pull request, which Combwork opens and follows. A statement of fact.' }),
   nextQueue: agentMsg({ id: 'reply.next.queue', text: "Next: Combwork's merge queue merges it.", note: "What comes next on a card (#1530): Combwork's merge queue merges it." }),
   nextDone: agentMsg({ id: 'reply.next.done', text: 'Done: nothing more on it.', note: 'What comes next on a card (#1530): nothing, it is done.' }),
   warning: agentMsg({ id: 'reply.warning', text: 'Warning: {warning}', note: "A warning on a line of its own after a reply (an intent's, a refusal's). {warning} is its text." }),
@@ -357,7 +359,9 @@ export function cardRequests(items: readonly { request: string; kind: string; ga
 }
 
 /** A card as the Agent API shows it: with what its agent is doing now, and why it is stalled. */
-export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'> {
+export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held' | 'source' | 'sourceBody' | 'sourceFeedback'> {
+  /** HI-3551: its GitHub pull request or issue; HI-3553: GitHub's own words only inside it, quoted under a note (outsideText). */
+  source?: SourceForAgents
   /** The user's decisions, first (#357); without their ids. Absent when there are none. */
   decisions?: Omit<TaskDecision, 'id'>[]
   agent: { id: string; name: string; status: string; backgroundTasks: number } | null
@@ -560,6 +564,8 @@ function nextText(n: NextStep): string {
       return say(R.nextMerge)
     case 'queue':
       return say(R.nextQueue)
+    case 'pullRequest':
+      return say(R.nextPullRequest)
     case 'done':
       return say(R.nextDone)
   }

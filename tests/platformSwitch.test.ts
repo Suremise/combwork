@@ -91,26 +91,12 @@ describe('setKept (#1419)', () => {
   })
 })
 
-describe('switchRefused for jj (HI-2799, HI-2896)', () => {
-  it('to jj: a jj repository colocated or not; one not colocated inside a Git working tree refused jjInGit; none noJj', () => {
-    expect(switchRefused('jj', { platform: 'jj', root: 'C:/r', jj: { colocated: true } })).toBeNull()
-    expect(switchRefused('jj', { platform: 'jj', root: 'C:/r', jj: { colocated: false } })).toBeNull()
-    expect(switchRefused('jj', { platform: 'jj', root: 'C:/o/r', jj: { colocated: false, inGit: 'C:/o' } })).toEqual({ why: 'jjInGit', root: 'C:/o' })
-    expect(switchRefused('jj', { platform: 'git', root: 'C:/r' })).toEqual({ why: 'noJj' })
-  })
-  it('back to Git: colocated is main’s to check; not colocated has no Git working copy (jjNoGitCopy); None always', () => {
-    expect(switchRefused('git', { platform: 'jj', root: 'C:/r', jj: { colocated: true } })).toBeNull()
-    expect(switchRefused('git', { platform: 'jj', root: 'C:/r', jj: { colocated: false } })).toEqual({ why: 'jjNoGitCopy' })
-    expect(switchRefused('none', { platform: 'jj', root: 'C:/r', jj: { colocated: false } })).toBeNull()
-  })
-})
-
 describe('switchRefused (#1419)', () => {
   it('Git only where a Git repository is found and nothing else is; None always', () => {
     expect(switchRefused('git', { platform: 'git', root: 'C:/r' })).toBeNull()
     expect(switchRefused('git', { platform: 'none' })).toEqual({ why: 'noGit' })
     expect(switchRefused('git', { platform: 'none', other: 'Mercurial' })).toEqual({ why: 'otherFound', vcs: 'Mercurial' })
-    for (const d of [{ platform: 'none' as const }, { platform: 'git' as const, root: 'C:/r' }, { platform: 'none' as const, other: 'Jujutsu' }]) expect(switchRefused('none', d)).toBeNull()
+    for (const d of [{ platform: 'none' as const }, { platform: 'git' as const, root: 'C:/r' }, { platform: 'none' as const, other: 'Mercurial' }]) expect(switchRefused('none', d)).toBeNull()
   })
 })
 
@@ -136,8 +122,8 @@ describe('switching a project (#1419)', () => {
     expect(platformOf(w, repo).offer).toBeUndefined()
   })
 
-  it('to None is never refused for what is detected: a Git repository, Mercurial, colocated jj+git', async () => {
-    for (const marker of [null, '.hg', '.jj']) {
+  it('to None is never refused for what is detected: a Git repository, Mercurial, Subversion', async () => {
+    for (const marker of [null, '.hg', '.svn']) {
       const { w, repo } = await workspace({ platform: 'git', workflow: { platform: 'git', preset: null, options: {} } })
       if (marker) mkdirSync(join(repo, marker))
       await w.refresh()
@@ -155,10 +141,8 @@ describe('switching a project (#1419)', () => {
         mkdirSync(join(repo, marker))
         await w.refresh()
       }
-      // Back to Git: refused while the other version control is there.
-      // HI-2799: a .jj makes Git the repository's switch (jj's fallback): refused here, no drained group shown.
-      if (marker === '.hg') await expect(sw.setPlatform(w, repo, 'git')).rejects.toThrow(/not supported yet/)
-      if (marker === '.jj') await expect(sw.setPlatform(w, repo, 'git')).rejects.toThrow()
+      // Back to Git: refused while the other version control is there (Subversion's as Mercurial's).
+      if (marker) await expect(sw.setPlatform(w, repo, 'git')).rejects.toThrow(/not supported yet/)
     }
   })
 

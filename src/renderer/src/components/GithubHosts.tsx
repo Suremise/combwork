@@ -40,7 +40,7 @@ function Origin({ origin }: { origin: GithubHostOrigin }) {
   if (origin === 'environment') return <>{tr(T.environment)}</>
   if (origin === 'default') return <>{tr(ORIGIN_TEXT.platform)}</>
   if (origin === 'project') return <>{tr(ORIGIN_TEXT.project)}</>
-  return <OriginText origin="workspace" />
+  return <OriginText origin="workspace" at={{ key: 'github', platform: 'git' }} />
 }
 
 export function GithubHosts({ projectPath }: { projectPath: string | null }) {

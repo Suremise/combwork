@@ -1,6 +1,8 @@
 // Types shared by the main process, preload bridge and renderer.
 
 import type { SessionEnd } from './sessionEnd'
+import type { GithubSource } from './githubSource'
+import type { FeedbackItem } from './prFeedback'
 import type { JournalSettings } from './journal'
 import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
@@ -26,7 +28,7 @@ import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
-import type { StoreSwitch, SwitchRefusal } from './platform/switching'
+import type { SwitchRefusal } from './platform/switching'
 import type { Contradiction, PresetId, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
@@ -1239,7 +1241,7 @@ export interface HiddenProject {
 export type TaskColumn = 'hold' | 'todo' | 'doing' | 'review' | 'passed' | 'done'
 
 /** A column of the board (#1420): a category's, or `merging`, a stage with a column of its own inside Approved. */
-export type BoardColumnId = TaskColumn | 'merging'
+export type BoardColumnId = TaskColumn | 'merging' | 'prOpen'
 
 /** A board as the user left it (a view preference, never in the cards' files): collapsed columns and folded cards. */
 export interface BoardFold {
@@ -1315,6 +1317,15 @@ export interface TaskCard {
   blockedBy: number[]
   /** Related cards. */
   links: number[]
+  /** HI-3551: the GitHub pull request or issue it is about (set by the user while it has never started); absent for most. */
+  source?: GithubSource
+  /** HI-3553: its source's body on GitHub (at most SOURCE_BODY_MAX): outside text, given to agents only quoted under a note. */
+  sourceBody?: string
+  /**
+   * HI-3554: a fix card's pull request feedback, the comments the user chose to address ("Address feedback"), beside its
+   * source: outside text, given to agents only quoted under the source's note. Absent for most.
+   */
+  sourceFeedback?: FeedbackItem[]
   /**
    * Doc sections the agent reads first (#818): references by file and heading, never by line (`docs/PLAN.md#setup`,
    * `shared:plans/notes.md#open-questions`; shared/docRefs.ts). Absent when none.
@@ -1778,7 +1789,7 @@ export interface RetargetPreview {
    * as checked, and its own target then, which the apply expects); one that can't stays with why.
    */
   cards: { move: { number: number; key: string; title: string; started?: { head: string; own: string | null } }[]; keep: { number: number; key: string; title: string; why: RetargetCardKeep }[] }
-  slots: { move: { name: string; folder: string; target: string | null; head: string }[]; keep: { name: string; why: 'lent' | 'dirty' | 'busy' | 'unmerged' | 'cantCheck' | 'kept' }[] }
+  slots: { move: { name: string; folder: string; target: string | null; head: string }[]; keep: { name: string; why: 'lent' | 'dirty' | 'busy' | 'unmerged' | 'cantCheck' }[] }
   /** Running lanes on `from` that stay, with why (none given: more than one card of it in flight). */
   lanes: { id: string; name: string | null; builder: string; why?: RetargetCardKeep }[]
   /** HI-2753: running lanes on `from` that move to `to`, each with its card in flight (moved with it in one write), if any. */
@@ -1786,7 +1797,7 @@ export interface RetargetPreview {
 }
 
 /** Why a card stays on the old target in a retarget (HI-2680, HI-2753): its own work, or why its move in flight can't be made. */
-export type RetargetCardKeep = 'work' | 'started' | 'cantCheck' | 'queued' | 'notInTarget' | 'reviewed' | 'noLine' | 'refused' | 'line' | 'kept' | 'lane'
+export type RetargetCardKeep = 'work' | 'started' | 'cantCheck' | 'queued' | 'notInTarget' | 'reviewed' | 'noLine' | 'refused' | 'line' | 'lane'
 
 /** What a retarget did (HI-2680): each item moved, or skipped with why (never all or nothing). */
 export interface RetargetResult {
@@ -1794,7 +1805,7 @@ export interface RetargetResult {
   to: string
   moved: { cards: { number: number; key: string }[]; slots: string[]; lanes?: string[] }
   /** A card's (`card`, `key`) or a slot's (`slot`), with why it didn't move. */
-  skipped: { card?: number; key?: string; slot?: string; lane?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed' | 'fixed'; detail?: string }[]
+  skipped: { card?: number; key?: string; slot?: string; lane?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed'; detail?: string }[]
 }
 
 export interface KeptTargets {
@@ -1818,8 +1829,6 @@ export interface PlatformSwitchCheck {
   gitFolder: boolean
   /** A card in flight goes through Combwork's merge queue (its ruleset's): the queue carries on, and stays shown. */
   queue: boolean
-  /** A switch between Git and jj (HI-2799): the repository's projects switch together, after a drain. */
-  store?: StoreSwitch
 }
 
 /** A project's Session tab as this user left it (AppConfig.ui.projectViews, HI-1749): ProjectConfig's view fields. */
@@ -1952,6 +1961,8 @@ export interface ProjectConfig {
   slots?: SlotOptions
   /** The project's own GitHub host and Copilot sign-in host (HI-2779), over its workspace's. */
   github?: GithubHostSettings
+  /** HI-3550: the remote whose repository is the project's GitHub link, when several are on its GitHub host (left out: origin, or the only one). */
+  githubRemote?: string
   /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
   copies?: { size?: number }
   /** From before HI-1766 (Project Settings → Card loops): see `fileLocks`. */
@@ -1959,30 +1970,6 @@ export interface ProjectConfig {
   loopRounds?: number | null
   loopWaitHours?: number | null
   loopStepWaitMinutes?: number | null
-}
-
-/**
- * HI-3134: a stale jj slot's recovery refused `divergent`: the commit its folder holds (`folder`) is still in jj beside
- * the commit jj's latest operation gives the slot (`head`); `same`: one change, divergent. Full commit ids.
- */
-export interface SlotRecoverDivergent {
-  folder: string
-  head: string
-  same: boolean
-}
-
-/**
- * What a stale jj slot's recovery did (HI-2996, the window's Recover…): how many files it put back as they were, each copy
- * it wrote beside a file that changed meanwhile (relative to the slot, with `/`), the files deleted there that it kept
- * (changed or back meanwhile), and the commit jj made of the folder that it kept (divergent), if any.
- */
-export interface SlotRecovery {
-  restored: number
-  copies: { path: string; copy: string }[]
-  /** Files it moved aside and left there, the version before the recovery: their path was created again meanwhile. */
-  asides: { path: string; copy: string }[]
-  keptDeleted: string[]
-  divergent: string | null
 }
 
 /** One of a project's slots as the window reads it (#1429, slots.ts): its state and its open lease, if any. */
@@ -2000,26 +1987,14 @@ export interface SlotView {
    * frees it.
    */
   writer: { agent: string; lease: string; held: boolean } | null
+  /** HI-3464: free and gone (its folder missing, or there but not a worktree git lists): Remove… forgets it. */
+  goneFree?: true
   /**
-   * HI-2869: the platform that made it, when its workspaces are its own commands' records (jj's; HI-3140: `ownedWorkspaces`),
-   * and, for such a slot, stale (another workspace rewrote it).
+   * HI-3465: free, with a git operation left under way in it (git's word for it), as its last settle found it, and since when.
+   * HI-3467: `what` `detach`: its detach at `target` failed in settles in a row (shown once it repeats), `error` git's own
+   * error line (English, never translated; '' when git said none: the target's branch isn't there).
    */
-  platform?: PlatformId
-  stale?: true
-  /** HI-3135: a stale jj slot whose checkout's operation the user's `jj op abandon` discarded (absent: another workspace rewrote it). */
-  staleWhy?: 'abandoned'
-  /** HI-2995: a jj slot kept for a card put back with committed work not in its target yet: that card's number. */
-  keptFor?: number
-  /** HI-3143: kept for that card's uncommitted edit (or files jj doesn't track), not commits. */
-  keptEdit?: true
-  /**
-   * HI-3032: a kept slot whose folder is gone (state `gone`): the generation it was kept at (Remove… sends it back, so only
-   * that slot is removed) and its work's last commit, as recorded when its card's lease ended (null: none recorded).
-   * HI-3097 `forgotten`: its folder is there, jj no longer listing its workspace (forgotten outside Combwork).
-   */
-  keptGone?: { generation: string; commit: string | null; forgotten?: true }
-  /** HI-3103: kept for no card, its workspace forgotten outside Combwork, its folder there: its generation, for Remove…. */
-  forgotten?: { generation: string }
+  operation?: { what: string; since: number; error?: string; target?: string }
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */
@@ -2966,6 +2941,11 @@ export interface LiveSessionState {
   backgroundTasks?: number
   /** When its background tasks last ended (ISO: the count went to none), so a review waiting on them starts its clock then (HI-1993). */
   backgroundEndedAt?: string
+  /**
+   * HI-3561: its background tasks Combwork stopped counting after the time limit, not seen to end since. Its turn ended
+   * with no card watch, it may still be waiting on one (a subagent's long run), or one ended without waking it.
+   */
+  tasksUncounted?: number
   /** The running conversation's transcript size in bytes, once the provider has written one. */
   transcriptBytes?: number
   /** The start of its latest reply, as its last turn's end reported it (shared/tiles.ts replyStart): its tile's last lines (#976). */
@@ -4005,7 +3985,8 @@ export interface ReadinessIssue {
   message: string
   /** Button: a provider task Combwork runs in a terminal. */
   /** `host`: the GitHub host a sign-in is for (HI-2779), where the CLI signs in per host. */
-  action?: { label: string; task: ProviderTask; host?: string }
+  /** `opens`: the button opens that place instead of running the task (HI-3490: no account to set up on, Accounts & Connections). */
+  action?: { label: string; task: ProviderTask; host?: string; opens?: 'connections' }
   /** Shown in Provider Setup with the button: what the task will ask and how to choose (paragraphs, `code` allowed). */
   detail?: string[]
 }
@@ -4040,6 +4021,8 @@ export interface FileGitInfo {
   repo: boolean
   branch: string | null
   items: FileGitItem[]
+  /** HI-3477: the project's target branch (Restore From's), when it has one. */
+  target?: string | null
 }
 
 /** The file of a rule outside the Files tab's tree, for Why is this ignored?'s viewer: as git names it, its full path, its text, and the rule's line and pattern. */
@@ -4684,13 +4667,12 @@ export interface ReleaseOfferPart {
 export interface LaneStartInfo {
   pool: { id: string; name: string }[] | null
   /** The branches its Merges into offers (HI-2556): the project's Work merges into and the others it lists; null: none to pick. */
-  /** HI-3129: `fixedInFlight`, a card in flight keeps its target (its platform can't move started work). */
-  targets: { default: string; others: string[]; othersUnread?: true; fixedInFlight?: true } | null
+  targets: { default: string; others: string[] } | null
 }
 
 /**
  * HI-3129: where a card waiting to start would start when that isn't the Merges into its dialog shows (main's
- * `tasks.keptTarget`): its kept work's branch or bookmark, or `unknown` when that can't be read; null: where it shows.
+ * `tasks.keptTarget`): its kept work's branch, or `unknown` when that can't be read; null: where it shows.
  */
 export type KeptTargetShown = { target: string } | { unknown: true } | null
 
@@ -4892,8 +4874,6 @@ export interface ProgressRun {
    * it, and it can be stopped from the panel: its processes are in the copy's job).
    */
   copy?: string
-  /** HI-2938: Combwork's own run in a check copy whose processes are its lease's job (a jj candidate's check): Stop ends them. */
-  stoppable?: boolean
 }
 
 /**

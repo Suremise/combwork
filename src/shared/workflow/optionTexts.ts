@@ -3,8 +3,8 @@
 // settings catalog's rows the Assistant sets them by. Kept as messages, shown with tr() where they are rendered.
 
 import { msg, type Msg } from '../i18n/msg'
-import { accepts, merges, type PlatformId } from '../platform/descriptors'
-import type { FormGroupId, OptionKey, PresetId } from './options'
+import { accepts, type PlatformId } from '../platform/descriptors'
+import type { FormGroupId, FormTabId, OptionKey, PresetId } from './options'
 import type { LaneEvent, WakeLevel } from '../laneEvents'
 
 interface OptionText {
@@ -14,8 +14,6 @@ interface OptionText {
   none?: Msg
   /** Git's label with everyone in the project folder, where it differs (G1: the work is on the target meanwhile). */
   shared?: Msg
-  /** Its label and what it does where the user integrates (jj, HI-2871): it shapes the candidate Combwork builds. */
-  integrates?: { title: Msg; desc: Msg }
 }
 
 /** Each option the form shows: its label (Git's; None's where it differs) and what it does. */
@@ -44,23 +42,11 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   },
   finish: {
     title: msg({ id: 'workflow.option.finish.title', defaultMessage: 'Who merges', description: 'A workflow option (glossary 2.6, G5).' }),
-    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, or whenever it is moved there.', description: 'What the workflow option “Who merges” does (glossary 2.1: merge queue).' }),
-    integrates: {
-      title: msg({ id: 'workflow.option.finish.jjTitle', defaultMessage: 'Who integrates', description: 'The workflow option “Who merges” (G5) for a project using jj (HI-3235): who moves the target bookmark to a passed card’s candidate.' }),
-      desc: msg({
-        id: 'workflow.option.finish.jjDesc',
-        defaultMessage: 'Once a card passes and its merge checks pass on its candidate, Combwork moves the target bookmark to the candidate, after you click Integrate on its preview, or you do it yourself. Combwork refuses first when anything is unexpected, and stops and tells you when it sees something change during the move. jj can’t make that move conditional, so a few races can still happen while Combwork moves it: a bookmark moved away and back, a move to an earlier commit of the candidate, or a Git checkout or another bookmark changed during the export. The preview decides when the move runs and what you agree to, but once you click it has the same races. Only You integrate it yourself avoids them.',
-        description: 'What the workflow option “Who integrates” does, for a project using jj (HI-3235, HI-2840/s30 and s34): the four residual races, in plain words; never call it safe. A bookmark is jj’s name for a branch: keep it as jj’s term. “You integrate it yourself” is the option’s other value, as translated there.'
-      })
-    }
+    desc: msg({ id: 'workflow.option.finish.desc', defaultMessage: 'When a card is done: once Combwork’s merge queue has merged it, once its agent has merged it and Combwork finds the work in the target branch, once it is committed, whenever it is moved there, or once its pull request is merged on GitHub.', description: 'What the workflow option “Who merges” does (glossary 2.1: merge queue).' }),
   },
   style: {
     title: msg({ id: 'workflow.option.style.title', defaultMessage: 'Merge style', description: 'A workflow option (glossary 2.6, G6).' }),
     desc: msg({ id: 'workflow.option.style.desc', defaultMessage: 'How a card’s work is merged into the target branch.', description: 'What the workflow option “Merge style” does.' }),
-    integrates: {
-      title: msg({ id: 'workflow.option.style.jjTitle', defaultMessage: 'Candidate style', description: 'The workflow option “Merge style” (G6) for a project using jj (HI-2871): how the candidate commit Combwork builds for the user to integrate is made (merge commit, squash or rebase). Candidate: the commit Combwork builds.' }),
-      desc: msg({ id: 'workflow.option.style.jjDesc', defaultMessage: 'Once a card passes, Combwork builds a candidate from it on the target bookmark: a merge commit, one squashed commit, or its commits copied on top. Who integrates says whether Combwork or you then move the bookmark to it.', description: 'What the workflow option “Candidate style” does, for a project using jj (HI-2871, HI-3235). A bookmark is jj’s name for a branch: keep it as jj’s term. “Who integrates” is another option’s name, as translated there.' })
-    }
   },
   target: {
     title: msg({ id: 'workflow.option.target.title', defaultMessage: 'Work merges into', description: 'A workflow option (glossary 2.6, G7): the target branch.' }),
@@ -73,18 +59,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   mergeChecks: {
     title: msg({ id: 'workflow.option.mergeChecks.title', defaultMessage: 'Checks pass on the merged result', description: 'A workflow option (glossary 2.6, G9): named commands Combwork’s merge queue runs on a card’s work merged with the target branch.' }),
     desc: msg({ id: 'workflow.option.mergeChecks.desc', defaultMessage: 'Combwork’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.', description: 'What the workflow option “Checks pass on the merged result” does (glossary 2.1: merge queue).' }),
-    integrates: {
-      title: msg({ id: 'workflow.option.mergeChecks.jjTitle', defaultMessage: 'Checks pass on the candidate', description: 'The workflow option “Checks pass on the merged result” (G9) for a project using jj (HI-2938): named commands Combwork runs on the candidate it builds for the user to integrate. Candidate: the commit Combwork builds.' }),
-      desc: msg({ id: 'workflow.option.mergeChecks.jjDesc', defaultMessage: 'Combwork runs these named commands on the candidate, in a check copy of its own, and offers the candidate for you to integrate only once each one has passed. One that fails sends the card back to its builder.', description: 'What the workflow option “Checks pass on the candidate” does, for a project using jj (HI-2938). A check copy is a working folder Combwork keeps for checks (glossary).' })
-    }
   },
   mergeGuards: {
     title: msg({ id: 'workflow.option.mergeGuards.title', defaultMessage: 'Merge guards', description: 'A workflow option (HI-3284): patterns (regular expressions) Combwork refuses in the lines a merge adds. A guard here is a check that keeps something out, not a person.' }),
     desc: msg({ id: 'workflow.option.mergeGuards.desc', defaultMessage: 'Patterns a merge may not add, matched against only the lines it adds (never what the target already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.', description: 'What the workflow option “Merge guards” does (HI-3284): each guard is a regular expression checked against the text lines a merge adds; a match returns the card. Secret scanning: tools that look for passwords and keys; say plainly that this is not one.' }),
-    integrates: {
-      title: msg({ id: 'workflow.option.mergeGuards.jjTitle', defaultMessage: 'Merge guards', description: 'The workflow option “Merge guards” (HI-3284) for a project using jj: the same name.' }),
-      desc: msg({ id: 'workflow.option.mergeGuards.jjDesc', defaultMessage: 'Patterns a candidate may not add, matched against only the lines it adds to the target bookmark (never what it already has, nor binary files): a match sends the card back to its builder with the guard’s message, and as a pattern catches only what you name, this isn’t secret scanning.', description: 'What the workflow option “Merge guards” does for a project using jj (HI-3284). A candidate is the commit Combwork builds for the user to integrate; a bookmark is jj’s name for a branch: keep it as jj’s term. Secret scanning: tools that look for passwords and keys.' })
-    }
   },
   focusedTests: {
     title: msg({ id: 'workflow.option.focusedTests.title', defaultMessage: 'Each card’s focused tests pass on the merged result', description: 'A workflow option (glossary 2.6, G20): the tests a card’s change needs are chosen when it is submitted, and Combwork’s merge queue runs them on its work merged with the target branch.' }),
@@ -93,10 +71,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   strict: {
     title: msg({ id: 'workflow.option.strict.title', defaultMessage: 'Work is up to date with its target branch before it merges', description: 'A workflow option (glossary 2.6, G8, strict): a card’s work must contain the target branch’s latest commit before it is merged; Combwork’s merge queue brings it up to date itself.' }),
     desc: msg({ id: 'workflow.option.strict.desc', defaultMessage: 'When the target branch has moved on since the review, the merge queue brings the work up to date in its own folder first, and returns the card if that conflicts or makes a different change.', description: 'What the workflow option “Work is up to date with its target branch before it merges” does (glossary 2.1: merge queue; Squash is the merge style’s value).' }),
-    integrates: {
-      title: msg({ id: 'workflow.option.strict.jjTitle', defaultMessage: 'The candidate brings work up to date first', description: 'The workflow option “Work is up to date with its target branch before it merges” (G8, strict) for a project using jj (HI-2871): before building the candidate the user integrates, Combwork brings the card’s work up to date with the target bookmark.' }),
-      desc: msg({ id: 'workflow.option.strict.jjDesc', defaultMessage: 'When the target bookmark has moved on since the review, Combwork first brings the work up to date with it (merged in, or rebased with Squash), then builds the candidate on that, and returns the card if that conflicts or makes a different change. Rebase builds its candidate on the bookmark anyway.', description: 'What the workflow option “The candidate brings work up to date first” does, for a project using jj (HI-2871). A bookmark is jj’s name for a branch; Squash and Rebase are the candidate style’s values.' })
-    }
+  },
+  prDraft: {
+    title: msg({ id: 'workflow.option.prDraft.title', defaultMessage: 'Open pull requests as drafts', description: 'HI-3552: a workflow option (G22), in the GitHub tab, shown when “Who merges” is “A pull request”: the pull request Combwork opens for an approved card is a draft (on, the default) or ready for review (off).' }),
+    desc: msg({ id: 'workflow.option.prDraft.desc', defaultMessage: 'On, each pull request opens as a draft for you to mark ready on GitHub; off, it opens ready for review.', description: 'HI-3552: what the workflow option “Open pull requests as drafts” does. Draft and ready for review are GitHub’s names for a pull request’s two states: use GitHub’s own words in your language where it has them.' })
   },
   pushTarget: {
     title: msg({ id: 'workflow.option.pushTarget.title', defaultMessage: 'Push the target branch after merging', description: 'A workflow option (glossary 2.6, G18): after Combwork’s merge queue merges a card, it pushes the target branch to its remote.' }),
@@ -110,13 +88,17 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     title: msg({ id: 'workflow.option.commitMessage.title', defaultMessage: 'Commit message', description: 'A workflow option (glossary 2.6, G19): the message of the commit Combwork’s merge queue makes when it merges a card (a merge commit, or a squash’s one commit).' }),
     desc: msg({ id: 'workflow.option.commitMessage.desc', defaultMessage: 'The message of the commit the merge queue makes: Combwork’s names the card’s key and title and adds Combwork’s trailers, and the branch’s own uses the message its commits have, with no card key or trailers, while Combwork still knows which card it merged.', description: 'What the workflow option “Commit message” does (glossary 2.1: merge queue). Trailers are git’s name for the “Key: value” lines at the end of a commit message: keep the word if your language’s git terms do.' })
   },
+  githubFeedback: {
+    title: msg({ id: 'workflow.option.githubFeedback.title', defaultMessage: 'Feedback to GitHub', description: 'A workflow option (HI-3559): who writes the review Combwork posts on a pull request a card was made from (GitHub tab).' }),
+    desc: msg({ id: 'workflow.option.githubFeedback.desc', defaultMessage: 'What goes back to a pull request a card was made from, posted through your GitHub CLI as your own account, always as a comment review (approving and merging stay yours): each reviewer agent’s verdict as it is given, the reviews you write on the card, or the agent’s verdict drafted on the card for you to edit and post.', description: 'What the workflow option “Feedback to GitHub” does (HI-3559). GitHub CLI is a product name; a comment review is GitHub’s kind of review that neither approves nor requests changes.' })
+  },
+  githubFooter: {
+    title: msg({ id: 'workflow.option.githubFooter.title', defaultMessage: 'Say which model drafted it', description: 'A workflow option (HI-3559): text an agent wrote, posted to GitHub, ends with a line naming the model.' }),
+    desc: msg({ id: 'workflow.option.githubFooter.desc', defaultMessage: 'An agent’s review, posted as your account, ends with a line naming the model that drafted it, such as “Drafted by Opus 5.5 in Combwork”, which reviews you write yourself never carry.', description: 'What the workflow option “Say which model drafted it” does (HI-3559). Keep the quoted line in English: it is posted to GitHub as written (Opus 5.5 is an example of a model’s name).' })
+  },
   mergeInstall: {
     title: msg({ id: 'workflow.option.mergeInstall.title', defaultMessage: 'Install dependencies from scratch', description: 'A workflow option (G9’s install): when the merge queue installs the project’s dependencies afresh before the merge checks.' }),
     desc: msg({ id: 'workflow.option.mergeInstall.desc', defaultMessage: 'Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.', description: 'What the workflow option “Install dependencies from scratch” does. Lock file: as in the glossary (G15 value).' }),
-    integrates: {
-      title: msg({ id: 'workflow.option.mergeInstall.jjTitle', defaultMessage: 'Install dependencies from scratch', description: 'The workflow option “Install dependencies from scratch” for a project using jj (HI-2938): before the checks on the candidate.' }),
-      desc: msg({ id: 'workflow.option.mergeInstall.jjDesc', defaultMessage: 'Before the checks on a candidate, its check copy installs the dependencies afresh: always, or when the lock file or manifests changed.', description: 'What the workflow option “Install dependencies from scratch” does, for a project using jj (HI-2938). A check copy is a working folder Combwork keeps for checks. Lock file: as in the glossary.' })
-    }
   },
   okBefore: {
     title: msg({ id: 'workflow.option.okBefore.title', defaultMessage: 'Your OK before merging', description: 'A workflow option (glossary 2.6, G10).' }),
@@ -219,9 +201,7 @@ export const VALUE_TEXT = {
     agentMerges: msg({ id: 'workflow.value.finish.agentMerges', defaultMessage: 'The agent merges, Combwork checks', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     committed: msg({ id: 'workflow.value.finish.committed', defaultMessage: 'Committed is done', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     notChecked: msg({ id: 'workflow.value.finish.notChecked', defaultMessage: 'Not checked', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
-    combworkAdvances: msg({ id: 'workflow.value.finish.combworkAdvances', defaultMessage: 'Combwork integrates after the checks', description: 'A value of the workflow option “Who integrates” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-3235): once a card passes and its merge checks pass on its candidate, Combwork moves the target bookmark to the candidate itself. The default for jj.' }),
-    previewAdvance: msg({ id: 'workflow.value.finish.previewAdvance', defaultMessage: 'Combwork integrates when you click', description: 'A value of the workflow option “Who integrates” (glossary 2.6, G5) for a project using jj (HI-3236): once a card passes and its merge checks pass, For you shows what Combwork would move (the preview), and Combwork moves the target bookmark only when you click Integrate.' }),
-    userIntegrates: msg({ id: 'workflow.value.finish.userIntegrates', defaultMessage: 'You integrate it yourself', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj; you bring the reviewed work into its target with jj.' })
+    pullRequest: msg({ id: 'workflow.value.finish.pullRequest', defaultMessage: 'A pull request', description: 'HI-3552: a value of the workflow option “Who merges” (G5): once a card is approved, Combwork pushes its branch and opens a GitHub pull request, and the card is done when it is merged on GitHub.' }),
   },
   style: {
     merge: msg({ id: 'workflow.value.style.merge', defaultMessage: 'Merge commit', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6).' }),
@@ -232,10 +212,14 @@ export const VALUE_TEXT = {
     combwork: msg({ id: 'workflow.value.commitMessage.cw', defaultMessage: 'Combwork’s: the card’s key and title, with trailers', description: 'A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Combwork’s trailers (Combwork-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end.' }),
     branch: msg({ id: 'workflow.value.commitMessage.branch', defaultMessage: 'The branch’s own, with no card key or trailers', description: 'A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Combwork’s trailers. Trailers: git’s “Key: value” lines at a message’s end.' })
   },
+  githubFeedback: {
+    agent: msg({ id: 'workflow.value.githubFeedback.agent', defaultMessage: 'The agent: its verdict is posted as it is given', description: 'A value of the workflow option “Feedback to GitHub” (HI-3559): each reviewer agent’s verdict on a pull request’s card is posted to GitHub automatically.' }),
+    user: msg({ id: 'workflow.value.githubFeedback.user', defaultMessage: 'You: you write and post it on the card', description: 'A value of the workflow option “Feedback to GitHub” (HI-3559): nothing is posted unless the user writes a review on the card and posts it.' }),
+    both: msg({ id: 'workflow.value.githubFeedback.both', defaultMessage: 'Both: the agent drafts, you edit and post', description: 'A value of the workflow option “Feedback to GitHub” (HI-3559): a reviewer agent’s verdict is drafted on the card, and the user edits it and posts it with one button.' })
+  },
   mergeInstall: {
     onManifestChange: msg({ id: 'workflow.value.mergeInstall.onManifestChange', defaultMessage: 'When the lock file or manifests change', description: 'A value of the workflow option “Install dependencies from scratch”: only when the project’s lock file or package manifests changed (glossary: lock file, as in the G15 value).' }),
     always: msg({ id: 'workflow.value.mergeInstall.always', defaultMessage: 'Before every merge', description: 'A value of the workflow option “Install dependencies from scratch”: before each card’s merge checks.' }),
-    alwaysCandidate: msg({ id: 'workflow.value.mergeInstall.alwaysCandidate', defaultMessage: 'Before every candidate’s checks', description: 'The value “always” of the workflow option “Install dependencies from scratch” in a project using jj (HI-2938): before the merge checks on each candidate (the commit Combwork builds for the user to integrate).' })
   },
   okBefore: {
     never: msg({ id: 'workflow.value.okBefore.never', defaultMessage: 'Never', description: 'A value of the workflow option “Your OK before merging” (glossary 2.6, G10).' }),
@@ -308,19 +292,11 @@ export const optionTitle = (key: OptionKey, platform: PlatformId, folder?: 'slot
   if (!t) return null
   // `none`: the label where work is accepted, not merged (None's N options; HI-2822: by the descriptor).
   if (accepts(platform)) return t.none ?? t.title
-  if (userIntegrates(platform) && t.integrates) return t.integrates.title
   return folder === 'project' && t.shared ? t.shared : t.title
 }
 
-/** Where the user integrates (jj, HI-2794's decision A): neither merged by Combwork's queue nor accepted. */
-const userIntegrates = (platform: PlatformId): boolean => !merges(platform) && !accepts(platform)
-
-/** What an option does, for a platform: where the user integrates, its candidate's words (HI-2871). */
-export const optionDesc = (key: OptionKey, platform: PlatformId): Msg | null => {
-  const t = OPTION_TEXT[key]
-  if (!t) return null
-  return userIntegrates(platform) && t.integrates ? t.integrates.desc : t.desc
-}
+/** What an option does, for a platform. */
+export const optionDesc = (key: OptionKey, _platform: PlatformId): Msg | null => OPTION_TEXT[key]?.desc ?? null
 
 /** The Workflow section's group headings (#1418). */
 export const GROUP_TEXT: Record<FormGroupId, Msg> = {
@@ -328,10 +304,23 @@ export const GROUP_TEXT: Record<FormGroupId, Msg> = {
   review: msg({ id: 'workflow.group.review', defaultMessage: 'Review', description: 'A heading of the Version Control tab’s Workflow section: the options about reviewing a card’s work.' }),
   checks: msg({ id: 'workflow.group.checks', defaultMessage: 'Checks', description: 'A heading of the Workflow section: the options about the checks that must pass (glossary 2.3: checks).' }),
   merging: msg({ id: 'workflow.group.merging', defaultMessage: 'Merging', description: 'A heading of the Workflow section (Git): the options about how and where work is merged.' }),
+  pullRequests: msg({ id: 'workflow.group.pullRequests', defaultMessage: 'Pull requests', description: 'HI-3552: a heading of the Workflow section’s GitHub tab: the options about the pull requests Combwork opens.' }),
   where: msg({ id: 'workflow.group.where', defaultMessage: 'Where cards are built', description: 'A heading of the Workflow section (Git): the options about the folders cards are built in and the commits made there (glossary 2.6, G11).' }),
+  githubFeedback: msg({ id: 'workflow.group.github', defaultMessage: 'Feedback to GitHub', description: 'A heading of the Workflow section’s GitHub tab (HI-3559): what goes back to a pull request a card was made from.' }),
   work: msg({ id: 'workflow.group.work', defaultMessage: 'The work', description: 'A heading of the Workflow section for a project without version control: what a card’s work is, and when cards start.' }),
   loops: msg({ id: 'workflow.group.loops', defaultMessage: 'Card loops', description: 'A heading of the Workflow section: how card loops run, a builder and a reviewer taking cards in turn (glossary: card loop).' }),
   stages: msg({ id: 'workflow.group.stages', defaultMessage: 'Stages', description: 'A heading of the Workflow section: the names of the board’s stages (glossary 2.2: stage).' })
+}
+
+/** The Workflow form's tabs (HI-3549), each named for the groups it holds. */
+export const TAB_TEXT: Record<FormTabId, Msg> = {
+  overview: msg({ id: 'workflow.tab.overview', defaultMessage: 'Overview', description: 'A tab of the Workflow form (Version Control → Workflow, and the workflow defaults in Settings; HI-3549): the preset picker and what it sets.' }),
+  checks: msg({ id: 'workflow.tab.checks', defaultMessage: 'Review & checks', description: 'A tab of the Workflow form (HI-3549): the team size, the review options and the checks that must pass (glossary 2.3: checks).' }),
+  merging: msg({ id: 'workflow.tab.merging', defaultMessage: 'Merging', description: 'A tab of the Workflow form (Git; HI-3549): how and where work is merged.' }),
+  where: msg({ id: 'workflow.tab.where', defaultMessage: 'Where cards are built', description: 'A tab of the Workflow form (Git; HI-3549): the folders cards are built in (slots, glossary 2.5), the commits made there and file locks. As the group heading “Where cards are built”.' }),
+  github: msg({ id: 'workflow.tab.github', defaultMessage: 'GitHub', description: 'A tab of the Workflow form (Git; HI-3549): the GitHub hosts the project or workspace uses. GitHub is a name: keep it.' }),
+  work: msg({ id: 'workflow.tab.work', defaultMessage: 'The work', description: 'A tab of the Workflow form for a project without version control (HI-3549): what a card’s work is, and when cards start. As the group heading “The work”.' }),
+  loops: msg({ id: 'workflow.tab.loops', defaultMessage: 'Loops & stages', description: 'A tab of the Workflow form (HI-3549): how card loops run (glossary: card loop) and the names of the board’s stages (glossary 2.2: stage).' })
 }
 
 /**
@@ -382,11 +371,5 @@ export const PRESET_SUMMARY: Record<PlatformId, Partial<Record<PresetId, Msg>>> 
     solo: msg({ id: 'workflow.summary.none.solo', defaultMessage: 'No review: a card is done when its builder submits it.', description: 'What the Solo preset sets up, for a project without version control.' }),
     pair: msg({ id: 'workflow.summary.none.pair', defaultMessage: 'A reviewer agent checks each card, after the quick checks pass.', description: 'What the Pair preset sets up, for a project without version control.' }),
     team: msg({ id: 'workflow.summary.none.team', defaultMessage: 'A reviewer agent, then you, check each card, after the quick checks and the tests pass.', description: 'What the Team preset sets up, for a project without version control.' })
-  },
-  // jj (HI-2799, option A): the user integrates what passed; Combwork never merges.
-  jj: {
-    solo: msg({ id: 'workflow.summary.jj.solo', defaultMessage: 'Each card in its own jj workspace, no review: you integrate the work yourself.', description: 'What the Solo preset sets up, for a project using jj (Jujutsu, HI-2799). Keep jj; a jj workspace is a working folder jj makes.' }),
-    pair: msg({ id: 'workflow.summary.jj.pair', defaultMessage: 'A reviewer agent passes each card after the quick checks, then you integrate it yourself.', description: 'What the Pair preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj.' }),
-    team: msg({ id: 'workflow.summary.jj.team', defaultMessage: 'A reviewer agent, then you, check each card after the quick checks and the tests, then you integrate it yourself.', description: 'What the Team preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj.' })
   }
 }

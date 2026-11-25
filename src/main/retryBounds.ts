@@ -1,6 +1,6 @@
 // HI-3374: retrying what Windows or another git refuses for a moment (a file held open by a virus scanner or the search
 // indexer, another git's index.lock), under a time bound rather than a count of tries, with waits that grow to a cap.
-// No imports: the separately bundled workers (jj's runner, OpenCode's history) use it as main does.
+// No imports: the separately bundled workers (OpenCode's history) use it as main does.
 
 /** How a retry is bounded: the whole of it (`boundMs`, from the first try), its first wait, and the longest wait. */
 export interface RetryBound {

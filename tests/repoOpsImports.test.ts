@@ -24,7 +24,7 @@ const namesFrom = (file: string, mod: string): string[] =>
 
 /** The mutations, by the module holding their Git implementation: what a moved caller takes from the port instead. */
 const MUTATIONS: Record<string, readonly string[]> = {
-  'src/main/gitRepo': ['switchBranch', 'createBranch', 'deleteBranches', 'deleteRemoteBranches', 'updateBranch', 'makeBranchAt', 'removeMadeBranch', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetchAll', 'pull', 'push', 'pushToRemote', 'setUpstream', 'createTag', 'setIdentity'],
+  'src/main/gitRepo': ['switchBranch', 'createBranch', 'deleteBranches', 'deleteRemoteBranches', 'updateBranch', 'makeBranchAt', 'removeMadeBranch', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetchAll', 'pull', 'push', 'pushToRemote', 'setUpstream', 'createTag', 'setIdentity', 'renameBranch', 'deleteTag', 'pushTag'],
   'src/main/gitInit': ['initCheck', 'initRepo'],
   'src/main/branchMerge': ['mergeBranch'],
   'src/main/worktrees': ['mergeWorktree'],
@@ -59,7 +59,7 @@ describe('callers moved to the repository operations port (HI-2788)', () => {
       }
     }
     walk('src')
-    expect(files.filter((f) => importsOf(f).includes('src/main/platform/gitRepoOps'))).toEqual(['src/main/platform/repoOpsPorts.ts'])
+    expect(files.filter((f) => importsOf(f).includes('src/main/platform/git/gitRepoOps'))).toEqual(['src/main/platform/repoOpsPorts.ts'])
     // The registry exports only the gated lookups: no ungated way to the port.
     expect([...read('src/main/platform/repoOpsPorts.ts').matchAll(/^export (?:function|const) (\w+)/gm)].map((m) => m[1]).sort()).toEqual(['lineRepoOps', 'repoOpsFor'])
   })

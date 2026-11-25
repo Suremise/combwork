@@ -11,8 +11,10 @@
 // read from endpoints pinned once (compare's `pinned`, History's page of a line read once), never a line that moves
 // between pages. The view types keep their Git names in 1.4.0 (the window's Git text); the members use platform words.
 
-import type { BranchDrops, BranchUpdatePlan, CompareLines, GitComparison, GitHistory, GitRepoInfo, GitRepoSummary, LeftoverInfo } from '../../shared/gitRepo'
+import type { BranchDrops, BranchUpdatePlan, CompareLines, GitComparison, GitHistory, GitRemote, GitRepoInfo, GitRepoSummary, LeftoverInfo } from '../../shared/gitRepo'
 import type { SigningInfo } from '../../shared/gitSigning'
+import type { GitOperationState } from '../../shared/gitOperations'
+import type { StashConflict } from '../../shared/gitStashes'
 import type { ResolvedStart, StartPoints } from '../../shared/nextVersion'
 import type { AgentBranchStatus, GitDiff, GitStatus, MergeBranchList, ProjectInfo } from '../../shared/types'
 
@@ -43,8 +45,14 @@ export interface RepoReads {
   changes(root: string, base?: string): Promise<GitStatus>
   /** The Changes tab's diff of one file (HI-2792), as `changes` lists it. */
   changeDiff(root: string, file: string, base?: string): Promise<GitDiff>
+  /** HI-3470: the operation left under way in a working folder (a merge, a rebase…) and its conflicted files; null with none. */
+  operation(root: string): Promise<GitOperationState | null>
+  /** HI-3518: the stash last applied with conflicts in a working folder, while they last; null otherwise (HI-3472). */
+  stashConflict(root: string): Promise<StashConflict | null>
   /** The folder's line, head, upstream, remotes and state (repoSummary): cheap, no working-tree scan. */
   summary(root: string): Promise<GitRepoSummary>
+  /** HI-3550: the remotes with their URLs (credentials shown as •••), none when the folder isn't a repository. */
+  remotes(root: string): Promise<GitRemote[]>
   /** The line the project's work merges into, as its options say (none: the default line). */
   workTarget(projectPath: string): Promise<string | null>
   /** Branches & remotes: lines, remote lines, remotes, workspaces, identity, the target and default line. */

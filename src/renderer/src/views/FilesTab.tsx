@@ -11,7 +11,8 @@ import { discardDrafts, draftsUnder, FILES_TEXT, FileView, hasDraft, moveDrafts,
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { pasteIntoTerminal } from '../components/TerminalView'
 import { Icon, IconButton, InfoTip, LoadFailed, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
-import { cardLabelOf, chooseTab, confirm, filesListeners, useRememberedTab, focusedAgentId, get, notify, openInSessionsTab, projectKey, set, setProjectTab, showAgent, useDateStyle, useStore } from '../store'
+import { useFileEvents } from '../fileEvents'
+import { cardLabelOf, chooseTab, confirm, useRememberedTab, focusedAgentId, get, notify, openInSessionsTab, projectKey, set, setProjectTab, showAgent, useDateStyle, useStore } from '../store'
 import { attachToCardMenu, CARD_ATTACH_TEXT, CardAttachmentSection, removeCardAttachmentAsked, shownCardGroups, useProjectCardAttachments } from '../components/CardAttachments'
 import type { CardAttachment } from '@shared/cardAttachments'
 import { TabPanel, Tabs } from '../components/Tabs'
@@ -145,24 +146,6 @@ const M = {
   openInApp: msg({ id: 'files.viewer.openInApp', defaultMessage: 'Open in Its App', description: "A button in the attachment viewer (HI-1958), for an image or a PDF only: opens it in the program Windows opens that kind of file with (its photo viewer, its PDF reader), for zooming, printing and the like. Other kinds of file are never opened (nothing attached is ever run): they get Show in Folder instead." }),
   removeFromCard: msg({ id: 'files.viewer.removeFromCard', defaultMessage: 'Remove from Card', description: "A button in the attachment viewer for a card's attachment (HI-1958): takes the file off its card (to the Recycle Bin), after asking. A session's attachment has Delete there instead." }),
   tooLarge: msg({ id: 'files.viewer.tooLarge', defaultMessage: 'Too large to preview here. Reveal it to open it in another program.', description: 'The attachment viewer for a file too large to show.' })
-}
-
-/** Starts live file events for the project while mounted and calls onChange with the changed folders. */
-function useFileEvents(projectPath: string, onChange: (dirs: string[]) => void): void {
-  const ref = useRef(onChange)
-  ref.current = onChange
-  useEffect(() => {
-    // Live updates only: without a watch the tree still loads, and Refresh reads it again.
-    void call('files:watch', projectPath).catch(() => undefined)
-    const listener = (p: string, dirs: string[]): void => {
-      if (p.toLowerCase() === projectPath.toLowerCase()) ref.current(dirs)
-    }
-    filesListeners.add(listener)
-    return () => {
-      filesListeners.delete(listener)
-      void call('files:unwatch', projectPath).catch(() => undefined)
-    }
-  }, [projectPath])
 }
 
 /**

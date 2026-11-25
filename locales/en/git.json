@@ -31,6 +31,42 @@
     "defaultMessage": "Couldn't read the commits {branch} would drop",
     "description": "An error notification's title: reading an unmerged branch's commits before deleting it failed."
   },
+  "git.branchRename.about": {
+    "defaultMessage": "{tracks, select, yes {Renames {branch} here. It tracks {upstream}: choose below whether {remote} gets the new name too. Never forced: there, the old name is deleted only where it's as you last fetched it.} other {Renames {branch} here. It tracks no remote branch, so no remote changes.}}",
+    "description": "HI-3474: the form that renames the branch {branch}. {upstream} is the remote branch it tracks (origin/x) on the remote {remote}; {tracks} is no when it tracks none."
+  },
+  "git.branchRename.busy": {
+    "defaultMessage": "Renaming…",
+    "description": "HI-3474: the Rename form's button while it runs."
+  },
+  "git.branchRename.button": {
+    "defaultMessage": "Rename",
+    "description": "HI-3474: the Rename form's button."
+  },
+  "git.branchRename.keepThere": {
+    "defaultMessage": "{upstream} keeps its name",
+    "description": "HI-3474: a choice of the Rename form's drop-down: the remote branch {upstream} stays as it is (the local branch still tracks it)."
+  },
+  "git.branchRename.newName": {
+    "defaultMessage": "New name",
+    "description": "HI-3474: field of the Rename form: the branch's new name."
+  },
+  "git.branchRename.on": {
+    "defaultMessage": "On {remote}",
+    "description": "HI-3474: label of the Rename form's drop-down: what happens to the branch on the remote {remote} it tracks."
+  },
+  "git.branchRename.there": {
+    "defaultMessage": "Rename it there too",
+    "description": "HI-3474: a choice of the Rename form's drop-down: push the new name to the remote, track it, and delete the old name there."
+  },
+  "git.branchRename.tip": {
+    "defaultMessage": "Rename {branch}…",
+    "description": "HI-3474: tooltip on a local branch's rename button in Version Control → Branches & remotes. {branch} is its name."
+  },
+  "git.branchRename.title": {
+    "defaultMessage": "Rename {branch}",
+    "description": "HI-3474: title of the form that renames the local branch {branch}."
+  },
   "git.branches.branch": {
     "defaultMessage": "Branch",
     "description": "Heading in Git → Branches & remotes: the branch checked out in the project folder."
@@ -95,6 +131,10 @@
     "defaultMessage": "{n, plural, one {# commit not in {target}} other {# commits not in {target}}}",
     "description": "On a branch of the Not merged group in Version Control → Branches & remotes: how many of its commits aren't in the target branch {target}."
   },
+  "git.branches.openOperation": {
+    "defaultMessage": "Open in Changes",
+    "description": "HI-3470: a button in the banner git.branches.stateBanner: shows the project folder in Version Control → Changes, whose panel continues or aborts the operation. Changes is the section’s name: keep it as it is named there."
+  },
   "git.branches.reload": {
     "defaultMessage": "Read git again (doesn't fetch)",
     "description": "Tooltip on the refresh button in Git → Branches & remotes."
@@ -108,8 +148,8 @@
     "description": "Shown for a moment after copying a revision beside a branch (Version Control → Branches & remotes)."
   },
   "git.branches.stateBanner": {
-    "defaultMessage": "Git is {state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}} in the project folder. Finish or abort it in a terminal (or ask an agent to): Combwork doesn't.",
-    "description": "Banner in Git → Branches & remotes while git has an operation in progress."
+    "defaultMessage": "Git is {state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}} in the project folder. Continue or abort it in Changes, in a terminal, or ask an agent to.",
+    "description": "Banner in Git → Branches & remotes while git has an operation in progress. HI-3470: Changes (Version Control → Changes, its section’s name: keep it as named there) has a panel that continues or aborts it."
   },
   "git.branches.trackLocal": {
     "defaultMessage": "A local {branch} tracking {remote}, and switch to it",
@@ -291,6 +331,90 @@
     "defaultMessage": "It holds this computer's sessions, transcript backups and launch settings, which don't belong in commits or shared copies.",
     "description": "Why .combwork should be kept out of version control and sync services: what Combwork keeps there. Follows the notice's first sentence."
   },
+  "git.commit.actionTip": {
+    "defaultMessage": "{action, select, revert {Makes a commit on {branch} in the project folder that undoes this one. Runs git revert.} other {Copies this commit onto {branch} in the project folder. Runs git cherry-pick.}}",
+    "description": "HI-3471: the tooltip of Revert… or Cherry-pick… when it can be done. {branch} is the project folder's branch. Keep the git commands as they are. Keep the select keys."
+  },
+  "git.commit.askMessage": {
+    "defaultMessage": "{action, select, revert {A new commit on {branch}, in the project folder, undoes “{subject}”{merge, select, yes { (what the merge brought in, against its first parent)} other {}}.} other {A new commit on {branch}, in the project folder, makes the changes of “{subject}”{merge, select, yes { (what the merge brought in, against its first parent)} other {}}.}} It uses git’s own message. If git stops on a conflict, Version Control → Changes finishes or aborts it.",
+    "description": "HI-3471: under git.commit.askTitle: what Revert… or Cherry-pick… does. {subject} is the commit's subject; merge yes for a merge commit. Keep the select keys."
+  },
+  "git.commit.askTitle": {
+    "defaultMessage": "{action, select, revert {Revert {commit} on {branch}?} other {Cherry-pick {commit} onto {branch}?}}",
+    "description": "HI-3471: the question before Revert… or Cherry-pick…. {commit} is a short id; {branch} the project folder's branch. Keep the select keys."
+  },
+  "git.commit.binary": {
+    "defaultMessage": "Binary file",
+    "description": "HI-3471: in place of a file's diff in the Commit dialog when it is binary."
+  },
+  "git.commit.branchHere": {
+    "defaultMessage": "Branch from here…",
+    "description": "HI-3471: the Commit dialog's button: opens New branch… starting at this commit."
+  },
+  "git.commit.cherryPick": {
+    "defaultMessage": "Cherry-pick…",
+    "description": "HI-3471: the Commit dialog's button: copies this commit onto the project folder's branch, after asking (git cherry-pick). Git's word."
+  },
+  "git.commit.close": {
+    "defaultMessage": "Close",
+    "description": "HI-3471: the Commit dialog's close button."
+  },
+  "git.commit.confirm": {
+    "defaultMessage": "{action, select, revert {Revert} other {Cherry-pick}}",
+    "description": "HI-3471: the confirm button of the question before Revert… or Cherry-pick…. Keep the select keys."
+  },
+  "git.commit.copied": {
+    "defaultMessage": "Copied {commit}",
+    "description": "HI-3471: a notice after Copy hash. {commit} is the full hash."
+  },
+  "git.commit.copy": {
+    "defaultMessage": "Copy hash",
+    "description": "HI-3471: the Commit dialog's button: copies the commit's full hash."
+  },
+  "git.commit.diffFailed": {
+    "defaultMessage": "Couldn't show the file's changes: {error}",
+    "description": "HI-3471: in place of a file's diff in the Commit dialog when reading it failed."
+  },
+  "git.commit.failed": {
+    "defaultMessage": "Git couldn't do that",
+    "description": "HI-3471: the title of the error notice when Revert…, Cherry-pick… or reading a file failed or was refused."
+  },
+  "git.commit.files": {
+    "defaultMessage": "{n, plural, one {# file} other {# files}}",
+    "description": "HI-3471: the heading of the commit's files in the Commit dialog."
+  },
+  "git.commit.loadFailed": {
+    "defaultMessage": "Couldn't read the commit: {error}",
+    "description": "HI-3471: the Commit dialog when reading the commit failed. {error} is why."
+  },
+  "git.commit.loading": {
+    "defaultMessage": "Reading the commit…",
+    "description": "HI-3471: the Commit dialog while it reads the commit."
+  },
+  "git.commit.meta": {
+    "defaultMessage": "{author} · {when}",
+    "description": "HI-3471: under a commit's message in the Commit dialog: its author and when it was made (a date and time)."
+  },
+  "git.commit.openCard": {
+    "defaultMessage": "Open {card}",
+    "description": "HI-3471: the tooltip of the card key in the Commit dialog (from the commit's Combwork-Card trailer or its subject): opens the card."
+  },
+  "git.commit.openChanges": {
+    "defaultMessage": "Open in Changes",
+    "description": "HI-3471: a button on the notice after a revert or cherry-pick stopped: shows Version Control → Changes, whose panel finishes or aborts it. Changes is the section's name: keep it as it is named there."
+  },
+  "git.commit.revert": {
+    "defaultMessage": "Revert…",
+    "description": "HI-3471: the Commit dialog's button: makes a commit on the project folder's branch that undoes this one, after asking (git revert)."
+  },
+  "git.commit.tagHere": {
+    "defaultMessage": "Tag here…",
+    "description": "HI-3471: the Commit dialog's button: opens Create tag… for this commit."
+  },
+  "git.commit.title": {
+    "defaultMessage": "Commit {commit}",
+    "description": "HI-3471: the title of History's Commit dialog. {commit} is a short commit id."
+  },
   "git.fetch.at": {
     "defaultMessage": "As of the last fetch, {when}. Combwork never fetches by itself.",
     "description": "In Git → Branches & remotes, beside Fetch. {when} is how long ago, such as \"5m ago\"."
@@ -314,86 +438,6 @@
   "git.form.enterName": {
     "defaultMessage": "Enter a name",
     "description": "Under a form's name box (a branch, a tag) while it is empty."
-  },
-  "git.gate.advance.name": {
-    "defaultMessage": "Combwork merging",
-    "description": "What Combwork doesn’t do with jj (HI-2799): merge reviewed work into the target itself (the merge queue’s last step)."
-  },
-  "git.gate.advance.why": {
-    "defaultMessage": "jj can’t move a bookmark safely when others move it too, so you integrate reviewed work yourself.",
-    "description": "Why Combwork doesn’t merge under jj (HI-2799, decision A). Keep jj; a bookmark is jj’s named line."
-  },
-  "git.gate.attributes.name": {
-    "defaultMessage": "Git attributes and filters",
-    "description": "A Git feature jj doesn’t support (HI-2799): .gitattributes line endings (eol, text), clean/smudge filters, diff and merge drivers. Keep Git."
-  },
-  "git.gate.attributes.why": {
-    "defaultMessage": "jj doesn’t apply them: line endings, filters and merge drivers would be ignored.",
-    "description": "Why jj can’t be used with Git attributes (HI-2799). Keep jj."
-  },
-  "git.gate.hooks.name": {
-    "defaultMessage": "Git hooks",
-    "description": "A Git feature jj doesn’t support (HI-2799): pre-commit, commit-msg and other hooks. Keep Git."
-  },
-  "git.gate.hooks.why": {
-    "defaultMessage": "jj doesn’t run them, so a hook the repository relies on would be skipped.",
-    "description": "Why jj can’t be used where Git hooks are set (HI-2799). Keep jj."
-  },
-  "git.gate.lfs.name": {
-    "defaultMessage": "Git LFS",
-    "description": "A Git feature jj doesn’t support (HI-2799): Large File Storage. Keep Git LFS (a product’s name)."
-  },
-  "git.gate.lfs.why": {
-    "defaultMessage": "jj doesn’t support large file storage.",
-    "description": "Why jj can’t be used with Git LFS (HI-2799). Keep jj."
-  },
-  "git.gate.plainGit.name": {
-    "defaultMessage": "Plain git commands by agents",
-    "description": "What isn’t supported in a jj project (HI-2799): agents running git themselves (reset, rebase, merge) in a jj workspace."
-  },
-  "git.gate.plainGit.why": {
-    "defaultMessage": "Agents are told to use jj, but a git command that moves HEAD, the index or a branch can still confuse jj’s view of the repository.",
-    "description": "Why plain git commands aren’t supported in a jj project (HI-2799, HI-2800: agents in a jj project are told to use jj). Keep git, jj and HEAD."
-  },
-  "git.gate.publish.name": {
-    "defaultMessage": "Pushing after a merge",
-    "description": "What Combwork doesn’t do with jj (HI-2799): push the target after merging."
-  },
-  "git.gate.publish.why": {
-    "defaultMessage": "Combwork doesn’t push for a jj project: push with jj yourself.",
-    "description": "Why Combwork doesn’t push under jj (HI-2799). Keep jj."
-  },
-  "git.gate.relocation.name": {
-    "defaultMessage": "Moving the workspace or project",
-    "description": "What Combwork can’t do with a jj project (HI-2799): move its workspace or project folder, or repair a moved one."
-  },
-  "git.gate.relocation.why": {
-    "defaultMessage": "No move of a jj workspace has been validated: after a move, Repair leaves jj’s workspaces as they are.",
-    "description": "Why moving is not supported with jj (HI-2799, HI-2800): Repair (after a moved workspace or project) doesn’t repair jj’s own workspaces. Keep jj; Repair is the button’s name."
-  },
-  "git.gate.sharedFolder.name": {
-    "defaultMessage": "Agents sharing the project folder",
-    "description": "What isn’t supported with jj (HI-2799): several agents working in the project folder itself rather than in their own folders."
-  },
-  "git.gate.sharedFolder.why": {
-    "defaultMessage": "Cards never run in the project folder: each would need its own jj workspace.",
-    "description": "Why the shared folder isn’t supported with jj (HI-2799, HI-2800): cards never run in a jj project’s folder. Keep jj; a jj workspace is a working folder jj makes."
-  },
-  "git.gate.signing.name": {
-    "defaultMessage": "Commit signing",
-    "description": "A feature not verified with jj (HI-2799): signed commits (gpgSign, jj’s signing.behavior)."
-  },
-  "git.gate.signing.why": {
-    "defaultMessage": "Signing with jj isn’t verified with Combwork yet.",
-    "description": "Why jj can’t be used where commits are signed (HI-2799). Keep jj."
-  },
-  "git.gate.submodules.name": {
-    "defaultMessage": "Submodules",
-    "description": "A Git feature jj doesn’t support (HI-2799): repositories nested as submodules."
-  },
-  "git.gate.submodules.why": {
-    "defaultMessage": "jj doesn’t support submodules.",
-    "description": "Why jj can’t be used with submodules (HI-2799). Keep jj."
   },
   "git.gitlink.binary": {
     "defaultMessage": "The file’s side is binary: its content can’t be shown.",
@@ -422,6 +466,162 @@
   "git.head.noCommits": {
     "defaultMessage": "no commits yet",
     "description": "What the project folder has checked out in a repository with no commit yet. Lower case: also in the status bar."
+  },
+  "git.health.about": {
+    "defaultMessage": "Git's own repairs, for when something was left behind. Each lists what it finds and asks first, and none runs while an agent, a run or a merge works on the repository.",
+    "description": "HI-3473: the sentence under the Repository health heading."
+  },
+  "git.health.fetch.busy": {
+    "defaultMessage": "Fetching…",
+    "description": "HI-3473: the Fetch with Prune dialog's button while it runs."
+  },
+  "git.health.fetch.button": {
+    "defaultMessage": "Fetch with Prune…",
+    "description": "HI-3473: the button of the remote-tracking branches row: asks each remote which of its branches are gone, then fetches and drops them here (git fetch --prune). Keep the …: it opens a dialog."
+  },
+  "git.health.fetch.checkFailed": {
+    "defaultMessage": "Couldn't ask the remotes",
+    "description": "HI-3473: an error's title: Fetch with Prune's check of the remotes failed."
+  },
+  "git.health.fetch.checking": {
+    "defaultMessage": "Asking the remotes which branches are gone…",
+    "description": "HI-3473: a notice while Fetch with Prune asks each remote (git remote prune --dry-run), with a Cancel."
+  },
+  "git.health.fetch.confirm": {
+    "defaultMessage": "Fetch and Prune",
+    "description": "HI-3473: the Fetch with Prune dialog's button: git fetch --prune from the remotes listed."
+  },
+  "git.health.fetch.fetching": {
+    "defaultMessage": "Fetching with prune from {remotes}…",
+    "description": "HI-3473: a notice while Fetch with Prune runs, with a Cancel. {remotes} lists the remotes."
+  },
+  "git.health.fetch.head": {
+    "defaultMessage": "Remote-tracking branches",
+    "description": "HI-3473: a Repository health row's name: this repository's copies of the remotes' branches (origin/main…)."
+  },
+  "git.health.fetch.message": {
+    "defaultMessage": "{n, plural, =0 {No remote-tracking branch here is gone from its remote. Fetching with prune would drop none.} other {These remote-tracking branches are gone from their remote. Fetching with prune drops them here; the remote isn't changed, and no local branch is deleted.}}",
+    "description": "HI-3473: the Fetch with Prune dialog: what it found ({n}: how many branches) and what fetching does."
+  },
+  "git.health.fetch.remote": {
+    "defaultMessage": "On {remote} ({n, number})",
+    "description": "HI-3473: a heading in the Fetch with Prune dialog: the remote-tracking branches of the remote {remote} that are gone from it."
+  },
+  "git.health.fetch.remoteError": {
+    "defaultMessage": "{remote} couldn't be asked: {why}",
+    "description": "HI-3473: in the Fetch with Prune dialog, a remote that couldn't be reached ({why}: git's error line); it isn't fetched."
+  },
+  "git.health.fetch.state": {
+    "defaultMessage": "{n, plural, =0 {No remote.} other {Those deleted on the remote stay here until a fetch prunes them.}}",
+    "description": "HI-3473: the Repository health row's state ({n}: how many remotes the repository has)."
+  },
+  "git.health.fetch.title": {
+    "defaultMessage": "Fetch with prune",
+    "description": "HI-3473: the title of the Fetch with Prune dialog."
+  },
+  "git.health.fetch.trackedBy": {
+    "defaultMessage": "{branches} {n, plural, one {tracks} other {track}} it: {n, plural, one {its} other {their}} upstream then shows as gone.",
+    "description": "HI-3473: beside a remote-tracking branch in the Fetch with Prune dialog: local branches ({branches}, their names; {n} of them) follow it; they stay, their upstream marked gone."
+  },
+  "git.health.locks.age": {
+    "defaultMessage": "written {when}",
+    "description": "HI-3473: beside a lock file in the Remove Stale Locks dialog: when it was last written ({when}: a time ago, such as \"5 minutes ago\")."
+  },
+  "git.health.locks.busy": {
+    "defaultMessage": "Removing…",
+    "description": "HI-3473: the Remove Stale Locks dialog's button while it runs."
+  },
+  "git.health.locks.button": {
+    "defaultMessage": "Remove Stale Locks…",
+    "description": "HI-3473: the button of the lock files row: lists them, to remove the stale ones. Keep the …: it opens a dialog."
+  },
+  "git.health.locks.confirm": {
+    "defaultMessage": "Remove Ticked",
+    "description": "HI-3473: the Remove Stale Locks dialog's button: removes the ticked lock files."
+  },
+  "git.health.locks.failed": {
+    "defaultMessage": "Couldn't remove the lock files",
+    "description": "HI-3473: an error's title: Remove Stale Locks failed or was refused."
+  },
+  "git.health.locks.head": {
+    "defaultMessage": "Lock files",
+    "description": "HI-3473: a Repository health row's name: git's lock files (index.lock and the like)."
+  },
+  "git.health.locks.held": {
+    "defaultMessage": "{why, select, young {Kept: less than {seconds, number} seconds old, a git may be using it.} process {Kept: {name} (process {pid, number}) started {when}, before this lock, and still runs.} other {Kept: Windows’ list of processes couldn’t be read.}}",
+    "description": "HI-3473: why a lock file in the Remove Stale Locks dialog can't be removed (select: translate each). {name} is a program's name (git.exe), {pid} its process id, {when} a time ago."
+  },
+  "git.health.locks.message": {
+    "defaultMessage": "A git that is ended or crashes can leave its lock file behind, and every git after it then refuses (\"index.lock: File exists\"). A lock is stale once it is at least {seconds, number} seconds old and no git that started before it still runs. Combwork removes only the ticked ones, each only while it is still that file and still stale, and never ends a process.",
+    "description": "HI-3473: the Remove Stale Locks dialog: what a stale lock is and what removing does. The quoted text is git's own error: keep it. {seconds}: Settings → Advanced, Git: how old a lock must be to be stale."
+  },
+  "git.health.locks.state": {
+    "defaultMessage": "{n, plural, =0 {None.} other {{stale, plural, =0 {{n, number} in use or too new to call stale.} other {{stale, number} stale, of {n, number}.}}}}",
+    "description": "HI-3473: the Repository health row's state: how many of git's lock files there are ({n}) and how many are stale ({stale})."
+  },
+  "git.health.locks.title": {
+    "defaultMessage": "Remove stale lock files",
+    "description": "HI-3473: the title of the Remove Stale Locks dialog."
+  },
+  "git.health.prune.busy": {
+    "defaultMessage": "Pruning…",
+    "description": "HI-3473: the Prune Worktrees dialog's button while it runs."
+  },
+  "git.health.prune.button": {
+    "defaultMessage": "Prune Worktrees…",
+    "description": "HI-3473: the button of the worktree entries row: lists them to drop (git worktree prune, one entry at a time). Keep the …: it opens a dialog."
+  },
+  "git.health.prune.confirm": {
+    "defaultMessage": "Prune Ticked",
+    "description": "HI-3473: the Prune Worktrees dialog's button: drops the ticked entries."
+  },
+  "git.health.prune.failed": {
+    "defaultMessage": "Couldn't prune the worktree entries",
+    "description": "HI-3473: an error's title: Prune Worktrees failed or was refused."
+  },
+  "git.health.prune.head": {
+    "defaultMessage": "Worktree entries",
+    "description": "HI-3473: a Repository health row's name: git's records of worktrees whose folder is gone."
+  },
+  "git.health.prune.message": {
+    "defaultMessage": "Git still keeps an entry for each of these worktrees, whose folder is gone, and refuses a new worktree at the same place. Pruning drops the ticked entries, each only if git still lists it so: nothing on disk outside git's own folder changes.",
+    "description": "HI-3473: the Prune Worktrees dialog: what it lists and does."
+  },
+  "git.health.prune.noFolder": {
+    "defaultMessage": "(entry {id}: git names no folder)",
+    "description": "HI-3473: in the Prune Worktrees dialog, an entry whose record doesn't say where its folder was; {id} is its name in git's folder."
+  },
+  "git.health.prune.ownerAgent": {
+    "defaultMessage": "{name}'s worktree: if it was moved, Repair can still find it by this entry, and pruning forgets it. Not ticked for you.",
+    "description": "HI-3473: beside an entry in the Prune Worktrees dialog: it was the 1.0-era worktree of the agent {name}; Repair (a command's name) locates a moved worktree by git's entry, which pruning drops."
+  },
+  "git.health.prune.ownerSlot": {
+    "defaultMessage": "{name}'s folder: Combwork makes a slot again by itself, so pruning is safe.",
+    "description": "HI-3473: beside an entry in the Prune Worktrees dialog: it was the folder of the slot {name} (such as slot-a; glossary: slot)."
+  },
+  "git.health.prune.state": {
+    "defaultMessage": "{n, plural, =0 {None whose folder is gone.} one {# whose folder is gone.} other {# whose folders are gone.}}",
+    "description": "HI-3473: the Repository health row's state: how many of git's worktree entries have lost their folder ({n})."
+  },
+  "git.health.prune.title": {
+    "defaultMessage": "Prune worktree entries",
+    "description": "HI-3473: the title of the Prune Worktrees dialog."
+  },
+  "git.health.readAgain": {
+    "defaultMessage": "Look again",
+    "description": "HI-3473: the tooltip of the refresh button beside the Repository health heading."
+  },
+  "git.health.readFailed": {
+    "defaultMessage": "Couldn't check the repository: {error}",
+    "description": "HI-3473: under the Repository health heading when reading what it finds failed. {error} is why."
+  },
+  "git.health.reading": {
+    "defaultMessage": "Checking…",
+    "description": "HI-3473: in a Repository health row while it is being read."
+  },
+  "git.health.title": {
+    "defaultMessage": "Repository health",
+    "description": "HI-3473: a section heading at the foot of Version Control → Branches & remotes: three repairs of the git repository (prune worktrees, remove a stale lock, fetch with prune)."
   },
   "git.history.branch": {
     "defaultMessage": "Branch to show",
@@ -659,6 +859,138 @@
     "defaultMessage": "Learn more",
     "description": "Link or button that opens the user guide's section about this."
   },
+  "git.moves.about": {
+    "defaultMessage": "Each time the branch moved, newest first, as git's reflog keeps it (git forgets moves after about 90 days). Restore to here… moves it back to that commit.",
+    "description": "HI-3469: the hint atop History's Moves. Restore to here… is the button of that name."
+  },
+  "git.moves.back": {
+    "defaultMessage": "{n, plural, one {The commit it brings back} other {The # commits it brings back}}",
+    "description": "HI-3469: a heading in Restore's dialog: the commits the branch would have again."
+  },
+  "git.moves.branch": {
+    "defaultMessage": "Branch whose moves to show",
+    "description": "HI-3469: the name, for screen readers, of Moves' branch picker."
+  },
+  "git.moves.cantTitle": {
+    "defaultMessage": "{branch} can't be restored now",
+    "description": "HI-3469: the title of Restore to here…'s dialog when something refuses it (said in the dialog)."
+  },
+  "git.moves.confirm": {
+    "defaultMessage": "Restore",
+    "description": "HI-3469: the confirm button of Restore to here…'s dialog."
+  },
+  "git.moves.detached": {
+    "defaultMessage": "The project folder is on a detached HEAD (no branch checked out): Moves shows a branch's moves once it is on one.",
+    "description": "HI-3469: Moves when the project folder has no branch checked out (git's detached HEAD)."
+  },
+  "git.moves.dropped": {
+    "defaultMessage": "{n, plural, one {The commit it drops} other {The # commits it drops}}",
+    "description": "HI-3469: a heading in Restore's dialog: the commits the branch would no longer have (they stay in Moves, for a while)."
+  },
+  "git.moves.failed": {
+    "defaultMessage": "Couldn't restore the branch",
+    "description": "HI-3469: the title of the error notice when Restore to here… was refused or failed."
+  },
+  "git.moves.heading": {
+    "defaultMessage": "Moves of",
+    "description": "HI-3469: the heading of History's Moves, before the branch picker (a drop-down of the local branches)."
+  },
+  "git.moves.inTheWay": {
+    "defaultMessage": "Uncommitted files the move would change",
+    "description": "HI-3469: a heading in Restore's dialog over the project folder's files with uncommitted changes that differ between the two commits: git refuses while there are any."
+  },
+  "git.moves.loadFailed": {
+    "defaultMessage": "Couldn't read the moves: {error}",
+    "description": "HI-3469: in place of the moves when reading them failed. {error} is why."
+  },
+  "git.moves.more": {
+    "defaultMessage": "and {n, number} more",
+    "description": "HI-3469: under a list of commits in Restore's dialog: how many more are not listed."
+  },
+  "git.moves.moveLine": {
+    "defaultMessage": "{branch} goes from {from} back to {to}.",
+    "description": "HI-3469: the first line of Restore to here…'s dialog. {from} and {to} are short commit ids."
+  },
+  "git.moves.noBranch": {
+    "defaultMessage": "The repository has no local branch yet.",
+    "description": "HI-3469: Moves when there is no local branch to show."
+  },
+  "git.moves.none": {
+    "defaultMessage": "Git has no moves of this branch.",
+    "description": "HI-3469: Moves when the branch's reflog is empty (or git keeps none)."
+  },
+  "git.moves.nothing": {
+    "defaultMessage": "No commit is dropped or brought back: only where the branch points changes.",
+    "description": "HI-3469: in Restore's dialog when the two commits have the same history either way (rare)."
+  },
+  "git.moves.now": {
+    "defaultMessage": "now",
+    "description": "HI-3469: beside the newest move: where the branch is now."
+  },
+  "git.moves.ok": {
+    "defaultMessage": "OK",
+    "description": "HI-3469: the button of Restore's dialog when it can't be done now."
+  },
+  "git.moves.openCard": {
+    "defaultMessage": "Open {card}",
+    "description": "HI-3469: the tooltip of a Combwork merge's card key in Moves: opens the card."
+  },
+  "git.moves.option": {
+    "defaultMessage": "{kind, select, target {{branch} · target} folder {{branch} · project folder} other {{branch}}}",
+    "description": "HI-3469: a branch in Moves' picker: the project's target, the one the project folder has checked out, or another. Keep the select keys."
+  },
+  "git.moves.pushed": {
+    "defaultMessage": "{n, plural, one {One of the dropped commits is} other {# of the dropped commits are}} on {upstream} already: a later Push is refused (Combwork never forces one), and Pull brings {n, plural, one {it} other {them}} back.",
+    "description": "HI-3469: a warning in Restore's dialog: the branch's upstream ({upstream}, such as origin/main) has some of the commits it drops."
+  },
+  "git.moves.reload": {
+    "defaultMessage": "Read the moves again",
+    "description": "HI-3469: the tooltip of Moves' refresh button."
+  },
+  "git.moves.restore": {
+    "defaultMessage": "Restore to here…",
+    "description": "HI-3469: a move's button: moves the branch back to the commit of that move, after asking."
+  },
+  "git.moves.restoreTip": {
+    "defaultMessage": "Moves {branch} back to {commit}, after showing what changes",
+    "description": "HI-3469: Restore to here…'s tooltip. {commit} is a short commit id."
+  },
+  "git.moves.running": {
+    "defaultMessage": "Restoring…",
+    "description": "HI-3469: Restore to here…'s button while it runs."
+  },
+  "git.moves.tip": {
+    "defaultMessage": "Git noted: {message}\n{commit}\n{when}",
+    "description": "HI-3469: the tooltip of a move: git's own words for it ({message}, English), the commit it left the branch at in full, and when."
+  },
+  "git.moves.title": {
+    "defaultMessage": "Restore {branch} to {commit}?",
+    "description": "HI-3469: the question of Restore to here…'s dialog. {commit} is a short commit id."
+  },
+  "git.moves.view": {
+    "defaultMessage": "{view, select, moves {Moves} other {Commits}}",
+    "description": "HI-3469: the two views of Version Control → History, a switch in its heading: the branch's commits, or its moves (git's reflog: each time the branch was moved, by a commit, a merge, a reset…). Keep the select keys."
+  },
+  "git.moves.viewName": {
+    "defaultMessage": "What History shows",
+    "description": "HI-3469: the name, for screen readers, of History's Commits | Moves switch."
+  },
+  "git.moves.wayBack": {
+    "defaultMessage": "The restore is itself a move: it shows at the top of Moves, and Restore to here… on the move below it undoes it.",
+    "description": "HI-3469: the last line of Restore's dialog: how to undo it."
+  },
+  "git.moves.what": {
+    "defaultMessage": "{kind, select, commit {Committed} initial {First commit} amend {Amended the last commit} mergeCommit {Committed a merge} fastForward {Fast-forwarded to {name}} merge {Merged {name}} pull {Pulled} rebase {Rebased onto {name}} reset {Reset to {name}} created {Created from {name}} renamed {Renamed from {name}} cherryPick {Cherry-picked a commit} revert {Reverted a commit} combworkMerge {Combwork merged {name}} restored {Restored here with Combwork, from {name}} combwork {Combwork: {name}} unnamed {Moved (git noted no reason)} other {{name}}}",
+    "description": "HI-3469: what a move of a branch was, read from git's reflog. {name}: a branch, a commit's short id, a card's key (combworkMerge), Combwork's or git's own words (combwork, other: as they are, in English). Keep the select keys."
+  },
+  "git.moves.whereNowhere": {
+    "defaultMessage": "{branch} isn't checked out in any folder: only the branch moves.",
+    "description": "HI-3469: in Restore's dialog, for a branch checked out nowhere."
+  },
+  "git.moves.whereProject": {
+    "defaultMessage": "The project folder has it checked out: its files follow (git reset --keep), and your uncommitted changes stay as they are.",
+    "description": "HI-3469: in Restore's dialog, for the project folder's own branch. Keep git reset --keep as it is: a command."
+  },
   "git.newBranch.blocked": {
     "defaultMessage": "It can't be switched to now: {why}",
     "description": "After \"A branch at …\" in the New branch form, when switching branch is refused now. {why} says why."
@@ -726,6 +1058,146 @@
   "git.newBranch.title": {
     "defaultMessage": "New branch",
     "description": "Title of the form that creates a branch."
+  },
+  "git.operation.abort": {
+    "defaultMessage": "Abort",
+    "description": "HI-3470: the panel's button: git ends the operation and puts the folder back as it was (git <op> --abort). It is also the confirm button of the dialog that asks first, beside the dialog's Cancel (shell.dialog.cancel): it must read differently from it (HI-3504)."
+  },
+  "git.operation.abortMessage": {
+    "defaultMessage": "{what, select, rebase {The branch goes back to where it was before the rebase: the commits replayed so far and every conflict settled are dropped.} am {The branch goes back to where it was before the patches: those applied so far and every conflict settled are dropped.} bisect {Git checks out again the commit the bisect started from.} other {Git puts the folder back as it was before the {what} began: every conflict settled so far is dropped. Commits you made yourself since stay.}}",
+    "description": "HI-3470: what Abort loses, under git.operation.abortTitle. {what} is git's word for the operation (merge, cherry-pick, revert in other)."
+  },
+  "git.operation.abortTitle": {
+    "defaultMessage": "{what, select, bisect {End the bisect in {folder}?} other {Abort the git {what} in {folder}?}}",
+    "description": "HI-3470: the question before Abort (or End bisect). {what} is git's word for the operation; {folder} a slot's name or git.operation.projectFolder."
+  },
+  "git.operation.at": {
+    "defaultMessage": "Stopped at {commit} {subject}",
+    "description": "HI-3470: under the panel's heading: the commit git stopped at ({commit}, a short commit id; {subject}, its first line), or for a merge the commit being merged."
+  },
+  "git.operation.conflicts": {
+    "defaultMessage": "In conflict ({count, number})",
+    "description": "HI-3470: the heading of the panel's list of conflicted files."
+  },
+  "git.operation.continue": {
+    "defaultMessage": "Continue",
+    "description": "HI-3470: the panel's button: git goes on with the operation (git <op> --continue), taking its prepared message."
+  },
+  "git.operation.done": {
+    "defaultMessage": "{step, select, continue {Git went on with the {what} in {folder}.} skip {Git skipped a commit of the {what} in {folder}.} other {{what, select, bisect {The bisect in {folder} is ended.} other {The git {what} in {folder} is aborted.}}}}",
+    "description": "HI-3470: a notice after the panel's step worked. {what} is git's word for the operation; {folder} a slot's name or git.operation.projectFolder."
+  },
+  "git.operation.endBisect": {
+    "defaultMessage": "End bisect",
+    "description": "HI-3470: the panel's button for a bisect: git bisect reset (good and bad stay the user's, in a terminal). It is also the confirm button of the dialog that asks first, beside the dialog's Cancel (shell.dialog.cancel): it must read differently from it (HI-3504)."
+  },
+  "git.operation.failed": {
+    "defaultMessage": "Git couldn't do that",
+    "description": "HI-3470: the title of the error notice when the panel's step or a conflicted file's button failed or was refused."
+  },
+  "git.operation.goOn": {
+    "defaultMessage": "Go On",
+    "description": "HI-3470: the button that confirms acting in a lent slot (git.operation.lentTitle)."
+  },
+  "git.operation.leftFrom": {
+    "defaultMessage": "{from, select, stash {From applying the stash “{stash}”: settle each file below. The stash is kept.} other {No git operation is under way: settle each file below.}}",
+    "description": "HI-3518: under git.operation.leftTitle: where the conflicts came from. from stash: Combwork applied a stash ({stash}, its message as Stashes lists it), which git keeps when it conflicts; other: Combwork doesn't know (a terminal's command)."
+  },
+  "git.operation.leftTheirsTip": {
+    "defaultMessage": "{from, select, stash {The other side: the stash's (“{stash}”).} other {The other side: what was brought in (git calls it theirs).}} {has, select, yes {Takes its version of the file.} submodule {Stages its commit of the submodule.} other {It deleted the file: deletes it.}} Runs {command}",
+    "description": "HI-3518: the tooltip of a conflicted file's other side when files are left in conflict with no git operation under way, as git.operation.theirsTip. from stash: it came from applying a stash ({stash}, its message); other: not known. {command} is the git command, as it is."
+  },
+  "git.operation.leftTitle": {
+    "defaultMessage": "Files left in conflict in {folder}",
+    "description": "HI-3518: the heading of the panel in Version Control → Changes when files are left in conflict with no git operation under way (after a stash's Apply or Pop, say). {folder} is a slot's name or git.operation.projectFolder."
+  },
+  "git.operation.lentMessage": {
+    "defaultMessage": "Its builder, {agent}, finds the folder as you leave it. Act on its git {what} anyway?",
+    "description": "HI-3470: under git.operation.lentTitle. {agent} is the builder agent's name; {what} git's word for the operation."
+  },
+  "git.operation.lentTitle": {
+    "defaultMessage": "{slot} is lent to {card, select, none {lane {lane}} other {{card}}}",
+    "description": "HI-3470: the question before the panel acts in a slot lent to a card ({card}, its key) or a lane ({lane}, its name) whose builder isn't running. Glossary: slot, lane."
+  },
+  "git.operation.mine": {
+    "defaultMessage": "Use mine",
+    "description": "HI-3470: a conflicted file's button: takes the folder's own side of it (its tooltip says which that is)."
+  },
+  "git.operation.mineTip": {
+    "defaultMessage": "{swap, select, yes {Your side: the commit being applied (git calls it theirs here).} other {Your side: this folder's branch (git calls it ours).}} {has, select, yes {Takes its version of the file.} submodule {Stages its commit of the submodule.} other {It deleted the file: deletes it.}} Runs {command}",
+    "description": "HI-3470: Use mine's tooltip. swap yes: a rebase, where git's names for the sides are swapped. has no: that side deleted the file; submodule (HI-3502): the file is a submodule, and that side's commit of it is staged. {command} is the git command, as it is."
+  },
+  "git.operation.open": {
+    "defaultMessage": "Open",
+    "description": "HI-3470: a conflicted file's button: opens it in the editor, to settle it by hand."
+  },
+  "git.operation.projectFolder": {
+    "defaultMessage": "the project folder",
+    "description": "HI-3470: {folder} in git.operation.title and the dialogs when the folder shown is the project folder."
+  },
+  "git.operation.readFailed": {
+    "defaultMessage": "Couldn't read the git operation under way: {error}",
+    "description": "HI-3470: the panel, when reading the operation failed. {error} is why."
+  },
+  "git.operation.resolved": {
+    "defaultMessage": "Mark resolved",
+    "description": "HI-3470: a conflicted file's button: marks it settled as it is now in the folder (after editing it by hand: git add)."
+  },
+  "git.operation.resolvedTip": {
+    "defaultMessage": "Marks the file settled as it is now, once you have edited it. Runs {command}",
+    "description": "HI-3470: Mark resolved's tooltip. {command} is the git command, as it is."
+  },
+  "git.operation.runs": {
+    "defaultMessage": "Runs {command}",
+    "description": "HI-3470: a tooltip on the panel's buttons: the git command it runs ({command}, as it is)."
+  },
+  "git.operation.skip": {
+    "defaultMessage": "Skip",
+    "description": "HI-3470: the panel's button: git drops the commit it stopped at and goes on (git <op> --skip). It is also the confirm button of the dialog that asks first, beside the dialog's Cancel (shell.dialog.cancel): it must read differently from it (HI-3504)."
+  },
+  "git.operation.skipMessage": {
+    "defaultMessage": "Its changes are left out, with every conflict settled in it, and git goes on with the next one.",
+    "description": "HI-3470: what Skip loses, under git.operation.skipTitle."
+  },
+  "git.operation.skipTitle": {
+    "defaultMessage": "Skip {commit, select, none {this commit} other {{commit}}} of the git {what}?",
+    "description": "HI-3470: the question before Skip. {commit} is the short id of the commit git stopped at (none: not known); {what} is git's word for the operation."
+  },
+  "git.operation.step": {
+    "defaultMessage": "Step {at, number} of {of, number}",
+    "description": "HI-3470: under the panel's heading, for a rebase or an am: which commit of the list git stopped at."
+  },
+  "git.operation.stoppedAgain": {
+    "defaultMessage": "{step, select, skip {Git skipped a commit of the {what} in {folder}, then stopped again.} other {Git went on with the {what} in {folder}, then stopped again.}} The panel shows where.",
+    "description": "HI-3503: a notice after Continue or Skip went through and git stopped at the next commit of the operation (in conflict, say): the panel shows the new stop. {what} is git's word for the operation (keep it as it is); {folder} a slot's name or git.operation.projectFolder."
+  },
+  "git.operation.submoduleStaged": {
+    "defaultMessage": "{path} is a submodule: its commit {commit} is staged. Its folder is left as it is: {command, select, none {to check that commit out there, run git submodule update for it in a terminal.} other {to check that commit out there, run {command}}}",
+    "description": "HI-3502: a notice after Use mine or Use theirs on a conflicted submodule: that side's commit ({commit}, a short commit id) is staged, and Combwork doesn't check it out in the submodule's own folder. {path} is the submodule's path. {command} is the git command that checks it out, quoted for a shell (keep it as it is); none: its path can't be quoted the same for every shell, so no command is shown ('git submodule update' is a git command: keep it as it is)."
+  },
+  "git.operation.theirs": {
+    "defaultMessage": "Use theirs",
+    "description": "HI-3470: a conflicted file's button: takes the other side of it."
+  },
+  "git.operation.theirsStash": {
+    "defaultMessage": "Use the stash's",
+    "description": "HI-3518: a conflicted file's button, in place of git.operation.theirs, when the conflict came from applying a stash: takes the stash's side of it."
+  },
+  "git.operation.theirsTip": {
+    "defaultMessage": "{swap, select, yes {The other side: the branch being rebased onto (git calls it ours here).} other {The other side: what is being merged, picked or reverted (git calls it theirs).}} {has, select, yes {Takes its version of the file.} submodule {Stages its commit of the submodule.} other {It deleted the file: deletes it.}} Runs {command}",
+    "description": "HI-3470: Use theirs' tooltip, as git.operation.mineTip."
+  },
+  "git.operation.title": {
+    "defaultMessage": "Unfinished git {what} in {folder}",
+    "description": "HI-3470: the heading of the panel in Version Control → Changes when a git operation was left under way in the folder shown. {what} is git's word for it (merge, rebase, am, cherry-pick, revert, bisect: keep it as it is); {folder} is a slot's name or the project folder (git.operation.projectFolder)."
+  },
+  "git.operation.unreadable": {
+    "defaultMessage": "Combwork can't read where git stopped here, so it takes no step: finish it in a terminal.",
+    "description": "HI-3470 (a reviewer's round 2): under the panel's heading when git's files that say where the operation stopped can't be read; its buttons are greyed out."
+  },
+  "git.operation.unresolved": {
+    "defaultMessage": "{count, plural, one {# file is} other {# files are}} still in conflict: settle {count, plural, one {it} other {them}} first.",
+    "description": "HI-3470: why Continue is greyed out (its tooltip): files still in conflict."
   },
   "git.parentRepo": {
     "defaultMessage": "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Combwork changes only a project's own repository.",
@@ -1059,10 +1531,6 @@
     "defaultMessage": "Another Combwork is merging into this repository ({profile}). Nothing was changed: try again once it has finished.",
     "description": "An error: a merge or another change to a repository didn't start, because another Combwork (its profile folder's name, {profile}) still held the repository's merge lock after Combwork had waited for it."
   },
-  "git.repoLock.jjFolder": {
-    "defaultMessage": "{folder} is in a jj repository that isn't colocated with Git, so Combwork didn't run git there: nothing was changed.",
-    "description": "An error (HI-2896): a change that needs a Git repository was asked of a folder a jj (Jujutsu) repository with no Git working copy holds; git there would reach another repository or none. Keep jj and Git."
-  },
   "git.repoLock.noGitDir": {
     "defaultMessage": "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}",
     "description": "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Combwork's merge lock lives). {why} is git's message."
@@ -1070,10 +1538,6 @@
   "git.repoLock.order": {
     "defaultMessage": "This repository is busy with another change. Nothing was changed: try again in a moment.",
     "description": "An error (HI-2896): a change needed a repository's lock while holding another repository's, and the lock was held by another change; Combwork refuses rather than waiting, so the two can't wait on each other."
-  },
-  "git.repoLock.unknownRepo": {
-    "defaultMessage": "Combwork couldn't read the jj repository at {root} ({why}), so nothing was changed.",
-    "description": "An error (HI-2896): a change needed the lock of a project's repository, and the jj (Jujutsu) repository holding the folder couldn't be read ({why}: a short code, kept in English). Keep jj."
   },
   "git.repoLock.waiting": {
     "defaultMessage": "Another Combwork is merging into this repository ({profile})",
@@ -1102,30 +1566,6 @@
   "git.section.history": {
     "defaultMessage": "History",
     "description": "The Git tab's section with the last commits and the tags."
-  },
-  "git.section.jjBookmarks": {
-    "defaultMessage": "Bookmarks",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): its bookmarks (jj's named lines, like Git's branches). Use jj's own word for bookmark in your language's jj documentation, else translate it."
-  },
-  "git.section.jjCompare": {
-    "defaultMessage": "Compare",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): what changed between two revisions."
-  },
-  "git.section.jjConflicts": {
-    "defaultMessage": "Conflicts",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): the commits jj stores with unresolved conflicts."
-  },
-  "git.section.jjHistory": {
-    "defaultMessage": "History",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): its commits, each with its change id and commit id."
-  },
-  "git.section.jjOperations": {
-    "defaultMessage": "Operations",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2800): jj's operation log, each operation by its name, and a preview of undoing one. Use jj's own word for operation in your language's jj documentation, else translate it."
-  },
-  "git.section.jjRepo": {
-    "defaultMessage": "Repository",
-    "description": "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): its repository, workspaces, operation and what jj doesn't support in Combwork."
   },
   "git.section.queue": {
     "defaultMessage": "Merge queue",
@@ -1239,6 +1679,154 @@
     "defaultMessage": "Yes",
     "description": "In the Signing table: commits are signed."
   },
+  "git.stash.applied": {
+    "defaultMessage": "{dropped, select, yes {Popped the stash into {folder}: it is dropped.} other {Applied the stash to {folder}: it is kept.}}",
+    "description": "HI-3472: a notice after Apply or Pop went in without a conflict. {folder} as in git.stash.applyTitle."
+  },
+  "git.stash.apply": {
+    "defaultMessage": "Apply",
+    "description": "HI-3472: a stash's button: puts its changes into the folder Changes shows, and keeps the stash (git stash apply)."
+  },
+  "git.stash.applyMessage": {
+    "defaultMessage": "“{name}”: {files, plural, one {its # file goes} other {its # files go}} into {folder}. {pop, select, yes {The stash is then dropped, unless a file is in conflict: then it is kept.} other {The stash is kept.}}",
+    "description": "HI-3472: under git.stash.applyTitle. {name} is the stash's name as the list shows it; {files} how many files it holds; {folder} as in the title."
+  },
+  "git.stash.applyTip": {
+    "defaultMessage": "Puts its changes into {folder} and keeps the stash. Runs git stash apply.",
+    "description": "HI-3472: Apply's tooltip. {folder} is a slot's name or the project folder (git.operation.projectFolder). Keep git stash apply as it is: a command."
+  },
+  "git.stash.applyTitle": {
+    "defaultMessage": "{pop, select, yes {Pop the stash into {folder}?} other {Apply the stash to {folder}?}}",
+    "description": "HI-3472: the question before Apply or Pop. {folder} is a slot's name or the project folder (git.operation.projectFolder)."
+  },
+  "git.stash.binary": {
+    "defaultMessage": "Binary file",
+    "description": "HI-3472: in place of a stash file's diff when it is binary."
+  },
+  "git.stash.close": {
+    "defaultMessage": "Back to the folder's changes",
+    "description": "HI-3472: the tooltip of the button above a stash file's diff that goes back to the folder's own changes."
+  },
+  "git.stash.combwork": {
+    "defaultMessage": "{why, select, merging {Set aside by Combwork before merging {card}} catchUp {Set aside by Combwork before bringing {target} up to date with {card}} starting {Set aside by Combwork before starting work on {target}} discarding {Set aside by Combwork before discarding {file}} restoring {Set aside by Combwork before restoring {file} from {from}} other {Set aside by Combwork {text}}}",
+    "description": "HI-3472: a stash's name in the list when Combwork's Set Aside made it (HI-2944: a paused merge's button). {card} is a card's key (HI-12), {target} a branch; discarding and restoring (HI-3477: the Files tab's Discard Changes… and Restore From…): {file} is a file's path, {from} a short commit id; other: {text} is Combwork's own English words after \"set aside\". Keep the select keys."
+  },
+  "git.stash.conflicts": {
+    "defaultMessage": "{count, plural, one {# file is} other {# files are}} in conflict in {folder}",
+    "description": "HI-3472: the title of the warning after Apply or Pop left files in conflict. {folder} as in git.stash.applyTitle."
+  },
+  "git.stash.conflictsDetail": {
+    "defaultMessage": "The stash is kept. Settle {files} (each shows its conflict markers), then drop the stash when you no longer need it.",
+    "description": "HI-3472: under git.stash.conflicts. {files} lists the files in conflict."
+  },
+  "git.stash.diffFailed": {
+    "defaultMessage": "Couldn't show the file's changes in the stash: {error}",
+    "description": "HI-3472: in place of a stash file's diff when reading it failed. {error} is why."
+  },
+  "git.stash.drop": {
+    "defaultMessage": "Drop",
+    "description": "HI-3472: a stash's button: deletes the stash (git stash drop), after asking."
+  },
+  "git.stash.dropMessage": {
+    "defaultMessage": "Git deletes it, with {files, plural, one {the # file} other {the # files}} it holds{card, select, none {} other {, set aside for {card}}}. Its commit, {commit}, can still be found in a terminal for a while (git fsck --unreachable).",
+    "description": "HI-3472: under git.stash.dropTitle: what Drop loses. {files}: how many files; {card}: the card Combwork set it aside for (none: not one of Combwork's); {commit}: its short commit id. Keep git fsck --unreachable as it is: a command."
+  },
+  "git.stash.dropTip": {
+    "defaultMessage": "Deletes the stash, after asking. Runs git stash drop.",
+    "description": "HI-3472: Drop's tooltip. Keep git stash drop as it is: a command."
+  },
+  "git.stash.dropTitle": {
+    "defaultMessage": "Drop the stash “{name}”?",
+    "description": "HI-3472: the question before Drop. {name} is the stash's name as the list shows it."
+  },
+  "git.stash.dropped": {
+    "defaultMessage": "Dropped the stash. Its commit was {commit}: git stash apply {commit} brings it back while git keeps it.",
+    "description": "HI-3472: a notice after Drop. {commit} is the stash's full commit id. Keep git stash apply as it is: a command."
+  },
+  "git.stash.failed": {
+    "defaultMessage": "Git couldn't do that",
+    "description": "HI-3472: the title of the error notice when Apply, Pop or Drop failed or was refused."
+  },
+  "git.stash.fileTip": {
+    "defaultMessage": "Shows its changes in the stash",
+    "description": "HI-3472: the tooltip of a stash's file: a click shows its diff."
+  },
+  "git.stash.filesFailed": {
+    "defaultMessage": "Couldn't read its files: {error}",
+    "description": "HI-3472: under a stash when Show couldn't read its files. {error} is why."
+  },
+  "git.stash.filesLoading": {
+    "defaultMessage": "Reading its files…",
+    "description": "HI-3472: under a stash while Show reads its files."
+  },
+  "git.stash.goOn": {
+    "defaultMessage": "Go On",
+    "description": "HI-3472: the button that confirms putting a stash into a lent slot (git.stash.lentTitle)."
+  },
+  "git.stash.hide": {
+    "defaultMessage": "Hide",
+    "description": "HI-3472: a stash's button while its files are listed: hides them."
+  },
+  "git.stash.inStash": {
+    "defaultMessage": "in the stash “{name}”",
+    "description": "HI-3472: beside a file's path above its diff when it is a stash's file: {name} is the stash's name."
+  },
+  "git.stash.inline": {
+    "defaultMessage": "{inline, select, yes {Side by side} other {Inline}}",
+    "description": "HI-3472: the tooltip of the button above a stash file's diff that switches its view."
+  },
+  "git.stash.lentMessage": {
+    "defaultMessage": "Its builder, {agent}, finds the folder as you leave it. Put the stash into it anyway?",
+    "description": "HI-3472: under git.stash.lentTitle. {agent} is the builder agent's name."
+  },
+  "git.stash.lentTitle": {
+    "defaultMessage": "{slot} is lent to {card, select, none {lane {lane}} other {{card}}}",
+    "description": "HI-3472: the question before Apply or Pop in a slot lent to a card ({card}, its key) or a lane ({lane}, its name) whose builder isn't running. Glossary: slot, lane."
+  },
+  "git.stash.meta": {
+    "defaultMessage": "{branch, select, none {no branch} other {on {branch}}} · {when} · {files, plural, one {# file} other {# files}}",
+    "description": "HI-3472: under a stash's name: the branch it was made on ({branch}; none: a detached HEAD), when ({when}, a date and time) and how many files it holds."
+  },
+  "git.stash.openCard": {
+    "defaultMessage": "Open {card}",
+    "description": "HI-3472: the tooltip of a Combwork stash's card key: opens the card ({card}, its key)."
+  },
+  "git.stash.otherBranch": {
+    "defaultMessage": "It was made on {branch}, and {folder} has {current} checked out.",
+    "description": "HI-3472: added to the question before Apply or Pop when the stash was made on another branch ({branch}) than the one checked out in the folder ({current}); {folder} as in git.stash.applyTitle."
+  },
+  "git.stash.pop": {
+    "defaultMessage": "Pop",
+    "description": "HI-3472: a stash's button: puts its changes into the folder, then drops the stash (git stash pop). Git's word: keep it short."
+  },
+  "git.stash.popTip": {
+    "defaultMessage": "Puts its changes into {folder}, then drops the stash if they went in without a conflict. Runs git stash apply, then git stash drop.",
+    "description": "HI-3472: Pop's tooltip. {folder} as in git.stash.applyTip. Keep the git commands as they are."
+  },
+  "git.stash.projectFolder": {
+    "defaultMessage": "the project folder",
+    "description": "HI-3472: {folder} in the Stashes dialogs and notices when the folder shown is the project folder."
+  },
+  "git.stash.readFailed": {
+    "defaultMessage": "Couldn't read the stashes: {error}",
+    "description": "HI-3472: under the Stashes heading when reading them failed. {error} is why."
+  },
+  "git.stash.show": {
+    "defaultMessage": "Show",
+    "description": "HI-3472: a stash's button: lists its files (a click on one shows its changes). Nothing changes."
+  },
+  "git.stash.title": {
+    "defaultMessage": "Stashes",
+    "description": "HI-3472: the heading of the list of git stashes in Version Control → Changes (glossary: stash, git's word: changes kept aside)."
+  },
+  "git.stash.toggle": {
+    "defaultMessage": "{open, select, yes {Hide the stashes} other {Show the stashes}}",
+    "description": "HI-3472: the tooltip of the Stashes heading, a button that opens or closes the list."
+  },
+  "git.stash.untracked": {
+    "defaultMessage": "untracked",
+    "description": "HI-3472: beside a stash's file: it was an untracked file (new, never added to git) when the stash was made."
+  },
   "git.state": {
     "defaultMessage": "{state, select, merge {merging} rebase {rebasing} cherrypick {cherry-picking} revert {reverting} other {bisecting}}",
     "description": "What git has in progress in the project folder, in the status bar and the Git tab (badge), lower case: \"main · merging\"."
@@ -1283,6 +1871,62 @@
     "defaultMessage": "Switch {project} to {branch}?",
     "description": "Title of the confirmation before switching the project folder's branch."
   },
+  "git.tagDelete.about": {
+    "defaultMessage": "Deletes the tag {name} (on {commit}) here; the commit stays. A remote you choose loses it too, first, and only where it is this same tag: if it refuses, the tag stays here as well.",
+    "description": "HI-3474: the form that deletes the tag {name}, which points at the commit {commit} (a short hash)."
+  },
+  "git.tagDelete.also": {
+    "defaultMessage": "Here and on {remote}",
+    "description": "HI-3474: a choice of the Delete tag form's drop-down: in this repository and on the remote {remote}."
+  },
+  "git.tagDelete.busy": {
+    "defaultMessage": "Deleting…",
+    "description": "HI-3474: the Delete tag form's button while it runs."
+  },
+  "git.tagDelete.button": {
+    "defaultMessage": "Delete",
+    "description": "HI-3474: the Delete tag form's button."
+  },
+  "git.tagDelete.here": {
+    "defaultMessage": "Here only",
+    "description": "HI-3474: a choice of the Delete tag form's drop-down: only in this repository."
+  },
+  "git.tagDelete.tip": {
+    "defaultMessage": "Delete the tag {name}…",
+    "description": "HI-3474: tooltip on a tag's delete button in Version Control → History. {name} is the tag."
+  },
+  "git.tagDelete.title": {
+    "defaultMessage": "Delete the tag {name}",
+    "description": "HI-3474: title of the form that deletes the tag {name}."
+  },
+  "git.tagDelete.where": {
+    "defaultMessage": "Delete it",
+    "description": "HI-3474: label of the Delete tag form's drop-down: where the tag is deleted."
+  },
+  "git.tagPush.about": {
+    "defaultMessage": "Pushes the tag {name} to the remote you choose. Never forced: a remote with another tag of that name refuses it.",
+    "description": "HI-3474: the form that pushes the tag {name}."
+  },
+  "git.tagPush.busy": {
+    "defaultMessage": "Pushing…",
+    "description": "HI-3474: the Push tag form's button while it runs."
+  },
+  "git.tagPush.button": {
+    "defaultMessage": "Push",
+    "description": "HI-3474: the Push tag form's button."
+  },
+  "git.tagPush.remote": {
+    "defaultMessage": "Remote",
+    "description": "HI-3474: label of the Push tag form's drop-down of remotes."
+  },
+  "git.tagPush.tip": {
+    "defaultMessage": "Push the tag {name} to a remote…",
+    "description": "HI-3474: tooltip on a tag's push button in Version Control → History. {name} is the tag."
+  },
+  "git.tagPush.title": {
+    "defaultMessage": "Push the tag {name}",
+    "description": "HI-3474: title of the form that pushes the tag {name} to a remote."
+  },
   "git.tags.about": {
     "defaultMessage": "{onBranch, select, yes {Tags the commit the project folder has checked out ({branch}). With a message, it's an annotated tag.} other {Tags the commit the project folder has checked out. With a message, it's an annotated tag.}}",
     "description": "The Create tag form. {branch} is the branch checked out ({onBranch} is no when HEAD is detached)."
@@ -1306,6 +1950,10 @@
   "git.tags.heading": {
     "defaultMessage": "Tags",
     "description": "Heading in Git → History, followed by how many tags there are."
+  },
+  "git.tags.hereAbout": {
+    "defaultMessage": "Tags {commit}, “{subject}”. With a message, it's an annotated tag.",
+    "description": "HI-3471: Tag here…'s form (History's Commit dialog): it tags the commit {commit} (a short id) whose subject is {subject}."
   },
   "git.tags.message": {
     "defaultMessage": "Message",
@@ -1571,29 +2219,17 @@
     "defaultMessage": "The Git repository is gone from this folder. Until it’s back, what needs Git can’t be read.",
     "description": "Atop the Version Control tab of a Git project whose .git was removed or moved."
   },
-  "git.vc.fact.jj": {
-    "defaultMessage": "This folder is a jj repository at {root}, {colocated, select, yes {colocated with Git} other {not colocated with Git}}.",
-    "description": "Atop the Version Control tab (HI-2799, HI-2896): what Combwork found in the project folder, a jj (Jujutsu) repository. {root} is its root; colocated with Git means a .git folder beside .jj, not colocated that Git’s data is inside .jj (both are supported). Keep jj and Git."
-  },
-  "git.vc.fact.jjGone": {
-    "defaultMessage": "The jj repository is gone from this folder.",
-    "description": "Atop the Version Control tab of a project using jj (Jujutsu, HI-2799) whose .jj folder was removed or moved. Keep jj."
-  },
-  "git.vc.fact.jjInGit": {
-    "defaultMessage": "This folder is a jj repository at {root}, not colocated, inside the Git repository at {git}: Combwork can’t use jj here.",
-    "description": "Atop the Version Control tab (HI-2896): a jj (Jujutsu) repository whose Git data is inside .jj, in a folder that is itself inside a Git working tree ({git}); git commands in it would reach that repository, so jj isn’t offered. Keep jj and Git."
-  },
   "git.vc.fact.none": {
     "defaultMessage": "This folder has no version control.",
     "description": "Atop the Version Control tab, when the project folder has no repository."
   },
   "git.vc.fact.other": {
     "defaultMessage": "{vcs} found: not supported yet, so this project uses None.",
-    "description": "Atop the Version Control tab: another version control was found in the folder. {vcs} is its name (Mercurial, Jujutsu). None: glossary 2.1."
+    "description": "Atop the Version Control tab: another version control was found in the folder. {vcs} is its name (Mercurial, Subversion). None: glossary 2.1."
   },
   "git.vc.fact.otherGit": {
     "defaultMessage": "{vcs} found in this folder: not supported yet.",
-    "description": "Atop the Version Control tab of a project still using Git, where another version control was found ({vcs}: Mercurial, Jujutsu). The offer under it says what to do."
+    "description": "Atop the Version Control tab of a project still using Git, where another version control was found ({vcs}: Mercurial, Subversion). The offer under it says what to do."
   },
   "git.vc.fact.repo": {
     "defaultMessage": "This folder is a Git repository at {root}.",
@@ -1619,10 +2255,6 @@
     "defaultMessage": "This folder is inside the Git repository at {root}: use that one, or give this folder its own.",
     "description": "Git’s page in the Version Control tab of a project inside another repository, chosen before it has its own: above the buttons Use that repository… and Initialise its own repository…. {root} is the outer repository’s folder."
   },
-  "git.vc.jj": {
-    "defaultMessage": "jj",
-    "description": "Jujutsu’s command name, as its users call it, in the choice atop the Version Control tab (HI-2799). Keep it: a product’s name, lower case."
-  },
   "git.vc.noCommitYet": {
     "defaultMessage": "This folder's Git repository has no first commit yet.",
     "description": "Git’s page in the Version Control tab, when Initialise repository… made the repository but stopped before its first commit: above the Make first commit… button."
@@ -1639,21 +2271,13 @@
     "defaultMessage": "Git found at {root}: switch to Git?",
     "description": "An offer atop the Version Control tab of a project without version control, after someone ran git init: {root} is the repository root. Combwork never switches by itself."
   },
-  "git.vc.offer.jjFound": {
-    "defaultMessage": "jj found at {root}: switch to jj?",
-    "description": "An offer atop the Version Control tab (HI-2799, HI-2896): a jj (Jujutsu) repository, colocated with Git or not, was found in the project folder. Combwork never switches by itself. Keep jj."
-  },
-  "git.vc.offer.jjGone": {
-    "defaultMessage": "The jj repository is gone: switch this project back to {platform}?",
-    "description": "An offer atop the Version Control tab of a project using jj (HI-2799) whose .jj folder is gone. {platform} is Git or None. Keep jj."
-  },
   "git.vc.offer.notNow": {
     "defaultMessage": "Not Now",
     "description": "A button of the offer to switch version control (atop the Version Control tab): hides the offer until Combwork starts again."
   },
   "git.vc.offer.otherFound": {
     "defaultMessage": "{vcs} found: not supported yet, so this project can only use None.",
-    "description": "An offer atop the Version Control tab of a Git project where another version control ({vcs}: Mercurial, Jujutsu) is found now. None: glossary 2.1."
+    "description": "An offer atop the Version Control tab of a Git project where another version control ({vcs}: Mercurial, Subversion) is found now. None: glossary 2.1."
   },
   "git.vc.offer.repositoryGone": {
     "defaultMessage": "The Git repository is gone. Git’s rules hold until you switch, because what they check can’t be read.",
@@ -1662,10 +2286,6 @@
   "git.vc.offer.switchGit": {
     "defaultMessage": "Switch…",
     "description": "A button of the offer to switch a project to Git (atop the Version Control tab): shows what changes, then asks. The … says it asks first: keep it."
-  },
-  "git.vc.offer.switchJj": {
-    "defaultMessage": "Switch to jj…",
-    "description": "A button of the offer to switch a project to jj (Jujutsu, HI-2799): shows what changes, then asks. The … says it asks first: keep it. Keep jj."
   },
   "git.vc.offer.switchNone": {
     "defaultMessage": "Switch to None…",
@@ -1759,137 +2379,9 @@
     "defaultMessage": "{n, plural, one {{projects} was added: how do you work?} other {{projects} were added: how do you work?}} A preset sets up a workflow in one click.",
     "description": "A notice for projects Combwork found in the workspace (or the Assistant added) that have no workflow yet: it offers the \"How do you work?\" step (glossary 2.1: preset, workflow). {projects} is a list of project names; {n} how many."
   },
-  "git.vc.store.autocrlf": {
-    "defaultMessage": "Git converts line endings here (core.autocrlf). If this repository doesn’t need that, turn it off for it alone: run {command} in it, then Check Again.",
-    "description": "Under Git attributes in the warning before switching to jj (HI-2872), when Git’s line-ending conversion is on. {command} is a git command, kept as it is; core.autocrlf is a Git setting; Check Again is the dialog’s button."
-  },
-  "git.vc.store.card": {
-    "defaultMessage": "{project}: {card} {title}, in flight",
-    "description": "A card started and not done, in the switch’s warning (HI-2799). {card} is its key."
-  },
-  "git.vc.store.carried": {
-    "defaultMessage": "{what, select, line {{project}: {card}’s work from before is on {line}{state, select, ahead {, with commits its target doesn’t hold} other {, and Combwork couldn’t tell whether its target holds it}}. After the switch {card} starts from its target, not that line: if its target doesn’t hold that work by then, bring it in yourself.} card {{project}: Combwork couldn’t read {card}’s earlier starts, so it can’t tell whether work from before is left on a line of its own. After the switch {card} starts from its target: check before you start it.} other {{project}: Combwork couldn’t read its cards’ earlier starts, so it can’t tell whether any has work from before left on a line of its own. After the switch they start from their target: check before you start them.}}",
-    "description": "HI-3107: a hint in the warning before switching to jj. line: a card not in flight ran before under Git, and its branch from then has (ahead) or may have (other: it couldn’t be read) work its target lacks; the card will start from its target, not that branch. card: that card’s earlier starts couldn’t be read; other: the project’s board couldn’t be read. Keep the select keys. {card} is a card key; {line} a branch name."
-  },
-  "git.vc.store.clear": {
-    "defaultMessage": "{gate}: not used",
-    "description": "A feature jj doesn’t support, not used by this repository (HI-2799). {gate} is its name."
-  },
-  "git.vc.store.conflictedBookmark": {
-    "defaultMessage": "Bookmark {name} is conflicted: resolve it with jj.",
-    "description": "Why a jj project can’t go back to Git yet (HI-2799): a bookmark points at several commits. Keep jj."
-  },
-  "git.vc.store.conflictedCommit": {
-    "defaultMessage": "Commit {commit} stores conflicts: resolve them with jj.",
-    "description": "Why a jj project can’t go back to Git yet (HI-2799): a commit on a bookmark stores unresolved conflicts. {commit} is a short id. Keep jj."
-  },
-  "git.vc.store.copy": {
-    "defaultMessage": "{project}: {kind, select, review {review copy} other {check copy}} {copy}",
-    "description": "In the switch’s warning (HI-2799): a review or check copy still in use."
-  },
-  "git.vc.store.detached": {
-    "defaultMessage": "{project}: its folder is on no branch (its head is detached at {head}), and stays so after the switch. Check out the branch its work goes on there (git switch) before its cards start in the project folder.",
-    "description": "HI-3104: a hint in the warning before switching back to Git: a project’s folder has no branch checked out (a detached head, as a jj repository colocated with Git leaves it). Combwork doesn’t check one out; a card started in that folder is refused until the user does. {head} is a short commit id. git switch is a command: keep it."
-  },
-  "git.vc.store.drain": {
-    "defaultMessage": "Still running on this repository (the switch waits until all of it has finished):",
-    "description": "In the warning before switching between Git and jj (HI-2799): above what still uses the repository. Nothing of it is stopped by Combwork."
-  },
-  "git.vc.store.fallback": {
-    "defaultMessage": "Before going back to Git:",
-    "description": "In the warning before switching a jj project back to Git (HI-2799): above what isn’t ready. Keep Git."
-  },
-  "git.vc.store.fallbackUnknown": {
-    "defaultMessage": "Couldn’t read the repository ({detail}).",
-    "description": "Why a jj project can’t go back to Git yet (HI-2799): jj couldn’t be read. {detail} is a short code, kept in English."
-  },
-  "git.vc.store.gates": {
-    "defaultMessage": "What this repository uses, checked for jj:",
-    "description": "In the warning before switching to jj (HI-2799): above each Git feature jj doesn’t support, checked in this repository. Keep jj."
-  },
-  "git.vc.store.group": {
-    "defaultMessage": "{n, plural, one {This project switches:} other {These projects share this repository and switch together:}}",
-    "description": "In the warning before switching between Git and jj (HI-2799): above the projects of the workspace on the same repository, which all switch."
-  },
-  "git.vc.store.heads": {
-    "defaultMessage": "jj has {n, plural, =0 {no readable operation head} one {# operation head} other {# operation heads}}: let jj reconcile them first.",
-    "description": "Why a jj project can’t go back to Git yet (HI-2799): jj’s operation log has diverged. Keep jj."
-  },
-  "git.vc.store.kept": {
-    "defaultMessage": "{project}: {card}’s committed work, kept in slot {slot} for when it starts again: start {card} and finish it",
-    "description": "In the switch’s warning (HI-3069): a card was put back with commits, and its slot is kept for it; after the switch that slot could never be lent back, so the switch waits until the card has finished. {card} is a card key like AM-12; {slot} a slot’s name (glossary 2.5: slot)."
-  },
-  "git.vc.store.lane": {
-    "defaultMessage": "{project}: lane “{name}” (builder {builder})",
-    "description": "A running lane in the switch’s warning (HI-2799). A noun before the name (glossary §1 rule 4)."
-  },
-  "git.vc.store.laneUnnamed": {
-    "defaultMessage": "{project}: a lane (builder {builder})",
-    "description": "A running lane with no name in the switch’s warning (HI-2799)."
-  },
-  "git.vc.store.limit": {
-    "defaultMessage": "{gate}: {why}",
-    "description": "A limit of jj in Combwork (HI-2799): its name and why."
-  },
-  "git.vc.store.member": {
-    "defaultMessage": "{project} (now {platform})",
-    "description": "A project in the warning before switching between Git and jj (HI-2799). {platform} is None, Git or jj, its version control now."
-  },
-  "git.vc.store.notExported": {
-    "defaultMessage": "Bookmark {name} isn’t the same in Git: run jj git export, or check it.",
-    "description": "Why a jj project can’t go back to Git yet (HI-2799): a bookmark and its Git branch differ. Keep jj git export (a command)."
-  },
-  "git.vc.store.queue": {
-    "defaultMessage": "{project}: its merge queue",
-    "description": "In the switch’s warning (HI-2799): a project’s merge queue still has work (glossary 2.5: merge queue)."
-  },
-  "git.vc.store.slot": {
-    "defaultMessage": "{project}: slot {slot}, lent to {agent}",
-    "description": "In the switch’s warning (HI-2799): a slot (a card’s own folder) still lent to an agent (glossary 2.5: slot)."
-  },
-  "git.vc.store.stock": {
-    "defaultMessage": "Git for Windows’ own default settings (its LFS filter, the diff driver for Office documents) don’t count: only what the repository or your own Git settings use.",
-    "description": "Under the gates in the warning before switching to jj (HI-2872): Git for Windows’ stock system settings are ignored. Keep Git for Windows (a product’s name) and LFS."
-  },
-  "git.vc.store.stuck": {
-    "defaultMessage": "Combwork stopped while switching {projects} between Git and jj, and can’t tell from their settings which way to finish: {changed} changed or can’t be read. Until they show their version control from before or after the switch, nothing starts on their repository.",
-    "description": "HI-3073: a notice’s message. {projects} names the projects that were switching; {changed}, those whose project settings were changed by hand meanwhile or can’t be read. Keep Git and jj."
-  },
-  "git.vc.store.stuckTitle": {
-    "defaultMessage": "A version control switch couldn’t be finished",
-    "description": "HI-3073: a notice’s title. A switch between Git and jj was cut short (Combwork closed or crashed during it), and Combwork couldn’t settle it from the projects’ files, so the repository stays switching."
-  },
-  "git.vc.store.toGit": {
-    "defaultMessage": "Combwork leaves .jj in place: remove it with jj if you no longer want it.",
-    "description": "In the warning before switching a jj project back to Git (HI-2799). Keep .jj and jj."
-  },
-  "git.vc.store.toJj": {
-    "defaultMessage": "Combwork never creates a jj repository or changes how it is colocated: .jj, and .git where there is one, stay as they are. Cards run in slots of their own. By default Combwork integrates each passed card itself once its merge checks pass, moving the target bookmark; Who integrates, in Workflow, can leave that to you. Combwork never pushes.",
-    "description": "In the warning before switching to jj (HI-2799, HI-2896: a jj repository colocated with Git has a .git beside .jj, one not colocated has none; HI-2874: jj cards run; HI-3235, HI-3315: Combwork integrates by default). Who integrates and Workflow are names in Combwork’s window. A bookmark is jj’s name for a branch. Keep jj, .jj and .git."
-  },
-  "git.vc.store.unknown": {
-    "defaultMessage": "{gate}: couldn’t be checked ({what}), so it counts as used",
-    "description": "A feature jj doesn’t support whose use Combwork couldn’t read (HI-2799): unreadable counts as used, so the switch is refused."
-  },
-  "git.vc.store.unsupported": {
-    "defaultMessage": "Not supported with jj, whatever the repository:",
-    "description": "In the warning before switching to jj (HI-2799): above what Combwork never does with jj (merging, pushing, moving…). Keep jj."
-  },
-  "git.vc.store.uses": {
-    "defaultMessage": "{gate}: used ({what})",
-    "description": "A feature jj doesn’t support, used by this repository (HI-2799): {what} says where (a setting, a file), as found."
-  },
   "git.vc.switch.changed": {
     "defaultMessage": "Changed meanwhile: this project uses {platform} now. Look again before switching.",
-    "description": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None, Git or jj."
-  },
-  "git.vc.switch.checkAgain": {
-    "defaultMessage": "Check Again",
-    "description": "The button of a refused switch between Git and jj (HI-2799): reads the repository and what runs on it again, and shows the warning again (or switches, after asking)."
-  },
-  "git.vc.switch.close": {
-    "defaultMessage": "Close",
-    "description": "Closes the refused switch’s dialog (HI-2799) without switching."
+    "description": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None or Git."
   },
   "git.vc.switch.confirm": {
     "defaultMessage": "Switch",
@@ -1899,53 +2391,17 @@
     "defaultMessage": "{project} uses {platform} from its next card",
     "description": "A notice after switching a project’s version control. {project} is its name, {platform} None or Git."
   },
-  "git.vc.switch.drain": {
-    "defaultMessage": "Work is still running on this repository: switch once it has finished.",
-    "description": "Why a switch between Git and jj is refused (HI-2799): lanes, cards in flight, the merge queue or slots are still in use on the repository (listed in the same dialog). Keep Git and jj."
-  },
-  "git.vc.switch.fallback": {
-    "defaultMessage": "The repository isn’t ready to go back to Git: see the list.",
-    "description": "Why a jj project can’t be switched back to Git (HI-2799): conflicted bookmarks, changes Git hasn’t received and the like (listed in the same dialog). Keep Git."
-  },
   "git.vc.switch.fresh": {
     "defaultMessage": "It has no {to} options of its own yet: they come from the workspace’s and Combwork’s defaults until you choose some. {from}’s are kept for a switch back.",
     "description": "In the warning before switching version control, when the project never used the other one: it starts with no options of its own (inherited). {to} and {from} are None or Git."
-  },
-  "git.vc.switch.gates": {
-    "defaultMessage": "This repository uses what jj doesn’t support: see the list.",
-    "description": "Why a project can’t be switched to jj (HI-2799): the compatibility check found Git features jj doesn’t support (listed in the same dialog). Keep jj."
   },
   "git.vc.switch.gitFolder": {
     "defaultMessage": "This folder is still a Git repository, but with None Combwork records no commits or merges for its cards.",
     "description": "In the warning before switching a project to None (no version control) while its folder is a Git repository. None: glossary 2.1."
   },
-  "git.vc.switch.groupChanged": {
-    "defaultMessage": "This repository’s projects changed meanwhile: look again before switching.",
-    "description": "Why a switch between Git and jj is refused (HI-2799): a project joined the repository, or one of its projects’ choices or options changed, after the warning was shown."
-  },
   "git.vc.switch.inFlight": {
     "defaultMessage": "{n, plural, one {This card in flight finishes under {from}’s rules (old rules):} other {These cards in flight finish under {from}’s rules (old rules):}}",
     "description": "In the warning before switching version control, above the cards already started (glossary: old rules). {from} is None or Git. Unlike other option changes, a switch can’t be applied to them."
-  },
-  "git.vc.switch.jjInGit": {
-    "defaultMessage": "This jj repository isn’t colocated with Git and sits inside the Git repository at {root}: git commands run here would change that repository. Move it out, or make it colocated with jj.",
-    "description": "Why a project (or a card start, or a slot) can’t use jj (HI-2896): its jj repository keeps Git’s data inside .jj, and a folder above it is a Git working tree ({root}), which any git command in the project would reach. Keep jj and Git."
-  },
-  "git.vc.switch.jjNoGitCopy": {
-    "defaultMessage": "No Git working copy here: this jj repository keeps Git’s data inside .jj. To go back to Git, make it colocated with jj (jj git colocation enable), then switch. Or choose None.",
-    "description": "Why a jj project can’t be switched to Git (HI-2896): its jj repository isn’t colocated, so the folder has no .git. Keep jj, Git, None (glossary 2.1) and the command as it is."
-  },
-  "git.vc.switch.jjTool": {
-    "defaultMessage": "{state, select, missing {jj isn’t installed (or isn’t on the PATH)} old {This jj is older than the one Combwork is tested with} untested {This jj is newer than the one Combwork is tested with} other {jj couldn’t be checked}}, so this project can’t use jj.",
-    "description": "Why a project can’t be switched to jj (HI-2799): the jj tool Combwork found. Keep jj."
-  },
-  "git.vc.switch.jjToolBack": {
-    "defaultMessage": "{state, select, missing {jj isn’t installed (or isn’t on the PATH)} old {This jj is older than the one Combwork is tested with} untested {This jj is newer than the one Combwork is tested with} other {jj couldn’t be checked}}, so Combwork can’t check that this repository is ready to go back to Git. Install the jj Combwork is tested with, then switch. Or, if you’re done with jj, remove the .jj folder: the project can then go back to Git without it.",
-    "description": "Why a jj project can’t be switched back to Git (HI-2975): jj itself is missing or not the tested version, so whether its bookmarks reached Git can’t be checked. Keep jj, Git and .jj."
-  },
-  "git.vc.switch.jjUnknown": {
-    "defaultMessage": "jj couldn’t confirm this repository ({code}), so this project can’t switch.",
-    "description": "Why a project can’t be switched to or from jj (HI-2799): jj didn’t confirm what its files say. {code} is a short code for why (kept in English). Keep jj."
   },
   "git.vc.switch.lane": {
     "defaultMessage": "Lane “{name}” (builder {builder})",
@@ -1959,21 +2415,9 @@
     "defaultMessage": "{n, plural, one {This running lane keeps {from}’s rules until it ends:} other {These running lanes keep {from}’s rules until they end:}}",
     "description": "In the warning before switching version control, above the lanes running now (glossary: lane, old rules). {from} is None or Git."
   },
-  "git.vc.switch.memberDrain": {
-    "defaultMessage": "Work is still running in this project. Its repository has been switched between Git and jj, so the project switches to None only once that work has finished.",
-    "description": "Why a project can’t be switched to None now (HI-2974): its repository was once switched between Git and jj, and lanes, cards in flight, the merge queue, slots or review copies of this project are still in use (listed in the same dialog). Keep Git, jj and None (glossary 2.1)."
-  },
-  "git.vc.switch.memberNoJj": {
-    "defaultMessage": "{project} is on this repository, but its folder isn’t a jj workspace (a Git worktree, say), so it can’t use jj. Choose None for {project}, or remove it from the workspace, then switch.",
-    "description": "Why a switch to jj is refused (HI-3034): every project on the repository switches together, and {project}, another project on it, is a folder jj doesn’t know (typically a git worktree the user made). Keep jj, Git and None (glossary 2.1)."
-  },
   "git.vc.switch.noGit": {
     "defaultMessage": "No Git repository here: Initialise repository… first.",
     "description": "Why a project can’t be switched to Git (the Version Control tab’s choice, a refusal): its folder has no Git repository. Initialise repository… is a button’s name: keep it as translated there."
-  },
-  "git.vc.switch.noJj": {
-    "defaultMessage": "No jj repository here. Combwork never makes one: create it with jj.",
-    "description": "Why a project can’t be switched to jj (Jujutsu, HI-2799, HI-2896): its folder has no jj repository. Keep jj."
   },
   "git.vc.switch.notSwitched": {
     "defaultMessage": "{project} is a Git repository now, but it wasn't switched to Git: {error}",
@@ -1987,10 +2431,6 @@
     "defaultMessage": "{vcs} found: not supported yet, so this project can only use None.",
     "description": "Why a project can’t be switched to Git: another version control ({vcs}: Mercurial, Subversion) was found in its folder. None: glossary 2.1."
   },
-  "git.vc.switch.otherWorkspace": {
-    "defaultMessage": "This repository is also a project of the open workspace {workspace}: close it there first.",
-    "description": "Why a switch between Git and jj is refused (HI-2799): another open workspace (another window) has a project on the same repository, whose work Combwork can’t hold while it switches. {workspace} is its name. Keep Git and jj."
-  },
   "git.vc.switch.queue": {
     "defaultMessage": "Their merge queue carries on, and stays in this tab and the Progress panel until it’s clear.",
     "description": "In the warning before switching from Git to None, under the Git cards in flight: their merge queue goes on until it is empty."
@@ -1998,14 +2438,6 @@
   "git.vc.switch.restored": {
     "defaultMessage": "The {to} options it had before come back as they were; {from}’s are kept for a switch back.",
     "description": "In the warning before switching version control, when the project used the other one before: its options for it are restored. {to} and {from} are None or Git."
-  },
-  "git.vc.switch.storeRuns": {
-    "defaultMessage": "This repository uses {platform} now (its other projects switched it), so this project can’t use Git on it: switch the repository back to Git from one of those projects first.",
-    "description": "Why a project can’t be switched to Git (HI-3072): it is on a repository (a Git worktree of one, say) whose other projects switched it to jj, so a Git project there would mix Git and jj on one repository. {platform} is jj (or Git), as the window names it."
-  },
-  "git.vc.switch.switching": {
-    "defaultMessage": "This repository’s version control is being switched: try again in a moment.",
-    "description": "Why a switch (or a start, a lane, a slot) is refused for now (HI-2799): another switch of the same repository between Git and jj is under way."
   },
   "git.vc.switch.title": {
     "defaultMessage": "Switch {project} to {platform}?",

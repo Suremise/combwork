@@ -482,6 +482,26 @@
       "max": "number"
     }
   },
+  "tasks.feedback.changed": {
+    "placeholders": {
+      "card": "plain",
+      "number": "plain",
+      "repo": "plain"
+    }
+  },
+  "tasks.feedback.gone": {
+    "placeholders": {
+      "number": "plain"
+    }
+  },
+  "tasks.feedback.none": {
+    "placeholders": {}
+  },
+  "tasks.feedback.notOpen": {
+    "placeholders": {
+      "number": "plain"
+    }
+  },
   "tasks.history.answerTold": {
     "placeholders": {
       "agent": "plain"
@@ -631,14 +651,6 @@
       "was": "plain"
     }
   },
-  "tasks.history.jjCandidateReturned": {
-    "placeholders": {
-      "target": "plain",
-      "reason": "select",
-      "check": "plain",
-      "files": "select"
-    }
-  },
   "tasks.history.kind": {
     "placeholders": {
       "how": "select",
@@ -734,6 +746,18 @@
     "placeholders": {
       "place": "plural",
       "column": "select"
+    }
+  },
+  "tasks.history.prClosed": {
+    "placeholders": {
+      "number": "plain"
+    }
+  },
+  "tasks.history.prNotPushed": {
+    "placeholders": {
+      "number": "plain",
+      "why": "select",
+      "rule": "plain"
     }
   },
   "tasks.history.queueGuarded": {
@@ -861,6 +885,14 @@
       "help": "plain"
     }
   },
+  "tasks.history.source": {
+    "placeholders": {
+      "set": "select",
+      "kind": "select",
+      "number": "plain",
+      "repo": "plain"
+    }
+  },
   "tasks.history.stageRepaired": {
     "placeholders": {
       "stage": "select"
@@ -921,6 +953,54 @@
       "watcher": "plain",
       "why": "select",
       "agent": "plain"
+    }
+  },
+  "tasks.source.agents": {
+    "placeholders": {}
+  },
+  "tasks.source.gh": {
+    "placeholders": {
+      "problem": "select",
+      "host": "plain"
+    }
+  },
+  "tasks.source.issueLinkChanged": {
+    "placeholders": {
+      "repo": "plain",
+      "shown": "plain"
+    }
+  },
+  "tasks.source.linkChanged": {
+    "placeholders": {
+      "repo": "plain",
+      "shown": "plain"
+    }
+  },
+  "tasks.source.noLink": {
+    "placeholders": {}
+  },
+  "tasks.source.noProject": {
+    "placeholders": {}
+  },
+  "tasks.source.notFound": {
+    "placeholders": {
+      "number": "plain",
+      "repo": "plain",
+      "why": "select"
+    }
+  },
+  "tasks.source.notGithub": {
+    "placeholders": {}
+  },
+  "tasks.source.otherRepo": {
+    "placeholders": {
+      "repo": "plain",
+      "host": "plain"
+    }
+  },
+  "tasks.source.started": {
+    "placeholders": {
+      "card": "plain"
     }
   },
   "tasks.start.alreadyStarting": {

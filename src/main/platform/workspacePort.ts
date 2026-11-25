@@ -6,7 +6,7 @@
 // (slots.ts, slotCards.ts, agentWorktree.ts): they ask this port to act on a folder and read its answers, and every
 // refusal (a held lease, a late process, a dirty or unmerged slot, unreadable state, a moved folder) stays theirs, in
 // their words (R2.3). Each platform implements it in its own module (Git: gitWorkspacePort.ts, over worktrees.ts,
-// platform/git.ts and git.ts, delegating to them unchanged); workspacePorts.ts finds it, never by a switch on an id.
+// gitCommands.ts and git.ts, delegating to them unchanged); workspacePorts.ts finds it, never by a switch on an id.
 //
 // 1.4.0 changes no behaviour (§16.3.6's rule 1): Git's implementation runs today's git commands, in the same folders and
 // order (tests/slotTraces.test.ts holds the pool to its traces). Folders here are paths: `repo` is the project's folder
@@ -17,78 +17,22 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import type { Maybe } from './types'
 import type { ChildProcess, SpawnOptions } from 'child_process'
 import type { GitFilesStatus } from '../../shared/types'
-import type { AgentMsg } from '../../shared/agentText'
 
 /**
  * HI-3003: the slot pool's words for a workspace's failures that name the platform's tool or terms (Git's worktree,
- * branch, switch): a platform that words them its own way gives its messages in `says`, with the same values (`slot`,
- * `what`, `error`); the pool's own (Git's) are said otherwise.
+ * branch, switch), said with the values `slot`, `what` and `error`.
  */
 export type SlotWord = 'branchUnread' | 'filesUnread' | 'lineUnread' | 'switchFailed' | 'createFailed' | 'notListed' | 'removeFailed' | 'noTarget'
 
-/**
- * jj's id (HI-2795's J2, agreed with J1, HI-2794, which imports it): a project platform since J6 (HI-2799), so these are
- * `PlatformId`'s own. jj's port is reached through the pools' platform port (`workspacesFor`, registered by the app,
- * J9a) or by injection (`PoolDeps.workspaces`, `CopyPoolDeps.workspaces`), never `slotWorkspaces` (Git's).
- */
-export type JjPlatform = Extract<PlatformId, 'jj'>
-/**
- * HI-3140: what a platform's refusal means to the slot pool: `fence`, the operation lost the folder's quiet (a wait);
- * `uncertain`, a write's result to decide on the next pass (a wait while preparing); `stale`, the workspace is stale
- * (said as itself, with Recover…); `held`, what the slot holds is the card's pending cycle's wait (HI-3115), never a failure.
- */
-export type WorkspaceRefusal = 'fence' | 'uncertain' | 'stale' | 'held'
-
 /** The platforms a workspace port can be: a project's. */
-export type WorkspacePlatform = PlatformId
-
-/**
- * Who a workspace is, beyond its folder (HI-2795): its store, its own name there and its creation generation (the
- * folder's file ids at creation: a folder replaced at the same path, even a same-named workspace of the same store, is
- * another). Recorded on a slot's or copy's row by a platform whose workspaces need it (jj); Git's rows have none.
- */
-export interface WorkspaceIdentity {
-  store: string
-  workspace: string
-  generation: string
-}
-
-/** A database a fence's transaction hands its callback (the pool's workspace database, as board_meta's store reads it). */
-export interface FenceDb {
-  prepare(sql: string): { get(...a: unknown[]): unknown; all(...a: unknown[]): unknown[]; run(...a: unknown[]): unknown }
-}
-
-/** The caller's proof it still holds the folder (its operation's token, checked in a write): false stops before a mutation. */
-export interface WorkspaceFence {
-  still(): boolean | Promise<boolean>
-  /**
-   * The fence's own write transaction (HI-2866, HR1's round 2): `fn` runs inside it only while the holder's record there
-   * still holds (the operation's token, its lease open, no writer or job), checked in that same transaction, so a final
-   * record commits atomically with the fence; `held: false`, and `fn` never run, otherwise. The pool's fences have it.
-   */
-  commit?<T>(fn: (db: FenceDb) => T): Promise<{ held: true; value: T } | { held: false }>
-}
-
-/**
- * Durable state a multi-step change keeps between its steps (HI-2795: a jj removal, a stale recovery), so an
- * interrupted one resumes where it was: board_meta, by key, in the pool's store. `read` answers what was written last.
- */
-export interface WorkspaceJournal {
-  read(): unknown
-  write(v: unknown): Promise<void>
-  clear(): Promise<void>
-  /**
-   * HI-2869: a compare-and-set inside the write itself: `fn` runs synchronously in the write's transaction (after any wait
-   * for its lock), given what is stored then, and answers the value to store, or undefined to write nothing. Whether it
-   * wrote. Absent where a journal can't offer it (its caller then writes nothing).
-   */
-  update?(fn: (current: unknown) => unknown): Promise<boolean>
-}
+type WorkspacePlatform = PlatformId
 
 /** One of the store's workspaces as the platform lists it: its folder (absolute) and the line it has checked out (null: none, detached). */
-export interface WorkspaceListing {
+interface WorkspaceListing {
   path: string
   line: string | null
+  /** HI-3464: registered, but its platform would prune it (no workspace at its folder: one made by hand in its place). */
+  prunable?: true
 }
 
 /** A folder's checkout read with no process (from its files): its line (null: detached) and its head; null when unreadable. */
@@ -98,60 +42,21 @@ export interface WorkspaceCheckout {
 }
 
 /** A folder's line, head and a target line's head, read at once (Git: one rev-parse), each a value or unknown. */
-export interface WorkspaceHeads {
+interface WorkspaceHeads {
   line: Maybe<string | null>
   head: Maybe<string>
   target: Maybe<string | null>
 }
 
 /** What a step that changes a workspace or a line answered: done, or not with the tool's own words (`err`, as it said them). */
-/**
- * HI-3115 (decision B, design HI-3115/s42): what keeps a jj card's slot from being prepared, frozen at the operation it was
- * read at, so the advice built from it still names the same work after the slot changes. `extra`: commits over the last
- * card's that are neither in its target nor any of its submitted commits (`commits`, oldest first), and the working
- * copy's own commit when it holds edits (`edits`); `select` the frozen revset of them all (full ids only). `notIntegrated`:
- * the last card's work isn't in its target yet. `cantInspect`: what it holds couldn't be read (no ids, no commands).
- */
-export interface HeldWork {
-  why: 'extra' | 'notIntegrated' | 'cantInspect'
-  commits: string[]
-  edits: string | null
-  select: string | null
-  base: string
-  target: string | null
-}
-
 export interface WorkspaceStep {
   ok: boolean
   err: string
-  /** HI-3115: a jj preparation refused for what the slot holds: the evidence for its wait's advice. */
-  held?: HeldWork
-  /**
-   * A refused detach because the slot holds its binding's own work not in the target yet (HI-2995; jj: the chain not
-   * integrated, or not the binding's): kept for its card, not a refusal to retry. Never set for a transient one (the
-   * fence, an uncertain write, the head moved, a read that failed).
-   */
-  kept?: boolean
 }
 
 /** HI-1182: how Combwork checks a folder out while submodules and Git LFS are set up there (Git: LFS files left as pointers, `git lfs pull` fills them). */
 export interface CheckoutOptions {
   skipSmudge?: boolean
-}
-
-/**
- * An owned write's proof (HI-2866, jj's prepare and detach): the row's recorded identity, the holder's fence (checked,
- * with the folder's quiescence, right before every write), the lease it is for, and, for a detach, the card's line it
- * settles and the target whose head it is put back on (re-read under the lock right before the write).
- */
-export interface OwnedWrite {
-  identity?: WorkspaceIdentity | null
-  fence?: WorkspaceFence
-  lease?: string
-  /** A detach's: the card's line (its preparation) being settled. */
-  settles?: string
-  /** A detach's: the target whose head `revision` is, read again right before the write. */
-  target?: string
 }
 
 /** A tool's run in a files step (HI-1182): `code` null when it didn't exit by itself (ended, timed out, not started). */
@@ -198,7 +103,7 @@ export interface WorkspaceFilesRunOptions {
 
 /**
  * HI-1182: a platform's step for what a checkout leaves out of its workspaces (Git: submodules and LFS files,
- * platform/gitModules.ts). jj refuses repositories that use them (HI-2799), so only Git's port has it.
+ * platform/git/gitModules.ts): only Git's port has it.
  */
 export interface WorkspaceFiles {
   /** The step's run title in the Progress panel (the commands it may run). */
@@ -222,13 +127,6 @@ export interface WorkspaceFiles {
  */
 export interface WorkspacePort {
   platform: WorkspacePlatform
-  /** HI-3003: the pool's failures in this platform's words (SlotWord); absent, or a word left out: the pool's own. */
-  says?: Partial<Record<SlotWord, AgentMsg>>
-  /**
-   * HI-3140: what one of this platform's refusals (a step's error, an unknown read's detail) means to the pool (jj's,
-   * HI-2913 and HI-3115): null, or absent (Git's), when it means nothing beyond its text.
-   */
-  refusal?(err: string): WorkspaceRefusal | null
 
   // Inspection: no side effects on the repository.
   /** The store's workspaces, the project's own folder included; null when they can't be listed (never an empty list). */
@@ -251,12 +149,6 @@ export interface WorkspacePort {
   lineHead(repo: string, line: string): Promise<Maybe<string | null>>
   /** The repository's default target line (Git: main, else master). */
   defaultLine(repo: string): Promise<Maybe<string>>
-  /**
-   * HI-3129 (decision (a)): the lines a card or lane may name as its Merges into, read from the
-   * repository (jj: its local bookmarks, conflicted ones left out), for a platform whose targets are its repository's.
-   * Absent (Git): the project's configured Other branches are its list. Unknown when it can't be read.
-   */
-  targetLines?(repo: string): Promise<Maybe<string[]>>
   /** Whether a line exists (false also when the tool can't say: a 0.9 worktree's recreation chooses by it, as before). */
   lineExists(repo: string, line: string): Promise<boolean>
   /** The workspaces whose registrations a prune would drop (their folders gone), by where each was. */
@@ -280,43 +172,15 @@ export interface WorkspacePort {
    * `none` (nothing registers it), or why it was left (several name it, it is locked, the folder is back, a read failed).
    */
   dropRegistration?(repo: string, folder: string): Promise<'dropped' | 'none' | { left: string }>
+  /**
+   * HI-3465: the operation of the platform's under way in a workspace that blocks moving it (Git: a merge, rebase, am,
+   * cherry-pick, revert or bisect, as git names it), read from its files; null with none or none readable.
+   */
+  operation?(folder: string): string | null
 
   // Preparation.
-  /**
-   * The folder switched to a line: the one it has (`base` null) or a new one made from `base`. Refused by the tool rather
-   * than lose files. `o`'s owned-write members (HI-2866) are a platform's whose workspaces need them (jj: refused without
-   * them); Git ignores them, its git commands unchanged.
-   */
-  prepare(folder: string, line: string, base: string | null, o?: CheckoutOptions & OwnedWrite): Promise<WorkspaceStep>
-  /**
-   * Whether preparing `line` from `base` carries the folder's current binding (HI-2981; jj: the same card started again
-   * in its own slot, on the same target and base, under a new key): its uncommitted edits are then that card's own, as
-   * on Git's same branch, so the pool doesn't refuse them. False whenever it can't tell. Git has none: its same line is
-   * the same name.
-   */
-  carries?(folder: string, line: string, base: string, o: { identity: WorkspaceIdentity | null; target?: string }): Promise<boolean>
-  /**
-   * Whether the folder's binding is still `card`'s at the folder's generation, its working copy on the binding's base
-   * (HI-2995: a slot kept for a card put back with committed work, revalidated before it is lent back to that card).
-   * False whenever it can't tell. Git has none.
-   */
-  heldFor?(folder: string, identity: WorkspaceIdentity | null, card: number): Promise<boolean>
-  /**
-   * The card the folder's binding names at the folder's generation (HI-3057: a lane that took a kept slot back and went on
-   * to another card leaves the slot bound to that card), or null: none, or it can't tell. Git has none.
-   */
-  heldCard?(folder: string, identity: WorkspaceIdentity | null): Promise<number | null>
-  /**
-   * HI-3129: the target the folder's binding names while it is `card`'s at the folder's generation, else null (another
-   * card's, none, or it can't tell). A kept slot's start checks it again before recording its target on the slot.
-   */
-  heldTarget?(folder: string, identity: WorkspaceIdentity | null, card: number): Promise<string | null>
-  /**
-   * HI-3143: whether the folder holds commits of its binding's card over the binding's base (the working copy's parents'
-   * ancestry, its own uncommitted edit left out), read pinned; null when it can't tell (another generation, no binding,
-   * unreadable). Git has none.
-   */
-  holdsCommits?(folder: string, identity: WorkspaceIdentity | null): Promise<boolean | null>
+  /** The folder switched to a line: the one it has (`base` null) or a new one made from `base`. Refused by the tool rather than lose files. */
+  prepare(folder: string, line: string, base: string | null, o?: CheckoutOptions): Promise<WorkspaceStep>
   /**
    * HI-3010: a new `line` made at the folder's own head and checked out there, changing no file, only while the folder
    * is detached at `base` or a commit past it (a builder already at work commits on it before its slot is prepared).
@@ -333,41 +197,21 @@ export interface WorkspacePort {
    * Git's only: absent, the pool waits for the slot's builder and prepares it as before.
    */
   lineAtBase?(folder: string, line: string, base: string, lease: string): Promise<WorkspaceStep>
-  /**
-   * HI-3115: committed work over the last card's in a slot whose builder still runs there, read without recording the
-   * folder, with the port's own refusal code for it (one its `refusal` reads as held, HI-3165); null when there's none or
-   * it can't be read. jj's only: absent, the preparation decides after its record.
-   */
-  heldEarly?(folder: string, line: string, base: string, o: { identity: WorkspaceIdentity | null }): Promise<{ code: string; work: HeldWork } | null>
-  /**
-   * HI-3165: whether `line` is one of this port's preparation keys (jj's, HI-2866): a locator with no head of its own,
-   * never prepared in place (HI-3010), prepared once its builder has left the slot (HI-2913). Absent (Git's): no line is.
-   */
-  lineIsKey?(line: string): boolean
-  /**
-   * HI-3165: the port takes its store's lock itself when it prepares one of its keys (jj's, HI-2866: that lock isn't
-   * re-entrant, and a non-colocated project folder has no Git to lock), so the pool prepares them outside the repository
-   * lock. Absent (Git's): the pool prepares under the repository lock.
-   */
-  ownPreparationLock?: true
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
-  detach(folder: string, revision: string, o?: { quiet?: boolean } & OwnedWrite): Promise<WorkspaceStep>
+  detach(folder: string, revision: string, o?: { quiet?: boolean }): Promise<WorkspaceStep>
 
   /**
    * A check or review copy put at exactly `revision` (HI-2789: copies.ts's reuse of a copy): tracked changes dropped and
    * what isn't ignored removed (dependencies stay); `failed` names the step the tool refused.
    */
-  resetTo(folder: string, revision: string, o?: { identity?: WorkspaceIdentity | null; fence?: WorkspaceFence } & CheckoutOptions): Promise<{ ok: true } | { ok: false; failed: 'checkout' | 'clean'; err: string }>
+  resetTo(folder: string, revision: string, o?: CheckoutOptions): Promise<{ ok: true } | { ok: false; failed: 'checkout' | 'clean'; err: string }>
 
   // Removal (R2.5: the platform's own, never forced on a folder holding anyone's work; the callers' guards first).
   /**
    * The workspace at `folder` removed by the tool, which refuses one with changes; `force` only for a check or review
-   * copy, which holds nobody's work (its build outputs go with it). `forgotten` (jj's, HI-3097: the user's Remove… of a
-   * kept slot whose workspace was forgotten outside Combwork): the folder trashed whole, its changes unread, only while
-   * proved afresh, with nothing awaited before the trash starts, that the store lists no such workspace (by name or root)
-   * at its single, unchanged operation head and the folder is still the recorded workspace; nothing journalled.
+   * copy, which holds nobody's work (its build outputs go with it).
    */
-  remove(repo: string, folder: string, o?: { force?: boolean; identity?: WorkspaceIdentity | null; journal?: WorkspaceJournal; fence?: WorkspaceFence; forgotten?: boolean }): Promise<WorkspaceStep>
+  remove(repo: string, folder: string, o?: { force?: boolean }): Promise<WorkspaceStep>
 
   // A card's line, once merged (§16.10.1).
   /** The line deleted only from `at` (compare and swap). */
@@ -378,33 +222,9 @@ export interface WorkspacePort {
   /** The line of a step's `err` that says what went wrong (Git: its fatal: or error: line, else the first), for a reason shown. */
   errorLine(err: string): string
 
-  /** Repair after a moved workspace or project (the relocation capability, §16.3.6's gate: relocation); absent where it isn't supported. */
+  /** Repair after a moved workspace or project (the relocation capability, §16.3.6); absent where it isn't supported. */
   relocate?: Relocation
 
-  // Owned members (HI-2795): a platform whose working copy is recorded by its own commands (jj) has them; Git hasn't, so
-  // the pool calls `dirty` as before and its git commands are unchanged (tests/slotTraces.test.ts).
-  /**
-   * The workspace's identity as it is now (store, name, generation), read after `create`, recorded on the row and
-   * compared before every change; null when it can't be read (then nothing is changed).
-   */
-  identity?(folder: string): Promise<WorkspaceIdentity | null>
-  /**
-   * Forgets, inside the pool's own write (`db`), what the platform keeps about a workspace by its name (HI-2979: jj's
-   * binding pointer and preparation journals): called as a slot's row is deleted, and as a workspace is made under a
-   * name, so a slot removed and made again under the same name never inherits its predecessor's records.
-   */
-  forgetIn?(db: FenceDb, identity: Pick<WorkspaceIdentity, 'store' | 'workspace'>): void
-  /**
-   * An explicit record of the folder's files (jj: a snapshot, a write), allowed only to the holder of the folder's
-   * operation (`fence`), after its writers are proved ended: its changed files then, or unknown (stale, not the
-   * recorded workspace, the fence lost). The pool calls it instead of `dirty` where it holds the slot.
-   */
-  record?(folder: string, fence: WorkspaceFence, identity?: WorkspaceIdentity | null): Promise<Maybe<string[]>>
-  /**
-   * A copy's verification after its quiescence barrier (HI-2795: credit): recorded (`record`), then exactly `revision`
-   * with nothing else, not stale, not divergent, read at one operation. True, false, or unknown.
-   */
-  copyIntact?(folder: string, revision: string, fence: WorkspaceFence, identity?: WorkspaceIdentity | null): Promise<Maybe<boolean>>
 }
 
 /**

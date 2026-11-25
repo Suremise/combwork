@@ -57,21 +57,6 @@ function dialectForRun(file, providerKey) {
 }
 
 /** Puts a run's dialect (dialectForRun) into a scenario workspace: `.combwork/dialects/<CLI>/<label>.json`. */
-/**
- * A jj scenario's environment (HI-2800, sc.jj): the pinned jj (npm run jj:fetch) first on `basePath`, and a jj config in
- * the scenario's folder (an identity and no pager), so neither Combwork's jj nor an agent's finds the user's. Throws when
- * the pinned jj isn't fetched: the scenario fails at setup, saying so.
- */
-function jjScenarioEnv(root, basePath) {
-  const { jjDir, portableJj } = require('../jjPortable.cjs')
-  if (!portableJj()) throw new Error("setup: this scenario needs the pinned jj, which isn't fetched (npm run jj:fetch)")
-  fs.mkdirSync(root, { recursive: true })
-  const config = path.join(root, 'jj.toml')
-  fs.writeFileSync(config, '[user]\nname = "Coder"\nemail = "coder@example.invalid"\n[ui]\npaginate = "never"\n')
-  // Git for Windows' system attributes (diff=astextplain) are jj's attributes gate (HI-2799): left out, as jjview does.
-  return { PATH: `${jjDir()};${basePath ?? ''}`, JJ_CONFIG: config, GIT_ATTR_NOSYSTEM: '1' }
-}
-
 function placeDialect(dialect, ws) {
   if (!dialect) return
   const dest = path.join(ws, '.combwork', 'dialects', ...dialect.path.split('/'))
@@ -106,10 +91,8 @@ const PROVIDERS = {
 }
 
 /**
- * Each provider's short tag in a scenario's folder name (HI-3212). A jj project's deepest file is its operation store's
- * `.jj\repo\op_store\operations\<128 hex>`, and jj fails past Windows' 260 characters ("Failed to commit new operation"):
- * with the provider's whole key, `jj-card-submit-nc-fake-opencode` reached 260 under lane 0. tests/scenarioFolders.test.ts
- * holds every jj scenario on every provider to it.
+ * Each provider's short tag in a scenario's folder name (HI-3212): with the provider's whole key, a scenario's deepest
+ * files came near Windows' 260 characters. tests/scenarioFolders.test.ts holds every provider to its own tag.
  */
 const PROVIDER_TAGS = { fake: 'fake', 'fake-codex': 'fcx', 'claude-code': 'cc', codex: 'cx', 'fake-copilot': 'fcp', 'fake-antigravity': 'fagy', 'fake-opencode': 'foc' }
 /** The folder (under its lane's) a run of scenario `scId` with `providerKey` works in. */
@@ -589,6 +572,10 @@ async function runScenario(sc, providerKey, opts = {}) {
   // review copies (HI-3337: withheld from a Claude Code whose home doesn't trust it). lib.openWorkspace does this for the
   // e2e suites (HI-3342); this harness opens its workspace itself, so it records it here.
   lib.trustWorktrees(fakeHome, ws)
+  // HI-3493: the real Claude Code runs from its test home (CLAUDE_CONFIG_DIR, below), not the fake's, and the run's reset
+  // (testHomes.mjs) leaves it no per-folder trust: it's recorded there too, as Set Up leaves it, or every Claude Code
+  // trial's reviewer is refused its review copy. No CLI uses the home here: the lease is this run's, its trials one at a time.
+  if (providerKey === 'claude-code') lib.trustWorktrees(CLAUDE_TEST_HOME, ws)
   // A fake that acts out an expired sign-in: each prompt's turn ends with "Login expired · Please run /login".
   if (opts.exitsAtLaunch && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-launch-exit.json'), JSON.stringify({ code: 1 }))
   if (opts.signedOut && p.fake) fs.writeFileSync(path.join(fakeHome, 'fake-signin.json'), JSON.stringify({ expired: true, ...(opts.signedOut === 'launch' ? { atLaunch: true } : opts.signedOut === 'late' ? { late: true } : {}) }))
@@ -655,6 +642,8 @@ async function runScenario(sc, providerKey, opts = {}) {
       CW_TEST_TOKEN_LOG: tokenLog,
       CW_TEST_MERGE_SLOT_LOG: slotLog,
       CW_TEST_START_VIEW_LOG: startViewLog,
+      // HI-3551: Combwork's GitHub CLI is the scenarios' fake (fake-gh/gh.cmd), never the user's own gh or its sign-in.
+      CW_TEST_GH: path.join(__dirname, 'fake-gh', 'gh.cmd'),
       CLAUDE_CONFIG_DIR: providerKey === 'claude-code' ? CLAUDE_TEST_HOME : fakeHome,
       CODEX_HOME: providerKey === 'fake-codex' ? fakeCodexHome : lib.CODEX_HOME,
       // The real Codex runs its commands in Windows PowerShell, not the Store's PowerShell 7 (#584, lib.cjs).
@@ -666,10 +655,6 @@ async function runScenario(sc, providerKey, opts = {}) {
       // The fake OpenCode the same, on the run's own test home (the CLI-home seam: no OpenCode account needed).
       ...(p.provider === 'opencode' ? { FAKE_OPENCODE_LOG: opencodeLog, FAKE_OPENCODE_WAKES: opencodeWakes, FAKE_OPENCODE_FOLLOW_NOTICES: '1', FAKE_OPENCODE_MODEL_MS: '700', XDG_DATA_HOME: opencodeHome } : {})
     }
-    // A jj scenario (HI-2800, sc.jj): the pinned jj first on Combwork's PATH (whatever PATH the provider's settings gave
-    // it, Copilot's and Codex's included), so its sessions' shells find it too, with a jj config of the run's own.
-    // PATH read whatever its spelling (HI-2945: PowerShell's copy of Windows' environment gives Path, not PATH).
-    if (sc.jj) Object.assign(env, jjScenarioEnv(root, lib.envValue(env, 'PATH') ?? lib.envValue(lib.baseEnv(), 'PATH')))
     // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')
     ;({ app, inv, page } = await lib.launch({ userData, env }))
@@ -1268,9 +1253,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     observed.notes = ((await api('GET', '/v1/shared')).body ?? []).flatMap(function flat(e) {
       return e.isDir ? (e.children ?? []).flatMap(flat) : [e.relPath]
     })
-    // A non-colocated jj project (HI-2896, sc.separate) has no .git: no Git status or branches to read.
-    // No repository (a scenario that took alpha out of version control, HI-2854's A/B): neither to read.
-    const noGit = sc.separate || !fs.existsSync(path.join(alpha, '.git'))
+    // No repository (a scenario that took alpha out of version control, HI-2854's A/B): no Git status or branches to read.
+    const noGit = !fs.existsSync(path.join(alpha, '.git'))
     observed.gitStatus = noGit ? '' : ctx.git('status', '--porcelain')
     // alpha's branches and its Work merges into and other branches as the run left them (HI-2811: Start the next version).
     observed.branches = noGit ? [] : String(ctx.git('branch', '--format=%(refname:short)')).split(/\r?\n/).map((b) => b.trim()).filter(Boolean)

@@ -524,6 +524,36 @@ files handing the global object on), so 187 of 704 test files can be left out at
 launcher), so every starter counts for now. When the e2e side is
 every suite the pick is still `{"every":true}`, unchanged.
 
+**Unit tests alone** (`--pick --unit`, HI-3542: the merge queue's focused tests here, as the merge checks run no unit
+test) is never a suite or `{"every":true}`, and by the user's decision (HI-3542, 22 Nov) **direct importers only**: a
+changed test file, `UNIT_SCANS`' tests, and a test that itself loads a changed file (`directUnitTests`: what
+`relatedTests.mjs`'s `fileLoads` reads it to load, a mock and a dynamic import included, its type-only imports left out).
+Not Vitest's import graph: that picked about 460 of the 911 test files for a typical change to main-process code (48 min
+at the queue's 2 workers). So a break reached through other modules gets through the merge (HI-3520's: `gitRepo.test.ts`
+reached the change 4 imports deep) and is left to the release's full passes. A change to Vitest's config or a setup file
+it names is every unit test; so is a pick of over 500 (Combwork's longest list, `FOCUSED_MAX_TESTS`): it answers
+`unit:all`, which `scripts/focusedTests.mjs` runs as one Vitest run of the whole set (failed when a file failed, a file
+that didn't load included). An unhandled error Vitest attributes to a file (a log or rejection after its tests,
+HI-3567) fails that file alone, naming the error; one it can't put on a file it ran fails every file that passed. A test it would name that isn't in the checkout is left out, saying so. So is an **opt-in**
+test file (HI-3558), one with a line `// focused: opt-in (why)`: a benchmark or trial that skips without its setup
+(`boardBench`, `cardSearchBench`: `CW_BOARD_BENCH_DB`; `workflow/workspaceCopyTrial`: `CW_TRIAL_WS`) would skip at every merge and pause the queue to ask about a skip
+by design. Mark only a file whose every test skips without its opt-in; any other skip still pauses. Measured on 1.7.0's
+last 25 merges: most pick 2 to 70 tests, a change to `workspace.ts` about 270 (that many mock or load it), and the
+picks take about 7 s. Run at the queue's 2 workers, under the machine's usual load: 25 tests in 62 s, a change to
+`workflow/runtime.ts` (68 tests, the queue's own, 80 to 280 s each) in 14 min, the `workspace.ts` one in 25 min.
+
+**The merge's pick is narrow** (`--pick --unit --narrow`, HI-3565, the project's `focused.pick`): on 24 Nov the 1.7.0
+queue spent about 5½ hours on 5 cards, 92% of it in focused tests, as a card touching `tasks.ts` or `servers.ts` picked
+192 to 359 files that load them (25 to 40 min a run). `--narrow` keeps the changed test files and `UNIT_SCANS`' tests,
+and puts the tests **named for** a changed source file (`namedUnitTests`: `src/main/tasks.ts` → `tests/tasks.test.ts`,
+`tests/i18n/tasks.test.ts`, in any folder but `tests/e2e`) in place of `directUnitTests`' importers. It follows no import
+and never answers `unit:all` for a config change. A change to `tasks.ts` and `servers.ts` picks 5 files; on 1.7.0's
+last 25 merges it picked 1 to 55 (5 for most), the big ones a card's own changed test files. **Where the wider sets
+run:** the full unit set in CI (`npm test`, on every push to main and every pull request: `.github/workflows/ci.yml`)
+and at the checkpoints (a version's full passes, each RC: RELEASING.md, What a release checks), and the import-following
+pick (`--pick --unit` without `--narrow`) for anyone who wants it on a branch. So a break only an importer's test sees
+gets through the merge and is caught there.
+
 **Progress in Combwork.** Run from an agent's session in Combwork, the runner shows in that Combwork's Progress panel: **e2e: N
 suites**, a step per suite, and the time left from how long each suite took before (kept in
 `%LOCALAPPDATA%\combwork-test\progress-timings.json`). `npm test` does the same, a step per test file. It reports to the
@@ -887,8 +917,8 @@ kept and why, without removing anything; `--days N` sets the age, default 3).
 - **Stays:** the CLI test homes' sign-ins, config and sandbox setup (`codex`, but for the above; `claude`, never opened), scenario results and baselines (a scenario run's own start keeps the newest 30 fake runs' results and the newest 30 model trials', those cited and those a run still writes into: tests/scenarios/README.md), the
   claims and locks, the concurrency checker's folders (it removes its own), the Progress panel's timings, the machine's test settings (`config.json`: `heavySlots`, #589); logs (the
   runner keeps the newest ten runs); a lane a runner holds; and what is set up once, by hand or pinned, that a suite or
-  release check runs (HI-2902): `agy-probe` (the agy profile onboarded by hand: The real Antigravity CLI, above),
-  `tools` (portable tools, checked as fetched: `npm run jj:fetch`) and the pinned CLI copies `copilot-<version>`
+  release check runs (HI-2902): `agy-probe` (the agy profile onboarded by hand: The real Antigravity CLI, above)
+  and the pinned CLI copies `copilot-<version>`
   (a release's two-version Copilot run, HI-2780) and `opencode-<version>` (The real OpenCode, above). `--dry-run` lists
   each kept folder with its reason; a new such folder goes in `KEPT` or `KEPT_PATTERNS` in `clean.mjs`, or the age rule
   takes it.
@@ -902,9 +932,14 @@ kept and why, without removing anything; `--days N` sets the age, default 3).
   kept every folder every later run made there, 2,078 of them, 23 GB in six hours). The cards are read from the
   workspace's board, found up from this repository's main checkout, afresh for every deletion (a card that cites
   something a moment before it would go keeps it). **Without the board** (none found, or a card that can't be read)
-  the runners don't start: nothing they made could be removed. Set `CW_TEST_NO_BOARD=1` on a machine where no Combwork
-  board cites test output. Should the board become unreadable during a run, nothing is deleted meanwhile and what
-  stays is tied to the run.
+  the runners don't start: nothing they made could be removed. **A checkout outside the workspace** (a `git archive`
+  export, a review copy) names its board with `CW_TEST_BOARD`: the workspace folder, its `.combwork` folder or its
+  `.combwork\combwork.db` (in PowerShell `$env:CW_TEST_BOARD='<the workspace folder>'`); the cards it cites are
+  kept as in the workspace (HI-3514). Set `CW_TEST_NO_BOARD=1` only on a machine where no Combwork board cites test
+  output (a contributor's clone): nothing is cited then, and a run (e2e or scenarios) removes only what it made itself,
+  never what was there before it started, so the flag set by mistake can't remove another run's evidence; what earlier
+  runs left goes when you run `npm run test:clean`. `CW_TEST_BOARD` wins when both are set. Should the board become
+  unreadable during a run, nothing is deleted meanwhile and what stays is tied to the run.
 - **A suite's folder** in its lane (`lanes\<k>\<suite>`): when the suite passes, the whole folder goes; when it fails
   (or something in it must stay), it is tied to the run (`.kept-folders.json` in the run's log folder) and goes when
   that run's logs are pruned (the newest ten runs, a day's runs up to 2 GB, a failed run a day): only in a lane the pruning runner may work in
@@ -946,7 +981,7 @@ Start from an existing suite and use `lib.cjs`:
 - in a real-CLI suite, `cliStep(name, { session }, fn)` around each step that waits on the CLI answering, with
   `checked(ok)` in the suite's `check` (above: how an environment failure there becomes a SKIP).
 
-**Slow or failing calls** (unpackaged builds only): `CW_TEST_SLOW_IPC="tasks:start=2000,git:diff=3000*1"` delays those IPC calls (`*n`: only the first n) and `CW_TEST_FAIL_IPC="git:status*1"` makes them fail; `CW_TEST_BLOCK_IPC="app:info=1500*1"` holds the main process that long in them, a stall the log's busy warning names (`stalls`, #1109, with `CW_TEST_STALL_QUIET_MS` shortening the minute between warnings). `CW_TEST_HOLD_IPC="activity:cardAgents"` holds those calls until the suite takes the channel out of it, and main's `globalThis.__cwHeldIpc` counts the calls held now by channel: a race the suite decides (hold, wait until held, act, release) rather than a delay that loses it under load (`activityworkspace`, HI-2652). `globalThis.__cwSettledIpc` counts the calls main has answered (or failed), by channel: a slowed call's late answer has reached the window once it counts and a call made after it is answered (`jjview`, HI-2971). Combwork reads them again when they change, so a suite can set them in the main process while it runs (`app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = '…' })`). `busy`, `changes` and `loadfail` use them. `CW_TEST_SLOW_DETECT="claude-code=12000"` holds that provider's detection at start, so another answers first, and `CW_TEST_DETECT_WAIT_MS` shortens how long a launch waits for detection before it is refused (`providerdetect`, #506); a test launch that holds one can't use `lib.launch`, whose `appReady` waits for every provider. `CW_TEST_SILENT_MS` shortens how long a running turn may be silent before Combwork looks for its end on screen or says its state is unknown (five minutes; `turnledger`, #648). `CW_TEST_FLIGHT_AFTER_MS` shortens how long the flight recorder waits after a trigger before it writes its capture (ten seconds; `flightrecorder`, #698). `CW_TEST_QUEUE_RETURNS` makes the window's merge queue model list fewer returns (50; the rest are counted), so a suite passes that bound with a few cards; read at each listing, so a suite can set them in main as it goes (`progressqueue`, #1356). `CW_TEST_PROFILE_CHOOSE=<folder>` (with `CW_USER_DATA` set, which it then overrides) chooses the profile folders (HI-2461, SPEC §4.3) in `<folder>\appdata` and `<folder>\localappdata` instead of the real ones: `Combwork-Dev` there, else 1.0's dev profile moved to it at start (the names upgrade, HI-2594), and the accounts in the local choice.
+**Slow or failing calls** (unpackaged builds only): `CW_TEST_SLOW_IPC="tasks:start=2000,git:diff=3000*1"` delays those IPC calls (`*n`: only the first n) and `CW_TEST_FAIL_IPC="git:status*1"` makes them fail; `CW_TEST_BLOCK_IPC="app:info=1500*1"` holds the main process that long in them, a stall the log's busy warning names (`stalls`, #1109, with `CW_TEST_STALL_QUIET_MS` shortening the minute between warnings). `CW_TEST_HOLD_IPC="activity:cardAgents"` holds those calls until the suite takes the channel out of it, and main's `globalThis.__cwHeldIpc` counts the calls held now by channel: a race the suite decides (hold, wait until held, act, release) rather than a delay that loses it under load (`activityworkspace`, HI-2652). `globalThis.__cwSettledIpc` counts the calls main has answered (or failed), by channel: a slowed call's late answer has reached the window once it counts and a call made after it is answered (HI-2971). Combwork reads them again when they change, so a suite can set them in the main process while it runs (`app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = '…' })`). `busy`, `changes` and `loadfail` use them. `CW_TEST_SLOW_DETECT="claude-code=12000"` holds that provider's detection at start, so another answers first, and `CW_TEST_DETECT_WAIT_MS` shortens how long a launch waits for detection before it is refused (`providerdetect`, #506); a test launch that holds one can't use `lib.launch`, whose `appReady` waits for every provider. `CW_TEST_SILENT_MS` shortens how long a running turn may be silent before Combwork looks for its end on screen or says its state is unknown (five minutes; `turnledger`, #648). `CW_TEST_FLIGHT_AFTER_MS` shortens how long the flight recorder waits after a trigger before it writes its capture (ten seconds; `flightrecorder`, #698). `CW_TEST_QUEUE_RETURNS` makes the window's merge queue model list fewer returns (50; the rest are counted), so a suite passes that bound with a few cards; read at each listing, so a suite can set them in main as it goes (`progressqueue`, #1356). `CW_TEST_PROFILE_CHOOSE=<folder>` (with `CW_USER_DATA` set, which it then overrides) chooses the profile folders (HI-2461, SPEC §4.3) in `<folder>\appdata` and `<folder>\localappdata` instead of the real ones: `Combwork-Dev` there, else 1.0's dev profile moved to it at start (the names upgrade, HI-2594), and the accounts in the local choice.
 
 **Restarting Combwork** (unpackaged builds only, #676): Settings → Advanced's **Restart Combwork** quits and starts Combwork again. With `CW_TEST_RELAUNCH_LOG=<file>`, a test copy writes the relaunch it would make to that file as a JSON line (`{ args }`) instead of making it, so no copy of Combwork outlives its suite (`hwaccel`).
 

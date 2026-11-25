@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 import { existsSync, statSync } from 'original-fs'
 import { delimiter, dirname, isAbsolute, join } from 'path'
 import { parentPort } from 'worker_threads'
-import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
+import { readRepoRefs, type RepoRefs } from './gitRefs'
 import { RUN_MARK_VAR, treeEnding, type MsysMark } from './processTree'
 
 /**
@@ -145,8 +145,8 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS, sig
     const bin = (m.timeout || signal) && process.platform === 'win32' ? msysBinFor(m) : null
     const msys: MsysMark | undefined = bin ? { mark: randomBytes(16).toString('hex'), bin, onIncomplete: (why) => (msysIncomplete = why) } : undefined
     const ending = treeEnding(process.platform, msys, { onLateLeft: (why) => (lateLeft = why) })
-    const given = m.launcherEnv ? withLauncherEnv(m.env ?? process.env, m.launcherEnv) : m.env
-    const env = msys ? { ...(given ?? process.env), [RUN_MARK_VAR]: msys.mark } : given
+    const given = gitEnv(m.env, m.launcherEnv)
+    const env = msys ? { ...given, [RUN_MARK_VAR]: msys.mark } : given
     const child = execFile(m.exe ?? 'git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(env ? { env } : {}) }, (err, stdout, stderr) => {
       clearTimeout(quiet)
       clearTimeout(bound)
@@ -195,6 +195,24 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS, sig
     // What the command reads (update-ref --stdin's transaction).
     if (m.input !== undefined) child.stdin?.end(m.input)
   })
+}
+
+/** HI-3534: the LANGUAGE git runs with (gitEnv). */
+export const GIT_LANGUAGE = 'en'
+
+/**
+ * HI-3534: the environment every git Combwork starts gets: `env` (Combwork's own when none), as Git for Windows'
+ * launcher gives it when `l` says so (withLauncherEnv), with git's messages in English. Combwork reads git's words in
+ * places (a dry run's list, an error it recognises, a conflict), and a git with its translations installed speaks the
+ * language LANGUAGE, LC_ALL, LC_MESSAGES or LANG names, else Windows' own: LANGUAGE comes first whatever the others say,
+ * and git ships no English catalogue, so `en` gives its own text. Only messages change (LC_ALL would change the character
+ * set too, for git and its hooks); the user's own terminals and agents' sessions keep their language.
+ */
+export function gitEnv(env: NodeJS.ProcessEnv | undefined, l?: LauncherEnv): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = l ? withLauncherEnv(env ?? process.env, l) : { ...(env ?? process.env) }
+  for (const k of Object.keys(out)) if (k.toUpperCase() === 'LANGUAGE') delete out[k]
+  out.LANGUAGE = GIT_LANGUAGE
+  return out
 }
 
 /**

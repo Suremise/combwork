@@ -787,9 +787,6 @@
   "api.check.leaseArgs": {
     "placeholders": {}
   },
-  "api.check.noCopies": {
-    "placeholders": {}
-  },
   "api.check.noVcs": {
     "placeholders": {}
   },
@@ -1660,12 +1657,6 @@
     "placeholders": {
       "root": "plain",
       "subfolder": "select"
-    }
-  },
-  "api.project.vcsJj": {
-    "placeholders": {
-      "root": "plain",
-      "colocated": "select"
     }
   },
   "api.project.vcsUnsupported": {

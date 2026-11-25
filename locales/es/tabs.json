@@ -1,5 +1,8 @@
 {
   "tabs.unsaved": "Cambios sin guardar",
   "tabs.unsavedNamed": "{tab} (cambios sin guardar)",
-  "tabs.withNote": "{tab} ({note})"
+  "tabs.unsavedProblemNamed": "{tab} (cambios sin guardar, hay algo que resolver)",
+  "tabs.withNote": "{tab} ({note})",
+  "tabs.problem": "Hay algo que resolver aquí",
+  "tabs.problemNamed": "{tab} (hay algo que resolver)"
 }

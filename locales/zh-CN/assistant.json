@@ -693,6 +693,7 @@
   "assistant.undo.askTitle": "{n, plural, other {撤销 # 项更改？}}",
   "assistant.undo.card": "{card}：{fields}",
   "assistant.undo.changed": "{fields}此后已更改",
+  "assistant.undo.confirm": "撤销",
   "assistant.undo.dismiss": "关闭撤销结果",
   "assistant.undo.ended": "通道已结束",
   "assistant.undo.error": "失败：{error}",

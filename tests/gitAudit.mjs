@@ -3,6 +3,8 @@
 // counted per caller. tests/gitAudit.test.ts (npm run check:repo) fails on an edge or a seam this table doesn't list, on
 // a listed one that is gone (stale), and on a name taken across a constrained edge beyond its list; scripts/gitInventory.mjs
 // prints the audit beside HI-2781's inventory. 1.5.0's J0 starts from it: a second platform with lines routes each seam.
+// HI-3489: and each platform's folder (src/main/platform/git/, none/) is sealed: imported from outside only by the
+// registries (sealBreaks).
 //
 // Classes:
 // - `impl`: Git's implementation, or a part of it kept in a common file (its runner, its route, its 0.9 worktrees).
@@ -19,6 +21,12 @@ import ts from 'typescript-classic'
 /** Git's own modules: an import of one from outside Git's implementation is an edge the audit classifies. */
 const GIT_FILES = new Set([
   'src/main/git',
+  // HI-3489: Combwork's own git library, shared by the Git platform's folder and Combwork's own git use (so outside it).
+  'src/main/gitCommands',
+  'src/main/gitRefs',
+  'src/main/gitKeepOut',
+  'src/main/gitIgnoredByKind',
+  'src/main/gitShadowIgnore',
   'src/main/gitTool',
   'src/main/gitWorker',
   'src/main/gitCompare',
@@ -27,8 +35,6 @@ const GIT_FILES = new Set([
   'src/main/branchWatch',
   'src/main/branchMerge',
   'src/main/filesGit',
-  // HI-2944: Commit and Set aside of a target folder's changes (port 5's folderChanges, Git's implementation).
-  'src/main/gitFolderChanges',
   'src/main/worktrees',
   'src/main/unusedWorktrees',
   'src/main/repoLock',
@@ -36,31 +42,131 @@ const GIT_FILES = new Set([
   'src/main/repoLockWorker',
   'src/main/folderFence',
   'src/main/workflow/gitHost',
-  'src/main/platform/refHold',
   'src/shared/gitTool',
   'src/shared/gitInit',
   'src/shared/gitRepo',
   'src/shared/gitIgnoreRules'
 ])
 
-/** Whether a module (repo path, no extension) is Git's: one of GIT_FILES, or a platform module named git… (platform/git.ts, gitHistory.ts…). */
-export const isGitModule = (m) => GIT_FILES.has(m) || /^src\/main\/platform\/git([A-Z]\w*)?$/.test(m)
+/** Whether a module (repo path, no extension) is Git's: one of GIT_FILES, or one in the Git platform's folder (HI-3489). */
+export const isGitModule = (m) => GIT_FILES.has(m) || m.startsWith('src/main/platform/git/')
+
+/**
+ * A dynamic import or require whose argument isn't one whole string literal (`import('./x')`, `require("./x", o)`): its
+ * specifier may be computed, so the file is parsed (HI-3506: a prefilter on the first character alone passed
+ * `import('./platform/' + id)` and a template with a substitution). A literal holding `$` or a backslash counts as maybe
+ * computed: it only costs a parse. A string, not a regex literal: the test selection's loader gate reads the code
+ * around strings (tests/e2e/relatedTests.mjs' LOADS_CODE).
+ */
+const MAYBE_COMPUTED = String.raw`(?:import|require)\s*\((?!\s*(?:'[^'\\\r\n]*'|"[^"\\\r\n]*"|${'`'}[^${'`'}$\\]*${'`'})\s*[,)])`
+
+/** A file that may load through `require` some other way (hiddenLoader's: handed on, `module.require`, `createRequire`): parsed too (HI-3512). */
+const MAYBE_HIDDEN = String.raw`${MAYBE_COMPUTED}|\brequire\b|createRequire|\bmodule\s*\[`
 
 /** A file that could name a Git module: only these are parsed (the rest can't import one). */
-const MAY_NAME_GIT = new RegExp(String.raw`git|worktree|repoLock|folderFence|branchWatch|branchMerge|refHold|require\(|import\(\s*[^'"${'`'}\s]`, 'i')
+const MAY_NAME_GIT = new RegExp(String.raw`git|worktree|repoLock|folderFence|branchWatch|branchMerge|refHold|${MAYBE_HIDDEN}`, 'i')
 
 /** A dynamic import or require whose specifier isn't a string (built from pieces): it could load anything, so it is an edge too. */
 const HIDDEN = '(computed specifier)'
 
-/** Every .ts/.tsx file under `dir` (repo paths, forward slashes). */
-function sources(root, dir = 'src') {
+/** Names whose use as a key or a type loads nothing: a property's, a method's, an enum member's, `typeof`'s. */
+const NOT_A_LOAD = [ts.isPropertyAssignment, ts.isPropertySignature, ts.isPropertyDeclaration, ts.isMethodDeclaration, ts.isMethodSignature, ts.isEnumMember]
+
+/**
+ * A loader the parser can't follow (HI-3512), so it counts as a computed specifier: `require` other than called directly
+ * (handed on, `const r = require`, `require.call(…)`, `{ require }`), any member named `require` (`module.require(…)`,
+ * `m['require']`), and `createRequire` however it is reached (imported, `m.createRequire`, its result under any name).
+ * A direct `require(…)` is read where it is called.
+ */
+function hiddenLoader(n) {
+  // A member of `module` by a name built from pieces (`module['req' + 'uire']`) could be `require` (HI-3521).
+  if (ts.isElementAccessExpression(n)) return ts.isStringLiteralLike(n.argumentExpression) ? ['require', 'createRequire'].includes(n.argumentExpression.text) : ts.isIdentifier(n.expression) && n.expression.text === 'module'
+  if (!ts.isIdentifier(n)) return false
+  if (n.text === 'createRequire') return true
+  if (n.text !== 'require') return false
+  const p = n.parent
+  if (ts.isCallExpression(p) && p.expression === n) return false
+  if (ts.isTypeOfExpression(p) || ts.isTypeQueryNode(p)) return false
+  return !NOT_A_LOAD.some((is) => is(p) && p.name === n)
+}
+
+/** Whether a statement is exported (`export import X = …`, `export const …`): what it loads, it passes on. */
+const isExported =(n) => !!n.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+
+/** Whether an identifier is a name read where it stands, not a member's, a key's or an import's own binding. */
+function isRead(n) {
+  const p = n.parent
+  if (ts.isImportSpecifier(p) || ts.isImportClause(p) || ts.isNamespaceImport(p)) return false
+  if ((ts.isPropertyAccessExpression(p) && p.name === n) || (ts.isQualifiedName(p) && p.right === n)) return false
+  if (ts.isExportSpecifier(p) && p.propertyName && p.name === n) return false
+  if (ts.isBindingElement(p) && p.propertyName === n) return false
+  return !NOT_A_LOAD.some((is) => is(p) && p.name === n)
+}
+
+/**
+ * Where a registry may use a name a static import bound (HI-3522's allow-list, the registries' own uses): `new X(…)`,
+ * `X(…)` or `X.f(…)` called, a value in an object literal (`{ git: gitHistory }`, `{ gitHistory }`), and a function's
+ * result (`return x`, `(wf) => x`). A namespace's name only through a member (`new none.X()`), never alone.
+ */
+function builtFrom(e, isNamespace) {
+  if (isNamespace && !ts.isPropertyAccessExpression(e.parent)) return false
+  while (ts.isPropertyAccessExpression(e.parent) && e.parent.expression === e) e = e.parent
+  const p = e.parent
+  if ((ts.isNewExpression(p) || ts.isCallExpression(p)) && p.expression === e) return true
+  if ((ts.isPropertyAssignment(p) && p.initializer === e) || ts.isShorthandPropertyAssignment(p)) return true
+  return ts.isReturnStatement(p) || (ts.isArrowFunction(p) && p.body === e)
+}
+
+/**
+ * The modules whose bound names a file uses anywhere else (HI-3522): exported as they are (`export { a }`, `export
+ * default a`, `export = a`, `export const n = a`), held under another name (`const m = a`, `m = a`), in a type
+ * (`type T = a`), in an array, as an argument. The registries' allow-list: everything not built from is passed on.
+ */
+function usedUnbuilt(sf) {
+  const bound = new Map()
+  const namespaces = new Set()
+  for (const st of sf.statements) {
+    const c = ts.isImportDeclaration(st) && ts.isStringLiteral(st.moduleSpecifier) ? st.importClause : null
+    if (!c) continue
+    if (c.name) bound.set(c.name.text, st.moduleSpecifier.text)
+    const ns = c.namedBindings && ts.isNamespaceImport(c.namedBindings) ? c.namedBindings.name.text : null
+    if (ns !== null) namespaces.add(ns)
+    for (const name of ns !== null ? [ns] : (c.namedBindings?.elements ?? []).map((el) => el.name.text)) bound.set(name, st.moduleSpecifier.text)
+  }
+  const out = new Set()
+  const visit = (n) => {
+    if (ts.isIdentifier(n) && bound.has(n.text) && isRead(n) && !builtFrom(n, namespaces.has(n.text))) out.add(bound.get(n.text))
+    ts.forEachChild(n, visit)
+  }
+  visit(sf)
+  return [...out]
+}
+
+/** A TypeScript source's extension: .ts, .tsx, and the module kinds .mts and .cts (HI-3506: src has .mts files). */
+const SRC_EXT = /\.(tsx?|[mc]ts)$/
+
+/** A source's repo path without its extension: its module. */
+const moduleOf = (file) => file.replace(SRC_EXT, '')
+
+/** Every TypeScript source under `dir`, declarations aside (repo paths, forward slashes). */
+export function sources(root, dir = 'src') {
   const out = []
   for (const e of readdirSync(join(root, dir))) {
     const p = `${dir}/${e}`
     if (statSync(join(root, p)).isDirectory()) out.push(...sources(root, p))
-    else if (/\.tsx?$/.test(e) && !/\.d\.tsx?$/.test(e)) out.push(p)
+    else if (SRC_EXT.test(e) && !/\.d\.(tsx?|[mc]ts)$/.test(e)) out.push(p)
   }
   return out
+}
+
+/**
+ * The module a specifier in `file` names (a repo path without its extension), or null for a package's: a relative one,
+ * or one through the renderer's aliases for src/shared and the repo's root (electron.vite.config.ts; HI-3506: `@root/`
+ * went unread).
+ */
+function moduleNamed(root, file, spec) {
+  const path = spec.startsWith('@shared/') ? `src/shared/${spec.slice('@shared/'.length)}` : spec.startsWith('@root/') ? spec.slice('@root/'.length) : spec.startsWith('.') ? relative(root, resolve(root, dirname(file), spec)) : null
+  return path === null ? null : path.replace(/\\/g, '/').replace(/\.([mc]?[jt]s|tsx)$/, '')
 }
 
 /** The files read, with `over`'s texts in place of theirs (a test's change to one, or a file added). */
@@ -73,7 +179,7 @@ const filesOf = (root, over) => [...new Set([...sources(root), ...Object.keys(ov
 export function gitEdges(root, over = {}) {
   const out = []
   for (const { file, text } of filesOf(root, over)) {
-    if (isGitModule(file.replace(/\.tsx?$/, ''))) continue
+    if (isGitModule(moduleOf(file))) continue
     // Each file's edges kept by its text (a test's runs reparse only the file it changes).
     const key = `${root}|${file}`
     const kept = parsed.get(key)
@@ -91,25 +197,22 @@ export function gitEdges(root, over = {}) {
 /** gitEdges' answers per file, by its text. */
 const parsed = new Map()
 
-/** One file's Git edges (gitEdges'), or, given `target` and `may`, its edges to the modules `target` names (jjEdges'). */
-function fileEdges(root, file, text, target = isGitModule, may = MAY_NAME_GIT) {
+/** One file's Git edges (gitEdges'). */
+function fileEdges(root, file, text) {
   const out = []
   {
     const found = new Map()
     const add = (spec, names) => {
       if (spec === `./${HIDDEN}`) return void found.set(HIDDEN, null)
-      // The renderer's alias for src/shared (electron.vite.config.ts).
-      const path = spec.startsWith('@shared/') ? `src/shared/${spec.slice('@shared/'.length)}` : spec.startsWith('.') ? relative(root, resolve(root, dirname(file), spec)) : null
-      if (path === null) return
-      const module = path.replace(/\\/g, '/').replace(/\.(tsx?|js)$/, '')
-      if (!target(module)) return
+      const module = moduleNamed(root, file, spec)
+      if (module === null || !isGitModule(module)) return
       const had = found.get(module)
       if (names === null || had === null) found.set(module, null)
       else found.set(module, [...new Set([...(had ?? []), ...names])].sort())
     }
     // TypeScript's own parser (HR1's HI-2792 round 1: a regex missed double quotes, indentation and side-effect imports).
     // Only a file whose text could name a Git module is parsed.
-    if (!may.test(text)) return out
+    if (!MAY_NAME_GIT.test(text)) return out
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
     /** The members used through a namespace's name (`wt.createWorktree`), anywhere in the file. */
     const membersOf = (alias) => {
@@ -132,8 +235,10 @@ function fileEdges(root, file, text, target = isGitModule, may = MAY_NAME_GIT) {
       return names
     }
     const visit = (n) => {
-      if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text, clauseNames(n.importClause))
-      else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text, membersOf(n.name.text))
+      if (hiddenLoader(n)) add(`./${HIDDEN}`, null)
+      else if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text, clauseNames(n.importClause))
+      // An exported one passes the whole module on, as `export * as X from` would.
+      else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text, isExported(n) ? null : membersOf(n.name.text))
       else if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) {
         const c = n.exportClause
         add(n.moduleSpecifier.text, !c ? null : ts.isNamespaceExport(c) ? null : c.elements.map((e) => (e.propertyName ?? e.name).text))
@@ -151,22 +256,25 @@ function fileEdges(root, file, text, target = isGitModule, may = MAY_NAME_GIT) {
     }
     visit(sf)
     // Repo paths without the extension (a script's path in the table would read as one it runs: the WorkspaceService rule).
-    for (const [module, names] of found) out.push({ file: file.replace(/\.tsx?$/, ''), module, names })
+    for (const [module, names] of found) out.push({ file: moduleOf(file), module, names })
   }
   return out
 }
 
-/** The "platform with lines" seams (HI-2792): each call of these lookups, counted per file. */
-export const SEAM_CALLS = ['lineHistory', 'lineRepoReads', 'lineRepoOps', 'queueIntegration', 'slotWorkspaces', 'slotRelocation']
+/**
+ * The "platform with lines" seams (HI-2792), and the platform with declared paths' (HI-3489: `pathsDeliverables`): each
+ * call of these lookups, counted per file.
+ */
+export const SEAM_CALLS = ['lineHistory', 'lineRepoReads', 'lineRepoOps', 'queueIntegration', 'slotWorkspaces', 'slotRelocation', 'pathsDeliverables', 'requirePathsDeliverables']
 
 /** Each file's count of each seam call (`name(`), outside the port modules that define them. */
 export function seamCounts(root, over = {}) {
   const out = {}
   for (const { file, text } of filesOf(root, over)) {
-    if (/^src\/main\/platform\/(historyPorts|repoReadsPorts|repoOpsPorts|integrationPorts|workspacePorts|releaseReadsPorts)\.ts$/.test(file)) continue
+    if (/^src\/main\/platform\/(historyPorts|repoReadsPorts|repoOpsPorts|integrationPorts|workspacePorts|releaseReadsPorts|deliverablesPorts)\.ts$/.test(file)) continue
     for (const s of SEAM_CALLS) {
       const n = [...text.matchAll(new RegExp(`\\b${s}\\(`, 'g'))].length
-      if (n) (out[file.replace(/\.tsx?$/, '')] ??= {})[s] = n
+      if (n) (out[moduleOf(file)] ??= {})[s] = n
     }
   }
   return out
@@ -179,14 +287,8 @@ export function seamCounts(root, over = {}) {
 export const EDGES = [
   { file: 'src/main/agentWorktree', module: 'src/main/worktrees', class: 'impl', names: ['GIT_FAILED', 'uniqueFolder'], why: "a 0.9 worktree's recreation: a free folder's name and the failure message (R4's rule: no git run)" },
   { file: 'src/main/antivirus', module: 'src/main/worktrees', class: 'impl', names: ['worktreesRoot'], why: "the worktrees folder beside the workspace, excluded from scanning (Git's slots and 0.9 worktrees live there)" },
-  { file: 'src/main/combworkMove', module: 'src/main/platform/gitKeepOut', class: 'historic', names: ['excludeLine', 'gitDirOf'], op: 'excludeMoveLock and moveExcludeLine (HI-2462)', why: "1.1's .hive → .combwork move keeps git's exclude lines right" }, // old-name: the 1.1 folder move's input, named as it was
+  { file: 'src/main/combworkMove', module: 'src/main/gitKeepOut', class: 'historic', names: ['excludeLine', 'gitDirOf'], op: 'excludeMoveLock and moveExcludeLine (HI-2462)', why: "1.1's .hive → .combwork move keeps git's exclude lines right" }, // old-name: the 1.1 folder move's input, named as it was
   { file: 'src/main/combworkMove', module: 'src/main/repoLock', class: 'common', names: ['withNamedLock'], why: "the folder move's named lock (a lock file of Combwork's, not git's)" },
-  { file: 'src/main/platform/jjOperations', module: 'src/main/git', class: 'impl', names: ['git'], why: "an operation preview reads the colocated store's refs and HEAD to compare with jj's record (HI-2800, E8): read-only git calls, never an import" },
-  { file: 'src/main/platform/jjKeepOut', module: 'src/main/platform/gitKeepOut', class: 'impl', names: ['excludeLine', 'hasExcludeLine'], why: "a non-colocated jj repository's .combwork kept out in its Git store's info/exclude (HI-2800): Git's exclude-line text, pure helpers, no git run" },
-  { file: 'src/main/platform/jjIgnoredEntries', module: 'src/main/platform/gitShadowIgnore', class: 'impl', names: ['shadowCheckIgnore'], why: "a jj check's snapshot and write record leave out what jj ignores (HI-3158): Git's check-ignore on jj's Git-backed store (`--git-dir`, `--no-index`), read-only, by kind in the shadow work tree Git's record shares (HI-3175)" },
-  { file: 'src/main/platform/jjCompat', module: 'src/main/git', class: 'impl', names: ['git'], why: "jj's compatibility assessment reads Git's effective config, attributes and files of the colocated store (HI-2799, §16.3.6's gates): read-only git calls" },
-  { file: 'src/main/workflow/storeSwitch', module: 'src/main/repoLock', class: 'common', names: ['commonGitDir'], why: "the store a Git ↔ jj switch is about (HI-2799): the Git store both platforms share, the repository lock's own key" },
-  { file: 'src/main/platform/jjStoreSide', module: 'src/main/repoLock', class: 'common', names: ['commonGitDir'], why: "a switch back to Git checks the jj repository beside the Git store a member names (HI-3034; HI-3140 moved it from storeSwitch): the repository lock's own key" },
   { file: 'src/main/deliveries', module: 'src/main/folderFence', class: 'common', names: ['folderChanging', 'folderSteady', 'inFolder', 'onFolderSteady'], why: "the folder fence: keyed by folder, every platform's (§16.3.6 port 1)" },
   { file: 'src/main/files', module: 'src/shared/gitIgnoreRules', class: 'gitUi', why: "the Files tab's ignore rule type (the Git dimming's tooltip)" },
   { file: 'src/main/index', module: 'src/main/branchWatch', class: 'gitUi', why: "starts the branch cards' watcher (the Git view's branch status)" },
@@ -198,28 +300,26 @@ export const EDGES = [
   { file: 'src/main/ipc', module: 'src/main/unusedWorktrees', class: 'impl', names: ['combworkWorktreeOf', 'mergeUnused', 'removalPreview', 'removeUnusedWorktree', 'unusedBranchOf', 'unusedBranchStatus', 'unusedWorktrees'], why: "the 0.9 agent worktrees' clean-up view (Git's worktrees)" },
   { file: 'src/main/lineWriter', module: 'src/main/folderFence', class: 'common', names: ['folderChanging', 'folderSteady'], why: "the folder fence: keyed by folder, every platform's" },
   { file: 'src/main/nameUpgradeProjects', module: 'src/main/git', class: 'historic', names: ['git'], op: 'moveRefs (HI-2594)', why: "1.1's name upgrade moves refs/hive/* to refs/cw/*" }, // old-name: the 1.1 name upgrade's input refs, named as they were
-  { file: 'src/main/nameUpgradeProjects', module: 'src/main/platform/gitKeepOut', class: 'historic', names: ['gitDirOf'], op: 'the exclude line upgrade (HI-2594)', why: "1.1's name upgrade rewrites git's exclude line" },
-  { file: 'src/main/platform/adapters', module: 'src/main/platform/gitPlatform', class: 'registry', names: ['GitPlatform'], why: "the workflow adapters' map (HI-2792)" },
-  { file: 'src/main/platform/historyPorts', module: 'src/main/platform/gitHistory', class: 'registry', names: ['gitHistory'], why: "the history port's map (R6)" },
-  { file: 'src/main/slotsApp', module: 'src/main/repoLock', class: 'common', names: ['takeStores'], why: "jj's store lock for its workspace port's writes (HI-2866): the repository lock's one owner (HI-2896), keyed by the store, every platform's" },
-  { file: 'src/main/slotsApp', module: 'src/main/git', class: 'registry', names: ['git'], why: "jj's stale-slot recovery composed with the app's deps (HI-2866): J2's recoverStale reads the workspace's files through git, read-only" },
-  { file: 'src/main/jjCards', module: 'src/main/git', class: 'registry', names: ['git'], why: "jj's card work composed with the app's deps (HI-2868): git on jj's Git-backed store (`--git-dir`): its pins, the named revision's resolution, J5's reads" },
-  { file: 'src/main/platform/integrationPorts', module: 'src/main/platform/gitIntegration', class: 'registry', names: ['gitIntegration'], why: "the integration port's map (R7, R8)" },
+  { file: 'src/main/nameUpgradeProjects', module: 'src/main/gitKeepOut', class: 'historic', names: ['gitDirOf'], op: 'the exclude line upgrade (HI-2594)', why: "1.1's name upgrade rewrites git's exclude line" },
+  { file: 'src/main/platform/adapters', module: 'src/main/platform/git/gitPlatform', class: 'registry', names: ['GitPlatform'], why: "the workflow adapters' map (HI-2792)" },
+  { file: 'src/main/platform/historyPorts', module: 'src/main/platform/git/gitHistory', class: 'registry', names: ['gitHistory'], why: "the history port's map (R6)" },
+  { file: 'src/main/platform/integrationPorts', module: 'src/main/platform/git/gitIntegration', class: 'registry', names: ['gitIntegration'], why: "the integration port's map (R7, R8)" },
   { file: 'src/main/platform/observe', module: 'src/main/git', class: 'impl', names: ['readRefsOffMain'], why: "the watcher's Git reads (refs off main's thread, git's reflog): ObservePort's Git half, kept with the common watcher (R6)" },
-  { file: 'src/main/platform/observe', module: 'src/main/platform/gitIgnoredByKind', class: 'impl', names: ['gitIgnoredByKind', 'EntryKind', 'RecordedKinds'], why: "a Git folder's write record leaves out what Git ignores, each path by every kind it had (HI-3173): ObservePort's Git half, read-only check-ignore" },
+  { file: 'src/main/platform/observe', module: 'src/main/gitRefs', class: 'impl', names: ['Heads', 'RepoRefs', 'isMainGitDir', 'plainRepo', 'readRepoRefs'], why: "the watcher's Git reads (a repository's refs from its files, no git process): ObservePort's Git half, kept with the common watcher (R6)" },
+  { file: 'src/main/platform/observe', module: 'src/main/gitIgnoredByKind', class: 'impl', names: ['gitIgnoredByKind', 'EntryKind', 'RecordedKinds'], why: "a Git folder's write record leaves out what Git ignores, each path by every kind it had (HI-3173): ObservePort's Git half, read-only check-ignore" },
   { file: 'src/main/platform/repoContext', module: 'src/shared/gitIgnoreRules', class: 'impl', names: ['IgnoreRule'], why: "RepoFiles' ignore rule type: the Files tab's rule, Git's syntax" },
   { file: 'src/main/platform/repoOps', module: 'src/shared/gitIgnoreRules', class: 'gitUi', why: "RepoOps' view types keep their Git names (§16.3.6 port 5)" },
   { file: 'src/main/platform/repoOps', module: 'src/shared/gitInit', class: 'gitUi', why: "RepoOps' view types keep their Git names (§16.3.6 port 5)" },
   { file: 'src/main/platform/repoOps', module: 'src/shared/gitRepo', class: 'gitUi', why: "RepoOps' view types keep their Git names (§16.3.6 port 5)" },
-  { file: 'src/main/platform/repoOpsPorts', module: 'src/main/platform/gitRepoOps', class: 'registry', names: ['gitRepoOps'], why: "the repository operations port's map (R3)" },
-  { file: 'src/main/platform/repoPorts', module: 'src/main/platform/gitRepoPorts', class: 'registry', names: ['gitRepoPorts'], why: "the repository context port's map (R1)" },
+  { file: 'src/main/platform/repoOpsPorts', module: 'src/main/platform/git/gitRepoOps', class: 'registry', names: ['gitRepoOps'], why: "the repository operations port's map (R3)" },
+  { file: 'src/main/platform/repoPorts', module: 'src/main/platform/git/gitRepoPorts', class: 'registry', names: ['gitRepoPorts'], why: "the repository context port's map (R1)" },
   { file: 'src/main/platform/repoPorts', module: 'src/shared/gitIgnoreRules', class: 'impl', names: ['IgnoreRule'], why: "ignoredIn's rule type (RepoFiles)" },
   { file: 'src/main/platform/repoPorts', module: 'src/main/repoLock', class: 'common', names: ['withStoreLocks'], why: "every context's store locked by the repository lock's one owner, whatever platform named it (HI-2896, s13 §2)" },
   { file: 'src/main/platform/repoReads', module: 'src/shared/gitRepo', class: 'gitUi', why: "RepoReads' view types keep their Git names (§16.3.6 port 5)" },
-  { file: 'src/main/platform/repoReadsPorts', module: 'src/main/platform/gitRepoReads', class: 'registry', names: ['gitRepoReads'], why: "the repository reads port's map (R2)" },
-  { file: 'src/main/platform/releaseReadsPorts', module: 'src/main/platform/gitReleaseReads', class: 'registry', names: ['gitReleaseReads'], why: "the release reads port's map (HI-3148)" },
-  { file: 'src/main/platform/revisionReadsPorts', module: 'src/main/platform/gitRevisionReads', class: 'registry', names: ['gitRevisionReads'], why: "the revision reads port's map (HI-3218)" },
-  { file: 'src/main/platform/workspacePorts', module: 'src/main/platform/gitWorkspacePort', class: 'registry', names: ['gitWorkspacePort'], why: "the workspace port's map (R4)" },
+  { file: 'src/main/platform/repoReadsPorts', module: 'src/main/platform/git/gitRepoReads', class: 'registry', names: ['gitRepoReads'], why: "the repository reads port's map (R2)" },
+  { file: 'src/main/platform/releaseReadsPorts', module: 'src/main/platform/git/gitReleaseReads', class: 'registry', names: ['gitReleaseReads'], why: "the release reads port's map (HI-3148)" },
+  { file: 'src/main/platform/revisionReadsPorts', module: 'src/main/platform/git/gitRevisionReads', class: 'registry', names: ['gitRevisionReads'], why: "the revision reads port's map (HI-3218)" },
+  { file: 'src/main/platform/workspacePorts', module: 'src/main/platform/git/gitWorkspacePort', class: 'registry', names: ['gitWorkspacePort'], why: "the workspace port's map (R4)" },
   { file: 'src/main/projectAgents', module: 'src/main/branchWatch', class: 'gitUi', why: "an agent's branch card checked again" },
   { file: 'src/main/projectAgents', module: 'src/main/gitTool', class: 'gitUi', why: "Add Agent's 0.9 worktree choice says why git can't run" },
   { file: 'src/main/projectAgents', module: 'src/main/repoLock', class: 'impl', names: ['withRepoLock'], why: "a 0.9 worktree's guarded removal under the repository lock (R5 left it to the audit)" },
@@ -238,20 +338,21 @@ export const EDGES = [
   { file: 'src/main/tray', module: 'src/main/branchWatch', class: 'gitUi', why: "the tray's branch status" },
   { file: 'src/main/workflow/mergeQueue', module: 'src/main/git', class: 'impl', names: ['GIT_PREFIX', 'git'], why: "the queue's own git when its config gives no runner (tests; the app passes QueueRunner's)" },
   { file: 'src/main/workflow/mergeQueue', module: 'src/main/gitTool', class: 'impl', names: ['gitExe'], why: "gitTree: the queue's default Git runner's tool" },
-  { file: 'src/main/workflow/mergeQueue', module: 'src/main/gitWorker', class: 'impl', names: ['onOutputSettled', 'withLauncherEnv'], why: "gitTree: the queue's default Git runner's launcher" },
-  { file: 'src/main/workflow/mergeQueue', module: 'src/main/platform/gitCommits', class: 'impl', names: ['CommitChild', 'CommitStream', 'commitFailed', 'readCommitStream'], why: "the merge commit's stream (R7 moved it to Git's module; the queue's runner reads it)" },
+  { file: 'src/main/workflow/mergeQueue', module: 'src/main/gitWorker', class: 'impl', names: ['gitEnv', 'onOutputSettled'], why: "gitTree: the queue's default Git runner's launcher" },
   { file: 'src/main/workflow/queueHost', module: 'src/main/folderFence', class: 'common', names: ['changingFolder', 'inFolder'], why: "the folder fence around a checked-out target's advance (R4.2)" },
+  { file: 'src/main/workflow/prHost', module: 'src/main/git', class: 'impl', names: ['git'], why: "HI-3552: the pull request finish's push of a card's approved commit and its remote's push addresses: Git's half of that finish, as the queue's push is the merge queue's" },
   { file: 'src/main/workflow/queueHost', module: 'src/main/git', class: 'impl', names: ['git', 'withGitRoute'], why: "Git's route into the queue's host (withGitRoute, port 1), and the test-only race hook's outside commit (CW_TEST_QUEUE_RACE)" },
   { file: 'src/main/workflow/queueHost', module: 'src/main/repoLock', class: 'impl', names: ['withRepoLock'], why: 'the advance under the repository lock (R4.2)' },
   { file: 'src/main/workflow/queueRunner', module: 'src/main/git', class: 'impl', names: ['GIT_PREFIX', 'withoutGitRoute'], why: "the queue's runner: Git's launcher (its prefix, work outside the route)" },
   { file: 'src/main/workflow/queueRunner', module: 'src/main/gitTool', class: 'impl', names: ['GitExe', 'PATH_GIT', 'gitExe', 'gitExeGone'], why: "the queue's runner: Git's tool" },
-  { file: 'src/main/workflow/queueRunner', module: 'src/main/gitWorker', class: 'impl', names: ['GitOutcome', 'GitRequest', 'onOutputSettled', 'withLauncherEnv'], why: "the queue's runner: Git's request and outcome" },
+  { file: 'src/main/workflow/queueRunner', module: 'src/main/gitWorker', class: 'impl', names: ['GitOutcome', 'GitRequest', 'gitEnv', 'onOutputSettled'], why: "the queue's runner: Git's request and outcome" },
   { file: 'src/main/workflow/queueRunner', module: 'src/main/workflow/gitHost', class: 'impl', names: ['GitHost', 'HostResult', 'startGitHost'], why: "the queue's runner: Git's host process" },
   { file: 'src/main/workspace', module: 'src/main/worktrees', class: 'impl', names: ['worktreesRoot'], why: "the worktrees folder beside the workspace (Git's slots and 0.9 worktrees)" },
   { file: 'src/renderer/src/commands', module: 'src/shared/gitRepo', class: 'gitUi', why: "the Version Control tab's sections, for its commands" },
   { file: 'src/renderer/src/components/AgentDialogs', module: 'src/shared/gitTool', class: 'gitUi', why: "Add Agent's 0.9 worktree choice says why git can't run" },
   { file: 'src/renderer/src/components/Board', module: 'src/shared/gitTool', class: 'gitUi', why: "a slot project's board says why git can't run (Provider Setup's Git row)" },
   { file: 'src/renderer/src/components/ChangesCompare', module: 'src/shared/gitRepo', class: 'gitUi', why: "Compare's view types (the Git view's text)" },
+  { file: 'src/renderer/src/components/FileRestore', module: 'src/shared/gitRepo', class: 'gitUi', why: "the Files tab's Restore From → A Commit…: the History list's page size (HI-3477)" },
   { file: 'src/renderer/src/components/ChangesLeftovers', module: 'src/shared/gitRepo', class: 'gitUi', why: "clean-up's branch rows (the Git view)" },
   { file: 'src/renderer/src/components/FilesGitMenu', module: 'src/shared/gitIgnoreRules', class: 'gitUi', why: "the Files tab's Git menu (ignore rules, Git's syntax)" },
   { file: 'src/renderer/src/components/InitRepo', module: 'src/shared/gitInit', class: 'gitUi', why: "Initialise repository, on Git's page (HI-1905)" },
@@ -268,6 +369,7 @@ export const EDGES = [
   { file: 'src/shared/api', module: 'src/shared/gitInit', class: 'gitUi', why: "the window's API types for Initialise repository" },
   { file: 'src/shared/api', module: 'src/shared/gitRepo', class: 'gitUi', why: "the window's API types for the Git view (port 5's view types keep their Git names, §16.3.6)" },
   { file: 'src/shared/api', module: 'src/shared/gitTool', class: 'gitUi', why: "the window's API types for Provider Setup's Git row" },
+  { file: 'src/shared/gitFileRestore', module: 'src/shared/gitRepo', class: 'gitUi', why: "the Files tab's Restore From → A Commit…: its rows are the History list's (HI-3477)" },
   { file: 'src/shared/branchCleanup', module: 'src/shared/gitRepo', class: 'gitUi', why: "clean-up's choices over the Git view's branch rows" },
   { file: 'src/shared/tips', module: 'src/shared/gitRepo', class: 'gitUi', why: "the Git view's tip text" },
   { file: 'src/shared/types', module: 'src/shared/gitIgnoreRules', class: 'gitUi', why: "FileEntry's ignore rule (the Files tab's Git dimming)" },
@@ -278,8 +380,11 @@ export const EDGES = [
 export const SEAMS = {
   'src/main/agentFolders': { calls: { slotWorkspaces: 2 }, why: "a Resume's claim of a slot: the pool's platform (R5)" },
   'src/main/assistantUndo': { calls: { lineRepoOps: 1 }, why: "the Assistant's branch undo: the window's repository operations, whatever the project's workflow platform (R3)" },
-  'src/main/ipc': { calls: { lineRepoReads: 19, slotWorkspaces: 1 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792), and Branches & remotes' Signing section (HI-1185); Slots and copies' submodules and LFS status, the slots' platform's (HI-1182)" },
+  'src/main/ipc': { calls: { lineRepoReads: 20, slotWorkspaces: 1 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792), and Branches & remotes' Signing section (HI-1185), and the Files tab's Git menu's target (HI-3477); Slots and copies' submodules and LFS status, the slots' platform's (HI-1182)" },
   'src/main/lanes': { calls: { slotWorkspaces: 1 }, why: "a lane's start reads its slot through the pool's platform (R5)" },
+  'src/main/githubLink': { calls: { lineRepoReads: 1 }, why: "HI-3550: a project's GitHub link reads its remotes' URLs, the window's repository read (R2), as Branches & remotes does" },
+  'src/main/fileRestorePanel': { calls: { lineRepoReads: 1 }, why: "the Files tab's Restore From → Target Branch: the project's target, the window's repository read (R2, HI-3477); its plan and change go through repoOpsIpc's opsAt" },
+  'src/main/operationPanel': { calls: { lineRepoReads: 1 }, why: "Changes' panel for an unfinished git operation: the window's repository read of the folder Changes shows, as the Changes tab's others (R2, HI-3470); its steps go through repoOpsIpc's opsAt" },
   'src/main/projectAgents': { calls: { lineRepoOps: 1 }, why: "the 0.9 worktree merge through RepoOps (R3)" },
   'src/main/repoOpsIpc': { calls: { lineRepoOps: 1 }, why: "the window's repository operations (R3)" },
   'src/main/servers': { calls: { lineRepoOps: 1 }, why: "the Assistant's branch route (R3)" },
@@ -296,6 +401,8 @@ export const SEAMS = {
   'src/main/workflow/queueRunner': { calls: { queueIntegration: 2 }, why: "the runner's workspace removal (R8)" },
   'src/main/workflow/reconcile': { calls: { lineHistory: 1 }, why: "a lane's own-work read (R6)" },
   'src/main/workflow/retarget': { calls: { lineHistory: 1 }, why: "the retarget preview (R6)" },
+  'src/main/workflow/runChecks': { calls: { requirePathsDeliverables: 2 }, why: "a None check's point and its deliverables: reached for a platform without history, the one whose cards declare paths (HI-3489)" },
+  'src/main/workflow/runtime': { calls: { pathsDeliverables: 1, requirePathsDeliverables: 2 }, why: "every project's deliverables while a platform declaring paths is installed (its watcher's writes invalidate them), and a None card's unclaimed changes (HI-3489)" },
   'src/main/workflow/runLink': { calls: { lineHistory: 2 }, why: "a run's checked-out revision, before its card is known (HI-2792)" },
   'src/main/workflow/targets': { calls: { lineHistory: 3 }, why: "a lane's target and own-work reads, and empty lines dropped (R6)" },
   'src/main/workflow/keptLine': { calls: { lineHistory: 1 }, why: "HI-3112: a put-back card's line read against the target it would follow (R6)" },
@@ -309,8 +416,8 @@ export const SEAMS = {
  * - a comparison (`===`, `!==`, `==`, `!=`, either side) with a platform id's string literal;
  * - a `case` of one;
  * - `'<id>' in x` (a platform's own shape read by its key; `none` is every union's "nothing" member, `{ none }`, so not);
- * - a platform id given to a descriptor helper (`revisionShort('jj', …)`, `hasCapability('git', …)`) or read off
- *   `PLATFORMS` by name (`PLATFORMS.jj`, `PLATFORMS['git']`).
+ * - a platform id given to a descriptor helper (`revisionShort('none', …)`, `hasCapability('git', …)`) or read off
+ *   `PLATFORMS` by name (`PLATFORMS.none`, `PLATFORMS['git']`).
  * `none` is also other enums' value (`review === 'none'`): a comparison or case with it is exempt only when the other
  * side's name is one NOT_PLATFORM lists, with why; any other spelling (`to`, `id`, `p`…) counts.
  */
@@ -362,26 +469,10 @@ export const NOT_PLATFORM = {
 }
 
 /** The descriptor helpers that take a platform's id: one given by name is a switch. */
-const HELPERS = new Set(['revisionShort', 'hasCapability', 'merges', 'accepts', 'deliversCommits', 'declaresPaths', 'needsRepository', 'hasOperation', 'hasGate', 'ownsWorkspaces', 'platformName', 'ruleKeyOf'])
+const HELPERS = new Set(['revisionShort', 'hasCapability', 'merges', 'accepts', 'deliversCommits', 'declaresPaths', 'needsRepository', 'hasOperation'])
 
 /** Where a switch belongs, whole: the platform layer (its descriptors and presentation, its ports and their registries) and Git's own modules. */
 const SWITCH_HOME = (f) => /^src\/(shared\/platform|main\/platform)\//.test(f) || isGitModule(f)
-
-/**
- * jj's modules outside the platform layer (HI-3140's §D), exempt for jj's own id only: a comparison on another id there
- * still counts, so shared logic can't hide in them. `compose`: jj's work composed with the app's services; `jjUi`: jj's
- * page and the window's jj reads and types.
- */
-export const JJ_HOMES = {
-  'src/main/jjCards': { class: 'compose', why: "jj's card work composed with the app's services (HI-2868): platform code imports no app module" },
-  'src/main/jjSetupStamp': { class: 'compose', why: "what a jj candidate's checks depend on in project.json (HI-3122), jjCards' helper" },
-  'src/main/jjPublish': { class: 'compose', why: "main's host of jj's publish worker (HI-2882)" },
-  'src/main/jjPublishWorker': { class: 'compose', why: "jj's publish worker thread, a build entry beside gitWorker and repoLockWorker" },
-  'src/main/jjWindow': { class: 'jjUi', why: "the window's reads and actions for jj cards (HI-2869), behind ipc's jj channels" },
-  'src/renderer/src/views/JjSections': { class: 'jjUi', why: "jj's page in the Version Control tab, as GitTab is Git's" },
-  'src/shared/jjViews': { class: 'jjUi', why: "jj's page's view types, as shared/gitRepo is Git's" },
-  'src/shared/jjTool': { class: 'jjUi', why: "jj's tool and its tested version, as shared/gitTool is Git's" }
-}
 
 /** An expression without what never changes its value: parentheses, `!`, `as`, `satisfies`, `<T>x`. */
 function bare(n) {
@@ -401,7 +492,7 @@ const COMPARE = new Set([ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.Ex
 
 /** One file's switches: each `{ id, line }`; `exempt` collects the NOT_PLATFORM names it used. */
 export function fileSwitches(file, text, ids, exempt) {
-  // Every file is parsed (no text prefilter: HR1's round 1 found one skipping `PLATFORMS.jj`); switchCounts keeps each
+  // Every file is parsed (no text prefilter: HR1's round 1 found one skipping `PLATFORMS.<id>`); switchCounts keeps each
   // file's answer by its text.
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   const idOf = (n0) => {
@@ -443,15 +534,14 @@ export function fileSwitches(file, text, ids, exempt) {
 const switchesParsed = new Map()
 
 /**
- * Each file's count of switches on a platform's id outside their home (a jj home's on jj's own id left out). `used`
- * collects the NOT_PLATFORM names the files used, and `files` every file read.
+ * Each file's count of switches on a platform's id outside their home. `used` collects the NOT_PLATFORM names the files
+ * used.
  */
-export function switchCounts(root, over = {}, used = new Set(), files = new Set()) {
+export function switchCounts(root, over = {}, used = new Set()) {
   const ids = platformIds(root, over)
   const out = {}
   for (const { file, text } of filesOf(root, over)) {
-    const f = file.replace(/\.tsx?$/, '')
-    files.add(f)
+    const f = moduleOf(file)
     if (SWITCH_HOME(f)) continue
     // Each file's answer kept by its text and the ids (a test's runs reparse only the file it changes).
     const key = `${root}|${file}|${ids.join(',')}`
@@ -462,8 +552,7 @@ export function switchCounts(root, over = {}, used = new Set(), files = new Set(
       switchesParsed.set(key, kept)
     }
     for (const n of kept.exempt) used.add(n)
-    const found = kept.found.filter((s) => !(JJ_HOMES[f] && s.id === 'jj'))
-    if (found.length) out[f] = found.length
+    if (kept.found.length) out[f] = kept.found.length
   }
   return out
 }
@@ -473,94 +562,17 @@ export function switchCounts(root, over = {}, used = new Set(), files = new Set(
  * data read by a one-time step. Counted like the seams: a new switch, or one gone, fails tests/gitAudit.test.ts.
  */
 export const SWITCHES = {
-  'src/main/copies': { n: 2, class: 'data', why: "a copy's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data, written and passed on" },
-  'src/main/slots': { n: 2, class: 'data', why: "a slot's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data, written and passed on" },
   'src/main/combworkMove': { n: 2, class: 'historic', why: "1.1's .hive → .combwork move fixes git's exclude lines in a Git repository (HI-2462): its boundary read as Git's" }, // old-name: the 1.1 folder move's input, named as it was
   'src/main/nameUpgradeProjects': { n: 2, class: 'historic', why: "1.1's name upgrade moves a Git repository's refs and exclude line (HI-2594): its boundary read as Git's" },
   'src/main/ipc': { n: 1, class: 'gitUi', why: "the Files tab's Git menu reads only a Git repository's boundary (git:…)" },
   'src/main/workflow/platformSwitch': { n: 1, class: 'gitUi', why: "the switch to None warns that the folder is still a Git repository (gitFolder, git.vc.switch.gitFolder): Git-facing text" },
   'src/main/workflow/commitMessageStep': { n: 2, class: 'historic', why: "HI-1997's one-time step over G19's stored Git options (in force, or kept as `kept.git`): Git's data alone" },
-  'src/shared/workflow/compile': { n: 1, class: 'historic', why: "HI-2874's one-time drop of the retired guard start.platformReady, which only jj rulesets had: jj's data alone" },
-  'src/main/jjSetupStamp': { n: 2, class: 'data', why: "a jj candidate's setup stamp's command id `none` (no setup command, HI-3122): not a platform" },
-  'src/main/workflow/storeSwitch': { n: 6, class: 'data', why: "a project's store read (`none`: no repository found), as storeOf and mapStores answer it: not a platform" },
   'src/renderer/src/components/AgentTiles': { n: 1, class: 'data', why: "a CSS grid column token (`none`): not a platform" },
   'src/renderer/src/components/WorkflowOptions': { n: 1, class: 'data', why: "the review option's value `none` (G3), said in None's words where the platform accepts work: not a platform" },
   'src/renderer/src/views/VersionControl': { n: 1, class: 'gitUi', why: "the Version Control tab compares git's own read of the folder (its status summary) with detection finding Git: Git's page" },
   'src/renderer/src/views/VersionControlHeader': { n: 1, class: 'gitUi', why: "Initialise repository… switches the project to Git by name once Git's page made it one (switchAfterInit): Git's page" }
 }
 
-/**
- * Modules kept at an old path for the tests' imports alone (HI-3140: jj's candidate checks and words moved into the
- * platform layer, reached by the workflow through its reconcile port): no module under src may import one.
- */
-export const COMPAT_ONLY = {
-  'src/main/workflow/jjCandidateChecks': 'src/main/platform/jjCandidateChecks',
-  'src/main/workflow/jjCandidateReturn': 'src/main/platform/jjCandidateReturn'
-}
-
-/** Each import of a COMPAT_ONLY module from src (`file -> module`), static, dynamic or required. */
-export function compatImports(root, over = {}) {
-  const out = []
-  for (const { file, text } of filesOf(root, over)) {
-    const f = file.replace(/\.tsx?$/, '')
-    if (Object.hasOwn(COMPAT_ONLY, f)) continue
-    for (const m of text.matchAll(/(?:\bfrom|\bimport\s*\(|\brequire\s*\(|^\s*import)\s*['"]([^'"]+)['"]/gm)) {
-      if (!m[1].startsWith('.')) continue
-      const module = relative(root, resolve(root, dirname(file), m[1])).replace(/\\/g, '/').replace(/\.(tsx?|js)$/, '')
-      if (Object.hasOwn(COMPAT_ONLY, module)) out.push(`${f} -> ${module}`)
-    }
-  }
-  return out
-}
-
-/** jj's platform modules (platform/jj…): reached from outside the platform layer only by a listed edge (HI-3140). */
-export const isJjModule = (m) => /^src\/main\/platform\/jj[A-Z]\w*$/.test(m)
-
-/** A file that could name a jj module (only these are parsed). */
-const MAY_NAME_JJ = new RegExp(String.raw`jj[A-Z]|require\(|import\(\s*[^'"${'`'}\s]`)
-
-/**
- * Each import of a jj platform module from outside the platform layer, jj's homes (JJ_HOMES) and the test-only paths
- * (COMPAT_ONLY): `{ file, module, names }` as gitEdges gives them.
- */
-export function jjEdges(root, over = {}) {
-  const out = []
-  for (const { file, text } of filesOf(root, over)) {
-    const f = file.replace(/\.tsx?$/, '')
-    if (f.startsWith('src/main/platform/') || Object.hasOwn(JJ_HOMES, f) || Object.hasOwn(COMPAT_ONLY, f)) continue
-    const key = `${root}|${file}|jj`
-    const kept = parsed.get(key)
-    if (kept?.text === text) {
-      out.push(...kept.edges)
-      continue
-    }
-    const edges = fileEdges(root, file, text, isJjModule, MAY_NAME_JJ)
-    parsed.set(key, { text, edges })
-    out.push(...edges)
-  }
-  return out.sort((a, b) => (a.file + a.module).localeCompare(b.file + b.module))
-}
-
-/**
- * The jj edges left outside the platform layer (HI-3140), each with the names it may take and why: composition of jj's
- * port with the app's services, the workflow's candidate pass's fingerprint, and what jj's runner and tool tell the
- * diagnostics. A new edge, a name beyond its list, or a listed edge gone fails tests/gitAudit.test.ts.
- */
-export const JJ_EDGES = [
-  { file: 'src/main/combworkVcs', module: 'src/main/platform/jjKeepOut', class: 'registry', names: ['ensureJjExcluded'], why: "keeping .combwork out of a jj repository: combworkVcs routes to each platform's keep-out (port 1)" },
-  { file: 'src/main/diagnostics', module: 'src/main/platform/jjRunner', class: 'jjUi', names: ['jjRunner'], why: "Copy Diagnostics names jj's tool and its readiness (J0)" },
-  { file: 'src/main/ipc', module: 'src/main/platform/jjOperations', class: 'jjUi', names: ['jjOperationPreview', 'jjOperations'], why: "jj's page's Operations section (jj:… channels)" },
-  { file: 'src/main/ipc', module: 'src/main/platform/jjViews', class: 'jjUi', names: ['jjBookmarks', 'jjCompare', 'jjConflicts', 'jjHistory', 'jjRepoView'], why: "jj's page's read-only views (jj:… channels)" },
-  { file: 'src/main/slotsApp', module: 'src/main/platform/jjRecovery', class: 'registry', names: ['recoverStale'], why: "jj's stale-slot recovery composed with the app's deps (HI-2866, the user's Recover…)" },
-  { file: 'src/main/slotsApp', module: 'src/main/platform/jjRunner', class: 'registry', names: ['storeGitGated'], why: "jj's recovery's git on the store, gated by jj's runner (HI-2866): composition" },
-  { file: 'src/main/slotsApp', module: 'src/main/platform/jjSlotPrep', class: 'registry', names: ['boardPrepStore'], why: "jj's port's preparation records in the workspace database (HI-2866): composition" },
-  { file: 'src/main/slotsApp', module: 'src/main/platform/jjWorkspacePort', class: 'registry', names: ['JjWorkspacePort', 'createJjWorkspacePort', 'generationOf'], why: "jj's workspace port made with the app's dependencies (APP_PORTS' maker) and a slot's generation for Remove…" },
-  { file: 'src/main/slotStaleView', module: 'src/main/platform/jjWorkspacePort', class: 'registry', names: ['StaleWhy'], why: "a stale jj slot's reason's type, for the Slots view's read of jj's port (HI-2912)" },
-  { file: 'src/main/workflow/reconcile', module: 'src/main/platform/jjCandidateStep', class: 'impl', names: ['JjCandidateFingerprint', 'JjCandidateOffer', 'JjCandidateStep', 'sameFingerprint'], why: "the candidate pass's fingerprint, offer and step (HI-2871): the reconcile port's own types, and the fingerprint's comparison" },
-  { file: 'src/main/workflow/runtime', module: 'src/main/platform/jjPlatform', class: 'registry', names: ['JjCardDeps'], why: "the type of jj's card work's dependencies, which the app gives each project's workflow (setJjCards, HI-2868)" },
-  { file: 'src/main/workflow/service', module: 'src/main/platform/jjPlatform', class: 'registry', names: ['JjCardDeps'], why: "the type of jj's card work's dependencies, which the app gives each project's workflow (setJjCards, HI-2868)" },
-  { file: 'src/main/workflow/storeSwitch', module: 'src/main/platform/jjStoreSide', class: 'impl', names: ['fallbackOf', 'retryMoved'], why: "re-exported for storeSwitch's callers and tests (HI-3140 moved jj's side of the store switch)" }
-]
 
 /** The descriptor fields that declare a platform's integration modes (HI-2840): its finishes and its default one. */
 export const MODE_FIELDS = ['finishes', 'defaultFinish']
@@ -596,7 +608,7 @@ export function modeDeclarations(root, over = {}) {
   }
   const out = []
   for (const { file, text } of filesOf(root, over)) {
-    if (file.replace(/\.tsx?$/, '') === DESCRIPTORS || !MODE_FIELDS.some((f) => text.includes(f))) continue
+    if (moduleOf(file) === DESCRIPTORS || !MODE_FIELDS.some((f) => text.includes(f))) continue
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
     const visit = (n) => {
       const value = ts.isPropertyAssignment(n) || ts.isPropertyDeclaration(n) ? n.initializer : null
@@ -607,6 +619,97 @@ export function modeDeclarations(root, over = {}) {
     visit(sf)
   }
   return out
+}
+
+/**
+ * HI-3489, each version control in its own folder: `src/main/platform/<vc>/` holds one platform's adapter and port
+ * implementations (git/, none/), and nothing outside that folder imports a file in it (another platform's folder, the
+ * seam beside it, the rest of src/) but the registries below, each the one place naming every platform's
+ * implementation. So a platform is added as a folder, its registry lines and its descriptor, and removed by deleting
+ * them, the build staying green. Only src/ is read: tests (tests/**) import a platform's files directly, as they test them.
+ */
+const PLATFORM_DIR = 'src/main/platform'
+
+/** The registries: the adapters' map and each port's lookup, the only files outside a platform's folder that may import it. */
+export const REGISTRIES = ['adapters', 'deliverablesPorts', 'historyPorts', 'integrationPorts', 'releaseReadsPorts', 'repoOpsPorts', 'repoPorts', 'repoReadsPorts', 'revisionReadsPorts', 'workspacePorts'].map((f) => `${PLATFORM_DIR}/${f}`)
+
+/** The platforms' folders: each folder in src/main/platform, as listed (and any a test's added file is in). */
+export function platformFolders(root, over = {}) {
+  const listed = readdirSync(join(root, PLATFORM_DIR)).filter((e) => statSync(join(root, PLATFORM_DIR, e)).isDirectory())
+  const added = Object.keys(over).flatMap((f) => (f.startsWith(`${PLATFORM_DIR}/`) && f.slice(PLATFORM_DIR.length + 1).includes('/') ? [f.slice(PLATFORM_DIR.length + 1).split('/')[0]] : []))
+  return [...new Set([...listed, ...added])].sort()
+}
+
+/**
+ * Every module a file names: imports, re-exports, dynamic imports and requires (repo paths, no extension); HIDDEN for a
+ * computed one or a loader it can't follow (hiddenLoader). For the registries' allow-list (HI-3522): `loose`, those named
+ * other than by a static `import … from` (a re-export, `import X = require(…)`, a dynamic import or require, an
+ * `import('…')` type), and `unbuilt`, those a static import bound whose names it uses but to build (usedUnbuilt).
+ */
+function modulesNamed(root, file, text) {
+  const out = new Set()
+  const loose = new Set()
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+  const add = (spec, isLoose = true) => {
+    const m = moduleNamed(root, file, spec)
+    if (m !== null) out.add(m)
+    if (m !== null && isLoose) loose.add(m)
+  }
+  const visit = (n) => {
+    if (hiddenLoader(n)) out.add(HIDDEN)
+    else if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text, false)
+    else if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text)
+    else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text)
+    // A type's `import('./x').T`: a type taken from the folder is as much an import of it.
+    else if (ts.isImportTypeNode(n) && ts.isLiteralTypeNode(n.argument) && ts.isStringLiteral(n.argument.literal)) add(n.argument.literal.text)
+    else if (ts.isCallExpression(n) && (n.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(n.expression) && n.expression.text === 'require')) && n.arguments.length) {
+      if (ts.isStringLiteralLike(n.arguments[0])) add(n.arguments[0].text)
+      else out.add(HIDDEN)
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(sf)
+  return { modules: [...out], loose: [...loose], unbuilt: usedUnbuilt(sf).map((spec) => moduleNamed(root, file, spec)).filter((m) => m !== null) }
+}
+
+/** sealBreaks' answers per file, by its text and the folders. */
+const sealParsed = new Map()
+
+/**
+ * Each import of a platform folder's file from outside that folder, not a registry's: `<file> -> <module>` (and a
+ * computed specifier anywhere, inside the folders too, which could load one). A registry's reach is an allow-list
+ * (HI-3522): it imports a folder's files only by a static `import … from` with a literal specifier, and exports only
+ * values it builds from them (`[new NoneAdapter()]`). Any other way it names one is `<file> -> <module> (not a static
+ * import)`, any use of a name such an import bound but those builtFrom allows `<file> -> <module> (passed on)`, and a
+ * computed specifier in it breaks the seal too. Empty when every folder is sealed.
+ */
+export function sealBreaks(root, over = {}) {
+  const folders = platformFolders(root, over)
+  const folderOf = (m) => folders.find((d) => m === `${PLATFORM_DIR}/${d}` || m.startsWith(`${PLATFORM_DIR}/${d}/`)) ?? null
+  // Only a file that could name a folder (a folder's name is a word: git, none) or load something computed is parsed.
+  const names = new RegExp(String.raw`/(${folders.join('|')})\b|${MAYBE_HIDDEN}`)
+  const out = []
+  for (const { file, text } of filesOf(root, over)) {
+    if (!file.startsWith('src/')) continue
+    const f = moduleOf(file)
+    if (!names.test(text)) continue
+    const key = `${root}|${file}|${folders.join(',')}`
+    let kept = sealParsed.get(key)
+    if (kept?.text !== text) sealParsed.set(key, (kept = { text, ...modulesNamed(root, file, text) }))
+    if (REGISTRIES.includes(f)) {
+      if (kept.modules.includes(HIDDEN)) out.push(`${f} -> ${HIDDEN}`)
+      for (const m of kept.loose) if (folderOf(m) !== null) out.push(`${f} -> ${m} (not a static import)`)
+      for (const m of kept.unbuilt) if (folderOf(m) !== null) out.push(`${f} -> ${m} (passed on)`)
+      continue
+    }
+    const own = folderOf(f)
+    for (const m of kept.modules) {
+      // A computed specifier can't be proved to stay in its folder, so it breaks the seal anywhere, a platform's own files
+      // included (one in git/ could load none/).
+      if (m === HIDDEN || (folderOf(m) !== null && folderOf(m) !== own)) out.push(`${f} -> ${m}`)
+    }
+  }
+  return out.sort()
 }
 
 /** The audit against the source: what isn't listed, what is listed but gone, and names beyond an edge's list. */
@@ -629,25 +732,9 @@ export function audit(root, over = {}) {
     return [...new Set([...Object.keys(have), ...Object.keys(want)])].filter((s) => (have[s] ?? 0) !== (want[s] ?? 0)).map((s) => `${file}: ${s}() ×${have[s] ?? 0}, listed ×${want[s] ?? 0}`)
   })
   const used = new Set()
-  const files = new Set()
-  const switched = switchCounts(root, over, used, files)
+  const switched = switchCounts(root, over, used)
   const switches = [...new Set([...Object.keys(switched), ...Object.keys(SWITCHES)])].sort().filter((f) => (switched[f] ?? 0) !== (SWITCHES[f]?.n ?? 0)).map((f) => `${f}: ${switched[f] ?? 0} switches on a platform's id, listed ${SWITCHES[f]?.n ?? 0}`)
-  // HI-3140: an exemption nothing uses any more is stale: a NOT_PLATFORM name no comparison has, a jj home that is gone.
+  // HI-3140: an exemption nothing uses any more is stale: a NOT_PLATFORM name no comparison has.
   switches.push(...Object.keys(NOT_PLATFORM).filter((n) => !used.has(n)).map((n) => `NOT_PLATFORM ${n}: no comparison uses it (stale)`))
-  switches.push(...Object.keys(JJ_HOMES).filter((f) => !files.has(f)).map((f) => `JJ_HOMES ${f}: no such file (stale)`))
-  const compat = compatImports(root, over)
-  // HI-3140: jj's modules reached from outside the platform layer, edge by edge and name by name, as Git's are.
-  const jjFound = jjEdges(root, over)
-  const jjListed = new Map(JJ_EDGES.map((e) => [key(e), e]))
-  const jj = [
-    ...jjFound.filter((e) => !jjListed.has(key(e))).map((e) => `${key(e)}: unlisted`),
-    ...JJ_EDGES.filter((e) => !jjFound.some((f) => key(f) === key(e))).map((e) => `${key(e)}: stale`),
-    ...jjFound.flatMap((f) => {
-      const e = jjListed.get(key(f))
-      if (!e) return []
-      if (f.names === null) return [`${key(f)}: imports it whole (namespace or dynamic), not just ${e.names.join(', ')}`]
-      return f.names.filter((n) => !e.names.includes(n)).map((n) => `${key(f)}: ${n}`)
-    })
-  ]
-  return { found, unlisted, stale, extraNames, seams, switches, compat, jj }
+  return { found, unlisted, stale, extraNames, seams, switches, sealed: sealBreaks(root, over) }
 }

@@ -1,11 +1,10 @@
 // HI-3375 (timing-margins audit, 18 Nov: finding tools and starting agents): the bounds that decide "not installed" or
-// "start without it". A CLI's, git's or jj's first start under antivirus on a slow disk takes tens of seconds, which a
+// "start without it". A CLI's or git's first start under antivirus on a slow disk takes tens of seconds, which a
 // user can't diagnose, so each bound is a bound for a hung step, never a performance budget. Their defaults, ranges and
 // constants as the card sets them; a user's own override of a setting stays (Settings → Advanced keeps it).
 import { describe, expect, it } from 'vitest'
 import { advancedDef, CLI_PROBE_SECONDS, RESTART_READY_SECONDS, SERVER_CHECK_INFER_SECONDS } from '../src/shared/advanced'
 import { REQUEST_MAX_AGE_MS } from '../src/shared/restartResume'
-import { JJ_DEFAULTS } from '../src/main/platform/jjRunner'
 import { WHERE_MS } from '../src/main/providers/common'
 import { LAUNCHER_SOURCE } from '../src/main/providers/opencode/launcher'
 
@@ -33,9 +32,8 @@ describe('the timing margins of finding tools and starting agents (HI-3375)', ()
     expect(LAUNCHER_SOURCE).toContain('r.Timeout = 30000; r.ReadWriteTimeout = 30000;')
   })
 
-  it('the constants: where.exe 20 s (row 2), jj --version 30 s (row 4), an installer’s restart request 10 min (row 11)', () => {
+  it('the constants: where.exe 20 s (row 2), an installer’s restart request 10 min (row 11)', () => {
     expect(WHERE_MS).toBe(20_000)
-    expect(JJ_DEFAULTS.versionTimeout).toBe(30_000)
     expect(REQUEST_MAX_AGE_MS).toBe(10 * 60_000)
   })
 })

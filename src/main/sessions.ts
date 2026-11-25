@@ -1,5 +1,3 @@
-import { detect } from './platform/registry'
-import { ruleKeyOf } from '../shared/platform/descriptors'
 import { endReason, type SessionEnd, type StopCause } from '../shared/sessionEnd'
 import type { ActivityTask } from '../shared/activity'
 import { maskText } from '../shared/redact'
@@ -11,7 +9,7 @@ import { launchPolicy, MCP_ISOLATION, terminalPreset, type LaunchPolicy } from '
 import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
-import { withSessionSigner, type SessionSigner } from './platform/signerRules'
+import { withSessionSigner, type SessionSigner } from './signer/signerRules'
 import { folderChanging, folderSteady, inFolder } from './folderFence'
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
@@ -96,7 +94,6 @@ import { providerService } from './providerService'
 import { config } from './config'
 import { emit, emitTo, onCombworkEvent, toast } from './events'
 import { presentWindow, testNotifyLog, testQuiet } from './testQuiet'
-import { admitLaunch, endAdmission, setLiveFolders } from './launchHolds'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
 import { HOOK_AUTH_FILE_ENV, HOOK_URL_ENV } from '../shared/hooks'
@@ -1953,12 +1950,6 @@ class SessionManager {
       const hidden = this.workflowToolsHidden(projectPath, side, pc)
       mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side, ...(hidden.length ? { CW_WORKFLOW_HIDDEN: hidden.join(',') } : {}) } }
     }
-    // A jj project's agents (HI-2800): its instructions add the jj rule (platformRule). Part of the signature, so a
-    // switch to jj or back is told to a running agent at its next start.
-    // A jj repository with no Git working copy (HI-2896): its own variant, `jj-separate`. The key is the platform's
-    // (HI-3140, its descriptor's `guidance`): none for Git and None.
-    const ruleKey = mcpServers[TOOLS_SERVER] && !assistant ? ruleKeyOf(pc.platform, () => detect(projectPath)) : null
-    if (mcpServers[TOOLS_SERVER] && ruleKey) mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_PLATFORM: ruleKey } }
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
@@ -2206,7 +2197,6 @@ class SessionManager {
       throw e
     } finally {
       this.starting.delete(id)
-      endAdmission(id)
       const slow = times.slowLine()
       if (slow) log.info(`${opts.resumeId ? 'Resume' : 'Start'} of ${userText(agentId)} in ${userText(basename(projectPath))} ${slow}`)
     }
@@ -2575,10 +2565,6 @@ class SessionManager {
     times.mark('folder')
     this.assertStarting(id)
     const cwd = place.cwd
-    // HI-2887: admitted in its folder now its folder is known, before anything is launched or prepared there: a folder
-    // held against launches (jj's control's making) makes it wait; its admission lasts until the start ends.
-    await admitLaunch(id, cwd, () => !!this.starting.get(id)?.cancelled)
-    this.assertStarting(id)
     if (!existsSync(cwd)) throw combworkError(msg({ id: 'session.start.worktreeMissing', defaultMessage: "{agent}'s worktree folder is missing: {folder}. Start {agent} from its pane to recreate the worktree on its branch (Repair… if the workspace moved), or remove the agent.", description: "Starting an agent is refused: its git worktree's folder is gone. {agent} is the agent's name, {folder} the folder's path. Repair… is a command." }), { agent: agent.name, folder: cwd }, { kind: 'conflict' })
 
     if (existing?.archived) throw combworkError(msg({ id: 'session.start.archived', defaultMessage: 'This session is archived. Unarchive it before resuming.', description: 'Resuming an archived session is refused (Sessions tab: Unarchive).' }), undefined, { kind: 'conflict' })
@@ -6377,6 +6363,7 @@ class SessionManager {
     }
     const had = l.state.backgroundTasks
     l.state.backgroundTasks = l.tasks?.size || undefined
+    l.state.tasksUncounted = l.tasksDropped?.size || undefined
     // When they last ended (HI-1993): a review waiting on them starts its stall clock again from then.
     if (had && !l.state.backgroundTasks) l.state.backgroundEndedAt = new Date().toISOString()
     return dropped.length > 0
@@ -6439,6 +6426,7 @@ class SessionManager {
     l.tasksOffset = 0
     l.tasksMemo = undefined
     l.state.backgroundTasks = undefined
+    l.state.tasksUncounted = undefined
   }
 
   /**
@@ -9910,8 +9898,6 @@ class SessionManager {
 }
 
 export const sessions = new SessionManager()
-// HI-2887: a hold against launches reads the live sessions' folders.
-setLiveFolders(() => sessions.liveStates().flatMap((s) => (s.cwd ? [s.cwd] : [])))
 // A workspace closing (HI-1829): its server markers whose records couldn't be saved can't be kept for its reopening.
 WorkspaceService.closingListeners.add((path) => serverMarks.closing(path))
 onLanguageChange(() => sessions.relabel())

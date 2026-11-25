@@ -33,7 +33,24 @@ export interface ReleaseReads {
    * without a process), is unknown: never taken as unchanged.
    */
   watch(projectPath: string, line: string): Promise<(() => string | null) | null>
+  /**
+   * HI-3555: `line`'s release tag (the first of `releaseTagNames` there), the commit it peels to and whether that commit
+   * is in the repository's main line, whether or not the line itself still exists (a release branch deleted after its
+   * release); null: no such tag. Absent: a platform that can't say, so nothing is taken as shipped on it.
+   */
+  tagged?(projectPath: string, line: string): Promise<Maybe<{ tag: string; commit: string; inMain: boolean } | null>>
+  /**
+   * HI-3555 (HR1 on s16): the lines the repository's release tags name (`v1.0.1` and `1.0.1` both name `1.0.1`), found
+   * from the tags themselves, so a release whose line no option or card names (a patch tagged on main) is still found.
+   */
+  releaseTagLines?(projectPath: string): Promise<Maybe<string[]>>
 }
+
+/** A tag name a release's is: a version, with or without a leading v (`v1.4.0`, `1.4.0`, `1.5.0-rc.1`). */
+export const RELEASE_TAG = /^v?\d+(?:\.\d+)+(?:-[0-9A-Za-z.-]+)?$/
+
+/** The line a release tag names (`v1.4.0` → `1.4.0`), or null for a tag that isn't a release's. */
+export const lineOfTag = (tag: string): string | null => (RELEASE_TAG.test(tag) ? tag.replace(/^v/, '') : null)
 
 /** The checker's answer now matches `first`, a readable one (unknown never matches). */
 export const stillAsRead = (check: (() => string | null) | null, first: string | null): boolean => {

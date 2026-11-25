@@ -57,6 +57,6 @@ describe('callers moved to the repository reads port (HI-2785)', () => {
       }
     }
     walk('src')
-    expect(files.filter((f) => importsOf(f).includes('src/main/platform/gitRepoReads'))).toEqual(['src/main/platform/repoReadsPorts.ts'])
+    expect(files.filter((f) => importsOf(f).includes('src/main/platform/git/gitRepoReads'))).toEqual(['src/main/platform/repoReadsPorts.ts'])
   })
 })

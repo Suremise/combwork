@@ -5,7 +5,7 @@ import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, SwapAbandoned, s
 import { git } from './git'
 import { createLogger, userText } from './logger'
 import { vcsOf } from './vcsDetect'
-import { gitDirOf } from './platform/gitKeepOut'
+import { gitDirOf } from './gitKeepOut'
 import { ifAbsent, present } from './fsPresence'
 
 /**

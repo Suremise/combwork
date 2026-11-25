@@ -9,6 +9,15 @@ interface CombworkMessageValues {
   'git.branch.deleteUnmergedMessage': { n: number; target: string | number; branch: string | number }
   'git.branch.deleteUnmergedTitle': { n: number; branch: string | number }
   'git.branch.dropsFailed': { branch: string | number }
+  'git.branchRename.about': { tracks: string; branch: string | number; upstream: string | number; remote: string | number }
+  'git.branchRename.busy': undefined
+  'git.branchRename.button': undefined
+  'git.branchRename.keepThere': { upstream: string | number }
+  'git.branchRename.newName': undefined
+  'git.branchRename.on': { remote: string | number }
+  'git.branchRename.there': undefined
+  'git.branchRename.tip': { branch: string | number }
+  'git.branchRename.title': { branch: string | number }
   'git.branches.branch': undefined
   'git.branches.cardOpen': { card: string | number; stage: string | number }
   'git.branches.checkedOut': { where: string; agent: string | number }
@@ -25,6 +34,7 @@ interface CombworkMessageValues {
   'git.branches.merged': { has: string; revision: string | number }
   'git.branches.noCommits': undefined
   'git.branches.notInTarget': { n: number; target: string | number }
+  'git.branches.openOperation': undefined
   'git.branches.reload': undefined
   'git.branches.remote': { count: number }
   'git.branches.revisionCopied': undefined
@@ -74,32 +84,33 @@ interface CombworkMessageValues {
   'git.combworkVcs.untrackedDetail': undefined
   'git.combworkVcs.untracking': undefined
   'git.combworkVcs.why': undefined
+  'git.commit.actionTip': { action: string; branch: string | number }
+  'git.commit.askMessage': { action: string; branch: string | number; subject: string | number; merge: string }
+  'git.commit.askTitle': { action: string; commit: string | number; branch: string | number }
+  'git.commit.binary': undefined
+  'git.commit.branchHere': undefined
+  'git.commit.cherryPick': undefined
+  'git.commit.close': undefined
+  'git.commit.confirm': { action: string }
+  'git.commit.copied': { commit: string | number }
+  'git.commit.copy': undefined
+  'git.commit.diffFailed': { error: string | number }
+  'git.commit.failed': undefined
+  'git.commit.files': { n: number }
+  'git.commit.loadFailed': { error: string | number }
+  'git.commit.loading': undefined
+  'git.commit.meta': { author: string | number; when: string | number }
+  'git.commit.openCard': { card: string | number }
+  'git.commit.openChanges': undefined
+  'git.commit.revert': undefined
+  'git.commit.tagHere': undefined
+  'git.commit.title': { commit: string | number }
   'git.fetch.at': { when: string | number }
   'git.fetch.button': undefined
   'git.fetch.failed': undefined
   'git.fetch.never': undefined
   'git.fetch.tip': undefined
   'git.form.enterName': undefined
-  'git.gate.advance.name': undefined
-  'git.gate.advance.why': undefined
-  'git.gate.attributes.name': undefined
-  'git.gate.attributes.why': undefined
-  'git.gate.hooks.name': undefined
-  'git.gate.hooks.why': undefined
-  'git.gate.lfs.name': undefined
-  'git.gate.lfs.why': undefined
-  'git.gate.plainGit.name': undefined
-  'git.gate.plainGit.why': undefined
-  'git.gate.publish.name': undefined
-  'git.gate.publish.why': undefined
-  'git.gate.relocation.name': undefined
-  'git.gate.relocation.why': undefined
-  'git.gate.sharedFolder.name': undefined
-  'git.gate.sharedFolder.why': undefined
-  'git.gate.signing.name': undefined
-  'git.gate.signing.why': undefined
-  'git.gate.submodules.name': undefined
-  'git.gate.submodules.why': undefined
   'git.gitlink.binary': undefined
   'git.gitlink.dirty': undefined
   'git.gitlink.hideGit': undefined
@@ -107,6 +118,45 @@ interface CombworkMessageValues {
   'git.gitlink.summary': { change: string; path: string | number; from: string | number; to: string | number }
   'git.head.detachedAt': { commit: string | number }
   'git.head.noCommits': undefined
+  'git.health.about': undefined
+  'git.health.fetch.busy': undefined
+  'git.health.fetch.button': undefined
+  'git.health.fetch.checkFailed': undefined
+  'git.health.fetch.checking': undefined
+  'git.health.fetch.confirm': undefined
+  'git.health.fetch.fetching': { remotes: string | number }
+  'git.health.fetch.head': undefined
+  'git.health.fetch.message': { n: number }
+  'git.health.fetch.remote': { remote: string | number; n: number }
+  'git.health.fetch.remoteError': { remote: string | number; why: string | number }
+  'git.health.fetch.state': { n: number }
+  'git.health.fetch.title': undefined
+  'git.health.fetch.trackedBy': { branches: string | number; n: number }
+  'git.health.locks.age': { when: string | number }
+  'git.health.locks.busy': undefined
+  'git.health.locks.button': undefined
+  'git.health.locks.confirm': undefined
+  'git.health.locks.failed': undefined
+  'git.health.locks.head': undefined
+  'git.health.locks.held': { why: string; seconds: number; name: string | number; pid: number; when: string | number }
+  'git.health.locks.message': { seconds: number }
+  'git.health.locks.state': { n: number; stale: number }
+  'git.health.locks.title': undefined
+  'git.health.prune.busy': undefined
+  'git.health.prune.button': undefined
+  'git.health.prune.confirm': undefined
+  'git.health.prune.failed': undefined
+  'git.health.prune.head': undefined
+  'git.health.prune.message': undefined
+  'git.health.prune.noFolder': { id: string | number }
+  'git.health.prune.ownerAgent': { name: string | number }
+  'git.health.prune.ownerSlot': { name: string | number }
+  'git.health.prune.state': { n: number }
+  'git.health.prune.title': undefined
+  'git.health.readAgain': undefined
+  'git.health.readFailed': { error: string | number }
+  'git.health.reading': undefined
+  'git.health.title': undefined
   'git.history.branch': undefined
   'git.history.heading': undefined
   'git.history.headingOf': { head: string | number }
@@ -166,6 +216,39 @@ interface CombworkMessageValues {
   'git.init.yourEmail': undefined
   'git.init.yourName': undefined
   'git.learnMore': undefined
+  'git.moves.about': undefined
+  'git.moves.back': { n: number }
+  'git.moves.branch': undefined
+  'git.moves.cantTitle': { branch: string | number }
+  'git.moves.confirm': undefined
+  'git.moves.detached': undefined
+  'git.moves.dropped': { n: number }
+  'git.moves.failed': undefined
+  'git.moves.heading': undefined
+  'git.moves.inTheWay': undefined
+  'git.moves.loadFailed': { error: string | number }
+  'git.moves.more': { n: number }
+  'git.moves.moveLine': { branch: string | number; from: string | number; to: string | number }
+  'git.moves.noBranch': undefined
+  'git.moves.none': undefined
+  'git.moves.nothing': undefined
+  'git.moves.now': undefined
+  'git.moves.ok': undefined
+  'git.moves.openCard': { card: string | number }
+  'git.moves.option': { kind: string; branch: string | number }
+  'git.moves.pushed': { n: number; upstream: string | number }
+  'git.moves.reload': undefined
+  'git.moves.restore': undefined
+  'git.moves.restoreTip': { branch: string | number; commit: string | number }
+  'git.moves.running': undefined
+  'git.moves.tip': { message: string | number; commit: string | number; when: string | number }
+  'git.moves.title': { branch: string | number; commit: string | number }
+  'git.moves.view': { view: string }
+  'git.moves.viewName': undefined
+  'git.moves.wayBack': undefined
+  'git.moves.what': { kind: string; name: string | number }
+  'git.moves.whereNowhere': { branch: string | number }
+  'git.moves.whereProject': undefined
   'git.newBranch.blocked': { why: string | number }
   'git.newBranch.button': undefined
   'git.newBranch.commitFirst': undefined
@@ -183,6 +266,41 @@ interface CombworkMessageValues {
   'git.newBranch.switchNow': undefined
   'git.newBranch.tip': { commit: string | number }
   'git.newBranch.title': undefined
+  'git.operation.abort': undefined
+  'git.operation.abortMessage': { what: string }
+  'git.operation.abortTitle': { what: string; folder: string | number }
+  'git.operation.at': { commit: string | number; subject: string | number }
+  'git.operation.conflicts': { count: number }
+  'git.operation.continue': undefined
+  'git.operation.done': { step: string; what: string; folder: string | number }
+  'git.operation.endBisect': undefined
+  'git.operation.failed': undefined
+  'git.operation.goOn': undefined
+  'git.operation.leftFrom': { from: string; stash: string | number }
+  'git.operation.leftTheirsTip': { from: string; stash: string | number; has: string; command: string | number }
+  'git.operation.leftTitle': { folder: string | number }
+  'git.operation.lentMessage': { agent: string | number; what: string | number }
+  'git.operation.lentTitle': { slot: string | number; card: string; lane: string | number }
+  'git.operation.mine': undefined
+  'git.operation.mineTip': { swap: string; has: string; command: string | number }
+  'git.operation.open': undefined
+  'git.operation.projectFolder': undefined
+  'git.operation.readFailed': { error: string | number }
+  'git.operation.resolved': undefined
+  'git.operation.resolvedTip': { command: string | number }
+  'git.operation.runs': { command: string | number }
+  'git.operation.skip': undefined
+  'git.operation.skipMessage': undefined
+  'git.operation.skipTitle': { commit: string; what: string | number }
+  'git.operation.step': { at: number; of: number }
+  'git.operation.stoppedAgain': { step: string; what: string | number; folder: string | number }
+  'git.operation.submoduleStaged': { path: string | number; commit: string | number; command: string }
+  'git.operation.theirs': undefined
+  'git.operation.theirsStash': undefined
+  'git.operation.theirsTip': { swap: string; has: string; command: string | number }
+  'git.operation.title': { what: string | number; folder: string | number }
+  'git.operation.unreadable': undefined
+  'git.operation.unresolved': { count: number }
   'git.parentRepo': { folder: string | number }
   'git.problem.agentSetup': undefined
   'git.problem.cantRead': { problem: string | number }
@@ -266,10 +384,8 @@ interface CombworkMessageValues {
   'git.remotes.pushesTo': { url: string | number }
   'git.remotes.url': undefined
   'git.repoLock.busy': { profile: string | number }
-  'git.repoLock.jjFolder': { folder: string | number }
   'git.repoLock.noGitDir': { folder: string | number; why: string | number }
   'git.repoLock.order': undefined
-  'git.repoLock.unknownRepo': { root: string | number; why: string | number }
   'git.repoLock.waiting': { profile: string | number }
   'git.repoLock.waitingFor': { seconds: number }
   'git.repoOp.notOffered': undefined
@@ -277,12 +393,6 @@ interface CombworkMessageValues {
   'git.section.branches': undefined
   'git.section.changes': undefined
   'git.section.history': undefined
-  'git.section.jjBookmarks': undefined
-  'git.section.jjCompare': undefined
-  'git.section.jjConflicts': undefined
-  'git.section.jjHistory': undefined
-  'git.section.jjOperations': undefined
-  'git.section.jjRepo': undefined
   'git.section.queue': undefined
   'git.section.workflow': undefined
   'git.setup.howTo': undefined
@@ -311,6 +421,43 @@ interface CombworkMessageValues {
   'git.signing.unattended': undefined
   'git.signing.unreadable': { message: string | number }
   'git.signing.yes': undefined
+  'git.stash.applied': { dropped: string; folder: string | number }
+  'git.stash.apply': undefined
+  'git.stash.applyMessage': { name: string | number; files: number; folder: string | number; pop: string }
+  'git.stash.applyTip': { folder: string | number }
+  'git.stash.applyTitle': { pop: string; folder: string | number }
+  'git.stash.binary': undefined
+  'git.stash.close': undefined
+  'git.stash.combwork': { why: string; card: string | number; target: string | number; file: string | number; from: string | number; text: string | number }
+  'git.stash.conflicts': { count: number; folder: string | number }
+  'git.stash.conflictsDetail': { files: string | number }
+  'git.stash.diffFailed': { error: string | number }
+  'git.stash.drop': undefined
+  'git.stash.dropMessage': { files: number; card: string; commit: string | number }
+  'git.stash.dropTip': undefined
+  'git.stash.dropTitle': { name: string | number }
+  'git.stash.dropped': { commit: string | number }
+  'git.stash.failed': undefined
+  'git.stash.fileTip': undefined
+  'git.stash.filesFailed': { error: string | number }
+  'git.stash.filesLoading': undefined
+  'git.stash.goOn': undefined
+  'git.stash.hide': undefined
+  'git.stash.inStash': { name: string | number }
+  'git.stash.inline': { inline: string }
+  'git.stash.lentMessage': { agent: string | number }
+  'git.stash.lentTitle': { slot: string | number; card: string; lane: string | number }
+  'git.stash.meta': { branch: string; when: string | number; files: number }
+  'git.stash.openCard': { card: string | number }
+  'git.stash.otherBranch': { branch: string | number; folder: string | number; current: string | number }
+  'git.stash.pop': undefined
+  'git.stash.popTip': { folder: string | number }
+  'git.stash.projectFolder': undefined
+  'git.stash.readFailed': { error: string | number }
+  'git.stash.show': undefined
+  'git.stash.title': undefined
+  'git.stash.toggle': { open: string }
+  'git.stash.untracked': undefined
   'git.state': { state: string }
   'git.status.aheadBehind': { ahead: number; behind: number }
   'git.status.noUpstream': undefined
@@ -322,12 +469,27 @@ interface CombworkMessageValues {
   'git.switch.message': { current: string | number; branch: string | number }
   'git.switch.tip': { branch: string | number }
   'git.switch.title': { project: string | number; branch: string | number }
+  'git.tagDelete.about': { name: string | number; commit: string | number }
+  'git.tagDelete.also': { remote: string | number }
+  'git.tagDelete.busy': undefined
+  'git.tagDelete.button': undefined
+  'git.tagDelete.here': undefined
+  'git.tagDelete.tip': { name: string | number }
+  'git.tagDelete.title': { name: string | number }
+  'git.tagDelete.where': undefined
+  'git.tagPush.about': { name: string | number }
+  'git.tagPush.busy': undefined
+  'git.tagPush.button': undefined
+  'git.tagPush.remote': undefined
+  'git.tagPush.tip': { name: string | number }
+  'git.tagPush.title': { name: string | number }
   'git.tags.about': { onBranch: string; branch: string | number }
   'git.tags.busy': undefined
   'git.tags.create': undefined
   'git.tags.createButton': undefined
   'git.tags.dontPush': undefined
   'git.tags.heading': undefined
+  'git.tags.hereAbout': { commit: string | number; subject: string | number }
   'git.tags.message': undefined
   'git.tags.name': undefined
   'git.tags.noSpaces': undefined
@@ -394,9 +556,6 @@ interface CombworkMessageValues {
   'git.validate.wholeUrl': undefined
   'git.vc.choice': undefined
   'git.vc.fact.gone': undefined
-  'git.vc.fact.jj': { root: string | number; colocated: string }
-  'git.vc.fact.jjGone': undefined
-  'git.vc.fact.jjInGit': { root: string | number; git: string | number }
   'git.vc.fact.none': undefined
   'git.vc.fact.other': { vcs: string | number }
   'git.vc.fact.otherGit': { vcs: string | number }
@@ -406,18 +565,14 @@ interface CombworkMessageValues {
   'git.vc.initHint': undefined
   'git.vc.initOwnHint': undefined
   'git.vc.insideRepo': { root: string | number }
-  'git.vc.jj': undefined
   'git.vc.noCommitYet': undefined
   'git.vc.none': undefined
   'git.vc.notRepoYet': undefined
   'git.vc.offer.gitFound': { root: string | number }
-  'git.vc.offer.jjFound': { root: string | number }
-  'git.vc.offer.jjGone': { platform: string | number }
   'git.vc.offer.notNow': undefined
   'git.vc.offer.otherFound': { vcs: string | number }
   'git.vc.offer.repositoryGone': undefined
   'git.vc.offer.switchGit': undefined
-  'git.vc.offer.switchJj': undefined
   'git.vc.offer.switchNone': undefined
   'git.vc.previewTip': undefined
   'git.vc.sections': undefined
@@ -441,68 +596,21 @@ interface CombworkMessageValues {
   'git.vc.stepNotice.choose': undefined
   'git.vc.stepNotice.notNow': undefined
   'git.vc.stepNotice.text': { n: number; projects: string | number }
-  'git.vc.store.autocrlf': { command: string | number }
-  'git.vc.store.card': { project: string | number; card: string | number; title: string | number }
-  'git.vc.store.carried': { what: string; project: string | number; card: string | number; line: string | number; state: string }
-  'git.vc.store.clear': { gate: string | number }
-  'git.vc.store.conflictedBookmark': { name: string | number }
-  'git.vc.store.conflictedCommit': { commit: string | number }
-  'git.vc.store.copy': { project: string | number; kind: string; copy: string | number }
-  'git.vc.store.detached': { project: string | number; head: string | number }
-  'git.vc.store.drain': undefined
-  'git.vc.store.fallback': undefined
-  'git.vc.store.fallbackUnknown': { detail: string | number }
-  'git.vc.store.gates': undefined
-  'git.vc.store.group': { n: number }
-  'git.vc.store.heads': { n: number }
-  'git.vc.store.kept': { project: string | number; card: string | number; slot: string | number }
-  'git.vc.store.lane': { project: string | number; name: string | number; builder: string | number }
-  'git.vc.store.laneUnnamed': { project: string | number; builder: string | number }
-  'git.vc.store.limit': { gate: string | number; why: string | number }
-  'git.vc.store.member': { project: string | number; platform: string | number }
-  'git.vc.store.notExported': { name: string | number }
-  'git.vc.store.queue': { project: string | number }
-  'git.vc.store.slot': { project: string | number; slot: string | number; agent: string | number }
-  'git.vc.store.stock': undefined
-  'git.vc.store.stuck': { projects: string | number; changed: string | number }
-  'git.vc.store.stuckTitle': undefined
-  'git.vc.store.toGit': undefined
-  'git.vc.store.toJj': undefined
-  'git.vc.store.unknown': { gate: string | number; what: string | number }
-  'git.vc.store.unsupported': undefined
-  'git.vc.store.uses': { gate: string | number; what: string | number }
   'git.vc.switch.changed': { platform: string | number }
-  'git.vc.switch.checkAgain': undefined
-  'git.vc.switch.close': undefined
   'git.vc.switch.confirm': undefined
   'git.vc.switch.done': { project: string | number; platform: string | number }
-  'git.vc.switch.drain': undefined
-  'git.vc.switch.fallback': undefined
   'git.vc.switch.fresh': { to: string | number; from: string | number }
-  'git.vc.switch.gates': undefined
   'git.vc.switch.gitFolder': undefined
-  'git.vc.switch.groupChanged': undefined
   'git.vc.switch.inFlight': { n: number; from: string | number }
-  'git.vc.switch.jjInGit': { root: string | number }
-  'git.vc.switch.jjNoGitCopy': undefined
-  'git.vc.switch.jjTool': { state: string }
-  'git.vc.switch.jjToolBack': { state: string }
-  'git.vc.switch.jjUnknown': { code: string | number }
   'git.vc.switch.lane': { name: string | number; builder: string | number }
   'git.vc.switch.laneUnnamed': { builder: string | number }
   'git.vc.switch.lanes': { n: number; from: string | number }
-  'git.vc.switch.memberDrain': undefined
-  'git.vc.switch.memberNoJj': { project: string | number }
   'git.vc.switch.noGit': undefined
-  'git.vc.switch.noJj': undefined
   'git.vc.switch.notSwitched': { project: string | number; error: string | number }
   'git.vc.switch.nothing': { to: string | number }
   'git.vc.switch.otherFound': { vcs: string | number }
-  'git.vc.switch.otherWorkspace': { workspace: string | number }
   'git.vc.switch.queue': undefined
   'git.vc.switch.restored': { to: string | number; from: string | number }
-  'git.vc.switch.storeRuns': { platform: string | number }
-  'git.vc.switch.switching': undefined
   'git.vc.switch.title': { project: string | number; platform: string | number }
   'git.vc.switch.what': { project: string | number; to: string | number; from: string | number }
   'git.vc.switchTip': { platform: string | number }

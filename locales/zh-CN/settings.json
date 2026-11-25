@@ -520,8 +520,6 @@
   "settings.advanced.cw.inbox.idleWakes.title": "唤醒空闲的智能体",
   "settings.advanced.cw.inbox.stopContinuation.desc": "当智能体要结束回合而收件箱中还有未读项时，Combwork 会让它继续，先去读取，每个回合一次：对 Codex 和 Copilot 是暂缓它们的停止，对 Claude Code 是在它的停止中加一行。关闭后，回合按 CLI 的方式结束，未读项留在收件箱中，等待空闲唤醒。项目可以在“项目设置”→“会话”中单独设置。",
   "settings.advanced.cw.inbox.stopContinuation.title": "智能体带着未读项停止时让它继续",
-  "settings.advanced.cw.jj.commandSeconds.desc": "Combwork 运行的单个 jj 命令可用多久（包括对大型工作副本的快照 snapshot），超过后 Combwork 会结束它：此时读取视为未知，合并期间所做的更改留待你处理。仓库非常大或磁盘较慢时请调高此值。",
-  "settings.advanced.cw.jj.commandSeconds.title": "jj：命令的最长时间",
   "settings.advanced.cw.journal.builds.desc": "从源代码构建 Combwork 自己的安装程序时（npm run dist 或 npm run release），Combwork 会把这次构建作为它自己的条目写入助手的日志：版本、提交、构建类型以及安装程序所在位置。只写入成功的构建，并且只在日志开启且其范围包含事件时写入。关闭后不写入构建；Combwork 关闭期间留给它的构建会在打开工作区时丢弃。",
   "settings.advanced.cw.journal.builds.title": "在日志中记录构建",
   "settings.advanced.cw.lanes.endWaitMinutes.desc": "从通道结束起，Combwork 等待其构建者结束回合并读到通道已完成的时长。超过后，Combwork 仍会结束构建者的 CLI：用它的退出命令，或在无法输入（你的草稿在其输入框中）或无法结束它时强制结束。",
@@ -1720,6 +1718,14 @@
   "settings.advanced.cw.resume.idleMinutes.desc": "自对话最后一次活动（其记录文件的最后一条，否则为 Combwork 最后一次看到它的时间）起经过多久，恢复前就先询问。默认值是各 CLI 保留提示词缓存的最长时间：一小时。",
   "settings.advanced.cw.cli.probeSeconds.title": "查找 CLI：版本检查超时",
   "settings.advanced.cw.cli.probeSeconds.desc": "Combwork 查找各编程智能体的 CLI 时（启动时、“重新检查”时、安装之后），给 CLI 输出其版本的时间。超过这个时间的 CLI 会被跳过，并显示为未安装：在慢速磁盘上被杀毒软件扫描时，CLI 的首次启动可能需要几十秒。",
+  "settings.advanced.cw.git.processNames.desc": "此正则表达式匹配到的程序名（如任务管理器的“详细信息”选项卡中显示的）会被视为可能持有锁的 git：只要有在某个锁文件之前启动的此类程序仍在运行，仓库健康就不会移除该锁。默认值匹配 git.exe 和 git 的远程助手（git-remote-https.exe 等）。只有当另一个程序自己会写入 git 的锁文件时，才需要添加它。",
+  "settings.advanced.cw.git.processNames.title": "Git：可能持有锁的程序",
+  "settings.advanced.cw.git.staleLockSeconds.desc": "仓库健康只会在 git 的锁文件（如 index.lock）至少达到这个时长，且没有在它之前启动的 git 仍在运行时，才提供移除它的选项。正常工作的 git 只会短暂持有锁；如果你的某个耗时较长的 git 命令（大型提交、repack）持有锁更久，请调大此值。",
+  "settings.advanced.cw.git.staleLockSeconds.title": "Git：锁多久算过期",
+  "settings.advanced.cw.github.ghMinutes.desc": "一次 GitHub CLI（gh）调用可以运行多久，之后 Combwork 会将其视为卡住而结束，并提示它未响应。连接较慢或 GitHub Enterprise Server 响应较慢时可调高此值。",
+  "settings.advanced.cw.github.ghMinutes.title": "GitHub CLI：单次调用最长用时",
+  "settings.advanced.cw.github.prFollowMinutes.desc": "当卡片在“PR 已打开”中等待时，Combwork 会按此频率读取它们在 GitHub 上的拉取请求，打开其看板或卡片时也会读取：GitHub 无法自行告知 Combwork 拉取请求何时被合并或关闭。",
+  "settings.advanced.cw.github.prFollowMinutes.title": "拉取请求：读取其状态的频率",
   "settings.advanced.cw.server.checkInferSeconds.title": "检查服务器：测试请求超时",
   "settings.advanced.cw.server.checkInferSeconds.desc": "“检查服务器”等待模型服务器回应其测试请求的时间。尚未加载的本地模型会先加载，在配置一般的硬件上可能需要几分钟；超过这个时间，检查会报告超时。"
 }

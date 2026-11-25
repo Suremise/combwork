@@ -19,7 +19,7 @@ Combwork's languages besides English are **drafted by AI**, and Combwork marks t
 |---|---|---|
 | `locales/<code>/<area>.json` | One language's translations for one area of Combwork (settings, board, progress…): message id → text. | **Yes.** This is where translations go. |
 | `locales/en/<area>.json` | The English source: each message's `defaultMessage`, and a `description` that tells you where it appears and what its placeholders are. | **No.** It is generated from the code (`npm run i18n:extract`). Read it, don't edit it. |
-| `locales/.source/<code>/<area>.json` | The English each translation was made from, so Combwork can tell when the English changed later. | Only through `npm run i18n:coverage -- --record` (below). |
+| `locales/.source/<code>/<area>.json` | The English each translation was made from, so Combwork can tell when the English changed later. | Only through `npm run i18n:coverage -- --record` (below), and `-- --prune`, which drops the records of messages that are gone. |
 | `src/shared/i18n/languages.ts` | The list of languages: each one's own name, its AI mark and note, and its direction. | When you add a language. A maintainer takes a language's AI mark off once it has been reviewed (below). |
 | `docs/translating/glossary.md` | Combwork's terms, and which to keep in English. | Suggest changes in a pull request. |
 | `docs/translating/<code>.md` | One language's style page: how to address the reader, its word for each glossary term, its punctuation. | Yes, for your language. New ones start from `style-template.md`. |
@@ -73,7 +73,8 @@ Say a German button reads badly.
    npm run i18n:coverage    # informational: how much of each language is done, and what is outdated
    ```
    `i18n:check` fails on a translation that would show wrong: a renamed or missing placeholder, broken ICU, a plural
-   without `other`, a tag that isn't the English's, an id the English doesn't have, invalid JSON, a control character
+   without `other`, a tag that isn't the English's, an id the English doesn't have (in a translation, or recorded in
+   `locales/.source`: `npm run i18n:coverage -- --prune` drops those), invalid JSON, a control character
    (a stray byte from a scripted edit; a line break only where the English has one). It never fails on a
    missing translation. The unit tests read the translations from the files rather than expecting their words, so a
    wording change needs no change to a test.
@@ -89,8 +90,10 @@ Say a German button reads badly.
    - **From the source:** `npx install-electron --no` once, then `npm run dev -- -- --lang=de` (both `--` are
      needed: the first is npm's, the second electron-vite's).
    - **Screenshots of the main screens** in both themes, without clicking around:
-     `npm run e2e -- --lang de --build` (after `npx install-electron --no`; outside a Combwork workspace, set
-     `CW_TEST_NO_BOARD=1` first, in PowerShell `$env:CW_TEST_NO_BOARD='1'`). It needs no sign-in: the agents in it
+     `npm run e2e -- --lang de --build` (after `npx install-electron --no`; in a clone no Combwork board
+     tracks, set `CW_TEST_NO_BOARD=1` first, in PowerShell `$env:CW_TEST_NO_BOARD='1'`: a run then removes only what
+     it made, and `npm run test:clean` the rest; a copy of a checkout Combwork works in, such as an export, names that
+     workspace's board instead, `$env:CW_TEST_BOARD='<the workspace folder>'`, so what its cards cite is kept). It needs no sign-in: the agents in it
      are a stand-in. The runner prints where it kept the screenshots. Look for text that is cut off or wraps
      badly. See [tests/e2e/README.md](tests/e2e/README.md), *The i18n screenshot route*.
 

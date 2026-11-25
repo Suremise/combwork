@@ -115,14 +115,14 @@ describe("None: the kept runtime's hashes follow the watcher (#1263)", () => {
     }
     edit('AAAA')
     expect(statSync(join(folder, 'a.txt')).mtimeMs).toBe(at * 1000)
-    const before = unwatched.none.revision(['a.txt'])
+    const before = unwatched.deliverables().revision(['a.txt'])
     // Not watched (no complete record): the next call drops every hash.
     edit('BBBB')
-    expect(unwatched.none.revision(['a.txt'])).toEqual(before)
-    const forget = vi.spyOn(unwatched.none, 'forget')
+    expect(unwatched.deliverables().revision(['a.txt'])).toEqual(before)
+    const forget = vi.spyOn(unwatched.deliverables(), 'forget')
     expect(await workflowFor(w, folder)).toBe(unwatched)
     expect(forget).toHaveBeenCalled()
-    const second = unwatched.none.revision(['a.txt'])
+    const second = unwatched.deliverables().revision(['a.txt'])
     expect(second).not.toEqual(before)
     forget.mockClear()
     // Watched: the record is complete from when its watch is armed; the written path alone is dropped.
@@ -131,11 +131,11 @@ describe("None: the kept runtime's hashes follow the watcher (#1263)", () => {
       await vi.waitFor(async () => expect(isUnknown(await observer.changedBetween(folder, Date.now(), Date.now(), (p) => p))).toBe(false), { timeout: HUNG_MS })
       // This call's record began before the watch did: every hash goes once more. Read again, the hash is kept.
       await workflowFor(w, folder)
-      expect(unwatched.none.revision(['a.txt'])).toEqual(second)
+      expect(unwatched.deliverables().revision(['a.txt'])).toEqual(second)
       forget.mockClear()
-      const invalidate = vi.spyOn(unwatched.none, 'invalidate')
+      const invalidate = vi.spyOn(unwatched.deliverables(), 'invalidate')
       edit('CCCC')
-      expect(unwatched.none.revision(['a.txt'])).toEqual(second)
+      expect(unwatched.deliverables().revision(['a.txt'])).toEqual(second)
       await vi.waitFor(
         async () => {
           await workflowFor(w, folder)
@@ -144,7 +144,7 @@ describe("None: the kept runtime's hashes follow the watcher (#1263)", () => {
         { timeout: HUNG_MS }
       )
       expect(forget).not.toHaveBeenCalled()
-      const third = unwatched.none.revision(['a.txt'])
+      const third = unwatched.deliverables().revision(['a.txt'])
       expect(third).not.toEqual(second)
       expect(third).not.toEqual(before)
     } finally {

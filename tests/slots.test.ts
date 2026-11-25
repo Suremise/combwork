@@ -15,15 +15,15 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
-import { asideKey, fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, NOT_IN_PLACE, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
+import { asideKey, operationKey, fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, NOT_IN_PLACE, operationTold, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { say } from '../src/shared/agentText'
 import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { junction } from './pathAliases'
-import { gitWorkspacePort } from '../src/main/platform/gitWorkspacePort'
-import { JJ_SAYS } from '../src/main/platform/jjWorkspacePort'
-import { unknown } from '../src/main/platform/types'
+import { gitWorkspacePort } from '../src/main/platform/git/gitWorkspacePort'
+import { operationSync } from '../src/main/gitCommands'
+import { unknown, withDetail } from '../src/main/platform/types'
 import { UNREADABLE } from '../src/shared/workflow/texts'
 import type { WorkspacePort } from '../src/main/platform/workspacePort'
 import { timing } from './timing.cjs'
@@ -44,8 +44,8 @@ vi.mock('fs/promises', async (original) => {
  * a test and cleared after.
  */
 const gitGate = vi.hoisted(() => ({ hold: null as { folder: string; entered: () => void; go: Promise<void> } | null, fail: null as string | null }))
-vi.mock('../src/main/platform/git', async (original) => {
-  const g = await original<typeof import('../src/main/platform/git')>()
+vi.mock('../src/main/gitCommands', async (original) => {
+  const g = await original<typeof import('../src/main/gitCommands')>()
   return {
     ...g,
     dirty: async (folder: string, paths?: string[]) => {
@@ -83,7 +83,7 @@ interface World {
   pool: SlotPool
   runs: (SlotRun & SlotRunEnd)[]
   opts: { setup: string; archive: string; copy: string }
-  set: { builders: number; removeIdle: boolean; sessions: Map<string, string>; inFlight: Set<number>; ended: string[]; writersOver: Set<string>; looked: string[] }
+  set: { builders: number; removeIdle: boolean; sessions: Map<string, string>; inFlight: Set<number>; ended: string[]; writersOver: Set<string>; looked: string[]; operations: string[] }
   steer: Steer
   clock: { now: number }
   /** Pids of holder processes that have ended. */
@@ -121,7 +121,7 @@ function world(o: { setup?: string; builders?: number; port?: WorkspacePort } = 
   const runs: World['runs'] = []
   const logs = tempDir('slots-logs-')
   const opts = { setup: o.setup ?? '', archive: '', copy: '.env' }
-  const set = { builders: o.builders ?? 2, removeIdle: true, sessions: new Map<string, string>(), inFlight: new Set<number>(), ended: [] as string[], writersOver: new Set<string>(), looked: [] as string[] }
+  const set = { builders: o.builders ?? 2, removeIdle: true, sessions: new Map<string, string>(), inFlight: new Set<number>(), ended: [] as string[], writersOver: new Set<string>(), looked: [] as string[], operations: [] as string[] }
   const steer: Steer = { gates: new Map(), settled: true, noSupervisor: false, settle: true, settledJobs: [] }
   const dead = new Set<number>()
   const root = join(`${ws}.worktrees`, 'project')
@@ -164,6 +164,7 @@ function world(o: { setup?: string; builders?: number; port?: WorkspacePort } = 
       ended: (l, s) => void set.ended.push(`${l.id} ${s.name}`),
       writerOver: (wr) => set.writersOver.has(wr.run),
       looked: (name, state) => void set.looked.push(`${pid} ${name} ${state}`),
+      operationFound: (name, _folder, what, failed) => void set.operations.push(failed ? `${name} ${what} at ${failed.target}: ${failed.error}` : `${name} ${what}`),
       now: () => clock.now,
       ...(o.port ? { workspaces: o.port } : {})
     })
@@ -464,38 +465,6 @@ describe('lending and releasing (#1429)', { timeout: timing('test.hang') }, () =
     // A lend that nothing serves leaves the one recorded.
     const again = await lent(w, { agent: 'a1', card: 3 })
     expect(again.slot.target).toBe('1.0.0')
-  })
-
-  it("HI-2936: after a switch from jj, a leftover jj slot neither fails a Git lending nor fills the pool; removed by its own port once it has one", async () => {
-    const w = world({ builders: 1 })
-    const first = await lent(w, { agent: 'a1', card: 1 })
-    await w.pool.release(first.lease.id, 'done')
-    // slot-a as jj left it (HI-2906's busy detach): lent with no lease, its folder there; jj's port not registered here.
-    await w.store.conn.write((db) => void db.prepare("UPDATE slots SET platform = 'jj', state = 'lent' WHERE project = ? AND name = 'slot-a'").run(w.store.project))
-    await w.pool.refresh()
-    expect(w.store.slot('slot-a')).toMatchObject({ platform: 'jj', state: 'lent' })
-    // A Git card starts in a new slot: the pool's size (1) counts Git's slots alone.
-    const second = await lent(w, { agent: 'a2', card: 2 })
-    expect(second.slot).toMatchObject({ name: 'slot-b' })
-    expect(w.store.slot('slot-b')?.platform ?? 'git').toBe('git')
-    // Idle, it is kept while it has no port; never a Git slot removed in its place.
-    w.clock.now += IDLE_MS
-    expect(await w.pool.tidy()).toEqual([])
-    expect(w.store.slot('slot-a')).toBeTruthy()
-    // With jj's port (the app registers it while a jj row is left; a Git worktree's stands in), it settles, and the
-    // idle tidy removes it by that port; the Git slot stays.
-    const { registerWorkspacePort } = await import('../src/main/platform/workspacePorts')
-    registerWorkspacePort('jj', { ...gitWorkspacePort, platform: 'jj' })
-    try {
-      await w.pool.refresh()
-      expect(w.store.slot('slot-a')?.state).toBe('ready')
-      expect(await w.pool.tidy()).toEqual(['slot-a'])
-      expect(w.store.slot('slot-a')).toBeNull()
-      expect(existsSync(first.slot.folder)).toBe(false)
-      expect(w.store.slot('slot-b')?.state).toBe('lent')
-    } finally {
-      registerWorkspacePort('jj', undefined as unknown as Parameters<typeof registerWorkspacePort>[1])
-    }
   })
 
   it("HI-2928: a free slot whose own target was deleted is checked against the default target: freed when its head is there, kept unmerged when not", async () => {
@@ -809,12 +778,324 @@ describe('the pool (#1429)', { timeout: timing('test.hang') }, () => {
     expect(w.store.slot('slot-a')?.state).toBe('gone')
   })
 
+  describe('HI-3464: a free slot marked gone never fills a pool of one', () => {
+    /** A pool of one whose only slot's folder was deleted (git's registration left) while leased, then released: free and gone. */
+    async function goneFree(w: World): Promise<string> {
+      const r = await lent(w, { agent: 'a1', card: 1 })
+      rmSync(r.slot.folder, { recursive: true, force: true })
+      await w.pool.refresh()
+      await w.pool.release(r.lease.id, 'done')
+      expect(w.store.slot('slot-a')).toMatchObject({ state: 'gone', op: null })
+      return r.slot.folder
+    }
+    const gitLists = (w: World, folder: string): boolean => sh(w.project, 'worktree', 'list', '--porcelain').replace(/\\/g, '/').toLowerCase().includes(folder.replace(/\\/g, '/').toLowerCase())
+
+    it('its folder missing: the next start makes it again at its folder', async () => {
+      const w = world({ builders: 1 })
+      const folder = await goneFree(w)
+      const again = await lent(w, { agent: 'a1', card: 2 })
+      expect(again.slot).toMatchObject({ name: 'slot-a', state: 'lent' })
+      expect(existsSync(join(folder, '.git'))).toBe(true)
+      expect(gitLists(w, folder)).toBe(true)
+      expect(w.pool.slots().map((s) => s.name)).toEqual(['slot-a'])
+    })
+
+    it('an empty folder made in its place: removed, and the slot made again there', async () => {
+      const w = world({ builders: 1 })
+      const folder = await goneFree(w)
+      mkdirSync(folder)
+      await w.pool.refresh()
+      expect(w.store.slot('slot-a')?.state).toBe('gone')
+      const again = await lent(w, { agent: 'a1', card: 2 })
+      expect(again.slot.name).toBe('slot-a')
+      expect(gitLists(w, folder)).toBe(true)
+    })
+
+    it('a folder with something in it: left as it is, a new slot lent instead, and Remove… forgets the gone one', async () => {
+      const w = world({ builders: 1 })
+      const folder = await goneFree(w)
+      mkdirSync(folder)
+      writeFileSync(join(folder, 'mine.txt'), 'the user’s')
+      const again = await lent(w, { agent: 'a1', card: 2 })
+      expect(again.slot.name).toBe('slot-b')
+      expect(readFileSync(join(folder, 'mine.txt'), 'utf8')).toBe('the user’s')
+      const a = w.store.slot('slot-a')!
+      expect(a).toMatchObject({ state: 'gone', op: null })
+      // A pool of one, its new slot lent: the gone one is tried, passed over again, and nothing more is made.
+      expect(await w.pool.lend({ agent: 'a2', card: 3 })).toMatchObject({ ok: false, refusal: { why: 'noSlot' } })
+      expect(w.pool.slots().map((s) => s.name)).toEqual(['slot-a', 'slot-b'])
+      // Remove…: only Combwork's record goes; the folder and its file stay.
+      expect(w.pool.goneRemovable(a)).toBe(true)
+      expect(w.pool.goneRemovable(w.store.slot('slot-b')!)).toBe(false)
+      expect(await w.pool.removeGone('slot-b')).toEqual({ ok: false, why: 'changed' })
+      expect(await w.pool.removeGone('slot-a')).toEqual({ ok: true })
+      expect(w.pool.slots().map((s) => s.name)).toEqual(['slot-b'])
+      expect(readFileSync(join(folder, 'mine.txt'), 'utf8')).toBe('the user’s')
+    })
+
+    it('the size leaves out only a gone slot found unusable and still free in the same write: one another Combwork reserved since still counts', async () => {
+      const w = world({ builders: 1 })
+      await goneFree(w)
+      const ask = (skip: string[], unusable: string[]) => w.store.take({ agent: 'a2', card: 3 }, { size: 1, root: w.root, target: null, token: 'tk-a', holder: { pid: 1, started: 1 }, skip: new Set(skip), unusable: new Set(unusable) })
+      // Passed over without being found unusable: it counts.
+      expect(await ask(['slot-a'], [])).toMatchObject({ ok: false, refusal: { why: 'noSlot' } })
+      // Another Combwork reserves it for its own lend (warming: state still gone, its operation and lease set).
+      const b = w.another(2)
+      expect(await b.store.take({ agent: 'o1', card: 9 }, { size: 1, root: w.root, target: null, token: 'tk-b', holder: { pid: 2, started: 1 } })).toMatchObject({ ok: true, slot: { name: 'slot-a', state: 'gone', op: { token: 'tk-b' } } })
+      // This lend's earlier finding is stale: the slot is held now, so it counts, and nothing new is made.
+      expect(await ask(['slot-a'], ['slot-a'])).toMatchObject({ ok: false, refusal: { why: 'noSlot' } })
+      expect(w.store.slots().map((s) => s.name)).toEqual(['slot-a'])
+    })
+
+    it("a gone slot passed over because git can't list the worktrees still counts: nothing is made in its stead", async () => {
+      const fail = { list: false }
+      const w = world({ builders: 1, port: { ...gitWorkspacePort, list: async (repo: string) => (fail.list ? null : gitWorkspacePort.list(repo)) } })
+      const folder = await goneFree(w)
+      // A folder in its place (a missing one needs no listing): whether git lists it can't be told now.
+      mkdirSync(folder)
+      fail.list = true
+      expect(await w.pool.lend({ agent: 'a2', card: 3 })).toMatchObject({ ok: false, refusal: { why: 'noSlot' } })
+      expect(w.pool.slots().map((s) => s.name)).toEqual(['slot-a'])
+      expect(w.store.slot('slot-a')).toMatchObject({ state: 'gone', op: null })
+      expect(existsSync(folder)).toBe(true)
+      // Listed again: the next start makes it again where it was.
+      fail.list = false
+      expect(await lent(w, { agent: 'a2', card: 3 })).toMatchObject({ slot: { name: 'slot-a', state: 'lent' } })
+    })
+  })
+
   it('reads the setup and copy patterns from the worktree settings while the slot options are unset', () => {
     expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: null }, {})).toEqual({ setup: 'npm install', archive: '', copy: '.env*', gitFiles: true })
     expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: 'a.txt', slots: { setup: 'pnpm i', archive: 'node done.js' } }, {})).toEqual({ setup: 'pnpm i', archive: 'node done.js', copy: 'a.txt', gitFiles: true })
     expect(slotOptionsOf({ worktreeSetup: 'x', worktreeCopy: null, slots: { setup: '', copy: '' } }, {})).toEqual({ setup: '', archive: '', copy: '', gitFiles: true })
     // HI-1182: Set up submodules and LFS is on unless turned off.
     expect(slotOptionsOf({ worktreeSetup: '', worktreeCopy: null, slots: { gitFiles: false } }, {}).gitFiles).toBe(false)
+  })
+})
+
+describe('HI-3465: a git operation left under way in a free slot', { timeout: timing('test.hang') }, () => {
+  /**
+   * A card's agent reverting two commits in its slot, the first stopping on a conflict that it commits by hand: git has
+   * no REVERT_HEAD then, nothing is uncommitted, and its sequencer stays, so git refuses to switch the slot's branch.
+   */
+  function revertLeft(folder: string): void {
+    commit(folder, { 'r.txt': 'one\n' }, 'c1')
+    commit(folder, { 'r.txt': 'two\n' }, 'c2')
+    commit(folder, { 's.txt': 's\n' }, 'c3')
+    expect(() => sh(folder, 'revert', '--no-edit', 'HEAD~2', 'HEAD')).toThrow()
+    sh(folder, 'rm', '-q', 'r.txt')
+    sh(folder, 'commit', '-q', '--no-edit')
+    expect(sh(folder, 'status', '--porcelain')).toBe('')
+    expect(existsSync(join(sh(folder, 'rev-parse', '--absolute-git-dir'), 'sequencer'))).toBe(true)
+  }
+
+  it("the reported case: never detached, the user told once, not lent; lent again once it is ended in the folder", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    revertLeft(r.slot.folder)
+    await w.pool.release(r.lease.id, 'done')
+    await w.pool.refresh()
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'dirty', op: null })
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'revert' })
+    expect(w.set.operations).toEqual(['slot-a revert'])
+    // Looked at again and again (each start, each refresh): told only the once, and never lent meanwhile.
+    await w.pool.refresh()
+    expect(await w.pool.lend({ agent: 'a2', card: 2 })).toMatchObject({ ok: false, refusal: { why: 'noSlot' } })
+    expect(w.set.operations).toEqual(['slot-a revert'])
+    // Ended where it is, as the notice says: nothing under way, the slot ready and lent again, its record gone.
+    sh(r.slot.folder, 'revert', '--abort')
+    const again = await lent(w, { agent: 'a2', card: 2 })
+    expect(again.slot.name).toBe('slot-a')
+    expect(w.pool.operation('slot-a')).toBeNull()
+  })
+
+  it("HI-3470: the user's step from Changes' panel runs while the pool holds the slot; lent again once it ends", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    revertLeft(r.slot.folder)
+    await w.pool.release(r.lease.id, 'done')
+    await w.pool.refresh()
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'revert' })
+    // A lease the user didn't confirm (the slot is free): refused, nothing run.
+    let ran = 0
+    expect(await w.pool.forUser('slot-a', r.slot.folder, 'lease-x', async () => ran++)).toEqual({ ok: false, why: 'changed' })
+    // A session in it: refused, nothing run, and the slot not held after.
+    w.set.sessions.set(r.slot.folder.toLowerCase(), 'a1')
+    expect(await w.pool.forUser('slot-a', r.slot.folder, null, async () => ran++)).toEqual({ ok: false, why: 'session' })
+    expect(w.store.slot('slot-a')?.op).toBeNull()
+    w.set.sessions.clear()
+    expect(ran).toBe(0)
+    // Held while it runs: no lend takes it meanwhile.
+    const during: unknown[] = []
+    const done = await w.pool.forUser('slot-a', r.slot.folder, null, async () => {
+      during.push(w.store.slot('slot-a')?.op?.kind, await w.pool.lend({ agent: 'a2', card: 2 }))
+      sh(r.slot.folder, 'revert', '--abort')
+      return 'ended'
+    })
+    expect(done).toEqual({ ok: true, value: 'ended' })
+    expect(during[0]).toBe('warm')
+    expect(during[1]).toMatchObject({ ok: false })
+    expect(w.store.slot('slot-a')?.op).toBeNull()
+    // Looked at again after it: nothing under way, its record gone, lent again.
+    const again = await lent(w, { agent: 'a2', card: 2 })
+    expect(again.slot.name).toBe('slot-a')
+    expect(w.pool.operation('slot-a')).toBeNull()
+  })
+
+  it("HI-3470 (HR1's round 1): the hold is released inside its tracked operation: a refresh meanwhile keeps it, and a close waits for it", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    revertLeft(r.slot.folder)
+    await w.pool.release(r.lease.id, 'done')
+    await w.pool.refresh()
+    // The hold's release write held back until the test lets it go.
+    const order: string[] = []
+    let letGo!: () => void
+    const gate = new Promise<void>((res) => (letGo = res))
+    let reached!: () => void
+    const atCleanup = new Promise<void>((res) => (reached = res))
+    let delay = false
+    const real = w.store.fenced.bind(w.store)
+    vi.spyOn(w.store, 'fenced').mockImplementation(async (n, t, fn) => {
+      if (delay) {
+        delay = false
+        reached()
+        await gate
+        const out = await real(n, t, fn)
+        order.push('released')
+        return out
+      }
+      return real(n, t, fn)
+    })
+    const step = w.pool.forUser('slot-a', r.slot.folder, null, async () => {
+      delay = true
+      return 'done'
+    })
+    await atCleanup
+    const held = w.store.slot('slot-a')?.op?.token
+    expect(held).toBeTruthy()
+    // A refresh while the release is queued: the hold's token is still live, so it isn't taken for an abandoned one.
+    await w.pool.refresh()
+    expect(w.store.slot('slot-a')?.op?.token).toBe(held)
+    const closing = w.pool.close().then(() => void order.push('closed'))
+    letGo()
+    expect(await step).toEqual({ ok: true, value: 'done' })
+    await closing
+    expect(order).toEqual(['released', 'closed'])
+    expect(w.store.slot('slot-a')?.op).toBeNull()
+  })
+
+  it("HI-3470: a lent slot's step runs only under the lease the user confirmed, and never while its run writes there", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    expect(await w.pool.forUser('slot-a', r.slot.folder, null, async () => 'x')).toEqual({ ok: false, why: 'changed' })
+    expect(await w.pool.forUser('slot-a', r.slot.folder, r.lease.id, async () => 'x')).toEqual({ ok: true, value: 'x' })
+    // Its lease kept, and the slot as it was.
+    expect(w.pool.openLease('slot-a')?.id).toBe(r.lease.id)
+    expect(w.store.slot('slot-a')).toMatchObject({ state: 'lent', op: null })
+  })
+
+  it('each operation is named as git names it, read from the worktree’s own git dir', async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    const gitDir = sh(r.slot.folder, 'rev-parse', '--absolute-git-dir')
+    const head = sh(r.slot.folder, 'rev-parse', 'HEAD')
+    expect(operationSync(r.slot.folder)).toBeNull()
+    for (const [marker, what] of [['MERGE_HEAD', 'merge'], ['REVERT_HEAD', 'revert'], ['CHERRY_PICK_HEAD', 'cherry-pick'], ['BISECT_LOG', 'bisect']] as const) {
+      writeFileSync(join(gitDir, marker), `${head}\n`)
+      expect(operationSync(r.slot.folder), marker).toBe(what)
+      rmSync(join(gitDir, marker))
+    }
+    mkdirSync(join(gitDir, 'sequencer'))
+    writeFileSync(join(gitDir, 'sequencer', 'todo'), `pick ${head.slice(0, 7)} c\n`)
+    expect(operationSync(r.slot.folder)).toBe('cherry-pick')
+    // The finish's check (submit.clean) and a slot's look both count it as not clean.
+    expect(await gitWorkspacePort.dirty(r.slot.folder)).toContain('(sequencer)')
+    rmSync(join(gitDir, 'sequencer'), { recursive: true })
+    mkdirSync(join(gitDir, 'rebase-apply'))
+    expect(operationSync(r.slot.folder)).toBe('rebase')
+    writeFileSync(join(gitDir, 'rebase-apply', 'applying'), '')
+    expect(operationSync(r.slot.folder)).toBe('am')
+    rmSync(join(gitDir, 'rebase-apply'), { recursive: true })
+    expect(await gitWorkspacePort.dirty(r.slot.folder)).toEqual([])
+  })
+
+  it("HI-3467: a detach that keeps failing for another reason is told once, with git's error, and cleared once one works", async () => {
+    // Git refusing the switch for as long as `fail.detach` says (a lock, files in the way…), its own words kept.
+    const fail = { detach: true, calls: 0 }
+    const port: WorkspacePort = {
+      ...gitWorkspacePort,
+      detach: async (folder, revision, o) => {
+        fail.calls++
+        return fail.detach ? { ok: false, err: "fatal: Unable to create 'x/index.lock': File exists.\n\nAnother git process seems to be running" } : gitWorkspacePort.detach(folder, revision, o)
+      }
+    }
+    const w = world({ builders: 1, port })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    // On its card's line, as a start leaves it: its settle detaches it at the target.
+    sh(r.slot.folder, 'switch', '-q', '-c', 'cw/card-1')
+    // Its release settles it: the first look.
+    await w.pool.release(r.lease.id, 'done')
+    // The first failure: recorded, not told (it may be gone at the next look), not shown, not lent.
+    expect(fail.calls).toBe(1)
+    expect(w.store.slot('slot-a')?.state).not.toBe('ready')
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'detach', tries: 1, error: "fatal: Unable to create 'x/index.lock': File exists." })
+    expect(operationTold(w.pool.operation('slot-a'))).toBe(false)
+    expect(w.set.operations).toEqual([])
+    // It repeats: told once, naming git's error and the target; shown from then on.
+    await w.pool.refresh()
+    expect(fail.calls).toBe(2)
+    expect(w.set.operations).toEqual(["slot-a detach at main: fatal: Unable to create 'x/index.lock': File exists."])
+    expect(operationTold(w.pool.operation('slot-a'))).toBe(true)
+    const since = w.pool.operation('slot-a')!.since
+    // Again and again (each refresh, a lend's look): never told again, never lent, its first failure's time kept.
+    await w.pool.refresh()
+    expect(await w.pool.lend({ agent: 'a2', card: 2 })).toMatchObject({ ok: false, refusal: { why: 'noSlot' } })
+    expect(fail.calls).toBeGreaterThanOrEqual(3)
+    expect(w.set.operations).toHaveLength(1)
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'detach', since })
+    // Git lets it switch now: the next look detaches it, the record goes, and the slot is lent again.
+    fail.detach = false
+    const again = await lent(w, { agent: 'a2', card: 2 })
+    expect(again.slot.name).toBe('slot-a')
+    expect(w.pool.operation('slot-a')).toBeNull()
+    expect(w.set.operations).toHaveLength(1)
+  })
+
+  it("HI-3516: a branch read that fails keeps git's own words only, never Combwork's", async () => {
+    // The folder's branch unreadable: first with git's stderr, then with none (git said nothing).
+    const said = { err: 'fatal: bad object refs/heads/main\nmore of it' as string | undefined }
+    const port: WorkspacePort = {
+      ...gitWorkspacePort,
+      heads: async (folder, target) => ({ ...(await gitWorkspacePort.heads(folder, target)), line: withDetail(unknown(UNREADABLE.branch, { folder }), said.err) })
+    }
+    const w = world({ builders: 1, port })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    sh(r.slot.folder, 'switch', '-q', '-c', 'cw/card-1')
+    await w.pool.release(r.lease.id, 'done')
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'detach', tries: 1, error: 'fatal: bad object refs/heads/main' })
+    said.err = undefined
+    await w.pool.refresh()
+    // Told now (its second failure in a row), with no "Git said" words: Combwork's "the branch checked out in …" isn't git's.
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'detach', tries: 2 })
+    expect(w.pool.operation('slot-a')!.error ?? '').toBe('')
+    expect(w.set.operations).toEqual(['slot-a detach at main: '])
+  })
+
+  it('HI-3467: a detach that failed once and then works is never told', async () => {
+    const fail = { detach: true }
+    const port: WorkspacePort = { ...gitWorkspacePort, detach: async (folder, revision, o) => (fail.detach ? ((fail.detach = false), { ok: false, err: 'fatal: something in the way' }) : gitWorkspacePort.detach(folder, revision, o)) }
+    const w = world({ builders: 1, port })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    // On its card's line, as a start leaves it: its settle detaches it at the target.
+    sh(r.slot.folder, 'switch', '-q', '-c', 'cw/card-1')
+    // Its release settles it: the first look.
+    await w.pool.release(r.lease.id, 'done')
+    expect(w.pool.operation('slot-a')).toMatchObject({ what: 'detach', tries: 1 })
+    await w.pool.refresh()
+    expect(w.pool.operation('slot-a')).toBeNull()
+    expect(w.store.slot('slot-a')?.state).toBe('ready')
+    expect(w.set.operations).toEqual([])
   })
 })
 
@@ -1419,11 +1700,10 @@ describe("an operation is its pool's from before its reservation (HR1 round 2)",
   })
 })
 
-describe("HI-3003: a slot's failures in its platform's words", { timeout: timing('test.hang') }, () => {
-  // Git's port with its reads or its switch failing: said in the pool's words (Git's, unchanged), or in jj's (JJ_SAYS).
-  const failing = (what: 'line' | 'files' | 'lineHead' | 'switch', says?: WorkspacePort['says']): WorkspacePort => ({
+describe("HI-3003: a slot's failures in the pool's words", { timeout: timing('test.hang') }, () => {
+  // Git's port with its reads or its switch failing: said in the pool's words (Git's, unchanged).
+  const failing = (what: 'line' | 'files' | 'lineHead' | 'switch'): WorkspacePort => ({
     ...gitWorkspacePort,
-    ...(says ? { says } : {}),
     ...(what === 'line' ? { line: async () => unknown(UNREADABLE.branchedOffTarget) } : {}),
     ...(what === 'files' ? { dirty: async () => unknown(UNREADABLE.branchedOffTarget) } : {}),
     ...(what === 'lineHead' ? { lineHead: async (repo: string, line: string) => (line === 'cw/AM/AM-1-one' ? unknown(UNREADABLE.branchedOffTarget) : gitWorkspacePort.lineHead(repo, line)) } : {}),
@@ -1445,24 +1725,9 @@ describe("HI-3003: a slot's failures in its platform's words", { timeout: timing
     expect(await errorOf(failing('switch'))).toBe('git switch: refused (test)')
   })
 
-  it("a port with jj's words: each failed preparation names no git, branch or switch", async () => {
-    const said = [await errorOf(failing('line', JJ_SAYS)), await errorOf(failing('files', JJ_SAYS)), await errorOf(failing('lineHead', JJ_SAYS)), await errorOf(failing('switch', JJ_SAYS))]
-    expect(said).toEqual(["jj couldn't read slot-a's workspace", "jj couldn't read slot-a's files", "jj couldn't read cw/AM/AM-1-one", "jj couldn't prepare slot-a for the card: refused (test)"])
-    for (const s of said) expect(s).not.toMatch(/\bgit\b|branch|switch/i)
-  })
-
-  it("a slot's setup that can't read its target: Git's words as before, jj's naming no git", async () => {
-    const setupError = async (says?: WorkspacePort['says']): Promise<unknown> => {
-      const w = world({ builders: 1, port: { ...gitWorkspacePort, ...(says ? { says } : {}), lineHead: async () => unknown(UNREADABLE.branchedOffTarget) } })
-      return w.pool.lend({ agent: 'a1', card: 1 }, { target: 'main' })
-    }
-    expect(await setupError()).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: "git couldn't read main" } })
-    expect(await setupError(JJ_SAYS)).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: "jj couldn't read main" } })
-  })
-
-  it("jj's words cover every word a port may give, and none names git, a branch, a switch or a worktree", () => {
-    expect(Object.keys(JJ_SAYS).sort()).toEqual(['branchUnread', 'createFailed', 'filesUnread', 'lineUnread', 'noTarget', 'notListed', 'removeFailed', 'switchFailed'])
-    for (const m of Object.values(JJ_SAYS)) expect(m!.text).not.toMatch(/\bgit\b|branch|switch|worktree/i)
+  it("a slot's setup that can't read its target: Git's words as before", async () => {
+    const w = world({ builders: 1, port: { ...gitWorkspacePort, lineHead: async () => unknown(UNREADABLE.branchedOffTarget) } })
+    expect(await w.pool.lend({ agent: 'a1', card: 1 }, { target: 'main' })).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: "git couldn't read main" } })
   })
 })
 
@@ -1839,6 +2104,20 @@ describe('moving a free slot onto another target (HI-2680)', { timeout: timing('
     await v.pool.refresh()
     expect((await v.pool.lend({ agent: 'a2', card: 2, slot: intent!.toName })).ok).toBe(false)
     expect(await v.pool.carry('a2', { name: intent!.toName, folder: intent!.to, target: b.expect.target })).toBeNull()
+  })
+
+  it('HI-3516: a renamed slot keeps its operation record under its new name, none left under the old', async () => {
+    const v = world({ builders: 1 })
+    const b = await free(v)
+    const intent = await v.store.startRename(b.name, 'ready', 'a-rename', { pid: 12, started: 1012 }, v.root, 'tree')
+    expect(intent).not.toBeNull()
+    // A record as a settle writes it (none is expected on a ready slot: the rename carries one anyway).
+    const rec = JSON.stringify({ what: 'detach', since: 1, error: 'fatal: x', tries: 2 })
+    await v.store.conn.write((db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)').run(operationKey(v.store.project, b.name), rec))
+    sh(v.project, 'worktree', 'move', b.expect.folder, intent!.to)
+    await v.store.finishRename(b.name, 'a-rename', intent!)
+    expect(v.store.operation(b.name)).toBeNull()
+    expect(v.store.operation(intent!.toName)).toMatchObject({ what: 'detach', tries: 2 })
   })
 
   it('a failure part way is never thrown: settled from the folder, or left recorded for the next look (HR1, round 1 finding 3)', async () => {

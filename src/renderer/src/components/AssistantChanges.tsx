@@ -27,6 +27,7 @@ const M = {
   askTitle: msg({ id: 'assistant.undo.askTitle', defaultMessage: '{n, plural, one {Undo # change?} other {Undo # changes?}}', description: "The question before every change the Assistant made for a message is undone." }),
   askMessage: msg({ id: 'assistant.undo.askMessage', defaultMessage: 'Changes made since by you or an agent are kept.', description: "The question before the Assistant's changes for a message are undone: what someone changed afterwards isn't overwritten." }),
   askFinal: msg({ id: 'assistant.undo.askFinal', defaultMessage: "{n, plural, one {# change can't be undone, such as a prompt that was sent: it is listed with why.} other {# changes can't be undone, such as prompts that were sent: they are listed with why.}}", description: "Under the question before a message's changes are undone, when some of them can't be." }),
+  confirm: msg({ id: 'assistant.undo.confirm', defaultMessage: 'Undo', description: "HI-3504: the confirm button of the question before every change the Assistant made for a message is undone. It sits beside the dialog's Cancel (shell.dialog.cancel), so it must read differently from it (French: not Annuler alone)." }),
   working: msg({ id: 'assistant.undo.working', defaultMessage: 'Undoing…', description: "The Undo button of the question while the changes are being undone." }),
   failed: msg({ id: 'assistant.undo.failed', defaultMessage: "Could not undo the Assistant's change", description: "An error notice: undoing a change the Assistant made failed; the reason follows." }),
   undoneAt: msg({ id: 'assistant.undo.undoneAt', defaultMessage: 'Undone {when}', description: "Beside a change of the Assistant's that was undone ({when}: \"5 minutes ago\", lower case)." }),
@@ -165,7 +166,7 @@ function MessageGroupView({ g, open, toggle, changeText }: { g: MessageGroup; op
       title: tr(M.askTitle, { n: left.length }),
       message: tr(M.askMessage),
       ...(finals.length ? { detail: tr(M.askFinal, { n: finals.length }) } : {}),
-      confirmLabel: tr(M.undo),
+      confirmLabel: tr(M.confirm),
       busyLabel: tr(M.working),
       run: async () => (results = await undoChanges({ group: g.id }))
     })

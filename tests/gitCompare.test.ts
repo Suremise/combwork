@@ -4,13 +4,13 @@
 // changes since it left the other, one file's diff, and a branch that isn't one refused. The repository's refs, index
 // and working tree are the same before and after.
 import { execFileSync } from 'child_process'
-import { readFileSync, statSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
-import { compareBranches, compareDiff, compareLines } from '../src/main/gitCompare'
+import { commitDiff, compareBranches, compareDiff, compareLines } from '../src/main/gitCompare'
 import { COMPARE_COMMITS } from '../src/shared/gitRepo'
 
 // Git fed on stdin (fast-import, mktree) runs with the run context's environment and the test's own global config, never
@@ -174,6 +174,22 @@ describe('compareBranches and compareDiff: 1.0.0 against main', () => {
     // Added and deleted files still show with an empty side.
     expect(await compareDiff(repo, 'main', 'broken', 'src/a.txt')).toMatchObject({ modified: expect.stringContaining('TWO') })
     expect(await compareDiff(repo, 'main', 'broken', 'README.md')).toMatchObject({ original: 'hello\n', modified: '' })
+  })
+
+  it('a file replaced by a folder, or a folder by a file, is that file deleted or added: the folder side empty (HI-3529)', async () => {
+    const repo = fixture(2)
+    const file = sh(repo, 'rev-parse', 'main')
+    sh(repo, 'checkout', '-q', '-b', 'shape')
+    sh(repo, 'rm', '-q', 'README.md')
+    mkdirSync(join(repo, 'README.md'))
+    writeFileSync(join(repo, 'README.md', 'inner.txt'), 'inside\n')
+    sh(repo, 'add', '-A')
+    sh(repo, 'commit', '-q', '-m', 'README.md is a folder')
+    const folder = sh(repo, 'rev-parse', 'HEAD')
+    expect(await commitDiff(repo, file, folder, 'README.md')).toMatchObject({ original: 'hello\n', modified: '', binary: false })
+    expect(await commitDiff(repo, folder, file, 'README.md')).toMatchObject({ original: '', modified: 'hello\n', binary: false })
+    expect(await commitDiff(repo, file, folder, 'README.md/inner.txt')).toMatchObject({ original: '', modified: 'inside\n' })
+    expect(await compareDiff(repo, 'main', 'shape', 'README.md')).toMatchObject({ original: 'hello\n', modified: '' })
   })
 
   it("refuses a branch that isn't one, and never takes a name as an option", async () => {

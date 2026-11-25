@@ -145,9 +145,6 @@ export interface WorkRevision {
   unknown: Record<string, string>
   /** The same reasons as data where a platform's read gave one (its `platform.unknownText`, #1477): the window words them. */
   unknownText: Record<string, StoredText>
-  /** HI-2869: jj's change id of the revision, and how many commits its chain holds, where the submission recorded them. */
-  change?: string
-  chain?: number
 }
 
 export interface WorkVerdict {
@@ -220,8 +217,6 @@ export interface WorkIntegration {
   /** The merge's own revision when it was merged with one (`method` merge): the result. */
   mergeCommit: string | null
   at: string
-  /** HI-2869: how jj proved it (its fact's `platform.jj.via`: ancestry, replay, sameTree, candidate). */
-  via?: string
 }
 
 /**
@@ -279,16 +274,19 @@ export interface WorkView {
   reviewSkipProposed: string | null
   /** Where the card works: `project`, or the slot's folder. */
   folder: string | null
-  /** The line it works on (Git: its branch); null for None. A jj card's is a key (`jj:…`), never shown: see `workspace`. */
+  /** The line it works on (Git: its branch); null for None. */
   line: string | null
-  /** HI-2869: a jj card's slot workspace, which the window shows in its line's place. */
-  workspace?: string
+  /**
+   * HI-3552: this cycle's pull request finish, once asked: the pull request opened (its number, link and repository, a
+   * draft or not), or why the last try didn't open it; null before it is asked, or in another finish.
+   */
+  pullRequest?: WorkPullRequest | null
   /**
    * HI-2913: its slot couldn't be prepared for this cycle (a `SlotPrepareFailed` for its lease, no `SlotPrepared` after
-   * it): the slot, why (English, as its builder was told) and whether it was a stale jj workspace. The window shows the
-   * card not ready there rather than started.
+   * it): the slot, and why (English, as its builder was told). The window shows the card not ready there rather than
+   * started.
    */
-  notReady?: { slot: string; why: string; stale: boolean }
+  notReady?: { slot: string; why: string }
   /** Every line it has started on, over its whole history (HI-1823: an open card's earlier work, never a leftover). */
   lines: string[]
   /** The revision its change starts from. */
@@ -313,8 +311,6 @@ export interface WorkView {
   integration: WorkIntegration | null
   /** Its acceptance this cycle, where there is no merge (None, a no-code card). */
   accepted: WorkAcceptance | null
-  /** HI-2924: Done by the user's own move, its integration not proved (a jj card; `doneUnproved`): when. */
-  doneUnproved: { at: string } | null
   queue: WorkQueueEntry | null
   /** Its latest refused request since its last move (#1279): cleared by the card's next move. */
   refused: WorkRefusal | null
@@ -429,24 +425,6 @@ export function inTargetNow(s: CardState): FactData['InTarget'] | null {
   return m && m.submission === s.latest?.id && m.revision === s.latest?.revision && m.target === (s.started?.target ?? null) ? m : null
 }
 
-/**
- * HI-2924: a jj card the user moved to Done themselves while its integration wasn't proved
- * (a hand-resolved conflict changes the change's diff, so J5's proofs don't hold). Their Done is their word that it's
- * integrated: shown as "Done by you, integration not proved", and its slot's binding may be released without
- * containment (jjWorkspacePort's reuse and detach). Only the user's own move into Done this cycle (never the Assistant's,
- * a repair or Combwork's), on a jj line, with neither `Integrated` nor `Accepted` this cycle. `line`, given: only that
- * cycle's (its jj line key). Null otherwise.
- */
-export function doneUnproved(facts: readonly Fact[], s: Pick<CardState, 'stage' | 'cycle' | 'started' | 'integrated' | 'accepted'>, line?: string): { at: string; line: string } | null {
-  const own = s.started?.line
-  if (s.stage !== 'done' || !s.started || s.integrated || s.accepted || !own || !own.startsWith('jj:')) return null
-  if (line !== undefined && own !== line) return null
-  const moved = facts.findLast((f) => f.kind === 'Moved' && f.seq >= s.cycle && (f.data as FactData['Moved']).to === 'done')
-  if (!moved || moved.actor !== 'user') return null
-  const cause = (moved.data as FactData['Moved']).cause
-  return cause === 'user' || cause === 'override' ? { at: moved.at, line: own } : null
-}
-
 function unknownOf(platform: Record<string, unknown> | undefined): Record<string, string> {
   const u = platform?.unknown
   if (!u || typeof u !== 'object') return {}
@@ -467,7 +445,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
   const at = new Map(facts.map((f) => [f.seq, f.at]))
   const latest = s.latest?.id ?? null
   const revisions = s.submissions.map(
-    (x): WorkRevision => ({ submission: x.id, revision: x.revision, base: x.base, round: x.round, files: x.files, at: at.get(x.id) ?? '', by: x.by, generation: x.generation, sameRevision: x.sameRevision, adopted: !!x.adopted, warnings: x.warnings ?? [], summary: x.summary, unknown: unknownOf(x.platform), unknownText: unknownTextOf(x.platform), ...jjRevisionOf(x.platform) })
+    (x): WorkRevision => ({ submission: x.id, revision: x.revision, base: x.base, round: x.round, files: x.files, at: at.get(x.id) ?? '', by: x.by, generation: x.generation, sameRevision: x.sameRevision, adopted: !!x.adopted, warnings: x.warnings ?? [], summary: x.summary, unknown: unknownOf(x.platform), unknownText: unknownTextOf(x.platform) })
   )
   const verdicts = s.verdicts
     .filter((v) => v.seq >= s.cycle)
@@ -523,8 +501,8 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     ...reviewSkipView(facts),
     folder: started?.folder ?? null,
     line: started?.line ?? null,
-    ...(jjField(started?.platform, 'workspace') ? { workspace: jjField(started?.platform, 'workspace')! } : {}),
-    ...(notReady ? { notReady: { slot: notReady.slot, why: notReady.why, stale: notReady.stale } } : {}),
+    pullRequest: s.pullRequest ? { number: s.pullRequest.opened?.number ?? null, url: s.pullRequest.opened?.url ?? null, repo: `${s.pullRequest.requested.owner}/${s.pullRequest.requested.repo}`, draft: s.pullRequest.opened?.draft ?? null, failed: s.pullRequest.failed?.problem ?? null, closed: s.pullRequest.closed?.at ?? (s.pullRequest.closed ? '' : null), ...(s.pullRequest.opened?.notPushed ? { notPushed: s.pullRequest.opened.notPushedWhy ?? 'other', ...(s.pullRequest.opened.notPushedWhy === 'rewrite' ? { notPushedRule: s.pullRequest.opened.notPushedDetail ?? '' } : {}) } : {}) } : null,
+    ...(notReady ? { notReady: { slot: notReady.slot, why: notReady.why } } : {}),
     lines: s.lines,
     base: started?.base ?? null,
     target: started?.target ?? null,
@@ -537,9 +515,8 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     verdicts,
     checks,
     marks: { carriedOver, stale: s.stale, outsideRules: s.marks.outsideRules ?? [], mergedInPart: s.marks.mergedInPart ?? null, inTarget: inTargetNow(s), leftTarget: s.marks.leftTarget ?? null, overridden: s.approvalOverridden, override },
-    integration: s.integrated && integrated ? { revision: s.integrated.revision, target: s.integrated.target, result: s.integrated.result, method: s.integrated.method, by: s.integrated.by, mergeCommit: s.integrated.method === 'merge' ? s.integrated.result : null, at: integrated.at, ...(jjField((integrated.data as { platform?: unknown }).platform, 'via') ? { via: jjField((integrated.data as { platform?: unknown }).platform, 'via')! } : {}) } : null,
+    integration: s.integrated && integrated ? { revision: s.integrated.revision, target: s.integrated.target, result: s.integrated.result, method: s.integrated.method, by: s.integrated.by, mergeCommit: s.integrated.method === 'merge' ? s.integrated.result : null, at: integrated.at } : null,
     accepted: s.accepted && accepted ? { revision: s.accepted.revision ?? null, submission: s.accepted.submission ?? null, at: accepted.at, actor: accepted.actor } : null,
-    doneUnproved: ((d) => (d ? { at: d.at } : null))(doneUnproved(facts, s)),
     refused,
     queue: entry ? queueEntryOf(entry, facts) : null,
     decisions: { generation: s.generation, received: s.received },
@@ -586,6 +563,26 @@ export const currentRevision = (v: WorkView): string | null => v.approved?.revis
 export const checksOn = (v: WorkView, revision: string): WorkCheck[] => v.checks.filter((c) => c.revision === revision)
 
 /** What a card's badges on the board need of its work (`workBadge`): little, for every live card at once. */
+/** HI-3552: a card's pull request as its view and badge keep it (from its facts; GitHub's live state is prHost's). */
+export interface WorkPullRequest {
+  number: number | null
+  url: string | null
+  /** owner/repo, as pinned on its request. */
+  repo: string
+  draft: boolean | null
+  /** Why the last try didn't open it (facts.ts's PrOpenFailedData problem), or null. */
+  failed: string | null
+  /** Closed on GitHub without merging: when ('' unknown), or null. */
+  closed: string | null
+  /**
+   * A pull request's card (HI-3551) following its own pull request with its fixes not pushed to it: why (HI-3562: facts.ts's
+   * PrNotPushedWhy; `other` for a record from before it).
+   */
+  notPushed?: string
+  /** HI-3562: the git url rewrite's config key, when that is why. */
+  notPushedRule?: string
+}
+
 export interface WorkBadge {
   card: number
   stage: StageId
@@ -641,6 +638,8 @@ export interface WorkBadge {
   stages: StageId[] | null
   /** The line it works on this cycle (Git: its branch, from its Started or Adopted; #1424); null for None or none. */
   line: string | null
+  /** HI-3552: its pull request (WorkView's); absent: none. */
+  pullRequest?: WorkPullRequest | null
   /** Every line it has started on, this cycle's and earlier ones' (HI-1823): while it is open, none is a leftover. */
   lines: string[]
   /**
@@ -726,13 +725,14 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     kind: v.kind,
     kindProposed: v.kindProposed,
     ...(v.cardTarget ? { target: v.cardTarget } : {}),
-    ...(v.target && (v.stage === 'active' || v.stage === 'review' || v.stage === 'approved' || v.stage === 'merging') ? { startedOn: v.target } : {}),
+    ...(v.target && (v.stage === 'active' || v.stage === 'review' || v.stage === 'approved' || v.stage === 'merging' || v.stage === 'prOpen') ? { startedOn: v.target } : {}),
     reviewSkip: v.reviewSkip,
     reviewSkipProposed: v.reviewSkipProposed,
     decisionSince: !!latest && v.decisions.generation > latest.generation,
     oldRules: onOldRules(v, current),
     stages: stagesOf ? keptStages(v, stagesOf) : null,
     line: v.line,
+    pullRequest: v.pullRequest,
     lines: v.lines,
     underReview: v.stage === 'review' && v.kind !== 'no-code' ? (latest?.revision ?? null) : null,
     startedAt: v.startedAt,
@@ -740,18 +740,4 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     ...(forwardWait ? { forwardWait } : {}),
     lastSeq: v.lastSeq
   }
-}
-
-/** A string field of a fact's `platform.jj` (HI-2869: the window's jj ids), or null.  */
-function jjField(platform: unknown, field: string): string | null {
-  const j = platform && typeof platform === 'object' ? (platform as { jj?: Record<string, unknown> }).jj : null
-  return j && typeof j[field] === 'string' ? (j[field] as string) : null
-}
-
-/** A submission's jj ids for the window (HI-2869): its change id and its chain's length, where recorded. */
-function jjRevisionOf(platform: unknown): { change?: string; chain?: number } {
-  const change = jjField(platform, 'changeId')
-  const j = platform && typeof platform === 'object' ? (platform as { jj?: { chain?: unknown } }).jj : null
-  const chain = j && Array.isArray(j.chain) ? j.chain.length : 0
-  return { ...(change ? { change } : {}), ...(chain > 1 ? { chain } : {}) }
 }

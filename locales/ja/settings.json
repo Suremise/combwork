@@ -520,8 +520,6 @@
   "settings.advanced.cw.inbox.idleWakes.title": "アイドルのエージェントを起こす",
   "settings.advanced.cw.inbox.stopContinuation.desc": "エージェントが受信箱に未読の項目を残したままターンを終えようとすると、Combworkはターンごとに一度、先にそれを読むよう続けさせます。CodexとCopilotでは停止を保留し、Claude Codeでは停止に一行加えます。オフにすると、ターンはCLIが終えるとおりに終わり、項目はアイドル時の起こしまで受信箱で待ちます。プロジェクトは「プロジェクト設定」→「セッション」で独自に設定できます。",
   "settings.advanced.cw.inbox.stopContinuation.title": "未読を残して止まるエージェントを続けさせる",
-  "settings.advanced.cw.jj.commandSeconds.desc": "Combworkが実行する1つのjjコマンドにかけられる時間です。大きな作業コピーのスナップショット（snapshot）も含みます。これを過ぎるとCombworkはコマンドを終了します。その場合、読み取りは不明として扱われ、マージ中の変更はあなたが解決するよう残されます。非常に大きなリポジトリや遅いディスクでは増やしてください。",
-  "settings.advanced.cw.jj.commandSeconds.title": "jj：コマンドの最長時間",
   "settings.advanced.cw.journal.builds.desc": "Combwork自身のインストーラーをソースコードからビルドすると（npm run distまたはnpm run release）、Combworkはそのビルドを自身のエントリとしてアシスタントのジャーナルに書き込みます。バージョン、コミット、ビルドの種類、インストーラーの場所です。書き込むのは成功したビルドだけで、ジャーナルがオンで、その範囲にイベントが含まれている間に限ります。オフにするとビルドは書き込まれず、Combworkが閉じている間に残されたビルドはワークスペースを開いたときに破棄されます。",
   "settings.advanced.cw.journal.builds.title": "ビルドをジャーナルに記録する",
   "settings.advanced.cw.lanes.endWaitMinutes.desc": "レーンの終了から、ビルダーがターンを終えてレーンの終了を読むまでCombworkが待つ時間です。これを過ぎると、CombworkはビルダーのCLIを終了させます。終了コマンドで終了させるか、入力できない場合（入力欄に自分の下書きがある）や終了しない場合は強制終了します。",
@@ -1720,6 +1718,14 @@
   "settings.advanced.cw.resume.idleMinutes.desc": "会話の最後のアクティビティ（トランスクリプトの最後のエントリ、なければCombworkが最後に確認した時刻）からこの時間を過ぎると、再開の前に確認します。既定値は、CLIが保持するプロンプトキャッシュの最長時間である1時間です。",
   "settings.advanced.cw.cli.probeSeconds.title": "CLIの検出：バージョン確認のタイムアウト",
   "settings.advanced.cw.cli.probeSeconds.desc": "Combworkが各コーディングエージェントのCLIを探すとき（起動時、「再確認」、インストール後）に、CLIがバージョンを表示するまでに与える時間です。これより時間がかかるCLIはスキップされ、未インストールと表示されます。遅いディスク上でウイルス対策ソフトがスキャンする場合、CLIの初回起動には数十秒かかることがあります。",
+  "settings.advanced.cw.git.processNames.desc": "この正規表現に一致するプログラム名（タスク マネージャーの「詳細」タブに表示される名前）は、ロックを保持している可能性のあるgitとみなされます。ロックファイルより前に起動したものが実行中の間、「リポジトリの状態」はそのロックを削除しません。既定ではgit.exeと、gitのリモートヘルパー（git-remote-https.exeなど）に一致します。gitのロックファイルを自分で書き込むプログラムの場合にだけ、ほかのプログラムを追加してください。",
+  "settings.advanced.cw.git.processNames.title": "Git：ロックを保持する可能性のあるプログラム",
+  "settings.advanced.cw.git.staleLockSeconds.desc": "「リポジトリの状態」は、gitのロックファイル（index.lockなど）を、作成から少なくともこの時間がたち、それより前に起動したgitがもう実行されていない場合にだけ、削除の対象として示します。通常のgitがロックを保持するのは一瞬です。大きなコミットやrepackなど、時間のかかるgitコマンドがそれより長く保持する場合は、この値を大きくしてください。",
+  "settings.advanced.cw.git.staleLockSeconds.title": "Git：ロックが古いとみなす経過時間",
+  "settings.advanced.cw.github.ghMinutes.desc": "GitHub CLI（gh）の 1 回の呼び出しが、Combwork に停止したとみなされて終了され、応答がなかったと表示されるまでに実行できる時間。接続が遅い場合や、応答の遅い GitHub Enterprise Server では値を上げてください。",
+  "settings.advanced.cw.github.ghMinutes.title": "GitHub CLI: 1 回の呼び出しの最長時間",
+  "settings.advanced.cw.github.prFollowMinutes.desc": "カードが「PRオープン」で待っている間、Combwork はこの間隔で GitHub 上のプルリクエストを読み取ります。ボードやカードを開いたときにも読み取ります。マージやクローズを GitHub から Combwork に直接知らせることはできないためです。",
+  "settings.advanced.cw.github.prFollowMinutes.title": "プルリクエスト：状態を読み取る間隔",
   "settings.advanced.cw.server.checkInferSeconds.title": "サーバーの確認：テストリクエストのタイムアウト",
   "settings.advanced.cw.server.checkInferSeconds.desc": "「サーバーの確認」が、モデルサーバーからテストリクエストへの応答を待つ時間です。まだ読み込まれていないローカルモデルは先に読み込まれ、性能の控えめなハードウェアでは数分かかることがあります。この時間を過ぎると、確認はタイムアウトを報告します。"
 }

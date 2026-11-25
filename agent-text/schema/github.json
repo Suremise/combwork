@@ -22,5 +22,71 @@
   },
   "github.host.rejected.scheme": {
     "placeholders": {}
+  },
+  "github.issues.changed": {
+    "placeholders": {
+      "line": "plain"
+    }
+  },
+  "github.issues.notPublished": {
+    "placeholders": {
+      "tag": "plain"
+    }
+  },
+  "github.issues.notReleased": {
+    "placeholders": {
+      "line": "plain"
+    }
+  },
+  "github.issues.tagMismatch": {
+    "placeholders": {
+      "tag": "plain"
+    }
+  },
+  "github.link.notARemote": {
+    "placeholders": {}
+  },
+  "github.review.approveChanged": {
+    "placeholders": {
+      "number": "plain",
+      "repo": "plain"
+    }
+  },
+  "github.review.approveFailed": {
+    "placeholders": {
+      "number": "plain",
+      "why": "select"
+    }
+  },
+  "github.review.done": {
+    "placeholders": {
+      "state": "select"
+    }
+  },
+  "github.review.empty": {
+    "placeholders": {}
+  },
+  "github.review.noCard": {
+    "placeholders": {}
+  },
+  "github.review.noDraft": {
+    "placeholders": {}
+  },
+  "github.review.noLink": {
+    "placeholders": {
+      "repo": "plain"
+    }
+  },
+  "github.review.notAllowed": {
+    "placeholders": {
+      "option": "select",
+      "what": "select"
+    }
+  },
+  "github.review.notPr": {
+    "placeholders": {}
+  },
+  "github.source.outsideText": {
+    "placeholders": {}
   }
 }

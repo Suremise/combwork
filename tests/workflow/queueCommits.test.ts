@@ -8,7 +8,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harness'
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { git } from '../../src/main/git'
-import { commitFailed, readCommitStream, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
+import type { QueueGitResult } from '../../src/main/workflow/mergeQueue'
+import { commitFailed, readCommitStream } from '../../src/main/platform/git/gitCommits'
 import { timing } from '../timing.cjs'
 
 let env: Env | null = null

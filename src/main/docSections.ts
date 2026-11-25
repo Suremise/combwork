@@ -21,12 +21,12 @@ export type DocRead = { ok: true; text: string } | { ok: false; code: 'outside' 
 
 const MARKDOWN = /\.(md|markdown|mdx)$/i
 
-/** Whether a path inside the folder goes into Combwork's own `.combwork` or a platform's own folder (`.git`, jj's `.jj`: HI-2800). */
+/** Whether a path inside the folder goes into Combwork's own `.combwork` or a version control's own folder (`.git`…: METADATA_DIRS). */
 const hidden = (inside: string): boolean => inside.split(/[\\/]/).some((part) => part.toLowerCase() === CW_DIR || METADATA_DIRS.includes(part.toLowerCase()))
 
 /**
  * Reads a document: `path` relative to `root` (a project's folder, or the shared notes' folder for `shared:` paths).
- * A path outside it, into `.combwork`, `.git` or `.jj`, or not Markdown is refused before anything is read.
+ * A path outside it, into `.combwork` or a version control's own folder (`.git`…), or not Markdown is refused before anything is read.
  */
 export async function readDoc(root: string, path: string): Promise<DocRead> {
   const rel = path.replace(/\\/g, '/').replace(/^\.\//, '')

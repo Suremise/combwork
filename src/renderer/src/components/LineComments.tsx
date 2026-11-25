@@ -49,7 +49,20 @@ type Zone = { key: string; side: LineSide; id: string; zone: Monaco.editor.IView
 
 const draftKey = (d: Draft): string => `${d.side}:${d.from}-${d.to}`
 
+// HI-3496: where the pointer last was in the window (null once it left it). Monaco's mouse move is the only other way a
+// layer hears of the pointer, so a pointer already over a line when the layer attaches, or one a layout change puts over
+// another line, would show no "+" until it moved.
+let pointer: { x: number; y: number } | null = null
+window.addEventListener('pointermove', (e) => void (pointer = { x: e.clientX, y: e.clientY }), { capture: true, passive: true })
+document.addEventListener('mouseout', (e) => void (e.relatedTarget === null && (pointer = null)))
 
+/** The line of `ed` under the pointer where it stands now, if it is over `ed`. */
+function lineUnderPointer(ed: Monaco.editor.ICodeEditor): number | undefined {
+  if (!pointer) return undefined
+  const under = document.elementFromPoint(pointer.x, pointer.y)
+  if (!under || !ed.getDomNode()?.contains(under)) return undefined
+  return ed.getTargetAtClientPoint(pointer.x, pointer.y)?.position?.lineNumber
+}
 
 /** The layer's store: a draft's text, an edit's text, a box's save under way and its error, a thread's open edit. */
 const Held = createContext<HeldStore | null>(null)
@@ -106,12 +119,14 @@ export function CommentLayer({ editor, card, submission, path, comments, agentNa
         const ed = sideEditor(side)
         ed.updateOptions({ glyphMargin: true })
         const hover = ed.createDecorationsCollection()
+        const showAt = (line: number | undefined): void => void hover.set(line ? [{ range: new monaco.Range(line, 1, line, 1), options: { glyphMarginClassName: 'cw-comment-add', glyphMarginHoverMessage: { value: tr(M.add) } } }] : [])
         subs.push({ dispose: () => hover.clear() })
-        subs.push(ed.onMouseMove((e) => {
-          const line = e.target.position?.lineNumber
-          hover.set(line ? [{ range: new monaco.Range(line, 1, line, 1), options: { glyphMarginClassName: 'cw-comment-add', glyphMarginHoverMessage: { value: tr(M.add) } } }] : [])
-        }))
+        subs.push(ed.onMouseMove((e) => showAt(e.target.position?.lineNumber)))
         subs.push(ed.onMouseLeave(() => hover.clear()))
+        // HI-3496: a pointer that hasn't moved still gets its "+": on attaching, and when the lines move under it.
+        const still = (): void => showAt(lineUnderPointer(ed))
+        still()
+        subs.push(ed.onDidLayoutChange(still), ed.onDidContentSizeChange(still), ed.onDidScrollChange(still))
         subs.push(ed.onMouseDown((e) => {
           if (e.target.type !== monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) return
           const line = e.target.position?.lineNumber

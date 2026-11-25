@@ -254,34 +254,69 @@ describe('the installer upgrades from the 1.0 app (legacyUpgrade.ps1, HI-2460)',
     })
   }
 
-  // Round 1's review: whether an app runs is known only from a process whose identity can be read.
-  for (const [what, rows, code] of [
-    ["a same-name process whose executable can't be read", () => [{ Name: 'Combwork.exe', ExecutablePath: null, CommandLine: null, ProcessId: 424242 }], 5],
-    ["this exe with an unreadable command line (counts as its main process)", (f: Fixture) => [{ Name: 'Combwork.exe', ExecutablePath: join(f.install, 'Combwork.exe'), CommandLine: null, ProcessId: 424243 }], 5],
-    ["the 1.0 app's exe whose path can't be read", () => [{ Name: OLD_EXE, ExecutablePath: null, CommandLine: null, ProcessId: 424244 }], 5],
-    ['another installation of the same name, positively elsewhere', () => [{ Name: 'Combwork.exe', ExecutablePath: 'C:\\Elsewhere\\Combwork\\Combwork.exe', CommandLine: '"C:\\Elsewhere\\Combwork\\Combwork.exe"', ProcessId: 424245 }], 0],
-    ["this exe's Chromium helper (--type=)", (f: Fixture) => [{ Name: 'Combwork.exe', ExecutablePath: join(f.install, 'Combwork.exe'), CommandLine: `"${join(f.install, 'Combwork.exe')}" --type=renderer`, ProcessId: 424246 }], 0]
+  // Round 1's review: whether an app runs is known only from a process whose identity can be read. HI-3463: a stop
+  // names what blocked it, for the installer's message (-BlockerFile: state, process id, the exe's path or, when its
+  // location is unknown, its name; UTF-16LE without a BOM, as NSIS's FileReadUTF16LE reads it).
+  for (const [what, rows, code, blocker] of [
+    ["a same-name process whose executable can't be read", () => [{ Name: 'Combwork.exe', ExecutablePath: null, CommandLine: null, ProcessId: 424242 }], 5, () => ['unknown', '424242', 'Combwork.exe']],
+    ["this exe with an unreadable command line (counts as its main process)", (f: Fixture) => [{ Name: 'Combwork.exe', ExecutablePath: join(f.install, 'Combwork.exe'), CommandLine: null, ProcessId: 424243 }], 5, (f: Fixture) => ['running', '424243', join(f.install, 'Combwork.exe')]],
+    ["the 1.0 app's exe whose path can't be read", () => [{ Name: OLD_EXE, ExecutablePath: null, CommandLine: null, ProcessId: 424244 }], 5, () => ['unknown', '424244', OLD_EXE]],
+    ["the 1.0 app's own exe running", (f: Fixture) => [{ Name: OLD_EXE, ExecutablePath: join(f.install, '..', `${OLD_APP} Test`, OLD_EXE), CommandLine: `"${join(f.install, '..', `${OLD_APP} Test`, OLD_EXE)}"`, ProcessId: 424247 }], 5, (f: Fixture) => ['running', '424247', join(f.install, '..', `${OLD_APP} Test`, OLD_EXE)]],
+    ['another installation of the same name, positively elsewhere', () => [{ Name: 'Combwork.exe', ExecutablePath: 'C:\\Elsewhere\\Combwork\\Combwork.exe', CommandLine: '"C:\\Elsewhere\\Combwork\\Combwork.exe"', ProcessId: 424245 }], 0, null],
+    ["this exe's Chromium helper (--type=)", (f: Fixture) => [{ Name: 'Combwork.exe', ExecutablePath: join(f.install, 'Combwork.exe'), CommandLine: `"${join(f.install, 'Combwork.exe')}" --type=renderer`, ProcessId: 424246 }], 0, null]
   ] as const) {
-    it(`${what}: ${code === 5 ? 'stops (5), the 1.0 app and the profile folders untouched' : 'goes on'}`, () => {
+    it(`${what}: ${code === 5 ? 'stops (5), naming it, the 1.0 app and the profile folders untouched' : 'goes on'}`, () => {
       const f = fixture(`identity-${randomUUID().slice(0, 8)}`)
       const old = installOld(f)
       profile(f.appData)
       profile(f.local)
       const list = join(f.work, 'processes.json')
       writeFileSync(list, JSON.stringify(rows(f)))
-      const r = upgrade(f, ['-ProcessesFile', list])
+      const told = join(f.work, 'still-running.txt')
+      const r = upgrade(f, ['-ProcessesFile', list, '-BlockerFile', told])
       expect(r.code, r.out).toBe(code)
-      if (code === 5) {
-        expect(r.out).toContain('still running:')
+      if (blocker) {
+        const [state, id, where] = blocker(f)
+        expect(r.out).toContain(`still running: ${state} `)
+        expect(r.out).toContain(`(process ${id}): nothing changed`)
+        const bytes = readFileSync(told)
+        expect([bytes[0], bytes[1]]).not.toEqual([0xff, 0xfe])
+        expect(bytes.toString('utf16le')).toBe(`${state}\n${id}\n${where}\n`)
         expect(existsSync(join(old, OLD_EXE))).toBe(true)
         expect(existsSync(join(f.seen, 'args.json'))).toBe(false)
         expect(readdirSync(f.appData)).toEqual([OLD_PROFILE])
         expect(readdirSync(f.local)).toEqual([OLD_PROFILE])
       } else {
+        expect(existsSync(told)).toBe(false)
         expect(readdirSync(f.local)).toEqual(['Combwork'])
       }
     })
   }
+
+  it("Windows' process list can't be read: stops (5), unknown with no process id, the installer's message without one", () => {
+    const f = fixture('no-list')
+    profile(f.local)
+    const told = join(f.work, 'still-running.txt')
+    const r = upgrade(f, ['-ProcessesFile', join(f.work, 'missing.json'), '-BlockerFile', told])
+    expect(r.code, r.out).toBe(5)
+    expect(r.out).toContain('(no process list): nothing changed')
+    expect(readFileSync(told).toString('utf16le')).toBe('unknown\n\nCombwork.exe\n')
+    expect(readdirSync(f.local)).toEqual([OLD_PROFILE])
+  })
+
+  // HI-3463: the installer reads that file into its refusal, every line translated in each of the installer's languages.
+  it("the installer's refusal names what blocked it, in all its languages", () => {
+    const nsh = readFileSync(join(__dirname, '..', 'build', 'installer.nsh'), 'utf8')
+    expect(nsh).toMatch(/legacyUpgrade\.ps1"[^\n]*-BlockerFile "\$PLUGINSDIR\\still-running\.txt"/)
+    expect(nsh).toMatch(/FileOpen \$1 "\$PLUGINSDIR\\still-running\.txt" r/)
+    const langs = (name: string) => [...nsh.matchAll(new RegExp(`^LangString ${name} (\\d+) "(.+)"\\r?$`, 'gm'))].map((m) => m[1]).sort()
+    const all = langs('combworkStillRunning')
+    expect(all).toHaveLength(8)
+    for (const name of ['combworkBlockerRunning', 'combworkBlockerUnknown', 'combworkBlockerId', 'combworkBlockerClose']) {
+      expect(langs(name), name).toEqual(all)
+      expect(nsh, name).toContain(`$(${name})`)
+    }
+  })
 
   it('Combwork still running (on the old folders, HI-2461\'s fallback): stops (5), nothing changed', async () => {
     const f = fixture('running')
@@ -296,7 +331,7 @@ describe('the installer upgrades from the 1.0 app (legacyUpgrade.ps1, HI-2460)',
     try {
       const r = upgrade(f)
       expect(r.code, r.out).toBe(5)
-      expect(r.out).toContain('still running: running')
+      expect(r.out).toContain(`still running: running ${exe} (process ${app.pid})`)
       expect(readdirSync(f.appData)).toEqual([OLD_PROFILE])
       expect(readdirSync(f.local)).toEqual([OLD_PROFILE])
     } finally {

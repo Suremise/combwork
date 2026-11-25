@@ -8,7 +8,7 @@
 import { accepts, deliversCommits, hasCapability, merges } from '../platform/descriptors'
 import type { Category, StageId } from './facts'
 import { STAGE_CATEGORY } from './facts'
-import { contradictions, finishAdvances, finishOnCandidate, finishPreviews, reviewerAgent, userReportsMerge, type Contradiction, type WorkflowOptions } from './options'
+import { contradictions, reviewerAgent, userReportsMerge, type Contradiction, type WorkflowOptions } from './options'
 import { GUARDS, isGuard, MOVES, type GuardId, type MoveId } from './pieces'
 
 export const RULESET_VERSION = 1
@@ -58,15 +58,15 @@ export function canonical(v: unknown): string {
  * are when it pushes, so it is left out whatever its value (a ruleset's options have it off). G19, the merge's commit
  * message (HI-1697), likewise: read as the options are when the queue merges. The preferences (HI-1766: card loops,
  * file locks; HI-2001: Maximum agents) aren't rules either: read as the options are when they're used. Nor are merge
- * guards (HI-3284): the merge queue and jj's candidate checks read them as the options are when they check.
+ * guards (HI-3284): the merge queue reads them as the options are when it checks.
  */
 export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
-  const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, followRemote: _follow, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, assistantWakes: _assistantWakes, fileLocks: _locks, maxAgents: _max, simplifyAt: _simplify, churnStopAt: _stop, mergeGuards: _guards, ...rules } = o
+  const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, prDraft: _draft, followRemote: _follow, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, assistantWakes: _assistantWakes, fileLocks: _locks, maxAgents: _max, simplifyAt: _simplify, churnStopAt: _stop, mergeGuards: _guards, githubFeedback: _feedback, githubFooter: _footer, ...rules } = o
   return (reviewerMode === 'pool' ? { ...rules, reviewerMode } : rules) as WorkflowOptions
 }
 
 /** Does any rule need the card's change (so its folder must be clean and its revision ready)? */
-export const needsChange = (o: WorkflowOptions): boolean => deliversCommits(o.platform) && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges' || finishOnCandidate(o.finish))
+export const needsChange = (o: WorkflowOptions): boolean => deliversCommits(o.platform) && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'pullRequest')
 
 /**
  * The stages the options produce (§16.5.2), in board order: Review with any review; Approved when something follows a
@@ -80,14 +80,15 @@ export function producedStages(o: WorkflowOptions): StageId[] {
   // on #1417): where work merges (Git) a merge (Combwork's, the agent's, or one Combwork doesn't check); where it is
   // accepted (None) your OK after the reviewer agent's pass (N1).
   const approves = review || o.okBefore.mode !== 'never'
-  // Where its user integrates (jj, HI-2799), your integration follows the approval, as a merge Combwork doesn't check follows Git's.
-  // HI-3235: where Combwork advances the target itself (jj's automatic advance), Approved always: the card waits there for
-  // its candidate and merge checks, as a Git card waits in Merging, review or no review.
-  const approved = finishAdvances(o.finish) || finishPreviews(o.finish) || (merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : accepts(o.platform) ? o.review === 'agentThenYou' : approves && o.finish === 'userIntegrates')
+  // HI-3552: a pull request's finish always has Approved: where a card waits while its pull request is opened, or after a
+  // failure to open it, review or not.
+  const approved = merging ? (approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked')) || o.finish === 'pullRequest' : accepts(o.platform) && o.review === 'agentThenYou'
   const out: StageId[] = ['hold', 'todo', 'active']
   if (review) out.push('review')
   if (approved) out.push('approved')
   if (merging && o.finish === 'combworkMerges') out.push('merging')
+  // HI-3552: a pull request's finish waits in PR open for GitHub's merge or close.
+  if (merging && o.finish === 'pullRequest') out.push('prOpen')
   out.push('done')
   return out
 }
@@ -108,7 +109,7 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   if (o.stopOwnRuns) g.submit.push('submit.ownRunsStopped')
   // A decision the builder hasn't read holds its submit with any review or a merge step (SPEC §16.5.3, HI-2275): All off
   // and Solo (committed) stay free.
-  if (review || o.finish === 'combworkMerges' || o.finish === 'agentMerges') g.submit.push('submit.decisionsReceived')
+  if (review || o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'pullRequest') g.submit.push('submit.decisionsReceived')
   // The builder's submit after a queue failure holds the same unread decision (HI-2275).
   if (o.finish === 'combworkMerges') g.requeue.push('submit.notDuplicate', 'requeue.allowed', ...(review ? (['integrate.approved'] as const) : []), 'submit.decisionsReceived')
   if (agent) {
@@ -169,23 +170,7 @@ export function loadRuleset(data: unknown): LoadResult {
     for (const id of ids as string[]) if (!isGuard(id)) return { ok: false, error: 'unknownPiece', piece: id }
   }
   const readOnly = r.version > RULESET_VERSION
-  return { ok: true, ruleset: readOnly ? (r as Ruleset) : withoutRetired(r as Ruleset), readOnly }
-}
-
-/**
- * The guard J6 put in every jj ruleset until J9e (HI-2874) let jj cards run: `start.platformReady`. A jj ruleset stored
- * before (a lane's, an Override's) still names it; it is dropped as the ruleset is read, so its cards start under the rest
- * of its rules. Kept a known piece so such a row still loads, and its texts kept for the `Refused` facts it left.
- */
-export const RETIRED_GUARD: GuardId = 'start.platformReady'
-
-/**
- * A supported ruleset as read (HI-2874): a jj one with the retired guard gets a copy without it, its id, version, other
- * guards, options and stages as they were; any other is returned as it is.
- */
-function withoutRetired(r: Ruleset): Ruleset {
-  if (r.options?.platform !== 'jj' || !r.guards.start?.includes(RETIRED_GUARD)) return r
-  return { ...r, guards: { ...r.guards, start: r.guards.start.filter((g) => g !== RETIRED_GUARD) } }
+  return { ok: true, ruleset: r as Ruleset, readOnly }
 }
 
 export const hasStage = (r: Ruleset, id: StageId): boolean => r.stages.some((s) => s.id === id)

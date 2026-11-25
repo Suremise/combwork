@@ -87,7 +87,7 @@ import { checkMoved, finishPending, movePlan, repairMove } from './workspaceMove
 import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agentWorktree'
 import { CW_DIR, projectAgents as agentsOf } from '../shared/defaults'
 import type { MoveOptions, TaskCard } from '../shared/types'
-import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
+import { hasPty, killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
 import { adminSnippetFacts, apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
 import * as projectAgents from './projectAgents'
 import * as templates from './templates'
@@ -138,22 +138,21 @@ import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
 import { checkWorkflowChange, chooseMerge, guardPreview, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
-import { SwitchRefusedError } from './workflow/storeSwitch'
 import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesNow } from './workflow/rulesets'
-import { poolFor, recoverStaleSlot, removeForgottenSlot, removeKeptSlot, slotTest, slotViews } from './slotsApp'
+import { poolFor, removeGoneSlot, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
+import { githubLinkOf, githubRepoFor, openPrsOf, setGithubRemote } from './githubLink'
+import { closeShippedIssues, issueSourceFor, openIssuesOf, releasedLines, shippedIssuesOf } from './issueSources'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
-import { jjBookmarks, jjCompare, jjConflicts, jjHistory, jjRepoView } from './platform/jjViews'
-import { jjChecksAgain, jjLeftovers, jjMarkChecked, jjToCheck, jjWaiting } from './jjWindow'
-import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
-import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
+import { slotWorkspaces } from './platform/workspacePorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
+import { operationPanel } from './operationPanel'
 import { cancelGitRun, cancellableGit, cancelOwnerOf, withGitCancel, type CancelOwner } from './gitCancel'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { checkOffer, dismissOffer, releaseOffers } from './workflow/releaseOffer'
@@ -162,6 +161,7 @@ import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pause
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { revisionDiff } from './workflow/revisionDiff'
 import { addLineComment, changeLineComment, feedbackPreview, sendFeedback } from './workflow/lineComments'
+import { approveGithubPr, discardGithubReview, githubReviewsView, postGithubReview } from './githubReviews'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
 import { withSkillDelivered } from '../shared/skillDelivery'
@@ -543,8 +543,14 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'git:push': (p, remote, op) => netRun(p, op, () => repoOpHandlers['git:push'](p, remote)),
     'git:pushTo': (p, remote, scope, branch, op) => netRun(p, op, () => repoOpHandlers['git:pushTo'](p, remote, scope, branch)),
     'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst, op) => netRun(p, op, () => repoOpHandlers['git:setUpstream'](p, branch, remote, remoteBranch, pushFirst)),
-    'git:createTag': (p, name, message, pushTo, op) => netRun(p, op, () => repoOpHandlers['git:createTag'](p, name, message, pushTo)),
+    'git:createTag': (p, name, message, pushTo, op, at) => netRun(p, op, () => repoOpHandlers['git:createTag'](p, name, message, pushTo, op, at)),
+    'git:renameBranch': (p, branch, to, onRemote, op) => netRun(p, op, () => repoOpHandlers['git:renameBranch'](p, branch, to, onRemote)),
+    'git:deleteTag': (p, tag, remote, op) => netRun(p, op, () => repoOpHandlers['git:deleteTag'](p, tag, remote)),
+    'git:pushTag': (p, name, remote, op) => netRun(p, op, () => repoOpHandlers['git:pushTag'](p, name, remote)),
     'git:deleteRemoteBranches': (p, remote, items, op) => netRun(p, op, () => repoOpHandlers['git:deleteRemoteBranches'](p, remote, items)),
+    // HI-3473: Repository health's checks and fetches of the remotes.
+    'git:remotePrunePreview': (p, op) => netRun(p, op, () => repoOpHandlers['git:remotePrunePreview'](p)),
+    'git:fetchPrune': (p, remotes, op) => netRun(p, op, () => repoOpHandlers['git:fetchPrune'](p, remotes)),
     'files:gitCommitIgnore': (p, op) => actRun(p, op, () => repoOpHandlers['files:gitCommitIgnore'](p)),
     // The owner's Cancel of its run `op` (the project it recorded with it): another window's, workspace's or project's changes nothing.
     'git:cancel': (op, p) => cancelGitRun(op, cancelOwner(String(p ?? ''))),
@@ -957,7 +963,19 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'tasks:confirmKind': (n, accept) => tasks.confirmKind(n, accept === true, { kind: 'user' }),
     'tasks:setReviewSkip': (n, skip, opts) => tasks.setReviewSkip(n, skip === true, { kind: 'user' }, { reason: opts?.reason }),
     'tasks:setTarget': (n, target) => tasks.setTarget(n, typeof target === 'string' ? target.slice(0, 250) : null, { kind: 'user' }),
+    // HI-3551: the GitHub pull request or issue a card is about (an address or #n), or null to clear it: the user's alone.
+    'tasks:setSource': (n, source) => tasks.setSource(n, typeof source === 'string' && source.trim() ? source.trim().slice(0, 500) : null, { kind: 'user' }),
+    // HI-3553: an open pull request made a card (the board's From GitHub…): the user's alone, read again from GitHub in main.
+    'tasks:fromPr': (project, number, repo, text) => tasks.createFromPr(String(project), Number(number), { host: String(repo?.host ?? ''), owner: String(repo?.owner ?? ''), repo: String(repo?.repo ?? '') }, { title: String(text?.title ?? '').slice(0, 200), description: String(text?.description ?? '').slice(0, 4000) }, { kind: 'user' }),
+    // HI-3555: an open issue made a card (From GitHub…'s Issues): the user's alone, read again through the issue source in main.
+    'tasks:fromIssue': (project, number, repo, text) => tasks.createFromIssue(String(project), Number(number), { host: String(repo?.host ?? ''), owner: String(repo?.owner ?? ''), repo: String(repo?.repo ?? '') }, { title: String(text?.title ?? '').slice(0, 200), description: String(text?.description ?? '').slice(0, 4000) }, { kind: 'user' }),
     'tasks:keptTarget': (n) => tasks.keptTarget(Number(n)),
+    // HI-3552: a card's pull request read now (its dialog opened), and every one in PR open (the board opened).
+    'tasks:prStatus': async (n) => (await import('./workflow/prHosts')).prStatus(currentWorkspace(), Number(n)),
+    'tasks:prFollow': async () => void (await import('./workflow/prHosts')).followAll(currentWorkspace()),
+    // HI-3554: a card's pull request's comments (its dialog opened), and Address feedback: the user's alone, read again in main.
+    'tasks:prFeedback': async (n) => (await import('./prFeedback')).prFeedbackOf(currentWorkspace(), Number(n)),
+    'tasks:addressFeedback': (n, target, ids, text) => tasks.createFromFeedback(Number(n), { host: String(target?.host ?? ''), owner: String(target?.owner ?? ''), repo: String(target?.repo ?? ''), number: Number(target?.number) }, Array.isArray(ids) ? ids.filter((i): i is string => typeof i === 'string').slice(0, 200) : [], { title: String(text?.title ?? '').slice(0, 200), description: String(text?.description ?? '').slice(0, 4000) }, { kind: 'user' }),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': async (n, patch, more) => {
       const user = { kind: 'user' } as const
@@ -1092,16 +1110,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'workflow:chooseMerge': (p, choice) => chooseMerge(workspace, workspace.assertProject(p), choice),
     'board:stages': async () => Object.fromEntries(await Promise.all((workspace.info()?.projects ?? []).map(async (p) => [p.path.toLowerCase(), await projectStages(workspace, p.path).catch(() => null)] as const))),
     'workflow:checkPlatform': (p, to) => checkPlatformSwitch(workspace, workspace.assertProject(p), to),
-    'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected, token: opts?.token }),
-    'workflow:switchPlatform': async (p, to, opts) => {
-      try {
-        return { switched: await setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected, token: opts?.token }) }
-      } catch (e) {
-        // Only a repository switch's own refusal is data (HI-3105); anything else (a save that failed, say) still throws.
-        if (e instanceof SwitchRefusedError) return { refused: e.refusal }
-        throw e
-      }
-    },
+    'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected }),
     'workflow:presetNotNow': (p, platform) => presetNotNow(workspace, workspace.assertProject(p), platform),
     'workflow:presetsNotice': () => presetsNotice(workspace),
     'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
@@ -1112,11 +1121,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
-    // Never asked of Git in a non-colocated jj project (HI-2896): git there finds no repository, or one above it.
-    'slots:gitFiles': async (p) => {
-      const at = workspace.assertProject(p)
-      return (await gitCantRead(at)) ? null : ((await slotWorkspaces().files?.status(at)) ?? null)
-    },
+    'slots:gitFiles': async (p) => (await slotWorkspaces().files?.status(workspace.assertProject(p))) ?? null,
     // A workspace's (null) or project's GitHub hosts (HI-2779): parsed again in setGithubHosts, whoever asks.
     'github:form': (p) => githubHostsForm(workspace, p ? workspace.assertProject(p) : null, process.env),
     'github:set': async (p, change) => {
@@ -1124,16 +1129,34 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       await setGithubHosts(workspace, at, change)
       return githubHostsForm(workspace, at, process.env)
     },
+    // HI-3550: a Git project's GitHub link (its repository and gh's sign-in on its host), and the remote chosen for it.
+    'github:link': (p) => githubLinkOf(workspace, workspace.assertProject(p)),
+    'github:setRemote': (p, remote) => setGithubRemote(workspace, workspace.assertProject(p), typeof remote === 'string' ? remote : null),
+    'github:repo': (p) => githubRepoFor(workspace, workspace.assertProject(p)),
+    'github:openPrs': (p) => openPrsOf(workspace, workspace.assertProject(p)),
+    // HI-3555: the project's open issues (narrowed), and the close at publish: a released line's shipped issues, closed by the user's click.
+    'github:openIssues': (p, q) => openIssuesOf(workspace, workspace.assertProject(p), q),
+    'github:releasedLines': async (p) => {
+      const at = workspace.assertProject(p)
+      const src = await issueSourceFor(workspace, at)
+      return src ? releasedLines(workspace, at, src.repo) : []
+    },
+    'github:shippedIssues': (p, line) => shippedIssuesOf(workspace, workspace.assertProject(p), String(line ?? '')),
+    'github:closeShippedIssues': (p, preview) => closeShippedIssues(workspace, workspace.assertProject(p), preview),
+    // HI-3559: a pull request's card's reviews to GitHub; the user posts a draft (its edit) or their own, or discards a draft.
+    'github:reviews': (n) => githubReviewsView(currentWorkspace(), Number(n)),
+    'github:postReview': (n, row, body) => postGithubReview(currentWorkspace(), Number(n), { row: typeof row === 'number' && Number.isInteger(row) ? row : null, body: typeof body === 'string' ? body.slice(0, 60_000) : '' }, 'user'),
+    'github:discardReview': (n, draft) => discardGithubReview(currentWorkspace(), Number(n), Number(draft)),
+    // HI-3560: the user approves the card's pull request on GitHub (asked first in the window).
+    'github:approvePr': (n, target) => approveGithubPr(currentWorkspace(), Number(n), { host: String(target?.host ?? ''), owner: String(target?.owner ?? ''), repo: String(target?.repo ?? ''), number: Number(target?.number) }),
     'slots:levelForm': (level) => slotLevelForm(workspace, level),
     'slots:setLevelDefault': async (level, key, value) => {
       await setSlotDefault(workspace, level, key, value)
       return slotLevelForm(workspace, level)
     },
     'slots:releaseCarried': (p, agentId) => releaseCarried(workspace, workspace.assertProject(p), String(agentId)),
-    // A stale jj slot recovered, the user's explicit action (HI-2866).
-    'slots:recoverStale': (p, slot) => recoverStaleSlot(workspace, workspace.assertProject(p), String(slot)),
-    'slots:removeKept': (p, slot, card, generation, forgotten) => removeKeptSlot(workspace, workspace.assertProject(p), String(slot), Number(card), String(generation), forgotten === true),
-    'slots:removeForgotten': (p, slot, generation) => removeForgottenSlot(workspace, workspace.assertProject(p), String(slot), String(generation)),
+    // A free slot whose folder is gone forgotten, the user's explicit action (HI-3464).
+    'slots:removeGone': (p, slot) => removeGoneSlot(workspace, workspace.assertProject(p), String(slot)),
     'slots:heldWriter': (p, slot) => heldWriter(workspace.assertProject(p), String(slot)),
     'slots:releaseWriter': (p, slot, run, end) => releaseHeldWriter(workspace.assertProject(p), String(slot), String(run), { end: end === true }),
     'copies:list': (p) => copyViews(workspace, workspace.assertProject(p)),
@@ -1440,7 +1463,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'files:watch': (p) => files.watchProject(p),
     'files:setUnsaved': (paths) => quitControl.setUnsaved(win(), Array.isArray(paths) ? paths.filter((p) => typeof p === 'string') : []),
     'files:unwatch': (p) => files.unwatchProject(p),
-    'files:gitInfo': (p, items) => filesGit.gitInfo(p, items),
+    // HI-3477: with the project's target, for Restore From → Target Branch.
+    'files:gitInfo': async (p, items) => {
+      const info = await filesGit.gitInfo(p, items)
+      return info.repo ? { ...info, target: await lineRepoReads().workTarget(workspace.assertProject(p)).catch(() => null) } : info
+    },
     'files:gitRuleText': (p, items) => filesGit.ignoreRuleText(p, items),
 
     'attachments:list': (p) => files.listAttachments(p),
@@ -1497,6 +1524,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'pty:kill': (key) => {
       if (key.startsWith('task:')) killPty(key)
     },
+    'pty:running': (key) => hasPty(key),
     'pty:clipboardRefused': (key, reason) => {
       log.info(`terminal ${userText(key)}: OSC 52 clipboard ${reason === 'read' ? 'read' : 'write'} refused (${String(reason).slice(0, 20)})`)
     },
@@ -1853,6 +1881,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // An unused worktree too (#400): read only, as the Changes tab opens it.
     'git:status': (root, base) => lineRepoReads().changes(workspace.assertChangesRoot(root), base),
     'git:diff': (root, f, base) => lineRepoReads().changeDiff(workspace.assertChangesRoot(root), f, base),
+    'git:operation': (root) => operationPanel(workspace, root),
     'git:compareLines': async (p) => {
       p = workspace.assertProject(p)
       // The slots as the board records them: a plain read, never the slot pool or the 0.9 migration (it runs as the project opens).
@@ -1879,23 +1908,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // The Git view (#607): the project folder only, read and changed by the user from the window (never an agent tool).
     // Its reads go through the repository reads port (HI-2785's R2), its changes are gitRepo.ts' until R3.
     'git:summary': (p) => lineRepoReads().summary(workspace.assertProject(p)),
-    // A jj project's views (HI-2799): read-only, pinned, off main (jj's worker); only a project the window shows.
-    'jj:repo': (p) => jjRepoView(workspace.assertProject(p)),
-    'jj:history': (p) => jjHistory(workspace.assertProject(p)),
-    'jj:bookmarks': (p) => jjBookmarks(workspace.assertProject(p)),
-    'jj:conflicts': (p) => jjConflicts(workspace.assertProject(p)),
-    'jj:compare': (p, from, to) => jjCompare(workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
     // HI-1185: Branches & remotes' Signing section (bounded, at most once a minute unless asked again).
     'git:signing': async (p, force) => (await lineRepoReads().signing?.(workspace.assertProject(p), force === true)) ?? null,
-    // The Operations section (HI-2800): read only; the preview's command is the user's to run.
-    'jj:operations': (p, from) => jjOperations(workspace.assertProject(p), typeof from === 'string' ? from : null),
-    'jj:operationPreview': (p, op, moment) => jjOperationPreview(workspace.assertProject(p), String(op ?? ''), typeof moment === 'string' ? moment : null),
-    // The window for jj cards (HI-2869): reads, the user's acknowledgement, and what a set-up left.
-    'jj:waiting': (p) => jjWaiting(workspace, workspace.assertProject(p)),
-    'jj:candidateChecksAgain': (p, card) => jjChecksAgain(workspace, workspace.assertProject(p), Number(card)),
-    'jj:toCheck': (p, after) => jjToCheck(workspace, workspace.assertProject(p), after ?? null),
-    'jj:markChecked': (p, row) => jjMarkChecked(workspace, workspace.assertProject(p), row),
-    'jj:leftovers': (p) => jjLeftovers(workspace.assertProject(p)),
     'git:info': async (p) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

@@ -1,12 +1,13 @@
 import { COMPARE_COMMITS, COMPARE_FILES, type CompareFile, type CompareLines, type GitCommitRow, type GitComparison } from '../shared/gitRepo'
 import type { GitDiff } from '../shared/types'
+import { parseHunks, type DiffHunk } from '../shared/githubReviews'
 import { resolve as resolvePath } from 'path'
 import { msg } from '../shared/i18n'
 import { failure as commandFailed, git, gitlinkChange, isBinary, MAX_DIFF_BYTES, tooLargeDiff } from './git'
 import { subprojectLine, type GitlinkSide } from '../shared/gitlink'
 import { gitProblem } from './gitTool'
 import { combworkError } from './combworkError'
-import * as G from './platform/git'
+import * as G from './gitCommands'
 import { isUnknown } from './platform/types'
 
 /**
@@ -147,22 +148,32 @@ export async function compareBranches(root: string, baseName: string, headName: 
 
 /**
  * A file at a commit, or empty when it isn't there (added or deleted); its size first, so a large one is never read.
- * A size that can't be read is empty only once the commit's tree is read and doesn't list the path; a path it lists whose
- * blob can't be read (a store missing the object) is an error, never an empty side (HI-3218's round 1; Compare's too,
- * HI-3227).
+ * The commit's tree says what is at the path, with its size: nothing, or a folder there (HI-3529: a file replaced by a
+ * folder, or the other way round), is an empty side; a file it lists whose blob can't be read (a store missing the
+ * object) is an error, never an empty side (HI-3218's round 1; Compare's too, HI-3227).
  */
+/**
+ * HI-3559: one file's hunks from commit `from` to `to` (`git diff -U3`, as GitHub shows a pull request's diff), read from
+ * their headers alone: where a review's line comment can sit. A binary change has none.
+ */
+export async function commitHunks(root: string, from: string, to: string, file: string): Promise<DiffHunk[]> {
+  const r = await git(root, ['--literal-pathspecs', 'diff', '--no-color', '--no-ext-diff', '--no-renames', '-U3', from, to, '--', String(file ?? '').replace(/\\/g, '/')], MAX_DIFF_BYTES * 2)
+  if (!r.ok) throw commandFailed('git diff', r) // i18n-ignore: a git command, as it is
+  return parseHunks(r.out)
+}
+
 async function fileAt(root: string, rev: string, file: string): Promise<{ buf: Buffer } | { size: number }> {
-  const spec = `${rev}:${file}`
-  const size = await git(root, ['cat-file', '-s', spec])
-  if (!size.ok) {
-    const listed = await git(root, ['--literal-pathspecs', 'ls-tree', '--full-tree', '-z', rev, '--', file])
-    if (!listed.ok) throw commandFailed('git ls-tree', listed) // i18n-ignore: a git command, as it is
-    if (listed.out.length) throw commandFailed('git cat-file', size) // i18n-ignore: a git command, as it is
-    return { buf: Buffer.alloc(0) }
-  }
-  const n = Number(size.out.trim()) || 0
+  const listed = await git(root, ['--literal-pathspecs', 'ls-tree', '-l', '--full-tree', '-z', rev, '--', file])
+  if (!listed.ok) throw commandFailed('git ls-tree', listed) // i18n-ignore: a git command, as it is
+  // `<mode> <type> <object> <size>\t<path>`, the size `-` for what isn't a blob (or a blob the store is missing).
+  const entry = listed.out
+    .split('\0')
+    .map((e) => ({ meta: e.slice(0, e.indexOf('\t')).trim().split(/\s+/), path: e.slice(e.indexOf('\t') + 1) }))
+    .find((e) => e.path === file)
+  if (!entry || entry.meta[1] !== 'blob') return { buf: Buffer.alloc(0) }
+  const n = Number(entry.meta[3]) || 0
   if (n > MAX_DIFF_BYTES) return { size: n }
-  const r = await git(root, ['cat-file', 'blob', spec], MAX_DIFF_BYTES * 2)
+  const r = await git(root, ['cat-file', 'blob', entry.meta[2]], MAX_DIFF_BYTES * 2)
   if (!r.ok) throw commandFailed('git cat-file', r) // i18n-ignore: a git command, as it is
   return { buf: r.buf }
 }

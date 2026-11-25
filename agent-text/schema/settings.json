@@ -1199,6 +1199,30 @@
   "settings.advanced.cw.git.networkMinutes.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.git.processNames.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.processNames.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.staleLockSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.staleLockSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.github.ghMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.github.ghMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.github.prFollowMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.github.prFollowMinutes.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.guidance.desc": {
     "placeholders": {}
   },
@@ -1239,12 +1263,6 @@
     "placeholders": {}
   },
   "settings.advanced.cw.input.hiddenSeconds.title": {
-    "placeholders": {}
-  },
-  "settings.advanced.cw.jj.commandSeconds.desc": {
-    "placeholders": {}
-  },
-  "settings.advanced.cw.jj.commandSeconds.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.journal.builds.desc": {

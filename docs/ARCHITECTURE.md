@@ -14,7 +14,7 @@ This document explains how Combwork is put together, for anyone changing the cod
 | `src/main/repoLock.ts`, `repoLockCore.ts`, `repoLockWorker.ts` | The repository lock (#1347, SPEC §16.9.3): one row in `cw-merge.lock` (SQLite) in the repository's common git dir, across copies of Combwork; a dead holder (pid gone or reused) taken over by compare and swap, a live one never; taken by merges, the Git view's folder actions and the line updater's move. Its takes and releases run in a worker thread of their own (HI-1680: their busy wait and commits' fsyncs held main's thread, and typing), which keeps each held lock's connection; a lock whose worker ended is released by its token. The core has no Electron imports, so tests run it in plain Node children; in unit tests the worker's code runs in main's thread |
 | `src/main/cardAttachmentCleanup.ts`, `cardCleanupFs.ts`, `shared/cardCleanup.ts` | Archived cards' attachments cleaned up (HI-1842): the rules, the plan (bounded batches from a cursor, a card at a time with a yield between), the apply a card at a time (checked again in each card's board change, per workspace lifetime), Clean Up Now's kept plans, and the idle-time queue. |
 | `src/main/walCheckpoint.ts`, `walCheckpointWorker.ts` | The WAL checkpoints of `combwork.db` and the Assistant's journal (#1633): out of the commits (`wal_autocheckpoint = 0`), checkpointed when a database is idle, when its WAL grows past 8 MB, or after writes without a pause; SQLite's own back after repeated unfinished ones. The triggers (a stat a second) and the fallback run on main; each checkpoint (PASSIVE) runs in a worker thread on a connection of its own (HI-1691: idle checkpoints of 100–893 ms held main's thread), and closing a database never waits for it: a checkpoint asked for before a close is skipped (`CLOSING`, shared with the worker), and what renames, replaces or deletes a database file (the 1.0 upgrade, restoring the 0.9 board, deleting the journal) first awaits `checkpointsReleased`, which resolves once the worker has let go of the file or has ended. The WAL's first write after a whole checkpoint, which restarts it and syncs its new header (SQLite's crash-safety sync, kept at `synchronous=NORMAL`), is the worker's too (HI-3289, `runRestart`: `user_version` written back as it is), so main's next commit doesn't pay that sync: made under the database's own async write lock (`hold`: the board's lock for `combwork.db`) with its write gate closed (`walWritable`/`walGate`, which the journal's writes, async since, await), and every write BEGIN on main goes through `db.ts`'s `beginTransaction`, whose guard (`beginGuards`) refuses one while the gate is closed (`tests/beginTransaction.test.ts` finds a raw one). The board's poll takes the restart for another connection's commit (one extra `tasks-changed`), so no other process's change is missed. The restart's own write isn't a change to checkpoint again (HI-3362: it made an idle database checkpoint, restart and announce a change every 30 s): the worker reads the WAL's size and time under the write lock after its commit, only when its own commit restarted the WAL (the header's salts changed across it, so nothing uncheckpointed was in the WAL before it) and its connection's `data_version` shows no other connection's commit since, and main takes that reading as where its next tick starts; without it (another connection writing after the checkpoint, before or after the restart), what is in the WAL is a change, as before. The worker keeps its connection to each database from its first request until the database closes (HI-3414: closing sends a `release`, which `checkpointsReleased` waits for), because the stat can miss a write: Windows stamps the WAL's time from its clock tick (about 15.6 ms by default), and a commit after a restart goes over old frames without growing the file. So while the stat says idle, main asks the worker to `check` every `everyMs`, and it checkpoints only when that connection's `data_version` has moved (another connection's commit; the restart is written on the same connection, and its own commits never move it). A new worker has no `data_version` to compare, so its first check checkpoints once. |
-| `src/main/noneBaseline.ts`, `noneBaselineWorker.ts` | A None project's whole-project read (HI-2340): a code card's start baseline (`Started.deliverables`) and its unclaimed read, `NoneAdapter`'s own walk and hashes run in a worker thread of their own (on main's thread they held typing 0.4–4 s on a few thousand files). One worker for the process; reads asked alike (project, folders left out, the adapter's `generation`) share one not sent yet (never one under way, which may have read a file before a write since), a newer generation drops the project's reads not sent, a caller's signal leaves only itself, a read past `cw.none.baselineSeconds` ends the worker, and each worker answers only its own calls. No answer is no baseline. The start checks the generation again at its write (gathered again once); `unclaimed()` reads the card again after it, in the same cycle. A no-code card reads nothing. A None check's points (HI-2358: `readCheckPoint`, from `runChecks`' `checkStart`/`checkEnd`) are reads of their own there too: its declared paths' revision and the deliverables' stat snapshot (`platform/snapshotLine.ts`, shared with `checks.ts`), null when unread, so the run doesn't count. In unit tests the worker's code runs in main's thread (`hold`/`release`: their barrier) |
+| `src/main/platform/none/noneBaseline.ts`, `noneBaselineWorker.ts` | A None project's whole-project read (HI-2340): a code card's start baseline (`Started.deliverables`) and its unclaimed read, `NoneAdapter`'s own walk and hashes run in a worker thread of their own (on main's thread they held typing 0.4–4 s on a few thousand files). One worker for the process; reads asked alike (project, folders left out, the adapter's `generation`) share one not sent yet (never one under way, which may have read a file before a write since), a newer generation drops the project's reads not sent, a caller's signal leaves only itself, a read past `cw.none.baselineSeconds` ends the worker, and each worker answers only its own calls. No answer is no baseline. The start checks the generation again at its write (gathered again once); `unclaimed()` reads the card again after it, in the same cycle. A no-code card reads nothing. A None check's points (HI-2358: `readCheckPoint`, from `runChecks`' `checkStart`/`checkEnd`) are reads of their own there too: its declared paths' revision and the deliverables' stat snapshot (`platform/snapshotLine.ts`, shared with `checks.ts`), null when unread, so the run doesn't count. In unit tests the worker's code runs in main's thread (`hold`/`release`: their barrier) |
 | `src/main/workerThreads.ts`, `src/main/places.ts` | The worker threads' common parts (HI-1880): `bundledScriptExists()` (a script inside an installed Combwork's `app.asar`, which original-fs sees as one file), and how each worker runs, for Copy Diagnostics. `places.ts`: the path helpers (`realPath`, `placeMatcher`, `relativeInside`) a worker's code may use, with no logger and so no Electron, which a worker thread can't load (`tests/workerImports.test.ts`); `fsutil.ts` re-exports them |
 | `src/shared/providers/` | The provider registry (`registry.ts`, one line each), each provider's shared half (`<folder>/`: its descriptor with names, modes, models and capability parts, its prices, tips, advanced values and safeguard defaults), what several share (`common.ts`), and the settings resolution helpers (`index.ts`) |
 | `src/shared/models.ts`, `src/main/providers/*/models.ts` | Models and capabilities from the CLIs (Claude Code's initialize, codex debug models, Copilot's ACP session), with the editable fallbacks: what the pickers, the footer and the Agent API offer |
@@ -38,7 +38,7 @@ This document explains how Combwork is put together, for anyone changing the cod
 | `src/main/workflow/lockRecord.ts` | G16's lock records (#1481): each agent's file locks, from its sessions' `session-status` (`lockedFiles`), recorded on its current card as `FilesLocked`, queued in order per project; a submit waits for those queued before it (`locksSettled`) |
 | `src/main/workflow/lineUpdates.ts` | An agent's worktree between a lane's cards (#1271, SPEC §16.19.2): after a squash merge, the builder's branch brought up to date before the next card (idle, no run, clean, nothing lost), recorded as `LineMoved`; else asked under For you; the lane's `lineUpdate` status meanwhile |
 | `src/main/workflow/adoption.ts`, `src/main/workflow/upgrade.ts` | The 1.0 upgrade's adoption (#1218): each project's options as it works today, cards from before 1.0 marked, cards in flight adopted from what their folder shows (`adoptionInputs` outside the board's lock, `writeAdoption` inside); in the background after the upgrade and at each open until it has run once |
-| `src/shared/platform/`, `src/main/platform/` | The platform layer (SPEC §16.3): None and Git behind one `PlatformAdapter` (`adapter.ts`; `gitPlatform.ts` on `git.ts`, `nonePlatform.ts` on `none.ts`; a value or unknown, `types.ts`), each one's capabilities (`descriptors.ts`), detection (`registry.ts`), switching a project's version control (`switching.ts`, `workflow/platformSwitch.ts`, #1419), and the watcher (`observe.ts`, its lifetime in `watching.ts`) |
+| `src/shared/platform/`, `src/main/platform/` | The platform layer (SPEC §16.3): None and Git behind one `PlatformAdapter` (`adapter.ts`; each platform in its own folder, HI-3489: `git/gitPlatform.ts` on `gitCommands.ts`, `none/nonePlatform.ts` on `none/none.ts`; their registries `adapters.ts` and the `*Ports.ts` lookups; a value or unknown, `types.ts`), each one's capabilities (`descriptors.ts`), detection (`registry.ts`), switching a project's version control (`switching.ts`, `workflow/platformSwitch.ts`, #1419), and the watcher (`observe.ts`, its lifetime in `watching.ts`) |
 | `src/shared/workflow/` | The workflow core, pure and unit-tested: a card's facts and their fold (`facts.ts`) and its work view (`workView.ts`); options, presets and their words (`options.ts`, `optionTexts.ts`, `projectWorkflow.ts`, `presetStep.ts`); the piece library and compiling options into a ruleset (`pieces.ts`, `guards.ts`, `compile.ts`); the board's stages (`stages.ts`); refusals and the next step (`refusals.ts`, `nextStep.ts`, `texts.ts`); card references (`cardRefs.ts`), lane lists (`laneList.ts`), roles (`roles.ts`), the reviewer pool's choice (`reviewerPool.ts`), the queue's model (`queue.ts`) |
 | `src/main/workflow/service.ts`, `runtime.ts`, `rulesets.ts`, `levels.ts`, `writes.ts`, `src/main/tasks.ts`, `src/main/cardIntents.ts` | Gates and intents (SPEC §16.7, §16.8): one runtime per project (`workflowFor`), each move's guards and actions in one `boardWrite`; options resolved Combwork → workspace → project (`rulesets.ts`; the levels' defaults `levels.ts`, written one at a time `writes.ts`); the board's one intent path (`tasks.ts` `runIntent`, the user's and the Assistant's moves through `moveThroughRules`) and agents' intents (`cardIntents.ts`); off with Advanced `cw.workflow.enforce` (`workflowEnforced()`) |
 | `src/main/workflow/reconcile.ts`, `reconciler.ts`, `checks.ts`, `runChecks.ts`, `runLink.ts`, `cardWork.ts` | Reconciliation of work done outside Combwork (SPEC §16.4.4); runs as checks (§16.13); a card's work read for the window (`tasks:work`, `tasks:workBadges`, `tasks:forYou`) |
@@ -307,18 +307,18 @@ wired the rest into the app.
 **The platform boundary** (P2, after its review): the runtime, reconciliation and check runs ask a `PlatformAdapter`
 (`src/main/platform/adapter.ts`: start, the revision now, a submission's endpoints and guard inputs, finish inputs, a
 moved head and sameness, containment, reconcile, a check's bracket, check copies, platform actions), looked up by the
-ruleset's platform, and never switch on a platform id (AGENTS.md's rule for providers). `gitPlatform.ts` and
-`nonePlatform.ts` implement it on `git.ts` and `none.ts`. The merge queue is Git's integration (Combwork merges needs Git).
+ruleset's platform, and never switch on a platform id (AGENTS.md's rule for providers). `git/gitPlatform.ts` and
+`none/nonePlatform.ts` implement it on `gitCommands.ts` and `none/none.ts`. The merge queue is Git's integration (Combwork merges needs Git).
 Many modules still call Git directly past it (the runner, locks, slots, copies, the queue's mechanics, the Git view):
 1.4.0's refactor (HI-2783's R0 to R9) puts them behind five ports, repository context, workspace lifecycle, evidence
 and history, integration and repository operations, with the invariants each keeps and a type map from today's modules
 in SPEC §16.3.6. Until a module has moved, the code above is how it works. Port 1, repository context (HI-2784's R1):
 `platform/repoContext.ts` holds the contracts (`RepoContext`, `RepoRunner`, `RepoLocks`, importing no platform's code),
-`platform/gitRepoPorts.ts` is Git's, delegating to `git.ts`, `gitTool.ts`, `repoLock.ts`, `folderFence.ts` and
+`platform/git/gitRepoPorts.ts` is Git's, delegating to `git.ts`, `gitTool.ts`, `repoLock.ts`, `folderFence.ts` and
 `refHold.ts` unchanged, and `platform/repoPorts.ts` finds a folder's or a platform's (`repoContext`,
 `withFolderRepoLocks`). A caller moved to it imports only those two (`tests/repoPortsImports.test.ts`, check:repo).
 Port 2, workspace lifecycle (HI-2786's R4): `platform/workspacePort.ts` is the contract (a workspace's reads, its
-creation, preparation, detach, recreation and removal, a merged card line's deletion), `platform/gitWorkspacePort.ts`
+creation, preparation, detach, recreation and removal, a merged card line's deletion), `platform/git/gitWorkspacePort.ts`
 Git's over worktrees (the same git commands as before; `worktrees.ts` stays its helpers), and
 `platform/workspacePorts.ts` finds it (`slotWorkspaces()`, by the isolation capability). The slot pool (`slots.ts`,
 which takes it as `PoolDeps.workspaces`), its card hooks (`slotCards.ts`) and a 0.9 worktree's recreation
@@ -329,17 +329,17 @@ making) use the workspace port too, and the providers' context reads (Claude Cod
 in `accounts.ts`, the skill copies' exclude) are port 1's `mainTree`, `trustRoot` and `excludeFile` (`repoPorts.ts`);
 `tests/contextTraces.test.ts` holds their commands and answers.
 Port 3, evidence and history (HI-2787's R6): `platform/history.ts` holds the contracts (`HistoryPort`, `ObservePort`),
-`platform/gitHistory.ts` is Git's, delegating to `platform/git.ts` and the exact `git()` commands its callers ran, and
+`platform/git/gitHistory.ts` is Git's, delegating to `gitCommands.ts` and the exact `git()` commands its callers ran, and
 `platform/historyPorts.ts` finds one (`historyOf(platform)`, null for None; `observePort`, the watcher for every
 platform). Reconciliation, the recorder, targets, retarget, check brackets (`runChecks`, `queueChecks`) and the focused
 pick's diff read through it (`tests/historyPortsImports.test.ts`, check:repo); Git's adapter passes its port to
 `reconcileHistory` and `attributeFolder`. A card's move to another target (`workflow/retargetCard.ts`, HI-2821) asks its
-platform's optional `ownWork` proof (Git's in `platform/gitOwnWork.ts`; absent, the move isn't offered) and holds the refs
+platform's optional `ownWork` proof (Git's in `platform/git/gitOwnWork.ts`; absent, the move isn't offered) and holds the refs
 through port 1's `holdRefs`; `tests/retargetTraces.test.ts` holds its git commands.
 Port 4's candidate half (HI-2790's R7): `platform/integration.ts` holds the contract (`IntegrationPort`'s `update`,
-`candidate` and `mergeBase`, the queue's `CandidateHost`, the outcomes), `platform/gitIntegration.ts` is Git's (the queue's
+`candidate` and `mergeBase`, the queue's `CandidateHost`, the outcomes), `platform/git/gitIntegration.ts` is Git's (the queue's
 worktree made or reused, strict's update, the test merge in each style and its cleanup, moved from `mergeQueue.ts`), with
-`platform/gitCommits.ts` reading a commit's stream (hook, signer or git), and `platform/integrationPorts.ts` finds it by
+`platform/git/gitCommits.ts` reading a commit's stream (hook, signer or git), and `platform/integrationPorts.ts` finds it by
 the card's platform. `mergeQueue.ts` keeps the state machine, the facts and the messages, and calls the port for each
 candidate (`tests/integrationPortsImports.test.ts`, check:repo; `tests/workflow/queueTraces.test.ts` holds the commands to
 their recorded traces). Its advance, recovery and publish half (HI-2791's R8) is granular steps of the same port (the
@@ -349,10 +349,10 @@ removal, Resume's condition reads), called between the journal's phases: the jou
 hooks and pauses stay in `mergeQueue.ts` (`tests/workflow/queueAdvanceTraces.test.ts` holds those commands to theirs).
 R9 (HI-2792) finished the routing and audited what's left. The runtime builds its adapters from
 `platform/adapters.ts`, and the Git tool's readiness is each repository platform's runner (`repoTools()`,
-`checkRepoTools()`). Port 1 also owns keeping `.combwork` out (`RepoPorts.keepOut`, Git's in `platform/gitKeepOut.ts`;
+`checkRepoTools()`). Port 1 also owns keeping `.combwork` out (`RepoPorts.keepOut`, Git's in `gitKeepOut.ts`;
 `combworkVcs.ts` routes to it), the Files tab's ignore rules and search list (`RepoPorts.files`, Git's in
-`platform/gitFiles.ts`), the project's current line, and the metadata folders the Files tab hides. Detection's folder
-markers are `vcsDetect.ts`. Port 2 has the relocation capability (`Relocation`, Git's in `platform/gitRelocation.ts`),
+`platform/git/gitFiles.ts`), the project's current line, and the metadata folders the Files tab hides. Detection's folder
+markers are `vcsDetect.ts`. Port 2 has the relocation capability (`Relocation`, Git's in `platform/git/gitRelocation.ts`),
 which Repair (`workspaceMove.ts`) and the 1.1 folder move's worktree repair (`combworkMove.ts`) use. Port 3 gained the
 reads its last direct callers made (a step, identity, messages, the queue's step reads, a run's checked-out revision),
 and the queue reads them by the card's platform (`historyFor`). Port 5 gained the Changes tab's status and diff. The
@@ -364,77 +364,68 @@ historic migration, common, or a defect with its card), with the names it may ta
 implementing each one's port routes it by the project's platform. Its `SWITCHES` justify, per file, the switches on a
 platform's id (`platform === 'git'`) left outside the descriptors, adapters and registry (HI-2822): everything else reads
 the descriptor's workflow facts (`merges()`, `accepts()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()` in
-`shared/platform/descriptors.ts`; jj's integration is `user`, neither merging nor accepting: HI-2799's option A), a
+`shared/platform/descriptors.ts`), a
 capability, a gate or an operation. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one,
 a changed seam count or a changed switch count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
-**Version control stays pluggable** (HI-3140): jj's last id switches outside the platform layer went behind data and
-ports, as Git's had. The descriptor adds `name`, `ownedWorkspaces` (a row's identity, owned writes, the user's Recover…,
-a slot's store), `guidance` (the agents' rule keys, `ruleKeyOf`, `allRuleKeys`) and `detectionSteady`. The workspace
-port adds `refusal` (what a platform's refusal means to the slot pool). The window's words per platform are
+**Version control stays pluggable** (HI-3140): no platform's id is switched on outside the platform layer; the
+differences are the descriptor's data and the ports'. The window's words per platform are
 `shared/platform/presentation.ts` (`PLATFORM_VIEW`, `factOf`), the Agent API's `platform/agentPresentation.ts`
-(`FOUND`). A switch between platforms on one store asks each one's side (`platform/storeSides.ts`, jj's in
-`jjStoreSide.ts`), and the app composes the ports that need its services in `slotsApp.ts`'s `APP_PORTS`. The form's
-finish and folder choices are `formFinishes`/`formFolders` (`shared/workflow/options.ts`). jj's modules outside the
-layer stay where they are, each for its reason: `jjCards.ts`, `jjSetupStamp.ts`, `jjPublish.ts` and its worker are
-composition (platform code imports no app module); `jjWindow.ts`, `views/JjSections.tsx`, `shared/jjViews.ts` and
-`shared/jjTool.ts` are jj's page, its reads and its types, as Git's are; `schema/jjPublishStep.ts` is the database's
-history. jj's candidate checks and words moved into the layer (`platform/jjCandidateChecks.ts`, `jjCandidateReturn.ts`):
-the workflow's candidate pass (`reconcile.ts`) gets them through its reconcile port (`CandidateWords`, JjPlatform's), and
-their old `workflow/` paths only re-export them for the tests (the audit's `COMPAT_ONLY` fails a module under `src` that
-imports one). Every import of a jj platform module from outside the layer and jj's homes is an edge in the audit's
-`JJ_EDGES`, with the names it may take, as Git's are in `EDGES` (slot preparation's two jj reads are `defect`s, HI-3165).
-The audit's scan is TypeScript's parser (any comparison, either side, any quotes, a `case`, `'<id>' in`, an id
-given to a descriptor helper or read off `PLATFORMS`), every id read from `PlatformId`. It exempts the platform layer and
-Git's modules, jj's homes above for jj's own id only, and another enum's `none` by the field names `NOT_PLATFORM`
-lists; each exemption no longer used fails as stale. `tests/platformCapabilities.test.ts` pins each answer to the id
-switch it replaced. **A fourth platform** adds its `PlatformId` and `PLATFORMS` entry, its port modules in `platform/`
-with their registry rows (workspace, history, repository reads and operations, integration, release reads, adapters),
-an `APP_PORTS` maker if its port needs the app's services, its `PLATFORM_VIEW` and `FOUND` rows and its `PLATFORM_NAME`
-(typecheck names each `Record<PlatformId, …>`), a `StoreSide` if it shares a store with another, its page's sections,
-and its words in every locale. Slots, sessions, the workflow, the queue, servers and the Version Control tab's header
-are not edited.
-jj (1.5.0's J0, HI-2793; SPEC §16.3.6, jj's runner and detection) is not a platform yet: `platform/jjRunner.ts` is its
-bounded runner (the standalone `jj.exe`, its version against `resources/tested-vcs.json` through `shared/jjTool.ts`,
-reads with `--ignore-working-copy` and config overrides, an output cap, a time limit, cancellation and shutdown, each
-ending jj's process tree by identity through `processTree.ts`, which cw-progress's wrapper uses too), starting its
-processes in its own worker (`platform/jjWorker.ts` over `jjProcess.ts`, never Git's); only the pinned version is
-trusted (`jjSupported`; a newer one is `untested`); and `platform/jjDetect.ts` is read-only detection
-(`jjContextOf`: the workspace, its shared repository and Git store, linked, colocated, a nearer Git root, or unknown
-with a code; its jj reads pinned to the one operation head, unknown with several, HI-2831). Neither is in `repoPorts.ts`; only Copy Diagnostics and the tests reach them (`tests/jjReal.test.ts` on
-the pinned jj, `npm run jj:fetch`). J3 (HI-2796; SPEC §16.3.6, jj's history, attribution and evidence) adds jj's side
-of port 3, unregistered too (J6 composes it): `platform/jjView.ts` (the operation heads, a checkout record and colocated
-Git state, read from files, bounded, no process), `jjReads.ts` (reads pinned `--at-op` the single head, used only while
-it still is), `jjBoundary.ts` (the one snapshot Combwork takes, under the store's lock and its owner's lease),
-`jjChecks.ts` (a check's bracket and its pure credit decision; `jjIgnoredEntries.ts` leaves out of it what jj ignores,
-asking Git's `check-ignore` on jj's store, HI-3158; by kind in `gitShadowIgnore.ts`'s shadow work tree, which Git's
-record shares, `gitIgnoredByKind.ts` with the folder's git dir and index, HI-3175), `jjAttribution.ts` and `jjFacts.ts` (provenance from
-recorded commits and complete evolutions; the ids in `data.platform.jj`) and `jjObserve.ts` (the heads watched, read at
-one head). `tests/jjHistory.test.ts` and, on the pinned jj, `tests/jjHistoryReal.test.ts`. `platform/jjAdvance.ts`
-(HI-3235, J1's probe promoted; SPEC §16.3.6, jj's target advance) is Combwork's advance of a jj target: the plan, its
-journal files (`.combwork/jj-advance`), the base refusals, the steps (prepare, integrate, export), the classifier that
-calls it integrated only on the full lineage, recovery and the undo. It takes no lock: its entries need a `Held` token
-from `underLock`, inside the store's repository lock. Only `jjPlatform.ts` reaches it, through the adapter's optional
-ports (`advance`, `advanceAnswer`, `recoverAdvances`) that the generic reconcile and `runActions` call
-(`workflow/advanceHost.ts` writes the facts); `tests/integrationPortsImports.test.ts` fails on any other import.
-jj's workspaces (1.5.0's J2, HI-2795; SPEC §16.3.6, jj's workspaces):
-`platform/jjWorkspacePort.ts` is jj's workspace lifecycle port (`createJjWorkspacePort`: made by `jj workspace add` from
-a sparse, empty control workspace, reads pinned at one operation, line operations refused, `record` the explicit
-snapshot, removal journalled and checked by the folder's creation generation), `platform/jjRecovery.ts` a stale
-workspace's resumable recovery (`recoverStale`), and `schema/workspaceIdentityStep.ts` the slots' and copies' platform
-and identity columns. `slots.ts` and `copies.ts` take a port per row (`portOf`) and call `record` where they hold the
-folder; jj's port reaches them only by injection (not in `workspacePorts.ts`), from the tests (`tests/jjWorkspaces`,
-`jjSlotPool`, `jjRecovery`, over `tests/jjWorkspaceHarness.ts`).
-jj's operations (1.5.0's J7, HI-2800; SPEC §16.3.6, jj's recovery, agents and compatibility): `platform/jjOperations.ts`
-reads the operation log and an operation's views pinned at the single head, and `platform/jjOpView.ts` (pure, run on jj's
-worker through `runner.preview`) parses jj 0.47.1's `debug object view` whole and decides a revert's preview and whether
-its command is offered (E1–E7); the window's Operations section is `views/JjSections.tsx`. `platform/jjKeepOut.ts` keeps
-`.combwork` out of a non-colocated jj repository, and `shared/platform/metadataDirs.ts` names every platform's own folder
-(`.git`, `.jj`) for the Files tab, search, the watchers, the document tools and None's deliverables.
-A folder's repository boundary (1.5.0's J9f, HI-2896): `platform/repoBoundary.ts`, a leaf read with no process, names the
-nearest marker's platform (a non-colocated `.jj` hides any Git repository above it, an unreadable one is unknown), and
-`repoPorts`' folder helpers and `repoLock.commonGitDir` go by it. Every repository lock goes through one owner,
-`repoLock.takeStores` (stores deduplicated and ordered whatever platform named them, re-entrant only for a live owner);
-`slotsApp.storeLock` delegates to it.
+(`FOUND`), and the app composes the ports that need its services in `slotsApp.ts`'s `APP_PORTS`. The form's finish and
+folder choices are `formFinishes`/`formFolders` (`shared/workflow/options.ts`). The audit's scan is TypeScript's parser
+(any comparison, either side, any quotes, a `case`, `'<id>' in`, an id given to a descriptor helper or read off
+`PLATFORMS`), every id read from `PlatformId`. It exempts the platform layer and Git's modules, and another enum's
+`none` by the field names `NOT_PLATFORM` lists; each exemption no longer used fails as stale.
+`tests/platformCapabilities.test.ts` pins each answer to the id switch it replaced. **A third platform** adds its
+`PlatformId` and `PLATFORMS` entry, its port modules in its own folder `platform/<vc>/` with their registry rows (workspace, history,
+repository reads and operations, integration, release reads, deliverables, adapters), an `APP_PORTS` maker if its port needs the
+app's services, its `PLATFORM_VIEW` and `FOUND` rows and its `PLATFORM_NAME` (typecheck names each
+`Record<PlatformId, …>`), its page's sections, and its words in every locale. Slots, sessions, the workflow, the queue,
+servers and the Version Control tab's header are not edited.
+A folder's repository lock (HI-2896): its store is the common git dir `repoLock.commonGitDir` names (read from the
+`.git` files with no process where they say, else asked of git), and `repoPorts`' folder helpers find a folder's context
+by it. Every repository lock goes through one owner, `repoLock.takeStores` (stores deduplicated and ordered, re-entrant
+only for a live owner), whichever platform's context named the store.
+**Each version control in its own folder** (HI-3489): `src/main/platform/` holds the seam (the adapter and port
+contracts, their registries, the watcher, detection, and what every platform shares: `types.ts`, `again.ts`,
+`limits.ts`, `ownedWork.ts`, `snapshotLine.ts`, `agentPresentation.ts`), and one folder per platform: `git/` (its
+adapter `gitPlatform.ts`, its ports `gitRepoPorts.ts`, `gitWorkspacePort.ts`, `gitHistory.ts`, `gitIntegration.ts`,
+`gitRepoOps.ts`, `gitRepoReads.ts`, `gitRevisionReads.ts`, `gitReleaseReads.ts`, and what only they use: submodules,
+transport, signing, commits, ref holds, the Commit and Set aside of a folder's changes) and `none/` (its adapter
+`nonePlatform.ts`, its content hashing `none.ts`, the whole-project read off main's thread `noneBaseline.ts` and its
+worker, and its deliverables port `noneDeliverables.ts`). Git's code that Combwork's own git use shares stays outside
+the folder, beside `git.ts` (the runner) and `gitTool.ts` (finding git): `gitCommands.ts` (the revision reads and line
+moves, which the Git view, the branch cards, Compare and the repository lock call too), `gitRefs.ts` (refs read from the
+files, git's worker's), `gitKeepOut.ts` (`.combwork` kept out of git, which the 1.1 moves rewrite), `gitIgnoredByKind.ts`
+and `gitShadowIgnore.ts` (the watcher's Git half). So do the Git view and the Version Control tab's features any project
+with a repository can use (`gitRepo.ts`, `gitCompare.ts`, `gitInit.ts`, `gitCancel.ts`, `branchWatch.ts`), and the
+signer agents' sessions run (`src/main/signer/`: `cw-sign.ts`, built to `out/main/cw-sign.js`, and its rules, which
+`sessions.ts` sets up for every session). A platform's folder may import outward; nothing outside it imports it but
+the registries: `platform/adapters.ts` and the port lookups `repoPorts.ts`, `workspacePorts.ts`, `historyPorts.ts`,
+`integrationPorts.ts`, `repoOpsPorts.ts`, `repoReadsPorts.ts`, `revisionReadsPorts.ts`, `releaseReadsPorts.ts` and
+`deliverablesPorts.ts` (the workflow's None paths ask `pathsDeliverables()`, never `none/`). `tests/gitAudit.mjs`'
+`sealBreaks` (check:repo) fails any other import of a folder's file from `src/`, a new folder's at once, and a dynamic
+import or require whose specifier isn't one whole string literal, anywhere (HI-3506), or a loader it can't follow:
+`require` handed on, `module.require`, `createRequire` (HI-3512), a member of `module` by a built name (HI-3521). A
+registry's reach is an allow-list (HI-3522): it imports a folder's files only by a static `import … from`, and exports
+only values it builds from them: an imported name may be `new`ed or called, a value in an object literal, or a
+function's result (`[new NoneAdapter()]`, `{ git: gitHistory }`, `return gitIntegration`). Any other reach (a re-export,
+`import X = require(…)`, a dynamic import or require) or any other use of an imported name (exported or aliased as it
+is, in a type, an array, an argument) fails;
+tests import a folder's files directly. **Adding a version control** is a folder `src/main/platform/<vc>/` holding its adapter and
+port implementations, its line in `adapters.ts` and in each port registry it implements, and its descriptor in
+`src/shared/platform/descriptors.ts` (its `PlatformId`, its `PLATFORMS` entry), plus its rows in the data keyed by
+platform id. **Removing one** is deleting its folder, those lines, its descriptor and those rows (HI-3489's decision:
+the rows stay in the shared tables, not in the folder). Typecheck lists each row when the id goes, so none is missed:
+the `Record<PlatformId, …>` maps (`PLATFORM_VIEW`, `FOUND`, `PLATFORM_NAME`, presets, form groups and their words, a
+page's sections), the lists of every id (the levels', the settings catalogue's, the templates'), and the defaults that
+name None (detection finding nothing, a project with no platform recorded, the default exclusions). Nothing else needs
+a platform at run time: the workflow keeps None's content hashing (`Workflow.none`) only while a platform declaring
+paths is installed, and asks for it (`deliverables()`) only on such a card's paths and checks. **None is the
+baseline, not removable in this way:** its id is what detection says when it finds no version control (or one Combwork
+doesn't support), and the switch offers, Initialise repository's switch and "use the parent repository" move a project
+between it and the one found; a build without it would have no answer for a plain folder. Its implementation is sealed
+in `none/` all the same, and a Git workflow runs without it (HI-3489's trial: both typechecks clean once its rows went,
+the Git workflow suites passing).
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets
@@ -566,14 +557,10 @@ outside it: the same answer, with the fingerprint steady across the asking and t
 likely only stat data moved (an outside `git status` refreshing the index, an editor's git integration, a file
 touched). Even then the guards' inputs read in between may have seen another state and back (HR5, round 2: dirty,
 clean when they read, dirty again), so the new fingerprint is never adopted for them: the intent is **gathered again**
-from the top, once (`regather`), every read afresh; a fingerprint moving again in that pass refuses. A start (an
-agent's, or the start in a drag) and a verdict may go further where its platform says so (`gathers`; jj's 3, HI-2916: Combwork's own jj operations move the head its
-fingerprint keeps; HI-3216: a verdict beside its review copy's checkout, the jj operation start review's lease makes): gathered again while only the fingerprint moved, or while it can't be read at that instant (HI-2972,
-`gatherAgain`: jj's operation heads mid-update, or the target's ref while Combwork's file gate holds the store, HI-3012), before the transaction or in it (the content asked again after the write
-refused), until its passes are spent, then refused. Anything else (an edit, a staged change, a checkout, an operation,
+from the top, once (`regather`), every read afresh; a fingerprint moving again in that pass refuses. Anything else (an edit, a staged change, a checkout, an operation,
 an index git can't read) refuses, as before. None's fingerprint is already content (its paths' hash). Each intent,
 each lane's look in a branch-update pass, and each merge-queue entry's way through (#1386), is one `gitStep`
-(`platform/git.ts`, #1376): what it asks about fixed commits (an ancestor, a merge base, a tree, the queue's containment
+(`gitCommands.ts`, #1376): what it asks about fixed commits (an ancestor, a merge base, a tree, the queue's containment
 of a head it read, by full ids) is asked of git once in it per repository (its common git dir, read
 from `.git`: a project and its worktrees share answers, another repository never); nothing about refs, HEAD or files is
 kept, so every read of state (a regather's, the move's own at its boundary) asks git again. The Assistant
@@ -635,7 +622,7 @@ once), each repository and folder watched once however many projects share it:
   never from watches inside `.git`: Windows won't rename a folder while a handle is open on anything inside it, so a
   watch there (or on any subfolder) stopped the project being renamed. A bare repository has one watch on its git dir.
   `HEAD`, `packed-refs`, `refs/heads`, `logs/HEAD` and `worktrees/<n>/{HEAD,gitdir,logs/HEAD}` count. A burst is read
-  once (150 ms quiet, at most 1 s), from the ref files with no git process (`repoRefs.ts`: in git's worker, one read at
+  once (150 ms quiet, at most 1 s), from the ref files with no git process (`gitRefs.ts`: in git's worker, one read at
   a time, HI-1814; the first, as the repository is attached, at once on main), and said to
   subscribers as `lineMoved` (a branch; a target is a line, whose the subscriber's options say) and `folderMoved` (a
   working folder's HEAD). Only a repository's first read takes what it finds silently; every later read (its events, a
@@ -1006,7 +993,7 @@ card's project) is still the one it was for. The actor is the change's
 `assistant`, `agent:<id>`, or `combwork` for Combwork's own; a move's cause `user` from the window, `intent` from an agent's
 or the Assistant's tools and the API, `derived` for Combwork's. **Platform reads are made before the change** ("The one path": slow reads outside `boardWrite`):
 `updateTask`, `updateTasks` and `createTask` plan which cards a change may start or submit from the board's columns
-(`cardHeads`, no document read) and read their folders with git (`platform/git.ts`: branch, head, merge base with the
+(`cardHeads`, no document read) and read their folders with git (`gitCommands.ts`: branch, head, merge base with the
 target, files, candidate key); a batch's are made before its lock and its cards changed by the locked path, so no read
 runs inside a change. A fact whose reads are missing or for another agent records them as not read. A read that fails
 never refuses: its field is null and `platform.unknown` names it with what couldn't be read (a project with no options

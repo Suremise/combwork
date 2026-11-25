@@ -20,6 +20,11 @@ import { ForYouChip, ForYouSection } from './ForYou'
 import { KindField, KindMark, KindProposal } from './CardKind'
 import { ReviewSkipField, ReviewSkipMark, ReviewSkipProposal, useProjectReviews } from './CardReviewSkip'
 import { TargetField, TargetMark, useProjectTargets } from './CardTarget'
+import { SourceField } from './CardSource'
+import { PrLine, PrStatus } from './CardPullRequest'
+import { FromGithubButton } from './GithubPrs'
+import { GithubFeedbackField } from './CardGithubFeedback'
+import { PrFeedbackField } from './CardPrFeedback'
 import { askedByNow, useForYou } from '../forYou'
 import { useTeamPause, workspacePaused } from '../teamPause'
 import type { ForYouItem } from '@shared/workflow/workView'
@@ -115,7 +120,7 @@ type StallKind = 'nobody' | 'forward' | 'not-watching' | 'wake-untaken' | 'revie
 
 /** The agents as every card's stall reads them: those that may loop on a card, and those watching cards. */
 function stallAgentsOf(projects: ProjectInfo[]) {
-  const loopers = projects.flatMap((p) => p.agents.map((a) => ({ name: a.name, project: p.name, notWatching: a.live?.notWatching, untaken: !!a.live?.untakenLine })))
+  const loopers = projects.flatMap((p) => p.agents.map((a) => ({ name: a.name, project: p.name, notWatching: a.live?.notWatching, untaken: !!a.live?.untakenLine, uncounted: a.live?.tasksUncounted })))
   const watchers = projects.flatMap((p) => p.agents.flatMap((a) => (a.live?.watch?.cards.length ? [{ name: a.name, project: p.name, agentId: a.id, cards: a.live.watch.cards, watchSince: a.live.watch.since, status: a.live.status, silentMinutes: agentRuntime(a.live).silentMinutes }] : [])))
   return { loopers, watchers }
 }
@@ -786,6 +791,7 @@ const CardTile = memo(function CardTile({
           </Tooltip>
         )}
         <ReviewLine c={c} reviewer={reviewer} projectPath={projectPath} />
+        <PrLine b={work} />
         {(!!forYou?.length || work?.kind === 'no-code' || work?.kindProposed === 'no-code' || !!work?.reviewSkip || (work?.reviewSkipProposed ?? null) !== null || !!work?.target) && (
           <div className="task-for-you-row">
             <ForYouChip items={forYou} />
@@ -846,6 +852,10 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const movedNames = useStore((s) => s.movedCardNames)
   // Each card's work badges (#1224), read with the board.
   const workBadges = useWorkBadges()
+  // HI-3552: the board opening reads the pull requests of its cards in PR open (GitHub can't tell Combwork).
+  useEffect(() => {
+    void call('tasks:prFollow').catch(() => {})
+  }, [])
   // The lanes, for a card held up by its lane's deadlock (#1410).
   useLanes()
   // What waits for the user on each card (#1276): its chip, and the For you filter.
@@ -878,7 +888,8 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
   const droppable = (column: BoardColumnId): boolean => {
     // Merging takes no drop (its cards come through the merge queue), and a card in Merging leaves it only by Remove
     // from queue, never by a drag into Approved (#1420).
-    if (column === 'merging' || (column === 'passed' && dragNow.current?.column === 'merging')) return false
+    // HI-3552: PR open the same: its cards come once their pull request opens, and leave by GitHub's merge or close.
+    if (column === 'merging' || column === 'prOpen' || (column === 'passed' && (dragNow.current?.column === 'merging' || dragNow.current?.column === 'prOpen'))) return false
     const d = dropsNow.current
     return !d || d.n !== dragNow.current?.n || !d.columns || d.columns.has(column)
   }
@@ -1020,7 +1031,7 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
     setDrag(null)
     if (!d) return
     // A drop into a stage is its category's move (#1420).
-    const column: TaskColumn = into === 'merging' ? 'passed' : into
+    const column: TaskColumn = into === 'merging' || into === 'prOpen' ? 'passed' : into
     const card = all.find((c) => c.number === d.n)
     if (!card || (card.column === column && d.before === d.n)) return
     // Into Doing from another column: who works on it is asked first, and the card stays put until then (Cancel).
@@ -1058,7 +1069,7 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
     // Merging's cards are the merge queue's: no Archive All there. A column's archives its own stage's cards only, whether
     // or not another stage of its category shows now: a card can move on to Merging while the dialog is open (HR2's
     // #1420 rounds 1 and 2), and main checks each card's stage again.
-    ...(col.id === 'merging' ? [] : [archiveAllItem(all, { column: col.category, stage: col.stage, name: col.name, project, scope, query }, readOnly, stageOf)])
+    ...(col.id === 'merging' || col.id === 'prOpen' ? [] : [archiveAllItem(all, { column: col.category, stage: col.stage, name: col.name, project, scope, query }, readOnly, stageOf)])
   ]
 
   const column = (col: BoardStageColumn) => {
@@ -1371,6 +1382,8 @@ export function BoardToolbar({
   useLanguage()
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const count = useStore((s) => (s.tasks ?? NO_TASKS).filter((c) => c.archived && (project === null || c.project.toLowerCase() === project.toLowerCase())).length)
+  // HI-3553: one project's board offers its open pull requests (From GitHub…) when it has a GitHub repository.
+  const projectPath = useStore((s) => (project ? (s.workspace?.projects.find((p) => p.name.toLowerCase() === project.toLowerCase() && p.isGitRepo)?.path ?? null) : null))
   // How many cards an older version saved are set aside (#1044): the ⋯ menu offers them while any are. Read again as the board
   // changes, and as their dialog closes: a discard there changes no card, so the board alone wouldn't say (HI-1860).
   const tasks = useStore((s) => s.tasks)
@@ -1405,6 +1418,7 @@ export function BoardToolbar({
       </label>
       <BoardWorkflowLink project={project} />
       <div className="grow" />
+      {project && projectPath && <FromGithubButton project={project} projectPath={projectPath} readOnly={readOnly} />}
       <button className="btn primary" disabled={!!readOnly} title={readOnly ?? undefined} onClick={() => set({ taskOpen: { project: project ?? '' } })}>
         <Icon name="add" /> {tr(NEW_CARD)}
       </button>
@@ -2343,6 +2357,23 @@ export function TaskDialog() {
           <KindField card={card} b={badge} noCode={noCode} setNoCode={setNoCode} readOnly={ro} />
           <ReviewSkipField card={card} b={badge} reviews={projectReviews} skip={skipReview} setSkip={setSkipReview} note={skipNote} setNote={setSkipNote} readOnly={ro} />
           <TargetField card={card} b={badge} targets={projectTargets} value={newTarget} setValue={setNewTarget} readOnly={ro} />
+          {card && <PrStatus card={card.number} b={badge} />}
+          {card?.project && (
+            <SourceField
+              card={card}
+              readOnly={ro}
+              onSet={(c) => {
+                // Its github-pr or github-issue label, shown at once unless the labels box was edited meanwhile.
+                const now = c.labels.join(', ')
+                if (labels === orig.current.labels) setLabels(now)
+                orig.current.labels = now
+              }}
+            />
+          )}
+          {/* HI-3559: a pull request's card's reviews to GitHub. */}
+          {card?.source?.kind === 'pr' && <GithubFeedbackField card={card} />}
+          {/* HI-3554: its pull request's comments, and Address feedback. */}
+          {card?.project && <PrFeedbackField card={card} b={badge} />}
           <label>{tr(msg({ id: 'board.dialog.labels', defaultMessage: 'Labels', description: "A field label in the card dialog: the card's labels." }))}</label>
           <input className="input" placeholder={tr(msg({ id: 'board.dialog.labelsPlaceholder', defaultMessage: 'Comma separated, e.g. bug, ui', description: "Placeholder of the card dialog's labels box: labels separated by commas (bug and ui are examples)." }))} value={labels} readOnly={ro} onChange={(e) => setLabels(e.target.value)} />
           <label>{tr(BLOCKED_FIELD)}</label>

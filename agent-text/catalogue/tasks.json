@@ -499,6 +499,26 @@
     "note": "An error (HI-2618): the reason a card waits on purpose is longer than it may be; {max} is the most characters it takes.",
     "audience": "both"
   },
+  "tasks.feedback.changed": {
+    "text": "{card} is now about another pull request than #{number} on {repo}: no fix card was made. Read its feedback again.",
+    "note": "HI-3554: an error from Address feedback in the card dialog: the card’s pull request changed (its GitHub source, or the one it opened) since its feedback was shown. {card} a card key like HI-12, {number} the pull request’s number, {repo} owner/name.",
+    "audience": "both"
+  },
+  "tasks.feedback.gone": {
+    "text": "None of the chosen comments is on pull request #{number} now: no fix card was made. Read its feedback again.",
+    "note": "HI-3554: an error from Address feedback: GitHub, read again, no longer has any of the comments the user ticked (deleted or edited away). {number} the pull request’s number.",
+    "audience": "both"
+  },
+  "tasks.feedback.none": {
+    "text": "Choose at least one comment to address.",
+    "note": "HI-3554: an error from Address feedback when no comment is ticked.",
+    "audience": "both"
+  },
+  "tasks.feedback.notOpen": {
+    "text": "Pull request #{number} isn’t open on GitHub: no fix card was made.",
+    "note": "HI-3554: an error from Address feedback: the pull request was merged or closed, so a fix card for it would have nowhere to push. {number} its number.",
+    "audience": "both"
+  },
   "tasks.history.answerTold": {
     "text": "Told agent {agent} of your answer",
     "note": "A line in a card's history: Combwork told the agent {agent} (its name) of the user's answer to a request for them (For you: an approval, a reply, a decision, a choice at the round limit). A noun before the name (glossary §1 rule 4).",
@@ -644,11 +664,6 @@
     "note": "A line in a card's history: the card came back with its removed project {project} (its folder name), under a new number; {was} was its number before.",
     "audience": "both"
   },
-  "tasks.history.jjCandidateReturned": {
-    "text": "Came back from its candidate on {target}: {reason, select, conflict {it conflicts with {target}} checks {its merge check {check} failed on the candidate} other {it isn't up to date with {target}}}{files, select, none {} other { (in {files})}}. Its builder {reason, select, checks {fixes it} other {brings {target} in with jj}} and submits it again.",
-    "note": "A comment Combwork writes on a jj card (HI-2871) when it sends the approved card back to its builder: before the user integrates it, Combwork built the reviewed change onto its target bookmark {target} (a name, such as main) as a candidate, and it conflicts with {target}, a merge check {check} (its name, such as typecheck) failed on it (HI-2938), or it isn’t up to date with it ({reason}, select: translate each; keep the keys). {files} lists the files concerned (file paths, keep them; none: leave that part out). jj is the tool’s name: keep it. “Candidate” is the commit Combwork built for the user to integrate.",
-    "audience": "both"
-  },
   "tasks.history.kind": {
     "text": "{how, select, made {Made as no code} proposed {Proposed as no code} confirmed {Confirmed as no code} kept {Kept as code} other {Kind changed to {kind, select, code {code} other {no code}}}}",
     "note": "A line in a card's history (#1277): the card's kind, code (the default) or no code (a decision, a write-up, a trial: no commits): it was made as no code, an agent proposed no code, the user or the Assistant confirmed that or kept it as code, or its kind was changed later (an exception to the rules). Select keys: translate each sentence.",
@@ -742,6 +757,16 @@
   "tasks.history.placed": {
     "text": "Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
     "note": "A line in a card's history: an agent put the column's cards in order, and this card is now at place {place} (an ordinal: 2nd, 3rd). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each.",
+    "audience": "both"
+  },
+  "tasks.history.prClosed": {
+    "text": "Pull request #{number} was closed on GitHub without being merged: the card is back in Todo, its branch kept for its next start.",
+    "note": "HI-3552: a comment Combwork writes on a card whose GitHub pull request (number {number}) was closed without merging: the card moved back to Todo, and its branch stays, so starting it again carries on from its work.",
+    "audience": "both"
+  },
+  "tasks.history.prNotPushed": {
+    "text": "The card’s fixes weren’t pushed to pull request #{number}: {why, select, fork {it is from a fork whose author doesn’t allow maintainers to push to it} outside {its branch on GitHub has commits the approved one lacks, pushed from outside} refused {the push was refused: its branch moved since it was read} notOpen {it isn’t open on GitHub} rewrite {a git URL rewrite, {rule}, applies to its fork’s address, and Combwork doesn’t push through one} config {git’s URL rewrites couldn’t be read, and Combwork doesn’t push without them} other {its head isn’t the branch the card started on}}. Nothing was pushed; the card follows the pull request in PR open.",
+    "note": "HI-3562: a comment Combwork writes on a card about an existing GitHub pull request (number {number}) when it couldn’t push the card’s approved fixes to it. {why} (select: translate each; keep the keys): a fork whose author doesn’t allow maintainer edits; commits on the pull request’s branch that someone else pushed, which Combwork never overwrites; GitHub refused the push because the branch moved; the pull request is no longer open; a git URL rewrite (insteadOf or pushInsteadOf: {rule}, its git config key, the user’s own: keep it as it is) applies to the fork’s address, and Combwork doesn’t push through one; git’s URL rewrites couldn’t be read; its head branch changed. \"PR open\" is the board stage: as translated there.",
     "audience": "both"
   },
   "tasks.history.queueGuarded": {
@@ -849,6 +874,11 @@
     "note": "A comment Combwork writes on the cards an agent works on, after its CLI's safety classifier stopped a response and the agent moved to another model. {agent}: the agent's name, in bold (keep the ** marks). Then, when it stopped any ({stops}: how many this session), on which model ({model}: its name; none: leave that branch empty) and when ({time}: \"15:12\"); the model it runs on now ({to}) instead of the old one ({from}) since a time ({since}); whether its CLI asks what to do (asks) or it sits idle (idle); its last tool calls before the stop ({tools}: tool names, keep them); and what to do about it in that CLI ({help}: its own sentence, already translated). Only names, never what was stopped.",
     "audience": "both"
   },
+  "tasks.history.source": {
+    "text": "{set, select, yes {Its source: {kind, select, pr {pull request} other {issue}} #{number} on {repo}} other {Its GitHub source removed}}",
+    "note": "A line in a card's history (HI-3551): the GitHub pull request or issue the card is about was set (set yes: its kind, its number and its repository, owner/name) or removed. Keep the select keys.",
+    "audience": "both"
+  },
   "tasks.history.stageRepaired": {
     "text": "Recorded as Done, as the board had it: its workflow still had it in {stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} other {{stage}}}",
     "note": "A line in a card's history, by Combwork (HI-1674): the card was in the Done column, but a move had not reached its workflow, which still had it at an earlier stage ({stage}, select: a board stage; translate each); Combwork recorded it as Done and closed its open questions.",
@@ -912,6 +942,56 @@
   "tasks.history.watchEnded": {
     "text": "Ended {watcher}'s watch on it: {why, select, blocked {the card is blocked} reviewer {{agent} reviews it} reviewTaken {its review was taken from it} reassigned {reassigned to {agent}} unassigned {reassigned to no agent} done {the card is in Done} laneEnded {its lane ended} laneAbandoned {its lane was abandoned} other {{why}}}",
     "note": "A line in a card's history: Combwork stopped the agent {watcher} (its name) waiting for the card to change, because the card is blocked, another agent ({agent}) now reviews it, the review it waited for was taken from it, the card was given to another agent ({agent}) or to none, the card reached the Done column (its work merged), or the card loop (lane) the agent waited in ended or was abandoned ({why}, select: translate each).",
+    "audience": "both"
+  },
+  "tasks.source.agents": {
+    "text": "Only the user sets a card’s GitHub source.",
+    "note": "HI-3551: an error: an agent or the Assistant tried to set the GitHub pull request or issue a card is about; only the user does, in the card dialog.",
+    "audience": "both"
+  },
+  "tasks.source.gh": {
+    "text": "The GitHub CLI {problem, select, missing {isn’t installed} signedOut {isn’t signed in on {host}} timeout {didn’t answer in time} other {couldn’t read it}}: see Version Control → Workflow → GitHub.",
+    "note": "HI-3551: an error setting a card’s GitHub source: gh couldn’t be asked (problem: not installed, not signed in on the host, no answer in time, or another failure). Keep the select keys. Version Control → Workflow → GitHub is a place in the window: as translated there.",
+    "audience": "both"
+  },
+  "tasks.source.issueLinkChanged": {
+    "text": "This project’s GitHub repository is now {repo}, not {shown} as listed: list its issues again.",
+    "note": "HI-3555: an error making a card of an issue from the board’s From GitHub… Issues list: the project’s GitHub link changed to another repository since the list was shown. {repo} and {shown} are owner/name.",
+    "audience": "both"
+  },
+  "tasks.source.linkChanged": {
+    "text": "This project’s GitHub repository is now {repo}, not {shown} as listed: list its pull requests again.",
+    "note": "HI-3553: an error making a card of a pull request from the board’s From GitHub… list: the project’s GitHub link changed to another repository since the list was shown. {repo} and {shown} are owner/name.",
+    "audience": "both"
+  },
+  "tasks.source.noLink": {
+    "text": "This project has no GitHub link: none of its remotes is on its GitHub host (Version Control → Workflow → GitHub).",
+    "note": "HI-3551: an error setting a card’s GitHub source in a project without a GitHub link (HI-3550). Version Control → Workflow → GitHub is a place in the window: as translated there.",
+    "audience": "both"
+  },
+  "tasks.source.noProject": {
+    "text": "A card about the workspace has no GitHub source: only a project’s cards do.",
+    "note": "HI-3551: an error setting the GitHub source of a card that belongs to no project.",
+    "audience": "both"
+  },
+  "tasks.source.notFound": {
+    "text": "The GitHub CLI found no pull request or issue #{number} on {repo}{why, select, none {} other {: {why}}}.",
+    "note": "HI-3551: an error setting a card’s GitHub source: gh couldn’t read it. {number} its number, {repo} owner/name; {why} gh’s own words, or none (keep the select key).",
+    "audience": "both"
+  },
+  "tasks.source.notGithub": {
+    "text": "That isn’t a pull request or issue: give its address (https://…/pull/12 or …/issues/12) or its number (#12).",
+    "note": "HI-3551: an error setting a card’s GitHub source: the text typed isn’t the address of a GitHub pull request or issue, nor a number. Keep the example addresses.",
+    "audience": "both"
+  },
+  "tasks.source.otherRepo": {
+    "text": "That pull request or issue isn’t on this project’s repository ({repo} on {host}).",
+    "note": "HI-3551: an error setting a card’s GitHub source: the address is of another repository or host than the project’s GitHub link. {repo} is owner/name, {host} a host name.",
+    "audience": "both"
+  },
+  "tasks.source.started": {
+    "text": "{card}’s GitHub source can’t change once its work has started.",
+    "note": "HI-3551: an error setting or clearing the GitHub pull request or issue of a card that has started (its work is on it). {card} is a card key like HI-12.",
     "audience": "both"
   },
   "tasks.start.alreadyStarting": {

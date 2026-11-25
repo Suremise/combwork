@@ -58,9 +58,8 @@ export interface QueueRuns {
  * caller is Combwork's own: only Combwork changes these runs. An install's title is its command line: `titleFromCommand` keeps
  * it from the Agent API's public form (#620).
  */
-export function progressRuns(store: ProgressStore, on: () => boolean, workspacePath: string, projectPath: string, warn: (e: unknown) => void = () => undefined, extra: { copy?: string; stoppable?: boolean } = {}): QueueRuns {
-  // HI-2938: `extra` places the runs in a check copy (its name) whose job Stop ends (a jj candidate's checks).
-  const caller = (r: { noInstall?: boolean; installAsWritten?: boolean } = {}): ProgressCaller => ({ source: 'combwork', workspacePath, projectPath, ...extra, ...(r.noInstall ? { noInstall: true } : {}), ...(r.installAsWritten ? { installAsWritten: true } : {}) })
+export function progressRuns(store: ProgressStore, on: () => boolean, workspacePath: string, projectPath: string, warn: (e: unknown) => void = () => undefined): QueueRuns {
+  const caller = (r: { noInstall?: boolean; installAsWritten?: boolean } = {}): ProgressCaller => ({ source: 'combwork', workspacePath, projectPath, ...(r.noInstall ? { noInstall: true } : {}), ...(r.installAsWritten ? { installAsWritten: true } : {}) })
   return {
     start: (r) => {
       if (!on()) return null
@@ -424,6 +423,8 @@ export class BoundedLog implements CommandLog {
   private fd: number | null = null
   private written = 0
   private dropped = 0
+  /** Past MAX_LOG_BYTES, its line saying so written. */
+  private full = false
   private tail: Buffer[] = []
   private tailBytes = 0
   private last = ''
@@ -478,6 +479,15 @@ export class BoundedLog implements CommandLog {
       chunk = chunk.subarray(now.length)
     }
     if (!chunk.length) return
+    // HI-3564: the log stops growing here while the run goes on; it says so at once, not only at the end.
+    if (!this.full) {
+      this.full = true
+      try {
+        this.io.writeSync(this.fd, Buffer.from(`\n[… the log is full (${MAX_LOG_BYTES} bytes): the run goes on, and only its last output is written when it ends …]\n`)) // i18n-ignore: a log file's line, as the command's output is
+      } catch {
+        return this.broke()
+      }
+    }
     this.tail.push(chunk)
     this.tailBytes += chunk.length
     while (this.tailBytes - this.tail[0].length >= TAIL_BYTES) {

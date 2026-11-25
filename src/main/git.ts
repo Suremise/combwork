@@ -14,7 +14,7 @@ import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { CANCELLED, runGit, type CancelRequest, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
-import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
+import { readRepoRefs, type RepoRefs } from './gitRefs'
 import type { RunResult } from './platform/repoContext'
 
 const log = createLogger('git')
@@ -150,7 +150,7 @@ async function afterHalfMade(args: string[], run: (a: string[]) => Promise<GitRe
 /**
  * HI-2322: the repository a folder's worktree changes belong to, as oneWorktreeChange's queue knows it: its common git
  * dir (`.git/worktrees` lives there), the same for a checkout and each of its linked worktrees, with links, junctions
- * and drive aliases resolved. Read from the `.git` files where they say (as platform/git.ts's commonDirSync), else asked
+ * and drive aliases resolved. Read from the `.git` files where they say (as gitCommands.ts's commonDirSync), else asked
  * of git, else the folder itself.
  */
 export async function worktreeQueueKey(cwd: string): Promise<string> {
@@ -502,7 +502,7 @@ export async function gitDiff(projectPath: string, file: string, base?: string):
 }
 
 /** A path's working copy: its content, a link's target as git stores it, empty when deleted; its size when too large. */
-async function workingCopy(projectPath: string, abs: string): Promise<Buffer | { tooLarge: number }> {
+export async function workingCopy(projectPath: string, abs: string): Promise<Buffer | { tooLarge: number }> {
   try {
     const s = await lstat(abs)
     // A link is shown as git stores it (the path it points to), never followed: it could lead outside the project.

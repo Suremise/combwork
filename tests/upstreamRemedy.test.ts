@@ -6,7 +6,7 @@ import { execFileSync } from 'child_process'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
-import { destinationOf, fetchHeadOf, projectHost, upstreamRemedyOf } from '../src/main/platform/gitTransport'
+import { destinationOf, fetchHeadOf, projectHost, upstreamRemedyOf } from '../src/main/platform/git/gitTransport'
 import { REMOTE_PLACEHOLDER } from '../src/shared/workflow/queue'
 import { isAgain } from '../src/main/platform/again'
 

@@ -7,6 +7,7 @@
 // conversation text), into CW_TRIAL_REPORT (else report.txt in its temp folder). Nothing is written in the original,
 // and no real profile is used.
 //   CW_TRIAL_WS=<workspace> CW_TRIAL_REPORT=<file> npx vitest run tests/workflow/workspaceCopyTrial.test.ts
+// focused: opt-in (HI-3569: skipped without CW_TRIAL_WS, so the focused-test picker leaves it out)
 import { execFileSync } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
@@ -35,7 +36,7 @@ const under = (p: string, root: string): boolean => p.toLowerCase().startsWith(r
 const report: string[] = []
 
 describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)', () => {
-  it('copies it, upgrades the copy and migrates it, twice', { timeout: timing('test.hangRealJj') }, async () => {
+  it('copies it, upgrades the copy and migrates it, twice', { timeout: timing('test.hangRealLong') }, async () => {
     const dst = join(base, basename(SRC))
     const at = (p: string): string => (under(p, SRC) ? dst + p.slice(SRC.length) : p)
     // The workspace's own files, read-only.

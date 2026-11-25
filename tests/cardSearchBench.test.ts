@@ -4,6 +4,7 @@
 // without it) and against the window's filter of cards it already holds, and a card's edit with and without its
 // trigger. It checks, over a few hundred pieces of the board's own text, that the index finds exactly what the in-memory
 // search finds. Skipped without it.
+// focused: opt-in (HI-3558: skipped without CW_BOARD_BENCH_DB, so the focused-test picker leaves it out)
 import { copyFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -35,7 +36,7 @@ afterAll(async () => {
 const WORDS = ['usage', 'release', 'resume', 'board search', 'the', 'flaky', 'e2e', 'worktree', 'Assistant', 'translation', 'zzzzqx', 'card loop']
 
 describe('the full-text search on a real board’s copy', () => {
-  it.skipIf(!source)('costs and saves, timed, and finds what the board finds', { timeout: timing('test.hangRealJj') }, async () => {
+  it.skipIf(!source)('costs and saves, timed, and finds what the board finds', { timeout: timing('test.hangRealLong') }, async () => {
     const ws = join(base, 'ws')
     mkdirSync(join(ws, '.combwork'), { recursive: true })
     const file = join(ws, '.combwork', 'combwork.db')

@@ -329,4 +329,37 @@ describe('coverage (i18n:coverage), informational', () => {
     expect(readFileSync(join(root, 'locales/.source/pl/tips.json')).equals(tips)).toBe(true)
     expect(readFileSync(join(root, 'locales/.source/pl/board.json'), 'utf8')).toBe(crlf({ 'board.a': 'Save', 'board.b': 'Cancel' }))
   })
+
+  it("a recorded English of a message that is gone fails i18n:check, naming it, and --prune drops it, keeping each record's CRLF (HI-3519)", () => {
+    const crlf = (o: object) => `${JSON.stringify(o, null, 2)}\n`.replace(/\n/g, '\r\n')
+    const root = tree({
+      ...english,
+      'locales/pl/board.json': JSON.stringify({ 'board.a': 'Zapisz' }),
+      'locales/pl/tips.json': JSON.stringify({ 'tips.c': 'Wskazówka' }),
+      'locales/.source/pl/board.json': crlf({ 'board.a': 'Save', 'board.gone': 'Gone' }),
+      'locales/.source/pl/tips.json': crlf({ 'tips.c': 'A tip' }),
+      'locales/.source/pl/old.json': crlf({ 'old.x': 'Old' }),
+      'locales/de/board.json': '{}',
+      'locales/.source/de/board.json': '{ not json'
+    })
+    const tips = readFileSync(join(root, 'locales/.source/pl/tips.json'))
+    for (const js of [true, false]) {
+      const { results } = checkTranslations(root, { js }) as { results: Record<string, string[]> }
+      expect(results.pl, js ? 'parser' : 'CLI').toEqual([
+        '.source/pl/board.json: board.gone is recorded, but the English has no such message (npm run i18n:coverage -- --prune drops it)',
+        '.source/pl/old.json: old.x is recorded, but the English has no such message (npm run i18n:coverage -- --prune drops it)'
+      ])
+      expect(results.de).toEqual([expect.stringMatching(/^\.source\/de\/board\.json: not JSON/)])
+    }
+    const failed = script('i18nCheck.mjs', '--root', root, '--js')
+    expect(failed.status, failed.stdout).toBe(1)
+    expect(failed.stdout).toContain('board.gone is recorded')
+    const r = script('i18nCoverage.mjs', '--root', root, '--prune')
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stdout).toContain('pl: dropped 2 recorded English of messages that are gone (board.gone, old.x)')
+    expect(readFileSync(join(root, 'locales/.source/pl/board.json'), 'utf8')).toBe(crlf({ 'board.a': 'Save' }))
+    expect(readFileSync(join(root, 'locales/.source/pl/tips.json')).equals(tips)).toBe(true)
+    expect(existsSync(join(root, 'locales/.source/pl/old.json'))).toBe(false)
+    expect((checkTranslations(root, { js: true }) as { results: Record<string, string[]> }).results.pl).toEqual([])
+  })
 })

@@ -18,9 +18,10 @@ const files = execFileSync('git', ['ls-files', 'src'], { cwd: root, encoding: 'u
   .filter((p) => /\.(ts|tsx|cjs|mjs)$/.test(p))
 const src = Object.fromEntries(files.map((p) => [p, readFileSync(join(root, p), 'utf8')]))
 
-// HI-2781's patterns, as its inventory.py had them.
+// HI-2781's patterns, as its inventory.py had them; a direct Git import names a file in the Git platform's folder too,
+// where HI-3489 moved its implementation (HI-3506: the old paths undercounted).
 const PATTERNS = {
-  directGitImport: /(?:from\s*|import\s*\()['"][^'"]*\/(?:git|gitTool|gitWorker|gitCompare|gitRepo|gitInit|platform\/git|platform\/gitPlatform)['"]/,
+  directGitImport: /(?:from\s*|import\s*\()['"][^'"]*\/(?:git|gitTool|gitWorker|gitCompare|gitRepo|gitInit|platform\/git|platform\/gitPlatform|git\/[^'"]+)['"]/,
   gitExecution: /\b(?:git|gitTree|gitReading|gitRouted|withGitRoute|withoutGitRoute)\s*\(|['"]git['"]/,
   worktree: /worktree/i,
   refsAndReflog: /refs\/|reflog|packed-refs|update-ref|symbolic-ref/,

@@ -111,8 +111,11 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     await page.locator('.tab', { hasText: 'Activity' }).click()
     const row = page.locator('.activity-row.act-orphan', { hasText: 'linger' })
     const refresh = () => page.locator('.activity-head').getByRole('button', { name: 'Refresh', exact: true }).click()
+    // HB2's work shows once it is picked in the strip (HI-3568: the shared view lists each agent's Now in a row).
+    const hb2Ring = page.locator(`.activity-tab:not(.activity-workspace) .activity-map-ring[data-agent="${hb2.id}"]`)
     const rowShown = await until(async () => {
       if ((await row.count()) > 0) return true
+      if ((await hb2Ring.count()) === 1 && (await hb2Ring.getAttribute('aria-pressed')) !== 'true') await hb2Ring.click()
       await refresh()
       return false
     }, HUNG_MS)

@@ -23,6 +23,7 @@ interface CombworkMessageValues {
   'activity.endTitle': undefined
   'activity.ended': { label: string | number }
   'activity.endedNode': undefined
+  'activity.fromMapHeading': undefined
   'activity.heading': undefined
   'activity.hideFinished': undefined
   'activity.input': undefined
@@ -33,12 +34,16 @@ interface CombworkMessageValues {
   'activity.loadFailed': { error: string | number }
   'activity.loading': undefined
   'activity.map.agentsWorking': { agents: number; working: number }
+  'activity.map.all': undefined
+  'activity.map.allTip': undefined
+  'activity.map.callGone': undefined
   'activity.map.cardRole': { card: string | number; role: string }
   'activity.map.context': { pct: number }
   'activity.map.contextUnknown': undefined
   'activity.map.count': { n: number }
   'activity.map.doing': { doing: string }
   'activity.map.feedHeading': undefined
+  'activity.map.focusAgent': { name: string | number }
   'activity.map.label': undefined
   'activity.map.loading': undefined
   'activity.map.needYou': { n: number }
@@ -47,16 +52,28 @@ interface CombworkMessageValues {
   'activity.map.notLoaded': undefined
   'activity.map.notReported': undefined
   'activity.map.notRunning': { name: string | number }
+  'activity.map.panelCalls': { n: number }
+  'activity.map.panelClose': undefined
+  'activity.map.panelEmpty': undefined
+  'activity.map.panelMore': { n: number }
+  'activity.map.panelNoFile': { path: string | number }
+  'activity.map.panelOpen': undefined
+  'activity.map.panelOpenTip': { path: string | number }
+  'activity.map.panelPid': { pid: string | number }
+  'activity.map.panelSection': { section: string }
+  'activity.map.panelSummary': { n: number; heat: number }
   'activity.map.partial': undefined
   'activity.map.pct': { pct: number }
   'activity.map.prompt': undefined
-  'activity.map.ringTipShown': { name: string | number; load: string; known: string; pct: number; shown: string }
+  'activity.map.ringTipPick': { load: string; name: string | number; known: string; pct: number; picked: string }
+  'activity.map.runningKind': { kind: string; type: string }
   'activity.map.show': undefined
+  'activity.map.showInList': undefined
   'activity.map.state': { state: string }
   'activity.map.station': { station: string }
   'activity.map.stationTip': { station: string | number; n: number; heat: number; hasLast: string; last: string | number }
   'activity.map.stationTipPending': { station: string | number; status: string }
-  'activity.map.stripLabel': undefined
+  'activity.map.stripPick': undefined
   'activity.map.toggleContext': undefined
   'activity.map.toggleFeed': undefined
   'activity.map.toggleMap': undefined
@@ -66,6 +83,7 @@ interface CombworkMessageValues {
   'activity.notEnded': { why: string; label: string | number }
   'activity.notRunning': undefined
   'activity.nowHeading': undefined
+  'activity.nowRowTip': { name: string | number }
   'activity.openCard': undefined
   'activity.openSession': undefined
   'activity.orphanFact': undefined
@@ -92,7 +110,6 @@ interface CombworkMessageValues {
   'activity.state': { state: string }
   'activity.statusLabel': undefined
   'activity.subagentsHeading': undefined
-  'activity.tabsLabel': undefined
   'activity.task': { type: string }
   'activity.thinking': undefined
   'activity.toolFor': { summary: string | number; time: string | number }

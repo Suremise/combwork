@@ -59,7 +59,7 @@ export interface RunResult {
 }
 
 /** A command's bounds and inputs. Unset, each is the platform runner's own default (Git: git()'s). */
-export interface RunOptions {
+interface RunOptions {
   /** The output kept, in bytes: past it the command is ended and didn't run to an exit (`notRun`). */
   maxOutput?: number
   /** Written to its standard input. */
@@ -184,7 +184,7 @@ export interface RepoPorts {
   files: RepoFiles
 }
 
-/** The Files tab's repository reads (port 1, HI-2792; Git's: check-ignore and ls-files, platform/gitFiles.ts). */
+/** The Files tab's repository reads (port 1, HI-2792; Git's: check-ignore and ls-files, platform/git/gitFiles.ts). */
 export interface RepoFiles {
   /** The ignored entries among `rels` (folders with a trailing `/`) with each one's rule; null when the tool couldn't say; `none` when no repository of this platform holds the folder. */
   ignored(folder: string, rels: string[]): Promise<Map<string, IgnoreRule> | null | 'none'>

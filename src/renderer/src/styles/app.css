@@ -1766,6 +1766,11 @@ textarea.input {
   border-radius: 50%;
   background: var(--accent);
 }
+/* A tab whose page has something to resolve (HI-3549): its warning, coloured as the reasons on its page. */
+.cw-tab-problem {
+  display: inline-flex;
+  color: var(--error);
+}
 .cw-tab.icon-only {
   padding: 0 8px;
 }
@@ -1957,6 +1962,110 @@ textarea.input {
 .banner.danger {
   background: rgba(242, 85, 90, 0.12);
   color: var(--error);
+}
+/* HI-3470: Changes' panel for an unfinished git operation, atop its right side: a column, a row a conflicted file. */
+.banner.operation-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 14px;
+}
+.operation-panel .operation-steps {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.operation-panel .operation-conflicts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--fg);
+}
+.operation-panel .operation-conflict {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.operation-panel .operation-conflict .label {
+  flex: 1;
+  min-width: 120px;
+}
+.operation-panel .operation-conflict .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.operation-panel .operation-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+/* A banner pushes its first button right (HI-2148): the panel's buttons stay in rows from the left. */
+.banner.operation-panel .btn {
+  margin-left: 0;
+}
+/* Many files in conflict scroll in the panel: it takes at most half the right side, the diff keeping the rest. */
+.banner.operation-panel {
+  max-height: 45%;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+/* HI-3472: Changes' Stashes, under the operation panel: a heading that opens the list; the list scrolls, taking at most
+   half the right side, the diff keeping the rest. */
+.stash-section {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  max-height: 45%;
+  display: flex;
+  flex-direction: column;
+}
+.stash-section .stash-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: none;
+  border: none;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+}
+.stash-section .stash-list {
+  overflow-y: auto;
+  padding: 0 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stash-section .stash-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.stash-section .stash-name {
+  flex: 1;
+  min-width: 160px;
+}
+.stash-section .stash-name .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stash-section .stash-meta {
+  font-size: 12px;
+}
+.stash-section .stash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.stash-section .stash-files {
+  padding: 4px 0 2px 12px;
+}
+.stash-section .stash-files .row .label {
+  flex: 1;
+  min-width: 0;
 }
 .banner.info {
   background: var(--accent-soft);
@@ -8354,11 +8463,15 @@ button.agent-place:hover {
   justify-content: space-between;
   gap: 8px 12px;
 }
-/* The Activity tab (#1254, HI-1743): a tab per running agent, its current work as a list, its details beside it. */
+/* The Activity tab (#1254, HI-1743): the agents' strip picks one (HI-3568), its current work as a list, its details beside it. */
 .activity-tab {
   display: flex;
   height: 100%;
   min-height: 0;
+}
+/* Focused only to keep Escape in the view (HI-3568): no ring of its own. */
+.activity-tab:focus {
+  outline: none;
 }
 .activity-main {
   flex: 1;
@@ -8393,6 +8506,11 @@ button.agent-place:hover {
 [data-theme='dark'] {
   --map-hex: #26262a;
   --map-comb: rgba(255, 255, 255, 0.035);
+  --map-bevel: rgba(255, 255, 255, 0.05);
+  --map-honey-deep: 0.42;
+  --map-honey-light: 0.12;
+  --map-halo: 0.16;
+  --map-lit: 0.55;
   --map-agent-0: #f59e0b;
   --map-agent-1: #3b9eff;
   --map-agent-2: #b48cff;
@@ -8405,6 +8523,11 @@ button.agent-place:hover {
 [data-theme='light'] {
   --map-hex: #fafafa;
   --map-comb: rgba(0, 0, 0, 0.035);
+  --map-bevel: rgba(255, 255, 255, 0.7);
+  --map-honey-deep: 0.34;
+  --map-honey-light: 0.1;
+  --map-halo: 0.12;
+  --map-lit: 0.45;
   --map-agent-0: #d97706;
   --map-agent-1: #0969da;
   --map-agent-2: #8250df;
@@ -8448,6 +8571,10 @@ button.agent-place:hover {
   gap: 10px;
   padding: 10px 12px;
   overflow: auto;
+}
+/* Focused only to keep Escape's keys (HI-3507), never by Tab: no ring of its own. */
+.activity-map:focus {
+  outline: none;
 }
 .activity-map > .pane-resizer {
   display: none;
@@ -8499,35 +8626,119 @@ button.agent-place:hover {
   fill: none;
   stroke: var(--map-comb);
 }
-.activity-map-spoke {
-  stroke: var(--border);
+/* HI-3479: the map in the window's honey look. Cells with depth (a gradient and an inner edge), a warm light behind the
+   centre, curved spokes glowing with their heat, stations that light up and settle, and their load as honey. */
+.activity-map-stop-cell-top {
+  stop-color: var(--bg-elevated);
+}
+.activity-map-stop-cell-bottom {
+  stop-color: var(--map-hex);
+}
+.activity-map-stop-honey-deep {
+  stop-color: var(--accent);
+  stop-opacity: var(--map-honey-deep);
+}
+.activity-map-stop-honey-light {
+  stop-color: var(--honey-light);
+  stop-opacity: var(--map-honey-light);
+}
+.activity-map-stop-halo {
+  stop-color: var(--accent);
+  stop-opacity: var(--map-halo);
+}
+.activity-map-stop-spark {
+  stop-color: var(--honey-light);
+  stop-opacity: 0.7;
+}
+.activity-map-stop-clear {
+  stop-color: var(--accent);
+  stop-opacity: 0;
+}
+.activity-map-stop-ring-light {
+  stop-color: var(--honey-light);
+}
+.activity-map-stop-ring-deep {
+  stop-color: var(--accent-strong);
+}
+.activity-map-halo {
+  opacity: 0.45;
+  transition: opacity 1.2s ease;
+}
+.activity-map-halo.on {
+  opacity: 1;
+}
+.activity-map-spoke path {
+  fill: none;
   stroke-linecap: round;
+}
+.activity-map-spoke .track {
+  stroke: var(--border);
+  stroke-width: 1.5;
   opacity: 0.9;
 }
-.activity-map-spoke.failed {
+.activity-map-spoke .heat {
+  stroke: var(--accent);
+  transition:
+    stroke-width 0.8s ease,
+    opacity 0.8s ease;
+}
+.activity-map-spoke.failed .track,
+.activity-map-spoke.failed .heat {
   stroke: var(--error);
 }
-.activity-map-spoke.na {
+.activity-map-spoke.na .track {
   stroke: var(--fg-decor);
   stroke-dasharray: 3 5;
   opacity: 0.6;
 }
-.activity-map-station polygon {
-  fill: var(--map-hex);
+.activity-map-cell {
   stroke: var(--border);
   stroke-width: 1;
+  transition:
+    stroke 0.3s ease,
+    stroke-width 0.3s ease;
 }
-.activity-map-station.active polygon {
-  fill: var(--accent-soft);
+.activity-map-station.active > .activity-map-cell {
   stroke: var(--accent);
   stroke-width: 2;
 }
-.activity-map-station.failed polygon {
+.activity-map-station.failed > .activity-map-cell {
   stroke: var(--error);
   stroke-width: 2;
 }
-.activity-map-station.notReported polygon {
+.activity-map-station.notReported > .activity-map-cell {
   stroke-dasharray: 4 4;
+}
+.activity-map-bevel {
+  fill: none;
+  stroke: var(--map-bevel);
+  pointer-events: none;
+}
+.activity-map-honey {
+  transition: transform 1.1s cubic-bezier(0.33, 1, 0.68, 1);
+}
+/* Lit at once when a call opens there; the light settles slowly once it ends. */
+.activity-map-lit {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.4s ease-out;
+}
+.activity-map-station.active > .activity-map-lit {
+  opacity: var(--map-lit);
+  transition-duration: 0.25s;
+}
+.activity-map-station.failed > .activity-map-lit {
+  stroke: var(--error);
+}
+.activity-map-pips polygon {
+  fill: var(--success);
+}
+/* Motion off (the Advanced setting, or Windows' reduced motion): every change lands at once. */
+.activity-map.still * {
+  transition: none !important;
 }
 .activity-map svg text {
   text-anchor: middle;
@@ -8551,11 +8762,15 @@ button.agent-place:hover {
   font-size: 10.5px !important;
   fill: var(--fg-muted) !important;
 }
-.activity-map-centre > polygon {
-  fill: var(--bg-elevated);
+.activity-map-centre > .activity-map-cell {
   stroke: var(--border);
 }
-.activity-map-centre.waiting > polygon {
+.activity-map-centre.working > .activity-map-cell {
+  stroke: var(--accent);
+  stroke-opacity: 0.7;
+  stroke-width: 1.5;
+}
+.activity-map-centre.waiting > .activity-map-cell {
   stroke: var(--state-waiting);
   stroke-width: 2;
 }
@@ -8584,6 +8799,9 @@ button.agent-place:hover {
 .activity-map-context .fill,
 .activity-map-ring-mark .fill {
   stroke: var(--accent);
+  transition:
+    stroke-dasharray 0.9s cubic-bezier(0.33, 1, 0.68, 1),
+    stroke 0.4s ease;
 }
 /* A ring is only ever stroked: an amber one's warning fill painted its whole hex solid (HI-3190). */
 .activity-map-context.amber .fill,
@@ -8607,28 +8825,55 @@ button.agent-place:hover {
 .activity-map-centre-context.ok {
   fill: var(--accent) !important;
 }
-.activity-map-pulse {
-  animation: activity-map-out 700ms ease-in-out forwards;
-  stroke: var(--bg);
-  stroke-width: 2;
+/* A pulse (HI-3479): a comet along its spoke, its head glowing and its tail following, eased out and in. */
+.activity-map {
+  --activity-map-pulse-ms: 900ms;
 }
-.activity-map-pulse.back {
+.activity-map-pulse circle {
+  offset-path: var(--spoke);
+  offset-rotate: 0deg;
+  offset-distance: 0%;
+  animation: activity-map-out var(--activity-map-pulse-ms) cubic-bezier(0.45, 0, 0.25, 1) var(--after, 0ms) both;
+  fill: var(--pulse);
+  pointer-events: none;
+}
+.activity-map-pulse.back circle {
   animation-name: activity-map-back;
 }
+.activity-map-pulse .head {
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
 @keyframes activity-map-out {
-  from {
-    transform: translate(0, 0);
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
   }
-  to {
-    transform: translate(var(--dx), var(--dy));
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
   }
 }
 @keyframes activity-map-back {
-  from {
-    transform: translate(var(--dx), var(--dy));
+  0% {
+    offset-distance: 100%;
+    opacity: 0;
   }
-  to {
-    transform: translate(0, 0);
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 0%;
+    opacity: 0;
   }
 }
 .activity-map-flash {
@@ -8656,7 +8901,8 @@ button.agent-place:hover {
   flex-wrap: wrap;
   gap: 4px 12px;
 }
-.activity-map-ring {
+.activity-map-ring,
+.activity-strip-all {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -8669,11 +8915,13 @@ button.agent-place:hover {
   border-radius: 4px;
   cursor: pointer;
 }
-.activity-map-ring:hover {
+.activity-map-ring:hover,
+.activity-strip-all:hover {
   background: var(--bg-hover);
 }
-/* The agent the map shows alone (HI-3180): marked in the strip, which still lists the selection. */
-.activity-map-ring.picked {
+/* The agent picked (HI-3180, HI-3568), or All: marked in the strip, which still lists the selection. */
+.activity-map-ring.picked,
+.activity-strip-all.picked {
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent);
   font-weight: 600;
@@ -8733,6 +8981,269 @@ button.agent-place:hover {
   height: 8px;
   border-radius: 50%;
   flex: 0 0 auto;
+}
+/* A station's panel (HI-3498): docked where the feed is, in the window's card look. */
+.activity-map-station {
+  cursor: pointer;
+  outline: none;
+}
+.activity-map-station:focus-visible > .activity-map-cell,
+.activity-map-station.open > .activity-map-cell {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+.activity-map-station.open > .activity-map-lit {
+  opacity: var(--map-lit);
+}
+.activity-map-panel {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-height: 46%;
+  overflow: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 8px 10px;
+  font-size: 12px;
+  animation: activity-map-panel-in 180ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.activity-map.still .activity-map-panel {
+  animation: none;
+}
+@keyframes activity-map-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.activity-map-panel-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+  min-width: 0;
+}
+.activity-map-panel-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fg-strong);
+}
+.activity-map-panel-head .faint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity-map-panel-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--fg-faint);
+  font: inherit;
+  padding: 0 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.activity-map-panel-close:hover {
+  background: var(--bg-hover);
+  color: var(--fg-strong);
+}
+.activity-map-panel-section h5 {
+  margin: 8px 0 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-faint);
+}
+.activity-map-panel-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 6px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+button.activity-map-panel-row {
+  cursor: pointer;
+}
+button.activity-map-panel-row:hover,
+button.activity-map-panel-row:focus-visible {
+  background: var(--bg-hover);
+}
+.activity-map-panel-label {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--fg-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.activity-map-panel-row.failed .activity-map-panel-label {
+  color: var(--error);
+}
+.activity-map-panel-tools {
+  display: inline-flex;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+.activity-map-panel-tool {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  background: var(--bg-hover);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+.activity-map-panel-detail {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+.activity-map-panel-time {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+.activity-map-panel-open {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--accent);
+}
+/* Running now: a lit dot (a process green, a task or subagent amber); an open call the same. */
+.activity-map-panel-live {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+.activity-map-panel-live.process {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+.activity-map-panel-more {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+/* HI-3499: a feed row, a panel's call or a file's time shows its call in the list; a station's agent dot focuses it. */
+button.activity-map-feed-row {
+  width: 100%;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 2px 4px;
+  margin: 0 -4px;
+  cursor: pointer;
+}
+button.activity-map-feed-row:hover,
+button.activity-map-feed-row:focus-visible,
+.activity-map-panel-main:hover,
+.activity-map-panel-main:focus-visible,
+.activity-map-panel-time.link:hover,
+.activity-map-panel-time.link:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+button.activity-map-feed-row:focus-visible,
+button.activity-map-panel-row:focus-visible,
+.activity-map-panel-main:focus-visible,
+.activity-map-panel-time.link:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.activity-map-panel-row.activity-map-panel-file {
+  padding: 0;
+  gap: 2px;
+}
+.activity-map-panel-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px 6px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.activity-map-panel-time.link {
+  border: none;
+  border-radius: 4px;
+  background: none;
+  padding: 3px 6px;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.activity-map-here {
+  cursor: pointer;
+  stroke: var(--bg);
+  stroke-width: 1.5;
+  outline: none;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* Only a dot arriving while the map moves (HI-3499: never on a frozen map). */
+.activity-map-here.arriving {
+  animation: activity-map-arrive 260ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.activity-map-here:hover,
+.activity-map-here:focus-visible {
+  stroke: var(--fg-strong);
+  stroke-width: 2;
+}
+/* An agent arriving in the strip, and one leaving it (HI-3499): eased in, faded out, then gone. */
+.activity-map-ring.arriving {
+  animation: activity-map-arrive 260ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.activity-map-ring.leaving {
+  pointer-events: none;
+  animation: activity-map-leave 260ms ease-in forwards;
+}
+@keyframes activity-map-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes activity-map-leave {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.activity-map.still .activity-map-here,
+.activity-map.still .activity-map-ring {
+  animation: none;
+}
+.activity-group[data-group='fromMap'] {
+  color: var(--accent);
 }
 .activity-map-partial {
   margin-top: 6px;
@@ -8907,63 +9418,56 @@ button.agent-place:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* A tab per agent (HI-1743), scrolling sideways when they don't fit, as the Progress panel's tabs. */
-.activity-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 0 14px;
+/* The strip as the picker with the map off (HI-3568): above the list, in a row of its own. */
+.activity-strip-bar {
+  padding: 6px 14px;
   border-bottom: 1px solid var(--border-subtle);
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
 }
-.activity-agent-tab {
-  flex: none;
-  display: inline-flex;
+/* The strip's All (HI-3568): the shared view, pressed while no agent is picked; a ring's look without a ring. */
+.activity-strip-all {
+  min-height: 30px;
+}
+/* The shared view's rows (HI-3568): each agent's Now in a line; a click picks it. */
+.activity-now-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.activity-now-row {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 8px;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-radius: 4px;
   background: transparent;
-  color: var(--fg-muted);
+  color: var(--fg);
   font: inherit;
   font-size: 12px;
+  text-align: left;
   cursor: pointer;
-  white-space: nowrap;
 }
-.activity-agent-tab:hover {
-  color: var(--fg);
+.activity-now-row:hover {
   background: var(--bg-hover);
 }
-.activity-agent-tab.active {
-  color: var(--fg-strong);
-  border-bottom-color: var(--accent);
-}
-.activity-agent-tab:focus-visible {
+.activity-now-row:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
-.activity-agent-tab-card {
+.activity-now-row-name {
+  flex: none;
+  font-weight: 600;
+}
+.activity-now-row-card {
+  flex: none;
   font-variant-numeric: tabular-nums;
 }
-/* Activity's workspace level (HI-1664): the agent tabs grouped by project, each group after its name. */
-.activity-tab-group {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-.activity-tab-group + .activity-tab-group {
-  margin-left: 8px;
-  padding-left: 10px;
-  border-left: 1px solid var(--border-subtle);
-}
-.activity-tab-group-name {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding-right: 4px;
+.activity-now-row-step {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .activity-for-card {
@@ -11056,6 +11560,26 @@ body.pane-resizing-v .monaco-editor {
   gap: 4px;
   align-items: flex-start;
 }
+/* HI-3552: a card's pull request: its number as a link, or that it isn't open yet. */
+.task-pr {
+  font-size: 12px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.task-pr.task-stalled {
+  align-items: flex-start;
+}
+.card-pr {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 8px;
+}
+.card-pr .flex {
+  gap: 6px;
+  align-items: center;
+}
 .task-meta {
   display: flex;
   flex-wrap: wrap;
@@ -11152,6 +11676,93 @@ body.pane-resizing-v .monaco-editor {
 }
 .kind-field .btn {
   margin-inline-start: 6px;
+}
+/* HI-3553: the board's From GitHub… list of open pull requests. */
+.github-prs {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 55vh;
+  overflow: auto;
+}
+.github-pr {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  border-top: 1px solid var(--border);
+}
+.github-pr:first-child {
+  border-top: none;
+}
+.github-pr-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.github-pr .btn {
+  flex: none;
+}
+/* HI-3555: From GitHub…'s Issues tab (its filters above the list) and Close Shipped Issues' choice of branch. */
+.github-issues-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.github-issues-filters .input {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.github-issues-filters .btn {
+  flex: none;
+}
+.github-shipped-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+/* HI-3559: a pull request card's Feedback to GitHub. */
+.github-feedback,
+.pr-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.github-review {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.github-review-text {
+  min-height: 72px;
+  resize: vertical;
+}
+.github-review-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.github-review-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 12px;
+}
+/* HI-3554: a pull request's comments on its card: a thread's replies under its first comment. */
+.pr-feedback-replies {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-inline-start: 12px;
+  border-inline-start: 2px solid var(--border);
 }
 .kind-proposal {
   display: flex;
@@ -15477,6 +16088,114 @@ button.progress-lane-retry {
   gap: 6px;
   font-weight: normal;
 }
+/* HI-3469: History's Commits | Moves switch, its moves, and Restore to here…'s dialog. */
+.history-view {
+  font-weight: normal;
+}
+.git-move .git-move-what {
+  flex-shrink: 0;
+}
+.git-move .git-subject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.restore-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.restore-plan p {
+  margin: 0;
+}
+.restore-commits {
+  max-height: 160px;
+  overflow: auto;
+  margin-top: 4px;
+  padding-left: 8px;
+}
+/* HI-3471: a commit opens its dialog from History and Moves. */
+.git-commit.clickable,
+.git-move-commit.clickable {
+  cursor: pointer;
+}
+.git-commit.clickable:hover {
+  background: var(--bg-hover);
+}
+.git-move-commit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.git-move-commit:hover .git-subject {
+  text-decoration: underline;
+}
+.dialog.wide:has(.commit-dialog) {
+  width: min(1180px, calc(100vw - 48px));
+}
+.commit-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.commit-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.commit-body {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  color: var(--fg-muted);
+  max-height: 120px;
+  overflow: auto;
+}
+.commit-meta,
+.commit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.commit-body-split {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) 1fr;
+  gap: 8px;
+  height: 50vh;
+  min-height: 260px;
+}
+.commit-files {
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  padding-right: 6px;
+}
+.commit-files .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.commit-files .row .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-files .row.selected {
+  background: var(--accent-soft);
+}
+.commit-diff {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
 .git-rows {
   display: flex;
   flex-direction: column;
@@ -15737,6 +16456,27 @@ button.progress-lane-retry {
 }
 .git-setup h2 .codicon {
   margin-right: 4px;
+}
+/* HI-3473: Repository health at the foot of Branches & remotes: a row a repair (its name, what it finds, its button),
+   and its dialogs' lists, each entry's note (git's reason, whose it was, why a lock is kept) under it. */
+.git-health {
+  margin-bottom: 18px;
+}
+.git-health td {
+  padding-right: 24px;
+  vertical-align: middle;
+}
+.git-health td:first-child,
+.git-health td:last-child {
+  white-space: nowrap;
+}
+.git-health-list > li + li {
+  margin-top: 6px;
+}
+.git-health-note {
+  margin-left: 24px;
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
 }
 
 /* ==========================================================================
@@ -16022,6 +16762,14 @@ button.progress-lane-retry {
   border-inline-start: 3px solid var(--error);
   padding-inline-start: 8px;
 }
+/* HI-3549: the option a link opened, marked a moment as it comes into view. */
+.workflow-option.linked {
+  animation: tx-flash 1.6s ease-out;
+}
+/* HI-3549: the Workflow form's tabs, above its groups. */
+.workflow-form > .cw-tabs-row {
+  margin-block: 4px 8px;
+}
 .workflow-never-off {
   padding: 8px 12px;
   margin-block: 4px 8px;
@@ -16289,8 +17037,48 @@ button.progress-lane-retry {
 .ignore-rule-at { margin-bottom: 8px; font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
 .ignore-rule-file { height: min(50vh, 420px); border: 1px solid var(--border); }
 .ignore-rule-file .monaco { height: 100%; }
-
-/* jj's leftovers (HI-2869): a long path wraps rather than pushing its button out of the panel. */
-.jj-leftovers code {
-  overflow-wrap: anywhere;
+/* HI-3477: the Files tab's Discard Changes… and Restore From…: the confirm's diff, and A Commit…'s list. */
+.file-restore-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.file-restore-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-size: 12px;
+}
+.file-restore-editor {
+  height: 340px;
+  display: flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.file-restore-editor > .monaco,
+.file-restore-editor > .empty-state {
+  flex: 1;
+  min-width: 0;
+}
+.file-restore-commits {
+  max-height: 220px;
+  overflow-y: auto;
+}
+.file-restore-commits > .git-row {
+  width: 100%;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.file-restore-commits > .git-row + .git-row {
+  border-top: 1px solid var(--border-subtle);
+}
+.file-restore-commits > .git-row:hover {
+  background: var(--bg-hover);
+}
+.file-restore-commits > .git-row.current {
+  background: var(--accent-soft);
 }

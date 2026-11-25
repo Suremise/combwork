@@ -24,8 +24,14 @@ async function world() {
   const store = new SlotStore(conn, 'p')
   const holder = { self: async () => ({ pid: 1, started: 1001 }), alive: async () => true, live: new Set<string>() }
   const pool = new SlotPool({ store, project: join(dir, 'proj'), root, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 1, cap: () => 4, runner: async () => ({ ok: true, exitCode: 0, logPath: null, settled: true }), settle: async () => true, holder, sessionIn: () => null } as unknown as ConstructorParameters<typeof SlotPool>[0])
-  /** The pool's removal guard, the processes' part (forgotten: no dirty check), on slot-a as the store has it. */
-  const guard = () => (pool as unknown as { guard: (s: unknown, probe: boolean, token?: string, forgotten?: boolean) => Promise<{ why: string } | null> }).guard(store.slot('slot-a'), true, undefined, true)
+  /**
+   * The pool's removal guard on slot-a as the store has it, its processes' part: what it says past that (the folder is no
+   * worktree here, so its dirty check can't tell) is null, and `process` only when the quiet check held it.
+   */
+  const guard = async () => {
+    const kept = await (pool as unknown as { guard: (s: unknown, probe: boolean) => Promise<{ why: string } | null> }).guard(store.slot('slot-a'), true)
+    return kept && kept.why !== 'cantCheck' ? kept : null
+  }
   const target = { conn, project: 'p', kind: 'slot' as const, name: 'slot-a' }
   return { folder, conn, pool, guard, target, close: async () => (await pool.close(), conn.close()) }
 }

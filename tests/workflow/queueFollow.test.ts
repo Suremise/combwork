@@ -1359,7 +1359,7 @@ describe('HI-3127: a card returned for what only the remote has', () => {
 
 describe("HI-3127: a card's tested pin is pruned with its pins", () => {
   it('listed under its key with its submissions’ pins; never one of its own refs (the own-work proof)', async () => {
-    const { gitIntegration } = await import('../../src/main/platform/gitIntegration')
+    const { gitIntegration } = await import('../../src/main/platform/git/gitIntegration')
     const { ownRefs } = await import('../../src/main/workflow/retargetCard')
     const { e } = following()
     const c = head(e.project)

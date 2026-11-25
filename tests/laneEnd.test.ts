@@ -36,7 +36,7 @@ function harness(over: Partial<Deps> = {}) {
   const w = waitForLaneEnd(deps)
   /** A change the end follows (a status, a delivery saved): it looks again. */
   const change = (): void => look?.()
-  return { s, quits, retired, notes, lines, change, done: w.done, watching: () => look !== null }
+  return { s, quits, retired, notes, lines, change, done: w.done, settled: w.settled, watching: () => look !== null }
 }
 
 // The longest a wait here waits: a bound for a hung run, never how long it should take.
@@ -180,6 +180,32 @@ describe("a lane's end waits for its builder's turn to be over", () => {
     expect(h.quits).toEqual([])
     expect(h.retired).toContain('its lane end lost its run')
     expect(h.retired).toContain('its lane end was over before its note was made')
+  })
+
+  it('settled once over and nothing it started still runs: a note failing after the fence was lost has logged, its retires done (HI-3567)', async () => {
+    let fail: (e: Error) => void = () => undefined
+    let retiring: () => void = () => undefined
+    const retires: string[] = []
+    const h = harness({ note: () => new Promise<string>((_r, j) => (fail = j)), retire: (why) => new Promise<void>((r) => (retiring = () => (retires.push(why), r()))) })
+    let settled = false
+    void h.settled().then(() => (settled = true))
+    // The workspace closing: the fence lost, it is over at once; the look still awaits its note.
+    h.s.fenced = false
+    h.change()
+    await expect(h.done).resolves.toBe('the run or its lease is gone: nothing ended')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(settled).toBe(false)
+    retiring()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(settled).toBe(false)
+    // Its note fails (the workspace was closed): logged, retired again, and only then settled.
+    fail(new Error('The workspace was closed'))
+    await vi.waitFor(() => expect(h.lines).toContain("its lane's note wasn't made: The workspace was closed"), HUNG)
+    expect(settled).toBe(false)
+    retiring()
+    await vi.waitFor(() => expect(settled).toBe(true), HUNG)
+    expect(retires).toEqual(['its lane end lost its run', 'its lane end was over before its note was made'])
+    expect(h.quits).toEqual([])
   })
 
   it('a quit still typing at the deadline is waited for, never a second one beside it', async () => {

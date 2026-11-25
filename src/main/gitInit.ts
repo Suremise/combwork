@@ -67,9 +67,9 @@ export async function initCheck(projectPath: string): Promise<GitInitCheck> {
   const refuse = (text: Text): GitInitCheck => ({ ...base, refused: englishText(text), refusedText: text })
   const problem = gitProblemData(gitTool())
   if (problem) return refuse(withValues(msg({ id: 'main.gitInit.noGit', defaultMessage: '{problem}: Provider Setup says how to fix it.', description: "Why a folder can't be made a git repository (the Initialise Git Repository dialog): git is missing or broken. {problem} says what's wrong. Provider Setup is a view's name." }), { problem }))
-  // Looked for at every level whatever git is there: a colocated Jujutsu repository has .git beside .jj.
+  // Looked for at every level whatever git is there: another system's repository may have a .git beside its own folder.
   const other = otherVcsOf(projectPath)
-  if (other) return refuse(withValues(msg({ id: 'main.gitInit.otherVcs', defaultMessage: '{vcs} keeps this folder (in {root}): Combwork makes a git repository only where no other version control system is.', description: "Why a folder can't be made a git repository: another version control system (Jujutsu, Mercurial…), {vcs}, keeps it. {root} is the folder it keeps." }), { vcs: other.name, root: other.root }))
+  if (other) return refuse(withValues(msg({ id: 'main.gitInit.otherVcs', defaultMessage: '{vcs} keeps this folder (in {root}): Combwork makes a git repository only where no other version control system is.', description: "Why a folder can't be made a git repository: another version control system (Mercurial, Subversion…), {vcs}, keeps it. {root} is the folder it keeps." }), { vcs: other.name, root: other.root }))
   const found = vcsOf(projectPath)
   if (found && samePlace(found.root, projectPath)) {
     const head = await git(projectPath, ['rev-parse', '-q', '--verify', 'HEAD'])

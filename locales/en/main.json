@@ -43,6 +43,10 @@
     "defaultMessage": "{cli} can't have sign-in connections in Combwork yet.",
     "description": "An error: connections were asked for a coding agent CLI ({cli}: \"Codex\") that Combwork keeps no connections for."
   },
+  "main.accounts.noSandboxSetUp": {
+    "defaultMessage": "{cli} has no sandbox setup on its accounts.",
+    "description": "An error (HI-3490): a sandbox setup was asked of a coding agent CLI ({cli}: \"Codex\") that has none to run on an account."
+  },
   "main.accounts.notFound": {
     "defaultMessage": "There is no such connection.",
     "description": "An error: a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile)."
@@ -58,6 +62,14 @@
   "main.accounts.running": {
     "defaultMessage": "{name} has agents running on it: stop them, then remove it.",
     "description": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or one is starting."
+  },
+  "main.accounts.sandboxNoAccount": {
+    "defaultMessage": "{cli} sets up its sandbox on one of your {cli} accounts, and none on in this workspace is signed in. Sign one in, or turn one on here, in Settings → Accounts & Connections.",
+    "description": "An error (HI-3490): Provider Setup's sandbox Set up for a coding agent CLI ({cli}: \"Codex\") found no account of it on in the workspace that is signed in, so it didn't start the CLI (it would only show its sign-in). Settings → Accounts & Connections names a section."
+  },
+  "main.accounts.sandboxSetAlready": {
+    "defaultMessage": "{cli}'s sandbox is already set up for every {cli} account on in this workspace.",
+    "description": "An error (HI-3490): Provider Setup's sandbox Set up for a coding agent CLI ({cli}: \"Codex\") was asked for, but every account of it on in the workspace already has its default sandbox."
   },
   "main.accounts.serverOnly": {
     "defaultMessage": "{cli} reaches a server of yours only: add a server connection.",
@@ -481,7 +493,7 @@
   },
   "main.gitInit.otherVcs": {
     "defaultMessage": "{vcs} keeps this folder (in {root}): Combwork makes a git repository only where no other version control system is.",
-    "description": "Why a folder can't be made a git repository: another version control system (Jujutsu, Mercurial…), {vcs}, keeps it. {root} is the folder it keeps."
+    "description": "Why a folder can't be made a git repository: another version control system (Mercurial, Subversion…), {vcs}, keeps it. {root} is the folder it keeps."
   },
   "main.gitInit.step.commit": {
     "defaultMessage": "{n, plural, one {committed # file} other {committed # files}}",
@@ -1458,6 +1470,34 @@
   "main.server.url.userinfo": {
     "defaultMessage": "The URL can't hold a user name or password: give the key in its own field.",
     "description": "An error saving a server connection's base URL: it has user:password@ in it, which Combwork won't keep."
+  },
+  "main.slots.detachFailed.message": {
+    "defaultMessage": "{said, select, yes {Git said: {error}} other {Git can't find {target}.}} Until it can, Combwork doesn't lend {slot} to another card. Put right what's in the way in {folder}, or run {command} there yourself, in PowerShell: Combwork tries again whenever it looks at its slots, and lends {slot} again once that works.",
+    "description": "HI-3467: the notice's text below main.slots.detachFailed.title. {error} is git's own error line, in English (keep it as it is); said: yes when git gave one, else no (the branch {target} isn't there): keep the select keys. {slot} is the slot's name, {folder} its folder's path, {command} the git command that does it by hand (git switch --detach main: keep it as it is), quoted for PowerShell (HI-3516: a branch name with & or ; would run something else in cmd), so keep PowerShell named."
+  },
+  "main.slots.detachFailed.title": {
+    "defaultMessage": "Combwork can't move {slot} back to {target}",
+    "description": "HI-3467: a notice's title: Combwork tried more than once to put a free slot (a worktree it lends to cards) back at the head of its target branch {target} for its next card, and git refused each time, so the slot isn't lent. {slot} is the slot's name."
+  },
+  "main.slots.leftDirty.message": {
+    "defaultMessage": "{card} was {why, select, archived {archived} other {left with nobody on it}}, so Combwork freed its slot and kept its branch. The changes in {folder} aren't on that branch: Combwork lends {slot} to no other card until they're committed or discarded there.",
+    "description": "HI-3556: the notice's text below main.slots.leftDirty.title. {card} is the card's key (HI-12), {folder} the slot's folder path, {slot} its name. {why} says what happened to the card: archived, or taken from its agent with nobody given it."
+  },
+  "main.slots.leftDirty.title": {
+    "defaultMessage": "{slot} has changes that aren't committed",
+    "description": "HI-3556: a notice's title: a card was archived or taken from its agent, so Combwork freed the slot (a worktree it lends to cards) its builder worked in, and that slot has uncommitted changes. {slot} is the slot's name."
+  },
+  "main.slots.operation.message": {
+    "defaultMessage": "Combwork can't lend {slot} to another card until it's finished. Finish it in {folder}, or end it there with {command}. Combwork never ends it itself, and lends the slot again once nothing is under way in it.",
+    "description": "HI-3465: the notice's text below main.slots.operation.title. {slot} is the slot's name, {folder} its folder's path, {command} the git command that ends the operation (git revert --abort, git bisect reset…: keep it as it is)."
+  },
+  "main.slots.operation.open": {
+    "defaultMessage": "Open in Changes",
+    "description": "HI-3470: the notice's button (main.slots.operation.title): shows the slot in Version Control → Changes, whose panel continues or aborts the operation. Changes is the section's name: keep it as it is named there."
+  },
+  "main.slots.operation.title": {
+    "defaultMessage": "{slot} has an unfinished git {what}",
+    "description": "HI-3465: a notice's title: a git operation was left under way in a slot (a worktree Combwork lends to cards), so Combwork can't lend it. {slot} is the slot's name; {what} is git's word for the operation (merge, rebase, am, cherry-pick, revert or bisect: keep it as it is)."
   },
   "main.storage.claimed": {
     "defaultMessage": "The folder belongs to a session again.",

@@ -15,12 +15,13 @@ import type { RefHold } from './platform/repoContext'
 import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, storedIds, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
-import { providerMessage } from '../shared/providers'
-import type { KeptWork } from './platform/adapter'
+import { providerMessage, PROVIDERS } from '../shared/providers'
+import { prAuthorship, type PrAuthorship } from '../shared/prAuthorship'
+import { cleanFeedback, type FeedbackItem, type FeedbackTarget } from '../shared/prFeedback'
 import type { CardState } from '../shared/workflow/facts'
-import { hasCapability } from '../shared/platform/descriptors'
 import { isUnknown } from './platform/types'
 import type { CombworkErrorKind, KeptTargetShown, TaskMoveResult } from '../shared/types'
+import { cleanSource, clipBody, parseSourceRef, sameSource, sourceLabel, type GithubSource } from '../shared/githubSource'
 import { workflowMessage } from '../shared/workflow/texts'
 import type { ArchiveBatch, ArchiveRequest, ArchiveResult, ContextProblem, SetAsideCard, StoredText, TaskCard, TaskChanges, TaskCursor, TaskDecision, TaskColumn, TaskComment, TaskHistoryEntry, TaskPatch, TaskWaiting, UnarchiveResult } from '../shared/types'
 import { returnRound } from '../shared/watch'
@@ -41,7 +42,7 @@ import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } fro
 import { hasStage, laneTargetOf, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
 import { decisionWithChoice } from '../shared/decisionChoice'
-import { answerFits, CHURN_GATES, churnTotal, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, advanceUnresolved, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type PauseChoice, type StageId } from '../shared/workflow/facts'
+import { answerFits, CHURN_GATES, churnTotal, approveNote, ASK_ACTIONS, ATTEMPT_STAGES, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, type Actor, type AttemptKey, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type PauseChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { refusal as refusalOf, refusalText, type Refusal } from '../shared/workflow/refusals'
@@ -232,6 +233,12 @@ function clean(raw: Partial<TaskCard> & { projectId?: unknown }, n: number, ids?
     ...(raw.waitingFor && typeof raw.waitingFor.reason === 'string' && raw.waitingFor.reason.trim() && typeof raw.waitingFor.by === 'string' && typeof raw.waitingFor.at === 'string' ? { waitingFor: { reason: raw.waitingFor.reason, by: raw.waitingFor.by, at: raw.waitingFor.at, ...(typeof raw.waitingFor.ask === 'string' && raw.waitingFor.ask ? { ask: raw.waitingFor.ask } : {}) } } : {}),
     blockedBy: nums(raw.blockedBy),
     links: nums(raw.links),
+    // HI-3551: its GitHub source, when well formed (absent otherwise, so a card's JSON doesn't grow for it).
+    ...(cleanSource(raw.source) ? { source: cleanSource(raw.source)! } : {}),
+    // HI-3553: its source's body on GitHub, only beside a source (outside text, cut to its most).
+    ...(cleanSource(raw.source) && clipBody(raw.sourceBody) ? { sourceBody: clipBody(raw.sourceBody) } : {}),
+    // HI-3554: a fix card's chosen pull request feedback, only beside a pull request source (outside text).
+    ...(cleanSource(raw.source)?.kind === 'pr' && cleanFeedback(raw.sourceFeedback).length ? { sourceFeedback: cleanFeedback(raw.sourceFeedback) } : {}),
     comments: Array.isArray(raw.comments) ? raw.comments.filter((c) => c && typeof c.text === 'string') : [],
     history: Array.isArray(raw.history) ? raw.history.filter((h) => h && typeof h.what === 'string') : [],
     archived: raw.archived === true,
@@ -1111,12 +1118,6 @@ function queueDependencyEdit(ws: WorkspaceService, card: TaskCard, had: number[]
   const folded = foldCard(store.facts(card.number), own)
   const late = (): number[] => card.blockedBy.filter((b) => !had.includes(b) && stage(b) !== 'done')
   const tooLate = (target: string, cards: number[]): CombworkError => combworkError(ERR.dependencyTooLate, { card: cardRef(card.number), cards: cards.map(cardRef).join(', '), target }, { kind: 'conflict' })
-  // HI-3265: a platform's advance attempted and not yet settled (jj's, `AdvanceAttempted`) is begun as IntegrationStarted
-  // is: its blockers were read in that write, so one added now can't hold it.
-  if (advanceUnresolved(folded)) {
-    const added = late()
-    if (added.length) throw tooLate(folded.started?.target ?? '', added)
-  }
   const e = openEntry(folded)
   if (!e) return
   if (e.state === 'started') {
@@ -1542,7 +1543,7 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
 export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultMessage: 'A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).', description: "An error said to the Combwork Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names." })
 
 async function createTaskLocked(
-  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string; target?: string | null; followUpOf?: number },
+  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string; target?: string | null; followUpOf?: number; source?: { source: GithubSource; body: string; feedback?: FeedbackItem[] } },
   actor: TaskActor,
   opts: { commit?: () => void; pinTarget?: boolean } = {}
 ): Promise<TaskCard> {
@@ -1599,6 +1600,8 @@ async function createTaskLocked(
     blocked: input.blocked?.trim() ? text(input.blocked.trim(), 1000, 'blockedReason') : null,
     blockedBy,
     links,
+    // HI-3553: made with its GitHub source (From GitHub…), in the same save: never an ordinary card first.
+    ...(input.source ? { source: input.source.source, ...(input.source.body ? { sourceBody: input.source.body } : {}), ...(input.source.feedback?.length ? { sourceFeedback: input.source.feedback } : {}) } : {}),
     ...(context.length ? { context } : {}),
     ...(problems.length ? { contextProblems: problems } : {}),
     comments: [],
@@ -1606,7 +1609,8 @@ async function createTaskLocked(
       entryOf(now, by, storedText(HISTORY.created, { column })),
       ...(kind === 'no-code' ? [entryOf(now, by, storedText(HISTORY.kind, { how: proposes ? 'proposed' : 'made', kind }))] : []),
       ...(skipReason !== null ? [entryOf(now, by, storedText(HISTORY.reviewSkip, { how: actor.kind === 'agent' ? 'proposed' : 'set' }))] : []),
-      ...(target ? [entryOf(now, by, storedText(HISTORY.target, { own: 'yes', target }))] : [])
+      ...(target ? [entryOf(now, by, storedText(HISTORY.target, { own: 'yes', target }))] : []),
+      ...(input.source ? [entryOf(now, by, storedText(HISTORY.source, { set: 'yes', kind: input.source.source.kind, number: input.source.source.number, repo: `${input.source.source.owner}/${input.source.source.repo}` }))] : [])
     ],
     archived: false,
     createdAt: now,
@@ -2047,6 +2051,8 @@ export async function runIntent<R>(
           // Only this intent's own card's writes: another card's write made under its context (something it set off,
           // scheduled from inside it) is that card's business, never this card's 0.9 fields (#1287).
           if (w.card.id !== n) return
+          // HI-3557: its move's board line is this hook's (updateTaskAs below), not the runtime's noteMove.
+          w.boardNoted = true
           const own = w.written.filter((f) => f.kind !== 'Refused')
           const extra = zero9(w, first)
           first = false
@@ -2347,7 +2353,7 @@ export async function setReviewSkip(n: number, skip: boolean, actor: TaskActor, 
       if (skip && !rules?.reviews) throw new TaskConflictError(withValues(SKIP.nothing, { card: cardRef(n) }))
       const stage = rules?.stage ?? 'todo'
       if (stage === 'review') throw new TaskConflictError(withValues(SKIP.inReview, { card: cardRef(n) }))
-      if (stage === 'approved' || stage === 'merging' || stage === 'done') throw new TaskConflictError(withValues(SKIP.past, { card: cardRef(n), stage }))
+      if (stage === 'approved' || stage === 'merging' || stage === 'prOpen' || stage === 'done') throw new TaskConflictError(withValues(SKIP.past, { card: cardRef(n), stage }))
       const before = structuredClone(card)
       const how = now.proposed !== null ? (skip ? 'confirmed' : 'kept') : skip ? 'set' : 'removed'
       note(card, actorName(actor), storedText(HISTORY.reviewSkip, { how }))
@@ -2481,8 +2487,6 @@ async function moveInFlight(n: number, target: string | null, def: string, actor
 async function targetPick(project: string, raw: unknown, actor: TaskActor, pin = false): Promise<string | null> {
   if (actor.kind === 'agent') throw new TaskPermissionError(TARGET.agents)
   const t = workspace.path && project ? await projectTargets(workspace, join(workspace.path, project)).catch(() => null) : null
-  // HI-3129: the repository's lines unreadable now: only the default can be named, another refused as unknown.
-  if (t?.othersUnread && typeof raw === 'string' && raw.trim() && raw.trim() !== t.default) throw new TaskConflictError(withValues(TARGET.missing, { target: raw.trim(), unknown: 'yes' }))
   const picked = pickTarget(t, raw)
   // Pinned (HI-2985): the default named is kept as itself, not as none.
   const p = pin && t && 'target' in picked && picked.target === null && typeof raw === 'string' && raw.trim() ? { target: t.default } : picked
@@ -2510,21 +2514,9 @@ function refuseOtherLaneTarget(wf: Workflow, n: number, target: string | null, d
   throw new TaskConflictError(withValues(TARGET.inLane, { card: cardRef(n), builder: (builder && names.get(builder)) ?? builder ?? '', target: theirs ?? '' }))
 }
 
-/** HI-3152: whether card `n`'s platform can move work between targets (`retarget`, Git's); a waiting card's work is read so. */
-function platformMoves(wf: Workflow, n: number, s: CardState): boolean {
-  return hasCapability(wf.platformOf(wf.store.card(n), s).id, 'retarget')
-}
-
-/** HI-3152: card `n`'s kept work through its platform (`keptWork`); a platform that can't say is unproved, never none. */
-async function keptWorkOf(wf: Workflow, n: number, s: CardState): Promise<KeptWork> {
-  const rec = wf.store.card(n)
-  const p = wf.platformOf(rec, s)
-  return p.keptWork ? await p.keptWork(rec) : { unproved: true, slot: null }
-}
-
 /**
  * HI-3129: where card `n`, waiting in On Hold or Todo, would start when that isn't the Merges into its dialog shows (its
- * own, else its lane's or the project's): a card put back whose work is kept on another branch or bookmark starts there
+ * own, else its lane's or the project's): a card put back whose work is kept on another branch starts there
  * (its platform's `startTarget`, the start's own rule). `unknown`: where its kept work is can't be read now, so its start
  * is refused until it can. Null: it starts where it shows. Reads only; the card's own Merges into is never changed by it.
  */
@@ -2569,10 +2561,6 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ c
   // HI-2753: a card in flight moves with its work kept, when that work is provably its own (its own path and locks).
   if (wf && def && IN_FLIGHT_STAGES.includes(wf.state(wf.store.card(n)).stage)) {
     const target = await targetPick(first.project, raw, actor, !!res)
-    // HI-3129: a platform that can't move started work (jj: its bookmarks, no `retarget`) keeps a card in flight where
-    // it started (decision (a)): its target and its proof there. Refused as the card's work keeping it.
-    const startedOn = wf.state(wf.store.card(n)).started?.target ?? def
-    if ((await projectTargets(ws, projectPath).catch(() => null))?.fixedInFlight && (target ?? def) !== startedOn) throw new TaskConflictError(withValues(TARGET.started, { card: cardRef(n), target: startedOn, unknown: 'no' }))
     if (res && wf.state(wf.store.card(n)).started?.target === res.to) return first
     // A retarget's move only from the target it was seen on (a stale preview, after an earlier move, moves nothing).
     if (o.expectFrom !== undefined && wf.state(wf.store.card(n)).started?.target !== o.expectFrom) throw new TaskConflictError(withValues(TARGET.changed, { card: cardRef(n) }))
@@ -2591,21 +2579,16 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ c
       if ((store.card(n).target ?? null) === target) return card
       const s = wf ? wf.state(wf.store.card(n)) : null
       const waiting = !!s && WAITING_STAGES.includes(s.stage)
-      // HI-3152: where work can't move between targets (its platform lacks `retarget`: jj), a waiting card's work is its
-      // kept slot (decision (a)), read through its platform, never Git's lines (`ownWork`, `dropEmptyLines`).
-      const viaKept = !!wf && !!s && !platformMoves(wf, n, s)
-      const kept = viaKept && waiting ? await keptWorkOf(wf!, n, s!) : null
       // No work of its own (HR2's round 1: its slot's changes not committed too), read here under the board's lock, where
       // a start or a put back of it would be written.
       // HI-2825: On Hold as well as Todo (a card never started, or put back there); a card past them has work.
-      const own = !viaKept && waiting ? await ownWork(projectPath, s!, wf!.folderOf(s!)) : null
-      const work = !s ? false : viaKept ? (!waiting ? true : kept === null ? false : 'unproved' in kept ? 'unknown' : true) : own ? own.work : true
+      const own = waiting ? await ownWork(projectPath, s!, wf!.folderOf(s!)) : null
+      const work = !s ? false : own ? own.work : true
       // HI-3112: set back to the branch its line was made from (a put back card): its work's own branch, so nothing of it
-      // changes and its line stays, work or not. HI-3152: on jj, the bookmark its kept work is on.
-      const pinBack = waiting && (viaKept ? !!kept && 'target' in kept && (target ?? def) === kept.target : !!target && target === s!.started?.target)
+      // changes and its line stays, work or not.
+      const pinBack = waiting && !!target && target === s!.started?.target
       // The branch its work was made from, else the one it merges into now: never an empty name (HI-2825).
-      const keptOn = kept && 'target' in kept ? kept.target : ''
-      if (work !== false && !pinBack) throw new TaskConflictError(withValues(TARGET.started, { unknown: work === 'unknown' ? 'yes' : 'no', card: cardRef(n), target: keptOn || s?.started?.target || store.card(n).target || def || '' })) // i18n-ignore: select keys
+      if (work !== false && !pinBack) throw new TaskConflictError(withValues(TARGET.started, { unknown: work === 'unknown' ? 'yes' : 'no', card: cardRef(n), target: s?.started?.target || store.card(n).target || def || '' })) // i18n-ignore: select keys
       if (wf) refuseOtherLaneTarget(wf, n, target, def, names)
       // Its old lines go (nothing of its own on them), so its next start makes a fresh one from the new target, never
       // carrying the old target's history; refused while one is checked out somewhere.
@@ -2620,6 +2603,216 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ c
       const before = structuredClone(card)
       note(card, actorName(actor), storedText(HISTORY.target, { own: target ? 'yes' : 'no', target: target ?? '' }))
       await saveCard(ws, n, card, before, () => store.updateCard(n, { target: target ?? undefined }), o.commit)
+      changed(ws)
+      return card
+    })
+  )
+}
+
+/** HI-3551: why a card's GitHub source wasn't set, in the window's words. */
+const SOURCE = {
+  agents: msg({ id: 'tasks.source.agents', defaultMessage: 'Only the user sets a card’s GitHub source.', description: 'HI-3551: an error: an agent or the Assistant tried to set the GitHub pull request or issue a card is about; only the user does, in the card dialog.' }),
+  started: msg({ id: 'tasks.source.started', defaultMessage: '{card}’s GitHub source can’t change once its work has started.', description: 'HI-3551: an error setting or clearing the GitHub pull request or issue of a card that has started (its work is on it). {card} is a card key like HI-12.' }),
+  noProject: msg({ id: 'tasks.source.noProject', defaultMessage: 'A card about the workspace has no GitHub source: only a project’s cards do.', description: 'HI-3551: an error setting the GitHub source of a card that belongs to no project.' }),
+  noLink: msg({ id: 'tasks.source.noLink', defaultMessage: 'This project has no GitHub link: none of its remotes is on its GitHub host (Version Control → Workflow → GitHub).', description: 'HI-3551: an error setting a card’s GitHub source in a project without a GitHub link (HI-3550). Version Control → Workflow → GitHub is a place in the window: as translated there.' }),
+  notGithub: msg({ id: 'tasks.source.notGithub', defaultMessage: 'That isn’t a pull request or issue: give its address (https://…/pull/12 or …/issues/12) or its number (#12).', description: 'HI-3551: an error setting a card’s GitHub source: the text typed isn’t the address of a GitHub pull request or issue, nor a number. Keep the example addresses.' }),
+  otherRepo: msg({ id: 'tasks.source.otherRepo', defaultMessage: 'That pull request or issue isn’t on this project’s repository ({repo} on {host}).', description: 'HI-3551: an error setting a card’s GitHub source: the address is of another repository or host than the project’s GitHub link. {repo} is owner/name, {host} a host name.' }),
+  notFound: msg({ id: 'tasks.source.notFound', defaultMessage: 'The GitHub CLI found no pull request or issue #{number} on {repo}{why, select, none {} other {: {why}}}.', description: 'HI-3551: an error setting a card’s GitHub source: gh couldn’t read it. {number} its number, {repo} owner/name; {why} gh’s own words, or none (keep the select key).' }),
+  linkChanged: msg({ id: 'tasks.source.linkChanged', defaultMessage: 'This project’s GitHub repository is now {repo}, not {shown} as listed: list its pull requests again.', description: 'HI-3553: an error making a card of a pull request from the board’s From GitHub… list: the project’s GitHub link changed to another repository since the list was shown. {repo} and {shown} are owner/name.' }),
+  issueLinkChanged: msg({ id: 'tasks.source.issueLinkChanged', defaultMessage: 'This project’s GitHub repository is now {repo}, not {shown} as listed: list its issues again.', description: 'HI-3555: an error making a card of an issue from the board’s From GitHub… Issues list: the project’s GitHub link changed to another repository since the list was shown. {repo} and {shown} are owner/name.' }),
+  gh: msg({ id: 'tasks.source.gh', defaultMessage: 'The GitHub CLI {problem, select, missing {isn’t installed} signedOut {isn’t signed in on {host}} timeout {didn’t answer in time} other {couldn’t read it}}: see Version Control → Workflow → GitHub.', description: 'HI-3551: an error setting a card’s GitHub source: gh couldn’t be asked (problem: not installed, not signed in on the host, no answer in time, or another failure). Keep the select keys. Version Control → Workflow → GitHub is a place in the window: as translated there.' })
+}
+
+/**
+ * HI-3551: sets, replaces or clears (null) the GitHub pull request or issue a card is about: the user's alone, only while
+ * the card has never started (no Started fact) and is in Todo or On Hold. Read once from GitHub through the gh service
+ * (outside the board's lock), on the project's GitHub link only; the card is labelled github-pr or github-issue. Once
+ * started, the start's evidence (Started.pr) carries a PR's identity, whatever the card says after.
+ */
+export async function setSource(n: number, input: string | null, actor: TaskActor): Promise<TaskCard> {
+  if (actor.kind !== 'user') throw new TaskPermissionError(SOURCE.agents)
+  const ws = workspace
+  const first = await getTask(n, ws)
+  if (!first.project) throw new TaskConflictError(SOURCE.noProject)
+  const projectPath = ws.path ? join(ws.path, first.project) : first.project
+  const read = input !== null ? await readSource(ws, projectPath, String(input)) : null
+  return writeSource(ws, projectPath, n, read, actor)
+}
+
+/** HI-3560: who wrote a pull request, as gh's `pr view` gives its commits' messages and body (prAuthorship), against Combwork's providers' names. */
+function wroteByOf(j: Record<string, unknown>): PrAuthorship | null {
+  const commits = Array.isArray(j.commits) ? (j.commits as Record<string, unknown>[]) : []
+  const messages = commits.map((c) => [c?.messageHeadline, c?.messageBody].filter((x): x is string => typeof x === 'string').join('\n\n'))
+  return prAuthorship(messages, typeof j.body === 'string' ? j.body : '', PROVIDERS.map((p) => ({ id: p.id, name: p.name, assistant: p.assistant, company: p.company })))
+}
+
+/** The fields gh's `pr view` is asked for (HI-3553: with the author and body; HI-3560: the commits, for who wrote it); an issue is read through the issue source (HI-3555). */
+const SOURCE_FIELDS = { pr: 'number,title,url,headRefName,baseRefName,isCrossRepository,maintainerCanModify,author,body,commits' } as const
+
+/**
+ * HI-3551, HI-3553: a pull request or issue on the project's GitHub link, read through the gh service (outside the
+ * board's lock): an address, or `#n` (a PR first, else an issue; `kind` forces one). A PR's author's association with
+ * the repository comes from GitHub's REST answer (gh's `pr view` doesn't give it): unknown when that read fails.
+ */
+async function readSource(ws: WorkspaceService, projectPath: string, input: string, only?: 'pr'): Promise<{ source: GithubSource; body: string }> {
+  const { githubRepoFor } = await import('./githubLink')
+  const { gh } = await import('./ghCli')
+  const link = await githubRepoFor(ws, projectPath)
+  const ref = parseSourceRef(input, link)
+  if ('error' in ref) throw new TaskConflictError(ref.error === 'otherRepo' && link ? withValues(SOURCE.otherRepo, { repo: `${link.owner}/${link.repo}`, host: link.host }) : SOURCE[ref.error])
+  const repo = `${ref.ref.owner}/${ref.ref.repo}`
+  const ask = (kind: 'pr') => gh({ repo: ref.ref }, [kind, 'view', String(ref.number), '--json', SOURCE_FIELDS[kind]], { json: true })
+  let kind: 'pr' | 'issue' = only ?? ref.kind ?? 'pr'
+  const got = kind === 'pr' ? await ask('pr') : null
+  // `#n` names either: a pull request first, else an issue (GitHub numbers both alike).
+  if (got && !got.ok && got.problem === 'failed' && ref.kind === null && !only) kind = 'issue'
+  // HI-3555 (HR1 on s9): an issue is read through the issue source's seam, as From GitHub…'s Issues reads it.
+  if (kind === 'issue') {
+    const { githubIssues } = await import('./issueSources')
+    const r = await githubIssues(ref.ref).read(ref.number)
+    if (!r.ok) throw new TaskConflictError(r.problem === 'failed' ? withValues(SOURCE.notFound, { number: ref.number, repo, why: r.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: r.problem, host: ref.ref.host })) // i18n-ignore: a select key (none), gh's own words otherwise
+    return { source: r.issue.source, body: r.issue.body }
+  }
+  if (!got) throw new TaskConflictError(withValues(SOURCE.notFound, { number: ref.number, repo, why: 'none' })) // i18n-ignore: a select key (none)
+  if (!got.ok) throw new TaskConflictError(got.problem === 'failed' ? withValues(SOURCE.notFound, { number: ref.number, repo, why: got.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: got.problem, host: ref.ref.host })) // i18n-ignore: a select key (none), gh's own words otherwise
+  const j = (got.json ?? {}) as Record<string, unknown>
+  const str = (k: string): string => (typeof j[k] === 'string' ? (j[k] as string) : '')
+  const login = j.author && typeof j.author === 'object' && typeof (j.author as { login?: unknown }).login === 'string' ? (j.author as { login: string }).login : ''
+  // The author's standing in the repository: the REST answer's author_association, on the same host (gh api names it).
+  const association = login ? await gh({ host: ref.ref.host }, ['api', `repos/${repo}/${kind === 'pr' ? 'pulls' : 'issues'}/${ref.number}`, '--jq', '.author_association']).then((r) => (r.ok && /^[A-Z_]{1,40}$/.test(r.stdout.trim()) ? r.stdout.trim() : null)) : null
+  const source = cleanSource({ kind, ...ref.ref, number: ref.number, url: str('url') || `https://${ref.ref.host}/${repo}/${kind === 'pr' ? 'pull' : 'issues'}/${ref.number}`, title: str('title'), ...(kind === 'pr' ? { pr: { headRef: str('headRefName'), baseRef: str('baseRefName'), crossRepository: j.isCrossRepository === true, maintainerCanModify: j.maintainerCanModify === true } } : {}), ...(login ? { author: { login, association } } : {}), ...(kind === 'pr' ? { wroteBy: wroteByOf(j) } : {}) })
+  if (!source || (kind === 'pr' && (!source.pr?.headRef || !source.pr.baseRef))) throw new TaskConflictError(withValues(SOURCE.notFound, { number: ref.number, repo, why: 'none' })) // i18n-ignore: a select key (none)
+  return { source, body: clipBody(j.body) }
+}
+
+/**
+ * HI-3553: an open pull request on the project's GitHub link made a card in Todo (the board's From GitHub…), the user's
+ * alone: its title and description the window's (in the user's language), its source and body read from GitHub again
+ * here. `expect` is the repository the window listed it from: a link changed since is refused, so a number is never
+ * taken for another repository's PR. Under the board's lock, a PR some card not archived is already about isn't made
+ * twice (that card comes back, `existing`), and the card is made with its source in one save.
+ */
+export async function createFromPr(project: string, number: number, expect: { host: string; owner: string; repo: string }, words: { title: string; description: string }, actor: TaskActor): Promise<{ card: TaskCard; existing: boolean }> {
+  if (actor.kind !== 'user') throw new TaskPermissionError(SOURCE.agents)
+  const ws = workspace
+  const projectPath = ws.path ? join(ws.path, project) : project
+  const read = await readSource(ws, projectPath, `#${number}`, 'pr')
+  const shown = `${expect.owner}/${expect.repo}`
+  if (!sameSource(read.source, { kind: 'pr', number, host: expect.host, owner: expect.owner, repo: expect.repo })) throw new TaskConflictError(withValues(SOURCE.linkChanged, { shown, repo: `${read.source.owner}/${read.source.repo}` }))
+  const { prSourceCards } = await import('./boardStore')
+  return recording(actor, null, () =>
+    boardLock(ws, async () => {
+      const had = prSourceCards(ws, read.source).find((c) => c.pr === read.source.number)
+      if (had) return { card: await getTask(had.n, ws), existing: true }
+      const card = await createTaskLocked({ title: words.title, description: words.description, project, labels: [sourceLabel('pr')], source: read }, actor)
+      return { card, existing: false }
+    })
+  )
+}
+
+/**
+ * HI-3555: an open issue on the project's issue source (its GitHub link) made a card in Todo (From GitHub…'s Issues),
+ * the user's alone, as createFromPr does for a pull request: its title and description the window's, its source, body
+ * and labels read again here through the seam (issueSources.ts), labelled with the issue's labels and github-issue. An
+ * issue some card not archived is already about isn't made twice (that card comes back, `existing`). Nothing is written
+ * to GitHub.
+ */
+export async function createFromIssue(project: string, number: number, expect: { host: string; owner: string; repo: string }, words: { title: string; description: string }, actor: TaskActor): Promise<{ card: TaskCard; existing: boolean }> {
+  if (actor.kind !== 'user') throw new TaskPermissionError(SOURCE.agents)
+  const ws = workspace
+  const projectPath = ws.path ? join(ws.path, project) : project
+  const { issueSourceFor } = await import('./issueSources')
+  const src = await issueSourceFor(ws, projectPath)
+  if (!src) throw new TaskConflictError(SOURCE.noLink)
+  const shown = `${expect.owner}/${expect.repo}`
+  if (!sameSource({ kind: 'issue', number, ...src.repo }, { kind: 'issue', number, ...expect })) throw new TaskConflictError(withValues(SOURCE.issueLinkChanged, { shown, repo: `${src.repo.owner}/${src.repo.repo}` }))
+  const got = await src.read(number)
+  const repo = `${src.repo.owner}/${src.repo.repo}`
+  if (!got.ok) throw new TaskConflictError(got.problem === 'failed' ? withValues(SOURCE.notFound, { number, repo, why: got.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: got.problem, host: src.repo.host })) // i18n-ignore: a select key (none), gh's own words otherwise
+  const { issueSourceCards } = await import('./boardStore')
+  const labels = [...got.issue.labels.filter((l) => l !== sourceLabel('issue')), sourceLabel('issue')]
+  return recording(actor, null, () =>
+    boardLock(ws, async () => {
+      const had = issueSourceCards(ws, src.repo).find((c) => !c.archived && c.issue === number)
+      if (had) return { card: await getTask(had.n, ws), existing: true }
+      const card = await createTaskLocked({ title: words.title, description: words.description, project, labels, source: { source: got.issue.source, body: got.issue.body } }, actor)
+      return { card, existing: false }
+    })
+  )
+}
+
+/** HI-3554: why "Address feedback" made no fix card, in the window's words. */
+const FEEDBACK = {
+  changed: msg({ id: 'tasks.feedback.changed', defaultMessage: '{card} is now about another pull request than #{number} on {repo}: no fix card was made. Read its feedback again.', description: 'HI-3554: an error from Address feedback in the card dialog: the card’s pull request changed (its GitHub source, or the one it opened) since its feedback was shown. {card} a card key like HI-12, {number} the pull request’s number, {repo} owner/name.' }),
+  gone: msg({ id: 'tasks.feedback.gone', defaultMessage: 'None of the chosen comments is on pull request #{number} now: no fix card was made. Read its feedback again.', description: 'HI-3554: an error from Address feedback: GitHub, read again, no longer has any of the comments the user ticked (deleted or edited away). {number} the pull request’s number.' }),
+  notOpen: msg({ id: 'tasks.feedback.notOpen', defaultMessage: 'Pull request #{number} isn’t open on GitHub: no fix card was made.', description: 'HI-3554: an error from Address feedback: the pull request was merged or closed, so a fix card for it would have nowhere to push. {number} its number.' }),
+  none: msg({ id: 'tasks.feedback.none', defaultMessage: 'Choose at least one comment to address.', description: 'HI-3554: an error from Address feedback when no comment is ticked.' })
+}
+
+/**
+ * HI-3554: "Address feedback": the comments of card `n`'s pull request the user chose (`ids`, as the dialog listed them)
+ * made a fix card in Todo, the user's alone. The pull request must still be the card's (`target`, the one the dialog
+ * showed) and open; its feedback is read from GitHub again here, so only GitHub's words go on the card, never the
+ * window's copy. The fix card's source is that pull request (read as From GitHub… reads one: it starts on its head and
+ * pushes back by HI-3562's rules), labelled github-pr, linked to card `n`, the chosen comments kept beside its source as
+ * outside text. Its title and description are the window's (the user's language). Nothing is written to GitHub.
+ */
+export async function createFromFeedback(n: number, target: FeedbackTarget, ids: string[], words: { title: string; description: string }, actor: TaskActor): Promise<TaskCard> {
+  if (actor.kind !== 'user') throw new TaskPermissionError(SOURCE.agents)
+  const ws = workspace
+  const first = await getTask(n, ws)
+  if (!first.project) throw new TaskConflictError(SOURCE.noProject)
+  const projectPath = ws.path ? join(ws.path, first.project) : first.project
+  const { cardFeedbackTarget, readPrFeedback } = await import('./prFeedback')
+  const repo = `${target.owner}/${target.repo}`
+  const still = async (): Promise<void> => {
+    const now = await cardFeedbackTarget(ws, await getTask(n, ws))
+    if (!sameSource(now ? { kind: 'pr', ...now } : null, { kind: 'pr', ...target })) throw new TaskConflictError(withValues(FEEDBACK.changed, { card: cardRef(n), number: target.number, repo }))
+  }
+  const wanted = new Set(ids.filter((i) => typeof i === 'string'))
+  if (!wanted.size) throw new TaskConflictError(FEEDBACK.none)
+  await still()
+  const read = await readPrFeedback(target)
+  if ('problem' in read) throw new TaskConflictError(read.problem === 'failed' || read.problem === 'noPr' ? withValues(SOURCE.notFound, { number: target.number, repo, why: read.detail ?? 'none' }) : withValues(SOURCE.gh, { problem: read.problem, host: target.host })) // i18n-ignore: a select key (none), gh's own words otherwise
+  if (!read.open) throw new TaskConflictError(withValues(FEEDBACK.notOpen, { number: target.number }))
+  const picked = read.items.filter((i) => wanted.has(i.id))
+  if (!picked.length) throw new TaskConflictError(withValues(FEEDBACK.gone, { number: target.number }))
+  const src = await readSource(ws, projectPath, `#${target.number}`, 'pr')
+  if (!sameSource(src.source, { kind: 'pr', ...target })) throw new TaskConflictError(withValues(SOURCE.linkChanged, { shown: repo, repo: `${src.source.owner}/${src.source.repo}` }))
+  return recording(actor, null, () =>
+    boardLock(ws, async () => {
+      await still()
+      return createTaskLocked({ title: words.title, description: words.description, project: first.project, labels: [sourceLabel('pr')], links: [n], source: { ...src, feedback: picked } }, actor)
+    })
+  )
+}
+
+/** HI-3551: sets (or clears, null) a card's source read from GitHub, under the board's lock, while its work hasn't started. */
+async function writeSource(ws: WorkspaceService, projectPath: string, n: number, read: { source: GithubSource; body: string } | null, actor: TaskActor): Promise<TaskCard> {
+  const source = read?.source ?? null
+  const { workflowFor } = await import('./workflow/service')
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  return recordingAs(actor, () =>
+    boardLock(ws, async () => {
+      const card = await getTask(n, ws)
+      if (card.archived) throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
+      // Under the board's lock, where a start is written: never once its work has started (a put back card included).
+      const s = wf ? wf.state(wf.store.card(n)) : null
+      if (s?.started || !['todo', 'hold'].includes(s?.stage ?? card.column)) throw new TaskConflictError(withValues(SOURCE.started, { card: cardRef(n) }))
+      if (JSON.stringify(card.source ?? null) === JSON.stringify(source) && (card.sourceBody ?? '') === (read?.body ?? '')) return card
+      const before = structuredClone(card)
+      const label = source ? sourceLabel(source.kind) : null
+      const old = card.source ? sourceLabel(card.source.kind) : null
+      if (source) card.source = source
+      else delete card.source
+      // HI-3553: GitHub's body beside it (outside text), gone with it.
+      if (read?.body) card.sourceBody = read.body
+      else delete card.sourceBody
+      // HI-3554: feedback chosen from the pull request it was about isn't another source's.
+      delete card.sourceFeedback
+      card.labels = [...card.labels.filter((l) => l !== old || l === label), ...(label && !card.labels.includes(label) ? [label] : [])]
+      note(card, actorName(actor), storedText(HISTORY.source, source ? { set: 'yes', kind: source.kind, number: source.number, repo: `${source.owner}/${source.repo}` } : { set: 'no', kind: '', number: 0, repo: '' }))
+      await saveCard(ws, n, card, before)
       changed(ws)
       return card
     })
@@ -3292,12 +3485,12 @@ export async function noteOnCard(n: number, what: string | StoredText, ws: Works
  * `key`: the comment's id, at most once on the card. Or both (HI-2087): its English as agents read it (`text`, longer
  * than the window's), and the message the window shows (`shown`).
  */
-export async function commentAsCombwork(n: number, said: string | StoredText | { text: string; shown: StoredText }, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string, evenArchived = false): Promise<boolean> {
+export async function commentAsCombwork(n: number, said: string | StoredText | { text: string; shown: StoredText }, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string): Promise<boolean> {
   return boardLock(ws, async () => {
     const card = await getTask(n, ws)
     // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing. An archived card
-    // gets none unless `evenArchived` (HI-3367: a notice that replaces a question it lost).
-    if ((card.archived && !evenArchived) || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
+    // gets none.
+    if (card.archived || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
     // Agents' English beside the window's message (and, where it is worded apart, what it is said from: `agent`).
     if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.combwork, said.text, said.shown, key)
     else addComment(card, BY.combwork, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)

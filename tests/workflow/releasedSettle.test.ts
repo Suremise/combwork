@@ -1,7 +1,6 @@
-// HI-3319: a start's release read (HI-3148) whose ground was unsettled or moved under it (jj's operation head while an
-// operation lands, Combwork's own beside it: a slot made or detached) is read again whole, at most RELEASE_READS reads,
-// so the user's drag starts the card instead of asking to confirm a released line (jjafterpush, under load: card 2's move
-// came back `ask` and it stayed in Todo). A steady unknown is not read again; one unsettled every time is still unknown.
+// HI-3319: a start's release read (HI-3148) whose ground was unsettled or moved under it (Combwork's own writes beside
+// it: a slot made or detached) is read again whole, at most RELEASE_READS reads, so the user's drag starts the card
+// instead of asking to confirm a released line. A steady unknown is not read again; one unsettled every time is still unknown.
 import { afterEach, describe, expect, it } from 'vitest'
 import { B1, moved, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
@@ -18,7 +17,7 @@ afterEach(() => {
 
 /**
  * Release reads whose watch's checker answers `heads` in turn, a value a call (null: unsettled; the last one stays), and
- * whose read is unknown the first `movedReads` times (the head moving under it, as jj's pinned read is then) or always
+ * whose read is unknown the first `movedReads` times (the head moving under it) or always
  * (`steadyUnknown`), else not released.
  */
 function reads(heads: (string | null)[], o: { movedReads?: number; steadyUnknown?: boolean } = {}) {

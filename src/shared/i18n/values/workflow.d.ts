@@ -5,8 +5,6 @@ interface CombworkMessageValues {
   'workflow.contradiction.combworkMergesNeedsGit': undefined
   'workflow.contradiction.committedNeedsFolder': undefined
   'workflow.contradiction.focusedNeedsRunner': undefined
-  'workflow.contradiction.jjNeedsSlots': undefined
-  'workflow.contradiction.jjYouIntegrate': undefined
   'workflow.contradiction.mergeNeedsSlots': undefined
   'workflow.contradiction.noneHasNoSlots': undefined
   'workflow.contradiction.okWithReview': undefined
@@ -15,15 +13,6 @@ interface CombworkMessageValues {
   'workflow.contradiction.selfReview': undefined
   'workflow.contradiction.subfolderTarget': undefined
   'workflow.contradiction.upToDateNeedsSlots': undefined
-  'workflow.earlierWork.message': { read: string; n: number; lines: string | number }
-  'workflow.earlierWork.title': { read: string; card: string | number; line: string | number }
-  'workflow.forYou.advanceNote': { project: string | number }
-  'workflow.forYou.advancePreview': { again: string; card: string | number; target: string | number; expected: string | number; result: string | number; style: string; commits: string | number; more: number }
-  'workflow.forYou.advancePreviewClosed': { clicked: string; card: string | number; why: string; cards: string | number }
-  'workflow.forYou.advanceRefused': { target: string | number; result: string | number; card: string | number; why: string; detail: string | number; next: string; mode: string }
-  'workflow.forYou.advanceStopped': { again: string; target: string | number; result: string | number; card: string | number; why: string; detail: string | number }
-  'workflow.forYou.advanceSuperseded': { card: string | number; target: string | number }
-  'workflow.forYou.advanceUncertain': { again: string; target: string | number; result: string | number; card: string | number; detail: string | number; op: string }
   'workflow.forYou.churnLimit': { card: string | number; churn: number }
   'workflow.forYou.decidedAfterMerge': { card: string | number }
   'workflow.forYou.focusedSkip': { card: string | number; tests: string | number }
@@ -35,6 +24,8 @@ interface CombworkMessageValues {
   'workflow.forYou.newDecision': { card: string | number }
   'workflow.forYou.okBefore': { card: string | number }
   'workflow.forYou.passedReview': { card: string | number }
+  'workflow.forYou.prOkBefore': { card: string | number }
+  'workflow.forYou.prRetry': { card: string | number; why: string | number }
   'workflow.forYou.queueAdvance': { card: string | number; target: string | number; folder: string | number }
   'workflow.forYou.queueCatchUp': { card: string | number; target: string | number; folder: string | number }
   'workflow.forYou.queuePublish': { card: string | number; result: string | number; endpoint: string | number; target: string | number }
@@ -99,10 +90,8 @@ interface CombworkMessageValues {
   'workflow.form.lanes': { n: number }
   'workflow.form.levelConfirm': undefined
   'workflow.form.levelForGit': undefined
-  'workflow.form.levelForJj': undefined
   'workflow.form.levelForNone': undefined
   'workflow.form.levelGit': undefined
-  'workflow.form.levelJj': undefined
   'workflow.form.levelNone': undefined
   'workflow.form.levelPlatform': undefined
   'workflow.form.loadFailed': { error: string | number }
@@ -159,13 +148,16 @@ interface CombworkMessageValues {
   'workflow.form.stageNamesValue': { n: number }
   'workflow.form.startedFrom': { preset: string | number }
   'workflow.form.stepWaitNote': undefined
+  'workflow.form.tabs': undefined
   'workflow.form.templateIdentityOff': undefined
   'workflow.form.templateNoCommand': { count: number; checks: string | number }
   'workflow.form.templateOtherPlatform': { template: string | number; platform: string | number; project: string | number }
   'workflow.form.use': { preset: string | number }
   'workflow.group.checks': undefined
+  'workflow.group.github': undefined
   'workflow.group.loops': undefined
   'workflow.group.merging': undefined
+  'workflow.group.pullRequests': undefined
   'workflow.group.review': undefined
   'workflow.group.stages': undefined
   'workflow.group.team': undefined
@@ -255,8 +247,6 @@ interface CombworkMessageValues {
   'workflow.option.fileLocks.desc': undefined
   'workflow.option.fileLocks.title': undefined
   'workflow.option.finish.desc': undefined
-  'workflow.option.finish.jjDesc': undefined
-  'workflow.option.finish.jjTitle': undefined
   'workflow.option.finish.title': undefined
   'workflow.option.focusedTests.desc': undefined
   'workflow.option.focusedTests.title': undefined
@@ -264,6 +254,10 @@ interface CombworkMessageValues {
   'workflow.option.folder.title': undefined
   'workflow.option.followRemote.desc': undefined
   'workflow.option.followRemote.title': undefined
+  'workflow.option.githubFeedback.desc': undefined
+  'workflow.option.githubFeedback.title': undefined
+  'workflow.option.githubFooter.desc': undefined
+  'workflow.option.githubFooter.title': undefined
   'workflow.option.identity.desc': undefined
   'workflow.option.identity.title': undefined
   'workflow.option.loopRounds.desc': undefined
@@ -277,16 +271,10 @@ interface CombworkMessageValues {
   'workflow.option.maxAgents.desc': undefined
   'workflow.option.maxAgents.title': undefined
   'workflow.option.mergeChecks.desc': undefined
-  'workflow.option.mergeChecks.jjDesc': undefined
-  'workflow.option.mergeChecks.jjTitle': undefined
   'workflow.option.mergeChecks.title': undefined
   'workflow.option.mergeGuards.desc': undefined
-  'workflow.option.mergeGuards.jjDesc': undefined
-  'workflow.option.mergeGuards.jjTitle': undefined
   'workflow.option.mergeGuards.title': undefined
   'workflow.option.mergeInstall.desc': undefined
-  'workflow.option.mergeInstall.jjDesc': undefined
-  'workflow.option.mergeInstall.jjTitle': undefined
   'workflow.option.mergeInstall.title': undefined
   'workflow.option.noSelfReview.desc': undefined
   'workflow.option.noSelfReview.title': undefined
@@ -294,6 +282,8 @@ interface CombworkMessageValues {
   'workflow.option.okBefore.title': undefined
   'workflow.option.otherTargets.desc': undefined
   'workflow.option.otherTargets.title': undefined
+  'workflow.option.prDraft.desc': undefined
+  'workflow.option.prDraft.title': undefined
   'workflow.option.preChecks.desc': undefined
   'workflow.option.preChecks.title': undefined
   'workflow.option.pushTarget.desc': undefined
@@ -319,15 +309,12 @@ interface CombworkMessageValues {
   'workflow.option.stopOwnRuns.desc': undefined
   'workflow.option.stopOwnRuns.title': undefined
   'workflow.option.strict.desc': undefined
-  'workflow.option.strict.jjDesc': undefined
-  'workflow.option.strict.jjTitle': undefined
   'workflow.option.strict.title': undefined
   'workflow.option.style.desc': undefined
-  'workflow.option.style.jjDesc': undefined
-  'workflow.option.style.jjTitle': undefined
   'workflow.option.style.title': undefined
   'workflow.option.target.desc': undefined
   'workflow.option.target.title': undefined
+  'workflow.prProblem': { problem: string; remote: string | number; owner: string | number; repo: string | number; host: string | number; line: string | number; detail: string | number }
   'workflow.preset.custom': undefined
   'workflow.preset.note.teamFocused': undefined
   'workflow.preset.pair': undefined
@@ -436,30 +423,23 @@ interface CombworkMessageValues {
   'workflow.refused.move.useIntent.next': { intent: string | number }
   'workflow.refused.paths.excluded.message': { card: string | number; path: string | number; folder: string | number }
   'workflow.refused.paths.excluded.next': { folder: string | number }
-  'workflow.refused.platform.changed.message': { card: string | number; platform: string | number }
-  'workflow.refused.platform.changed.next': { platform: string | number }
+  'workflow.refused.paths.notDeclared.message': { card: string | number; platform: string | number }
+  'workflow.refused.paths.notDeclared.next': undefined
   'workflow.refused.platform.detachedFolder.message': { card: string | number; head: string | number }
   'workflow.refused.platform.detachedFolder.next': { has: string; branch: string | number }
-  'workflow.refused.platform.jjRefused.message': { why: string; card: string | number; count: number; files: string | number; setting: string | number; base: string | number; commit: string | number; other: string | number; max: number; state: string }
-  'workflow.refused.platform.jjRefused.next': { why: string; state: string; told: string | number }
-  'workflow.refused.platform.keptAcross.message': { card: string | number; slot: string | number; platform: string | number; now: string | number }
-  'workflow.refused.platform.keptAcross.next': { gone: string; card: string | number; platform: string | number }
-  'workflow.refused.platform.keptElsewhere.message': { card: string | number; slot: string | number }
-  'workflow.refused.platform.keptElsewhere.next': { slot: string | number; card: string | number }
   'workflow.refused.platform.keptLine.message': { card: string | number; kept: string | number; target: string | number }
   'workflow.refused.platform.keptLine.next': { kept: string | number; target: string | number }
-  'workflow.refused.platform.keptOnTarget.message': { why: string; card: string | number; slot: string | number; target: string | number; now: string | number }
-  'workflow.refused.platform.keptOnTarget.next': { why: string; target: string | number }
-  'workflow.refused.platform.noTarget.message': { card: string | number }
-  'workflow.refused.platform.noTarget.next': undefined
   'workflow.refused.platform.noUpstream.message': { card: string | number; target: string | number }
   'workflow.refused.platform.noUpstream.next': { how: string; remote: string | number; target: string | number; publish: string | number; track1: string | number; track2: string | number }
   'workflow.refused.platform.offLine.message': { card: string | number; line: string | number; where: string; head: string | number; on: string | number }
   'workflow.refused.platform.offLine.next': { where: string; lineArg: string | number; made: string; start: string | number; onArg: string | number }
+  'workflow.refused.platform.prNeedsSlot.change': undefined
+  'workflow.refused.platform.prNeedsSlot.message': { card: string | number; number: string | number }
+  'workflow.refused.platform.prNeedsSlot.next': undefined
+  'workflow.refused.platform.prNotLocal.message': { card: string | number }
+  'workflow.refused.platform.prNotLocal.next': undefined
   'workflow.refused.platform.slotLeft.message': { unknown: string; card: string | number; slot: string | number; folder: string | number }
   'workflow.refused.platform.slotLeft.next': { unknown: string }
-  'workflow.refused.platform.switching.message': { card: string | number }
-  'workflow.refused.platform.switching.next': undefined
   'workflow.refused.platform.targetGone.message': { card: string | number; target: string | number }
   'workflow.refused.platform.targetGone.next': undefined
   'workflow.refused.platform.unknown.message': { card: string | number; what: string | number; rule: string | number }
@@ -488,8 +468,6 @@ interface CombworkMessageValues {
   'workflow.refused.start.notBlocked.change': undefined
   'workflow.refused.start.notBlocked.message': { card: string | number; reason: string | number }
   'workflow.refused.start.notBlocked.next': undefined
-  'workflow.refused.start.platformReady.message': { card: string | number }
-  'workflow.refused.start.platformReady.next': undefined
   'workflow.refused.start.releaseUnknown.message': { target: string | number; what: string | number; card: string | number }
   'workflow.refused.start.releaseUnknown.next': undefined
   'workflow.refused.start.released.message': { card: string | number; target: string | number; dated: string; tag: string | number; date: Date | number; into: string | number }
@@ -541,7 +519,6 @@ interface CombworkMessageValues {
   'workflow.refused.why.stale': undefined
   'workflow.refused.why.userOk': undefined
   'workflow.roundChoice': { choice: string }
-  'workflow.rule.advance.verified': undefined
   'workflow.rule.approval.given': undefined
   'workflow.rule.card.kind': undefined
   'workflow.rule.done.contained': undefined
@@ -557,7 +534,6 @@ interface CombworkMessageValues {
   'workflow.rule.review.notAuthor': undefined
   'workflow.rule.start.dependenciesIntegrated': undefined
   'workflow.rule.start.notBlocked': undefined
-  'workflow.rule.start.platformReady': undefined
   'workflow.rule.start.released': undefined
   'workflow.rule.start.slotAvailable': undefined
   'workflow.rule.submit.checksPassed': undefined
@@ -583,9 +559,8 @@ interface CombworkMessageValues {
   'workflow.slots.copy': undefined
   'workflow.slots.copyDesc': undefined
   'workflow.slots.desc': undefined
-  'workflow.slots.divergent': { same: string; folder: string | number; head: string | number }
-  'workflow.slots.divergentNext': { folder: string | number; head: string | number }
-  'workflow.slots.divergentTitle': { slot: string | number }
+  'workflow.slots.detachFailedHint': { said: string; error: string | number; target: string | number; command: string | number }
+  'workflow.slots.detachFailedState': { target: string | number }
   'workflow.slots.fromSetup': undefined
   'workflow.slots.gitFiles': undefined
   'workflow.slots.gitFilesDesc': undefined
@@ -597,37 +572,23 @@ interface CombworkMessageValues {
   'workflow.slots.held': { agent: string | number }
   'workflow.slots.inUse': undefined
   'workflow.slots.inherit': undefined
-  'workflow.slots.keptEditFor': { card: string | number }
-  'workflow.slots.keptFor': { card: string | number }
-  'workflow.slots.keptForgottenFor': { card: string | number }
-  'workflow.slots.keptGoneFor': { card: string | number }
   'workflow.slots.lentCard': { agent: string | number; card: string | number }
   'workflow.slots.lentLane': { agent: string | number }
   'workflow.slots.levelInherit': undefined
   'workflow.slots.levelNone': undefined
   'workflow.slots.noSlots': undefined
   'workflow.slots.none': undefined
-  'workflow.slots.notRecovered': { slot: string | number; why: string }
   'workflow.slots.notRemovedKept': { slot: string | number; why: string }
   'workflow.slots.off': undefined
   'workflow.slots.on': undefined
   'workflow.slots.openAdvanced': undefined
-  'workflow.slots.recover': undefined
-  'workflow.slots.recoverMessage': undefined
-  'workflow.slots.recoverTitle': { slot: string | number }
-  'workflow.slots.recovered': { slot: string | number }
-  'workflow.slots.recoveredAsides': { n: number; files: string | number }
-  'workflow.slots.recoveredCopies': { n: number }
-  'workflow.slots.recoveredDivergent': { commit: string | number }
-  'workflow.slots.recoveredKeptDeleted': { n: number; files: string | number }
-  'workflow.slots.recoveredPutBack': { n: number }
-  'workflow.slots.recoveredTitle': { slot: string | number }
+  'workflow.slots.openOperation': undefined
+  'workflow.slots.operationHint': { command: string | number }
+  'workflow.slots.operationState': { what: string | number }
   'workflow.slots.release': undefined
-  'workflow.slots.removeForgottenFree': { slot: string | number }
-  'workflow.slots.removeForgottenMessage': { card: string | number; commit: string }
-  'workflow.slots.removeKept': undefined
-  'workflow.slots.removeKeptMessage': { card: string | number; commit: string }
-  'workflow.slots.removeKeptTitle': { slot: string | number }
+  'workflow.slots.removeGone': undefined
+  'workflow.slots.removeGoneMessage': { slot: string | number }
+  'workflow.slots.removeGoneTitle': { slot: string | number }
   'workflow.slots.removedKept': { slot: string | number }
   'workflow.slots.reviewCopies': undefined
   'workflow.slots.reviewCopiesDesc': undefined
@@ -636,14 +597,9 @@ interface CombworkMessageValues {
   'workflow.slots.setNone': undefined
   'workflow.slots.setup': undefined
   'workflow.slots.setupDesc': undefined
-  'workflow.slots.stale': undefined
-  'workflow.slots.staleAbandoned': undefined
   'workflow.slots.state.creating': undefined
   'workflow.slots.state.dirty': undefined
-  'workflow.slots.state.forgotten': undefined
   'workflow.slots.state.gone': undefined
-  'workflow.slots.state.kept': undefined
-  'workflow.slots.state.keptEdit': undefined
   'workflow.slots.state.lent': undefined
   'workflow.slots.state.ready': undefined
   'workflow.slots.state.removing': undefined
@@ -653,6 +609,7 @@ interface CombworkMessageValues {
   'workflow.stage.done': undefined
   'workflow.stage.hold': undefined
   'workflow.stage.merging': undefined
+  'workflow.stage.prOpen': undefined
   'workflow.stage.review': undefined
   'workflow.stage.todo': undefined
   'workflow.stageName.control': { stage: string | number }
@@ -663,12 +620,16 @@ interface CombworkMessageValues {
   'workflow.summary.git.pairAgent': undefined
   'workflow.summary.git.solo': undefined
   'workflow.summary.git.team': undefined
-  'workflow.summary.jj.pair': undefined
-  'workflow.summary.jj.solo': undefined
-  'workflow.summary.jj.team': undefined
   'workflow.summary.none.pair': undefined
   'workflow.summary.none.solo': undefined
   'workflow.summary.none.team': undefined
+  'workflow.tab.checks': undefined
+  'workflow.tab.github': undefined
+  'workflow.tab.loops': undefined
+  'workflow.tab.merging': undefined
+  'workflow.tab.overview': undefined
+  'workflow.tab.where': undefined
+  'workflow.tab.work': undefined
   'workflow.unreadable.blockerWork': { card: string | number; what: string | number }
   'workflow.unreadable.branch': { folder: string | number }
   'workflow.unreadable.branchedOff': { a: string | number; b: string | number }
@@ -693,6 +654,10 @@ interface CombworkMessageValues {
   'workflow.unreadable.ignored': { folder: string | number }
   'workflow.unreadable.line': { branch: string | number }
   'workflow.unreadable.pathOutside': { path: string | number }
+  'workflow.unreadable.prFetch': { number: string | number; base: string | number; remote: string | number }
+  'workflow.unreadable.prLeftover': { line: string | number; number: string | number }
+  'workflow.unreadable.prLink': { number: string | number; repo: string | number }
+  'workflow.unreadable.prSlot': { card: string | number }
   'workflow.unreadable.remoteBehind': { target: string | number; endpoint: string | number }
   'workflow.unreadable.remoteHead': { branch: string | number; endpoint: string | number; target: string | number }
   'workflow.unreadable.remoteSetup': { target: string | number }
@@ -715,16 +680,16 @@ interface CombworkMessageValues {
   'workflow.value.commitMessage.branch': undefined
   'workflow.value.commitMessage.cw': undefined
   'workflow.value.finish.agentMerges': undefined
-  'workflow.value.finish.combworkAdvances': undefined
   'workflow.value.finish.combworkMerges': undefined
   'workflow.value.finish.committed': undefined
   'workflow.value.finish.notChecked': undefined
-  'workflow.value.finish.previewAdvance': undefined
-  'workflow.value.finish.userIntegrates': undefined
+  'workflow.value.finish.pullRequest': undefined
   'workflow.value.folder.project': undefined
   'workflow.value.folder.slots': undefined
+  'workflow.value.githubFeedback.agent': undefined
+  'workflow.value.githubFeedback.both': undefined
+  'workflow.value.githubFeedback.user': undefined
   'workflow.value.mergeInstall.always': undefined
-  'workflow.value.mergeInstall.alwaysCandidate': undefined
   'workflow.value.mergeInstall.onManifestChange': undefined
   'workflow.value.okBefore.every': undefined
   'workflow.value.okBefore.labels': undefined

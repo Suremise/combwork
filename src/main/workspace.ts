@@ -33,7 +33,7 @@ import { createLogger, userText } from './logger'
 import { changeSessionRecord, changeSessions, exportSessions, readAgentSessions, readCardSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
 import { worktreesRoot } from './worktrees'
-import { ensureCombworkExcluded, ensureJjExcluded, combworkVcs } from './combworkVcs'
+import { ensureCombworkExcluded, combworkVcs } from './combworkVcs'
 import { detect, initialOf, projectPlatform } from './platform/registry'
 import { currentLine, repoHolding } from './platform/repoPorts'
 import type { ProjectPlatform } from '../shared/platform/descriptors'
@@ -79,16 +79,9 @@ const M = {
   repositoryGone: msg({ id: 'service.workspace.platformRepositoryGone', defaultMessage: "{project}'s Git repository is gone. Git's rules hold, so its cards can't move on until the repository is back or you switch the project to None in its Version Control tab.", description: "A notice: the .git folder of a project Combwork treats as a Git project was removed or moved. Combwork doesn't switch it by itself: the Version Control tab offers the switch to None (glossary 2.1)." }),
   platformInvalidTitle: msg({ id: 'service.workspace.platformInvalidTitle', defaultMessage: 'Unknown version control setting in {project}', description: "A notice's title: the project {project}'s settings file names a version control Combwork doesn't have." }),
   platformInvalid: msg({ id: 'service.workspace.platformInvalid', defaultMessage: "{project}'s project.json names a version control Combwork doesn't know (platform: {value}). Until it says \"git\" or \"none\", Combwork uses what it finds in the folder.", description: 'A notice: the platform setting in the project {project}\'s .combwork/project.json is {value}, which is not one Combwork has (only "git" and "none" are: keep them as they are, they are setting values).' }),
-  otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Combwork doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.", description: 'A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Combwork treats as a Git project. Combwork does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1).' }),
-  jjFound: msg({ id: 'service.workspace.platformJjFound', defaultMessage: '{project} is a jj repository. Combwork goes on with its version control as it is until you switch it to jj in its Version Control tab.', description: 'A notice (HI-2799, HI-2896): a jj (Jujutsu) repository, colocated with Git or not, was found in a project. Combwork does not switch it by itself: the Version Control tab offers it. Keep jj.' }),
-  jjGone: msg({ id: 'service.workspace.platformJjGone', defaultMessage: "{project}'s jj repository is gone. Switch it to Git or None in its Version Control tab.", description: 'A notice (HI-2799): the .jj folder of a project using jj was removed or moved. Keep jj, Git and None.' }),
+  otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Combwork doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.", description: 'A notice: another version control system ({vcs}: Mercurial, Subversion…) was found in a project Combwork treats as a Git project. Combwork does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1).' }),
   platformSettled: msg({ id: 'service.workspace.platformSettled', defaultMessage: 'Settled: nothing to change now', description: "What the notice that a project's version control changed says once it no longer applies (HI-2320): the project was switched, or its folder is back as it was. Shown in place of its button." }),
   openVc: msg({ id: 'service.workspace.platformOpen', defaultMessage: 'Open Version Control', description: "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Combwork offers the switch (glossary 2.1)." })
-}
-/** What runs after each refresh reported (HI-2799: the platform fence's store map and recovery), registered by its module. */
-const afterRefresh: ((ws: WorkspaceService) => void)[] = []
-export function onAfterRefresh(fn: (ws: WorkspaceService) => void): void {
-  afterRefresh.push(fn)
 }
 
 // What a closed workspace's refused open throws (#1381: made when refused, not kept per workspace).
@@ -98,7 +91,7 @@ setFenceReason(() => combworkError(M.closed, undefined, { kind: 'conflict' }))
 function platformNotice(project: string, p: ProjectPlatform): { title: string; message: string } {
   if (p.invalid !== undefined) return { title: tr(M.platformInvalidTitle, { project }), message: tr(M.platformInvalid, { project, value: p.invalid }) }
   const why = p.offer?.why
-  const message = why === 'gitFound' ? tr(M.gitFound, { project }) : why === 'jjFound' ? tr(M.jjFound, { project }) : why === 'jjGone' ? tr(M.jjGone, { project }) : why === 'otherFound' ? tr(M.otherFound, { project, vcs: p.detected.other ?? 'jj' }) : tr(M.repositoryGone, { project })
+  const message = why === 'gitFound' ? tr(M.gitFound, { project }) : why === 'otherFound' ? tr(M.otherFound, { project, vcs: p.detected.other ?? '' }) : tr(M.repositoryGone, { project })
   return { title: tr(M.platformTitle, { project }), message }
 }
 
@@ -222,6 +215,9 @@ const projectFileConfig = (raw: Record<string, unknown>): { cfg: ProjectConfig; 
   cfg: mergeDefaults(structuredClone(DEFAULT_PROJECT_CONFIG), migrateProjectConfig(raw)),
   viewKeys: Object.keys(viewOf(raw as Partial<ProjectConfig>))
 })
+
+/** A path that is neither a project nor one of its agents' worktrees (assertRoot, changesRootProject). */
+const NOT_ROOT = msg({ id: 'service.workspace.notRoot', defaultMessage: 'Not a project or agent worktree in the open workspace: {path}', description: "An error: {path} is neither one of the open workspace's projects nor the worktree of one of their agents." })
 
 export class WorkspaceService {
   path: string | null = null
@@ -737,6 +733,13 @@ export class WorkspaceService {
     this.wsConfig = structuredClone(DEFAULT_WORKSPACE_CONFIG)
     // A save waiting for an open that ended before its read writes nothing (settingsToSave).
     this.settingsReadNow()
+    // Its workspace.json saves under way end before it is closed (HI-3544), as its refreshes do (#1341): one a refresh
+    // started and didn't wait for (flagDuplicateNames) otherwise wrote into the folder after its window let it go, failing
+    // a move of it, or a test's removal of it. One still waiting for the read writes nothing now (settingsToSave).
+    for (let saving = this.savingConfig; ; saving = this.savingConfig) {
+      await saving
+      if (saving === this.savingConfig) break
+    }
     // A new lifetime only once it is fully closed: work started while it was closing (its path still set) belongs to the
     // aborted one, so nothing can be admitted for a workspace that is going away.
     this.life = new AbortController()
@@ -1318,7 +1321,7 @@ export class WorkspaceService {
   assertRoot(p: string): string {
     if (this.isProjectPath(p)) return resolve(p)
     if (this.roots.has(resolve(p).toLowerCase())) return resolve(p)
-    throw combworkError(msg({ id: 'service.workspace.notRoot', defaultMessage: 'Not a project or agent worktree in the open workspace: {path}', description: "An error: {path} is neither one of the open workspace's projects nor the worktree of one of their agents." }), { path: p }, { kind: 'notFound' })
+    throw combworkError(NOT_ROOT, { path: p }, { kind: 'notFound' })
   }
 
   /**
@@ -1329,6 +1332,19 @@ export class WorkspaceService {
   assertChangesRoot(p: string): string {
     if (this.unusedRoots.has(resolve(p).toLowerCase())) return resolve(p)
     return this.assertRoot(p)
+  }
+
+  /**
+   * HI-3470: a Changes root (assertChangesRoot) and the project whose repository it is in: the project folder itself, an
+   * agent's worktree or slot, or an unused worktree as last listed. Throws as assertChangesRoot does.
+   */
+  changesRootProject(p: string): { folder: string; project: string } {
+    const folder = this.assertChangesRoot(p)
+    if (this.isProjectPath(folder)) return { folder, project: resolve(folder) }
+    const key = folder.toLowerCase()
+    const project = this.unusedRoots.get(key) ?? this.roots.get(key)
+    if (!project) throw combworkError(NOT_ROOT, { path: p }, { kind: 'notFound' })
+    return { folder, project: resolve(project) }
   }
 
   /** A project's unused worktrees as just listed (#400): the ones the Changes tab may read, replacing the last list. */
@@ -1518,8 +1534,6 @@ export class WorkspaceService {
   async ensureGitExclude(projectPath: string): Promise<void> {
     const r = await ensureCombworkExcluded(projectPath)
     if (r?.added) log.info(`Excluded .combwork from git in ${userText(r.root)}`)
-    // A non-colocated jj repository (HI-2800), which Git's keep-out doesn't hold: its Git store's info/exclude.
-    if (!r && (await ensureJjExcluded(projectPath).catch(() => null))?.added) log.info(`Excluded .combwork from jj in ${userText(projectPath)}`)
     // The line is there whatever git can do; git missing only means it couldn't confirm a .gitignore doesn't bring .combwork back (#346).
     const problem = r?.unconfirmed ? repoHolding(projectPath)?.runner.problem() : null
     if (r?.unconfirmed) log.info(`Git couldn't confirm .combwork is ignored in ${userText(r.root)}${problem ? ` (${problem})` : ''}`)
@@ -1856,10 +1870,18 @@ export class WorkspaceService {
     const ms = performance.now() - started
     if (ms > SLOW_PROJECT_READ_MS) log.info(`reading ${userText(basename(projectPath))} for the window took ${Math.round(ms)} ms: ${parts.map(([w, t]) => `${w} ${Math.round(t)} ms`).join(', ')}`)
     this.readAt.set(info, ticket)
-    // Said only in the lifetime the read is for: a read begun before a close or a switch is another workspace's.
-    if (info.platform && gen === this.generation && this.path) this.sayPlatform(projectPath, info.platform)
+    // Said only in the lifetime the read is for: a read begun before a close or a switch is another workspace's. Only of a
+    // project the window has been told of (HI-3524): a notice about one it doesn't know yet (a folder just added) reads to
+    // it as about a project gone, and loses its buttons; the refresh reporting it says it after its report.
+    if (info.platform && gen === this.generation && this.path) {
+      if (this.cached?.projects.some((p) => p.path.toLowerCase() === projectPath.toLowerCase())) this.sayPlatform(projectPath, info.platform)
+      else this.platformHeld.add(info)
+    }
     return info
   }
+
+  /** Reads whose platform notice waits for the window to be told of their project (HI-3524). */
+  private platformHeld = new WeakSet<ProjectInfo>()
 
   /** The offer each project's platform last had (lower-cased path → its reason, '' for none): each is said once, as it appears. */
   private platformOffers = new Map<string, string>()
@@ -1952,8 +1974,9 @@ export class WorkspaceService {
     for (const project of this.platformOffers.keys()) if (!known.has(project)) this.platformOffers.delete(project)
     this.cached = { path: this.path, name: basename(this.path), config: this.wsConfig, projects, assistant: assistant && { ...assistant, name: ASSISTANT_NAME, active: true, unmanagedMcp: [] }, moved: this.moved }
     this.emit({ type: 'workspace-changed', workspace: this.cached })
+    // The notices held for projects the window has only now been told of (HI-3524), after the report, as the names' are.
+    for (const p of projects) if (p.platform && this.platformHeld.has(p)) this.sayPlatform(p.path, p.platform)
     this.flagDuplicateNames(projects)
-    for (const fn of afterRefresh) fn(this)
     return this.cached
   }
 

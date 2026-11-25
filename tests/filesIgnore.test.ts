@@ -15,8 +15,10 @@ const HUNG_MS = timing('wait.hang')
 const ENOUGH = 30
 const STRESS_HUNG_MS = timing('wait.hangReal')
 
-/** check-ignore results to give instead of running it, in order; empty: run it. */
+/** check-ignore results to give instead of running it, in order; empty: run it (or fail as `failing` says). */
 const failNext: Partial<GitResult>[] = []
+/** HI-3577: while set, every check-ignore fails so, however many tries a look makes (failNext runs out at a count). */
+let failing: Partial<GitResult> | null = null
 let checkIgnoreCalls = 0
 /** Real check-ignores that failed (neither 0 nor 1), for the stress test's report. */
 let realFailures = 0
@@ -29,7 +31,7 @@ vi.mock('../src/main/git', async (original) => {
     git: async (cwd: string, args: string[], max?: number): Promise<GitResult> => {
       if (args[0] !== 'check-ignore') return real.git(cwd, args, max)
       checkIgnoreCalls++
-      const f = failNext.shift()
+      const f = failNext.shift() ?? failing
       if (f) return { out: '', ok: false, buf: Buffer.alloc(0), err: '', code: 128, ...f }
       const r = await real.git(cwd, args, max)
       if (r.code !== 0 && r.code !== 1) realFailures++
@@ -42,7 +44,8 @@ vi.mock('../src/main/git', async (original) => {
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const files = await import('../src/main/files')
 // Git's check-ignore tries, with Git's Files reads (HI-2792).
-const { IGNORE_TRIES } = await import('../src/main/platform/gitFiles')
+const { IGNORE_TRIES } = await import('../src/main/platform/git/gitFiles')
+const { INDEX_BUSY: INDEX_BOUNDS } = await import('../src/main/retryBounds')
 const { onCombworkEvent } = await import('../src/main/events')
 
 const BUSY = { err: 'fatal: .git/index: index file open failed: Permission denied' }
@@ -63,6 +66,7 @@ afterAll(async () => {
 })
 beforeEach(() => {
   failNext.length = 0
+  failing = null
   checkIgnoreCalls = 0
 })
 
@@ -81,29 +85,37 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
   })
 
   it('still failing: the folder keeps its last known state and is listed again shortly, a few times at most', async () => {
+    // A failing look is tried again for INDEX_BOUNDS.read, which outlasts a re-list's delay: so when a failing look
+    // returns, the re-list the look before it scheduled has come (the loop below counts on it).
+    expect(INDEX_BOUNDS.read.boundMs).toBeGreaterThan(files.RELIST_MS)
     const r = relists()
     expect(await dimmed()).toEqual(['dist'])
-    for (let i = 0; i < IGNORE_TRIES; i++) failNext.push(BUSY)
+    // HI-3577: git fails for as long as the look asks it, not for IGNORE_TRIES tries: an extra try (below) once found
+    // git working, which reset the re-lists' count and made a fourth on CI.
+    failing = BUSY
     expect(await dimmed()).toEqual(['dist'])
-    // HI-3374: tried again for INDEX_BOUNDS.read's time (at most IGNORE_TRIES tries in it), then given up: what is
-    // left of the failures queued isn't for the next look.
+    failing = null
+    // HI-3374: tried again for INDEX_BOUNDS.read's time (IGNORE_TRIES tries in it), then given up. HI-3577: one more at
+    // most, as a timer can end a millisecond early by the clock the bound is measured on (Date.now), leaving the bound
+    // its last millisecond for a try.
     expect(checkIgnoreCalls).toBeGreaterThan(2)
-    expect(checkIgnoreCalls).toBeLessThanOrEqual(1 + IGNORE_TRIES)
-    failNext.length = 0
+    expect(checkIgnoreCalls).toBeLessThanOrEqual(1 + IGNORE_TRIES + 1)
     await vi.waitFor(() => expect(r.seen).toEqual([['']]), { timeout: HUNG_MS })
-    // Failing on every re-list: at most RELIST_MAX of them in a row.
+    // Failing on every re-list: at most RELIST_MAX of them in a row. HI-3577: each one due is waited for (it was a fixed
+    // 700 ms); one past RELIST_MAX would have come by the time the next failing look returns (above), so each look
+    // also checks that none came that wasn't due.
     for (let k = 0; k < files.RELIST_MAX + 2; k++) {
-      for (let i = 0; i < IGNORE_TRIES; i++) failNext.push(BUSY)
+      failing = BUSY
       await dimmed()
-      failNext.length = 0
-      await new Promise((res) => setTimeout(res, 700)) // timing-ok: past RELIST_MS (500 ms), the relist's own delay
+      failing = null
+      expect(r.seen.length).toBe(Math.min(k + 1, files.RELIST_MAX))
+      if (k + 2 <= files.RELIST_MAX) await vi.waitFor(() => expect(r.seen.length).toBe(k + 2), { timeout: HUNG_MS })
     }
-    expect(r.seen.length).toBe(files.RELIST_MAX)
     // Working again: back to normal, and a later failure is listed again once more.
     expect(await dimmed()).toEqual(['dist'])
-    for (let i = 0; i < IGNORE_TRIES; i++) failNext.push(BUSY)
+    failing = BUSY
     await dimmed()
-    failNext.length = 0
+    failing = null
     await vi.waitFor(() => expect(r.seen.length).toBe(files.RELIST_MAX + 1), { timeout: HUNG_MS })
     r.off()
     // HI-3374: each failing look retries for INDEX_BOUNDS.read (3.2 s): a bound for a hung run, not the time it takes.
@@ -167,5 +179,5 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
     // Once under four unit suites at once (#560), never since: if it comes back, what git answered says whether it's git
     // or Combwork (#222's handling).
     expect(undimmed, `listings showing dist undimmed; git's answers without it: ${JSON.stringify(unnamed.slice(0, 5))}`).toEqual([])
-  }, timing('test.hangRealJj'))
+  }, timing('test.hangRealLong'))
 })

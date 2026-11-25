@@ -160,6 +160,44 @@ LangString combworkStillRunning 1045 "Combwork lub Hive Desktop nadal działa. N
 LangString combworkStillRunning 1046 "O Combwork ou o Hive Desktop ainda está em execução. Nada foi instalado: feche-o e execute este instalador de novo."
 LangString combworkStillRunning 2052 "Combwork 或 Hive Desktop 仍在运行。未安装任何内容：请关闭它，然后重新运行此安装程序。"
 
+; What still runs (HI-3463), from legacyUpgrade.ps1's -BlockerFile, below the message above: each line a label and a
+; value (the executable's path, or its name when its location is unknown; its process id), then how to close it.
+LangString combworkBlockerRunning 1033 "Running:"
+LangString combworkBlockerRunning 1031 "Läuft:"
+LangString combworkBlockerRunning 3082 "En ejecución:"
+LangString combworkBlockerRunning 1036 "En cours d'exécution :"
+LangString combworkBlockerRunning 1041 "実行中:"
+LangString combworkBlockerRunning 1045 "Działa:"
+LangString combworkBlockerRunning 1046 "Em execução:"
+LangString combworkBlockerRunning 2052 "正在运行："
+
+LangString combworkBlockerUnknown 1033 "Its location is unknown: Windows won't show it (it may belong to another account)."
+LangString combworkBlockerUnknown 1031 "Sein Speicherort ist unbekannt: Windows zeigt ihn nicht an (er gehört vielleicht zu einem anderen Konto)."
+LangString combworkBlockerUnknown 3082 "Su ubicación es desconocida: Windows no la muestra (puede que sea de otra cuenta)."
+LangString combworkBlockerUnknown 1036 "Son emplacement est inconnu : Windows ne l'indique pas (il appartient peut-être à un autre compte)."
+LangString combworkBlockerUnknown 1041 "場所は不明です。Windows が表示しません (別のアカウントのものかもしれません)。"
+LangString combworkBlockerUnknown 1045 "Jego lokalizacja jest nieznana: Windows jej nie pokazuje (może należeć do innego konta)."
+LangString combworkBlockerUnknown 1046 "A localização é desconhecida: o Windows não a mostra (pode ser de outra conta)."
+LangString combworkBlockerUnknown 2052 "位置未知：Windows 不显示它的位置（它可能属于另一个帐户）。"
+
+LangString combworkBlockerId 1033 "Process ID:"
+LangString combworkBlockerId 1031 "Prozess-ID:"
+LangString combworkBlockerId 3082 "Id. de proceso:"
+LangString combworkBlockerId 1036 "ID de processus :"
+LangString combworkBlockerId 1041 "プロセス ID:"
+LangString combworkBlockerId 1045 "Identyfikator procesu:"
+LangString combworkBlockerId 1046 "ID do processo:"
+LangString combworkBlockerId 2052 "进程 ID："
+
+LangString combworkBlockerClose 1033 "If it has no window to close, end it in Task Manager: on the Details tab, select the process with this ID and click End task."
+LangString combworkBlockerClose 1031 "Wenn es kein Fenster zum Schließen hat, beenden Sie es im Task-Manager: Wählen Sie auf der Registerkarte „Details“ den Prozess mit dieser ID aus und klicken Sie auf „Task beenden“."
+LangString combworkBlockerClose 3082 "Si no tiene ninguna ventana que cerrar, finalízalo en el Administrador de tareas: en la pestaña Detalles, selecciona el proceso con este identificador y haz clic en Finalizar tarea."
+LangString combworkBlockerClose 1036 "S'il n'a pas de fenêtre à fermer, arrêtez-le dans le Gestionnaire des tâches : dans l'onglet Détails, sélectionnez le processus portant cet ID et cliquez sur Fin de tâche."
+LangString combworkBlockerClose 1041 "閉じるウィンドウがない場合は、タスク マネージャーで終了してください。[詳細] タブでこの ID のプロセスを選び、[タスクを終了する] をクリックします。"
+LangString combworkBlockerClose 1045 "Jeśli nie ma okna do zamknięcia, zakończ go w Menedżerze zadań: na karcie Szczegóły zaznacz proces o tym identyfikatorze i kliknij Zakończ zadanie."
+LangString combworkBlockerClose 1046 "Se ele não tiver uma janela para fechar, finalize-o no Gerenciador de Tarefas: na guia Detalhes, selecione o processo com esse ID e clique em Finalizar tarefa."
+LangString combworkBlockerClose 2052 "如果它没有可关闭的窗口，请在任务管理器中结束它：在“详细信息”选项卡中选择此 ID 的进程，然后单击“结束任务”。"
+
 LangString hiveOldNotRemoved 1033 "Hive Desktop couldn't be uninstalled, so Combwork wasn't installed and your data folders weren't moved. Its uninstall may have stopped partway: check Installed apps, then run this installer again."
 LangString hiveOldNotRemoved 1031 "Hive Desktop konnte nicht deinstalliert werden, daher wurde Combwork nicht installiert und Ihre Datenordner wurden nicht verschoben. Die Deinstallation wurde möglicherweise unterbrochen: Prüfen Sie die installierten Apps und starten Sie dieses Installationsprogramm erneut."
 LangString hiveOldNotRemoved 3082 "No se ha podido desinstalar Hive Desktop, así que no se ha instalado Combwork ni se han movido tus carpetas de datos. Puede que la desinstalación se haya detenido a medias: revisa las aplicaciones instaladas y vuelve a ejecutar este instalador."
@@ -168,6 +206,19 @@ LangString hiveOldNotRemoved 1041 "Hive Desktop をアンインストールで�
 LangString hiveOldNotRemoved 1045 "Nie udało się odinstalować Hive Desktop, więc Combwork nie został zainstalowany, a foldery danych nie zostały przeniesione. Deinstalacja mogła zatrzymać się w połowie: sprawdź zainstalowane aplikacje i uruchom ten instalator ponownie."
 LangString hiveOldNotRemoved 1046 "Não foi possível desinstalar o Hive Desktop, então o Combwork não foi instalado e suas pastas de dados não foram movidas. A desinstalação pode ter parado no meio: verifique os aplicativos instalados e execute este instalador de novo."
 LangString hiveOldNotRemoved 2052 "无法卸载 Hive Desktop，因此未安装 Combwork，也未移动你的数据文件夹。卸载可能中途停止：请检查已安装的应用，然后重新运行此安装程序。"
+
+; A line read with FileRead*, without its line ending.
+!macro cwChomp VAR
+  ${Do}
+    StrCpy $9 ${VAR} 1 -1
+    ${If} $9 == "$\n"
+    ${OrIf} $9 == "$\r"
+      StrCpy ${VAR} ${VAR} -1
+    ${Else}
+      ${Break}
+    ${EndIf}
+  ${Loop}
+!macroend
 
 !macro customInit
   ${IfNot} ${UAC_IsInnerInstance}
@@ -197,12 +248,34 @@ LangString hiveOldNotRemoved 2052 "无法卸载 Hive Desktop，因此未安装 C
     InitPluginsDir
     File "/oname=$PLUGINSDIR\askToClose.ps1" "${CW_BUILD_DIR}\askToClose.ps1"
     File "/oname=$PLUGINSDIR\legacyUpgrade.ps1" "${CW_BUILD_DIR}\legacyUpgrade.ps1"
-    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\legacyUpgrade.ps1" -InstallDir "$INSTDIR" -WorkDir "$PLUGINSDIR"'
+    nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\legacyUpgrade.ps1" -InstallDir "$INSTDIR" -WorkDir "$PLUGINSDIR" -BlockerFile "$PLUGINSDIR\still-running.txt"'
     Pop $0
     ; Every install logs it, a clean one too: it names no old app (HI-2632).
     DetailPrint "The upgrade from an earlier version: $0"
     ${If} $0 == "5"
-      MessageBox MB_OK|MB_ICONSTOP "$(combworkStillRunning)" /SD IDOK
+      ; HI-3463: what still runs, as the script wrote it (state, process id, executable); without it, the message alone.
+      StrCpy $5 ""
+      ClearErrors
+      FileOpen $1 "$PLUGINSDIR\still-running.txt" r
+      ${IfNot} ${Errors}
+        FileReadUTF16LE $1 $6
+        FileReadUTF16LE $1 $7
+        FileReadUTF16LE $1 $8
+        FileClose $1
+        !insertmacro cwChomp $6
+        !insertmacro cwChomp $7
+        !insertmacro cwChomp $8
+        ${If} $6 == "running"
+          StrCpy $5 "$\r$\n$\r$\n$(combworkBlockerRunning) $8"
+        ${ElseIf} $6 == "unknown"
+          StrCpy $5 "$\r$\n$\r$\n$(combworkBlockerRunning) $8$\r$\n$(combworkBlockerUnknown)"
+        ${EndIf}
+        ${If} $5 != ""
+        ${AndIf} $7 != ""
+          StrCpy $5 "$5$\r$\n$(combworkBlockerId) $7$\r$\n$\r$\n$(combworkBlockerClose)"
+        ${EndIf}
+      ${EndIf}
+      MessageBox MB_OK|MB_ICONSTOP "$(combworkStillRunning)$5" /SD IDOK
       SetErrorLevel 5
       Quit
     ${ElseIf} $0 == "6"

@@ -58,7 +58,7 @@ const UPGRADE_IDS = {
   // a lane and its slot, a connection, advanced overrides at both levels, a skill copy) is carried over as it was.
   combwork: {
     mark: ['4.settings-saved', '4.login-registered', '4.connection-made', '4.workspace-made', '4.advanced-saved', '4.lane-made'],
-    after: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-kept', '4.login-kept', '4.no-fallback', '4.connection-kept', '4.workspace-kept', '4.workspace-card', '4.workflow-kept', '4.values-facts', '4.advanced-kept', '4.lane-kept', '4.slot-kept', ...NAME_IDS]
+    after: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-kept', '4.login-kept', '4.no-fallback', '4.connection-kept', '4.workspace-kept', '4.workspace-card', '4.workflow-kept', '4.values-facts', '4.advanced-kept', '4.lane-kept', '4.slot-kept', '4.clean-close', ...NAME_IDS]
   }
 }
 

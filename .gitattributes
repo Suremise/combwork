@@ -26,7 +26,7 @@
 *.ttf binary
 *.otf binary
 
-# Recorded tool output kept byte for byte (HI-3284: a git and a jj diff whose lines carry a file's own CRLF).
+# Recorded tool output kept byte for byte (HI-3284: a git diff whose lines carry a file's own CRLF).
 tests/fixtures/mergeGuards/*.diff -text
 
 # Branches all add CHANGELOG entries at the top of Unreleased: keep both sides instead of a conflict.

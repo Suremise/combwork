@@ -16,8 +16,8 @@ const M = {
   own: msg({ id: 'board.target.own', defaultMessage: '{branch} (the project’s)', description: 'HI-2556: the first choice of the card dialog’s Merges into: the project’s Work merges into, {branch} its name.' }),
   mark: msg({ id: 'board.target.mark', defaultMessage: 'Into {branch}', description: 'HI-2556: a mark on a card’s tile: its work merges into {branch} (a branch name), not the project’s Work merges into.' }),
   markTip: msg({ id: 'board.target.markTip', defaultMessage: 'This card’s work is made from {branch} and merges into it, not the project’s Work merges into.', description: 'HI-2556: tooltip and accessible name of a card tile’s Merges into mark. {branch} is a branch name.' }),
-  kept: msg({ id: 'board.target.kept', defaultMessage: 'Its work is kept on {branch}: it starts there again, whatever this says.', description: 'HI-3129: a note under the card dialog’s Merges into, for a card put back whose work is kept (in its slot) on another branch or bookmark ({branch}) than the one the field shows: its next start carries on there. Changing the field doesn’t move that work.' }),
-  keptUnknown: msg({ id: 'board.target.keptUnknown', defaultMessage: 'Its work is kept in a slot whose branch Combwork can’t read now: it won’t start until it can.', description: 'HI-3129: a note under the card dialog’s Merges into, for a card put back whose kept work’s branch or bookmark can’t be read now: its start is refused until it can be, never started on the one the field shows.' }),
+  kept: msg({ id: 'board.target.kept', defaultMessage: 'Its work is kept on {branch}: it starts there again, whatever this says.', description: 'HI-3129: a note under the card dialog’s Merges into, for a card put back whose work is kept (in its slot) on another branch ({branch}) than the one the field shows: its next start carries on there. Changing the field doesn’t move that work.' }),
+  keptUnknown: msg({ id: 'board.target.keptUnknown', defaultMessage: 'Its work is kept in a slot whose branch Combwork can’t read now: it won’t start until it can.', description: 'HI-3129: a note under the card dialog’s Merges into, for a card put back whose kept work’s branch can’t be read now: its start is refused until it can be, never started on the one the field shows.' }),
   failed: msg({ id: 'board.target.failed', defaultMessage: 'Where the card merges wasn’t changed', description: 'HI-2556: an error toast’s title: setting a card’s Merges into failed. Its text says why.' })
 }
 
@@ -72,8 +72,7 @@ export function TargetField(props: { card: TaskCard | null; b: WorkBadge | undef
   const flying = !!card && !!b?.startedOn
   const own = card ? (flying ? (b!.startedOn === targets?.default ? '' : b!.startedOn!) : (b?.target ?? '')) : value
   if (!targets && !own) return null
-  // HI-3129: a card in flight keeps its target where its platform can't move started work (jj): shown, not changed.
-  const open = !card || !b || b.stage === 'hold' || b.stage === 'todo' || (flying && !targets?.fixedInFlight)
+  const open = !card || !b || b.stage === 'hold' || b.stage === 'todo' || flying
   const save = async (to: string): Promise<void> => {
     if (!card) return setValue(to)
     let failed: string | null = null
@@ -113,7 +112,7 @@ export function TargetField(props: { card: TaskCard | null; b: WorkBadge | undef
 
 /**
  * HI-3129: where card `n` (waiting to start) would start when that isn't what its Merges into shows: its kept work's
- * branch or bookmark, or unknown. Read again as the field's inputs change (each opening re-reads the targets).
+ * branch, or unknown. Read again as the field's inputs change (each opening re-reads the targets).
  */
 function useKeptTarget(n: number | null, deps: unknown[]): KeptTargetShown {
   const [read, setRead] = useState<{ n: number; kept: KeptTargetShown } | null>(null)

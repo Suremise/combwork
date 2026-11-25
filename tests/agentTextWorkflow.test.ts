@@ -9,8 +9,8 @@ import { join } from 'path'
 import { setChainResolver, setProcessChain, type DialectChain } from '../src/shared/agentText'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
 import { leftWake, queueLine, resubmittedText, returnedComment, returnedText, staleWake, type QueueState } from '../src/main/workflow/queueState'
-import { candidateLog, signingPause } from '../src/main/platform/gitIntegration'
-import { checkSigning, signingTestHooks, type SignDeps } from '../src/main/platform/gitSigning'
+import { candidateLog, signingPause } from '../src/main/platform/git/gitIntegration'
+import { checkSigning, signingTestHooks, type SignDeps } from '../src/main/platform/git/gitSigning'
 import type { QueueGitResult } from '../src/main/platform/integration'
 import { tempDir } from './tempDir'
 import { CAME_BACK } from '../src/shared/workflow/queue'
@@ -86,6 +86,8 @@ const STATES: QueueState[] = [
   { state: 'left', why: 'decision' },
   { state: 'stale', approved: 'abc1234def', current: null },
   { state: 'merged' },
+  // HI-3551: a pull request's card, never merged here.
+  { state: 'pullRequest' },
   { state: 'notYet' }
 ]
 /** What the tests pass in, which isn't Combwork's wording: names, codes, paths and the queue's fixed words. */

@@ -55,6 +55,7 @@ async function theForm(page, app, inv) {
   const dialog = page.locator('.dialog', { hasText: 'Save Workflow Options' })
   /** Previews a choice and uses it. */
   const applyChoice = async (id) => {
+    await lib.workflowTab(section, 'overview')
     await choice(id).click()
     await preview.waitFor({ timeout: HUNG_MS })
     await preview.locator('[data-action="use-choice"]').click()
@@ -183,14 +184,16 @@ async function theForm(page, app, inv) {
     check('…only the selected section in the Tab order', JSON.stringify(await sectionTabs.evaluateAll((els) => els.filter((e) => e.tabIndex === 0).map((e) => e.getAttribute('data-section')))) === '["changes"]')
     await page.keyboard.press('ArrowLeft')
     // Its form read again (it remounts with the section), so the shots show it, not the page before its read answers.
-    check('…ArrowLeft back to Workflow, its form shown again', !!(await lib.until(async () => (await workflowTab.getAttribute('aria-selected')) === 'true' && (await focusedSection()) === 'workflow' && (await panelFor()) === 'workflow' && (await section.locator('.workflow-group[data-group="review"]').isVisible().catch(() => false)), HUNG_MS)))
+    check('…ArrowLeft back to Workflow, its form shown again', !!(await lib.until(async () => (await workflowTab.getAttribute('aria-selected')) === 'true' && (await focusedSection()) === 'workflow' && (await panelFor()) === 'workflow' && (await section.locator('.workflow-group[data-group="presets"]').isVisible().catch(() => false)), HUNG_MS)))
     await themes('section-tabs', page.locator('.git-head'))
     check('the notice is gone, and answered for good',!!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)), `notice shown: ${await notice.count()}, presetsNotice: ${JSON.stringify(await inv('workflow:presetsNotice'))}`)
     await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
 
     // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.
-    // GitHub's host setting has its group between slots and loops (HI-2779).
-    check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'merging', 'where', 'slots', 'github', 'loops', 'stages']), JSON.stringify(await groups()))
+    // GitHub's host setting has its group between slots and loops (HI-2779); the GitHub tab's option groups come before
+    // its link and hosts, as Where's group before the slots panel: Feedback to GitHub (HI-3559) shown, Pull requests
+    // (HI-3552) not, its one option only with the pull-request finish.
+    check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'merging', 'where', 'slots', 'githubFeedback', 'githubLink', 'github', 'loops', 'stages']), JSON.stringify(await groups()))
     const inGroup = async (g) => section.locator(`.workflow-group[data-group="${g}"] .workflow-option`).evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
     const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), loops: await inGroup('loops'), stages: await inGroup('stages') }
     check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Combwork; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'otherTargets', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'], loops: ['loopWakes', 'loopRounds', 'simplifyAt', 'churnStopAt', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes'], stages: ['stageNames'] }), JSON.stringify(layout))
@@ -204,19 +207,36 @@ async function theForm(page, app, inv) {
     // Card loops (HI-1766): options of their own, from the defaults; File locks with them.
     check('Card loops: the defaults, Default as their origin', (await row('loopRounds').locator('input').getAttribute('placeholder')) === '10' && (await row('loopWaitHours').locator('input').getAttribute('placeholder')) === '6 hours' && (await row('loopStepWaitMinutes').locator('input').getAttribute('placeholder')) === '30 minutes' && (await row('loopRounds').locator('.workflow-origin').innerText()).includes('Default') && (await row('simplifyAt').locator('input').getAttribute('placeholder')) === '12' && (await row('churnStopAt').locator('input').getAttribute('placeholder')) === '30', await section.locator('.workflow-group[data-group="loops"]').innerText())
     // HI-3211: Wake the Assistant for, Standard by default, each level said in full under the choice; Custom ticks the events.
+    await lib.workflowTab(section, 'assistantWakes')
     await themes('assistant-wakes', row('assistantWakes'))
     check('Wake the Assistant for: Standard, said in full', (await row('assistantWakes').locator('select').inputValue()) === 'standard' && (await row('assistantWakes').locator('[data-note="assistant-wakes"]').innerText()).includes('What Combwork has always woken it for.'), await row('assistantWakes').innerText())
+    await lib.workflowTab(section, 'assistantWakes')
     await row('assistantWakes').locator('select').selectOption('custom')
     await lib.until(async () => (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input[type="checkbox"]').count()) === 13, HUNG_MS)
+    await lib.workflowTab(section, 'assistantWakes')
     await themes('assistant-wakes-custom', row('assistantWakes'))
     check('…Custom: a tick per event, from the level left; a question for you always on', (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input:checked').count()) === 10 && (await row('assistantWakes').locator('[data-note="assistant-wake-events"] input:disabled').count()) === 1, await row('assistantWakes').innerText())
     await discard()
     await lib.until(async () => (await row('assistantWakes').locator('select').inputValue()) === 'standard', HUNG_MS)
     check('File locks: Block, with what it applies to', (await row('fileLocks').locator('select').inputValue()) === 'block' && (await row('fileLocks').locator('[data-note="file-locks"]').innerText()) === 'Applies to agents working in the same folder, outside a slot.')
+    await lib.workflowTab(section, 'checks')
     await themes('groups-top', section.locator('.workflow-group[data-group="review"]'))
+    await lib.workflowTab(section, 'loops')
     await themes('groups-end', section.locator('.workflow-group[data-group="loops"]'))
+    // HI-3549: the form's tabs, each shot in both themes; the tab list a keyboard row (arrows move and focus).
+    const tabIds = () => section.locator('[role="tab"][data-workflow-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-workflow-tab')))
+    check("HI-3549: a Git project's tabs, in order", JSON.stringify(await tabIds()) === JSON.stringify(['overview', 'checks', 'merging', 'where', 'github', 'loops']), JSON.stringify(await tabIds()))
+    check('…a labelled tab list', (await section.locator('[role="tablist"][aria-label="Workflow options"]').count()) === 1)
+    for (const id of await tabIds()) {
+      await lib.workflowTab(section, id)
+      await themes(`tab-${id}`, section.locator('[role="tablist"][aria-label="Workflow options"]'))
+    }
+    await section.locator('[role="tab"][data-workflow-tab="loops"]').focus()
+    await page.keyboard.press('ArrowRight')
+    check('…ArrowRight wraps to Overview, the focus with it', !!(await lib.until(async () => (await section.locator('[role="tab"][data-workflow-tab="overview"]').getAttribute('aria-selected')) === 'true' && (await page.evaluate(() => document.activeElement?.getAttribute('data-workflow-tab'))) === 'overview', HUNG_MS)))
 
     // --- A preset's preview: what it sets and why, what it would change; Use fills the form.
+    await lib.workflowTab(section, 'overview')
     await choice('pairAgent').click()
     await preview.waitFor({ timeout: HUNG_MS })
     const lines = await preview.locator('li[data-option]').evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
@@ -247,6 +267,7 @@ async function theForm(page, app, inv) {
     // --- Maximum agents (HI-2058): stepped with the arrow keys it is staged at once, before the box loses focus, so Save
     // lights and the row is marked; Discard drops it; typed and saved, it is the project's own. Pair's 2 again after.
     const maxBox = row('maxAgents').locator('input')
+    await lib.workflowTab(section, 'maxAgents')
     const maxBefore = saved().maxAgents
     await maxBox.click()
     await maxBox.press('ArrowUp')
@@ -264,41 +285,56 @@ async function theForm(page, app, inv) {
 
     // --- Contradictions as you choose: the reason under both rows at once, Save off until it's resolved.
     const both = async (c, a, b) => JSON.stringify(await reasons(a)).includes(c) && JSON.stringify(await reasons(b)).includes(c)
+    await lib.workflowTab(section, 'finish')
     await row('finish').locator('select').selectOption('committed')
     check('Committed is done with each card in its own folder: the reason under Who merges and Where cards are built', !!(await lib.until(() => both('committedNeedsFolder', 'finish', 'folder'), HUNG_MS)) && (await row('folder').innerText()).includes('“Committed is done” needs everyone in the project folder.'))
     check('…and Save is off', await save.isDisabled())
     check('…the preset line says Custom, started from the preset', (await section.locator('.workflow-preset-now').innerText()).includes('started from Pair (the agent merges)'))
+    await lib.workflowTab(section, 'finish')
     await themes('contradiction', row('finish'))
+    await lib.workflowTab(section, 'folder')
     await row('folder').locator('select').selectOption('project')
     check('resolved: the reasons go, Save is on', !!(await lib.until(async () => (await reasons('finish')).length === 0 && (await reasons('folder')).length === 0 && (await save.isEnabled()), HUNG_MS)))
+    await lib.workflowTab(section, 'finish')
     await row('finish').locator('select').selectOption('combworkMerges')
     check('Combwork merges in the project folder: under both rows', !!(await lib.until(() => both('mergeNeedsSlots', 'finish', 'folder'), HUNG_MS)) && (await save.isDisabled()))
     await discard()
+    await lib.workflowTab(section, 'reviewers')
     await row('reviewers').locator('select').selectOption('2')
+    await lib.workflowTab(section, 'review')
     await row('review').locator('select').selectOption('you')
     check('Two reviewers with you reviewing: under both rows', !!(await lib.until(() => both('quorumNeedsAgent', 'reviewers', 'review'), HUNG_MS)))
+    await lib.workflowTab(section, 'okBefore')
     await row('okBefore').locator('select').selectOption('every')
     check('Your OK before merging while you review: under both rows', !!(await lib.until(() => both('okWithReview', 'okBefore', 'review'), HUNG_MS)) && (await save.isDisabled()))
     await discard()
     check('Discard Changes clears them', !!(await lib.until(async () => (await section.locator('.workflow-contradiction').count()) === 0, HUNG_MS)))
 
     // --- Inherit: an option the project sets goes back to the inherited value (the platform's: the default branch).
+    await lib.workflowTab(section, 'target')
     await row('target').locator('input').fill('release')
+    await lib.workflowTab(section, 'target')
     await row('target').locator('input').blur()
     check('a value set here shows Inherit', (await row('target').getByRole('button', { name: 'Inherit' }).count()) === 1)
+    await lib.workflowTab(section, 'target')
     await row('target').getByRole('button', { name: 'Inherit' }).click()
     check('…which goes back to the inherited value', (await row('target').locator('input').inputValue()) === '' && (await row('target').innerText()).includes('Default'))
+    await lib.workflowTab(section, 'style')
     await row('style').locator('select').selectOption('squash')
     await saveAll()
     check('saved with the merge style set', !!(await lib.until(async () => saved().style === 'squash', HUNG_MS)))
+    await lib.workflowTab(section, 'style')
     await row('style').getByRole('button', { name: 'Inherit' }).click()
     await saveAll()
     check('an option inherited again is left out of project.json', !!(await lib.until(async () => !('style' in saved()) && saved().finish === 'agentMerges', HUNG_MS)), JSON.stringify(saved()))
 
     // --- Typed as a person types (HR6's round 1): Your OK's labels and a check's command keep their spaces.
     const okSelect = row('okBefore').locator('select')
+    await lib.workflowTab(section, 'okBefore')
     await okSelect.selectOption('labels')
+    await lib.workflowTab(section, 'okBefore')
     await row('okBefore').locator('input').pressSequentially('ui, release')
+    await lib.workflowTab(section, 'preChecks')
     await row('preChecks').getByRole('button', { name: 'Add Check' }).click()
     const newCheck = row('preChecks').locator('.workflow-check').last()
     await newCheck.locator('input').first().fill('')
@@ -351,29 +387,38 @@ async function theForm(page, app, inv) {
     check('…G8 shown in Merging while Combwork merges', (await inGroup('merging')).includes('strict'))
     // G18 (#1179): pushing the target after a merge, shown while Combwork merges, off in the preset; switched on and saved.
     const push = row('pushTarget').locator('[role="switch"]')
+    await lib.workflowTab(section, 'pushTarget')
     check('…G18 shown in Merging while Combwork merges, off', (await inGroup('merging')).includes('pushTarget') && (await push.getAttribute('aria-checked')) === 'false')
     // G21 (HI-1183): the target following its remote, shown beside G18, off; on, G18 shows on and can't be turned off.
     const follow = row('followRemote').locator('[role="switch"]')
     check('…G21 shown in Merging after G18 while Combwork merges, off', (await inGroup('merging')).join(',').includes('pushTarget,followRemote') && (await follow.getAttribute('aria-checked')) === 'false')
     await follow.click()
     check('…G21 on: G18 shown on and fixed', !!(await lib.until(async () => (await push.getAttribute('aria-checked')) === 'true' && (await push.isDisabled()), HUNG_MS)))
+    await lib.workflowTab(section, 'followRemote')
     await themes('follow', row('followRemote'))
     await follow.click()
     check('…G21 off again: G18 back as it was, off and free', !!(await lib.until(async () => (await push.getAttribute('aria-checked')) === 'false' && !(await push.isDisabled()), HUNG_MS)))
     await push.click()
+    await lib.workflowTab(section, 'pushTarget')
     await themes('push', row('pushTarget'))
     // G6's third value (#1184): offered by name, chosen, and saved below.
     const styles = await row('style').locator('select option').allInnerTexts()
     check('…G6 offers Merge commit, Squash and Rebase and fast-forward', JSON.stringify(styles) === JSON.stringify(['Merge commit', 'Squash', 'Rebase and fast-forward']), JSON.stringify(styles))
+    await lib.workflowTab(section, 'style')
     await row('style').locator('select').selectOption('rebase')
+    await lib.workflowTab(section, 'style')
     await themes('rebase', row('style'))
+    await lib.workflowTab(section, 'mergeChecks')
     await themes('cwmerges', row('mergeChecks'))
     // File locks (HI-1766) stays with each card in a slot: agents can still share the project folder outside one.
     check('File locks is shown with slots too, saying where it applies', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('fileLocks').locator('[data-note="file-locks"]').count()) === 1)
+    await lib.workflowTab(section, 'fileLocks')
     await themes('filelocks-slots', row('fileLocks'))
+    await lib.workflowTab(section, 'mergeInstall')
     await row('mergeInstall').locator('select').selectOption('always')
     await saveAll()
     check('saved: Combwork merges, the merge checks, the install and the push after merging, in project.json', !!(await lib.until(async () => saved().finish === 'combworkMerges' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint']) && saved().mergeInstall === 'always' && saved().pushTarget === true && saved().style === 'rebase', HUNG_MS)), JSON.stringify(saved()))
+    await lib.workflowTab(section, 'mergeChecks')
     for (let i = (await row('mergeChecks').locator('.workflow-check').count()) - 1; i >= 0; i--) await row('mergeChecks').locator('.workflow-check').nth(i).getByRole('button', { name: 'Remove' }).click()
     check('with no merge checks, the install row is not shown', !!(await lib.until(async () => (await row('mergeInstall').count()) === 0, HUNG_MS)))
     await discard()
@@ -385,13 +430,17 @@ async function theForm(page, app, inv) {
     await applyChoice('team')
     check('Team: its note says where to set the command that runs each card’s focused tests', !!(await lib.until(async () => (await note.count()) === 1 && (await note.innerText()).includes('Each card’s focused tests'), HUNG_MS)))
     check('…G20 off with no runner', (await row('focusedTests').locator('[role="switch"]').getAttribute('aria-checked')) === 'false')
+    await lib.workflowTab(section, 'focusedTests')
     await row('focusedTests').locator('[role="switch"]').click()
     check('…switched on: its two commands to fill in, and why it can’t be saved without the runner', !!(await lib.until(async () => (await row('focusedTests').locator('input').count()) === 2 && (await row('focusedTests').innerText()).includes('need the command that runs them'), HUNG_MS)), await row('focusedTests').innerText())
+    await lib.workflowTab(section, 'focusedTests')
     await themes('focused', row('focusedTests'))
+    await lib.workflowTab(section, 'focusedTests')
     await row('focusedTests').locator('[role="switch"]').click()
     const teamChecks = JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint', 'test', 'npm test'])
     check('…quick checks + unit tests before review and on the merged result', JSON.stringify(await values('preChecks')) === teamChecks && JSON.stringify(await values('mergeChecks')) === teamChecks)
     check('…installed from scratch before every merge, your OK for ui or release', (await row('mergeInstall').locator('select').inputValue()) === 'always' && (await row('okBefore').locator('input').inputValue()) === 'ui, release')
+    await lib.workflowTab(section, 'overview')
     await themes('team', section.locator('.workflow-group[data-group="presets"]'))
     await saveAll()
     check('saved: Team, in project.json', !!(await lib.until(async () => projectJson().workflow?.preset === 'team' && saved().okBefore?.mode === 'labels', HUNG_MS)), JSON.stringify(projectJson().workflow))
@@ -405,6 +454,7 @@ async function theForm(page, app, inv) {
       return !!(await lib.until(async () => (await tip.count()) === 1, HUNG_MS))
     }
     check('HI-3333: Save… off with nothing changed says so in its tooltip', (await save.isDisabled()) && (await save.getAttribute('data-off')) === 'noChanges' && (await saveTip()))
+    await lib.workflowTab(section, 'overview')
     await choice('pair').click()
     await preview.waitFor({ timeout: HUNG_MS })
     await save.scrollIntoViewIfNeeded()
@@ -432,6 +482,7 @@ async function theForm(page, app, inv) {
     // --- Stage names (N5): a rename alone applies now, never "old rules".
     const stageBox = (stage) => row('stageNames').locator(`input[aria-label="Name of the stage ${stage}"]`)
     check('Stage names: a box per stage these options produce, its default name as the placeholder', (await stageBox('Review').getAttribute('placeholder')) === 'Review' && (await stageBox('Merging').count()) === 1, await row('stageNames').innerText())
+    await lib.workflowTab(section, 'stageNames')
     await stageBox('Review').fill('Checking')
     await stageBox('Review').blur()
     await save.click()
@@ -447,6 +498,7 @@ async function theForm(page, app, inv) {
     await discard()
 
     // --- A save after another change (the Assistant's settings tool, another window) is refused and the form reloads.
+    await lib.workflowTab(section, 'style')
     await row('style').locator('select').selectOption('squash')
     // Another window's save, as main takes it (no base: the tool's way).
     await inv('workflow:setOptions', project, { preset: 'team', options: { ...saved(), target: 'release' } })
@@ -458,6 +510,7 @@ async function theForm(page, app, inv) {
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS }).catch(() => {})
 
     // --- All off (§16.6.4): chosen and saved; the section says what never turns off.
+    await lib.workflowTab(section, 'overview')
     await choice('allOff').click()
     await preview.waitFor({ timeout: HUNG_MS })
     check('All off’s preview lists what never turns off', (await preview.locator('[data-never-off]').innerText()).includes('index.lock'))
@@ -471,6 +524,7 @@ async function theForm(page, app, inv) {
     await inv('advanced:set', 'cw.workflow.enforce', false)
     await reopen()
     check('with Workflow rules are enforced off, the section says so', !!(await lib.until(async () => (await section.locator('.workflow-note').count()) > 0 && (await section.innerText()).includes('aren’t enforced'), HUNG_MS)))
+    await lib.workflowTab(section, 'style')
     await row('style').locator('select').selectOption('squash')
     await saveAll()
     check('…and still saves', !!(await lib.until(async () => saved().style === 'squash', HUNG_MS)))
@@ -482,8 +536,10 @@ async function theForm(page, app, inv) {
     const switchOf = (option) => row(option).locator('[role="switch"]')
     const switchedOn = async (option) => (await switchOf(option).getAttribute('aria-checked')) === 'true'
     check('#1508: from All off, nobody-reviews-their-own-work saved off', saved().review === 'none' && saved().noSelfReview === false, JSON.stringify(saved()))
+    await lib.workflowTab(section, 'review')
     await row('review').locator('select').selectOption('agent')
     check('#1508: a reviewer agent chosen, the switch held on, no contradiction shown, Save on', !!(await lib.until(async () => (await switchedOn('noSelfReview')) && (await section.locator('.workflow-contradiction').count()) === 0 && (await save.isEnabled()), HUNG_MS)))
+    await lib.workflowTab(section, 'noSelfReview')
     await themes('reviewer-from-alloff', row('noSelfReview'))
     await save.click()
     await dialog.waitFor({ timeout: HUNG_MS })
@@ -504,6 +560,7 @@ async function theForm(page, app, inv) {
     const switchAlone = async (opts, option, value) => {
       const before = opts()
       const was = await switchedOn(option)
+      await lib.workflowTab(section, option)
       await switchOf(option).click()
       await saveAll()
       const want = JSON.stringify(value(!was))
@@ -511,6 +568,7 @@ async function theForm(page, app, inv) {
       return { ok: !!ok, now: !was, said: JSON.stringify({ was, want: value(!was), now: opts() }) }
     }
     const before1b = saved()
+    await lib.workflowTab(section, 'reviewers')
     await row('reviewers').locator('select').selectOption('2')
     await saveAll()
     check('G1b: two reviewers chosen in the window alone, saved', !!(await lib.until(() => saved().reviewers === 2 && without(saved(), 'reviewers') === without(before1b, 'reviewers'), HUNG_MS)), JSON.stringify(saved()))
@@ -534,9 +592,17 @@ async function theForm(page, app, inv) {
     check('…N1, N2 in Review, N3 in Checks, N4, N6 and N7 (File locks) in The work', JSON.stringify(noneLayout) === JSON.stringify({ review: ['review', 'noSelfReview'], checks: ['preChecks'], work: ['excluded', 'dependenciesDone', 'fileLocks'] }), JSON.stringify(noneLayout))
     check('…and Card loops, as Git’s', JSON.stringify(await inGroup('loops')) === JSON.stringify(['loopWakes', 'loopRounds', 'simplifyAt', 'churnStopAt', 'loopWaitHours', 'loopStepWaitMinutes', 'assistantWakes']))
     check('…N1 reads “Who checks the work before it’s done”', (await row('review').innerText()).startsWith('Who checks the work before it’s done'))
+    await lib.workflowTab(section, 'checks')
     await themes('none', section.locator('.workflow-group[data-group="review"]'))
     check('…its Card loops from the defaults, Default as their origin', (await row('loopWakes').locator('.workflow-origin').innerText()).includes('Default') && (await row('fileLocks').locator('.workflow-origin').innerText()).includes('Default'))
+    await lib.workflowTab(section, 'loops')
     await themes('none-loops', section.locator('.workflow-group[data-group="loops"]'))
+    const noneTabs = await section.locator('[role="tab"][data-workflow-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-workflow-tab')))
+    check("HI-3549: a None project's tabs: no Merging, Where or GitHub", JSON.stringify(noneTabs) === JSON.stringify(['overview', 'checks', 'work', 'loops']), JSON.stringify(noneTabs))
+    for (const id of noneTabs) {
+      await lib.workflowTab(section, id)
+      await themes(`none-tab-${id}`, section.locator('[role="tablist"][aria-label="Workflow options"]'))
+    }
     const noneBase = { combworkWorkflow: 1, platform: 'none', preset: null, options: {} }
     const merging = await pasteIn({ ...noneBase, options: { finish: 'combworkMerges' } })
     check('None: a merge pasted is refused, merging needs Git', !!(await lib.until(async () => (await merging.innerText()).includes('Merging needs Git'), HUNG_MS)), await merging.innerText())
@@ -547,9 +613,11 @@ async function theForm(page, app, inv) {
 
     // --- None's form (#1483): N1, N3, N4 and N6 chosen on it and saved, each on its own.
     const noneSaved = () => projectJson(notes).workflow?.options ?? {}
+    await lib.workflowTab(section, 'review')
     await row('review').locator('select').selectOption('you')
     await saveAll()
     check('N1: You chosen on None’s form, saved', !!(await lib.until(() => noneSaved().review === 'you', HUNG_MS)), JSON.stringify(noneSaved()))
+    await lib.workflowTab(section, 'preChecks')
     await row('preChecks').getByRole('button', { name: 'Add Check' }).click()
     const noneCheck = row('preChecks').locator('.workflow-check').last()
     await noneCheck.locator('input').first().fill('')
@@ -557,7 +625,9 @@ async function theForm(page, app, inv) {
     await noneCheck.locator('input').nth(1).pressSequentially('npm run spell')
     await saveAll()
     check('N3: a check added on None’s form, saved with its command', !!(await lib.until(() => JSON.stringify(noneSaved().preChecks) === JSON.stringify(['spelling']) && noneSaved().commands?.spelling === 'npm run spell', HUNG_MS)), JSON.stringify(noneSaved()))
+    await lib.workflowTab(section, 'excluded')
     await row('excluded').locator('input').fill('node_modules, .venv, build')
+    await lib.workflowTab(section, 'excluded')
     await row('excluded').locator('input').blur()
     await saveAll()
     check('N4: a folder left out of the work on None’s form, saved', !!(await lib.until(() => JSON.stringify(noneSaved().excluded) === JSON.stringify(['node_modules', '.venv', 'build']), HUNG_MS)), JSON.stringify(noneSaved()))
@@ -602,6 +672,7 @@ async function theForm(page, app, inv) {
     await hold(notes, true)
     await changedElsewhere(notes)
     check('a reload of notes is held', !!(await lib.until(async () => (await heldFor(notes)) > 0, HUNG_MS)))
+    await lib.workflowTab(section, 'review')
     await row('review').locator('select').selectOption('you')
     await release(notes)
     await hold(notes, false)
@@ -612,7 +683,9 @@ async function theForm(page, app, inv) {
     await hold(notes, true)
     await changedElsewhere(notes)
     check('another reload of notes is held', !!(await lib.until(async () => (await heldFor(notes)) > 0, HUNG_MS)))
+    await lib.workflowTab(section, 'excluded')
     await row('excluded').locator('input').fill('build')
+    await lib.workflowTab(section, 'excluded')
     await row('excluded').locator('input').blur()
     await reject(notes)
     await hold(notes, false)
@@ -667,6 +740,7 @@ async function theForm(page, app, inv) {
     const saveDialogIn = async (code) => {
       const m = (id) => messages[id]
       const style = row('style').locator('select')
+      await lib.workflowTab(section, 'style')
       const from = await style.inputValue()
       const to = from === 'squash' ? 'merge' : 'squash'
       await style.selectOption(to)
@@ -685,14 +759,18 @@ async function theForm(page, app, inv) {
     }
     await speak('de')
     check('the section shows in German', !!(await lib.until(async () => (await section.innerText()).includes('Wer mergt'), HUNG_MS)))
+    await lib.workflowTab(section, 'overview')
     await choice('team').click()
     await preview.waitFor({ timeout: HUNG_MS })
+    await lib.workflowTab(section, 'overview')
     await themes('presets-de', section.locator('.workflow-group[data-group="presets"]'))
     await preview.getByRole('button').last().click()
+    await lib.workflowTab(section, 'merging')
     await themes('groups-de', section.locator('.workflow-group[data-group="merging"]'))
     await saveDialogIn('de')
     await speak('pl')
     check('the section shows in Polish', !!(await lib.until(async () => (await section.innerText()).includes('Kto scala'), HUNG_MS)))
+    await lib.workflowTab(section, 'checks')
     await themes('groups-pl', section.locator('.workflow-group[data-group="review"]'))
     await saveDialogIn('pl')
     await speak('en')
@@ -720,6 +798,7 @@ async function theForm(page, app, inv) {
     await h.page.locator('.git-sections [data-section="workflow"]').click()
     const g = await theForm(h.page, h.app, h.inv)
     const sameness = async (value) => {
+      await lib.workflowTab(g.section, 'sameness')
       await g.row('sameness').locator('select').selectOption(value)
       await g.saveAll()
       return lib.until(() => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combwork', 'project.json'), 'utf8')).workflow?.options?.sameness === value, HUNG_MS)

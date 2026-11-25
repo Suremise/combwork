@@ -359,6 +359,10 @@
     "text": "Next: its builder merges it, then reports the merge (cw_report_merge).",
     "note": "What comes next on a card (#1530): its builder merges it."
   },
+  "reply.next.pullRequest": {
+    "text": "Next: Combwork opens its pull request on GitHub (or follows the one open), and it is done once merged there.",
+    "note": "What comes next on a card (#1530; HI-3552): its finish is a GitHub pull request, which Combwork opens and follows. A statement of fact."
+  },
   "reply.next.queue": {
     "text": "Next: Combwork's merge queue merges it.",
     "note": "What comes next on a card (#1530): Combwork's merge queue merges it."

@@ -2775,6 +2775,10 @@
     "defaultMessage": "{fields} changed since",
     "description": "Why undo left part of a change of the Assistant's as it is: someone (the user or an agent) changed it afterwards ({fields}: \"labels\", \"title and column\")."
   },
+  "assistant.undo.confirm": {
+    "defaultMessage": "Undo",
+    "description": "HI-3504: the confirm button of the question before every change the Assistant made for a message is undone. It sits beside the dialog's Cancel (shell.dialog.cancel), so it must read differently from it (French: not Annuler alone)."
+  },
   "assistant.undo.dismiss": {
     "defaultMessage": "Close what the undo did",
     "description": "A button that closes the note under a message saying what its undo did."

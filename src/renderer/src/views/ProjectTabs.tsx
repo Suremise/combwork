@@ -35,6 +35,8 @@ import { useGitRead } from './GitTab'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, SectionNav, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
+import { OperationPanel } from '../components/OperationPanel'
+import { StashesSection, StashFileDiff, type StashFileShown } from '../components/StashesSection'
 import { cliReadyOf, ConnectionMark, connectionCli, connectionLine, firstReadyConnection, useConnections } from '../components/ConnectionChoice'
 import { connectionOf } from '@shared/connectionLabel'
 import { useConnectionsInUse } from '../connectionUsage'
@@ -44,6 +46,8 @@ import { useScopedLoad } from '../scopedLoad'
 import { oneAtATime, withinTime } from '@shared/coalesce'
 import { addSkill, deleteSkill, DeliveredSwitch, editInWorkspace, otherLocal, SKILL_LEVEL_TIP, SkillDetail, SkillRow } from '../components/Skills'
 import { CHANGES_ABOUT, unusedName, unusedPickerLabel } from '@shared/unusedWorktrees'
+import { useFileEvents } from '../fileEvents'
+import { scopedReader } from '../scopedReads'
 import { agentProviderOf, confirm, notify, projectKeyOf, openInSessionsTab, set, setActivity, showView, UNUSED_ROOT, unusedRoot, useDateStyle, useFocusedAgent, useLanguage, useStore } from '../store'
 import { rememberProjectPref } from '../projectPrefs'
 import { keyProblemText } from '../projectKeys'
@@ -1032,6 +1036,9 @@ function ChangesPicker({ project, value, onChange, unused, looking, listed, comp
   )
 }
 
+/** HI-3470: two picker ids for one folder, whatever their case or slashes (Slots and copies' Open in Changes names a slot's folder as the pool has it). */
+const sameRootId = (a: string, b: string): boolean => a === b || a.replace(/\\/g, '/').toLowerCase() === b.replace(/\\/g, '/').toLowerCase()
+
 export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   const usageVersion = useStore((s) => s.usageVersion[owner.path] ?? 0)
   const rootId = useStore((s) => s.changesRoot[owner.path])
@@ -1043,6 +1050,8 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   const [diffOf, setDiffOf] = useState<{ for: string; diff: GitDiff } | null>(null)
   const [diffErrorOf, setDiffErrorOf] = useState<{ for: string; error: string } | null>(null)
   const [inline, setInline] = useState(false)
+  // HI-3472: a stash's file shown in place of the folder's diff (its own root: another folder's never shows here).
+  const [stashShown, setStashShown] = useState<StashFileShown | null>(null)
   // The project's unused worktrees (#400): listed in the folder picker, shown all at once, or one opened like an agent's.
   // The last list shows at once while git is asked again (#476).
   const { data: unusedData, reload: reloadUnused, loading: unusedLoading, error: unusedError, at: unusedAt } = useUnusedWorktrees(owner)
@@ -1063,7 +1072,7 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
   const infoRead = useGitRead('git:leftovers', owner)
   const leftovers = useLeftovers(owner, infoRead.data)
   const listingUnused = shownId === UNUSED_ROOT
-  const spare = shownId.startsWith(`${UNUSED_ROOT}:`) ? (unusedList.find((w) => unusedRoot(w.path) === shownId && (w.branch || w.slot)) ?? null) : null
+  const spare = shownId.startsWith(`${UNUSED_ROOT}:`) ? (unusedList.find((w) => sameRootId(unusedRoot(w.path), shownId) && (w.branch || w.slot)) ?? null) : null
   // An agent's folder's changes (its slot, the slot kept for it or its 0.9 worktree, #1569) are everything on its branch
   // since it left its base branch (only what isn't committed when the base isn't known); an unused one's, since the
   // branch it would merge into.
@@ -1079,30 +1088,51 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
 
   const [statusError, setStatusError] = useState<string | null>(null)
   const [diffTry, setDiffTry] = useState(0)
-  // Each answer is for the folder (and base) it was asked about: an older one arriving late is dropped.
+  // Each answer is for the folder (and base) it was asked about: an older one arriving late is dropped, and an older
+  // folder's reads are over once another's begins (scopedReader, HR2's round 1), however the read was asked for.
   const statusFor = useRef('')
-  const statusLoads = useRef(0)
   const key = `${root}\n${base ?? ''}`
-  const load = useCallback(() => {
-    const n = ++statusLoads.current
-    void call('git:status', root, base).then(
-      (s) => {
-        if (n !== statusLoads.current) return
-        statusFor.current = `${root}\n${base ?? ''}`
-        setStatus(s)
-        setStatusError(null)
-        setFile((f) => (f && s.files.some((x) => x.path === f) ? f : s.files[0]?.path ?? null))
-      },
-      (e) => n === statusLoads.current && setStatusError(errorMessage(e))
-    )
-  }, [root, base])
+  const reader = useMemo(
+    () =>
+      scopedReader(
+        (scope) => {
+          const [r, b] = JSON.parse(scope) as [string, string | null]
+          return call('git:status', r, b ?? undefined)
+        },
+        (scope, answer) => {
+          const [r, b] = JSON.parse(scope) as [string, string | null]
+          if (!answer.ok) return setStatusError(errorMessage(answer.error))
+          const s = answer.value
+          statusFor.current = `${r}\n${b ?? ''}`
+          setStatus(s)
+          setStatusError(null)
+          setFile((f) => (f && s.files.some((x) => x.path === f) ? f : s.files[0]?.path ?? null))
+        }
+      ),
+    []
+  )
+  const load = useCallback(() => reader(JSON.stringify([root, base ?? null])), [reader, root, base])
   // Another folder: its files aren't these, so nothing shows until its own status arrives.
   useEffect(() => {
     setStatus(null)
     setStatusError(null)
     setFile(null)
   }, [root, base])
-  useEffect(load, [load, usageVersion])
+  // HI-3505: what git does outside Combwork (a merge stopped in conflict in a terminal, an abort) shows by itself, with
+  // the operation panel that reads on each status: read again as the status bar's git state is (the project's git
+  // changes here, its agents' work, the window's focus, the minute), and on writes in the folder shown (its live file
+  // events), each through `load`: one read at a time, one more after it for what came meanwhile (scopedReader).
+  const gitVersion = useStore((s) => s.gitVersion[owner.path] ?? 0)
+  useEffect(load, [load, usageVersion, gitVersion])
+  useEffect(() => {
+    window.addEventListener('focus', load)
+    const t = setInterval(load, 60_000)
+    return () => {
+      window.removeEventListener('focus', load)
+      clearInterval(t)
+    }
+  }, [load])
+  useFileEvents(root, load)
   // The Files tab's Show changes (HI-2743): the project folder's file, once its status is in.
   const jump = useStore((s) => (s.changesJump?.project === owner.path ? s.changesJump : null))
   useEffect(() => {
@@ -1237,6 +1267,8 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
       </div>
     )
   }
+  const folderName = agent ? (agent.place.name ?? whose) : spare ? (spare.slot ?? unusedName(spare)) : null
+  const stashFile = stashShown?.root === root ? stashShown : null
   return (
     <ChangesSplit listWidth={listWidth}>
       <div className="split-list">
@@ -1267,7 +1299,10 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
           {status.files.length === 0 && <div className="pane-empty">{agent && own?.branch ? tr(C.noAgentChanges, { branch: own.branch }) : agent ? tr(C.clean) : spare ? tr(C.nothingOn, { branch: unusedName(spare), base: base ?? '' }) : tr(C.clean)}</div>}
           {status.files.map((f) => (
             <Tooltip block key={f.path} content={tr(f.staged ? C.staged : C.unstaged, { status: tr(C.gitStatus, { status: f.status === '?' ? 'untracked' : f.status }), path: f.path })}>
-              <div className={cx('row', file === f.path && 'selected')} data-path={f.path} style={{ width: '100%' }} onClick={() => setFile(f.path)}>
+              <div className={cx('row', file === f.path && !stashFile && 'selected')} data-path={f.path} style={{ width: '100%' }} onClick={() => {
+                setStashShown(null)
+                setFile(f.path)
+              }}>
                 <span className="label">{f.path.split('/').pop()}</span>
                 <span className="desc" style={{ flex: 1, minWidth: 0 }}>{f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : ''}</span>
                 <span className={cx('git-status', f.status === '?' ? 'U' : f.status)}>{f.status === '?' ? 'U' : f.status /* i18n-ignore: git's status letter */}</span>
@@ -1278,7 +1313,11 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
       </div>
       <div className="split-main">
         {about}
-        {diff ? (
+        <OperationPanel project={owner} root={root} folder={folderName} reloadKey={status} onChanged={load} />
+        <StashesSection project={owner} root={root} folder={folderName} branch={status.branch || null} reloadKey={status} shown={stashFile} onShow={setStashShown} onChanged={load} />
+        {stashFile ? (
+          <StashFileDiff shown={stashFile} onClose={() => setStashShown(null)} />
+        ) : diff ? (
           <>
             <div className="editor-toolbar">
               <Icon name="git-compare" />

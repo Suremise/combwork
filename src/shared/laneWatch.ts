@@ -224,8 +224,10 @@ export interface LaneBuilderNow {
  * idle (its turn ended, no background task) with no place at the merge slot, for MERGE_STALL_MS since the later of its
  * cards' last change and its own. A builder working, watching or waiting for the user (told as `waiting`) isn't stalled.
  */
-export function mergeStallReason(lane: { state: LaneState | 'gone'; builder: string; cards: readonly { mark: LaneCardMark; updatedAt?: string }[] }, builder: LaneBuilderNow | null, now = Date.now()): string | null {
+export function mergeStallReason(lane: { state: LaneState | 'gone'; builder: string; cards: readonly { mark: LaneCardMark; updatedAt?: string }[]; queued?: boolean }, builder: LaneBuilderNow | null, now = Date.now()): string | null {
   if (lane.state !== 'active' && lane.state !== 'paused') return null
+  // HI-3561: a card of it in Combwork's merge queue (Merging): the lane waits on the queue, not on its builder.
+  if (lane.queued) return null
   const marks = lane.cards.map((c) => c.mark)
   if (!mergeDue(marks) || marks.some((m) => m.b)) return null
   if (builder && (!IDLE.includes(builder.status) || (builder.backgroundTasks ?? 0) > 0 || builder.mergeSlot)) return null

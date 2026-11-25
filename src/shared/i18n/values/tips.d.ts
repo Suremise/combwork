@@ -3,6 +3,10 @@
 interface CombworkMessageValues {
   'tips.activityMap.text': undefined
   'tips.activityMap.title': undefined
+  'tips.activityMapPanels.text': undefined
+  'tips.activityMapPanels.title': undefined
+  'tips.activityMapShowCall.text': undefined
+  'tips.activityMapShowCall.title': undefined
   'tips.activityTab.text': undefined
   'tips.activityTab.title': undefined
   'tips.activityWorkspace.text': undefined
@@ -129,6 +133,8 @@ interface CombworkMessageValues {
   'tips.branchCards.title': undefined
   'tips.branchCleanup.text': undefined
   'tips.branchCleanup.title': undefined
+  'tips.branchMoves.text': undefined
+  'tips.branchMoves.title': undefined
   'tips.bringUpToDate.text': undefined
   'tips.bringUpToDate.title': undefined
   'tips.cardAttachments.text': undefined
@@ -192,6 +198,8 @@ interface CombworkMessageValues {
   'tips.combworkTokens.text': undefined
   'tips.combworkTokens.title': undefined
   'tips.commandName': { command: string | number }
+  'tips.commitDetails.text': undefined
+  'tips.commitDetails.title': undefined
   'tips.compactFocus.text': { key: string | number }
   'tips.compactFocus.title': undefined
   'tips.compactSidebar.text': undefined
@@ -242,6 +250,8 @@ interface CombworkMessageValues {
   'tips.editTemplates.title': undefined
   'tips.fileLinks.text': undefined
   'tips.fileLinks.title': undefined
+  'tips.fileRestore.text': undefined
+  'tips.fileRestore.title': undefined
   'tips.filesGit.text': undefined
   'tips.filesGit.title': undefined
   'tips.filesTab.text': undefined
@@ -272,6 +282,18 @@ interface CombworkMessageValues {
   'tips.gitSigning.title': undefined
   'tips.gitView.text': { example: string | number }
   'tips.gitView.title': undefined
+  'tips.githubApprove.text': undefined
+  'tips.githubApprove.title': undefined
+  'tips.githubFeedback.text': undefined
+  'tips.githubFeedback.title': undefined
+  'tips.githubIssues.text': undefined
+  'tips.githubIssues.title': undefined
+  'tips.githubPrs.text': undefined
+  'tips.githubPrs.title': undefined
+  'tips.githubRepository.text': undefined
+  'tips.githubRepository.title': undefined
+  'tips.githubSource.text': undefined
+  'tips.githubSource.title': undefined
   'tips.gotoProject.text': { key: string | number }
   'tips.gotoProject.title': undefined
   'tips.group.agents': undefined
@@ -298,16 +320,6 @@ interface CombworkMessageValues {
   'tips.inboxNotices.title': undefined
   'tips.isolatedChecks.text': undefined
   'tips.isolatedChecks.title': undefined
-  'tips.jjAdvance.text': undefined
-  'tips.jjAdvance.title': undefined
-  'tips.jjCandidates.text': undefined
-  'tips.jjCandidates.title': undefined
-  'tips.jjCards.text': undefined
-  'tips.jjCards.title': undefined
-  'tips.jjOperations.text': undefined
-  'tips.jjOperations.title': undefined
-  'tips.jjPreview.text': undefined
-  'tips.jjPreview.title': undefined
   'tips.keepAwake.text': undefined
   'tips.keepAwake.title': undefined
   'tips.laneApplyNow.text': undefined
@@ -456,6 +468,8 @@ interface CombworkMessageValues {
   'tips.permissionMode.title': undefined
   'tips.planLimitsProviders.text': undefined
   'tips.planLimitsProviders.title': undefined
+  'tips.prComments.text': undefined
+  'tips.prComments.title': undefined
   'tips.progressCard.text': undefined
   'tips.progressCard.title': undefined
   'tips.progressCheck.text': undefined
@@ -488,6 +502,8 @@ interface CombworkMessageValues {
   'tips.projectTabsKeys.title': undefined
   'tips.projectTabsSettings.text': undefined
   'tips.projectTabsSettings.title': undefined
+  'tips.pullRequestFinish.text': undefined
+  'tips.pullRequestFinish.title': undefined
   'tips.quitWhenDone.text': undefined
   'tips.quitWhenDone.title': undefined
   'tips.recentWorkspaces.text': undefined
@@ -496,6 +512,10 @@ interface CombworkMessageValues {
   'tips.releaseOffer.title': undefined
   'tips.removeAll.text': undefined
   'tips.removeAll.title': undefined
+  'tips.renameBranch.text': undefined
+  'tips.renameBranch.title': undefined
+  'tips.repositoryHealth.text': undefined
+  'tips.repositoryHealth.title': undefined
   'tips.resolveOnBuilder.text': undefined
   'tips.resolveOnBuilder.title': undefined
   'tips.resumeAfterUpdate.text': undefined
@@ -562,6 +582,8 @@ interface CombworkMessageValues {
   'tips.startFreshIdle.title': undefined
   'tips.startNewAll.text': undefined
   'tips.startNewAll.title': undefined
+  'tips.stashes.text': undefined
+  'tips.stashes.title': undefined
   'tips.stoppedPane.text': undefined
   'tips.stoppedPane.title': undefined
   'tips.storageCleanup.text': undefined
@@ -572,6 +594,8 @@ interface CombworkMessageValues {
   'tips.submodulesInDiffs.title': undefined
   'tips.submodulesLfs.text': undefined
   'tips.submodulesLfs.title': undefined
+  'tips.tagPushDelete.text': undefined
+  'tips.tagPushDelete.title': undefined
   'tips.taskbarBadge.text': undefined
   'tips.taskbarBadge.title': undefined
   'tips.teamPreset.text': undefined
@@ -607,6 +631,8 @@ interface CombworkMessageValues {
   'tips.ui.tryIt': undefined
   'tips.unexpectedClose.text': undefined
   'tips.unexpectedClose.title': undefined
+  'tips.unfinishedGitOperation.text': undefined
+  'tips.unfinishedGitOperation.title': undefined
   'tips.unmerged.text': undefined
   'tips.unmerged.title': undefined
   'tips.unusedWorktrees.text': undefined
@@ -615,8 +641,6 @@ interface CombworkMessageValues {
   'tips.updateFromTarget.title': undefined
   'tips.usageMoves.text': undefined
   'tips.usageMoves.title': undefined
-  'tips.versionControlJj.text': undefined
-  'tips.versionControlJj.title': undefined
   'tips.versionControlSwitch.text': undefined
   'tips.versionControlSwitch.title': undefined
   'tips.versionControlTab.text': undefined
@@ -627,6 +651,8 @@ interface CombworkMessageValues {
   'tips.waitingOnPurpose.title': undefined
   'tips.workflowDefaults.text': undefined
   'tips.workflowDefaults.title': undefined
+  'tips.workflowOptionTabs.text': undefined
+  'tips.workflowOptionTabs.title': undefined
   'tips.workflowOptions.text': undefined
   'tips.workflowOptions.title': undefined
   'tips.workflowPresetsWhy.text': undefined

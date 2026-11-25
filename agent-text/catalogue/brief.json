@@ -91,10 +91,6 @@
     "text": "The builder merges each approved card (merge-ready), then reports it with cw_report_merge; Combwork checks it is in.",
     "note": "Finish: the builder merges."
   },
-  "brief.rule.finish.combworkAdvances": {
-    "text": "Combwork integrates each approved card into its target with jj once its merge checks pass.",
-    "note": "Finish (jj, HI-3235): Combwork advances the target bookmark itself."
-  },
   "brief.rule.finish.combworkMerges": {
     "text": "Combwork merges each approved card.",
     "note": "Finish: Combwork merges."
@@ -107,13 +103,9 @@
     "text": "Combwork does not check merges: report each one with cw_report_merge.",
     "note": "Finish: merges aren't checked."
   },
-  "brief.rule.finish.previewAdvance": {
-    "text": "Combwork integrates each approved card into its target with jj once its merge checks pass and the user clicks Integrate on its preview.",
-    "note": "Finish (jj, HI-3236): Combwork advances the target bookmark once the user consents to the preview."
-  },
-  "brief.rule.finish.userIntegrates": {
-    "text": "The user integrates each approved card into its target with jj; Combwork does not merge it.",
-    "note": "Finish (jj, HI-2799): the user integrates."
+  "brief.rule.finish.pullRequest": {
+    "text": "Combwork pushes each approved card and opens its pull request on GitHub; the card is done when it is merged there.",
+    "note": "Finish (HI-3552): a pull request, which only Combwork pushes and opens. A statement of fact."
   },
   "brief.rule.off": {
     "text": "Workflow rules are off in this project: the cards move as you put them (cw_update_task).",

@@ -376,8 +376,8 @@
     "description": "HI-3021, HI-3059: the text under a warning notification after Commit or Set aside (a paused merge, a start's warning, Files' Commit it), titled as done: git committed (or stashed) the files ({made}, a commit or stash id), but updating git's index (staging area) for them afterwards failed; {why} is git's own message (English), often another git command holding the index. {action} is commit or setAside. Keep git status and git reset as they are: commands."
   },
   "service.folderChanges.midOperation": {
-    "defaultMessage": "Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} other {a revert}} in {folder}. Finish or abort it first.",
-    "description": "HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done."
+    "defaultMessage": "Git is in the middle of {state, select, merge {a merge} rebase {a rebase} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}. Finish or abort it first.",
+    "description": "HI-2944: an error from Commit or Set aside: a git operation is under way in the folder ({folder}, a path); nothing was done. HI-3465: bisect, git bisect (ended with git bisect reset)."
   },
   "service.folderChanges.moved": {
     "defaultMessage": "Where {target} is checked out changed meanwhile. Look again.",
@@ -583,9 +583,281 @@
     "defaultMessage": "That action is already running.",
     "description": "HI-3372: an error when the window starts an action (a commit, a fetch, a push) under an id another one still runs under: it isn't started again."
   },
+  "service.gitCommit.alreadyIn": {
+    "defaultMessage": "{branch} has this commit already.",
+    "description": "HI-3471: why Cherry-pick… can't be done: the project folder's branch ({branch}) already contains the commit."
+  },
+  "service.gitCommit.detached": {
+    "defaultMessage": "The project folder is on a detached HEAD: switch to a branch first.",
+    "description": "HI-3471: why Revert… or Cherry-pick… can't be done: the project folder has no branch checked out (git's detached HEAD)."
+  },
+  "service.gitCommit.dirty": {
+    "defaultMessage": "The project folder has uncommitted changes: commit them or set them aside first.",
+    "description": "HI-3471: why Revert… or Cherry-pick… can't be done: tracked files in the project folder have uncommitted changes (git would refuse, or mix them in)."
+  },
+  "service.gitCommit.done": {
+    "defaultMessage": "{action, select, revert {Reverted {commit} on {branch}} other {Cherry-picked {commit} onto {branch}}}: the new commit is {made}.",
+    "description": "HI-3471: a notice after Revert… or Cherry-pick… committed. {commit} and {made} are short commit ids; {branch} the project folder's branch. Keep the select keys."
+  },
+  "service.gitCommit.failed": {
+    "defaultMessage": "Git refused: {why}",
+    "description": "HI-3471: an error from Revert… or Cherry-pick…: git's own command failed; {why} is git's error line, in English."
+  },
+  "service.gitCommit.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was done.",
+    "description": "HI-3471: an error from History's Commit dialog: the request was malformed (not reached from the window)."
+  },
+  "service.gitCommit.moved": {
+    "defaultMessage": "The project folder is no longer on {branch} at the commit you saw: nothing was done. Look again.",
+    "description": "HI-3471: an error from Revert… or Cherry-pick…: the project folder switched branch, or its branch ({branch}) moved, since the dialog read it."
+  },
+  "service.gitCommit.noCommit": {
+    "defaultMessage": "Git has no commit {commit}: it may be gone. Look again.",
+    "description": "HI-3471: an error from History's Commit dialog: the commit ({commit}, a short id) isn't in the repository."
+  },
+  "service.gitCommit.notIn": {
+    "defaultMessage": "{branch} doesn't have this commit, so there is nothing of it to revert. Cherry-pick… brings it in.",
+    "description": "HI-3471: why Revert… can't be done: the project folder's branch ({branch}) doesn't contain the commit."
+  },
+  "service.gitCommit.stopped": {
+    "defaultMessage": "{action, select, revert {The revert} other {The cherry-pick}} of {commit} stopped on {count, plural, one {a conflict in # file} other {conflicts in # files}}: finish or abort it in Version Control → Changes.",
+    "description": "HI-3471: a notice after Revert… or Cherry-pick… stopped on a conflict: git is left mid-operation, and Changes' panel (HI-3470) continues or aborts it. {commit}: a short id. Keep the select keys."
+  },
+  "service.gitCommit.stoppedEmpty": {
+    "defaultMessage": "{action, select, revert {The revert} other {The cherry-pick}} of {commit} stopped: git says it would change nothing. Skip or abort it in Version Control → Changes.",
+    "description": "HI-3471: a notice after Revert… or Cherry-pick… stopped with no conflict (git found nothing to commit) and left the operation under way, for Changes' panel. Keep the select keys."
+  },
+  "service.gitCommit.timedOut": {
+    "defaultMessage": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at Version Control → Changes before you try again.",
+    "description": "HI-3471: an error from Revert… or Cherry-pick…: git ran past Settings → Advanced's longest commit time ({seconds}) and was ended."
+  },
   "service.gitCompare.noBranch": {
     "defaultMessage": "There's no branch {branch} here any more.",
     "description": "An error comparing two branches in the Changes tab: the branch {branch} was deleted or renamed since the list was read."
+  },
+  "service.gitHealth.agentBusy": {
+    "defaultMessage": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",
+    "description": "HI-3473: an error from Repository health: an agent ({agent}, its name) works in a folder of the repository ({folder}, a path)."
+  },
+  "service.gitHealth.busy": {
+    "defaultMessage": "A run or an agent is working in {folder} ({what}): nothing was done. Try again once it has finished.",
+    "description": "HI-3473: an error from Repository health: a run (a test, a build) or an agent's file lock is in a folder of the repository ({folder}, a path); {what} names the first one's folder or file."
+  },
+  "service.gitHealth.combworkRun": {
+    "defaultMessage": "Combwork is running “{what}” in {folder}: nothing was done. Try again once it has finished.",
+    "description": "HI-3473: an error from Repository health: one of Combwork's own runs (a merge check, a slot's setup; {what} is its title) works in a folder of the repository ({folder}, a path)."
+  },
+  "service.gitHealth.fetchFailed": {
+    "defaultMessage": "Fetching {remote} failed: {why}",
+    "description": "HI-3473: an error from Fetch with prune: git's fetch from the remote {remote} failed; {why} is git's error line, in English."
+  },
+  "service.gitHealth.fetchedPruned": {
+    "defaultMessage": "Fetched {remotes}. {n, plural, =0 {No remote-tracking branch was dropped.} one {Dropped # remote-tracking branch: {branches}.} other {Dropped # remote-tracking branches: {branches}.}}",
+    "description": "HI-3473: after Fetch with prune: the remotes fetched from ({remotes}, a list of names) and the remote-tracking branches dropped because they were deleted on the remote ({n}; {branches} lists them, such as origin/old)."
+  },
+  "service.gitHealth.gaveUp": {
+    "defaultMessage": "git gave up after {minutes, number} minutes (no answer from the remote, or a sign-in left open).",
+    "description": "HI-3473: why the check or fetch of a remote failed: git waited {minutes} minutes (Settings → Advanced, the longest a fetch takes) and was ended."
+  },
+  "service.gitHealth.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was done.",
+    "description": "HI-3473: an error from Repository health (Version Control → Branches & remotes): the request was malformed (not reached from the window)."
+  },
+  "service.gitHealth.kept.changed": {
+    "defaultMessage": "it changed since you looked",
+    "description": "HI-3473: why Repository health kept a worktree entry or a lock file the user ticked: it is gone, or not the one they were shown any more. A phrase in a list."
+  },
+  "service.gitHealth.kept.folder": {
+    "defaultMessage": "its folder is there",
+    "description": "HI-3473: why Prune worktrees kept an entry: the worktree's folder exists again. A phrase in a list."
+  },
+  "service.gitHealth.kept.held": {
+    "defaultMessage": "it isn't stale now",
+    "description": "HI-3473: why Remove stale lock kept a lock: by the time the user confirmed, a git that may hold it is running, or it was written again. A phrase in a list."
+  },
+  "service.gitHealth.kept.refused": {
+    "defaultMessage": "it couldn't be proved to be the one you saw",
+    "description": "HI-3473: why Prune worktrees or Remove stale lock kept something: Combwork couldn't prove, as it moved it aside, that it was what the user was shown (a file in use, a link, something replaced). A phrase in a list."
+  },
+  "service.gitHealth.noProcesses": {
+    "defaultMessage": "Windows' list of processes couldn't be read, so no lock can be called stale: nothing was removed. Try again.",
+    "description": "HI-3473: an error from Remove stale lock: the list of running processes (used to rule out a git holding the lock) could not be read whole."
+  },
+  "service.gitHealth.notStandard": {
+    "defaultMessage": "{remote} isn't fetched as git sets a remote up (its remote.{remote}.fetch names more than its branches, or it's a mirror), so pruning could drop more than its remote-tracking branches: Combwork leaves it to you, in a terminal.",
+    "description": "HI-3473 (a reviewer's round 1): why Fetch with Prune skips or refuses the remote {remote}: its fetch settings aren't git's default. remote.{remote}.fetch is a git setting's name: keep it."
+  },
+  "service.gitHealth.pruned": {
+    "defaultMessage": "{n, plural, =0 {No worktree entry was dropped.} one {Dropped # worktree entry.} other {Dropped # worktree entries.}}{kept, plural, =0 {} one { # was kept: {keptList}.} other { # were kept: {keptList}.}}",
+    "description": "HI-3473: after Prune worktrees: how many of git's entries for missing worktrees were dropped ({n}), and how many were kept ({kept}) with each one's name and why ({keptList}, a list of 'name (why)')."
+  },
+  "service.gitHealth.removed": {
+    "defaultMessage": "{n, plural, =0 {No lock file was removed.} one {Removed # lock file.} other {Removed # lock files.}}{kept, plural, =0 {} one { # was kept: {keptList}.} other { # were kept: {keptList}.}}",
+    "description": "HI-3473: after Remove stale lock: how many of git's lock files were removed ({n}), and how many kept ({kept}) with each one's path and why ({keptList}, a list of 'path (why)')."
+  },
+  "service.gitHealth.slotBusy": {
+    "defaultMessage": "{slot} is being {state, select, creating {made} other {removed}}: nothing was done. Try again in a moment.",
+    "description": "HI-3473: an error from Repository health: the slot {slot} (such as slot-a; glossary: slot) is being made or removed now. Keep the select keys."
+  },
+  "service.gitHealth.stopped": {
+    "defaultMessage": "Stopped here. What git fetched or dropped before it stopped stays: look again to see where things stand.",
+    "description": "HI-3473: after the user cancelled Fetch with prune or its check of a remote."
+  },
+  "service.gitHealth.unlisted": {
+    "defaultMessage": "Git couldn't list this repository's worktrees, so Combwork can't tell nothing works in them: nothing was done. Git said: {why}",
+    "description": "HI-3473 (a reviewer's round 1): an error from Repository health: git worktree list failed, so a worktree an agent or a run works in could be missed. {why} is git's error line, in English."
+  },
+  "service.gitMoves.agentBusy": {
+    "defaultMessage": "{agent} is working in the project folder: try again once it has finished.",
+    "description": "HI-3469: why Restore to here… is refused: an agent ({agent}) works in the project folder."
+  },
+  "service.gitMoves.busy": {
+    "defaultMessage": "A run or an agent is working in the project folder ({what}): try again once it has finished.",
+    "description": "HI-3469: why Restore to here… is refused: a run (a test, a build) or an agent's file lock is in the project folder; {what} names the first one's folder or file."
+  },
+  "service.gitMoves.card": {
+    "defaultMessage": "{branch} is the branch of {card}, which is still open: its builder moves it, or move the card to Done first.",
+    "description": "HI-3469: why Restore to here… is refused: the branch ({branch}) is a card's line ({card}, its key) and the card isn't Done."
+  },
+  "service.gitMoves.conflicted": {
+    "defaultMessage": "{file} is in conflict in the project folder: settle it first.",
+    "description": "HI-3469: why Restore to here… is refused: a file ({file}, a path) is in conflict in the project folder."
+  },
+  "service.gitMoves.detached": {
+    "defaultMessage": "The project folder is on a detached HEAD: Moves restores a branch once the folder is on one.",
+    "description": "HI-3469 (a reviewer's round 1): why Restore to here… is refused: the project folder has no branch checked out (git's detached HEAD); the design shows no Moves then."
+  },
+  "service.gitMoves.failed": {
+    "defaultMessage": "Git refused: {why}",
+    "description": "HI-3469: an error from Restore to here…: git's own command failed; {why} is git's error line, in English."
+  },
+  "service.gitMoves.inSlot": {
+    "defaultMessage": "{branch} is checked out in {slot}: restore it there, by its agent or in a terminal.",
+    "description": "HI-3469: why Restore to here… is refused: the branch ({branch}) is checked out in a slot ({slot}, such as slot-a; glossary: slot), whose folder Combwork leaves to whoever works there."
+  },
+  "service.gitMoves.inTheWay": {
+    "defaultMessage": "{count, plural, one {An uncommitted file would change} other {# uncommitted files would change}}: commit {count, plural, one {it} other {them}} or set {count, plural, one {it} other {them}} aside first.",
+    "description": "HI-3469: why Restore to here… is refused: files with uncommitted changes in the project folder differ between the branch's commit and the one restored to (git reset --keep refuses rather than lose them); the files are listed under it."
+  },
+  "service.gitMoves.inWorktree": {
+    "defaultMessage": "{branch} is checked out in {folder}: restore it there, in a terminal.",
+    "description": "HI-3469: why Restore to here… is refused: the branch ({branch}) is checked out in another worktree ({folder}, a path)."
+  },
+  "service.gitMoves.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was done.",
+    "description": "HI-3469: an error from Moves: the request was malformed (not reached from the window)."
+  },
+  "service.gitMoves.moved": {
+    "defaultMessage": "{branch} has moved on since you looked: nothing was done. Look again.",
+    "description": "HI-3469: an error from Moves' Restore to here…: the branch ({branch}) is no longer at the commit the user saw."
+  },
+  "service.gitMoves.noBranch": {
+    "defaultMessage": "{branch} isn't a local branch any more: nothing was done. Look again.",
+    "description": "HI-3469: an error from Version Control → History → Moves: the branch ({branch}) was deleted or renamed since the user looked."
+  },
+  "service.gitMoves.noCommit": {
+    "defaultMessage": "Git no longer has the commit {commit}: nothing was done.",
+    "description": "HI-3469: an error from Restore to here…: the commit to restore to ({commit}, a short id) is gone from the repository (git's clean-up removed it)."
+  },
+  "service.gitMoves.operation": {
+    "defaultMessage": "Git is in the middle of {what, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in the project folder: finish it first (Version Control → Changes).",
+    "description": "HI-3469: why Restore to here… is refused: an operation is under way in the project folder ({what}, git's word for it); Changes' panel ends it."
+  },
+  "service.gitMoves.queue": {
+    "defaultMessage": "The merge queue is testing {card}'s merge into {branch}: try again once it is done.",
+    "description": "HI-3469: why Restore to here… is refused: a card ({card}, its key) is being tested and merged into the branch ({branch}) now."
+  },
+  "service.gitMoves.restored": {
+    "defaultMessage": "Restored {branch} to {to}. It was at {from}: the move just made is at the top of Moves, and Restore to here… on the one below it undoes it.",
+    "description": "HI-3469: a notice after Restore to here…: the branch ({branch}) is at the commit {to} (a short id) now; {from} is the commit it was at, in full (keep it whole: it is the way back)."
+  },
+  "service.gitMoves.same": {
+    "defaultMessage": "{branch} is at that commit already: nothing to do.",
+    "description": "HI-3469: Restore to here… on a move whose commit is where the branch is now."
+  },
+  "service.gitMoves.session": {
+    "defaultMessage": "{agent}'s session is in the project folder: nothing was done. Stop it first.",
+    "description": "HI-3469: why Restore to here… is refused for the project folder's branch: an agent's session ({agent}, its name) runs there."
+  },
+  "service.gitMoves.slotHeld": {
+    "defaultMessage": "A merge into {branch} is under way or waiting (its merge slot): try again once it is done.",
+    "description": "HI-3469: why Restore to here… is refused: an agent or the merge queue holds or waits for the branch's merge slot."
+  },
+  "service.gitMoves.timedOut": {
+    "defaultMessage": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at the project folder before you try again.",
+    "description": "HI-3469: an error from Restore to here…: git reset ran past Settings → Advanced's longest commit time ({seconds}) and was ended."
+  },
+  "service.gitMoves.unlisted": {
+    "defaultMessage": "Git couldn't list this repository's worktrees, so Combwork can't tell where {branch} is checked out: nothing was done. Git said: {why}",
+    "description": "HI-3469 (a reviewer's round 1): an error from Restore to here…: git worktree list failed, so a worktree that has the branch ({branch}) checked out could be missed. {why} is git's error line, in English."
+  },
+  "service.gitOperation.agentBusy": {
+    "defaultMessage": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",
+    "description": "HI-3470: an error from the panel: an agent ({agent}) works in the folder ({folder}, a path)."
+  },
+  "service.gitOperation.busy": {
+    "defaultMessage": "A run or an agent is working in {folder} ({what}): nothing was done. Try again once it has finished.",
+    "description": "HI-3470: an error from the panel: a run (a test, a build) or an agent's file lock is in the folder ({folder}, a path); {what} names the first one's folder or file."
+  },
+  "service.gitOperation.changed": {
+    "defaultMessage": "Git isn't in the middle of {was, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder} any more: nothing was done. Look again.",
+    "description": "HI-3470: an error from the unfinished git operation panel (Version Control → Changes): the operation the user acted on ({was}, git's word for it) has ended or changed since they looked; {folder} is a path. Nothing was done."
+  },
+  "service.gitOperation.failed": {
+    "defaultMessage": "Git refused: {why}",
+    "description": "HI-3470: an error from the panel: git's own command failed; {why} is git's error line, in English."
+  },
+  "service.gitOperation.fileChanged": {
+    "defaultMessage": "{file}'s conflict changed since you looked: nothing was done. Look again.",
+    "description": "HI-3518 (a reviewer's round 1): an error from the unfinished git operation panel: the conflicted file the user settled ({file}, a path in the repository) is still in conflict, but not the conflict they saw (it was settled in a terminal and another took its place). Nothing was done."
+  },
+  "service.gitOperation.invalid": {
+    "defaultMessage": "That step was asked for wrongly: nothing was done.",
+    "description": "HI-3470: an error from the panel: the request was malformed (not reached from the window)."
+  },
+  "service.gitOperation.leftChanged": {
+    "defaultMessage": "{folder} changed since you looked (a commit, or a git operation began): nothing was done. Look again.",
+    "description": "HI-3518: an error from the panel showing files left in conflict with no git operation under way (after a stash's Apply, say): since the user looked, HEAD moved or a git operation (a merge, a rebase…) began in the folder ({folder}, a path). Nothing was done."
+  },
+  "service.gitOperation.moved": {
+    "defaultMessage": "Git has moved on in {folder} since you looked (to another commit of the {what}, or a new one began): nothing was done. Look again.",
+    "description": "HI-3470 (a reviewer's round 1): an error from the panel: the operation is still of the same kind ({what}, git's word for it: keep it as it is) but git is no longer stopped where the user saw it (a terminal went on, or it was ended and another begun); {folder} is a path. Nothing was done."
+  },
+  "service.gitOperation.notConflicted": {
+    "defaultMessage": "{file} isn't in conflict any more: nothing was done. Look again.",
+    "description": "HI-3470: an error from the panel: the conflicted file the user settled ({file}, a path in the repository) was settled meanwhile (in a terminal, say)."
+  },
+  "service.gitOperation.notStep": {
+    "defaultMessage": "That isn't a step git offers for this operation.",
+    "description": "HI-3470: an error from the unfinished git operation panel: a step (Continue, Skip, Abort) the operation has none of. Not reached from the window, which offers only the steps each has."
+  },
+  "service.gitOperation.session": {
+    "defaultMessage": "{agent}'s session is in {folder}: nothing was done. Stop it first, or ask it to finish the operation.",
+    "description": "HI-3470: an error from the unfinished git operation panel (Version Control → Changes): an agent's session ({agent}, its name) runs in the folder ({folder}, a path), so Combwork doesn't touch git there."
+  },
+  "service.gitOperation.slotChanged": {
+    "defaultMessage": "{slot} changed meanwhile (lent, released, or something of Combwork's started in it): nothing was done. Look again.",
+    "description": "HI-3470: an error from the panel: the slot ({slot}) was lent to a card, released, or taken by one of Combwork's own steps (its setup, an archive, a run writing in it) since the user looked, or the lent slot they confirmed is lent under another lease now."
+  },
+  "service.gitOperation.slotProcess": {
+    "defaultMessage": "A process has a file or a folder in {slot} open: nothing was done. Close it (a terminal, an editor) and try again.",
+    "description": "HI-3470: an error from the panel: something has the slot's folder ({slot}) open, so Windows refused to rename it aside for a moment (the check that nothing works there)."
+  },
+  "service.gitOperation.slotSession": {
+    "defaultMessage": "A session is in {slot}: nothing was done. Stop it first.",
+    "description": "HI-3470: an error from the panel: a session runs in the slot ({slot}, such as slot-a; glossary: slot)."
+  },
+  "service.gitOperation.timedOut": {
+    "defaultMessage": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at {folder} before you try again: a hook may have done part of its work.",
+    "description": "HI-3470: an error from the panel: git's step (a Continue running the repository's commit hooks, say) ran past Settings → Advanced's longest commit time ({seconds}) and was ended; {folder} is a path."
+  },
+  "service.gitOperation.unreadable": {
+    "defaultMessage": "Combwork can't read where git stopped in {folder}, so it can't tell it's still where you saw it: nothing was done. Finish it in a terminal there.",
+    "description": "HI-3470 (a reviewer's round 2): an error from the panel: git's files that say where the operation stopped (in the folder's git dir) are missing or can't be read, so Combwork refuses any step; {folder} is a path."
+  },
+  "service.gitOperation.unresolved": {
+    "defaultMessage": "{count, plural, one {# file is} other {# files are}} still in conflict: settle {count, plural, one {it} other {them}} first.",
+    "description": "HI-3470: an error from the panel (and the reason Continue is greyed out): files still in conflict."
   },
   "service.gitRepo.addFailed": {
     "defaultMessage": "Couldn't add {remote}: {why}",
@@ -606,6 +878,18 @@
   "service.gitRepo.branchKept": {
     "defaultMessage": "{why, select, target {{branch} is the branch work merges into: kept.} default {{branch} is the default branch: kept.} current {{branch} is checked out in the project folder: kept.} worktree {{branch} is checked out in a worktree or slot: kept.} card {An open card works on {branch}: kept.} remoteHead {{branch} is the remote's default branch: kept.} moved {{branch} has moved since you were shown it: kept. Look at it again.} unmerged {{branch} has commits that aren't in {target}: kept.} gone {There's no branch {branch}.} other {{branch} isn't a valid branch name.}}",
     "description": "Why a branch wasn't deleted (Clean Up Merged Branches, Delete branch…, in Version Control → Branches & remotes). {branch} is its name, {target} the branch the project's work merges into. Keep the select keys."
+  },
+  "service.gitRepo.branchRenamed": {
+    "defaultMessage": "{tracks, select, yes {Renamed {from} to {to}. It still tracks {upstream}.} other {Renamed {from} to {to}.}}",
+    "description": "HI-3474: after renaming the branch {from} to {to} here only. When {tracks} is yes it still follows the remote branch {upstream} by its old name."
+  },
+  "service.gitRepo.branchRenamedBoth": {
+    "defaultMessage": "Renamed {from} to {to}, here and on {remote}.",
+    "description": "HI-3474: after renaming the branch {from} to {to} in the repository and on the remote {remote} (pushed by its new name, the old one deleted there)."
+  },
+  "service.gitRepo.branchSameName": {
+    "defaultMessage": "{branch} keeps its name.",
+    "description": "HI-3474: after Rename… on a branch in Version Control → Branches & remotes, when it was given its own name."
   },
   "service.gitRepo.branchTaken": {
     "defaultMessage": "There’s already a branch {name}.",
@@ -715,6 +999,14 @@
     "defaultMessage": "There’s no branch, tag or commit {ref}.",
     "description": "HI-2807: an error creating a branch from a start point: nothing in the repository is called {ref} (as typed in Starts at)."
   },
+  "service.gitRepo.noTag": {
+    "defaultMessage": "There's no tag {name}.",
+    "description": "HI-3474: an error deleting or pushing a tag in Version Control → History: the repository has no tag called {name}."
+  },
+  "service.gitRepo.noTagCommit": {
+    "defaultMessage": "Git has no commit {commit} to tag.",
+    "description": "HI-3471: an error from Tag here… (History's Commit dialog): the commit ({commit}, a short id) isn't in the repository."
+  },
   "service.gitRepo.noTarget": {
     "defaultMessage": "There's no branch {target} here to check the branches against.",
     "description": "An error deleting branches in Version Control → Branches & remotes: the branch the project's work merges into ({target}; the default branch when none is set) isn't in the repository, so Combwork can't tell which branches are merged."
@@ -807,9 +1099,53 @@
     "defaultMessage": "Couldn't remove {remote}: {why}",
     "description": "An error removing the remote {remote} in the Git view; {why} is git's own words."
   },
+  "service.gitRepo.renameAgentHere": {
+    "defaultMessage": "{agent} is working in the project folder, on {branch}: rename it once it has finished.",
+    "description": "HI-3474: an error renaming the branch {branch} checked out in the project folder: the agent {agent} is working there now."
+  },
+  "service.gitRepo.renameFailed": {
+    "defaultMessage": "Couldn't rename {branch}: {why}",
+    "description": "HI-3474: an error renaming the branch {branch}; {why} is git's own words."
+  },
+  "service.gitRepo.renameInUse": {
+    "defaultMessage": "{why, select, target {{branch} is the branch work merges into: it keeps its name.} default {{branch} is the default branch: it keeps its name.} worktree {{branch} is checked out in a worktree or slot: it keeps its name.} other {An open card works on {branch}: it keeps its name.}}",
+    "description": "HI-3474: why the branch {branch} can't be renamed: it is the project's target, the default branch, checked out in a worktree or slot, or an open card's branch. Keep the select keys."
+  },
+  "service.gitRepo.renameMoved": {
+    "defaultMessage": "{branch} has moved since you were shown it: nothing was renamed. Look at it again.",
+    "description": "HI-3474: an error renaming the branch {branch}: it points at another commit than the one the window showed."
+  },
+  "service.gitRepo.renameNoUpstream": {
+    "defaultMessage": "{branch} doesn't track a branch on a remote: there's nothing to rename there. Nothing was renamed.",
+    "description": "HI-3474: an error renaming the branch {branch} with Also rename on the remote: it tracks no remote branch."
+  },
+  "service.gitRepo.renameOldKept": {
+    "defaultMessage": "Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but {remote} refused to delete {old}: it has commits there you haven't fetched, or it doesn't allow deleting branches. Look at it before you delete it.",
+    "description": "HI-3474: an error after renaming a branch here and on a remote: the remote {remote} refused to delete the old branch {old} (Combwork deletes it only at the commit last fetched)."
+  },
+  "service.gitRepo.renamePushFailed": {
+    "defaultMessage": "Renamed {from} to {to} here, but couldn't push {to} to {remote}: {why} It still tracks {upstream}.",
+    "description": "HI-3474: an error after renaming the branch {from} to {to} locally: pushing it to the remote {remote} failed or was refused ({why}, git's words or why), so it still follows {upstream}."
+  },
   "service.gitRepo.renameRemoteFailed": {
     "defaultMessage": "Couldn't rename {remote}: {why}",
     "description": "An error renaming the remote {remote} in the Git view; {why} is git's own words."
+  },
+  "service.gitRepo.renameRemoteTaken": {
+    "defaultMessage": "{remote} already has a branch {to} (as of the last fetch): nothing was renamed.",
+    "description": "HI-3474: an error renaming a branch to {to} with Also rename on the remote: the remote {remote} has a branch of that name."
+  },
+  "service.gitRepo.renameStopped": {
+    "defaultMessage": "{step, select, push {Renamed {from} to {to} here, but the push of {to} to {remote} was stopped: it may have reached {remote}. {to} still tracks {upstream}.} other {Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but deleting {old} there was stopped: it may still be there.}} Refresh to see where things stand.",
+    "description": "HI-3474 (round 1): after the user cancelled renaming a branch on its remote too, once {from} was renamed {to} here: during the push of the new name to the remote {remote} (it still follows {upstream}), or during the deletion of the old name {old} there. Keep the select keys."
+  },
+  "service.gitRepo.renameTrackFailed": {
+    "defaultMessage": "Renamed {from} to {to} and pushed it to {remote}, but couldn't make it track {remote}/{to}: {why} It still tracks {upstream}, and {old} is still on {remote}.",
+    "description": "HI-3474 (round 1): an error renaming a branch here and on a remote: {from} was renamed {to} and pushed to the remote {remote}, but setting it to follow its new name there failed ({why}, git's words); it still follows {upstream}, and the old name {old} wasn't deleted there."
+  },
+  "service.gitRepo.renameUpstreamKept": {
+    "defaultMessage": "{upstream} is the remote's default branch, the branch work merges into or the default branch: Combwork won't delete it there, so nothing was renamed.",
+    "description": "HI-3474: an error renaming a branch with Also rename on the remote: the remote branch it tracks ({upstream}, such as origin/main) is one Combwork never deletes."
   },
   "service.gitRepo.setFailed": {
     "defaultMessage": "Couldn't set {key}: {why}",
@@ -835,9 +1171,41 @@
     "defaultMessage": "Switched to {branch}, tracking {remote}.",
     "description": "After switching to a remote branch in the Git view: a new local branch {branch} was made, following the remote branch {remote} (origin/x)."
   },
+  "service.gitRepo.tagDeleteFailed": {
+    "defaultMessage": "Couldn't delete the tag {name}: {why}",
+    "description": "HI-3474: an error deleting the tag {name}; {why} is git's own words."
+  },
+  "service.gitRepo.tagDeleted": {
+    "defaultMessage": "{onRemote, select, yes {Deleted the tag {name}, here and on {remote}.} other {Deleted the tag {name}.}}",
+    "description": "HI-3474: after deleting the tag {name} in Version Control → History; when {onRemote} is yes, on the remote {remote} too."
+  },
+  "service.gitRepo.tagMoved": {
+    "defaultMessage": "The tag {name} has changed since you were shown it: nothing was deleted. Look at it again.",
+    "description": "HI-3474: an error deleting the tag {name}: it points at something else than the window showed."
+  },
   "service.gitRepo.tagPushFailed": {
     "defaultMessage": "Tagged {commit} {name}, but couldn't push it to {remote}: {why}",
     "description": "An error in the Git view: the commit {commit} was tagged {name}, but pushing the tag to the remote {remote} failed; {why} is git's own words."
+  },
+  "service.gitRepo.tagPushOnlyFailed": {
+    "defaultMessage": "Couldn't push the tag {name} to {remote}: {why}",
+    "description": "HI-3474: an error pushing the tag {name} to the remote {remote}; {why} is git's own words."
+  },
+  "service.gitRepo.tagPushRefused": {
+    "defaultMessage": "{remote} has another tag {name}, so the push was refused (Combwork never forces a push).",
+    "description": "HI-3474: an error pushing the tag {name}: the remote {remote} has a tag of that name pointing elsewhere."
+  },
+  "service.gitRepo.tagPushed": {
+    "defaultMessage": "{result, select, upToDate {{remote} already has the tag {name}.} other {Pushed the tag {name} to {remote}.}}",
+    "description": "HI-3474: after Push… on a tag in Version Control → History: the tag {name} went to the remote {remote}, or it was there already."
+  },
+  "service.gitRepo.tagRemoteFailed": {
+    "defaultMessage": "Couldn't delete the tag {name} on {remote}: {why} Nothing was deleted here either.",
+    "description": "HI-3474: an error deleting the tag {name} on the remote {remote}; {why} is git's own words. The local tag was kept."
+  },
+  "service.gitRepo.tagRemoteRefused": {
+    "defaultMessage": "{remote} refused to delete the tag {name}: its tag {name} isn't this one, or it has none, or it doesn't allow deleting tags. Nothing was deleted here either.",
+    "description": "HI-3474: an error deleting the tag {name} here and on the remote {remote}: the remote refused (its tag differs or is missing, or it forbids deletions), so the local tag was kept too."
   },
   "service.gitRepo.tagTaken": {
     "defaultMessage": "There’s a tag {name}: a branch of the same name would make the name mean two things to git.",
@@ -947,6 +1315,138 @@
     "defaultMessage": "Couldn't change {remote}'s URL: {why}",
     "description": "An error changing the address of the remote {remote} in the Git view; {why} is git's own words."
   },
+  "service.gitRestore.agentBusy": {
+    "defaultMessage": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",
+    "description": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: an agent ({agent}) works in the folder ({folder}, a path)."
+  },
+  "service.gitRestore.busy": {
+    "defaultMessage": "A run or an agent is working in {folder} ({what}): nothing was done. Try again once it has finished.",
+    "description": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: a run (a test, a build) or an agent's file lock is in the folder ({folder}, a path); {what} names the first one's folder or file."
+  },
+  "service.gitRestore.conflicted": {
+    "defaultMessage": "{file} is in conflict: nothing was done. Settle it first.",
+    "description": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: the file ({file}, a path) is in conflict."
+  },
+  "service.gitRestore.failed": {
+    "defaultMessage": "Git refused: {why}",
+    "description": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: git's own command failed; {why} is git's error line, in English."
+  },
+  "service.gitRestore.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was done.",
+    "description": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: the request was malformed (not reached from the window)."
+  },
+  "service.gitRestore.missing": {
+    "defaultMessage": "{file} isn't in {commit}: nothing was done.",
+    "description": "HI-3477: an error from the Files tab's Restore From…: the file ({file}, a path) isn't in the commit chosen or on the target ({commit}, a short commit id)."
+  },
+  "service.gitRestore.moved": {
+    "defaultMessage": "The commit checked out changed meanwhile: nothing was done. Look again.",
+    "description": "HI-3477: an error from the Files tab's Discard Changes…: the folder's HEAD moved since the confirm showed the diff (a commit, a switch)."
+  },
+  "service.gitRestore.noCommit": {
+    "defaultMessage": "That commit isn't in this repository: nothing was done.",
+    "description": "HI-3477: an error from the Files tab's Restore From → A Commit…: the commit chosen can't be found."
+  },
+  "service.gitRestore.noTarget": {
+    "defaultMessage": "The project's target isn't a branch here: nothing was done.",
+    "description": "HI-3477: an error from the Files tab's Restore From → Target Branch: the project's target branch isn't a branch in this repository."
+  },
+  "service.gitRestore.notFile": {
+    "defaultMessage": "{file} isn't a file in {commit} (a folder or a submodule there): nothing was done.",
+    "description": "HI-3477: an error from the Files tab's Restore From…: at the commit chosen or on the target ({commit}, a short commit id) the path ({file}) is a folder or a submodule, not a file, so it can't be restored as one."
+  },
+  "service.gitRestore.notTracked": {
+    "defaultMessage": "Git doesn't track {file}: nothing was done.",
+    "description": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: the file ({file}, a path) isn't one git tracks."
+  },
+  "service.gitRestore.nothing": {
+    "defaultMessage": "{file} has no uncommitted changes: nothing was done.",
+    "description": "HI-3477: an error from the Files tab's Discard Changes…: the file ({file}, a path) has nothing to discard (committed or discarded meanwhile)."
+  },
+  "service.gitRestore.operation": {
+    "defaultMessage": "Git is in the middle of {what, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}: nothing was done. Finish it first (Version Control → Changes).",
+    "description": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: an operation is under way in the folder ({what}, git's word for it; {folder} a path); Changes' panel ends it."
+  },
+  "service.gitRestore.request": {
+    "defaultMessage": "That was asked for wrongly: nothing was done.",
+    "description": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: the request was malformed (not reached from the window)."
+  },
+  "service.gitRestore.session": {
+    "defaultMessage": "{agent}'s session is in {folder}: nothing was done. Stop it first.",
+    "description": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: an agent's session ({agent}, its name) runs in the project folder ({folder}, a path), so Combwork doesn't change its files."
+  },
+  "service.gitRestore.stashedFailed": {
+    "defaultMessage": "Git refused: {why}. The file's changes are kept in Version Control → Changes → Stashes.",
+    "description": "HI-3477: an error from the Files tab's Restore From…: the file's changes were stashed, then git's restore failed; {why} is git's error line, in English. Apply in the Stashes list brings them back."
+  },
+  "service.gitRestore.timedOut": {
+    "defaultMessage": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at {file} and Version Control → Changes → Stashes before you try again.",
+    "description": "HI-3477: an error from the Files tab's Discard Changes… or Restore From…: git ran past Settings → Advanced's longest commit or set aside time ({seconds}) and was ended; {file} is a path."
+  },
+  "service.gitStash.agentBusy": {
+    "defaultMessage": "{agent} is working in {folder}: nothing was done. Try again once it has finished.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: an agent ({agent}) works in the folder ({folder}, a path)."
+  },
+  "service.gitStash.busy": {
+    "defaultMessage": "A run or an agent is working in {folder} ({what}): nothing was done. Try again once it has finished.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: a run (a test, a build) or an agent's file lock is in the folder ({folder}, a path); {what} names the first one's folder or file."
+  },
+  "service.gitStash.conflicted": {
+    "defaultMessage": "{file} is in conflict in {folder}: nothing was done. Settle it first.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: a file ({file}, a path in the repository) is already in conflict in the folder ({folder}, a path)."
+  },
+  "service.gitStash.failed": {
+    "defaultMessage": "Git refused: {why}",
+    "description": "HI-3472: an error from Stashes: git's own command failed; {why} is git's error line, in English."
+  },
+  "service.gitStash.gone": {
+    "defaultMessage": "That stash isn't in the list any more (dropped or popped meanwhile): nothing was done. Look again.",
+    "description": "HI-3472: an error from Version Control → Changes → Stashes: the stash the user acted on is no longer one of the repository's stashes."
+  },
+  "service.gitStash.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was done.",
+    "description": "HI-3472: an error from Stashes: the request was malformed (not reached from the window)."
+  },
+  "service.gitStash.moved": {
+    "defaultMessage": "The stashes changed meanwhile, and more than one is like the one you chose: nothing was done. Look again.",
+    "description": "HI-3527: an error from Version Control → Changes → Stashes' Apply, Pop or Drop: the list's places moved since the user looked, and several stashes now have the same commit and message as the one they chose, so Combwork can't tell which they meant."
+  },
+  "service.gitStash.notDropped": {
+    "defaultMessage": "The stash was applied, but git didn't drop it: {why}. It is still in the list.",
+    "description": "HI-3472: an error from Stashes' Pop: the apply was clean but git's drop failed; {why} is git's error line, in English."
+  },
+  "service.gitStash.operation": {
+    "defaultMessage": "Git is in the middle of {what, select, merge {a merge} rebase {a rebase} am {an am} cherryPick {a cherry-pick} bisect {a bisect} other {a revert}} in {folder}: nothing was done. Finish it first (the panel above).",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: an operation is under way in the folder ({what}, git's word for it; {folder} a path); HI-3470's panel above the list ends it."
+  },
+  "service.gitStash.overlap": {
+    "defaultMessage": "{file} has uncommitted changes in {folder}, and the stash holds it too: nothing was done. Commit it or set it aside first.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: the folder ({folder}, a path) has uncommitted changes to a file ({file}, a path in the repository) that the stash also changes; Combwork refuses rather than mix them in a conflict."
+  },
+  "service.gitStash.raced": {
+    "defaultMessage": "Another git changed the stashes just as Combwork dropped this one, so git dropped a different stash, {commit}. {back, select, yes {Combwork put it back, at the top of the list, so nothing is lost.} other {Combwork couldn't put it back, so it isn't listed now: git stash store {commit} lists it again (git keeps its changes for a while).}} The stash you chose wasn't dropped{pop, select, yes {, and its changes were applied} other {}}. Look again.",
+    "description": "HI-3533: an error from Version Control → Changes → Stashes' Drop or Pop: another git (a terminal, an agent) pushed or dropped a stash at the moment Combwork dropped one, so git dropped another ({commit}, its full commit id). back yes: Combwork listed it again; no: it couldn't, so that stash is off the list until the command (keep git stash store as it is) lists it again. pop yes: it was a Pop, whose apply had already gone in."
+  },
+  "service.gitStash.session": {
+    "defaultMessage": "{agent}'s session is in {folder}: nothing was done. Stop it first.",
+    "description": "HI-3472: an error from Version Control → Changes → Stashes' Apply or Pop: an agent's session ({agent}, its name) runs in the folder ({folder}, a path), so Combwork doesn't change its files."
+  },
+  "service.gitStash.slotChanged": {
+    "defaultMessage": "{slot} changed meanwhile (lent, released, or something of Combwork's started in it): nothing was done. Look again.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: the slot ({slot}) was lent to a card, released, or taken by one of Combwork's own steps since the user looked, or the lent slot they confirmed is lent under another lease now."
+  },
+  "service.gitStash.slotProcess": {
+    "defaultMessage": "A process has a file or a folder in {slot} open: nothing was done. Close it (a terminal, an editor) and try again.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: something has the slot's folder ({slot}) open, so Windows refused to rename it aside for a moment (the check that nothing works there)."
+  },
+  "service.gitStash.slotSession": {
+    "defaultMessage": "A session is in {slot}: nothing was done. Stop it first.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: a session runs in the slot ({slot}, such as slot-a; glossary: slot)."
+  },
+  "service.gitStash.timedOut": {
+    "defaultMessage": "Git was still running after {seconds, number} seconds, so Combwork ended it. Look at {folder} before you try again: part of the stash may be applied.",
+    "description": "HI-3472: an error from Stashes' Apply or Pop: git ran past Settings → Advanced's longest commit or set aside time ({seconds}) and was ended; {folder} is a path."
+  },
   "service.intent.noWorkflow": {
     "defaultMessage": "{card} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.",
     "description": "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {card} is the card's key (HI-12)."
@@ -954,14 +1454,6 @@
   "service.intent.queueNotAgents": {
     "defaultMessage": "Only the user, or the Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",
     "description": "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Combwork Assistant (within its Control setting, a setting name: use it as Combwork shows it) can do."
-  },
-  "service.jj.revisionNoRepo": {
-    "defaultMessage": "No jj repository was found for this project.",
-    "description": "A card's revision diff couldn't be read: the project's folder is no longer in a jj repository."
-  },
-  "service.jj.revisionUnreadable": {
-    "defaultMessage": "Couldn't read {path} at {commit}: {error}",
-    "description": "A card's revision diff couldn't be read from a jj repository: the file's path, the commit's short id and jj's error."
   },
   "service.keys.closed": {
     "defaultMessage": "The workspace was closed, or the window opened another, before the key was changed: nothing changed.",
@@ -1339,10 +1831,6 @@
     "defaultMessage": "Version control ({platform}) doesn’t offer that here.",
     "description": "HI-2788: an error when the window asks to change a repository in a way its version control ({platform}: a version control’s name, as Combwork names it) doesn’t list. Not reached in 1.4.0: Git lists every operation."
   },
-  "service.slots.held": {
-    "defaultMessage": "{card} waits for {slot}: {kind, select, notIntegrated {the last card's work isn't in {target} yet. Integrate it there; your own Done on exactly that card's cycle also counts.} cantInspect {Combwork can't read what it holds ({why}). It tries again; nothing there was changed.} other {it holds {hasCommits, select, yes {commits over the last card's work that are neither in {target} nor among the last card's own: {ids}{more, plural, =0 {} other { and # more (see them all with jj log -r {selectArg})}}{hasEdits, select, yes {, and edits in its working copy, recorded as {at}} other {}}} other {edits in its working copy over the last card's work, recorded as {at}}}. Set them aside so Combwork can prepare {slot}: jj new {base} keeps them where they are. Once {card} is prepared, bring what belongs to it under its working copy: jj rebase -r {selectArg} -B ''@''{hasEdits, select, yes { (or squash the edits in: jj squash --from {at} --into ''@'')} other {}}; leave out what doesn't, or jj abandon it.}}{stopped, select, yes { {builder} was stopped so Combwork could read {slot}: resume it from its pane (Resume) to deal with this; {card} is prepared once {slot} is clear.} other {}}",
-    "description": "A notice (HI-3115) on a card and to its builder: a jj slot (a working folder Combwork lends to a card or a lane) can’t be prepared for the card yet because of what it holds; the card waits, nothing there is changed. kind (select): notIntegrated (the previous card’s work isn’t in its target), cantInspect (unreadable; {why} is jj’s side in English), other (work over the previous card’s: commits {ids}, edits recorded as {at}). {base} is a commit id, {selectArg} a jj revset as typed in a shell, {target} a bookmark, {builder} an agent’s name. jj new, jj rebase -r … -B @, jj squash --from … --into @, jj log -r and jj abandon are commands: keep them and their arguments exactly as they are. Keep the select keys."
-  },
   "service.slots.notPrepared": {
     "defaultMessage": "Combwork couldn't get {slot} ready for {card}: {why}",
     "description": "A notice: a card was started in a slot (a worktree Combwork lends to a card or a lane), and Combwork couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English."
@@ -1551,21 +2039,13 @@
     "defaultMessage": "Unknown version control setting in {project}",
     "description": "A notice's title: the project {project}'s settings file names a version control Combwork doesn't have."
   },
-  "service.workspace.platformJjFound": {
-    "defaultMessage": "{project} is a jj repository. Combwork goes on with its version control as it is until you switch it to jj in its Version Control tab.",
-    "description": "A notice (HI-2799, HI-2896): a jj (Jujutsu) repository, colocated with Git or not, was found in a project. Combwork does not switch it by itself: the Version Control tab offers it. Keep jj."
-  },
-  "service.workspace.platformJjGone": {
-    "defaultMessage": "{project}'s jj repository is gone. Switch it to Git or None in its Version Control tab.",
-    "description": "A notice (HI-2799): the .jj folder of a project using jj was removed or moved. Keep jj, Git and None."
-  },
   "service.workspace.platformOpen": {
     "defaultMessage": "Open Version Control",
     "description": "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Combwork offers the switch (glossary 2.1)."
   },
   "service.workspace.platformOtherFound": {
     "defaultMessage": "{vcs} was found in {project}. Combwork doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.",
-    "description": "A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Combwork treats as a Git project. Combwork does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1)."
+    "description": "A notice: another version control system ({vcs}: Mercurial, Subversion…) was found in a project Combwork treats as a Git project. Combwork does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1)."
   },
   "service.workspace.platformRepositoryGone": {
     "defaultMessage": "{project}'s Git repository is gone. Git's rules hold, so its cards can't move on until the repository is back or you switch the project to None in its Version Control tab.",

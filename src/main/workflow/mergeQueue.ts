@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'orig
 import { tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
-import { onOutputSettled, withLauncherEnv } from '../gitWorker'
+import { gitEnv, onOutputSettled } from '../gitWorker'
 import { gitExe } from '../gitTool'
 import { treeEnding } from '../processTree'
 import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, type CardState, type Fact, type FactData, type FocusedReturn, type IntegrationFailReason, type PublishFact, type QueueEntry } from '../../shared/workflow/facts'
@@ -41,8 +41,6 @@ import { again, isAgain } from '../platform/again'
 import type { Again, BegunAdvance, CandidateFail, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, PublishReply, QueueGitOptions, QueueGitResult, TransportSnapshot } from '../platform/integration'
 import type { TransportStore } from './transportSnapshots'
 import { integrationFor, queueIntegration } from '../platform/integrationPorts'
-// Git's commit reading (HI-2790: moved to the platform with the candidate steps), named here for its tests.
-export { commitFailed, readCommitStream, type CommitChild, type CommitStream } from '../platform/gitCommits'
 import type { ConflictsRecord } from '../../shared/workflow/conflicts'
 import { bracketEnd, bracketStart } from './queueChecks'
 import { CW_RUNS } from '../progress'
@@ -439,7 +437,7 @@ export function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Pro
     let child: ChildProcess
     try {
       const use = gitExe()
-      child = spawn(use.exe, [...GIT_PREFIX, ...args], { cwd, env: use.launcherEnv ? withLauncherEnv(opts.env ?? process.env, use.launcherEnv) : opts.env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+      child = spawn(use.exe, [...GIT_PREFIX, ...args], { cwd, env: gitEnv(opts.env, use.launcherEnv), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     } catch (e) {
       // HI-2020: a start that failed at once ran nothing.
       return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1, notRun: String((e as NodeJS.ErrnoException).code ?? 'error') })
@@ -627,9 +625,13 @@ export class MergeQueue {
     // choice carried to the cards waiting first. Still to be chosen with no question open (answered in words, say):
     // lifted too, so the next entry asks again.
     if (p?.reason === 'mergeChoice' && (!(await this.mergeAsked()) || !this.asking(p.card)) && (await this.fenced(target, () => this.chosen(target, p.card)).catch(lostIsNull))) return this.runOnce(target)
-    // G20 (HI-1367): lifted once its skipped focused tests are decided (the reviewer's answer or the user's); the entry is
-    // tested again from its test merge and takes that decision (`skipDecided`).
-    if (p?.reason === 'focusedSkip' && !this.skipAsking(p.card) && (await this.wf.locked(() => this.wf.store.clearQueuePause(target, 'focusedSkip')))) return this.runOnce(target)
+    // G20 (HI-1367): lifted once its skipped focused tests are decided (the reviewer's answer or the user's). Approved for
+    // the entry's latest focused run, it advances on that test merge and its checks (HI-3564: `skipResumed`); otherwise
+    // the entry is tested again from its test merge and takes that decision (`skipDecided`).
+    if (p?.reason === 'focusedSkip' && !this.skipAsking(p.card)) {
+      const o = await this.fenced(target, () => this.skipResumed(target, p.card)).catch(lostIsNull)
+      return o === 'again' ? this.runOnce(target) : o
+    }
     // G21 (HI-1183): an unknown publication waits for the user's answer (Resume verifies it again, below).
     if (p?.reason === 'publishUnknown') return this.fenced(target, () => this.publishAnswered(target, p.card)).catch(lostIsNull)
     if (p || this.cfg.teamPaused?.()) return null
@@ -2128,6 +2130,27 @@ export class MergeQueue {
     const asked = Object.values(s.made).filter((r) => r.gate === FOCUSED_SKIP_GATE && r.entry === entry.id && r.revision === bound.expected && r.result === bound.tree && (r.tests ?? []).slice().sort().join('\n') === tests)
     const a = s.approvals.findLast((x) => asked.some((r) => r.request === x.request))
     return a ? (a.answer === 'approved' ? 'approved' : 'declined') : null
+  }
+
+  /**
+   * HI-3564: the skip pause lifted once nothing is asked. Its approval of the entry's latest focused run (the request's
+   * target head, and its merged tree that run's result's) resumes at once on that test merge, its checks all run (the
+   * focused tests are the last), as Ask each time's approved advance does (`ready`): the last checks before the advance
+   * still apply, and a target moved since is tested again. Declined, unmatched, or no longer the open entry: 'again', the
+   * entry tested from its test merge as before. Follow mode's `ready` needs a kept snapshot no skip leaves, so it is too.
+   */
+  private async skipResumed(target: string, key: string): Promise<QueueOutcome | 'again' | null> {
+    const card = this.wf.store.cardByKey(key)
+    const s = card ? this.wf.state(card) : null
+    const e = s ? openEntry(s) : undefined
+    const run = s && e ? s.checks.filter((c) => c.name === FOCUSED_CHECK && c.entry === e.id).at(-1) : undefined
+    const asked = s && e ? Object.values(s.made).filter((r) => r.gate === FOCUSED_SKIP_GATE && r.entry === e.id).at(-1) : undefined
+    const approved = !!asked && s!.approvals.findLast((a) => a.request === asked.request)?.answer === 'approved'
+    const tree = card && run && approved && run.result === 'passed' && run.counted ? await this.history(card).treeOf(this.cfg.folder, run.revision) : null
+    const ready = card && e && e.target === target && run && asked?.revision && tree && asked.result === tree ? { expected: asked.revision, result: run.revision } : undefined
+    if (!(await this.wf.locked(() => this.wf.store.clearQueuePause(target, 'focusedSkip')))) return null
+    if (!ready) return 'again'
+    return this.thenPush(target, await this.process(card!, e!, ready))
   }
 
   /**

@@ -84,7 +84,8 @@ const LAST_IGNORED_MAX = 500
 /** Folders whose listing failed to check what is ignored: a re-list pending, and how many in a row so far. */
 const relists = new Map<string, { pending: boolean; count: number }>()
 export const RELIST_MAX = 3
-const RELIST_MS = 500
+/** A re-list's delay (exported for tests: a failing look outlasts it, HI-3577). */
+export const RELIST_MS = 500
 
 function rememberIgnored(key: string, ignored: Map<string, IgnoreRule>): void {
   relists.delete(key)
@@ -379,7 +380,7 @@ export function watchProject(projectPath: string): void {
     entry.w = watch(projectPath, { recursive: true }, (_evt, file) => {
       if (!file) return
       const rel = String(file).split(sep).join('/')
-      // A platform's own folder (`.git`, and jj's `.jj`, whose every command writes there: HI-2800).
+      // A version control's own folder (`.git`…: METADATA_DIRS).
       if (inMetadataDir(rel)) return
       // An install writes thousands of files there; the tree shows the folder itself.
       if (rel.startsWith('node_modules/') || rel.includes('/node_modules/')) return

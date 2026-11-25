@@ -12,10 +12,13 @@ interface CombworkMessageValues {
   'main.accounts.noHome': { cli: string | number; folder: string | number }
   'main.accounts.noName': undefined
   'main.accounts.noProvider': { cli: string | number }
+  'main.accounts.noSandboxSetUp': { cli: string | number }
   'main.accounts.notFound': undefined
   'main.accounts.nothingToKeep': { name: string | number }
   'main.accounts.removeFailed': { name: string | number; error: string | number }
   'main.accounts.running': { name: string | number }
+  'main.accounts.sandboxNoAccount': { cli: string | number }
+  'main.accounts.sandboxSetAlready': { cli: string | number }
   'main.accounts.serverOnly': { cli: string | number }
   'main.accounts.setUpCancelled': { name: string | number }
   'main.accounts.usageMove.bad': undefined
@@ -366,6 +369,13 @@ interface CombworkMessageValues {
   'main.server.url.remoteHttp': undefined
   'main.server.url.scheme': undefined
   'main.server.url.userinfo': undefined
+  'main.slots.detachFailed.message': { said: string; error: string | number; target: string | number; slot: string | number; folder: string | number; command: string | number }
+  'main.slots.detachFailed.title': { slot: string | number; target: string | number }
+  'main.slots.leftDirty.message': { card: string | number; why: string; folder: string | number; slot: string | number }
+  'main.slots.leftDirty.title': { slot: string | number }
+  'main.slots.operation.message': { slot: string | number; folder: string | number; command: string | number }
+  'main.slots.operation.open': undefined
+  'main.slots.operation.title': { slot: string | number; what: string | number }
   'main.storage.claimed': undefined
   'main.storage.launchInUse': undefined
   'main.storage.noLonger': { path: string | number }

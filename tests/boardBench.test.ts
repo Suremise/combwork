@@ -2,6 +2,7 @@
 // compare before and after a change): CW_BOARD_BENCH_DB=<a combwork.db> copies it (with its -wal) into tempDir() (the file
 // itself is never opened), upgrades the copy and prints the median of each. Skipped without it. It uses only the board's
 // public calls, so the same file runs on an older commit for the "before".
+// focused: opt-in (HI-3558: skipped without CW_BOARD_BENCH_DB, so the focused-test picker leaves it out)
 import { copyFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -30,7 +31,7 @@ afterAll(async () => {
 })
 
 describe('the board on a real board’s copy', () => {
-  it.skipIf(!source)('reads and writes, timed', { timeout: timing('test.hangRealJj') }, async () => {
+  it.skipIf(!source)('reads and writes, timed', { timeout: timing('test.hangRealLong') }, async () => {
     const ws = join(base, 'ws')
     mkdirSync(join(ws, '.combwork'), { recursive: true })
     const file = join(ws, '.combwork', 'combwork.db')

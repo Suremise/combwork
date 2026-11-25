@@ -35,7 +35,7 @@ const SAMPLE: RefusalValues = {
   onArg: 'main',
   start: 'a3f2c1d4e5f60718293a4b5c6d7e8f9012345678',
   // platform.changed (HI-2799): the version control the project uses now.
-  platform: 'jj',
+  platform: 'None',
   revision: 'a3f2c1d',
   reason: 'waits for the design',
   waitsFor: 'AM-3',
@@ -85,13 +85,13 @@ const SAMPLE: RefusalValues = {
   // platform.detachedFolder (HI-3104): the branch to check out, found ('no', none it could name, is rendered on its own below).
   has: 'yes',
   branch: 'main',
-  // platform.keptAcross, platform.keptElsewhere (HI-3069): the kept slot, the version control now, its folder there.
+  // A slot's name, the version control now, a folder there: values other refusals' tests share.
   slot: 'slot-b',
   now: 'Git',
   gone: 'no',
   // platform.slotLeft: whether Combwork could tell the slot is still the card's.
   unknown: 'no',
-  // platform.jjRefused: what jj's check found (its forms are its own test's).
+  // Values a refusal's message may name beside these.
   count: 2,
   setting: 'none()',
   base: 'a3f2c1d',
@@ -122,6 +122,8 @@ const SAMPLE: RefusalValues = {
   // done.noCodeUnmerged (HI-3410): the first commits its line has that its target lacks, and how many more.
   commits: 'a1b2c3d The driver; e4f5a6b Its tests',
   more: 1,
+  // platform.prNeedsSlot (HI-3551): the pull request's number.
+  number: '7',
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',
   cause: 'passes',
@@ -219,18 +221,6 @@ describe('the workflow text in every locale', () => {
       expect(b.next, code).toContain('git switch cw/b1')
       expect(c.next, code).toContain(`git switch -c cw/b1 ${start}`)
       expect(c.next, code).not.toBe(b.next)
-    }
-  })
-
-  it("renders platform.jjRefused's unbound by its {state} in every locale: pending says to end the turn, held repeats the hold's own sentence, other is today's (HI-3115)", async () => {
-    const told = 'AM-12 waits for slot-a: jj new 0123abcd keeps them where they are.'
-    const of = (state: string) => refusalLines('platform.jjRefused', { card: 'AM-12', why: 'unbound', state, told }, WINDOW)
-    for (const code of LOCALES) {
-      setLanguage(code, await loadCatalogue(code), code)
-      const [pending, held, other] = [of('pending'), of('held'), of('other')]
-      for (const line of [pending.message, pending.next, held.message, held.next, other.message, other.next]) expect(line, code).not.toMatch(/[{}]/)
-      expect(held.next, code).toBe(told)
-      expect(pending.next, code).not.toBe(other.next)
     }
   })
 

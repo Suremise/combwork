@@ -18,7 +18,7 @@ import { decomposeCard, writeCardRows } from '../src/main/schema/cardRows'
 import { CARDS_STEP } from '../src/main/schema/v1_0'
 
 const require = createRequire(import.meta.url)
-const { citedBy, findBoard, readCards, evidence, freshFolder, clearDir, finishSuiteDir, recordKept, releaseKept, claimedByRuns, MAX_COPIES } = require('./e2e/evidence.cjs')
+const { boardAt, boardFor, citedBy, evidenceFor, findBoard, noBoardRefusal, readCards, evidence, freshFolder, clearDir, finishSuiteDir, recordKept, releaseKept, claimedByRuns, MAX_COPIES } = require('./e2e/evidence.cjs')
 const { probeDir } = require('./e2e/lib.cjs')
 const { pruneResults, saveBaseline } = require('./scenarios/benchmark.cjs')
 
@@ -288,7 +288,6 @@ describe('the clean-up (clean.mjs)', () => {
     const m = machine()
     tree(m.root, {
       'agy-probe/User/settings.json': 30,
-      'tools/jj/jj.exe': 30,
       'copilot-1.0.106/bin/copilot.exe': 30,
       'copilot-1.0.107/bin/copilot.exe': 30,
       'opencode-2.2.6/opencode.exe': 30,
@@ -300,7 +299,7 @@ describe('the clean-up (clean.mjs)', () => {
     })
     const items = plan({ root: m.root, days: 0, ev: rules(m.root, m.cards) })
     const item = (rel: string) => items.find((i: { rel: string }) => i.rel === rel)
-    for (const rel of ['agy-probe', 'tools', 'copilot-1.0.106', 'copilot-1.0.107', 'opencode-2.2.6', 'codex-home-locks', 'codex', 'claude', 'config.json']) {
+    for (const rel of ['agy-probe', 'copilot-1.0.106', 'copilot-1.0.107', 'opencode-2.2.6', 'codex-home-locks', 'codex', 'claude', 'config.json']) {
       expect(item(rel)?.remove, rel).toBe(false)
       expect(item(rel)?.why, rel).toBe(keptWhy(rel))
     }
@@ -310,7 +309,7 @@ describe('the clean-up (clean.mjs)', () => {
     for (const rel of ['agy-probe-work', 'copilot-probe', 'opencode-2.2.6.zip']) expect(item(rel)?.remove, rel).toBe(true)
     // And clean() leaves them, even at --days 0.
     const r = await run(m, { days: 0 })
-    for (const p of ['agy-probe/User/settings.json', 'tools/jj/jj.exe', 'copilot-1.0.106/bin/copilot.exe', 'copilot-1.0.107/bin/copilot.exe', 'opencode-2.2.6/opencode.exe', 'codex-home-locks']) expect(there(m.root, p), p).toBe(true)
+    for (const p of ['agy-probe/User/settings.json', 'copilot-1.0.106/bin/copilot.exe', 'copilot-1.0.107/bin/copilot.exe', 'opencode-2.2.6/opencode.exe', 'codex-home-locks']) expect(there(m.root, p), p).toBe(true)
     expect(r.removed.map((x: { rel: string }) => x.rel)).toEqual(expect.arrayContaining(['agy-probe-work', 'copilot-probe', 'opencode-2.2.6.zip']))
   })
 
@@ -385,6 +384,98 @@ describe('the clean-up (clean.mjs)', () => {
     expect(why('tmp/cw-git-new-y')).toBe('newer than 1 day')
     expect(why('tmp')).toBe(undefined)
     expect(why('codex')).toMatch(/^the Codex test home/)
+  })
+})
+
+describe('a checkout outside the workspace (HI-3514): it names the board, or under CW_TEST_NO_BOARD=1 a run removes only what it made', () => {
+  /** An export (no git, no board above it), a workspace whose board cites one folder, and a combwork-test with old things. */
+  function outside() {
+    const exported = temp('cw-clean-export-')
+    const ws = temp('cw-clean-ws-')
+    const tasks = join(ws, '.combwork', 'tasks')
+    mkdirSync(tasks, { recursive: true })
+    const write = (n: number, c: object) => writeFileSync(join(tasks, `${n}.json`), JSON.stringify({ number: n, title: 't', description: '', comments: [], column: 'todo', ...c }))
+    write(1, { description: 'the screenshot: combwork-test\\e2e\\review20-cited\\shot.png' })
+    write(2, { column: 'done', description: 'combwork-test\\e2e\\review21-done\\shot.png' })
+    writeFileSync(join(tasks, 'board.json'), '{"next":3}')
+    const root = temp('cw-clean-root-')
+    tree(root, { 'e2e/review20-cited/shot.png': 10, 'e2e/review21-done/shot.png': 10, 'e2e/review22-probe/': 10, 'e2e/lanes/0/about/about-profile/x': 10 })
+    return { exported, ws, tasks, root, lanesDir: join(root, 'e2e-lanes') }
+  }
+  const sweep = (o: ReturnType<typeof outside>, ev: Ev) => clean({ root: o.root, lanesDir: o.lanesDir, ev, alive: () => false, owner: 777 })
+  const gone = (r: { removed: { rel: string }[] }) => r.removed.map((x) => x.rel).sort()
+  const there = (root: string, p: string) => existsSync(join(root, p))
+
+  it('CW_TEST_BOARD names the board by its workspace, .combwork folder, database or cards folder; it wins over CW_TEST_NO_BOARD', () => {
+    const o = outside()
+    for (const named of [o.ws, join(o.ws, '.combwork'), o.tasks]) expect(boardFor(o.exported, { CW_TEST_BOARD: named }).tasksDir).toBe(o.tasks)
+    expect(boardFor(o.exported, { CW_TEST_BOARD: o.ws, CW_TEST_NO_BOARD: '1' })).toEqual({ tasksDir: o.tasks, missing: undefined })
+    // The database first, as findBoard: a moved board's stub folder never counts.
+    writeFileSync(join(o.ws, '.combwork', 'combwork.db'), '')
+    const db = join(o.ws, '.combwork', 'combwork.db')
+    for (const named of [o.ws, join(o.ws, '.combwork'), db]) expect(boardAt(named)).toBe(db)
+    expect(boardAt(join(o.ws, 'nothing-here'))).toBe(null)
+  })
+
+  it('an export given the board keeps what an open card cites through housekeeping, and removes the rest', async () => {
+    const o = outside()
+    // Without it the export has no board: nothing may go, and the runners refuse, naming CW_TEST_BOARD first.
+    const none = evidenceFor(o.exported, { since: Date.now(), testRoot: o.root }, {})
+    expect(none.ok).toBe(false)
+    expect(noBoardRefusal(none.why)).toMatch(/set CW_TEST_BOARD to the workspace folder.*Only where no Combwork board cites test output.*CW_TEST_NO_BOARD=1/)
+    const r = await sweep(o, evidenceFor(o.exported, { since: Date.now(), testRoot: o.root }, { CW_TEST_BOARD: o.ws }))
+    expect(gone(r)).toEqual(['e2e/lanes/0/about', 'e2e/review21-done', 'e2e/review22-probe'])
+    expect(there(o.root, 'e2e/review20-cited/shot.png')).toBe(true)
+    expect(r.items.find((i: { rel: string }) => i.rel === 'e2e/review20-cited').why).toBe('cited by #1')
+    for (const p of ['e2e/review21-done', 'e2e/review22-probe', 'e2e/lanes/0/about']) expect(there(o.root, p), p).toBe(false)
+  })
+
+  it('both runners read the board this way, from their start, and refuse naming CW_TEST_BOARD first', () => {
+    for (const runner of ['e2e/run.mjs', 'scenarios/run.mjs']) {
+      const src = readFileSync(join(__dirname, runner), 'utf8')
+      expect(src, runner).toMatch(/evidenceFor\([^\n]*\{ since: Date\.now\(\) \}\)/)
+      expect(src, runner).toContain('console.error(noBoardRefusal(evidence.why))')
+      expect(src, runner).not.toMatch(/process\.env\.CW_TEST_NO_BOARD/)
+    }
+  })
+
+  it('a named place with no board in it: nothing may go, saying so', async () => {
+    const o = outside()
+    const ev = evidenceFor(o.exported, { since: Date.now(), testRoot: o.root }, { CW_TEST_BOARD: join(o.ws, 'nothing-here') })
+    expect(ev.ok).toBe(false)
+    expect(ev.why).toMatch(/^CW_TEST_BOARD \(.*nothing-here\) names no board/)
+    const r = await sweep(o, ev)
+    expect(r.removed).toEqual([])
+    expect(r.blocked).toBe(ev.why)
+    for (const p of ['e2e/review20-cited', 'e2e/review21-done', 'e2e/review22-probe', 'e2e/lanes/0/about']) expect(there(o.root, p), p).toBe(true)
+  })
+
+  it('under CW_TEST_NO_BOARD=1 a run removes only what it made; npm run test:clean (no run start) removes the stale rest', async () => {
+    const o = outside()
+    const made = Math.max(...['e2e/review20-cited', 'e2e/review21-done', 'e2e/review22-probe', 'e2e/lanes/0/about'].map((p) => lstatSync(join(o.root, p)).birthtimeMs))
+    while (Date.now() <= made) {
+      // The run starts after the older things were made (a millisecond at most).
+    }
+    const since = Date.now()
+    const ev = evidenceFor(o.exported, { since, testRoot: o.root }, { CW_TEST_NO_BOARD: '1' })
+    expect(ev.ok).toBe(true)
+    // Windows stamps a new file's birth from a coarser clock than Date.now(), up to a tick behind (so the run's first
+    // moments' things read as older and stay: the safe side): its own things are made once a new file is stamped after since.
+    const stamps = temp('cw-clean-stamp-')
+    writeFileSync(join(stamps, '0'), '')
+    for (let n = 0; lstatSync(join(stamps, String(n))).birthtimeMs < since; n++) writeFileSync(join(stamps, String(n + 1)), '')
+    // The run's own leftovers, dated as old (their birth is the run's): they may go.
+    tree(o.root, { 'e2e/review23-mine/x.png': 10, 'e2e/lanes/0/plan/x': 10 })
+    const r = await sweep(o, ev)
+    expect(gone(r)).toEqual(['e2e/lanes/0/plan', 'e2e/review23-mine'])
+    for (const p of ['e2e/review20-cited/shot.png', 'e2e/review21-done', 'e2e/review22-probe', 'e2e/lanes/0/about/about-profile/x']) expect(there(o.root, p), p).toBe(true)
+    expect(r.items.find((i: { rel: string }) => i.rel === 'e2e/review22-probe').why).toMatch(/^made before this run \(CW_TEST_NO_BOARD=1/)
+    // A suite's earlier folder from another run stays: the run takes the next copy.
+    expect(freshFolder(join(o.root, 'e2e', 'lanes', '0', 'about'), ev)).toBe(join(o.root, 'e2e', 'lanes', '0', 'about-2'))
+    expect(there(o.root, 'e2e/lanes/0/about/about-profile/x')).toBe(true)
+    // Asked for by name, with no board to cite anything, the clean-up removes what is stale.
+    const asked = await sweep(o, evidenceFor(o.exported, { testRoot: o.root }, { CW_TEST_NO_BOARD: '1' }))
+    expect(gone(asked)).toEqual(['e2e/lanes/0/about', 'e2e/lanes/0/about-2', 'e2e/review20-cited', 'e2e/review21-done', 'e2e/review22-probe'])
   })
 })
 

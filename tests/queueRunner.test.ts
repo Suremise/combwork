@@ -21,7 +21,7 @@ import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunn
 import { windowsProbe, type Listed, type ProcessProbe } from '../src/main/workflow/queueProcs'
 import { commit, gitRepo, moved, R1, B1, setup, sh, type Env } from './workflow/harness'
 import { preset } from '../src/shared/workflow/options'
-import { quoteArgMsvc } from '../src/main/platform/signerRules'
+import { quoteArgMsvc } from '../src/main/signer/signerRules'
 import { timing } from './timing.cjs'
 
 // HI-3009: PowerShell started with spawnSync (endTree's blocking listing and ending), recorded; everything else as it is.

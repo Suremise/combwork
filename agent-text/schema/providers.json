@@ -91,7 +91,25 @@
   "providers.codex.sandbox.needed": {
     "placeholders": {}
   },
+  "providers.codex.sandbox.neededFor": {
+    "placeholders": {
+      "n": "plural",
+      "names": "plain"
+    }
+  },
+  "providers.codex.sandbox.noAccount": {
+    "placeholders": {}
+  },
   "providers.codex.sandbox.nonAdminUsed": {
+    "placeholders": {}
+  },
+  "providers.codex.sandbox.nonAdminUsedBy": {
+    "placeholders": {
+      "n": "plural",
+      "names": "plain"
+    }
+  },
+  "providers.codex.sandbox.openConnections": {
     "placeholders": {}
   },
   "providers.codex.sandbox.setUpAction": {

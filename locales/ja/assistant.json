@@ -693,6 +693,7 @@
   "assistant.undo.askTitle": "{n, plural, other {#件の変更を元に戻しますか？}}",
   "assistant.undo.card": "{card}：{fields}",
   "assistant.undo.changed": "{fields}はその後変更済み",
+  "assistant.undo.confirm": "元に戻す",
   "assistant.undo.dismiss": "元に戻した結果を閉じる",
   "assistant.undo.ended": "レーンは終了しています",
   "assistant.undo.error": "失敗：{error}",

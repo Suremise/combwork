@@ -1,5 +1,5 @@
 // Merge guards (HI-3284, design HI-3284/s16): the shape and bounds a save takes, the globs, the unified-diff parser over
-// recorded Git and jj output (tests/fixtures/mergeGuards), the matching (added lines only, whole lines, flags, paths),
+// recorded Git output (tests/fixtures/mergeGuards), the matching (added lines only, whole lines, flags, paths),
 // the report for agents, the example guard's pattern, and the worker: a runaway pattern ends at its time limit naming
 // the guard, the empty-match rule at a save, and a read that fails or is too large is incomplete, never a pass.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -37,7 +37,7 @@ import { tr } from '../src/shared/i18n'
 import { takesOption } from '../src/shared/workflow/options'
 import { tempDir } from './tempDir'
 import { freshGitRepo, sh } from './workflow/harness'
-import { addedDiff } from '../src/main/platform/git'
+import { addedDiff } from '../src/main/gitCommands'
 import { timing } from './timing.cjs'
 
 const fixture = (name: string): string => readFileSync(join(__dirname, 'fixtures', 'mergeGuards', name), 'utf8')
@@ -52,8 +52,8 @@ const files = (d: string): AddedFile[] => {
 // budget a loaded runner outlasts (HI-3349).
 const HUNG_MS = timing('wait.hang')
 
-describe('the diff parser (recorded git 2.56.0 and jj 0.47.1 output)', () => {
-  // The same change both tools describe: an added line, a deleted file, a binary change, a non-ASCII name with a space,
+describe('the diff parser (recorded git 2.56.0 output)', () => {
+  // The change it describes: an added line, a deleted file, a binary change, a non-ASCII name with a space,
   // a CRLF file, a new file, a line without its final newline, a pure rename and an edited one.
   const expected = [
     { path: 'a.txt', lines: [{ n: 4, text: 'new secret line' }] },
@@ -64,7 +64,7 @@ describe('the diff parser (recorded git 2.56.0 and jj 0.47.1 output)', () => {
     { path: 'renedit2.txt', lines: [{ n: 6, text: 'added secret' }] }
   ]
 
-  it.each(['git-2.56.0-added.diff', 'jj-0.47.1-added.diff'])('reads only the added text lines of %s', (name) => {
+  it.each(['git-2.56.0-added.diff'])('reads only the added text lines of %s', (name) => {
     expect(files(fixture(name))).toEqual(expected)
   })
 

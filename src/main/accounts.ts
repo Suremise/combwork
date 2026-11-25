@@ -25,14 +25,14 @@ import { capturedText, combworkError, CombworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { connectionLoginChanged, forgetConnectionUsage, usageLogin } from './planUsage'
 import { childEnv, hasPty, killPty, ptyGone } from './ptyHost'
-import { connectionsManaged, testHomeSeam } from './connectionSeam'
+import { connectionsManaged, setAccountHomes, testHomeSeam } from './connectionSeam'
 import { hasProvider, provider } from './providers'
 import type { ProviderAccountsPart, TrustReading, TrustTarget } from './providers/types'
 import { trustRoot } from './platform/repoPorts'
-import { withoutAccountEnv } from './providers/common'
+import { shownIssues, withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
 import { accountInfo, cachedCatalogFor, modelCaps } from '../shared/models'
-import { openWorkspaces, setConnectionGuard, workspace, workspaceOf } from './workspace'
+import { contextWorkspace, openWorkspaces, setConnectionGuard, workspace, workspaceOf, type WorkspaceService } from './workspace'
 import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStore'
 import type { ServerOn } from './serverLaunch'
 import { coverageView } from './keyCoverage'
@@ -1887,8 +1887,136 @@ export function accountsView(check = false): ConnectionsView {
     return k && k.origin === originOf(a.server?.baseUrl ?? '') ? { key: { last4: k.last4, at: k.at } } : {}
   }
   const intro = !config.get().ui.connectionsIntroShown && !all.length ? providers.filter((p) => !testHome.includes(p)) : []
-  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), ...(hasProvider(a.provider) ? {} : { gone: true as const }), defaults: defaultsOf(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a), ...(setUpRead.has(a.id) ? { setUp: setUpRead.get(a.id) } : {}), ...trustOf(a) })), workspace: ws, testHome, masking: coverageView(), order: allAccounts().map((a) => a.id), homes: allAccounts().filter((a) => a.home), connectionRows: connectionRows() }
+  const readiness = accountsReadiness(providers.filter((p) => !testHome.includes(p)), ws, all)
+  return { ...(intro.length ? { intro } : {}), ...(readiness ? { readiness } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), ...(hasProvider(a.provider) ? {} : { gone: true as const }), defaults: defaultsOf(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a), ...(setUpRead.has(a.id) ? { setUp: setUpRead.get(a.id) } : {}), ...trustOf(a) })), workspace: ws, testHome, masking: coverageView(), order: allAccounts().map((a) => a.id), homes: allAccounts().filter((a) => a.home), connectionRows: connectionRows() }
 }
+
+// The folders an adapter reads across a CLI's accounts (HI-3490: Codex's sandbox fallback), in the one order.
+setAccountHomes((cli) => allAccounts().filter((a) => signInFolderOf(a, cli)).map((a) => accountFolder(a.id)))
+
+/** A sign-in account with a folder of Combwork's, of this CLI: the ones a CLI's own setup can run on (HI-3490). */
+const signInFolderOf = (a: Account | undefined, cli: ProviderId): a is Account => !!a && a.provider === cli && !isServer(a) && hasFolder(a) && !a.leftover
+
+/**
+ * Provider Setup's items about the accounts on in this workspace (HI-3490, ConnectionsView.readiness): each CLI whose
+ * accounts part reads a sandbox of their own, from the sign-in accounts on here (none on: one unnamed row, as an account
+ * with no setting of its own would be). Set up is offered while one of them isn't known to be signed out; else its button
+ * opens Accounts & Connections. Undefined when there are none.
+ */
+function accountsReadiness(providers: readonly ProviderId[], ws: ConnectionsView['workspace'], all: readonly Account[]): ConnectionsView['readiness'] {
+  const out: NonNullable<ConnectionsView['readiness']> = {}
+  for (const p of providers) {
+    const part = hasProvider(p) ? provider(p).accounts : undefined
+    if (!part?.accountSandbox || !part.accountSandboxReadiness || !providerService.info(p).found) continue
+    const on = (ws[p]?.on ?? []).map((id) => all.find((a) => a.id === id)).filter((a): a is Account => signInFolderOf(a, p))
+    const rows = on.length ? on.map((a) => ({ name: a.name, sandbox: part.accountSandbox!(accountFolder(a.id)) })) : [{ sandbox: part.accountSandbox(null) }]
+    // Set up is offered only where one it could run on isn't known to be signed out (HI-3490 round 1): the same
+    // candidates runSandboxSetUp tries, never a signed-in account that needs nothing.
+    const issues = part.accountSandboxReadiness(rows, sandboxCandidates(part, p, on).some((a) => a.observed?.loggedIn !== false))
+    if (issues.length) out[p] = shownIssues(issues)
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+/**
+ * Provider Setup's `setup` task on an account (HI-3490): Codex's own home is never signed in, so its sandbox setup runs on
+ * one of the CLI's sign-in accounts on in this workspace, in the one order: the first with no sandbox, else the first on
+ * the non-admin one. Only a positive sign-in starts the CLI there: one not known is checked first, and one signed out, or
+ * whose check can't tell, is passed over. None left: refused, saying where to sign one in. Under the account's lock and
+ * held as a launch is (claimAccount), so it isn't removed meanwhile; refused while the CLI's own check holds it. Returns
+ * the terminal's key.
+ */
+export async function runSandboxSetUp(cli: ProviderId): Promise<string> {
+  // One setup at a time: an open one is shown again, nothing new started or held.
+  if (hasPty(setUpKey(cli))) return setUpKey(cli)
+  const { homeEnv, accounts: part } = support(cli)
+  const sandboxOf = part.accountSandbox?.bind(part)
+  if (!sandboxOf || !part.accountSandboxSetUp) throw combworkError(NO_SANDBOX_SETUP, { cli: providerDescriptor(cli).name }, { kind: 'invalid' })
+  // The asking workspace, kept for the checks after each wait (its accounts read again then: HI-3490 round 1).
+  const asking = contextWorkspace() ?? workspace
+  const candidates = (): Account[] => sandboxCandidates(part, cli, onIn(asking, cli))
+  const order = candidates()
+  if (onIn(asking, cli).length && !order.length) throw combworkError(NOTHING_TO_SET_UP, { cli: providerDescriptor(cli).name }, { kind: 'conflict' })
+  for (const a of order) {
+    if (!(await signedInNow(a.id))) continue
+    // Still on there, still needing it, and its latest check positively signed in (round 2: one a check under way left
+    // unknown is passed over too), as read under its lock just before it starts; else the next.
+    const key = await sandboxSetUpOn(a.id, cli, homeEnv, () => candidates().some((c) => c.id === a.id) && getAccount(a.id)?.observed?.loggedIn === true)
+    if (key) return key
+  }
+  throw combworkError(NO_SIGNED_IN, { cli: providerDescriptor(cli).name }, { kind: 'conflict' })
+}
+
+/** The sign-in accounts of a CLI on in a workspace, as they are now (HI-3490), in the one order. */
+function onIn(ws: WorkspaceService, cli: ProviderId): Account[] {
+  const all = list()
+  return (workspaceAccounts(ws.path ? ws.config : null, cli, all)?.on ?? []).map((id) => all.find((a) => a.id === id)).filter((a): a is Account => signInFolderOf(a, cli))
+}
+
+/**
+ * The accounts a CLI's sandbox setup may run on (HI-3490), of those given, in the order it tries them: those with no
+ * sandbox, then those on the non-admin one. Others need nothing.
+ */
+function sandboxCandidates(part: ProviderAccountsPart, cli: ProviderId, on: readonly Account[]): Account[] {
+  const kinds = new Map(on.map((a) => [a.id, part.accountSandbox?.(accountFolder(a.id))]))
+  return [...on.filter((a) => !kinds.get(a.id)), ...on.filter((a) => kinds.get(a.id) === 'unelevated')].filter((a) => a.provider === cli)
+}
+
+/** Whether an account is signed in, by a positive answer only (HI-3490): its last check's, else a check made now. */
+async function signedInNow(id: string): Promise<boolean> {
+  const seen = getAccount(id)?.observed?.loggedIn
+  if (seen === true) return true
+  if (seen === false) return false
+  try {
+    return (await checkAccount(id))?.loggedIn === true
+  } catch {
+    return false
+  }
+}
+
+/** Starts the setup on one account, under its lock; null, nothing started, when `eligible` says no once its checks are done. */
+function sandboxSetUpOn(id: string, cli: ProviderId, homeEnv: string, eligible: () => boolean): Promise<string | null> {
+  return locked(id, async () => {
+    const a = mustGet(id)
+    await assertUsable(a)
+    assertNotHeld(a)
+    // After the last wait, nothing between this and the claim: turned off there, signed out or set up meanwhile, not started.
+    if (!eligible()) return null
+    const exe = providerService.info(cli).path
+    const cmd = exe && accountsPart(a)?.accountSandboxSetUp?.(exe, accountFolder(id))
+    if (!cmd) throw combworkError(NO_SANDBOX_SETUP, { cli: providerDescriptor(cli).name }, { kind: 'invalid' })
+    if (hasPty(setUpKey(cli))) return setUpKey(cli)
+    // Held as a launch holds it (claims): its removal is refused while the setup runs.
+    claims.set(id, (claims.get(id) ?? 0) + 1)
+    let released = false
+    const release = (): void => {
+      if (released) return
+      released = true
+      const n = (claims.get(id) ?? 1) - 1
+      if (n > 0) claims.set(id, n)
+      else claims.delete(id)
+    }
+    try {
+      log.info(`${providerDescriptor(cli).name} sandbox setup on account ${id}`)
+      return providerService.runAccountSetUp(cli, cmd, withoutAccountEnv(accountsPart(a) ?? null, childEnv({ [homeEnv]: accountFolder(id) })), () => {
+        release()
+        // Its sandbox read again in every window.
+        emit({ type: 'connections-changed' })
+      })
+    } catch (e) {
+      release()
+      throw e
+    }
+  })
+}
+
+const NO_SIGNED_IN = msg({ id: 'main.accounts.sandboxNoAccount', defaultMessage: '{cli} sets up its sandbox on one of your {cli} accounts, and none on in this workspace is signed in. Sign one in, or turn one on here, in Settings → Accounts & Connections.', description: "An error (HI-3490): Provider Setup's sandbox Set up for a coding agent CLI ({cli}: \"Codex\") found no account of it on in the workspace that is signed in, so it didn't start the CLI (it would only show its sign-in). Settings → Accounts & Connections names a section." })
+/** The provider's setup task's terminal (providerService.runTask's key for it). */
+const setUpKey = (cli: ProviderId): string => `task:${cli}:setup`
+providerService.sandboxSetUp = (cli) => runSandboxSetUp(cli)
+
+const NOTHING_TO_SET_UP = msg({ id: 'main.accounts.sandboxSetAlready', defaultMessage: "{cli}'s sandbox is already set up for every {cli} account on in this workspace.", description: "An error (HI-3490): Provider Setup's sandbox Set up for a coding agent CLI ({cli}: \"Codex\") was asked for, but every account of it on in the workspace already has its default sandbox." })
+const NO_SANDBOX_SETUP = msg({ id: 'main.accounts.noSandboxSetUp', defaultMessage: '{cli} has no sandbox setup on its accounts.', description: 'An error (HI-3490): a sandbox setup was asked of a coding agent CLI ({cli}: "Codex") that has none to run on an account.' })
 
 /** An account's defaults as today's screens show them (HI-2106, until HI-2107): its base connection's model, effort and context. */
 function defaultsOf(a: Account): ConnectionDefaults {

@@ -327,6 +327,7 @@ function helpers(h) {
     // --- HI-2556: 1.2.0 beside main, listed in the tab's Other branches work can merge into: it applies at once.
     git(alpha, 'branch', '1.2.0')
     const others = form.locator('.workflow-option[data-option="otherTargets"] input')
+    await lib.workflowTab(form, 'otherTargets')
     await others.fill('1.2.0')
     await others.press('Enter')
     await form.locator('[data-action="save"]').click()
@@ -756,6 +757,7 @@ async function gallery(h, kept) {
   await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
   await page.locator('.git-sections [data-section="workflow"]').click()
   const group = page.locator('.workflow-form .workflow-group[data-group="slots"]')
+  await lib.workflowTab(page.locator('.workflow-form'), 'where')
   await group.waitFor({ timeout: HUNG_MS })
   await group.scrollIntoViewIfNeeded()
   await shoot('slots-and-copies', { loc: group })

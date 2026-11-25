@@ -15,8 +15,6 @@ import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { NAMES_STEP } from './schema/namesStep'
 import { VALUES_STEP } from './schema/valuesStep'
-import { WORKSPACE_IDENTITY_STEP } from './schema/workspaceIdentityStep'
-import { JJ_PUBLISH_STEP } from './schema/jjPublishStep'
 import { REQUEST_RECEIPTS_STEP } from './schema/requestReceiptsStep'
 import { PROJECT_REVS_STEP } from './schema/projectRevsStep'
 import { QUEUE_REVS_STEP } from './schema/queueRevsStep'
@@ -356,22 +354,10 @@ export const BOARD_MIGRATIONS: Migration[] = [
     group: UPGRADE_GROUP_ID,
     up: (db) => addCommentArchive(db)
   },
-  {
-    // HI-2795 (jj's J2): slots' and copies' platform identity, and a copy lease's verification (schema/workspaceIdentityStep.ts).
-    // In the 1.0 group, as 25–27 are: every step outside it is 0.9's.
-    version: 28,
-    name: WORKSPACE_IDENTITY_STEP.name,
-    group: UPGRADE_GROUP_ID,
-    up: (db) => WORKSPACE_IDENTITY_STEP.up(db)
-  },
-  {
-    // HI-2882 (jj's J9b2): jj integrations' publish obligations, their per-target sequence and sweep, and the retained
-    // proof bundles (schema/jjPublishStep.ts). In the 1.0 group, as 25–28 are.
-    version: 29,
-    name: JJ_PUBLISH_STEP.name,
-    group: UPGRADE_GROUP_ID,
-    up: (db) => JJ_PUBLISH_STEP.up(db)
-  },
+  // Versions 28 and 29 change nothing: steps that keep a board's version sequence without a gap. In the 1.0 group, as
+  // 25–27 are.
+  { version: 28, name: 'no change', group: UPGRADE_GROUP_ID, up: () => {} }, // i18n-ignore: a schema step's name, recorded in schema_version
+  { version: 29, name: 'no change', group: UPGRADE_GROUP_ID, up: () => {} }, // i18n-ignore: a schema step's name, recorded in schema_version
   {
     // HI-3195: each keyed Agent API write's durable "applied" marker, saved in the write's transaction
     // (schema/requestReceiptsStep.ts, requestReceipts.ts). In the 1.0 group, as 25–29 are.
@@ -1509,6 +1495,30 @@ export function askWaitMarks(ws: WorkspaceService): { n: number; ref: string }[]
   return readSnapshot(ws, (b, db) => {
     const ask = `json_extract(${b.legacy ? 'doc' : 'extra'}, '$.waitingFor.ask')` // i18n-ignore: SQL
     return db.prepare(`SELECT number AS n, ${ask} AS ref FROM cards WHERE ${ask} IS NOT NULL`).all() as { n: number; ref: string }[] // i18n-ignore: SQL
+  })
+}
+
+/**
+ * HI-3553: the cards not archived whose GitHub source (kept in a card's extra) is a pull request of `owner/repo` on
+ * `host`: each card's number and the PR's. Names compared as GitHub does, case aside.
+ */
+export function prSourceCards(ws: WorkspaceService, repo: { host: string; owner: string; repo: string }): { n: number; pr: number }[] {
+  return readSnapshot(ws, (b, db) => {
+    const src = (path: string): string => `json_extract(${b.legacy ? 'doc' : 'extra'}, '$.source.${path}')` // i18n-ignore: SQL
+    const sql = `SELECT number AS n, ${src('number')} AS pr FROM cards WHERE archived = 0 AND ${src('kind')} = 'pr' AND lower(${src('host')}) = lower(?) AND lower(${src('owner')}) = lower(?) AND lower(${src('repo')}) = lower(?)` // i18n-ignore: SQL
+    return (db.prepare(sql).all(repo.host, repo.owner, repo.repo) as { n: number; pr: unknown }[]).filter((r) => Number.isInteger(r.pr)) as { n: number; pr: number }[]
+  })
+}
+
+/**
+ * HI-3555: the cards whose GitHub source is an issue of `owner/repo` on `host`: each card's number, the issue's, and
+ * whether the card is archived (an issue's import looks only at cards not archived; its close at publish at all).
+ */
+export function issueSourceCards(ws: WorkspaceService, repo: { host: string; owner: string; repo: string }): { n: number; issue: number; archived: boolean }[] {
+  return readSnapshot(ws, (b, db) => {
+    const src = (path: string): string => `json_extract(${b.legacy ? 'doc' : 'extra'}, '$.source.${path}')` // i18n-ignore: SQL
+    const sql = `SELECT number AS n, ${src('number')} AS issue, archived FROM cards WHERE ${src('kind')} = 'issue' AND lower(${src('host')}) = lower(?) AND lower(${src('owner')}) = lower(?) AND lower(${src('repo')}) = lower(?)` // i18n-ignore: SQL
+    return (db.prepare(sql).all(repo.host, repo.owner, repo.repo) as { n: number; issue: unknown; archived: number }[]).filter((r) => Number.isInteger(r.issue)).map((r) => ({ n: r.n, issue: r.issue as number, archived: !!r.archived }))
   })
 }
 

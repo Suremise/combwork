@@ -1,4 +1,4 @@
-// Submodules and Git LFS in the folders Combwork makes (HI-1182, src/main/platform/gitModules.ts): with real git and,
+// Submodules and Git LFS in the folders Combwork makes (HI-1182, src/main/platform/git/gitModules.ts): with real git and,
 // where installed, real git-lfs (skipped, and said, when missing). Each fixture is one HR2 asked for in the design
 // (HI-1182/s10–s16): the shared .git/config, the main checkout and its .git/modules left byte for byte as they were; a URL
 // override used and kept; two worktrees at different gitlinks prepared at once; active=false and update=none over empty
@@ -12,9 +12,9 @@ import { createRequire } from 'module'
 import { join } from 'path'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
-import { clearSubmoduleCheckouts, composeConfigEnv, forgetGitLfsVersion, gitFilesNeeded, gitFilesUse, insidePath, prepareGitFiles, resolveSubmoduleUrl, type GitFilesExec } from '../src/main/platform/gitModules'
-import { gitFilesExec } from '../src/main/platform/gitModulesRun'
-import { gitIntegration } from '../src/main/platform/gitIntegration'
+import { clearSubmoduleCheckouts, composeConfigEnv, forgetGitLfsVersion, gitFilesNeeded, gitFilesUse, insidePath, prepareGitFiles, resolveSubmoduleUrl, type GitFilesExec } from '../src/main/platform/git/gitModules'
+import { gitFilesExec } from '../src/main/platform/git/gitModulesRun'
+import { gitIntegration } from '../src/main/platform/git/gitIntegration'
 import type { CandidateHost } from '../src/main/platform/integration'
 import { timing } from './timing.cjs'
 

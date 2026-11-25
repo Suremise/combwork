@@ -29,7 +29,7 @@ export const EMPTY_CHECK_MS = 10_000
 export const WORKER_START_MS = 30_000
 
 /** A check's outcome: its report, and whether an incomplete one was the environment's (a read that failed: tried again). */
-export type GuardsOutcome = GuardReport & { transient?: boolean }
+type GuardsOutcome = GuardReport & { transient?: boolean }
 
 /**
  * Why a worker gave no answer: its time limit (with the guard it was on), a cancel, or it failed or couldn't start

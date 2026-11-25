@@ -184,6 +184,10 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const hide = page.getByRole('checkbox', { name: 'Hide finished' })
     await until(async () => (await hide.count()) === 1, HUNG_MS)
     if (await hide.isChecked()) await hide.click()
+    // Its work shows once it is picked in the strip (HI-3568: the shared view lists each agent's Now in a row).
+    const codexRing = page.locator(`.activity-tab:not(.activity-workspace) .activity-map-ring[data-agent="${codex.id}"]`)
+    await until(async () => (await codexRing.count()) === 1, HUNG_MS)
+    if ((await codexRing.getAttribute('aria-pressed')) !== 'true') await codexRing.click()
     check('Activity shows "Model changed" for the agent', !!(await until(async () => (await page.locator('[data-model-switch="yes"]', { hasText: /Model changed: GPT-6 Astra → GPT-6 Luna/i }).count()) >= 1, HUNG_MS)), (await page.locator('.activity-part').allInnerTexts()).join(' | ').slice(0, 600))
     await page.screenshot({ path: path.join(lib.WORK, 'codexnudge-activity.png') })
 

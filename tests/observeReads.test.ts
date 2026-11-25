@@ -6,7 +6,7 @@ import { writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { readRepoRefs, type RepoRefs } from '../src/main/platform/repoRefs'
+import { readRepoRefs, type RepoRefs } from '../src/main/gitRefs'
 import { tempDir } from './tempDir'
 import { timing } from './timing.cjs'
 

@@ -57,6 +57,7 @@
   "shell.command.folderChanges.settle": "Hacer commit o apartar cambios",
   "shell.command.folderChanges.show": "Mostrar cambios sin commit",
   "shell.command.git.cancelRun": "Cancelar acción de Git",
+  "shell.command.git.openOperation": "Mostrar operación de Git sin terminar",
   "shell.command.help.about": "Acerca de {app}",
   "shell.command.help.agentSetup": "Configuración de proveedores…",
   "shell.command.help.api": "Referencia de la Agent API",

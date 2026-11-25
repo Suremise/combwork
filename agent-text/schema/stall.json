@@ -86,6 +86,12 @@
       "card": "plain"
     }
   },
+  "stall.loop.notWatchingUncounted": {
+    "placeholders": {
+      "agent": "plain",
+      "card": "plain"
+    }
+  },
   "stall.loop.wakeUntaken": {
     "placeholders": {
       "agent": "plain",

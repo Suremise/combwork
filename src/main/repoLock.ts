@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from 'async_hooks'
-import { existsSync } from 'original-fs'
 import { app } from 'electron'
 import { realpath } from 'original-fs/promises'
 import { basename, join } from 'path'
@@ -12,8 +11,7 @@ import { toast } from './events'
 import { fileLockDepth, withFileLock } from './fsutil'
 import { git } from './git'
 import { combworkError } from './combworkError'
-import { commonDirSync } from './platform/git'
-import { gitVeto } from './platform/repoBoundary'
+import { commonDirSync } from './gitCommands'
 import { createLogger, userText } from './logger'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { REPO_LOCK_FILE } from './repoLockCore'
@@ -136,12 +134,6 @@ const profile = (): string => {
  */
 export async function commonGitDir(folder: string): Promise<string> {
   const known = commonDirSync(folder)
-  // Never git's answer for a folder a nearer non-colocated `.jj` holds (HI-2896, s13 §1): git would name a repository
-  // above it, or none; an unreadable `.jj` is refused the same way.
-  // A `.git` read here with a `.jj` beside it is asked of the boundary too (HR1's round 1): a valid jj repository naming
-  // another store is unknown, not Git's.
-  const veto = known && !existsSync(join(folder, '.jj')) ? null : await gitVeto(folder)
-  if (veto) throw combworkError(msg({ id: 'git.repoLock.jjFolder', defaultMessage: "{folder} is in a jj repository that isn't colocated with Git, so Combwork didn't run git there: nothing was changed.", description: 'An error (HI-2896): a change that needs a Git repository was asked of a folder a jj (Jujutsu) repository with no Git working copy holds; git there would reach another repository or none. Keep jj and Git.' }), { folder }, { kind: 'conflict' })
   const r = known ? null : await git(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
   const dir = known ?? (r?.ok ? r.out.trim() : '')
   if (dir) return realpath(dir).catch(() => dir)
@@ -183,12 +175,12 @@ const owners = new AsyncLocalStorage<readonly StoreOwner[]>()
 /** The stores this async context holds now, by key (its live owners'). */
 export const heldStoreKeys = (): Set<string> => new Set((owners.getStore() ?? []).filter((o) => o.live).flatMap((o) => [...o.keys]))
 
-/** A store's key, as every take compares them (platformFence's storeKey: separators one way, case folded). */
+/** A store's key, as every take compares them: separators one way, case folded. */
 export const storeKeyOf = (store: string): string => store.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase()
 
 /**
- * Runs fn holding the repository locks of `stores` (each a Git dir: a common git dir, or jj's store), whatever platform
- * names them (s13 §2): each store once by its key (callers resolve real paths, as commonGitDir and J0 do), in the key's
+ * Runs fn holding the repository locks of `stores` (each a Git dir: a common git dir), whatever platform
+ * names them (s13 §2): each store once by its key (callers resolve real paths, as commonGitDir does), in the key's
  * order, so no two takers in this process or another wait on each other. A store this context already holds (a live
  * owner's) runs straight through. A nested take of a store ordered before one it holds can't wait (it would hold and wait
  * out of order): it takes the lock only if it is free at once, else refuses.
@@ -356,8 +348,7 @@ export async function withNamedLock<T>(dir: string, file: string, fn: () => Prom
 export async function withRepoLocks<T>(folders: readonly string[], fn: () => Promise<T>, opts: RepoLockOptions = {}): Promise<T> {
   const found: { store: string; folder: string }[] = []
   for (const f of folders) {
-    // A folder in no repository takes none; one a nearer non-colocated `.jj` holds is refused (HI-2896), never skipped.
-    if (!commonDirSync(f) && (await gitVeto(f))) await commonGitDir(f)
+    // A folder in no repository takes none.
     const dir = await commonGitDir(f).catch(() => null)
     if (dir) found.push({ store: dir, folder: f })
   }

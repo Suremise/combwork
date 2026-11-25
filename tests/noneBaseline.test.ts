@@ -9,12 +9,12 @@ import { join } from 'path'
 import { mkdirSync, writeFileSync } from 'fs'
 import { build } from 'esbuild'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { NoneAdapter } from '../src/main/platform/none'
+import { NoneAdapter } from '../src/main/platform/none/none'
 import { isUnknown, unknown } from '../src/main/platform/types'
 import { UNREADABLE } from '../src/shared/workflow/texts'
-import { endedLine, failedLine, readBaseline, useBaselineWorker, type BaselineThread } from '../src/main/noneBaseline'
+import { endedLine, failedLine, readBaseline, useBaselineWorker, type BaselineThread } from '../src/main/platform/none/noneBaseline'
 import { MARKED_LOG, redactLog, type RedactContext } from '../src/shared/redact'
-import { scanProject } from '../src/main/noneBaselineWorker'
+import { scanProject } from '../src/main/platform/none/noneBaselineWorker'
 import { tempDir } from './tempDir'
 import { timing } from './timing.cjs'
 
@@ -25,7 +25,7 @@ const tmp = tempDir('cw-none-baseline-')
 const bundle = join(tmp, 'none-baseline-worker.cjs')
 
 beforeAll(async () => {
-  await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'noneBaselineWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
+  await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'platform', 'none', 'noneBaselineWorker.ts')], outfile: bundle, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
 }, timing('hook.hang'))
 afterAll(() => void useBaselineWorker(null))
 

@@ -174,12 +174,13 @@ function readCards(tasksDir) {
  * the board can't be read), or null. Built from a board (tasksDir: its database or folder; null: none found, so nothing may go) or from
  * cards given (tests). Every protects() reads the board afresh (a few ms: only the cards that may cite, HI-2364), so a deletion is never authorised by
  * an older look: a card that cites something a moment before it would go keeps it. snapshot() reads it once, for
- * listing many things (the clean-up's plan), never for deleting.
+ * listing many things (the clean-up's plan), never for deleting. missing: why nothing may go when tasksDir is null.
+ * bornAfter (ms): anything made before it stays too (a run under CW_TEST_NO_BOARD=1 removes only what it made, HI-3514).
  */
-function evidence({ tasksDir, cards, testRoot = runContext.TEST_ROOT, label = 'combwork-test' } = {}) {
+function evidence({ tasksDir, cards, missing, bornAfter, testRoot = runContext.TEST_ROOT, label = 'combwork-test' } = {}) {
   const load = () => {
     if (cards) return { ok: true, cards }
-    if (!tasksDir) return { ok: false, why: "no board was found (the workspace's board in .combwork, up from this repository's main checkout)" }
+    if (!tasksDir) return { ok: false, why: missing ?? "no board was found (the workspace's board in .combwork, up from this repository's main checkout)" }
     return readCards(tasksDir)
   }
   /** Rules over one look (get: the cards, read when asked). */
@@ -199,6 +200,7 @@ function evidence({ tasksDir, cards, testRoot = runContext.TEST_ROOT, label = 'c
       // A folder on the way that is a link (a junction) would carry the deletion somewhere else.
       const link = linkOnTheWay(testRoot, p)
       if (link) return `reached through a link (${link})`
+      if (bornAfter !== undefined && madeBefore(p, bornAfter)) return 'made before this run (CW_TEST_NO_BOARD=1: with no board, a run removes only what it made)'
       const n = citedBy(rel.split(path.sep).join('/'), s.cards, safeList(p), label)
       return n === null ? null : `cited by #${n}`
     },
@@ -211,12 +213,70 @@ function evidence({ tasksDir, cards, testRoot = runContext.TEST_ROOT, label = 'c
   return rules(load)
 }
 
+/** Whether p (not followed if a link) was made before ms; gone: no. Where a file system keeps no birth time, its last change. */
+function madeBefore(p, ms) {
+  let st
+  try {
+    st = fs.lstatSync(p)
+  } catch (e) {
+    return e.code !== 'ENOENT' // Can't be looked at: kept.
+  }
+  return (st.birthtimeMs > 0 ? st.birthtimeMs : st.mtimeMs) < ms
+}
+
 /**
- * The evidence rules for the repository at root (its workspace's board). CW_TEST_NO_BOARD=1 says there is no board
- * whose cards could cite test output (a checkout outside a Combwork workspace): then nothing is evidence. Without it, no
- * board found means nothing may be deleted, and the runners won't start (#285: copies would pile up run after run).
+ * The board CW_TEST_BOARD names (HI-3514: a checkout outside the workspace, such as an export or a review copy, names the
+ * board whose cards cite test output): the workspace folder, its .combwork folder, its combwork.db, or a cards folder
+ * (.combwork\tasks, before the database). The database is looked for first, as findBoard does. null: none there.
  */
-const evidenceFor = (root, opts = {}, env = process.env) => (env.CW_TEST_NO_BOARD === '1' ? evidence({ cards: [], ...opts }) : evidence({ tasksDir: findBoard(root), ...opts }))
+function boardAt(named) {
+  const p = path.resolve(String(named))
+  const isFile = (f) => {
+    try {
+      return fs.statSync(f).isFile()
+    } catch {
+      return false
+    }
+  }
+  for (const db of [p, path.join(p, 'combwork.db'), path.join(p, '.combwork', 'combwork.db')]) if (db.toLowerCase().endsWith('.db') && isFile(db)) return db
+  for (const tasks of [p, path.join(p, 'tasks'), path.join(p, '.combwork', 'tasks')]) if (isFile(path.join(tasks, 'board.json'))) return tasks
+  return null
+}
+
+/**
+ * Where the evidence rules for the repository at root read the cards (evidence()'s board: { tasksDir, missing } or
+ * { cards }), by the environment: CW_TEST_BOARD names the board (it wins over CW_TEST_NO_BOARD: it protects more);
+ * CW_TEST_NO_BOARD=1 says no board's cards cite test output on this machine (noBoard: true, nothing is evidence);
+ * else the workspace's board, found up from root's main checkout.
+ */
+function boardFor(root, env = process.env) {
+  const named = env.CW_TEST_BOARD
+  if (named) {
+    const tasksDir = boardAt(named)
+    return { tasksDir, missing: tasksDir ? undefined : `CW_TEST_BOARD (${named}) names no board: name the workspace folder, its .combwork folder or its combwork.db` }
+  }
+  if (env.CW_TEST_NO_BOARD === '1') return { cards: [], noBoard: true }
+  return { tasksDir: findBoard(root) }
+}
+
+/**
+ * The evidence rules for the repository at root (boardFor: the board CW_TEST_BOARD names, else its workspace's). No board
+ * found means nothing may be deleted, and the runners won't start (#285: copies would pile up run after run).
+ * CW_TEST_NO_BOARD=1 says no board cites test output: then nothing is cited, and with since (a run's start, ms) nothing
+ * made before it may go either, so a run under a mistaken flag can't remove another run's evidence (HI-3514). Without
+ * since (npm run test:clean, asked for by name) it removes what is stale.
+ */
+function evidenceFor(root, { since, ...opts } = {}, env = process.env) {
+  const { noBoard, ...board } = boardFor(root, env)
+  return evidence({ ...board, ...(noBoard && since !== undefined ? { bornAfter: since } : {}), ...opts })
+}
+
+/**
+ * Why a runner doesn't start (why: the evidence rules' why): naming the board first, for a checkout outside the workspace
+ * (an export, a review copy), and CW_TEST_NO_BOARD=1 only where no board cites test output (HI-3514).
+ */
+const noBoardRefusal = (why) =>
+  `Can't tell what the tests may delete: ${why}. A checkout outside the workspace (an export, a review copy) names its board: set CW_TEST_BOARD to the workspace folder (or its .combwork\\combwork.db). Only where no Combwork board cites test output on this machine, set CW_TEST_NO_BOARD=1: a run then removes only what it made.`
 
 /**
  * The first folder between root and p (root and p themselves not counted) that is a link (a junction or a symlink), or
@@ -563,4 +623,4 @@ function claimedByRuns(logsRoots) {
   return out
 }
 
-module.exports = { AREAS, MAX_COPIES, KEPT_FILE, SUITE_FOLDER, suiteFolderTarget, linkOnTheWay, linkOnPath, isArea, pathText, mentions, citedBy, findBoard, readCards, evidence, evidenceFor, safeList, sizeOf, removeTree, freshFolder, clearDir, finishSuiteDir, recordKept, keptBy, releaseKept, claimedByRuns }
+module.exports = { AREAS, MAX_COPIES, KEPT_FILE, SUITE_FOLDER, suiteFolderTarget, linkOnTheWay, linkOnPath, isArea, pathText, mentions, citedBy, findBoard, boardAt, boardFor, readCards, evidence, evidenceFor, noBoardRefusal, safeList, sizeOf, removeTree, freshFolder, clearDir, finishSuiteDir, recordKept, keptBy, releaseKept, claimedByRuns }

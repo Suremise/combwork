@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { B1, B2, moved, put, refusedBy, setup, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { isRefusal } from '../../src/main/workflow/runtime'
-import { baselineThread } from '../../src/main/noneBaseline'
+import { baselineThread } from '../../src/main/platform/none/noneBaseline'
 import { timing } from '../timing.cjs'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -53,7 +53,7 @@ describe('a None start or submit waiting on its whole-project read (HI-2340)', (
     const e = none()
     const card = e.wf.createCard({ title: 'Excluded', paths: ['a.txt'] })
     const { p } = await heldStart(e, card.key)
-    e.wf.none.setExcluded(['big'])
+    e.wf.deliverables().setExcluded(['big'])
     baselineThread().release()
     moved(await p)
     const base = e.wf.state(card).started?.deliverables ?? {}
@@ -138,7 +138,7 @@ describe('a None start or submit waiting on its whole-project read (HI-2340)', (
     const card = e.wf.createCard({ title: 'Whole', paths: ['.'] })
     moved(await e.wf.start(card.key, B1))
     const rec = e.store.card(card.id)
-    const hashes = [vi.spyOn(e.wf.none, 'revision'), vi.spyOn(e.wf.none, 'manifest'), vi.spyOn(e.wf.none, 'deliverables')]
+    const hashes = [vi.spyOn(e.wf.deliverables(), 'revision'), vi.spyOn(e.wf.deliverables(), 'manifest'), vi.spyOn(e.wf.deliverables(), 'deliverables')]
     const t = baselineThread()
     t.hold()
     let done = false
@@ -149,7 +149,7 @@ describe('a None start or submit waiting on its whole-project read (HI-2340)', (
     const r = await linked
     for (const h of hashes) expect(h).not.toHaveBeenCalled()
     for (const h of hashes) h.mockRestore()
-    const here = e.wf.none.revision(['.'])
+    const here = e.wf.deliverables().revision(['.'])
     expect(r).toMatchObject({ revision: 'revision' in here ? here.revision : null, testedIs: 'content' })
     expect(r.tested).toBe(r.revision)
     // A name is kept as given; a no-code card has no revision and reads nothing.
@@ -164,7 +164,7 @@ describe('a None start or submit waiting on its whole-project read (HI-2340)', (
   it('a no-code card with declared paths reads nothing of the project: no hash, no whole-project read, held or not', async () => {
     const e = none()
     const card = e.wf.createCard({ title: 'Decide', kind: 'no-code', paths: ['big', 'a.txt'] })
-    const hashes = [vi.spyOn(e.wf.none, 'revision'), vi.spyOn(e.wf.none, 'manifest'), vi.spyOn(e.wf.none, 'deliverables')]
+    const hashes = [vi.spyOn(e.wf.deliverables(), 'revision'), vi.spyOn(e.wf.deliverables(), 'manifest'), vi.spyOn(e.wf.deliverables(), 'deliverables')]
     // Held: a read asked for would never answer, so a start that ends asked for none.
     baselineThread().hold()
     moved(await e.wf.start(card.key, B1))

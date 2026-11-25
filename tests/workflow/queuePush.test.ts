@@ -12,7 +12,7 @@ import { FactStore } from '../../src/main/workflow/factStore'
 import { pushLogKey, pushLogOf, pushPendingKey, pushPendingOf } from '../../src/main/workflow/queueLogs'
 import { Workflow } from '../../src/main/workflow/runtime'
 import { git } from '../../src/main/git'
-import * as G from '../../src/main/platform/git'
+import * as G from '../../src/main/gitCommands'
 
 let env: Env | null = null
 const extra: FactStore[] = []

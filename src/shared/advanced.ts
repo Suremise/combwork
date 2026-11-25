@@ -143,10 +143,16 @@ export const QUEUE_SIGN_SECONDS = 'cw.queue.signSeconds'
 export const GIT_COMMIT_MINUTES = 'cw.git.commitMinutes'
 /** HI-3372: the last resort for the user's Fetch, Pull and Push (cancellable from the window). */
 export const GIT_NETWORK_MINUTES = 'cw.git.networkMinutes'
+/** HI-3550: the longest one call of the GitHub CLI (gh) takes before Combwork ends it (ghCli.ts). */
+export const GITHUB_GH_MINUTES = 'cw.github.ghMinutes'
+/** HI-3552: how often Combwork reads the pull requests of cards in PR open, in minutes. */
+export const GITHUB_PR_FOLLOW_MINUTES = 'cw.github.prFollowMinutes'
+/** HI-3473: how old a lock file of git's must be before Repository health calls it stale. */
+export const GIT_STALE_LOCK_SECONDS = 'cw.git.staleLockSeconds'
+/** HI-3473: the programs that count as a git that may hold a lock (Windows' process names). */
+export const GIT_PROCESS_NAMES = 'cw.git.processNames'
 /** HI-3372: the merge queue's own fetches and pushes. */
 export const QUEUE_NETWORK_MINUTES = 'cw.queue.networkMinutes'
-/** HI-3372: one jj command's bound (its `--version` keeps its own). */
-export const JJ_COMMAND_SECONDS = 'cw.jj.commandSeconds'
 /** HI-3284: the longest the merge guards' matching runs before the check ends incomplete (never a pass). */
 export const MERGE_GUARDS_SECONDS = 'cw.mergeGuards.seconds'
 /** HI-3284: the most lines a merge may add for its guards to check them (past it, incomplete, never a pass). */
@@ -1009,7 +1015,7 @@ const SOURCES: readonly AdvancedSource[] = [
     ]
   },
   // HI-3372: the user's own git work and Combwork's network steps, bounded only as a last resort (a commit or a fetch, pull
-  // or push can be cancelled from the window), and jj's commands, whose first snapshot of a large working copy passed a minute.
+  // or push can be cancelled from the window).
   {
     id: GIT_COMMIT_MINUTES,
     group: 'cw',
@@ -1035,6 +1041,54 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
+    id: GITHUB_GH_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.github.ghMinutes.title', defaultMessage: 'GitHub CLI: longest a call takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (HI-3550): each time Combwork asks the GitHub CLI (gh) something, such as its sign-in in Version Control → Workflow → GitHub. GitHub CLI is a product name." }),
+    desc: msg({ id: 'settings.advanced.cw.github.ghMinutes.desc', defaultMessage: 'How long one call of the GitHub CLI (gh) may run before Combwork ends it as stuck and says it didn’t answer. Raise it on a slow connection or a GitHub Enterprise Server that answers slowly.', description: 'What the advanced setting "GitHub CLI: longest a call takes" does (Settings → Advanced, HI-3550). GitHub CLI and GitHub Enterprise Server are product names; gh is a command name: keep it.' }),
+    kind: 'number',
+    default: 2,
+    min: 1,
+    max: 60,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: GITHUB_PR_FOLLOW_MINUTES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.github.prFollowMinutes.title', defaultMessage: 'Pull requests: how often their state is read', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes (HI-3552): while cards wait in PR open, how often Combwork asks GitHub (through gh) whether their pull requests were merged or closed, and their checks and reviews." }),
+    desc: msg({ id: 'settings.advanced.cw.github.prFollowMinutes.desc', defaultMessage: 'While cards wait in PR open, Combwork reads their pull requests on GitHub this often, and also when their board or card opens: GitHub can’t tell Combwork itself when one is merged or closed.', description: 'What the advanced setting "Pull requests: how often their state is read" does (Settings → Advanced, HI-3552). PR open is a stage of the board: use its translation.' }),
+    kind: 'number',
+    default: 5,
+    min: 1,
+    max: 240,
+    unit: 'min',
+    applies: 'now'
+  },
+  // HI-3473: Repository health's Remove stale lock: a lock is stale only when it is at least this old and no git that
+  // could hold it (a process of these names started before it) runs.
+  {
+    id: GIT_STALE_LOCK_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.staleLockSeconds.title', defaultMessage: 'Git: how old a lock must be to be stale', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: Repository health's Remove stale lock in Version Control → Branches & remotes (HI-3473)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.staleLockSeconds.desc', defaultMessage: "Repository health offers to remove a lock file of git's (such as index.lock) only once it is at least this old, and only while no git that started before it still runs. A git working normally holds a lock for moments; raise this if a long git command of yours (a large commit, a repack) holds one longer.", description: 'What the advanced setting "Git: how old a lock must be to be stale" does (Settings → Advanced, HI-3473). index.lock is a file name: keep it.' }),
+    kind: 'number',
+    default: 60,
+    min: 10,
+    max: 3600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: GIT_PROCESS_NAMES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.processNames.title', defaultMessage: 'Git: the programs that may hold a lock', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a regular expression: Repository health's Remove stale lock (HI-3473)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.processNames.desc', defaultMessage: "The program names (as Task Manager's Details tab shows them) this regular expression finds count as a git that may hold a lock: while one that started before a lock file still runs, Repository health won't remove that lock. The default finds git.exe and git's remote helpers (git-remote-https.exe and the like). Add another program only if it writes git's lock files itself.", description: 'What the advanced setting "Git: the programs that may hold a lock" does (Settings → Advanced, HI-3473). git.exe and git-remote-https.exe are program names: keep them. Task Manager\'s Details tab: as Windows names it.' }),
+    kind: 'pattern',
+    default: String.raw`^git(?:-remote-[a-z0-9.+-]+)?\.exe$`,
+    flags: 'i',
+    applies: 'now'
+  },
+  {
     id: QUEUE_NETWORK_MINUTES,
     group: 'cw',
     title: msg({ id: 'settings.advanced.cw.queue.networkMinutes.title', defaultMessage: 'Merge queue: longest a fetch or push takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes: the merge queue's own fetches and pushes (HI-3372)." }),
@@ -1044,18 +1098,6 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 240,
     unit: 'min',
-    applies: 'now'
-  },
-  {
-    id: JJ_COMMAND_SECONDS,
-    group: 'cw',
-    title: msg({ id: 'settings.advanced.cw.jj.commandSeconds.title', defaultMessage: 'jj: longest a command takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds. jj is the Jujutsu version control tool: keep its name (HI-3372)." }),
-    desc: msg({ id: 'settings.advanced.cw.jj.commandSeconds.desc', defaultMessage: "How long one jj command Combwork runs may take, a snapshot of a large working copy included, before Combwork ends it: a read then counts as unknown, and a change made during a merge is left for you to settle. Raise it for a very large repository or a slow disk.", description: 'What the advanced setting "jj: longest a command takes" does, and when to change it (Settings → Advanced, HI-3372). jj is the Jujutsu version control tool.' }),
-    kind: 'number',
-    default: 300,
-    min: 30,
-    max: 3600,
-    unit: 's',
     applies: 'now'
   },
   // How long the merge queue's own commit may take when the repository signs its commits (#1350, SPEC §16.9.1 step 4):

@@ -21,11 +21,11 @@ import { dirname, isAbsolute, join, resolve, sep } from 'path'
 import { readRefsOffMain } from '../git'
 import { createLogger, userText } from '../logger'
 import { declaresPaths, deliversCommits, type PlatformId } from '../../shared/platform/descriptors'
-import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
+import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from '../gitRefs'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { inMetadataDir } from '../../shared/platform/metadataDirs'
 import { unknown, type Maybe } from './types'
-import { gitIgnoredByKind, type EntryKind, type RecordedKinds } from './gitIgnoredByKind'
+import { gitIgnoredByKind, type EntryKind, type RecordedKinds } from '../gitIgnoredByKind'
 import type { Disposable, FolderChanges, ObserveEvent, ObservePort } from './history'
 
 const log = createLogger('observe')
@@ -208,7 +208,7 @@ class FolderLog {
       this.gitEvent?.(rel.slice(5))
       return
     }
-    // jj's store (HI-2800): every jj command writes there, and none of it is the project's work.
+    // A version control's own folder (METADATA_DIRS): none of it is the project's work.
     if (inMetadataDir(rel)) return
     // Every path is kept, `node_modules` too (a project can track vendored files there): what git ignores is dropped
     // when a check asks. An install's thousands of writes are bounded by WRITE_LOG_MAX: past it, the oldest go and a

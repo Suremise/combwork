@@ -3,12 +3,11 @@
 // has no revision diff to show.
 
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { gitRevisionReads } from './gitRevisionReads'
-import { jjRevisionReads } from './jjRevisionReads'
+import { gitRevisionReads } from './git/gitRevisionReads'
 import type { RevisionReads } from './revisionReads'
 
 /** Each platform's revision reads; absent for a platform with none (None). */
-const PORTS: Partial<Record<PlatformId, RevisionReads>> = { git: gitRevisionReads, jj: jjRevisionReads }
+const PORTS: Partial<Record<PlatformId, RevisionReads>> = { git: gitRevisionReads }
 
 /** A platform's revision reads, or null for one with no repository (None). */
 export const revisionReadsOf = (platform: PlatformId): RevisionReads | null => PORTS[platform] ?? null

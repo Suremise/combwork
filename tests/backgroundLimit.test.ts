@@ -93,6 +93,8 @@ describe('background tasks past the time limit (HI-3406)', () => {
     expect(l.tasks?.size).toBe(0)
     expect(l.state.status).toBe('finished')
     expect(l.state.statusMessage).toBe('Stopped counting its background tasks after 120 minutes')
+    // HI-3561: the dropped task is kept on its state, uncounted, for the stall check to say it may still be waited on.
+    expect(l.state.tasksUncounted).toBe(1)
   })
 
   it('a run that finishes after the limit dropped it still wakes the agent', async () => {
@@ -103,6 +105,9 @@ describe('background tasks past the time limit (HI-3406)', () => {
     await read()
     // Claude Code begins a turn for it: the agent works again, and that wake may open the turn (turnLedger rule 1).
     expect([l.state.status, l.state.statusMessage, l.woke]).toEqual(['working', undefined, true])
+    // HI-3561: seen to end, it is no longer uncounted.
+    s.settleBackground(l, true)
+    expect(l.state.tasksUncounted).toBeUndefined()
   })
 
   it('one the agent stopped itself after the drop wakes nothing (#640)', async () => {

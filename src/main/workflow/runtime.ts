@@ -11,11 +11,11 @@
 import { appliesRequest, auditOnly } from '../requestReceipts'
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { ADVANCE_GATES, ADVANCE_PREVIEW_GATE, ADVANCE_STOPPED_GATE, agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type StageId, CHURN_GATES, CHURN_LIMIT_GATE, PAUSE_GATES, SIMPLIFY_GATE, churnDue, churnTotal, countsChurn, type PauseChoice } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, overridableEntry, passingReviewers, PR_RETRY_GATE, QUEUE_ADVANCE_GATE, QUEUE_PUBLISH_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type StageId, CHURN_GATES, CHURN_LIMIT_GATE, PAUSE_GATES, SIMPLIFY_GATE, churnDue, churnTotal, countsChurn, type PauseChoice } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, mergeCommitOf, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
-import { finishOnCandidate, FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
+import { FOCUSED_PICK, githubFeedbackOf, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import { reviewsInProgress, submissionReviewers } from '../../shared/workflow/reviewerPool'
 import { ACCEPT_MAX, chosenTests, focusedCheckName, reviewProved, standingFocusedRun, validTestId, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
 import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
@@ -28,18 +28,17 @@ import { parseCardRef } from '../../shared/workflow/cardRefs'
 import type { ForwardOverride } from '../../shared/workflow/forwardOrder'
 import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
 import { LANE_MAX_ROUNDS } from '../../shared/lanes'
-import type { AdvanceAnswer, FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
-import { advanceHostOf } from './advanceHost'
-import type { JjCardDeps } from '../platform/jjPlatform'
+import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
 import { adaptersFor } from '../platform/adapters'
 import { historyOf } from '../platform/historyPorts'
-import { NoneAdapter } from '../platform/none'
-import { readBaseline } from '../noneBaseline'
+import type { Deliverables } from '../platform/deliverables'
+import { pathsDeliverables, requirePathsDeliverables } from '../platform/deliverablesPorts'
 import { isUnknown, unknown, withDetail, type Maybe } from '../platform/types'
 import { releaseReadsOf } from '../platform/releaseReadsPorts'
 import { stillAsRead, unreleasedFor, type ReleaseReads } from '../platform/releaseReads'
-import { declaresPaths, hasCapability, needsRepository, platformName, type PlatformId } from '../../shared/platform/descriptors'
+import { declaresPaths, hasCapability, needsRepository, PLATFORMS, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
+import { sameSource, type StartedPr } from '../../shared/githubSource'
 import { finishAccepts, recordFinish } from './finish'
 import { writeReadiness } from './dependencyReadiness'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
@@ -52,10 +51,8 @@ import { inDefaultDialect } from '../../shared/agentText/asyncScope'
 import { HISTORY, storedText } from '../../shared/taskHistory'
 
 import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
-import { admit } from '../platform/platformFence'
 import { createLogger, userText } from '../logger'
 import { GatherDepth } from './gatherDepth'
-import { earlierWork, UNREAD, type EarlierLine } from './earlierWork'
 import { asCardCounts } from './containment'
 import { GUARD_CHECK_DEFAULTS, guardsOf, guardsRefuse, guardWarning } from '../../shared/workflow/mergeGuards'
 import { checkMergeGuards } from './mergeGuardsRun'
@@ -162,21 +159,9 @@ export interface Effects {
 }
 
 /** What `slotFor` gives a start (#1438): the slot and lease, or why it waits for one; null, no slot. */
-/** HI-3107: a card's earlier work on another version control's line, said to agents (a start's warning, the card's comment). */
-export const earlierWorkText = (card: string, e: EarlierLine, now: PlatformId): string =>
-  e.line === null ? say(W.earlierUnread, { card }) : say(W.earlierWork, { card, line: e.line, from: e.platform ? 'known' : 'unknown', now: shownPlatform(now), state: e.state, target: e.target ?? '' }) // i18n-ignore: select keys
 
-/** HI-3069: a card's kept slot of the other version control (SlotPool.keptAcross): its platform's and the project's now. */
-export interface KeptAcross {
-  slot: string
-  platform: string
-  now: string
-  gone: boolean
-}
-
-/** A version control's name as a refusal shows it (Git, jj: product names, kept in every language), else its id. */
-/** A platform's product name, the same in every language (HI-3140: its descriptor's). */
-export const shownPlatform = (p: string): string => platformName(p)
+/** Why an intent whose fingerprint moved again at its write was refused, not gathered again (HI-2972's log): #1206's one pass. */
+const NO_PASS = 'one pass' // i18n-ignore: a log line's code, never shown
 
 export type SlotForStart = { slot: string; folder: string; lease: string; fresh: boolean } | { wait: string } | null
 
@@ -243,14 +228,10 @@ export interface WorkflowConfig {
   project: string
   /** The project key (`AM`). */
   projectKey: string
-  /** The project's identity as the slot and copy tables key it (HI-2799: the platform fence's admissions); absent in tests. */
-  projectId?: () => string
   /** The project's resolved options (§16.6.6); a card in flight keeps its own ruleset. */
   options: () => WorkflowOptions
   /** HI-3284: the merge guards' limits (Settings → Advanced), for submit's early warning; left out, 10 s and 200,000 lines. */
   guardLimits?: () => { timeoutMs: number; maxLines: number }
-  /** HI-3235: whether the project's finish is its platform's default, set at no level (the one-time note's condition). */
-  finishInherited?: () => boolean
   /** Where cards' own folders go (the P2 spike's stand-in for slots, its unit tests only: the app lends slots, `slotFor`). */
   slots?: string
   /**
@@ -258,20 +239,9 @@ export interface WorkflowConfig {
    * its lease (a lane's, kept for the lane; else the card's own, `fresh` when lent now), or why none can be now (`wait`,
    * English). `dry`: only whether one could be, nothing lent. Null: no slot here (the rules off, the builder a reviewer).
    */
-  /** HI-3129: `kept`, a kept slot's proved binding the start resolved its target from: checked again before the lend records it. */
-  slotFor?: (card: CardRecord, builder: string, o: { dry: boolean; target: string | null; kept?: { slot: string; generation: string; target: string } }) => Promise<SlotForStart>
-  /**
-   * HI-3069: the card's committed work kept in a slot of the other version control (a switch since it was put back): the
-   * slot, its platform, the project's now, and whether its folder is gone. Every start asks it before its folder is
-   * chosen (`platform.keptAcross`). Left out, none.
-   */
-  keptAcross?: (card: CardRecord) => Promise<KeptAcross | null>
-  /**
-   * HI-3132: the card's committed work kept in a slot of the project's own version control (HI-2995): the slot and its
-   * folder. A start placing the card anywhere else (the project folder, its builder's own, a user's start across a slot
-   * wait) is refused naming it (`platform.keptElsewhere`). Left out, none.
-   */
-  keptHere?: (card: CardRecord) => Promise<{ slot: string; folder: string } | null>
+  slotFor?: (card: CardRecord, builder: string, o: { dry: boolean; target: string | null }) => Promise<SlotForStart>
+  /** HI-3551: the project's GitHub link (its remote, host and repository), null with none: a PR card's start fetches from it. */
+  githubLink?: () => Promise<{ remote: string; host: string; owner: string; repo: string } | null>
   /**
    * HI-3148: the released line a running lane's starts may go onto, by the user's or the Assistant's override given with
    * the lane's start (its record's, for its fixed Merges into while it runs), or null: none. Synchronous (the lanes as
@@ -280,8 +250,6 @@ export interface WorkflowConfig {
   releaseGrant?: (lane: string) => string | null
   /** HI-3164: a platform's release reads (default: `releaseReadsOf`, Combwork's own runners). A seam for a test world whose version control runs through its own runner, never a way round the check: null is a platform with nothing released, as the default's. */
   releaseReads?: (platform: PlatformId) => ReleaseReads | null
-  /** HI-3107: a start written with earlier work on another version control's lines: the app comments and tells the user. */
-  earlierWork?: (card: CardRecord, lines: EarlierLine[], now: PlatformId) => Promise<void> | void
   /** A lease lent for a start that wasn't written (refused, or undone): given back. */
   slotUnused?: (lease: string) => Promise<void>
   /**
@@ -292,8 +260,6 @@ export interface WorkflowConfig {
   slotHeld?: (lease: string, slot: string, folder: string, card: number) => boolean | null
   /** HI-2944: a start found its target's folder with uncommitted changes (warned, never refused): the app tells the window. */
   targetChanges?: (changes: TargetChanges, card: string) => void
-  /** jj's card work's dependencies (HI-2868, the app's jjCards.ts): absent where jj's adapter answers nothing. */
-  jj?: JjCardDeps
   /** Runs an agent started that are still going (G13). */
   runsOf?: (agent: string) => string[]
   /**
@@ -342,10 +308,15 @@ export interface WorkflowConfig {
   autoRun?: boolean
   effects?: Effects
   /**
-   * After a write that moved a card, once it is committed: from and to (HI-2938: a jj card's pass changes no jj operation
-   * or ref, so the app asks for its reconciliation here, which builds its candidate).
+   * After a write that moved a card, once it is committed: from and to (HI-2938: the app asks for its reconciliation here).
    */
   moved?: (card: CardRecord, from: StageId, to: StageId) => void
+  /**
+   * HI-3557: a move no intent wrote the board's line for (the merge queue's Done, its return to Active), in the write's own
+   * board change: its history's "Moved to …" line, which the lane's stall check counts from (columnSince). The app's
+   * notes it when the column changes; a failure is logged and never undoes the move.
+   */
+  noteMove?: (card: CardRecord, from: StageId, to: StageId) => Promise<void>
   /** Test seams: called between gathering and the transaction. */
   hooks?: { beforeWrite?: (move: string) => void | Promise<void>; unsubmittedRead?: () => void | Promise<void> }
   /**
@@ -396,7 +367,7 @@ export function lineName(projectKey: string, card: Pick<CardRecord, 'key' | 'tit
   return `cw/${projectKey}/${card.key}${slug ? `-${slug}` : ''}`
 }
 
-const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'done']
+const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'prOpen', 'done']
 /**
  * Where file locks were seen (recordLocks, #1481): on that cycle of the agent's current card then, or, when the cards
  * weren't read then (the runtime not made yet this launch), at that time (ISO).
@@ -404,7 +375,7 @@ const ORDER: StageId[] = ['todo', 'active', 'review', 'approved', 'merging', 'do
 export type LockSeen = { card: number; cycle: number } | { at: string }
 
 /** The stages in which a card's lock record counts (G16, #1481): started and not finished. */
-const LOCK_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging']
+const LOCK_STAGES: readonly StageId[] = ['active', 'review', 'approved', 'merging', 'prOpen']
 
 /** A reviewer's intents (§16.7.2): refused outside Review, their next step is the reviewer's (`sideOf`, #1604). */
 const REVIEW_MOVES: ReadonlySet<string> = new Set(['start review', 'verdict']) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
@@ -451,8 +422,8 @@ const W = {
   acceptTooMany: agentMsg({ id: 'runtime.verdict.acceptTooMany', text: 'accept: only the first {max} tests are taken', note: "HI-2660: more than ACCEPT_MAX tests in cw_verdict's accept. {max}: the limit." }),
   acceptNone: agentMsg({ id: 'runtime.verdict.acceptNone', text: "accept: {test} has no counted run at this revision (or its command changed since), so it isn't accepted", note: "HI-2660: no standing run of focused:<test> at the passed revision to accept. {test}: the test id." }),
   acceptFailed: agentMsg({ id: 'runtime.verdict.acceptFailed', text: "accept: {test}'s latest counted run at this revision failed, so it isn't accepted", note: "HI-2660: the standing run of focused:<test> at the passed revision didn't pass; an earlier pass never stands behind it. {test}: the test id." }),
-  mergeSeen: agentMsg({ id: 'runtime.reportMerge.mergeSeen', text: 'Done already: Combwork saw its merge into {target}; nothing more to report', note: "HI-3282: report merge's answer (an OK, nothing written), its reply's `already` value, on a card Combwork had already seen merged into its target this cycle (its reconciliation or merge queue, before the builder's report). Historical: no fresh check is made. {target}: the branch or bookmark." }),
-  mergeSeenMove: agentMsg({ id: 'runtime.reportMerge.mergeSeenMove', text: '{card} was already Done: Combwork saw its merge into {target}; nothing more to report.', note: "HI-3282: an agent's old move to Done (cw_update_task) on a card already Done whose merge Combwork saw this cycle: a line of its reply, as report merge answers. {target}: the branch or bookmark." }),
+  mergeSeen: agentMsg({ id: 'runtime.reportMerge.mergeSeen', text: 'Done already: Combwork saw its merge into {target}; nothing more to report', note: "HI-3282: report merge's answer (an OK, nothing written), its reply's `already` value, on a card Combwork had already seen merged into its target this cycle (its reconciliation or merge queue, before the builder's report). Historical: no fresh check is made. {target}: the branch." }),
+  mergeSeenMove: agentMsg({ id: 'runtime.reportMerge.mergeSeenMove', text: '{card} was already Done: Combwork saw its merge into {target}; nothing more to report.', note: "HI-3282: an agent's old move to Done (cw_update_task) on a card already Done whose merge Combwork saw this cycle: a line of its reply, as report merge answers. {target}: the branch." }),
   mergeSeenMoveNext: agentMsg({ id: 'runtime.reportMerge.mergeSeenMoveNext', text: 'As report merge: next time call {tool}', note: "HI-3282: the line after mergeSeenMove, as an old move translated into an intent says it (#1268). {tool}: cw_report_merge." }),
   questionDone: agentMsg({ id: 'runtime.wake.questionDone', text: '{card}: your question "{question}" no longer stands: the card is in Done.', note: "An asker's wake when the card reached Done with its question open. {question}: the question, quoted short (#1626)." }),
   boardDone: agentMsg({ id: 'runtime.repair.boardDone', text: 'the board had it in Done while its stage was {stage}', note: "A repair's reason, stored on the card's Moved fact: the board's column and the card's stage disagreed. {stage}: the stage id." }),
@@ -460,8 +431,6 @@ const W = {
   blocked: agentMsg({ id: 'runtime.start.blocked', text: '{card} is blocked: {why}', note: "A start's warning: the card is blocked. {why}: the block's reason, in its author's words." }),
   targetChanges: agentMsg({ id: 'runtime.start.targetChanges', text: "{target}'s folder {folder} has uncommitted changes ({files}): a merge into {target} that changes them pauses until they are committed or set aside. Combwork tells the user in its window; leave them as they are.", note: "HI-2944: a start's warning (never a refusal): the folder the target is checked out in has uncommitted changes; the user's window shows a notification with Commit and Set Aside. {files}: up to three paths, then how many more." }),
   moreFiles: agentMsg({ id: 'runtime.start.moreFiles', text: '{files} and {more} more', note: 'HI-2944: a list of paths cut at three, and how many more there are.' }),
-  earlierWork: agentMsg({ id: 'runtime.start.earlierWork', text: "{card} has earlier work on {line}, {from, select, known {from before its project switched to {now}} other {from a start whose version control Combwork couldn't read}}: {state, select, ahead {commits its target {target} doesn't hold} other {Combwork couldn't tell whether its target holds it}}. Combwork leaves it on that line and doesn't carry it in, though this start's target may hold it by now: check whether your folder has it before bringing in what you need, or leave it.", note: 'HI-3107: a start’s warning (never a refusal): the card ran before under another version control (Git, say, before the repository switched to jj; from other: its start’s ruleset couldn’t be read), and its line from then has (ahead) or may have (other: it couldn’t be read) work the target recorded then lacked. Never claims the new folder lacks it (its new target, or a kept folder, may hold it). {line} and {target} are branch or bookmark names; {now} is the version control in force (Git, jj).' }),
-  earlierUnread: agentMsg({ id: 'runtime.start.earlierUnread', text: "Combwork couldn't read {card}'s earlier starts, so it can't tell whether work from before (on a line of another version control) was left behind: if the card ran before, check its earlier line before bringing in what you need.", note: 'HI-3107: a start’s warning (never a refusal): the card’s recorded starts couldn’t be read, so its earlier work can’t be looked for; said rather than taken for none (HR2).' }),
   slotWait: agentMsg({ id: 'runtime.start.slotWait', text: '{card} waits for a slot: {why}', note: "A start's warning beside its refusal (#1438): why no slot is free." }),
   slotMove: agentMsg({ id: 'runtime.start.slotMove', text: "You'll continue in {slot}, on {line}: Combwork {carried, select, yes {carries the line on there, as it was (it merges into {target})} other {makes the line there from {target}}}, then gives you {card} there (a new conversation unless you already work there; your old one is kept). End your turn now.", note: "A start given a slot (#1438): the card's line is made there and the card given to the agent there, so it ends its turn now. HI-3112: carried, a line from an earlier start that carries on (never said to be made from the target)." }),
   staleChange: agentMsg({ id: 'runtime.wake.stalePaths', text: 'stale: your paths changed since the pass, submit again', note: "The builder's wake when its declared paths changed after its pass." }),
@@ -524,6 +493,11 @@ export class Write {
   readonly woken: string[] = []
   /** A builder's reported merge result nothing checked (Not checked), for the card's finish (HI-2014): a claim, never containment. */
   claimed: string | null = null
+  /**
+   * HI-3557: the board's line for this write's move is written (an intent's own card, its 0.9 fields saved with the move).
+   * Unset, a move the write made is noted on the card by the runtime (`noteMove`), in the same board change.
+   */
+  boardNoted = false
   /** The card's stage when the write began. */
   readonly was: StageId
   constructor(
@@ -575,8 +549,6 @@ interface StartGathered {
   warnings: string[]
   /** A slot's lease lent for this start (#1438): given back if the start isn't written. */
   lent: string | null
-  /** HI-3107: its earlier work on lines of another version control, said once the start is written. */
-  earlier: EarlierLine[]
   /** None (HI-2340): the generation its whole-project read was made under; another at the write, it is gathered again. */
   baselineGen?: number
 }
@@ -599,7 +571,7 @@ interface SubmitGathered {
   files: FactData['Submitted']['files']
   commits?: string[]
   paths?: string[]
-  /** What only the platform records of the submission (`Submitted.platform`: jj's ids and chain, HI-2868). */
+  /** What only the platform records of the submission (`Submitted.platform`, HI-2868). */
   platform?: Record<string, unknown>
   inputs: Omit<GuardInputs, 'card' | 'state' | 'ruleset'>
   /** G20 (HI-1367): its submission's operation, aborted once a newer submission of the card or its workspace's close ended it. */
@@ -648,14 +620,25 @@ const SETUP_PAUSES = new Set(['noUpstream', 'remoteAmbiguous', 'remoteUnsupporte
 
 export class Workflow {
   readonly store: FactStore
-  readonly none: NoneAdapter
+  /**
+   * The content hashing of the platform whose cards declare paths (None's), kept for every project while one is installed
+   * (the watcher's writes and agents' edits invalidate it); null in a build without such a platform (HI-3489), where no
+   * card declares paths.
+   */
+  readonly none: Deliverables | null
   /** The platform adapters (§16.3.1): the runtime asks them, and never switches on a platform id. */
   private platforms: Record<PlatformId, PlatformAdapter>
 
   constructor(readonly cfg: WorkflowConfig) {
     this.store = cfg.store
-    this.none = new NoneAdapter(cfg.project, cfg.options().excluded)
-    this.platforms = adaptersFor(this, this.none)
+    this.none = pathsDeliverables()?.of(cfg.project, cfg.options().excluded) ?? null
+    this.platforms = adaptersFor(this)
+  }
+
+  /** The content hashing, where only a card declaring paths gets: its platform is installed, so it is there. */
+  deliverables(): Deliverables {
+    if (!this.none) throw new Error('No platform declares paths') // i18n-ignore: an internal error, for the log
+    return this.none
   }
 
   /** The adapter of a ruleset's platform (a card keeps its ruleset's, so a switch applies from the next card). */
@@ -828,7 +811,7 @@ export class Workflow {
    * merge Combwork saw this cycle, HI-3282). Such a write isn't fenced: it changes nothing a stale call could, and its
    * answer is the one the same call gets when the card was already there at its read. Writing anything then throws.
    */
-  async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>, opts: { runActions?: boolean; settled?: (w: Write) => boolean } = {}): Promise<T> {
+  async write<T, P = undefined>(card: CardRecord, ruleset: Ruleset | null, actor: Actor, fn: (w: Write, prepared: P) => T, prepare?: () => Promise<P>, opts: { settled?: (w: Write) => boolean } = {}): Promise<T> {
     const scope = alongsideScope()
     let movedTo: { from: StageId; to: StageId } | null = null
     const asked: string[] = []
@@ -867,6 +850,15 @@ export class Workflow {
       if (also && w && (w as Write).written.length) await also.written(w)
       const done = w as Write | null
       if (done && done.current !== done.was) movedTo = { from: done.was, to: done.current }
+      // HI-3557: a move no intent noted on the board (the queue's Done) gets its history line in this same change, so the
+      // card's history and the stall check see it as it lands, never the move before it.
+      if (done && done.current !== done.was && !done.boardNoted && this.cfg.noteMove) {
+        try {
+          await this.cfg.noteMove(card, done.was, done.current)
+        } catch (e) {
+          log.warn(`noting ${card.key}'s move to ${done.current} on the board`, e)
+        }
+      }
       if (done) asked.push(...done.written.filter((f) => f.kind === 'ApprovalRequested' && CHURN_GATES.includes((f.data as FactData['ApprovalRequested']).gate)).map((f) => (f.data as FactData['ApprovalRequested']).request))
       return r
     })
@@ -892,9 +884,7 @@ export class Workflow {
         // A hook's own failure never undoes or fails the committed write.
       }
     }
-    // HI-3235: a write made holding a platform's repository lock (an advance's records) leaves its actions for its caller to
-    // run once that lock is let go, so none of them (an advance answer's) runs nested inside it.
-    if (this.cfg.autoRun !== false && opts.runActions !== false) await this.runActions()
+    if (this.cfg.autoRun !== false) await this.runActions()
     return out
   }
 
@@ -1316,13 +1306,10 @@ export class Workflow {
       if (res && g.data.target !== res.to) return await this.refuse(card, actor, 'start', { rule: 'forward.resolutionTarget', values: { card: card.key, from: res.from, to: res.to, target: g.data.target ?? '' } })
       // Its ruleset is stored by the write that names it (write()), under the store's lock.
       await this.cfg.hooks?.beforeWrite?.('start')
-      // How many times it may be gathered again while only its fingerprint moved (its platform's; HI-2916: jj's head moves
-      // with Combwork's own jj operations beside it).
-      const gathers = this.platform(g.o).gathers ?? 1
       // Each pass gathered again is awaited here, never returned bare (HI-2916): this pass's `finally` gives back the slot
       // it lent only once the pass after has started with it, or hasn't. Returned bare, the `finally` ran at once, so the
       // pass after found its lease ended, lent another, and a third could find the slot still settling and wait.
-      if (await this.revalidate(card, from, g.o, g.before, gathers)) return await this.regather(card, () => this.start(ref, actor, opts))
+      if (await this.revalidate(card, from, g.o, g.before)) return await this.regather(card, () => this.start(ref, actor, opts))
       let laneMoved = false
       let baselineMoved = false
       let evidenceMoved = false
@@ -1341,16 +1328,19 @@ export class Workflow {
           evidenceMoved = true
           return undone(changed)
         }
-        if (g.baselineGen !== undefined && g.baselineGen !== this.none.generation) {
+        if (g.baselineGen !== undefined && g.baselineGen !== this.none?.generation) {
           baselineMoved = true
+          return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
+        }
+        // HI-3551: the pull request the gather fetched is still the card's (its source, read here under the store's lock),
+        // or it has none still: a source set, changed or cleared meanwhile is gathered again. A restart keeps its recorded PR.
+        if (!from.started?.pr && !prStillSame(this.store.card(card.id).source, g.data.pr)) {
+          evidenceMoved = true
           return undone({ rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal)
         }
         // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
         // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
         // then refused: the boundary passed either way), then the start is checked against it.
-        // The platform fence (HI-2799): a start is an admission on the project's repository, decided in this transaction.
-        const fenced = this.cfg.projectId ? admit({ get: (k) => this.store.boardMeta(k), set: () => undefined }, this.cfg.projectId(), g.o.platform) : null
-        if (fenced) return undone(fenced.why === 'switching' ? { rule: 'platform.switching', values: { card: card.key } } : { rule: 'platform.changed', values: { card: card.key, platform: shownPlatform(fenced.now) } })
         if (this.enforced() && !opts.drag) {
           this.applyLaneBoundary(w, this.store.card(card.id))
           // The lane and ruleset the gather used must still be the card's (HR6's round 4: a queued list that took the card
@@ -1378,21 +1368,10 @@ export class Workflow {
         return null
       })
       if (out && (laneMoved || baselineMoved || releaseMoved) && !this.gathering.depth(card.id)) return await this.regather(card, () => this.start(ref, actor, opts))
-      // Its fingerprint moved again between the last gather and the write, its answer by content still the same, or the
-      // fingerprint unreadable at that instant (HI-2972): gathered again from the top while its platform allows more
-      // passes (none beyond #1206's one unless it says so), else refused.
-      if (out && evidenceMoved) {
-        const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, from, g.o, g.before) : null
-        if (again) {
-          this.passLog(card, 'start', 'write', again, gathers)
-          return await this.regather(card, () => this.start(ref, actor, opts))
-        }
-      }
-      if (out?.rule === 'evidence.changed') this.startRefusedLog(card, laneMoved ? 'lane' : baselineMoved ? 'baseline' : releaseMoved ? 'release' : 'write', gathers, evidenceMoved ? this.noPassWhy(card, gathers) : undefined)
+      // Its fingerprint moved again between the last gather and the write (HI-2972): refused, #1206's one pass spent.
+      if (out?.rule === 'evidence.changed') this.startRefusedLog(card, laneMoved ? 'lane' : baselineMoved ? 'baseline' : releaseMoved ? 'release' : 'write', evidenceMoved ? NO_PASS : undefined)
       if (out) return (out.rule === 'move.notFromHere' ? forIt(this.state(this.store.card(card.id))) : null) ?? this.refuse(card, actor, 'start', out)
       const moved = this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
-      // HI-3107: written, its earlier work is said where the user and its builder read it (a comment, a notice).
-      if (g.earlier.length) void Promise.resolve(this.cfg.earlierWork?.(card, g.earlier, g.o.platform)).catch((e) => log.warn(`#${card.id}: saying its earlier work`, e))
       return g.data.lease && g.data.slot ? { ...moved, placed: true } : moved
     } finally {
       // A slot lent for it and not started with (refused, undone): given back (#1438).
@@ -1424,9 +1403,8 @@ export class Workflow {
       check = await reads.watch(this.cfg.project, target).catch(() => null)
       first = check ? check() : null
       r = first === null ? unknown(UNREADABLE.line, { branch: target }) : await reads.released(this.cfg.project, target)
-      // HI-3319: unknown only because what it rests on was unsettled or moved under the read (jj's operation head while
-      // an operation lands, Combwork's own beside it: a slot made or detached), it is read again whole, at most
-      // RELEASE_READS reads in all, as jjTargetHead is (HI-2916); nothing of a moved read is kept. A steady unknown (a
+      // HI-3319: unknown only because what it rests on was unsettled or moved under the read, it is read again whole, at
+      // most RELEASE_READS reads in all (HI-2916); nothing of a moved read is kept. A steady unknown (a
       // conflicted tag, a failed read) is not read again.
       if (!isUnknown(r) || !check || stillAsRead(check, first) || i >= RELEASE_READS) break
       log.info(`#${card.id}'s release read again (${first === null ? 'unsettled' : 'moved'} under it), read ${i + 1} of ${RELEASE_READS}`) // i18n-ignore: a log line
@@ -1448,10 +1426,6 @@ export class Workflow {
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(say(W.blocked, { card: card.key, why: s.blocked }))
     // Its target's ref included, resolved as the plan resolves it (#1401: the default branch, when G7 is empty).
-    // HI-3069: its work kept in a slot of the other version control: refused before any folder is chosen (a slot, the
-    // project folder or its builder's own), so it never starts without that work, the user's start included.
-    const across = await this.cfg.keptAcross?.(card)
-    if (across) return { rule: 'platform.keptAcross', values: { card: card.key, slot: across.slot, platform: shownPlatform(across.platform), now: shownPlatform(across.now), gone: across.gone ? 'yes' : 'no' } }
     const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder, dry)
     if (isUnknown(plan)) {
@@ -1467,16 +1441,6 @@ export class Workflow {
     const { existing, slotWait, acrossWait, fresh, baselineGen, carried, ...planned } = plan
     // A slot lent for this start (#1438) is given back if the start isn't written (refused, gathered again, undone).
     const lent = fresh && plan.lease ? plan.lease : null
-    // HI-3132: its work kept in a slot of the project's own version control: it starts there or not at all. A plan
-    // placing it anywhere else (the project folder, its builder's own) is refused naming the slot, as keptAcross is;
-    // waiting for that slot stays a wait for an agent's or a lane's start, but a user's start across that wait (which
-    // would start it where it is) is refused too: an override of the slot's rule never leaves the work behind.
-    const here = card.kind === 'no-code' ? null : await this.cfg.keptHere?.(card)
-    const elsewhere = !!here && (planned.folder === 'project' || resolvePath(planned.folder).toLowerCase() !== resolvePath(here.folder).toLowerCase())
-    if (here && elsewhere && (!slotWait || actor === 'user')) {
-      if (lent) await this.slotUnused(card, lent)
-      return { rule: 'platform.keptElsewhere', values: { card: card.key, slot: here.slot } }
-    }
     // HI-3141: a user's start across a slot wait is built where the card's agent is; the platform's reason it can't be
     // built there (a project folder on no branch) refuses that start, never a card on no branch.
     if (slotWait && actor === 'user' && acrossWait) {
@@ -1487,16 +1451,12 @@ export class Workflow {
     // covers, so a change to it before the write would go unseen (#1401 round 2).
     if (!this.platform(o).planCovered(before.primed, plan)) {
       if (lent) await this.slotUnused(card, lent)
-      this.startRefusedLog(card, 'plan', this.platform(o).gathers ?? 1)
+      this.startRefusedLog(card, 'plan')
       return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
     }
     const data: FactData['Started'] = { ...planned, builder, cardKind: card.kind }
     if (dry) delete data.lease
     if (slotWait) warnings.push(say(W.slotWait, { card: card.key, why: slotWait }))
-    // HI-3107: work from cycles under another version control, left on its line, said (never carried, never refused).
-    const earlier = card.kind !== 'no-code' && needsRepository(o.platform) ? await earlierWork({ facts: (id) => this.store.facts(id), ruleset: (id) => this.store.ruleset(id) }, card.id, o.platform, this.cfg.project, data.line).catch((e: unknown) => (log.warn(`#${card.id}: its earlier work couldn't be read`, e), [UNREAD])) : []
-    if (earlier.length) log.info(`#${card.id} has earlier work: ${earlier.map((e) => `${e.line === null ? 'its starts unread' : userText(e.line)} (${e.state})`).join(', ')}`) // i18n-ignore: a log line
-    for (const e of earlier) warnings.push(earlierWorkText(card.key, e, o.platform))
     // Where it is built (#1438): its builder is given it there once its line is made, so a builder starting it ends its turn.
     if (data.lease && data.slot) warnings.push(say(W.slotMove, { slot: String(data.slot), line: String(data.line), target: String(data.target), card: card.key, carried: carried ? 'yes' : 'no' })) // i18n-ignore: select keys
     // HI-2944: its target's folder with uncommitted changes, said before the start is written or any work is dispatched:
@@ -1509,7 +1469,7 @@ export class Workflow {
     }
     // Dependencies Done by facts, in this card's target (§16.7.4).
     const waitingFor = r.guards.start.includes('start.dependenciesIntegrated') ? await this.waitingFor(card, data.target, o) : []
-    return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: !slotWait }, before, warnings, lent, earlier, ...(baselineGen !== undefined ? { baselineGen } : {}) }
+    return { r, o, data, existing: !!existing, ins: { agent: agentOf(actor), waitingFor, slotFree: !slotWait }, before, warnings, lent, ...(baselineGen !== undefined ? { baselineGen } : {}) }
   }
 
   /**
@@ -1526,7 +1486,10 @@ export class Workflow {
     w.fact('Started', g.data) // i18n-ignore: a fact's kind and codes, not text
     w.move('active', cause)
     // A slot's (#1438): its lease's, and whether it is brought up to date (G15).
-    if (g.data.folder !== 'project' && !g.existing) w.action('prepareSlot', { folder: g.data.folder, line: g.data.line, base: g.data.base, ...(g.data.lease ? { slot: g.data.slot, lease: g.data.lease, upToDate: g.o.slotsUpToDate, builder: g.data.builder } : {}) })
+    // HI-3551: a pull request's line is made at the PR's head (its base is where that left the PR's base), only now that
+    // its start is written, and never brought up to date with the target: its history is the PR's.
+    const pr = g.data.pr
+    if (g.data.folder !== 'project' && !g.existing) w.action('prepareSlot', { folder: g.data.folder, line: g.data.line, base: pr ? pr.headOid : g.data.base, ...(g.data.lease ? { slot: g.data.slot, lease: g.data.lease, upToDate: pr ? false : g.o.slotsUpToDate, builder: g.data.builder } : {}) })
   }
 
   /** The card's state as it would be once a gathered start is written (a drag gathers its submission on it). */
@@ -1580,8 +1543,7 @@ export class Workflow {
 
   /**
    * How many passes deep each intent is in being gathered again (`regather`), its own call chain's (gatherDepth.ts): at
-   * most once, so a fingerprint moving again refuses, except a start or a verdict on a platform allowing more (`gathers`,
-   * HI-2916, HI-3216).
+   * most once, so a fingerprint moving again refuses.
    */
   private readonly gathering = new GatherDepth()
 
@@ -1593,55 +1555,17 @@ export class Workflow {
    * inputs: dirty files, the revision) may have seen another state and back, so it is never reused with a new
    * fingerprint: the intent starts again, reading everything afresh, once (`regather`). A real change refuses at once,
    * as does a fingerprint moving again in the second pass. Git, the files and SQLite can't be one transaction:
-   * reconciliation settles what comes after the transaction's read. `passes`: how many passes deep it may go (a start's
-   * platform may allow more than one, `gathers`).
+   * reconciliation settles what comes after the transaction's read.
    */
-  private async revalidate(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence, passes = 1, intent = 'start'): Promise<boolean> {
-    if (this.gathering.depth(card.id) >= passes) return false
-    // An intent allowed several passes (HI-2972; a verdict's, HI-3216): `gatherAgain`'s answer, a steady fingerprint going
-    // on to the write.
-    if (passes > 1) {
-      const again = await this.gatherAgain(card, s, o, before)
-      if (again === 'moved' || again === 'unreadable') this.passLog(card, intent, 'before write', again, passes) // i18n-ignore: a log line's code, never shown
-      return again === 'moved' || again === 'unreadable'
-    }
+  private async revalidate(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<boolean> {
+    if (this.gathering.depth(card.id) >= 1) return false
     const a = before.value === null ? null : this.evidenceNow(card, s, o, before.primed)
     return a !== null && a !== before.value && (await this.sameContent(card, s, o, before))
   }
 
-  /**
-   * Whether a start or a verdict on a platform allowing several passes (`gathers`) is gathered again (HI-2972, HI-3216), asked with passes
-   * left: `moved`, its fingerprint moved and its answer by content is the gathered one; `unreadable`, its fingerprint
-   * couldn't be read when it was gathered or can't be now (jj's operation heads while any jj operation lands, Combwork's
-   * own included: the new head is written before the old one goes); `steady`, the fingerprint is the gathered one;
-   * null, a real change (the cards waited for, or the content). Another pass reads everything afresh, and the write
-   * still needs exactly the fingerprint it gathered, so nothing unreadable or changed is ever written on: unlike
-   * `sameContent`, this asks no steadiness across its own read, since its answer only decides to read again.
-   */
-  private async gatherAgain(card: CardRecord, s: CardState, o: WorkflowOptions, before: Evidence): Promise<'moved' | 'unreadable' | 'steady' | null> {
-    if (before.value === null || before.content === null) return 'unreadable'
-    const a = this.evidenceNow(card, s, o, before.primed)
-    if (a === null) return 'unreadable'
-    if (a === before.value) return 'steady'
-    if (this.depsOf(a) !== this.depsOf(before.value)) return null
-    const content = await this.platform(o).content(card, s, o, before.primed)
-    if (content === null) return 'unreadable'
-    return content === before.content ? 'moved' : null
-  }
-
-  /** An intent gathered again (HI-2972; a verdict's, HI-3216): which, where, why, and the pass the next one is, in the log. */
-  private passLog(card: CardRecord, intent: string, at: string, why: string, passes: number): void {
-    log.info(`#${card.id}'s ${intent} gathered again (${at}: fingerprint ${why}), pass ${this.gathering.depth(card.id) + 2} of ${passes}`)
-  }
-
   /** A start refused as `evidence.changed` (HI-2972): which check, on which pass, in the log (` not started: `, as the platform's). */
-  private startRefusedLog(card: CardRecord, check: string, passes: number, why?: string): void {
-    log.info(`#${card.id} not started: evidence.changed at ${check}, pass ${this.gathering.depth(card.id) + 1} of ${passes}${why ? ` (${why})` : ''}`)
-  }
-
-  /** Why a start whose fingerprint moved at its write wasn't gathered again (HI-2972's log): its passes, or a real change. */
-  private noPassWhy(card: CardRecord, passes: number): string {
-    return passes <= 1 ? 'one pass' : this.gathering.depth(card.id) >= passes ? 'passes spent' : 'a change by content' // i18n-ignore: a log line's codes, never shown
+  private startRefusedLog(card: CardRecord, check: string, why?: string): void {
+    log.info(`#${card.id} not started: evidence.changed at ${check}, pass ${this.gathering.depth(card.id) + 1} of 1${why ? ` (${why})` : ''}`)
   }
 
   /**
@@ -1820,8 +1744,35 @@ export class Workflow {
   }
 
   /** What a finish needs from the platform (gathered before the transaction). */
-  finishInputs(card: CardRecord, s: CardState, r: Ruleset, revision: string | null | undefined): Promise<FinishInputs> {
-    return this.platform(r.options).finishInputs(card, s, r.options, revision)
+  async finishInputs(card: CardRecord, s: CardState, r: Ruleset, revision: string | null | undefined): Promise<FinishInputs> {
+    const fin = await this.platform(r.options).finishInputs(card, s, r.options, revision)
+    // HI-3552: a pull request's finish pins the project's GitHub link as it is now on its request.
+    if (r.options.finish !== 'pullRequest' || card.kind === 'no-code') return fin
+    return { ...fin, github: this.cfg.githubLink ? await this.cfg.githubLink().catch(() => null) : null }
+  }
+
+  /**
+   * HI-3552: asks Combwork's pull request host (prHost.ts) to push the card's approved revision and open its pull request:
+   * a `PrRequested` pinning that revision, the target, the line and the project's GitHub link as gathered (`fin.github`;
+   * with none, the host says so), and its `openPr` action. The card waits in Approved meanwhile. A retry is a new request
+   * of the same cycle (`since` kept: none opened since); after one was opened (and closed), a new cycle starts its own.
+   * HI-3562: a pull request's card (HI-3551) asks instead to push its fixes back to the pull request it is about
+   * (`source`): its head branch and base, that pull request's repository (pushed through the link's remote only when the
+   * link is that repository), and none opened.
+   */
+  requestPr(w: Write, github: FinishInputs['github']): void {
+    const s = w.state()
+    const request = `${w.card.key}/pr${s.lastSeq + 1}`
+    const link = github ?? null
+    const pr = s.started?.pr
+    if (pr) {
+      const same = !!link && link.host.toLowerCase() === pr.host.toLowerCase() && link.owner.toLowerCase() === pr.owner.toLowerCase() && link.repo.toLowerCase() === pr.repo.toLowerCase()
+      w.fact('PrRequested', { request, revision: s.approved?.revision ?? s.latest?.revision ?? '', target: pr.baseRef, line: pr.headRef, host: pr.host, owner: pr.owner, repo: pr.repo, remote: same ? link!.remote : '', submission: s.latest?.id ?? 0, since: s.pullRequest?.requested.since ?? new Date().toISOString(), source: { number: pr.number, headRef: pr.headRef } }) // i18n-ignore: a fact's kind and codes, not text
+      w.action('openPr', { request })
+      return
+    }
+    w.fact('PrRequested', { request, revision: s.approved?.revision ?? s.latest?.revision ?? '', target: s.started?.target ?? '', line: s.started?.line ?? '', host: link?.host ?? '', owner: link?.owner ?? '', repo: link?.repo ?? '', remote: link?.remote ?? '', submission: s.latest?.id ?? 0, since: (s.pullRequest && !s.pullRequest.opened ? s.pullRequest.requested.since : null) ?? new Date().toISOString() }) // i18n-ignore: a fact's kind and codes, not text
+    w.action('openPr', { request })
   }
 
   /**
@@ -1937,6 +1888,8 @@ export class Workflow {
   /** Puts a card in the merge queue: a new entry (`IntegrationRequested`). */
   enqueue(w: Write, requeue?: 'transient' | 'retry'): void {
     const s = w.state()
+    // HI-3551: a pull request's card is never queued to merge here, by any path: its finish is its pull request.
+    if (s.started?.pr) return
     const target = s.started?.target ?? ''
     w.fact('IntegrationRequested', { entry: `${w.card.key}/e${s.lastSeq + 1}`, revision: s.approved?.revision ?? s.latest?.revision ?? '', key: s.latest?.key ?? null, target, style: w.ruleset!.options.style, ...(requeue ? { requeue } : {}) })
     w.move('merging', 'derived')
@@ -1963,6 +1916,19 @@ export class Workflow {
     if (w.card.kind === 'no-code') {
       w.fact('Accepted', { submission: s.latest!.id }) // i18n-ignore: a fact's kind and codes, not text
       w.move('done', 'derived')
+      return
+    }
+    // HI-3551: a pull request's card finishes through its pull request (HI-3552), never by a merge here, whatever the
+    // project's finish: its pass kept, it waits in Passed. No queue entry, no agent's merge, nothing marked integrated.
+    // Passed even where its project's own rules have no such stage (no review, no OK before merging: HR1's round 1).
+    if (s.started?.pr) {
+      w.move('approved', 'derived')
+      // HI-3552, HI-3562: under the pull request finish, after the user's OK where G10 asks, Combwork pushes its fixes
+      // back to its own pull request (opening none) and it follows that pull request in PR open.
+      if (o.finish === 'pullRequest') {
+        if (this.enforced() && okBeforeApplies(r, w.card.labels) && !approvedByUser(s, 'okBefore')) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.prOkBefore, { card: w.card.key }))
+        else this.requestPr(w, fin.github)
+      }
       return
     }
     if (o.finish === 'accept') {
@@ -2000,6 +1966,13 @@ export class Workflow {
           w.move('done', 'derived')
         }
         return
+      case 'pullRequest':
+        // HI-3552: Approved while Combwork pushes it and opens its pull request (with no review too: where a failure
+        // waits), after the user's OK where G10 asks for it, then PR open (prHost.ts).
+        w.move('approved', 'derived')
+        if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.prOkBefore, { card: w.card.key }))
+        else this.requestPr(w, fin.github)
+        return
       case 'notChecked':
         // G10 applies here too (decided on #1592): the OK is asked in Approved, and the report of the merge waits for it.
         if (o.review !== 'none' || needOk) {
@@ -2008,19 +1981,6 @@ export class Workflow {
         } else {
           w.move('done', 'derived')
         }
-        return
-      case 'userIntegrates':
-        // jj (HI-2868, option A): the user integrates what passed. It waits in Approved, its OK asked there first where G10
-        // applies, until reconciliation finds it in its target (J9b2); Combwork never merges or moves anything for it.
-        if (hasStage(r, 'approved')) w.move('approved', 'derived')
-        if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
-        return
-      case 'combworkAdvances':
-      case 'previewAdvance':
-        // HI-3235 (HI-3236: its preview too): Combwork integrates what passed (its platform's advance port): it waits in Approved, its OK asked there
-        // first where G10 applies, for its candidate and merge checks; the reconcile then calls the adapter's advance.
-        w.move('approved', 'derived')
-        if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
         return
       default:
         return
@@ -2219,7 +2179,7 @@ export class Workflow {
       inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
       // The first missing check's newest run on the revision, if it passed and didn't count: the refusal says why (#1654).
       const last = inputs.checksMissing.length ? s.checks.findLast((c) => c.name === inputs.checksMissing![0] && c.revision === revision) : undefined
-      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: hasCapability(o.platform, 'checkCopies') && !last.isolated }
+      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: hasCapability(o.platform, 'isolation') && !last.isolated }
     }
     // G13: the builder's own running work, whoever submits (an agent itself; the user's or the Assistant's move: the
     // card's builder). Read again in the write (`runsNow`): work started meanwhile counts.
@@ -2395,11 +2355,8 @@ export class Workflow {
     // HI-2660: what the pass accepts of others' focused-test runs, worked out in the write on the card's facts then.
     let acceptance: ReturnType<typeof acceptedRuns> = { accepted: [], warnings: [] }
     await this.cfg.hooks?.beforeWrite?.('verdict')
-    // As a start's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant, as often
-    // as its platform allows. jj's head moves with Combwork's own jj operations beside a review (its review copy put at
-    // the revision reviewed as start review leases it), which change nothing the verdict decides on.
-    const gathers = this.platform(r.options).gathers ?? 1
-    if (await this.revalidate(card, s, r.options, before, gathers, 'verdict')) return this.regather(card, () => this.verdict(ref, actor, args))
+    // As a start's (HI-3216): gathered again once while only its fingerprint moved.
+    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.verdict(ref, actor, args))
     let evidenceMoved = false
     const out = await this.writeWhole(card, r, actor, (w) => {
       const stale = this.stillAt(w, s, 'verdict')
@@ -2421,7 +2378,7 @@ export class Workflow {
       if (bad) return args.startReview ? undo(bad) : bad
       const st = w.state()
       acceptance = args.accept?.length ? (args.pass ? acceptedRuns(st.checks, sub?.revision ?? null, args.accept, r.options.commands) : { accepted: [], warnings: [say(W.acceptOnPass)] }) : { accepted: [], warnings: [] }
-      w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment, ...(acceptance.accepted.length ? { accepted: acceptance.accepted } : {}) }) // i18n-ignore: a fact's kind and codes, not text
+      const given = w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment, ...(acceptance.accepted.length ? { accepted: acceptance.accepted } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       // HI-1734: a code card passing with nothing to merge is proposed no code, as an agent's proposal is (the user
       // confirms; then it finishes with nothing to merge). HI-1449 sat in Approved for two days. Once only: not after a
       // proposal or a decision of its kind (`merged` was only read without either).
@@ -2429,6 +2386,14 @@ export class Workflow {
       // A verdict frees its pooled reviewer for the next card, and with G1b = 2 a pass asks for the second (#1443); a loose
       // card's too (HI-2046).
       if (card.reviewerPool || !card.lane) w.action('assignReviewer', { submission: subId! })
+      // HI-3559 (Feedback to GitHub): a reviewer agent's verdict on a pull request's card, drafted as its review there under
+      // the option as it is now (never for a verdict written before it changed); Agent's posted by Combwork, through an
+      // action run once this write commits.
+      const feedback = githubFeedbackOf(this.cfg.options())
+      if (agent && card.source?.kind === 'pr' && feedback !== 'user') {
+        const draft = w.fact('GithubReviewDrafted', { verdict: given.seq, submission: subId!, revision: sub?.revision ?? null, reviewer: agent, body: args.comment, auto: feedback === 'agent' })
+        if (feedback === 'agent') w.action('postGithubReview', { draft: draft.seq }, draft.seq)
+      }
       if (!args.pass) {
         w.move('active', 'intent')
         this.wake(w, st.started?.builder, stored(W.failedReview, { card: card.key }))
@@ -2453,16 +2418,8 @@ export class Workflow {
       this.finish(w, fin)
       return null
     })
-    // Its fingerprint moved again between the last gather and the write, its answer by content the same, or unreadable at
-    // that instant (a start's rule, HI-2972): gathered again from the top while its platform allows more passes.
-    if (out && evidenceMoved) {
-      const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, s, r.options, before) : null
-      if (again) {
-        this.passLog(card, 'verdict', 'write', again, gathers)
-        return this.regather(card, () => this.verdict(ref, actor, args))
-      }
-      log.info(`#${card.id}'s verdict refused: evidence.changed at its write, pass ${this.gathering.depth(card.id) + 1} of ${gathers} (${this.noPassWhy(card, gathers)})`)
-    }
+    // Its fingerprint moved again between the last gather and the write (a start's rule, HI-2972): refused.
+    if (out && evidenceMoved) log.info(`#${card.id}'s verdict refused: evidence.changed at its write, pass ${this.gathering.depth(card.id) + 1} of 1 (${NO_PASS})`)
     if (out) return this.refuse(card, actor, 'verdict', out)
     return this.ok(card, 'review', this.state(card).stage, acceptance.accepted.length ? { accepted: acceptance.accepted } : undefined, acceptance.warnings)
   }
@@ -2564,7 +2521,7 @@ export class Workflow {
    * a Decide answer, or an agent's question approved with a note, HI-2286) is the board's to record, beside this. The agent waiting on it is woken: whoever asked (an agent's own question), else the builder;
    * at the round limit the builder and the reviewer, whose lane paused for it.
    */
-  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', opts: { note?: string; choice?: PauseChoice; rounds?: number; decided?: boolean; action?: AskActionKind; /** HI-3235: who answers (the window: the user): an advance's question takes only the user's; HI-3188: 'assistant' answers a simplify check (carry on or simplify). */ by?: string } = {}): Promise<Reply> {
+  async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', opts: { note?: string; choice?: PauseChoice; rounds?: number; decided?: boolean; action?: AskActionKind; /** HI-3235: who answers (the window: the user); HI-3188: 'assistant' answers only a simplify check (carry on or simplify). */ by?: string } = {}): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -2575,8 +2532,6 @@ export class Workflow {
     const usersOnly = (gate: string): GuardRefusal | null => (by === 'assistant' && (gate !== SIMPLIFY_GATE || (opts.choice !== 'carryOn' && opts.choice !== 'simplify')) ? ({ rule: 'loop.usersChoice', values: { card: card.key, request } } as GuardRefusal) : null)
     const notTheirs = usersOnly(req.gate)
     if (notTheirs) return this.refuse(card, by, 'answer', notTheirs)
-    // HI-3235: an advance's question is the user's alone (its Approve can be an attestation): only the window's answer.
-    if (ADVANCE_GATES.includes(req.gate) && ((opts.by ?? 'user') !== 'user' || (answer !== 'approved' && answer !== 'declined'))) return this.refuse(card, by, 'answer', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'answer', moves: '' } })
     const r = this.rulesetOf(card, s)
     const before = await this.evidenceOf(card, s, r.options)
     const fin = await this.finishInputs(card, s, r, s.approved?.revision ?? s.latest?.revision)
@@ -2589,11 +2544,9 @@ export class Workflow {
     const unmerged = req.gate === 'review' && answer === 'approved' && card.kind === 'no-code' ? this.unmergedRefusal(card, fin) : null
     if (unmerged) return this.refuse(card, by, 'answer', unmerged)
     await this.cfg.hooks?.beforeWrite?.('answer')
-    // HI-3391: as a verdict's (HI-3216): gathered again while only its fingerprint moved, or can't be read at that instant,
-    // as often as its platform allows. jj's head moves with any jj operation in the repository (another lane's commit, a
-    // review copy's checkout), which changes nothing the answer decides on; a change by content still refuses at once.
-    const gathers = this.platform(r.options).gathers ?? 1
-    if (await this.revalidate(card, s, r.options, before, gathers, 'answer')) return this.regather(card, () => this.answer(ref, request, answer, opts))
+    // HI-3391: as a verdict's (HI-3216): gathered again once while only its fingerprint moved; a change by content still
+    // refuses at once.
+    if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.answer(ref, request, answer, opts))
     let evidenceMoved = false
     const out = await this.write(card, r, by, (w) => {
       // Under the transaction: the request still open (a newer submission retires the old one's), the card where it was.
@@ -2644,17 +2597,17 @@ export class Workflow {
         const e = st.entries.find((x) => x.id === req.entry)
         if (e) w.action('enqueue', { target: e.target, ...(req.gate === QUEUE_STUCK_GATE ? { recheck: true } : {}) })
       }
-      if (ADVANCE_GATES.includes(req.gate) && req.entry && req.result && (answer === 'approved' || answer === 'declined')) {
-        // HI-3235: the platform adapter takes the answer up in a durable action bound to what was asked (its request,
-        // attempt, plan, cycle and state): one per answer, its handler reading the attempt's journal before anything.
-        const payload: AdvanceAnswer = { request, gate: req.gate, attempt: req.entry, plan: req.result, cycle: st.cycle, state: req.gate === ADVANCE_STOPPED_GATE ? 'stopped' : req.gate === ADVANCE_PREVIEW_GATE ? 'preview' : 'uncertain', answer, project: this.cfg.project }
-        w.action('advanceAnswer', { ...payload })
-        return null
-      }
       if (req.gate === MERGE_CHOICE_GATE) {
         // HI-1697: the merge style and commit message are saved with the answer (chooseMerge); its queue looks again now.
         const e = st.entries.find((x) => x.id === req.entry)
         if (e) w.action('enqueue', { target: e.target })
+      }
+      if (req.gate === PR_RETRY_GATE) {
+        // HI-3552: Approve tries again, as a new request of this cycle pinned to the link as it is now; Decline leaves the
+        // card waiting in Approved. Its builder hears of it either way.
+        if (answer === 'approved' && st.stage === 'approved' && r.options.finish === 'pullRequest' && !st.pullRequest?.opened) this.requestPr(w, fin.github)
+        this.wake(w, builder, said, 'answer')
+        return null
       }
       if (req.gate !== 'review' && req.gate !== 'okBefore') {
         // A question an agent asked (or Combwork's own, after a merge): recorded, and the asker told; nothing moves.
@@ -2674,22 +2627,15 @@ export class Workflow {
         if (!missing || (missing.missing === 'userOk' && approvedByUser(now, 'review'))) this.finish(w, fin)
       } else if (!missing && st.stage === 'approved') {
         if (r.options.finish === 'combworkMerges') this.enqueue(w)
+        else if (r.options.finish === 'pullRequest') this.requestPr(w, fin.github)
         else this.wake(w, builder, stored(W.approvedMerge))
       }
       // Whatever the approval led to (finished, queued, still waiting on another gate), its builder hears of it, once.
       if (!w.woken.includes(builder ?? '')) this.wake(w, builder, said)
       return null
     })
-    // HI-3391: its fingerprint moved again between the last gather and the write, its answer by content the same, or
-    // unreadable at that instant (a verdict's rule): gathered again from the top while its platform allows more passes.
-    if (out && evidenceMoved) {
-      const again = gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, s, r.options, before) : null
-      if (again) {
-        this.passLog(card, 'answer', 'write', again, gathers)
-        return this.regather(card, () => this.answer(ref, request, answer, opts))
-      }
-      log.info(`#${card.id}'s answer refused: evidence.changed at its write, pass ${this.gathering.depth(card.id) + 1} of ${gathers} (${this.noPassWhy(card, gathers)})`)
-    }
+    // HI-3391: its fingerprint moved again between the last gather and the write (a verdict's rule): refused.
+    if (out && evidenceMoved) log.info(`#${card.id}'s answer refused: evidence.changed at its write, pass ${this.gathering.depth(card.id) + 1} of 1 (${NO_PASS})`)
     if (out) return this.refuse(card, by, 'answer', out)
     return this.ok(card, from, this.state(card).stage)
   }
@@ -2746,6 +2692,8 @@ export class Workflow {
     if (isRefusal(card)) return card
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
+    // HI-3551: a pull request's card is never reported merged here: its finish is its pull request (a fixed notice).
+    if (s.started?.pr) return this.refuse(card, actor, 'report merge', { rule: 'platform.prNotLocal', values: { card: card.key } }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     // Under Combwork merges (the card's own ruleset) the queue merges, never a report: refused saying where it is (#1354).
     const combwork = r.options.finish === 'combworkMerges'
     const queued = this.combworkMergesRefusal(card, s)
@@ -2864,7 +2812,7 @@ export class Workflow {
     const s = this.state(card)
     if (s.stage !== 'todo' && s.stage !== 'hold' && s.stage !== 'active' && s.stage !== 'review') return null
     const o = this.rulesetOf(card, s).options
-    return checksView(o.preChecks, card.key, hasCapability(o.platform, 'checkCopies'))
+    return checksView(o.preChecks, card.key, hasCapability(o.platform, 'isolation'))
   }
 
   /** The merge slot claimed for a card (#1354): refused, and recorded as Refused, when Combwork merges it. */
@@ -3303,9 +3251,8 @@ export class Workflow {
       // agent-protocol: who can override, the refusal's override field (§16.8.3)
       if (releasedTarget && !opts.dry && opts.released !== releasedTarget) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'start', (releasedRule as { refusal: GuardRefusal }).refusal, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
-      // A start's passes, as `start`'s (its platform's `gathers`, HI-2916).
-      const gathers = gs ? (this.platform(gs.o).gathers ?? 1) : 1
-      if (gs && (await this.revalidate(card, s, gs.o, gs.before, gathers))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
+      // A start's one pass gathered again, as `start`'s (HI-2916).
+      if (gs && (await this.revalidate(card, s, gs.o, gs.before))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       if (!gs && gsub && (await this.revalidate(gsub.card, gsub.s, gsub.o, gsub.before))) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
       const cause: FactData['Moved']['cause'] = skipped.length ? 'override' : 'user'
       // The rules as they are in the write: one not decided on undoes the write (it throws), to ask again.
@@ -3316,6 +3263,8 @@ export class Workflow {
       let out: GuardRefusal | null
       let startMoved = false
       let releaseMoved = false
+      // HI-3552: moved into Passed under a pull request's finish, its request pins the project's GitHub link as it is now.
+      const prLink = r.options.finish === 'pullRequest' && this.cfg.githubLink ? await this.cfg.githubLink().catch(() => null) : null
       try {
         out = await this.write(card, r, by, (w) => {
           const moved = this.stillAt(w, s0, 'move')
@@ -3352,26 +3301,22 @@ export class Workflow {
           else if (pastReview && ORDER.indexOf(w.current) < ORDER.indexOf(to)) {
             if (to === 'merging' && r.options.finish === 'combworkMerges') this.enqueue(w)
             else w.move(hasStage(r, 'approved') ? 'approved' : to, cause)
+            // HI-3552: the user's move into Passed is their OK: Combwork pushes it and opens its pull request.
+            if (r.options.finish === 'pullRequest' && w.current === 'approved' && !w.state().pullRequest) {
+              this.requestPr(w, prLink)
+            }
           }
           return null
         })
       } catch (e) {
         if (!(e instanceof DragUndone)) throw e
         if (releaseMoved && !this.gathering.depth(card.id)) return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
-        // The start's fingerprint moved again before the write, its content the same: gathered again while its platform
-        // allows more passes (`start`'s rule, HI-2916).
-        const again = startMoved && gs && gathers > 1 && this.gathering.depth(card.id) < gathers ? await this.gatherAgain(card, s, gs.o, gs.before) : null
-        if (again) {
-          this.passLog(card, 'start', 'write', again, gathers)
-          return await this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
-        }
-        if (startMoved) this.startRefusedLog(card, 'write', gathers, this.noPassWhy(card, gathers))
+        // The start's fingerprint moved again before the write: refused (`start`'s rule, HI-2916).
+        if (startMoved) this.startRefusedLog(card, 'write', NO_PASS)
         if (e.refused.rule === 'move.needsOverride' && by === 'user') return needs(String(e.refused.values.rules).split(', '))
         // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
         return this.refuse(card, by, 'move', e.refused, e.refused.rule === 'move.needsOverride' ? 'the user or the Assistant' : 'the user') // i18n-ignore: who can override, agent-facing (§16.8.3)
       }
-      // HI-3107: a start written by the move (a board drag, the Assistant's move), its earlier work said as start's is.
-      if (!out && gs && !opts.dry && gs.earlier.length && this.state(card).stage === 'active') void Promise.resolve(this.cfg.earlierWork?.(card, gs.earlier, gs.o.platform)).catch((e) => log.warn(`#${card.id}: saying its earlier work`, e))
       return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, this.state(card).stage)
     } finally {
       // A slot lent for its start and not started with (asked, refused, undone): given back (#1438).
@@ -3629,7 +3574,7 @@ export class Workflow {
   /** Edits Combwork saw through the card's agents' hooks and file locks: the pre-fill of its paths. */
   noteEdit(card: CardRecord, path: string): void {
     this.store.addPrefill(card.id, path)
-    this.none.invalidate(path)
+    this.none?.invalidate(path)
   }
 
   /**
@@ -3637,7 +3582,7 @@ export class Workflow {
    * agent or the user active), else left as an unclaimed change.
    */
   noteWrite(path: string, active: { agents: string[]; user: boolean }): void {
-    this.none.invalidate(path)
+    this.none?.invalidate(path)
     if (active.user || active.agents.length !== 1) return
     const card = this.store.cards().find((c) => c.stage === 'active' && this.state(c).started?.builder === active.agents[0])
     if (card) this.noteEdit(card, path)
@@ -3652,6 +3597,10 @@ export class Workflow {
   async declarePaths(ref: unknown, actor: Actor, paths: string[], commit?: () => void): Promise<{ prefill: string[]; unclaimed: string[]; revision: string | null } | Refusal> {
     const card0 = this.resolve(ref, actor)
     if (isRefusal(card0)) return card0
+    // HI-3517: only where the card's platform declares paths and its deliverables are installed: elsewhere (Git, a build
+    // without None) refused, nothing stored and nothing read.
+    const platform = this.rulesetOf(card0).options.platform
+    if (!declaresPaths(platform) || !this.none) return this.refuse(card0, actor, 'declare paths', { rule: 'paths.notDeclared', values: { card: card0.key, platform: PLATFORMS[platform].name } }, null) // i18n-ignore: an intent name (the window: texts.ts's MOVE_NAMES)
     // A card's paths narrow the deliverables, never widen them (#1511): none under `.combwork`, `.git` or an excluded folder.
     const bad = this.excludedPath(paths)
     if (bad) return refusal('paths.excluded', { card: card0.key, ...bad }, null)
@@ -3659,14 +3608,14 @@ export class Workflow {
       commit?.()
       return this.store.updateCard(card0.id, { paths })
     })
-    const rev = this.none.revision(paths)
+    const rev = this.deliverables().revision(paths)
     return { prefill: this.prefill(card), unclaimed: await this.unclaimed(card), revision: isUnknown(rev) ? null : rev.revision }
   }
 
   /** The first declared path under `.combwork`, `.git` or an excluded folder (#1511), with that folder; null when none is. */
   private excludedPath(paths: readonly string[]): { path: string; folder: string } | null {
     for (const path of paths) {
-      const folder = this.none.excludedPart(path)
+      const folder = this.deliverables().excludedPart(path)
       if (folder) return { path, folder }
     }
     return null
@@ -3684,19 +3633,20 @@ export class Workflow {
     if (this.store.card(card0.id).kind === 'no-code') return []
     for (let tries = 0; tries < 2; tries++) {
       const cycle = this.state(this.store.card(card0.id)).cycle
-      const generation = this.none.generation
-      const now = await readBaseline(this.none, o.signal)
+      const none = this.deliverables()
+      const generation = none.generation
+      const now = await requirePathsDeliverables().readWhole(none, o.signal)
       if (!now || isUnknown(now) || o.signal?.aborted) return []
       const card = this.store.card(card0.id)
       const s = this.state(card)
       if (s.cycle !== cycle || card.kind === 'no-code') return []
-      if (this.none.generation !== generation) continue
-      const before = this.none.covering(s.started?.deliverables ?? {})
+      if (none.generation !== generation) continue
+      const before = none.covering(s.started?.deliverables ?? {})
       // Covered as a revision covers them (HI-2339): a declared folder's files are the card's.
       const mine = [...(o.paths ?? card.paths ?? []), ...this.prefill(card)]
-      return NoneAdapter.diff(before, this.none.covering(now))
+      return requirePathsDeliverables().diff(before, none.covering(now))
         .map((f) => f.path)
-        .filter((p) => !this.none.covers(mine, p))
+        .filter((p) => !none.covers(mine, p))
     }
     return []
   }
@@ -3714,7 +3664,7 @@ export class Workflow {
   private async guardWarnings(o: WorkflowOptions, base: string, revision: string): Promise<string[]> {
     const guards = guardsOf(this.cfg.options())
     const adapter = this.platform(o)
-    if (!guards.length || !adapter.addedDiff || !(o.finish === 'combworkMerges' || finishOnCandidate(o.finish))) return []
+    if (!guards.length || !adapter.addedDiff || o.finish !== 'combworkMerges') return []
     // A warning only, which says nothing when it can't finish: never a submit held for the merge's own limit (HI-3377).
     const limits = this.cfg.guardLimits?.() ?? GUARD_CHECK_DEFAULTS
     const r = await checkMergeGuards(guards, () => adapter.addedDiff!(base, revision), { ...limits, timeoutMs: Math.min(limits.timeoutMs, SUBMIT_GUARDS_MS) })
@@ -3725,7 +3675,7 @@ export class Workflow {
     if (!declaresPaths(o.platform) || card.kind !== 'code') return []
     const paths = card.paths ?? []
     const out: string[] = []
-    const outside = given ? [] : this.prefill(card).filter((p) => !this.none.covers(paths, p))
+    const outside = given ? [] : this.prefill(card).filter((p) => !this.deliverables().covers(paths, p))
     if (outside.length) out.push(say(W.pathsLeaveOut, { card: card.key, files: outside.join(', ') }))
     const unclaimed = (await this.unclaimed(card, { paths, signal })).filter((p) => !outside.includes(p))
     if (unclaimed.length) out.push(say(W.unclaimed, { card: card.key, files: unclaimed.join(', ') }))
@@ -3740,7 +3690,7 @@ export class Workflow {
     if (!declaresPaths(o.platform) || card.kind !== 'code') return null
     const prefill = this.prefill(card)
     const paths = card.paths ?? prefill
-    const outside = prefill.filter((p) => !this.none.covers(paths, p))
+    const outside = prefill.filter((p) => !this.deliverables().covers(paths, p))
     const files = [...outside, ...(await this.unclaimed(card, { paths })).filter((p) => !outside.includes(p))]
     return files.length ? { paths, files } : null
   }
@@ -3783,7 +3733,7 @@ export class Workflow {
   /** A lane's card in flight: started and not Done (Active, Review, Approved or Merging), by the stage the board keeps. */
   private laneCardFlying(n: number): boolean {
     const stage = this.store.card(n).stage
-    return stage === 'active' || stage === 'review' || stage === 'approved' || stage === 'merging'
+    return stage === 'active' || stage === 'review' || stage === 'approved' || stage === 'merging' || stage === 'prOpen'
   }
 
   /**
@@ -4023,11 +3973,6 @@ export class Workflow {
       case 'pin':
         await this.platformOf(card).perform(kind, payload)
         return
-      case 'advanceAnswer':
-        // HI-3235: the platform's handler (its journal first: a replay after a crash runs nothing it may have run), then the
-        // actions its records left (run here, outside its locks).
-        await this.platformOf(card).advanceAnswer?.(card, payload as unknown as AdvanceAnswer, advanceHostOf(this))
-        return
       // A finish (HI-2014) ends its lane once all its cards are Done, as `endLaneIfDone` (written before it) still does.
       case 'finish':
       case 'endLaneIfDone': {
@@ -4058,3 +4003,10 @@ export type { RuleId }
 
 /** HI-3377: the longest cw_submit's early merge-guards warning matches (the merge's own check takes the setting's time). */
 const SUBMIT_GUARDS_MS = 10_000
+
+/** HI-3551: whether a gathered start's pull request (none for an ordinary card) is still what the card's source says: the same PR, or no PR source at all. */
+export function prStillSame(source: CardRecord['source'], gathered: StartedPr | undefined): boolean {
+  const pr = source?.kind === 'pr' ? source : null
+  if (!pr || !gathered) return !pr && !gathered
+  return sameSource(pr, { kind: 'pr', host: gathered.host, owner: gathered.owner, repo: gathered.repo, number: gathered.number })
+}

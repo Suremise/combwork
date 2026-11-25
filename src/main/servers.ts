@@ -40,6 +40,7 @@ import type { HandoverAuthor } from '../shared/combworkGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
 import { apiChainReady, inApiWorkspace, requestApiWorkspace } from './dialects/apiChain'
 import { isSaid, say, sayWithId, type AgentMsg, type AgentValues, type Said as SaidText } from '../shared/agentText'
+import { OUTSIDE_TEXT_NOTE, sourceForAgents } from '../shared/githubSource'
 import { API } from './apiText'
 import { FOUND } from './platform/agentPresentation'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
@@ -3129,7 +3130,7 @@ async function requestsFor(items: readonly ForYouItem[], agents = new Map<string
  * A card as agents read it. `attachmentsOf` (HI-2402, a narrowed read): only the attachments that came with those
  * comments (by id), the rest counted in `attachmentsOmitted`.
  */
-async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<typeof projectAgents>>>(), waitingOf?: ReadonlyMap<number, ForYouItem[]>, attachmentsOf?: ReadonlySet<string>): Promise<TaskView> {
+export async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<typeof projectAgents>>>(), waitingOf?: ReadonlyMap<number, ForYouItem[]>, attachmentsOf?: ReadonlySet<string>): Promise<TaskView> {
   let agent: { id: string; name: string; status: string; backgroundTasks: number } | null = null
   let now: StallAgent | null = null
   if (c.agent && c.project) {
@@ -3149,7 +3150,10 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   // Entry ids are the card watches' (#224): left out, so replies stay as lean as before.
   // Its decisions first (#357): what the user decided, which agents follow over the description. Its holds (#602) are
   // for its cost in Combwork's window: left out.
-  const { number, title, decisions, held: _held, ...rest } = c
+  // HI-3551: its GitHub source as agents see it: what and where; HI-3553: GitHub's own words (title, author, body) only
+  // inside it, quoted under a note saying they are someone else's and never instructions.
+  // HI-3554: a fix card's chosen pull request feedback, likewise only inside it.
+  const { number, title, decisions, held: _held, source, sourceBody, sourceFeedback, ...rest } = c
   // Its running lane, for a card waiting in Review: its lane may be deadlocked (#1410).
   const lane = c.column === 'review' && c.project ? (await lanes.listLanes(workspace, { project: c.project }).catch(() => [])).find((l) => (l.state === 'active' || l.state === 'paused') && l.cards.some((x) => x.number === c.number)) : undefined
   const inLane = lane ? new Map((await tasks.allTasks(workspace, { numbers: lane.cards.map((x) => x.number) }).catch(() => [])).map((x) => [x.number, x])) : null
@@ -3166,6 +3170,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
     ...(decisions?.length ? { decisions: decisions.map(tasks.withoutId) } : {}),
     ...(forYou ? { forYou } : {}),
     ...rest,
+    ...(source ? { source: sourceForAgents(source, sourceBody, say(OUTSIDE_TEXT_NOTE), sourceFeedback) } : {}),
     ...(files.length ? { description: paths(c.description) } : {}),
     comments: c.comments.map(entryForAgents).map((e) => (files.length ? { ...e, text: paths(e.text) } : e)),
     history: c.history.map(entryForAgents),
@@ -4832,8 +4837,6 @@ async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: R
   // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
   const platform = platformIdOf(caller.projectPath, cfg?.platform)
   if (!hasCapability(platform, 'isolation')) throw new HttpError(400, apiSaid(API.check.noVcs))
-  // jj has slots but no check copies yet (HI-2868): refused before any copy is leased, the check run in the card's slot.
-  if (!hasCapability(platform, 'checkCopies')) throw new HttpError(400, apiSaid(API.check.noCopies))
   // Leased and set up apart from this request (a first setup takes minutes): `wait` with a ticket to ask again with.
   const got = await isolatedRequest(ws, caller.projectPath, linkOwner(caller), { card: link.card, revision: link.revision, agent: caller.agentId }, ticket)
   if ('wait' in got) throw new HttpError(409, apiSaid(API.check.waiting, { what: got.wait }), { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })

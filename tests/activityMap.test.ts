@@ -5,7 +5,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { SCRIPT_CALLS, activityTurns, type ActivityTurns } from '../src/shared/activity'
-import { MAP_AGENTS, MAP_CALLS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, shownAlone, stationLastShown, stationOf, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapStation } from '../src/shared/activityMap'
+import { MAP_AGENTS, MAP_CALLS, MAP_STATIONS, MAX_PULSES, boundAgents, mapReadKeys, mapReadOrder, buildMapModel, contextLevel, diffPulses, hostLabel, liveIn, mapContextEntries, mapContextKey, mapLabel, mapMode, mcpParts, pathLabel, pickedAgent, stationLastShown, stationLoad, stationOf, stationPanel, PANEL_ROWS, mapCallNode, mapPickNode, mapSessionKey, stationTitle, STATION_LAST_CHARS, textColumns, type MapAgentInput, type MapCall, type MapPick, type MapStation } from '../src/shared/activityMap'
 import { contextShown } from '../src/shared/defaults'
 import { setLanguage } from '../src/shared/i18n'
 import type { TranscriptItem } from '../src/shared/types'
@@ -202,16 +202,58 @@ describe("the map's model", () => {
     expect(mixed.stations.agents.status).toBe('ok')
   })
 
-  it("counts Agents from subagent sessions, background tasks and agent calls alike", () => {
-    const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Agent' }]]), subagents: 1, tasks: [{ type: 'command' }] })], 0)
+  it("counts Agents from subagent sessions, background tasks other than commands and agent calls alike", () => {
+    const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Agent' }]]), subagents: 1, tasks: [{ type: 'monitor' }, { type: 'command' }] })], 0)
     expect(m.stations.agents.count).toBe(3)
+    // Running (HI-3479): the subagent session and the monitor, not the finished call.
+    expect(m.stations.agents.running).toBe(2)
+    // A command task is Shell's, as its panel lists it (HI-3509): running there, its agent there, not a call of its turn.
+    expect(m.stations.shell).toMatchObject({ running: 1, here: ['A'], count: 0 })
+  })
+
+  // HI-3509: what a station counts as running is what its panel lists as running, for every station and kind.
+  it("counts what runs on the station whose panel lists it", () => {
+    const one = buildMapModel([agent('A', { tasks: [{ type: 'command' }] })], 0)
+    expect(one.stations.agents).toMatchObject({ running: 0, count: 0, here: [] })
+    expect(one.stations.shell).toMatchObject({ running: 1, here: ['A'] })
+    const m = buildMapModel(
+      [
+        agent('A', { processes: [{ name: 'node.exe', pid: 1 }], tasks: [{ type: 'command' }, { type: 'monitor' }, { type: 'subagent' }, {}], subagents: 2 }),
+        agent('B', { sessionKey: 'B-s', tasks: [{ type: 'command' }, { type: 'command' }] }),
+        agent('C', { sessionKey: 'C-s', subagents: 1 })
+      ],
+      0
+    )
+    for (const s of MAP_STATIONS) {
+      const listed = stationPanel(m, s).sections.reduce((n, sec) => n + sec.rows.filter((r) => r.kind === 'running').length, 0)
+      const agents = new Set(m.running.filter((r) => r.station === s).map((r) => r.agentKey))
+      expect([s, m.stations[s].running]).toEqual([s, listed])
+      expect([s, [...agents].every((k) => m.stations[s].here.includes(k))]).toEqual([s, true])
+    }
+    expect(m.stations.shell.running).toBe(4)
+    expect(m.stations.agents.running).toBe(6)
   })
 
   it("marks You for an agent waiting, Edit for a lock block, and Shell's last as a running process's name", () => {
-    const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Bash' }]]), waiting: true, blocks: 1, processes: ['node.exe'] })], 0)
+    const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Bash' }]]), waiting: true, blocks: 1, processes: [{ name: 'node.exe', pid: 7, since: 5 }] })], 0)
     expect(m.stations.you.here).toEqual(['A'])
     expect(m.stations.edit.failed).toBe(true)
     expect(m.stations.shell.last).toBe('node.exe')
+    expect(m.stations.shell.running).toBe(1)
+    expect(m.stations.read.running).toBe(0)
+  })
+
+  // HI-3479: the honey level each station's hex fills to.
+  it("loads a station by its recent calls, saturating, and by what runs there; empty until it is counted", () => {
+    const ok = { status: 'ok' as const, running: 0 }
+    expect(stationLoad({ ...ok, heat: 0 })).toBe(0)
+    expect(stationLoad({ ...ok, heat: 3 })).toBeGreaterThan(0)
+    expect(stationLoad({ ...ok, heat: 3 })).toBeLessThan(stationLoad({ ...ok, heat: 12 }))
+    expect(stationLoad({ ...ok, heat: 500 })).toBeLessThanOrEqual(1)
+    expect(stationLoad({ ...ok, heat: 0, running: 2 })).toBe(0.5)
+    expect(stationLoad({ ...ok, heat: 0, running: 9 })).toBe(1)
+    expect(stationLoad({ status: 'loading', heat: 40, running: 2 })).toBe(0)
+    expect(stationLoad({ status: 'notReported', heat: 40, running: 0 })).toBe(0)
   })
 
   it('counts a Codex or OpenCode script by its calls', () => {
@@ -355,6 +397,7 @@ describe('pulses (HR2, s11 gap 2)', () => {
     expect(r.pulses.map((p) => [p.callKey, p.back, p.station])).toEqual([['2', false, 'shell']])
     r = diffPulses(r.seen, [call('1', true), call('2', true, 'shell')], next, r.sessions)
     expect(r.pulses.map((p) => [p.callKey, p.back])).toEqual([['2', true]])
+    expect(r.pulses[0].follows).toBeUndefined()
     r = diffPulses(r.seen, [call('1', true), call('2', true, 'shell')], next, r.sessions)
     expect(r.pulses).toEqual([])
   })
@@ -362,6 +405,8 @@ describe('pulses (HR2, s11 gap 2)', () => {
   it('a call that started and ended between two reads goes out and comes back', () => {
     const r = diffPulses(new Map([['1', true]]), [call('1', true), call('9', true)], ids(), new Set(['s']))
     expect(r.pulses.map((p) => [p.callKey, p.back])).toEqual([['9', false], ['9', true]])
+    // HI-3479: its return follows its going out (it leaves once that one lands); a return of its own read doesn't.
+    expect(r.pulses.map((p) => !!p.follows)).toEqual([false, true])
   })
 
   it("a session's turns read late, after the scope began (a stale answer, a restart's new session), are a baseline of their own", () => {
@@ -555,20 +600,165 @@ describe('an agent shown alone from the strip is read (HI-3180, HR1’s round 1)
   })
 })
 
-describe('one shown agent: the map shows the current tab’s alone (HI-3186)', () => {
+describe('one selection: the agent picked in the strip (HI-3568)', () => {
   const two = [{ key: 'mb1' }, { key: 'mr1' }]
-  it('is the tab’s agent, whichever it is, so the tab and the strip mark the same one', () => {
-    expect(shownAlone(true, 'shared', two, 'mb1')).toBe('mb1')
-    expect(shownAlone(true, 'shared', two, 'mr1')).toBe('mr1')
+  it('is the agent kept in the view, whichever it is, so the map and the panel show the same one', () => {
+    expect(pickedAgent('shared', two, 'mb1')).toBe('mb1')
+    expect(pickedAgent('shared', two, 'mr1')).toBe('mr1')
   })
-  it('is none while the whole selection is shown, in one agent’s map, or for a tab the map hasn’t', () => {
-    expect(shownAlone(false, 'shared', two, 'mb1')).toBeNull()
-    expect(shownAlone(true, 'single', two, 'mb1')).toBeNull()
-    expect(shownAlone(true, 'shared', two, null)).toBeNull()
-    expect(shownAlone(true, 'shared', two, 'gone')).toBeNull()
+  it('is none in the shared view: no pick, or one a filter leaves out or that left, never the first in its place', () => {
+    expect(pickedAgent('shared', two, null)).toBeNull()
+    expect(pickedAgent('shared', two, undefined)).toBeNull()
+    expect(pickedAgent('shared', two, 'gone')).toBeNull()
+    expect(pickedAgent('shared', [], 'mb1')).toBeNull()
+  })
+  it('is the one agent of an Agents filter on one, whatever was kept', () => {
+    expect(pickedAgent('single', [{ key: 'mr1' }], 'mb1')).toBe('mr1')
+    expect(pickedAgent('single', [], 'mb1')).toBeNull()
   })
   it('says whether an agent has a running session, for the map’s plain line in place of its graph', () => {
     const m = buildMapModel([agent('mb1'), agent('mr1', { state: 'idle', doing: null, sessionKey: null })], Date.now())
     expect(m.agents.map((a) => a.running)).toEqual([true, false])
+  })
+})
+
+// HI-3498: a station's panel, from the map's own model (names only, nothing read for it).
+describe("a station's panel", () => {
+  const AT = Date.parse('2026-11-10T12:00:00Z')
+  const ago = (min: number): string => new Date(AT - min * 60_000).toISOString()
+
+  it("Shell: what runs (processes by their executable's name, command tasks) and this turn's calls, newest first", () => {
+    const turns = turnsOf('s', [[{ name: 'Bash', at: ago(9) }], [{ name: 'Bash', at: ago(2), failed: true }, { name: 'PowerShell', at: ago(1), done: false }]])
+    const m = buildMapModel([agent('A', { turns, processes: [{ name: 'node.exe', pid: 41, since: 1000 }], tasks: [{ type: 'command', since: 2000 }, { type: 'monitor', since: 3000 }] })], AT)
+    const p = stationPanel(m, 'shell')
+    expect(p.sections.map((x) => x.id)).toEqual(['running', 'thisTurn'])
+    expect(p.sections[0].rows.map((r) => [r.label, r.running?.kind, r.running?.pid ?? r.running?.type, r.running?.since])).toEqual([
+      ['node.exe', 'process', 41, 1000],
+      ['', 'task', 'command', 2000]
+    ])
+    expect(p.sections[1].rows.map((r) => [r.label, r.failed, r.open])).toEqual([
+      ['PowerShell', false, true],
+      ['Bash', true, false]
+    ])
+  })
+
+  it('Read and Edit: each file once per agent, newest first, counted, with its path to open; a list or a non-path has none', () => {
+    const turns = turnsOf('s', [[{ name: 'Read', summary: 'src/a.ts', at: ago(5) }, { name: 'Read', summary: 'src/b.ts', at: ago(4) }, { name: 'Read', summary: 'src/a.ts', at: ago(3) }, { name: 'Grep', summary: 'needle', at: ago(2) }, { name: 'Read', summary: 'C:\\p\\deep\\c.ts', at: ago(1) }]])
+    const other = turnsOf('t', [[{ name: 'Read', summary: 'src/a.ts', at: ago(0.5) }]])
+    const m = buildMapModel([agent('A', { turns }), agent('B', { turns: other, sessionKey: 'B-s' })], AT)
+    const rows = stationPanel(m, 'read').sections[0].rows
+    expect(rows.map((r) => [r.agentKey, r.label, r.count, r.path])).toEqual([
+      ['B', 'src/a.ts', 1, 'src/a.ts'],
+      ['A', 'deep/c.ts', 1, 'C:\\p\\deep\\c.ts'],
+      ['A', 'Grep', 1, undefined],
+      ['A', 'src/a.ts', 2, 'src/a.ts'],
+      ['A', 'src/b.ts', 1, 'src/b.ts']
+    ])
+    const patch = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'apply_patch', summary: 'a/x.ts, b/y.ts' }]]) })], AT)
+    expect(stationPanel(patch, 'edit').sections[0].rows[0]).toMatchObject({ label: 'a/x.ts +1' })
+    expect(stationPanel(patch, 'edit').sections[0].rows[0].path).toBeUndefined()
+  })
+
+  // HR1's round 1: the label keeps a path's last two segments, so two files can share it; each keeps its own row.
+  it('Read and Edit: two files whose last two segments match are two rows, each with its own count and path', () => {
+    const turns = turnsOf('s', [[{ name: 'Read', summary: 'src/foo/a.ts', at: ago(4) }, { name: 'Read', summary: 'tests/foo/a.ts', at: ago(3) }, { name: 'Read', summary: 'src/foo/a.ts', at: ago(2) }, { name: 'Read', summary: 'tests/foo/a.ts', at: ago(1.5) }, { name: 'Read', summary: 'tests\\foo\\A.ts', at: ago(1) }]])
+    const rows = stationPanel(buildMapModel([agent('A', { turns })], AT), 'read').sections[0].rows
+    expect(rows.map((r) => [r.label, r.count, r.path])).toEqual([
+      ['foo/A.ts', 3, 'tests\\foo\\A.ts'],
+      ['foo/a.ts', 2, 'src/foo/a.ts']
+    ])
+  })
+
+  it('Agents: subagent sessions with their state, background tasks other than commands, and the calls', () => {
+    const m = buildMapModel([agent('A', { turns: turnsOf('s', [[{ name: 'Agent' }]]), subagents: 2, subagentStates: ['working', 'done'], tasks: [{ type: 'subagent', since: 9 }, { type: 'command', since: 8 }] })], AT)
+    const p = stationPanel(m, 'agents')
+    expect(p.sections.map((x) => [x.id, x.rows.length])).toEqual([
+      ['subagents', 2],
+      ['tasks', 1],
+      ['thisTurn', 1]
+    ])
+    expect(p.sections[0].rows.map((r) => r.running?.state)).toEqual(['working', 'done'])
+    expect(p.sections[1].rows[0].running).toMatchObject({ kind: 'task', type: 'subagent', since: 9 })
+  })
+
+  it('Tools: MCP servers with their tools, web hosts, skills and other tools, each counted; nothing of a query', () => {
+    const turns = turnsOf('s', [[{ name: 'mcp__github__get_issue', at: ago(4) }, { name: 'mcp__github__list_prs', at: ago(3) }, { name: 'mcp__combwork__cw_inbox', at: ago(2) }, { name: 'WebFetch', summary: 'https://docs.example.com/x?q=hush', at: ago(1) }, { name: 'WebSearch', summary: 'secret words' }, { name: 'Skill' }, { name: 'ToolSearch' }]])
+    const p = stationPanel(buildMapModel([agent('A', { turns })], AT), 'tools')
+    const by = Object.fromEntries(p.sections.map((x) => [x.id, x.rows.map((r) => [r.label, r.count, r.tools ?? null])]))
+    expect(by.servers).toEqual([
+      ['combwork', 1, ['cw_inbox']],
+      ['github', 2, ['list_prs', 'get_issue']]
+    ])
+    expect(by.web).toEqual([
+      ['docs.example.com', 1, null],
+      ['WebSearch', 1, null]
+    ])
+    expect(by.skills).toEqual([['Skill', 1, null]])
+    expect(by.other).toEqual([['ToolSearch', 1, null]])
+    expect(JSON.stringify(p)).not.toMatch(/hush|secret/)
+  })
+
+  it('bounds each section at PANEL_ROWS, counting the rest; an empty section is left out', () => {
+    const many = turnsOf('s', [Array.from({ length: PANEL_ROWS + 3 }, (_, i) => ({ name: 'Read', summary: `src/f${i}.ts`, at: ago(1) }))])
+    const p = stationPanel(buildMapModel([agent('A', { turns: many })], AT), 'read')
+    expect(p.sections[0]).toMatchObject({ id: 'files', more: 3 })
+    expect(p.sections[0].rows).toHaveLength(PANEL_ROWS)
+    expect(stationPanel(buildMapModel([agent('A', { turns: many })], AT), 'agents').sections).toEqual([])
+  })
+
+  it("leaves out an agent past the shared map's bound: nothing of it runs on the map", () => {
+    const m = buildMapModel([agent('A', { notLoaded: true, processes: [{ name: 'node.exe' }], subagents: 1 })], AT)
+    expect(m.running).toEqual([])
+  })
+})
+
+// HI-3499: a call the map shows, found in the list by its own agent, host, session and transcript items (HR1's check).
+describe('a map call shown in the list', () => {
+  const AT = Date.parse('2026-11-10T12:00:00Z')
+  const host = 'C:\\ws\\alpha'
+  const turns = turnsOf('s1', [[{ name: 'Read', summary: 'src/a.ts' }], [{ name: 'Bash', failed: true }, { name: 'code', calls: ['Read', 'Grep'] }]])
+  const entry = (over: { path?: string; sid?: string } = {}) => ({ key: 'hb1', path: over.path ?? host, agentId: 'hb1', input: { agents: [{ id: 'hb1', name: 'HB1', live: { sessionId: over.sid ?? 's1', status: 'working' as const, text: '', working: true, waiting: false, failed: false } }], turns: new Map([['s1', turns]]) } })
+  const calls = buildMapModel([agent('hb1', { turns, sessionKey: mapSessionKey(host, 's1') })], AT).calls
+  const ref = (c: MapCall) => ({ agentKey: c.agentKey, sessionKey: c.sessionKey, ref: c.ref, ...(c.kind ? { kind: c.kind } : {}) })
+
+  it("finds a tool call by its item, a prompt by its turn, keyed as the list keys them", () => {
+    const bash = calls.find((c) => c.label === 'Bash')!
+    expect(mapCallNode([entry()], ref(bash))).toMatchObject({ entryKey: 'hb1', agentId: 'hb1', node: { kind: 'tool', key: `tool:s1:${bash.ref!.item}`, sessionId: 's1', state: 'failed' } })
+    const prompt = calls.filter((c) => c.kind === 'prompt')[0]
+    expect(mapCallNode([entry()], ref(prompt))).toMatchObject({ node: { kind: 'turn', key: `turn:s1:${prompt.ref!.turn}`, state: 'done' } })
+  })
+
+  it("finds a script's call as its script's item", () => {
+    const grep = calls.find((c) => c.label === 'Grep')!
+    const scriptRead = calls.filter((c) => c.label === 'Read').at(-1)!
+    expect(grep.ref).toEqual(scriptRead.ref)
+    expect(mapCallNode([entry()], ref(grep))?.node).toMatchObject({ kind: 'tool', tool: { name: 'code' } })
+  })
+
+  it('finds nothing, never another row, for a restarted session, another host or an item no longer read', () => {
+    const bash = ref(calls.find((c) => c.label === 'Bash')!)
+    expect(mapCallNode([entry({ sid: 's2' })], bash)).toBeNull()
+    expect(mapCallNode([entry({ path: 'C:\\ws\\beta' })], bash)).toBeNull()
+    expect(mapCallNode([entry()], { ...bash, ref: { turn: bash.ref!.turn, item: 9999 } })).toBeNull()
+    expect(mapCallNode([entry()], { ...bash, ref: { turn: 9999, item: bash.ref!.item } })).toBeNull()
+    expect(mapCallNode([entry()], { ...bash, agentKey: 'hb2' })).toBeNull()
+    // The host's path in any case is the same host.
+    expect(mapCallNode([entry({ path: host.toUpperCase() })], bash)).not.toBeNull()
+  })
+
+  // HI-3508: a pick keeps what finds the call, never its node then, so its state is the reads' each time.
+  it('finds a pick again in the reads now: working, then done or failed once it ends; gone as it goes', () => {
+    const running = turnsOf('s1', [[{ name: 'Bash', done: false }]])
+    const live = { sessionId: 's1', status: 'working' as const, text: '', working: true, waiting: false, failed: false }
+    const inputOf = (t: ActivityTurns, sid = 's1') => ({ agents: [{ id: 'hb1', name: 'HB1', live: { ...live, sessionId: sid } }], turns: new Map([['s1', t]]) })
+    const call = buildMapModel([agent('hb1', { turns: running, sessionKey: mapSessionKey(host, 's1') })], AT).calls.find((c) => c.label === 'Bash')!
+    const found = mapCallNode([{ key: 'hb1', path: host, agentId: 'hb1', input: inputOf(running) }], ref(call))!
+    const pick: MapPick = { entryKey: found.entryKey, path: found.path, agentId: found.agentId, key: found.node.key, call: ref(call) }
+    expect(mapPickNode(pick, inputOf(running))).toMatchObject({ key: pick.key, state: 'working' })
+    expect(mapPickNode(pick, inputOf(turnsOf('s1', [[{ name: 'Bash' }, { name: 'Read' }]])))).toMatchObject({ key: pick.key, state: 'done', tool: { done: true } })
+    expect(mapPickNode(pick, inputOf(turnsOf('s1', [[{ name: 'Bash', failed: true }]])))).toMatchObject({ key: pick.key, state: 'failed' })
+    // Its session restarted, or its turn no longer read: nothing, never the old node.
+    expect(mapPickNode(pick, inputOf(running, 's2'))).toBeNull()
+    expect(mapPickNode(pick, inputOf(turnsOf('s1', [[{ name: 'Read' }]], 50)))).toBeNull()
   })
 })

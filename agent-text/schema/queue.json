@@ -172,6 +172,9 @@
       "waits": "plain"
     }
   },
+  "queue.line.pullRequest": {
+    "placeholders": {}
+  },
   "queue.line.queued": {
     "placeholders": {
       "who": "plain",

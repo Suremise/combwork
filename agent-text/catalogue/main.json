@@ -54,6 +54,11 @@
     "note": "An error: connections were asked for a coding agent CLI ({cli}: \"Codex\") that Combwork keeps no connections for.",
     "audience": "both"
   },
+  "main.accounts.noSandboxSetUp": {
+    "text": "{cli} has no sandbox setup on its accounts.",
+    "note": "An error (HI-3490): a sandbox setup was asked of a coding agent CLI ({cli}: \"Codex\") that has none to run on an account.",
+    "audience": "both"
+  },
   "main.accounts.notFound": {
     "text": "There is no such connection.",
     "note": "An error: a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile).",
@@ -72,6 +77,16 @@
   "main.accounts.running": {
     "text": "{name} has agents running on it: stop them, then remove it.",
     "note": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or one is starting.",
+    "audience": "both"
+  },
+  "main.accounts.sandboxNoAccount": {
+    "text": "{cli} sets up its sandbox on one of your {cli} accounts, and none on in this workspace is signed in. Sign one in, or turn one on here, in Settings → Accounts & Connections.",
+    "note": "An error (HI-3490): Provider Setup's sandbox Set up for a coding agent CLI ({cli}: \"Codex\") found no account of it on in the workspace that is signed in, so it didn't start the CLI (it would only show its sign-in). Settings → Accounts & Connections names a section.",
+    "audience": "both"
+  },
+  "main.accounts.sandboxSetAlready": {
+    "text": "{cli}'s sandbox is already set up for every {cli} account on in this workspace.",
+    "note": "An error (HI-3490): Provider Setup's sandbox Set up for a coding agent CLI ({cli}: \"Codex\") was asked for, but every account of it on in the workspace already has its default sandbox.",
     "audience": "both"
   },
   "main.accounts.serverOnly": {
@@ -386,7 +401,7 @@
   },
   "main.gitInit.otherVcs": {
     "text": "{vcs} keeps this folder (in {root}): Combwork makes a git repository only where no other version control system is.",
-    "note": "Why a folder can't be made a git repository: another version control system (Jujutsu, Mercurial…), {vcs}, keeps it. {root} is the folder it keeps.",
+    "note": "Why a folder can't be made a git repository: another version control system (Mercurial, Subversion…), {vcs}, keeps it. {root} is the folder it keeps.",
     "audience": "both"
   },
   "main.gitInit.stopped": {

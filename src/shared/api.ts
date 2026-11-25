@@ -1,3 +1,5 @@
+import type { PrView } from './githubSource'
+import type { FeedbackTarget, PrFeedbackRead } from './prFeedback'
 import type { FeedbackExpect, LineCommentView } from './workflow/lineComments'
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
@@ -26,8 +28,6 @@ import type {
   SlotOptions,
   GitFilesStatus,
   SlotView,
-  SlotRecoverDivergent,
-  SlotRecovery,
   HeldWriter,
   BoardState,
   SetAsideCard,
@@ -172,9 +172,12 @@ import type {
   WorkspaceInfo
 } from './types'
 import type { PlatformId } from './platform/descriptors'
-import type { SwitchRefusal } from './platform/switching'
 import type { SlotLevelForm, SlotOptionOrigin } from './slotDefaults'
 import type { GithubHostChange, GithubHostsForm } from './githubHost'
+import type { GithubLink, GithubRepoRef } from './githubRepo'
+import type { OpenPrsRead } from './githubSource'
+import type { CloseOutcome, IssueQuery, OpenIssuesRead, ReleasedLine, ShippedIssuesRead, ShippedPreview } from './issueSource'
+import type { GithubReviewRow, GithubReviewsView } from './githubReviews'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
 import type { CommitMessage, WorkflowOptions } from './workflow/options'
@@ -188,7 +191,12 @@ import type { AdvancedState, Text } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
-import type { JjBookmarksView, JjCompareView, JjConflictsView, JjHistoryView, JjLeftover, JjOperationPreview, JjOperationsView, JjRepoView, JjResolved, JjToCheckRow, JjView, JjWaitingCard } from './jjViews'
+import type { OperationPanelState, OperationRequest, OperationStepResult } from './gitOperations'
+import type { LockAsk, PruneAsk, RemotePrune, RepoHealth } from './gitHealth'
+import type { StashApplied, StashFile, StashList, StashRef, StashRequest } from './gitStashes'
+import type { BranchMoves, RestorePlan, RestoreRequest } from './gitMoves'
+import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from './gitFileRestore'
+import type { CommitActionDone, CommitActionRequest, CommitDetail } from './gitCommitView'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -449,10 +457,7 @@ export interface CombworkRequests {
    * Switches the project's version control from its next card (#1419), checked again under its lock: refused when
    * `expected` (the platform the window showed) isn't the one in force, or what is detected doesn't allow it.
    */
-  /** `token` (HI-2799): a switch between Git and jj, the group its warning showed (`PlatformSwitchCheck.store.token`). */
-  'workflow:setPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId; token?: string }) => { from: PlatformId; to: PlatformId }
-  /** HI-3105: as workflow:setPlatform, but a repository switch's refusal returned as data (its reason), for the dialog to look again; every other failure still throws. */
-  'workflow:switchPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId; token?: string }) => { switched: { from: PlatformId; to: PlatformId } } | { refused: SwitchRefusal }
+  'workflow:setPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId }) => { from: PlatformId; to: PlatformId }
   /**
    * "How do you work?" answered Not now (#1423) for the platform the step showed: no preset, the options inherited, not
    * asked again for it. Ignored if the project uses another platform now, or was answered meanwhile.
@@ -485,19 +490,30 @@ export interface CombworkRequests {
   /** A workspace's (null) or a project's GitHub host settings as they resolve (HI-2779), and a change to them. */
   'github:form': (projectPath: string | null) => GithubHostsForm
   'github:set': (projectPath: string | null, change: GithubHostChange) => GithubHostsForm
+  'github:link': (projectPath: string) => GithubLink
+  'github:setRemote': (projectPath: string, remote: string | null) => GithubLink
+  /** HI-3553: the project's GitHub repository, without asking gh (null: no link); its open pull requests, through gh. */
+  'github:repo': (projectPath: string) => GithubRepoRef | null
+  'github:openPrs': (projectPath: string) => OpenPrsRead
+  /** HI-3555: the project's open issues (narrowed by search, label, assignee); the released lines and a line's shipped issues; their close. */
+  'github:openIssues': (projectPath: string, query: IssueQuery) => OpenIssuesRead
+  'github:releasedLines': (projectPath: string) => ReleasedLine[]
+  'github:shippedIssues': (projectPath: string, line: string) => ShippedIssuesRead
+  'github:closeShippedIssues': (projectPath: string, preview: ShippedPreview) => CloseOutcome[]
+  /** HI-3559: a pull request's card's reviews to GitHub (Feedback to GitHub), and the user's posting or discarding one. */
+  'github:reviews': (n: number) => GithubReviewsView
+  'github:postReview': (n: number, row: number | null, body: string) => GithubReviewRow
+  'github:discardReview': (n: number, draft: number) => void
+  /** HI-3560: approves the card's pull request on GitHub as the user's account. */
+  'github:approvePr': (n: number, target: { host: string; owner: string; repo: string; number: number }) => void
   /** Combwork's or the workspace's slot defaults (HI-1765: Settings → Workflow defaults, Git), with what each inherits. */
   'slots:levelForm': (level: WorkflowLevel) => SlotLevelForm
   /** Sets one of a level's slot defaults (an empty string: none), or with null removes it, so it inherits. */
   'slots:setLevelDefault': (level: WorkflowLevel, key: 'copy', value: string | null) => SlotLevelForm
   /** Ends an agent's carried lease (#1441, Release Slot… in its menu): its adopted worktree stops being its own. Whether it did. */
   'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
-  /** A stale jj slot recovered (HI-2866): the user's explicit action, with what it did (HI-2996); a protocol code when refused. */
-  'slots:recoverStale': (projectPath: string, slot: string) => { ok: true; recovered?: SlotRecovery } | { ok: false; why: string; divergent?: SlotRecoverDivergent }
-  /** HI-3032: a slot kept for a card with its folder gone, removed (Remove…): only that card's record at that generation. */
-  /** `forgotten` (HI-3097): the mode the user confirmed, its folder there (true) or missing (false); another now: `changed`. */
-  'slots:removeKept': (projectPath: string, slot: string, card: number, generation: string, forgotten: boolean) => { ok: true } | { ok: false; why: string }
-  /** HI-3103: a slot kept for no card whose workspace the user forgot, at the generation shown; anything else: `changed`. */
-  'slots:removeForgotten': (projectPath: string, slot: string, generation: string) => { ok: true } | { ok: false; why: string }
+  /** HI-3464: a free slot whose folder is gone or not a worktree, forgotten (its folder left as it is); anything else: `changed`. */
+  'slots:removeGone': (projectPath: string, slot: string) => { ok: true } | { ok: false; why: string }
   /** A slot's writer as Release Slot… shows it (#1506): its holder, whether its run is live, what is listed of its processes. Null: none. */
   'slots:heldWriter': (projectPath: string, slot: string) => HeldWriter | null
   /** Release Slot… on a held writer (#1506): `end` ends its listed processes first; refused while its Combwork or run lives, or it changed. */
@@ -590,6 +606,19 @@ export interface CombworkRequests {
   'tasks:setReviewSkip': (n: number, skip: boolean, opts?: { reason?: string }) => TaskCard
   /** Sets the branch a card merges into (HI-2556, its Merges into): one the project lists, or null for its own. */
   'tasks:setTarget': (n: number, target: string | null) => TaskCard
+  'tasks:setSource': (n: number, source: string | null) => TaskCard
+  /** HI-3552: a card's pull request in PR open, read from GitHub now (or its last read); null: none. */
+  'tasks:prStatus': (n: number) => PrView | null
+  /** HI-3554: the comments, reviews and threads of a card's pull request (its source's, or the one it opened), read now. */
+  'tasks:prFeedback': (n: number) => PrFeedbackRead
+  /** HI-3554: Address feedback: the chosen comments of card n's pull request made a fix card in Todo. */
+  'tasks:addressFeedback': (n: number, target: FeedbackTarget, ids: string[], text: { title: string; description: string }) => TaskCard
+  /** HI-3552: every card's pull request in PR open read again now (the board opened). */
+  'tasks:prFollow': () => void
+  /** HI-3553: an open pull request made a card in Todo (the board's From GitHub…), or the card already about it. */
+  'tasks:fromPr': (project: string, number: number, repo: GithubRepoRef, text: { title: string; description: string }) => { card: TaskCard; existing: boolean }
+  /** HI-3555: an open issue made a card in Todo (From GitHub…'s Issues), or the card already about it. */
+  'tasks:fromIssue': (project: string, number: number, repo: GithubRepoRef, text: { title: string; description: string }) => { card: TaskCard; existing: boolean }
   'tasks:keptTarget': (n: number) => KeptTargetShown
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }
@@ -874,6 +903,8 @@ export interface CombworkRequests {
   /** Its process's size now, or the size the next one starts at without one (HI-2250): a terminal shown before the window has fitted it draws at that size. */
   'pty:size': (key: string) => { cols: number; rows: number }
   'pty:kill': (key: string) => void
+  /** Whether its process still runs (HI-3466): a view watching for its exit asks, in case it ended before the view began. */
+  'pty:running': (key: string) => boolean
   /** A terminal refused its program's OSC 52 clipboard request (#736): logged. */
   'pty:clipboardRefused': (key: string, reason: Osc52Refusal) => void
 
@@ -1158,6 +1189,36 @@ export interface CombworkRequests {
   /** root is a project or one of its agents' worktrees. With base, lists everything changed since the branch left base. */
   'git:status': (root: string, base?: string) => GitStatus
   'git:diff': (root: string, file: string, base?: string) => GitDiff
+  /** HI-3470: the git operation left under way in a Changes root (a merge, a rebase…), its conflicted files and its slot's lease; null with none. */
+  'git:operation': (root: string) => OperationPanelState | null
+  /** HI-3470: the user's step on it (Continue, Skip, Abort) or a conflicted file settled; git's output, and whether it went on and stopped again (HI-3503). Refused while anything works in the folder. */
+  'git:operationStep': (root: string, req: OperationRequest) => OperationStepResult
+  /** HI-3472: the repository's stashes (newest first) and the Changes root's slot's lease; Show's files and one file's diff. */
+  'git:stashes': (root: string) => StashList
+  'git:stashFiles': (root: string, commit: string) => StashFile[]
+  'git:stashDiff': (root: string, commit: string, file: string, untracked: boolean) => GitDiff
+  /** HI-3472: Apply or Pop of a stash into a Changes root. Refused while anything works in the folder. */
+  'git:applyStash': (root: string, req: StashRequest) => StashApplied
+  /** HI-3472: Drop of a row of the stash list (HI-3527: its commit, place and message), only while it is still in the list. */
+  'git:dropStash': (root: string, ref: StashRef) => void
+  /** HI-3469: History's Moves: a page of a local branch's reflog (null: the project folder's branch). */
+  'git:moves': (projectPath: string, branch: string | null, page: number) => BranchMoves
+  /** HI-3469: what Restore to here… would do now, for its dialog; `blocked` says why it can't. */
+  'git:restorePlan': (projectPath: string, req: RestoreRequest) => RestorePlan
+  /** HI-3469: Restore to here…: the branch moved back to that commit, only from the commit the user saw; the notice. */
+  'git:restore': (projectPath: string, req: RestoreRequest) => string
+  /** HI-3477: the Files tab's Discard Changes… (source head) and Restore From… (the project's target, or a commit of the file's): what it would do, for its confirm. */
+  'files:gitRestorePlan': (projectPath: string, rel: string, source: RestoreSource, commit?: string | null) => FileRestorePlan
+  /** HI-3477: Restore From → A Commit…'s list: a page of the commits that changed the file, newest first. */
+  'files:gitFileCommits': (projectPath: string, rel: string, page?: number) => FileCommits
+  /** HI-3477: the Discard or Restore its confirm showed: the file's changes stashed first. Refused while anything works in the project folder. */
+  'files:gitRestore': (projectPath: string, req: FileRestoreRequest) => FileRestored
+  /** HI-3471: History's Commit dialog: a commit's details and files, and why Revert… or Cherry-pick… can't be done now. */
+  'git:commitDetail': (projectPath: string, commit: string) => CommitDetail
+  /** HI-3471: one file of a commit against its first parent. */
+  'git:commitFileDiff': (projectPath: string, commit: string, file: string) => GitDiff
+  /** HI-3471: Revert… or Cherry-pick… onto the project folder's branch; a conflict leaves git mid-operation for Changes' panel. */
+  'git:commitAction': (projectPath: string, req: CommitActionRequest) => CommitActionDone
   /** The Changes tab's branch comparison (HI-1824, read-only): what can be compared, two branches, one file of them. */
   'git:compareLines': (projectPath: string) => CompareLines
   /** The Changes tab's leftover branches (HI-1823): every local branch, uncut, with its worktree and commits not in the target. */
@@ -1171,26 +1232,6 @@ export interface CombworkRequests {
   'git:tool': (recheck?: boolean) => GitTool
   /** The Git view (#607), the project folder's only (agents' worktrees change through the merge flow). The user's: no agent tool reaches these. */
   'git:summary': (projectPath: string) => GitRepoSummary
-  /** A jj project's views (HI-2799): read-only, pinned at the single operation head; the user's window only. */
-  'jj:repo': (projectPath: string) => JjView<JjRepoView>
-  'jj:history': (projectPath: string) => JjView<JjHistoryView>
-  'jj:bookmarks': (projectPath: string) => JjView<JjBookmarksView>
-  'jj:conflicts': (projectPath: string) => JjView<JjConflictsView>
-  'jj:compare': (projectPath: string, from: string, to: string) => JjView<JjCompareView | { from: JjResolved; to: JjResolved; op: string }>
-  /** jj's operations, newest first, a page from the head or from `from` (HI-2800). */
-  'jj:operations': (projectPath: string, from?: string | null) => JjView<JjOperationsView>
-  /** What reverting one operation would change, read only; `moment`: the moment the window showed it at (Copy's revalidation: the head and Git's state). */
-  'jj:operationPreview': (projectPath: string, op: string, moment?: string | null) => JjView<JjOperationPreview>
-  /** HI-2869: the passed jj cards with their last containment observation for exactly their approval. */
-  'jj:waiting': (projectPath: string) => JjWaitingCard[]
-  /** HI-2938: Run Checks Again for a jj card's candidate whose checks were stopped or keep failing; whether it did. */
-  'jj:candidateChecksAgain': (projectPath: string, card: number) => boolean
-  /** HI-2869: a page of the publish records to check (J9b2's checkThis), after a cursor. */
-  'jj:toCheck': (projectPath: string, after?: { target: string; checkAt: number; card: string; cycle: number; bundle: string } | null) => { rows: JjToCheckRow[]; more: boolean }
-  /** HI-2869: Mark as checked, the user's acknowledgement (false: the record changed meanwhile). */
-  'jj:markChecked': (projectPath: string, row: { target: string; card: string; cycle: number; bundle: string; checkAt: number }) => boolean
-  /** HI-2869: what an interrupted or lost set-up left (after a prune of the ones proved gone). */
-  'jj:leftovers': (projectPath: string) => { rows: JjLeftover[]; total: number }
   'git:info': (projectPath: string) => GitRepoInfo
   /** HI-1185: how the project's commits are signed, and whether its signer could sign just now with nobody there (null: a platform without signing). */
   'git:signing': (projectPath: string, force?: boolean) => SigningInfo | null
@@ -1217,6 +1258,16 @@ export interface CombworkRequests {
   'git:setRemoteUrl': (projectPath: string, name: string, url: string) => string
   /** HI-3372: `op`, the window's id for this run, which `git:cancel` names (Fetch, Pull, Push and the rest). */
   'git:fetch': (projectPath: string, op?: string) => string
+  /** HI-3473: Repository health's local finds: worktree entries whose folder is gone, and git's lock files (each judged stale or not). */
+  'git:health': (projectPath: string) => RepoHealth
+  /** HI-3473: Prune worktrees: the entries as listed; a summary. Refused while anything works on the repository. */
+  'git:pruneWorktrees': (projectPath: string, entries: PruneAsk[]) => string
+  /** HI-3473: Remove stale lock: the locks as listed; a summary. Refused while anything works on the repository. */
+  'git:removeLocks': (projectPath: string, locks: LockAsk[]) => string
+  /** HI-3473: Fetch with prune's check: per remote, what a prune would drop (reaches each remote; `op` its Cancel). */
+  'git:remotePrunePreview': (projectPath: string, op?: string) => RemotePrune[]
+  /** HI-3473: Fetch with prune of these remotes; a summary of what was dropped. */
+  'git:fetchPrune': (projectPath: string, remotes: string[], op?: string) => string
   'git:pull': (projectPath: string, op?: string) => string
   /** To the upstream, or to `remote` (setting it as the upstream) when the branch has none. Never forced. */
   'git:push': (projectPath: string, remote?: string, op?: string) => string
@@ -1231,7 +1282,13 @@ export interface CombworkRequests {
   'git:renameRemote': (projectPath: string, from: string, to: string) => string
   /** What a local branch tracks (#1385): `remote`'s `remoteBranch`, or nothing (`remote` null); `pushFirst` makes it there first. */
   'git:setUpstream': (projectPath: string, branch: string, remote: string | null, remoteBranch?: string, pushFirst?: boolean, op?: string) => string
-  'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string, op?: string) => string
+  'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string, op?: string, at?: string) => string
+  /** HI-3474: a local branch renamed at the commit shown; `onRemote`: the remote branch it tracks too (pushed, the old one deleted by lease). */
+  'git:renameBranch': (projectPath: string, branch: BranchAt, to: string, onRemote?: boolean, op?: string) => string
+  /** HI-3474: a tag deleted as shown (`sha`: its ref's whole value); with `remote`, on it first. */
+  'git:deleteTag': (projectPath: string, tag: BranchAt, remote?: string | null, op?: string) => string
+  /** HI-3474: a tag pushed to a remote, never forced. */
+  'git:pushTag': (projectPath: string, name: string, remote: string, op?: string) => string
   /** This repository's own user.name and user.email; empty removes it (the global one applies). */
   'git:setIdentity': (projectPath: string, name: string, email: string) => string
   /** Initialise repository (#701): whether it can be done, and what the dialog asks; then git init on main, .combwork excluded first, a starter .gitignore, the first commit. */

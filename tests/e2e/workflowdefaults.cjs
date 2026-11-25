@@ -82,11 +82,12 @@ const check = (name, ok, extra = '') => {
     // --- Settings → Version Control (HI-1768, HI-1837): the tabs Combwork defaults and Workspace defaults named after the workspace.
     await settingsSection('Version Control')
     const group = page.locator('.settings-group[data-section="workflow"]')
-    const tabs = () => group.locator('[role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-setting-tab'), name: e.innerText.trim(), selected: e.getAttribute('aria-selected') === 'true' })))
+    // The section's own tabs (each level's form has tabs of its own inside, HI-3549).
+    const tabs = () => group.locator('[role="tab"][data-setting-tab]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-setting-tab'), name: e.innerText.trim(), selected: e.getAttribute('aria-selected') === 'true' })))
     const tab = (id) => group.locator(`[role="tab"][data-setting-tab="${id}"]`)
     const selectedTab = async () => (await tabs()).find((t) => t.selected)?.id ?? null
     // The parts shown: each tab panel on screen, and the editors visible in them.
-    const shownParts = () => group.evaluate((g) => ({ panels: [...g.querySelectorAll('[role="tabpanel"]')].filter((p) => p.checkVisibility()).map((p) => p.getAttribute('data-setting')), levels: [...g.querySelectorAll('.workflow-level')].filter((l) => l.checkVisibility()).map((l) => l.getAttribute('data-level')) }))
+    const shownParts = () => group.evaluate((g) => ({ panels: [...g.querySelectorAll('[role="tabpanel"][data-setting]')].filter((p) => p.checkVisibility()).map((p) => p.getAttribute('data-setting')), levels: [...g.querySelectorAll('.workflow-level')].filter((l) => l.checkVisibility()).map((l) => l.getAttribute('data-level')) }))
     const configTab = () => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.tabs?.['settings.workflow']
     check('Settings → Version Control has two tabs, in order, the workspace’s named after it, Combwork defaults first chosen', !!(await lib.until(async () => JSON.stringify(await tabs()) === JSON.stringify([{ id: 'workflow.defaults', name: 'Combwork defaults', selected: true }, { id: 'workflow.workspaceDefaults', name: 'Workspace defaults (workflowdefaults-ws)', selected: false }]), HUNG_MS)), JSON.stringify(await tabs()))
     check('…the intro line above them, saying the order', (await text(group.locator(':scope > p'))).includes('A project’s own options'), await text(group.locator(':scope > p')))
@@ -98,7 +99,7 @@ const check = (name, ok, extra = '') => {
     const focusedTab = () => page.evaluate(() => document.activeElement?.getAttribute('data-setting-tab') ?? null)
     check('ArrowRight selects and focuses Workspace defaults, its form alone shown', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults' && (await focusedTab()) === 'workflow.workspaceDefaults' && JSON.stringify(await shownParts()) === JSON.stringify({ panels: ['workflow.workspaceDefaults'], levels: ['workspace'] }), HUNG_MS)), JSON.stringify([await selectedTab(), await focusedTab(), await shownParts()]))
     check('…with its own line', (await text(group.locator('[role="tabpanel"][data-setting="workflow.workspaceDefaults"] > .s-text > .s-desc').first())).startsWith('For this workspace’s projects'))
-    check('…the tabs in the Tab order: only the selected one', JSON.stringify(await group.locator('[role="tab"]').evaluateAll((els) => els.map((e) => e.tabIndex))) === JSON.stringify([-1, 0]))
+    check('…the tabs in the Tab order: only the selected one', JSON.stringify(await group.locator('[role="tab"][data-setting-tab]').evaluateAll((els) => els.map((e) => e.tabIndex))) === JSON.stringify([-1, 0]))
     await page.keyboard.press('Home')
     check('Home goes back to Combwork defaults', !!(await lib.until(async () => (await selectedTab()) === 'workflow.defaults' && (await focusedTab()) === 'workflow.defaults', HUNG_MS)))
     await page.keyboard.press('End')
@@ -119,6 +120,7 @@ const check = (name, ok, extra = '') => {
     const form = level.locator('.workflow-form')
     const row = (option) => form.locator(`.workflow-option[data-option="${option}"]`)
     check('the editor’s groups, Inherit relative to Combwork’s level (every option Default here)', !!(await lib.until(async () => (await row('style').count()) === 1, HUNG_MS)) && (await row('style').innerText()).includes('Default') && (await form.locator('.workflow-group[data-group="elsewhere"]').count()) === 0)
+    await lib.workflowTab(form, 'style')
     await row('style').locator('select').selectOption('squash')
     check('a value set at this level says so', (await row('style').innerText()).includes('Set here'))
     await form.locator('[data-action="save"]').click()
@@ -134,6 +136,7 @@ const check = (name, ok, extra = '') => {
     // Maximum agents (HI-2058): staged as it is typed, before the box loses focus, so Save lights at once; Discard drops
     // it, nothing written; saved, it is the workspace's.
     const maxBox = row('maxAgents').locator('input')
+    await lib.workflowTab(form, 'maxAgents')
     await maxBox.fill('18')
     check('Maximum agents typed at the workspace’s level: Save lights and the row is marked before the box loses focus', !!(await lib.until(async () => (await form.locator('[data-action="save"]').isEnabled()) && (await row('maxAgents').locator('.modified').count()) === 1, HUNG_MS)) && (await maxBox.evaluate((e) => e === document.activeElement)))
     await form.getByRole('button', { name: 'Discard Changes' }).click()
@@ -159,12 +162,14 @@ const check = (name, ok, extra = '') => {
     const loopsOrigin = async (k) => projectRow(k).locator('.workflow-origin').innerText().catch(() => '')
     check('the project’s old rounds and file locks are its own options, the workspace’s old wait its default', (await projectRow('loopRounds').locator('input').inputValue()) === '8' && (await loopsOrigin('loopRounds')).includes('Set for this project') && (await projectRow('fileLocks').locator('select').inputValue()) === 'warn' && (await projectRow('loopWaitHours').locator('input').getAttribute('placeholder')) === '3 hours' && (await loopsOrigin('loopWaitHours')).includes('From the workspace'), JSON.stringify([await loopsOrigin('loopRounds'), await loopsOrigin('loopWaitHours')]))
     check('…and the old keys are gone from the files once saved', !('loops' in wsJson()))
+    await lib.workflowTab(project, 'loopRounds')
     await shots('migrated', projectRow('loopRounds'))
     const after = await startCard('After the default')
     check('its next card starts under the new options (another ruleset)', !!after && after !== before, `${before} → ${after}`)
     check('the card started before keeps its ruleset', (await inv('tasks:facts', 1)).find((f) => f.kind === 'Started')?.ruleset === before)
 
     // --- A project's own value still wins.
+    await lib.workflowTab(project, 'style')
     await projectRow('style').locator('select').selectOption('merge')
     await project.locator('[data-action="save"]').click()
     await dialog.waitFor({ timeout: HUNG_MS })
@@ -179,11 +184,13 @@ const check = (name, ok, extra = '') => {
     const combworkRow = (option) => globalLevel.locator(`.workflow-option[data-option="${option}"]`)
     // A draft in the workspace's tab (not saved) stays through switching and a save of Combwork's (HR5's HI-1768 check), its
     // tab marked meanwhile, and is discarded after.
-    const unsaved = async () => group.locator('[role="tab"]').evaluateAll((els) => els.filter((e) => e.querySelector('[data-unsaved]')).map((e) => e.getAttribute('data-setting-tab')))
+    const unsaved = async () => group.locator('[role="tab"][data-setting-tab]').evaluateAll((els) => els.filter((e) => e.querySelector('[data-unsaved]')).map((e) => e.getAttribute('data-setting-tab')))
     check('no tab marked unsaved yet', (await unsaved()).length === 0)
+    await lib.workflowTab(form, 'stopOwnRuns')
     await row('stopOwnRuns').locator('[role="switch"], input[type="checkbox"]').first().click()
     check('a workspace draft: its Save on, its tab marked unsaved, named so for screen readers', !!(await lib.until(async () => (await form.locator('[data-action="save"]').isEnabled()) && (await unsaved()).join() === 'workflow.workspaceDefaults', HUNG_MS)) && (await tab('workflow.workspaceDefaults').getAttribute('aria-label')) === 'Workspace defaults (workflowdefaults-ws) (unsaved changes)', JSON.stringify(await unsaved()))
     await tab('workflow.defaults').click()
+    await lib.workflowTab(globalLevel, 'dependenciesDone')
     check('Combwork defaults: its editor alone, the workspace’s tab still marked', !!(await lib.until(async () => (await combworkRow('dependenciesDone').isVisible()) && JSON.stringify((await shownParts()).levels) === '["global"]', HUNG_MS)) && (await unsaved()).join() === 'workflow.workspaceDefaults')
     await shots('tabs-unsaved', group.locator('h2'))
     await combworkRow('dependenciesDone').locator('[role="switch"], input[type="checkbox"]').first().click()
@@ -205,6 +212,7 @@ const check = (name, ok, extra = '') => {
     check('the project inherits Combwork’s default, under the workspace’s (style still its own)', !!form2 && form2.options.dependenciesDone === true && form2.origins.style === 'project', JSON.stringify(form2?.origins))
     // Maximum agents at Combwork's level (HI-2058): staged as typed, and saved in Combwork's settings, not the workspace's.
     const combworkMax = combworkRow('maxAgents').locator('input')
+    await lib.workflowTab(globalLevel, 'maxAgents')
     await combworkMax.fill('20')
     check('Maximum agents typed at Combwork’s level: Save lights before the box loses focus', !!(await lib.until(async () => globalLevel.locator('[data-action="save"]').isEnabled(), HUNG_MS)))
     await globalLevel.locator('[data-action="save"]').click()
@@ -216,6 +224,7 @@ const check = (name, ok, extra = '') => {
     await shots('combwork', globalLevel.locator('.workflow-level-head'))
     // Combwork's files copied into new slots (HI-1765), with Git's options: the default, .env*, until set here.
     const combworkCopy = globalLevel.locator('[data-slot-default="copy"][data-level="global"]')
+    await lib.workflowTab(globalLevel, 'where')
     check('Combwork’s level has the files copied into new slots, at the default, .env*', !!(await lib.until(async () => (await combworkCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'default' && (await text(combworkCopy)).includes('.env*'), HUNG_MS)), await text(combworkCopy))
     await shots('combwork-copy', combworkCopy)
     // Changed elsewhere (the settings tool, another window) while open: the row follows (HR5's round 1), and so does the
@@ -225,6 +234,7 @@ const check = (name, ok, extra = '') => {
     check('…following a change made elsewhere while it is open', !!(await lib.until(async () => { const c = await copyOf(combworkCopy); return c.origin === 'here' && c.field === 'changed.env' }, HUNG_MS)), JSON.stringify(await copyOf(combworkCopy)))
     await tab('workflow.workspaceDefaults').click()
     const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
+    await lib.workflowTab(level, 'where')
     check('the workspace’s copied files inherit it, From Combwork defaults', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'global' && c.text.includes('changed.env') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
     await inv('slots:setLevelDefault', 'global', 'copy', 'again.env')
     check('…following Combwork’s changing while it is open', !!(await lib.until(async () => { const c = await copyOf(wsCopy); return c.origin === 'global' && c.text.includes('again.env') }, HUNG_MS)), JSON.stringify(await copyOf(wsCopy)))
@@ -260,10 +270,13 @@ const check = (name, ok, extra = '') => {
     // The workspace's level shows Combwork's as what it inherits.
     check('the workspace’s level inherits it: From Combwork defaults', !!(await lib.until(async () => (await row('dependenciesDone').innerText().catch(() => '')).includes('From Combwork defaults'), HUNG_MS)))
     // Its "From Combwork defaults" opens Combwork defaults' tab, where that value is set; and the copied files' too.
+    await lib.workflowTab(form, 'dependenciesDone')
+    // HI-3549: Combwork's form was left on Where cards are built, so the link must choose the option's tab itself.
     await row('dependenciesDone').locator('[data-origin-link="global"]').click()
-    check('…a link to Combwork defaults’ tab', !!(await lib.until(async () => (await selectedTab()) === 'workflow.defaults' && (await combworkRow('dependenciesDone').isVisible()), HUNG_MS)), String(await selectedTab()))
+    check('…a link to Combwork defaults’ tab, at that option: its tab chosen, the row in view', !!(await lib.until(async () => (await selectedTab()) === 'workflow.defaults' && (await combworkRow('dependenciesDone').isVisible()) && (await globalLevel.locator('[role="tab"][data-workflow-tab="merging"]').getAttribute('aria-selected')) === 'true', HUNG_MS)), String(await selectedTab()))
     await tab('workflow.workspaceDefaults').click()
     await inv('slots:setLevelDefault', 'global', 'copy', 'link.env')
+    await lib.workflowTab(level, 'where')
     await wsCopy.locator('[data-origin-link="global"]').waitFor({ timeout: HUNG_MS })
     await shots('origin-link', wsCopy)
     await wsCopy.locator('[data-origin-link="global"]').click()
@@ -273,6 +286,7 @@ const check = (name, ok, extra = '') => {
 
     // --- A level that would make an inheriting project contradictory is refused, naming it.
     await inv('workflow:setOptions', alpha, { preset: null, options: { style: 'merge', finish: 'committed' } })
+    await lib.workflowTab(form, 'folder')
     await row('folder').locator('select').selectOption('slots')
     await form.locator('[data-action="save"]').click()
     const problems = form.locator('.workflow-problems')
@@ -285,8 +299,27 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Escape')
     await page.getByText('alpha', { exact: true }).first().click()
     await page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.workflowTab(project, 'loopWaitHours')
     await projectRow('loopWaitHours').locator('[data-origin-link="workspace"]').click()
     check('a project’s From the workspace opens Settings → Version Control on Workspace defaults', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults' && JSON.stringify((await shownParts()).levels) === '["workspace"]', HUNG_MS)), JSON.stringify([await selectedTab(), await shownParts()]))
+    const wsTab = (id) => level.locator(`[role="tab"][data-workflow-tab="${id}"]`)
+    check('…at that option (HI-3549): Loops & stages chosen in its form, the row in view', !!(await lib.until(async () => (await wsTab('loops').getAttribute('aria-selected')) === 'true' && (await row('loopWaitHours').isVisible()), HUNG_MS)), await text(level.locator('[role="tablist"]').first()))
+    // --- HI-3549: a Settings search for an option lands on its tab, the option in view; a hidden tab's problem is marked.
+    await search.fill('merge style')
+    check('a search for Merge style shows the workspace defaults on Merging, the row in view', !!(await lib.until(async () => (await wsTab('merging').getAttribute('aria-selected')) === 'true' && (await row('style').isVisible()), HUNG_MS)), await text(level.locator('[role="tablist"]').first()))
+    await search.fill('')
+    await lib.workflowTab(form, 'stageNames')
+    await row('stageNames').locator('input').first().fill('Done')
+    await row('stageNames').locator('input').first().press('Enter')
+    await lib.workflowTab(form, 'overview')
+    check("a stage name that can't be saved marks Loops & stages from Overview, said for screen readers; Save held", !!(await lib.until(async () => (await wsTab('loops').locator('[data-problem]').count()) === 1 && /needs resolving/.test((await wsTab('loops').getAttribute('aria-label')) ?? '') && (await wsTab('overview').locator('[data-problem]').count()) === 0 && (await form.locator('[data-action="save"]').isDisabled()), HUNG_MS)), await text(level.locator('[role="tablist"]').first()))
+    await shots('tab-marks', level.locator('[role="tablist"]').first())
+    await form.getByRole('button', { name: 'Discard Changes' }).click()
+    for (const id of await level.locator('[role="tab"][data-workflow-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-workflow-tab')))) {
+      await lib.workflowTab(form, id)
+      await shots(`tab-${id}`, level.locator('[role="tablist"]').first())
+    }
+    check('…Discard Changes clears both marks', !!(await lib.until(async () => (await level.locator('[role="tab"] [data-problem], [role="tab"] [data-unsaved]').count()) === 0, HUNG_MS)))
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
     await page.screenshot({ path: path.join(lib.WORK, 'workflowdefaults-failed.png') }).catch(() => {})

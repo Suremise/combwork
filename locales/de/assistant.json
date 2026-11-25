@@ -693,6 +693,7 @@
   "assistant.undo.askTitle": "{n, plural, one {# Änderung rückgängig machen?} other {# Änderungen rückgängig machen?}}",
   "assistant.undo.card": "{card}: {fields}",
   "assistant.undo.changed": "{fields} seitdem geändert",
+  "assistant.undo.confirm": "Rückgängig",
   "assistant.undo.dismiss": "Ergebnis des Rückgängigmachens schließen",
   "assistant.undo.ended": "die Lane ist beendet",
   "assistant.undo.error": "fehlgeschlagen: {error}",

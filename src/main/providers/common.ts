@@ -37,13 +37,15 @@ export const WHERE_MS = 20_000
 
 
 /** `ended`: it didn't exit by itself (its timeout ended it, or it couldn't start): its code says nothing then. */
-export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string; code: number; ended?: true; timedOut?: true }> {
-  const shell = /\.(cmd|bat)$/i.test(file)
-  // Through cmd, Node joins the command and its arguments as they are: a path with spaces ("C:\My Tools\agy.cmd") would be
-  // read as "C:\My" (HI-2548), so it and any argument with a space are quoted.
-  const quote = (a: string): string => (shell && /\s/.test(a) && !/^".*"$/.test(a) ? `"${a}"` : a)
+export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJS.ProcessEnv, input?: string): Promise<{ stdout: string; stderr: string; code: number; ended?: true; timedOut?: true }> {
+  // A .cmd/.bat runs through cmd.exe, on a line built here: each part quoted as cmdArg does (a path with spaces, HI-2548;
+  // quotes and `&|<>^%`, HI-3552: an argument such as a card's title is data, never a command of its own), the line
+  // passed on verbatim, as toSpawnable's is (HI-2722).
+  const viaCmd = /\.(cmd|bat)$/i.test(file)
+  const command = viaCmd ? process.env.ComSpec || 'cmd.exe' : file
+  const argv = viaCmd ? ['/d', '/s', '/c', `"${[file, ...args].map(cmdArg).join(' ')}"`] : args
   return new Promise((resolve) => {
-    execFile(quote(file), args.map(quote), { timeout: timeoutMs, windowsHide: true, shell, encoding: 'utf8', env }, (err, stdout, stderr) => {
+    const child = execFile(command, argv, { timeout: timeoutMs, windowsHide: true, windowsVerbatimArguments: viaCmd, encoding: 'utf8', env }, (err, stdout, stderr) => {
       const raw = err ? (err as NodeJS.ErrnoException & { code?: number | string }).code : 0
       const code = err ? (raw as unknown as number) || 1 : 0
       const ended = !!err && (!!(err as { killed?: boolean }).killed || typeof raw !== 'number')
@@ -51,6 +53,12 @@ export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJ
       const timedOut = !!err && !!(err as { killed?: boolean }).killed
       resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code: typeof code === 'number' ? code : 1, ...(ended ? { ended: true as const } : {}), ...(timedOut ? { timedOut: true as const } : {}) })
     })
+    // HI-3552: text given on its standard input (a pull request's body), never on a command line; a program that ends
+    // before reading it all is answered by its exit, not by the pipe's error.
+    if (input !== undefined) {
+      child.stdin?.on('error', () => {})
+      child.stdin?.end(input, 'utf8')
+    }
   })
 }
 
@@ -573,6 +581,16 @@ export function shownInstallInfo(info: AgentInstallInfo): AgentInstallInfo {
   })
 }
 
+/** Readiness items as the window shows them (HI-3490: the accounts' own, in the connections view), in the language shown. */
+export const shownIssues = (issues: ReadinessIssue[]): ReadinessIssue[] =>
+  issuesIn(issues, (s) => {
+    const t = INSTALL_TEXT.get(s)
+    return t === undefined ? s : shownText(t)
+  })
+
+const issuesIn = (issues: ReadinessIssue[], shown: (s: string) => string): ReadinessIssue[] =>
+  issues.map((r) => ({ ...r, message: shown(r.message), ...(r.action ? { action: { ...r.action, label: shown(r.action.label) } } : {}), ...(r.detail ? { detail: r.detail.map(shown) } : {}) }))
+
 /** A provider's install info as an agent reads it (the Agent API's status): Combwork's own words in its dialect (dialects, HI-2440). */
 export const agentInstallInfo = (info: AgentInstallInfo): AgentInstallInfo => installInfoIn(info, (s) => agentField(s, INSTALL_TEXT.get(s)))
 
@@ -580,7 +598,7 @@ function installInfoIn(info: AgentInstallInfo, shown: (s: string) => string): Ag
   return {
     ...info,
     ...(info.updateRetry ? { updateRetry: { message: shown(info.updateRetry.message), label: shown(info.updateRetry.label) } } : {}),
-    ...(info.readiness ? { readiness: info.readiness.map((r) => ({ ...r, message: shown(r.message), ...(r.action ? { action: { ...r.action, label: shown(r.action.label) } } : {}), ...(r.detail ? { detail: r.detail.map(shown) } : {}) })) } : {}),
+    ...(info.readiness ? { readiness: issuesIn(info.readiness, shown) } : {}),
     ...(info.notes ? { notes: info.notes.map(shown) } : {})
   }
 }

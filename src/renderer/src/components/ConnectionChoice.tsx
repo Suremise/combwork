@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { AppSettings, Connection, LiveSessionState, ProviderId } from '@shared/types'
+import type { AgentInstallInfo, AppSettings, Connection, LiveSessionState, ProviderId, ReadinessIssue } from '@shared/types'
 import { connectionSummary } from './ConnectionDefaults'
 import { connectionsOn, type ConnectionsView } from '@shared/accounts'
 import { enabledProviders, providerDescriptor, providerName, providersInUse, providerWarnings } from '@shared/providers'
@@ -212,6 +212,16 @@ export const noAccountText = (view: ConnectionsView | null, providers: Parameter
  * on its CLI test home (whose account is made as its first agent needs it).
  */
 export const noAccountHere = (view: ConnectionsView | null, settings: Parameters<typeof offeredConnections>[1]): boolean => !!view && !offeredConnections(view, settings).length && !view.testHome.length
+
+/**
+ * A CLI's readiness as this window shows it (HI-3490): its own (main's, the same in every window), and, once it is found,
+ * the items about its accounts on in this window's workspace (the connections view's: Codex's sandbox, per account).
+ */
+export function readinessHere(cli: ProviderId, info: Pick<AgentInstallInfo, 'found' | 'readiness'> | undefined, view: Pick<ConnectionsView, 'readiness'> | null | undefined): ReadinessIssue[] {
+  const own = info?.readiness ?? []
+  const accounts = info?.found ? (view?.readiness?.[cli] ?? []) : []
+  return accounts.length ? [...own, ...accounts] : own
+}
 
 /** Opens Settings → Accounts & Connections. */
 export function openConnections(): void {

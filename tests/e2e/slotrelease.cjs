@@ -185,6 +185,7 @@ async function endFromOutside(app, spare = []) {
     await h.page.locator('.git-sections [data-section="workflow"]').click()
     const section = h.page.locator('.workflow-form')
     await section.waitFor({ timeout: HUNG_MS })
+    await lib.workflowTab(section, 'folder')
     await section.locator('.workflow-option[data-option="folder"] select').selectOption('slots')
     const row = section.locator('.workflow-slots-table tr[data-slot="slot-a"]')
     check('the slot list shows slot-a held by B1\'s ended session', !!(await until(async () => (await row.locator(`[data-held="${b1.id}"]`).count()) === 1, HUNG_MS)) && /Held by an ended session of agent B1/.test(await row.innerText()), await row.innerText().catch(() => ''))

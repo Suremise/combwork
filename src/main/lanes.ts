@@ -48,7 +48,6 @@ import { lineWaiting, onLineWaitChanged } from './workflow/lineUpdates'
 import { hooksMissingFor, onHooksHealthChanged } from './hooksHealth'
 import { teamPauseOf } from './teamPause'
 import { independentIn } from './independent'
-import { admitOrThrow, projectIdOf } from './platform/fenceAdmit'
 import { platformIdOf } from './platform/registry'
 
 const log = createLogger('lanes')
@@ -125,7 +124,7 @@ const A = {
   reordered: agentMsg({ id: 'lane.tell.reordered', text: 'Your lane was reordered now by {by}: {card} is back in Todo (its work stays on {line}): stop working on it. Its cards are now {cards}. cw_lane next names your next card.', note: "Delivered to a lane's builder after a reorder applied now (HI-1995) put its card in flight back; {by} is who reordered it, {line} its branch (or lane.reorder.itsBranch)." }),
   itsBranch: agentMsg({ id: 'lane.reorder.itsBranch', text: 'its branch', note: "In place of {line}: where a put-back card's work stays, when its branch's name isn't known." }),
   yieldWhy: agentMsg({ id: 'lane.yield.putBackWhy', text: 'Put back so {first}, which it waits on, goes first (lane reorder by {by})', note: "HI-3323: the reason recorded on a lane's card in Doing put back at its builder's turn end because the lane's new list puts first {first}, a card it waits on; {by} is who reordered. Stored on the card's facts." }),
-  yieldTold: agentMsg({ id: 'lane.tell.yield', text: "Your lane's list was changed by {by} to put {first} first: {card} waits on it. Commit {card}'s work and end your turn: Combwork then puts {card} back in Todo (its work stays on its branch) and starts {first}; your lane comes back to {card} after. If {card}'s folder can't be read as clean (a jj slot, an error), Combwork waits and tries again at your next turn end.", note: "HI-3323: delivered once to a lane's builder when its lane's new list puts first {first}, a card that its card in Doing ({card}) waits on, and the builder is in a turn or the folder isn't clean yet; {by} is who changed the list." }),
+  yieldTold: agentMsg({ id: 'lane.tell.yield', text: "Your lane's list was changed by {by} to put {first} first: {card} waits on it. Commit {card}'s work and end your turn: Combwork then puts {card} back in Todo (its work stays on its branch) and starts {first}; your lane comes back to {card} after. If {card}'s folder can't be read as clean (an error), Combwork waits and tries again at your next turn end.", note: "HI-3323: delivered once to a lane's builder when its lane's new list puts first {first}, a card that its card in Doing ({card}) waits on, and the builder is in a turn or the folder isn't clean yet; {by} is who changed the list." }),
   putBackWhy: agentMsg({ id: 'lane.reorder.putBackWhy', text: 'Put back by a lane reorder applied now ({by})', note: "The reason recorded on a card put back by a reorder applied now (HI-1995), stored on the card's facts; {by} is who reordered." }),
   independent: agentMsg({ id: 'lane.refused.independent', text: "{agent} is Independent: it takes no part in the workflow (its own role, or its connection launches it without Combwork's tools), so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "cw_lane's refusal (HI-2670): an Independent agent is never a lane's builder or reviewer." }),
   wrongSide: agentMsg({ id: 'lane.refused.wrongSide', text: "{agent} is a {part, select, builder {reviewer} other {builder}} by its role, so it has no {part}'s tools: a lane's {part} is a {part} or an either-role agent. Choose another, or change {agent}'s role first.", note: "cw_lane's refusal (HI-2664): an agent's Combwork tools follow its workflow role, so a lane part only for a role that does it. {part} is builder or reviewer." }),
@@ -1387,20 +1386,19 @@ async function yieldNow(ws: WorkspaceService, l: LaneRecord, y: LaneYield): Prom
   const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return { kind: 'wait', why: 'folder' } // i18n-ignore: a wait's code, never shown
   const started = wf.state(wf.store.card(y.card)).started
-  // As a reorder applied now reads it: a non-colocated jj slot (HI-2896) or an unreadable one is a wait, never taken for clean.
+  // As a reorder applied now reads it: an unreadable slot is a wait, never taken for clean.
   if (!(await cardFolderClean(started?.folder))) return { kind: 'wait', why: 'folder' } // i18n-ignore: a wait's code, never shown
   return { kind: 'run', runId: st?.runId ?? null, line: started?.line ?? null }
 }
 
 /**
  * Whether a card's folder (its start's) has nothing uncommitted, for a put back that keeps its work on its line (HI-1995,
- * HI-3323): the project folder, or none, is; a slot is when its changes read as none. A non-colocated jj slot (HI-2896:
- * Git can't read it, and jj can't see unrecorded edits without a snapshot) or one that can't be read is not.
+ * HI-3323): the project folder, or none, is; a slot is when its changes read as none. One that can't be read is not.
  */
 async function cardFolderClean(folder: string | undefined): Promise<boolean> {
   if (!folder || folder === 'project') return true
-  const { gitCantRead, slotWorkspaces } = await import('./platform/workspacePorts')
-  const d = (await gitCantRead(folder)) ? null : await slotWorkspaces().dirty(folder).catch(() => null)
+  const { slotWorkspaces } = await import('./platform/workspacePorts')
+  const d = await slotWorkspaces().dirty(folder).catch(() => null)
   return Array.isArray(d) && !d.length
 }
 
@@ -1723,8 +1721,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const projectPath = ws.path ? join(ws.path, s.project) : s.project
   const laneCfg = ws.path ? await ws.projectConfig(projectPath).catch(() => null) : null
   const prefs = projectPreferences(ws, projectPath, laneCfg)
-  // The platform fence (HI-2799): a new lane is an admission on its project's repository, refused while it switches.
-  const admission = { id: projectIdOf(laneCfg, projectPath), platform: platformIdOf(projectPath, laneCfg?.platform) }
+  const platform = platformIdOf(projectPath, laneCfg?.platform)
   const defaults = { rounds: prefs.loopRounds, waitHours: prefs.loopWaitHours }
   const on = await enforced()
   // The texts for the caller name cards as it may see them (HR3's HI-2169 round 1): a builder's own start is a project
@@ -1748,7 +1745,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const running0 = (await read(ws)).find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
     // A new lane on a released line (or one that can't be checked) is refused, unless the user's or the Assistant's
     // override names that line; a running lane's list change isn't a new start of its line (its cards' starts are checked).
-    if (!running0 && on) await laneReleased(projectPath, admission.platform, pick ?? defaultTarget, defaultTarget, s.released)
+    if (!running0 && on) await laneReleased(projectPath, platform, pick ?? defaultTarget, defaultTarget, s.released)
     const target0 = running0 ? otherThanOwn(laneTarget(ws, running0), defaultTarget) : null
     if (running0 && on && pick !== undefined && (pick ?? null) !== target0) throw new LaneError(409, withValues(M.targetFixed, { builder: running0.builder.name, target: target0 ?? defaultTarget ?? '' }))
     refuseOtherTargets(ws, s.project, s.cards, running0 && on ? target0 : (pick ?? null), defaultTarget, s.ownBuilder ? s.project : null)
@@ -1830,7 +1827,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     // to the save (its checks, run just before it): a tag made meanwhile throws it back to be decided again, so it is refused then.
     releasedGrant = null
     if (on) {
-      const rel = await laneReleased(projectPath, admission.platform, pick ?? defaultTarget, defaultTarget, s.released)
+      const rel = await laneReleased(projectPath, platform, pick ?? defaultTarget, defaultTarget, s.released)
       releasedGrant = rel.grant
       if (rel.bound) {
         const stillBound = rel.bound
@@ -1879,7 +1876,6 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const brief = nextBrief(undefined, carried?.brief?.text ?? s.brief, s.briefNotIn)
     if (brief) rec.brief = brief
     lanes.push(rec)
-    also.push((db) => admitOrThrow(db, admission.id, admission.platform))
     also.push((db) => noteLaneIn(db, ws.path!, null, rec))
     return { rec, did: 'started' as const, replaced }
   })

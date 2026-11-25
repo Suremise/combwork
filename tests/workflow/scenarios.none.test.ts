@@ -12,7 +12,7 @@ import { reconcile } from '../../src/main/workflow/reconcile'
 import { runCheck } from '../../src/main/workflow/checks'
 import { detect, offer } from '../../src/main/platform/registry'
 import { isRefusal } from '../../src/main/workflow/runtime'
-import { NoneAdapter } from '../../src/main/platform/none'
+import { NoneAdapter } from '../../src/main/platform/none/none'
 import { tempDir } from '../tempDir'
 
 let env: Env | null = null
@@ -378,8 +378,8 @@ describe('None: what a submission leaves out of its paths is named (HI-2339)', (
     expect(changed).toEqual(expect.arrayContaining(['src/a.txt', 'lib/b.txt']))
     expect(changed.some((f) => f.startsWith('node_modules/'))).toBe(false)
     // An empty path is no declaration of the root: it covers nothing.
-    expect(e.wf.none.covers([''], 'src/a.txt')).toBe(false)
-    expect(e.wf.none.covers(['.'], 'node_modules/x/index.js')).toBe(false)
+    expect(e.wf.deliverables().covers([''], 'src/a.txt')).toBe(false)
+    expect(e.wf.deliverables().covers(['.'], 'node_modules/x/index.js')).toBe(false)
   })
 
   it('Solo with no version control: its submission (Done, no review) names what its paths leave out too', async () => {

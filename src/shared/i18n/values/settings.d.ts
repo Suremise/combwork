@@ -508,6 +508,14 @@ interface CombworkMessageValues {
   'settings.advanced.cw.git.commitMinutes.title': undefined
   'settings.advanced.cw.git.networkMinutes.desc': undefined
   'settings.advanced.cw.git.networkMinutes.title': undefined
+  'settings.advanced.cw.git.processNames.desc': undefined
+  'settings.advanced.cw.git.processNames.title': undefined
+  'settings.advanced.cw.git.staleLockSeconds.desc': undefined
+  'settings.advanced.cw.git.staleLockSeconds.title': undefined
+  'settings.advanced.cw.github.ghMinutes.desc': undefined
+  'settings.advanced.cw.github.ghMinutes.title': undefined
+  'settings.advanced.cw.github.prFollowMinutes.desc': undefined
+  'settings.advanced.cw.github.prFollowMinutes.title': undefined
   'settings.advanced.cw.guidance.desc': undefined
   'settings.advanced.cw.guidance.title': undefined
   'settings.advanced.cw.heapSnapshotNearLimit.desc': undefined
@@ -522,8 +530,6 @@ interface CombworkMessageValues {
   'settings.advanced.cw.inbox.stopContinuation.title': undefined
   'settings.advanced.cw.input.hiddenSeconds.desc': undefined
   'settings.advanced.cw.input.hiddenSeconds.title': undefined
-  'settings.advanced.cw.jj.commandSeconds.desc': undefined
-  'settings.advanced.cw.jj.commandSeconds.title': undefined
   'settings.advanced.cw.journal.builds.desc': undefined
   'settings.advanced.cw.journal.builds.title': undefined
   'settings.advanced.cw.lanes.endWaitMinutes.desc': undefined

@@ -693,6 +693,7 @@
   "assistant.undo.askTitle": "{n, plural, one {Undo # change?} other {Undo # changes?}}",
   "assistant.undo.card": "{card}: {fields}",
   "assistant.undo.changed": "{fields} changed since",
+  "assistant.undo.confirm": "Undo",
   "assistant.undo.dismiss": "Close what the undo did",
   "assistant.undo.ended": "the lane has ended",
   "assistant.undo.error": "failed: {error}",
