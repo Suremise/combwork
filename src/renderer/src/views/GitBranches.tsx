@@ -386,15 +386,18 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
     // What is deleted already (#1642 round 2): a retry after a failure, or a tick changed after one, never asks for it
     // again, so a remote that failed is tried again on its own.
     const done = new Set<string>()
+    const preview: CleanupPreview = { stop: async () => undefined }
     await confirm({
       title: tr(C.cleanUpTitle),
       message: tr(C.cleanUpMessage, { target }),
-      content: <CleanupPicker projectPath={project.path} offer={offer} onChange={(p) => (picked = p)} />,
+      content: <CleanupPicker projectPath={project.path} offer={offer} onChange={(p) => (picked = p)} preview={preview} />,
       wide: true,
       confirmLabel: tr(C.deleteTicked),
       busyLabel: tr(C.deleting),
       danger: true,
       run: async () => {
+        // HI-3593 (HR2's round 1): the remotes' check stopped first, never a delete queued behind it.
+        await preview.stop()
         // Each part said as it is done: a remote's failure (shown in the dialog) never hides the local branches deleted.
         const asked = ({ name, sha }: BranchAt): BranchAt => ({ name, sha })
         const local = picked.local.filter((b) => !done.has(`local:${b.name}`))
@@ -900,38 +903,50 @@ function GroupHead({ group, n, target, remote }: { group: BranchGroup; n: number
   )
 }
 
+/** HI-3593: Clean Up's check of what the remotes still have, stopped (and waited for) before Delete Ticked deletes. */
+interface CleanupPreview {
+  stop: () => Promise<void>
+}
+
 /**
  * Clean Up Merged Branches' choice (#1642): the local branches offered, ticked; the remote ones apart, under a warning
  * that ticking them deletes them on the remote, none ticked (one whose local branch is ticked is marked suggested).
  */
-function CleanupPicker({ projectPath, offer, onChange }: { projectPath: string; offer: CleanupOffer; onChange: (picked: CleanupOffer) => void }) {
+function CleanupPicker({ projectPath, offer, onChange, preview }: { projectPath: string; offer: CleanupOffer; onChange: (picked: CleanupOffer) => void; preview: CleanupPreview }) {
   const [local, setLocal] = useState<ReadonlySet<string>>(() => new Set(offer.local.map((b) => b.name)))
   const [remote, setRemote] = useState<ReadonlySet<string>>(() => new Set())
   const remotes = [...new Set(offer.remote.map((r) => r.remote))]
   // HI-3593: what each remote still has, asked once the dialog shows (never before it: a sign-in or a slow link would
   // hold it): a remote branch already deleted there is marked, its tick removing only the local reference; a remote that
-  // couldn't be asked says so, its rows as they were. Closing the dialog stops the check. The delete asks again itself.
+  // couldn't be asked says so, its rows as they were. Closing the dialog stops the check, and so does Delete Ticked
+  // before it deletes anything (HR2's round 1: the delete waits for the repository's queue, which the check holds). The
+  // delete asks the remote again itself.
   const [check, setCheck] = useState<'checking' | { gone: ReadonlySet<string>; failed: { remote: string; why: string }[] } | null>(() => (offer.remote.length && offered('git:remotePrunePreview') ? 'checking' : null))
   useEffect(() => {
     if (!offer.remote.length || !offered('git:remotePrunePreview')) return
     const run = startGitRun(projectPath)
     let done = false
-    repoOp('git:remotePrunePreview', projectPath, run.op)
+    const settled = repoOp('git:remotePrunePreview', projectPath, run.op)
       .then(
         (found) => ({ gone: new Set(found.flatMap((r) => r.branches.map((b) => b.name))), failed: found.filter((r) => r.error && remotes.includes(r.remote)).map((r) => ({ remote: r.remote, why: r.error ?? '' })) }),
         (e: unknown) => ({ gone: new Set<string>(), failed: remotes.map((r) => ({ remote: r, why: errorMessage(e) })) })
       )
       .then((c) => {
         done = true
-        if (!run.cancelled()) setCheck(c)
+        setCheck(run.cancelled() ? null : c)
       })
       .finally(() => run.end())
+    preview.stop = async () => {
+      if (done) return
+      cancelGitRun(run.op)
+      await settled
+    }
     return () => {
       if (!done) cancelGitRun(run.op)
     }
     // Once, for the offer the dialog opened with.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectPath, offer])
+  }, [projectPath, offer, preview])
   const gone = check && check !== 'checking' ? check.gone : null
   useEffect(() => {
     onChange({ local: offer.local.filter((b) => local.has(b.name)), remote: offer.remote.filter((r) => remote.has(r.name)) })

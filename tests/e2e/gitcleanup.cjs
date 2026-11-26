@@ -162,6 +162,31 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
     await one.getByRole('button', { name: 'Delete Branch', exact: true }).click()
     check('…then deleted', !!(await lib.until(async () => (!heads(alpha).includes('spike/i18n') && (await branches.locator('[data-branch="spike/i18n"]').count()) === 0 ? true : null), HUNG_MS)), JSON.stringify(heads(alpha)))
     check('the slot’s branch and its worktree untouched', heads(alpha).includes('cw/slot-line') && fs.existsSync(path.join(slot, 'a.txt')))
+
+    // --- HI-3593 (HR2's round 1): Delete Ticked while the remotes' check is held by the remote (an upload-pack of the
+    // test's own that waits far longer than any wait here): the check is stopped, its process ended, and the local
+    // deletion goes on without the hold ever being released.
+    {
+      g(alpha, 'branch', 'cw/hb6')
+      g(alpha, 'push', '-q', 'nas', 'cw/hb6')
+      g(alpha, 'fetch', '-q', 'nas')
+      const dir = lib.probeDir('gitcleanup-hold')
+      const started = path.join(dir, 'started')
+      const pidFile = path.join(dir, 'pid')
+      const fwd = (p) => p.replace(/\\/g, '/')
+      const script = path.join(dir, 'hold.sh')
+      fs.writeFileSync(script, `#!/bin/sh\n: > "${fwd(started)}"\n"${fwd(process.execPath)}" -e 'require("fs").writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, ${lib.timing('hang.slow')})' "${fwd(pidFile)}"\n`)
+      g(alpha, 'config', 'remote.nas.uploadpack', `sh "${fwd(script)}" #`)
+      await branches.locator('[data-action="clean-up-branches"]').click()
+      await lib.until(async () => (await dialog.locator('[data-git-cleanup]').count()) === 1, HUNG_MS)
+      check('HI-3593: the remotes’ check held by nas, said in the dialog', !!(await lib.until(async () => fs.existsSync(started) && fs.existsSync(pidFile) && (await dialog.locator('[data-cleanup-checking]').count()) === 1, HUNG_MS)), await text(dialog))
+      const held = lib.identify([Number(fs.readFileSync(pidFile, 'utf8'))])
+      check('…cw/hb6 offered, ticked', (await ticks('local')).includes('cw/hb6:on'), JSON.stringify(await ticks('local')))
+      await dialog.getByRole('button', { name: 'Delete Ticked', exact: true }).click()
+      check('…Delete Ticked: cw/hb6 deleted, never waiting behind the check', !!(await lib.until(async () => ((await dialog.count()) === 0 && !heads(alpha).includes('cw/hb6') ? true : null), HUNG_MS)), JSON.stringify({ alpha: heads(alpha), dialog: await text(dialog) }))
+      check('…and the check stopped: its upload-pack ended', !!(await lib.until(() => lib.stillSame(held).length === 0, HUNG_MS)), JSON.stringify(lib.stillSame(held)))
+      g(alpha, 'config', '--unset', 'remote.nas.uploadpack')
+    }
     await shot(page, '4-after')
   } finally {
     await app.close()
