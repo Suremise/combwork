@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { appTakesTerminalKey, copyPasteKey, isTyping } from '../src/shared/terminalInput'
+import { appTakesTerminalKey, copyPasteKey, isTyping, mayWriteText, typedText } from '../src/shared/terminalInput'
+
+describe('mayWriteText (HI-3598)', () => {
+  it('Esc, Ctrl+C and sequences (arrows, Shift+Tab) leave no text; a letter, Tab, a paste, Ctrl+V or Ctrl+Y may', () => {
+    for (const keys of ['\x1b', '\x03', '\x1b\x1b', '\x1b[Z', '\x1b[A', '\x1b[D']) expect(mayWriteText(typedText(keys)), JSON.stringify(keys)).toBe(false)
+    for (const keys of ['a', '\t', '\x1b[200~pasted\x1b[201~', '\x16', '\x19']) expect(mayWriteText(typedText(keys)), JSON.stringify(keys)).toBe(true)
+  })
+})
 
 describe('isTyping', () => {
   it("ignores xterm's replies to the program", () => {

@@ -15,6 +15,15 @@ export function isTyping(data: string): boolean {
 }
 
 /**
+ * Whether what the user typed (typedText's: arrows, Shift+Tab and other sequences gone already) may have put text into a
+ * CLI's input (HI-3598): anything but Esc and Ctrl+C, which leave none. Tab (Claude Code takes its suggestion), a
+ * letter, a paste, Ctrl+V or Ctrl+Y may.
+ */
+export function mayWriteText(typed: string): boolean {
+  return typed.replace(/[\x1b\x03]/g, '') !== ''
+}
+
+/**
  * What Ctrl+C or Ctrl+V does in an agent's terminal (#1286): Combwork's copy (Ctrl+C with a selection) or paste, or the
  * CLI's ('cli': xterm sends it on, Ctrl+C as ^C and Ctrl+V as ^V), which Settings → Advanced can give both keys to.
  * null for any other key, and for Ctrl+C with nothing selected, which goes on as other keys do (to the CLI, unless it

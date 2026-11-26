@@ -14,7 +14,7 @@ import { folderChanging, folderSteady, inFolder } from './folderFence'
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
 import { constants as fsConstants, existsSync, realpathSync } from 'original-fs'
-import { TYPED_NEWLINE_KEYS, typedText } from '../shared/terminalInput'
+import { TYPED_NEWLINE_KEYS, mayWriteText, typedText } from '../shared/terminalInput'
 import { failedStart, type StartFailure } from '../shared/startFailure'
 import { startBegins, startFailed } from './agentStarts'
 import { BrowserWindow, app, clipboard } from 'electron'
@@ -1526,6 +1526,11 @@ class SessionManager {
    * Esc), the first since the run began or since an Enter: the question took it, so it leaves no draft.
    */
   private userInput = new Map<string, { at: number; enter: boolean; answer?: boolean }>()
+  /**
+   * The last key of the user's that may have put text into an agent's input (mayWriteText, HI-3598), with its run and the
+   * prompts its CLI had taken then: one taken since took that text (or what came after it) with it.
+   */
+  private userWrote = new Map<string, { runId: string; prompts: number }>()
   /** The Combwork Assistant's instructions for a launch (who it is, and its mode's), and the mode's name and id. */
   assistantInstructions: (projectPath: string, agent: AgentDef) => Promise<{ text: string; mode: string; modeId: string; modeText: string }> = async () => ({ text: '', mode: '', modeId: '', modeText: '' })
   /**
@@ -3673,8 +3678,23 @@ class SessionManager {
     if (this.lineBlocked(l)) return "a line Combwork typed isn't taken yet" // i18n-ignore: a reason for the log
     if (this.userMayBeTyping(projectPath, agentId)) return 'the user is typing there' // i18n-ignore: a reason for the log
     const u = this.userInput.get(key)
-    if (u && !u.enter && !u.answer && userDraftShown(l.adapter.terminal?.promptText && l.screen ? l.adapter.terminal.promptText(l.screen.textWithoutDim()) : null)) return "the user's draft is in its prompt" // i18n-ignore: a reason for the log
+    if (!u || u.enter || u.answer) return null
+    const input = l.adapter.terminal?.promptText && l.screen ? l.adapter.terminal.promptText(l.screen.textWithoutDim()) : null
+    // Unreadable (null), any key not sent still holds it (HI-3213); text read there, only one the user may have written.
+    if (userDraftShown(input) && (input === null || this.userMayHaveWritten(l, key))) return "the user's draft is in its prompt" // i18n-ignore: a reason for the log
     return null
+  }
+
+  /**
+   * Whether text in an agent's input may be the user's (HI-3598). Where the console draws dim, what reads as text is: its
+   * CLI's dim hint is blanked. Where it doesn't (Windows 10, consoleDrawsDim), Claude Code's suggestion reads as text too,
+   * so it may be the user's only after a key of theirs that may write text (not Esc or Ctrl+C) since its CLI last took a
+   * prompt, in this run.
+   */
+  private userMayHaveWritten(l: LiveSession, key: string): boolean {
+    if (consoleDrawsDim()) return true
+    const w = this.userWrote.get(key)
+    return !!w && w.runId === l.state.runId && (l.prompts ?? 0) <= w.prompts
   }
 
   /**
@@ -4449,6 +4469,7 @@ class SessionManager {
     const prev = this.userInput.get(key)
     const answer = !!typed && !!l?.askedAtStart && [...typed].length === 1 && (!prev || prev.enter)
     if (typed) this.userInput.set(key, { at: Date.now(), enter: typed.endsWith('\r'), ...(answer ? { answer: true } : {}) })
+    if (typed && l && mayWriteText(typed)) this.userWrote.set(key, { runId: l.state.runId, prompts: l.prompts ?? 0 })
     if (typed?.includes('\r')) {
       this.userEnter.set(key, Date.now())
       // A prompt of the user's, perhaps (#1336): a hook should follow it if it starts a turn.
