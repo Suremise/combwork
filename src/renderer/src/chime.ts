@@ -60,17 +60,20 @@ async function running(ac: ChimeContext, ms: number): Promise<{ ok: boolean; err
   return { ok: (ac.state as string) === 'running', ...(error ? { error } : {}) }
 }
 
-/** Plays a chime on `deps`' context if it runs within the bound, else drops it (HI-3605). What happened is reported. */
+/** Plays a chime on `deps`' context if it runs within the bound (by `now`, not only by which promise settles first),
+ * else drops it (HI-3605). What happened is reported. */
 export async function chimeNow(sound: ChimeSound, volume: number, deps: ChimeDeps): Promise<ChimeReport> {
   const now = deps.now ?? Date.now
   const ac = deps.context()
   const state = ac.state as string
   const started = now()
-  const { ok, error } = await running(ac, deps.resumeMs ?? CHIME_RESUME_MS)
+  const bound = deps.resumeMs ?? CHIME_RESUME_MS
+  const { ok, error } = await running(ac, bound)
   const waitedMs = now() - started
   const after = ac.state as string
   let report: ChimeReport
-  if (!ok) report = { outcome: 'dropped', state, after, waitedMs, ...(error ? { error } : {}) }
+  // Late is late, whichever settled first: a renderer paused (sleep, a long stall) can see the resume before the timer.
+  if (!ok || waitedMs > bound) report = { outcome: 'dropped', state, after, waitedMs, ...(error ? { error } : {}) }
   else {
     const list = pendingOf(ac, deps.report)
     const t = ac.currentTime

@@ -8,7 +8,7 @@ import { CHIME_RESUME_MS, chimeLogLine, cleanChimeReport, type ChimeReport } fro
 type ChimeContext = { readonly __chimeContext: unique symbol }
 const rendererChime = '../src/renderer/src/chime'
 const { chimeNow } = (await import(/* @vite-ignore */ rendererChime)) as {
-  chimeNow: (sound: string, volume: number, deps: { context: () => ChimeContext; report: (r: ChimeReport) => void }) => Promise<ChimeReport>
+  chimeNow: (sound: string, volume: number, deps: { context: () => ChimeContext; report: (r: ChimeReport) => void; now?: () => number }) => Promise<ChimeReport>
 }
 
 const param = () => ({ value: 0, setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() })
@@ -78,6 +78,21 @@ describe('a chime plays now or not at all', () => {
     expect(started.length).toBeGreaterThan(0)
   })
 
+  it('drops it when the bound has passed by the time the resume is seen, even with the context running', async () => {
+    // A renderer paused (sleep, a long stall) can see the resume settle before its overdue timer: the clock decides.
+    let now = 0
+    const { ac, c } = fakeContext('suspended', async (ctx) => {
+      ctx.state = 'running'
+      now = 60_000
+    })
+    const reports: ChimeReport[] = []
+    const r = await chimeNow('chime', 0.5, { context: () => ac, report: (x) => reports.push(x), now: () => now })
+    expect(r).toMatchObject({ outcome: 'dropped', state: 'suspended', after: 'running', waitedMs: 60_000 })
+    expect(c.createGain).not.toHaveBeenCalled()
+    expect(c.createOscillator).not.toHaveBeenCalled()
+    expect(reports).toEqual([r])
+  })
+
   it('drops it when the resume resolves but the context is still not running', async () => {
     const { ac, c } = fakeContext('suspended', async () => undefined)
     expect(await run(ac).play()).toMatchObject({ outcome: 'dropped', after: 'suspended' })
@@ -128,6 +143,7 @@ describe("a chime's line in combwork.log", () => {
     expect(chimeLogLine({ outcome: 'played', state: 'running', after: 'running', waitedMs: 0 })).toBe('Chime played (audio context running)')
     expect(chimeLogLine({ outcome: 'resumed', state: 'suspended', after: 'running', waitedMs: 12 })).toBe('Chime played after resuming its audio context (was suspended), waited 12 ms')
     expect(chimeLogLine({ outcome: 'dropped', state: 'suspended', after: 'suspended', waitedMs: 1000, error: 'no device' })).toBe('Chime dropped: its audio context was suspended and still suspended, waited 1000 ms; resume failed: no device')
+    expect(chimeLogLine({ outcome: 'dropped', state: 'suspended', after: 'running', waitedMs: 60000 })).toBe('Chime dropped: its audio context resumed too late (was suspended), waited 60000 ms')
     expect(chimeLogLine({ outcome: 'cut', state: 'running', after: 'suspended', waitedMs: 0 })).toBe('Chime cut off: its audio context went from running to suspended before it played')
   })
 })

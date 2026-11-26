@@ -47,6 +47,7 @@ export function cleanChimeReport(raw: unknown): ChimeReport | null {
 export function chimeLogLine(r: ChimeReport): string {
   const waited = r.waitedMs ? `, waited ${r.waitedMs} ms` : '' // i18n-ignore: combwork.log, in English
   const error = r.error ? `; resume failed: ${r.error}` : '' // i18n-ignore: combwork.log, in English
+  if (r.outcome === 'dropped' && r.after === 'running') return `Chime dropped: its audio context resumed too late (was ${r.state})${waited}` // i18n-ignore: combwork.log, in English
   if (r.outcome === 'dropped') return `Chime dropped: its audio context was ${r.state} and still ${r.after}${waited}${error}` // i18n-ignore: combwork.log, in English
   if (r.outcome === 'cut') return `Chime cut off: its audio context went from ${r.state} to ${r.after} before it played` // i18n-ignore: combwork.log, in English
   if (r.outcome === 'resumed') return `Chime played after resuming its audio context (was ${r.state})${waited}` // i18n-ignore: combwork.log, in English
