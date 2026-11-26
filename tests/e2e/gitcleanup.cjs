@@ -165,11 +165,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
 
     // --- HI-3593 (HR2's round 1): Delete Ticked while the remotes' check is held by the remote (an upload-pack of the
     // test's own that waits far longer than any wait here): the check is stopped, its process ended, and the local
-    // deletion goes on without the hold ever being released.
+    // deletion (backup/hb5, still merged and unused) goes on without the hold ever being released.
     {
-      g(alpha, 'branch', 'cw/hb6')
-      g(alpha, 'push', '-q', 'nas', 'cw/hb6')
-      g(alpha, 'fetch', '-q', 'nas')
       const dir = lib.probeDir('gitcleanup-hold')
       const started = path.join(dir, 'started')
       const pidFile = path.join(dir, 'pid')
@@ -181,9 +178,9 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
       await lib.until(async () => (await dialog.locator('[data-git-cleanup]').count()) === 1, HUNG_MS)
       check('HI-3593: the remotes’ check held by nas, said in the dialog', !!(await lib.until(async () => fs.existsSync(started) && fs.existsSync(pidFile) && (await dialog.locator('[data-cleanup-checking]').count()) === 1, HUNG_MS)), await text(dialog))
       const held = lib.identify([Number(fs.readFileSync(pidFile, 'utf8'))])
-      check('…cw/hb6 offered, ticked', (await ticks('local')).includes('cw/hb6:on'), JSON.stringify(await ticks('local')))
+      check('…backup/hb5 offered, ticked; nas’s branches offered too', (await ticks('local')).includes('backup/hb5:on') && (await ticks('remote')).some((r) => r.startsWith('nas/')), JSON.stringify([await ticks('local'), await ticks('remote')]))
       await dialog.getByRole('button', { name: 'Delete Ticked', exact: true }).click()
-      check('…Delete Ticked: cw/hb6 deleted, never waiting behind the check', !!(await lib.until(async () => ((await dialog.count()) === 0 && !heads(alpha).includes('cw/hb6') ? true : null), HUNG_MS)), JSON.stringify({ alpha: heads(alpha), dialog: await text(dialog) }))
+      check('…Delete Ticked: backup/hb5 deleted, never waiting behind the check', !!(await lib.until(async () => ((await dialog.count()) === 0 && !heads(alpha).includes('backup/hb5') ? true : null), HUNG_MS)), JSON.stringify({ alpha: heads(alpha), dialog: await text(dialog) }))
       check('…and the check stopped: its upload-pack ended', !!(await lib.until(() => lib.stillSame(held).length === 0, HUNG_MS)), JSON.stringify(lib.stillSame(held)))
       g(alpha, 'config', '--unset', 'remote.nas.uploadpack')
     }
