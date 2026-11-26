@@ -4471,7 +4471,11 @@ class SessionManager {
     const prev = this.userInput.get(key)
     const answer = !!typed && !!l?.askedAtStart && [...typed].length === 1 && (!prev || prev.enter)
     if (typed) this.userInput.set(key, { at: Date.now(), enter: typed.endsWith('\r'), ...(answer ? { answer: true } : {}) })
-    if (writes && l) this.userWrote.set(key, { runId: l.state.runId, prompts: l.prompts ?? 0 })
+    // A key that may write text but types none (Up or Down recalling a prompt from its history: HI-3604) after an Enter,
+    // or as a run's first key: its prompt is read again (inputHeld). Not typing (its time stays), and not while its
+    // question before its start shows, whose choice the arrows move (its answer is read as before).
+    else if (writes && (!prev || prev.enter) && !l?.askedAtStart) this.userInput.set(key, { at: prev?.at ?? 0, enter: false })
+    if (writes && l)this.userWrote.set(key, { runId: l.state.runId, prompts: l.prompts ?? 0 })
     if (typed?.includes('\r')) {
       this.userEnter.set(key, Date.now())
       // A prompt of the user's, perhaps (#1336): a hook should follow it if it starts a turn.

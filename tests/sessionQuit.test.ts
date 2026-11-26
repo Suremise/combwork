@@ -130,6 +130,69 @@ describe("a lane's builder ended by its CLI's own exit", () => {
     expect(a.typed()).toContain('/exit')
   })
 
+  // HI-3604 (HR1, reviewing HI-3598): a prompt sent, then Up (no Esc between) recalling it into the input. Up is a sequence
+  // typedText drops, so the Enter stayed the user's last key and the recalled text never held: a lane end's quit typed over
+  // it. A key that may write text (Up, Down, in each form xterm sends) after an Enter has its prompt read again.
+  describe('a prompt recalled after Enter (HI-3604)', () => {
+    /** The user's keys, as their terminal sends them, past the typing pause. */
+    const user = (a: ReturnType<typeof live>, data: string): void => {
+      priv.noteUserInput(a.key, data)
+      const u = priv.userInput.get(a.key) as { at: number } | undefined
+      if (u) u.at = 0
+    }
+    const sent = (): ReturnType<typeof live> => {
+      const a = live()
+      user(a, 'an earlier prompt\r')
+      a.l.prompts = 1
+      return a
+    }
+
+    it('Up or Down, plain, SS3 or modified, recalling a prompt into its input: a draft, held, nothing typed', async () => {
+      for (const key of ['\x1b[A', '\x1bOA', '\x1b[1;5A', '\x1b[B', '\x1bOB']) {
+        const a = sent()
+        user(a, key)
+        a.input.feed('an earlier prompt')
+        expect(sessions.inputHeld(P, a.agentId), JSON.stringify(key)).toBe(DRAFT)
+      }
+      const a = sent()
+      user(a, '\x1b[A')
+      a.input.feed('an earlier prompt')
+      expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended' })).toBe('held')
+      expect(a.typed()).toBe('')
+      // Sent again (Enter): nothing held.
+      user(a, '\r')
+      expect(sessions.inputHeld(P, a.agentId)).toBeNull()
+    })
+
+    it('Up leaving its prompt empty (no history), or only xterm replies after the Enter: no draft, so its exit is typed', async () => {
+      const a = sent()
+      user(a, '\x1b[A')
+      expect(sessions.inputHeld(P, a.agentId)).toBeNull()
+      expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended' })).toBe('sent')
+      const b = sent()
+      // Focus in and out, a cursor report: never the user's.
+      user(b, '\x1b[I\x1b[O\x1b[12;40R')
+      b.input.feed('text the CLI drew')
+      expect(sessions.inputHeld(P, b.agentId)).toBeNull()
+      expect(priv.userInput.get(b.key)).toMatchObject({ enter: true })
+    })
+
+    it('Up as the first key of a run (a prompt recalled from its history) holds; Up while its question before its start shows leaves the answer as it was', () => {
+      const a = live()
+      priv.noteUserInput(a.key, '\x1b[A')
+      a.input.feed('a prompt from before')
+      expect(sessions.inputHeld(P, a.agentId)).toBe(DRAFT)
+      expect(sessions.userTypedAt(P, a.agentId), 'not counted as typing').toBe(0)
+      // At its question before its start: arrows move its choice, then the one key that answers it leaves no draft.
+      const { a: b, l, type } = asking()
+      priv.noteUserInput(b.key, '\x1b[B')
+      expect(priv.userInput.get(b.key)).toBeUndefined()
+      type('2')
+      l.askedAtStart = false
+      expect(sessions.inputHeld(P, b.agentId)).toBeNull()
+    })
+  })
+
   // HI-3261: a CLI whose prompt can't be read counts any key not sent as a draft. The one key that answered its question
   // before its start (y, 1, Esc) went to that question, so it leaves none. Anything more may be a draft left in the prompt
   // the answer opened (HR2's round 1): text after the key in the same write, a key after it before its screen says the
