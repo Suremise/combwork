@@ -173,7 +173,7 @@ Claude Code, Codex, Copilot, Antigravity and OpenCode update on their own schedu
 - **Two versions tested**: a release can be tested with two versions of a CLI, as when GitHub publishes a Copilot version before WinGet has it. Either one installed gets the tick, with its own version named.
 - **Version unknown**: Combwork says it couldn't tell which version is installed.
 
-**Help → Copy Diagnostics** lists the tested and installed versions for each CLI, so a bug report says how they compare, and the Assistant can see them too when you ask it about a CLI behaving oddly.
+**Help → Copy Diagnostics** lists the tested and installed versions for each CLI, so a bug report says how they compare, and the Assistant can see them too when you ask it about a CLI behaving oddly. **Help → About Combwork** shows Combwork's own versions (Electron, Chromium, Node.js and the rest) and its data folder, not the CLIs'; its **Copy** adds each installed CLI's version and where Combwork found it, after Combwork's version.
 
 ### Models, effort levels and prices <a id="models-effort-levels-and-prices"></a>
 

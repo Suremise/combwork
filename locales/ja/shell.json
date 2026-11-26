@@ -6,7 +6,6 @@
   "shell.about.dataFolder": "データフォルダー",
   "shell.about.legal": "© 2026 Darren Marshall。{app}は独立して開発されており、{companies}との提携、承認、後援はありません。{products}。それぞれ提供元の規約のもとで別途インストールされます。",
   "shell.about.licence": "<licence>MIT License</licence>のオープンソースです。<notices>サードパーティ製ソフトウェア</notices>と<chromium>Chromium</chromium>を含みます。",
-  "shell.about.noCli": "CLIがインストールされていません",
   "shell.about.noLicences": "ライセンスが見つかりません",
   "shell.about.noLicencesDetail": "Chromiumのライセンスファイルは、Combworkのインストール先フォルダーにあります。",
   "shell.about.productOf": "{product}は{company}の製品です",

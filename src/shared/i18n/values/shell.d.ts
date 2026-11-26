@@ -8,7 +8,6 @@ interface CombworkMessageValues {
   'shell.about.dataFolder': undefined
   'shell.about.legal': { app: string | number; companies: string | number; products: string | number }
   'shell.about.licence': undefined
-  'shell.about.noCli': undefined
   'shell.about.noLicences': undefined
   'shell.about.noLicencesDetail': undefined
   'shell.about.productOf': { product: string | number; company: string | number }

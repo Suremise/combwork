@@ -44,7 +44,23 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await page.keyboard.press('F1')
   await page.locator('.split-list .row', { hasText: 'About Combwork' }).click()
   check('About shows MIT link', await becomes(() => page.locator('.about-licence a', { hasText: 'MIT License' }).isVisible()))
-  await page.screenshot({ path: path.join(scratch, 'about-1.png') })
+  // No row per CLI (HI-3599): Combwork's own versions and its data folder only. Copy adds the installed CLIs.
+  const rowNames = await page.locator('.about-table tr td:first-child').allInnerTexts()
+  check('About has no CLI rows', JSON.stringify(rowNames) === JSON.stringify(['Version', 'Electron', 'Chromium', 'Node.js', 'V8', 'OS', 'Data folder']), JSON.stringify(rowNames))
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate((t) => window.combwork.invoke('settings:update', { appearance: { theme: t } }), theme)
+    await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    await page.getByRole('dialog', { name: 'About Combwork' }).screenshot({ path: path.join(scratch, `about-1-${theme}.png`) })
+  }
+  await page.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText: async () => '', writeText: async (t) => { window.__copied = t } } }) })
+  await page.getByRole('dialog', { name: 'About Combwork' }).getByRole('button', { name: 'Copy' }).click()
+  const copied = (await lib.until(() => page.evaluate(() => window.__copied), HUNG_MS)) || ''
+  const installed = Object.values(await page.evaluate(() => window.combwork.invoke('provider:info'))).filter((i) => i?.found).length
+  const lines = copied.split('\n')
+  const cliLines = lines.filter((l) => /^[^:]+: CLI \S+ \(.+\)$/.test(l))
+  check("About's Copy lists each installed CLI after Combwork's version, and none not installed",
+    /^Version: \S+$/.test(lines[0]) && cliLines.length === installed && lines.slice(1, 1 + installed).every((l) => cliLines.includes(l)) && !/not installed/i.test(copied) && lines.length === 7 + installed,
+    `${installed} installed: ${JSON.stringify(copied)}`)
   await page.locator('.about-licence a', { hasText: 'MIT License' }).click()
   const pageText = () => page.locator('.scroll-page').innerText({ timeout: lib.timing('poll.readMs') }).catch(() => '')
   check('License page opens', await becomes(async () => (await pageText()).includes('Permission is hereby granted')))
