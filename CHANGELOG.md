@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Removed
+
+- **Help → Restore the 0.9 Board Backup…** (HI-3601). Every user is on 1.6.0 or later, so no one goes back to 0.9 any more. Upgrading a 0.9 workspace to 1.0 still works, and now says plainly that there's no going back. The copy of the 0.9 board kept at the upgrade, and any copy the restore made, stay in the workspace's `.combwork/backups`: Combwork never deletes them.
+
 ### Fixed
 
 - **Discard Changes… and Restore From… keep only that file in their stash** (HI-3587). When another file had staged changes, the stash made for one file held those too, so applying it later brought them back, over whatever that file had become. The stash now holds the one file's changes, staged and not, and Apply restores that file alone.
