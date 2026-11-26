@@ -4625,7 +4625,7 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    the target no longer holding the result (reset since), drops it with no push; a read of the target that fails is
    never taken for settled: it pauses `pushUnreadable` (Combwork's own words, translated), still owed, so no later merge goes ahead of it; else it pushes `refs/heads/<target>` to what the target tracks
    (`branch.<target>.remote` and `.merge`), or with nothing tracked to the only remote or `origin` under the same name,
-   never `--force` and never `--set-upstream`, with no prompt (`GIT_TERMINAL_PROMPT=0`, no askpass, the credential
+   never `--force` and never `--set-upstream`, that ref alone (`--no-follow-tags`, whatever the user's `push.followTags`: HI-3594), with no prompt (`GIT_TERMINAL_PROMPT=0`, no askpass, the credential
    manager non-interactive) and within `cw.queue.networkMinutes` (HI-3372: 30 min; 5 cut a slow link short). Pushed, or up to date already (a retry after a crash
    before the clear), it is cleared, only if still the same result (a newer merge's stays owed). Refused (the remote
    has commits the target lacks), failed (git's message: a sign-in, the network, the bound) or with no remote: the
@@ -5469,7 +5469,7 @@ each secret value of the snapshot, its URL's query values included). Where it ca
      `publishRefused` with its words; ran too long, `hookTimedOut`. Follow mode's fetches and its push take
      `cw.queue.networkMinutes` (30 min; 5 before HI-3372), as do a slotted card's fetch of its remote head and Bring up
      to date's fetches (a minute before).
-   - `push`: `git push --porcelain --no-verify --force-with-lease=<ref>:<onto> <url> <X>:<ref>`. The remote takes it
+   - `push`: `git push --porcelain --no-verify --force-with-lease=<ref>:<onto> <url> <X>:<ref>` (no tag goes with it: the sealed context has none and reads no `push.followTags`, HI-3594). The remote takes it
      only while its ref is exactly `onto`, and it is a fast-forward by construction, so the lease never discards remote
      history. Pushed, or at the result already (`atResult`: the lease never applied, counted only because the result
      is there): `Integrated`, the push logged as made, and the local catch-up owed in the same write. Stale lease or not a

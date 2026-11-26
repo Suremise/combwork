@@ -108,6 +108,17 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect(started.publish).toMatchObject({ remote: 'origin', ref: 'refs/heads/main', endpoint: bare })
   })
 
+  it('HI-3594: the sealed publication sends the target alone: no tag of the project’s goes with it under push.followTags', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following()
+    // The sealed context reads neither the project's configuration nor the user's, and has no tags of its own to follow.
+    sh(e.project, 'tag', '-a', '-m', 'not for publishing', 'v0.9.0-draft', 'main')
+    sh(e.project, 'config', 'push.followTags', 'true')
+    await queued(e, 'A', 'a.txt')
+    expect((await queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    expect(head(bare)).toBe(head(e.project))
+    expect(sh(bare, 'for-each-ref', '--format=%(refname)', 'refs/tags')).toBe('')
+  })
+
   it('the snapshot store unreadable at the save (HI-2993): nothing published or begun, tried again as a failed read, then merged', { timeout: GIT_HEAVY_MS }, async () => {
     const { e, bare, transport } = following()
     const a = await queued(e, 'A', 'a.txt')
