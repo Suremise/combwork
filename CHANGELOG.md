@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **Discard Changes… and Restore From… keep only that file in their stash** (HI-3587). When another file had staged changes, the stash made for one file held those too, so applying it later brought them back, over whatever that file had become. The stash now holds the one file's changes, staged and not, and Apply restores that file alone.
 - **Cards Combwork moves into a column land at its bottom** (HI-3585). A card the workflow moved, such as a merged card going from Passed to Done, kept the place it had in the column it left, so it could appear at the top or in the middle of Done instead of last. It now goes after the cards already there, as your own moves do.
 
 ## 1.7.0 — 2026-11-25

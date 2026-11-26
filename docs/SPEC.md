@@ -6086,7 +6086,10 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   (`files:gitFileCommits`); a click shows that commit's version, and Restore acts on it (one the commit deleted the
   file in says so and can't be restored). The target's commit is the one the confirm showed, even if the target moves
   before Restore; a target with no file at that path says so and offers nothing. **Nothing is lost**: the file's
-  uncommitted changes, staged and not, are stashed first (`git stash push -- :(literal)<file>`), named with Set Aside's
+  uncommitted changes, staged and not, are stashed first, that file's alone (HI-3587: `git stash push -- <file>` keeps
+  the whole index, so its Apply brought back other files' staged changes; the stash is built as git builds one, its
+  index commit HEAD plus that file's index entry, its work tree commit that plus the file on disk, then `git stash
+  store`, and the file put back to HEAD, one new in the index taken out), named with Set Aside's
   mark (`Combwork: set aside before discarding <file> [cw:…]`, *before restoring <file> from <short>*), so Stashes
   (above) lists it as *Set aside by Combwork before discarding <file>* and Apply brings it back; the notification says
   where it went. A file with no changes stashes nothing (git holds that version). Discard is the stash alone (index and
