@@ -517,7 +517,7 @@ export const AREAS = [
   // A request's or a decision's short plain form (#1635): For you's chip, the inbox's rows, a card's decision count.
   { paths: ['src/shared/gist.ts'], suites: ['foryou', 'inbox', 'decisions'] },
   { paths: ['src/main/tasks.ts', 'src/main/lanes.ts', 'src/shared/lanes.ts', 'src/main/workflow/cardWork.ts', 'src/main/workflow/recorder.ts', 'src/main/workflow/runtime.ts', 'src/shared/workflow/workView.ts', 'tests/e2e/foryou.cjs'], suites: ['foryou'] },
-  { paths: ['src/main/tray.ts', 'src/renderer/src/chime.ts', 'src/shared/bursts.ts'], suites: ['bursts', 'bell', 'banners'] },
+  { paths: ['src/main/tray.ts', 'src/renderer/src/chime.ts', 'src/shared/chime.ts', 'src/shared/bursts.ts'], suites: ['bursts', 'bell', 'banners'] },
   { paths: ['src/main/notices.ts', 'src/main/planUsage.ts'], suites: ['banners'] },
   // One notification system (HI-2320): the routing table, tell(), the pop-ups, the bell and its buttons.
   { paths: ['src/shared/notify.ts', 'src/main/notify.ts', 'src/main/outcomes.ts', 'src/renderer/src/components/Popups.tsx', 'src/renderer/src/entryConditions.ts', 'tests/e2e/notifyonce.cjs'], suites: ['notifyonce', 'banners', 'bell', 'bursts', 'notifytarget'] },
