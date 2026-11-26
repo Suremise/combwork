@@ -22,6 +22,7 @@ import { addChips, attachFiles, clearChips } from '../attach'
 import { AttachmentChips } from './AttachmentChips'
 import { deferHiddenSelectionRedraws } from '../hiddenTerminalRedraws'
 import { msg, tr } from '@shared/i18n'
+import { windowsPtyOption } from '@shared/windowsPty'
 
 type Listener = (data: string) => void
 const dataListeners = new Map<string, Set<Listener>>()
@@ -439,9 +440,10 @@ export function TerminalView({
       // fallback font; squeeze them into their cell instead of letting the next cell paint over half.
       // Needs the WebGL renderer below.
       rescaleOverlappingGlyphs: true,
-      // No buildNumber: xterm then re-wraps lines when the terminal narrows or widens (#896), as ConPTY itself does
-      // from Windows build 21376. A build below that would turn its reflow off.
-      windowsPty: { backend: 'conpty' }
+      // From Windows build 21376 no buildNumber: xterm re-wraps lines when the terminal narrows or widens (#896), as
+      // ConPTY itself does. Below it (Windows 10, HI-3589) the build: xterm joins the rows ConPTY wrapped with CR LF, so a
+      // long line selected and copied comes whole, and leaves reflowing to ConPTY.
+      windowsPty: windowsPtyOption(window.combwork.platform, window.combwork.systemVersion ?? '')
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
