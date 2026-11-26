@@ -120,7 +120,7 @@ import { agentGetsMcp, assistantMcpAdded, serverOnIn } from '../shared/agentMcp'
 import { launchEnded, leftoversOf, leftoversOffer, noteUntracked, settleLeftovers, STOPPED_BEFORE_START, trackingProblemText, trackingReady, trackLaunch, type TrackResult } from './agentProcesses'
 import type { GateWord } from './launchGate'
 import { leftoversSummary, processCount } from '../shared/agentProcesses'
-import { childEnv, hasPty, killPty, refreshPty, spawnPty, startSize, writePty } from './ptyHost'
+import { childEnv, consoleDrawsDim, hasPty, killPty, refreshPty, spawnPty, startSize, writePty } from './ptyHost'
 import { refreshPathBeforeStart } from './freshPath'
 import { TerminalScreen } from './terminalScreen'
 import { heldLineLost } from './heldLine'
@@ -4835,9 +4835,10 @@ class SessionManager {
         try {
           box = await press('\x15', 'A Ctrl+U', box)
         } catch (e) {
-          // The first Ctrl+U left text in its box as it was (HI-3583): tried once more with the letter. A Ctrl+U that
-          // emptied rows before shows a draft, which an unanswered one leaves (a busy CLI): refused.
-          if (n > 0 || !was || e !== refusal) throw e
+          // The first Ctrl+U left text in its box as it was (HI-3583), where the console doesn't draw dim (Windows 10): a
+          // CLI's dim suggestion reads as text there, so the letter is tried once. Elsewhere it is a draft in a busy CLI,
+          // which would read the letter with the Ctrl+U as a paste (#597): refused, as is one after a Ctrl+U that emptied rows.
+          if (n > 0 || !was || e !== refusal || consoleDrawsDim()) throw e
           unmoved = was
         }
       }
