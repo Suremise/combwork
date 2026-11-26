@@ -2882,6 +2882,12 @@ export interface LiveSessionState {
    */
   inputBlocked?: { since: string }
   /**
+   * A message of Combwork's waits on text in its input (HI-3583): a clear before typing was refused with text in its input
+   * box (a draft Combwork couldn't empty, or something its CLI drew there that isn't a suggestion). Shown in its pane until
+   * its box reads empty, a clear succeeds or another run begins.
+   */
+  inputText?: { since: string }
+  /**
    * Its CLI's hooks aren't reaching Combwork (#1336), this launch: none came within a while of its start (a CLI that sends one
    * then), or none after a prompt its CLI went to work on (its screen or its records show it). Combwork's status for it may be
    * wrong, so it shows as unknown and nothing is typed into it; any hook clears it. `why` when Combwork can tell: Combwork

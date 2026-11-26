@@ -319,6 +319,14 @@
     "defaultMessage": "Answer what its terminal shows, such as a question of its CLI's own, then try again.",
     "description": "A notice's body: Try again found the agent's input still taking no keys; the user answers what its terminal shows first."
   },
+  "panes.header.inputText": {
+    "defaultMessage": "Waiting: text in its input",
+    "description": "A pane's status: a message Combwork would type into the agent waits, because the agent's input shows text Combwork couldn't clear. Keep it short."
+  },
+  "panes.header.inputTextTip": {
+    "defaultMessage": "Combwork has something to type into this agent, but its input shows text that Combwork couldn't clear: a draft, or something its CLI drew there. Combwork never types over it. Send it or clear it in its terminal, and what waits is typed then.",
+    "description": "Tooltip of a pane's status when a message Combwork would type into the agent's CLI waits because the CLI's input shows text that Combwork's keys didn't clear."
+  },
   "panes.header.markIdle": {
     "defaultMessage": "Mark idle",
     "description": "Button beside a pane's unknown state, and an item of its ⋯ menu: tells Combwork the agent is idle (its terminal shows it at its prompt). Keep it short."

@@ -754,6 +754,8 @@ interface LiveSession {
    * box seen again, or a clear that empties it, ends it. Past Advanced's Input box hidden: wait, the input is blocked.
    */
   boxHidden?: { runId: string; since: number }
+  /** A clear refused with text in its box, in this run (HI-3583; LiveSessionState.inputText): its box read empty ends it. */
+  inputText?: { runId: string }
   /** A look at its screen for that question and a lost line is queued (one at a time, however much the CLI draws). */
   idleChecking?: boolean
   /** The user was told this launch runs another model than it was given (HI-2609): once a launch. */
@@ -4752,9 +4754,12 @@ class SessionManager {
       return box === null ? null : box.trim() ? box : ''
     }
     const words = (box: string | null): string => (box ?? '').replace(/\s+/g, ' ').trim()
+    // The refusal thrown, as against the caller's guard's (HI-3583).
+    let refusal: Error | null = null
     const notCleared = (why: string): Error => {
       log.info(`${userText(this.label(l.state))}: its input wasn't seen empty, so nothing is typed into it: ${why}`) // i18n-ignore: why, for the log
-      return combworkError(msg({ id: 'session.prompt.inputNotCleared', defaultMessage: "Its input couldn't be seen empty after Combwork cleared it: nothing is typed into it until it can be.", description: "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Combwork pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards." }), undefined, { kind: 'conflict' })
+      refusal = combworkError(msg({ id: 'session.prompt.inputNotCleared', defaultMessage: "Its input couldn't be seen empty after Combwork cleared it: nothing is typed into it until it can be.", description: "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Combwork pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards." }), undefined, { kind: 'conflict' })
+      return refusal
     }
     const waitMs = advanced.number(clearKeyWaitId(l.adapter.id)) * 1000
     // Refused because a key went unanswered while the box read empty (HI-2191): something else may take its keys.
@@ -4785,6 +4790,9 @@ class SessionManager {
     let box = read()
     // The letter typed and not taken back yet.
     let probe = false
+    // What the box showed when its first Ctrl+U left it as it was (HI-3583): a CLI's suggestion drawn in its empty input,
+    // which reads as text where the terminal doesn't draw dim (Windows 10's console), or a draft a busy CLI didn't read.
+    let unmoved: string | null = null
     try {
       for (let n = 0; ; n++) {
         if (n >= CLEAR_KEYS_MOST) {
@@ -4792,6 +4800,21 @@ class SessionManager {
           throw notCleared(`${CLEAR_KEYS_MOST} keys didn't empty it`) // i18n-ignore: why, for the log
         }
         check()
+        if (unmoved !== null) {
+          // A letter typed replaces a suggestion, which a draft never does: shown alone, the input was empty. The Backspace
+          // that takes it back may show the suggestion again, the same text as before the letter.
+          probe = true
+          box = await press(CLEAR_PROBE, 'A letter typed', box) // i18n-ignore: the key's name, for the log
+          if (words(box) !== CLEAR_PROBE) throw notCleared(`a Ctrl+U left its input as it was, and the letter Combwork typed didn't replace what it showed ("${userText(words(unmoved).slice(0, 60))}")`) // i18n-ignore: why, for the log
+          check()
+          box = await press('\x7f', 'A Backspace', box)
+          probe = false
+          if (box !== '' && words(box) !== words(unmoved)) throw notCleared(`the letter Combwork typed and took back left "${userText(words(box).slice(0, 60))}"`) // i18n-ignore: why, for the log
+          check()
+          log.info(`${userText(this.label(l.state))}: what its input showed was its CLI's own text, not a draft: a letter typed replaced it`) // i18n-ignore: for the log
+          this.clearedInput(l)
+          return
+        }
         if (box === '') {
           probe = true
           box = await press(CLEAR_PROBE, 'A letter typed', box) // i18n-ignore: the key's name, for the log
@@ -4805,19 +4828,55 @@ class SessionManager {
           probe = false
           if (box !== '') throw notCleared(`the letter Combwork typed and took back left "${userText(words(box).slice(0, 60))}"`) // i18n-ignore: why, for the log
           check()
-          l.unanswered = 0
-          l.boxHidden = undefined
+          this.clearedInput(l)
           return
         }
-        box = await press('\x15', 'A Ctrl+U', box)
+        const was = box
+        try {
+          box = await press('\x15', 'A Ctrl+U', box)
+        } catch (e) {
+          // The first Ctrl+U left text in its box as it was (HI-3583): tried once more with the letter. A Ctrl+U that
+          // emptied rows before shows a draft, which an unanswered one leaves (a busy CLI): refused.
+          if (n > 0 || !was || e !== refusal) throw e
+          unmoved = was
+        }
       }
     } catch (e) {
       const same = this.live.get(liveId(projectPath, agentId)) === l && l.state.runId === runId
       if (probe && same && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x7f')
       if (unanswered && same) this.inputUnanswered(l)
       if (hidden && same) this.inputHidden(l)
+      // Refused with text in its box (HI-3583): the pane says why its message waits.
+      if (e === refusal && !unanswered && !hidden && (unmoved ?? box) && same) this.inputHasText(l)
       throw e
     }
+  }
+
+  /** Its input was seen empty by a clear (clearInput): what it counted against it is over. */
+  private clearedInput(l: LiveSession): void {
+    l.unanswered = 0
+    l.boxHidden = undefined
+    this.inputTextGone(l)
+  }
+
+  /**
+   * A clear refused with text in its input box (HI-3583: Claude Code's suggestion read as a draft on Windows 10 held every
+   * message with nothing said): its pane says its messages wait on text in its input, until its box reads empty, a clear
+   * succeeds or another run begins.
+   */
+  private inputHasText(l: LiveSession): void {
+    if (l.inputText?.runId === l.state.runId) return
+    const at = Date.now()
+    l.inputText = { runId: l.state.runId }
+    l.state.inputText = { since: new Date(at).toISOString() }
+    this.emitState(l.state)
+  }
+
+  private inputTextGone(l: LiveSession): void {
+    if (!l.inputText && !l.state.inputText) return
+    l.inputText = undefined
+    l.state.inputText = undefined
+    this.emitState(l.state)
   }
 
   /**
@@ -4923,6 +4982,8 @@ class SessionManager {
    */
   private inputBlockedDrawn(id: string, l: LiveSession): void {
     const b = l.inputBlocked
+    // Text in its box that held a message (HI-3583): gone once the box reads empty, or with its run.
+    if (l.inputText && (l.inputText.runId !== l.state.runId || this.boxNow(l) === '')) this.inputTextGone(l)
     // Its box off the screen (HI-3411): drawn again, it is back, whoever answered what hid it (a dialog's own timeout too).
     if (!b) {
       if (l.boxHidden && this.boxNow(l) !== null) l.boxHidden = undefined

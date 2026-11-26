@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixed
+
+- **Windows 10: Claude Code's prompt suggestion no longer stops Combwork's messages** (HI-3583, issue #16). Windows 10's console doesn't draw greyed-out text, so the suggestion Claude Code shows in an empty input looked like a draft of yours: Combwork's Ctrl+U couldn't clear it, and every message to that agent waited. Combwork now types a letter when a Ctrl+U leaves the input as it was. A suggestion gives way to it and a draft doesn't, so a suggestion no longer holds anything, and a draft is still never typed over. If a message does wait on text in an agent's input, its pane now says **Waiting: text in its input**, until the input is empty. The workaround, turning off Claude Code's `promptSuggestionEnabled`, is no longer needed.
+
 ## 1.7.0 — 2026-11-25
 
 ### Added

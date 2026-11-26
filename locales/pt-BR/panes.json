@@ -90,6 +90,8 @@
   "panes.header.unknownTip": "O Combwork não recebe notícias do turno deste agente há algum tempo e não vê sinal de que ele terminou: nenhum Stop da CLI, nada nos registros da CLI, nenhum prompt ocioso na tela. Até receber mais notícias, o agente conta como ocupado e nada é digitado nele. Se o terminal mostrar que ele está esperando no prompt, marque-o como ocioso.",
   "panes.header.untaken": "Uma linha digitada pelo Combwork não foi aceita",
   "panes.header.untakenTip": "O Combwork digitou isto, mas a CLI não aceitou (ela não estava lendo a entrada): “{line}”. Clique no terminal e pressione Enter. O Combwork não digita mais nada nele até a CLI aceitar.",
+  "panes.header.inputText": "Aguardando: texto na entrada",
+  "panes.header.inputTextTip": "O Combwork tem algo a digitar neste agente, mas a entrada dele mostra um texto que o Combwork não conseguiu limpar: um rascunho ou algo que a CLI desenhou ali. O Combwork nunca digita por cima. Envie ou limpe no terminal dele, e o que está aguardando será digitado então.",
   "panes.header.watchTip": "{watch}: o Combwork digita uma linha nele quando {kind, select, agent {{n, plural, one {o agente termina} other {um deles termina}}, espera por você ou para} lane {uma revisão falha, um cartão fica bloqueado ou travado, ou uma raia chega à vez de merge ou termina} other {{n, plural, one {o cartão muda} other {um deles muda}}}}, ou no prazo ({limit}) se nada acontecer. Nada roda enquanto isso, e ele não assume outro trabalho.",
   "panes.layout.name": "{layout, select, single {Um por vez} columns2 {Duas colunas} columns3 {Três colunas} grid {Grade de quatro} other {Grade de seis}}",
   "panes.layout.narrowed": "{layout}: mostrado como {shown} até haver espaço para um terminal em cada painel",
