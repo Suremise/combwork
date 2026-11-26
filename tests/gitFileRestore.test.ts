@@ -89,6 +89,69 @@ describe('Discard Changes', () => {
     expect(read('a.txt')).toBe('staged and more\n')
   })
 
+  it("HI-3587: the stash holds that file alone, though another file is staged; applying it brings back only that file's changes", async () => {
+    write('a.txt', 'mine\n')
+    write('b.txt', 'staged other\n')
+    sh(proj, 'add', 'b.txt')
+    expect(await restore('a.txt', 'head', (await plan('a.txt', 'head')).commit)).toEqual({ stashed: true })
+    expect(read('a.txt')).toBe('base\n')
+    expect(status('b.txt')).toBe('M  b.txt')
+    expect(sh(proj, 'stash', 'show', '--name-status').trim()).toBe('M\ta.txt')
+    expect(sh(proj, 'show', '--name-only', '--format=', 'stash@{0}^2').trim()).toBe('')
+    // b.txt put back and staged; the stash then applies a.txt only.
+    write('b.txt', 'b\n')
+    sh(proj, 'add', 'b.txt')
+    sh(proj, 'stash', 'apply', '-q')
+    expect(sh(proj, 'diff', '--name-only', 'HEAD').trim()).toBe('a.txt')
+    expect(read('a.txt')).toBe('mine\n')
+    expect(read('b.txt')).toBe('b\n')
+  })
+
+  it('HI-3587: a file new in the index is taken out, and its stash brings it back, staged', async () => {
+    write('new.txt', 'new\n')
+    sh(proj, 'add', 'new.txt')
+    write('b.txt', 'staged other\n')
+    sh(proj, 'add', 'b.txt')
+    expect(await restore('new.txt', 'head', head())).toEqual({ stashed: true })
+    expect(status('new.txt')).toBe('')
+    expect(sh(proj, 'ls-files', '--', 'new.txt').trim()).toBe('')
+    expect(sh(proj, 'stash', 'show', '--name-status').trim()).toBe('A\tnew.txt')
+    sh(proj, 'restore', '--staged', '--worktree', 'b.txt')
+    sh(proj, 'stash', 'apply', '-q')
+    expect(read('new.txt')).toBe('new\n')
+    expect(status('new.txt')).toBe('A  new.txt')
+    expect(status('b.txt')).toBe('')
+  })
+
+  it("HI-3587 round 1: with no identity configured (user.useConfigOnly too) it stashes as git's stash does, as `git stash`; a configured one is used", async () => {
+    const keys = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'EMAIL']
+    const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]))
+    const empty = join(base, `no-identity-${n}.gitconfig`)
+    writeFileSync(empty, '')
+    for (const k of keys) delete process.env[k]
+    process.env.GIT_CONFIG_GLOBAL = empty
+    process.env.GIT_CONFIG_NOSYSTEM = '1'
+    try {
+      // The template repository's own identity taken out: this one has none.
+      for (const key of sh(proj, 'config', '--local', '--name-only', '--list').split(/\r?\n/)) if (/^(user|author|committer)\./.test(key)) sh(proj, 'config', '--local', '--unset-all', key)
+      expect(sh(proj, 'config', '--local', '--list')).not.toMatch(/^(user|author|committer)\./m)
+      sh(proj, 'config', '--local', 'user.useConfigOnly', 'true')
+      write('a.txt', 'mine\n')
+      expect(await restore('a.txt', 'head', head())).toEqual({ stashed: true })
+      expect(read('a.txt')).toBe('base\n')
+      expect(sh(proj, 'log', '-1', '--format=%an <%ae>|%cn <%ce>', 'stash@{0}')).toBe('git stash <git@stash>|git stash <git@stash>')
+      sh(proj, 'config', '--local', 'user.name', 'Someone')
+      sh(proj, 'config', '--local', 'user.email', 'someone@example.invalid')
+      write('a.txt', 'again\n')
+      expect(await restore('a.txt', 'head', head())).toEqual({ stashed: true })
+      expect(sh(proj, 'log', '-1', '--format=%an <%ae>', 'stash@{0}')).toBe('Someone <someone@example.invalid>')
+      expect(stashMessages()).toHaveLength(2)
+    } finally {
+      for (const k of keys) if (saved[k] === undefined) delete process.env[k]
+      else process.env[k] = saved[k]
+    }
+  })
+
   it("works on a file in a subfolder, and in a project folder that is a repository's subfolder", async () => {
     write('sub/c.txt', 'changed\n')
     const p = await plan('sub/c.txt', 'head')
@@ -165,6 +228,28 @@ describe('Restore From', () => {
     expect(await restore('a.txt', 'commit', p.commit)).toEqual({ stashed: true })
     expect(read('a.txt')).toBe('base\n')
     expect(combworkStash(stashMessages()[0])).toEqual({ why: 'restoring', file: 'a.txt', from: first.slice(0, 7) })
+  })
+
+  it("HI-3587: the stash holds that file's changes alone, staged and not, though another file is staged", async () => {
+    const first = head()
+    commit(proj, { 'a.txt': 'second\n' }, 'second')
+    write('a.txt', 'staged a\n')
+    sh(proj, 'add', 'a.txt')
+    write('a.txt', 'staged a and more\n')
+    write('b.txt', 'staged other\n')
+    sh(proj, 'add', 'b.txt')
+    expect(await restore('a.txt', 'commit', first)).toEqual({ stashed: true })
+    expect(read('a.txt')).toBe('base\n')
+    // a.txt's restore is a change to commit, unstaged; only b.txt stays staged.
+    expect(sh(proj, 'diff', '--name-only').trim()).toBe('a.txt')
+    expect(sh(proj, 'diff', '--cached', '--name-only').trim()).toBe('b.txt')
+    expect(sh(proj, 'stash', 'show', '--name-status').trim()).toBe('M\ta.txt')
+    expect(sh(proj, 'show', '--name-status', '--format=', 'stash@{0}^2').trim()).toBe('M\ta.txt')
+    sh(proj, 'checkout', 'HEAD', '--', 'a.txt', 'b.txt')
+    sh(proj, 'stash', 'apply', '-q', '--index')
+    expect(read('a.txt')).toBe('staged a and more\n')
+    expect(status('a.txt')).toBe('MM a.txt')
+    expect(status('b.txt')).toBe('')
   })
 
   it("refuses a target that isn't a branch, and a commit without the file; nothing is changed", async () => {

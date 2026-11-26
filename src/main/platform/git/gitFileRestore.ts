@@ -1,7 +1,7 @@
 // HI-3477: the Files tab's Discard Changes… and Restore From… (SPEC §16.10.2, Discard and restore a file), the user's
 // click at a time, never an agent's tool: one tracked file of the project folder.
-// - Discard: the file's uncommitted changes (staged and not) stashed, which puts it back to the commit checked out:
-//   `git stash push -- <file>`.
+// - Discard: the file's uncommitted changes (staged and not) stashed, which puts it back to the commit checked out: a
+//   stash of that file alone (HI-3587: `git stash push -- <file>` keeps every staged file's changes too), stashFile.
 // - Restore From: its changes stashed the same way when it has any, then its version on the target (the commit the
 //   confirm showed, even if the target moves meanwhile) or in a commit picked: `git restore --source=<commit>
 //   --worktree -- <file>`, so it shows in Changes as a change to commit.
@@ -10,7 +10,8 @@
 // fence, refused as Stashes' Apply is (gitStashes.ts): an operation under way or the file in conflict, a Combwork run or
 // an agent's lock there, an agent working there, or the caller's guard (a session there: fileRestorePanel.ts).
 import { randomBytes } from 'crypto'
-import { resolve, sep } from 'path'
+import { rm } from 'original-fs/promises'
+import { join, resolve, sep } from 'path'
 import { HISTORY_COMMITS, type GitCommitRow } from '../../../shared/gitRepo'
 import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from '../../../shared/gitFileRestore'
 import type { GitDiff } from '../../../shared/types'
@@ -170,13 +171,75 @@ export async function fileCommits(projectPath: string, relRaw: unknown, pageRaw:
 }
 
 /** Runs a git that writes the folder, bounded as Set Aside's (Settings → Advanced, `cw.git.commitMinutes`). */
-async function writing(projectPath: string, rel: string, args: string[]): Promise<GitResult> {
-  const r = await git(projectPath, args, undefined, undefined, { env: restoreEnv(), timeout: platformLimits.gitCommitMs() })
+async function writing(projectPath: string, rel: string, args: string[], env: NodeJS.ProcessEnv = restoreEnv()): Promise<GitResult> {
+  const r = await git(projectPath, args, undefined, undefined, { env, timeout: platformLimits.gitCommitMs() })
   if (r.timedOut) {
-    log.warn(`git ${args[1]} of a file in ${userText(projectPath)} ran past its bound and was ended`)
+    log.warn(`git ${args.find((a) => !a.startsWith('-'))} of a file in ${userText(projectPath)} ran past its bound and was ended`)
     throw combworkError(M.timedOut, { seconds: Math.round(platformLimits.gitCommitMs() / 1000), file: rel })
   }
   return r
+}
+
+/**
+ * HI-3587: stashes `rel`'s uncommitted changes, staged and not, and only its: `git stash push -- <file>` keeps the whole
+ * index in its stash, so applying it brought back what other files had staged. The stash is made as git makes one, from
+ * a temporary index that is HEAD's tree with `rel`'s entry from the real index (the stash's index commit), then its file
+ * on disk (its work tree commit, on HEAD and that), stored under `message`; then `rel` is put back to HEAD (a file new
+ * in the index taken out, as git's stash does).
+ */
+/**
+ * HI-3587 round 1: git's stash commits with `git stash <git@stash>` where no identity is configured (its fallback,
+ * `user.useConfigOnly` too), and commit-tree has none: the same names, as git's environment for the stash's own
+ * commits, wherever neither `user.*` nor that side's `author.*`/`committer.*` names one, and the environment doesn't
+ * either. The user's config is never changed.
+ */
+async function stashIdent(projectPath: string): Promise<NodeJS.ProcessEnv> {
+  const r = await git(projectPath, ['config', '--get-regexp', '^(user|author|committer)\\.(name|email)$'])
+  const set = new Set(r.out.split(/\r?\n/).map((row) => row.split(' ')[0].toLowerCase()).filter(Boolean))
+  const env: NodeJS.ProcessEnv = {}
+  for (const side of ['author', 'committer'] as const)
+    for (const [what, fallback] of [['name', 'git stash'], ['email', 'git@stash']] as const) { // i18n-ignore: git stash's own fallback identity, in the repository
+      const key = `GIT_${side.toUpperCase()}_${what.toUpperCase()}`
+      if (!set.has(`user.${what}`) && !set.has(`${side}.${what}`) && !process.env[key]) env[key] = fallback
+    }
+  return env
+}
+
+async function stashFile(projectPath: string, rel: string, message: string): Promise<void> {
+  const read = async (args: string[], env?: NodeJS.ProcessEnv): Promise<string> => {
+    const r = await writing(projectPath, rel, args, env)
+    if (!r.ok) throw refused(r)
+    return r.out.trim()
+  }
+  const head = await read(['rev-parse', '--verify', 'HEAD^{commit}'])
+  const branch = (await git(projectPath, ['symbolic-ref', '-q', '--short', 'HEAD'])).out.trim() || '(no branch)' // i18n-ignore: git's own word in a stash's subject
+  const subject = await read(['log', '-1', '--format=%s', head])
+  const gitDir = await read(['rev-parse', '--absolute-git-dir'])
+  const index = join(gitDir, `index.cw-restore-${randomBytes(4).toString('hex')}`)
+  const ident = await stashIdent(projectPath)
+  const env = { ...restoreEnv(), ...ident, GIT_INDEX_FILE: index }
+  try {
+    await read(['read-tree', head], env)
+    const entry = (await read(['--literal-pathspecs', 'ls-files', '-s', '-z', '--', rel])).split('\0').find((row) => row.slice(row.indexOf('\t') + 1) === rel)
+    if (entry) {
+      const [mode, sha] = entry.slice(0, entry.indexOf('\t')).split(' ')
+      await read(['update-index', '--add', '--cacheinfo', mode, sha, rel], env)
+    } else await read(['update-index', '--force-remove', '--', rel], env)
+    const indexTree = await read(['write-tree'], env)
+    const indexCommit = await read(['commit-tree', indexTree, '-p', head, '-m', `index on ${branch}: ${head.slice(0, 7)} ${subject}`], env) // i18n-ignore: git's own subject for a stash's index commit
+    await read(['update-index', '--add', '--remove', '--', rel], env)
+    const workTree = await read(['write-tree'], env)
+    const said = `On ${branch}: ${message}` // i18n-ignore: git's own subject for a stash, as `git stash push -m` writes it
+    const stash = await read(['commit-tree', workTree, '-p', head, '-p', indexCommit, '-m', said], env)
+    await read(['stash', 'store', '-q', '-m', said, stash], { ...restoreEnv(), ...ident })
+  } finally {
+    await rm(index, { force: true }).catch(() => undefined)
+  }
+  const inHead = (await git(projectPath, ['cat-file', '-e', `${head}:./${rel}`])).ok
+  const back = inHead
+    ? await writing(projectPath, rel, ['--literal-pathspecs', 'restore', `--source=${head}`, '--staged', '--worktree', '--', rel])
+    : await writing(projectPath, rel, ['--literal-pathspecs', 'rm', '-q', '-f', '--', rel])
+  if (!back.ok) throw combworkError(M.stashedFailed, { why: gitErrorLine(`${back.err}\n${back.out}`) || back.err.trim().slice(0, 400) })
 }
 
 /**
@@ -213,9 +276,7 @@ export async function restoreFile(projectPath: string, req: FileRestoreRequest, 
           const why = req.source === 'head' ? `before discarding ${rel}` : `before restoring ${rel} from ${req.commit.slice(0, 7)}` // i18n-ignore: the stash's message, in the repository (English, as Set Aside's)
           const message = `Combwork: set aside ${why} [cw:${randomBytes(3).toString('hex')}]` // i18n-ignore: the stash's message, in the repository
           log.info(`The user's ${req.source === 'head' ? 'discard' : 'restore'} of a file in ${userText(projectPath)}: its changes stashed`)
-          // The path literal by its own magic: git's stash, given --literal-pathspecs, misreads a path from a subfolder.
-          const s = await writing(projectPath, rel, ['stash', 'push', '--quiet', '-m', message, '--', `:(literal)${rel}`])
-          if (!s.ok) throw refused(s)
+          await stashFile(projectPath, rel, message)
           stashed = true
         }
         if (req.source === 'head') return { stashed }
