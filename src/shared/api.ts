@@ -1408,6 +1408,8 @@ export interface CombworkBridge {
   /** Full path of a file dropped from Explorer. */
   pathForFile(file: File): string
   platform: string
+  /** The OS version (`process.getSystemVersion()`: "10.0.19045" on Windows 10), for xterm's `windowsPty` (HI-3589). */
+  systemVersion: string
   /** A test copy's window: React's commits are watched (HI-1387, renderer commitWatch.ts). */
   commitWatch: boolean
   /**
