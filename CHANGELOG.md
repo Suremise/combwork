@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **Clean Up no longer calls a branch already deleted on the remote refused** (HI-3593). A branch deleted on GitHub after your last fetch, such as one deleted when its pull request was merged, was still offered, and deleting it said the remote refused. Clean Up Merged Branches now checks the remote once it opens and marks such a branch **already deleted**. Ticking it removes only your clone's reference to it, and says so. A real refusal still says it was refused, with git's reason when it gives one, such as a protected branch. Renaming a branch on its remote and deleting a tag there treat a name already deleted the same way.
 - **Cards Combwork moves into a column land at its bottom** (HI-3585). A card the workflow moved, such as a merged card going from Passed to Done, kept the place it had in the column it left, so it could appear at the top or in the middle of Done instead of last. It now goes after the cards already there, as your own moves do.
 
 ## 1.7.0 — 2026-11-25

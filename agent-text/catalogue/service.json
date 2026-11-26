@@ -919,9 +919,19 @@
     "note": "An error creating a branch or a tag ({kind}): its name {name} is one git refuses. {hasName} is no when no name was given (then it says That).",
     "audience": "both"
   },
+  "service.gitRepo.branchKept": {
+    "text": "{why, select, target {{branch} is the branch work merges into: kept.} default {{branch} is the default branch: kept.} current {{branch} is checked out in the project folder: kept.} worktree {{branch} is checked out in a worktree or slot: kept.} card {An open card works on {branch}: kept.} remoteHead {{branch} is the remote's default branch: kept.} moved {{branch} has moved since you were shown it: kept. Look at it again.} unmerged {{branch} has commits that aren't in {target}: kept.} gone {There's no branch {branch}.} other {{branch} isn't a valid branch name.}}",
+    "note": "Why a branch wasn't deleted (Clean Up Merged Branches, Delete branch…, in Version Control → Branches & remotes). {branch} is its name, {target} the branch the project's work merges into. Keep the select keys.",
+    "audience": "both"
+  },
   "service.gitRepo.branchTaken": {
     "text": "There’s already a branch {name}.",
     "note": "HI-2807: an error creating a branch: the repository has a branch called {name} already.",
+    "audience": "both"
+  },
+  "service.gitRepo.branchesDeleted": {
+    "text": "{n, plural, one {Deleted {branches}.} other {Deleted # branches: {branches}.}}",
+    "note": "After deleting branches in Version Control → Branches & remotes: {branches} lists them ({n}).",
     "audience": "both"
   },
   "service.gitRepo.chooseRemote": {
@@ -937,6 +947,11 @@
   "service.gitRepo.createFailed": {
     "text": "Couldn't create {name}: {why}",
     "note": "An error creating the branch or tag {name}; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.deleteBranchFailed": {
+    "text": "Couldn't delete {branch}: {why}",
+    "note": "An error deleting the branch {branch} in Version Control → Branches & remotes; {why} is git's own words.",
     "audience": "both"
   },
   "service.gitRepo.detachedPull": {
@@ -1079,9 +1094,29 @@
     "note": "After deleting branches on the remote {remote} (Clean Up Merged Branches): {branches} lists them ({n}).",
     "audience": "both"
   },
+  "service.gitRepo.remoteBranchesGone": {
+    "text": "{n, plural, one {{branches} was already deleted on {remote}: removed its local reference.} other {{branches} were already deleted on {remote}: removed their local references.}}",
+    "note": "HI-3593: after Clean Up Merged Branches: the branches {branches} ({n}) had already been deleted on the remote {remote} by someone else, so only their remote-tracking branches here (the local references, origin/…) were removed.",
+    "audience": "both"
+  },
+  "service.gitRepo.remoteBranchesGoneKept": {
+    "text": "{n, plural, one {{branches} was already deleted on {remote}, but its local reference has changed since you were shown it, so it was kept.} other {{branches} were already deleted on {remote}, but their local references have changed since you were shown them, so they were kept.}}",
+    "note": "HI-3593: after Clean Up Merged Branches: the branches {branches} ({n}) had already been deleted on the remote {remote}, but their remote-tracking branches here changed meanwhile (a fetch), so they were left as they are.",
+    "audience": "both"
+  },
   "service.gitRepo.remoteDeleteRefused": {
     "text": "{remote} refused to delete {branches}: it has commits there you haven't fetched, or it doesn't allow deleting them.",
     "note": "After deleting branches on the remote {remote}: it refused those listed in {branches} (Combwork deletes a remote branch only at the commit you were shown).",
+    "audience": "both"
+  },
+  "service.gitRepo.remoteDeleteRejected": {
+    "text": "{remote} refused to delete {branch}: {why}",
+    "note": "HI-3593: after deleting branches on the remote {remote}: it refused the branch {branch} for a reason of its own ({why}, git's words, such as a protected branch or a hook that declined it).",
+    "audience": "both"
+  },
+  "service.gitRepo.remoteDeleteUnchecked": {
+    "text": "{remote} didn't delete {branch}, and Combwork couldn't check whether it still has it: {why}",
+    "note": "HI-3593: after deleting branches on the remote {remote}: the branch {branch} wasn't deleted, and asking the remote whether it still exists failed ({why}, git's words: a sign-in, the network). Its local reference is kept.",
     "audience": "both"
   },
   "service.gitRepo.remoteTaken": {
@@ -1127,6 +1162,16 @@
   "service.gitRepo.renameOldKept": {
     "text": "Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but {remote} refused to delete {old}: it has commits there you haven't fetched, or it doesn't allow deleting branches. Look at it before you delete it.",
     "note": "HI-3474: an error after renaming a branch here and on a remote: the remote {remote} refused to delete the old branch {old} (Combwork deletes it only at the commit last fetched).",
+    "audience": "both"
+  },
+  "service.gitRepo.renameOldRejected": {
+    "text": "Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but {remote} refused to delete {old}: {why}",
+    "note": "HI-3593: an error after renaming a branch here and on a remote: the remote {remote} refused to delete the old branch {old} for a reason of its own ({why}, git's words, such as a protected branch or a hook that declined it).",
+    "audience": "both"
+  },
+  "service.gitRepo.renameOldUnchecked": {
+    "text": "Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but {remote} didn't delete {old}, and Combwork couldn't check whether it still has it: {why}",
+    "note": "HI-3593: an error after renaming a branch here and on a remote: deleting the old branch {old} on {remote} was refused, and asking the remote whether that branch still exists failed ({why}, git's words: a sign-in, the network).",
     "audience": "both"
   },
   "service.gitRepo.renamePushFailed": {
@@ -1210,8 +1255,13 @@
     "audience": "both"
   },
   "service.gitRepo.tagRemoteRefused": {
-    "text": "{remote} refused to delete the tag {name}: its tag {name} isn't this one, or it has none, or it doesn't allow deleting tags. Nothing was deleted here either.",
-    "note": "HI-3474: an error deleting the tag {name} here and on the remote {remote}: the remote refused (its tag differs or is missing, or it forbids deletions), so the local tag was kept too.",
+    "text": "{remote} refused to delete the tag {name}: its tag {name} isn't this one. Nothing was deleted here either.",
+    "note": "HI-3474, HI-3593: an error deleting the tag {name} here and on the remote {remote}: the remote has a tag of that name that is another tag (Combwork deletes it only as shown), so the local tag was kept too.",
+    "audience": "both"
+  },
+  "service.gitRepo.tagRemoteUnchecked": {
+    "text": "{remote} didn't delete the tag {name}, and Combwork couldn't check whether it still has it: {why} Nothing was deleted here either.",
+    "note": "HI-3593: an error deleting the tag {name} here and on the remote {remote}: the remote refused, and asking it whether it still has that tag failed ({why}, git's words: a sign-in, the network). The local tag was kept.",
     "audience": "both"
   },
   "service.gitRepo.tagTaken": {

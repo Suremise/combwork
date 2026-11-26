@@ -269,7 +269,11 @@ interface CombworkMessageValues {
   'service.gitRepo.pushedAll': { remote: string | number }
   'service.gitRepo.rejected': { to: string | number; branch: string | number }
   'service.gitRepo.remoteBranchesDeleted': { n: number; branches: string | number; remote: string | number }
+  'service.gitRepo.remoteBranchesGone': { n: number; branches: string | number; remote: string | number }
+  'service.gitRepo.remoteBranchesGoneKept': { n: number; branches: string | number; remote: string | number }
   'service.gitRepo.remoteDeleteRefused': { remote: string | number; branches: string | number }
+  'service.gitRepo.remoteDeleteRejected': { remote: string | number; branch: string | number; why: string | number }
+  'service.gitRepo.remoteDeleteUnchecked': { remote: string | number; branch: string | number; why: string | number }
   'service.gitRepo.remoteRemoved': { n: number; remote: string | number; branches: string | number }
   'service.gitRepo.remoteRenamed': { n: number; from: string | number; to: string | number; branches: string | number }
   'service.gitRepo.remoteSameName': { remote: string | number }
@@ -282,12 +286,15 @@ interface CombworkMessageValues {
   'service.gitRepo.renameMoved': { branch: string | number }
   'service.gitRepo.renameNoUpstream': { branch: string | number }
   'service.gitRepo.renameOldKept': { from: string | number; to: string | number; remote: string | number; old: string | number }
+  'service.gitRepo.renameOldRejected': { from: string | number; to: string | number; remote: string | number; old: string | number; why: string | number }
+  'service.gitRepo.renameOldUnchecked': { from: string | number; to: string | number; remote: string | number; old: string | number; why: string | number }
   'service.gitRepo.renamePushFailed': { from: string | number; to: string | number; remote: string | number; why: string | number; upstream: string | number }
   'service.gitRepo.renameRemoteFailed': { remote: string | number; why: string | number }
   'service.gitRepo.renameRemoteTaken': { remote: string | number; to: string | number }
   'service.gitRepo.renameStopped': { step: string; from: string | number; to: string | number; remote: string | number; upstream: string | number; old: string | number }
   'service.gitRepo.renameTrackFailed': { from: string | number; to: string | number; remote: string | number; why: string | number; upstream: string | number; old: string | number }
   'service.gitRepo.renameUpstreamKept': { upstream: string | number }
+  'service.gitRepo.renamedOldGone': { local: string; from: string | number; to: string | number; remote: string | number; old: string | number }
   'service.gitRepo.setFailed': { key: string | number; why: string | number }
   'service.gitRepo.startMoved': { ref: string | number; now: string | number }
   'service.gitRepo.stopped': { kind: string }
@@ -296,6 +303,7 @@ interface CombworkMessageValues {
   'service.gitRepo.switchedTracking': { branch: string | number; remote: string | number }
   'service.gitRepo.tagDeleteFailed': { name: string | number; why: string | number }
   'service.gitRepo.tagDeleted': { onRemote: string; name: string | number; remote: string | number }
+  'service.gitRepo.tagDeletedGone': { name: string | number; remote: string | number }
   'service.gitRepo.tagMoved': { name: string | number }
   'service.gitRepo.tagPushFailed': { commit: string | number; name: string | number; remote: string | number; why: string | number }
   'service.gitRepo.tagPushOnlyFailed': { name: string | number; remote: string | number; why: string | number }
@@ -303,6 +311,7 @@ interface CombworkMessageValues {
   'service.gitRepo.tagPushed': { result: string; remote: string | number; name: string | number }
   'service.gitRepo.tagRemoteFailed': { name: string | number; remote: string | number; why: string | number }
   'service.gitRepo.tagRemoteRefused': { remote: string | number; name: string | number }
+  'service.gitRepo.tagRemoteUnchecked': { remote: string | number; name: string | number; why: string | number }
   'service.gitRepo.tagTaken': { name: string | number }
   'service.gitRepo.tagged': { commit: string | number; name: string | number }
   'service.gitRepo.taggedPushed': { commit: string | number; name: string | number; remote: string | number }

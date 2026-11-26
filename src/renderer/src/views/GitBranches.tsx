@@ -20,7 +20,7 @@ import {
 } from '@shared/gitRepo'
 import { BRANCH_GROUPS, busyLines, cleanupOffer, localGroup, localUse, remoteGroup, type BranchGroup, type CleanupOffer } from '@shared/branchCleanup'
 import { samePath } from '@shared/movePaths'
-import { call } from '../api'
+import { call, errorMessage } from '../api'
 import { offered, offeredCleanup, repoOp } from '../repoOps'
 import { attempt, releaseHeldSlot } from '../actions'
 import { cancelGitRun, cancelLabel, gitRun, startGitRun } from '../gitRuns'
@@ -205,6 +205,9 @@ const C = {
   remoteHead: msg({ id: 'git.cleanUp.remote', defaultMessage: 'On {remotes} ({n, number})', description: 'A heading in the Clean Up Merged Branches dialog: the branches it offers on the remote(s) {remotes} (a list of names), {n} of them, none ticked to start with.' }),
   remoteWarn: msg({ id: 'git.cleanUp.remoteWarn', defaultMessage: "Ticking these deletes them on the remote, for everyone who uses it, and Combwork can't undo that. None is ticked for you.", description: "A warning in the Clean Up Merged Branches dialog over the remote branches it offers: deleting them is outward-facing (git push --delete)." }),
   withLocal: msg({ id: 'git.cleanUp.withLocal', defaultMessage: 'its local branch is ticked above', description: 'Beside a remote branch in the Clean Up Merged Branches dialog: the local branch of the same name is ticked to be deleted, so this one is suggested too (it still needs its own tick).' }),
+  checking: msg({ id: 'git.cleanUp.checking', defaultMessage: 'Checking {remotes} for branches already deleted there…', description: 'HI-3593: in the Clean Up Merged Branches dialog, over the remote branches it offers, while Combwork asks the remote(s) {remotes} (a list of names) which of those branches still exist there.' }),
+  unchecked: msg({ id: 'git.cleanUp.unchecked', defaultMessage: "Couldn't check what {remote} still has: {why}", description: "HI-3593: in the Clean Up Merged Branches dialog: asking the remote {remote} which branches it still has failed ({why}, git's words: a sign-in, the network), so its branches are shown as last fetched." }),
+  alreadyGone: msg({ id: 'git.cleanUp.alreadyGone', defaultMessage: 'already deleted on {remote}: ticking it removes only its local reference', description: "HI-3593: beside a remote branch in the Clean Up Merged Branches dialog: it was already deleted on the remote {remote} (by someone else); this clone still has its remote-tracking branch, which ticking it removes. Lower case: it follows the branch's name." }),
   none: msg({ id: 'git.cleanUp.none', defaultMessage: 'None', description: 'In the Clean Up Merged Branches dialog, under a heading with nothing to offer.' }),
   deleteTicked: msg({ id: 'git.cleanUp.delete', defaultMessage: 'Delete Ticked', description: 'The button of the Clean Up Merged Branches dialog: deletes the branches ticked.' }),
   deleting: msg({ id: 'git.cleanUp.deleting', defaultMessage: 'Deleting…', description: 'The Clean Up Merged Branches or Delete branch dialog\'s button while branches are being deleted.' }),
@@ -386,7 +389,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
     await confirm({
       title: tr(C.cleanUpTitle),
       message: tr(C.cleanUpMessage, { target }),
-      content: <CleanupPicker offer={offer} onChange={(p) => (picked = p)} />,
+      content: <CleanupPicker projectPath={project.path} offer={offer} onChange={(p) => (picked = p)} />,
       wide: true,
       confirmLabel: tr(C.deleteTicked),
       busyLabel: tr(C.deleting),
@@ -901,9 +904,35 @@ function GroupHead({ group, n, target, remote }: { group: BranchGroup; n: number
  * Clean Up Merged Branches' choice (#1642): the local branches offered, ticked; the remote ones apart, under a warning
  * that ticking them deletes them on the remote, none ticked (one whose local branch is ticked is marked suggested).
  */
-function CleanupPicker({ offer, onChange }: { offer: CleanupOffer; onChange: (picked: CleanupOffer) => void }) {
+function CleanupPicker({ projectPath, offer, onChange }: { projectPath: string; offer: CleanupOffer; onChange: (picked: CleanupOffer) => void }) {
   const [local, setLocal] = useState<ReadonlySet<string>>(() => new Set(offer.local.map((b) => b.name)))
   const [remote, setRemote] = useState<ReadonlySet<string>>(() => new Set())
+  const remotes = [...new Set(offer.remote.map((r) => r.remote))]
+  // HI-3593: what each remote still has, asked once the dialog shows (never before it: a sign-in or a slow link would
+  // hold it): a remote branch already deleted there is marked, its tick removing only the local reference; a remote that
+  // couldn't be asked says so, its rows as they were. Closing the dialog stops the check. The delete asks again itself.
+  const [check, setCheck] = useState<'checking' | { gone: ReadonlySet<string>; failed: { remote: string; why: string }[] } | null>(() => (offer.remote.length && offered('git:remotePrunePreview') ? 'checking' : null))
+  useEffect(() => {
+    if (!offer.remote.length || !offered('git:remotePrunePreview')) return
+    const run = startGitRun(projectPath)
+    let done = false
+    repoOp('git:remotePrunePreview', projectPath, run.op)
+      .then(
+        (found) => ({ gone: new Set(found.flatMap((r) => r.branches.map((b) => b.name))), failed: found.filter((r) => r.error && remotes.includes(r.remote)).map((r) => ({ remote: r.remote, why: r.error ?? '' })) }),
+        (e: unknown) => ({ gone: new Set<string>(), failed: remotes.map((r) => ({ remote: r, why: errorMessage(e) })) })
+      )
+      .then((c) => {
+        done = true
+        if (!run.cancelled()) setCheck(c)
+      })
+      .finally(() => run.end())
+    return () => {
+      if (!done) cancelGitRun(run.op)
+    }
+    // Once, for the offer the dialog opened with.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectPath, offer])
+  const gone = check && check !== 'checking' ? check.gone : null
   useEffect(() => {
     onChange({ local: offer.local.filter((b) => local.has(b.name)), remote: offer.remote.filter((r) => remote.has(r.name)) })
   }, [offer, local, remote, onChange])
@@ -913,7 +942,6 @@ function CleanupPicker({ offer, onChange }: { offer: CleanupOffer; onChange: (pi
     else next.delete(name)
     return next
   }
-  const remotes = [...new Set(offer.remote.map((r) => r.remote))]
   return (
     <div className="git-cleanup" data-git-cleanup="">
       <div className="git-cleanup-h">{tr(C.localHead, { n: offer.local.length })}</div>
@@ -937,13 +965,19 @@ function CleanupPicker({ offer, onChange }: { offer: CleanupOffer; onChange: (pi
           <div className="banner warn" data-git-cleanup-remote-warning="">
             <Icon name="warning" /> {tr(C.remoteWarn)}
           </div>
+          {check === 'checking' && <div className="faint" data-cleanup-checking="">{tr(C.checking, { remotes: fmt.list(remotes, 'unit') })}</div>}
+          {check && check !== 'checking' && check.failed.map((f) => (
+            <div key={f.remote} className="faint" data-cleanup-unchecked={f.remote}>
+              {tr(C.unchecked, { remote: f.remote, why: f.why })}
+            </div>
+          ))}
           <ul className="git-cleanup-list">
             {offer.remote.map((r) => (
               <li key={r.name}>
                 <label className="dialog-check">
                   <input type="checkbox" className="checkbox" data-cleanup-remote={r.name} checked={remote.has(r.name)} onChange={(e) => setRemote(flip(remote, r.name, e.target.checked))} />
                   <code>{r.name}</code>
-                  {r.withLocal && local.has(r.branch) && <span className="faint">· {tr(C.withLocal)}</span>}
+                  {gone?.has(r.name) ? <span className="faint" data-cleanup-gone="">· {tr(C.alreadyGone, { remote: r.remote })}</span> : r.withLocal && local.has(r.branch) && <span className="faint">· {tr(C.withLocal)}</span>}
                 </label>
               </li>
             ))}

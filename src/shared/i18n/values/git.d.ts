@@ -48,6 +48,8 @@ interface CombworkMessageValues {
   'git.busy.slotWaiting': { agents: string | number; count: number; branch: string | number; action: string }
   'git.busy.yourMerge': { branch: string | number; action: string }
   'git.cancel': undefined
+  'git.cleanUp.alreadyGone': { remote: string | number }
+  'git.cleanUp.checking': { remotes: string | number }
   'git.cleanUp.delete': undefined
   'git.cleanUp.deleting': undefined
   'git.cleanUp.failed': undefined
@@ -57,6 +59,7 @@ interface CombworkMessageValues {
   'git.cleanUp.remote': { remotes: string | number; n: number }
   'git.cleanUp.remoteWarn': undefined
   'git.cleanUp.title': undefined
+  'git.cleanUp.unchecked': { remote: string | number; why: string | number }
   'git.cleanUp.withLocal': undefined
   'git.combworkVcs.checking': undefined
   'git.combworkVcs.dismiss': undefined

@@ -187,6 +187,14 @@
     "defaultMessage": "Cancel",
     "description": "Button: closes the Git tab's dialog or form without doing anything."
   },
+  "git.cleanUp.alreadyGone": {
+    "defaultMessage": "already deleted on {remote}: ticking it removes only its local reference",
+    "description": "HI-3593: beside a remote branch in the Clean Up Merged Branches dialog: it was already deleted on the remote {remote} (by someone else); this clone still has its remote-tracking branch, which ticking it removes. Lower case: it follows the branch's name."
+  },
+  "git.cleanUp.checking": {
+    "defaultMessage": "Checking {remotes} for branches already deleted there…",
+    "description": "HI-3593: in the Clean Up Merged Branches dialog, over the remote branches it offers, while Combwork asks the remote(s) {remotes} (a list of names) which of those branches still exist there."
+  },
   "git.cleanUp.delete": {
     "defaultMessage": "Delete Ticked",
     "description": "The button of the Clean Up Merged Branches dialog: deletes the branches ticked."
@@ -222,6 +230,10 @@
   "git.cleanUp.title": {
     "defaultMessage": "Clean up merged branches",
     "description": "Title of the Clean Up Merged Branches dialog (Version Control → Branches & remotes)."
+  },
+  "git.cleanUp.unchecked": {
+    "defaultMessage": "Couldn't check what {remote} still has: {why}",
+    "description": "HI-3593: in the Clean Up Merged Branches dialog: asking the remote {remote} which branches it still has failed ({why}, git's words: a sign-in, the network), so its branches are shown as last fetched."
   },
   "git.cleanUp.withLocal": {
     "defaultMessage": "its local branch is ticked above",

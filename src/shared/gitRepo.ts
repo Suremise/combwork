@@ -137,7 +137,12 @@ export interface PushedRef {
   name: string
   kind: 'branch' | 'tag' | 'other'
   result: 'pushed' | 'upToDate' | 'refused'
+  /** HI-3593: a refusal's reason as git gives it in brackets ("stale info", "pre-receive hook declined"), when it gives one. */
+  reason?: string
 }
+
+/** HI-3593: the reason git gives a lease that failed: the ref isn't at the commit leased (moved there, or not there at all). */
+export const STALE_INFO = 'stale info' // i18n-ignore: git's own words, matched, never shown
 
 /**
  * `git push --porcelain`'s lines, one per ref (`<flag>\t<from>:<to>\t<summary>`): `=` up to date, `!` refused (rejected
@@ -146,11 +151,13 @@ export interface PushedRef {
 export function parsePushPorcelain(out: string): PushedRef[] {
   const refs: PushedRef[] = []
   for (const line of out.split(/\r?\n/)) {
-    const m = /^([ +\-*!=])\t[^\t]*:([^\t]+)\t/.exec(line)
+    const m = /^([ +\-*!=])\t[^\t]*:([^\t]+)\t(.*)$/.exec(line)
     if (!m) continue
     const to = m[2]
     const kind = to.startsWith('refs/heads/') ? 'branch' : to.startsWith('refs/tags/') ? 'tag' : 'other'
-    refs.push({ name: to.replace(/^refs\/(heads|tags)\//, ''), kind, result: m[1] === '=' ? 'upToDate' : m[1] === '!' ? 'refused' : 'pushed' })
+    const result = m[1] === '=' ? 'upToDate' : m[1] === '!' ? 'refused' : 'pushed'
+    const reason = result === 'refused' ? /\(([^)]*)\)\s*$/.exec(m[3])?.[1]?.trim() : undefined
+    refs.push({ name: to.replace(/^refs\/(heads|tags)\//, ''), kind, result, ...(reason ? { reason } : {}) })
   }
   return refs
 }

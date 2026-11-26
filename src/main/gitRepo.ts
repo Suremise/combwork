@@ -17,6 +17,7 @@ import {
   scrubSecrets,
   urlSecrets,
   parsePushPorcelain,
+  STALE_INFO,
   remoteNameProblemData,
   remoteUrlProblemData,
   type PushedRef,
@@ -1266,6 +1267,47 @@ export async function createTag(projectPath: string, name: string, message: stri
 }
 
 // ---------------------------------------------------------------------------
+// A remote's refusal to delete, told apart (HI-3593)
+// ---------------------------------------------------------------------------
+
+/**
+ * HI-3593: why a remote refused a delete: `moved` (it has the ref at another commit than the lease: commits not fetched),
+ * `gone` (it has no such ref any more, deleted there behind this clone's back: the delete is done), `rejected` (another
+ * reason, git's own words: a protected branch, a hook), or `unchecked` (a lease that failed, but the remote couldn't be
+ * asked which it was).
+ */
+export type DeleteRefusal = { kind: 'moved' } | { kind: 'gone' } | { kind: 'rejected'; why: TextPart } | { kind: 'unchecked'; why: TextPart }
+
+/**
+ * HI-3593: a lease that failed says only `stale info` whether the ref moved on the remote or isn't there at all, so the
+ * remote is asked (one `ls-remote` of the exact refs): only an answer that lacks a ref exactly counts as gone; a remote
+ * that can't be asked leaves each such ref `unchecked`, never gone. `refs` are whole refs (refs/heads/x, refs/tags/v1),
+ * each with what the push said of it (undefined: no line for it, so the push's own words).
+ */
+export async function whyRefused(projectPath: string, remote: string, refs: { ref: string; pushed?: PushedRef }[], pushRun: GitResult): Promise<Map<string, DeleteRefusal>> {
+  const out = new Map<string, DeleteRefusal>()
+  const stale: string[] = []
+  for (const { ref, pushed } of refs) {
+    if (pushed?.reason === STALE_INFO) stale.push(ref)
+    else out.set(ref, { kind: 'rejected', why: pushed?.reason || gitSaid(pushRun) })
+  }
+  if (!stale.length) return out
+  const ls = await net(projectPath, ['ls-remote', remote, ...stale])
+  const there = new Set(ls.ok ? [...ls.out.matchAll(/^[0-9a-f]{40,64}\t(\S+)$/gm)].map((m) => m[1]) : [])
+  for (const ref of stale) out.set(ref, !ls.ok ? { kind: 'unchecked', why: gitSaid(ls) } : there.has(ref) ? { kind: 'moved' } : { kind: 'gone' })
+  return out
+}
+
+/**
+ * HI-3593: a remote-tracking ref whose branch is gone on its remote, removed only at the commit shown (`update-ref -d
+ * <ref> <sha>`, under the caller's lock): `false` when it has changed since (a fetch outside the lock), so it stays.
+ */
+async function dropStaleTracking(projectPath: string, ref: string, sha: string): Promise<boolean> {
+  if ((await git(projectPath, ['update-ref', '-d', ref, sha])).ok) return true
+  return !(await git(projectPath, ['rev-parse', '--verify', '-q', ref])).ok
+}
+
+// ---------------------------------------------------------------------------
 // A branch renamed, a tag deleted or pushed (HI-3474)
 // ---------------------------------------------------------------------------
 
@@ -1281,12 +1323,17 @@ const R = {
   remoteTaken: msg({ id: 'service.gitRepo.renameRemoteTaken', defaultMessage: '{remote} already has a branch {to} (as of the last fetch): nothing was renamed.', description: 'HI-3474: an error renaming a branch to {to} with Also rename on the remote: the remote {remote} has a branch of that name.' }),
   pushFailed: msg({ id: 'service.gitRepo.renamePushFailed', defaultMessage: "Renamed {from} to {to} here, but couldn't push {to} to {remote}: {why} It still tracks {upstream}.", description: "HI-3474: an error after renaming the branch {from} to {to} locally: pushing it to the remote {remote} failed or was refused ({why}, git's words or why), so it still follows {upstream}." }),
   oldKept: msg({ id: 'service.gitRepo.renameOldKept', defaultMessage: "Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but {remote} refused to delete {old}: it has commits there you haven't fetched, or it doesn't allow deleting branches. Look at it before you delete it.", description: "HI-3474: an error after renaming a branch here and on a remote: the remote {remote} refused to delete the old branch {old} (Combwork deletes it only at the commit last fetched)." }),
+  oldRejected: msg({ id: 'service.gitRepo.renameOldRejected', defaultMessage: "Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but {remote} refused to delete {old}: {why}", description: "HI-3593: an error after renaming a branch here and on a remote: the remote {remote} refused to delete the old branch {old} for a reason of its own ({why}, git's words, such as a protected branch or a hook that declined it)." }),
+  oldUnchecked: msg({ id: 'service.gitRepo.renameOldUnchecked', defaultMessage: "Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but {remote} didn't delete {old}, and Combwork couldn't check whether it still has it: {why}", description: "HI-3593: an error after renaming a branch here and on a remote: deleting the old branch {old} on {remote} was refused, and asking the remote whether that branch still exists failed ({why}, git's words: a sign-in, the network)." }),
+  renamedOldGone: msg({ id: 'service.gitRepo.renamedOldGone', defaultMessage: '{local, select, kept {Renamed {from} to {to}, here and on {remote}. {old} was already deleted on {remote}, but its local reference has changed since you were shown it, so it was kept.} other {Renamed {from} to {to}, here and on {remote}. {old} was already deleted on {remote}: removed its local reference.}}', description: "HI-3593: after renaming the branch {from} to {to} here and on the remote {remote}: the old name {old} had already been deleted there by someone else. Its remote-tracking branch (origin/{old}, the local reference) was removed, or kept when it changed meanwhile ({local} is kept). Keep the select keys." }),
   stopped: msg({ id: 'service.gitRepo.renameStopped', defaultMessage: '{step, select, push {Renamed {from} to {to} here, but the push of {to} to {remote} was stopped: it may have reached {remote}. {to} still tracks {upstream}.} other {Renamed {from} to {to} and pushed it to {remote}, where it tracks {to} now, but deleting {old} there was stopped: it may still be there.}} Refresh to see where things stand.', description: 'HI-3474 (round 1): after the user cancelled renaming a branch on its remote too, once {from} was renamed {to} here: during the push of the new name to the remote {remote} (it still follows {upstream}), or during the deletion of the old name {old} there. Keep the select keys.' }),
   trackFailed: msg({ id: 'service.gitRepo.renameTrackFailed', defaultMessage: "Renamed {from} to {to} and pushed it to {remote}, but couldn't make it track {remote}/{to}: {why} It still tracks {upstream}, and {old} is still on {remote}.", description: "HI-3474 (round 1): an error renaming a branch here and on a remote: {from} was renamed {to} and pushed to the remote {remote}, but setting it to follow its new name there failed ({why}, git's words); it still follows {upstream}, and the old name {old} wasn't deleted there." }),
   renamedBoth: msg({ id: 'service.gitRepo.branchRenamedBoth', defaultMessage: 'Renamed {from} to {to}, here and on {remote}.', description: 'HI-3474: after renaming the branch {from} to {to} in the repository and on the remote {remote} (pushed by its new name, the old one deleted there).' }),
   noTag: msg({ id: 'service.gitRepo.noTag', defaultMessage: "There's no tag {name}.", description: 'HI-3474: an error deleting or pushing a tag in Version Control → History: the repository has no tag called {name}.' }),
   tagMoved: msg({ id: 'service.gitRepo.tagMoved', defaultMessage: 'The tag {name} has changed since you were shown it: nothing was deleted. Look at it again.', description: 'HI-3474: an error deleting the tag {name}: it points at something else than the window showed.' }),
-  tagRemoteRefused: msg({ id: 'service.gitRepo.tagRemoteRefused', defaultMessage: "{remote} refused to delete the tag {name}: its tag {name} isn't this one, or it has none, or it doesn't allow deleting tags. Nothing was deleted here either.", description: 'HI-3474: an error deleting the tag {name} here and on the remote {remote}: the remote refused (its tag differs or is missing, or it forbids deletions), so the local tag was kept too.' }),
+  tagRemoteRefused: msg({ id: 'service.gitRepo.tagRemoteRefused', defaultMessage: "{remote} refused to delete the tag {name}: its tag {name} isn't this one. Nothing was deleted here either.", description: 'HI-3474, HI-3593: an error deleting the tag {name} here and on the remote {remote}: the remote has a tag of that name that is another tag (Combwork deletes it only as shown), so the local tag was kept too.' }),
+  tagRemoteUnchecked: msg({ id: 'service.gitRepo.tagRemoteUnchecked', defaultMessage: "{remote} didn't delete the tag {name}, and Combwork couldn't check whether it still has it: {why} Nothing was deleted here either.", description: "HI-3593: an error deleting the tag {name} here and on the remote {remote}: the remote refused, and asking it whether it still has that tag failed ({why}, git's words: a sign-in, the network). The local tag was kept." }),
+  tagDeletedGone: msg({ id: 'service.gitRepo.tagDeletedGone', defaultMessage: 'Deleted the tag {name}. It was already deleted on {remote}.', description: 'HI-3593: after deleting the tag {name} here and on the remote {remote}, when the remote no longer had it (deleted there by someone else).' }),
   tagRemoteFailed: msg({ id: 'service.gitRepo.tagRemoteFailed', defaultMessage: "Couldn't delete the tag {name} on {remote}: {why} Nothing was deleted here either.", description: "HI-3474: an error deleting the tag {name} on the remote {remote}; {why} is git's own words. The local tag was kept." }),
   tagDeleteFailed: msg({ id: 'service.gitRepo.tagDeleteFailed', defaultMessage: "Couldn't delete the tag {name}: {why}", description: "HI-3474: an error deleting the tag {name}; {why} is git's own words." }),
   tagDeleted: msg({ id: 'service.gitRepo.tagDeleted', defaultMessage: '{onRemote, select, yes {Deleted the tag {name}, here and on {remote}.} other {Deleted the tag {name}.}}', description: 'HI-3474: after deleting the tag {name} in Version Control → History; when {onRemote} is yes, on the remote {remote} too.' }),
@@ -1360,8 +1407,17 @@ export async function renameBranch(projectPath: string, branch: BranchAt, to: st
       if (gitRunSignal()?.aborted) throw deleteStopped()
       const d = await net(projectPath, ['push', '--porcelain', `--force-with-lease=refs/heads/${old}:${lease}`, '--', remote, `:refs/heads/${old}`])
       if (d.cancelled) throw deleteStopped()
-      const gone = parsePushPorcelain(d.out).some((x) => x.kind === 'branch' && x.name === old && x.result === 'pushed')
-      if (!gone) throw refusal(R.oldKept, { from, to, remote, old })
+      const line = parsePushPorcelain(d.out).find((x) => x.kind === 'branch' && x.name === old)
+      if (line?.result !== 'pushed') {
+        // HI-3593: refused, said why; already deleted there, done, and its stale remote-tracking branch goes too.
+        const why = (await whyRefused(projectPath, remote, [{ ref: `refs/heads/${old}`, pushed: line }], d)).get(`refs/heads/${old}`)
+        if (why?.kind === 'rejected') throw refusal(R.oldRejected, { from, to, remote, old, why: why.why })
+        if (why?.kind === 'unchecked') throw refusal(R.oldUnchecked, { from, to, remote, old, why: why.why })
+        if (why?.kind !== 'gone') throw refusal(R.oldKept, { from, to, remote, old })
+        const dropped = await dropStaleTracking(projectPath, tracking, lease)
+        log.info(`Renamed ${userText(old)} to ${userText(to)} on ${userText(remote)} for ${userText(projectPath)}: the old name was already deleted there`)
+        return tr(R.renamedOldGone, { from, to, remote, old, local: dropped ? 'removed' : 'kept' })
+      }
       log.info(`Renamed ${userText(remote)}'s ${userText(old)} to ${userText(to)} for ${userText(projectPath)}`)
       return tr(R.renamedBoth, { from, to, remote })
     })
@@ -1383,18 +1439,26 @@ export async function deleteTag(projectPath: string, tag: BranchAt, remote?: str
     const at = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/tags/${name}`])
     if (!at.ok) throw refusal(R.noTag, { name })
     if (at.out.trim() !== sha) throw refusal(R.tagMoved, { name })
+    let goneThere = false
     if (remote) {
       if (!s.remotes.includes(remote)) throw refusal(M.noRemote, { remote })
       const p = await net(projectPath, ['push', '--porcelain', `--force-with-lease=refs/tags/${name}:${sha}`, '--', remote, `:refs/tags/${name}`])
       if (p.cancelled) throw stopped('tag')
       const got = parsePushPorcelain(p.out).find((x) => x.kind === 'tag' && x.name === name)
-      if (got?.result === 'refused') throw refusal(R.tagRemoteRefused, { remote, name })
-      if (!p.ok || got?.result !== 'pushed') throw failed(R.tagRemoteFailed, { remote, name }, p)
-      log.info(`Deleted the tag ${userText(name)} on ${userText(remote)} for ${userText(projectPath)}`)
+      if (got?.result === 'refused') {
+        // HI-3593: a lease refused because the remote has no such tag any more is a delete done there.
+        const why = (await whyRefused(projectPath, remote, [{ ref: `refs/tags/${name}`, pushed: got }], p)).get(`refs/tags/${name}`)
+        if (why?.kind === 'rejected') throw refusal(R.tagRemoteFailed, { remote, name, why: why.why })
+        if (why?.kind === 'unchecked') throw refusal(R.tagRemoteUnchecked, { remote, name, why: why.why })
+        if (why?.kind !== 'gone') throw refusal(R.tagRemoteRefused, { remote, name })
+        goneThere = true
+      } else if (!p.ok || got?.result !== 'pushed') throw failed(R.tagRemoteFailed, { remote, name }, p)
+      log.info(`Deleted the tag ${userText(name)} on ${userText(remote)} for ${userText(projectPath)}${goneThere ? ' (already deleted there)' : ''}`)
     }
     const r = await git(projectPath, ['update-ref', '-d', `refs/tags/${name}`, sha])
     if (!r.ok) throw failed(R.tagDeleteFailed, { name }, r)
     log.info(`Deleted the tag ${userText(name)} of ${userText(projectPath)}`)
+    if (goneThere) return tr(R.tagDeletedGone, { name, remote: remote ?? '' })
     return tr(R.tagDeleted, { name, onRemote: remote ? 'yes' : 'no', remote: remote ?? '' })
   })
 }
@@ -1449,7 +1513,11 @@ const B = {
   deleteFailed: msg({ id: 'service.gitRepo.deleteBranchFailed', defaultMessage: "Couldn't delete {branch}: {why}", description: "An error deleting the branch {branch} in Version Control → Branches & remotes; {why} is git's own words." }),
   deleted: msg({ id: 'service.gitRepo.branchesDeleted', defaultMessage: '{n, plural, one {Deleted {branches}.} other {Deleted # branches: {branches}.}}', description: 'After deleting branches in Version Control → Branches & remotes: {branches} lists them ({n}).' }),
   remoteDeleted: msg({ id: 'service.gitRepo.remoteBranchesDeleted', defaultMessage: '{n, plural, one {Deleted {branches} on {remote}.} other {Deleted # branches on {remote}: {branches}.}}', description: 'After deleting branches on the remote {remote} (Clean Up Merged Branches): {branches} lists them ({n}).' }),
-  remoteRefused: msg({ id: 'service.gitRepo.remoteDeleteRefused', defaultMessage: "{remote} refused to delete {branches}: it has commits there you haven't fetched, or it doesn't allow deleting them.", description: 'After deleting branches on the remote {remote}: it refused those listed in {branches} (Combwork deletes a remote branch only at the commit you were shown).' })
+  remoteRefused: msg({ id: 'service.gitRepo.remoteDeleteRefused', defaultMessage: "{remote} refused to delete {branches}: it has commits there you haven't fetched, or it doesn't allow deleting them.", description: 'After deleting branches on the remote {remote}: it refused those listed in {branches} (Combwork deletes a remote branch only at the commit you were shown).' }),
+  remoteGone: msg({ id: 'service.gitRepo.remoteBranchesGone', defaultMessage: '{n, plural, one {{branches} was already deleted on {remote}: removed its local reference.} other {{branches} were already deleted on {remote}: removed their local references.}}', description: 'HI-3593: after Clean Up Merged Branches: the branches {branches} ({n}) had already been deleted on the remote {remote} by someone else, so only their remote-tracking branches here (the local references, origin/…) were removed.' }),
+  remoteGoneKept: msg({ id: 'service.gitRepo.remoteBranchesGoneKept', defaultMessage: '{n, plural, one {{branches} was already deleted on {remote}, but its local reference has changed since you were shown it, so it was kept.} other {{branches} were already deleted on {remote}, but their local references have changed since you were shown them, so they were kept.}}', description: 'HI-3593: after Clean Up Merged Branches: the branches {branches} ({n}) had already been deleted on the remote {remote}, but their remote-tracking branches here changed meanwhile (a fetch), so they were left as they are.' }),
+  remoteRejected: msg({ id: 'service.gitRepo.remoteDeleteRejected', defaultMessage: '{remote} refused to delete {branch}: {why}', description: "HI-3593: after deleting branches on the remote {remote}: it refused the branch {branch} for a reason of its own ({why}, git's words, such as a protected branch or a hook that declined it)." }),
+  remoteUnchecked: msg({ id: 'service.gitRepo.remoteDeleteUnchecked', defaultMessage: "{remote} didn't delete {branch}, and Combwork couldn't check whether it still has it: {why}", description: "HI-3593: after deleting branches on the remote {remote}: the branch {branch} wasn't deleted, and asking the remote whether it still exists failed ({why}, git's words: a sign-in, the network). Its local reference is kept." })
 }
 
 /** The branches of open cards (any but Done) on the board, any project's (#1642): never deleted. */
@@ -1600,13 +1668,38 @@ export async function deleteRemoteBranches(projectPath: string, remote: string, 
         const r = await net(projectPath, ['push', '--porcelain', ...ready.map((g) => `--force-with-lease=refs/heads/${g.branch}:${g.sha}`), '--', remote, ...ready.map((g) => `:refs/heads/${g.branch}`)])
         if (r.cancelled) throw stopped('delete')
         const got = parsePushPorcelain(r.out)
-        const done = ready.filter((g) => got.some((x) => x.kind === 'branch' && x.name === g.branch && x.result === 'pushed'))
-        const refused = ready.filter((g) => !done.includes(g))
-        if (!done.length && !got.length && !r.ok) throw failed(M.pushFailed, { to: remote }, r)
-        if (done.length) log.info(`Deleted ${done.length} branch(es) on ${userText(remote)} of ${userText(projectPath)}: ${userText(done.map((g) => g.branch).join(', '))}`)
+        const lineOf = (g: (typeof ready)[number]): PushedRef | undefined => got.find((x) => x.kind === 'branch' && x.name === g.branch)
+        const deleted = ready.filter((g) => lineOf(g)?.result === 'pushed')
+        const notDone = ready.filter((g) => !deleted.includes(g))
+        if (!deleted.length && !got.length && !r.ok) throw failed(M.pushFailed, { to: remote }, r)
+        // HI-3593: each refusal told apart. One the remote no longer has is done: its stale remote-tracking branch goes,
+        // only at the commit shown (kept, and said, when a fetch outside the lock changed it).
+        const why = notDone.length ? await whyRefused(projectPath, remote, notDone.map((g) => ({ ref: `refs/heads/${g.branch}`, pushed: lineOf(g) })), r) : new Map<string, DeleteRefusal>()
+        const of = (kind: DeleteRefusal['kind']): typeof ready => notDone.filter((g) => why.get(`refs/heads/${g.branch}`)?.kind === kind)
+        const gone: string[] = []
+        const goneKept: string[] = []
+        for (const g of of('gone')) ((await dropStaleTracking(projectPath, `refs/remotes/${g.name}`, g.sha)) ? gone : goneKept).push(g.branch)
+        const moved = of('moved').map((g) => g.branch)
+        const branches = (gs: string[]): Text => listOf(gs, 'unit')
+        const saidWhy = (g: (typeof ready)[number]): TextPart => {
+          const w = why.get(`refs/heads/${g.branch}`)
+          return w && 'why' in w ? w.why : ''
+        }
+        if (deleted.length) log.info(`Deleted ${deleted.length} branch(es) on ${userText(remote)} of ${userText(projectPath)}: ${userText(deleted.map((g) => g.branch).join(', '))}`)
+        if (gone.length + goneKept.length) log.info(`${gone.length + goneKept.length} branch(es) were already deleted on ${userText(remote)} of ${userText(projectPath)}: ${userText([...gone, ...goneKept].join(', '))}`)
         void checkProject(projectPath)
-        const lines = [...(done.length ? [withValues(B.remoteDeleted, { n: done.length, remote, branches: listOf(done.map((g) => g.branch), 'unit') })] : []), ...(refused.length ? [withValues(B.remoteRefused, { remote, branches: listOf(refused.map((g) => g.branch), 'unit') })] : []), ...said]
-        if (!done.length) throw new CombworkError(linesOf(lines))
+        const lines = [
+          ...(deleted.length ? [withValues(B.remoteDeleted, { n: deleted.length, remote, branches: branches(deleted.map((g) => g.branch)) })] : []),
+          ...(gone.length ? [withValues(B.remoteGone, { n: gone.length, remote, branches: branches(gone) })] : []),
+          ...(goneKept.length ? [withValues(B.remoteGoneKept, { n: goneKept.length, remote, branches: branches(goneKept) })] : []),
+          ...(moved.length ? [withValues(B.remoteRefused, { remote, branches: branches(moved) })] : []),
+          ...of('rejected').map((g) => withValues(B.remoteRejected, { remote, branch: g.branch, why: saidWhy(g) })),
+          ...of('unchecked').map((g) => withValues(B.remoteUnchecked, { remote, branch: g.branch, why: saidWhy(g) })),
+          ...said
+        ]
+        // Deleted there, or found already deleted there: either is done.
+        const done = [...deleted, ...gone, ...goneKept]
+        if (!done.length) throw new CombworkError(linesOf(lines)) // agent-text: B
         return shownText(linesOf(lines))
     })
   })
