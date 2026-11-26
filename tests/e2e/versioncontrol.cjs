@@ -347,9 +347,9 @@ function board(sql, ...args) {
     // Room taken from the row while the button is held, just enough that it folds (less than its names and the status
     // line's share need) and its icons still fit without scrolling.
     await page.evaluate(() => {
-      const head = document.querySelector('.git-sections').closest('.git-head')
-      const need = Math.ceil(head.querySelector('.cw-tabs-measure').getBoundingClientRect().width)
-      head.style.maxWidth = `${need + 40}px`
+      const gitHead = document.querySelector('.git-sections').closest('.git-head')
+      const need = Math.ceil(gitHead.querySelector('.cw-tabs-measure').getBoundingClientRect().width)
+      gitHead.style.maxWidth = `${need + 40}px`
     })
     const folded = !!(await lib.until(async () => (await page.locator('.git-sections.icons [data-section="workflow"].icon-only').count()) === 1, HUNG_MS))
     const under = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-section]')?.getAttribute('data-section') ?? null, at)
