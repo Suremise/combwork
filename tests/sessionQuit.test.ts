@@ -228,6 +228,20 @@ describe("a lane's builder ended by its CLI's own exit", () => {
       expect(sessions.inputHeld(P, b.agentId)).toBe(DRAFT)
     })
 
+    // HR1's round 1: Up is a sequence typedText drops, and it recalls a prompt from Claude Code's history into the input.
+    it('Esc, then Up recalling an earlier prompt into its input: a draft, held, nothing typed', async () => {
+      dim.drawn = false
+      const a = live(claudeCode, SUGGESTION)
+      user(a, 'an earlier prompt\r')
+      a.l.prompts = 1
+      user(a, '\x1b')
+      user(a, '\x1b[A')
+      a.input.feed('an earlier prompt')
+      expect(sessions.inputHeld(P, a.agentId)).toBe(DRAFT)
+      expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended' })).toBe('held')
+      expect(a.typed()).toBe('')
+    })
+
     it('text the user typed and its CLI took as a prompt, then Esc over the next suggestion: no draft', () => {
       dim.drawn = false
       const a = live(claudeCode, SUGGESTION)

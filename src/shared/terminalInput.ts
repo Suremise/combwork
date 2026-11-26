@@ -15,12 +15,21 @@ export function isTyping(data: string): boolean {
 }
 
 /**
- * Whether what the user typed (typedText's: arrows, Shift+Tab and other sequences gone already) may have put text into a
- * CLI's input (HI-3598): anything but Esc and Ctrl+C, which leave none. Tab (Claude Code takes its suggestion), a
- * letter, a paste, Ctrl+V or Ctrl+Y may.
+ * xterm's replies to the program, as REPLIES has them but not the keys among them: focus in/out, cursor and status
+ * reports, device attributes, window reports, and OSC/DCS/APC/PM/SOS strings.
  */
-export function mayWriteText(typed: string): boolean {
-  return typed.replace(/[\x1b\x03]/g, '') !== ''
+const ONLY_REPLIES = /\x1b\[[IO]|\x1b\[\d+;\d+R|\x1b\[\d*n|\x1b\[[?>=][\d;]*c|\x1b\[[\d;]*t|\x1b[\]P_^X][\s\S]*?(?:\x07|\x1b\\)/g
+/** Keys that leave a CLI's input as it was: Left and Right (plain or modified), Shift+Tab, then Esc and Ctrl+C. */
+const NO_TEXT_KEYS = /\x1b\[(?:1;\d+)?[CDZ]|\x1bO[CD]|[\x1b\x03]/g
+
+/**
+ * Whether what the user's terminal sent (as sent: `data`, before typedText) may have put text into a CLI's input
+ * (HI-3598): anything but xterm's replies and the keys that leave it as it was (Esc, Ctrl+C, Shift+Tab, Left, Right).
+ * A letter, a paste, Tab (Claude Code takes its suggestion), Up or Down (a prompt from its history), Ctrl+V or Ctrl+Y
+ * may.
+ */
+export function mayWriteText(data: string): boolean {
+  return data.replace(ONLY_REPLIES, '').replace(NO_TEXT_KEYS, '') !== ''
 }
 
 /**

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { appTakesTerminalKey, copyPasteKey, isTyping, mayWriteText, typedText } from '../src/shared/terminalInput'
+import { appTakesTerminalKey, copyPasteKey, isTyping, mayWriteText } from '../src/shared/terminalInput'
 
 describe('mayWriteText (HI-3598)', () => {
-  it('Esc, Ctrl+C and sequences (arrows, Shift+Tab) leave no text; a letter, Tab, a paste, Ctrl+V or Ctrl+Y may', () => {
-    for (const keys of ['\x1b', '\x03', '\x1b\x1b', '\x1b[Z', '\x1b[A', '\x1b[D']) expect(mayWriteText(typedText(keys)), JSON.stringify(keys)).toBe(false)
-    for (const keys of ['a', '\t', '\x1b[200~pasted\x1b[201~', '\x16', '\x19']) expect(mayWriteText(typedText(keys)), JSON.stringify(keys)).toBe(true)
+  it("Esc, Ctrl+C, Shift+Tab, Left and Right leave no text, nor do xterm's replies; a letter, Tab, a paste, Ctrl+V, Ctrl+Y, Up or Down (its history, HR1's round 1) may", () => {
+    for (const keys of ['\x1b', '\x03', '\x1b\x1b', '\x1b[Z', '\x1b[C', '\x1b[D', '\x1bOC', '\x1bOD', '\x1b[1;5D', '\x1b[I', '\x1b[O', '\x1b[12;40R', '\x1b[?1;2c', '\x1b]11;rgb:0000/0000/0000\x07', '\x1b[0n', '\x1b[8;30;120t'])
+      expect(mayWriteText(keys), JSON.stringify(keys)).toBe(false)
+    for (const keys of ['a', '\t', '\x1b[200~pasted\x1b[201~', '\x16', '\x19', '\x1b[A', '\x1b[B', '\x1bOA', '\x1bOB', '\x1b[1;5A', '\x1bx', '\x10', '\x0e'])
+      expect(mayWriteText(keys), JSON.stringify(keys)).toBe(true)
   })
 })
 
