@@ -81,7 +81,7 @@ const check = (name, ok, extra = '') => {
     const toasts = () => page.locator('.toast').allInnerTexts().then((t) => t.join(' | ')).catch(() => '')
     await page.getByText('alpha', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await page.locator('.git-sections [data-section="changes"]').click()
+    await lib.vcSection(page, 'changes')
     const section = page.locator('.stash-section')
     const row = (c) => section.locator(`[data-stash="${c}"]`)
     const ask = (title) => page.locator('.dialog', { hasText: title })

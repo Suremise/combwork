@@ -151,10 +151,7 @@ const addGitProject = async (dir, files) => {
       await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
       await waitHung(async () => (await head.count()) === 1)
     }
-    const section = async (id) => {
-      await page.locator(`.git-sections [data-section="${id}"]`).click()
-      return waitHung(async () => (await page.locator(`.git-sections [data-section="${id}"][aria-selected="true"]`).count()) === 1)
-    }
+    const section = (id) => lib.vcSection(page, id)
     /** Each section of the Version Control tab shown, its view shot (both themes, English and German). */
     const shootSections = async (name, want) => {
       // Once the row has the sections the platform shows (it is read again after a switch).

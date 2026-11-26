@@ -109,7 +109,7 @@ function board(sql, ...args) {
     await shots('git-workflow', page.locator('.vc-view'))
 
     // --- Project Settings has no Workflow section (HI-1766: it was only a link here) and no Card loops (options here now).
-    await page.locator('.git-sections [data-section="history"]').click()
+    await lib.vcSection(page, 'history')
     await lib.openProjectSettings(page)
     const nav = page.locator('.settings-nav .row')
     check('Project Settings has neither a Workflow nor a Card loops section', !!(await lib.until(async () => (await nav.count()) > 0, HUNG_MS)) && (await nav.filter({ hasText: /^\s*(Workflow|Card loops)\s*$/ }).count()) === 0 && (await page.locator('.tab-body .workflow-form').count()) === 0, (await nav.allInnerTexts()).join(' | '))
@@ -163,7 +163,7 @@ function board(sql, ...args) {
     check('the tab and the fact line in German', !!(await lib.until(async () => (await page.locator('.tabs .tab', { hasText: 'Versionsverwaltung' }).count()) === 1 && (await text(fact)) === 'Dieser Ordner hat keine Versionsverwaltung.', HUNG_MS)), await text(fact))
     await shots('none-de', page.locator('.vc-view'))
     await page.getByText('alpha', { exact: true }).first().click()
-    await page.locator('.git-sections [data-section="changes"]').click()
+    await lib.vcSection(page, 'changes')
     check('the Git header in German', !!(await lib.until(async () => (await text(link)).trim() === 'Workflow: Git · Benutzerdefiniert (aus Solo)', HUNG_MS)), await text(link))
     await shots('git-de', page.locator('.vc-view'))
     await speak()
@@ -397,12 +397,12 @@ function board(sql, ...args) {
     await everySection('en')
     const histTip = await lib.hoverTip(page, page.locator('.git-sections [data-section="history"]'), (t) => t === 'History')
     check("a folded section's tooltip names it", histTip === 'History', histTip)
-    await page.locator('.git-sections [data-section="branches"]').click()
+    await lib.vcSection(page, 'branches')
     await shots('sections-narrow', page.locator('.vc-view'))
     await speak('de')
     check('the sections in German', !!(await lib.until(async () => (await page.locator('.tabs .tab', { hasText: 'Versionsverwaltung' }).count()) === 1, HUNG_MS)))
     await everySection('de')
-    await page.locator('.git-sections [data-section="branches"]').click()
+    await lib.vcSection(page, 'branches')
     await shots('sections-narrow-de', page.locator('.vc-view'))
     await speak()
   } finally {

@@ -163,7 +163,7 @@ const f = q.folderHelpers(fx)
       await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
     }
     await toGit()
-    await page.locator('.git-sections [data-section="queue"]').click()
+    await lib.vcSection(page, 'queue')
     const section = page.locator('.git-queue')
     const history = section.locator('.git-queue-target[data-target="integration"] .git-queue-table')
     const rows = await until(async () => ((await history.locator('tbody tr').count()) >= 3 ? history.locator('tbody tr') : null), HUNG_MS)

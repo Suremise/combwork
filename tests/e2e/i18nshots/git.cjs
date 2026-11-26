@@ -40,7 +40,7 @@ const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'u
 const gitView = (ctx) => ctx.page.locator('.git-view').first()
 const section = async (ctx, id, hook, what) => {
   await gitTab(ctx)
-  await ctx.page.locator(`.git-sections [data-section="${id}"]`).first().click()
+  await ctx.lib.chooseTab(ctx.page.locator(`.git-sections [data-section="${id}"]`).first(), `the ${id} section`, ctx.hungMs)
   return shown(ctx, ctx.page.locator(hook), what)
 }
 
