@@ -204,6 +204,7 @@ import type { Osc52Refusal } from './osc52'
 import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflow/workView'
 import type { BranchQueueCard, QueueRecent, QueueResumed, QueueView } from './workflow/queue'
 import type { LongTask, WindowWhere } from './windowHealth'
+import type { ChimeReport } from './chime'
 import type { MainStalls } from './mainStalls'
 import type { GuardPreview, MergeGuard } from './workflow/mergeGuards'
 
@@ -303,6 +304,8 @@ export interface CombworkRequests {
   'window:where': (where: WindowWhere) => void
   /** The page's long tasks just ended, and where it was: logged in combwork.log, rate-limited (HI-1775). */
   'window:longTasks': (tasks: LongTask[], where: WindowWhere) => void
+  /** A chime played, played after resuming its audio context, dropped or cut off (HI-3605): logged in combwork.log. */
+  'window:chime': (report: ChimeReport) => void
   /** The taskbar button's badge: a PNG (base64) drawn at `scale`, or none at 0. */
   'window:setBadge': (count: number, png: string | null, scale: number) => void
   /** Always on Top for this window, remembered for its workspace (pin.ts). Returns the window's state now. */

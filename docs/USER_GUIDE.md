@@ -2720,7 +2720,7 @@ Combwork tells you each thing once, in one place, and keeps it under the bell.
 - **With several Combwork windows**, what an action you started says (it worked, or a warning about it) pops up in the window you started it from, even if you have moved to another by the time it finishes, so you find it under that window's bell. Everything else pops up in the window you are using.
 - Never both: what you see in Combwork never comes as a Windows notification as well.
 
-When an agent finishes (for one waiting on background tasks, once they have ended) or needs input, Combwork also plays a chime. Configure all of this in **Settings → Notifications**; each project can override the chime.
+When an agent finishes (for one waiting on background tasks, once they have ended) or needs input, Combwork also plays a chime. Configure all of this in **Settings → Notifications**; each project can override the chime. A chime plays when it's due or not at all: if Windows' sound can't play it at that moment, it's skipped rather than played later.
 
 Agents that finish together don't flood you: they chime once, and get one notice (**3 agents finished in demo**: *Claude, Codex, Agent 3*, or across projects *demo (2), web (1)*), shown a few seconds after the last of them. An agent that starts its next turn within those seconds (Combwork gave it more work as it finished) isn't told as finished: you hear from it when that turn ends, or at once if it needs you. If you turn notifications off meanwhile, it isn't shown. An agent asking for your input is always told at once, on its own.
 

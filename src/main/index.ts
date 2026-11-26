@@ -360,6 +360,9 @@ function createWindow(opts: { workspacePath?: string | null; bounds?: WindowStat
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
+      // Combwork's own page, not web content: its chimes play without waiting for a click or key in the window, which
+      // Chromium's default policy asks of an AudioContext (HI-3605).
+      autoplayPolicy: 'no-user-gesture-required',
       // Enables Chromium's built-in PDF viewer for the Files tab preview.
       plugins: true,
       spellcheck: false,
