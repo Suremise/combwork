@@ -8605,7 +8605,31 @@ under Combwork in Advanced (no CLI's recording to check it against), defaulting 
       as nothing was written. `/compact`'s guard is its run and the user typing since it began, checked before
       every key, before the command is typed and before its Enter: it fails with "You typed in the agent's
       terminal…" (HR6's round 1).
-    - Codex and Copilot keep one Ctrl+U.
+    - **A suggestion drawn as text** (HI-3583, issue #16): the box is read with dim cells blanked (`textWithoutDim`,
+      HI-1959), but Windows 10's console (its inbox ConPTY, which Combwork uses: `useConptyDll: false`) doesn't draw
+      faint (SGR 2), so Claude Code's prompt suggestion came as plain text in the empty box. Its Ctrl+U changed
+      nothing, every clear was refused ("A Ctrl+U wasn't answered"), and every message to that agent waited with
+      nothing said. So where the console doesn't draw dim (`consoleDrawsDim()`, `ptyHost.ts`: Windows before build 22000),
+      when the **first** Ctrl+U of a clear leaves a box with text as it was, the letter is typed once:
+      a suggestion gives way to it (shown alone, the input was empty), which a draft never does. The Backspace that
+      takes it back must then leave the box empty or showing the same text as before the letter (the suggestion back).
+      The letter not shown alone refuses, the letter taken back (unless the user typed since). A Ctrl+U unanswered after
+      one that emptied rows is a draft in a busy CLI: refused with no letter, as before. Where the console draws dim
+      (Windows 11, other systems) nothing changes: a suggestion is blanked and the box reads empty, and a first Ctrl+U
+      unanswered on text is a busy CLI holding a draft, which would read the letter with the Ctrl+U as one paste (#597):
+      refused with no letter. The suite `wakeputoff` holds that (its input reading paused on a draft).
+      - **Weighed against the bundled ConPTY** (`useConptyDll: true`, `conpty.dll` and `OpenConsole.exe` in
+        `@lydell/node-pty-win32-x64`): measured on Windows 11, both keep SGR 2, but the bundled one opens by asking its
+        terminal for its attributes (`ESC[c`) and waits 3 s for the answer before the CLI's output goes on (a child
+        that exits at once took 3.1 s against 0.1 s answered). Main's screen doesn't answer, and the pane's xterm only
+        while it is shown, so every pane's launch would change. The letter proves an empty input whatever the console
+        draws, and only on the path that was refused.
+    - **Never a silent hold** (HI-3583): a clear refused with text in its box (not a box off the screen, nor keys
+      unanswered on an empty one, which have their own states) sets `LiveSessionState.inputText`. The pane's status
+      says **Waiting: text in its input** until the box reads empty (each redraw looks), a clear succeeds or another
+      run begins.
+    - Codex and Copilot keep one Ctrl+U. They have no input-box reader, so a placeholder of theirs (Codex's "Ask Codex
+      to do anything") never holds a line: their one Ctrl+U isn't checked against the screen.
     - **Tried on 2.1.312:** a typed draft of four rows took four Ctrl+U, then read empty
       (`tests/fixtures/advanced/input-clear-claude-2.1.312.txt`). A multi-line paste is one row there (`[Pasted text
       #1 +44 lines]`), cleared by one.

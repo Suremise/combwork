@@ -79,6 +79,8 @@
   "panes.header.inputRetryFailed": "Could not try the input again",
   "panes.header.inputStillBlocked": "Its input still takes no keys",
   "panes.header.inputStillBlockedBody": "Answer what its terminal shows, such as a question of its CLI's own, then try again.",
+  "panes.header.inputText": "Waiting: text in its input",
+  "panes.header.inputTextTip": "Combwork has something to type into this agent, but its input shows text that Combwork couldn't clear: a draft, or something its CLI drew there. Combwork never types over it. Send it or clear it in its terminal, and what waits is typed then.",
   "panes.header.markIdle": "Mark idle",
   "panes.header.markIdleFailed": "Could not mark the agent idle",
   "panes.header.more": "More",

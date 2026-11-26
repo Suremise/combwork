@@ -90,6 +90,8 @@
   "panes.header.unknownTip": "Combwork 已有一段时间没有收到此智能体这一回合的任何消息，也没有看到它结束的迹象：CLI 没有发出 Stop，CLI 的记录中没有内容，屏幕上也没有空闲的提示符。在收到更多消息之前，此智能体视为忙碌，Combwork 不会向它输入任何内容。如果它的终端显示正在提示符处等待，请将它标记为空闲。",
   "panes.header.untaken": "CLI 未接收 Combwork 输入的一行",
   "panes.header.untakenTip": "Combwork 输入了以下内容，但 CLI 尚未接收（它当时没有读取输入）：“{line}”。请点击它的终端并按 Enter。在 CLI 接收之前，Combwork 不会再向它输入任何内容。",
+  "panes.header.inputText": "等待中：输入框中有文本",
+  "panes.header.inputTextTip": "Combwork 有内容要输入到此代理，但其输入框中显示了 Combwork 无法清除的文本：草稿，或其 CLI 绘制在那里的内容。Combwork 从不在其上输入。请在其终端中发送或清除它，之后等待的内容就会输入。",
   "panes.header.watchTip": "{watch}：当{kind, select, agent {{n, plural, =1 {该智能体结束} other {其中一个智能体结束}}、等你回应或停止时} lane {评审失败、卡片受阻或停滞，或通道需要合并或结束时} other {{n, plural, =1 {卡片发生变化时} other {其中一张卡片发生变化时}}}}，Combwork 会向它输入一行；如果都没有发生，则在 {limit} 输入。在此期间它不运行任何东西，也不接其他工作。",
   "panes.layout.name": "{layout, select, single {逐个显示} columns2 {两列} columns3 {三列} grid {2×2 网格} other {3×2 网格}}",
   "panes.layout.narrowed": "{layout}：以{shown}显示，直到每个窗格都放得下终端",
