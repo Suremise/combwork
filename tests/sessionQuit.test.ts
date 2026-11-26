@@ -13,8 +13,11 @@ const writes: { key: string; data: string }[] = []
 const kills: string[] = []
 /** Called at each write (a test's input or turn arriving while Combwork types). */
 let onWrite: ((key: string, data: string) => void) | null = null
+/** Whether the console draws dim (consoleDrawsDim): false is Windows 10's (HI-3598). */
+const dim = { drawn: true }
 vi.mock('../src/main/ptyHost', async (orig) => ({
   ...(await orig<typeof import('../src/main/ptyHost')>()),
+  consoleDrawsDim: () => dim.drawn,
   writePty: (key: string, data: string) => {
     writes.push({ key, data })
     onWrite?.(key, data)
@@ -37,12 +40,12 @@ type Priv = { live: Map<string, { state: Record<string, unknown>; adapter: unkno
 const priv = sessions as unknown as Priv
 let n = 0
 /** A live session of the agent (a stand-in for its launch), at its prompt. */
-function live(adapter: unknown = claudeCode) {
+function live(adapter: unknown = claudeCode, suggestion?: string) {
   const agentId = `b${++n}`
   const state = { provider: 'claude-code', runId: `run-${n}`, projectPath: P, agentId, agentName: `B${n}`, cwd: P, status: 'ready', startedAt: new Date().toISOString() }
   // Its input box (claudeInputStandIn, fed what is typed into this agent: HI-1979, Combwork types into it only once a key
   // of its own shows it empty), bracketed paste off.
-  const input = claudeInput({ paste: false })
+  const input = claudeInput({ paste: false, ...(suggestion ? { suggestion } : {}) })
   input.from(() => writes.filter((w) => w.key === `session:${P.toLowerCase()}#${agentId}`).map((w) => w.data))
   const l: { state: typeof state; adapter: unknown; screen: ClaudeInput['screen']; ending?: boolean; stopRequested?: boolean; stopCause?: string; prompts?: number } = { state, adapter, screen: input.screen }
   priv.live.set(`${P.toLowerCase()}#${agentId}`, l)
@@ -180,6 +183,86 @@ describe("a lane's builder ended by its CLI's own exit", () => {
     two.l.askedAtStart = false
     two.type('\x1b')
     expect(sessions.inputHeld(P, two.a.agentId)).toBe(DRAFT)
+  })
+
+  // HI-3598: on Windows 10 the console doesn't draw dim, so Claude Code's prompt suggestion reads as text in its empty
+  // input. After a key of the user's that wasn't Enter, that text held a lane end's quit (and a first prompt, a switch)
+  // as their draft. Text there is theirs only after a key that may write text since its CLI last took a prompt.
+  describe("Windows 10: Claude Code's suggestion read as text (HI-3598)", () => {
+    const SUGGESTION = 'go ahead and create cards for the top picks'
+    /** The user's keys, noted as theirs (Shift+Tab, a sequence, isn't), and past the typing pause. */
+    const user = (a: ReturnType<typeof live>, data: string): void => {
+      priv.noteUserInput(a.key, data)
+      const u = priv.userInput.get(a.key) as { at: number } | undefined
+      if (u) u.at = 0
+    }
+    afterEach(() => {
+      dim.drawn = true
+    })
+
+    it('after Esc, Shift+Tab or Ctrl+C alone: no draft, so its exit is typed', async () => {
+      dim.drawn = false
+      for (const keys of ['\x1b', '\x1b[Z', '\x03']) {
+        const a = live(claudeCode, SUGGESTION)
+        user(a, keys)
+        expect(claudeCode.promptText!(a.input.screen.textWithoutDim()), 'the suggestion reads as text').toBe(SUGGESTION)
+        expect(sessions.inputHeld(P, a.agentId), JSON.stringify(keys)).toBeNull()
+      }
+      const a = live(claudeCode, SUGGESTION)
+      user(a, '\x1b')
+      expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended' })).toBe('sent')
+      expect(a.typed()).toContain('/exit')
+    })
+
+    it('a draft the user typed, then Esc: still held; Tab (taking the suggestion) holds too', async () => {
+      dim.drawn = false
+      const a = live(claudeCode, SUGGESTION)
+      user(a, 'half a sentence')
+      a.input.feed('half a sentence')
+      user(a, '\x1b')
+      expect(sessions.inputHeld(P, a.agentId)).toBe(DRAFT)
+      expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended' })).toBe('held')
+      expect(a.typed()).toBe('')
+      const b = live(claudeCode, SUGGESTION)
+      user(b, '\t')
+      expect(sessions.inputHeld(P, b.agentId)).toBe(DRAFT)
+    })
+
+    // HR1's round 1: Up is a sequence typedText drops, and it recalls a prompt from Claude Code's history into the input.
+    it('Esc, then Up recalling an earlier prompt into its input: a draft, held, nothing typed', async () => {
+      dim.drawn = false
+      const a = live(claudeCode, SUGGESTION)
+      user(a, 'an earlier prompt\r')
+      a.l.prompts = 1
+      user(a, '\x1b')
+      user(a, '\x1b[A')
+      a.input.feed('an earlier prompt')
+      expect(sessions.inputHeld(P, a.agentId)).toBe(DRAFT)
+      expect(await sessions.quit(P, a.agentId, a.run, { fenced: () => true, why: 'its lane ended' })).toBe('held')
+      expect(a.typed()).toBe('')
+    })
+
+    it('text the user typed and its CLI took as a prompt, then Esc over the next suggestion: no draft', () => {
+      dim.drawn = false
+      const a = live(claudeCode, SUGGESTION)
+      user(a, 'do this\r')
+      a.l.prompts = 1
+      user(a, '\x1b')
+      expect(sessions.inputHeld(P, a.agentId)).toBeNull()
+    })
+
+    it('where the console draws dim, text read in its input after Esc holds as before (a suggestion there is blanked, never text)', () => {
+      const a = live(claudeCode, SUGGESTION)
+      user(a, '\x1b')
+      expect(sessions.inputHeld(P, a.agentId)).toBe(DRAFT)
+    })
+
+    it("a CLI whose input can't be read: any key not sent still holds it there too", () => {
+      dim.drawn = false
+      const a = live(codex)
+      user(a, '\x1b')
+      expect(sessions.inputHeld(P, a.agentId)).toBe(DRAFT)
+    })
   })
 
   it('a fence lost (a new lease, a restart) before or while it types: nothing more written, nothing killed', async () => {
