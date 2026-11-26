@@ -664,5 +664,7 @@
   "tips.tagPushDelete.title": "Einen Git-Tag pushen oder löschen",
   "tips.tagPushDelete.text": "Jeder Tag in Versionsverwaltung → Verlauf hat Pushen…, um ihn zu einem Remote zu senden, und Löschen…, um ihn hier zu löschen, oder auch auf einem Remote, damit der nächste Fetch ihn nicht zurückbringt.",
   "tips.commitDetails.text": "Klicke in Versionsverwaltung → Verlauf auf einen Commit, um seine Dateien und Änderungen zu sehen. Von dort wendest du ihn mit „Revert…“ oder „Cherry-Pick…“ auf den Branch des Projektordners an oder legst mit „Branch ab hier…“ und „Hier taggen…“ einen Branch oder ein Tag an ihm an.",
-  "tips.commitDetails.title": "Einen Commit aus dem Verlauf reverten, cherry-picken, abzweigen oder taggen"
+  "tips.commitDetails.title": "Einen Commit aus dem Verlauf reverten, cherry-picken, abzweigen oder taggen",
+  "tips.externalTerminal.title": "Wähle dein externes Terminal",
+  "tips.externalTerminal.text": "„Externes Terminal hier öffnen“ öffnet Windows Terminal im Ordner des Projekts, oder die Eingabeaufforderung, wo Windows Terminal sich nicht öffnet. Für immer Eingabeaufforderung oder PowerShell wähle es unter Einstellungen → Allgemein → Externes Terminal."
 }

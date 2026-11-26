@@ -1205,7 +1205,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const dir = workspace.assertProject(p)
       // A new terminal gets what was installed since Combwork started (#821).
       await refreshPathBeforeStart()
-      openExternalTerminal(dir)
+      // What opened, or an error saying which terminal didn't and why (HI-3582), which the window shows.
+      await openExternalTerminal(dir, config.settings.general.externalTerminal)
     },
 
     'session:list': (p, opts) => sessions.list(p, { own: opts?.own === true }),

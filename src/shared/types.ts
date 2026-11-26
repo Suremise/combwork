@@ -19,6 +19,7 @@ import type { GithubHostSettings } from './githubHost'
 import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
 import type { ConnectionOption } from './templateConnections'
 import type { KeepAwakeSetting } from './keepAwake'
+import type { ExternalTerminalSetting } from './externalTerminal'
 import type { DateFormat, TimeFormat } from './dates'
 import type { ProjectPref } from './uiPrefs'
 import type { GitTool } from './gitTool'
@@ -210,6 +211,8 @@ export interface AppSettings {
     dateFormat: DateFormat
     /** How times show with them: 24-hour (14:05) by default. */
     timeFormat: TimeFormat
+    /** What Open External Terminal Here opens (HI-3582): Automatic (Windows Terminal, else Command Prompt) by default. */
+    externalTerminal: ExternalTerminalSetting
     /** How Combwork names the user to the Combwork Assistant (#426): "User replied to B1 on #399". "User" by default. */
     userName: string
     /** The language Combwork shows (#767): 'auto' (Windows' display languages) or a language's code (de, pl…). */

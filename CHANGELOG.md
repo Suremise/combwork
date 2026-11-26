@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixed
+
+- **Open External Terminal Here opens a terminal without Windows Terminal, and says when it can't** (HI-3582). On a PC without Windows Terminal it opened nothing and said nothing, even where Windows has a `wt.exe` for it. Now it opens Command Prompt there, and when no terminal can open, an error notification says which and why. **Settings → General → External terminal** chooses what it opens: Automatic (Windows Terminal, else Command Prompt), Windows Terminal, Command Prompt or PowerShell.
+
 ## 1.7.0 — 2026-11-25
 
 ### Added

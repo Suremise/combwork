@@ -54,6 +54,7 @@
   "actions.duration.hoursMinutes": "{h, number} h {m} min",
   "actions.duration.minutes": "{m} min",
   "actions.duration.seconds": "{s} s",
+  "actions.externalTerminal.failed": "No se pudo abrir una terminal externa",
   "actions.idleResume.message": "{what, select, conversation {Esta conversación} other {Esta sesión}} estuvo activa por última vez hace {unit, select, days {{days, plural, one {# día} many {# días} other {# días}}} other {{duration}}}{size, select, tokens {, con unos {tokens} tokens de contexto} bytes {; su transcripción ocupa {bytes}} other {}}. Lo más probable es que haya perdido su caché de prompts, así que al reanudarla puede volver a procesarse ese contexto.",
   "actions.keys.ctrl": "Ctrl",
   "actions.keys.delete": "Supr",

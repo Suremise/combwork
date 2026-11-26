@@ -401,5 +401,8 @@
   "project.tabs.more": "その他",
   "project.tabs.moreSettings": "プロジェクト設定…",
   "project.tabs.moreTip": "プロジェクトの{tabs}",
-  "project.tabs.tip": "{tab}（{key}）"
+  "project.tabs.tip": "{tab}（{key}）",
+  "project.externalTerminal.failed": "{terminal}が開きませんでした: {reason}",
+  "project.externalTerminal.exited": "すぐに終了コード {code} で終了しました",
+  "project.externalTerminal.missing": "{path} がありません"
 }

@@ -56,6 +56,7 @@ interface CombworkMessageValues {
   'actions.duration.hoursMinutes': { h: number; m: string | number }
   'actions.duration.minutes': { m: string | number }
   'actions.duration.seconds': { s: string | number }
+  'actions.externalTerminal.failed': undefined
   'actions.idleResume.message': { what: string; unit: string; days: number; duration: string | number; size: string; tokens: string | number; bytes: string | number }
   'actions.keys.ctrl': undefined
   'actions.keys.delete': undefined

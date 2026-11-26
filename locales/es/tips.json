@@ -664,5 +664,7 @@
   "tips.tagPushDelete.title": "Haz push de una etiqueta de git o elimínala",
   "tips.tagPushDelete.text": "Cada etiqueta de Control de versiones → Historial tiene Hacer push… para enviarla a un remoto, y Eliminar… para eliminarla aquí, o también en un remoto para que el próximo fetch no la traiga de vuelta.",
   "tips.commitDetails.text": "Haz clic en un commit en Control de versiones → Historial para ver sus archivos y cambios. Desde ahí, Revert… o Cherry-pick… lo aplican a la rama de la carpeta del proyecto, y Rama desde aquí… y Etiquetar aquí… parten de él.",
-  "tips.commitDetails.title": "Revertir, hacer cherry-pick, ramificar o etiquetar un commit desde el Historial"
+  "tips.commitDetails.title": "Revertir, hacer cherry-pick, ramificar o etiquetar un commit desde el Historial",
+  "tips.externalTerminal.title": "Elige tu terminal externa",
+  "tips.externalTerminal.text": "Abrir una terminal externa aquí abre Windows Terminal en la carpeta del proyecto, o el Símbolo del sistema donde Windows Terminal no se abre. Para usar siempre el Símbolo del sistema o PowerShell, elígelo en Configuración → General → Terminal externa."
 }
