@@ -6,7 +6,6 @@
   "shell.about.dataFolder": "数据文件夹",
   "shell.about.legal": "© 2026 Darren Marshall。{app} 为独立开发，与 {companies} 无关联，也未获其认可或赞助。{products}；它们各自按其开发方的条款单独安装。",
   "shell.about.licence": "基于 <licence>MIT License</licence> 开源。包含<notices>第三方软件</notices>和 <chromium>Chromium</chromium>。",
-  "shell.about.noCli": "未安装 CLI",
   "shell.about.noLicences": "找不到许可证",
   "shell.about.noLicencesDetail": "Chromium 的许可证文件位于 Combwork 的安装文件夹中。",
   "shell.about.productOf": "{product} 是 {company} 的产品",

@@ -6,7 +6,6 @@
   "shell.about.dataFolder": "Folder danych",
   "shell.about.legal": "© 2026 Darren Marshall. {app} jest rozwijany niezależnie i nie jest powiązany z {companies}, popierany ani sponsorowany przez nie. {products}; każdy z nich instaluje się osobno, na warunkach jego producenta.",
   "shell.about.licence": "Oprogramowanie open source na <licence>licencji MIT</licence>. Zawiera <notices>oprogramowanie innych firm</notices> i <chromium>Chromium</chromium>.",
-  "shell.about.noCli": "CLI nie jest zainstalowane",
   "shell.about.noLicences": "Nie znaleziono licencji",
   "shell.about.noLicencesDetail": "Plik licencji Chromium jest w folderze, w którym zainstalowano Combwork.",
   "shell.about.productOf": "{product} to produkt firmy {company}",

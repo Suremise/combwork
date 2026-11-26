@@ -521,12 +521,15 @@ export function AboutDialog() {
   const info = useStore((s) => s.appInfo)
   const providers = useStore((s) => s.providers)
   if (!open || !info) return null
+  const version: [string, string] = [tr(msg({ id: 'shell.about.version', defaultMessage: 'Version', description: "A row of Help → About: Combwork's version." })), info.version]
+  // The installed CLIs are in Copy's text only, for a bug report (HI-3599): shown, a row each made the dialog grow
+  // with every provider, and Settings shows each CLI's version on its own page.
+  const clis = PROVIDERS.flatMap((p): [string, string][] => {
+    const i = providers[p.id]
+    return i?.found ? [[p.name, tr(msg({ id: 'shell.about.cli', defaultMessage: 'CLI {version} ({source})', description: "A line of the text Help → About's Copy copies, a coding agent's: its CLI's version and where Combwork found it." }), { version: i.version ?? '', source: installSourceText(i.source, tr) })]] : []
+  })
   const rows: [string, string][] = [
-    [tr(msg({ id: 'shell.about.version', defaultMessage: 'Version', description: "A row of Help → About: Combwork's version." })), info.version],
-    ...PROVIDERS.map((p): [string, string] => {
-      const i = providers[p.id]
-      return [p.name, i?.found ? tr(msg({ id: 'shell.about.cli', defaultMessage: 'CLI {version} ({source})', description: "A row of Help → About, a coding agent's: its CLI's version and where Combwork found it." }), { version: i.version ?? '', source: installSourceText(i.source, tr) }) : tr(msg({ id: 'shell.about.noCli', defaultMessage: 'CLI not installed', description: "A row of Help → About, a coding agent's, when its CLI isn't installed." }))]
-    }),
+    version,
     // Names of software, the same in every language.
     ['Electron', info.electron], // i18n-ignore: a name
     ['Chromium', info.chrome], // i18n-ignore: a name
@@ -540,7 +543,7 @@ export function AboutDialog() {
     setActivity('docs')
   }
   const copy = (): void => {
-    void navigator.clipboard.writeText(rows.map(([k, v]) => `${k}: ${v}`).join('\n'))
+    void navigator.clipboard.writeText([version, ...clis, ...rows.slice(1)].map(([k, v]) => `${k}: ${v}`).join('\n'))
     notify('success', tr(msg({ id: 'shell.about.copied', defaultMessage: 'Version information copied', description: "A notice after Help → About's Copy." })))
   }
   return (

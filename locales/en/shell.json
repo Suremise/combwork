@@ -5,7 +5,7 @@
   },
   "shell.about.cli": {
     "defaultMessage": "CLI {version} ({source})",
-    "description": "A row of Help → About, a coding agent's: its CLI's version and where Combwork found it."
+    "description": "A line of the text Help → About's Copy copies, a coding agent's: its CLI's version and where Combwork found it."
   },
   "shell.about.copied": {
     "defaultMessage": "Version information copied",
@@ -26,10 +26,6 @@
   "shell.about.licence": {
     "defaultMessage": "Open source under the <licence>MIT License</licence>. Includes <notices>third-party software</notices> and <chromium>Chromium</chromium>.",
     "description": "Help → About: Combwork's licence. Each tag is a link: to the licence, the notices of the software Combwork includes, and Chromium's licences. MIT and Chromium are names: keep them."
-  },
-  "shell.about.noCli": {
-    "defaultMessage": "CLI not installed",
-    "description": "A row of Help → About, a coding agent's, when its CLI isn't installed."
   },
   "shell.about.noLicences": {
     "defaultMessage": "Licences not found",
