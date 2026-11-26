@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **Chimes no longer play late, several at once** (HI-3605). A chime asked for while Combwork's sound was paused could wait, and play minutes later together with others, when the sound next resumed. A chime now plays when it's due, or is skipped, and Combwork's log says which and why.
 - **Windows 10: Claude Code's prompt suggestion no longer holds a lane's end or a connection switch** (HI-3598). After you pressed Esc in an agent's pane, its suggestion (not greyed out on Windows 10) looked like a draft of yours, so ending the agent at its lane's end, its first prompt or a connection switch waited for you to press Enter there. Text in its input now counts as yours only once you've typed something there since its last prompt. A draft you typed and left still holds them.
 - **A prompt you bring back with Up holds a lane's end or a connection switch** (HI-3604). After you sent a prompt in an agent's pane, pressing Up (or Down) to bring back an earlier one didn't count as a draft of yours, so ending the agent at its lane's end, its first prompt or a connection switch could clear it. A prompt brought back into its input now holds them, as one you typed does, until you send or clear it.
 - **Discard Changes… and Restore From… keep only that file in their stash** (HI-3587). When another file had staged changes, the stash made for one file held those too, so applying it later brought them back, over whatever that file had become. The stash now holds the one file's changes, staged and not, and Apply restores that file alone.

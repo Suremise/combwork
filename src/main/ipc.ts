@@ -109,6 +109,7 @@ import { ensureCombworkExcluded, trackedCombworkFiles, untrackCombwork, vcsOf } 
 import { combworkWindows, windowForPath, windowOf, windowShowing } from './windows'
 import { noteLongTasks, noteWhere } from './rendererWatch'
 import { cleanTasks, cleanWhere } from '../shared/windowHealth'
+import { chimeLogLine, cleanChimeReport } from '../shared/chime'
 import { setTitleBarBackdrops, setTitleBarColors } from './titleBar'
 import { showWindow } from './tray'
 import { resetMetrics } from './metrics'
@@ -703,6 +704,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const wc = senderStore.getStore()
       const entry = wc ? windowOf(wc) : null
       if (entry) noteLongTasks(entry, cleanTasks(list), cleanWhere(where))
+    },
+    // A chime plays now or not at all (HI-3605): what became of each, so a late or missing one says why.
+    'window:chime': (raw) => {
+      const r = cleanChimeReport(raw)
+      if (r) (r.outcome === 'played' ? log.info : log.warn)(chimeLogLine(r))
     },
 
     'settings:get': () => config.settings,
