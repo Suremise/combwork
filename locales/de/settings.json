@@ -1727,5 +1727,12 @@
   "settings.advanced.cw.github.prFollowMinutes.desc": "Solange Karten in „PR offen“ warten, liest Combwork ihre Pull-Requests auf GitHub in diesem Abstand und auch, wenn ihr Board oder ihre Karte geöffnet wird: GitHub kann Combwork nicht selbst mitteilen, wann einer gemergt oder geschlossen wird.",
   "settings.advanced.cw.github.prFollowMinutes.title": "Pull-Requests: wie oft ihr Status gelesen wird",
   "settings.advanced.cw.server.checkInferSeconds.title": "Server prüfen: Zeitlimit der Testanfrage",
-  "settings.advanced.cw.server.checkInferSeconds.desc": "Wie lange „Server prüfen“ auf die Antwort eines Modellservers auf seine Testanfrage wartet. Ein lokales Modell, das noch nicht geladen ist, lädt zuerst, was auf bescheidener Hardware Minuten dauern kann; nach dieser Zeit meldet die Prüfung eine Zeitüberschreitung."
+  "settings.advanced.cw.server.checkInferSeconds.desc": "Wie lange „Server prüfen“ auf die Antwort eines Modellservers auf seine Testanfrage wartet. Ein lokales Modell, das noch nicht geladen ist, lädt zuerst, was auf bescheidener Hardware Minuten dauern kann; nach dieser Zeit meldet die Prüfung eine Zeitüberschreitung.",
+  "settings.general.externalTerminal.title": "Externes Terminal",
+  "settings.general.externalTerminal.desc": "Was „Externes Terminal hier öffnen“ öffnet, im Ordner des Projekts.",
+  "settings.general.externalTerminal.tip": "Automatisch öffnet Windows Terminal, oder die Eingabeaufforderung, wo Windows Terminal sich nicht öffnet. Ein Terminal, das du wählst und das sich nicht öffnen kann, sagt warum, statt ein anderes zu öffnen. Jedes bekommt die Ordner der CLIs, die Combwork gefunden hat, in seinen PATH.",
+  "settings.general.externalTerminal.option.auto": "Automatisch (Windows Terminal, sonst Eingabeaufforderung)",
+  "settings.general.externalTerminal.option.wt": "Windows Terminal",
+  "settings.general.externalTerminal.option.cmd": "Eingabeaufforderung",
+  "settings.general.externalTerminal.option.powershell": "PowerShell"
 }

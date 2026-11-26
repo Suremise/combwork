@@ -248,6 +248,8 @@ interface CombworkMessageValues {
   'tips.dialectsNewModel.title': undefined
   'tips.editTemplates.text': undefined
   'tips.editTemplates.title': undefined
+  'tips.externalTerminal.text': undefined
+  'tips.externalTerminal.title': undefined
   'tips.fileLinks.text': undefined
   'tips.fileLinks.title': undefined
   'tips.fileRestore.text': undefined

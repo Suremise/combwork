@@ -428,6 +428,17 @@ The sidebar and the lists in the Sessions, Files, Version Control (Changes) and 
 
 A project's tabs (Session, Overview, Performance, Tasks and the rest) shrink to **icons** when their names don't fit, as in a narrow window or with the sidebar and panels open; the tab you're on keeps its name. Hover a tab for its name and shortcut. They get their names back once there's room. In a very narrow window the tabs scroll sideways, keeping the one you're on in view.
 
+### An external terminal <a id="external-terminal"></a>
+
+**Project → Open External Terminal Here** (also on a project's right-click menu in the sidebar, and Ctrl+Shift+`) opens a terminal window in the project's folder. The CLIs Combwork found can be run in it by name, even one whose folder isn't on your PATH.
+
+Which terminal is **Settings → General → External terminal**:
+
+- **Automatic** (the default): Windows Terminal, or Command Prompt where Windows Terminal doesn't open (it isn't installed, or Windows has a `wt.exe` for it that doesn't start it).
+- **Windows Terminal**, **Command Prompt** or **PowerShell** (Windows PowerShell): always that one.
+
+When the terminal can't open, Combwork says so in an error notification, with which terminal and why. One you chose by name isn't replaced by another: choose another, or Automatic.
+
 ### Removing a project <a id="removing-a-project"></a>
 
 **Project → Remove Project…** (also in a project's right-click menu and the **⋯** at the top of a project) offers three ways. The dialog lists what each one touches as a table, **What** and **What happens** for the way you pick: running agents (stopped first; their conversations are kept), the folder (by its name; point at it for the full path), the project's handovers, its cards on the task board and its worktrees, each with any work not merged.

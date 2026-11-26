@@ -246,6 +246,8 @@
   "tips.dialectsNewModel.title": "A dialect file for any model",
   "tips.editTemplates.text": "Select a template in the Templates view and choose Edit…: add, copy, reorder or remove its agents, change each in the Agent Settings dialog (its Save saves the template too), rename it and pick its layout.",
   "tips.editTemplates.title": "Edit a template in place",
+  "tips.externalTerminal.text": "Open External Terminal Here opens Windows Terminal in the project's folder, or Command Prompt where Windows Terminal doesn't open. To always get Command Prompt or PowerShell, choose it in Settings → General → External terminal.",
+  "tips.externalTerminal.title": "Choose your external terminal",
   "tips.fileLinks.text": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",
   "tips.fileLinks.title": "Ctrl+click a path in the terminal",
   "tips.fileRestore.text": "Right-click a changed file in the Files tab: Discard Changes… puts it back to the commit checked out, and Restore From takes its version on the target branch or in one of its commits. Both show the diff first, and keep its changes in a stash.",

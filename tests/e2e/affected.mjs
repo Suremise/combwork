@@ -205,7 +205,7 @@ export const AREAS = [
   // Switching the version control (#1419): the switch, detection's offers, the shared rules.
   { paths: ['src/main/workflow/platformSwitch.ts', 'src/main/platform/registry.ts', 'src/shared/platform/switching.ts', 'src/shared/workflow/projectWorkflow.ts'], suites: ['vcswitch', 'versioncontrol', 'workflowoptions'] },
   { paths: ['src/main/gitInit.ts', 'src/shared/gitInit.ts', 'src/renderer/src/components/InitRepo.tsx'], suites: ['gitinit', 'gitview'] },
-  { paths: ['src/main/freshPath.ts', 'src/main/externalTerminal.ts'], suites: ['freshpath', 'gitmissing', 'providers'] },
+  { paths: ['src/main/freshPath.ts', 'src/main/externalTerminal.ts', 'src/shared/externalTerminal.ts'], suites: ['freshpath', 'gitmissing', 'providers'] },
   // The providers' version checks' GET (#1582): the test copies turn the checks off, so these drive its callers only.
   { paths: ['src/main/plainHttpsJson.ts'], suites: ['providers', 'providerdetect', 'setupcopy', 'setuplayout'] },
   { paths: ['src/main/testedClis.ts', 'src/shared/testedClis.ts', 'resources/tested-clis.json', 'scripts/testedClis.mjs', 'scripts/tested-clis.mjs', 'scripts/release.mjs'], suites: ['testedclis'] },

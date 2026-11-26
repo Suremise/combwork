@@ -54,6 +54,7 @@
   "actions.duration.hoursMinutes": "{h, number} h {m} min",
   "actions.duration.minutes": "{m} min",
   "actions.duration.seconds": "{s} s",
+  "actions.externalTerminal.failed": "Kein externes Terminal geöffnet",
   "actions.idleResume.message": "{what, select, conversation {Diese Unterhaltung} other {Diese Sitzung}} war zuletzt vor {unit, select, days {{days, plural, one {# Tag} other {# Tagen}}} other {{duration}}} aktiv{size, select, tokens {, mit etwa {tokens} Tokens Kontext} bytes {; ihr Transkript ist {bytes} groß} other {}}. Ihr Prompt-Cache ist höchstwahrscheinlich verloren, daher wird dieser Kontext beim Fortsetzen womöglich erneut verarbeitet.",
   "actions.keys.ctrl": "Strg",
   "actions.keys.delete": "Entf",

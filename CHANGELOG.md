@@ -7,6 +7,7 @@
 - **Cards Combwork moves into a column land at its bottom** (HI-3585). A card the workflow moved, such as a merged card going from Passed to Done, kept the place it had in the column it left, so it could appear at the top or in the middle of Done instead of last. It now goes after the cards already there, as your own moves do.
 - **Finishing a card with a pull request pushes only its branch** (HI-3590). With git's `push.followTags` on, the push that opens a card's pull request, or sends a pull request's card's fixes back to it, also published any annotated tag on its commits that the remote didn't have yet. It now pushes the card's branch alone; pushing a tag yourself works as before.
 - **Close Shipped Issues… closes only the issues its button counted** (HI-3588). An issue shown as already closed, then reopened on GitHub before you clicked **Close N Issues**, was closed too, beyond the number the button showed. It is now left open and says *something changed meanwhile*; look again to close it.
+- **Open External Terminal Here opens a terminal without Windows Terminal, and says when it can't** (HI-3582). On a PC without Windows Terminal it opened nothing and said nothing, even where Windows has a `wt.exe` for it. Now it opens Command Prompt there, and when no terminal can open, an error notification says which and why. **Settings → General → External terminal** chooses what it opens: Automatic (Windows Terminal, else Command Prompt), Windows Terminal, Command Prompt or PowerShell.
 
 ## 1.7.0 — 2026-11-25
 

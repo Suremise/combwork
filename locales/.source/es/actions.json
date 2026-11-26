@@ -54,6 +54,7 @@
   "actions.duration.hoursMinutes": "{h, number}h {m}m",
   "actions.duration.minutes": "{m}m",
   "actions.duration.seconds": "{s}s",
+  "actions.externalTerminal.failed": "Couldn't open an external terminal",
   "actions.idleResume.message": "{what, select, conversation {This conversation} other {This session}} was last active {unit, select, days {{days, plural, one {# day} other {# days}}} other {{duration}}} ago{size, select, tokens {, with about {tokens} tokens of context} bytes {; its transcript is {bytes}} other {}}. It has most likely lost its prompt cache, so resuming may process that context again.",
   "actions.keys.ctrl": "Ctrl",
   "actions.keys.delete": "Del",

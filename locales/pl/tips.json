@@ -664,5 +664,7 @@
   "tips.tagPushDelete.title": "Wypchnij lub usuń tag gita",
   "tips.tagPushDelete.text": "Każdy tag w Kontrola wersji → Historia ma Wypchnij…, by wysłać go do zdalnego repozytorium, i Usuń…, by usunąć go tutaj albo także w zdalnym repozytorium, żeby następne pobranie go nie przywróciło.",
   "tips.commitDetails.text": "Kliknij commit w widoku Kontrola wersji → Historia, aby zobaczyć jego pliki i zmiany. Stamtąd użyj Gałąź stąd… lub Taguj tutaj… albo wykonaj Revert… lub Cherry-pick… na gałęzi folderu projektu.",
-  "tips.commitDetails.title": "Revert, cherry-pick, gałąź lub tag z commita w Historii"
+  "tips.commitDetails.title": "Revert, cherry-pick, gałąź lub tag z commita w Historii",
+  "tips.externalTerminal.title": "Wybierz terminal zewnętrzny",
+  "tips.externalTerminal.text": "„Otwórz tutaj terminal zewnętrzny” otwiera Windows Terminal w folderze projektu, a tam, gdzie Windows Terminal się nie otwiera – Wiersz polecenia. Aby zawsze mieć Wiersz polecenia lub PowerShell, wybierz go w Ustawienia → Ogólne → Terminal zewnętrzny."
 }

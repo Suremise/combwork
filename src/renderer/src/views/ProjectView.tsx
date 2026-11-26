@@ -645,7 +645,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
                 ...(cramped && batch.length ? [...batchWith(sub), { separator: true as const }] : []),
                 // Each with its command's keys, where it has some (HI-2551). Project Settings is under More ▾ on the tabs' row.
                 { label: tr(M.explorer), icon: 'folder-opened', keybinding: shownKeys('project.openExplorer'), onClick: () => void call('project:openInExplorer', project.path) },
-                { label: tr(M.terminal), icon: 'terminal', keybinding: shownKeys('project.openTerminal'), onClick: () => void call('project:openTerminal', project.path) },
+                { label: tr(M.terminal), icon: 'terminal', keybinding: shownKeys('project.openTerminal'), onClick: () => void actions.openExternalTerminal(project.path) },
                 { separator: true },
                 { label: tr(M.removeProject), icon: 'trash', keybinding: shownKeys('project.remove'), onClick: () => set({ removeProjectFor: project.path }) }
               ])

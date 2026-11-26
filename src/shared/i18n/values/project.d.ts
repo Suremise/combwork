@@ -193,6 +193,9 @@ interface CombworkMessageValues {
   'project.empty.providerOff': { provider: string | number }
   'project.empty.resumeLast': undefined
   'project.empty.startOrResume': { provider: string | number }
+  'project.externalTerminal.exited': { code: string | number }
+  'project.externalTerminal.failed': { terminal: string | number; reason: string | number }
+  'project.externalTerminal.missing': { path: string | number }
   'project.header.active': undefined
   'project.header.agentsMenu': undefined
   'project.header.agentsMenuTip': undefined

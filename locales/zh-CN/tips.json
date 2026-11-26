@@ -664,5 +664,7 @@
   "tips.tagPushDelete.title": "推送或删除 git 标签",
   "tips.tagPushDelete.text": "“版本控制”→“历史”中的每个标签都有“推送…”，可将它发送到远程仓库；还有“删除…”，可在这里删除它，或同时在远程仓库上删除，这样下次获取时不会把它带回来。",
   "tips.commitDetails.text": "在“版本控制”→“历史”中点击某个提交，即可查看它的文件和更改。在那里可以将它“还原…”或“拣选…”到项目文件夹的分支上，或在它那里“从此处新建分支…”和“在此处打标签…”。",
-  "tips.commitDetails.title": "从历史中还原、拣选提交，或在其处新建分支、打标签"
+  "tips.commitDetails.title": "从历史中还原、拣选提交，或在其处新建分支、打标签",
+  "tips.externalTerminal.title": "选择外部终端",
+  "tips.externalTerminal.text": "“在此处打开外部终端”会在项目文件夹中打开 Windows 终端；Windows 终端打不开时打开命令提示符。要始终使用命令提示符或 PowerShell，请在“设置”→“常规”→“外部终端”中选择。"
 }

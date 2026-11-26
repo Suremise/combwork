@@ -1727,5 +1727,12 @@
   "settings.advanced.cw.github.prFollowMinutes.desc": "Tant que des cartes attendent dans PR ouverte, Combwork lit leurs pull requests sur GitHub à cet intervalle, et aussi quand leur tableau ou leur carte s’ouvre : GitHub ne peut pas prévenir lui-même Combwork quand l’une d’elles est fusionnée ou fermée.",
   "settings.advanced.cw.github.prFollowMinutes.title": "Pull requests : fréquence de lecture de leur état",
   "settings.advanced.cw.server.checkInferSeconds.title": "Vérifier le serveur : délai de la requête de test",
-  "settings.advanced.cw.server.checkInferSeconds.desc": "Le temps que Vérifier le serveur attend la réponse d’un serveur de modèles à sa requête de test. Un modèle local pas encore chargé se charge d’abord, ce qui peut prendre des minutes sur un matériel modeste ; passé ce délai, la vérification signale un dépassement de délai."
+  "settings.advanced.cw.server.checkInferSeconds.desc": "Le temps que Vérifier le serveur attend la réponse d’un serveur de modèles à sa requête de test. Un modèle local pas encore chargé se charge d’abord, ce qui peut prendre des minutes sur un matériel modeste ; passé ce délai, la vérification signale un dépassement de délai.",
+  "settings.general.externalTerminal.title": "Terminal externe",
+  "settings.general.externalTerminal.desc": "Ce qu’ouvre Ouvrir un terminal externe ici, dans le dossier du projet.",
+  "settings.general.externalTerminal.tip": "Automatique ouvre Windows Terminal, ou l’Invite de commandes là où Windows Terminal ne s’ouvre pas. Un terminal que tu choisis et qui ne peut pas s’ouvrir dit pourquoi, au lieu d’en ouvrir un autre. Chacun reçoit dans son PATH les dossiers des CLI que Combwork a trouvées.",
+  "settings.general.externalTerminal.option.auto": "Automatique (Windows Terminal, sinon Invite de commandes)",
+  "settings.general.externalTerminal.option.wt": "Windows Terminal",
+  "settings.general.externalTerminal.option.cmd": "Invite de commandes",
+  "settings.general.externalTerminal.option.powershell": "PowerShell"
 }

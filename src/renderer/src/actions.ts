@@ -68,6 +68,14 @@ export async function attempt<T>(title: string, fn: () => Promise<T>): Promise<T
   }
 }
 
+/**
+ * Open External Terminal Here, from the menus, the command palette and its shortcut: what it couldn't open, and why, as an
+ * error notification (HI-3582: it used to fail with nothing said).
+ */
+export async function openExternalTerminal(projectPath: string): Promise<void> {
+  await attempt(tr(msg({ id: 'actions.externalTerminal.failed', defaultMessage: "Couldn't open an external terminal", description: "An error notification's title: Open External Terminal Here opened nothing. Its text says which terminal and why (Settings → General → External terminal chooses it)." })), () => call('project:openTerminal', projectPath))
+}
+
 /** What drops unsaved edits, as its callers name it (#801: each is a message's select key, not words in a sentence). */
 export type UnsavedAction = 'switch workspace' | 'close the workspace' | 'reload the window'
 

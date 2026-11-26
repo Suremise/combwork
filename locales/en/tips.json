@@ -987,6 +987,14 @@
     "defaultMessage": "Edit a template in place",
     "description": "A tip's title."
   },
+  "tips.externalTerminal.text": {
+    "defaultMessage": "Open External Terminal Here opens Windows Terminal in the project's folder, or Command Prompt where Windows Terminal doesn't open. To always get Command Prompt or PowerShell, choose it in Settings → General → External terminal.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Windows Terminal and Command Prompt are Windows programs: use the names Windows gives them in this language."
+  },
+  "tips.externalTerminal.title": {
+    "defaultMessage": "Choose your external terminal",
+    "description": "A tip's title (HI-3582)."
+  },
   "tips.fileLinks.text": {
     "defaultMessage": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

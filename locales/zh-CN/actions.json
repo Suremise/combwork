@@ -54,6 +54,7 @@
   "actions.duration.hoursMinutes": "{h, number} 小时 {m} 分",
   "actions.duration.minutes": "{m} 分钟",
   "actions.duration.seconds": "{s} 秒",
+  "actions.externalTerminal.failed": "无法打开外部终端",
   "actions.idleResume.message": "{what, select, conversation {此对话} other {此会话}}上次活动是在 {unit, select, days {{days, plural, other {# 天}}} other {{duration}}}前{size, select, tokens {，上下文约 {tokens} 个 Token} bytes {，其记录文件大小为 {bytes}} other {}}。它的提示词缓存很可能已经失效，因此恢复时可能会重新处理这些上下文。",
   "actions.keys.ctrl": "Ctrl",
   "actions.keys.delete": "Del",
