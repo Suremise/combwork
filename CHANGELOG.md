@@ -5,6 +5,7 @@
 ### Fixed
 
 - **Cards Combwork moves into a column land at its bottom** (HI-3585). A card the workflow moved, such as a merged card going from Passed to Done, kept the place it had in the column it left, so it could appear at the top or in the middle of Done instead of last. It now goes after the cards already there, as your own moves do.
+- **Close Shipped Issues… closes only the issues its button counted** (HI-3588). An issue shown as already closed, then reopened on GitHub before you clicked **Close N Issues**, was closed too, beyond the number the button showed. It is now left open and says *something changed meanwhile*; look again to close it.
 
 ## 1.7.0 — 2026-11-25
 

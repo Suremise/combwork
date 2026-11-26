@@ -226,7 +226,10 @@ describe('a GitHub issue pulled in as a card (HI-3555)', () => {
   it('cleans a query, an issue’s labels and a preview', () => {
     expect(cleanIssueQuery({ search: ' a\u0000b ', label: '', assignee: 3, x: 'y' })).toEqual({ search: 'a b' })
     expect(issueCardLabels(['bug', 'Bug', ' p1,\turgent ', '', 'x'.repeat(60)])).toEqual(['bug', 'p1 urgent', 'x'.repeat(50)])
-    expect(cleanPreview({ repo: ACME, line: '1', tag: 'v1', commit: 'c', issues: [{ card: 1, issue: 2 }] })).toEqual({ repo: ACME, line: '1', tag: 'v1', commit: 'c', issues: [{ card: 1, issue: 2 }] })
+    expect(cleanPreview({ repo: ACME, line: '1', tag: 'v1', commit: 'c', issues: [{ card: 1, issue: 2, state: 'open' }] })).toEqual({ repo: ACME, line: '1', tag: 'v1', commit: 'c', issues: [{ card: 1, issue: 2, state: 'open' }] })
+    // HI-3588: each row's state as shown is part of what a click authorises: none, or another word, isn't a preview.
+    expect(cleanPreview({ repo: ACME, line: '1', tag: 'v1', commit: 'c', issues: [{ card: 1, issue: 2 }] })).toBeNull()
+    expect(cleanPreview({ repo: ACME, line: '1', tag: 'v1', commit: 'c', issues: [{ card: 1, issue: 2, state: 'reopened' }] })).toBeNull()
     expect(cleanPreview({ repo: ACME, line: '1', tag: 'v1', commit: 'c', issues: [{ card: 1 }] })).toBeNull()
     expect(cleanPreview({ line: '1', tag: 'v1', commit: 'c', issues: [] })).toBeNull()
   })
@@ -293,7 +296,7 @@ describe('closing shipped issues at publish (HI-3555)', () => {
     if (!('issues' in r)) throw new Error(JSON.stringify(r))
     return r
   }
-  const previewOf = (r: Extract<ShippedIssuesRead, { issues: unknown }>) => ({ repo: r.repo, line: r.line, tag: r.tag, commit: r.commit, issues: r.issues.map((i) => ({ card: i.card, issue: i.issue })) })
+  const previewOf = (r: Extract<ShippedIssuesRead, { issues: unknown }>) => ({ repo: r.repo, line: r.line, tag: r.tag, commit: r.commit, issues: r.issues.map((i) => ({ card: i.card, issue: i.issue, state: i.state })) })
 
   it('takes a release’s shipped cards from its tagged commit: not what came after it, nor what an earlier release shipped', async () => {
     const { w, repo, cards } = await history()
@@ -386,6 +389,36 @@ describe('closing shipped issues at publish (HI-3555)', () => {
     ])
     // Every write and the release guard named the same repository.
     expect(calls().filter((c) => c[0] === 'release' || c[1] === 'close').every((c) => c.includes('github.com/acme/app'))).toBe(true)
+  })
+
+  it('closes only the issues the button counted: one shown closed and reopened before the click is left unwritten (HI-3588)', async () => {
+    const { w, repo, cards } = await history()
+    setGithub((s) => (s.releases['v1.0.0'] = false))
+    const shown = await shippedOf(w, repo, '1.0.0')
+    expect(shown.issues.map((i) => [i.issue, i.state])).toEqual([
+      [21, 'open'],
+      [22, 'open'],
+      [23, 'closed']
+    ])
+    // Reopened on GitHub after the preview: the click covered #21 and #22 only.
+    setGithub((s) => (s.issues[23].state = 'OPEN'))
+    const out = await inWorkspace(w, () => closeShippedIssues(w, repo, previewOf(shown)))
+    expect(out).toEqual([
+      { issue: 21, card: cards[21], outcome: 'closed', detail: null },
+      { issue: 22, card: cards[22], outcome: 'closed', detail: null },
+      { issue: 23, card: cards[23], outcome: 'stopped', detail: null }
+    ])
+    expect(github().issues[23]).toMatchObject({ state: 'OPEN', comments: [] })
+    expect(writes().map((c) => c[2])).toEqual(['21', '22'])
+    // Shown again, it is open and counted: that click closes it.
+    const again = await shippedOf(w, repo, '1.0.0')
+    expect(again.issues.find((i) => i.issue === 23)?.state).toBe('open')
+    expect((await inWorkspace(w, () => closeShippedIssues(w, repo, previewOf(again)))).map((o) => [o.issue, o.outcome])).toEqual([
+      [21, 'alreadyClosed'],
+      [22, 'alreadyClosed'],
+      [23, 'closed']
+    ])
+    expect(github().issues[23]).toMatchObject({ state: 'CLOSED', comments: ['Fixed in 1.0.0'] })
   })
 
   it('goes on past a failure, saying each issue’s outcome, and two clicks at once close each issue once', async () => {
