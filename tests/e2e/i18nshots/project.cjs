@@ -117,7 +117,7 @@ async function planLimits(ctx) {
 async function changes(ctx) {
   seedChanges(ctx)
   await ctx.command('project.tab.changes')
-  await (await shown(ctx, ctx.page.locator('.git-sections [data-section="changes"]'), "the Git tab's sections")).first().click()
+  await ctx.lib.chooseTab((await shown(ctx, ctx.page.locator('.git-sections [data-section="changes"]'), "the Git tab's sections")).first(), 'the Changes section', ctx.hungMs)
   // The project folder's own changes (the picker's last entry, its value empty), when the picker is there. It shows
   // once the tab has read the branches it can compare (HI-1824), and the page it opens on may be another (unused
   // worktrees, or two branches compared), so choose the folder until its changes list.

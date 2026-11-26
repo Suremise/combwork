@@ -46,7 +46,7 @@ const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combw
     await inv('settings:update', { general: { userName: 'Ann Lee' } })
     await page.getByText('alpha', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(page, 'workflow')
     const form = page.locator('.workflow-form')
     const row = form.locator('.workflow-option[data-option="mergeGuards"]')
     await lib.workflowTab(page, 'mergeGuards')

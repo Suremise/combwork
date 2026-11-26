@@ -304,7 +304,7 @@ function helpers(h) {
     // Team chosen in the Version Control tab: G15 On, G17 One per lane, Combwork merging into main (the default branch).
     await x.toProject('alpha')
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(page, 'workflow')
     const form = page.locator('.workflow-form')
     await form.waitFor({ timeout: HUNG_MS })
     await form.locator('.workflow-choice[data-choice="team"]').click()
@@ -755,7 +755,7 @@ async function gallery(h, kept) {
   // The Slots and copies group of alpha's Version Control tab.
   await x.toProject('alpha')
   await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-  await page.locator('.git-sections [data-section="workflow"]').click()
+  await lib.vcSection(page, 'workflow')
   const group = page.locator('.workflow-form .workflow-group[data-group="slots"]')
   await lib.workflowTab(page.locator('.workflow-form'), 'where')
   await group.waitFor({ timeout: HUNG_MS })

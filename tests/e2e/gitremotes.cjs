@@ -222,7 +222,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
       check('…renames it here and on origin, tracking its new name there', !!(await lib.until(async () => (await renameBranch.count()) === 0 && (await branches.locator('[data-branch="topic2"]').count()) === 1, HUNG_MS)) && !has(alpha, 'refs/heads/topic') && !has(origin, 'refs/heads/topic') && !!has(origin, 'refs/heads/topic2') && upstreamOf('topic2') === 'origin/topic2', JSON.stringify({ up: upstreamOf('topic2'), old: has(origin, 'refs/heads/topic') }))
 
       // --- HI-3474: a tag's Push… to origin, then Delete… here and on origin.
-      await page.locator('.git-sections [data-section="history"]').click()
+      await lib.vcSection(page, 'history')
       const history = page.locator('[data-git-history]')
       const v1 = history.locator('[data-tag="v1"]')
       await lib.until(async () => (await v1.locator('[data-action="push-tag"]').count()) === 1, HUNG_MS)
@@ -241,7 +241,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitrem
       await shot(page, '7-delete-tag-dark')
       await deleteTag.getByRole('button', { name: 'Delete', exact: true }).click()
       check('…deletes it here and on origin', !!(await lib.until(async () => (await deleteTag.count()) === 0 && (await v1.count()) === 0, HUNG_MS)) && !has(alpha, 'refs/tags/v1') && !has(origin, 'refs/tags/v1') && !!has(backup, 'refs/tags/v1'))
-      await page.locator('.git-sections [data-section="branches"]').click()
+      await lib.vcSection(page, 'branches')
       await lib.until(async () => (await branches.locator('[data-git-head]').count()) === 1, HUNG_MS)
 
       // --- Rename backup to nas: main follows.

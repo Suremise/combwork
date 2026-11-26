@@ -61,7 +61,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
 
     // --- Pair (the agent merges) through Version Control → Workflow (#1278).
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(page, 'workflow')
     const form = page.locator('.workflow-form')
     await until(async () => (await form.count()) > 0, HUNG_MS)
     // The preset previewed, then used (#1418): it fills the form, saved with Save….
