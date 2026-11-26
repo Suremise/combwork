@@ -333,6 +333,33 @@ function board(sql, ...args) {
     check('subfolder: the workflow link at the end of the header row', await linkInPlace())
     await shots('subfolder', page.locator('.vc-view'))
 
+    // HI-3591: a click pressed on a section and released after the row folds to its icons still chooses it. Folding gives
+    // an unselected section its name as a tooltip: the tab keeps its node meanwhile, so the release lands on what was
+    // pressed (a new node would take the click from both). Workflow, first in the row, keeps its place, so the release is
+    // over it either way: this is about the node, never the row moving.
+    await page.locator('.git-sections [data-section="changes"]').click()
+    check('HI-3591: Changes chosen, the row unfolded', !!(await lib.until(async () => (await selected()) === 'changes' && (await page.locator('.git-sections.icons').count()) === 0, HUNG_MS)))
+    const wfBox = await page.locator('.git-sections [data-section="workflow"]').boundingBox()
+    const at = { x: wfBox.x + 14, y: wfBox.y + wfBox.height / 2 }
+    await page.evaluate(() => (window.__hi3591 = document.querySelector('.git-sections [data-section="workflow"]')))
+    await page.mouse.move(at.x, at.y)
+    await page.mouse.down()
+    // Room taken from the row while the button is held, just enough that it folds (less than its names and the status
+    // line's share need) and its icons still fit without scrolling.
+    await page.evaluate(() => {
+      const gitHead = document.querySelector('.git-sections').closest('.git-head')
+      const need = Math.ceil(gitHead.querySelector('.cw-tabs-measure').getBoundingClientRect().width)
+      gitHead.style.maxWidth = `${need + 40}px`
+    })
+    const folded = !!(await lib.until(async () => (await page.locator('.git-sections.icons [data-section="workflow"].icon-only').count()) === 1, HUNG_MS))
+    const under = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-section]')?.getAttribute('data-section') ?? null, at)
+    const sameNode = await page.evaluate(() => window.__hi3591 === document.querySelector('.git-sections [data-section="workflow"]'))
+    await page.mouse.up()
+    check('HI-3591: folded while pressed, Workflow still under the pointer', folded && under === 'workflow', JSON.stringify({ folded, under }))
+    check('HI-3591: …the pressed tab kept its node, and the release chose it', sameNode && !!(await lib.until(async () => (await selected()) === 'workflow', HUNG_MS)), JSON.stringify({ sameNode, selected: await selected() }))
+    await page.evaluate(() => (document.querySelector('.git-sections').closest('.git-head').style.maxWidth = ''))
+    check('HI-3591: the row unfolds again', !!(await lib.until(async () => (await page.locator('.git-sections.icons').count()) === 0, HUNG_MS)))
+
     // A narrow tab: the fact line takes a row of its own under None · Git and the link, never a sliver (unusedwt's narrow
     // window with Progress open caught one).
     await lib.fitWindow(app, page, { width: 760, height: 860 })

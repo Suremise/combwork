@@ -2561,8 +2561,41 @@ async function workflowTab(scope, optionOrTab, ms = timing('hang.ui')) {
   }
   const tab = scope.locator(`[role="tab"][data-workflow-tab="${id}"]`).first()
   if (!(await until(async () => (await tab.count()) > 0, ms))) throw new Error(`No Workflow tab ${id}`)
-  if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click()
-  if (!(await until(async () => (await tab.getAttribute('aria-selected')) === 'true', ms))) throw new Error(`The Workflow tab ${id} wasn't chosen`)
+  await chooseTab(tab, `The Workflow tab ${id}`, ms)
 }
 
-module.exports = { timing, workflowTab, PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, speakLanguage, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, pageFocused, realFocus, openWorkspace, trustWorktrees, hadEstimate, fitWindow, stubFocus, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven, animationsDone, exitWithin }
+/**
+ * HI-3591: a tab (a Tabs button) chosen with one click, unless it is chosen already; resolves once it is selected. A click
+ * that doesn't choose it is never clicked again: it throws, saying what the row shows instead, what is at the tab's centre
+ * and whether the tab is still the node clicked (a replaced one loses a click pressed on the old), so a lost click is
+ * seen rather than retried.
+ */
+async function chooseTab(tab, what, ms = timing('hang.ui')) {
+  if ((await tab.getAttribute('aria-selected')) === 'true') return
+  await tab.evaluate((el) => (window.__cwTabClicked = el))
+  await tab.click()
+  if (await until(async () => (await tab.getAttribute('aria-selected')) === 'true', ms)) return
+  const seen = await tab
+    .evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+      return {
+        chosen: el.closest('[role="tablist"]')?.querySelector('[aria-selected="true"]')?.getAttribute('data-tab') ?? null,
+        box: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)],
+        atCentre: hit?.closest('[role="tab"]')?.getAttribute('data-tab') ?? hit?.className ?? null,
+        sameNode: window.__cwTabClicked === el,
+        modal: document.querySelectorAll('[aria-modal="true"]').length
+      }
+    })
+    .catch((e) => String(e))
+  throw new Error(`${what} wasn't chosen by its click: ${JSON.stringify(seen)}`)
+}
+
+/** HI-3591: the open Version Control tab's section (workflow, changes, history, branches, queue) chosen with one click. */
+async function vcSection(page, id, ms = timing('hang.ui')) {
+  const tab = page.locator(`.git-sections [data-section="${id}"]`)
+  if (!(await until(async () => (await tab.count()) === 1, ms))) throw new Error(`No Version Control section ${id}`)
+  await chooseTab(tab, `The Version Control section ${id}`, ms)
+}
+
+module.exports = { timing, workflowTab, chooseTab, vcSection,PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, speakLanguage, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, pageFocused, realFocus, openWorkspace, trustWorktrees, hadEstimate, fitWindow, stubFocus, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven, animationsDone, exitWithin }

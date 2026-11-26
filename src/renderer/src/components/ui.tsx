@@ -296,9 +296,12 @@ export function sentences(first: ReactNode, second: ReactNode): ReactNode[] {
  * Hover tooltip rendered in a portal so it is never clipped by scroll containers. It is measured hidden first, then
  * placed by its real size next to its anchor (placeTip), so one near the window's edge stays beside its button. One
  * inside another's (an icon in an agent tab) hides the outer one while it shows. `focus`: also shown while what it
- * wraps has the keyboard focus. `className` styles the tooltip itself (the agents table's is wider, #529).
+ * wraps has the keyboard focus. `className` styles the tooltip itself (the agents table's is wider, #529). With no
+ * content it wraps nothing, unless `steady` (HI-3591): then its wrapper stays and only the tip is left out, so content
+ * that comes and goes (a tab folding to its icon) never replaces what it wraps; a click pressed on the old element and
+ * released on a new one reaches neither.
  */
-export function Tooltip({ content, children, delay = 350, block, side, focus, className }: { content: ReactNode; children: ReactNode; delay?: number; block?: boolean; side?: 'right'; focus?: boolean; className?: string }) {
+export function Tooltip({ content, children, delay = 350, block, side, focus, className, steady }: { content: ReactNode; children: ReactNode; delay?: number; block?: boolean; side?: 'right'; focus?: boolean; className?: string; steady?: boolean }) {
   const ref = useRef<HTMLSpanElement>(null)
   // Who holds the hovered slot (HI-2084): this tooltip for as long as it is mounted. Its anchor's ref is already null when
   // its unmount's cleanup runs, so the slot is released by this, never by the anchor.
@@ -310,7 +313,8 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
   const [fit, setFit] = useState<'normal' | 'wide' | 'clipped'>('normal')
   const [inner, setInner] = useState(false)
   const parent = useContext(TipParent)
-  const shown = !!anchor
+  // A steady one whose content has gone shows nothing.
+  const shown = !!anchor && !!content
   useEffect(() => {
     if (!parent || !shown) return
     parent(true)
@@ -382,20 +386,20 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
     const next = placeTip(anchor, { width: tip.width, height: tip.height }, { width: window.innerWidth, height: window.innerHeight }, side)
     if (!placed || next.left !== placed.left || next.top !== placed.top) setPlaced(next)
   }, [anchor, placed, side, content, fit])
-  if (!content) return <>{children}</>
+  if (!content && !steady) return <>{children}</>
   return (
     <span
       className="tip-wrap"
       style={block ? { display: 'flex' } : undefined}
       ref={ref}
-      onMouseEnter={() => show('hover')}
+      onMouseEnter={() => content && show('hover')}
       onMouseLeave={hide}
       onMouseDown={hide}
       onFocus={focus ? (e) => (e.target as Element).matches(':focus-visible') && show('focus') : undefined}
       onBlur={focus ? hide : undefined}
     >
       <TipParent.Provider value={setInner}>{children}</TipParent.Provider>
-      {anchor &&
+      {shown &&
         !inner &&
         createPortal(
           <div ref={tipRef} className={cx('tip', className, fit !== 'normal' && 'wide', fit === 'clipped' && 'clipped')} style={placed ?? { left: 0, top: 0, visibility: 'hidden' }}>
