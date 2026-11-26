@@ -198,7 +198,7 @@ async function stashIdent(projectPath: string): Promise<NodeJS.ProcessEnv> {
   const set = new Set(r.out.split(/\r?\n/).map((row) => row.split(' ')[0].toLowerCase()).filter(Boolean))
   const env: NodeJS.ProcessEnv = {}
   for (const side of ['author', 'committer'] as const)
-    for (const [what, fallback] of [['name', 'git stash'], ['email', 'git@stash']] as const) {
+    for (const [what, fallback] of [['name', 'git stash'], ['email', 'git@stash']] as const) { // i18n-ignore: git stash's own fallback identity, in the repository
       const key = `GIT_${side.toUpperCase()}_${what.toUpperCase()}`
       if (!set.has(`user.${what}`) && !set.has(`${side}.${what}`) && !process.env[key]) env[key] = fallback
     }
