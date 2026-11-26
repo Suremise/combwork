@@ -437,29 +437,6 @@ export function openLockDb(file: string, busyMs: number, schema: string): Databa
 }
 
 /**
- * A copy of a database file kept for good (`keepAll`), made by a connection of its own holding the file's exclusive lock:
- * the proof no other connection has it open (Restore the 0.9 Board Backup, #1207). Closed after, which ends the lock.
- * DbInUseError when another connection has it; the caller's own must be closed first.
- */
-export function soleCopy(file: string, dir: string, family: string, version: number): string {
-  const db = new DatabaseSync(file, { timeout: GROUP_LOCK_WAIT_MS })
-  try {
-    db.exec('PRAGMA locking_mode = EXCLUSIVE')
-    try {
-      db.exec('BEGIN EXCLUSIVE')
-      db.exec('COMMIT')
-    } catch (e) {
-      if (db.isTransaction) db.exec('ROLLBACK')
-      if (/locked|busy/i.test(e instanceof Error ? e.message : '')) throw new DbInUseError(file)
-      throw e
-    }
-    return backupTo(db, dir, family, version, new Date(), true)
-  } finally {
-    db.close()
-  }
-}
-
-/**
  * Opens (or makes) a database file with its two connections, set up and migrated. A file saved by a newer Combwork (a
  * schema version this build doesn't know) is opened read-only and migrated not at all: `newer` says its version, and
  * every write to it fails. So is one whose group of steps wasn't approved (`pending`). A group refused for another

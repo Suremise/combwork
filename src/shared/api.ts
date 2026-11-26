@@ -572,8 +572,6 @@ export interface CombworkRequests {
   'board:state': () => BoardState
   /** Upgrades the board to 1.0, the user having said yes (refused while another Combwork has the workspace open). */
   'board:upgrade': () => { backup: string | null }
-  /** Help → Restore the 0.9 Board Backup…: the 1.0 board copied aside, the 0.9 copy put back. */
-  'board:restore09': () => { saved: string; restored: string }
   /** Every card on the workspace's board, archived ones too. */
   /** The board as the window shows it: archived cards in short (TaskCard.summary) unless `fullArchive` (#1017). */
   'tasks:list': (fullArchive?: boolean) => TaskCard[]

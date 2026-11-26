@@ -1370,12 +1370,10 @@ export interface TaskCard {
  */
 /**
  * The board's state for the window (#1207): why it is read-only (saved by a newer Combwork, or waiting for its upgrade to 1.0,
- * which the user is asked for), and when the copy kept from before its upgrade to 1.0 was made (Help → Restore the 0.9
- * Board Backup… puts it back), if there is one.
+ * which the user is asked for).
  */
 export interface BoardState {
   readOnly: 'newer' | 'upgrade' | null
-  backup09: { at: string } | null
 }
 
 export interface ArchiveBatch {

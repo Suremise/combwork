@@ -95,7 +95,7 @@ function notices(w: WS): { title: string; message: string }[] {
 
 /** Each file of a folder with its bytes: what must stay exactly as it was. */
 const snapshot = (dir: string): Record<string, string> => Object.fromEntries(files(dir).map((f) => [f, readFileSync(join(dir, f), 'latin1')]))
-/** The mark gone, as after Restore the 0.9 Board Backup and another upgrade (the board put back has none). */
+/** The mark gone, as a board upgraded again from its 0.9 copy has it (that copy has none). */
 const unmark = (w: WS): Promise<void> => inWorkspace(w, () => store.boardWrite(w, async () => void store.boardWriteOp(w, (db) => db.prepare("DELETE FROM board_meta WHERE key = 'templates.v09'").run())))
 /** An error as the file system gives one (EACCES: a file or folder another program holds). */
 const ioError = (what: string): NodeJS.ErrnoException => Object.assign(new Error(`EACCES: permission denied, ${what}`), { code: 'EACCES' })

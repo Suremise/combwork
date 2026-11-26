@@ -1357,7 +1357,7 @@
   },
   "board.error.inUse": {
     "defaultMessage": "Another Combwork has this workspace open: close it first.",
-    "description": "An error: the board can't be upgraded to 1.0 (or its 0.9 backup put back) while another copy of Combwork (an older version, or another profile) has the workspace open. Nothing was changed."
+    "description": "An error: the board can't be upgraded to 1.0 while another copy of Combwork (an older version, or another profile) has the workspace open. Nothing was changed."
   },
   "board.error.move": {
     "defaultMessage": "Could not move the card",
@@ -1367,17 +1367,9 @@
     "defaultMessage": "This board was saved by a newer version of Combwork. It is shown read-only: update Combwork to change it.",
     "description": "An error: the workspace's task board was saved by a newer Combwork, whose format this version doesn't know; cards can be read but not changed."
   },
-  "board.error.noBackup": {
-    "defaultMessage": "There is no 0.9 board backup to put back: this board was never upgraded to 1.0 here.",
-    "description": "An error from Help → Restore the 0.9 Board Backup…: no copy of the board from before its upgrade to 1.0 is kept in the workspace."
-  },
   "board.error.noWorkspace": {
     "defaultMessage": "No workspace is open",
     "description": "An error: the task board needs an open workspace, and there is none."
-  },
-  "board.error.stopAgentsFirst": {
-    "defaultMessage": "Stop this workspace's agents and its Assistant first: once the 0.9 board is back, Combwork can't record them.",
-    "description": "An error from Help → Restore the 0.9 Board Backup…: agents of the workspace are running or starting; the board put back is read-only in this Combwork, so their sessions couldn't be recorded. Nothing was changed."
   },
   "board.error.unarchive": {
     "defaultMessage": "Could not bring the card back",
@@ -3579,34 +3571,6 @@
     "defaultMessage": "Start {next}…",
     "description": "HI-3155: a release offer’s button: opens Start the next version for {next} (a branch name, as 1.5.0)."
   },
-  "board.restore09.done": {
-    "defaultMessage": "The 0.9 board is back",
-    "description": "A notification after the 0.9 board backup was put back."
-  },
-  "board.restore09.doneDetail": {
-    "defaultMessage": "The 1.0 board is kept as {file}.",
-    "description": "Under \"The 0.9 board is back\": {file} is the file the board as it was before the restore was saved to."
-  },
-  "board.restore09.message": {
-    "defaultMessage": "Combwork keeps a copy of the board as it is now, then puts back the copy made before its upgrade to 1.0 ({when}). Changes made since are only in the kept copy. The board is then read-only here: quit this Combwork and open the workspace in version 0.9 to carry on.",
-    "description": "The confirmation before restoring the 0.9 board backup. {when} is when the backup was made (a date and time)."
-  },
-  "board.restore09.none": {
-    "defaultMessage": "There is no 0.9 board backup to restore",
-    "description": "A notification from Help → Restore the 0.9 Board Backup… when the workspace has no copy of its board from before an upgrade to 1.0."
-  },
-  "board.restore09.restore": {
-    "defaultMessage": "Restore",
-    "description": "The button of the confirmation: puts the 0.9 board backup back."
-  },
-  "board.restore09.restoring": {
-    "defaultMessage": "Restoring…",
-    "description": "The Restore button while the 0.9 board backup is put back."
-  },
-  "board.restore09.title": {
-    "defaultMessage": "Restore the 0.9 board backup?",
-    "description": "Title of the confirmation before Help → Restore the 0.9 Board Backup… puts back the copy of the board Combwork kept when it upgraded it to 1.0."
-  },
   "board.review.line": {
     "defaultMessage": "Reviewing: {agent} · {ago}",
     "description": "A card's reviewer line on the board: who is reviewing it and since when ({ago}: \"5 min ago\")."
@@ -4356,8 +4320,8 @@
     "description": "Under the upgrade dialog's text: the upgrade is refused while another copy of Combwork has the workspace open; declining leaves the board readable but not changeable in this Combwork, and no agent (nor the Assistant) can start."
   },
   "board.upgrade.askMessage": {
-    "defaultMessage": "Combwork 1.0 needs to upgrade this workspace's data. Version 0.9 can then no longer open it; a backup of the board is kept, and Help → Restore the 0.9 Board Backup… puts it back. Back up first: there's no going back to 0.9.3 once your agents' worktrees become slots.",
-    "description": "The upgrade dialog's text: why (1.0 keeps the workspace's data in a new format), then what follows: version 0.9 can't open the board any more, and a copy of the board as it was is kept; but the agents' own worktrees become slots (working folders Combwork lends to cards), which 0.9.3 can't use again, so the user should back up first. Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Combwork shows it. Keep 0.9.3 as it is (a version)."
+    "defaultMessage": "Combwork 1.0 needs to upgrade this workspace's data. There's no going back: version 0.9 can then no longer open it, and your agents' worktrees become slots. Back up first.",
+    "description": "The upgrade dialog's text: why (1.0 keeps the workspace's data in a new format), then what follows, for good: version 0.9 can't open the workspace any more, and the agents' own worktrees become slots (working folders Combwork lends to cards), which 0.9 can't use again, so the user should back up first."
   },
   "board.upgrade.askTitle": {
     "defaultMessage": "Upgrade this workspace's board to 1.0?",
@@ -4376,8 +4340,8 @@
     "description": "A notification after the workspace's board was converted to 1.0's format."
   },
   "board.upgrade.doneDetail": {
-    "defaultMessage": "The 0.9 board is kept: Help → Restore the 0.9 Board Backup… puts it back.",
-    "description": "Under \"Board upgraded to 1.0\". Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Combwork shows it."
+    "defaultMessage": "Version 0.9 can no longer open this workspace.",
+    "description": "Under \"Board upgraded to 1.0\": the upgrade is one-way, so the older version 0.9 of Combwork can no longer open the workspace."
   },
   "board.upgrade.learnMore": {
     "defaultMessage": "Learn more",

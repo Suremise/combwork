@@ -503,14 +503,6 @@
     "defaultMessage": "The board shows your workflow’s stages",
     "description": "A tip's title (glossary 2.2: stage; 2.1: workflow)."
   },
-  "tips.boardUpgrade.text": {
-    "defaultMessage": "Combwork keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so version 0.9 can change it again.",
-    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
-  },
-  "tips.boardUpgrade.title": {
-    "defaultMessage": "Back to 0.9 after the upgrade",
-    "description": "A tip's title."
-  },
   "tips.branchCards.text": {
     "defaultMessage": "In Version Control → Branches & remotes, a branch a card works on shows the card and its stage, and in Review the revision under review. Click the card to open it.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: Version Control; 2.2: stage)."

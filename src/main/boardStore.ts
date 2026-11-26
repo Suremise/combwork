@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { createHash } from 'crypto'
-import { copyFileSync, existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'original-fs'
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'original-fs'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { basename, join } from 'path'
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
@@ -20,7 +20,7 @@ import { PROJECT_REVS_STEP } from './schema/projectRevsStep'
 import { QUEUE_REVS_STEP } from './schema/queueRevsStep'
 import { PROJECT_REVS_DROP_STEP } from './schema/projectRevsDropStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
-import { backupsOf, beginTransaction, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
+import { backupsOf, beginTransaction, DbInUseError, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsLetGo, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { beginWrite, countedWrite } from './dbWrites'
 import { timedStep } from './stallWork'
@@ -480,9 +480,7 @@ const M = {
   newer: msg({ id: 'board.error.newer', defaultMessage: 'This board was saved by a newer version of Combwork. It is shown read-only: update Combwork to change it.', description: "An error: the workspace's task board was saved by a newer Combwork, whose format this version doesn't know; cards can be read but not changed." }),
   upgradeFirst: msg({ id: 'board.error.upgradeFirst', defaultMessage: "This board is from version 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).", description: "An error: the workspace's task board hasn't been upgraded to 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board." }),
   upgradeFirstStart: msg({ id: 'board.error.upgradeFirstStart', defaultMessage: 'This workspace is from version 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).', description: "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window." }),
-  stopAgentsFirst: msg({ id: 'board.error.stopAgentsFirst', defaultMessage: "Stop this workspace's agents and its Assistant first: once the 0.9 board is back, Combwork can't record them.", description: "An error from Help → Restore the 0.9 Board Backup…: agents of the workspace are running or starting; the board put back is read-only in this Combwork, so their sessions couldn't be recorded. Nothing was changed." }),
-  inUse: msg({ id: 'board.error.inUse', defaultMessage: 'Another Combwork has this workspace open: close it first.', description: "An error: the board can't be upgraded to 1.0 (or its 0.9 backup put back) while another copy of Combwork (an older version, or another profile) has the workspace open. Nothing was changed." }),
-  noBackup: msg({ id: 'board.error.noBackup', defaultMessage: 'There is no 0.9 board backup to put back: this board was never upgraded to 1.0 here.', description: "An error from Help → Restore the 0.9 Board Backup…: no copy of the board from before its upgrade to 1.0 is kept in the workspace." }),
+  inUse: msg({ id: 'board.error.inUse', defaultMessage: 'Another Combwork has this workspace open: close it first.', description: "An error: the board can't be upgraded to 1.0 while another copy of Combwork (an older version, or another profile) has the workspace open. Nothing was changed." }),
   unavailable: msg({ id: 'board.error.unavailable', defaultMessage: "The board couldn't be opened: {error}", description: "An error: the workspace's task board database couldn't be opened or its cards couldn't be moved into it; {error} says why (from the system, often in English). Nothing was lost: the cards are still where they were." })
 }
 
@@ -845,8 +843,6 @@ const writable = (db: Db): boolean => db.newer === null && !db.pending
 const BACKUPS = 'backups'
 /** The family of the board's copies; the copy before the 1.0 upgrade is `combwork-before-1.0-v<n>-<time>.db`. */
 const FAMILY = DB_FILE.replace(/\.db$/, '')
-/** Where Restore the 0.9 Board Backup keeps the 1.0 file it replaces: never pruned either. */
-const RESTORE_FAMILY = `${FAMILY}-before-restore`
 
 /** Another profile's Combwork has the workspace open, by its presence marker (1.0's; a 0.9 build shows by SQLite's lock). */
 class OtherCombworkError extends Error {
@@ -2114,15 +2110,13 @@ export const boardFile = (workspacePath: string): string => join(workspacePath, 
 export const boardReadOnly = (ws: WorkspaceService): boolean => (ws.path ? !writable(boardOf(ws.path).db) : false)
 
 // ---------------------------------------------------------------------------
-// The 1.0 upgrade (#1207, SPEC §16.17): asked first, the file locked to this Combwork, the 0.9 copy kept, and a way back.
+// The 1.0 upgrade (#1207, SPEC §16.17): asked first, the file locked to this Combwork, the 0.9 copy kept (HI-3601: no way back).
 // ---------------------------------------------------------------------------
 
-/** The board's state for the window: why it is read-only, and the copy kept from before its upgrade to 1.0. */
+/** The board's state for the window: why it is read-only. */
 export function boardState(ws: WorkspaceService): BoardState {
-  const path = pathOf(ws)
-  const b = boardOf(path)
-  const kept = copy09(path)
-  return { readOnly: b.db.newer !== null ? 'newer' : b.db.pending ? 'upgrade' : null, backup09: kept ? { at: isoOf(kept.at) } : null }
+  const b = boardOf(pathOf(ws))
+  return { readOnly: b.db.newer !== null ? 'newer' : b.db.pending ? 'upgrade' : null }
 }
 
 /** The 1.0 group's first version: a copy of the file before it is a 0.9 board. */
@@ -2130,7 +2124,7 @@ const FIRST_10 = Math.min(...BOARD_MIGRATIONS.filter((m) => m.group === UPGRADE_
 
 /**
  * The newest copy kept from before the board's upgrade to 1.0: of the group's family, and of a version before the group
- * (by its name; the restore checks the file itself). A copy made before a later step of the group is a 1.0 board's, and
+ * (by its name). A copy made before a later step of the group is a 1.0 board's, and
  * db.ts keeps those with the ordinary copies anyway.
  */
 const copy09 = (path: string): { file: string; version: number; at: string } | undefined =>
@@ -2140,9 +2134,8 @@ const copy09 = (path: string): { file: string; version: number; at: string } | u
 
 /**
  * The workspace database's generation (#1207 round 2): a number that changes each time its file is replaced under the
- * services (the upgrade to 1.0, Restore the 0.9 Board Backup), whose caches were read from the file before. What a
- * service read in an older generation is stale: it reads again, and a save made from it is refused (`saveStore`'s guard),
- * so nothing written meanwhile (by a 0.9 build while the upgrade waited) is overwritten from an old snapshot.
+ * services (the upgrade to 1.0), whose caches were read from the file before. What a service read in an older generation
+ * is stale: it reads again, and a save made from it is refused (`saveStore`'s guard), so nothing written meanwhile (by a 0.9 build while the upgrade waited) is overwritten from an old snapshot.
  */
 /** By the workspace's place (#1395: a store loaded through another spelling of its folder is the same database's). */
 const generations = new Map<string, number>()
@@ -2209,9 +2202,6 @@ export function assertUpgraded(workspacePath: string): void {
   if (upgradeWaiting(workspacePath)) throw combworkError(M.upgradeFirstStart, undefined, { kind: 'conflict' })
 }
 
-/** A copy's time as its name has it (`2026-10-20T14-06-21-256Z`), as ISO. */
-const isoOf = (at: string): string => at.replace(/T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z$/, 'T$1:$2:$3.$4Z')
-
 /** The user's errors for another Combwork on the file (SQLite's lock or a fresh presence marker). */
 const inUse = (e: unknown): boolean => e instanceof DbInUseError || e instanceof OtherCombworkError
 
@@ -2277,64 +2267,6 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
       log.warn('a service following the upgraded board', e)
     }
   }
-  return out
-}
-
-/**
- * Help → Restore the 0.9 Board Backup… (SPEC §16.17): the board as it is now copied aside first (kept for good), then the
- * copy made before its upgrade to 1.0 put back in its place, and the board opened again: read-only in this Combwork (its
- * upgrade waiting again), writable for a 0.9 build. Nothing is deleted. Refused while another Combwork has the workspace open:
- * it would go on with the 1.0 file under the copy put back. Replies with the copy of the 1.0 board.
- */
-export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: () => number): Promise<{ saved: string; restored: string }> {
-  const path = pathOf(ws)
-  const combwork = join(path, CW_DIR)
-  const file = join(combwork, DB_FILE)
-  // Counted as a write (HI-1368): a close command waits for it.
-  const out = await countedWrite(path, () => withFileLock(boardLock(path), async () => {
-    // Opened first: an open is what upgrades it (a test copy's answer), and so makes its copy.
-    const version = schemaVersion(boardOf(path).db.reader)
-    const kept = copy09(path)
-    // The file itself, not only its name: a 0.9 board, which a 0.9 build can change again.
-    if (!kept || !(fileSchemaVersion(kept.file) < FIRST_10)) throw combworkError(M.noBackup, undefined, { kind: 'conflict' })
-    // The board put back takes no writes here: an agent running on would go unrecorded. Starts are refused from then on.
-    if (agentsRunning() > 0) throw combworkError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
-    if (othersPresent(combwork, presenceId()).length) throw combworkError(M.inUse, undefined, { kind: 'conflict' })
-    // Copied as its only connection, then replaced: the checkpoints' worker lets go of it first (HI-1691, its kept
-    // connection too: HI-3414), awaited before the close, so nothing opens it again between the close and the copy.
-    await checkpointsLetGo(file)
-    // As they are after that wait: still a window's (#1395, HR6's round 3: closed meanwhile, nothing is changed), and no
-    // agent or other Combwork on it.
-    assertAdmitted(file)
-    if (agentsRunning() > 0) throw combworkError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
-    if (othersPresent(combwork, presenceId()).length) throw combworkError(M.inUse, undefined, { kind: 'conflict' })
-    closeBoard(path)
-    let saved: string
-    try {
-      saved = soleCopy(file, join(combwork, BACKUPS), RESTORE_FAMILY, version)
-    } catch (e) {
-      failures.delete(keyOf(path))
-      boardOf(path)
-      if (e instanceof DbInUseError) throw combworkError(M.inUse, undefined, { kind: 'conflict' })
-      throw e
-    }
-    // Closed by its only connection, SQLite has folded its log back in and removed it: what is left of one is another
-    // process's, which opened the file meanwhile.
-    if (existsSync(`${file}-wal`)) {
-      boardOf(path)
-      throw combworkError(M.inUse, undefined, { kind: 'conflict' })
-    }
-    const next = `${file}.restoring`
-    copyFileSync(kept.file, next)
-    rmSync(`${file}-shm`, { force: true })
-    renameSync(next, file)
-    failures.delete(keyOf(path))
-    boardOf(path)
-    log.info(`put the 0.9 board back in ${userText(path)} (${basename(kept.file)}); the 1.0 board is kept as ${basename(saved)}`)
-    replaced(path)
-    return { saved, restored: kept.file }
-  }))
-  emit({ type: 'tasks-changed', workspacePath: path })
   return out
 }
 

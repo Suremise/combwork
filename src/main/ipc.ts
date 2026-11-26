@@ -57,7 +57,7 @@ import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } 
 import { loopChecksOf } from './loopCheck'
 import { sweepWorkspaceLeftovers } from './leftovers'
 import { AfterOpen, assertNotOpening, claimWindow, openProgress, openStep, releaseWindow, windowClaim } from './openProgress'
-import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
+import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, upgradeBoard } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
@@ -942,10 +942,6 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
         // Refused, or upgraded already (nothing pending): no steps after it carry the claim on.
         if (openProgress(ws)?.step === 'upgrade') releaseWindow(ws, claim)
       }
-    },
-    'board:restore09': () => {
-      const ws = currentWorkspace()
-      return restoreBoardBackup(ws, () => (ws.path ? sessions.agentsIn(ws.path) : 0))
     },
     'tasks:list': (fullArchive) => tasks.windowTasks(workspace, fullArchive === true),
     'tasks:changes': (since) => tasks.windowChanges(workspace, since && typeof since === 'object' && typeof since.board === 'string' && Number.isSafeInteger(since.mark) ? { board: since.board, mark: since.mark } : null),

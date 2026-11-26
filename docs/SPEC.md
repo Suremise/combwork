@@ -7369,7 +7369,7 @@ repeating them (#533) [note §8].
   it; one a crash left is harmless and left alone, as it may be another run's) and published at the first free name (`pair.json`, `pair-2.json`…) by a link that never replaces a file. A
   folder or file that can't be read, or a copy that can't be written, leaves the step unmarked for the next open. One
   quiet notice (`templates.v09.notice`), "Your 0.9 agent templates aren't used in 1.0 … A copy … is kept with the 0.9
-  board backup", counts what the backup holds. Nothing puts them back (Restore the 0.9 Board Backup restores the board).
+  board backup", counts what the backup holds. Nothing puts them back.
 
 #### 16.10.7 What reaches agents in slots
 
@@ -7489,9 +7489,9 @@ decided again in it):
   Advanced, **Rename adopted worktrees to slot names** (`cw.slots.renameAdopted`, on).
 - **A reviewer's own worktree** gets no slot and no rename: it becomes a retired home (its conversations resume there,
   its new ones start in the project folder).
-- **One-way.** The board backup and Help → Restore the 0.9 Board Backup… stay (cards and history), with no promise that
-  0.9.3 carries on with worktrees, sessions or lanes once slots have moved them; the upgrade's ask says "Back up first:
-  there's no going back to 0.9.3 once your agents' worktrees become slots."
+- **One-way.** The board backup stays on disk, and nothing puts it back (HI-3601, §16.17); the upgrade's ask says
+  "There's no going back: version 0.9 can then no longer open it, and your agents' worktrees become slots. Back up
+  first."
 
 #### 16.10.9 Pausing the team before an update
 
@@ -8775,10 +8775,10 @@ Board are unchanged. A 0.9 board waiting for its upgrade is read from its docume
 typed tables (#1211, v6, the last of its stores: `store_rows` goes with it), every record read back equal as JSON;
 deliveries keep their in-memory store (published after each transaction), the table its durable copy [#1211].
 - **Before it runs, Combwork asks** ("Upgrade this workspace's board to 1.0? Combwork 1.0 needs to upgrade this workspace's
-  data. Version 0.9 can then no longer open it; a backup of the board is kept, and Help → Restore the 0.9 Board Backup…
-  puts it back. Back up first: there's no going back to 0.9.3 once your agents' worktrees become slots." [the Assistant
-  on #1207; reworded on #1209: the cards step drops the cards' documents, which 0.9
-  reads; its last sentence since the upgrade is one-way, #1123]). Until the user agrees, the board opens read-only, as for a newer
+  data. There's no going back: version 0.9 can then no longer open it, and your agents' worktrees become slots. Back up
+  first." [the Assistant on #1207; reworded on #1209: the cards step drops the cards' documents, which 0.9 reads; on
+  #1123, since the upgrade is one-way; on HI-3601, with the restore gone]). Once it is done: "Board upgraded to 1.0 /
+  Version 0.9 can no longer open this workspace". Until the user agrees, the board opens read-only, as for a newer
   file (writes refused with "This board is from version 0.9: it is read-only until it is upgraded to 1.0"; what would
   change a card is off, saying why in its tooltip: the board's add-card buttons, dragging cards, a card's menu but Open, the
   card dialog's fields, Save, Start…, Archive, Delete, comments and decisions, with the reason as a banner in the dialog
@@ -8808,7 +8808,7 @@ deliveries keep their in-memory store (published after each transaction), the ta
   window has it, in the background; an agent's launch waits for them, and the .combwork folder is watched once they are (a
   watched folder can't be swapped on Windows). What the open starts in the background is timed, each part, in one
   "after opening" line of the log once all have ended. **When the file is replaced
-  under the services** (the upgrade, Restore) [HR1's round 2 finding]: what they keep from it in memory (deliveries,
+  under the services** (the upgrade; until HI-3601, Restore too) [HR1's round 2 finding]: what they keep from it in memory (deliveries,
   card watches, metrics, lanes' and sessions' "moved in" marks) was read before, and a 0.9 may have written since
   (while the upgrade waited), so each reads it again from the file as it is then; the workspace database's
   **generation** (`dbGeneration`) moves on, and a save made from something read in an older generation is refused
@@ -8822,7 +8822,7 @@ deliveries keep their in-memory store (published after each transaction), the ta
   be had, the migration doesn't start and says "Another Combwork has this workspace open: close it first". After the
   migration, a 0.9 opening the file sees a newer schema and opens it read-only (`db.ts:147`), but **can't read its
   board** [#1209 option 1]: its cards are no longer JSON documents (0.9.3 prepares `SELECT doc` and
-  `INSERT … doc` as it opens the board), so it says "The board couldn't be opened"; the way back is Restore, below. The stores' steps (#1211, #1212) likewise
+  `INSERT … doc` as it opens the board), so it says "The board couldn't be opened": there's no going back (No way back, below). The stores' steps (#1211, #1212) likewise
   leave 0.9 nothing it can read [the same decision]. P3
   proves this with a two-process test (a 0.9 build holding the workspace, a 1.0 build migrating; and a 0.9 build
   started *during* the migration, recording what it shows the user, which the RC notes then describe) before relying
@@ -8835,18 +8835,10 @@ deliveries keep their in-memory store (published after each transaction), the ta
   folder's name and a hash of its path; the heartbeat is renewed every 30 s while the board is open, the file removed as
   it closes, and a marker is stale once its heartbeat is 90 s old or its process is gone. The upgrade refuses, as for
   SQLite's lock, while another profile's fresh marker exists.
-- **A way back:** Help → **Restore the 0.9 Board Backup…** puts the pre-migration backup back (after its own backup of
-  the 1.0 file), for a user who returns to 0.9.x; the RC notes say so. Nothing is deleted. [#1207] It brings back the
-  board's cards and their history only: once slots have moved agents' worktrees, nothing promises that 0.9.3 carries on
-  with worktrees, sessions or lanes (#1123: the upgrade is one-way; the release notes say to back up
-  first). The 1.0 file is
-  copied first by a connection holding the file's exclusive lock (refused, as the upgrade is, while another Combwork has it
-  open), kept for good as `combwork-before-restore-v<n>-<time>.db`; the board is closed, the 0.9 copy put in its place,
-  and the board opened again: read-only in the 1.0 build (its upgrade waiting again), writable for 0.9. The copy put
-  back is the newest of the group's family **made before the group's first step**, its file checked to be a 0.9 board
-  (a schema before the group); the copy before a later step of the group, on a board in the group already, is an
-  ordinary one of the file's three [HR1's round 1 finding 2]. Refused while any of the workspace's agents (or its
-  Assistant) runs or starts: the board put back takes no writes here, so they would go on unrecorded.
+- **No way back** (HI-3601: every user is on 1.6.0 or later, so no one returns to 0.9): the copy kept before the upgrade
+  stays in `.combwork/backups`, never pruned and never deleted, but nothing in Combwork puts it back. Until 1.7.1, Help →
+  Restore the 0.9 Board Backup… did [#1207]; a `combwork-before-restore-v<n>-<time>.db` it left is the user's and stays
+  too. The upgrade is one-way (#1123), as its ask and the release notes say.
 - **Two copies of Combwork on one workspace** (the dev and the installed one, after the migration): both observe the platform, so
   an observation is deduplicated as **the same transition**, not the same value [HR2's round 2 finding 7, HB3's G]:
   every observed fact names the observed fact it follows for that card and kind (`prev`: its seq, or the cycle's
@@ -9024,7 +9016,7 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 | S47 | Combwork's merge with no commit identity → paused, not failed; a commit-msg hook rejecting the message → returned with the hook's output; `commit.gpgsign` waiting for a passphrase → paused with "signing waits for you". | HB3 r1 f11 | Git |
 | S48 | An agent passes `1061` as a card in an intent → refused with the forms `AM-12` and `#1061`. | HB3 r1 f13 | Git |
 | S49 | A card reaches the round limit → For you (Decide) and the lane pauses until the user answers; the user ends or abandons a lane from its row. | HB3 r1 f14 | Git |
-| S50 | The dev and the installed Combwork both open a migrated workspace and observe the same merge → one `Integrated` fact. The migration asks first and refuses while a 0.9 has the workspace open; Restore the 0.9 board backup puts it back. | HB3 r1 f9 | Git |
+| S50 | The dev and the installed Combwork both open a migrated workspace and observe the same merge → one `Integrated` fact. The migration asks first and refuses while a 0.9 has the workspace open (Restore the 0.9 board backup, which put it back, went in HI-3601). | HB3 r1 f9 | Git |
 | S51 | A Claude Code, a Codex and a Copilot reviewer each build and run tests in a review copy (outside their folder) within their permission mode. | HB3 r1 f10 | Git |
 | S52 | The target moves during every test for an hour → after 3 retests the entry pauses with its reason; a hand merge of the change during a test → recorded as observed, no empty merge commit. | HB3 r1 f19 | Git |
 | S53 | **P3's RC** (facts only): an upgraded workspace with running lanes works as on 0.9.3; cards show their work section; nothing is refused; a passed card finishes by the builder's report of its merge, as in S40 (HI-1985: the lane's next card waits for Done, as for any lane). | HB3 r2 A | Git |
@@ -9047,7 +9039,7 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 | P4 Gates and intents | #1120 | Gates at `boardWrite`; intents (§16.8); refusals; overrides; For you; no-code; decisions wake; Combwork owns lanes; undo (§16.14); override switches A, B, E, #1167, #1174 (§16.15); Progress P4. **Operable without the Assistant and before P6** [HB3's round 1 finding 7]: a plain options form in Project Settings (every option of §16.6 as a row, presets as a choice, no polish) and the options through `cw_update_setting` (built: #1278, §16.6.6); the transition for agents' old column moves and the skill lines its gates change (§16.17); window controls to end or abandon a lane. Its RC moves the hive project to Pair (the agent merges) (§16.19.1). **Built** (21 Oct): #1261's cards are in 1.0.0. **What changed against the plan:** no RC, so the hive project keeps its options until the 1.0 baseline (#1288); the seven answers on #1120 shaped the switches (`cw.workflow.enforce` kept as the off switch; the CLI's own permission setting and the Assistant's other MCP servers, #1284; no hooks-free mode, with the status line and Combwork's guidance as switches, #1285; OSC 52 Allow, Ask or Block and only a card's start raw, #1292; only the user answers For you, whose count is the Board icon's badge) | Checks only (#1337, cb1bef5b: the full e2e set and the Sandbox upgrade from 0.9.3) |
 | P5 Combwork merges | #1121 | The merge queue (§16.9; in the app for a target checked out nowhere: #1348), the lock, `mergeWorktree`, agent-merges option; Progress P5. **Built** (22 Oct): #1338's cards (#1347–#1358, #1360–#1362, #1371, #1455) are in 1.0.0. **What changed against the plan:** Team came in P5 rather than P6 (#1361), its merge checks the quick checks and the unit tests with dependencies installed from scratch every time, each card's focused tests left to #1367; a merge check that exits 75 or ends with Node's or npm's network errors counts as transient (#1362); the queue also merges into a target checked out in a folder (#1351), with **Ask each time** in Advanced; pushing after a merge stays On Hold (#1179) | Checks only (#1359, 5172d064: 235/235 e2e suites, the unit tests, the scenarios, the Sandbox upgrade) |
 | P6 Version Control tab | #1122 | The tab replaces P4's plain form: options worded and laid out, presets documented, detection, switching (§16.6, §16.3.5); stages on the board; Progress P6. **Built** (24 Oct): #1416–#1425 are in 1.0.0. **What changed against the plan:** None can be chosen for a Git folder, with a warning (#1419); the window says Active and Approved for Doing and Passed, the ids unchanged (OP-1, #1417); Merging is a stage inside Approved that takes no drop (#1420); Combwork's and the workspace's workflow defaults got a place in the window (#1422); a project added since 1.0 asks "How do you work?" (#1423) | Checks only (#1426, on 9846ea3a) |
-| P7 Slots | #1123 | Slots, review copies, sessions, templates v2, names, migration (§16.10); override switches C; Progress P7. **Built** (24 Oct): #1429–#1452 and the "P7 fixes" lanes (to c62a118b) are in 1.0.0. **What changed against the plan:** the upgrade is one-way: the board backup brings back the cards and their history, with no way back for worktrees, sessions or lanes; agents' worktrees are carried into slots in place and renamed later (#1441); a reviewer pool (G17, #1443); six shipped templates named from the project's key, the 0.9 ones no longer used (#1436, #1440) | Checks only (#1449, round 2 on 50add517: the real tier and the Sandbox upgrade at 6×6 and solo) |
+| P7 Slots | #1123 | Slots, review copies, sessions, templates v2, names, migration (§16.10); override switches C; Progress P7. **Built** (24 Oct): #1429–#1452 and the "P7 fixes" lanes (to c62a118b) are in 1.0.0. **What changed against the plan:** the upgrade is one-way: the board backup brought back the cards and their history (until HI-3601 removed the restore in 1.7.1), with no way back for worktrees, sessions or lanes; agents' worktrees are carried into slots in place and renamed later (#1441); a reviewer pool (G17, #1443); six shipped templates named from the project's key, the 0.9 ones no longer used (#1436, #1440) | Checks only (#1449, round 2 on 50add517: the real tier and the Sandbox upgrade at 6×6 and solo) |
 | Translation review | #1126 | §16.16 | — |
 | P8 Guidance and 1.0.0 | #1124 | Skills describe the rules; AGENTS.md, RELEASING.md; memory rules retired; scenarios and trials; 1.0.0. **Built** (25 Oct): the skills and modes (#1524–#1528), the contract and tool texts (#1529–#1531), AGENTS.md, RELEASING.md and builds as facts (#1532–#1534), the user guide's heading ids (#1535), the translation review (#1126), #1582's workaround for Electron's CVE, the scenarios for the intents and presets on the three fakes (#1536), Claude Code's and Codex's smoke trials (#1537) and the fold-ins their findings raised (#1604, #1607–#1611, #1613–#1617) are in 1.0.0; P8's checks (#1539) run beside the baseline's build. **What changed against the plan:** P8 ends with the maintainer's daily 1.0 baseline (#1288), not 1.0.0, which comes after the On Hold stretch (#1540, #1541); the baseline's trials are a smoke run and it doesn't wait for Electron's fix (#1503); the memory rules are retired after the baseline is installed (#1538) | The 1.0 baseline (#1288) |
 
@@ -9179,7 +9171,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | OP-34 | A lane's cards: separate lines, each from the target's head, reviewed and merged one by one (a card needing an earlier one waits for its merge), rather than one cumulative lane branch merged at the lane's end as today? | **Agreed [#1117 20 Oct].** Separate lines: the queue merges each approved card, and review covers one card's change. Stacked cards come later. |
 | OP-35 | A decision recorded after a pass makes it stale, so the reviewer confirms the same revision before it merges (§16.4.6)? | **Agreed [#1117 20 Oct].** Yes: it closes #587 for work already passed; the confirmation needs no new commit. |
 | OP-36 | A lane's next card waits until the previous one is Done (merged), rather than starting while it is in the queue (§16.11.2)? | **Agreed [#1117 20 Oct].** Yes: a returned card is fixed in a clean slot by the builder who knows it, and the next card starts from a target that has the previous one. The cost is idle time during merge checks; the alternative is a second slot and a fresh conversation for a returned card. |
-| OP-37 | The 1.0 migration asks before converting a workspace, refuses while a 0.9 has it open, and Help offers Restore the 0.9 board backup (§16.17)? RCs migrate your daily workspace. | **Agreed [#1117 20 Oct].** Yes. |
+| OP-37 | The 1.0 migration asks before converting a workspace, refuses while a 0.9 has it open, and Help offers Restore the 0.9 board backup (§16.17)? RCs migrate your daily workspace. | **Agreed [#1117 20 Oct].** Yes. The restore went in 1.7.1 (HI-3601): no user is on 0.9 now. |
 | OP-38 | Next-card switching: may the user apply an option change to cards already in flight (recorded as an override on each), for a broken check that would block them all (§16.11.4)? It bends "applies from the next card". | **Agreed [#1117 20 Oct].** Yes, the user only, per change, with the cards listed first. |
 | OP-39 | P2 (the spike, no UI): #1118 says no RC; #1112's release plan says each phase cuts one. | **Agreed [#1117 20 Oct].** No RC for P2: there's nothing to install that differs from 0.9.3. |
 | OP-40 | Automatic merges into a branch that is checked out in a folder (`main` in the project folder): §16.9.2's journaled update can, in one narrow race (another git client switching that folder to a branch whose files match in the same instant), write the merged files into the other branch's working copy as uncommitted changes, detected and reported but not prevented. Accept that for automatic merges, or have Combwork ask before each update of a checked-out target? | **Agreed [#1117 20 Oct].** P5 ships with **asking** ("Update main now" on the queue card, one click) until its crash-injection tests pass; then automatic, with the race documented and detected. A target that isn't checked out anywhere is always automatic (a true compare-and-swap). **Built [#1351]:** Settings → Advanced, Merge queue: merge into a checked-out branch (`cw.queue.checkedOutTarget`), *Ask each time* (the request in For you) or *Automatically*. **Automatic since 22 Oct**, when #1351's crash-injection tests passed in its review (HR4's round 2, on 156a53a0: the e2e suite `mergequeuecrash` three times in a row); the race stays documented and detected (§16.9.2), and *Ask each time* stays the switch. |
