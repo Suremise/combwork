@@ -5,6 +5,7 @@
 ### Fixed
 
 - **Cards Combwork moves into a column land at its bottom** (HI-3585). A card the workflow moved, such as a merged card going from Passed to Done, kept the place it had in the column it left, so it could appear at the top or in the middle of Done instead of last. It now goes after the cards already there, as your own moves do.
+- **Finishing a card with a pull request pushes only its branch** (HI-3590). With git's `push.followTags` on, the push that opens a card's pull request, or sends a pull request's card's fixes back to it, also published any annotated tag on its commits that the remote didn't have yet. It now pushes the card's branch alone; pushing a tag yourself works as before.
 
 ## 1.7.0 — 2026-11-25
 
