@@ -6,7 +6,8 @@
 // ones, ticked, never main or the slot's branch, and nas's apart under a warning, none ticked; untick one, tick one on
 // nas, Delete Ticked: those go, the rest stay. Round 2: a third remote, other, unreachable by then, fails after the local
 // branches and nas's went; a tick changed, Try Again deletes only other's (nothing done is asked again). The unmerged
-// branch's 🗑 lists its two commits first, then deletes it.
+// branch's 🗑 lists its two commits first, then deletes it. HI-3593: nas's only branch deleted there behind the clone's
+// back is marked already deleted once the dialog has asked nas, and ticked, only its local reference goes, never refused.
 // Remotes are local bare repositories in the suite's folder (never a real remote), git's global config the suite's own.
 // Screenshots of the list and the dialog in both themes. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -110,6 +111,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
     await theme('dark')
 
     // --- Clean Up: exactly the merged unused ones, ticked; nas's apart, none ticked; never main or a slot's branch.
+    g(nas, 'update-ref', '-d', 'refs/heads/old/only-on-nas')
     await branches.locator('[data-action="clean-up-branches"]').click()
     const dialog = page.locator('.dialog', { hasText: 'Clean up merged branches' })
     await lib.until(async () => (await dialog.locator('[data-git-cleanup]').count()) === 1, HUNG_MS)
@@ -118,8 +120,11 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
     check('nas and other: their merged branches but main and the slot’s, none ticked', JSON.stringify(await ticks('remote')) === JSON.stringify(['nas/backup/hb5', 'nas/cw/hb1', 'nas/cw/hb2', 'nas/old/only-on-nas', 'other/cw/hb2']), JSON.stringify(await ticks('remote')))
     check('…under a warning that it deletes on the remote', /deletes them on the remote, for everyone/.test(await text(dialog.locator('[data-git-cleanup-remote-warning]'))))
     check('…each whose local branch is ticked says so', (await dialog.locator('li', { hasText: 'nas/cw/hb1' }).innerText()).includes('its local branch is ticked above') && !(await dialog.locator('li', { hasText: 'nas/old/only-on-nas' }).innerText()).includes('ticked above'))
+    const marked = await lib.until(async () => ((await dialog.locator('[data-cleanup-checking]').count()) === 0 && (await dialog.locator('[data-cleanup-gone]').count()) > 0 ? true : null), HUNG_MS)
+    check('HI-3593: the branch deleted on nas behind the clone is marked already deleted, only it', !!marked && (await dialog.locator('li', { hasText: 'nas/old/only-on-nas' }).innerText()).includes('already deleted on nas: ticking it removes only its local reference') && (await dialog.locator('[data-cleanup-gone]').count()) === 1 && (await dialog.locator('[data-cleanup-unchecked]').count()) === 0, await text(dialog.locator('[data-git-cleanup]')))
     await dialog.locator('[data-cleanup-local="backup/hb5"]').uncheck()
     await dialog.locator('[data-cleanup-remote="nas/cw/hb1"]').check()
+    await dialog.locator('[data-cleanup-remote="nas/old/only-on-nas"]').check()
     for (const t of ['dark', 'light']) {
       await theme(t)
       await page.mouse.move(5, 5)
@@ -131,7 +136,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
     g(alpha, 'remote', 'set-url', 'other', missing)
     await dialog.getByRole('button', { name: 'Delete Ticked', exact: true }).click()
     const partly = await lib.until(async () => ((await dialog.locator('.dialog-error').count()) === 1 && !heads(alpha).includes('cw/hb1') && !heads(nas).includes('cw/hb1') ? true : null), HUNG_MS)
-    check('Delete Ticked: the local branches and nas’s go, other’s fails in the dialog', !!partly && JSON.stringify(heads(alpha)) === JSON.stringify(['backup/hb5', 'cw/slot-line', 'main', 'spike/i18n']) && JSON.stringify(heads(nas)) === JSON.stringify(['backup/hb5', 'cw/hb2', 'cw/slot-line', 'main', 'old/only-on-nas', 'spike/i18n']) && heads(otherRepo).includes('cw/hb2'), JSON.stringify({ alpha: heads(alpha), nas: heads(nas), error: await text(dialog.locator('.dialog-error')) }))
+    check('HI-3593: the one already deleted on nas: its local reference gone, never called refused', !g(alpha, 'for-each-ref', 'refs/remotes/nas/old/only-on-nas') && !/refused/.test(await text(dialog.locator('.dialog-error'))), await text(dialog.locator('.dialog-error')))
+    check('Delete Ticked: the local branches and nas’s go, other’s fails in the dialog', !!partly && JSON.stringify(heads(alpha)) === JSON.stringify(['backup/hb5', 'cw/slot-line', 'main', 'spike/i18n']) && JSON.stringify(heads(nas)) === JSON.stringify(['backup/hb5', 'cw/hb2', 'cw/slot-line', 'main', 'spike/i18n']) && heads(otherRepo).includes('cw/hb2'), JSON.stringify({ alpha: heads(alpha), nas: heads(nas), error: await text(dialog.locator('.dialog-error')) }))
     // A tick changed after the failure, other reachable again: Try Again asks only for other's (nothing deleted already).
     g(alpha, 'remote', 'set-url', 'other', otherRepo)
     await dialog.locator('[data-cleanup-local="backup/hb5"]').check()
@@ -156,6 +162,28 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitcle
     await one.getByRole('button', { name: 'Delete Branch', exact: true }).click()
     check('…then deleted', !!(await lib.until(async () => (!heads(alpha).includes('spike/i18n') && (await branches.locator('[data-branch="spike/i18n"]').count()) === 0 ? true : null), HUNG_MS)), JSON.stringify(heads(alpha)))
     check('the slot’s branch and its worktree untouched', heads(alpha).includes('cw/slot-line') && fs.existsSync(path.join(slot, 'a.txt')))
+
+    // --- HI-3593 (HR2's round 1): Delete Ticked while the remotes' check is held by the remote (an upload-pack of the
+    // test's own that waits far longer than any wait here): the check is stopped, its process ended, and the local
+    // deletion (backup/hb5, still merged and unused) goes on without the hold ever being released.
+    {
+      const dir = lib.probeDir('gitcleanup-hold')
+      const started = path.join(dir, 'started')
+      const pidFile = path.join(dir, 'pid')
+      const fwd = (p) => p.replace(/\\/g, '/')
+      const script = path.join(dir, 'hold.sh')
+      fs.writeFileSync(script, `#!/bin/sh\n: > "${fwd(started)}"\n"${fwd(process.execPath)}" -e 'require("fs").writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, ${lib.timing('hang.slow')})' "${fwd(pidFile)}"\n`)
+      g(alpha, 'config', 'remote.nas.uploadpack', `sh "${fwd(script)}" #`)
+      await branches.locator('[data-action="clean-up-branches"]').click()
+      await lib.until(async () => (await dialog.locator('[data-git-cleanup]').count()) === 1, HUNG_MS)
+      check('HI-3593: the remotes’ check held by nas, said in the dialog', !!(await lib.until(async () => fs.existsSync(started) && fs.existsSync(pidFile) && (await dialog.locator('[data-cleanup-checking]').count()) === 1, HUNG_MS)), await text(dialog))
+      const held = lib.identify([Number(fs.readFileSync(pidFile, 'utf8'))])
+      check('…backup/hb5 offered, ticked; nas’s branches offered too', (await ticks('local')).includes('backup/hb5:on') && (await ticks('remote')).some((r) => r.startsWith('nas/')), JSON.stringify([await ticks('local'), await ticks('remote')]))
+      await dialog.getByRole('button', { name: 'Delete Ticked', exact: true }).click()
+      check('…Delete Ticked: backup/hb5 deleted, never waiting behind the check', !!(await lib.until(async () => ((await dialog.count()) === 0 && !heads(alpha).includes('backup/hb5') ? true : null), HUNG_MS)), JSON.stringify({ alpha: heads(alpha), dialog: await text(dialog) }))
+      check('…and the check stopped: its upload-pack ended', !!(await lib.until(() => lib.stillSame(held).length === 0, HUNG_MS)), JSON.stringify(lib.stillSame(held)))
+      g(alpha, 'config', '--unset', 'remote.nas.uploadpack')
+    }
     await shot(page, '4-after')
   } finally {
     await app.close()

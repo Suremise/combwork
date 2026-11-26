@@ -536,12 +536,16 @@ describe('Push to…, remotes and tracking (#1385)', () => {
   const upstreamOf = (branch: string): string => git(proj, 'for-each-ref', '--format=%(upstream:short)', `refs/heads/${branch}`)
 
   it('reads git’s porcelain push lines: pushed, up to date, refused, by branch or tag', () => {
-    const out = ['To ../remote.git', ' \trefs/heads/main:refs/heads/main\t0e1eae2..dad582d', '*\trefs/heads/other:refs/heads/other\t[new branch]', '!\trefs/heads/feat:refs/heads/feat\t[rejected] (fetch first)', '=\trefs/tags/v1:refs/tags/v1\t[up to date]', 'Done'].join('\n')
+    const out = ['To ../remote.git', ' \trefs/heads/main:refs/heads/main\t0e1eae2..dad582d', '*\trefs/heads/other:refs/heads/other\t[new branch]', '!\trefs/heads/feat:refs/heads/feat\t[rejected] (fetch first)', '=\trefs/tags/v1:refs/tags/v1\t[up to date]', '!\t(delete):refs/heads/gone\t[rejected] (stale info)', '!\t:refs/heads/kept\t[remote rejected] (protected branch hook declined)', '-\t:refs/heads/old\t[deleted]', 'Done'].join('\n')
     expect(parsePushPorcelain(out)).toEqual([
       { name: 'main', kind: 'branch', result: 'pushed' },
       { name: 'other', kind: 'branch', result: 'pushed' },
-      { name: 'feat', kind: 'branch', result: 'refused' },
-      { name: 'v1', kind: 'tag', result: 'upToDate' }
+      { name: 'feat', kind: 'branch', result: 'refused', reason: 'fetch first' },
+      { name: 'v1', kind: 'tag', result: 'upToDate' },
+      // HI-3593: a refusal's reason, as git gives it.
+      { name: 'gone', kind: 'branch', result: 'refused', reason: 'stale info' },
+      { name: 'kept', kind: 'branch', result: 'refused', reason: 'protected branch hook declined' },
+      { name: 'old', kind: 'branch', result: 'pushed' }
     ])
   })
 
@@ -1319,6 +1323,66 @@ describe('branches by state, and cleaning up the merged ones (#1642)', () => {
     await expect(repo.deleteRemoteBranches(proj, 'origin', [r('cw/hb2')])).rejects.toThrow(/origin refused to delete cw\/hb2/)
     expect(branchNames(remote)).toContain('cw/hb2')
   }, timing('test.hang'))
+
+  // HI-3593: a lease refused says only "stale info", whether the branch moved there or isn't there at all.
+  describe('a remote branch already deleted there, moved there, or refused there (HI-3593)', () => {
+    const tracking = (b: string): string => git(proj, 'for-each-ref', '--format=%(objectname)', `refs/remotes/origin/${b}`)
+    /** cw/hb3 too, merged and unused; the remote refuses deleting it by a hook of its own. */
+    const withHook = (): Record<string, string> => {
+      const at = setUp()
+      git(proj, 'branch', 'cw/hb3', '1.0.0')
+      git(proj, 'push', '-q', 'origin', 'cw/hb3')
+      git(proj, 'fetch', '-q', 'origin')
+      writeFileSync(join(remote, 'hooks', 'update'), '#!/bin/sh\n[ "$1" = refs/heads/cw/hb3 ] && exit 1\nexit 0\n', { mode: 0o755 })
+      return { ...at, 'cw/hb3': git(proj, 'rev-parse', 'cw/hb3') }
+    }
+    const r = (at: Record<string, string>, name: string): { name: string; sha: string } => ({ name: `origin/${name}`, sha: at[name] })
+
+    it('counts one already deleted there as done and removes its local reference; one moved or refused there says why', async () => {
+      const at = withHook()
+      git(remote, 'update-ref', '-d', 'refs/heads/cw/hb1')
+      commit(other, 'x.txt')
+      git(other, 'push', '-q', '-f', 'origin', 'HEAD:refs/heads/cw/hb2')
+      const said = await repo.deleteRemoteBranches(proj, 'origin', [r(at, 'cw/hb1'), r(at, 'cw/hb2'), r(at, 'cw/hb3')])
+      expect(said).toContain('cw/hb1 was already deleted on origin: removed its local reference.')
+      expect(said).toContain("origin refused to delete cw/hb2: it has commits there you haven't fetched")
+      expect(said).toContain('origin refused to delete cw/hb3: hook declined')
+      expect(said).not.toMatch(/refused to delete cw\/hb1/)
+      expect([tracking('cw/hb1'), tracking('cw/hb2'), tracking('cw/hb3')]).toEqual(['', at['cw/hb2'], at['cw/hb3']])
+      expect(branchNames(remote)).toEqual(expect.arrayContaining(['cw/hb2', 'cw/hb3']))
+      // Only one already gone: done all the same, never called refused.
+      git(remote, 'update-ref', '-d', 'refs/heads/cw/hb3')
+      expect(await repo.deleteRemoteBranches(proj, 'origin', [r(at, 'cw/hb3')])).toBe('cw/hb3 was already deleted on origin: removed its local reference.')
+    }, timing('test.hang'))
+
+    // The dialog marks a row already gone from its own check; the delete never trusts that: it asks the remote again.
+    it('deletes one marked already gone that has come back on the remote by the lease, as any other', async () => {
+      const at = setUp()
+      git(remote, 'update-ref', '-d', 'refs/heads/cw/hb1')
+      git(remote, 'update-ref', 'refs/heads/cw/hb1', at['cw/hb1'])
+      expect(await repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/cw/hb1', sha: at['cw/hb1'] }])).toBe('Deleted cw/hb1 on origin.')
+      expect(branchNames(remote)).not.toContain('cw/hb1')
+      // Back at another commit: the lease refuses it, never deleted there or here.
+      git(remote, 'update-ref', 'refs/heads/cw/hb2', at.main)
+      await expect(repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/cw/hb2', sha: at['cw/hb2'] }])).rejects.toThrow("origin refused to delete cw/hb2: it has commits there you haven't fetched")
+      expect([branchNames(remote).includes('cw/hb2'), tracking('cw/hb2')]).toEqual([true, at['cw/hb2']])
+    }, timing('test.hang'))
+
+    it("keeps the local reference when the remote can't be asked, or when it changed since it was shown", async () => {
+      const at = setUp()
+      git(remote, 'update-ref', '-d', 'refs/heads/cw/hb1')
+      gitFails = (a) => a[0] === 'ls-remote'
+      await expect(repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/cw/hb1', sha: at['cw/hb1'] }])).rejects.toThrow("origin didn't delete cw/hb1, and Combwork couldn't check whether it still has it: failed (a test)")
+      expect(tracking('cw/hb1')).toBe(at['cw/hb1'])
+      gitFails = null
+      // A fetch outside the lock moved it between the check and its removal: kept, and said so.
+      gitBefore = (a) => {
+        if (a[0] === 'update-ref' && a[2] === 'refs/remotes/origin/cw/hb1') git(proj, 'update-ref', 'refs/remotes/origin/cw/hb1', at.main)
+      }
+      expect(await repo.deleteRemoteBranches(proj, 'origin', [{ name: 'origin/cw/hb1', sha: at['cw/hb1'] }])).toBe('cw/hb1 was already deleted on origin, but its local reference has changed since you were shown it, so it was kept.')
+      expect(tracking('cw/hb1')).toBe(at.main)
+    }, timing('test.hang'))
+  })
 })
 
 describe('Update from <target> (HI-1180)', () => {
@@ -1620,6 +1684,20 @@ describe('a branch renamed, a tag deleted or pushed (HI-3474)', () => {
     expect([has(remote, 'refs/heads/old'), has(remote, 'refs/heads/new'), has(proj, 'refs/heads/new')]).toEqual([true, true, true])
   })
 
+  // HI-3593: the old name already deleted on the remote is a rename done there; one that can't be checked says so.
+  it('renames on the remote when the old name was already deleted there, removing its stale local reference', async () => {
+    for (const b of ['gone1', 'gone2']) {
+      git(proj, 'branch', b)
+      git(proj, 'push', '-q', '-u', 'origin', b)
+      git(remote, 'update-ref', '-d', `refs/heads/${b}`)
+    }
+    expect(await repo.renameBranch(proj, at('gone1'), 'kept1', true)).toBe('Renamed gone1 to kept1, here and on origin. gone1 was already deleted on origin: removed its local reference.')
+    expect([has(proj, 'refs/remotes/origin/gone1'), has(remote, 'refs/heads/kept1')]).toEqual([false, true])
+    gitFails = (a) => a[0] === 'ls-remote'
+    await expect(repo.renameBranch(proj, at('gone2'), 'kept2', true)).rejects.toThrow("Renamed gone2 to kept2 and pushed it to origin, where it tracks kept2 now, but origin didn't delete gone2, and Combwork couldn't check whether it still has it: failed (a test)")
+    expect(has(proj, 'refs/remotes/origin/gone2')).toBe(true)
+  })
+
   it('refuses a remote rename before anything when it tracks nothing, tracks a branch never deleted, or the remote has the name', async () => {
     git(proj, 'branch', 'loose')
     await expect(repo.renameBranch(proj, at('loose'), 'loose2', true)).rejects.toThrow("loose doesn't track a branch on a remote: there's nothing to rename there. Nothing was renamed.")
@@ -1661,6 +1739,17 @@ describe('a branch renamed, a tag deleted or pushed (HI-3474)', () => {
     await expect(repo.deleteTag(proj, { name: 'v2', sha: sha('refs/tags/v2') }, 'origin')).rejects.toThrow('origin refused to delete the tag v2')
     expect([has(proj, 'refs/tags/v2'), has(remote, 'refs/tags/v2')]).toEqual([true, true])
     await expect(repo.deleteTag(proj, { name: 'v2', sha: sha('refs/tags/v2') }, 'nowhere')).rejects.toThrow("There's no remote nowhere.")
+    // HI-3593: already deleted on the remote: deleted here, said so; one the remote can't be asked about stays.
+    for (const t of ['v3', 'v4']) {
+      git(proj, 'tag', t)
+      git(proj, 'push', '-q', 'origin', `refs/tags/${t}`)
+      git(remote, 'tag', '-d', t)
+    }
+    expect(await repo.deleteTag(proj, { name: 'v3', sha: sha('refs/tags/v3') }, 'origin')).toBe('Deleted the tag v3. It was already deleted on origin.')
+    expect(has(proj, 'refs/tags/v3')).toBe(false)
+    gitFails = (a) => a[0] === 'ls-remote'
+    await expect(repo.deleteTag(proj, { name: 'v4', sha: sha('refs/tags/v4') }, 'origin')).rejects.toThrow("origin didn't delete the tag v4, and Combwork couldn't check whether it still has it: failed (a test) Nothing was deleted here either.")
+    expect(has(proj, 'refs/tags/v4')).toBe(true)
   })
 
   it('pushes a tag, never forced: there already, or another tag of its name there refuses', async () => {

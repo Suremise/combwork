@@ -6260,7 +6260,16 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   against HEAD, not the target),
   merged unless it is one unmerged branch the user confirmed with the commits
   it drops (`git:branchDrops`); `git:deleteRemoteBranches` with `push --force-with-lease=<ref>:<sha> :<ref>`, so one
-  that moved on the remote is refused there. Each one kept is said, why. What a branch is to the project (the target,
+  that moved on the remote is refused there. HI-3593: a lease refused says only `stale info`, whether the branch moved
+  there or is no longer there, so main asks the remote (`whyRefused`: one `ls-remote` of the exact refs). Gone there:
+  the delete is done, and its stale remote-tracking ref is removed at the commit shown (`update-ref -d`; kept, and said,
+  when a fetch changed it meanwhile). There at another commit: refused, the commits not fetched. Any other refusal (a
+  protected branch, a hook) gives git's reason, and a remote that can't be asked keeps the ref and says so. The rename's
+  delete of its old name and a tag's delete on a remote are told apart the same way. Once the dialog shows, it asks the
+  remotes it offers branches of what they still have (`git:remotePrunePreview`, cancelled when it closes): a branch
+  already deleted there is marked, its tick removing only the local reference, and a remote that couldn't be asked
+  says so. The delete never trusts that mark: it asks the remote again, and a branch back at the commit shown is
+  deleted by the lease as any other. Each one kept is said, why. What a branch is to the project (the target,
   read from its options again; the folder's branch, the worktrees and slots, the board's open cards) is read for each
   branch right before it goes (HR1's round 1), and the check and the deletion are one hold (round 2's finding): the
   repository's lock, across copies of Combwork (slot preparation, merges, branch switches, and every workflow options write that can
