@@ -81,12 +81,15 @@ const check = (name, ok, extra = '') => {
     await banner.locator('button.primary').click()
     return page.locator('.dialog', { has: page.locator('.move-repair') })
   }
+  const textOf = async (dialog) => (await dialog.innerText().catch(() => '')).replace(/\s+/g, ' ')
+  // Reopened, the dialog's first render can still hold the last opening's Defender rows before it reads Defender again
+  // (HI-3608): so its rows are waited for with Defender's read done, and a check of what they say waits for it (shows).
   const openRepair = async (page) => {
     const dialog = await openDialog(page)
-    await lib.until(async () => (await dialog.locator('.repair-defender').count()) === 1, HUNG_MS)
+    await lib.until(async () => (await dialog.locator('.repair-defender').count()) === 1 && !/Reading Defender's exclusions…/.test(await textOf(dialog)), HUNG_MS)
     return dialog
   }
-  const textOf = async (dialog) => (await dialog.innerText().catch(() => '')).replace(/\s+/g, ' ')
+  const shows = async (dialog, ok) => !!(await lib.until(async () => ok(await textOf(dialog)), HUNG_MS))
 
   // Scratch: the user excluded its worktrees folder themselves; Combwork's Add excludes the workspace (and the test area).
   setFixture({ exclusions: [scratch.trees] })
@@ -235,7 +238,7 @@ const check = (name, ok, extra = '') => {
     try {
       await lib.openWorkspace(inv, page, inner.ws)
       let dialog = await openRepair(page)
-      check('the list hidden, no administrator read: Combwork’s own exclusion moves; the states are what Combwork knows, said so', (await textOf(dialog)).includes(`The workspace (every project in it): was ${fourth.ws} (Added by Combwork), now ${inner.ws} (Unknown); will move Combwork's exclusion`) && /Defender shows its exclusions only to administrators: these states are what Combwork knows/.test(await textOf(dialog)), await textOf(dialog))
+      check('the list hidden, no administrator read: Combwork’s own exclusion moves; the states are what Combwork knows, said so', await shows(dialog, (t) => t.includes(`The workspace (every project in it): was ${fourth.ws} (Added by Combwork), now ${inner.ws} (Unknown); will move Combwork's exclusion`) && /Defender shows its exclusions only to administrators: these states are what Combwork knows/.test(t)), await textOf(dialog))
       check('…a folder of unknown state, with no exclusion of Combwork’s, is never said to be scanned', (await textOf(dialog)).includes(`Its worktrees: was ${fourth.trees} (Unknown); will nothing (no exclusion of Combwork's)`) && !/Defender scans it/.test(await textOf(dialog)), await textOf(dialog))
       await page.screenshot({ path: path.join(lib.WORK, 'repairdefender-plan-unknown.png') })
       await dialog.getByRole('button', { name: 'Cancel' }).click()
@@ -243,7 +246,7 @@ const check = (name, ok, extra = '') => {
       // Defender's list shown now: the new workspace is Excluded, but only through the entry Repair removes.
       setFixture({ exclusions: machine }, { exclusions: machine })
       dialog = await openRepair(page)
-      check('the list shown: the new workspace Excluded through Combwork’s old entry, still to move, and said to be the list now', (await textOf(dialog)).includes(`The workspace (every project in it): was ${fourth.ws} (Excluded), now ${inner.ws} (Excluded); will move Combwork's exclusion`) && /As Defender lists its exclusions now\./.test(await textOf(dialog)), await textOf(dialog))
+      check('the list shown: the new workspace Excluded through Combwork’s old entry, still to move, and said to be the list now', await shows(dialog, (t) => t.includes(`The workspace (every project in it): was ${fourth.ws} (Excluded), now ${inner.ws} (Excluded); will move Combwork's exclusion`) && /As Defender lists its exclusions now\./.test(t)), await textOf(dialog))
       const before = changes('move-requested').length
       await dialog.getByRole('button', { name: 'Repair', exact: true }).click()
       check('Repair removes the old entry and excludes the new workspace, no longer covered', !!(await lib.until(async () => /Moved Combwork's exclusions to the new folders: 1 removed, 1 added\./.test(await textOf(dialog)), HUNG_MS)), await textOf(dialog))
