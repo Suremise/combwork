@@ -6089,7 +6089,8 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   uncommitted changes, staged and not, are stashed first, that file's alone (HI-3587: `git stash push -- <file>` keeps
   the whole index, so its Apply brought back other files' staged changes; the stash is built as git builds one, its
   index commit HEAD plus that file's index entry, its work tree commit that plus the file on disk, then `git stash
-  store`, and the file put back to HEAD, one new in the index taken out), named with Set Aside's
+  store`, and the file put back to HEAD, one new in the index taken out; with no identity configured its commits are
+  git stash's own fallback, `git stash <git@stash>`, given in git's environment, never written to config), named with Set Aside's
   mark (`Combwork: set aside before discarding <file> [cw:…]`, *before restoring <file> from <short>*), so Stashes
   (above) lists it as *Set aside by Combwork before discarding <file>* and Apply brings it back; the notification says
   where it went. A file with no changes stashes nothing (git holds that version). Discard is the stash alone (index and

@@ -187,6 +187,24 @@ async function writing(projectPath: string, rel: string, args: string[], env: No
  * on disk (its work tree commit, on HEAD and that), stored under `message`; then `rel` is put back to HEAD (a file new
  * in the index taken out, as git's stash does).
  */
+/**
+ * HI-3587 round 1: git's stash commits with `git stash <git@stash>` where no identity is configured (its fallback,
+ * `user.useConfigOnly` too), and commit-tree has none: the same names, as git's environment for the stash's own
+ * commits, wherever neither `user.*` nor that side's `author.*`/`committer.*` names one, and the environment doesn't
+ * either. The user's config is never changed.
+ */
+async function stashIdent(projectPath: string): Promise<NodeJS.ProcessEnv> {
+  const r = await git(projectPath, ['config', '--get-regexp', '^(user|author|committer)\\.(name|email)$'])
+  const set = new Set(r.out.split(/\r?\n/).map((row) => row.split(' ')[0].toLowerCase()).filter(Boolean))
+  const env: NodeJS.ProcessEnv = {}
+  for (const side of ['author', 'committer'] as const)
+    for (const [what, fallback] of [['name', 'git stash'], ['email', 'git@stash']] as const) {
+      const key = `GIT_${side.toUpperCase()}_${what.toUpperCase()}`
+      if (!set.has(`user.${what}`) && !set.has(`${side}.${what}`) && !process.env[key]) env[key] = fallback
+    }
+  return env
+}
+
 async function stashFile(projectPath: string, rel: string, message: string): Promise<void> {
   const read = async (args: string[], env?: NodeJS.ProcessEnv): Promise<string> => {
     const r = await writing(projectPath, rel, args, env)
@@ -198,7 +216,8 @@ async function stashFile(projectPath: string, rel: string, message: string): Pro
   const subject = await read(['log', '-1', '--format=%s', head])
   const gitDir = await read(['rev-parse', '--absolute-git-dir'])
   const index = join(gitDir, `index.cw-restore-${randomBytes(4).toString('hex')}`)
-  const env = { ...restoreEnv(), GIT_INDEX_FILE: index }
+  const ident = await stashIdent(projectPath)
+  const env = { ...restoreEnv(), ...ident, GIT_INDEX_FILE: index }
   try {
     await read(['read-tree', head], env)
     const entry = (await read(['--literal-pathspecs', 'ls-files', '-s', '-z', '--', rel])).split('\0').find((row) => row.slice(row.indexOf('\t') + 1) === rel)
@@ -212,7 +231,7 @@ async function stashFile(projectPath: string, rel: string, message: string): Pro
     const workTree = await read(['write-tree'], env)
     const said = `On ${branch}: ${message}` // i18n-ignore: git's own subject for a stash, as `git stash push -m` writes it
     const stash = await read(['commit-tree', workTree, '-p', head, '-p', indexCommit, '-m', said], env)
-    await read(['stash', 'store', '-q', '-m', said, stash])
+    await read(['stash', 'store', '-q', '-m', said, stash], { ...restoreEnv(), ...ident })
   } finally {
     await rm(index, { force: true }).catch(() => undefined)
   }

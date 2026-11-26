@@ -123,6 +123,35 @@ describe('Discard Changes', () => {
     expect(status('b.txt')).toBe('')
   })
 
+  it("HI-3587 round 1: with no identity configured (user.useConfigOnly too) it stashes as git's stash does, as `git stash`; a configured one is used", async () => {
+    const keys = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'EMAIL']
+    const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]))
+    const empty = join(base, `no-identity-${n}.gitconfig`)
+    writeFileSync(empty, '')
+    for (const k of keys) delete process.env[k]
+    process.env.GIT_CONFIG_GLOBAL = empty
+    process.env.GIT_CONFIG_NOSYSTEM = '1'
+    try {
+      // The template repository's own identity taken out: this one has none.
+      for (const key of sh(proj, 'config', '--local', '--name-only', '--list').split(/\r?\n/)) if (/^(user|author|committer)\./.test(key)) sh(proj, 'config', '--local', '--unset-all', key)
+      expect(sh(proj, 'config', '--local', '--list')).not.toMatch(/^(user|author|committer)\./m)
+      sh(proj, 'config', '--local', 'user.useConfigOnly', 'true')
+      write('a.txt', 'mine\n')
+      expect(await restore('a.txt', 'head', head())).toEqual({ stashed: true })
+      expect(read('a.txt')).toBe('base\n')
+      expect(sh(proj, 'log', '-1', '--format=%an <%ae>|%cn <%ce>', 'stash@{0}')).toBe('git stash <git@stash>|git stash <git@stash>')
+      sh(proj, 'config', '--local', 'user.name', 'Someone')
+      sh(proj, 'config', '--local', 'user.email', 'someone@example.invalid')
+      write('a.txt', 'again\n')
+      expect(await restore('a.txt', 'head', head())).toEqual({ stashed: true })
+      expect(sh(proj, 'log', '-1', '--format=%an <%ae>', 'stash@{0}')).toBe('Someone <someone@example.invalid>')
+      expect(stashMessages()).toHaveLength(2)
+    } finally {
+      for (const k of keys) if (saved[k] === undefined) delete process.env[k]
+      else process.env[k] = saved[k]
+    }
+  })
+
   it("works on a file in a subfolder, and in a project folder that is a repository's subfolder", async () => {
     write('sub/c.txt', 'changed\n')
     const p = await plan('sub/c.txt', 'head')
