@@ -1009,6 +1009,8 @@ export const UNIT_SCANS = [
   // one, or a change to a listed file (a rename of its function), can break it.
   { test: 'tests/dbWrites.test.ts', paths: ['src/main/'], lines: ['withFileLock', 'boardLock', 'leaseDb', 'withLeasedDb'] },
   { test: 'tests/dbWrites.test.ts', paths: ['src/main/boardStore.ts', 'src/main/deliveries.ts', 'src/main/sessionStore.ts', 'src/main/storeRows.ts', 'src/main/storeTables.ts'] },
+  // HI-3606: the board's migrations, the schema modules and the database layer, read against the v1.0.0 tag's (HI-2462).
+  { test: 'tests/combworkMove10.test.ts', paths: ['src/main/boardStore.ts', 'src/main/db.ts', 'src/main/schema/'] },
   { test: 'tests/legacyWorktreeGate.test.ts', paths: ['src/'], lines: ['worktree'] },
   { test: 'tests/i18nFormatting.test.ts', paths: ['src/'], lines: ['toLocale', 'Intl\\.', 'i18n-ignore'] },
   { test: 'tests/userGuide.test.ts', paths: ['src/renderer/src/'], lines: ['openGuideAt'] },
