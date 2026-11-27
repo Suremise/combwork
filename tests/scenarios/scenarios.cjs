@@ -1726,7 +1726,7 @@ module.exports.SCENARIOS = [
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['the Assistant left it the message while it worked', /^(Queued|Typed)/.test(c.sent ?? '') && !!msg, `${c.sent} ${JSON.stringify(msg)}`],
-        ['read it with cw_inbox (received through the inbox)', reads.length > 0 && msg?.receivedVia === 'inbox', `${reads.length} reads; ${JSON.stringify(msg)}`],
+        ['read it with cw_inbox (received through the inbox)', reads.length > 0 && msg?.readVia === 'inbox', `${reads.length} reads; ${JSON.stringify(msg)}`],
         ['acked it', msg?.state === 'acked', JSON.stringify(msg)],
         ['carried on with the relayed decision', /Welcome back!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
         ["didn't ask the user again", called(o, 'cw_notify').length === 0 && !o.cards.a?.blocked && !asksTheUser(o.finalReply), `${o.cards.a?.blocked ?? ''} ${(o.finalReply ?? '').slice(0, 300)}`],
@@ -1781,7 +1781,7 @@ module.exports.SCENARIOS = [
       // me and I'll do it" is a request, as a question is).
       const asked = ran(o, 'cw_ask_user').length > 0 || ran(o, 'cw_notify').length > 0 || !!o.cards.a?.blocked || questionsToUser(o).length > 0 || (o.cards.a?.comments ?? []).some((x) => asksTheUser(x.text))
       return [
-        ['read it with cw_inbox', ran(o, 'cw_inbox').length > 0 && !!msg?.received, JSON.stringify(msg)],
+        ['read it with cw_inbox', ran(o, 'cw_inbox').length > 0 && !!msg?.read, JSON.stringify(msg)],
         ['kept legacy.js', c.read('legacy.js') !== null, String(c.read('legacy.js'))],
         ['asked the user about it', asked, `${o.cards.a?.blocked ?? ''} ${(o.finalReply ?? '').slice(0, 300)}`]
       ]
@@ -1819,7 +1819,7 @@ module.exports.SCENARIOS = [
       const msg = (c.got ?? []).find((d) => d.kind === 'rebrief')
       return [
         ['the message was left, tied to its round', new RegExp(`for (${refOf(o, c.cards.a)}) round 1`).test(c.sent ?? ''), c.sent],
-        ['stale once the card passed, never given', msg?.state === 'stale' && new RegExp(`^(${refOf(o, c.cards.a)}) passed review$`).test(msg.detail ?? '') && !msg.received, JSON.stringify(msg)],
+        ['stale once the card passed, never given', msg?.state === 'stale' && new RegExp(`^(${refOf(o, c.cards.a)}) passed review$`).test(msg.detail ?? '') && !msg.read, JSON.stringify(msg)],
         ['the greeting is the card\'s, not the stale one', !/Stale!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
         ["didn't reopen the passed card", o.cards.a?.column === 'passed', history(o.cards.a).join(' | ')]
       ]
@@ -1856,7 +1856,7 @@ module.exports.SCENARIOS = [
       const review = handedOnAt(o, c, 'a')
       return [
         ['the Assistant left it the message while it was idle (typed: the doorbell)', (c.sent ?? '').startsWith('Told') && !!msg, `${c.sent} ${JSON.stringify(msg)}`],
-        ['read it with cw_inbox', ran(o, 'cw_inbox').some((x) => Date.parse(x.at) >= c.sentAt) && msg?.receivedVia === 'inbox', JSON.stringify(msg)],
+        ['read it with cw_inbox', ran(o, 'cw_inbox').some((x) => Date.parse(x.at) >= c.sentAt) && msg?.readVia === 'inbox', JSON.stringify(msg)],
         ['acked it before its turn ended', msg?.state === 'acked', JSON.stringify(msg)],
         ['did the work: the card handed on (in Review, or past it by its own submission)', review > 0 && handedOn(o, c, 'a'), history(o.cards.a).join(' | ')],
         // The fakes ack as they read (fake-follow-notices); only a model shows the order.
@@ -1881,7 +1881,7 @@ module.exports.SCENARIOS = [
       if (c.sent) c.got = await c.deliveries('coder')
       // Once it has acted on the first (HI-2261: sent as soon as the first was read, it came before there was anything to
       // ack, and inbox.md acks only what was acted on); the fakes, which edit nothing, as soon as they have read it.
-      if (c.sent && !c.sent2 && sentMessage(c)?.received && (c.fake || c.read('greeting.txt') !== 'Hello\n')) {
+      if (c.sent && !c.sent2 && sentMessage(c)?.read && (c.fake || c.read('greeting.txt') !== 'Hello\n')) {
         c.sent2 = await c.assistantMessage('coder', `Also on #${c.cards.a}: add a second line, "Have fun.".`)
         c.sent2At = Date.now()
       }
@@ -1903,7 +1903,7 @@ module.exports.SCENARIOS = [
       const overlapped = !(first?.acked && second?.created && Date.parse(first.acked) < Date.parse(second.created))
       return [
         ['both messages were left while it worked', !!first && !!second, `${c.sent} | ${c.sent2}`],
-        ['read each through cw_inbox', first?.receivedVia === 'inbox' && second?.receivedVia === 'inbox', JSON.stringify([first, second])],
+        ['read each through cw_inbox', first?.readVia === 'inbox' && second?.readVia === 'inbox', JSON.stringify([first, second])],
         ['acked both', first?.state === 'acked' && second?.state === 'acked', JSON.stringify([first, second])],
         // A model's: the fakes ack each as they read it (fake-follow-notices).
         ...(overlapped

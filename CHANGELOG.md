@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Changed
+
+- **A delivery's activity says when it woke the agent, apart from when it was read** (HI-3611). `cw_agent_activity`'s inbox rows and the Agent API's deliveries list each delivery's times in the order they happen: `offered`, then `woke` (when the agent's CLI took the line Combwork typed to wake it, or the launch carrying it started), then `read` (when the agent read it with `cw_inbox`), then `acked`. How long a delivery took to reach its agent is from `created` to `woke`. Before, only the read was shown, as `received`, so deliveries looked slower than they were whenever an agent finished its step before reading. In those rows `received` and `receivedVia` are now `read` and `readVia`; the state `received` is unchanged.
+
 ## 1.7.1 — 2026-11-26
 
 ### Removed

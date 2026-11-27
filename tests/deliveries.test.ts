@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { DELIVERY_BODY_MAX_CHARS, DELIVERY_STATES, ackText, canMove, inboxItems, inboxSummary, inboxText, isOverdue, moved, offerLine, readDelivery, type DeliveryRecord, type DeliverySender } from '../src/shared/deliveries'
+import { DELIVERY_BODY_MAX_CHARS, DELIVERY_STATES, ackText, canMove, deliveryRow, inboxItems, inboxSummary, inboxText, isOverdue, moved, offerLine, readDelivery, type DeliveryRecord, type DeliverySender } from '../src/shared/deliveries'
 import { taskPrompt } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
@@ -21,6 +21,33 @@ const at = '2026-10-12T03:00:00.000Z'
 const rec = (over: Partial<DeliveryRecord> = {}): DeliveryRecord => ({ id: 'm1', seq: 1, agentId: 'b1', conversation: null, kind: 'rebrief', from: { kind: 'assistant', name: 'the Assistant', workspace: 'C:/ws', launch: 'a1' }, body: 'Rebase first.', state: 'queued', created: at, expires: '2026-10-13T03:00:00.000Z', ...over })
 
 describe('delivery records (#647)', () => {
+  it('HI-3611: woke belongs to its offer: kept when uncertain, read and acked; cleared when offered again or put back; saved and shown before read', () => {
+    const woke = { ...moved(rec(), 'offered', '2026-10-12T03:01:00.000Z')!, offerRun: 'r1', woke: '2026-10-12T03:01:02.000Z' }
+    expect(moved(woke, 'uncertain', '2026-10-12T03:05:00.000Z')).toMatchObject({ woke: '2026-10-12T03:01:02.000Z' })
+    expect(moved(moved(woke, 'received', '2026-10-12T03:02:00.000Z')!, 'acked', '2026-10-12T03:03:00.000Z')).toMatchObject({ woke: '2026-10-12T03:01:02.000Z' })
+    expect(moved(moved(woke, 'uncertain', '2026-10-12T03:05:00.000Z')!, 'offered', '2026-10-12T03:06:00.000Z')).not.toHaveProperty('woke')
+    expect(moved(woke, 'queued', '2026-10-12T03:06:00.000Z')).not.toHaveProperty('woke')
+    expect(readDelivery(woke)).toMatchObject({ woke: '2026-10-12T03:01:02.000Z' })
+    expect(readDelivery({ ...woke, woke: 'soon' })).toBeNull()
+    const row = deliveryRow({ ...moved(woke, 'received', '2026-10-12T03:02:00.000Z')!, receivedVia: 'inbox' }, Date.parse(at))
+    expect(row).toMatchObject({ offered: '2026-10-12T03:01:00.000Z', woke: '2026-10-12T03:01:02.000Z', read: '2026-10-12T03:02:00.000Z', readVia: 'inbox' })
+    expect(row).not.toHaveProperty('received')
+    expect(Object.keys(row).filter((k) => ['offered', 'woke', 'read', 'readVia'].includes(k))).toEqual(['offered', 'woke', 'read', 'readVia'])
+  })
+
+  it('HI-3611: wokeAt: once, for its own launch, never after its read', async () => {
+    const { wokeAt } = await import('../src/main/deliveries')
+    const offered = { ...rec({ state: 'offered', offered: '2026-10-12T03:01:00.000Z', offers: 1 }), offerRun: 'r1' }
+    expect(wokeAt(offered, 'r1', '2026-10-12T03:01:02.000Z')).toMatchObject({ woke: '2026-10-12T03:01:02.000Z' })
+    // Another launch's take, or a second take of the same offer: nothing.
+    expect(wokeAt(offered, 'r2', '2026-10-12T03:01:02.000Z')).toBeNull()
+    expect(wokeAt({ ...offered, woke: '2026-10-12T03:01:01.000Z' }, 'r1', '2026-10-12T03:01:02.000Z')).toBeNull()
+    // Read before its take was seen (#1514, Codex's queued input): it had woken the agent by its read.
+    expect(wokeAt({ ...offered, state: 'received', received: '2026-10-12T03:01:01.500Z' }, 'r1', '2026-10-12T03:01:03.000Z')).toMatchObject({ woke: '2026-10-12T03:01:01.500Z' })
+    // Put back or ended: it woke nothing.
+    expect(wokeAt({ ...offered, state: 'cancelled' }, 'r1', '2026-10-12T03:01:02.000Z')).toBeNull()
+  })
+
   it('moves only as the states allow, filling in their times', () => {
     const offered = moved(rec(), 'offered', '2026-10-12T03:01:00.000Z')!
     expect(offered).toMatchObject({ state: 'offered', offered: '2026-10-12T03:01:00.000Z', offers: 1 })
@@ -499,6 +526,8 @@ describe('the delivery service (#647)', async () => {
       })
       expect(line).toBe('[CW] New in your inbox: 1 task (m5). Call cw_inbox to read it, act on it, then ack it.')
       expect(record).toMatchObject({ id: 'm5', state: 'offered', offerRun: 'r9' })
+      // HI-3611: the launch that carries it started: it woke the agent then, after it was offered.
+      expect(Date.parse(record!.woke!)).toBeGreaterThanOrEqual(Date.parse(record!.offered!))
       // Its first prompt taken (the agent at work on it): still offered, not received.
       taken.n = 1
       await deliveries.followAllForTests()
@@ -512,6 +541,8 @@ describe('the delivery service (#647)', async () => {
         })
       ).rejects.toThrow(/refused to start/)
       expect((await states()).at(-1)).toBe('m6 cancelled: not given: It refused to start.')
+      // Never started: it woke nobody.
+      expect((await deliveries.deliveriesOf(alpha, 'b1')).find((r) => r.id === 'm6')).not.toHaveProperty('woke')
     } finally {
       Object.assign(sessions, { promptsTaken: () => null })
     }
@@ -537,6 +568,14 @@ describe('the delivery service (#647)', async () => {
       await deliveries.followAllForTests()
       await deliveries.offerAllForTests()
       expect(await states()).toEqual(['m1 offered'])
+      // HI-3611: its CLI took the doorbell: when it woke the agent, after it was offered, and not read yet.
+      const woken = await vi.waitFor(async () => {
+        const r = (await deliveries.deliveriesOf(alpha, 'b1'))[0]
+        if (!r.woke) throw new Error('not woken yet')
+        return r
+      }, { timeout: HUNG_MS })
+      expect(Date.parse(woken.woke!)).toBeGreaterThanOrEqual(Date.parse(woken.offered!))
+      expect(woken.received).toBeUndefined()
       expect(st.typed).toHaveLength(1)
       // Its turn ends without reading it: the doorbell rings once more.
       st.status = 'finished'
@@ -551,6 +590,15 @@ describe('the delivery service (#647)', async () => {
       expect(await states()).toEqual(['m1 offered'])
       expect((await deliveries.readInbox(alpha, 'b1')).items.map((i) => `${i.ids.join()} ${i.text}`)).toEqual(['m1 Rebase first.'])
       expect((await deliveries.deliveriesOf(alpha, 'b1'))[0]).toMatchObject({ state: 'received', receivedVia: 'inbox' })
+      // Rung again (offered again): its woke is that second doorbell's, and the row shows woke before read.
+      const row = await vi.waitFor(async () => {
+        const r = (await deliveries.deliveryView(alpha, 'b1', 5)).deliveries[0]
+        if (!r.woke) throw new Error('not woken yet')
+        return r
+      }, { timeout: HUNG_MS })
+      expect(Object.keys(row).filter((k) => ['created', 'offered', 'woke', 'read', 'acked'].includes(k))).toEqual(['created', 'offered', 'woke', 'read'])
+      expect(Date.parse(row.woke!)).toBeGreaterThanOrEqual(Date.parse(row.offered!))
+      expect(Date.parse(row.read!)).toBeGreaterThanOrEqual(Date.parse(row.woke!))
       // Rung and taken, not read yet: still the sender's to take back; the agent's inbox then has nothing.
       await make({ body: 'Never mind.' })
       await deliveries.offerAllForTests()
@@ -1078,9 +1126,12 @@ describe('the delivery service (#647)', async () => {
     await deliveries.ackDeliveries(alpha, 'b1', ['m1'])
     await make({ body: 'Third, a long one '.repeat(10) })
     const v = await deliveries.deliveryView(alpha, 'b1', 2)
-    expect(v).toMatchObject({ unread: 1, overdue: 0, more: 1, deliveries: [{ id: 'm2', state: 'received', receivedVia: 'inbox' }, { id: 'm3', state: 'queued', from: 'the Assistant' }] })
+    expect(v).toMatchObject({ unread: 1, overdue: 0, more: 1, deliveries: [{ id: 'm2', state: 'received', readVia: 'inbox' }, { id: 'm3', state: 'queued', from: 'the Assistant' }] })
     expect(v.deliveries[1].text.length).toBeLessThanOrEqual(80)
-    expect(v.deliveries[0].received).toBeTruthy()
+    expect(v.deliveries[0].read).toBeTruthy()
+    // HI-3611: read unprompted (nothing rang for it): no woke, and the record's received is shown as read only.
+    expect(v.deliveries[0]).not.toHaveProperty('woke')
+    expect(v.deliveries[0]).not.toHaveProperty('received')
     expect((await file()).deliveries.length).toBeGreaterThan(0)
   })
 

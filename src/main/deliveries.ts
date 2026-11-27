@@ -1841,6 +1841,25 @@ function confirming(store: Store, o: Offer, before: { runId: string; count: numb
   for (const id of o.ids) store.confirming.set(id, before)
 }
 
+/**
+ * HI-3611: when a delivery woke its agent, `at` (taken as the wake was seen, before any save waits), for this offer in
+ * `runId` only, once. Never after its read: one read before its line's take was seen (Codex's queued input, #1514)
+ * woke the agent by the time it was read.
+ */
+export function wokeAt(r: DeliveryRecord, runId: string, at: string): DeliveryRecord | null {
+  if (r.woke || r.offerRun !== runId || !(r.state === 'offered' || r.state === 'received' || r.state === 'acked' || r.state === 'uncertain')) return null
+  return { ...r, woke: r.received && Date.parse(r.received) < Date.parse(at) ? r.received : at }
+}
+
+/** Records, in a draft, that these deliveries woke their agent at `at` (wokeAt). */
+function recordWoke(d: Draft, ids: readonly string[], runId: string, at: string): void {
+  for (const id of ids) {
+    const r = byId(d.records, id)
+    const next = r && wokeAt(r, runId, at)
+    if (r && next) put(d, r, next)
+  }
+}
+
 /** Each source's line made again for what is about to be offered (from things as they are now): its body, or why it is cancelled. */
 async function refreshAll(store: Store, items: readonly DeliveryRecord[]): Promise<Map<string, Fresh>> {
   const out = new Map<string, Fresh>()
@@ -1972,6 +1991,11 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
       // A line the user typed into before its CLI took it is theirs (#652 round 1 finding 2): what it named waits again.
       follow: {
         confirming: (before) => confirming(store, o, before),
+        // HI-3611: its CLI took the line: the moment these woke the agent, taken now, before the save queues.
+        taken: () => {
+          const at = nowIso()
+          transactSoon(store, 'recording a wake', (d) => recordWoke(d, o.ids, o.runId, at)) // agent-protocol: for the log
+        },
         lost: () => lost(store),
         left: () => void unoffer(store, o),
         // Read since (#1514): its CLI took the line, whether or not it told of a prompt (Codex's queued input).
@@ -2136,6 +2160,8 @@ export async function launchWith<T extends { runId: string }>(host: string, nd: 
     show(store, nd.agentId)
     throw e
   }
+  // HI-3611: the launch that carries it has started: it woke the agent then (taken before the save below waits).
+  const started = nowIso()
   // The launch it went into, in memory at once (what the checks follow if saving it fails), and on disk.
   if (run?.runId) {
     store.launches.set(rec.id, run.runId)
@@ -2145,6 +2171,9 @@ export async function launchWith<T extends { runId: string }>(host: string, nd: 
     await transact(store, (d) => {
       const r = byId(d.records, rec.id)
       if (r?.state === 'offered' && r.offerRun === LAUNCHING && run?.runId) put(d, r, { ...r, offerRun: run.runId })
+      // Its woke, in the launch it went into: read already (the agent was quick), never later than its read.
+      // One read before this save still names the launch as about to start.
+      if (run?.runId) recordWoke(d, [rec.id], byId(d.records, rec.id)?.offerRun === LAUNCHING ? LAUNCHING : run.runId, started)
     })
   } catch (e) {
     // Launched with it: still offered into that launch (followed in memory); a restart finds it uncertain.

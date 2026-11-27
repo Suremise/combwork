@@ -138,7 +138,7 @@ async function start() {
   // --- 2. The agent fetches it mid-turn with cw_inbox: received, and not typed after.
   fs.writeFileSync(path.join(claudeHome, 'deliveries-go1'), '')
   check('cw_inbox gives it the message, with its id and sender', !!(await until(() => toolResults(sessionId).some((t) => t.startsWith('1 new:\nm1 · the Assistant: Rebase on main before the next card.')), HUNG_MS)), JSON.stringify(toolResults(sessionId)))
-  check('…it is received (fetched)', !!(await until(() => delivery('m1')?.state === 'received', HUNG_MS)) && delivery('m1')?.receivedVia === 'inbox' && !!delivery('m1')?.received, JSON.stringify(delivery('m1')))
+  check('…it is received (fetched)', !!(await until(() => delivery('m1')?.state === 'received', HUNG_MS)) && delivery('m1')?.readVia === 'inbox' && !!delivery('m1')?.read, JSON.stringify(delivery('m1')))
   check('…and the pane no longer counts it unread', !!(await until(async () => !/unread/.test(await paneText()), HUNG_MS)), await paneText())
   fs.writeFileSync(path.join(claudeHome, 'deliveries-go2'), '')
   check('the builder is idle again', !!(await until(() => idle(builder.id), HUNG_MS)))
@@ -148,13 +148,20 @@ async function start() {
   check('…its doorbell names it by id, never its text (#650)', !!(await until(() => bells().includes('[CW] New in your inbox: 1 message (m2). Call cw_inbox to read it, act on it, then ack it.'), HUNG_MS)), JSON.stringify(bells()))
   check('…and the builder reads it in its inbox', !!(await until(() => wakes().includes('Then take #2.'), HUNG_MS)), JSON.stringify(wakes()))
   check('…the message it had fetched is never offered again', !wakes().some((t) => t.includes('Rebase on main')) && !bells().some((t) => /\bm1\b/.test(t)), JSON.stringify(wakeLog()))
-  check('…offered (its doorbell typed), and received once it read it', !!(await until(async () => wakes().length > 0 && delivery('m2')?.state === 'received' && (await idle(builder.id)), HUNG_MS)) && delivery('m2')?.receivedVia === 'inbox' && !!delivery('m2')?.offered, JSON.stringify(delivery('m2')))
+  check('…offered (its doorbell typed), and received once it read it', !!(await until(async () => wakes().length > 0 && delivery('m2')?.state === 'received' && (await idle(builder.id)), HUNG_MS)) && delivery('m2')?.readVia === 'inbox' && !!delivery('m2')?.offered, JSON.stringify(delivery('m2')))
+  // HI-3611: its woke is saved apart from its read (the take is confirmed in the background), so the whole row is waited
+  // for, one snapshot an attempt: offered, then woke, then read.
+  let m2 = null
+  check('…its row says when it woke the agent (its CLI took the doorbell), between offered and read', !!(await until(() => {
+    m2 = delivery('m2')
+    return !!m2?.offered && Date.parse(m2.woke) >= Date.parse(m2.offered) && Date.parse(m2.read) >= Date.parse(m2.woke)
+  }, HUNG_MS)), JSON.stringify(m2))
 
   // --- 3. Acked: the agent says it acted on m1; m2 isn't, and becomes overdue.
   await until(() => idle(builder.id), HUNG_MS)
   await say(builder.id, 'cw cw_inbox {"ack":["m1"]}')
   check('cw_inbox ack says what it acked', !!(await until(() => toolResults(sessionId).includes('Acked m1.'), HUNG_MS)), JSON.stringify(toolResults(sessionId).slice(-2)))
-  check('…and the Assistant sees it acked, with its times', !!(await until(() => delivery('m1')?.state === 'acked', HUNG_MS)) && ['created', 'received', 'acked'].every((k) => !!delivery('m1')?.[k]) && !delivery('m1')?.overdue, JSON.stringify(delivery('m1')))
+  check('…and the Assistant sees it acked, with its times', !!(await until(() => delivery('m1')?.state === 'acked', HUNG_MS)) && ['created', 'read', 'acked'].every((k) => !!delivery('m1')?.[k]) && !delivery('m1')?.overdue, JSON.stringify(delivery('m1')))
   check('m2, not acked in time, is overdue: in its activity', !!(await until(() => delivery('m2')?.overdue === true, HUNG_MS)), JSON.stringify(delivery('m2')))
   check("…and in the builder's pane", !!(await until(async () => /1 overdue/.test(await paneText()), HUNG_MS)), await paneText())
   await page.screenshot({ path: path.join(lib.WORK, 'deliveries-overdue.png') })
