@@ -18,7 +18,7 @@ import { legacyWorktree } from '../../shared/agentFolders'
 import type { StageId } from '../../shared/workflow/facts'
 import type { ProjectConfig } from '../../shared/types'
 import { merges, type PlatformId } from '../../shared/platform/descriptors'
-import { ADOPTION_UPTO, adoptionCardNow, adoptionCards, boardValue, boardWrite, markPreWorkflow, setBoardValue, upgradeWaiting, type AdoptionCard } from '../boardStore'
+import { ADOPTION_UPTO, adoptionCardNow, adoptionCards, boardValue, boardWrite, markPreWorkflow, setBoardValue, type AdoptionCard } from '../boardStore'
 import { coalesced } from '../coalesce'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
@@ -72,10 +72,10 @@ export function adoptWorkspace(ws: WorkspaceService): Promise<void> {
   })
 }
 
-/** The adoption itself; null when there is nothing to do (the upgrade waits, or it finished before). */
+/** The adoption itself; null when there is nothing to do (it finished before). */
 export async function adoptNow(ws: WorkspaceService): Promise<AdoptionResult | null> {
   const path = ws.path
-  if (!path || upgradeWaiting(path) || boardValue(ws, DONE_KEY) !== null) return null
+  if (!path || boardValue(ws, DONE_KEY) !== null) return null
   // The workspace as it was when the run began: once it closes, or its window opens another, the run stops (checked
   // after each wait, and inside each board change before the board is touched), never writing another workspace's.
   const life = ws.lifetime

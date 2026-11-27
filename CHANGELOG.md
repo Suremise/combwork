@@ -11,6 +11,9 @@
 ### Added
 
 - **Move a free slot left on an old release from the window** (HI-3592). A slot that was lent, had changes or held commits when **Work merges into** moved on stayed on the old branch, and only the Assistant or a git command could move it. Once it's free, its row in **Version Control → Branches & remotes → Worktrees** and in **Slots and copies** now has **Move to 1.8.0…** (the branch work merges into now), checked as **Also retarget what can move** checks a slot, and checked again as it moves. Taking a branch out of **Other branches work can merge into** while something still uses it, **Save…** now names what uses it and offers to move what can, before saving.
+### Removed
+
+- **Upgrading a 0.9 workspace to 1.0** (HI-3602). Every user is on 1.6.0 or later, so the upgrade's question, its read-only board and banner, and the copy of 0.9's agent templates it made are gone. A workspace whose board Combwork 0.9 saved now gets one plain refusal as you open it: *This workspace is from Combwork 0.9, which this version can't open.* Nothing in its folder is changed or moved. Workspaces made or upgraded by 1.0 or later open as before. The backups the upgrade kept in `.combwork/backups` stay where they are.
 
 ## 1.7.1 — 2026-11-26
 

@@ -18,7 +18,7 @@ import { basename } from 'path'
 import type { ProjectWorkflow, WorkflowDefaults } from '../../shared/types'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import { writeWorkflow } from '../../shared/workflow/projectWorkflow'
-import { boardValue, boardWrite, setBoardValue, upgradeWaiting } from '../boardStore'
+import { boardValue, boardWrite, setBoardValue } from '../boardStore'
 import { config } from '../config'
 import { createLogger, userText } from '../logger'
 import type { WorkspaceService } from '../workspace'
@@ -91,12 +91,11 @@ export async function settleGlobalCommitMessage(): Promise<void> {
 /**
  * The step over a workspace's projects (hidden ones too) and its own defaults, once: each project under its lock (its
  * `stepsDone` and the board's mark checked there first) with its record in the same write; then the workspace's defaults
- * with theirs; then the board's mark. Not before the 1.0 upgrade (its board isn't 1.0's yet), nor after the mark, nor once
- * the workspace has closed. How many it changed; a failure leaves the rest, the mark unset, for the next open.
+ * with theirs; then the board's mark. Not after the mark, nor once the workspace has closed. How many it changed; a failure leaves the rest, the mark unset, for the next open.
  */
 export async function settleCommitMessageDefault(ws: WorkspaceService, hooks: StepHooks = {}): Promise<number> {
   const path = ws.path
-  if (!path || upgradeWaiting(path) || boardValue(ws, COMMIT_MESSAGE_STEP) !== null) return 0
+  if (!path || boardValue(ws, COMMIT_MESSAGE_STEP) !== null) return 0
   const life = ws.lifetime
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path
   let changed = 0

@@ -576,8 +576,6 @@ interface CombworkMessageValues {
   'tips.slotResume.title': undefined
   'tips.slots.text': undefined
   'tips.slots.title': undefined
-  'tips.slotsAdopted.text': undefined
-  'tips.slotsAdopted.title': undefined
   'tips.sortTables.text': undefined
   'tips.sortTables.title': undefined
   'tips.staleMessages.text': undefined

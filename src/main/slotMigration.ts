@@ -24,7 +24,7 @@ import { projectAgents } from '../shared/defaults'
 import { running, type LaneRecord } from '../shared/lanes'
 import { agentWorkflowRole, buildsWork } from '../shared/workflow/roles'
 import { legacyWorktree, rebindSession, setRetiredHomes, setSlotsMigrated } from './agentFolders'
-import { ADOPTION_UPTO, boardRead, boardValue, boardWrite, boardWriteOp, upgradeWaiting } from './boardStore'
+import { ADOPTION_UPTO, boardRead, boardValue, boardWrite, boardWriteOp } from './boardStore'
 import { coalesced } from './coalesce'
 import { samePlace } from './fsutil'
 import { rawLanes } from './lanes'
@@ -126,7 +126,7 @@ export function migrateSlots(ws: WorkspaceService): Promise<void> {
   if (!path || (!app.isPackaged && process.env.CW_TEST_SLOT_MIGRATION === 'off')) return Promise.resolve()
   return coalesced(`slot-migration:${path.toLowerCase()}`, async () => {
     try {
-      if (upgradeWaiting(path) || boardValue(ws, ADOPTION_UPTO) === null) return
+      if (boardValue(ws, ADOPTION_UPTO) === null) return
       const done = migratedIn(ws)
       let lanes: LaneRecord[] | null = null
       // The project folders as the adoption lists them (hidden ones too: their agents' worktrees are theirs), not the

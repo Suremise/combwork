@@ -532,8 +532,6 @@
   "tips.slotResume.title": "Une conversation reprend là où elle a été créée",
   "tips.slots.text": "Avec Où les cartes sont réalisées sur Chaque carte dans son propre dossier, démarrer une carte prête à son auteur un emplacement, un worktree prêt, et y crée la branche de la carte. Un couloir garde son emplacement de carte en carte ; si tous sont pris, il en attend un.",
   "tips.slots.title": "Chaque carte sur sa propre branche",
-  "tips.slotsAdopted.text": "Depuis la mise à niveau, le worktree de chaque auteur est un emplacement qui lui est réservé jusqu’à ce que sa prochaine carte ou son prochain couloir le reprenne. Libérer l’emplacement… dans le menu ⋯ de l’agent en libère un ; une fois libre, Combwork renomme son dossier en nom d’emplacement, en emportant ses conversations.",
-  "tips.slotsAdopted.title": "Les worktrees de tes agents sont désormais des emplacements",
   "tips.sortTables.text": "Clique sur l’en-tête d’une colonne dans les tableaux de Combwork (raccourcis, Performances, Stockage, les vues d’ensemble) pour trier dessus, une deuxième fois pour l’ordre inverse. Combwork mémorise le tri et le nombre de lignes par page de chaque tableau.",
   "tips.sortTables.title": "Trier n’importe quel tableau",
   "tips.staleMessages.text": "Quand l’Assistant transmet quelque chose sur le tour en cours d’une carte, il lie le message à cette carte : si la carte est validée ou commence un autre tour avant que l’agent le lise, Combwork l’abandonne comme périmé, pour qu’aucun agent ne rouvre une carte validée pour un ancien constat.",

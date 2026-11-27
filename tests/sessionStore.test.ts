@@ -46,7 +46,7 @@ const { storeValue, storeTestHooks } = await import('../src/main/storeRows')
 const { sessions } = await import('../src/main/sessions')
 const removal = await import('../src/main/projectRemoval')
 const { workspaceDb } = await import('../src/main/boardStore')
-const { changeSessions, readSessions, sessionRows, sessionsOf } = await import('../src/main/sessionStore')
+const { changeSessions, readSessions } = await import('../src/main/sessionStore')
 const { QUERIES } = await import('../src/main/schema/v1_0')
 type SessionsPlace = import('../src/main/sessionStore').SessionsPlace
 
@@ -233,18 +233,14 @@ describe('changes', () => {
     expect((await run(() => workspace.sessionsFile(p))).sessions.length).toBe(ids.length)
   })
 
-  it("a record from before 0.9.3 has the Assistant's mode it was given as its persona: read as its mode (#1084)", () => {
-    const rows = [{ key: 's:a', doc: JSON.stringify({ ...rec('a'), persona: 'planner' }), ord: 0 }, { key: 's:b', doc: JSON.stringify({ ...rec('b'), persona: 'planner', mode: 'coordinator' }), ord: 1 }]
-    const [a, b] = sessionsOf({ rows, meta: new Map() }).sessions
+  it("a record from before 0.9.3 has the Assistant's mode it was given as its persona: read as its mode (#1084)", async () => {
+    // HI-3602: from a sessions.json moved in (0.9's rows are no longer read).
+    const p = project('persona', { version: 1, sessions: [{ ...rec('a'), persona: 'planner' }, { ...rec('b'), persona: 'planner', mode: 'coordinator' }] })
+    await run(() => workspace.ensureProject(p))
+    await run(() => workspace.projectIds({ fresh: true }))
+    const [a, b] = (await run(() => workspace.sessionsFile(p))).sessions
     expect(a).toEqual(rec('a', { mode: 'planner' }))
     expect(b).toEqual(rec('b', { mode: 'coordinator' }))
-  })
-
-  it('rows and records round-trip, keys kept apart by kind (a deleted id equal to a record id)', () => {
-    const f = { version: 1 as const, sessions: [rec('x'), rec('x')], deleted: ['x'], deletedUsage: [usage('x')] } as unknown as Parameters<typeof sessionRows>[0]
-    const rows = sessionRows(f)
-    expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length)
-    expect(sessionsOf({ rows, meta: new Map() })).toEqual(f)
   })
 })
 

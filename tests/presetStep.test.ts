@@ -8,7 +8,6 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { as09 } from './boardDb'
 
 const base = tempDir('cw-presetstep-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -123,26 +122,18 @@ describe('the answer (#1423)', () => {
     expect(asksPreset(await w.projectConfig(repo), 'none')).toBe(true)
   })
 
-  it("a project from before 1.0 never asks, also before its upgrade has run; an empty 0.9 board's projects get their options (HR3's round 1, finding 1)", async () => {
+  it("a project from before 1.0 never asks, also before its adoption has run; an empty board's projects get their options (HR3's round 1, finding 1)", async () => {
     const ws = join(base, `ws-${++n}`)
     const repo = join(ws, 'p')
     mkdirSync(join(repo, '.combwork'), { recursive: true })
     mkdirSync(join(ws, '.combwork'), { recursive: true })
     git(repo, 'init', '-q', '-b', 'main')
-    // As 0.9 left it: no platform recorded, no workflow, no card on the board.
+    // As a Combwork before 1.0 left it: no platform recorded, no workflow, no card on the board (HI-3602: none made yet).
     writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
-    const w0 = createWorkspaceService()
-    await w0.open(ws)
-    // Its board made (an empty one), then as 0.9 left it.
-    await store.boardWrite(w0, async () => undefined)
-    await disposeWorkspaceService(w0)
-    store.closeBoard(ws)
-    as09(store.boardFile(ws))
     const w = createWorkspaceService()
     await w.open(ws)
     opened.push(w)
     expect(asksPreset(await w.projectConfig(repo), 'git')).toBe(false)
-    await inWorkspace(w, () => store.upgradeBoard(w))
     expect(await adoptNow(w)).toMatchObject({ configured: 1, failed: 0 })
     expect(onDisk(repo)).toMatchObject({ platform: 'git', preset: null, options: { review: 'agent' } })
     expect(asksPreset(await w.projectConfig(repo), 'git')).toBe(false)

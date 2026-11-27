@@ -397,8 +397,6 @@
   "service.targetChanges.setAside": "Deixar de lado",
   "service.targetChanges.show": "Mostrar alterações",
   "service.targetChanges.title": "Alterações sem commit onde {target} está em checkout",
-  "service.templates.v09": "Os modelos do 1.0 não prendem agentes a worktrees, então os modelos do Combwork ficam no lugar deles. Uma cópia {n, plural, one {do modelo} other {dos # modelos}} fica guardada com o backup do quadro do 0.9.",
-  "service.templates.v09Title": "Seus modelos de agentes do 0.9 não são usados no 1.0",
   "service.transcripts.busy": "Esta sessão está sendo arquivada ou excluída. Tente de novo daqui a pouco.",
   "service.transcripts.exported": "{session} · exportada do Combwork em {date}",
   "service.transcripts.imageNotKept": "A imagem não está armazenada na transcrição",
@@ -527,5 +525,7 @@
   "service.gitCommit.stopped": "{action, select, revert {O revert} other {O cherry-pick}} de {commit} parou em {count, plural, one {um conflito em # arquivo} many {conflitos em # arquivos} other {conflitos em # arquivos}}: conclua ou aborte a operação em Controle de versão → Alterações.",
   "service.gitCommit.stoppedEmpty": "{action, select, revert {O revert} other {O cherry-pick}} de {commit} parou: o git diz que não mudaria nada. Pule ou aborte a operação em Controle de versão → Alterações.",
   "service.gitCommit.timedOut": "O git ainda estava rodando depois de {seconds, number} segundos, então o Combwork o encerrou. Olhe Controle de versão → Alterações antes de tentar de novo.",
-  "service.gitRepo.noTagCommit": "O git não tem o commit {commit} para criar uma tag."
+  "service.gitRepo.noTagCommit": "O git não tem o commit {commit} para criar uma tag.",
+  "service.workspace.formatUnknown": "O Combwork não conseguiu ler o quadro deste espaço de trabalho para verificar a versão dele: {error}. Tente abri-lo de novo.",
+  "service.workspace.from09": "Este espaço de trabalho é do Combwork 0.9, e esta versão não pode abri-lo."
 }

@@ -60,20 +60,6 @@ export function windowClaim(ws: WorkspaceService): symbol | null {
   return claims.get(ws)?.token ?? null
 }
 
-/**
- * The window's open is at `step` now: told to its window, and logged with how long the step before took. Only for the
- * claim `token` names (or, without one, an open of `path`): a workspace opened another way (a test, a start) or an
- * operation since replaced changes nothing.
- */
-export function openStep(ws: WorkspaceService, step: OpenProgress['step'], of: { token?: symbol | null; path?: string | null } = {}): void {
-  const c = claims.get(ws)
-  if (!c?.step || (of.token !== undefined && c.token !== of.token) || (of.path !== undefined && c.path !== of.path)) return
-  const now = performance.now()
-  if (c.step !== step) log.info(`opening ${userText(c.name)}: ${c.step} took ${Math.round(now - c.at)} ms`)
-  claims.set(ws, { ...c, step, at: c.step === step ? c.at : now })
-  tell(ws)
-}
-
 function tell(ws: WorkspaceService): void {
   if (ws.window && !ws.window.isDestroyed()) emitTo(ws.window, { type: 'workspace-progress', progress: openProgress(ws) })
 }

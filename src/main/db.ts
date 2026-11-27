@@ -1,6 +1,8 @@
 import { DatabaseSync } from 'node:sqlite'
-import { existsSync, mkdirSync, readdirSync, rmSync } from 'original-fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from 'original-fs'
+import { tmpdir } from 'os'
 import { basename, dirname, join } from 'path'
+import { pathToFileURL } from 'url'
 import { timedStep } from './stallWork'
 
 /**
@@ -14,8 +16,8 @@ import { timedStep } from './stallWork'
 
 /**
  * One step of a database's schema: run once, in its own transaction, in order of `version`. Steps of a `group` (the 1.0
- * upgrade, #1207) run as one: asked first (`OpenOptions.approve`), with the file locked to this connection, after a copy
- * kept for good, all of the group's pending steps in one transaction.
+ * group, #1207) run as one: with the file locked to this connection, after a copy, all of the group's pending steps in
+ * one transaction.
  */
 export interface Migration {
   version: number
@@ -39,6 +41,82 @@ export class DbInUseError extends Error {
   }
 }
 
+/** HI-3602: a file from before `OpenOptions.refuseBefore` (a 0.9 board): refused, nothing beside it made or changed. */
+export class TooOldError extends Error {
+  constructor(
+    file: string,
+    readonly version: number
+  ) {
+    super(`${basename(file)} is at schema version ${version}, from before this build can open`) // i18n-ignore: the board turns it into its message; this is for the log
+    this.name = 'TooOldError'
+  }
+}
+
+/** HI-3602: a file's version couldn't be told without changing it (fileFormat): refused rather than opened unchecked. */
+export class FormatUnknownError extends Error {
+  constructor(file: string, cause: unknown) {
+    super(`${basename(file)}'s schema version couldn't be read: ${cause instanceof Error ? cause.message : String(cause)}`) // i18n-ignore: the log's, and the {error} of the window's message
+    this.name = 'FormatUnknownError'
+  }
+}
+
+/** Seams for unit tests: the WAL snapshot's copy (fileFormat), to make it fail. */
+export const formatTestHooks: { copy?: (from: string, to: string) => void } = {}
+
+/** A file's schema version and whether it has tables (anything worth a copy), as fileFormat reads it. */
+export interface FileFormat {
+  version: number
+  tables: boolean
+}
+
+const fileStamp = (f: string): string => {
+  try {
+    const s = statSync(f)
+    return `${s.size}:${s.mtimeMs}`
+  } catch {
+    return 'none'
+  }
+}
+
+/**
+ * A database file's schema version and whether it has tables (HI-3602), read without making or changing anything beside
+ * it: a 0.9 board is refused untouched. No file: version 0, no tables. The main file is read through SQLite's
+ * `immutable=1`, which creates no `-wal` or `-shm`. A version of the main file can only rise in its WAL, so only one
+ * under `trustFrom` (the version the caller tells apart by) with a `-wal` beside it may be other than it shows (its
+ * commits only in the WAL): that file and its `-wal` are copied into a folder of the system temp, read there (its `-shm`
+ * made there), and the folder removed. Anything that keeps it from being read (unreadable, locked, a copy that changed
+ * while it was made) throws FormatUnknownError, so no caller goes on to open it for writing unchecked.
+ */
+export function fileFormat(file: string, trustFrom = 3): FileFormat {
+  if (!existsSync(file)) return { version: 0, tables: false }
+  const read = (name: string, readOnly: { immutable: boolean }): FileFormat => {
+    const db = new DatabaseSync(readOnly.immutable ? `${pathToFileURL(name).href}?immutable=1` : name, { readOnly: true, timeout: 100 })
+    try {
+      return { version: schemaVersion(db), tables: hasData(db) }
+    } finally {
+      db.close()
+    }
+  }
+  try {
+    const main = read(file, { immutable: true })
+    if (main.version >= trustFrom || !existsSync(`${file}-wal`)) return main
+    const dir = mkdtempSync(join(tmpdir(), 'combwork-format-'))
+    try {
+      const before = [fileStamp(file), fileStamp(`${file}-wal`)].join('|')
+      const copy = formatTestHooks.copy ?? ((from: string, to: string) => copyFileSync(from, to))
+      const name = join(dir, 'board.db')
+      copy(file, name)
+      copy(`${file}-wal`, `${name}-wal`)
+      if ([fileStamp(file), fileStamp(`${file}-wal`)].join('|') !== before) throw new Error('it changed while it was read') // i18n-ignore: the log's, and the {error} of the window's message
+      return read(name, { immutable: false })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  } catch (e) {
+    throw new FormatUnknownError(file, e)
+  }
+}
+
 export interface OpenOptions {
   /** The schema's steps, in order. */
   migrations: Migration[]
@@ -54,11 +132,10 @@ export interface OpenOptions {
    */
   setup?: (db: DatabaseSync, isNew: boolean) => void
   /**
-   * Whether a group's steps may run on a file that has data (a new file takes every step unasked, and a file in the group
-   * already its later steps: HI-1718). Refused, the steps before the group run, and the file opens read-only with
-   * `pending` saying what it waits for. Left out: they run.
+   * HI-3602: a file with tables whose version is under this (a 0.9 board, before the 1.0 group) is refused with
+   * TooOldError before anything opens it for writing (fileFormat): nothing beside it is made or changed.
    */
-  approve?: (pending: PendingGroup) => boolean
+  refuseBefore?: number
   /** Runs with a group's exclusive lock held, before its copy and steps: throwing refuses the group, changing nothing. */
   beforeGroup?: (pending: PendingGroup) => void
   /** For tests: runs once a group's steps are committed, its lock still held (another process trying to open the file meanwhile). */
@@ -160,8 +237,6 @@ export interface Db {
   reader: DatabaseSync
   /** The schema version of a file saved by a newer Combwork (opened read-only), else null. */
   newer: number | null
-  /** A group of steps this file waits for, not approved (opened read-only), else null. */
-  pending: PendingGroup | null
   close: () => void
 }
 
@@ -241,9 +316,6 @@ const backupName = (family: string, version: number, at: Date): string => `${fam
 /** What follows `<family>-v` in a copy's name: its version and time. */
 const BACKUP_REST = /^\d+-(\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z)\.db$/
 
-/** The family a group's copy is kept under (`combwork-before-1.0`): never pruned, and apart from the file's own three. */
-export const groupBackupFamily = (family: string, group: string): string => `${family}-before-${group}`
-
 /** The copies of a family in `dir`, oldest first: only names of the family's exact form, never another's or anything else. */
 export function backupsOf(dir: string, family: string): { file: string; version: number; at: string }[] {
   const prefix = `${family}-v`
@@ -262,16 +334,15 @@ export function backupsOf(dir: string, family: string): { file: string; version:
 
 /**
  * A copy of the file as it is (VACUUM INTO: consistent, synchronous), keeping the newest three of its family in `dir`
- * (#1039), or every one with `keepAll` (a group's copy, #1207). Only names of the family's exact form count, so another
- * database's copies, or anything else in the folder, are never pruned.
+ * (#1039). Only names of the family's exact form count, so another database's copies (the copies 1.0 kept of a 0.9 board,
+ * `combwork-before-1.0-…`), or anything else in the folder, are never pruned.
  */
-export function backupTo(db: DatabaseSync, dir: string, family: string, version: number, at = new Date(), keepAll = false): string {
+export function backupTo(db: DatabaseSync, dir: string, family: string, version: number, at = new Date()): string {
   mkdirSync(dir, { recursive: true })
   const name = backupName(family, version, at)
   const file = join(dir, name)
   rmSync(file, { force: true })
   db.prepare('VACUUM INTO ?').run(file)
-  if (keepAll) return file
   const kept = backupsOf(dir, family)
   for (const c of kept.slice(0, Math.max(0, kept.length - BACKUPS_KEPT))) rmSync(c.file, { force: true })
   return file
@@ -318,13 +389,13 @@ const GROUP_LOCK_WAIT_MS = 10_000
 
 /**
  * Runs the steps the file hasn't had, each in its own transaction, after a copy of a file with data in it. A group's
- * steps run as one (runGroup), once approved; refused, the file stays before the group and its pending group is returned.
+ * steps run as one (runGroup).
  */
-function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGroup | null {
+function migrate(db: DatabaseSync, file: string, opts: OpenOptions): void {
   const from = schemaVersion(db)
   const todo = opts.migrations.filter((m) => m.version > from).sort((a, b) => a.version - b.version)
-  if (!todo.length) return null
-  // A new file has nothing to upgrade: every step runs, as one at a time, unasked.
+  if (!todo.length) return
+  // A new file has nothing to upgrade: every step runs, as one at a time.
   const existing = from > 0 && hasData(db)
   const family = opts.backupFamily ?? basename(file).replace(/\.db$/i, '')
   let copied = false
@@ -359,31 +430,23 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
     while (end < todo.length && todo[end].group === group) end++
     const steps = todo.slice(i, end)
     const pending: PendingGroup = { group, from: schemaVersion(db), to: steps[steps.length - 1].version }
-    const first = Math.min(...opts.migrations.filter((m) => m.group === group).map((m) => m.version))
-    // A file in the group already (asked when it joined, or made in 1.0) takes a later step of it unasked: asked again, a
-    // board an earlier 1.0 upgraded would wait as if from 0.9 (HI-1718).
-    if (pending.from < first && opts.approve && !opts.approve(pending)) {
-      told()
-      return pending
-    }
-    // The copy before the group's first step is kept for good (the way back); one before a later step of it (a file in the
-    // group already) is an ordinary copy, of the file's own three.
-    runGroup(db, file, opts, pending, pending.from < first ? groupBackupFamily(family, group) : null, family, () => steps.forEach(run), copy)
+    // A file in the group already (a board 1.0 made or upgraded) takes its later steps, after an ordinary copy (HI-3602:
+    // a board from before the group, 0.9's, is refused before it opens: refuseBefore).
+    runGroup(db, file, opts, pending, family, () => steps.forEach(run), copy)
     // The group's copy is the file before every step after it too.
     copied = true
     i = end
   }
   told()
-  return null
 }
 
 /**
  * A group's run (#1207, SPEC §16.17): the file locked to this connection for all of it (`locking_mode=EXCLUSIVE`, which
  * SQLite grants only when no other connection has the file open, and while held no other can open it), `beforeGroup`'s
- * check, a copy kept for good, then every step in one transaction (a failure or a crash leaves the file before the group).
+ * check, a copy, then every step in one transaction (a failure or a crash leaves the file before the group).
  * The lock goes back to NORMAL after, whatever happened. Another connection holding the file: DbInUseError, nothing changed.
  */
-function runGroup(db: DatabaseSync, file: string, opts: OpenOptions, pending: PendingGroup, keptFamily: string | null, family: string, steps: () => void, copy: (make: () => void) => void): void {
+function runGroup(db: DatabaseSync, file: string, opts: OpenOptions, pending: PendingGroup, family: string, steps: () => void, copy: (make: () => void) => void): void {
   db.exec('PRAGMA locking_mode = EXCLUSIVE')
   try {
     db.exec(`PRAGMA busy_timeout = ${GROUP_LOCK_WAIT_MS}`)
@@ -399,7 +462,7 @@ function runGroup(db: DatabaseSync, file: string, opts: OpenOptions, pending: Pe
       db.exec(`PRAGMA busy_timeout = ${dbLimits.busyMs}`)
     }
     opts.beforeGroup?.(pending)
-    if (opts.backupDir) copy(() => backupTo(db, opts.backupDir!, keptFamily ?? family, pending.from, new Date(), !!keptFamily))
+    if (opts.backupDir) copy(() => backupTo(db, opts.backupDir!, family, pending.from))
     transaction(db, steps)
     opts.whileGroupLocked?.()
   } finally {
@@ -439,7 +502,8 @@ export function openLockDb(file: string, busyMs: number, schema: string): Databa
 /**
  * Opens (or makes) a database file with its two connections, set up and migrated. A file saved by a newer Combwork (a
  * schema version this build doesn't know) is opened read-only and migrated not at all: `newer` says its version, and
- * every write to it fails. So is one whose group of steps wasn't approved (`pending`). A group refused for another
+ * every write to it fails. One from before `refuseBefore` (a 0.9 board) throws TooOldError before anything opens it for
+ * writing, and one whose version can't be told then FormatUnknownError (fileFormat, HI-3602). A group refused for another
  * connection on the file throws DbInUseError, the file as it was.
  */
 export function openDb(file: string, opts: OpenOptions): Db {
@@ -471,6 +535,11 @@ export function renameVersionColumn(db: DatabaseSync): void {
 }
 
 function openDbNow(file: string, opts: OpenOptions): Db {
+  // HI-3602: told apart before the writer below can change or add anything beside it (configure's WAL, setup, the steps).
+  if (opts.refuseBefore !== undefined) {
+    const f = fileFormat(file, opts.refuseBefore)
+    if (f.tables && f.version > 0 && f.version < opts.refuseBefore) throw new TooOldError(file, f.version)
+  }
   mkdirSync(dirname(file), { recursive: true })
   const writer = new DatabaseSync(file, { timeout: dbLimits.busyMs })
   let reader: DatabaseSync | null = null
@@ -482,8 +551,8 @@ function openDbNow(file: string, opts: OpenOptions): Db {
     const newer = found > known ? found : null
     // The version column's old name (HI-2587, the names upgrade): renamed before anything reads or records a step.
     if (newer === null) renameVersionColumn(writer)
-    const pending = newer === null ? migrate(writer, file, opts) : null
-    if (newer !== null || pending) writer.exec('PRAGMA query_only = ON')
+    if (newer === null) migrate(writer, file, opts)
+    else writer.exec('PRAGMA query_only = ON')
     reader = new DatabaseSync(file, { timeout: dbLimits.busyMs })
     keepStatements(writer)
     keepStatements(reader)
@@ -493,13 +562,12 @@ function openDbNow(file: string, opts: OpenOptions): Db {
     opts.setup?.(reader, false)
     reader.exec('PRAGMA query_only = ON')
     const r = reader
-    const stopCheckpoints = newer === null && !pending ? opts.checkpointer?.(file, writer) : undefined
+    const stopCheckpoints = newer === null ? opts.checkpointer?.(file, writer) : undefined
     return {
       file,
       writer,
       reader: r,
       newer,
-      pending,
       close: () => {
         // HI-3289: the worker holding the write lock, the close's optional writes (PRAGMA optimize may write its statistics)
         // are skipped rather than waited for on main; the PASSIVE checkpoint takes no write lock and never waits.
@@ -510,7 +578,7 @@ function openDbNow(file: string, opts: OpenOptions): Db {
         r.close()
         try {
           if (writer.isTransaction) writer.exec('ROLLBACK')
-          if (newer === null && !pending) {
+          if (newer === null) {
             if (!lockedElsewhere) writer.exec('PRAGMA optimize')
             writer.exec('PRAGMA wal_checkpoint(PASSIVE)')
           }

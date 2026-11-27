@@ -16,7 +16,6 @@
 
 import { AsyncResource } from 'async_hooks'
 import { advanced } from '../advanced'
-import { boardWaits } from '../boardStore'
 import { onCombworkEvent } from '../events'
 import { createLogger, userText } from '../logger'
 import { coalesced } from '../coalesce'
@@ -63,8 +62,7 @@ export function onLineWaitChanged(fn: (ws: WorkspaceService) => void): () => voi
 /** One pass over a workspace's running lanes: each next card's builder's line brought up to date where it is held up. */
 export async function updateLines(ws: WorkspaceService): Promise<void> {
   const path = ws.path
-  // A board waiting for its upgrade to 1.0 has no lanes table yet (HI-1694): its upgrade brings the next pass.
-  if (!path || boardWaits(ws)) return
+  if (!path) return
   const key = path.toLowerCase()
   // The workspace as the pass began: closed, or its window switched to another, it stops (checked before every move).
   const life = ws.lifetime
@@ -205,17 +203,14 @@ const timers = new Map<string, ReturnType<typeof setTimeout>>()
  */
 const root = new AsyncResource('lineUpdates')
 /**
- * A pass soon (once things settle), one at a time per workspace. None for a workspace whose board waits for its upgrade
- * to 1.0 (HI-1694): its lanes aren't in their table yet ("no such table: lanes", seen on every agent's change in another
- * window); the upgrade's own board change brings the next pass.
+ * A pass soon (once things settle), one at a time per workspace.
  */
 function soon(ws: WorkspaceService): void {
   const k = ws.path?.toLowerCase()
-  if (!k || timers.has(k) || boardWaits(ws)) return
+  if (!k || timers.has(k)) return
   const t = root.runInAsyncScope(() =>
     setTimeout(() => {
       timers.delete(k)
-      if (boardWaits(ws)) return
       void coalesced(`lines:${k}`, () => updateLines(ws).catch((e) => log.warn('bringing builders\' branches up to date', e)))
     }, 1000)
   )

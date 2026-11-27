@@ -1,7 +1,8 @@
 // How long the board's reads and writes take on a copy of a real board (#1209's timings, for the cards' storage cards to
-// compare before and after a change): CW_BOARD_BENCH_DB=<a combwork.db> copies it (with its -wal) into tempDir() (the file
-// itself is never opened), upgrades the copy and prints the median of each. Skipped without it. It uses only the board's
-// public calls, so the same file runs on an older commit for the "before".
+// compare before and after a change): CW_BOARD_BENCH_DB=<a 1.x combwork.db> copies it (with its -wal) into tempDir() (the
+// file itself is never opened), opens the copy (taking any later schema steps) and prints the median of each. Skipped
+// without it; a 0.9 board isn't opened any more (HI-3602). It uses only the board's public calls, so the same file runs on
+// an older commit for the "before".
 // focused: opt-in (HI-3558: skipped without CW_BOARD_BENCH_DB, so the focused-test picker leaves it out)
 import { copyFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
@@ -27,7 +28,6 @@ const opened: ReturnType<typeof createWorkspaceService>[] = []
 afterAll(async () => {
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()
-  store.boardTestHooks.upgradeAnswer = null
 })
 
 describe('the board on a real board’s copy', () => {
@@ -39,16 +39,15 @@ describe('the board on a real board’s copy', () => {
     if (existsSync(`${source}-wal`)) copyFileSync(`${source}-wal`, `${file}-wal`)
     const raw = new DatabaseSync(file)
     const numbers = (raw.prepare('SELECT number FROM cards ORDER BY number').all() as { number: number }[]).map((r) => r.number)
-    // The largest card (its document, as 0.9 keeps it), for a comment on it.
-    const largest = raw.prepare('SELECT number, length(doc) AS bytes FROM cards ORDER BY length(doc) DESC LIMIT 1').get() as { number: number; bytes: number }
     raw.close()
-    store.boardTestHooks.upgradeAnswer = 'yes'
     const w = createWorkspaceService()
     await w.open(ws)
     opened.push(w)
     const t0 = performance.now()
     await inWorkspace(w, () => tasks.allTasks(w))
     const openMs = performance.now() - t0
+    // The largest card (its document, as the board composes it), for a comment on it.
+    const largest = store.cardDocs(w).map((c) => ({ number: c.number, bytes: JSON.stringify(c.doc).length })).reduce((a, b) => (b.bytes > a.bytes ? b : a))
     const median = async (fn: () => Promise<unknown>, times: number): Promise<number> => {
       const ms: number[] = []
       for (let i = 0; i < times; i++) {
@@ -103,7 +102,7 @@ describe('the board on a real board’s copy', () => {
       [`the held cards for their costs, in full (allTasks, ${held.length} cards)`]: await median(() => tasks.allTasks(w, { numbers: held }), 7),
       ...(costCards ? { 'the held cards for their costs, what they need (costCards)': await median(() => costCards(w, held), 7) } : {})
     }
-    console.log(`bench: ${numbers.length} cards; opened (and upgraded) with the first read in ${Math.round(openMs)} ms`)
+    console.log(`bench: ${numbers.length} cards; opened with the first read in ${Math.round(openMs)} ms`)
     for (const [k, ms] of Object.entries(results)) console.log(`  ${k}: ${ms.toFixed(1)} ms`)
     expect(Object.values(results).every((ms) => ms >= 0)).toBe(true)
   })

@@ -15,11 +15,6 @@
     "text": "Unknown task #{n}",
     "note": "#910: the words the Agent API always gave (the window says card). Also what a confined agent is told about a card outside its project."
   },
-  "board.error.inUse": {
-    "text": "Another Combwork has this workspace open: close it first.",
-    "note": "An error: the board can't be upgraded to 1.0 while another copy of Combwork (an older version, or another profile) has the workspace open. Nothing was changed.",
-    "audience": "both"
-  },
   "board.error.newer": {
     "text": "This board was saved by a newer version of Combwork. It is shown read-only: update Combwork to change it.",
     "note": "An error: the workspace's task board was saved by a newer Combwork, whose format this version doesn't know; cards can be read but not changed.",
@@ -33,16 +28,6 @@
   "board.error.unavailable": {
     "text": "The board couldn't be opened: {error}",
     "note": "An error: the workspace's task board database couldn't be opened or its cards couldn't be moved into it; {error} says why (from the system, often in English). Nothing was lost: the cards are still where they were.",
-    "audience": "both"
-  },
-  "board.error.upgradeFirst": {
-    "text": "This board is from version 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).",
-    "note": "An error: the workspace's task board hasn't been upgraded to 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board.",
-    "audience": "both"
-  },
-  "board.error.upgradeFirstStart": {
-    "text": "This workspace is from version 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).",
-    "note": "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window.",
     "audience": "both"
   },
   "board.work.changes.noRepository": {

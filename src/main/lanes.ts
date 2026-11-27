@@ -17,7 +17,7 @@ import { onCombworkEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { placeKey, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable, saveTableInBoard } from './storeTables'
-import { beforeBoardCommit, boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
+import { beforeBoardCommit, boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { pickTarget, projectTargets, targetExists, type ProjectTargets } from './workflow/targets'
 import { otherThanOwn, targetedOf, targetOfRulesetId } from '../shared/workflow/compile'
@@ -266,8 +266,7 @@ async function savedLanes(ws: WorkspaceService): Promise<{ version: 1; lanes: Re
   const data = place === null
     ? readTable(path, 'lanes')
     : await openTable(path, 'lanes', file, () => readLanesFile(file))
-  // While the upgrade to 1.0 waits nothing was moved in: looked for again once it is upgraded.
-  if (place !== null && !upgradeWaiting(path)) opened.set(key, place)
+  if (place !== null) opened.set(key, place)
   return { version: 1, lanes: data.docs as Record<string, unknown>[] }
 }
 

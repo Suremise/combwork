@@ -16,9 +16,6 @@
       "n": "plain"
     }
   },
-  "board.error.inUse": {
-    "placeholders": {}
-  },
   "board.error.newer": {
     "placeholders": {}
   },
@@ -29,12 +26,6 @@
     "placeholders": {
       "error": "plain"
     }
-  },
-  "board.error.upgradeFirst": {
-    "placeholders": {}
-  },
-  "board.error.upgradeFirstStart": {
-    "placeholders": {}
   },
   "board.work.changes.noRepository": {
     "placeholders": {}

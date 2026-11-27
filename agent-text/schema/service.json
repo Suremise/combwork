@@ -2027,6 +2027,14 @@
       "name": "plain"
     }
   },
+  "service.workspace.formatUnknown": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "service.workspace.from09": {
+    "placeholders": {}
+  },
   "service.workspace.holdsOpen": {
     "placeholders": {
       "workspace": "plain",

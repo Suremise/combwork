@@ -56,8 +56,8 @@ import { editLanes, endedSinceOf, laneEditOf } from './laneEdits'
 import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } from './laneStart'
 import { loopChecksOf } from './loopCheck'
 import { sweepWorkspaceLeftovers } from './leftovers'
-import { AfterOpen, assertNotOpening, claimWindow, openProgress, openStep, releaseWindow, windowClaim } from './openProgress'
-import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, upgradeBoard } from './boardStore'
+import { AfterOpen, assertNotOpening, claimWindow, releaseWindow } from './openProgress'
+import { boardState, cardHeads, exportBoard, movedNames, projectKeys } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
@@ -136,7 +136,6 @@ import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
 import { settleCommitMessageDefault } from './workflow/commitMessageStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
-import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
 import { checkWorkflowChange, chooseMerge, guardPreview, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { presetNotNow } from './workflow/presetStep'
@@ -410,23 +409,10 @@ async function authorizedMerge(path: string, branch: string | null | undefined, 
   if (r.ok && queued && out) await mergedOutsideQueue(workspace, path, queued.card, typeof out.reason === 'string' ? out.reason.slice(0, 2000) : '').catch((e) => log.warn('recording a merge outside the queue', e))
   return r
 }
-/**
- * What a workspace's opening does with its board, each step in the background. A 0.9 board waiting for its upgrade takes
- * no writes, and its tables aren't 1.0's yet: none of the steps runs on it (HI-1694: the stage repair failed against it),
- * and all of them run once it is upgraded (#1621), with no restart; each changes nothing the second time.
- */
-function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): void {
-  if (boardWaits(ws)) return
+/** What a workspace's opening does with its board, each step in the background; each changes nothing the second time. */
+function boardSteps(ws: WorkspaceService, after?: AfterOpen): void {
   // Each chain timed in the open's "after opening" line (HI-1705), when an open started it.
   const timed = <T>(what: string, p: Promise<T>): Promise<T> => (after ? after.track(what, p) : p)
-  // Just upgraded at the user's word: the adoption and the slots that follow are shown as the open's last steps (HI-1694).
-  const path = ws.path
-  // The upgrade's claim of the window (board:upgrade), which the adoption and slots carry on and let go; none for an
-  // upgrade made another way, so never another operation's.
-  const claim = upgraded && openProgress(ws)?.step === 'upgrade' ? windowClaim(ws) : null
-  const step = (s: 'adoption' | 'slots'): void => {
-    if (claim && path && ws.path === path) openStep(ws, s, { token: claim })
-  }
   // Each card, lane and card watch names its project by its stable id (#508), then old Done cards are archived.
   void timed(
     "projects' ids and keys, old Done cards", // i18n-ignore: a part of a log line's timing
@@ -450,39 +436,25 @@ function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): 
   // Then its agents' worktrees become slots (#1441), each project once, before what changed is observed.
   // And G15 saved before P7 settled once (#1445), so a Pair or Team project gets its preset's On.
   // And a card the board has in Done while its stage isn't (HI-1674) brought into line, before what changed is observed.
-  step('adoption')
   void timed(
     'adoption, slots, repairs and what changed while closed', // i18n-ignore: a part of a log line's timing
     adoptWorkspace(ws)
       .then(() => settleSlotsUpToDate(ws))
       // HI-1997: a commit message a preset stored as Combwork's, switched once to the branch's own (a proven choice kept).
       .then(() => settleCommitMessageDefault(ws))
-      .then(() => step('slots'))
       .then(() => migrateSlots(ws))
       .then(() => repairStages(ws))
       // HI-1697: a merge choice the board recorded and a save stopped before writing to project.json, written there now.
       .then(() => settleMergeChoices(ws))
       // What an interrupted card attachment operation left (HI-1700), settled from its records against the board.
       .then(() => recoverCardAttachments(ws))
-      .finally(() => {
-        releaseWindow(ws, claim)
-        return reconcileWorkspace(ws)
-      })
-  )
-  // 0.9's agent templates copied into the 0.9 backup once after the upgrade (#1436), and a quiet notice saying so.
-  void timed(
-    "0.9's agent templates", // i18n-ignore: a part of a log line's timing
-    copyV09Templates(ws)
-      .then(() => sayV09TemplatesOnce(ws))
-      .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
+      .finally(() => reconcileWorkspace(ws))
   )
   // HI-2059: choices dropped converting MCP servers to added servers, said once.
   void mcp.sayMcpAddedOnce(ws).catch((e) => log.warn('the MCP added-servers notice', e))
 }
 
 export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:info']>, quitControl: QuitControl): void {
-  // A board upgraded to 1.0 while its workspace is open: what its opening skipped, now (#1621).
-  onBoardUpgraded((ws) => boardSteps(ws, true))
   // Each time a workspace opens: Combwork's bundled skills and modes it hasn't got, or has untouched older copies of.
   // After the open, not before it (HI-1705): a launch waits for it.
   WorkspaceService.bringItemsUpToDate = (fresh) => syncBundled({ fresh })
@@ -492,8 +464,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     const ws = workspace
     // Its usage history imports the sessions it had, the first time (#1106), in the background.
     void after.track('usage history', usageHistory.opened(contextWorkspace()!)) // i18n-ignore: a part of a log line's timing
-    // Its board's steps: skipped while the board waits for its upgrade to 1.0, and run again once it is upgraded.
-    boardSteps(contextWorkspace()!, false, after)
+    // Its board's steps.
+    boardSteps(contextWorkspace()!, after)
     // Builds of Combwork left for it while it was closed (#1534), into the journal once.
     void after.track('builds left for it', pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Combwork', e))) // i18n-ignore: a part of a log line's timing
     // What failed or interrupted saves and the project-id migration left in the .combwork folders (#1016).
@@ -935,21 +907,6 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'project:forget': (name) => removal.forgetHidden(name),
     'project:takeRemovedData': (p, keep) => removal.takeRemovedData(p, keep),
     'board:state': () => boardState(currentWorkspace()),
-    'board:upgrade': async () => {
-      const ws = currentWorkspace()
-      // Shown as the open's steps (HI-1694): the upgrade, then the adoption and slots, until they are done.
-      // The window claimed, shown as the open's steps (HI-1694): the upgrade, then the adoption and slots, which carry the
-      // claim on and let it go (boardSteps).
-      const claim = claimWindow(ws, ws.path ?? '', 'upgrade')
-      // Then what the workspace's opening skipped (boardSteps, through onBoardUpgraded): the adoption (#1218), its
-      // agents' worktrees adopted as slots (#1441), 0.9's templates copied aside (#1436), the cards' ids and keys.
-      try {
-        return await upgradeBoard(ws)
-      } finally {
-        // Refused, or upgraded already (nothing pending): no steps after it carry the claim on.
-        if (openProgress(ws)?.step === 'upgrade') releaseWindow(ws, claim)
-      }
-    },
     'tasks:list': (fullArchive) => tasks.windowTasks(workspace, fullArchive === true),
     'tasks:changes': (since) => tasks.windowChanges(workspace, since && typeof since === 'object' && typeof since.board === 'string' && Number.isSafeInteger(since.mark) ? { board: since.board, mark: since.mark } : null),
     'tasks:export': async () => {

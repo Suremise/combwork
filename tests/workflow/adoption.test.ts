@@ -1,17 +1,16 @@
 // The upgrade's adoption (#1218, SPEC §16.17, workflow/adoption.ts): each project gets options matching how it works,
 // cards from before 1.0 are marked and get no facts, and cards in flight are adopted from what their folder shows. Run
 // again, or by two at once, it adds nothing, and a card changed while it runs is never written from stale reads.
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from '../tempDir'
-import { as09, readCard, writeCard, writeCardOutside } from '../boardDb'
+import { readCard, writeCard, writeCardOutside } from '../boardDb'
 import { commit, gitRepo, sh } from './harness'
 import { allOff } from '../../src/shared/workflow/options'
 import { foldCard, type Fact } from '../../src/shared/workflow/facts'
 import { bound } from '../keepType'
-import { timing } from '../timing.cjs'
 
 const base = tempDir('cw-adoption-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -42,7 +41,7 @@ async function open(ws: string): Promise<WS> {
 
 let n = 0
 /**
- * A workspace whose board 0.9 left, upgraded to 1.0 (its adoption not run yet): a Git project `p` (a builder B1 in a
+ * A workspace whose cards are from before 1.0 (its adoption not run yet): a Git project `p` (a builder B1 in a
  * worktree off main, one commit ahead, and a reviewer), a None project `n`, and a card in each column; returns it and
  * where B1's worktree is.
  */
@@ -56,7 +55,6 @@ async function world(): Promise<{ ws: string; w: WS; wt: string }> {
   writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1', worktree: { path: wt, branch: 'cw/b1', base: 'main' } }, { id: 'r1', name: 'R1 (reviewer)' }] }))
   mkdirSync(join(ws, 'n', '.combwork'), { recursive: true })
   writeFileSync(join(ws, 'n', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
-  const w = await open(ws)
   const cards = [
     card(1, 'p', 'todo'),
     card(2, 'p', 'doing', { agent: 'b1', agentName: 'B1' }),
@@ -69,15 +67,16 @@ async function world(): Promise<{ ws: string; w: WS; wt: string }> {
     card(9, '', 'doing'),
     card(10, 'gone', 'review')
   ]
-  for (const c of cards) await writeCard(w, c.number as number, c)
-  // As 0.9 left it, then upgraded: the cards up to here are the adoption's.
-  opened.splice(opened.indexOf(w), 1)
-  await disposeWorkspaceService(w)
-  store.closeBoard(ws)
-  as09(store.boardFile(ws))
-  const up = await open(ws)
-  await inWorkspace(up, () => store.upgradeBoard(up))
-  return { ws, w: up, wt }
+  // Card files from before 0.9, moved in as the board is made: the cards up to here are the adoption's (HI-3602: a 0.9
+  // board, the other source of them, isn't upgraded any more).
+  const files = join(ws, '.combwork', 'tasks')
+  mkdirSync(files, { recursive: true })
+  for (const c of cards) writeFileSync(join(files, `${c.number}.json`), JSON.stringify(c))
+  writeFileSync(join(files, 'board.json'), JSON.stringify({ version: 1, next: cards.length + 1 }))
+  const w = await open(ws)
+  // The board opened (the move in made) before a test reaches its file another way.
+  store.adoptionCards(w)
+  return { ws, w, wt }
 }
 
 /** Runs `fn` once, just after the adoption has classified the cards (its first read after its snapshot is the projects' list). */
@@ -283,34 +282,4 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(after.map((f) => f.kind)).toEqual(['Adopted', 'Submitted', 'Moved', 'ReviewStarted', 'Verdict', 'Moved'])
     for (const f of after) expect([f.kind, f.ruleset]).toEqual([f.kind, adopted])
   })
-})
-
-// A copy of the live board (CW_STORE_ROUNDTRIP_DB, never the file in place): every card handled, none moved, once.
-describe.runIf(!!process.env.CW_STORE_ROUNDTRIP_DB && existsSync(process.env.CW_STORE_ROUNDTRIP_DB))('on a copy of a live board (#1218)', () => {
-  it('handles every card once and moves none', async () => {
-    const ws = join(base, 'live')
-    mkdirSync(join(ws, '.combwork'), { recursive: true })
-    copyFileSync(process.env.CW_STORE_ROUNDTRIP_DB!, join(ws, '.combwork', 'combwork.db'))
-    const w = await open(ws)
-    if (store.upgradeWaiting(ws)) await inWorkspace(w, () => store.upgradeBoard(w))
-    const before = store.adoptionCards(w)
-    // Its projects as plain folders (None): their cards in flight are adopted with nothing read.
-    for (const p of new Set(before.map((c) => c.project).filter((name) => name && /^[\w.-]+$/.test(name)))) {
-      mkdirSync(join(ws, p, '.combwork'), { recursive: true })
-      writeFileSync(join(ws, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
-    }
-    const inFlight = before.filter((c) => !c.archived && ['doing', 'review', 'passed'].includes(c.column) && c.project && existsSync(join(ws, c.project))).length
-    const t0 = performance.now()
-    const r = await adoptNow(w)
-    const ms = performance.now() - t0
-    const after = store.adoptionCards(w)
-    expect(r).not.toBeNull()
-    expect(r!.failed + r!.changed).toBe(0)
-    expect(r!.adopted).toBe(inFlight)
-    expect(after.map((c) => [c.number, c.column])).toEqual(before.map((c) => [c.number, c.column]))
-    // Every card is marked or has facts; none both.
-    for (const c of after) expect(c.preWorkflow !== c.facts).toBe(true)
-    console.log(`adoption of a live board copy: ${after.length} cards, ${r!.adopted} adopted, ${r!.marked} marked in ${ms.toFixed(0)} ms`)
-    expect(await adoptNow(w)).toBeNull()
-  }, timing('test.hang'))
 })

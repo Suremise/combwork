@@ -1,9 +1,7 @@
 // Sessions and deliveries in their 1.0 tables (#1211, schema/sessionDeliveryTables.ts and sessionDeliveryCodec.ts): every record reads back
 // equal as JSON (odd ones too: a field Combwork doesn't know, a null, a lone surrogate, one missing), a change writes only
-// the rows it changed, the 1.0 step moves store_rows' rows into the tables and keeps aside what isn't of Combwork's form, and
-// the queries use their indexes. CW_STORE_ROUNDTRIP_DB=<a combwork.db> runs the step over a copy of that board made in
-// tempDir() (the file itself is never opened): counts equal, every session and delivery equal as JSON.
-import { copyFileSync, existsSync } from 'fs'
+// the rows it changed, a new file takes the 1.0 step (HI-3602: 0.9's store_rows, its input, are no longer moved), and the
+// queries use their indexes.
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
@@ -12,7 +10,7 @@ import { BOARD_MIGRATIONS } from '../src/main/boardStore'
 import { openDb, schemaVersion } from '../src/main/db'
 import { readDelivery } from '../src/shared/deliveries'
 import { deliveryFromRow, deliveryToRow, keptUsageFromRow, keptUsageToRow, sessionFromRows, sessionToRows } from '../src/main/schema/sessionDeliveryCodec'
-import { addDeliveries, addSessionRecords, moveStoreRows, readAgentSessionRecords, readCardSessionRecords, readDeleted, readDeletedUsage, readDeliveries, readDeliveriesWithBases, readSessionRecord, readSessionRecords, saveDeliveryChanges as saveDeliveryChanges1_0, writeDeliveries, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
+import { addDeliveries, addSessionRecords, readAgentSessionRecords, readCardSessionRecords, readDeleted, readDeletedUsage, readDeliveries, readDeliveriesWithBases, readSessionRecord, readSessionRecords, saveDeliveryChanges as saveDeliveryChanges1_0, writeDeliveries, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
 import { saveDeliveryChanges } from '../src/main/deliveryChanges'
 import { QUERIES, V1_0_STEPS } from '../src/main/schema/v1_0'
 
@@ -375,122 +373,12 @@ describe("a host's records in the tables (storeTables.ts)", () => {
 })
 
 describe('the 1.0 step: store_rows into the tables', () => {
-  /** A board file at 0.9's schema (and the group's steps before this one), with these store_rows rows. */
-  function board09(rows: { store: string; scope: string; key: string; ord: number; doc: string }[], metas: [string, string, string, string][] = []): string {
-    const file = join(base, `b-${++n}`, 'combwork.db')
-    const step = BOARD_MIGRATIONS.find((m) => m.name === 'sessions and deliveries in tables')!
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS.filter((m) => m.version < step.version), appVersion: '0.9.3' })
-    try {
-      const put = db.writer.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?)')
-      for (const r of rows) put.run(r.store, r.scope, r.key, r.ord, r.doc)
-      for (const m of metas) db.writer.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?)').run(...m)
-    } finally {
-      db.close()
-    }
-    return file
-  }
-
-  it('every host moves, in order, equal as JSON; the odd ones kept aside; the rows gone and the values kept', () => {
-    const min = (id: string): Rec => ({ id, agent: 'codex', name: 'n', createdAt: at, lastActiveAt: at, archived: false })
-    const edges: Rec[] = [{ ...min('e0'), cards: [] }, JSON.parse(`{"id":"e1","agent":"codex","name":"n","createdAt":"${at}","lastActiveAt":"${at}","archived":false,"__proto__":{"x":1}}`) as Rec, { ...min('e2'), $absent: ['name'], $$y: 2 }]
-    const s = (scope: string, key: string, ord: number, v: unknown) => ({ store: 'sessions', scope, key, ord, doc: typeof v === 'string' && key === 'raw' ? v : JSON.stringify(v) })
-    const file = board09(
-      [
-        s('p1', 's:a', 0, fullSession('a')),
-        s('p1', 's:b', 1, fullSession('b', { cards: undefined })),
-        // The same id twice (a hand edit): the first kept; a row whose JSON is damaged; one without an id.
-        s('p1', 's:#2', 2, fullSession('a', { name: 'second a' })),
-        { store: 'sessions', scope: 'p1', key: 's:x', ord: 3, doc: '{ damaged' },
-        s('p1', 's:#4', 4, { name: 'no id' }),
-        s('p1', 'd:g1', 0, 'g1'),
-        s('p1', 'u:g1', 0, { id: 'g1', provider: 'codex', name: 'g', usage: { inputTokens: 3 } }),
-        s('assistant', 's:as', 0, fullSession('as', { mode: 'coordinator' })),
-        { store: 'deliveries', scope: 'p1', key: 'm1', ord: 0, doc: JSON.stringify(fullDelivery('m1', 1)) },
-        { store: 'deliveries', scope: 'p1', key: 'm2', ord: 1, doc: JSON.stringify(fullDelivery('m2', 2, { conversation: 'c' })) },
-        { store: 'deliveries', scope: 'p1', key: 'bad', ord: 2, doc: JSON.stringify({ id: 'bad' }) },
-        { store: 'deliveries', scope: 'p1', key: 'm3', ord: 3, doc: JSON.stringify(fullDelivery('m3', 3, { body: 'lone \ud800' })) },
-        { store: 'deliveries', scope: 'p1', key: '#4', ord: 4, doc: JSON.stringify({ noId: true }) },
-        ...edges.map((r, i) => s('edges', `s:e${i}`, i, r)),
-        { store: 'deliveries', scope: 'folder:x', key: 'm1', ord: 0, doc: JSON.stringify(fullDelivery('m1', 1)) },
-      ],
-      [
-        ['sessions', 'p1', 'imported', '{"rows":7}'],
-        ['deliveries', 'p1', 'next', '3'],
-        ['deliveries', 'p1', 'invalid', '[{"kept":"before"}]']
-      ]
-    )
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.0.0', approve: () => true })
-    try {
-      const w = db.writer
-      expect(readSessionRecords(w, 'p1')).toEqual([json(fullSession('a')), json(fullSession('b', { cards: undefined }))])
-      expect(readDeleted(w, 'p1')).toEqual(['g1'])
-      expect(readDeletedUsage(w, 'p1')).toEqual([{ id: 'g1', provider: 'codex', name: 'g', usage: { inputTokens: 3 } }])
-      expect(readSessionRecords(w, 'assistant')).toEqual([json(fullSession('as', { mode: 'coordinator' }))])
-      expect(meta(w, 'sessions', 'p1', 'setAside')).toEqual([{ name: 'no id' }, json(fullSession('a', { name: 'second a' })), '{ damaged'])
-      expect(readDeliveries(w, 'p1')).toEqual([{ id: 'bad' }, json(fullDelivery('m1', 1)), json(fullDelivery('m2', 2, { conversation: 'c' })), json(fullDelivery('m3', 3, { body: 'lone \ud800' }))])
-      expect(readDeliveries(w, 'folder:x')).toEqual([json(fullDelivery('m1', 1))])
-      expect(meta(w, 'deliveries', 'p1', 'invalid')).toEqual([{ kept: 'before' }, { noId: true }])
-      // JSON's edges, through the step too.
-      expect(readSessionRecords(w, 'edges').map((r) => JSON.stringify(r))).toEqual(edges.map((r) => JSON.stringify(r)))
-      expect(meta(w, 'deliveries', 'p1', 'next')).toBe(3)
-      expect(meta(w, 'sessions', 'p1', 'imported')).toEqual({ rows: 7 })
-      // The last of its stores: store_rows goes (store_meta stays, with these values).
-      expect(w.prepare("SELECT 1 FROM sqlite_master WHERE name = 'store_rows'").get()).toBeUndefined()
-    } finally {
-      db.close()
-    }
-  })
-
-  it("refuses while store_rows still has another store's rows (they would be lost): the whole group, the file left as it was", () => {
-    const file = board09([{ store: 'lanes', scope: '', key: 'l1', ord: 0, doc: '{"id":"l1"}' }])
-    expect(() => openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.0.0', approve: () => true })).toThrow('store_rows still has rows of lanes (1)')
-    const raw = new DatabaseSync(file, { readOnly: true })
-    try {
-      // As it was: every step before this one (board09 makes it so), none after.
-      expect(schemaVersion(raw)).toBe(BOARD_MIGRATIONS.find((m) => m.name === 'sessions and deliveries in tables')!.version - 1)
-    } finally {
-      raw.close()
-    }
-  })
-
   it('a new file takes the step with nothing to move', () => {
     const file = join(base, `b-${++n}`, 'combwork.db')
     const db = openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.0.0' })
     try {
       expect(schemaVersion(db.writer)).toBe(Math.max(...BOARD_MIGRATIONS.map((m) => m.version)))
       expect(readSessionRecords(db.writer, 'p1')).toEqual([])
-    } finally {
-      db.close()
-    }
-  })
-
-  const live = process.env.CW_STORE_ROUNDTRIP_DB
-  it.skipIf(!live)("moves every session and delivery of a live board's copy: counts equal, each equal as JSON", () => {
-    const copy = join(tempDir('cw-store-roundtrip-'), 'combwork.db')
-    copyFileSync(live!, copy)
-    if (existsSync(`${live}-wal`)) copyFileSync(`${live}-wal`, `${copy}-wal`)
-    const db = new DatabaseSync(copy)
-    try {
-      const before = (store: string): Map<string, unknown[]> => {
-        const out = new Map<string, unknown[]>()
-        for (const r of db.prepare('SELECT scope, key, doc FROM store_rows WHERE store = ? ORDER BY scope, ord, key').all(store) as { scope: string; key: string; doc: string }[]) {
-          if (store === 'sessions' && !r.key.startsWith('s:')) continue
-          out.set(r.scope, [...(out.get(r.scope) ?? []), JSON.parse(r.doc)])
-        }
-        return out
-      }
-      const sessions = before('sessions')
-      const deliveries = before('deliveries')
-      const t0 = performance.now()
-      db.exec('BEGIN')
-      const counts = moveStoreRows(db)
-      db.exec('COMMIT')
-      const ms = Math.round(performance.now() - t0)
-      const total = (m: Map<string, unknown[]>): number => [...m.values()].reduce((a, l) => a + l.length, 0)
-      console.log(`moved ${counts.sessions} of ${total(sessions)} sessions and ${counts.deliveries} of ${total(deliveries)} deliveries in ${ms} ms`)
-      for (const [host, list] of sessions) expect(readSessionRecords(db, host)).toEqual(list)
-      for (const [host, list] of deliveries) expect(readDeliveries(db, host)).toEqual([...list].sort((a, b) => (a as Rec).seq as number - ((b as Rec).seq as number)))
-      expect(counts).toEqual({ sessions: total(sessions), deliveries: total(deliveries) })
     } finally {
       db.close()
     }

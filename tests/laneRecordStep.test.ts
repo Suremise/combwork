@@ -73,7 +73,7 @@ function boardBefore(fill: (db: DatabaseSync) => void): string {
 
 /** The board opened with every step: this one runs as a later step of the 1.0 group. */
 function upgrade(file: string): { tables: string[]; cardCols: string[]; version: number; lanesDocs: unknown[] } {
-  const db = openDb(file, { migrations: store.BOARD_MIGRATIONS, appVersion: '1.0.0', approve: () => true })
+  const db = openDb(file, { migrations: store.BOARD_MIGRATIONS, appVersion: '1.0.0' })
   try {
     const r = db.reader
     return {

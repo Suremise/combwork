@@ -365,7 +365,6 @@ describe("a store's save holds its own connection (#1383)", () => {
   it('a workspace never opened by a window: a persistent read is refused and leaves nothing open (#1395)', () => {
     const ws = workspace()
     expect(() => board.workspaceDb(ws)).toThrow('The workspace was closed')
-    expect(() => board.upgradeWaiting(ws)).toThrow('The workspace was closed')
     expect(board.boardOpen(ws)).toBe(false)
     expect(nothingOpen(ws)).toBe(true)
   })

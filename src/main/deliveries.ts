@@ -37,9 +37,9 @@ import * as assistant from './assistantControl'
 import { config } from './config'
 import { onCombworkEvent } from './events'
 import { placeKey, readCapped, readJson, realPath, renameRetrying, withFileLock } from './fsutil'
-import { openTable, readStore, saveTable, storeValue } from './storeRows'
+import { openTable, saveTable, storeValue } from './storeRows'
 import { measured } from './stallWork'
-import { boardLock, dbGenerationAt, onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
+import { boardLock, dbGenerationAt, onDbReplaced, withLeasedDb, workspaceDb } from './boardStore'
 import { transaction } from './db'
 import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, StaleDeliveries } from './schema/sessionDeliveryTables'
 import { saveDeliveryChanges } from './deliveryChanges'
@@ -573,29 +573,17 @@ export function load(host: string): Promise<Store> {
  */
 async function readSaved(place: HostPlace): Promise<{ records: DeliveryRecord[]; next: number; invalid: unknown[]; base: Map<string, string> }> {
   const file = fileOf(place.host)
-  let raw: unknown[]
-  let value: (key: string) => string | null
-  // The rows' texts as read (none while the upgrade waits: nothing is saved then).
-  let base = new Map<string, string>()
-  if (upgradeWaiting(place.workspace)) {
-    // The workspace's upgrade to 1.0 waits (#1207): its file is 0.9's, its deliveries rows of store_rows; nothing is moved in.
-    const data = readStore(place.workspace, 'deliveries', place.scope)
-    raw = data.rows.map((r) => JSON.parse(r.doc) as unknown)
-    value = (key) => data.meta.get(key) ?? null
-  } else {
-    // In their own table since 1.0 (#1211), deliveries.json moved in the first time (its next id and entries kept aside with it).
-    await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(place.host), DELIVERIES_TABLE)
-    // The rows, their bases and the values beside them, read in one read transaction (one snapshot, #1266 round 3): a
-    // record and its base are the same row's, never two reads another Combwork committed between.
-    const db = workspaceDb(place.workspace).reader
-    db.exec('BEGIN')
-    try {
-      ;({ raw, base, value } = readRows(db, place.scope))
-    } finally {
-      db.exec('COMMIT')
-    }
+  // In their own table since 1.0 (#1211), deliveries.json moved in the first time (its next id and entries kept aside with it).
+  await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(place.host), DELIVERIES_TABLE)
+  // The rows, their bases and the values beside them, read in one read transaction (one snapshot, #1266 round 3): a
+  // record and its base are the same row's, never two reads another Combwork committed between.
+  const db = workspaceDb(place.workspace).reader
+  db.exec('BEGIN')
+  try {
+    return parsedRows(readRows(db, place.scope))
+  } finally {
+    db.exec('COMMIT')
   }
-  return parsedRows({ raw, base, value })
 }
 
 /** A host's delivery rows, their bases and the values beside them, on the connection given (in the caller's transaction). */
@@ -1271,7 +1259,6 @@ async function reconcileLeft(place: HostPlace): Promise<void> {
 function leftOnLease(host: string, place: HostPlace, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined): Promise<DeliveryRecord | null> {
   return withLeasedDb(place.workspace, async (db) => {
     await inLeave?.()
-    if (db.pending) return null
     await openTable(place.workspace, 'deliveries', place.scope, fileOf(place.host), () => readFileOf(place.host), DELIVERIES_TABLE, { db })
     return withFileLock(boardLock(place.workspace), async () =>
       transaction(db.writer, () => {
@@ -2403,12 +2390,10 @@ export async function loadsForTests(): Promise<void> {
 /** For tests: a host's deliveries as saved (#1018: its workspace's database), with what is kept beside them. */
 export async function savedForTests(host: string): Promise<{ next: number | undefined; deliveries: DeliveryRecord[]; invalid?: unknown[] }> {
   const place = await hostPlace(host)
-  // In their table since 1.0 (#1211, store_rows gone); 0.9's rows while the workspace's upgrade waits.
-  const waiting = upgradeWaiting(place.workspace)
-  const old = waiting ? readStore(place.workspace, 'deliveries', place.scope) : null
+  // In their table since 1.0 (#1211, store_rows gone).
   const db = workspaceDb(place.workspace).reader
-  const value = (key: string): string | null => (old ? (old.meta.get(key) ?? null) : storeValue(db, 'deliveries', place.scope, key))
-  const deliveries = old ? old.rows.map((r) => JSON.parse(r.doc) as DeliveryRecord) : (readDeliveryRows(db, place.scope) as unknown as DeliveryRecord[])
+  const value = (key: string): string | null => storeValue(db, 'deliveries', place.scope, key)
+  const deliveries = readDeliveryRows(db, place.scope) as unknown as DeliveryRecord[]
   const next = value('next')
   const invalid = value('invalid')
   return { next: next !== null ? (JSON.parse(next) as number) : undefined, deliveries, ...(invalid ? { invalid: JSON.parse(invalid) as unknown[] } : {}) }

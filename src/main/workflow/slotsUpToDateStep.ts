@@ -22,7 +22,7 @@ import type { ProjectWorkflow } from '../../shared/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { preset, type PresetId, type WorkflowOptions } from '../../shared/workflow/options'
 import { writeWorkflow } from '../../shared/workflow/projectWorkflow'
-import { boardValue, boardWrite, setBoardValue, upgradeWaiting } from '../boardStore'
+import { boardValue, boardWrite, setBoardValue } from '../boardStore'
 import { config } from '../config'
 import { createLogger, userText } from '../logger'
 import type { WorkspaceService } from '../workspace'
@@ -88,13 +88,13 @@ export interface StepHooks {
 
 /**
  * The step over a workspace's projects (hidden ones too), once: each project settled under its lock (its `stepsDone` and
- * the step's mark checked there first) with its record in the same write, then once every project is done the step's. Not before the 1.0
- * upgrade (its board isn't 1.0's yet), nor after the step's mark, nor once the workspace has closed. How many it changed;
+ * the step's mark checked there first) with its record in the same write, then once every project is done the step's.
+ * Not after the step's mark, nor once the workspace has closed. How many it changed;
  * a failure leaves the rest for the next open.
  */
 export async function settleSlotsUpToDate(ws: WorkspaceService, hooks: StepHooks = {}): Promise<number> {
   const path = ws.path
-  if (!path || upgradeWaiting(path) || boardValue(ws, SLOTS_UP_TO_DATE_STEP) !== null) return 0
+  if (!path || boardValue(ws, SLOTS_UP_TO_DATE_STEP) !== null) return 0
   const life = ws.lifetime
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path
   let changed = 0

@@ -231,12 +231,8 @@ interface CombworkMessageValues {
   'workspace.notes.workspaceNotes.off': undefined
   'workspace.notes.workspaceNotes.template': undefined
   'workspace.notes.workspaceNotes.title': undefined
-  'workspace.opening.adoption': undefined
   'workspace.opening.projects': undefined
-  'workspace.opening.slots': undefined
   'workspace.opening.title': { name: string | number }
-  'workspace.opening.upgrade': undefined
-  'workspace.opening.upgradingTitle': { name: string | number }
   'workspace.opening.wait': undefined
   'workspace.overview.agentLabel': { project: string | number; agent: string | number }
   'workspace.overview.apiCost': undefined

@@ -7,7 +7,6 @@ import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
 import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, RESUME_IDLE_ASK, RESUME_IDLE_MINUTES, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { launchPolicy, MCP_ISOLATION, terminalPreset, type LaunchPolicy } from '../shared/launchPolicy'
 import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
-import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
 import { withSessionSigner, type SessionSigner } from './signer/signerRules'
 import { folderChanging, folderSteady, inFolder } from './folderFence'
@@ -2257,14 +2256,10 @@ class SessionManager {
 
   /**
    * Refuses a start while Combwork quits, while the project's workspace is closing or switching, or while a fence holds the
-   * project (it is being removed, or a template is replacing its agents), while its workspace's move is being repaired,
-   * or while its workspace's upgrade to 1.0 waits.
+   * project (it is being removed, or a template is replacing its agents), or while its workspace's move is being repaired.
    */
   private assertStartsAllowed(projectPath: string): void {
     if (this.shuttingDown || workspaceFor(projectPath)?.closing) throw combworkError(msg({ id: 'session.start.closing', defaultMessage: "Combwork is stopping this workspace's agents, so none can start now.", description: 'Starting an agent is refused: Combwork is quitting, or its workspace is closing.' }), undefined, { kind: 'conflict' })
-    // Its workspace's upgrade to 1.0 waits (#1207): combwork.db takes no writes, so the session couldn't be recorded.
-    const ws = workspaceFor(projectPath)?.path
-    if (ws) assertUpgraded(ws)
     if (workspaceFor(projectPath)?.openGate?.held) throw combworkError(msg({ id: 'session.start.openCommands', defaultMessage: "This workspace's open commands are still running: agents start once they're done or you move on.", description: "Starting an agent is refused while the commands the user set to run as the workspace opens are running (Settings → Workspace → When this workspace opens, run), shown in a dialog with Don't wait." }), undefined, { kind: 'conflict' })
     if (workspaceFor(projectPath)?.repairingMove) throw combworkError(msg({ id: 'session.start.repairing', defaultMessage: 'Combwork is repairing this moved workspace: start the agent when Repair has finished.', description: "Starting an agent is refused while Repair… fixes a moved workspace's paths." }), undefined, { kind: 'conflict' })
     const why = this.fenced.get(resolve(projectPath).toLowerCase())?.at(-1)

@@ -8,13 +8,12 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { as09 } from './boardDb'
 
 const base = tempDir('cw-workflowroles-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const store = await import('../src/main/boardStore')
 const { adoptNow } = await import('../src/main/workflow/adoption')
 const { cleanWorkflowRole } = await import('../src/main/projectAgents')
@@ -93,7 +92,7 @@ describe('its readers (#1430)', () => {
 
   const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()
   let n = 0
-  /** A 0.9 workspace (no platform recorded, an empty 0.9 board) whose project `p` has these agents; upgraded and adopted. */
+  /** A workspace from before 1.0 (no platform recorded, no board yet) whose project `p` has these agents; adopted. */
   async function upgraded(agents: { id: string; name: string; role?: string }[]): Promise<Record<string, any>> {
     const ws = join(base, `ws-${++n}`)
     const repo = join(ws, 'p')
@@ -101,16 +100,9 @@ describe('its readers (#1430)', () => {
     mkdirSync(join(ws, '.combwork'), { recursive: true })
     git(repo, 'init', '-q', '-b', 'main')
     writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
-    const w0 = createWorkspaceService()
-    await w0.open(ws)
-    await store.boardWrite(w0, async () => undefined)
-    await disposeWorkspaceService(w0)
-    store.closeBoard(ws)
-    as09(store.boardFile(ws))
     const w = createWorkspaceService()
     await w.open(ws)
     opened.push(w)
-    await inWorkspace(w, () => store.upgradeBoard(w))
     expect(await adoptNow(w)).toMatchObject({ configured: 1, failed: 0 })
     return JSON.parse(readFileSync(join(repo, '.combwork', 'project.json'), 'utf8'))
   }

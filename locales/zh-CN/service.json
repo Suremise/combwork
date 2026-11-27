@@ -397,8 +397,6 @@
   "service.targetChanges.setAside": "搁置",
   "service.targetChanges.show": "显示更改",
   "service.targetChanges.title": "检出 {target} 的位置有未提交的更改",
-  "service.templates.v09": "1.0 的模板不会把智能体固定到工作树，因此由 Combwork 自带的模板取而代之。{n, plural, other {这 # 个模板}}的副本与 0.9 看板备份保存在一起。",
-  "service.templates.v09Title": "你的 0.9 智能体模板在 1.0 中不再使用",
   "service.transcripts.busy": "此会话正在归档或删除。请稍后重试。",
   "service.transcripts.exported": "{session} · {date} 从 Combwork 导出",
   "service.transcripts.imageNotKept": "会话记录中未保存此图片",
@@ -527,5 +525,7 @@
   "service.gitCommit.stopped": "{commit} 的{action, select, revert {还原} other {拣选}}因{count, plural, other {# 个文件中的冲突}}而停下：请在“版本控制”→“更改”中完成或中止它。",
   "service.gitCommit.stoppedEmpty": "{commit} 的{action, select, revert {还原} other {拣选}}已停下：Git 表示它不会更改任何内容。请在“版本控制”→“更改”中跳过或中止它。",
   "service.gitCommit.timedOut": "Git 运行 {seconds, number} 秒后仍未结束，因此 Combwork 结束了它。重试前请先查看“版本控制”→“更改”。",
-  "service.gitRepo.noTagCommit": "Git 中没有要打标签的提交 {commit}。"
+  "service.gitRepo.noTagCommit": "Git 中没有要打标签的提交 {commit}。",
+  "service.workspace.formatUnknown": "Combwork 无法读取此工作区的看板以检查其版本：{error}。请再次尝试打开它。",
+  "service.workspace.from09": "此工作区来自 Combwork 0.9，此版本无法打开它。"
 }

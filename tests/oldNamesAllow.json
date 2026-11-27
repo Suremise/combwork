@@ -1,6 +1,5 @@
 {
   "regions": [
-    { "file": "README.md", "id": "readme-09-folder", "why": "The 0.9.3 upgrade's backup step names the old data folder the user backs up (upgrade input, HI-2631)." },
     { "file": "docs/ARCHITECTURE.md", "id": "arch-folder-move", "why": "The folder move's code map: it names the old folder it renames (upgrade input, HI-2631)." },
     { "file": "docs/SPEC.md", "id": "spec-upgrade-inputs", "why": "§4.1.1 and §4.1.2, the folder move and the names upgrade: the old folders, files, refs, keys and values they convert (upgrade input, HI-2631)." },
     { "file": "docs/SPEC.md", "id": "spec-profile-folders", "why": "§4.3's profile folders: 1.0's profile folder names, which the installer and the profile step move (upgrade input, HI-2631)." },
@@ -50,7 +49,7 @@
     {"file": "tests/nameUpgradeStub.test.ts", "id": "nameUpgradeStub-inputs", "why": "The 1.0 names the upgrade converts, which the test writes as its input."},
     {"file": "tests/journalNames.test.ts", "id": "journalNames-inputs", "why": "The 1.0 names the upgrade converts, which the test writes as its input."},
     {"file": "tests/renamedFresh.test.ts", "id": "renamedFresh-inputs", "why": "The 1.0 names the upgrade converts, which the test writes as its input."},
-    {"file": "tests/e2e/queueupgrade.cjs", "id": "queueupgrade-inputs", "why": "0.9's schema_version column the suite writes, and the log line naming 0.9's board."},
+    {"file": "tests/workspaceVersions.test.ts", "id": "workspaceVersions-inputs", "why": "1.0's folder, board file and columns, and 0.9's, which the test writes as its input (HI-3602)."},
     { "file": "src/main/boardStore.ts", "id": "board-names-step", "why": "The names upgrade's input: the old name it finds and converts (HI-2587)." },
     { "file": "src/main/db.ts", "id": "version-column", "why": "The names upgrade's input: the old name it finds and converts (HI-2587)." },
     { "file": "src/main/logger.ts", "id": "old-logs", "why": "The names upgrade's input: the log files' 1.0 names (HI-2587)." },
