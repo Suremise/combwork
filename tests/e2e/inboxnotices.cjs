@@ -111,7 +111,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     go('notices-go1')
     check("at its next tool call it is told, in Combwork's words with the id only", !!(await until(() => notices('Builder').some((n) => n.at === 'checkpoint'), HUNG_MS)) && notices('Builder')[0].text === `[CW] New in your inbox: 1 message (${m1}). Call cw_inbox now to read it; act on it and ack it, then carry on.`, JSON.stringify(notices('Builder')))
     check('…never with what the message says', !notices('Builder').some((n) => /rebase|user says|push/i.test(n.text)), JSON.stringify(notices('Builder')))
-    check('…it reads it (received, through the inbox) and acks it, still working', !!(await until(() => delivery('Builder', m1)?.state === 'acked', HUNG_MS)) && delivery('Builder', m1)?.receivedVia === 'inbox' && (await status(builder.id)) === 'working', JSON.stringify(delivery('Builder', m1)))
+    check('…it reads it (received, through the inbox) and acks it, still working', !!(await until(() => delivery('Builder', m1)?.state === 'acked', HUNG_MS)) && delivery('Builder', m1)?.readVia === 'inbox' && (await status(builder.id)) === 'working', JSON.stringify(delivery('Builder', m1)))
     go('notices-go2')
     check('…its turn ends as usual, with nothing more to drain', !!(await until(() => idle(builder.id), HUNG_MS)) && notices('Builder').length === 1, JSON.stringify(notices('Builder')))
     check('…and nothing was typed into it', wakes('Builder').length === 0, JSON.stringify(wakes('Builder')))
@@ -135,7 +135,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     go('notices-go5')
     // Its first turn's notices: once at its two tool calls, once before it stops (what comes after is the next turn's).
     check('…told once at its two tool calls and once before it stops, and its turn still ends', !!(await until(() => idle(reviewer.id), HUNG_MS)) && notices('Reviewer').map((n) => n.at).join(',').startsWith('checkpoint,drain'), JSON.stringify(notices('Reviewer')))
-    check('…the message is still unread (it never fetched it)', ['queued', 'offered'].includes(delivery('Reviewer', m3)?.state) && !delivery('Reviewer', m3)?.received, JSON.stringify(delivery('Reviewer', m3)))
+    check('…the message is still unread (it never fetched it)', ['queued', 'offered'].includes(delivery('Reviewer', m3)?.state) && !delivery('Reviewer', m3)?.read, JSON.stringify(delivery('Reviewer', m3)))
   } catch (e) {
     check('no error', false, e.stack)
   } finally {

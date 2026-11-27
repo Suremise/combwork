@@ -76,9 +76,16 @@ export interface DeliveryRecord {
   state: DeliveryState
   created: string
   expires: string
+  /** When its offer was saved, just before its doorbell's first key (or before the launch that carries it starts). */
   offered?: string
   /** How many times it was offered (again after Combwork stopped while offering it). */
   offers?: number
+  /**
+   * HI-3611: when its doorbell woke the agent: its CLI took the line typed for this offer (or the launch that carried it
+   * started). Cleared when it is offered again. Absent when nothing rang for it (the agent read it unprompted, or on a
+   * hook's notice). Not a receipt: `received` is when the agent read it with cw_inbox.
+   */
+  woke?: string
   received?: string
   /** How it was received: fetched with cw_inbox ('typed': its line taken by its CLI, before #650 made the inbox the only receipt). */
   receivedVia?: 'inbox' | 'typed'
@@ -160,8 +167,11 @@ export function moved(r: DeliveryRecord, to: DeliveryState, at: string, detail?:
   if (to === 'offered') {
     next.offered = at
     next.offers = (r.offers ?? 0) + 1
+    // HI-3611: a wake belongs to the offer it answered; this new one hasn't woken the agent yet.
+    delete next.woke
   } else if (to === 'queued') {
     // Not offered after all: as it was before the offer.
+    delete next.woke
     next.offers = Math.max(0, (r.offers ?? 1) - 1)
     if (!next.offers) {
       delete next.offered
@@ -299,7 +309,11 @@ export function inboxSummary(records: readonly DeliveryRecord[], now: number, ov
   return unread.length || overdue ? { unread, overdue } : undefined
 }
 
-/** A delivery as the Agent API and cw_agent_activity show it: its state and times, the start of what it says. */
+/**
+ * A delivery as the Agent API and cw_agent_activity show it: its state and times, in the order they happen, and the start
+ * of what it says. HI-3611: `woke` (its doorbell taken by the agent's CLI) comes before `read` (fetched with cw_inbox), so
+ * how long a wake took is created → woke; the record's `received` is shown as `read`, never mistaken for delivered.
+ */
 export interface DeliveryRow {
   id: string
   kind: DeliveryKind
@@ -309,8 +323,9 @@ export interface DeliveryRow {
   state: DeliveryState
   created: string
   offered?: string
-  received?: string
-  receivedVia?: 'inbox' | 'typed'
+  woke?: string
+  read?: string
+  readVia?: 'inbox' | 'typed'
   acked?: string
   ended?: string
   detail?: string
@@ -327,7 +342,8 @@ export function deliveryRow(r: DeliveryRecord, now: number, textChars = 80, over
     state: r.state,
     created: r.created,
     ...(r.offered ? { offered: r.offered } : {}),
-    ...(r.received ? { received: r.received, ...(r.receivedVia ? { receivedVia: r.receivedVia } : {}) } : {}),
+    ...(r.woke ? { woke: r.woke } : {}),
+    ...(r.received ? { read: r.received, ...(r.receivedVia ? { readVia: r.receivedVia } : {}) } : {}),
     ...(r.acked ? { acked: r.acked } : {}),
     ...(r.ended ? { ended: r.ended } : {}),
     ...(r.detail ? { detail: r.detail } : {}),
@@ -361,7 +377,7 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (r.card !== undefined && !(Number.isInteger(r.card) && (r.card as number) > 0)) return null
   if (r.round !== undefined && !(r.card !== undefined && Number.isInteger(r.round) && (r.round as number) > 0)) return null
   if (r.attempt !== undefined && !(r.card !== undefined && typeof r.attempt === 'string' && /^\d{1,12}\.\d{1,9}$/.test(r.attempt))) return null
-  if (![r.offered, r.received, r.acked, r.ended].every(optTime)) return null
+  if (![r.offered, r.woke, r.received, r.acked, r.ended].every(optTime)) return null
   if (r.offers !== undefined && !(Number.isInteger(r.offers) && (r.offers as number) >= 0)) return null
   if (r.receivedVia !== undefined && r.receivedVia !== 'inbox' && r.receivedVia !== 'typed') return null
   if (r.again !== undefined && !str(r.again, DELIVERY_DETAIL_MAX_CHARS)) return null
@@ -381,7 +397,7 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (r.card) out.card = r.card as number
   if (r.round) out.round = r.round as number
   if (r.attempt) out.attempt = r.attempt as string
-  for (const k of ['offered', 'received', 'acked', 'ended', 'detail'] as const) if (r[k]) out[k] = r[k] as string
+  for (const k of ['offered', 'woke', 'received', 'acked', 'ended', 'detail'] as const) if (r[k]) out[k] = r[k] as string
   if (r.offers) out.offers = r.offers as number
   if (r.receivedVia) out.receivedVia = r.receivedVia as 'inbox' | 'typed'
   if (r.offerRun) out.offerRun = r.offerRun as string

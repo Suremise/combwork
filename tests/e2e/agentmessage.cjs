@@ -135,9 +135,9 @@ const check = (name, ok, extra = '') => {
   check('…not typed while it works', !wakes('Builder').length)
   check('once idle, its doorbell is typed, and the builder reads it', !!(await until(async () => wakes('Builder').some((t) => t === `Add #${c1}'s follow-up to your lane after it.`), lib.timing('hang.step'))) && bells('Builder').includes(`[CW] New in your inbox: 1 message (${mid}). Call cw_inbox to read it, act on it, then ack it.`), JSON.stringify(wakeLog('Builder')))
   // Read (#650: the only receipt): received through the inbox, and no longer unread in the pane; still the builder's to ack.
-  check('…received as it reads it, and no longer unread in its pane', !!(await until(async () => lastDelivery('Builder')?.state === 'received' && lastDelivery('Builder')?.receivedVia === 'inbox' && !(await unread()), lib.timing('hang.ui'))), JSON.stringify(lastDelivery('Builder')))
+  check('…received as it reads it, and no longer unread in its pane', !!(await until(async () => lastDelivery('Builder')?.state === 'received' && lastDelivery('Builder')?.readVia === 'inbox' && !(await unread()), lib.timing('hang.ui'))), JSON.stringify(lastDelivery('Builder')))
   const done = activity('Builder')
-  check('…and its activity says when it was offered and received', done.inbox?.unread === 0 && !!done.inbox.deliveries.at(-1)?.offered && !!done.inbox.deliveries.at(-1)?.received, JSON.stringify(done))
+  check('…and its activity says when it was offered, woke it and was read (HI-3611)', done.inbox?.unread === 0 && !!done.inbox.deliveries.at(-1)?.offered && !!done.inbox.deliveries.at(-1)?.woke && !!done.inbox.deliveries.at(-1)?.read, JSON.stringify(done))
   await until(() => idle(builder.id), lib.timing('hang.ui'))
   // While it acts on that one, a second comes (#1531): one call acks the first and reads the second (ack with read),
   // which is received, not acked.
