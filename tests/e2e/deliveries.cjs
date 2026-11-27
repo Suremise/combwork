@@ -154,7 +154,7 @@ async function start() {
   await until(() => idle(builder.id), HUNG_MS)
   await say(builder.id, 'cw cw_inbox {"ack":["m1"]}')
   check('cw_inbox ack says what it acked', !!(await until(() => toolResults(sessionId).includes('Acked m1.'), HUNG_MS)), JSON.stringify(toolResults(sessionId).slice(-2)))
-  check('…and the Assistant sees it acked, with its times', !!(await until(() => delivery('m1')?.state === 'acked', HUNG_MS)) && ['created', 'received', 'acked'].every((k) => !!delivery('m1')?.[k]) && !delivery('m1')?.overdue, JSON.stringify(delivery('m1')))
+  check('…and the Assistant sees it acked, with its times', !!(await until(() => delivery('m1')?.state === 'acked', HUNG_MS)) && ['created', 'read', 'acked'].every((k) => !!delivery('m1')?.[k]) && !delivery('m1')?.overdue, JSON.stringify(delivery('m1')))
   check('m2, not acked in time, is overdue: in its activity', !!(await until(() => delivery('m2')?.overdue === true, HUNG_MS)), JSON.stringify(delivery('m2')))
   check("…and in the builder's pane", !!(await until(async () => /1 overdue/.test(await paneText()), HUNG_MS)), await paneText())
   await page.screenshot({ path: path.join(lib.WORK, 'deliveries-overdue.png') })

@@ -147,7 +147,7 @@ const check = (name, ok, extra = '') => {
   const mid2 = /\((m\d+), working\)/.exec(second.text)?.[1] ?? '?'
   fs.writeFileSync(path.join(claudeHome, 'agentmessage-ack-go'), '')
   const state = (id) => (activity('Builder').inbox?.deliveries ?? []).find((d) => d.id === id)
-  check('the builder acks the first and reads the second in one call (ack with read): the first acked, the second received only', !!(await until(async () => state(mid)?.state === 'acked' && state(mid2)?.state === 'received' && state(mid2)?.receivedVia === 'inbox', lib.timing('hang.ui'))), JSON.stringify([state(mid), state(mid2)]))
+  check('the builder acks the first and reads the second in one call (ack with read): the first acked, the second received only', !!(await until(async () => state(mid)?.state === 'acked' && state(mid2)?.state === 'received' && state(mid2)?.readVia === 'inbox', lib.timing('hang.ui'))), JSON.stringify([state(mid), state(mid2)]))
   await until(() => idle(builder.id), lib.timing('hang.ui'))
   // The reply it got, from its transcript: the ack line, then the read with the second, to ack once acted on.
   const s = await live(alpha, builder.id)
