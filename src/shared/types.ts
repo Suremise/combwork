@@ -19,6 +19,7 @@ import type { GithubHostSettings } from './githubHost'
 import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
 import type { ConnectionOption } from './templateConnections'
 import type { KeepAwakeSetting } from './keepAwake'
+import type { ExternalTerminalSetting } from './externalTerminal'
 import type { DateFormat, TimeFormat } from './dates'
 import type { ProjectPref } from './uiPrefs'
 import type { GitTool } from './gitTool'
@@ -210,6 +211,8 @@ export interface AppSettings {
     dateFormat: DateFormat
     /** How times show with them: 24-hour (14:05) by default. */
     timeFormat: TimeFormat
+    /** What Open External Terminal Here opens (HI-3582): Automatic (Windows Terminal, else Command Prompt) by default. */
+    externalTerminal: ExternalTerminalSetting
     /** How Combwork names the user to the Combwork Assistant (#426): "User replied to B1 on #399". "User" by default. */
     userName: string
     /** The language Combwork shows (#767): 'auto' (Windows' display languages) or a language's code (de, pl…). */
@@ -1367,12 +1370,10 @@ export interface TaskCard {
  */
 /**
  * The board's state for the window (#1207): why it is read-only (saved by a newer Combwork, or waiting for its upgrade to 1.0,
- * which the user is asked for), and when the copy kept from before its upgrade to 1.0 was made (Help → Restore the 0.9
- * Board Backup… puts it back), if there is one.
+ * which the user is asked for).
  */
 export interface BoardState {
   readOnly: 'newer' | 'upgrade' | null
-  backup09: { at: string } | null
 }
 
 export interface ArchiveBatch {
@@ -2881,6 +2882,12 @@ export interface LiveSessionState {
    * names this block).
    */
   inputBlocked?: { since: string }
+  /**
+   * A message of Combwork's waits on text in its input (HI-3583): a clear before typing was refused with text in its input
+   * box (a draft Combwork couldn't empty, or something its CLI drew there that isn't a suggestion). Shown in its pane until
+   * its box reads empty, a clear succeeds or another run begins.
+   */
+  inputText?: { since: string }
   /**
    * Its CLI's hooks aren't reaching Combwork (#1336), this launch: none came within a while of its start (a CLI that sends one
    * then), or none after a prompt its CLI went to work on (its screen or its records show it). Combwork's status for it may be

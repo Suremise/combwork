@@ -119,8 +119,6 @@
   "tips.boardSetAside.title": "Cartões criados por um Combwork mais antigo",
   "tips.boardStages.text": "As colunas do quadro são as etapas que suas opções do fluxo de trabalho criam: Em merge fica sob Aprovado enquanto o Combwork faz o merge, e uma etapa que ninguém usa fica oculta. Peça ao Assistente para renomear uma, como “chame Fazendo de Construindo no projeto web”: um nome não muda nenhuma regra.",
   "tips.boardStages.title": "O quadro mostra as etapas do seu fluxo de trabalho",
-  "tips.boardUpgrade.text": "O Combwork guarda o quadro 0.9 que atualizou para 1.0. Ajuda → Restaurar o backup do quadro 0.9… o traz de volta, depois de guardar uma cópia do quadro como está, para que a versão 0.9 possa alterá-lo de novo.",
-  "tips.boardUpgrade.title": "Voltar ao 0.9 depois de atualizar",
   "tips.branchCards.text": "Em Controle de versão → Branches e remotes, um branch em que um cartão trabalha mostra o cartão e a etapa dele, e em Revisão a versão em revisão. Clique no cartão para abri-lo.",
   "tips.branchCards.title": "Veja de qual cartão é um branch",
   "tips.branchCleanup.text": "Controle de versão → Branches e remotes agrupa os branches em Em uso, Com merge e Sem merge. Limpar branches com merge feito… exclui os com merge que nada usa, e oferece à parte os dos seus remotes, nunca marcados.",
@@ -664,5 +662,7 @@
   "tips.tagPushDelete.title": "Faça push de uma tag do git ou exclua-a",
   "tips.tagPushDelete.text": "Cada tag em Controle de versão → Histórico tem Fazer push… para enviá-la a um remote, e Excluir… para excluí-la aqui, ou também em um remote para que o próximo fetch não a traga de volta.",
   "tips.commitDetails.text": "Clique em um commit em Controle de versão → Histórico para ver os arquivos e as alterações dele. Dali, use Revert… ou Cherry-pick… no branch da pasta do projeto, ou Criar branch aqui… e Criar tag aqui… nele.",
-  "tips.commitDetails.title": "Faça revert, cherry-pick, branch ou tag de um commit no Histórico"
+  "tips.commitDetails.title": "Faça revert, cherry-pick, branch ou tag de um commit no Histórico",
+  "tips.externalTerminal.title": "Escolha seu terminal externo",
+  "tips.externalTerminal.text": "Abrir terminal externo aqui abre o Windows Terminal na pasta do projeto, ou o Prompt de Comando onde o Windows Terminal não abre. Para ter sempre o Prompt de Comando ou o PowerShell, escolha em Configurações → Geral → Terminal externo."
 }

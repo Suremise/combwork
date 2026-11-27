@@ -3090,6 +3090,27 @@
   "settings.general.dateFormat.title": {
     "placeholders": {}
   },
+  "settings.general.externalTerminal.desc": {
+    "placeholders": {}
+  },
+  "settings.general.externalTerminal.option.auto": {
+    "placeholders": {}
+  },
+  "settings.general.externalTerminal.option.cmd": {
+    "placeholders": {}
+  },
+  "settings.general.externalTerminal.option.powershell": {
+    "placeholders": {}
+  },
+  "settings.general.externalTerminal.option.wt": {
+    "placeholders": {}
+  },
+  "settings.general.externalTerminal.tip": {
+    "placeholders": {}
+  },
+  "settings.general.externalTerminal.title": {
+    "placeholders": {}
+  },
   "settings.general.keepAwake.desc": {
     "placeholders": {}
   },

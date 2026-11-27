@@ -10,31 +10,29 @@
 
 ---
 
-Combwork is a free, open-source Windows app for running coding agents. It looks and feels like a streamlined VS Code, but it is built around **agent sessions** rather than a text editor. Open a workspace, mark the projects you're working on, and give each one an agent, a builder and a reviewer, or a whole team: **Claude Code**, **Codex**, the **GitHub Copilot CLI**, Google's **Antigravity CLI**, **OpenCode** and Meta's **Muse Code**, side by side in one project if you like, or a CLI you describe yourself. A task board, reviews and a merge queue keep their work in order, by rules you set, in Git or jj. Combwork shows what every agent is doing and what it costs, and tells you when one finishes or needs you. An **Assistant** in each workspace can run the work for you: it plans cards, starts lanes, follows each one to the end and asks you only for real decisions.
+Combwork is a free, open-source Windows app for running coding agents. It looks and feels like a streamlined VS Code, but it is built around **agent sessions** rather than a text editor. Open a workspace, mark the projects you're working on, and give each one an agent, a builder and a reviewer, or a whole team: **Claude Code**, **Codex**, the **GitHub Copilot CLI**, Google's **Antigravity CLI**, **OpenCode** and Meta's **Muse Code**, side by side in one project if you like, or a CLI you describe yourself. A task board, reviews and a merge queue keep their work in order, by rules you set, and pull requests and issues from GitHub can be cards too. Combwork shows what every agent is doing and what it costs, and tells you when one finishes or needs you. An **Assistant** in each workspace can run the work for you: it plans cards, starts lanes, follows each one to the end and asks you only for real decisions.
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="docs/images/hero-light.png">
   <img src="docs/images/hero.png" alt="Combwork in Panes: six agents on one project, Claude Code builders above Codex reviewers, each on a card, and the Assistant beside them following the lanes">
 </picture>
 
-## What's new in 1.6
+## What's new in 1.7
 
-- **More CLIs** — Muse Code is a sixth provider. A CLI Combwork has no provider for can run from a JSON description, on a model server of yours too.
-- **Reviewing a card's work** — each revision shows its own diff. Comment on its lines and send all your comments to the builder as one fix round.
-- **jj** — Combwork can integrate a passed card itself after its checks, or when you click **Integrate**. The Repository section says who brings each card in.
-- **Card loops** — a card that goes round in circles stops, a lane switches to a card its current card waits on, and you choose what wakes the Assistant.
-- **Merge guards** — patterns a merge may not add, each with a message saying what to do instead.
-- **Busy machines** — time limits and waits that fit a slower or loaded machine. Cancelling a git command doesn't cut its work short, and resuming a long-idle conversation asks first.
-- **Safer agent writes** — a stale agent can't move the wrong card, and a retried write is applied once.
+- **GitHub pull requests** — review an incoming pull request as a card, see its comments and review threads there, and send your review back from your own GitHub account. **Address feedback** turns the comments you tick into a fix card, and a card can finish as a pull request instead of a merge.
+- **GitHub issues** — make cards from a project's open issues, and **Close Shipped Issues…** closes them as *Fixed in* the release that shipped them.
+- **More of git in Version Control** — Workflow's options on tabs; a commit's details, **Revert…** and **Cherry-pick…** in History, and **Moves** to undo a branch's moves; rename branches, push or delete tags, your stashes, and **Continue** or **Abort** for an unfinished merge or rebase. **Repository health** runs git's own repairs, and the Files tab discards or restores a file.
+- **The Activity map** — click a station to see what's behind it, or a row to find it in the list; one agent picker, and a new look in both themes.
+- **1.7.1** — on Windows 10, Claude Code's prompt suggestion no longer holds up Combwork's messages, and **Settings → General → External terminal** chooses what **Open External Terminal Here** opens, Windows Terminal or not.
 
-The [release notes](CHANGELOG.md) have the full list, and what 1.4 and 1.5 added.
+The [release notes](CHANGELOG.md) have the full list, and what 1.5 and 1.6 added.
 
 ## Highlights
 
 - **Workflows and lanes** — each project chooses its workflow in its **Version Control** tab: **Solo**, **Pair** or **Team**, or your own options for who reviews the work, which checks pass first, who merges it and where cards are built. Give a builder and a reviewer a list of cards and they work through it as a **lane**: the builder submits each card, the reviewer approves it or sends it back with findings, and Combwork moves the card by your rules, refusing a move they don't allow and saying what to do next.
 - **The merge queue** — with **Combwork merges**, each approved card goes into the project's merge queue. Combwork merges it in a folder of its own, runs your checks on the merged result, and moves the target branch only once they pass: work that fails goes back to its builder. Each card is built in a **slot** (a folder and branch of its own), and reviewers read it in a review copy.
 - **Accounts and connections** — Combwork keeps your Claude Code and Codex sign-ins in **Settings → Accounts & Connections**, so you can use several side by side (two plans, or a work and a personal account); GitHub Copilot uses its one sign-in for the PC. A Claude Code account can also get its model from a server such as DeepSeek, Ollama on this PC or your own gateway. Every agent, and the Assistant, runs on the connection it chooses, and your terminal's own sign-ins stay yours.
-- **The MCP catalogue** — install MCP servers from Combwork's own catalogue or one you add. Combwork checks what each needs on this PC, checks the download against the catalogue's size and checksum, and shows what it runs before you add it to a project.
+- **Pull requests as cards** — **From GitHub…** on the task board makes a card of a pull request on the project's GitHub repository: its builder runs your checks on the pull request's branch, and its review goes back to GitHub from your own account, drafted by the reviewer agent for you to edit, or as you set. What a pull request says reaches agents only quoted, never as instructions, and approving and merging stay yours. Combwork works with GitHub only through your own GitHub CLI and its sign-in.
 - **Pause the Team** — before you install an update while agents are at work, pause the team: no lane starts its next card and the merge queue takes no new one, each agent finishes its turn and commits its work, and Combwork says when everything has parked. After the update, the agents carry on where they were.
 
 <table>
@@ -42,7 +40,7 @@ The [release notes](CHANGELOG.md) have the full list, and what 1.4 and 1.5 added
     <td width="50%">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/images/workflow-light.png">
-        <img src="docs/images/workflow.png" alt="The Version Control tab's Workflow section: the Solo, Pair and Team presets, and the options for review, each with where its value comes from" width="100%">
+        <img src="docs/images/workflow.png" alt="The Version Control tab's Workflow section on its Overview tab: the Solo, Pair and Team presets, with tabs for review and checks, merging, where cards are built, GitHub, and loops and stages" width="100%">
       </picture>
     </td>
     <td width="50%">
@@ -68,7 +66,10 @@ The [release notes](CHANGELOG.md) have the full list, and what 1.4 and 1.5 added
   </tr>
   <tr>
     <td width="50%">
-      <img src="docs/images/catalogue.png" alt="The MCP view's Catalogue: servers from Combwork's own catalogue, with search and filters, and a server's requirements checked on this PC" width="100%">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/images/pr-card-light.png">
+        <img src="docs/images/pr-card.png" alt="A pull request's card: its source on GitHub, who wrote it and a warning that its author isn't a member, the review to post to GitHub, and the pull request's comments ticked for Address feedback" width="100%">
+      </picture>
     </td>
     <td width="50%">
       <img src="docs/images/pause.png" alt="Pausing the team: the lanes held, and the Progress panel listing the agents still running until they park, with Resume the Team" width="100%">
@@ -85,15 +86,15 @@ The [release notes](CHANGELOG.md) have the full list, and what 1.4 and 1.5 added
 - **Reviewing a card's work** — each revision of a card shows its own diff; comment on its lines and send all your comments to the builder as one fix round.
 - **Card loops** — a builder and a reviewer work through a lane of cards; edit a lane's cards yourself, and a lane switches to a card its current card waits on. A card that goes round in circles stops for a **simplify check** (after 12 turns by default) and a **hard stop** (after 30).
 - **Merge guards** — patterns a merge may not add, such as your own name, each with a message saying what to do instead.
-- **jj (Jujutsu)** — a jj repository, colocated with Git or not, can be a project's version control: cards run in jj workspaces, and Combwork integrates a passed card itself after its checks, or when you click **Integrate**, or leaves it to you. Undoing a jj operation can be previewed.
+- **GitHub issues and pull requests** — make cards from a project's open issues, and close them as *Fixed in* a release once it ships; **Address feedback** turns a pull request's comments into a fix card, and **Who merges → A pull request** finishes each approved card as a pull request into its target.
 - **Git, done for you** — **Start the next version…** makes the next version's branch and points work at it; signed merges without waiting, submodules and Git LFS in slots, and merges against your team's remote.
-- **The Activity map** — every agent's tool calls at a glance, as a honeycomb.
+- **The Activity map** — every agent's tool calls at a glance, as a honeycomb: click a station for the programs, files, subagents and tools behind it.
 - **Assistant** — one per workspace, in a panel beside your agents: ask it what they are doing, or let it run the work. Four working modes (Coordinator, Planner, QA triager and Release manager) or your own; you decide how far it may go, and **Undo** takes back what it changed.
 - **Live status** — every agent shows whether it is working, waiting for you, waiting for a card or done; a chime and a Windows notification tell you when one finishes or needs input, even from the tray.
 - **Tokens and plan usage** — tokens and API-equivalent cost per project and for the workspace, what each card cost, and each connection's plan limits with warnings.
 - **Transcript viewer** — read every session in full, including what came before each compaction, search across sessions, export as Markdown and resume.
-- **Files and Version Control** — a file browser with an editor and previews for Markdown, CSV, HTML, SVG, images and PDFs; changes, history, branches and remotes, with side-by-side diffs; `CLAUDE.md`, `AGENTS.md` and Claude Code's auto memory editable in place.
-- **Skills and MCP servers** — every Combwork skill reaches every agent, of any CLI, the bundled ones for card loops, merging and handovers among them; an MCP server runs only in the projects you add it to.
+- **Files and Version Control** — a file browser with an editor and previews for Markdown, CSV, HTML, SVG, images and PDFs; changes, stashes, history (revert, cherry-pick, and undoing a branch's moves), branches, tags and remotes, with side-by-side diffs, a way out of an unfinished git operation and git's own repairs in **Repository health**; `CLAUDE.md`, `AGENTS.md` and Claude Code's auto memory editable in place.
+- **Skills and MCP servers** — every Combwork skill reaches every agent, of any CLI, the bundled ones for card loops, merging and handovers among them; MCP servers install from Combwork's catalogue or one you add, checked on this PC first, and each runs only in the projects you add it to.
 - **Agent API** — every session gets Combwork's built-in `combwork` MCP server (a tool for each step of a card's work, shared notes, handovers and notices for you), and scripts get the same through a local REST API.
 - **Nothing left running** — Combwork keeps track of what each agent starts, and offers to end what a stopped agent left running: a preview server, a watcher, a shell.
 - **Several windows** — one workspace per window, each with its own projects and agents.
@@ -113,6 +114,7 @@ The seven languages besides English were translated by AI, and Combwork says so 
 - Windows 10 or 11 (x64)
 - At least one coding agent CLI, the standalone one: [Claude Code](https://code.claude.com/docs/en/setup), [Codex](https://developers.openai.com/codex), the [GitHub Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli), Google's [Antigravity CLI](https://antigravity.google), [OpenCode](https://opencode.ai/docs) (version 2; OpenCode 1 isn't supported) or Meta's [Muse Code](https://dev.meta.ai/docs/muse-code), on your own plan, or Claude Code or a CLI you describe with a model server such as DeepSeek or Ollama. Help → Provider Setup offers to install them, except Muse Code, which Meta's own installer installs; Claude Code, Codex, OpenCode and Muse Code sign in under Settings → Accounts & Connections, and GitHub Copilot and Antigravity once for the whole PC. Copies built into editor extensions are not used.
 - Git (optional): for Version Control, slots and the merge queue. Projects without it get workflows too.
+- The [GitHub CLI](https://cli.github.com/) (`gh`, optional): for pull requests and issues, signed in (`winget install GitHub.cli`, then `gh auth login`). Combwork works with GitHub only through it and stores no token.
 
 ## Install
 
@@ -139,7 +141,9 @@ npm run release    # build and upload a draft GitHub release (see RELEASING.md)
 
 | Path | Contents |
 |---|---|
-| `src/main` | Electron main process: workspaces, sessions (node-pty), hooks, Agent API, tray |
+| `src/main` | Electron main process: workspaces, sessions (node-pty), hooks, Agent API, lanes, GitHub through `gh`, tray |
+| `src/main/workflow` | The workflow's rules for each move, the merge queue and its checks, pull-request finishes |
+| `src/main/platform` | Version control behind one interface: Git, and None for a project without it |
 | `src/main/providers` | Provider adapters (Claude Code, Codex, GitHub Copilot, Antigravity, OpenCode, Muse Code) and CLIs from a description: launch, hooks, transcripts, usage |
 | `src/main/mcp/cw-mcp.ts` | The built-in `combwork` MCP server |
 | `src/preload` | Typed bridge between the UI and the main process |
@@ -147,7 +151,7 @@ npm run release    # build and upload a draft GitHub release (see RELEASING.md)
 | `src/shared` | Types, defaults and provider descriptors shared by both sides |
 | `tests/` | Unit tests (Vitest) and end-to-end suites (`tests/e2e`, Playwright) |
 | `docs/` | Specification, user guide, Agent API reference, architecture |
-| `scripts/` | Icon generation, third-party licence notices |
+| `scripts/` | Installer and release builds, translation and repository checks, icons, third-party licence notices |
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it fits together and [docs/SPEC.md](docs/SPEC.md) for product decisions.
 

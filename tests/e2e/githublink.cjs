@@ -76,7 +76,7 @@ const calls = () => fs.readFileSync(callLog, 'utf8').trim().split('\n').filter(B
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(page, 'workflow')
     const form = page.locator('.workflow-form')
     await lib.workflowTab(form, 'github')
     const link = form.locator('[data-group="githubLink"]')

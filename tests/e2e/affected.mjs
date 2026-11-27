@@ -205,7 +205,7 @@ export const AREAS = [
   // Switching the version control (#1419): the switch, detection's offers, the shared rules.
   { paths: ['src/main/workflow/platformSwitch.ts', 'src/main/platform/registry.ts', 'src/shared/platform/switching.ts', 'src/shared/workflow/projectWorkflow.ts'], suites: ['vcswitch', 'versioncontrol', 'workflowoptions'] },
   { paths: ['src/main/gitInit.ts', 'src/shared/gitInit.ts', 'src/renderer/src/components/InitRepo.tsx'], suites: ['gitinit', 'gitview'] },
-  { paths: ['src/main/freshPath.ts', 'src/main/externalTerminal.ts'], suites: ['freshpath', 'gitmissing', 'providers'] },
+  { paths: ['src/main/freshPath.ts', 'src/main/externalTerminal.ts', 'src/shared/externalTerminal.ts'], suites: ['freshpath', 'gitmissing', 'providers'] },
   // The providers' version checks' GET (#1582): the test copies turn the checks off, so these drive its callers only.
   { paths: ['src/main/plainHttpsJson.ts'], suites: ['providers', 'providerdetect', 'setupcopy', 'setuplayout'] },
   { paths: ['src/main/testedClis.ts', 'src/shared/testedClis.ts', 'resources/tested-clis.json', 'scripts/testedClis.mjs', 'scripts/tested-clis.mjs', 'scripts/release.mjs'], suites: ['testedclis'] },
@@ -517,7 +517,7 @@ export const AREAS = [
   // A request's or a decision's short plain form (#1635): For you's chip, the inbox's rows, a card's decision count.
   { paths: ['src/shared/gist.ts'], suites: ['foryou', 'inbox', 'decisions'] },
   { paths: ['src/main/tasks.ts', 'src/main/lanes.ts', 'src/shared/lanes.ts', 'src/main/workflow/cardWork.ts', 'src/main/workflow/recorder.ts', 'src/main/workflow/runtime.ts', 'src/shared/workflow/workView.ts', 'tests/e2e/foryou.cjs'], suites: ['foryou'] },
-  { paths: ['src/main/tray.ts', 'src/renderer/src/chime.ts', 'src/shared/bursts.ts'], suites: ['bursts', 'bell', 'banners'] },
+  { paths: ['src/main/tray.ts', 'src/renderer/src/chime.ts', 'src/shared/chime.ts', 'src/shared/bursts.ts'], suites: ['bursts', 'bell', 'banners'] },
   { paths: ['src/main/notices.ts', 'src/main/planUsage.ts'], suites: ['banners'] },
   // One notification system (HI-2320): the routing table, tell(), the pop-ups, the bell and its buttons.
   { paths: ['src/shared/notify.ts', 'src/main/notify.ts', 'src/main/outcomes.ts', 'src/renderer/src/components/Popups.tsx', 'src/renderer/src/entryConditions.ts', 'tests/e2e/notifyonce.cjs'], suites: ['notifyonce', 'banners', 'bell', 'bursts', 'notifytarget'] },
@@ -531,7 +531,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/pendingMoves.ts'], suites: ['placement', 'tilesview', 'reorder', 'swap'] },
   { paths: ['src/main/docSections.ts', 'src/shared/docSections.ts', 'src/main/mcp/', 'src/shared/toolReplies.ts'], suites: ['docsections', 'replysize'] },
   { paths: ['src/shared/docRefs.ts', 'src/main/docSections.ts', 'src/main/taskStart.ts', 'src/main/tasks.ts', 'src/renderer/src/components/Board.tsx', 'src/renderer/src/components/DocRefViewer.tsx'], suites: ['cardcontext'] },
-  { paths: ['src/renderer/src/components/TerminalView.tsx', 'src/renderer/src/fileLinks.ts', 'src/shared/fileLinks.ts', 'src/renderer/src/cardLinks.ts', 'src/shared/cardLinks.ts', 'src/shared/osc52.ts', 'src/renderer/src/hiddenTerminalRedraws.ts'], suites: ['filelinks', 'cardlinks', 'image', 'restart', 'rendercrash', 'termsize', 'hiddenredraw', 'pageswitch', 'assistantbatch', 'copilotsize', 'copilotcopy', 'atlasmerge'] },
+  { paths: ['src/renderer/src/components/TerminalView.tsx', 'src/shared/windowsPty.ts', 'src/renderer/src/fileLinks.ts', 'src/shared/fileLinks.ts', 'src/renderer/src/cardLinks.ts', 'src/shared/cardLinks.ts', 'src/shared/osc52.ts', 'src/renderer/src/hiddenTerminalRedraws.ts'], suites: ['filelinks', 'cardlinks', 'image', 'restart', 'rendercrash', 'termsize', 'hiddenredraw', 'pageswitch', 'assistantbatch', 'copilotsize', 'copilotcopy', 'atlasmerge'] },
   { paths: ['src/renderer/src/deferredFocus.ts'], suites: ['progress', 'restart', 'termsize', 'assistantbatch'] },
   { paths: ['src/shared/sessionEpoch.ts'], suites: ['assistantbatch', 'restart', 'termsize', 'pageswitch'] },
   { paths: ['src/renderer/src/components/Inbox.tsx', 'src/renderer/src/inbox.ts', 'src/shared/inbox.ts'], suites: ['inbox', 'attention', 'bell', 'signin'] },
@@ -1009,6 +1009,8 @@ export const UNIT_SCANS = [
   // one, or a change to a listed file (a rename of its function), can break it.
   { test: 'tests/dbWrites.test.ts', paths: ['src/main/'], lines: ['withFileLock', 'boardLock', 'leaseDb', 'withLeasedDb'] },
   { test: 'tests/dbWrites.test.ts', paths: ['src/main/boardStore.ts', 'src/main/deliveries.ts', 'src/main/sessionStore.ts', 'src/main/storeRows.ts', 'src/main/storeTables.ts'] },
+  // HI-3606: the board's migrations, the schema modules and the database layer, read against the v1.0.0 tag's (HI-2462).
+  { test: 'tests/combworkMove10.test.ts', paths: ['src/main/boardStore.ts', 'src/main/db.ts', 'src/main/schema/'] },
   { test: 'tests/legacyWorktreeGate.test.ts', paths: ['src/'], lines: ['worktree'] },
   { test: 'tests/i18nFormatting.test.ts', paths: ['src/'], lines: ['toLocale', 'Intl\\.', 'i18n-ignore'] },
   { test: 'tests/userGuide.test.ts', paths: ['src/renderer/src/'], lines: ['openGuideAt'] },

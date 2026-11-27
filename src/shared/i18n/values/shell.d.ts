@@ -8,7 +8,6 @@ interface CombworkMessageValues {
   'shell.about.dataFolder': undefined
   'shell.about.legal': { app: string | number; companies: string | number; products: string | number }
   'shell.about.licence': undefined
-  'shell.about.noCli': undefined
   'shell.about.noLicences': undefined
   'shell.about.noLicencesDetail': undefined
   'shell.about.productOf': { product: string | number; company: string | number }
@@ -71,7 +70,6 @@ interface CombworkMessageValues {
   'shell.command.help.improveTranslation': undefined
   'shell.command.help.logs': undefined
   'shell.command.help.releaseNotes': undefined
-  'shell.command.help.restoreBoard09': undefined
   'shell.command.help.shortcuts': undefined
   'shell.command.help.tips': undefined
   'shell.command.hooks.adminSnippet': undefined
@@ -435,7 +433,6 @@ interface CombworkMessageValues {
   'shell.tip.app.quitAll': { n: string | number }
   'shell.tip.help.devConsole': undefined
   'shell.tip.help.improveTranslation': undefined
-  'shell.tip.help.restoreBoard09': undefined
   'shell.tip.window.closeQuit': undefined
   'shell.tip.window.closeSeveral': undefined
   'shell.tip.window.closeToTray': undefined

@@ -15,6 +15,24 @@ export function isTyping(data: string): boolean {
 }
 
 /**
+ * xterm's replies to the program, as REPLIES has them but not the keys among them: focus in/out, cursor and status
+ * reports, device attributes, window reports, and OSC/DCS/APC/PM/SOS strings.
+ */
+const ONLY_REPLIES = /\x1b\[[IO]|\x1b\[\d+;\d+R|\x1b\[\d*n|\x1b\[[?>=][\d;]*c|\x1b\[[\d;]*t|\x1b[\]P_^X][\s\S]*?(?:\x07|\x1b\\)/g
+/** Keys that leave a CLI's input as it was: Left and Right (plain or modified), Shift+Tab, then Esc and Ctrl+C. */
+const NO_TEXT_KEYS = /\x1b\[(?:1;\d+)?[CDZ]|\x1bO[CD]|[\x1b\x03]/g
+
+/**
+ * Whether what the user's terminal sent (as sent: `data`, before typedText) may have put text into a CLI's input
+ * (HI-3598): anything but xterm's replies and the keys that leave it as it was (Esc, Ctrl+C, Shift+Tab, Left, Right).
+ * A letter, a paste, Tab (Claude Code takes its suggestion), Up or Down (a prompt from its history), Ctrl+V or Ctrl+Y
+ * may.
+ */
+export function mayWriteText(data: string): boolean {
+  return data.replace(ONLY_REPLIES, '').replace(NO_TEXT_KEYS, '') !== ''
+}
+
+/**
  * What Ctrl+C or Ctrl+V does in an agent's terminal (#1286): Combwork's copy (Ctrl+C with a selection) or paste, or the
  * CLI's ('cli': xterm sends it on, Ctrl+C as ^C and Ctrl+V as ^V), which Settings → Advanced can give both keys to.
  * null for any other key, and for Ctrl+C with nothing selected, which goes on as other keys do (to the CLI, unless it

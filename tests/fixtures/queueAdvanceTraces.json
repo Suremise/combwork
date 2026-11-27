@@ -353,7 +353,7 @@
     "r <home>/project :: merge-base --is-ancestor <id> <id>",
     "q <home>/project :: config --get branch.main.remote",
     "q <home>/project :: config --get branch.main.merge",
-    "q <home>/project :: push -- origin <id>:refs/heads/main"
+    "q <home>/project :: push --no-follow-tags -- origin <id>:refs/heads/main"
   ],
   "push off": [
     "r <home>/project :: show -s --no-show-signature --format=%h %t refs/heads/main --",
@@ -378,7 +378,7 @@
     "r <home>/project :: merge-base --is-ancestor <id> <id>",
     "q <home>/project :: config --get branch.main.remote",
     "q <home>/project :: config --get branch.main.merge",
-    "q <home>/project :: push -- origin <id>:refs/heads/main",
+    "q <home>/project :: push --no-follow-tags -- origin <id>:refs/heads/main",
     "= integrated / "
   ],
   "push rejected then reset": [
@@ -402,7 +402,7 @@
     "r <home>/project :: merge-base --is-ancestor <id> <id>",
     "q <home>/project :: config --get branch.main.remote",
     "q <home>/project :: config --get branch.main.merge",
-    "q <home>/project :: push -- origin <id>:refs/heads/main",
+    "q <home>/project :: push --no-follow-tags -- origin <id>:refs/heads/main",
     "r <home>/project :: merge-base --is-ancestor <id> <id>"
   ],
   "push no remote": [

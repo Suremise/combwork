@@ -282,7 +282,7 @@ function projectMenu(p: ProjectInfo, sub: (items: MenuEntry[], keyboard: boolean
     { label: tr(p.active ? M.markNotWorking : M.markWorking), icon: p.active ? 'circle-slash' : 'pass', onClick: () => void actions.setProjectActive(p.path, !p.active) },
     { separator: true },
     { label: tr(M.reveal), icon: 'folder-opened', onClick: () => void call('project:openInExplorer', p.path) },
-    { label: tr(M.terminal), icon: 'terminal', onClick: () => void call('project:openTerminal', p.path) },
+    { label: tr(M.terminal), icon: 'terminal', onClick: () => void actions.openExternalTerminal(p.path) },
     { separator: true },
     {
       label: tr(M.tasks),

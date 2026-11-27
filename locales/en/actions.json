@@ -219,6 +219,10 @@
     "defaultMessage": "{s}s",
     "description": "A very short duration in seconds (\"40s\"), as a compact figure. Keep it as short as possible."
   },
+  "actions.externalTerminal.failed": {
+    "defaultMessage": "Couldn't open an external terminal",
+    "description": "An error notification's title: Open External Terminal Here opened nothing. Its text says which terminal and why (Settings → General → External terminal chooses it)."
+  },
   "actions.idleResume.message": {
     "defaultMessage": "{what, select, conversation {This conversation} other {This session}} was last active {unit, select, days {{days, plural, one {# day} other {# days}}} other {{duration}}} ago{size, select, tokens {, with about {tokens} tokens of context} bytes {; its transcript is {bytes}} other {}}. It has most likely lost its prompt cache, so resuming may process that context again.",
     "description": "The question before resuming a session (what: other) or an Assistant conversation idle for a long time (HI-3360). unit: days, {days} whole days; other, {duration} a short duration such as 5 h. size: tokens, about {tokens} tokens (\"120K\") of context; bytes, only the transcript's size on disk is known ({bytes}, such as 4.2 MB: never call it tokens); other, nothing is known. A prompt cache is what the CLI keeps of a conversation so a resumed one is read cheaply: it is an estimate, so keep the 'most likely' and 'may'."

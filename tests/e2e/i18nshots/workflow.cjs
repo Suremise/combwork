@@ -36,7 +36,7 @@ const gitView = (ctx) => ctx.page.locator('.git-view').first()
 /** The Version Control tab at a section. */
 async function vcSection(ctx, id, hook, what) {
   await ctx.command('project.tab.changes')
-  await (await shown(ctx, ctx.page.locator(`.git-sections [data-section="${id}"]`), `the ${id} section's tab`)).first().click()
+  await ctx.lib.chooseTab((await shown(ctx, ctx.page.locator(`.git-sections [data-section="${id}"]`), `the ${id} section's tab`)).first(), `the ${id} section`, ctx.hungMs)
   return shown(ctx, ctx.page.locator(hook), what)
 }
 

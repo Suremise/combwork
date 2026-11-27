@@ -90,6 +90,8 @@
   "panes.header.unknownTip": "このエージェントのターンについて、しばらく何の連絡もなく、終わった形跡も見当たりません：CLIからのStopも、CLIの記録への書き込みも、画面上のアイドル状態のプロンプトもありません。新しい情報が届くまで、エージェントは作業中とみなされ、何も入力されません。ターミナルがプロンプトで待機している場合は、アイドルにしてください。",
   "panes.header.untaken": "Combworkが入力した行が受け付けられていません",
   "panes.header.untakenTip": "Combworkが入力しましたが、CLIが受け付けていません（入力を読み取っていませんでした）：「{line}」。ターミナルをクリックしてEnterを押してください。CLIが受け付けるまで、Combworkはこれ以上何も入力しません。",
+  "panes.header.inputText": "待機中: 入力欄にテキストがあります",
+  "panes.header.inputTextTip": "Combworkにはこのエージェントに入力する内容がありますが、入力欄にCombworkが消去できなかったテキストがあります（下書き、またはCLIが表示したもの）。Combworkがその上から入力することはありません。ターミナルで送信するか消去すると、待っている内容が入力されます。",
   "panes.header.watchTip": "{watch}：{kind, select, agent {{n, plural, other {エージェントが完了したとき}}、回答を待っているとき、停止したとき} lane {レビューが不合格になったとき、カードがブロック中または停滞になったとき、レーンのマージ時期が来たとき、レーンが終わったとき} other {{n, plural, other {カードが変わったとき}}}}、または何も起きなければ{limit}に、Combworkが1行入力して起こします。その間は何も実行されず、ほかの作業も受けません。",
   "panes.layout.name": "{layout, select, single {1つずつ} columns2 {2列} columns3 {3列} grid {2×2グリッド} other {3×2グリッド}}",
   "panes.layout.narrowed": "{layout}：各ペインにターミナルが収まる幅になるまで{shown}で表示",

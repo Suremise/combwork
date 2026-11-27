@@ -1,7 +1,7 @@
 // The 1.0 upgrade's run (#1207, SPEC §16.17): a group of schema steps run as one (asked first, the file locked to one
 // connection, a copy kept for good, one transaction), and the board's side of it: read-only until the user says yes,
-// refused while another Combwork has the workspace open (SQLite's lock, or a fresh presence marker), and Restore the 0.9
-// Board Backup putting the copy back.
+// refused while another Combwork has the workspace open (SQLite's lock, or a fresh presence marker), and the 0.9 copy
+// kept (HI-3601: nothing puts it back).
 import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
@@ -313,7 +313,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
   it('opens a 0.9 board read-only until the user says yes; then upgraded, its cards kept and the 0.9 copy kept', async () => {
     const ws = await board09()
     const w = await open(ws)
-    expect(inWorkspace(w, () => store.boardState(w))).toEqual({ readOnly: 'upgrade', backup09: null })
+    expect(inWorkspace(w, () => store.boardState(w))).toEqual({ readOnly: 'upgrade' })
     expect(await titles(w)).toEqual(['From 0.9'])
     await expect(inWorkspace(w, () => tasks.createTask({ title: 'Too soon', project: 'p' }, user))).rejects.toThrow(/read-only until it is upgraded/)
     const { backup } = await inWorkspace(w, () => store.upgradeBoard(w))
@@ -321,7 +321,6 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     expect(tables(backup!)).toContain('cards')
     const state = inWorkspace(w, () => store.boardState(w))
     expect(state.readOnly).toBeNull()
-    expect(Date.parse(state.backup09!.at)).toBeGreaterThan(0)
     await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))
     expect(await titles(w)).toEqual(['After', 'From 0.9'])
     // Upgrading again does nothing.
@@ -405,50 +404,11 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     await close(w)
   })
 
-  it('Restore the 0.9 Board Backup puts the copy back after keeping the 1.0 board; upgrading again works', async () => {
-    const ws = await board09()
-    const w = await open(ws)
-    await expect(inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))).rejects.toThrow('There is no 0.9 board backup')
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    await inWorkspace(w, () => tasks.createTask({ title: 'Made in 1.0', project: 'p' }, user))
-    const { saved, restored } = await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
-    // Back to what 0.9 had, read-only here until upgraded again.
-    expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBe('upgrade')
-    expect(await titles(w)).toEqual(['From 0.9'])
-    // Nothing deleted: the 1.0 board and the 0.9 copy both kept.
-    expect(existsSync(restored)).toBe(true)
-    const copy = new DatabaseSync(saved, { readOnly: true })
-    expect((copy.prepare('SELECT count(*) AS n FROM cards').get() as { n: number }).n).toBe(2)
-    copy.close()
-    const raw = new DatabaseSync(store.boardFile(ws), { readOnly: true })
-    expect(schemaVersion(raw)).toBe(2)
-    raw.close()
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    expect(await titles(w)).toEqual(['From 0.9'])
-    await close(w)
-  })
-
-  it("the workspace closing while Restore or the upgrade waits for the checkpoints' worker: refused, the file and its copies as they were (HI-1691, HR6's round 3)", async () => {
-    // Restore: the 1.0 board, upgraded from 0.9, kept as it is.
-    const ws = await board09()
-    const w = await open(ws)
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    const backups = join(combworkOf(ws), 'backups')
-    const copies = readdirSync(backups).sort()
-    const version = fileSchemaVersion(store.boardFile(ws))
-    let hold = holdRelease()
-    const restoring = inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
-    restoring.catch(() => undefined)
-    await hold.waiting
-    await close(w)
-    hold.release()
-    await expect(restoring).rejects.toThrow()
-    expect(fileSchemaVersion(store.boardFile(ws))).toBe(version)
-    expect(readdirSync(backups).sort()).toEqual(copies)
-    // The upgrade: a 0.9 board, left waiting for it.
+  it("the workspace closing while the upgrade waits for the checkpoints' worker: refused, the file as it was (HI-1691, HR6's round 3)", async () => {
+    // A 0.9 board, left waiting for it.
     const ws2 = await board09()
     const w2 = await open(ws2)
-    hold = holdRelease()
+    const hold = holdRelease()
     const upgrading = inWorkspace(w2, () => store.upgradeBoard(w2))
     upgrading.catch(() => undefined)
     await hold.waiting
@@ -458,22 +418,6 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     expect(fileSchemaVersion(store.boardFile(ws2))).toBe(2)
   })
 
-  it('Restore is refused while another Combwork has the file open, the 1.0 board left as it was', async () => {
-    const ws = await board09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    const w = await open(ws)
-    await inWorkspace(w, () => tasks.createTask({ title: 'Made in 1.0', project: 'p' }, user))
-    const other = new DatabaseSync(store.boardFile(ws))
-    other.prepare('SELECT count(*) FROM cards').get()
-    try {
-      await expect(inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))).rejects.toThrow('close it first')
-    } finally {
-      other.close()
-    }
-    expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
-    expect(await titles(w)).toEqual(['From 0.9', 'Made in 1.0'])
-    await close(w)
-  })
 })
 
 describe('while the upgrade waits, nothing needing combwork.db starts or writes (#1207 round 1)', () => {
@@ -621,46 +565,6 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
     await close(w)
   })
 
-  it('Restore is refused while agents of the workspace run or start, nothing changed', async () => {
-    const ws = await board09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    const w = await open(ws)
-    await expect(inWorkspace(w, () => store.restoreBoardBackup(w, () => 1))).rejects.toThrow("Stop this workspace's agents and its Assistant first")
-    expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
-    expect(fileSchemaVersion(store.boardFile(ws))).toBeGreaterThan(2)
-    await close(w)
-  })
-
-  it("Restore puts back the 0.9 board's copy, never a later 1.0 copy of the group's family (#1207 round 1)", async () => {
-    const ws = await board09()
-    const w = await open(ws)
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    const dir = join(combworkOf(ws), 'backups')
-    const [v2] = readdirSync(dir).filter((x) => x.startsWith('combwork-before-1.0-v2-'))
-    // A later copy of the family, of a 1.0 board (as round 1 made one before a later step of the group), named newer.
-    const raw = new DatabaseSync(store.boardFile(ws))
-    raw.prepare('VACUUM INTO ?').run(join(dir, 'combwork-before-1.0-v3-2099-01-01T00-00-00-000Z.db'))
-    raw.close()
-    const at = v2.replace(/^combwork-before-1.0-v2-(.*)\.db$/, '$1').replace(/T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z$/, 'T$1:$2:$3.$4Z')
-    expect(inWorkspace(w, () => store.boardState(w)).backup09?.at).toBe(at)
-    const { restored } = await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
-    expect(restored.endsWith(v2)).toBe(true)
-    expect(fileSchemaVersion(store.boardFile(ws))).toBe(2)
-    await close(w)
-  })
-
-  it("Restore refuses a copy named as 0.9's whose file isn't a 0.9 board", async () => {
-    const ws = await board09()
-    const w = await open(ws)
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    const dir = join(combworkOf(ws), 'backups')
-    const raw = new DatabaseSync(store.boardFile(ws))
-    raw.prepare('VACUUM INTO ?').run(join(dir, 'combwork-before-1.0-v2-2099-01-01T00-00-00-000Z.db'))
-    raw.close()
-    await expect(inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))).rejects.toThrow('There is no 0.9 board backup')
-    expect(fileSchemaVersion(store.boardFile(ws))).toBeGreaterThan(2)
-    await close(w)
-  })
 })
 
 describe("what services read before the database was replaced is read again (#1207 round 2)", () => {
@@ -728,56 +632,6 @@ describe("what services read before the database was replaced is read again (#12
     }
   })
 
-  it("what services keep of the database under another spelling than the window's goes when it is replaced: by the place recorded (#1456)", async () => {
-    const { committedFor, saveTable } = await import('../src/main/storeTables')
-    const { sessionsOpenedFor } = await import('../src/main/sessionStore')
-    const ws = await board09()
-    const via = junction(ws, `${ws}-via`)
-    const w = await open(via)
-    try {
-      await inWorkspace(w, () => store.upgradeBoard(w))
-      // Kept under the real spelling (as deliveries save, from where a host really is); the window has the junction's.
-      await inWorkspace(w, () => workspace.sessionsFile(join(ws, 'p')))
-      await saveTable(ws, 'lanes', [])
-      expect(sessionsOpenedFor()).toContain(ws.toLowerCase())
-      expect(committedFor().map((p) => p.toLowerCase())).toContain(ws.toLowerCase())
-      await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
-      expect(sessionsOpenedFor()).not.toContain(ws.toLowerCase())
-      expect(committedFor().map((p) => p.toLowerCase())).not.toContain(ws.toLowerCase())
-    } finally {
-      await close(w)
-      unlinkSync(via)
-    }
-  })
-
-  it('Restore and a second upgrade: deliveries read again each time, from the board put back and then upgraded', async () => {
-    const delivery = await import('../src/main/deliveries')
-    delivery.setReadsInboxForTests(() => true)
-    const ws = await board09()
-    const host = join(ws, 'p')
-    const w = await open(ws)
-    try {
-      const { scope } = await inWorkspace(w, () => w.sessionScope(host))
-      writtenBy09(ws, scope, 'm1', 2, 'From 0.9')
-      await inWorkspace(w, () => store.upgradeBoard(w))
-      await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'Only in 1.0' }))
-      expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 From 0.9', 'm2 Only in 1.0'])
-      // Back to the 0.9 board: what it has, not the 1.0 board's cache.
-      await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
-      expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 From 0.9'])
-      // 0.9 adds one, then it is upgraded again: that one is kept, and the next id follows it.
-      writtenBy09(ws, scope, 'm2', 3, 'From 0.9 after the restore')
-      await inWorkspace(w, () => store.upgradeBoard(w))
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'In 1.0 again' }))
-      expect(made.id).toBe('m3')
-      expect(bodies((await inWorkspace(w, () => delivery.savedForTests(host))).deliveries)).toEqual(['m1 From 0.9', 'm2 From 0.9 after the restore', 'm3 In 1.0 again'])
-    } finally {
-      await delivery.forgetDeliveriesForTests()
-      delivery.setReadsInboxForTests(null)
-      await close(w)
-    }
-  })
-
   it('each replacement moves the generation on, and a save read in an older one is refused', async () => {
     const ws = await board09()
     const w = await open(ws)
@@ -796,8 +650,6 @@ describe("what services read before the database was replaced is read again (#12
       })).rejects.toThrow('stale')
       expect(wrote).toBe(false)
       expect(storeRows.storeValue(store.workspaceDb(ws).reader, 'sessions', 'probe', 'probe')).toBeNull()
-      await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
-      expect(store.dbGeneration(ws)).toBe(before + 2)
     } finally {
       await close(w)
     }
@@ -837,29 +689,26 @@ describe('a workspace closed right after its database was replaced stays closed 
     }
   }
 
-  for (const how of ['upgrade', 'restore'] as const) {
-    it(`after ${how === 'upgrade' ? 'the upgrade' : 'Restore'}, closing the workspace at once: its deliveries and watches aren't read again, its database not opened`, async () => {
-      const delivery = await import('../src/main/deliveries')
-      const watches = await import('../src/main/watches')
-      delivery.setReadsInboxForTests(() => true)
-      const ws = await board09()
-      const host = join(ws, 'p')
-      const w = await open(ws)
-      try {
-        if (how === 'restore') await inWorkspace(w, () => store.upgradeBoard(w))
-        // Loaded, so the replacement has something to drop.
-        await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))
-        await inWorkspace(w, () => watches.evaluateAgentWatches(w))
-        await replaceThenClose(w, () => (how === 'upgrade' ? inWorkspace(w, () => store.upgradeBoard(w)) : inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))))
-        expect(store.boardOpen(ws)).toBe(false)
-        expect(markers(ws)).toEqual([])
-      } finally {
-        await delivery.forgetDeliveriesForTests()
-        delivery.setReadsInboxForTests(null)
-        store.closeBoard(ws)
-      }
-    })
-  }
+  it("after the upgrade, closing the workspace at once: its deliveries and watches aren't read again, its database not opened", async () => {
+    const delivery = await import('../src/main/deliveries')
+    const watches = await import('../src/main/watches')
+    delivery.setReadsInboxForTests(() => true)
+    const ws = await board09()
+    const host = join(ws, 'p')
+    const w = await open(ws)
+    try {
+      // Loaded, so the replacement has something to drop.
+      await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))
+      await inWorkspace(w, () => watches.evaluateAgentWatches(w))
+      await replaceThenClose(w, () => inWorkspace(w, () => store.upgradeBoard(w)))
+      expect(store.boardOpen(ws)).toBe(false)
+      expect(markers(ws)).toEqual([])
+    } finally {
+      await delivery.forgetDeliveriesForTests()
+      delivery.setReadsInboxForTests(null)
+      store.closeBoard(ws)
+    }
+  })
 
   it('after the upgrade, a workspace still open reads its deliveries again on their next use', async () => {
     const delivery = await import('../src/main/deliveries')

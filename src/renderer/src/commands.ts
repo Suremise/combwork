@@ -9,7 +9,6 @@ import { msg, tr, type Msg, type Values } from '@shared/i18n'
 import { call } from './api'
 import { EXPORT_BOARD, exportBoard, unarchiveBatch } from './boardBatches'
 import { undoLaneEdit } from './laneEdits'
-import { restoreBoard09 } from './components/BoardUpgrade'
 import { checkForUpdates, openReleaseNotes } from './components/Updates'
 import { openModeMenu } from './components/PermissionMode'
 import * as actions from './actions'
@@ -245,7 +244,7 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'project.focus', name: msg({ id: 'shell.command.project.focus', defaultMessage: 'Focus Project', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category. It isn't in the menus or the palette: notifications and buttons run it by its name." }), category: 'project', internal: true, run: (path: string) => path && actions.selectProject(path) },
   { id: 'project.remove', name: msg({ id: 'shell.command.project.remove', defaultMessage: 'Remove Project…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category. The … says it opens a dialog first: keep it.' }), category: 'project', when: hasProject, run: (path?: unknown) => set({ removeProjectFor: typeof path === 'string' ? path : get().selectedProject }) },
   { id: 'project.openExplorer', name: msg({ id: 'shell.command.project.openExplorer', defaultMessage: 'Reveal Project in File Explorer', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: () => call('project:openInExplorer', get().selectedProject!) },
-  { id: 'project.openTerminal', name: msg({ id: 'shell.command.project.openTerminal', defaultMessage: 'Open External Terminal Here', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Mod+Shift+`', when: hasProject, run: () => call('project:openTerminal', get().selectedProject!) }, // i18n-ignore: a shortcut's keys
+  { id: 'project.openTerminal', name: msg({ id: 'shell.command.project.openTerminal', defaultMessage: 'Open External Terminal Here', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Mod+Shift+`', when: hasProject, run: () => actions.openExternalTerminal(get().selectedProject!) }, // i18n-ignore: a shortcut's keys
   { id: 'project.tab.session', name: msg({ id: 'shell.command.project.tab.session', defaultMessage: 'Go to Session', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+1', when: hasProject, run: tab('session') },
   { id: 'project.tab.overview', name: msg({ id: 'shell.command.project.tab.overview', defaultMessage: 'Go to Overview', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+2', when: hasProject, run: tab('overview') },
   { id: 'project.tab.performance', name: msg({ id: 'shell.command.project.tab.performance', defaultMessage: 'Go to Performance', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+3', when: hasProject, run: tab('performance') },
@@ -729,14 +728,6 @@ const COMMAND_DEFS: CommandDef[] = [
     run: () => call('app:openExternal', TRANSLATING_URL)
   },
   { id: 'help.logs', name: msg({ id: 'shell.command.help.logs', defaultMessage: 'Open Logs Folder', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', run: () => call('app:openLogs') },
-  {
-    id: 'help.restoreBoard09',
-    name: msg({ id: 'shell.command.help.restoreBoard09', defaultMessage: 'Restore the 0.9 Board Backup…', description: "A command (the Help menu, the command palette), in the Help category: puts back the copy of the workspace's board Combwork kept when it upgraded the board to 1.0, for going back to version 0.9. The … says it asks first: keep it." }),
-    category: 'help',
-    when: () => hasWorkspace() && !!get().boardState?.backup09,
-    tip: () => tr(msg({ id: 'shell.tip.help.restoreBoard09', defaultMessage: 'Puts back the board as it was before its upgrade to 1.0, to go back to version 0.9', description: 'What a command does, on hover in the menus.' })),
-    run: () => void restoreBoard09()
-  },
   { id: 'help.diagnostics', name: msg({ id: 'shell.command.help.diagnostics', defaultMessage: 'Copy Diagnostics…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it.' }), category: 'help', run: () => set({ diagnosticsOpen: true }) },
   { id: 'help.about', name: msg({ id: 'shell.command.help.about', defaultMessage: 'About {app}', description: "A command (the Help menu, the command palette), in the Help category. {app} is Combwork's name." }), nameValues: { app: APP_NAME }, category: 'help', run: () => set({ aboutOpen: true }) },
   { id: 'help.checkUpdates', name: msg({ id: 'shell.command.help.checkUpdates', defaultMessage: 'Check for Updates…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it.' }), category: 'help', run: () => checkForUpdates() },

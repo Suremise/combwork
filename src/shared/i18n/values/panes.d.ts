@@ -81,6 +81,8 @@ interface CombworkMessageValues {
   'panes.header.inputRetryFailed': undefined
   'panes.header.inputStillBlocked': undefined
   'panes.header.inputStillBlockedBody': undefined
+  'panes.header.inputText': undefined
+  'panes.header.inputTextTip': undefined
   'panes.header.markIdle': undefined
   'panes.header.markIdleFailed': undefined
   'panes.header.more': undefined

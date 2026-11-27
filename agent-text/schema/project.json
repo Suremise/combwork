@@ -1,4 +1,10 @@
 {
+  "project.externalTerminal.failed": {
+    "placeholders": {
+      "terminal": "plain",
+      "reason": "plain"
+    }
+  },
   "project.limit.models": {
     "placeholders": {
       "models": "select",

@@ -76,7 +76,7 @@ const values = () => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'ut
     const own = async () => (await inv('workflow:form', alpha)).own.loopWakes
     await page.getByText('alpha', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await page.locator('.git-sections [data-section="workflow"]').click().catch(() => {})
+    await lib.vcSection(page, 'workflow')
     const wakeRow = page.locator('.workflow-form .workflow-group[data-group="loops"] .workflow-option[data-option="loopWakes"]')
     const wake = wakeRow.getByRole('switch')
     await lib.workflowTab(page.locator('.workflow-form'), 'loopWakes')

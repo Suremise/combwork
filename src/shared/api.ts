@@ -204,6 +204,7 @@ import type { Osc52Refusal } from './osc52'
 import type { ForYouAnswer, ForYouSummary, WorkBadge, WorkView } from './workflow/workView'
 import type { BranchQueueCard, QueueRecent, QueueResumed, QueueView } from './workflow/queue'
 import type { LongTask, WindowWhere } from './windowHealth'
+import type { ChimeReport } from './chime'
 import type { MainStalls } from './mainStalls'
 import type { GuardPreview, MergeGuard } from './workflow/mergeGuards'
 
@@ -303,6 +304,8 @@ export interface CombworkRequests {
   'window:where': (where: WindowWhere) => void
   /** The page's long tasks just ended, and where it was: logged in combwork.log, rate-limited (HI-1775). */
   'window:longTasks': (tasks: LongTask[], where: WindowWhere) => void
+  /** A chime played, played after resuming its audio context, dropped or cut off (HI-3605): logged in combwork.log. */
+  'window:chime': (report: ChimeReport) => void
   /** The taskbar button's badge: a PNG (base64) drawn at `scale`, or none at 0. */
   'window:setBadge': (count: number, png: string | null, scale: number) => void
   /** Always on Top for this window, remembered for its workspace (pin.ts). Returns the window's state now. */
@@ -572,8 +575,6 @@ export interface CombworkRequests {
   'board:state': () => BoardState
   /** Upgrades the board to 1.0, the user having said yes (refused while another Combwork has the workspace open). */
   'board:upgrade': () => { backup: string | null }
-  /** Help → Restore the 0.9 Board Backup…: the 1.0 board copied aside, the 0.9 copy put back. */
-  'board:restore09': () => { saved: string; restored: string }
   /** Every card on the workspace's board, archived ones too. */
   /** The board as the window shows it: archived cards in short (TaskCard.summary) unless `fullArchive` (#1017). */
   'tasks:list': (fullArchive?: boolean) => TaskCard[]
@@ -1408,6 +1409,8 @@ export interface CombworkBridge {
   /** Full path of a file dropped from Explorer. */
   pathForFile(file: File): string
   platform: string
+  /** The OS version (`process.getSystemVersion()`: "10.0.19045" on Windows 10), for xterm's `windowsPty` (HI-3589). */
+  systemVersion: string
   /** A test copy's window: React's commits are watched (HI-1387, renderer commitWatch.ts). */
   commitWatch: boolean
   /**

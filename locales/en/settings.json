@@ -4895,6 +4895,34 @@
     "defaultMessage": "Date format",
     "description": "A setting's title (Settings → General)."
   },
+  "settings.general.externalTerminal.desc": {
+    "defaultMessage": "What Open External Terminal Here opens, in the project's folder.",
+    "description": "What the setting \"External terminal\" does, under its title (Settings → General). Open External Terminal Here is a command's name: keep it as Combwork shows it."
+  },
+  "settings.general.externalTerminal.option.auto": {
+    "defaultMessage": "Automatic (Windows Terminal, else Command Prompt)",
+    "description": "A choice of the setting \"External terminal\" (Settings → General): Windows Terminal when it opens, else Command Prompt. Use the names Windows gives them in this language."
+  },
+  "settings.general.externalTerminal.option.cmd": {
+    "defaultMessage": "Command Prompt",
+    "description": "A choice of the setting \"External terminal\" (Settings → General), and the name of that terminal where Combwork says it couldn't open. Command Prompt is the name of a Windows program (cmd.exe): use the name Windows gives it in this language."
+  },
+  "settings.general.externalTerminal.option.powershell": {
+    "defaultMessage": "PowerShell",
+    "description": "A choice of the setting \"External terminal\" (Settings → General), and the name of that terminal where Combwork says it couldn't open. PowerShell is a name: keep it."
+  },
+  "settings.general.externalTerminal.option.wt": {
+    "defaultMessage": "Windows Terminal",
+    "description": "A choice of the setting \"External terminal\" (Settings → General), and the name of that terminal where Combwork says it couldn't open. Windows Terminal is the name of a Microsoft app: use the name Windows gives it in this language."
+  },
+  "settings.general.externalTerminal.tip": {
+    "defaultMessage": "Automatic opens Windows Terminal, or Command Prompt where Windows Terminal doesn't open. A terminal you choose that can't open says why, rather than opening another. Each gets the folders of the CLIs Combwork found on its PATH.",
+    "description": "The info tip of the setting \"External terminal\" (Settings → General): more on what it does. Windows Terminal and Command Prompt are names of Windows programs: use the names Windows gives them in this language."
+  },
+  "settings.general.externalTerminal.title": {
+    "defaultMessage": "External terminal",
+    "description": "A setting's title (Settings → General): what Open External Terminal Here opens."
+  },
   "settings.general.keepAwake.desc": {
     "defaultMessage": "Stop Windows from sleeping while an agent is working or waiting on background tasks, so it doesn't stop mid-task.",
     "description": "What the setting \"Keep the PC awake while agents work\" does, under its title (Settings → General)."

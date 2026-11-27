@@ -54,6 +54,7 @@ const bridge: CombworkBridge = {
   },
   pathForFile: (file) => webUtils.getPathForFile(file),
   platform: process.platform,
+  systemVersion: process.getSystemVersion(),
   commitWatch,
   arrivals: (from, to) => arrived.filter((a) => a.at >= from && a.at <= to).map((a) => (a.n > 1 ? `${a.what} ×${a.n}` : a.what))
 }

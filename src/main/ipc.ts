@@ -57,7 +57,7 @@ import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } 
 import { loopChecksOf } from './loopCheck'
 import { sweepWorkspaceLeftovers } from './leftovers'
 import { AfterOpen, assertNotOpening, claimWindow, openProgress, openStep, releaseWindow, windowClaim } from './openProgress'
-import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
+import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, upgradeBoard } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
@@ -109,6 +109,7 @@ import { ensureCombworkExcluded, trackedCombworkFiles, untrackCombwork, vcsOf } 
 import { combworkWindows, windowForPath, windowOf, windowShowing } from './windows'
 import { noteLongTasks, noteWhere } from './rendererWatch'
 import { cleanTasks, cleanWhere } from '../shared/windowHealth'
+import { chimeLogLine, cleanChimeReport } from '../shared/chime'
 import { setTitleBarBackdrops, setTitleBarColors } from './titleBar'
 import { showWindow } from './tray'
 import { resetMetrics } from './metrics'
@@ -704,6 +705,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const entry = wc ? windowOf(wc) : null
       if (entry) noteLongTasks(entry, cleanTasks(list), cleanWhere(where))
     },
+    // A chime plays now or not at all (HI-3605): what became of each, so a late or missing one says why.
+    'window:chime': (raw) => {
+      const r = cleanChimeReport(raw)
+      if (r) (r.outcome === 'played' ? log.info : log.warn)(chimeLogLine(r))
+    },
 
     'settings:get': () => config.settings,
     // Show developer features is kept in advanced.json too: written there first, or refused (#367).
@@ -942,10 +948,6 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
         // Refused, or upgraded already (nothing pending): no steps after it carry the claim on.
         if (openProgress(ws)?.step === 'upgrade') releaseWindow(ws, claim)
       }
-    },
-    'board:restore09': () => {
-      const ws = currentWorkspace()
-      return restoreBoardBackup(ws, () => (ws.path ? sessions.agentsIn(ws.path) : 0))
     },
     'tasks:list': (fullArchive) => tasks.windowTasks(workspace, fullArchive === true),
     'tasks:changes': (since) => tasks.windowChanges(workspace, since && typeof since === 'object' && typeof since.board === 'string' && Number.isSafeInteger(since.mark) ? { board: since.board, mark: since.mark } : null),
@@ -1205,7 +1207,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const dir = workspace.assertProject(p)
       // A new terminal gets what was installed since Combwork started (#821).
       await refreshPathBeforeStart()
-      openExternalTerminal(dir)
+      // What opened, or an error saying which terminal didn't and why (HI-3582), which the window shows.
+      await openExternalTerminal(dir, config.settings.general.externalTerminal)
     },
 
     'session:list': (p, opts) => sessions.list(p, { own: opts?.own === true }),

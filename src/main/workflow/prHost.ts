@@ -184,6 +184,13 @@ function authority(wf: Workflow, card: CardRecord, s: CardState, request: string
   return (rules.options.review === 'none' ? !s.stale : !notApproved(s, rules, card.labels)) ? r : null
 }
 
+/**
+ * HI-3590: a finish's push sends the one branch it names and nothing else. `--no-follow-tags` overrides the user's
+ * `push.followTags`, which would otherwise publish every annotated tag reachable from the pushed commit that the remote
+ * lacks (tags the user never chose to publish).
+ */
+const ONLY_THE_BRANCH = ['--no-follow-tags'] as const
+
 /** The request's authority read in the workflow's lock, on the facts as they are now: before each push and create. */
 const holds = (wf: Workflow, cardId: number, request: string, alive: Alive): Promise<boolean> => (alive() ? wf.write(wf.store.card(cardId), null, 'combwork', (w) => alive() && !!authority(wf, w.card, w.state(), request)) : Promise.resolve(false))
 
@@ -250,7 +257,7 @@ async function opening(wf: Workflow, cardId: number, request: string, ports: PrP
   // come meanwhile), read in the lock: else nothing is pushed.
   if (!(await holds(wf, cardId, request, alive))) return
   // That exact commit, never the line as it is now; never forced, so commits there from outside refuse it.
-  const push = await git(wf.cfg.project, ['push', '--porcelain', '--', r.remote, `${r.revision}:refs/heads/${r.line}`], undefined, undefined, { timeout: platformLimits.gitNetworkMs() })
+  const push = await git(wf.cfg.project, ['push', '--porcelain', ...ONLY_THE_BRANCH, '--', r.remote, `${r.revision}:refs/heads/${r.line}`], undefined, undefined, { timeout: platformLimits.gitNetworkMs() })
   if (!push.ok) return fail('push', firstLine(push.err) ?? firstLine(push.out))
   if (!(await holds(wf, cardId, request, alive))) return
   const card = wf.store.card(cardId)
@@ -321,7 +328,7 @@ async function pushingBack(wf: Workflow, cardId: number, r: PrRequestData, src: 
   if (!pushesTo(at.urls, head)) return fail('pushUrl')
   if (!(await holds(wf, cardId, r.request, alive))) return
   // That exact commit to its head branch, never forced: a branch that moved since it was read refuses it.
-  const push = await git(project, ['push', '--porcelain', '--', at.target, `${r.revision}:refs/heads/${src.headRef}`], undefined, undefined, { timeout: platformLimits.gitNetworkMs() })
+  const push = await git(project, ['push', '--porcelain', ...ONLY_THE_BRANCH, '--', at.target, `${r.revision}:refs/heads/${src.headRef}`], undefined, undefined, { timeout: platformLimits.gitNetworkMs() })
   if (!alive()) return
   if (!push.ok) {
     const said = `${push.out}\n${push.err}`

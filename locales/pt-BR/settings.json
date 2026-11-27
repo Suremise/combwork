@@ -1727,5 +1727,12 @@
   "settings.advanced.cw.github.prFollowMinutes.desc": "Enquanto cartões aguardam em PR aberto, o Combwork lê os pull requests deles no GitHub com esta frequência, e também quando o quadro ou o cartão deles é aberto: o próprio GitHub não consegue avisar o Combwork quando um deles passa por merge ou é fechado.",
   "settings.advanced.cw.github.prFollowMinutes.title": "Pull requests: com que frequência o estado é lido",
   "settings.advanced.cw.server.checkInferSeconds.title": "Verificar servidor: tempo limite da solicitação de teste",
-  "settings.advanced.cw.server.checkInferSeconds.desc": "Quanto tempo Verificar servidor espera um servidor de modelos responder à solicitação de teste. Um modelo local que ainda não está carregado carrega primeiro, o que em um hardware modesto pode levar minutos; depois desse tempo, a verificação informa que o tempo esgotou."
+  "settings.advanced.cw.server.checkInferSeconds.desc": "Quanto tempo Verificar servidor espera um servidor de modelos responder à solicitação de teste. Um modelo local que ainda não está carregado carrega primeiro, o que em um hardware modesto pode levar minutos; depois desse tempo, a verificação informa que o tempo esgotou.",
+  "settings.general.externalTerminal.title": "Terminal externo",
+  "settings.general.externalTerminal.desc": "O que Abrir terminal externo aqui abre, na pasta do projeto.",
+  "settings.general.externalTerminal.tip": "Automático abre o Windows Terminal, ou o Prompt de Comando onde o Windows Terminal não abre. Um terminal que você escolhe e não consegue abrir diz por quê, em vez de abrir outro. Cada um recebe no PATH as pastas das CLIs que o Combwork encontrou.",
+  "settings.general.externalTerminal.option.auto": "Automático (Windows Terminal, senão Prompt de Comando)",
+  "settings.general.externalTerminal.option.wt": "Windows Terminal",
+  "settings.general.externalTerminal.option.cmd": "Prompt de Comando",
+  "settings.general.externalTerminal.option.powershell": "PowerShell"
 }

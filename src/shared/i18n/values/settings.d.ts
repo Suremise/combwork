@@ -1225,6 +1225,13 @@ interface CombworkMessageValues {
   'settings.general.dateFormat.option.ymd': undefined
   'settings.general.dateFormat.tip': undefined
   'settings.general.dateFormat.title': undefined
+  'settings.general.externalTerminal.desc': undefined
+  'settings.general.externalTerminal.option.auto': undefined
+  'settings.general.externalTerminal.option.cmd': undefined
+  'settings.general.externalTerminal.option.powershell': undefined
+  'settings.general.externalTerminal.option.wt': undefined
+  'settings.general.externalTerminal.tip': undefined
+  'settings.general.externalTerminal.title': undefined
   'settings.general.keepAwake.desc': undefined
   'settings.general.keepAwake.option.always': undefined
   'settings.general.keepAwake.option.never': undefined

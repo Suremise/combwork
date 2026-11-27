@@ -111,6 +111,28 @@ describe('the fact store in combwork.db (#1215)', () => {
     expect(ran).toHaveLength(1)
   })
 
+  it("a workflow move into another column puts the card at that column's end; a stage within its column keeps its place (HI-3585)", async () => {
+    const { w } = await workspace()
+    const facts = FactStore.forBoard(w, scope)
+    const make = async (title: string, column?: 'done'): Promise<number> => (await inWorkspace(w, () => tasks.createTask({ title, project: 'p', column }, user))).number
+    const orderOf = async (card: number): Promise<number> => (await inWorkspace(w, () => tasks.getTask(card, w))).order
+    const moveTo = (card: number, stage: 'approved' | 'merging' | 'done'): Promise<void> => store.boardWrite(w, async () => void facts.tx((tx) => tx.setStage(card, stage)))
+    // The reported board: PEN-1 to PEN-4 in Done (orders 1 to 4), then a card alone in Passed (order 1 there) merged.
+    const done = [await make('Done 1', 'done'), await make('Done 2', 'done'), await make('Done 3', 'done')]
+    const merged = await make('Merged')
+    await moveTo(merged, 'approved')
+    const inPassed = await orderOf(merged)
+    // Approved to Merging stays in Passed: its place there is kept.
+    await moveTo(merged, 'merging')
+    expect(await orderOf(merged)).toBe(inPassed)
+    await moveTo(merged, 'done')
+    const orders = await Promise.all(done.map(orderOf))
+    // Before the fix it kept Passed's order 1, tied with Done's first card and sorted above the rest by number.
+    expect(await orderOf(merged)).toBeGreaterThan(Math.max(...orders))
+    const column = (await inWorkspace(w, () => tasks.listTasks({ column: 'done' }))).sort((a, b) => a.order - b.order || a.number - b.number)
+    expect(column.map((c) => c.number)).toEqual([...done, merged])
+  })
+
   it('a restart runs a claimed action a crash left pending, once; one claimed before the crash is not run again (#1266)', async () => {
     const { ws, w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Crashed', project: 'p' }, user))).number

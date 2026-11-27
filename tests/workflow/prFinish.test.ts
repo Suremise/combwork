@@ -163,6 +163,23 @@ describe('the pull request finish (HI-3552)', () => {
     expect(gh.calls.every((c) => !c.args.some((a) => a.includes('Fixed the parser')))).toBe(true)
   })
 
+  it('pushes only its branch, publishing no tag under push.followTags (HI-3590)', async () => {
+    const e = (env = project())
+    const { bare, gh, ports } = github(e)
+    const { card, revision } = await approved(e)
+    // An annotated tag on the approved commit the user never published, and git set to follow tags on every push.
+    sh(e.project, 'tag', '-a', '-m', 'not for publishing', 'v0.9.0-draft', revision)
+    sh(e.project, 'config', 'push.followTags', 'true')
+    await openPr(e.wf, card.id, requestOf(e, card.id), ports)
+    expect(e.wf.state(card).stage).toBe('prOpen')
+    expect(gh.creates()).toBe(1)
+    expect(sh(bare, 'for-each-ref', '--format=%(refname)', 'refs/tags')).toBe('')
+    expect(sh(bare, 'rev-parse', e.wf.state(card).started!.line!)).toBe(revision)
+    // A tag pushed by name still goes.
+    sh(e.project, 'push', '-q', 'origin', 'refs/tags/v0.9.0-draft')
+    expect(sh(bare, 'for-each-ref', '--format=%(refname)', 'refs/tags')).toBe('refs/tags/v0.9.0-draft')
+  })
+
   it('opens it ready for review when the project says so', async () => {
     const e = (env = project({ prDraft: false }))
     const { gh, ports } = github(e)
@@ -527,6 +544,19 @@ describe('the pull request finish (HI-3552)', () => {
     await followPr(e.wf, card.id, ports)
     expect(e.wf.state(card).stage).toBe('done')
     expect(e.wf.state(card).integrated).toMatchObject({ revision, result: 'c'.repeat(40), platform: { pr: 7, pushed: revision } })
+  })
+
+  it('pushes back only the pull request’s branch, publishing no tag under push.followTags (HI-3590)', async () => {
+    const e = (env = project())
+    const { bare, gh, ports } = github(e)
+    const { card, revision } = await prCard(e, bare, gh)
+    sh(e.project, 'tag', '-a', '-m', 'not for publishing', 'v0.9.0-draft', revision)
+    sh(e.project, 'config', 'push.followTags', 'true')
+    await openPr(e.wf, card.id, requestOf(e, card.id), ports)
+    expect(e.wf.state(card).pullRequest?.opened).toMatchObject({ number: 7, pushed: revision })
+    expect(e.wf.state(card).pullRequest?.opened?.notPushed).toBeUndefined()
+    expect(sh(bare, 'rev-parse', 'feature')).toBe(revision)
+    expect(sh(bare, 'for-each-ref', '--format=%(refname)', 'refs/tags')).toBe('')
   })
 
   it('pushes to a fork’s branch whose author allows maintainer edits, by the fork’s own address', async () => {

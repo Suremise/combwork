@@ -139,7 +139,7 @@ function writeProject(dir, cfg) {
     check('…with no switch back offered: None was chosen knowing the folder is a Git repository', (await offer.count()) === 0)
     check("…and the old Git queue's section stays", !!(await until(async () => (await sections()).includes('queue'), HUNG_MS)), JSON.stringify(await sections()))
     // Reached from the Progress panel's queue card.
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(page, 'workflow')
     const merges = await q.mergesTab(h)
     await merges.card('integration').locator('.progress-queue-link').click()
     check('Queue in Version Control lands on its section', !!(await until(async () => (await page.locator('.vc-view').getAttribute('data-platform')) === 'none' && (await selected()) === 'queue', HUNG_MS)))

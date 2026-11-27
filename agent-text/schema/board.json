@@ -22,13 +22,7 @@
   "board.error.newer": {
     "placeholders": {}
   },
-  "board.error.noBackup": {
-    "placeholders": {}
-  },
   "board.error.noWorkspace": {
-    "placeholders": {}
-  },
-  "board.error.stopAgentsFirst": {
     "placeholders": {}
   },
   "board.error.unavailable": {
