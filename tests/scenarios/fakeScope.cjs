@@ -52,7 +52,9 @@ const MODEL_TRIALS_ONLY = [
   'pick-up-named', 'hold-skipped', 'assistant-plan', 'assistant-look', 'coordinator-relayed-ok', 'fresh-start-solo-done', 'fresh-start-lanes-ended', 'review-screenshot-report', 'prioritise',
   'follow-up-title', 'assistant-follow-up-title', 'progress-background', 'mode-coordinator-coordinates', 'mode-planner-coordinates', 'mode-qa-triager-coordinates', 'mode-release-manager-coordinates',
   // HI-2854's A: its one check (the parser's tests) holds by construction on a fake, whose script writes them.
-  'solo-ab-plain'
+  'solo-ab-plain',
+  // HI-3595: its checks read only the Assistant's reply and the branches, which a fake's script states.
+  'assistant-window-route'
 ]
 
 const NOT_A_TRIAL = ['tool-sweep']
