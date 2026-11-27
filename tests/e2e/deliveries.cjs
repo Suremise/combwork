@@ -148,7 +148,14 @@ async function start() {
   check('…its doorbell names it by id, never its text (#650)', !!(await until(() => bells().includes('[CW] New in your inbox: 1 message (m2). Call cw_inbox to read it, act on it, then ack it.'), HUNG_MS)), JSON.stringify(bells()))
   check('…and the builder reads it in its inbox', !!(await until(() => wakes().includes('Then take #2.'), HUNG_MS)), JSON.stringify(wakes()))
   check('…the message it had fetched is never offered again', !wakes().some((t) => t.includes('Rebase on main')) && !bells().some((t) => /\bm1\b/.test(t)), JSON.stringify(wakeLog()))
-  check('…offered (its doorbell typed), woke it (its CLI took the doorbell, HI-3611), and received once it read it', !!(await until(async () => wakes().length > 0 && delivery('m2')?.state === 'received' && (await idle(builder.id)), HUNG_MS)) && delivery('m2')?.readVia === 'inbox' && !!delivery('m2')?.offered && Date.parse(delivery('m2')?.woke) >= Date.parse(delivery('m2')?.offered) && Date.parse(delivery('m2')?.read) >= Date.parse(delivery('m2')?.woke), JSON.stringify(delivery('m2')))
+  check('…offered (its doorbell typed), and received once it read it', !!(await until(async () => wakes().length > 0 && delivery('m2')?.state === 'received' && (await idle(builder.id)), HUNG_MS)) && delivery('m2')?.readVia === 'inbox' && !!delivery('m2')?.offered, JSON.stringify(delivery('m2')))
+  // HI-3611: its woke is saved apart from its read (the take is confirmed in the background), so the whole row is waited
+  // for, one snapshot an attempt: offered, then woke, then read.
+  let m2 = null
+  check('…its row says when it woke the agent (its CLI took the doorbell), between offered and read', !!(await until(() => {
+    m2 = delivery('m2')
+    return !!m2?.offered && Date.parse(m2.woke) >= Date.parse(m2.offered) && Date.parse(m2.read) >= Date.parse(m2.woke)
+  }, HUNG_MS)), JSON.stringify(m2))
 
   // --- 3. Acked: the agent says it acted on m1; m2 isn't, and becomes overdue.
   await until(() => idle(builder.id), HUNG_MS)
