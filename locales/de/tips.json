@@ -47,6 +47,8 @@
   "tips.assistantConnection.title": "Wählen, womit der Assistent läuft",
   "tips.assistantControl.text": "Einstellungen → Assistent → Steuerung legt fest, was er darf: nur beraten oder auch Agenten hinzufügen, starten und einweisen und Karten starten, wenn du darum bittest.",
   "tips.assistantControl.title": "Den Assistenten Agenten steuern lassen",
+  "tips.assistantGithubSource.text": "Bitte den Assistenten, ein von dir eröffnetes Issue als Karte anzulegen oder eine Karte damit zu verknüpfen: Er setzt die GitHub-Quelle der Karte für dich, sodass Ausgelieferte Issues schließen… das Issue schließt, sobald sein Release veröffentlicht ist.",
+  "tips.assistantGithubSource.title": "Der Assistent verknüpft Karten mit Issues",
   "tips.assistantImages.text": "Unter „Anhänge“ in der Ansicht des Assistenten findest du jeden Screenshot und jede Datei, die du in seine Unterhaltungen eingefügt oder gezogen hast, nach Unterhaltung sortiert. Klicke auf den Namen einer Unterhaltung, um sie noch einmal zu lesen.",
   "tips.assistantImages.title": "Was du dem Assistenten angehängt hast",
   "tips.assistantJournal.text": "Der Assistent führt in jedem Arbeitsbereich ein Journal: Entscheidungen, Pläne und was passiert ist, nach einem Neustart zeilenweise abgerufen. Einstellungen → Assistent → Journal legt fest, was er speichern darf, oder schaltet es aus.",

@@ -205,7 +205,10 @@ interface CombworkMessageValues {
   'tasks.source.agents': undefined
   'tasks.source.gh': { problem: string; host: string | number }
   'tasks.source.issueLinkChanged': { repo: string | number; shown: string | number }
+  'tasks.source.linkAgents': undefined
   'tasks.source.linkChanged': { repo: string | number; shown: string | number }
+  'tasks.source.moved': { card: string | number }
+  'tasks.source.newColumn': undefined
   'tasks.source.noLink': undefined
   'tasks.source.noProject': undefined
   'tasks.source.notFound': { number: string | number; repo: string | number; why: string }

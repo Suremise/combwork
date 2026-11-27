@@ -215,6 +215,14 @@
     "defaultMessage": "Let the Assistant run agents",
     "description": "A tip's title."
   },
+  "tips.assistantGithubSource.text": {
+    "defaultMessage": "Ask the Assistant to card an issue you opened, or to link a card to one: it sets the card's GitHub source for you, so Close Shipped Issues… closes the issue once its release is published.",
+    "description": "A tip (HI-3584). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (GitHub source is the card dialog's field; Close Shipped Issues… the board's)."
+  },
+  "tips.assistantGithubSource.title": {
+    "defaultMessage": "The Assistant links cards to issues",
+    "description": "A tip's title (HI-3584): the Assistant can link a card to a GitHub issue or pull request."
+  },
   "tips.assistantImages.text": {
     "defaultMessage": "The Assistant view's Attachments shows every screenshot and file you've pasted or dropped into its conversations, by conversation. Click a conversation's name to read it again.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

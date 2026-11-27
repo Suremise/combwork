@@ -83,8 +83,8 @@ export const recordedHere = (): number => recording.getStore()?.recorded ?? 0
 
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 
-/** A card's fields undo puts back (SPEC §16.14): its words, labels, block, links, agent, column and project. */
-export const CARD_FIELDS = ['title', 'description', 'labels', 'blocked', 'blockedBy', 'links', 'agent', 'column', 'project', 'waitingFor'] as const
+/** A card's fields undo puts back (SPEC §16.14): its words, labels, block, links, agent, column and project; its GitHub source (HI-3584). */
+export const CARD_FIELDS = ['title', 'description', 'labels', 'blocked', 'blockedBy', 'links', 'agent', 'column', 'project', 'waitingFor', 'source'] as const
 export type CardField = (typeof CARD_FIELDS)[number]
 
 /** The implicit field a card's move records (its review, as it was and became): checked by undo, never restored. */
@@ -109,6 +109,10 @@ export function cardValue(card: TaskCard, field: CardField): Value {
     // of the request it waits on (HI-2931), so a request's mark put back still goes when that request ends.
     case 'waitingFor':
       return card.waitingFor ? { reason: card.waitingFor.reason, by: card.waitingFor.by, at: card.waitingFor.at, ...(card.waitingFor.ask ? { ask: card.waitingFor.ask } : {}) } : null
+    // HI-3584: its GitHub source as read, with GitHub's body and any feedback chosen from it, so undo puts back all three
+    // without reading GitHub again.
+    case 'source':
+      return card.source ? ({ source: card.source, body: card.sourceBody ?? '', ...(card.sourceFeedback?.length ? { feedback: card.sourceFeedback } : {}) } as unknown as Value) : null
     default:
       return card[field]
   }

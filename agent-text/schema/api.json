@@ -369,6 +369,13 @@
       "state": "plain"
     }
   },
+  "api.card.linkedSource": {
+    "placeholders": {
+      "set": "select",
+      "kind": "select",
+      "number": "plain"
+    }
+  },
   "api.card.madeKind": {
     "placeholders": {
       "kind": "plain"
@@ -444,6 +451,13 @@
   "api.card.saidSkipsReview": {
     "placeholders": {}
   },
+  "api.card.saidSource": {
+    "placeholders": {
+      "set": "select",
+      "kind": "select",
+      "number": "plain"
+    }
+  },
   "api.card.saidTarget": {
     "placeholders": {
       "own": "select",
@@ -454,6 +468,9 @@
     "placeholders": {}
   },
   "api.card.setSkipReview": {
+    "placeholders": {}
+  },
+  "api.card.sourceArg": {
     "placeholders": {}
   },
   "api.card.splitHint": {

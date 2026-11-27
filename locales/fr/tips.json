@@ -47,6 +47,8 @@
   "tips.assistantConnection.title": "Choisir sur quoi fonctionne l’Assistant",
   "tips.assistantControl.text": "Paramètres → Assistant → Contrôle décide de ce qu’il peut faire : seulement conseiller, ou aussi ajouter des agents, les démarrer et leur donner leurs consignes, et démarrer des cartes quand tu le demandes.",
   "tips.assistantControl.title": "Laisser l’Assistant piloter les agents",
+  "tips.assistantGithubSource.text": "Demande à l’Assistant de créer une carte pour une issue que tu as ouverte, ou de lier une carte à une issue : il définit la source GitHub de la carte pour toi, et Fermer les issues livrées… ferme l’issue une fois sa version publiée.",
+  "tips.assistantGithubSource.title": "L’Assistant lie des cartes à des issues",
   "tips.assistantImages.text": "Dans la vue de l’Assistant, Pièces jointes montre chaque capture d’écran et chaque fichier que tu as collés ou déposés dans ses conversations, classés par conversation. Clique sur le nom d’une conversation pour la relire.",
   "tips.assistantImages.title": "Ce que tu as joint à l’Assistant",
   "tips.assistantJournal.text": "L’Assistant tient un journal dans chaque espace de travail : décisions, plans et ce qui s’est passé, rappelés quelques lignes à la fois après un redémarrage. Paramètres → Assistant → Journal choisit ce qu’il peut enregistrer, ou le désactive.",

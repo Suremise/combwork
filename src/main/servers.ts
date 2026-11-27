@@ -40,7 +40,7 @@ import type { HandoverAuthor } from '../shared/combworkGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
 import { apiChainReady, inApiWorkspace, requestApiWorkspace } from './dialects/apiChain'
 import { isSaid, say, sayWithId, type AgentMsg, type AgentValues, type Said as SaidText } from '../shared/agentText'
-import { OUTSIDE_TEXT_NOTE, sourceForAgents } from '../shared/githubSource'
+import { OUTSIDE_TEXT_NOTE, sourceForAgents, sourceLabel } from '../shared/githubSource'
 import { API } from './apiText'
 import { FOUND } from './platform/agentPresentation'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
@@ -3560,27 +3560,54 @@ function targetArg(v: unknown): string | null {
   return v.slice(0, 250)
 }
 
+/** A card's GitHub source as a call gives it (HI-3584): `#12` or an address, null to clear; undefined when not given. */
+function sourceArg(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined
+  if (v === null) return null
+  if (typeof v !== 'string') throw new HttpError(400, apiSaid(API.card.sourceArg))
+  return v.trim() ? v.trim().slice(0, 500) : null
+}
+
+/** The line a card change's reply and the Assistant's activity say for a source set or cleared (HI-3584). */
+const sourceSaid = (c: TaskCard): Record<string, string | number> => (c.source ? { set: 'yes', kind: c.source.kind, number: c.source.number } : { set: 'no', kind: '', number: 0 })
+
 route('POST', '/v1/tasks', async ({ body }) => {
   requireWorkspace()
   const title = String(body?.title ?? '').trim()
   if (!title) throw new HttpError(400, apiSaid(API.card.titleRequired))
+  // HI-3584: the GitHub pull request or issue it is about, the Assistant's (an agent's refused before anything is made).
+  const source = sourceArg(body?.source)
   const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked === undefined ? undefined : reasonArg(body.blocked), blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}), ...(body?.target !== undefined ? { target: targetArg(body.target) } : {}), ...(body?.followUpOf !== undefined && body?.followUpOf !== null ? { followUpOf: cardRefIn(body.followUpOf) as number } : {}) }
   const actor = await taskActor()
+  if (source !== undefined && source !== null) tasks.checkSourceActor(actor)
   // Placed on a lane as it is made (HI-2167): checked before the card is made; placed after, through cw_lane start's
   // own path, so nobody guesses its key.
   const lane = await lanePlacement(body?.lane, input)
   // Files to keep with it (HI-1700): the list checked now; copied inside the operation that makes the card, once its
   // project is known to be allowed, and published with it.
   const paths = attachmentList(body)
+  // HI-3584: its source read from GitHub first (outside any lock), then made with it in the one save that makes it,
+  // labelled github-pr or github-issue as the card dialog labels it.
+  const sourced = async (): Promise<typeof input & { source?: Awaited<ReturnType<typeof tasks.readNewCardSource>> }> => {
+    if (source === undefined || source === null) return input
+    const read = await tasks.readNewCardSource(typeof input.project === 'string' && input.project ? input.project : null, input.column, source, actor)
+    const label = sourceLabel(read.source.kind)
+    const labels = Array.isArray(input.labels) ? (input.labels as unknown[]).filter((l) => l !== label) : []
+    return { ...input, labels: [...labels, label], source: read }
+  }
   // `commit`: the Assistant's guard (HI-2415), checked again just before each write, after the awaits a queued change waits on.
-  const create = (commit?: () => void) => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor, { commit }), commit))
+  const create = async (commit?: () => void) => {
+    const made = await sourced()
+    return withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(made, actor, { commit }), commit))
+  }
   // A long title is kept, with a line suggesting a shorter one (HI-1872), or one with what belongs in the description (HI-2061).
   const nudge = titleNudge(title, actor, titleKeys())
   // A target of its own given as it is made (HI-3043): said as cw_update_task says it (HI-3017), under the reply.
   const reply = async (c: TaskCard) => {
     const own = input.target ? (await cardTargetSaid(workspace, c.number, c.project)).note : ''
     const notes = [nudge, own].filter(Boolean).join('\n')
-    return { ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(notes ? { nudge: notes } : {}) }
+    const linked = source && c.source ? [sayStored([API.card.saidSource, sourceSaid(c)])] : []
+    return { ...(shortReply(body) ? await taskChange(c, [...linked, ...attachedLines(c)]) : await taskView(c)), ...(notes ? { nudge: notes } : {}) }
   }
   // Placed once it is made (the Assistant's: its own change, as cw_lane start is), never inside the card's own change.
   const placing = async <R extends { number: number }>(r: R) => (lane ? { ...r, ...(await placeOnLane(lane, r.number)) } : r)
@@ -3610,7 +3637,8 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const actor = await taskActor()
   // A decision that answers requests (HI-1932) is that change alone: checked against the body as sent, before any of
   // its other fields (its kind, skipping review, attachments: changed outside the patch) could be.
-  if (patch.answers !== undefined) tasks.checkDecisionAnswers(actor, body.answers, ['kind', 'confirmKind', 'skipReview', 'target', 'attachments'].some((k) => body[k] !== undefined))
+  // HI-3584 (HR1's round 1): its GitHub source too, written outside the patch.
+  if (patch.answers !== undefined) tasks.checkDecisionAnswers(actor, body.answers, ['kind', 'confirmKind', 'skipReview', 'target', 'source', 'attachments'].some((k) => body[k] !== undefined))
   const changes: string[] = []
   // Its kind (#1277): changed after it was made (the Assistant's, with override.reason), or an agent's proposal answered.
   const kind = body?.kind
@@ -3624,6 +3652,10 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const skipReview = body?.skipReview === undefined ? undefined : tasks.reviewSkipArg(body.skipReview)
   // Its Merges into (HI-2556): a branch, or null for the project's own; checked by tasks.setTarget.
   const target = body?.target === undefined ? undefined : targetArg(body.target)
+  // HI-3584: its GitHub pull request or issue (null clears it), the Assistant's: an agent's refused before anything is written.
+  const source = sourceArg(body?.source)
+  if (source !== undefined) tasks.checkSourceActor(actor)
+  let sourceRead: tasks.CardSourceRead | null = null
   // HI-3017: a target of its own (one of the project's other targets) is said under the change: it stays there when the
   // project's target changes, even to it, so setting cards before the project pins them.
   let ownTargetNote = ''
@@ -3637,6 +3669,11 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const fenced = tasks.fenceCommit(actor, n)
   const write = async (assistantGuard?: () => void): Promise<TaskCard> => {
     const commit = assistantGuard ?? fenced
+    // First, while the card is still where it was (its source only in Todo or On Hold, before a move in the same call).
+    if (sourceRead) {
+      const c = await tasks.writeCardSource(n, sourceRead, actor, { commit })
+      changes.push(sayStored([API.card.saidSource, sourceSaid(c)]))
+    }
     if (confirmKind !== undefined) {
       await tasks.confirmKind(n, confirmKind, actor, { commit })
       changes.push(sayStored([confirmKind ? API.card.saidNoCode : API.card.saidCode]))
@@ -3662,8 +3699,10 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
   // HI-2753: a card in flight moves to its new target in a change of its own, first: refused, nothing else is changed.
   const moving = target !== undefined && (await tasks.targetMovesInFlight(n).catch(() => false))
-  const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined || (target !== undefined && !moving) ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
+  const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined || source !== undefined || (target !== undefined && !moving) ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const apply = async (commit?: () => void): Promise<TaskCard> => {
+    // HI-3584: read from GitHub here, outside the board's lock (the Assistant's: once its change is admitted).
+    if (source !== undefined) sourceRead = await tasks.readCardSource(n, source, actor)
     if (moving) await setCardTarget(commit)
     // Its files copied here, inside the operation (the Assistant's: once admitted), to the card's own project.
     const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit), commit))
@@ -3712,6 +3751,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
       confirmKind !== undefined ? sayStored([confirmKind ? API.card.confirmedNoCode : API.card.keptCode]) : '',
       kind !== undefined ? sayStored([API.card.madeKind, { kind: String(kind) }]) : '',
       skipReview !== undefined ? sayStored([skipReview !== false ? API.card.setSkipReview : API.card.setReviewed]) : '',
+      source !== undefined ? sayStored([API.card.linkedSource, sourceSaid(c)]) : '',
       Object.keys(patch).some((k) => k !== 'column' && k !== 'before' && k !== 'position' && k !== 'decision') ? sayStored([API.card.changedIt]) : ''
     ]
       .filter(Boolean)
@@ -5430,4 +5470,6 @@ const asAgent = <T>(workspacePath: string, projectPath: string, agentId: string,
 /** Runs fn as a request of an agent's launch (HI-3340: its token's run, with the fence it captured as it arrived), as handleApi does. */
 const asLaunch = <T>(workspacePath: string, launch: { projectPath: string; agentId: string; runId: string }, fn: () => T): T =>
   callerStore.run({ kind: 'agent', workspace: workspacePath, ...launch, fence: captureFence(launch) }, () => inRequestScope({ projectPath: launch.projectPath, agentId: launch.agentId }, fn))
-export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, asLaunch, httpFrom }
+/** Runs fn as a request of the workspace's Assistant with its launch's token (HI-3584's route tests), as handleApi does. */
+const asAssistant = <T>(workspacePath: string, token: string, fn: () => T): T => callerStore.run({ kind: 'assistant', workspace: workspacePath, token }, fn)
+export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, asLaunch, asAssistant, httpFrom }

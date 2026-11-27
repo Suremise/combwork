@@ -805,7 +805,7 @@
   },
   "tasks.source.agents": {
     "defaultMessage": "Only the user sets a card’s GitHub source.",
-    "description": "HI-3551: an error: an agent or the Assistant tried to set the GitHub pull request or issue a card is about; only the user does, in the card dialog."
+    "description": "HI-3551: an error: an agent or the Assistant tried to make a card from a GitHub pull request, issue or its feedback (the board’s From GitHub…, Address feedback); only the user does."
   },
   "tasks.source.gh": {
     "defaultMessage": "The GitHub CLI {problem, select, missing {isn’t installed} signedOut {isn’t signed in on {host}} timeout {didn’t answer in time} other {couldn’t read it}}: see Version Control → Workflow → GitHub.",
@@ -815,9 +815,21 @@
     "defaultMessage": "This project’s GitHub repository is now {repo}, not {shown} as listed: list its issues again.",
     "description": "HI-3555: an error making a card of an issue from the board’s From GitHub… Issues list: the project’s GitHub link changed to another repository since the list was shown. {repo} and {shown} are owner/name."
   },
+  "tasks.source.linkAgents": {
+    "defaultMessage": "Only the user, or the Assistant for them, links a card to a GitHub pull request or issue.",
+    "description": "HI-3584: an error: an agent (a builder, reviewer or another of a project’s agents) tried to set or clear the GitHub pull request or issue a card is about; the user does it in the card dialog, and the Assistant may for them."
+  },
   "tasks.source.linkChanged": {
     "defaultMessage": "This project’s GitHub repository is now {repo}, not {shown} as listed: list its pull requests again.",
     "description": "HI-3553: an error making a card of a pull request from the board’s From GitHub… list: the project’s GitHub link changed to another repository since the list was shown. {repo} and {shown} are owner/name."
+  },
+  "tasks.source.moved": {
+    "defaultMessage": "{card} moved to another project while its GitHub source was read: set it again.",
+    "description": "HI-3584: an error: a card was moved to another project between reading its new GitHub source and saving it, so the source read may be of the wrong repository. {card} is a card key like HI-12."
+  },
+  "tasks.source.newColumn": {
+    "defaultMessage": "A card linked to a GitHub pull request or issue is made in Todo or On Hold: make it there, then move it on.",
+    "description": "HI-3584: an error: the Assistant tried to make a card with a GitHub source straight into another column (Doing, Review…). Todo and On Hold are board columns: as translated there."
   },
   "tasks.source.noLink": {
     "defaultMessage": "This project has no GitHub link: none of its remotes is on its GitHub host (Version Control → Workflow → GitHub).",

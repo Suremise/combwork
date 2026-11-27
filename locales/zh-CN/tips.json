@@ -47,6 +47,8 @@
   "tips.assistantConnection.title": "选择助手运行所用的连接",
   "tips.assistantControl.text": "“设置”→“助手”→“控制”决定它能做什么：只提建议，或者在你要求时也添加和启动智能体、向它们交代任务并开始处理卡片。",
   "tips.assistantControl.title": "让助手运行智能体",
+  "tips.assistantGithubSource.text": "让助手为你开的 Issue 创建卡片，或把卡片关联到某个 Issue：它会替你设置卡片的 GitHub 来源，这样版本发布后，“关闭已发布的 Issue…”就会关闭该 Issue。",
+  "tips.assistantGithubSource.title": "助手把卡片关联到 Issue",
   "tips.assistantImages.text": "助手视图的“附件”按对话列出你粘贴或拖入其对话的每张截图和每个文件。点击对话名称可以再次阅读该对话。",
   "tips.assistantImages.title": "你给助手的附件",
   "tips.assistantJournal.text": "助手会在每个工作区记日志：决定、计划和发生的事，重启后每次回想几行。“设置”→“助手”→“日志”可以选择它可以记录的内容，或将其关闭。",

@@ -47,6 +47,8 @@
   "tips.assistantConnection.title": "Wybierz, na czym działa Asystent",
   "tips.assistantControl.text": "Ustawienia → Asystent → Kontrola decyduje, co Asystent może robić: tylko doradzać, czy też, gdy poprosisz, dodawać, uruchamiać i instruować agentów oraz rozpoczynać karty.",
   "tips.assistantControl.title": "Pozwól Asystentowi kierować agentami",
+  "tips.assistantGithubSource.text": "Poproś Asystenta, by zrobił kartę z otwartego przez ciebie issue albo połączył z nim kartę: ustawi za ciebie źródło karty na GitHubie, więc Zamknij wydane issues… zamknie to issue po opublikowaniu jego wydania.",
+  "tips.assistantGithubSource.title": "Asystent łączy karty z issues",
   "tips.assistantImages.text": "Załączniki w widoku Asystenta pokazują każdy zrzut ekranu i plik wklejony lub upuszczony do jego rozmów, pogrupowane według rozmów. Kliknij nazwę rozmowy, żeby przeczytać ją ponownie.",
   "tips.assistantImages.title": "Co załączono Asystentowi",
   "tips.assistantJournal.text": "Asystent prowadzi dziennik w każdym obszarze roboczym: decyzje, plany i to, co się stało, przywoływane po kilka wierszy naraz po ponownym uruchomieniu. Ustawienia → Asystent → Dziennik określa, co może przechowywać, albo go wyłącza.",
