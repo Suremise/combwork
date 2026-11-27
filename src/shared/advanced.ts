@@ -182,6 +182,13 @@ export const USAGE_TIMELINE_DETAIL_DAYS = 'cw.usage.timelineDetailDays'
 /** The longest a slot's setup, install or archive command runs, in minutes (#1429): read by main's slotsApp. */
 export const SLOTS_SETUP_MINUTES = 'cw.slots.setupMinutes'
 
+/** Whether the Preview is on (HI-3614, SPEC §16.21): off, no preview runs and nothing of it is offered. Read by main's previewApp. */
+export const PREVIEW_ENABLED = 'cw.preview.enabled'
+/** The first of the profile's preview ports (HI-3614): a development build's default range is the next 1000 (previewApp). */
+export const PREVIEW_PORT_RANGE = 'cw.preview.portRange'
+/** How long a preview's server gets to listen on its port, in seconds (HI-3614): read by main's previewApp. */
+export const PREVIEW_START_SECONDS = 'cw.preview.startSeconds'
+
 /**
  * Whether a lane's end lets its builder finish its turn, tells it, and ends its CLI with the CLI's own exit (HI-1706):
  * read by main's slotsApp. Off, its session is stopped at its first idle moment, as before.
@@ -1222,6 +1229,51 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 1440,
     unit: 'min',
+    applies: 'now'
+  },
+  // The Preview (HI-3614, SPEC §16.21): a project's dev server per place, on a port of its own; off by default.
+  {
+    id: PREVIEW_ENABLED,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.preview.enabled.title', defaultMessage: "Preview: run projects' dev servers", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. The Preview runs a web project's development server (the command in Project Settings → Preview) so it can be looked at." }),
+    desc: msg({
+      id: 'settings.advanced.cw.preview.enabled.desc',
+      defaultMessage: "Lets Combwork run a web project's development server, the command set in Project Settings → Preview, in the project folder, a slot or a review copy, each on a free port of its own, started only when asked and stopped with its slot's or review's end. Turned off, Project Settings has no Preview section, no preview starts, and the ones running are stopped.",
+      description: "What the advanced setting \"Preview: run projects' dev servers\" does (Settings → Advanced, under Combwork). A slot is a worktree Combwork lends to a card or a lane; a review copy is a copy of a project at the revision a reviewer reviews. Project Settings → Preview is a section: use its names as translated there."
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'now'
+  },
+  {
+    id: PREVIEW_PORT_RANGE,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.preview.portRange.title', defaultMessage: 'Preview: first port', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a port number. The Preview runs web projects' development servers, each on a port of its own." }),
+    desc: msg({
+      id: 'settings.advanced.cw.preview.portRange.desc',
+      defaultMessage: "Preview servers get their ports from the 1,000 ports from this one, across every project and window of Combwork. A development build of Combwork uses the 1,000 after them while this is left at its default, so the two never share. A port another program listens on is skipped, and so are Combwork's own.",
+      description: "What the advanced setting \"Preview: first port\" does (Settings → Advanced, under Combwork). A preview server is a web project's development server Combwork runs."
+    }),
+    kind: 'number',
+    default: 45000,
+    min: 1024,
+    max: 64536,
+    applies: 'now'
+  },
+  {
+    id: PREVIEW_START_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.preview.startSeconds.title', defaultMessage: 'Preview: longest a server takes to start', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\"). The Preview runs web projects' development servers." }),
+    desc: msg({
+      id: 'settings.advanced.cw.preview.startSeconds.desc',
+      defaultMessage: 'How long a preview server gets to listen on the port Combwork gave it. Not listening by then, or listening on another port, it is stopped and the preview says why.',
+      description: "What the advanced setting \"Preview: longest a server takes to start\" does (Settings → Advanced, under Combwork). A preview server is a web project's development server Combwork runs."
+    }),
+    kind: 'number',
+    default: 60,
+    min: 5,
+    max: 600,
+    unit: 's',
     applies: 'now'
   },
   // Lanes nothing will wake the Assistant about (HI-2069): told so as its turn ends.

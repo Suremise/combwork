@@ -586,6 +586,12 @@ interface CombworkMessageValues {
   'settings.advanced.cw.outage.resumesPerHour.title': undefined
   'settings.advanced.cw.outage.waitMinutes.desc': undefined
   'settings.advanced.cw.outage.waitMinutes.title': undefined
+  'settings.advanced.cw.preview.enabled.desc': undefined
+  'settings.advanced.cw.preview.enabled.title': undefined
+  'settings.advanced.cw.preview.portRange.desc': undefined
+  'settings.advanced.cw.preview.portRange.title': undefined
+  'settings.advanced.cw.preview.startSeconds.desc': undefined
+  'settings.advanced.cw.preview.startSeconds.title': undefined
   'settings.advanced.cw.processes.knownHosts.desc': undefined
   'settings.advanced.cw.processes.knownHosts.title': undefined
   'settings.advanced.cw.processes.orphanMinutes.desc': undefined
@@ -1472,6 +1478,8 @@ interface CombworkMessageValues {
   'settings.project.keybindings.title': undefined
   'settings.project.metadata.desc': undefined
   'settings.project.metadata.title': undefined
+  'settings.project.preview.desc': undefined
+  'settings.project.preview.title': undefined
   'settings.project.reset.desc': undefined
   'settings.project.reset.title': undefined
   'settings.project.storage.desc': undefined
@@ -1498,6 +1506,8 @@ interface CombworkMessageValues {
   'settings.projectSection.general.label': undefined
   'settings.projectSection.keys.desc': undefined
   'settings.projectSection.keys.label': undefined
+  'settings.projectSection.preview.desc': undefined
+  'settings.projectSection.preview.label': undefined
   'settings.projectSection.sessions.desc': undefined
   'settings.projectSection.sessions.label': undefined
   'settings.projectSection.storage.desc': undefined

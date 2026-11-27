@@ -17,7 +17,8 @@ import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } 
 import { PROVIDERS, contextLines, isProviderEnabled, permissionLabel, providerDescriptor, providerName } from '@shared/providers'
 import { instructionsStarter } from '@shared/projectTabs'
 import { PROJECT_KEY_DESC, PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
-import { shownText } from '@shared/advanced'
+import { PREVIEW_ENABLED, shownText } from '@shared/advanced'
+import { PreviewSettings } from '../components/PreviewSettings'
 import { NumberField } from '../components/NumberField'
 import { CardCleanupSetting, StorageView } from '../components/Storage'
 import { CARD_CLEANUP_DEFAULT } from '@shared/cardCleanup'
@@ -1784,9 +1785,9 @@ function SettingRow({ title, desc, tip, children, modified }: { title: string; d
   )
 }
 
-type ProjectSection = 'general' | 'agents' | 'sessions' | 'storage' | 'keys' | 'advanced'
+type ProjectSection = 'general' | 'agents' | 'sessions' | 'storage' | 'keys' | 'preview' | 'advanced'
 
-const PROJECT_SECTION_ICONS: Record<string, string> = { general: 'settings-gear', agents: 'organization', sessions: 'history', storage: 'database', keys: 'keyboard', advanced: 'tools' }
+const PROJECT_SECTION_ICONS: Record<string, string> = { general: 'settings-gear', agents: 'organization', sessions: 'history', storage: 'database', keys: 'keyboard', preview: 'globe', advanced: 'tools' }
 
 // Each section's label and description are shown from its messages (text), in the window's language when it renders;
 // label and desc stay the catalogue's English, for the Assistant's tools.
@@ -1957,6 +1958,11 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
     stopContinuation: useAdvancedValue<boolean>(INBOX_SWITCH_ID.stopContinuation),
     idleWakes: useAdvancedValue<boolean>(INBOX_SWITCH_ID.idleWakes)
   }
+  // HI-3614: Preview's section only while Settings → Advanced's switch is on.
+  const previewOn = useAdvancedValue<boolean>(PREVIEW_ENABLED) === true
+  useEffect(() => {
+    if (!previewOn && section === 'preview') setSection('general')
+  }, [previewOn, section])
   if (!settings) return null
   const update = async (patch: Partial<ProjectConfig>): Promise<void> => {
     await actions.attempt(tr(S.saveFailed), () => call('project:updateConfig', project.path, patch))
@@ -2083,6 +2089,17 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       wide: true,
       render: () => <AgentList project={project} />
     },
+    ...(previewOn
+      ? [
+          {
+            section: 'preview' as const,
+            key: 'preview',
+            ...rowText('project.preview'),
+            wide: true,
+            render: () => <PreviewSettings project={project} />
+          }
+        ]
+      : []),
     {
       section: 'advanced',
       key: 'metadata',
@@ -2113,7 +2130,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
 
   const q = query.trim().toLowerCase()
   const visible = defs.filter((d) => (q ? `${d.title} ${d.desc} ${d.tip ?? ''} ${d.key}`.toLowerCase().includes(q) : d.section === section))
-  const sections = PROJECT_SECTIONS
+  const sections = PROJECT_SECTIONS.filter((s) => s.id !== 'preview' || previewOn)
   const groups = sections.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
 
   return (

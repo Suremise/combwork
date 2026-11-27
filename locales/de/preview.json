@@ -1,0 +1,16 @@
+{
+  "preview.settings.address": "Jeder Start bekommt einen freien Port aus {first}–{last} in {variable}. Der Server muss auf localhost darauf lauschen: Die Seite ist dann unter {url}.",
+  "preview.settings.badPath": "Ein Seitenpfad beginnt mit / und enthält keine Leerzeichen oder Backslashes.",
+  "preview.settings.clear": "Entfernen",
+  "preview.settings.command": "Befehl",
+  "preview.settings.commandPlaceholder": "npm run dev",
+  "preview.settings.failed": "Die Vorschau konnte nicht gespeichert werden",
+  "preview.settings.hmr": "Ein zweiter Port für Hot Reload",
+  "preview.settings.hmrNote": "In {variable}, für einen Server, dessen Hot-Reload-Socket getrennt lauscht.",
+  "preview.settings.noSuggestion": "Kein dev-, start- oder preview-Skript in package.json, das sich vorschlagen ließe.",
+  "preview.settings.path": "Seite",
+  "preview.settings.save": "Speichern",
+  "preview.settings.saved": "Vorschau gespeichert",
+  "preview.settings.suggested": "Das Skript {script} in package.json führt {line} aus. Vorgeschlagener Befehl: {command}",
+  "preview.settings.useIt": "Übernehmen"
+}

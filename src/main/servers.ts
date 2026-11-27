@@ -534,6 +534,15 @@ export function apiInfo(): AgentApiInfo {
   }
 }
 
+/**
+ * Combwork's own ports (HI-3614): this build's Agent API port, both builds' defaults, and the hook server's. The Preview
+ * never gives one of them to a dev server.
+ */
+export function combworkPorts(): number[] {
+  const hook = Number(/:(\d+)\//.exec(sessions.hookUrl ?? '')?.[1])
+  return [apiPort(), DEFAULT_API_PORT, DEFAULT_API_PORT + 1, ...(hook > 0 ? [hook] : [])]
+}
+
 /** The server's address for the Combwork Assistant, which reaches it whether or not the Agent API is turned on. */
 export function assistantApiUrl(): string | null {
   return apiServer?.listening ? `http://127.0.0.1:${apiPort()}` : null

@@ -2339,6 +2339,30 @@
     "defaultMessage": "Resuming after a connection drops: wait at most",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\")."
   },
+  "settings.advanced.cw.preview.enabled.desc": {
+    "defaultMessage": "Lets Combwork run a web project's development server, the command set in Project Settings → Preview, in the project folder, a slot or a review copy, each on a free port of its own, started only when asked and stopped with its slot's or review's end. Turned off, Project Settings has no Preview section, no preview starts, and the ones running are stopped.",
+    "description": "What the advanced setting \"Preview: run projects' dev servers\" does (Settings → Advanced, under Combwork). A slot is a worktree Combwork lends to a card or a lane; a review copy is a copy of a project at the revision a reviewer reviews. Project Settings → Preview is a section: use its names as translated there."
+  },
+  "settings.advanced.cw.preview.enabled.title": {
+    "defaultMessage": "Preview: run projects' dev servers",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork. The Preview runs a web project's development server (the command in Project Settings → Preview) so it can be looked at."
+  },
+  "settings.advanced.cw.preview.portRange.desc": {
+    "defaultMessage": "Preview servers get their ports from the 1,000 ports from this one, across every project and window of Combwork. A development build of Combwork uses the 1,000 after them while this is left at its default, so the two never share. A port another program listens on is skipped, and so are Combwork's own.",
+    "description": "What the advanced setting \"Preview: first port\" does (Settings → Advanced, under Combwork). A preview server is a web project's development server Combwork runs."
+  },
+  "settings.advanced.cw.preview.portRange.title": {
+    "defaultMessage": "Preview: first port",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a port number. The Preview runs web projects' development servers, each on a port of its own."
+  },
+  "settings.advanced.cw.preview.startSeconds.desc": {
+    "defaultMessage": "How long a preview server gets to listen on the port Combwork gave it. Not listening by then, or listening on another port, it is stopped and the preview says why.",
+    "description": "What the advanced setting \"Preview: longest a server takes to start\" does (Settings → Advanced, under Combwork). A preview server is a web project's development server Combwork runs."
+  },
+  "settings.advanced.cw.preview.startSeconds.title": {
+    "defaultMessage": "Preview: longest a server takes to start",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\"). The Preview runs web projects' development servers."
+  },
   "settings.advanced.cw.processes.knownHosts.desc": {
     "defaultMessage": "Programs expected to keep running after the shell that started them is gone, such as Windows Sandbox's guest: a regular expression matched against the program's file name. Combwork never tells these as left running; Activity still lists them, with End It. Add a program here to stop its notices.",
     "description": "What the advanced setting \"Processes left running: known hosts\" does (Settings → Advanced). Activity is a tab of Combwork's; End It its button. Keep \"Windows Sandbox\" as it is (a product)."
@@ -5883,6 +5907,14 @@
     "defaultMessage": "Settings file",
     "description": "A setting's title (Project Settings → Advanced)."
   },
+  "settings.project.preview.desc": {
+    "defaultMessage": "Combwork runs this command in the place being previewed, with a free port in PORT (and CW_PREVIEW_PORT). The server must listen on that port on localhost: one that picks its own needs it passed, such as --port %PORT%.",
+    "description": "What the setting \"Dev server\" does, under its title (Project Settings → Preview). PORT, CW_PREVIEW_PORT and --port %PORT% are names and a command line: keep them as they are."
+  },
+  "settings.project.preview.title": {
+    "defaultMessage": "Dev server",
+    "description": "A setting's title (Project Settings → Preview): the command that starts the project's development server, its page and its ports."
+  },
   "settings.project.reset.desc": {
     "defaultMessage": "Everything on this page goes back to Inherit. Agents, and skill and MCP opt-outs, are kept.",
     "description": "What the setting \"Reset project settings\" does, under its title (Project Settings → Advanced)."
@@ -5986,6 +6018,14 @@
   "settings.projectSection.keys.label": {
     "defaultMessage": "Keyboard Shortcuts",
     "description": "A section of Project Settings, in its list on the left."
+  },
+  "settings.projectSection.preview.desc": {
+    "defaultMessage": "The command that runs this project’s development server, which the Preview starts when asked, in the project folder, a slot or a review copy, each on a port of its own.",
+    "description": "Under the heading of the section \"Preview\" of Project Settings: what it holds. A slot is a worktree Combwork lends to a card or a lane; a review copy is a copy at the revision a reviewer reviews."
+  },
+  "settings.projectSection.preview.label": {
+    "defaultMessage": "Preview",
+    "description": "A section of Project Settings, in its list on the left: the command that runs the project’s development server for the Preview."
   },
   "settings.projectSection.sessions.desc": {
     "defaultMessage": "Compacting and notifications for this project.",

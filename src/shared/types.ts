@@ -10,6 +10,7 @@ import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActi
 import type { AttachmentKind } from './attachments'
 import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
 import type { GitlinkChange } from './gitlink'
+import type { PreviewConfig } from './preview'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { IdleResume } from './sessionFresh'
@@ -1966,6 +1967,8 @@ export interface ProjectConfig {
   githubRemote?: string
   /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
   copies?: { size?: number }
+  /** The project's preview (HI-3614, SPEC §16.21): its dev server's command, page path and hot reload port, set in Project Settings → Preview. */
+  preview?: PreviewConfig
   /** From before HI-1766 (Project Settings → Card loops): see `fileLocks`. */
   loopWakes?: boolean
   loopRounds?: number | null

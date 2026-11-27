@@ -1,0 +1,16 @@
+{
+  "preview.settings.address": "Każde uruchomienie dostaje wolny port z zakresu {first}–{last} w {variable}. Serwer musi na nim nasłuchiwać na localhost: strona będzie wtedy pod adresem {url}.",
+  "preview.settings.badPath": "Ścieżka strony zaczyna się od / i nie zawiera spacji ani ukośników wstecznych.",
+  "preview.settings.clear": "Usuń",
+  "preview.settings.command": "Polecenie",
+  "preview.settings.commandPlaceholder": "npm run dev",
+  "preview.settings.failed": "Nie udało się zapisać podglądu",
+  "preview.settings.hmr": "Drugi port do przeładowania na gorąco",
+  "preview.settings.hmrNote": "W {variable}, dla serwera, którego gniazdo przeładowania na gorąco nasłuchuje osobno.",
+  "preview.settings.noSuggestion": "W package.json nie ma skryptu dev, start ani preview do zaproponowania.",
+  "preview.settings.path": "Strona",
+  "preview.settings.save": "Zapisz",
+  "preview.settings.saved": "Zapisano podgląd",
+  "preview.settings.suggested": "Skrypt {script} w package.json uruchamia {line}. Proponowane polecenie: {command}",
+  "preview.settings.useIt": "Użyj"
+}

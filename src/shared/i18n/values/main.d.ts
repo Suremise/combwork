@@ -293,6 +293,11 @@ interface CombworkMessageValues {
   'main.plan.resetsOn': { when: string | number }
   'main.plan.used': { share: number; provider: string | number; window: string; hours: number; label: string | number }
   'main.plan.usedOn': { share: number; window: string; hours: number; label: string | number; connection: string | number }
+  'main.preview.badConfig': undefined
+  'main.preview.noConfig': { project: string | number }
+  'main.preview.notAPlace': { project: string | number }
+  'main.preview.notLent': { slot: string | number }
+  'main.preview.off': undefined
   'main.profileMove.refused': { from: string | number; to: string | number; reason: string | number }
   'main.profileMove.refusedTitle': undefined
   'main.profileMove.signInBody': { names: string | number; n: number }

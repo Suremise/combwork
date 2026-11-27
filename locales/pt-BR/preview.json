@@ -1,0 +1,16 @@
+{
+  "preview.settings.address": "Cada início recebe uma porta livre de {first}–{last} em {variable}. O servidor precisa escutar nela em localhost: a página fica então em {url}.",
+  "preview.settings.badPath": "Um caminho de página começa com / e não tem espaços nem barras invertidas.",
+  "preview.settings.clear": "Remover",
+  "preview.settings.command": "Comando",
+  "preview.settings.commandPlaceholder": "npm run dev",
+  "preview.settings.failed": "Não foi possível salvar a pré-visualização",
+  "preview.settings.hmr": "Uma segunda porta para recarga a quente",
+  "preview.settings.hmrNote": "Em {variable}, para um servidor cujo socket de recarga a quente escuta à parte.",
+  "preview.settings.noSuggestion": "Nenhum script dev, start ou preview no package.json para sugerir.",
+  "preview.settings.path": "Página",
+  "preview.settings.save": "Salvar",
+  "preview.settings.saved": "Pré-visualização salva",
+  "preview.settings.suggested": "O script {script} do package.json roda {line}. Comando sugerido: {command}",
+  "preview.settings.useIt": "Usar"
+}
