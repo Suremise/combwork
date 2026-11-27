@@ -148,7 +148,8 @@ import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { githubLinkOf, githubRepoFor, openPrsOf, setGithubRemote } from './githubLink'
 import { closeShippedIssues, issueSourceFor, openIssuesOf, releasedLines, shippedIssuesOf } from './issueSources'
 import { copyViews, stopIsolated } from './copiesApp'
-import { retargetApply, retargetArg } from './workflow/retarget'
+import { retargetApply, retargetArg, slotMoveApply, slotMoveArg, slotMovePreview } from './workflow/retarget'
+import { projectTargets } from './workflow/targets'
 import { lineRepoReads } from './platform/repoReadsPorts'
 import { checkRepoTools } from './platform/repoPorts'
 import { slotWorkspaces } from './platform/workspacePorts'
@@ -1120,7 +1121,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'workflow:levelCheck': (level, platform, change) => checkLevelChange(workspace, level, platform, change),
     'workflow:setLevel': (level, platform, change) => setLevelOptions(workspace, level, platform, change),
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
-    'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
+    'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p)), (await projectTargets(workspace, workspace.assertProject(p)).catch(() => null))?.default ?? null),
+    'slots:movePreview': (p, slot) => slotMovePreview(currentWorkspace(), workspace.assertProject(p), String(slot)),
+    'slots:move': (p, preview) => slotMoveApply(currentWorkspace(), workspace.assertProject(p), slotMoveArg(preview)),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
     'slots:gitFiles': async (p) => (await slotWorkspaces().files?.status(workspace.assertProject(p))) ?? null,

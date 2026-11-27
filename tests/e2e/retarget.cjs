@@ -334,6 +334,9 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     await others.press('Enter')
     await form.locator('[data-action="save"]').click()
     const refusal = await waitHung(async () => {
+      // HI-3592: Save… offers to move the lane (and its card) off 1.3.0 first; this checks the refusal, so it's unticked.
+      const first = save.locator('[data-removal="1.3.0"] input[data-retarget-on]')
+      if ((await first.count()) && (await first.isChecked().catch(() => false))) await first.uncheck().catch(() => undefined)
       if (await save.isVisible().catch(() => false)) await save.getByRole('button', { name: 'Save', exact: true }).click().catch(() => undefined)
       const t = await text(page.locator('body'))
       // Its card started on 1.3.0 and their slot are named too; the lane (B11) is what HI-3113 adds.

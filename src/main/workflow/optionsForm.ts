@@ -37,7 +37,7 @@ import { closeStaleChurn, workflowEnforced, workflowFor } from './service'
 import { APPLY_OPTIONS } from './runtime'
 import { kickQueue, queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
-import { refuseRemovedTargets, retargetPreview, slotUses } from './retarget'
+import { refuseRemovedTargets, removalsOf, retargetPreview, slotUses } from './retarget'
 import { newlyMissing, projectTargets, refuseMissingTargets } from './targets'
 import { workflowWrite } from './writes'
 import { withFolderRepoLocks } from '../platform/repoPorts'
@@ -298,7 +298,10 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
   const retarget = targets ? await retargetOf(ws, project, targets.to) : null
   // HI-2807: branches newly named as targets that don't exist (the save refuses them; the section offers to create each).
   const missing = merges(project.platform) && (c.changed.includes('target') || c.changed.includes('otherTargets')) ? await newlyMissing(project.path, resolvedOf(ws, project.path, project.platform, cfg).options, c.options) : []
-  return { problems: c.problems, ...(missing.length ? { missing } : {}), changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}), ...(retarget ? { retarget } : {}) }
+  // HI-3592: branches taken out of Other branches work can merge into that something still uses: named, and what can
+  // move from each offered before the save (none while the same change moves Work merges into: a second save then).
+  const removals = merges(project.platform) && c.changed.includes('otherTargets') && !c.problems.length ? await removalsOf(ws, project.path, resolvedOf(ws, project.path, project.platform, cfg).options.otherTargets ?? [], c.options.otherTargets ?? [], c.options.target || null, c.changed.includes('target')).catch(() => []) : []
+  return { problems: c.problems, ...(missing.length ? { missing } : {}), ...(removals.length ? { removals } : {}), changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}), ...(retarget ? { retarget } : {}) }
 }
 
 /**

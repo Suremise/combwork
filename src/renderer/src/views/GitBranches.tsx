@@ -25,6 +25,7 @@ import { offered, offeredCleanup, repoOp } from '../repoOps'
 import { attempt, releaseHeldSlot } from '../actions'
 import { cancelGitRun, cancelLabel, gitRun, startGitRun } from '../gitRuns'
 import { SLOT_HELD_TEXT } from '../components/SlotsAndCopies'
+import { moveSlotOn, slotMoveText } from '../slotMove'
 import { bumpGit, cardLabelOf, choose, confirm, notify, openChangesOf, prompt, set, showVersionControl, UNUSED_ROOT, useStore } from '../store'
 import { agentCard, branchCards, type BranchCard } from '@shared/branchCards'
 import { revisionShort } from '@shared/platform/descriptors'
@@ -775,6 +776,12 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                         )}
                         <BranchCards cards={agentsCard(w.path)} project={project} names={names} />
                         <span className="git-url faint">{w.path}</span>
+                        {/* HI-3592: a free slot left on an older branch than Work merges into, moved on from here. */}
+                        {slot?.moveOn && (
+                          <button className="btn small subtle" data-action="move-slot" title={slotMoveText(slot.name, slot.moveOn).tip} disabled={!!ro} onClick={() => void moveSlotOn(project.path, slot.name, read.reload)}>
+                            {slotMoveText(slot.name, slot.moveOn).label}
+                          </button>
+                        )}
                         <button
                           className="btn small subtle"
                           onClick={() => {

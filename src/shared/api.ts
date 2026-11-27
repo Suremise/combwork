@@ -159,6 +159,7 @@ import type {
   ReleaseOffer,
   RetargetPreview,
   RetargetResult,
+  SlotMovePreview,
   NextVersionPlan,
   NextVersionResult,
   WorkflowCheck,
@@ -484,6 +485,10 @@ export interface CombworkRequests {
   'queue:list': (projectPath: string, target?: string) => QueueView[]
   /** The project's slots (#1429, SPEC §16.10.1), each with its open lease. */
   'slots:list': (projectPath: string) => SlotView[]
+  /** HI-3592: a free slot's move to Work merges into from its row: what it would be, read-only. */
+  'slots:movePreview': (projectPath: string, slot: string) => SlotMovePreview
+  /** HI-3592: that move, as its preview showed it, rechecked as it is made. */
+  'slots:move': (projectPath: string, preview: SlotMovePreview) => RetargetResult
   /** One setting of the Version Control tab's Slots and copies (#1445): set, or with null removed, under the project's lock. */
   'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize' | 'gitFiles', value: string | number | boolean | null) => { slots: SlotOptions; copies: { size?: number } }
   /** HI-1182: what the project folder uses of submodules and Git LFS, and git-lfs's version; null when git couldn't say. */

@@ -171,6 +171,10 @@
     "defaultMessage": "The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.",
     "description": "A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant); the section reloads them."
   },
+  "workflow.form.changedMeanwhileKept": {
+    "defaultMessage": "The workflow options changed meanwhile, so they weren’t saved. Your changes are kept, over the options as they are now: Save… again to check them.",
+    "description": "HI-3592: a notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant), after something had already been moved for it. The user’s own unsaved changes stay in the form, laid over the options as they are now. Save… is the button’s name."
+  },
   "workflow.form.changesHead": {
     "defaultMessage": "What changes:",
     "description": "In the dialog before saving workflow options: above the list of options that change, each with its old and new value."
@@ -383,6 +387,10 @@
     "defaultMessage": "{n, plural, one {# minute} other {# minutes}}",
     "description": "The value of the workflow option “Design check wait (minutes)” (Card loops) in words, as in the Inherit box."
   },
+  "workflow.form.movedUnsaved": {
+    "defaultMessage": "Moved what could move, but the options weren’t saved",
+    "description": "HI-3592: a notification’s title: before taking a branch out of Other branches work can merge into, what could move from it was moved, but the save was then refused (something still uses the branch, or the options changed meanwhile). Its text says what moved; the dialog says why the save was refused."
+  },
   "workflow.form.neverOff.fileLocks": {
     "defaultMessage": "File locks, while their own setting has them on.",
     "description": "A protection that stays on with every rule off: agents can’t edit one file at once (its own setting decides)."
@@ -514,6 +522,18 @@
   "workflow.form.readOnly": {
     "defaultMessage": "{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.",
     "description": "Under “Reviewers” (G17) when some reviewing agents use a coding agent that Combwork can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names."
+  },
+  "workflow.form.removalAfterTarget": {
+    "defaultMessage": "This save also changes Work merges into, so nothing can move from {branch} yet. Save the change to Work merges into first, with {branch} kept in Other branches work can merge into; then take it out, and Save… offers to move what uses it to the new branch.",
+    "description": "HI-3592: in the dialog before saving workflow options that change Work merges into and also take {branch} out of Other branches work can merge into while something uses it: what is moved goes to the saved Work merges into, so this takes two saves. Work merges into and Other branches work can merge into are the options’ names: as translated there."
+  },
+  "workflow.form.removalPersist": {
+    "defaultMessage": "What moves stays moved, even if {branch} still can’t be taken out afterwards.",
+    "description": "HI-3592: under the list of what can move from {branch} before it is taken out of Other branches work can merge into: the moves are made first, and kept even if the save is then refused (something else still uses it)."
+  },
+  "workflow.form.removalUses": {
+    "defaultMessage": "{branch} is still used by: {uses}",
+    "description": "HI-3592: in the dialog before saving workflow options that take {branch} out of Other branches work can merge into: what still uses it ({uses}: card keys, lane and slot names, a list). The save is refused while any of them is left on it."
   },
   "workflow.form.removeCheck": {
     "defaultMessage": "Remove",

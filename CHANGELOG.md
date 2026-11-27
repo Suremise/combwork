@@ -8,6 +8,9 @@
 ### Added
 
 - **The Assistant can link a card to a GitHub issue or pull request** (HI-3584). Ask it to card an issue you opened, or to link a card to one, and it does it in one step, as the card dialog's **GitHub source** does: the card is labelled **github-issue** or **github-pr**, and **Close Shipped Issues…** closes the issue once the release that ships it is published. Before, only you could set a card's source, so an issue the Assistant opened and carded needed a second step in the card dialog, and was left open if that was forgotten. The same limits apply (only before the card's work starts, in Todo or On Hold), nothing is written to GitHub, and the link is one of the Assistant's changes, under Settings → Assistant → Control and undone from its changes. Builders, reviewers and other agents still can't link a card.
+### Added
+
+- **Move a free slot left on an old release from the window** (HI-3592). A slot that was lent, had changes or held commits when **Work merges into** moved on stayed on the old branch, and only the Assistant or a git command could move it. Once it's free, its row in **Version Control → Branches & remotes → Worktrees** and in **Slots and copies** now has **Move to 1.8.0…** (the branch work merges into now), checked as **Also retarget what can move** checks a slot, and checked again as it moves. Taking a branch out of **Other branches work can merge into** while something still uses it, **Save…** now names what uses it and offers to move what can, before saving.
 
 ## 1.7.1 — 2026-11-26
 

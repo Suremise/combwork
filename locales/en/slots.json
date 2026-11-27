@@ -11,6 +11,54 @@
     "defaultMessage": "{slot} is held by {names}",
     "description": "A notice's title (HI-2309): a slot (a worktree Combwork lends to a card, {slot} such as slot-a) stays held after Combwork restarted, only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer)."
   },
+  "slots.move.button": {
+    "defaultMessage": "Move to {to}…",
+    "description": "HI-3592: a button on a free slot's row (Version Control → Worktrees, Slots and copies): the slot still follows an older branch, and this moves it to the project's Work merges into, {to} (a branch name, such as 1.8.0). Asks first."
+  },
+  "slots.move.buttonTip": {
+    "defaultMessage": "{slot} is free and still follows {from}: move it to {to}, the branch work merges into now",
+    "description": "HI-3592: the tooltip of a free slot's Move to… button. {slot} is its name (slot-e), {from} the older branch it follows, {to} the project's Work merges into."
+  },
+  "slots.move.cant": {
+    "defaultMessage": "{slot} can’t move to {to} now",
+    "description": "HI-3592: a notification's title: the free slot ({slot}) can't move to Work merges into ({to}); its text says why."
+  },
+  "slots.move.confirm": {
+    "defaultMessage": "Move",
+    "description": "HI-3592: the button that moves the free slot to Work merges into."
+  },
+  "slots.move.detail": {
+    "defaultMessage": "Checked again as it moves: if it was lent or changed meanwhile, it stays where it is.",
+    "description": "HI-3592: under the question before moving a free slot to Work merges into."
+  },
+  "slots.move.failed": {
+    "defaultMessage": "Could not move the slot",
+    "description": "HI-3592: an error's title: moving a free slot to Work merges into failed."
+  },
+  "slots.move.kept": {
+    "defaultMessage": "{slot} stayed on {from}",
+    "description": "HI-3592: a notification's title: the slot ({slot}) was checked again as it moved and stayed on its branch ({from}); its text says why."
+  },
+  "slots.move.message": {
+    "defaultMessage": "{slot} is free and still follows {from}. Its folder is detached at {to}, and its next card or lane starts there. Nothing in it is lost: it has no changes, and every commit it holds is in {from}.",
+    "description": "HI-3592: the question before moving a free slot ({slot}) from the older branch it follows ({from}) to Work merges into ({to}): what happens. Detached: git's word (its folder at that branch's commit, on no branch)."
+  },
+  "slots.move.moved": {
+    "defaultMessage": "{slot} follows {to} now",
+    "description": "HI-3592: a notification after a free slot ({slot}) moved to Work merges into ({to})."
+  },
+  "slots.move.onTarget": {
+    "defaultMessage": "{slot} follows {to} already.",
+    "description": "HI-3592: why a slot ({slot}) needs no move: it follows Work merges into ({to}) already."
+  },
+  "slots.move.readFailed": {
+    "defaultMessage": "Could not check the slot's move",
+    "description": "HI-3592: an error's title: Combwork couldn't check whether a slot can move to Work merges into."
+  },
+  "slots.move.title": {
+    "defaultMessage": "Move {slot} to {to}?",
+    "description": "HI-3592: the question before moving a free slot ({slot}, such as slot-e) to the project's Work merges into ({to}, a branch name)."
+  },
   "slots.release.changed": {
     "defaultMessage": "{slot} changed meanwhile: its writer is no longer the one shown. Look again.",
     "description": "Release Slot… refused: the slot ({slot}, such as slot-b) was released or taken by another run while the question was open."
