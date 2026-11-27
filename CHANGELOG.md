@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **The Assistant names the window's way before a command** (HI-3595). Asked to do something with branches, slots or issues, it now points first to where Combwork's window does it, such as Clean Up Merged Branches…, which goes through Combwork's checks, undo and history where a git command could leave them out of step. It still gives the command when you ask for one, or when the window has no way to do it, and says so.
 - **A delivery's activity says when it woke the agent, apart from when it was read** (HI-3611). `cw_agent_activity`'s inbox rows and the Agent API's deliveries list each delivery's times in the order they happen: `offered`, then `woke` (when the agent's CLI took the line Combwork typed to wake it, or the launch carrying it started), then `read` (when the agent read it with `cw_inbox`), then `acked`. How long a delivery took to reach its agent is from `created` to `woke`. Before, only the read was shown, as `received`, so deliveries looked slower than they were whenever an agent finished its step before reading. In those rows `received` and `receivedVia` are now `read` and `readVia`; the state `received` is unchanged.
 ### Added
 
