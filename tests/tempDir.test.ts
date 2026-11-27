@@ -42,6 +42,8 @@ const ALLOWED: Record<string, string[]> = {
   'e2e/build.mjs': ["import { tmpdir } from 'os'", "export const BUILD_LOCKS = join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'build-locks')"],
   'progressReport.mts': ["import { tmpdir } from 'node:os'", "const timings = (): string => process.env.CW_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'progress-timings.json')"],
   // npm run e2e -- --clear-dir: a folder the user names may be in the temp folder (one nothing here made).
+  // HI-3602: db.ts's import of it, as text the 1.0 schema guard takes out of db.ts's code (no use of the temp folder).
+  'combworkMove10.test.ts': ["\"import { tmpdir } from 'os' \","],
   'e2e/evidence.cjs': ['function clearDir(target, { board = {}, temp = os.tmpdir(), testRoot = runContext.TEST_ROOT, homes = [runContext.CODEX_HOME, runContext.CLAUDE_TEST_HOME] } = {}) {']
 }
 // msysTemp.mts: the run's Git Bash /tmp keeper, given the temp folder the run started with (HI-3447).

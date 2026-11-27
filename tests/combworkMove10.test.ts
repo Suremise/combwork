@@ -126,8 +126,7 @@ const UPGRADE_09_REMOVED: string[] = [
   'copyFileSync, ',
   'mkdtempSync, ',
   ', statSync',
-  // db.ts's import, split so tests/tempDir.test.ts's scan for a test's own use of the system temp doesn't take it for one.
-  "import { tmp" + "dir } from 'os' ",
+  "import { tmpdir } from 'os' ",
   "import { pathToFileURL } from 'url' "
 ]
 /** UPGRADE_09_REMOVED, each piece wherever it is (escaped for a regular expression). */
