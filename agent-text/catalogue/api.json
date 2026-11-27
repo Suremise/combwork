@@ -274,6 +274,10 @@
   "api.card.lineCommentsState": {
     "text": "Unknown state \"{state}\": open or all."
   },
+  "api.card.linkedSource": {
+    "text": "{set, select, yes {linked it to {kind, select, pr {pull request} other {issue}} #{number}} other {cleared its GitHub source}}",
+    "note": "HI-3584: what the Assistant's card change did, one of a list joined with commas (stored)."
+  },
   "api.card.madeKind": {
     "text": "made it {kind}"
   },
@@ -329,6 +333,10 @@
   "api.card.saidSkipsReview": {
     "text": "Skips review"
   },
+  "api.card.saidSource": {
+    "text": "{set, select, yes {Linked to {kind, select, pr {pull request} other {issue}} #{number}} other {GitHub source cleared}}",
+    "note": "HI-3584: a line of the Assistant's card change's reply: it set the card's GitHub source (set yes, kind pr or issue, its number) or cleared it."
+  },
   "api.card.saidTarget": {
     "text": "{own, select, yes {Merges into {target}} other {Merges into the project's branch}}",
     "note": "HI-2556: a card update set its Merges into: own yes, {target} (a branch); else the project's Work merges into."
@@ -338,6 +346,10 @@
   },
   "api.card.setSkipReview": {
     "text": "set it to skip review"
+  },
+  "api.card.sourceArg": {
+    "text": "source is a GitHub pull request or issue of the project: #12 or its address; null clears it.",
+    "note": "HI-3584: cw_create_task or cw_update_task was given a source that is not text or null."
   },
   "api.card.splitHint": {
     "text": "{n} comments: a card this long is hard to follow. Consider splitting its remaining work into new cards.",

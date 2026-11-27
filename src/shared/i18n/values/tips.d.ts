@@ -55,6 +55,8 @@ interface CombworkMessageValues {
   'tips.assistantConnection.title': undefined
   'tips.assistantControl.text': undefined
   'tips.assistantControl.title': undefined
+  'tips.assistantGithubSource.text': undefined
+  'tips.assistantGithubSource.title': undefined
   'tips.assistantImages.text': undefined
   'tips.assistantImages.title': undefined
   'tips.assistantJournal.text': undefined

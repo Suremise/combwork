@@ -47,6 +47,8 @@
   "tips.assistantConnection.title": "Elige con qué se ejecuta el Asistente",
   "tips.assistantControl.text": "Configuración → Asistente → Control decide qué puede hacer: solo aconsejar, o también agregar, iniciar e instruir agentes e iniciar tarjetas cuando se lo pidas.",
   "tips.assistantControl.title": "Deja que el Asistente dirija agentes",
+  "tips.assistantGithubSource.text": "Pide al Asistente que cree una tarjeta para una issue que abriste, o que vincule una tarjeta a ella: establece el origen en GitHub de la tarjeta por ti, así Cerrar issues publicadas… cierra la issue cuando se publica su versión.",
+  "tips.assistantGithubSource.title": "El Asistente vincula tarjetas a issues",
   "tips.assistantImages.text": "Adjuntos, en la vista del Asistente, muestra cada captura y archivo que pegaste o soltaste en sus conversaciones, por conversación. Haz clic en el nombre de una conversación para volver a leerla.",
   "tips.assistantImages.title": "Lo que adjuntaste al Asistente",
   "tips.assistantJournal.text": "El Asistente lleva un diario en cada espacio de trabajo: decisiones, planes y lo que pasó, que recupera unas pocas líneas cada vez tras un reinicio. Configuración → Asistente → Diario elige qué puede guardar, o lo desactiva.",

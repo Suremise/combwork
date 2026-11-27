@@ -231,10 +231,17 @@ async function undoCard(ws: WorkspaceService, c: RecordedChange, by: UndoBy, gua
       return failedOr(['created'], e)
     }
   }
-  const values = c.values.filter((v) => (CARD_FIELDS as readonly string[]).includes(v.field))
+  // HI-3584: its GitHub source first, on its own (it changes the card's labels too, which then count as put back).
+  const sourceChange = c.values.find((v) => v.field === 'source')
+  const fromSource = sourceChange ? await undoSource(ws, n, sourceChange, actor, guard) : null
+  const current = fromSource ? ((await inWorkspace(ws, () => tasks.getTask(n, ws)).catch(() => null)) ?? card) : card
+  const values = c.values.filter((v) => v.field !== 'source' && (CARD_FIELDS as readonly string[]).includes(v.field))
   const review = c.values.find((v) => v.field === REVIEW)
   const agentChange = values.find((v) => v.field === 'agent')
-  const { back, undone, skipped } = plan(values, (f) => cardValue(card, f as CardField))
+  const planned = plan(values, (f) => cardValue(current, f as CardField))
+  const undone = [...(fromSource?.undone ?? []), ...planned.undone]
+  const skipped = [...(fromSource?.skipped ?? []), ...planned.skipped]
+  const back = planned.back
   if (!back.length) return { undone, skipped }
   const r = await setBack(back, async (rest) => {
     const project = rest.find((v) => v.field === 'project')
@@ -274,6 +281,29 @@ async function undoCard(ws: WorkspaceService, c: RecordedChange, by: UndoBy, gua
   return { undone: [...undone, ...r.undone], skipped: [...skipped, ...r.skipped] }
 }
 
+/**
+ * HI-3584: a card's GitHub source the Assistant set, changed or cleared, put back as it was (with GitHub's body and any
+ * feedback chosen from it), only while it is still as the change left it, checked under the board's lock, and the card's
+ * work hasn't started; nothing is read from GitHub.
+ */
+async function undoSource(ws: WorkspaceService, n: number, v: FieldChange, actor: tasks.TaskActor, guard: Guard): Promise<Outcome> {
+  const card = await inWorkspace(ws, () => tasks.getTask(n, ws)).catch(() => null)
+  if (!card) return goneAll(['source'])
+  if (sameValue(cardValue(card, 'source'), v.old)) return { undone: ['source'], skipped: [] }
+  if (!sameValue(cardValue(card, 'source'), v.new)) return { undone: [], skipped: changed(['source']) }
+  const check = (now: TaskCard): void => {
+    if (!sameValue(cardValue(now, 'source'), v.new)) throw new ChangedSince(['source'])
+    guard?.()
+  }
+  try {
+    const saved = await inWorkspace(ws, () => tasks.restoreSource(n, (v.old ?? null) as unknown as Parameters<typeof tasks.restoreSource>[1], actor, { check, ...(guard ? { commit: guard } : {}) }))
+    return readBack([v], (f) => cardValue(saved, f as CardField))
+  } catch (e) {
+    if (e instanceof ChangedSince) return { undone: [], skipped: changed(['source']) }
+    return failedOr(['source'], e)
+  }
+}
+
 function setCardField(patch: TaskPatch, field: CardField, v: Value): void {
   switch (field) {
     case 'labels':
@@ -300,6 +330,9 @@ function setCardField(patch: TaskPatch, field: CardField, v: Value): void {
       break
     case 'project':
       patch.project = v as string
+      break
+    // HI-3584: put back by undoSource, never through a patch.
+    case 'source':
       break
     default:
       patch[field] = v as string

@@ -47,6 +47,8 @@
   "tips.assistantConnection.title": "Escolha em que o Assistente roda",
   "tips.assistantControl.text": "Configurações → Assistente → Controle decide o que ele pode fazer: só aconselhar, ou também adicionar, iniciar e instruir agentes e iniciar cartões quando você pedir.",
   "tips.assistantControl.title": "Deixe o Assistente comandar agentes",
+  "tips.assistantGithubSource.text": "Peça ao Assistente para criar um cartão para uma issue que você abriu, ou para vincular um cartão a ela: ele define a origem no GitHub do cartão por você, e Fechar issues entregues… fecha a issue quando a versão dela é publicada.",
+  "tips.assistantGithubSource.title": "O Assistente vincula cartões a issues",
   "tips.assistantImages.text": "Anexos, na visualização do Assistente, mostra cada captura de tela e cada arquivo que você colou ou soltou nas conversas dele, por conversa. Clique no nome de uma conversa para lê-la de novo.",
   "tips.assistantImages.title": "O que você anexou para o Assistente",
   "tips.assistantJournal.text": "O Assistente mantém um diário em cada espaço de trabalho: decisões, planos e o que aconteceu, lembrados algumas linhas por vez depois de um reinício. Configurações → Assistente → Diário escolhe o que ele pode guardar, ou o desativa.",

@@ -2611,7 +2611,10 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o:{ c
 
 /** HI-3551: why a card's GitHub source wasn't set, in the window's words. */
 const SOURCE = {
-  agents: msg({ id: 'tasks.source.agents', defaultMessage: 'Only the user sets a card’s GitHub source.', description: 'HI-3551: an error: an agent or the Assistant tried to set the GitHub pull request or issue a card is about; only the user does, in the card dialog.' }),
+  agents: msg({ id: 'tasks.source.agents', defaultMessage: 'Only the user sets a card’s GitHub source.', description: 'HI-3551: an error: an agent or the Assistant tried to make a card from a GitHub pull request, issue or its feedback (the board’s From GitHub…, Address feedback); only the user does.' }),
+  linkAgents: msg({ id: 'tasks.source.linkAgents', defaultMessage: 'Only the user, or the Assistant for them, links a card to a GitHub pull request or issue.', description: 'HI-3584: an error: an agent (a builder, reviewer or another of a project’s agents) tried to set or clear the GitHub pull request or issue a card is about; the user does it in the card dialog, and the Assistant may for them.' }),
+  newColumn: msg({ id: 'tasks.source.newColumn', defaultMessage: 'A card linked to a GitHub pull request or issue is made in Todo or On Hold: make it there, then move it on.', description: 'HI-3584: an error: the Assistant tried to make a card with a GitHub source straight into another column (Doing, Review…). Todo and On Hold are board columns: as translated there.' }),
+  moved: msg({ id: 'tasks.source.moved', defaultMessage: '{card} moved to another project while its GitHub source was read: set it again.', description: 'HI-3584: an error: a card was moved to another project between reading its new GitHub source and saving it, so the source read may be of the wrong repository. {card} is a card key like HI-12.' }),
   started: msg({ id: 'tasks.source.started', defaultMessage: '{card}’s GitHub source can’t change once its work has started.', description: 'HI-3551: an error setting or clearing the GitHub pull request or issue of a card that has started (its work is on it). {card} is a card key like HI-12.' }),
   noProject: msg({ id: 'tasks.source.noProject', defaultMessage: 'A card about the workspace has no GitHub source: only a project’s cards do.', description: 'HI-3551: an error setting the GitHub source of a card that belongs to no project.' }),
   noLink: msg({ id: 'tasks.source.noLink', defaultMessage: 'This project has no GitHub link: none of its remotes is on its GitHub host (Version Control → Workflow → GitHub).', description: 'HI-3551: an error setting a card’s GitHub source in a project without a GitHub link (HI-3550). Version Control → Workflow → GitHub is a place in the window: as translated there.' }),
@@ -2624,19 +2627,79 @@ const SOURCE = {
 }
 
 /**
- * HI-3551: sets, replaces or clears (null) the GitHub pull request or issue a card is about: the user's alone, only while
- * the card has never started (no Started fact) and is in Todo or On Hold. Read once from GitHub through the gh service
- * (outside the board's lock), on the project's GitHub link only; the card is labelled github-pr or github-issue. Once
- * started, the start's evidence (Started.pr) carries a PR's identity, whatever the card says after.
+ * HI-3551: sets, replaces or clears (null) the GitHub pull request or issue a card is about: the user's, and the
+ * Assistant's for them (HI-3584; an agent is refused), only while the card has never started (no Started fact) and is in
+ * Todo or On Hold. Read once from GitHub through the gh service (outside the board's lock), on the project's GitHub link
+ * only; the card is labelled github-pr or github-issue. Once started, the start's evidence (Started.pr) carries a PR's
+ * identity, whatever the card says after.
  */
-export async function setSource(n: number, input: string | null, actor: TaskActor): Promise<TaskCard> {
-  if (actor.kind !== 'user') throw new TaskPermissionError(SOURCE.agents)
+export async function setSource(n: number, input: string | null, actor: TaskActor, o: { commit?: () => void } = {}): Promise<TaskCard> {
+  const read = await readCardSource(n, input, actor)
+  return writeCardSource(n, read, actor, o)
+}
+
+/** A card's source as read for it (HI-3584): what writeCardSource saves, with the project it was read for. */
+export type CardSourceRead = { project: string; read: SourceRead | null }
+type SourceRead = { source: GithubSource; body: string; feedback?: FeedbackItem[] }
+
+/** Refuses an agent setting a card's GitHub source (HI-3584): the user's, or the Assistant's for them. */
+export function checkSourceActor(actor: TaskActor): void {
+  if (actor.kind === 'agent') throw new TaskPermissionError(SOURCE.linkAgents)
+}
+
+/**
+ * HI-3584: a card's new GitHub source (`input`, or null to clear it) read from GitHub for its project as it is now, outside
+ * any lock: an agent is refused before anything is read.
+ */
+export async function readCardSource(n: number, input: string | null, actor: TaskActor): Promise<CardSourceRead> {
+  checkSourceActor(actor)
+  const ws = workspace
+  const first = await getTask(n, ws)
+  if (!first.project) throw new TaskConflictError(SOURCE.noProject)
+  return { project: first.project, read: input !== null ? await readProjectSource(first.project, String(input), actor) : null }
+}
+
+/**
+ * HI-3584: a new card's GitHub source, read for `project` (the Assistant's cw_create_task): an agent is refused, and one
+ * made in another column than Todo or On Hold (`column`, Todo by default), before anything is read.
+ */
+export async function readNewCardSource(project: string | null, column: TaskColumn | undefined, input: string, actor: TaskActor): Promise<SourceRead> {
+  checkSourceActor(actor)
+  if (column !== undefined && column !== 'todo' && column !== 'hold') throw new TaskConflictError(SOURCE.newColumn)
+  if (!project) throw new TaskConflictError(SOURCE.noProject)
+  return readProjectSource(project, input, actor)
+}
+
+async function readProjectSource(project: string, input: string, actor: TaskActor): Promise<SourceRead> {
+  checkSourceActor(actor)
+  const ws = workspace
+  const projectPath = ws.path ? join(ws.path, project) : project
+  return readSource(ws, projectPath, input)
+}
+
+/**
+ * HI-3584: saves a source readCardSource read (under the board's lock, while the card's work hasn't started, still in the
+ * project it was read for); `commit`, the Assistant's guard, checked just before the write.
+ */
+export async function writeCardSource(n: number, r: CardSourceRead, actor: TaskActor, o: { commit?: () => void } = {}): Promise<TaskCard> {
+  checkSourceActor(actor)
+  const ws = workspace
+  const projectPath = ws.path ? join(ws.path, r.project) : r.project
+  return writeSource(ws, projectPath, n, r.read, actor, { ...o, project: r.project })
+}
+
+/**
+ * HI-3584: undo of the Assistant's source change: the card's source, body and chosen feedback put back as they were
+ * (`old`, none: cleared), only while the card's work hasn't started and `check` (under the board's lock) finds the source
+ * still as the change left it. Nothing is read from GitHub.
+ */
+export async function restoreSource(n: number, old: SourceRead | null, actor: TaskActor, o: { check: (card: TaskCard) => void; commit?: () => void }): Promise<TaskCard> {
+  checkSourceActor(actor)
   const ws = workspace
   const first = await getTask(n, ws)
   if (!first.project) throw new TaskConflictError(SOURCE.noProject)
   const projectPath = ws.path ? join(ws.path, first.project) : first.project
-  const read = input !== null ? await readSource(ws, projectPath, String(input)) : null
-  return writeSource(ws, projectPath, n, read, actor)
+  return writeSource(ws, projectPath, n, old, actor, { ...o, project: first.project })
 }
 
 /** HI-3560: who wrote a pull request, as gh's `pr view` gives its commits' messages and body (prAuthorship), against Combwork's providers' names. */
@@ -2787,8 +2850,12 @@ export async function createFromFeedback(n: number, target: FeedbackTarget, ids:
   )
 }
 
-/** HI-3551: sets (or clears, null) a card's source read from GitHub, under the board's lock, while its work hasn't started. */
-async function writeSource(ws: WorkspaceService, projectPath: string, n: number, read: { source: GithubSource; body: string } | null, actor: TaskActor): Promise<TaskCard> {
+/**
+ * HI-3551: sets (or clears, null) a card's source read from GitHub, under the board's lock, while its work hasn't started.
+ * HI-3584: `project`, the project it was read for (a card moved since is refused); `check`, undo's, under the lock;
+ * `commit`, the Assistant's guard, just before the write; `feedback`, the chosen comments undo puts back with it.
+ */
+async function writeSource(ws: WorkspaceService, projectPath: string, n: number, read: SourceRead | null, actor: TaskActor, o: { project?: string; check?: (card: TaskCard) => void; commit?: () => void } = {}): Promise<TaskCard> {
   const source = read?.source ?? null
   const { workflowFor } = await import('./workflow/service')
   const wf = await workflowFor(ws, projectPath).catch(() => null)
@@ -2796,10 +2863,12 @@ async function writeSource(ws: WorkspaceService, projectPath: string, n: number,
     boardLock(ws, async () => {
       const card = await getTask(n, ws)
       if (card.archived) throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
+      if (o.project !== undefined && card.project !== o.project) throw new TaskConflictError(withValues(SOURCE.moved, { card: cardRef(n) }))
+      o.check?.(card)
       // Under the board's lock, where a start is written: never once its work has started (a put back card included).
       const s = wf ? wf.state(wf.store.card(n)) : null
       if (s?.started || !['todo', 'hold'].includes(s?.stage ?? card.column)) throw new TaskConflictError(withValues(SOURCE.started, { card: cardRef(n) }))
-      if (JSON.stringify(card.source ?? null) === JSON.stringify(source) && (card.sourceBody ?? '') === (read?.body ?? '')) return card
+      if (JSON.stringify(card.source ?? null) === JSON.stringify(source) && (card.sourceBody ?? '') === (read?.body ?? '') && JSON.stringify(card.sourceFeedback ?? null) === JSON.stringify(read?.feedback ?? null)) return card
       const before = structuredClone(card)
       const label = source ? sourceLabel(source.kind) : null
       const old = card.source ? sourceLabel(card.source.kind) : null
@@ -2808,11 +2877,12 @@ async function writeSource(ws: WorkspaceService, projectPath: string, n: number,
       // HI-3553: GitHub's body beside it (outside text), gone with it.
       if (read?.body) card.sourceBody = read.body
       else delete card.sourceBody
-      // HI-3554: feedback chosen from the pull request it was about isn't another source's.
-      delete card.sourceFeedback
+      // HI-3554: feedback chosen from the pull request it was about isn't another source's (HI-3584: undo puts it back).
+      if (read?.feedback?.length) card.sourceFeedback = read.feedback
+      else delete card.sourceFeedback
       card.labels = [...card.labels.filter((l) => l !== old || l === label), ...(label && !card.labels.includes(label) ? [label] : [])]
       note(card, actorName(actor), storedText(HISTORY.source, source ? { set: 'yes', kind: source.kind, number: source.number, repo: `${source.owner}/${source.repo}` } : { set: 'no', kind: '', number: 0, repo: '' }))
-      await saveCard(ws, n, card, before)
+      await saveCard(ws, n, card, before, undefined, o.commit)
       changed(ws)
       return card
     })

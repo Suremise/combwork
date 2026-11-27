@@ -53,6 +53,8 @@
   "tips.assistantConnection.title": "Choose what the Assistant runs on",
   "tips.assistantControl.text": "Settings → Assistant → Control decides what it may do: only advise, or also add, start and brief agents and start cards when you ask.",
   "tips.assistantControl.title": "Let the Assistant run agents",
+  "tips.assistantGithubSource.text": "Ask the Assistant to card an issue you opened, or to link a card to one: it sets the card's GitHub source for you, so Close Shipped Issues… closes the issue once its release is published.",
+  "tips.assistantGithubSource.title": "The Assistant links cards to issues",
   "tips.assistantImages.text": "The Assistant view's Attachments shows every screenshot and file you've pasted or dropped into its conversations, by conversation. Click a conversation's name to read it again.",
   "tips.assistantImages.title": "What you've attached to the Assistant",
   "tips.assistantJournal.text": "The Assistant keeps a journal in each workspace: decisions, plans and what happened, recalled a few lines at a time after a restart. Settings → Assistant → Journal chooses what it may store, or turns it off.",

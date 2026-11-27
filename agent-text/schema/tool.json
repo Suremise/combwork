@@ -84,6 +84,9 @@
       "project": "plain"
     }
   },
+  "tool.arg.source": {
+    "placeholders": {}
+  },
   "tool.arg.target": {
     "placeholders": {}
   },
