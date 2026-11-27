@@ -3637,7 +3637,8 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const actor = await taskActor()
   // A decision that answers requests (HI-1932) is that change alone: checked against the body as sent, before any of
   // its other fields (its kind, skipping review, attachments: changed outside the patch) could be.
-  if (patch.answers !== undefined) tasks.checkDecisionAnswers(actor, body.answers, ['kind', 'confirmKind', 'skipReview', 'target', 'attachments'].some((k) => body[k] !== undefined))
+  // HI-3584 (HR1's round 1): its GitHub source too, written outside the patch.
+  if (patch.answers !== undefined) tasks.checkDecisionAnswers(actor, body.answers, ['kind', 'confirmKind', 'skipReview', 'target', 'source', 'attachments'].some((k) => body[k] !== undefined))
   const changes: string[] = []
   // Its kind (#1277): changed after it was made (the Assistant's, with override.reason), or an agent's proposal answered.
   const kind = body?.kind
@@ -5469,4 +5470,6 @@ const asAgent = <T>(workspacePath: string, projectPath: string, agentId: string,
 /** Runs fn as a request of an agent's launch (HI-3340: its token's run, with the fence it captured as it arrived), as handleApi does. */
 const asLaunch = <T>(workspacePath: string, launch: { projectPath: string; agentId: string; runId: string }, fn: () => T): T =>
   callerStore.run({ kind: 'agent', workspace: workspacePath, ...launch, fence: captureFence(launch) }, () => inRequestScope({ projectPath: launch.projectPath, agentId: launch.agentId }, fn))
-export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, asLaunch, httpFrom }
+/** Runs fn as a request of the workspace's Assistant with its launch's token (HI-3584's route tests), as handleApi does. */
+const asAssistant = <T>(workspacePath: string, token: string, fn: () => T): T => callerStore.run({ kind: 'assistant', workspace: workspacePath, token }, fn)
+export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, asLaunch, asAssistant, httpFrom }

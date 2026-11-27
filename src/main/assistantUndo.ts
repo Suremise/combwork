@@ -12,6 +12,7 @@ import { sessions } from './sessions'
 import { applySetting, entryOf, removedPrices } from './settingsTools'
 import * as tasks from './tasks'
 import { isWorkflowRole } from '../shared/workflow/roles'
+import { sourceLabel } from '../shared/githubSource'
 import { restoreProjectAgents } from './templates'
 import { setWorkflowOptions, workflowForm, WorkflowStale } from './workflow/optionsForm'
 import { inWorkspace, workspaceOf, type WorkspaceService } from './workspace'
@@ -235,7 +236,10 @@ async function undoCard(ws: WorkspaceService, c: RecordedChange, by: UndoBy, gua
   const sourceChange = c.values.find((v) => v.field === 'source')
   const fromSource = sourceChange ? await undoSource(ws, n, sourceChange, actor, guard) : null
   const current = fromSource ? ((await inWorkspace(ws, () => tasks.getTask(n, ws)).catch(() => null)) ?? card) : card
-  const values = c.values.filter((v) => v.field !== 'source' && (CARD_FIELDS as readonly string[]).includes(v.field))
+  // A source kept (changed since, or not put back): its label stays with it (HR1's round 1), the change's other labels
+  // still going back.
+  const keptSource = !!sourceChange && !fromSource?.undone.includes('source')
+  const values = c.values.filter((v) => v.field !== 'source' && (CARD_FIELDS as readonly string[]).includes(v.field)).map((v) => (keptSource && v.field === 'labels' ? { ...v, old: withSourceLabel(v.old as string[] | null, sourceChange!.old as Value, current) } : v))
   const review = c.values.find((v) => v.field === REVIEW)
   const agentChange = values.find((v) => v.field === 'agent')
   const planned = plan(values, (f) => cardValue(current, f as CardField))
@@ -279,6 +283,18 @@ async function undoCard(ws: WorkspaceService, c: RecordedChange, by: UndoBy, gua
   // off; one still open stays until that request ends. Never throws.
   if (r.undone.includes('waitingFor') && (back.find((v) => v.field === 'waitingFor')?.old as { ask?: string } | null)?.ask) await reconcileAskWaits(ws)
   return { undone: [...undone, ...r.undone], skipped: [...skipped, ...r.skipped] }
+}
+
+/**
+ * HI-3584 (HR1's round 1): the labels a change's undo puts back when the card's source stays as it is now: the label of
+ * the source it had before the change goes (unless it is the one now), and the label of the source it has now is kept.
+ */
+function withSourceLabel(old: string[] | null, oldSource: Value, now: TaskCard): string[] {
+  const was = (oldSource as { source?: { kind?: 'pr' | 'issue' } } | null)?.source?.kind
+  const wasLabel = was ? sourceLabel(was) : null
+  const keep = now.source ? sourceLabel(now.source.kind) : null
+  const base = (old ?? []).filter((l) => l !== wasLabel || l === keep)
+  return keep && !base.includes(keep) ? [...base, keep] : base
 }
 
 /**

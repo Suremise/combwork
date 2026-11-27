@@ -53,6 +53,8 @@ const { userUndo } = await import('../src/main/assistantUndo')
 const { advanced } = await import('../src/main/advanced')
 const { shippedIssuesOf } = await import('../src/main/issueSources')
 const { FactStore } = await import('../src/main/workflow/factStore')
+const { apiTextTestHooks } = await import('../src/main/servers')
+const { config } = await import('../src/main/config')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -185,7 +187,61 @@ describe('the Assistant links a card to a GitHub source (HI-3584)', () => {
     await inWorkspace(w, () => tasks.setSource(c.number, '#32', user))
     const kept = await userUndo(w, { group: again })
     expect(kept[0].skipped).toEqual(expect.arrayContaining([{ field: 'source', why: 'changed' }]))
-    expect((await inWorkspace(w, () => tasks.getTask(c.number, w))).source).toMatchObject({ number: 32 })
+    const keptCard = await inWorkspace(w, () => tasks.getTask(c.number, w))
+    expect(keptCard.source).toMatchObject({ number: 32 })
+    // HR1's round 1: its label stays with the source kept.
+    expect(keptCard.labels).toEqual(['docs', 'github-issue'])
+    // Changed since to a pull request: the source and its github-pr kept, the Assistant's github-issue gone with its source.
+    await inWorkspace(w, () => tasks.setSource(c.number, null, user))
+    control.newTurn(ws)
+    const third = control.currentTurn(ws).id
+    await asAssistant(ws, w, () => tasks.setSource(c.number, '#31', assistant))
+    await inWorkspace(w, () => tasks.setSource(c.number, '#7', user))
+    const keptPr = await userUndo(w, { group: third })
+    expect(keptPr[0].skipped).toEqual(expect.arrayContaining([{ field: 'source', why: 'changed' }]))
+    expect(await inWorkspace(w, () => tasks.getTask(c.number, w))).toMatchObject({ source: { kind: 'pr', number: 7 }, labels: ['docs', 'github-pr'] })
+    // A label the Assistant's change added beside the source still goes back while the source stays.
+    await inWorkspace(w, () => tasks.setSource(c.number, null, user))
+    control.newTurn(ws)
+    const fourth = control.currentTurn(ws).id
+    await asAssistant(ws, w, async () => {
+      await tasks.setSource(c.number, '#31', assistant)
+      await tasks.updateTask(c.number, { labels: ['docs', 'github-issue', 'triage'] }, assistant)
+    })
+    await inWorkspace(w, () => tasks.setSource(c.number, '#32', user))
+    await userUndo(w, { group: fourth })
+    expect(await inWorkspace(w, () => tasks.getTask(c.number, w))).toMatchObject({ source: { kind: 'issue', number: 32 }, labels: ['docs', 'github-issue'] })
+    expect(writes()).toEqual([])
+  })
+
+  it('through the Agent API’s routes: the Assistant’s new and existing card linked; an agent’s, or one beside a decision’s answers, refused before anything is read (HR1’s round 1)', async () => {
+    const { w, ws, repo } = await workspace()
+    config.settings.assistant = { ...config.settings.assistant, control: 'projects' } as typeof config.settings.assistant
+    await control.newAssistantToken(ws)
+    const token = readFileSync(control.assistantTokenFile(ws), 'utf8').match(/"token":\s*"([0-9a-f]+)"/)![1]
+    const call = (method: string, template: string, params: string[], body: unknown, as: 'assistant' | 'agent') => {
+      const run = () => apiTextTestHooks.routeHandler(method, template)!({ params, query: new URLSearchParams(), body, signal: new AbortController().signal })
+      return inWorkspace(w, () => (as === 'assistant' ? apiTextTestHooks.asAssistant(ws, token, run) : apiTextTestHooks.asAgent(ws, repo, 'a1', run)))
+    }
+    const made = (await call('POST', '/v1/tasks', [], { title: 'Fix it', project: 'p', source: '#31', labels: ['docs'], reply: 'short' }, 'assistant')) as { number: number; text?: string }
+    const card = await inWorkspace(w, () => tasks.getTask(made.number, w))
+    expect(card).toMatchObject({ column: 'todo', labels: ['docs', 'github-issue'], source: { kind: 'issue', number: 31 } })
+    expect(JSON.stringify(made)).toContain('Linked to issue #31')
+    const other = await inWorkspace(w, () => tasks.createTask({ title: 'Another', project: 'p' }, user))
+    await call('PATCH', '/v1/tasks/:n', [String(other.number)], { source: 'https://github.com/acme/app/pull/7', reply: 'short' }, 'assistant')
+    expect((await inWorkspace(w, () => tasks.getTask(other.number, w))).source).toMatchObject({ kind: 'pr', number: 7 })
+    await expect(call('PATCH', '/v1/tasks/:n', [String(other.number)], { source: 12 }, 'assistant')).rejects.toThrow('source is a GitHub pull request or issue of the project')
+    writeFileSync(callLog, '')
+    // An agent: refused before any read or change, made or patched.
+    await expect(call('PATCH', '/v1/tasks/:n', [String(other.number)], { source: '#31' }, 'agent')).rejects.toThrow('Only the user, or the Assistant for them')
+    await expect(call('POST', '/v1/tasks', [], { title: 'Mine', project: 'p', source: '#31' }, 'agent')).rejects.toThrow('Only the user, or the Assistant for them')
+    // A decision answering requests is that change alone: with a source it is refused whole.
+    const before = await inWorkspace(w, () => tasks.getTask(other.number, w))
+    await expect(call('PATCH', '/v1/tasks/:n', [String(other.number)], { decision: 'Use the bee icon.', answers: ['r-1'], source: '#31' }, 'assistant')).rejects.toThrow()
+    const after = await inWorkspace(w, () => tasks.getTask(other.number, w))
+    expect([after.source, after.decisions?.length ?? 0, after.labels]).toEqual([before.source, before.decisions?.length ?? 0, before.labels])
+    expect(calls()).toEqual([])
+    expect((await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title).sort()).toEqual(['Another', 'Fix it'])
     expect(writes()).toEqual([])
   })
 
