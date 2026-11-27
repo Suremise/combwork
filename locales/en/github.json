@@ -407,6 +407,10 @@
     "defaultMessage": "The cards with a GitHub issue that merged into a released branch. Once its release is published on GitHub, each open issue is closed with the comment “Fixed in {version}”, under your GitHub account.",
     "description": "Under the Close Shipped Issues dialog’s title (HI-3555): what it lists and does. Fixed in {version} is the comment posted on GitHub, in English: keep it as it is. {version} is a version such as 1.7.0."
   },
+  "github.shipped.doubt": {
+    "defaultMessage": "{reason, select, earlier {Issue #{issue} · {card}: left out, as it couldn’t be told whether the earlier release {tag} shipped it} other {Issue #{issue} · {card}: left out, as it couldn’t be read whether its merge is in {tag}}}",
+    "description": "A row of the Close Shipped Issues dialog (HI-3613): a card linked to a GitHub issue that was left out, not closed, because something couldn’t be read (Git or GitHub didn’t answer, or its merge commit isn’t in this repository). {card} is a card key like HI-12, {tag} a release tag such as v1.7.0. Keep the select keys."
+  },
   "github.shipped.failed": {
     "defaultMessage": "Couldn’t close the shipped issues",
     "description": "An error’s title (HI-3555): Close Shipped Issues was refused or failed; its message says why."

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Close Shipped Issues… offers a patch released by its pull request while its branch is still there** (HI-3613). A patch branch merged into `main` by its pull request, with its release tag on that merge, was offered only once the branch was deleted, so opening the dialog just after publishing could miss the release and its issues. It is now offered at once. A card linked to an issue that was left out because something couldn't be read is now listed as *left out*, with why, instead of the dialog saying no card was linked.
+
 ### Changed
 
 - **A delivery's activity says when it woke the agent, apart from when it was read** (HI-3611). `cw_agent_activity`'s inbox rows and the Agent API's deliveries list each delivery's times in the order they happen: `offered`, then `woke` (when the agent's CLI took the line Combwork typed to wake it, or the launch carrying it started), then `read` (when the agent read it with `cw_inbox`), then `acked`. How long a delivery took to reach its agent is from `created` to `woke`. Before, only the read was shown, as `received`, so deliveries looked slower than they were whenever an agent finished its step before reading. In those rows `received` and `receivedVia` are now `read` and `readVia`; the state `received` is unchanged.

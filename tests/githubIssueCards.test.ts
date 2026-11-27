@@ -469,7 +469,14 @@ describe('closing shipped issues at publish (HI-3555)', () => {
     for (const error of ['HTTP 502: Bad Gateway', 'malformed']) {
       setGithub((s) => (s.releaseErrors['v1.0.0'] = error))
       // 1.0.0's issues aren't 1.1.0's, whatever 1.0.0's read says; and 1.0.0 itself can't be listed.
-      expect((await shippedOf(w, repo, '1.1.0')).issues.map((i) => i.issue)).toEqual([24, 25])
+      const r = await shippedOf(w, repo, '1.1.0')
+      expect(r.issues.map((i) => i.issue)).toEqual([24, 25])
+      // HI-3613: named, with the earlier release it couldn't be told about.
+      expect(r.doubts.map((d) => [d.issue, d.reason, d.tag])).toEqual([
+        [21, 'earlier', 'v1.0.0'],
+        [22, 'earlier', 'v1.0.0'],
+        [23, 'earlier', 'v1.0.0']
+      ])
       expect(await inWorkspace(w, () => shippedIssuesOf(w, repo, '1.0.0'))).toMatchObject({ problem: 'failed' })
     }
     // Only GitHub saying there's no such release is "not published".
@@ -551,6 +558,80 @@ describe('closing shipped issues at publish (HI-3555)', () => {
     const out2 = await closing
     expect(out2.map((o) => [o.issue, o.outcome])).toEqual([[24, 'closed']])
     expect(writes().map((c) => c[2])).toEqual(['24'])
+  })
+
+  /**
+   * HI-3613: 1.7.1's shape. A card made plain and linked to #21 in the card dialog afterwards, merged into the patch line
+   * 1.7.1 (off v1.7.0 on main); main moves on; the line reaches main by its pull request's merge commit, tagged v1.7.1 on
+   * main, so the tag is outside the line's own history.
+   */
+  async function patchByPullRequest() {
+    const { w, repo } = await workspace()
+    const facts = FactStore.forBoard(w, { project: 'p', key: 'p' })
+    git(repo, 'tag', 'v1.7.0', 'main')
+    git(repo, 'checkout', '-q', '-b', '1.7.1')
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'A card', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.setSource(card, 'https://github.com/acme/app/issues/21', user))
+    writeFileSync(join(repo, 'fix.txt'), 'fix\n')
+    git(repo, 'add', '-A')
+    git(repo, 'commit', '-qm', 'fix')
+    const result = git(repo, 'rev-parse', 'HEAD')
+    const integrate = (n: number, at: string) => store.boardWrite(w, async () => facts.tx((tx) => void tx.append(n, { kind: 'Integrated', actor: 'combwork', source: 'recorded', data: { revision: at, target: '1.7.1', result: at, method: 'merge', by: 'combwork' } } as never)))
+    await integrate(card, result)
+    await inWorkspace(w, () => tasks.moveTask(card, 'done', { confirm: true, paths: null }))
+    git(repo, 'checkout', '-q', 'main')
+    writeFileSync(join(repo, 'other.txt'), 'other\n')
+    git(repo, 'add', '-A')
+    git(repo, 'commit', '-qm', 'other work on main')
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'Merge pull request from 1.7.1', '1.7.1')
+    git(repo, 'tag', 'v1.7.1', 'main')
+    setGithub((s) => {
+      s.repoPath = repo
+      s.releases['v1.7.0'] = false
+      s.releases['v1.7.1'] = false
+    })
+    return { w, repo, card, integrate }
+  }
+
+  it('offers a patch released by its pull request’s merge on main, branch kept or deleted, with a card linked to its issue after it was made (HI-3613)', async () => {
+    const { w, repo, card } = await patchByPullRequest()
+    const offered = async () => (await inWorkspace(w, () => releasedLines(w, repo, ACME))).map((l) => [l.line, l.tag, l.commit === git(repo, 'rev-parse', 'v1.7.1')]).sort()
+    // The branch still there: its tag isn't in its history, and the release is still found by its tag on main.
+    expect(await offered()).toEqual([
+      ['1.7.0', 'v1.7.0', false],
+      ['1.7.1', 'v1.7.1', true]
+    ])
+    const kept = await shippedOf(w, repo, '1.7.1')
+    expect(kept).toMatchObject({ tag: 'v1.7.1', commit: git(repo, 'rev-parse', 'v1.7.1'), published: true, doubts: [] })
+    expect(kept.issues.map((i) => [i.issue, i.card, i.state])).toEqual([[21, card, 'open']])
+    // Nothing of 1.7.1's is 1.7.0's.
+    expect((await shippedOf(w, repo, '1.7.0')).issues).toEqual([])
+    git(repo, 'branch', '-D', '1.7.1')
+    expect(await offered()).toEqual([
+      ['1.7.0', 'v1.7.0', false],
+      ['1.7.1', 'v1.7.1', true]
+    ])
+    const shown = await shippedOf(w, repo, '1.7.1')
+    expect(shown.issues.map((i) => [i.issue, i.card])).toEqual([[21, card]])
+    expect(writes()).toEqual([])
+    expect(await inWorkspace(w, () => closeShippedIssues(w, repo, previewOf(shown)))).toEqual([{ issue: 21, card, outcome: 'closed', detail: null }])
+    expect(github().issues[21]).toMatchObject({ state: 'CLOSED', comments: ['Fixed in 1.7.1'] })
+  })
+
+  it('names a card it leaves out on doubt, with why, rather than leaving it silently missing (HI-3613)', async () => {
+    const { w, repo, card } = await patchByPullRequest()
+    // A second card on #24 whose recorded merge isn't in this repository (never fetched): can't be told, so left out.
+    const lost = (await inWorkspace(w, () => tasks.createTask({ title: 'Lost merge', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.setSource(lost, 'https://github.com/acme/app/issues/24', user))
+    const facts = FactStore.forBoard(w, { project: 'p', key: 'p' })
+    await store.boardWrite(w, async () => facts.tx((tx) => void tx.append(lost, { kind: 'Integrated', actor: 'combwork', source: 'recorded', data: { revision: 'x', target: '1.7.1', result: 'deadbeef'.repeat(5), method: 'merge', by: 'combwork' } } as never)))
+    await inWorkspace(w, () => tasks.moveTask(lost, 'done', { confirm: true, paths: null }))
+    const r = await shippedOf(w, repo, '1.7.1')
+    expect(r.issues.map((i) => [i.issue, i.card])).toEqual([[21, card]])
+    expect(r.doubts).toEqual([{ card: lost, issue: 24, url: 'https://github.com/acme/app/issues/24', reason: 'merge', tag: 'v1.7.1' }])
+    // A close never takes a doubtful card: only #21 is closed.
+    expect((await inWorkspace(w, () => closeShippedIssues(w, repo, previewOf(r)))).map((o) => o.issue)).toEqual([21])
+    expect(github().issues[24].state).toBe('OPEN')
   })
 
   it('takes a missing release as not published', async () => {

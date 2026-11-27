@@ -101,6 +101,7 @@
   "github.shipped.cancel": "閉じる",
   "github.shipped.close": "{count, plural, other {# 件の Issue をクローズ}}",
   "github.shipped.desc": "リリースされたブランチにマージされた、GitHub の Issue 付きのカードです。リリースが GitHub で公開されると、オープンな各 Issue があなたの GitHub アカウントで「Fixed in {version}」というコメント付きでクローズされます。",
+  "github.shipped.doubt": "{reason, select, earlier {Issue #{issue} · {card}: 以前のリリース {tag} に含まれたかどうか判断できなかったため、除外しました} other {Issue #{issue} · {card}: そのマージが {tag} に含まれるかどうか読み取れなかったため、除外しました}}",
   "github.shipped.failed": "リリース済みの Issue をクローズできませんでした",
   "github.shipped.line": "リリースされたブランチ",
   "github.shipped.loading": "GitHub に問い合わせ中…",

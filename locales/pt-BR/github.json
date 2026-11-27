@@ -101,6 +101,7 @@
   "github.shipped.cancel": "Fechar",
   "github.shipped.close": "{count, plural, one {Fechar # issue} many {Fechar # issues} other {Fechar # issues}}",
   "github.shipped.desc": "Os cartões com uma issue do GitHub que foram mesclados em um branch lançado. Assim que a versão dele for publicada no GitHub, cada issue aberta é fechada com o comentário “Fixed in {version}”, pela sua conta do GitHub.",
+  "github.shipped.doubt": "{reason, select, earlier {Issue #{issue} · {card}: deixada de fora, pois não foi possível saber se a versão anterior {tag} a entregou} other {Issue #{issue} · {card}: deixada de fora, pois não foi possível ler se o merge dela está em {tag}}}",
   "github.shipped.failed": "Não foi possível fechar as issues entregues",
   "github.shipped.line": "Branch lançado",
   "github.shipped.loading": "Consultando o GitHub…",

@@ -101,6 +101,7 @@
   "github.shipped.cancel": "关闭",
   "github.shipped.close": "{count, plural, other {关闭 # 个 Issue}}",
   "github.shipped.desc": "关联了 GitHub Issue、并已合并到已发布分支的卡片。其版本在 GitHub 上发布后，每个打开的 Issue 都会以你的 GitHub 账户关闭，并附上评论“Fixed in {version}”。",
+  "github.shipped.doubt": "{reason, select, earlier {Issue #{issue} · {card}：已略过，因为无法确定之前的发布 {tag} 是否已包含它} other {Issue #{issue} · {card}：已略过，因为无法读取它的合并是否在 {tag} 中}}",
   "github.shipped.failed": "无法关闭已发布的 Issue",
   "github.shipped.line": "已发布的分支",
   "github.shipped.loading": "正在询问 GitHub…",

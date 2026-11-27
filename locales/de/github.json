@@ -101,6 +101,7 @@
   "github.shipped.cancel": "Schließen",
   "github.shipped.close": "{count, plural, one {# Issue schließen} other {# Issues schließen}}",
   "github.shipped.desc": "Die Karten mit einem GitHub-Issue, die in einen veröffentlichten Branch gemergt wurden. Sobald sein Release auf GitHub veröffentlicht ist, wird jedes offene Issue mit dem Kommentar „Fixed in {version}“ geschlossen, unter deinem GitHub-Konto.",
+  "github.shipped.doubt": "{reason, select, earlier {Issue #{issue} · {card}: ausgelassen, da sich nicht sagen ließ, ob das frühere Release {tag} es ausgeliefert hat} other {Issue #{issue} · {card}: ausgelassen, da sich nicht lesen ließ, ob sein Merge in {tag} enthalten ist}}",
   "github.shipped.failed": "Die ausgelieferten Issues konnten nicht geschlossen werden",
   "github.shipped.line": "Veröffentlichter Branch",
   "github.shipped.loading": "GitHub wird gefragt…",
