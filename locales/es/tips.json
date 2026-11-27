@@ -119,8 +119,6 @@
   "tips.boardSetAside.title": "Tarjetas creadas por una versión anterior de Combwork",
   "tips.boardStages.text": "Las columnas del tablero son las etapas que crean tus opciones del flujo de trabajo: Fusionando va bajo Aprobado mientras Combwork fusiona, y una etapa que nadie usa se oculta. Pide al Asistente que cambie el nombre de una, por ejemplo “llama Construyendo a En curso en web”: un nombre no cambia ninguna regla.",
   "tips.boardStages.title": "El tablero muestra las etapas de tu flujo de trabajo",
-  "tips.boardUpgrade.text": "Combwork guarda el tablero 0.9 que actualizó a 1.0. Ayuda → Restaurar la copia de seguridad del tablero 0.9… lo devuelve, tras guardar una copia del tablero tal como está, para que la versión 0.9 pueda cambiarlo de nuevo.",
-  "tips.boardUpgrade.title": "Volver a 0.9 después de actualizar",
   "tips.branchCards.text": "En Control de versiones → Ramas y remotos, una rama en la que trabaja una tarjeta muestra la tarjeta y su etapa, y en Revisión la versión en revisión. Haz clic en la tarjeta para abrirla.",
   "tips.branchCards.title": "Mira para qué tarjeta es una rama",
   "tips.branchCleanup.text": "Control de versiones → Ramas y remotos agrupa las ramas en En uso, Fusionadas y Sin fusionar. Limpiar ramas fusionadas… elimina las fusionadas que nada usa, y ofrece aparte las fusionadas de tus remotos, nunca marcadas de antemano.",
@@ -664,5 +662,7 @@
   "tips.tagPushDelete.title": "Haz push de una etiqueta de git o elimínala",
   "tips.tagPushDelete.text": "Cada etiqueta de Control de versiones → Historial tiene Hacer push… para enviarla a un remoto, y Eliminar… para eliminarla aquí, o también en un remoto para que el próximo fetch no la traiga de vuelta.",
   "tips.commitDetails.text": "Haz clic en un commit en Control de versiones → Historial para ver sus archivos y cambios. Desde ahí, Revert… o Cherry-pick… lo aplican a la rama de la carpeta del proyecto, y Rama desde aquí… y Etiquetar aquí… parten de él.",
-  "tips.commitDetails.title": "Revertir, hacer cherry-pick, ramificar o etiquetar un commit desde el Historial"
+  "tips.commitDetails.title": "Revertir, hacer cherry-pick, ramificar o etiquetar un commit desde el Historial",
+  "tips.externalTerminal.title": "Elige tu terminal externa",
+  "tips.externalTerminal.text": "Abrir una terminal externa aquí abre Windows Terminal en la carpeta del proyecto, o el Símbolo del sistema donde Windows Terminal no se abre. Para usar siempre el Símbolo del sistema o PowerShell, elígelo en Configuración → General → Terminal externa."
 }

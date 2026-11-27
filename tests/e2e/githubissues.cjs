@@ -182,7 +182,7 @@ const writes = () => calls().filter((c) => (c.args[0] === 'issue' && !['list', '
     await shoot('4-draft', shipped)
     // Main refuses it too, whatever the window sends.
     const shown = await inv('github:shippedIssues', alpha, '1.0.0')
-    const preview = { repo: shown.repo, line: shown.line, tag: shown.tag, commit: shown.commit, issues: shown.issues.map((i) => ({ card: i.card, issue: i.issue })) }
+    const preview = { repo: shown.repo, line: shown.line, tag: shown.tag, commit: shown.commit, issues: shown.issues.map((i) => ({ card: i.card, issue: i.issue, state: i.state })) }
     const refused = await inv('github:closeShippedIssues', alpha, preview).then(() => null, (e) => String(e.message ?? e))
     check('…and main refuses a close before the release is published, writing nothing', /isn’t published on GitHub yet/.test(refused ?? '') && writes().length === 0, String(refused))
 

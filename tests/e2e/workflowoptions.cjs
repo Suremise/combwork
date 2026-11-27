@@ -70,8 +70,8 @@ async function theForm(page, app, inv) {
   }
   /** Leaves the Workflow section and comes back to it: the form is read again. */
   const reopen = async () => {
-    await page.locator('.git-sections [data-section="changes"]').click().catch(() => {})
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    if (await page.locator('.git-sections [data-section="changes"]').count()) await lib.vcSection(page, 'changes')
+    await lib.vcSection(page, 'workflow')
     await section.waitFor({ timeout: HUNG_MS })
   }
   const discard = () => section.getByRole('button', { name: 'Discard Changes' }).click()
@@ -470,7 +470,7 @@ async function theForm(page, app, inv) {
     await lib.appReady(page)
     await page.getByText('web', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(page, 'workflow')
     await section.waitFor({ timeout: HUNG_MS })
     check('…after the window reloads: Pair shown, nothing to save', !!(await lib.until(async () => (await section.locator('.workflow-preset-now').getAttribute('data-preset-now')) === 'pair' && (await save.getAttribute('data-off')) === 'noChanges', HUNG_MS)))
     // Team back, as the rest of the suite has it.
@@ -795,7 +795,7 @@ async function theForm(page, app, inv) {
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges', mergeChecks: [] }) })
     await h.page.getByText('alpha', { exact: true }).first().click()
     await h.page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await h.page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(h.page, 'workflow')
     const g = await theForm(h.page, h.app, h.inv)
     const sameness = async (value) => {
       await lib.workflowTab(g.section, 'sameness')

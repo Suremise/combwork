@@ -503,14 +503,6 @@
     "defaultMessage": "The board shows your workflow’s stages",
     "description": "A tip's title (glossary 2.2: stage; 2.1: workflow)."
   },
-  "tips.boardUpgrade.text": {
-    "defaultMessage": "Combwork keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so version 0.9 can change it again.",
-    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
-  },
-  "tips.boardUpgrade.title": {
-    "defaultMessage": "Back to 0.9 after the upgrade",
-    "description": "A tip's title."
-  },
   "tips.branchCards.text": {
     "defaultMessage": "In Version Control → Branches & remotes, a branch a card works on shows the card and its stage, and in Review the revision under review. Click the card to open it.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: Version Control; 2.2: stage)."
@@ -986,6 +978,14 @@
   "tips.editTemplates.title": {
     "defaultMessage": "Edit a template in place",
     "description": "A tip's title."
+  },
+  "tips.externalTerminal.text": {
+    "defaultMessage": "Open External Terminal Here opens Windows Terminal in the project's folder, or Command Prompt where Windows Terminal doesn't open. To always get Command Prompt or PowerShell, choose it in Settings → General → External terminal.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Windows Terminal and Command Prompt are Windows programs: use the names Windows gives them in this language."
+  },
+  "tips.externalTerminal.title": {
+    "defaultMessage": "Choose your external terminal",
+    "description": "A tip's title (HI-3582)."
   },
   "tips.fileLinks.text": {
     "defaultMessage": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",

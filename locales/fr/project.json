@@ -401,5 +401,8 @@
   "project.tabs.more": "Plus",
   "project.tabs.moreSettings": "Paramètres du projet…",
   "project.tabs.moreTip": "{tabs} du projet",
-  "project.tabs.tip": "{tab} ({key})"
+  "project.tabs.tip": "{tab} ({key})",
+  "project.externalTerminal.failed": "{terminal} ne s’est pas ouvert : {reason}",
+  "project.externalTerminal.exited": "il s’est terminé aussitôt avec le code de sortie {code}",
+  "project.externalTerminal.missing": "{path} n’existe pas"
 }

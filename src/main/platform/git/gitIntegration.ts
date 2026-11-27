@@ -352,8 +352,9 @@ const advanceAndPublish: Omit<IntegrationPort, 'mergeBase' | 'update' | 'candida
 
   // The captured head, by its commit (HI-1924), to the destination ref: never forced, never --set-upstream, no prompt, within
   // cw.queue.networkMinutes (HI-3372: a push reaches the remote and can wait on a sign-in window; 5 min cut a slow one short).
+  // HI-3594: that ref alone, whatever the user's push.followTags says: no annotated tag of theirs goes with it.
   async push(h, dest, commit) {
-    const r = await h.run(h.project, ['push', '--', dest.remote, `${commit}:${dest.ref}`], { env: pushEnv(), timeoutMs: platformLimits.queueNetworkMs() })
+    const r = await h.run(h.project, ['push', '--no-follow-tags', '--', dest.remote, `${commit}:${dest.ref}`], { env: pushEnv(), timeoutMs: platformLimits.queueNetworkMs() })
     if (r.ok) return 'pushed'
     const said = `${r.err}\n${r.out}`.trim()
     // HI-1183: the remote's own refusal (a hook, a protected branch), its words kept as they are.

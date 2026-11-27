@@ -54,6 +54,7 @@
   "actions.duration.hoursMinutes": "{h, number} h {m} min",
   "actions.duration.minutes": "{m} min",
   "actions.duration.seconds": "{s} s",
+  "actions.externalTerminal.failed": "Nie udało się otworzyć terminala zewnętrznego",
   "actions.idleResume.message": "{what, select, conversation {Ta rozmowa} other {Ta sesja}} była ostatnio aktywna {unit, select, days {{days, plural, one {# dniem} few {# dniami} many {# dniami} other {# dnia}}} other {{duration}}} temu{size, select, tokens {, z około {tokens} tokenami kontekstu} bytes {; jej transkrypcja ma {bytes}} other {}}. Najprawdopodobniej straciła pamięć podręczną promptu, więc wznowienie może ponownie przetworzyć ten kontekst.",
   "actions.keys.ctrl": "Ctrl",
   "actions.keys.delete": "Del",

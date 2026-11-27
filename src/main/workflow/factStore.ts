@@ -1075,7 +1075,18 @@ export class FactStore {
           // The stage cache, and the card's column its category (SPEC §16.4.3): the board shows where the fold put it. A
           // card the workflow moves is a 1.0 card from then on (HI-1674: one from before 1.0 started by an intent kept its
           // mark, so the board's moves of it skipped its rules, Done in the column and Active in the stage).
-          this.conn.write(() => w.prepare('UPDATE cards SET stage = ?, col = ?, pre_workflow = 0 WHERE number = ?').run(stage, STAGE_CATEGORY[stage], card))
+          // A move into another column puts the card at that column's end, one past its highest card as the board's own moves
+          // do (tasks.ts orderIn, HI-3585): the order it had in the column it left would put it wherever that number falls
+          // there (a card alone in Passed, order 1, at the top of Done). Within its column (Approved to Merging) it stays put.
+          this.conn.write(() =>
+            w
+              .prepare(
+                `UPDATE cards SET stage = ?1, col = ?2, pre_workflow = 0,
+                   ord = CASE WHEN col = ?2 THEN ord ELSE COALESCE((SELECT MAX(o.ord) FROM cards o WHERE o.col = ?2 AND o.archived = 0 AND o.number != ?3), 0) + 1 END
+                 WHERE number = ?3`
+              )
+              .run(stage, STAGE_CATEGORY[stage], card)
+          )
         },
         action: (card, kind, payload, fact) => this.conn.write(() => Number(w.prepare('INSERT INTO card_actions (card, kind, payload, fact) VALUES (?, ?, ?, ?)').run(card, kind, JSON.stringify(payload), fact).lastInsertRowid)),
         saveRuleset: (r) => this.saveRuleset(r),

@@ -881,9 +881,22 @@
       "name": "plain"
     }
   },
+  "service.gitRepo.branchKept": {
+    "placeholders": {
+      "why": "select",
+      "branch": "plain",
+      "target": "plain"
+    }
+  },
   "service.gitRepo.branchTaken": {
     "placeholders": {
       "name": "plain"
+    }
+  },
+  "service.gitRepo.branchesDeleted": {
+    "placeholders": {
+      "n": "plural",
+      "branches": "plain"
     }
   },
   "service.gitRepo.chooseRemote": {
@@ -898,6 +911,12 @@
   "service.gitRepo.createFailed": {
     "placeholders": {
       "name": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.deleteBranchFailed": {
+    "placeholders": {
+      "branch": "plain",
       "why": "plain"
     }
   },
@@ -1037,10 +1056,38 @@
       "remote": "plain"
     }
   },
+  "service.gitRepo.remoteBranchesGone": {
+    "placeholders": {
+      "n": "plural",
+      "branches": "plain",
+      "remote": "plain"
+    }
+  },
+  "service.gitRepo.remoteBranchesGoneKept": {
+    "placeholders": {
+      "n": "plural",
+      "branches": "plain",
+      "remote": "plain"
+    }
+  },
   "service.gitRepo.remoteDeleteRefused": {
     "placeholders": {
       "remote": "plain",
       "branches": "plain"
+    }
+  },
+  "service.gitRepo.remoteDeleteRejected": {
+    "placeholders": {
+      "remote": "plain",
+      "branch": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.remoteDeleteUnchecked": {
+    "placeholders": {
+      "remote": "plain",
+      "branch": "plain",
+      "why": "plain"
     }
   },
   "service.gitRepo.remoteTaken": {
@@ -1093,6 +1140,24 @@
       "to": "plain",
       "remote": "plain",
       "old": "plain"
+    }
+  },
+  "service.gitRepo.renameOldRejected": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "remote": "plain",
+      "old": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.renameOldUnchecked": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "remote": "plain",
+      "old": "plain",
+      "why": "plain"
     }
   },
   "service.gitRepo.renamePushFailed": {
@@ -1207,6 +1272,13 @@
     "placeholders": {
       "remote": "plain",
       "name": "plain"
+    }
+  },
+  "service.gitRepo.tagRemoteUnchecked": {
+    "placeholders": {
+      "remote": "plain",
+      "name": "plain",
+      "why": "plain"
     }
   },
   "service.gitRepo.tagTaken": {

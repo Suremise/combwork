@@ -54,6 +54,7 @@
   "actions.duration.hoursMinutes": "{h, number}時間{m}分",
   "actions.duration.minutes": "{m}分",
   "actions.duration.seconds": "{s}秒",
+  "actions.externalTerminal.failed": "外部ターミナルを開けませんでした",
   "actions.idleResume.message": "{what, select, conversation {この会話} other {このセッション}}の最後のアクティビティは{unit, select, days {{days, plural, other {#日}}} other {{duration}}}前{size, select, tokens {で、コンテキストは約{tokens}トークンです} bytes {で、トランスクリプトは{bytes}です} other {です}}。プロンプトキャッシュはおそらく失われているため、再開するとそのコンテキストが再び処理される可能性があります。",
   "actions.keys.ctrl": "Ctrl",
   "actions.keys.delete": "Del",

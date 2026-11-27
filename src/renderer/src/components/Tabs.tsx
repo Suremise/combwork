@@ -100,7 +100,8 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
           const named = x.unsaved && x.problem ? tr(T.bothNamed, { tab: x.label }) : x.problem ? tr(T.problemNamed, { tab: x.label }) : x.unsaved ? tr(T.named, { tab: x.label }) : x.label
           const name = x.muted ? tr(T.withNote, { tab: named, note: x.muted }) : named
           return (
-            <Tooltip key={x.id} content={x.tip ?? (folded ? name : (x.muted ?? null))}>
+            // steady (HI-3591): folding gives a tab a tooltip, and must not replace its button under a press.
+            <Tooltip key={x.id} steady content={x.tip ?? (folded ? name : (x.muted ?? null))}>
               <button type="button" role="tab" id={tabIds(base, x.id).tab} aria-controls={tabIds(base, x.id).panel} aria-selected={selected} {...(x.unsaved || x.problem || x.muted ? { 'aria-label': name } : {})} tabIndex={selected ? 0 : -1} data-tab={x.id} {...(x.muted ? { 'data-muted': '' } : {})} {...x.attrs} className={cx('cw-tab', selected && 'active', folded && 'icon-only', x.muted && 'muted')} onClick={() => onChange(x.id)}>
                 {tabIcon(x.icon)}
                 <span className="cw-tab-label">{x.label}</span>

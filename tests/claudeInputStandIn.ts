@@ -13,7 +13,10 @@
 // - `input.dialog`: a dialog of its own drawn in the box's place while set (HI-3411), which takes every key, Enter
 //   answering it (set to null);
 // - `ascii`: drawn as where the terminal doesn't say it shows Unicode (no TERM or WT_SESSION): ">" its prompt mark, and
-//   the session's name in its top rule.
+//   the session's name in its top rule;
+// - `suggestion`: its prompt suggestion, drawn in the empty input as plain text, as Windows 10's console delivers it (no
+//   dim, HI-3583): not input, so a Ctrl+U leaves it, a letter typed replaces it, and it shows again once the input is
+//   empty (`input.suggestion`, set to null to take it away).
 
 const RULE = '─'.repeat(60)
 const NAMED_RULE = `${'─'.repeat(53)} demo ─`
@@ -37,7 +40,7 @@ function rows(text: string): string[] {
 }
 
 export interface ClaudeInput {
-  input: { text: string; sent: string[]; keys: number; ctrlU: number; answers: number; dialog: string | null }
+  input: { text: string; sent: string[]; keys: number; ctrlU: number; answers: number; dialog: string | null; suggestion: string | null }
   /** What Combwork wrote, as the CLI reads it. */
   feed(data: string): void
   /** Reads `writes` (its new entries) before each look at the screen. */
@@ -46,14 +49,14 @@ export interface ClaudeInput {
   screen: { text(): string; textWithoutDim(): string; textToCursor(): string; bracketedPaste(): boolean }
 }
 
-export function claudeInput(opts: { draft?: string; viewport?: number; lagMs?: number; shows?: string; paste?: boolean; ascii?: boolean } = {}): ClaudeInput {
-  const input = { text: opts.draft ?? '', sent: [] as string[], keys: 0, ctrlU: 0, answers: Infinity, dialog: null as string | null }
+export function claudeInput(opts: { draft?: string; viewport?: number; lagMs?: number; shows?: string; paste?: boolean; ascii?: boolean; suggestion?: string } = {}): ClaudeInput {
+  const input = { text: opts.draft ?? '', sent: [] as string[], keys: 0, ctrlU: 0, answers: Infinity, dialog: null as string | null, suggestion: opts.suggestion ?? null }
   let inPaste = false
   let source: (() => readonly string[]) | null = null
   let read = 0
   const draw = (): string => {
     if (input.dialog !== null) return input.dialog
-    const lines = claudeBox(input.text, opts.ascii).split('\n')
+    const lines = claudeBox(input.text || (input.suggestion ?? ''), opts.ascii).split('\n')
     return lines.slice(-(opts.viewport ?? 1000)).join('\n')
   }
   let shown = opts.shows ?? draw()

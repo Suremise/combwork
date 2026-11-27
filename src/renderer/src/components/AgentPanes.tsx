@@ -1372,6 +1372,11 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
         <Tooltip content={tr(msg({ id: 'panes.header.untakenTip', defaultMessage: "Combwork typed this, but its CLI hasn't taken it (it wasn't reading its input): \"{line}\". Click its terminal and press Enter. Combwork types nothing more into it until its CLI takes it.", description: "Tooltip of a pane's status when a line Combwork typed into the agent's CLI wasn't taken ({line}: the line)." }), { line: live.untakenLine.text })}>
           <span className="faint pane-status asks">{tr(msg({ id: 'panes.header.untaken', defaultMessage: "A line Combwork typed wasn't taken", description: "A pane's status: a line Combwork typed into the agent's CLI wasn't taken." }))}</span>
         </Tooltip>
+      ) : live?.inputText ? (
+        // What Combwork would type waits on text in its input it couldn't clear (HI-3583): never a silent hold.
+        <Tooltip content={tr(msg({ id: 'panes.header.inputTextTip', defaultMessage: "Combwork has something to type into this agent, but its input shows text that Combwork couldn't clear: a draft, or something its CLI drew there. Combwork never types over it. Send it or clear it in its terminal, and what waits is typed then.", description: "Tooltip of a pane's status when a message Combwork would type into the agent's CLI waits because the CLI's input shows text that Combwork's keys didn't clear." }))}>
+          <span className="faint pane-status asks">{tr(msg({ id: 'panes.header.inputText', defaultMessage: 'Waiting: text in its input', description: "A pane's status: a message Combwork would type into the agent waits, because the agent's input shows text Combwork couldn't clear. Keep it short." }))}</span>
+        </Tooltip>
       ) : retryWaitText(live, Date.now(), tr) ? (
         // Its CLI waits to retry its model request (HI-1972): what it waits on and until when, rather than "Working…".
         <Tooltip content={<RetryTip live={live!} large={suggested} />}>

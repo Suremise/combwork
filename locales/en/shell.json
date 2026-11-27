@@ -5,7 +5,7 @@
   },
   "shell.about.cli": {
     "defaultMessage": "CLI {version} ({source})",
-    "description": "A row of Help → About, a coding agent's: its CLI's version and where Combwork found it."
+    "description": "A line of the text Help → About's Copy copies, a coding agent's: its CLI's version and where Combwork found it."
   },
   "shell.about.copied": {
     "defaultMessage": "Version information copied",
@@ -26,10 +26,6 @@
   "shell.about.licence": {
     "defaultMessage": "Open source under the <licence>MIT License</licence>. Includes <notices>third-party software</notices> and <chromium>Chromium</chromium>.",
     "description": "Help → About: Combwork's licence. Each tag is a link: to the licence, the notices of the software Combwork includes, and Chromium's licences. MIT and Chromium are names: keep them."
-  },
-  "shell.about.noCli": {
-    "defaultMessage": "CLI not installed",
-    "description": "A row of Help → About, a coding agent's, when its CLI isn't installed."
   },
   "shell.about.noLicences": {
     "defaultMessage": "Licences not found",
@@ -278,10 +274,6 @@
   "shell.command.help.releaseNotes": {
     "defaultMessage": "Release Notes",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category."
-  },
-  "shell.command.help.restoreBoard09": {
-    "defaultMessage": "Restore the 0.9 Board Backup…",
-    "description": "A command (the Help menu, the command palette), in the Help category: puts back the copy of the workspace's board Combwork kept when it upgraded the board to 1.0, for going back to version 0.9. The … says it asks first: keep it."
   },
   "shell.command.help.shortcuts": {
     "defaultMessage": "Keyboard Shortcuts",
@@ -1733,10 +1725,6 @@
   },
   "shell.tip.help.improveTranslation": {
     "defaultMessage": "How to fix a translation, or add a language, on GitHub",
-    "description": "What a command does, on hover in the menus."
-  },
-  "shell.tip.help.restoreBoard09": {
-    "defaultMessage": "Puts back the board as it was before its upgrade to 1.0, to go back to version 0.9",
     "description": "What a command does, on hover in the menus."
   },
   "shell.tip.window.closeQuit": {

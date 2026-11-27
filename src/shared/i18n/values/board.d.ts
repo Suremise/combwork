@@ -343,9 +343,7 @@ interface CombworkMessageValues {
   'board.error.inUse': undefined
   'board.error.move': undefined
   'board.error.newer': undefined
-  'board.error.noBackup': undefined
   'board.error.noWorkspace': undefined
-  'board.error.stopAgentsFirst': undefined
   'board.error.unarchive': undefined
   'board.error.unavailable': { error: string | number }
   'board.error.upgradeFirst': undefined
@@ -896,13 +894,6 @@ interface CombworkMessageValues {
   'board.releaseOffer.removeButton': undefined
   'board.releaseOffer.stale': undefined
   'board.releaseOffer.startButton': { next: string | number }
-  'board.restore09.done': undefined
-  'board.restore09.doneDetail': { file: string | number }
-  'board.restore09.message': { when: string | number }
-  'board.restore09.none': undefined
-  'board.restore09.restore': undefined
-  'board.restore09.restoring': undefined
-  'board.restore09.title': undefined
   'board.review.line': { agent: string | number; ago: string | number }
   'board.review.lineNotRunning': { agent: string | number }
   'board.review.lineRemoved': { agent: string | number }

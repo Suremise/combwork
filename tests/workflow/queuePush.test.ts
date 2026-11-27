@@ -86,6 +86,17 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     expect(owed(e)).toBeNull()
   })
 
+  it('HI-3594: pushes the target alone, publishing no tag under push.followTags', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare } = pushing()
+    // An annotated tag the user never published, on a commit the merge contains, and git set to follow tags on a push.
+    sh(e.project, 'tag', '-a', '-m', 'not for publishing', 'v0.9.0-draft', 'main')
+    sh(e.project, 'config', 'push.followTags', 'true')
+    await queued(e, 'A', 'a.txt')
+    expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    expect(remoteMain(bare)).toBe(localMain(e))
+    expect(sh(bare, 'for-each-ref', '--format=%(refname)', 'refs/tags')).toBe('')
+  })
+
   it('off (the default): nothing is pushed, and the option is never part of a ruleset', async () => {
     const { e, bare } = pushing(false)
     const before = remoteMain(bare)
@@ -413,7 +424,7 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
         }
       })
       .drain('main')
-    expect(pushedArgs).toEqual([['push', '--', 'origin', `${localMain(e)}:refs/heads/main`]])
+    expect(pushedArgs).toEqual([['push', '--no-follow-tags', '--', 'origin', `${localMain(e)}:refs/heads/main`]])
     expect(settled(e)[0]).toMatchObject({ entry: entryOf(e, b), state: 'pushed' })
   })
 

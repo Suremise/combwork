@@ -87,7 +87,7 @@ function board(sql, ...args) {
     const openWorkflow = async (p, tab = 'overview') => {
       await page.getByText(path.basename(p), { exact: true }).first().click()
       await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-      await page.locator('.git-sections [data-section="workflow"]').click()
+      await lib.vcSection(page, 'workflow')
       await section.waitFor({ timeout: HUNG_MS })
       await lib.workflowTab(section, tab)
     }
@@ -152,8 +152,8 @@ function board(sql, ...args) {
     const folder = lent?.slot?.folder
     check('…whose warming ran the tab’s setup script (its marker file in the slot)', !!(await until(() => folder && fs.existsSync(path.join(folder, marker)) && fs.readFileSync(path.join(folder, marker), 'utf8') === 'from the tab', HUNG_MS)), folder)
     // The list reads the slots as the group is shown: open the section again.
-    await page.locator('.git-sections [data-section="changes"]').click().catch(() => {})
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    if (await page.locator('.git-sections [data-section="changes"]').count()) await lib.vcSection(page, 'changes')
+    await lib.vcSection(page, 'workflow')
     const slotRow = slotsGroup.locator(`tr[data-slot="${lent?.slot?.name}"]`)
     check('the slots list shows the lent slot with its card', !!(await until(async () => (await slotRow.count()) === 1 && (await slotRow.innerText()).includes(key) && (await slotRow.innerText()).includes('B1'), HUNG_MS)), await slotsGroup.innerText().catch(() => ''))
     const size = slotsGroup.locator('[data-slot-option="copies"] input')
@@ -297,7 +297,7 @@ function board(sql, ...args) {
     const form2 = page.locator('.workflow-form')
     await page.getByText('beta', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(page, 'workflow')
     await form2.waitFor({ timeout: HUNG_MS })
     check('…and reads as Pair, not Custom', !!(await until(async () => (await form2.locator('.workflow-preset-now').innerText()).trim() === 'Pair', HUNG_MS)), await form2.locator('.workflow-preset-now').innerText().catch(() => ''))
   } catch (e) {

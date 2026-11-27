@@ -188,7 +188,7 @@ export function ShippedIssuesDialog({ projectPath, onClose }: { projectPath: str
   const close = async (): Promise<void> => {
     if (!shipped || !line) return
     setBusy(true)
-    const preview = { repo: shipped.repo, line: shipped.line, tag: shipped.tag, commit: shipped.commit, issues: shipped.issues.map((i) => ({ card: i.card, issue: i.issue })) }
+    const preview = { repo: shipped.repo, line: shipped.line, tag: shipped.tag, commit: shipped.commit, issues: shipped.issues.map((i) => ({ card: i.card, issue: i.issue, state: i.state })) }
     const r = await actions.attempt(tr(S.failed), () => call('github:closeShippedIssues', projectPath, preview))
     setBusy(false)
     if (r) {

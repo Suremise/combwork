@@ -119,8 +119,6 @@
   "tips.boardSetAside.title": "旧版 Combwork 创建的卡片",
   "tips.boardStages.text": "看板的列是工作流程选项产生的阶段：Combwork 负责合并时，“合并中”位于“已批准”之下；没有人使用的阶段会隐藏。可以让助手重命名某个阶段，例如“把 web 里的进行中改名为构建中”：名称不会改变任何规则。",
   "tips.boardStages.title": "看板显示你的工作流程的阶段",
-  "tips.boardUpgrade.text": "Combwork 会保留它升级到 1.0 的 0.9 看板。“帮助”→“恢复 0.9 看板备份…”会先保留看板当前的副本，再将其放回，以便 0.9 版可以再次更改它。",
-  "tips.boardUpgrade.title": "升级后回到 0.9",
   "tips.branchCards.text": "在“版本控制”→“分支与远程仓库”中，卡片正在使用的分支会显示该卡片及其阶段，评审中还会显示正在评审的修订版本。点击卡片即可打开。",
   "tips.branchCards.title": "查看分支属于哪张卡片",
   "tips.branchCleanup.text": "“版本控制”→“分支与远程仓库”将分支分为“使用中”“已合并”和“未合并”三组。“清理已合并分支…”会删除没有任何东西使用的已合并分支，并单独列出远程上的已合并分支，默认都不勾选。",
@@ -664,5 +662,7 @@
   "tips.tagPushDelete.title": "推送或删除 git 标签",
   "tips.tagPushDelete.text": "“版本控制”→“历史”中的每个标签都有“推送…”，可将它发送到远程仓库；还有“删除…”，可在这里删除它，或同时在远程仓库上删除，这样下次获取时不会把它带回来。",
   "tips.commitDetails.text": "在“版本控制”→“历史”中点击某个提交，即可查看它的文件和更改。在那里可以将它“还原…”或“拣选…”到项目文件夹的分支上，或在它那里“从此处新建分支…”和“在此处打标签…”。",
-  "tips.commitDetails.title": "从历史中还原、拣选提交，或在其处新建分支、打标签"
+  "tips.commitDetails.title": "从历史中还原、拣选提交，或在其处新建分支、打标签",
+  "tips.externalTerminal.title": "选择外部终端",
+  "tips.externalTerminal.text": "“在此处打开外部终端”会在项目文件夹中打开 Windows 终端；Windows 终端打不开时打开命令提示符。要始终使用命令提示符或 PowerShell，请在“设置”→“常规”→“外部终端”中选择。"
 }

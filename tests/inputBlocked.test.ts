@@ -4,12 +4,12 @@
 // clears in a row unanswered while the box reads empty block the input, the agent waits for the user with why, and no key
 // is pressed there until it is seen to take keys again (its box taking the user's key, a hook that moves it, or the
 // user's Try again), in the same run; another question it waits on keeps its reason.
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { claudeInput, type ClaudeInput } from './claudeInputStandIn'
 import { timing } from './timing.cjs'
 
-const { writes, echo } = vi.hoisted(() => ({ writes: [] as string[], echo: { to: null as null | { write(d: string): void } } }))
-vi.mock('../src/main/ptyHost', async (original) => ({ ...((await original()) as object), writePty: (_key: string, data: string) => void (writes.push(data), echo.to?.write(data)) }))
+const { writes, echo, dim } = vi.hoisted(() => ({ writes: [] as string[], echo: { to: null as null | { write(d: string): void } }, dim: { drawn: true } }))
+vi.mock('../src/main/ptyHost', async (original) => ({ ...((await original()) as object), writePty: (_key: string, data: string) => void (writes.push(data), echo.to?.write(data)), consoleDrawsDim: () => dim.drawn }))
 const { sessions } = await import('../src/main/sessions')
 const { claudeCode } = await import('../src/main/providers/claude/adapter')
 const { advanced } = await import('../src/main/advanced')
@@ -250,5 +250,97 @@ describe('an input that takes no keys (HI-2191)', () => {
       await expect(sessions.retryInput(project, id, since)).resolves.toBe('gone')
       expect(writes).toEqual([])
     })
+  })
+})
+
+// HI-3583: on Windows 10 the console doesn't draw dim, so Claude Code's prompt suggestion came as plain text in its empty
+// input. The clear read it as a draft, its Ctrl+U changed nothing, and every message waited, with nothing said.
+describe("a suggestion drawn as text in an empty input (HI-3583)", () => {
+  const SUGGESTION = 'go ahead and create cards for the top picks'
+  const LINE = '[CW] New in your inbox: 1 task'
+  type Shown = Entry & { state: Entry['state'] & { inputText?: { since: string } } }
+  // Windows 10's console, which doesn't draw dim.
+  beforeEach(() => {
+    dim.drawn = false
+  })
+  afterEach(() => {
+    dim.drawn = true
+    s.live.delete(key)
+    s.delivering.clear()
+    writes.length = 0
+    echo.to = null
+    claude = null
+    vi.restoreAllMocks()
+  })
+
+  it('its first Ctrl+U leaves it, the letter typed replaces it and the Backspace brings it back: the line is typed and sent alone', async () => {
+    shortWait()
+    const e = running('ready', { suggestion: SUGGESTION }) as Shown
+    await sessions.sendPrompt(project, id, LINE)
+    expect(writes.slice(0, 3)).toEqual(['\x15', 'x', '\x7f'])
+    expect(claude!.input.sent).toEqual([LINE])
+    expect(e.state.inputText, 'nothing waits').toBeUndefined()
+    expect(e.unanswered ?? 0).toBe(0)
+  })
+
+  it('the same once the suggestion is gone after the Backspace: an empty box', async () => {
+    shortWait()
+    running('ready', { suggestion: SUGGESTION })
+    const feed = claude!.feed
+    echo.to = { write: (d) => (feed(d), d === 'x' && (claude!.input.suggestion = null)) }
+    await sessions.sendPrompt(project, id, LINE)
+    expect(claude!.input.sent).toEqual([LINE])
+  })
+
+  it("text no key empties (a CLI not reading its keys): refused, the letter taken back, and the pane says why until its box reads empty", async () => {
+    shortWait()
+    const e = running('ready', { draft: 'my draft' }) as Shown
+    claude!.input.answers = 0
+    await refusedTry()
+    expect(writes).toEqual(['\x15', 'x', '\x7f'])
+    expect(e.state.inputText?.since, 'shown in its pane').toBeTruthy()
+    expect(e.unanswered ?? 0, 'not counted as keys taken by something else').toBe(0)
+    expect(sessions.inputBlocked(project, id)).toBe(false)
+    // The user clears it: its box drawn empty ends the notice.
+    claude!.input.answers = Infinity
+    claude!.input.text = ''
+    s.inputBlockedDrawn(liveKey(), e)
+    expect(e.state.inputText).toBeUndefined()
+  })
+
+  it("a draft the letter joins: refused, the letter taken back, the draft as it was", async () => {
+    shortWait()
+    const e = running('ready', { draft: 'my draft' }) as Shown
+    // Reads no Ctrl+U (a key it ignores), but reads the letter and the Backspace.
+    const feed = claude!.feed
+    echo.to = { write: (d) => d !== '\x15' && feed(d) }
+    await refusedTry()
+    expect(writes).toEqual(['\x15', 'x', '\x7f'])
+    expect(claude!.input.text).toBe('my draft')
+    expect(claude!.input.sent).toEqual([])
+    expect(e.state.inputText?.since).toBeTruthy()
+  })
+
+  it('where the console draws dim (Windows 11): a first Ctrl+U unanswered is a busy CLI holding a draft, refused with no letter (#597: it would read them as one paste)', async () => {
+    dim.drawn = true
+    shortWait()
+    const e = running('ready', { draft: 'my draft' }) as Shown
+    claude!.input.answers = 0
+    await refusedTry()
+    expect(writes).toEqual(['\x15'])
+    expect(e.state.inputText?.since, 'still shown in its pane').toBeTruthy()
+  })
+
+  it('which consoles draw dim: Windows 11 (build 22000 on) and other systems; not Windows 10', async () => {
+    const { consoleDrawsDim } = (await vi.importActual('../src/main/ptyHost')) as typeof import('../src/main/ptyHost')
+    expect([consoleDrawsDim('win32', '10.0.19045'), consoleDrawsDim('win32', '10.0.22000'), consoleDrawsDim('win32', '10.0.26200'), consoleDrawsDim('darwin', '23.1.0'), consoleDrawsDim('linux', '6.8.0')]).toEqual([false, true, true, true, true])
+  })
+
+  it('a Ctrl+U that emptied rows before one left the rest: refused, no letter (a busy CLI holding a draft)', async () => {
+    shortWait()
+    running('ready', { draft: `${'a draft wrapping onto two rows. '.repeat(3)}end` })
+    claude!.input.answers = 1
+    await refusedTry()
+    expect(writes).toEqual(['\x15', '\x15'])
   })
 })

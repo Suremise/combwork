@@ -55,6 +55,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     progressCommands: true,
     dateFormat: 'ymd',
     timeFormat: '24h',
+    externalTerminal: 'auto',
     userName: 'User', // i18n-ignore: a stored default name, which agents' wake lines quote
     language: 'auto'
   },

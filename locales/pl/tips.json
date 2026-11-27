@@ -119,8 +119,6 @@
   "tips.boardSetAside.title": "Karty utworzone przez starszy Combwork",
   "tips.boardStages.text": "Kolumny tablicy to etapy, które tworzą opcje przepływu pracy: Scalanie stoi pod Zatwierdzone, gdy scala Combwork, a nieużywany etap jest ukryty. Poproś Asystenta o zmianę nazwy, na przykład „w projekcie web zmień nazwę Aktywne na Budowa”: nazwa nie zmienia żadnej reguły.",
   "tips.boardStages.title": "Tablica pokazuje etapy Twojego przepływu pracy",
-  "tips.boardUpgrade.text": "Combwork zachowuje tablicę z 0.9, którą uaktualnił do 1.0. Pomoc → Przywróć kopię zapasową tablicy z 0.9… przywraca ją po zachowaniu kopii tablicy w obecnym stanie, aby wersja 0.9 mogła ją znowu zmieniać.",
-  "tips.boardUpgrade.title": "Powrót do 0.9 po uaktualnieniu",
   "tips.branchCards.text": "W Kontroli wersji → Gałęzie i zdalne repozytoria gałąź, na której pracuje karta, pokazuje tę kartę i jej etap, a w etapie Recenzja – recenzowaną rewizję. Kliknij kartę, aby ją otworzyć.",
   "tips.branchCards.title": "Zobacz, do której karty należy gałąź",
   "tips.branchCleanup.text": "Kontrola wersji → Gałęzie i zdalne repozytoria grupuje gałęzie jako W użyciu, Scalone i Niescalone. Uporządkuj scalone gałęzie… usuwa scalone, których nic nie używa, a scalone na Twoich zdalnych repozytoriach proponuje osobno, nigdy niezaznaczone za Ciebie.",
@@ -664,5 +662,7 @@
   "tips.tagPushDelete.title": "Wypchnij lub usuń tag gita",
   "tips.tagPushDelete.text": "Każdy tag w Kontrola wersji → Historia ma Wypchnij…, by wysłać go do zdalnego repozytorium, i Usuń…, by usunąć go tutaj albo także w zdalnym repozytorium, żeby następne pobranie go nie przywróciło.",
   "tips.commitDetails.text": "Kliknij commit w widoku Kontrola wersji → Historia, aby zobaczyć jego pliki i zmiany. Stamtąd użyj Gałąź stąd… lub Taguj tutaj… albo wykonaj Revert… lub Cherry-pick… na gałęzi folderu projektu.",
-  "tips.commitDetails.title": "Revert, cherry-pick, gałąź lub tag z commita w Historii"
+  "tips.commitDetails.title": "Revert, cherry-pick, gałąź lub tag z commita w Historii",
+  "tips.externalTerminal.title": "Wybierz terminal zewnętrzny",
+  "tips.externalTerminal.text": "„Otwórz tutaj terminal zewnętrzny” otwiera Windows Terminal w folderze projektu, a tam, gdzie Windows Terminal się nie otwiera – Wiersz polecenia. Aby zawsze mieć Wiersz polecenia lub PowerShell, wybierz go w Ustawienia → Ogólne → Terminal zewnętrzny."
 }

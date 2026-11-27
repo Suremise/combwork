@@ -118,15 +118,22 @@ export interface ReleasedLine {
 
 /**
  * What a close authorises (the preview shown, sent back by the click): the repository, the release (its line, tag and
- * tagged commit) and the shipped cards' issues. Main closes nothing unless all of it is still so.
+ * tagged commit) and the shipped cards' issues, each with the state it was shown in. Main closes nothing unless all of
+ * it is still so, and (HI-3588) only the issues the button counted: one shown closed is never written, even reopened.
  */
 export interface ShippedPreview {
   repo: GithubRepoRef
   line: string
   tag: string
   commit: string
-  issues: { card: number; issue: number }[]
+  issues: { card: number; issue: number; state: ShippedIssue['state'] }[]
 }
+
+/** A preview's release and card–issue pairs, without the states shown (what main reads again to compare). */
+export type PreviewPairs = Omit<ShippedPreview, 'issues'> & { issues: { card: number; issue: number }[] }
+
+/** Whether a close of `preview` may write to `issue` (HI-3588): some row of it was shown not closed, as the button counted. */
+export const closeAuthorised = (preview: ShippedPreview, issue: number): boolean => preview.issues.some((i) => i.issue === issue && i.state !== 'closed')
 
 /** What Close Shipped Issues… shows for a line: its release on GitHub, and its shipped issues. */
 export type ShippedIssuesRead =
@@ -152,15 +159,19 @@ export function cleanPreview(raw: unknown): ShippedPreview | null {
   const s = (o: Record<string, unknown> | null, k: string): string | null => (o && typeof o[k] === 'string' && (o[k] as string).length <= 250 ? (o[k] as string) : null)
   const [host, owner, name, line, tag, commit] = [s(repo, 'host'), s(repo, 'owner'), s(repo, 'repo'), s(r, 'line'), s(r, 'tag'), s(r, 'commit')]
   if (!host || !owner || !name || !line || !tag || !commit || !Array.isArray(r?.issues) || r.issues.length > 1000) return null
-  const issues = (r.issues as unknown[]).map((x) => (x && typeof x === 'object' ? (x as Record<string, unknown>) : {})).filter((x) => Number.isInteger(x.card) && Number.isInteger(x.issue)).map((x) => ({ card: x.card as number, issue: x.issue as number }))
+  const states: readonly unknown[] = ['open', 'closed', 'unknown']
+  const issues = (r.issues as unknown[])
+    .map((x) => (x && typeof x === 'object' ? (x as Record<string, unknown>) : {}))
+    .filter((x) => Number.isInteger(x.card) && Number.isInteger(x.issue) && states.includes(x.state))
+    .map((x) => ({ card: x.card as number, issue: x.issue as number, state: x.state as ShippedIssue['state'] }))
   if (issues.length !== r.issues.length) return null
   return { repo: { host, owner, repo: name }, line, tag, commit, issues }
 }
 
-/** Whether two previews authorise the same close: one repository, release and set of card–issue pairs. */
-export function samePreview(a: ShippedPreview, b: ShippedPreview): boolean {
-  const pairs = (p: ShippedPreview): string => JSON.stringify([...p.issues].map((i) => `${i.card}:${i.issue}`).sort())
-  const repo = (p: ShippedPreview): string => `${p.repo.host}/${p.repo.owner}/${p.repo.repo}`.toLowerCase()
+/** Whether two previews name the same close: one repository, release and set of card–issue pairs (states aside: closeAuthorised). */
+export function samePreview(a: PreviewPairs, b: PreviewPairs): boolean {
+  const pairs = (p: PreviewPairs): string => JSON.stringify([...p.issues].map((i) => `${i.card}:${i.issue}`).sort())
+  const repo = (p: PreviewPairs): string => `${p.repo.host}/${p.repo.owner}/${p.repo.repo}`.toLowerCase()
   return repo(a) === repo(b) && a.line === b.line && a.tag === b.tag && a.commit === b.commit && pairs(a) === pairs(b)
 }
 

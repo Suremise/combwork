@@ -182,7 +182,7 @@ async function endFromOutside(app, spare = []) {
     const tree = h.page.locator('.git-worktree[data-slot="slot-a"]')
     check("Branches & remotes' Worktrees list shows slot-a held by B1's ended session, with Release…", !!(await until(async () => (await tree.locator(`[data-held="${b1.id}"]`).count()) === 1 && (await tree.locator('[data-action="release-held"]').count()) === 1, HUNG_MS)) && /Held by an ended session of agent B1/.test(await tree.innerText()), await tree.innerText().catch(() => ''))
     await h.page.screenshot({ path: path.join(shots, 'slotrelease-worktrees.png') })
-    await h.page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(h.page, 'workflow')
     const section = h.page.locator('.workflow-form')
     await section.waitFor({ timeout: HUNG_MS })
     await lib.workflowTab(section, 'folder')

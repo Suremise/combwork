@@ -7,7 +7,7 @@
 import { msg } from '../shared/i18n/msg'
 import type { GithubRepoRef } from '../shared/githubRepo'
 import { cleanSource, clipBody } from '../shared/githubSource'
-import { cleanIssueQuery, cleanPreview, fixedInComment, issueCardLabels, OPEN_ISSUES_LIMIT, samePreview, versionOfLine, type CloseOutcome, type IssueSource, type OpenIssuesRead, type ReleasedLine, type ShippedIssue, type ShippedIssuesRead, type ShippedPreview } from '../shared/issueSource'
+import { cleanIssueQuery, cleanPreview, closeAuthorised, fixedInComment, issueCardLabels, OPEN_ISSUES_LIMIT, samePreview, versionOfLine, type CloseOutcome, type IssueSource, type OpenIssuesRead, type ReleasedLine, type ShippedIssue, type PreviewPairs, type ShippedIssuesRead, type ShippedPreview } from '../shared/issueSource'
 import { combworkError } from './combworkError'
 import { gh } from './ghCli'
 import { githubRepoFor } from './githubLink'
@@ -285,7 +285,8 @@ const closing = new Map<string, Promise<unknown>>()
  * `preview`, the list the user was shown, each closed "Fixed in <version>". Refused, nothing written, unless the workspace
  * is still open, the project still links that repository, the line's release is still that tag at that commit and is
  * published on GitHub (that repository's), and the shipped cards are those shown. Each issue (one per number, however
- * many cards link it) is read back first: closed already is left; a "Fixed in <version>" comment already there (an
+ * many cards link it) is read back first: closed already is left; one the preview showed closed (not counted on the
+ * button) and open now is stopped, unwritten (HI-3588); a "Fixed in <version>" comment already there (an
  * attempt that commented but didn't close) closes it without another; after a failure it is read again, and only a
  * closed read counts as closed (unreadable: unknown). One failure doesn't stop the rest.
  */
@@ -316,7 +317,7 @@ async function closeLocked(ws: WorkspaceService, projectPath: string, preview: S
   const lines = await releasedLines(ws, projectPath, src.repo)
   const rel = lines.find((r) => r.line === line)
   if (!rel) throw combworkError(T.notReleased, { line }, { kind: 'conflict' })
-  const now: ShippedPreview = { repo: src.repo, line, tag: rel.tag, commit: rel.commit, issues: (await shippedCards(ws, projectPath, p, src, rel, lines)).map((c) => ({ card: c.card, issue: c.issue })) }
+  const now: PreviewPairs = { repo: src.repo, line, tag: rel.tag, commit: rel.commit, issues: (await shippedCards(ws, projectPath, p, src, rel, lines)).map((c) => ({ card: c.card, issue: c.issue })) }
   if (!samePreview(now, preview)) throw combworkError(T.changed, { line }, { kind: 'conflict' })
   // The release guard asks the repository every write names (the link is the preview's, checked just above), and
   // (HR1's round 1) GitHub's own tag must name the preview's commit.
@@ -356,6 +357,11 @@ async function closeLocked(ws: WorkspaceService, projectPath: string, preview: S
     }
     if (read.state === 'closed') {
       at('alreadyClosed')
+      continue
+    }
+    // HI-3588: shown closed, so not counted on the button, and open now (reopened since): not this click's to close.
+    if (!closeAuthorised(preview, issue)) {
+      at('stopped')
       continue
     }
     if (!(await stillSo(card, issue))) {

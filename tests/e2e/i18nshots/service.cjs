@@ -57,7 +57,7 @@ async function diffTooLarge(ctx) {
   }
   fs.writeFileSync(path.join(ctx.project, BIG), Buffer.alloc(3 * 1024 * 1024, 120))
   await ctx.command('project.tab.changes')
-  await (await shown(ctx, page.locator('.git-sections [data-section="changes"]'), "the Git tab's sections")).click()
+  await ctx.lib.chooseTab(await shown(ctx, page.locator('.git-sections [data-section="changes"]'), "the Git tab's sections"), 'the Changes section', ctx.hungMs)
   // The project folder's own changes (the picker's entry valued "", its last), when there is a picker: by its value, not
   // its place, as the groups above it (comparisons, unused worktrees) can still be loading (HI-2159: an index counted
   // before they came picked the unused worktrees). Picked again in the wait below until it holds.

@@ -1,6 +1,7 @@
 // HI-2462, HR1's finding 6: a workspace as Combwork 1.0.0 left it opens in this build with everything under .combwork.
 // The board's schema is pinned to the released 1.0.0's: its migrations and schema sources at the v1.0.0 tag are this
-// build's apart from comments (checked here against git, skipped where the tag isn't fetched). The workspace is made by
+// build's apart from comments (checked here against git: skipped only in a shallow clone, failing in a full one that
+// lacks the tag, HI-3606; the merge's focused pick selects it for those files by UNIT_SCANS). The workspace is made by
 // the real services (a card with an attachment, a comment, context and its history; a shared note; a handover; the
 // Assistant's home; a project), its folders then put back under 1.0's name with paths stored as 1.0 stored them, and
 // opened by the real WorkspaceService: the move runs in its open, the cards' rewrite in its late phase. Then the board,
@@ -83,6 +84,9 @@ const before2587 = (s: string): string =>
       .replace(/\{ timeout: dbLimits\.busyMs \}/g, '{ timeout: 5000 }')
       .replace(/export const OPENABLE_WAIT_MS = [\d_]+/, 'export const OPENABLE_WAIT_MS = 20_000')
       .replace(/const GROUP_LOCK_WAIT_MS = [\d_]+/, 'const GROUP_LOCK_WAIT_MS = 1000')
+      // HI-3601's removal, which changes no schema: soleCopy(), the copy Restore the 0.9 Board Backup took of a board no
+      // connection held. Neither the migrations nor an open ran it; taken out of 1.0's text, so this build lacks it.
+      .replace(/\nexport function soleCopy\(file: string, dir: string, family: string, version: number\): string \{\n[\s\S]*?\n\}\n/, '\n')
   )
 /** Code without its comments and with the folder's name as 1.0 had it: what makes the schema. */
 const code = (s: string): string =>
@@ -109,10 +113,22 @@ const migrations = (raw: string): string => {
   return s.slice(at, s.indexOf('\n]\n', at) + 2)
 }
 
+/** Whether the checkout is a shallow clone (CI's default, which fetches no tags), where the tag can't be read. */
+function shallow(): boolean {
+  try {
+    return execFileSync('git', ['rev-parse', '--is-shallow-repository'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() === 'true'
+  } catch {
+    return false
+  }
+}
+
 describe("a 1.0.0 workspace opened in this build (HR1's finding 6)", () => {
   const tagged = atTag('src/main/boardStore.ts')
 
-  it.skipIf(!tagged)("the board's schema is the released 1.0.0's, apart from comments", () => {
+  // HI-3606: skipped only in a shallow clone. A full checkout without the tag fails, saying so, rather than passing a
+  // change to the 1.0 schema unchecked.
+  it.skipIf(!tagged && shallow())("the board's schema is the released 1.0.0's, apart from comments", () => {
+    if (!tagged) throw new Error('The v1.0.0 tag is missing from this checkout: run `git fetch --tags` so the 1.0 schema can be compared')
     const now = migrations(readFileSync(join(ROOT, 'src/main/boardStore.ts'), 'utf8'))
     expect(now.length).toBeGreaterThan(1000)
     expect(code(now)).toBe(code(migrations(tagged!)))

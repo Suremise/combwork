@@ -90,7 +90,7 @@ const logged = () => (fs.existsSync(fakeLog) ? fs.readFileSync(fakeLog, 'utf8').
     // --- The enterprise project's Version Control tab → GitHub.
     await page.getByText('enterprise', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(page, 'workflow')
     const group = page.locator('.workflow-github[data-level="project"]')
     // On the Workflow form's GitHub tab (HI-3549).
     await lib.workflowTab(page.locator('.vc-view .workflow-form'), 'github')
@@ -121,7 +121,7 @@ const logged = () => (fs.existsSync(fakeLog) ? fs.readFileSync(fakeLog, 'utf8').
     // --- alpha inherits the workspace's.
     await page.getByText('alpha', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(page, 'workflow')
     const alphaHost = page.locator('.workflow-github[data-level="project"] [data-github-option="host"] .workflow-origin')
     check('alpha inherits tenant.ghe.com from the workspace', !!(await lib.until(async () => (await alphaHost.getAttribute('data-host')) === 'tenant.ghe.com' && (await alphaHost.getAttribute('data-origin')) === 'workspace', HUNG_MS)), await alphaHost.innerText().catch(() => ''))
 

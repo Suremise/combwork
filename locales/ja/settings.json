@@ -1727,5 +1727,12 @@
   "settings.advanced.cw.github.prFollowMinutes.desc": "カードが「PRオープン」で待っている間、Combwork はこの間隔で GitHub 上のプルリクエストを読み取ります。ボードやカードを開いたときにも読み取ります。マージやクローズを GitHub から Combwork に直接知らせることはできないためです。",
   "settings.advanced.cw.github.prFollowMinutes.title": "プルリクエスト：状態を読み取る間隔",
   "settings.advanced.cw.server.checkInferSeconds.title": "サーバーの確認：テストリクエストのタイムアウト",
-  "settings.advanced.cw.server.checkInferSeconds.desc": "「サーバーの確認」が、モデルサーバーからテストリクエストへの応答を待つ時間です。まだ読み込まれていないローカルモデルは先に読み込まれ、性能の控えめなハードウェアでは数分かかることがあります。この時間を過ぎると、確認はタイムアウトを報告します。"
+  "settings.advanced.cw.server.checkInferSeconds.desc": "「サーバーの確認」が、モデルサーバーからテストリクエストへの応答を待つ時間です。まだ読み込まれていないローカルモデルは先に読み込まれ、性能の控えめなハードウェアでは数分かかることがあります。この時間を過ぎると、確認はタイムアウトを報告します。",
+  "settings.general.externalTerminal.title": "外部ターミナル",
+  "settings.general.externalTerminal.desc": "「ここで外部ターミナルを開く」でプロジェクトのフォルダーに開くもの。",
+  "settings.general.externalTerminal.tip": "「自動」は Windows ターミナルを開き、Windows ターミナルが開かない環境ではコマンド プロンプトを開きます。選んだターミナルが開けないときは、別のものを開かずに理由を表示します。どれも、Combwork が見つけた CLI のフォルダーが PATH に入ります。",
+  "settings.general.externalTerminal.option.auto": "自動（Windows ターミナル、なければコマンド プロンプト）",
+  "settings.general.externalTerminal.option.wt": "Windows ターミナル",
+  "settings.general.externalTerminal.option.cmd": "コマンド プロンプト",
+  "settings.general.externalTerminal.option.powershell": "PowerShell"
 }

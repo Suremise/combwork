@@ -69,7 +69,7 @@ const ancestor = (x, y) => {
 
     // --- Pair (Combwork merges), strict on, through Version Control → Workflow (#1355, #1352).
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await page.locator('.git-sections [data-section="workflow"]').click()
+    await lib.vcSection(page, 'workflow')
     const form = page.locator('.workflow-form')
     await waitHung(async () => (await form.count()) > 0)
     // The preset previewed, then used (#1418): it fills the form, saved with Save….

@@ -1,4 +1,5 @@
 import * as pty from '@lydell/node-pty'
+import { release } from 'node:os'
 import type { IPty } from '@lydell/node-pty'
 import { sendPty } from './events'
 import { argsForLog, createLogger, userText } from './logger'
@@ -182,6 +183,17 @@ const SECRET_SETTING = /(?<![\w-])((?:--?)?(?:[A-Za-z_][\w-]*?)?(?:token|secret|
 export function forLog(arg: string): string {
   const safe = arg.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi, '$1***').replace(SECRET_SETTING, '$1***')
   return safe.length > 300 ? `${safe.slice(0, 300)}… (${safe.length} characters)` : safe
+}
+
+/**
+ * Whether the console between Combwork and a CLI draws dim (faint, SGR 2) text as dim (HI-3583). Windows' own ConPTY
+ * (`useConptyDll: false`) does from Windows 11 (build 22000); Windows 10's sends it as plain text, so a CLI's dim hint
+ * reads as typed text there. Elsewhere the CLI's own bytes reach the screen.
+ */
+export function consoleDrawsDim(platform: NodeJS.Platform = process.platform, osRelease: string = release()): boolean {
+  if (platform !== 'win32') return true
+  const build = Number(osRelease.split('.')[2])
+  return !Number.isFinite(build) || build >= 22000
 }
 
 export function spawnPty(key: string, opts: SpawnOptions): IPty {

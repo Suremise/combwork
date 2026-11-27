@@ -1727,5 +1727,12 @@
   "settings.advanced.cw.github.prFollowMinutes.desc": "当卡片在“PR 已打开”中等待时，Combwork 会按此频率读取它们在 GitHub 上的拉取请求，打开其看板或卡片时也会读取：GitHub 无法自行告知 Combwork 拉取请求何时被合并或关闭。",
   "settings.advanced.cw.github.prFollowMinutes.title": "拉取请求：读取其状态的频率",
   "settings.advanced.cw.server.checkInferSeconds.title": "检查服务器：测试请求超时",
-  "settings.advanced.cw.server.checkInferSeconds.desc": "“检查服务器”等待模型服务器回应其测试请求的时间。尚未加载的本地模型会先加载，在配置一般的硬件上可能需要几分钟；超过这个时间，检查会报告超时。"
+  "settings.advanced.cw.server.checkInferSeconds.desc": "“检查服务器”等待模型服务器回应其测试请求的时间。尚未加载的本地模型会先加载，在配置一般的硬件上可能需要几分钟；超过这个时间，检查会报告超时。",
+  "settings.general.externalTerminal.title": "外部终端",
+  "settings.general.externalTerminal.desc": "“在此处打开外部终端”在项目文件夹中打开的程序。",
+  "settings.general.externalTerminal.tip": "“自动”打开 Windows 终端；Windows 终端打不开时打开命令提示符。你选择的终端打不开时会说明原因，而不会改开另一个。每个终端的 PATH 都包含 Combwork 找到的 CLI 所在的文件夹。",
+  "settings.general.externalTerminal.option.auto": "自动（Windows 终端，否则命令提示符）",
+  "settings.general.externalTerminal.option.wt": "Windows 终端",
+  "settings.general.externalTerminal.option.cmd": "命令提示符",
+  "settings.general.externalTerminal.option.powershell": "PowerShell"
 }

@@ -401,5 +401,8 @@
   "project.tabs.more": "更多",
   "project.tabs.moreSettings": "项目设置…",
   "project.tabs.moreTip": "项目的{tabs}",
-  "project.tabs.tip": "{tab}（{key}）"
+  "project.tabs.tip": "{tab}（{key}）",
+  "project.externalTerminal.failed": "{terminal}未能打开：{reason}",
+  "project.externalTerminal.exited": "它立即退出，退出代码为 {code}",
+  "project.externalTerminal.missing": "{path} 不存在"
 }

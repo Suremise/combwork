@@ -54,6 +54,7 @@
   "actions.duration.hoursMinutes": "{h, number}h {m}min",
   "actions.duration.minutes": "{m}min",
   "actions.duration.seconds": "{s}s",
+  "actions.externalTerminal.failed": "Não foi possível abrir um terminal externo",
   "actions.idleResume.message": "{what, select, conversation {Esta conversa} other {Esta sessão}} esteve ativa pela última vez há {unit, select, days {{days, plural, one {# dia} other {# dias}}} other {{duration}}}{size, select, tokens {, com cerca de {tokens} tokens de contexto} bytes {; a transcrição tem {bytes}} other {}}. Muito provavelmente ela perdeu o cache de prompt, então retomá-la pode processar esse contexto de novo.",
   "actions.keys.ctrl": "Ctrl",
   "actions.keys.delete": "Del",

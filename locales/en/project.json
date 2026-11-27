@@ -767,6 +767,18 @@
     "defaultMessage": "Start a new {provider} session, or resume a previous one. Sessions keep running when you switch to other projects.",
     "description": "The Session tab when its agent has no session running. {provider} is Claude Code, Codex…"
   },
+  "project.externalTerminal.exited": {
+    "defaultMessage": "it ended at once with exit code {code}",
+    "description": "Why a terminal didn't open (HI-3582): its program started and ended at once with this exit code. Follows \"Windows Terminal didn't open: \"."
+  },
+  "project.externalTerminal.failed": {
+    "defaultMessage": "{terminal} didn't open: {reason}",
+    "description": "Why Open External Terminal Here opened nothing (HI-3582), shown under the error's title. {terminal} is the terminal's name (Windows Terminal, Command Prompt, PowerShell); {reason} is why, Windows' error or one of Combwork's reasons."
+  },
+  "project.externalTerminal.missing": {
+    "defaultMessage": "{path} isn't there",
+    "description": "Why a terminal didn't open (HI-3582): its program isn't at this path. Follows \"PowerShell didn't open: \"."
+  },
   "project.header.active": {
     "defaultMessage": "Active",
     "description": "Label of the project header's switch: you are working on this project."

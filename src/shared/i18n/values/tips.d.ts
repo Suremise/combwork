@@ -127,8 +127,6 @@ interface CombworkMessageValues {
   'tips.boardSetAside.title': undefined
   'tips.boardStages.text': undefined
   'tips.boardStages.title': undefined
-  'tips.boardUpgrade.text': undefined
-  'tips.boardUpgrade.title': undefined
   'tips.branchCards.text': undefined
   'tips.branchCards.title': undefined
   'tips.branchCleanup.text': undefined
@@ -248,6 +246,8 @@ interface CombworkMessageValues {
   'tips.dialectsNewModel.title': undefined
   'tips.editTemplates.text': undefined
   'tips.editTemplates.title': undefined
+  'tips.externalTerminal.text': undefined
+  'tips.externalTerminal.title': undefined
   'tips.fileLinks.text': undefined
   'tips.fileLinks.title': undefined
   'tips.fileRestore.text': undefined
