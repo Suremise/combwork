@@ -576,8 +576,7 @@ describe('closing shipped issues at publish (HI-3555)', () => {
     git(repo, 'add', '-A')
     git(repo, 'commit', '-qm', 'fix')
     const result = git(repo, 'rev-parse', 'HEAD')
-    const integrate = (n: number, at: string) => store.boardWrite(w, async () => facts.tx((tx) => void tx.append(n, { kind: 'Integrated', actor: 'combwork', source: 'recorded', data: { revision: at, target: '1.7.1', result: at, method: 'merge', by: 'combwork' } } as never)))
-    await integrate(card, result)
+    await store.boardWrite(w, async () => facts.tx((tx) => void tx.append(card, { kind: 'Integrated', actor: 'combwork', source: 'recorded', data: { revision: result, target: '1.7.1', result, method: 'merge', by: 'combwork' } } as never)))
     await inWorkspace(w, () => tasks.moveTask(card, 'done', { confirm: true, paths: null }))
     git(repo, 'checkout', '-q', 'main')
     writeFileSync(join(repo, 'other.txt'), 'other\n')
@@ -590,7 +589,7 @@ describe('closing shipped issues at publish (HI-3555)', () => {
       s.releases['v1.7.0'] = false
       s.releases['v1.7.1'] = false
     })
-    return { w, repo, card, integrate }
+    return { w, repo, card }
   }
 
   it('offers a patch released by its pull request’s merge on main, branch kept or deleted, with a card linked to its issue after it was made (HI-3613)', async () => {
