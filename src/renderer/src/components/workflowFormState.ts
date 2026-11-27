@@ -21,6 +21,29 @@ export function afterSave(now: LoadedForm | null, path: string, saved: WorkflowF
   return loadedForm(path, saved)
 }
 
+/**
+ * HI-3592: a draft whose save found the options changed meanwhile, after moves made for it already (Save…'s pre-save
+ * retarget): the user's own edits (what the draft changed from the form it was read with, `was`) laid over the options
+ * as they are now (`now`), never the old values of what changed elsewhere, so the next Save… checks them afresh.
+ */
+export function rebaseDraft(was: Pick<WorkflowForm, 'preset' | 'own'>, draft: WorkflowChange, now: Pick<WorkflowForm, 'preset' | 'own'>): WorkflowChange {
+  const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b)
+  const before = was.own as Record<string, unknown>
+  const mine = draft.options as Record<string, unknown>
+  const options: Record<string, unknown> = { ...(now.own as Record<string, unknown>) }
+  for (const k of new Set([...Object.keys(before), ...Object.keys(mine)])) {
+    if (same(before[k], mine[k])) continue
+    if (mine[k] === undefined) delete options[k]
+    else options[k] = mine[k]
+  }
+  return { preset: draft.preset !== was.preset ? draft.preset : now.preset, options: options as WorkflowChange['options'] }
+}
+
+/** HI-3592: the form after such a save: the options as they are now, the draft rebased onto them (`rebaseDraft`). */
+export function afterStale(path: string, was: Pick<WorkflowForm, 'preset' | 'own'>, draft: WorkflowChange, now: WorkflowForm): LoadedForm {
+  return { for: path, form: now, draft: rebaseDraft(was, draft, now) }
+}
+
 /** Why Save… is off, the first that applies (HI-3333: each has its tooltip), or null when it can be pressed. */
 export type SaveOff = 'noChanges' | 'blocked' | 'missingBranches' | 'loading'
 

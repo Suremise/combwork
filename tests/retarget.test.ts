@@ -633,6 +633,23 @@ describe('taking a used branch out of Other branches work can merge into names i
     expect((await w.projectConfig(repo)).workflow?.options.otherTargets).toEqual(['1.2.0'])
   })
 
+  it('the old default taken out with the change of Work merges into is a removal too: named, nothing moved until the second save (HR2, round 1)', async () => {
+    const { w, repo } = await project()
+    // Saved: Work merges into 1.1.0, listed among the other branches too.
+    await moveTarget(w, repo, '1.1.0', ['main', '1.2.0', '1.1.0'])
+    const a = await card(w, 'On 1.1.0')
+    await own(w, repo, a.number, '1.1.0')
+    const both = await checkOf(w, repo, '1.2.0', ['main'])
+    expect(both.removals).toEqual([expect.objectContaining({ branch: '1.1.0', uses: [expect.any(String)], retarget: null, afterTarget: true })])
+    // The save itself refuses it, as the dialog said it would.
+    await expect(moveTarget(w, repo, '1.2.0', ['main'])).rejects.toThrow(/1\.1\.0 can’t be taken out/)
+    // The first save, 1.1.0 kept listed; the second offers its move to the new default.
+    await moveTarget(w, repo, '1.2.0', ['main', '1.1.0'])
+    const second = await checkOf(w, repo, '1.2.0', ['main'])
+    expect(second.removals).toEqual([expect.objectContaining({ branch: '1.1.0', retarget: expect.objectContaining({ from: '1.1.0', to: '1.2.0' }) })])
+    expect(second.removals![0].retarget!.cards.move.map((c) => c.number)).toEqual([a.number])
+  })
+
   it('a movable blocker moves and stays moved while another keeps the branch; one changed between preview and move stays', async () => {
     const { w, repo } = await project()
     await moveTarget(w, repo, '1.2.0')

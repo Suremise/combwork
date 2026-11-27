@@ -41,6 +41,7 @@
   "workflow.form.cantSave": "Ces options ne peuvent pas être enregistrées :",
   "workflow.form.carried": "Les anciens worktrees des agents terminent d’abord leur travail en cours : {agents}. Ensuite, ils travaillent eux aussi dans des emplacements.",
   "workflow.form.changeLine": "{option} : {from} → {to}",
+  "workflow.form.changedMeanwhileKept": "Les options du flux de travail ont changé entre-temps, donc elles n’ont pas été enregistrées. Tes modifications sont conservées, par-dessus les options telles qu’elles sont maintenant : clique à nouveau sur Enregistrer… pour les vérifier.",
   "workflow.form.changedMeanwhile": "Les options du flux de travail ont changé entre-temps, donc rien n’a été enregistré. Elles sont affichées telles qu’elles sont maintenant.",
   "workflow.form.changesHead": "Ce qui change :",
   "workflow.form.checkCommand": "Commande",

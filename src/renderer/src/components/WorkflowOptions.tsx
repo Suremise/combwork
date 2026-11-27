@@ -33,7 +33,7 @@ import { overlayTemplateWorkflow } from '@shared/workflow/templateOptions'
 import { PLATFORM_NAME } from '@shared/platform/switching'
 import { isVersionBranch } from '@shared/nextVersion'
 import { MissingBranches, missingSaveText, newlyNamed, NextVersionButton, startNextVersion } from './NextVersion'
-import { afterSave, saveOff } from './workflowFormState'
+import { afterSave, afterStale, saveOff } from './workflowFormState'
 import { TabPanel, Tabs } from './Tabs'
 import { shownTab } from '@shared/tabs'
 
@@ -161,6 +161,7 @@ const T = {
   levelForGit: msg({ id: 'workflow.form.levelForGit', defaultMessage: 'The defaults of Git projects.', description: 'Beside the None · Git choice above workflow defaults, while Git is chosen.' }),
   offerUnsaved: msg({ id: 'workflow.form.offerUnsaved', defaultMessage: 'Workflow has changes you haven’t saved, so the release offer wasn’t filled in. Save or discard them, then choose Move… again.', description: 'HI-3155: a notification: Move… or Remove… on a release offer (For you) found unsaved edits in the Workflow section, which it doesn’t overwrite. Move… and Remove… are the offer’s buttons: as translated there.' }),
   offerStale: msg({ id: 'workflow.form.offerStale', defaultMessage: 'Work merges into or Other branches work can merge into changed since the release offer was made, so it wasn’t filled in. The offer is read again.', description: 'HI-3155: a notification: a release offer’s Move… or Remove… found the saved options no longer the ones it was made on. Work merges into and Other branches work can merge into are option names: as translated there.' }),
+  changedMeanwhileKept: msg({ id: 'workflow.form.changedMeanwhileKept', defaultMessage: 'The workflow options changed meanwhile, so they weren’t saved. Your changes are kept, over the options as they are now: Save… again to check them.', description: 'HI-3592: a notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant), after something had already been moved for it. The user’s own unsaved changes stay in the form, laid over the options as they are now. Save… is the button’s name.' }),
   changedMeanwhile: msg({ id: 'workflow.form.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.', description: 'A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant); the section reloads them.' }),
   tabsLabel: msg({ id: 'workflow.form.tabs', defaultMessage: 'Workflow options', description: 'Accessible name of the Workflow form’s tabs (HI-3549): Overview, Review & checks, Merging and the others, each a group of the workflow options.' }),
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
@@ -552,6 +553,8 @@ function WorkflowEditor({ source, project, at, onDirty }: { source: FormSource; 
     const movedFirst = new Map<string, RetargetResult>()
     const movedLines = (): string => [...movedFirst.values()].map((r) => [tr(T.retargetDone, { cards: r.moved.cards.length, slots: r.moved.slots.length, skipped: r.skipped.length, to: r.to }), retargetSkippedText(r)].filter(Boolean).join('\n')).join('\n')
     let stale = false
+    // HI-3592: stale after moves made for it: the user's edits kept, over the options as they are now.
+    let keptStale = false
     const ok = await confirm({
       title: tr(T.confirmTitle),
       message: tr(source.level ? T.levelConfirm : check.appliesNow ? (check.changed.includes('otherTargets') ? T.appliesNowBranches : T.appliesNow) : T.confirmMessage),
@@ -587,11 +590,18 @@ function WorkflowEditor({ source, project, at, onDirty }: { source: FormSource; 
           const now = await source.read().catch(() => null)
           if (!now || sameOwn({ preset: now.preset, options: now.own }, { preset: form.preset, options: form.own })) throw e
           stale = true
-          show(path, now)
+          if (!movedFirst.size) show(path, now)
+          else {
+            keptStale = true
+            reads.current++
+            setLoaded((l) => (l && l.for === path ? afterStale(path, form, l.draft, now) : l))
+            setProblems([])
+            setFailed(null)
+          }
         }
       }
     })
-    if (stale) notify('warning', tr(T.changedMeanwhile))
+    if (stale) notify('warning', tr(keptStale ? T.changedMeanwhileKept : T.changedMeanwhile))
     else if (ok) notify('success', tr(T.saved))
   }
   saveRef.current = (offer) => save(offer).catch((e) => notify('error', errorMessage(e)))

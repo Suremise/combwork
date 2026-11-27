@@ -6,7 +6,9 @@
 // - Taking integration out of Other branches work can merge into while two cards use it: Save… names them, lists the
 //   Todo card that can move (ticked) and the put-back one that stays (its branch holds a commit 1.2.0 lacks), and says
 //   what moves stays moved. Saved: the card moves, the save is refused naming the other, the notification says what
-//   moved, and the dialog keeps the refusal. With the other gone, saved again: integration taken out.
+//   moved, and the dialog keeps the refusal. With the other gone and a new card on integration, saved while another
+//   window changed the merge style: the card moves, the save finds the options changed, and the form keeps the user's
+//   change over them (HR2's round 1). Saved again: integration taken out, the other window's style kept.
 // Screenshots of the row, the question and Save… in both themes. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -150,8 +152,31 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     await save.getByRole('button', { name: 'Cancel', exact: true }).click().catch(() => undefined)
     await closeToasts()
 
-    // --- With the other card gone, saved again: integration taken out, nothing left to move.
+    // --- HR2's round 1: the other card gone, a new Todo card on integration; Save… again, and while its dialog is open
+    // another window changes an unrelated option (the merge style). Saved: the card moves, the save finds the options
+    // changed, the dialog closes, and the form keeps the user's change (integration out) over the options as they are now.
     await inv('tasks:delete', kept)
+    const later = (await inv('tasks:create', { title: 'Another on integration', project: 'alpha' })).number
+    await inv('tasks:setTarget', later, 'integration')
+    const laterKey = await keyOf(later)
+    await form.locator('[data-action="save"]').click()
+    await save.waitFor({ timeout: HUNG_MS })
+    check('Save… lists the new card as moving off integration', !!(await waitHung(async () => (await removal.locator(`[data-retarget-move="${laterKey}"]`).count()) > 0).catch(() => null)), (await text(save)).slice(0, 600))
+    await options({ target: '1.2.0', otherTargets: ['integration'], style: 'squash' })
+    await save.getByRole('button', { name: 'Save', exact: true }).click()
+    await save.waitFor({ state: 'detached', timeout: HUNG_MS })
+    const keptSaid = await waitHung(async () => {
+      const t = page.locator('.toast', { hasText: 'Your changes are kept' })
+      return (await t.count()) ? text(t.first()) : null
+    }).catch(() => null)
+    check('…changed meanwhile: not saved, the notification says the changes are kept', !!keptSaid && keptSaid.includes('changed meanwhile'), (await text(page.locator('body'))).slice(-500))
+    check('…what moved is said too', (await page.locator('.toast', { hasText: 'Moved what could move, but the options weren’t saved' }).count()) > 0)
+    check('…the card moved', (await ownTarget(later)) === null, JSON.stringify(await inv('tasks:workBadges')))
+    await lib.workflowTab(form, 'otherTargets')
+    check("…the form keeps the user's change: integration out", (await others.inputValue().catch(() => null)) === '', String(await others.inputValue().catch(() => null)))
+    await closeToasts()
+
+    // --- Saved again: integration taken out, nothing left to move, and the other window's merge style kept.
     await form.locator('[data-action="save"]').click()
     await save.waitFor({ timeout: HUNG_MS })
     check('…saved again with nothing on integration: no removal listed', (await save.locator('[data-removal]').count()) === 0, (await text(save)).slice(0, 600))
@@ -159,6 +184,7 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     await save.waitFor({ state: 'detached', timeout: HUNG_MS })
     const gone = await waitHung(async () => (((await inv('workflow:form', fx.alpha))?.options?.otherTargets ?? []).includes('integration') ? null : true)).catch(() => null)
     check('…integration is taken out of Other branches work can merge into', !!gone, JSON.stringify((await inv('workflow:form', fx.alpha))?.options))
+    check("…and the other window's merge style is kept (squash), never written back", (await inv('workflow:form', fx.alpha))?.options?.style === 'squash', JSON.stringify((await inv('workflow:form', fx.alpha))?.options))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

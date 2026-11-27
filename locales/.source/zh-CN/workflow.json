@@ -42,6 +42,7 @@
   "workflow.form.carried": "Agents’ old worktrees finish their current work first: {agents}. Then they work in slots too.",
   "workflow.form.changeLine": "{option}: {from} → {to}",
   "workflow.form.changedMeanwhile": "The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.",
+  "workflow.form.changedMeanwhileKept": "The workflow options changed meanwhile, so they weren’t saved. Your changes are kept, over the options as they are now: Save… again to check them.",
   "workflow.form.changesHead": "What changes:",
   "workflow.form.checkCommand": "Command",
   "workflow.form.checkName": "Name",

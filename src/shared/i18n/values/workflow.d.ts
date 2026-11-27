@@ -44,6 +44,7 @@ interface CombworkMessageValues {
   'workflow.form.carried': { agents: string | number }
   'workflow.form.changeLine': { option: string | number; from: string | number; to: string | number }
   'workflow.form.changedMeanwhile': undefined
+  'workflow.form.changedMeanwhileKept': undefined
   'workflow.form.changesHead': undefined
   'workflow.form.checkCommand': undefined
   'workflow.form.checkName': undefined

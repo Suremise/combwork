@@ -41,6 +41,7 @@
   "workflow.form.cantSave": "これらのオプションは保存できません：",
   "workflow.form.carried": "エージェントの古いワークツリーは、まず現在の作業を終えます：{agents}。その後はスロットで作業します。",
   "workflow.form.changeLine": "{option}：{from} → {to}",
+  "workflow.form.changedMeanwhileKept": "ワークフローのオプションがその間に変更されたため、保存されませんでした。変更内容は、現在のオプションの上に保持されています。もう一度「保存…」で確認してください。",
   "workflow.form.changedMeanwhile": "その間にワークフローのオプションが変更されたため、何も保存されませんでした。現在のオプションを表示しています。",
   "workflow.form.changesHead": "変更内容：",
   "workflow.form.checkCommand": "コマンド",

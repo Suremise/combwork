@@ -300,7 +300,7 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
   const missing = merges(project.platform) && (c.changed.includes('target') || c.changed.includes('otherTargets')) ? await newlyMissing(project.path, resolvedOf(ws, project.path, project.platform, cfg).options, c.options) : []
   // HI-3592: branches taken out of Other branches work can merge into that something still uses: named, and what can
   // move from each offered before the save (none while the same change moves Work merges into: a second save then).
-  const removals = merges(project.platform) && c.changed.includes('otherTargets') && !c.problems.length ? await removalsOf(ws, project.path, resolvedOf(ws, project.path, project.platform, cfg).options.otherTargets ?? [], c.options.otherTargets ?? [], c.options.target || null).catch(() => []) : []
+  const removals = merges(project.platform) && c.changed.includes('otherTargets') && !c.problems.length ? await removalsOf(ws, project.path, resolvedOf(ws, project.path, project.platform, cfg).options.otherTargets ?? [], c.options.otherTargets ?? [], c.options.target || null, c.changed.includes('target')).catch(() => []) : []
   return { problems: c.problems, ...(missing.length ? { missing } : {}), ...(removals.length ? { removals } : {}), changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}), ...(retarget ? { retarget } : {}) }
 }
 

@@ -1,7 +1,7 @@
 // The Workflow section's Save… (HI-3333): off only for a reason it says, "No changes to save" first, and a save's answer
 // never drops an edit made while it ran (a preset used, a template or release offer laid over the draft).
 import { describe, expect, it } from 'vitest'
-import { afterSave, loadedForm, saveOff } from '../src/renderer/src/components/workflowFormState'
+import { afterSave, afterStale, loadedForm, rebaseDraft, saveOff } from '../src/renderer/src/components/workflowFormState'
 import type { WorkflowForm } from '../src/shared/types'
 
 const form = (preset: WorkflowForm['preset'], own: WorkflowForm['own']): WorkflowForm => ({ preset, own }) as WorkflowForm
@@ -31,6 +31,29 @@ describe('a save’s answer (HI-3333)', () => {
     const l = loadedForm('p', pair)
     expect(l.draft.options).toEqual(pair.own)
     expect(l.draft.options).not.toBe(pair.own)
+  })
+})
+
+describe('a save found stale after moves made for it (HI-3592)', () => {
+  const was = form('pair', { review: 'agent', maxAgents: 2, otherTargets: ['main', '1.1.0'], style: 'merge' })
+  // The user took 1.1.0 out, raised Maximum agents and cleared Merge style; another window then set the style to squash
+  // and the review to none, and chose another preset.
+  const draft = { preset: 'pair' as const, options: { review: 'agent' as const, maxAgents: 4, otherTargets: ['main'] } }
+  const now = form('team', { review: 'none', maxAgents: 2, otherTargets: ['main', '1.1.0'], style: 'squash' })
+
+  it("keeps the user's own edits, laid over the options as they are now, never the old values of what changed elsewhere", () => {
+    expect(rebaseDraft(was, draft, now)).toEqual({ preset: 'team', options: { review: 'none', maxAgents: 4, otherTargets: ['main'] } })
+  })
+
+  it('a preset the user chose is kept over the one chosen elsewhere', () => {
+    expect(rebaseDraft(was, { ...draft, preset: 'solo' }, now).preset).toBe('solo')
+  })
+
+  it('the form is the options as they are now, the draft rebased onto them', () => {
+    const r = afterStale('p', was, draft, now)
+    expect(r.form).toBe(now)
+    expect(r.for).toBe('p')
+    expect(r.draft).toEqual(rebaseDraft(was, draft, now))
   })
 })
 

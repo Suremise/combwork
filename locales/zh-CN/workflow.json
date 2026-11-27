@@ -41,6 +41,7 @@
   "workflow.form.cantSave": "无法保存这些选项：",
   "workflow.form.carried": "智能体的旧工作树会先完成当前工作：{agents}。之后它们也在槽位中工作。",
   "workflow.form.changeLine": "{option}：{from} → {to}",
+  "workflow.form.changedMeanwhileKept": "工作流程选项在此期间已更改，因此未保存。你的更改已保留，并叠加在当前的选项上：请再次点击“保存…”进行检查。",
   "workflow.form.changedMeanwhile": "工作流程选项在此期间已更改，因此没有保存任何内容。现在显示的是它们当前的状态。",
   "workflow.form.changesHead": "更改内容：",
   "workflow.form.checkCommand": "命令",

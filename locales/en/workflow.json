@@ -171,6 +171,10 @@
     "defaultMessage": "The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.",
     "description": "A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant); the section reloads them."
   },
+  "workflow.form.changedMeanwhileKept": {
+    "defaultMessage": "The workflow options changed meanwhile, so they weren’t saved. Your changes are kept, over the options as they are now: Save… again to check them.",
+    "description": "HI-3592: a notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant), after something had already been moved for it. The user’s own unsaved changes stay in the form, laid over the options as they are now. Save… is the button’s name."
+  },
   "workflow.form.changesHead": {
     "defaultMessage": "What changes:",
     "description": "In the dialog before saving workflow options: above the list of options that change, each with its old and new value."

@@ -3181,9 +3181,11 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   leaves G7 as saved, a retarget preview from it to the saved G7, shown in Save… and ticked when anything can move. Those
   move before the save, branch by branch (moving them is what lets the save pass), each item rechecked as above; what
   moved stays moved if the save is then refused (the dialog says so first), and a notification says what moved and
-  stayed, the refusal staying in the dialog with the draft (a retry moves nothing again). A change that also moves G7
-  offers no move (`afterTarget`: a move goes to the saved G7, never a draft's): the dialog says to save G7's change
-  first, the branch kept in G7b, then take it out. The refusal itself is as before (HI-2680).
+  stayed, the refusal staying in the dialog with the draft (a retry moves nothing again); options changed meanwhile
+  (a stale save after moves) keep the user's own edits laid over the options as they are now (`rebaseDraft`), never the
+  old values of what changed elsewhere, said so. A change that also moves G7 offers no move (`afterTarget`: a move goes
+  to the saved G7, never a draft's), the old G7 taken out of G7b in the same save included: the dialog says to save G7's
+  change first, the branch kept in G7b, then take it out. The refusal itself is as before (HI-2680).
 - **A target that doesn't exist, and Start the next version (HI-2807, design s10 after s7).** A save naming a branch in
   G7 or G7b that the options before it didn't name, and that isn't a local branch now (`newlyMissing`; one git can't
   answer for isn't counted), is refused (`refuseMissingTargets`) in every save's own write: the Workflow section's

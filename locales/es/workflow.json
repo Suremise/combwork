@@ -41,6 +41,7 @@
   "workflow.form.cantSave": "Estas opciones no se pueden guardar:",
   "workflow.form.carried": "Los worktrees antiguos de los agentes terminan primero su trabajo actual: {agents}. Después también trabajan en slots.",
   "workflow.form.changeLine": "{option}: {from} → {to}",
+  "workflow.form.changedMeanwhileKept": "Las opciones del flujo de trabajo cambiaron entretanto, así que no se guardaron. Tus cambios se conservan, sobre las opciones tal como están ahora: vuelve a pulsar Guardar… para comprobarlos.",
   "workflow.form.changedMeanwhile": "Las opciones del flujo de trabajo cambiaron mientras tanto, así que no se guardó nada. Se muestran tal como están ahora.",
   "workflow.form.changesHead": "Qué cambia:",
   "workflow.form.checkCommand": "Comando",

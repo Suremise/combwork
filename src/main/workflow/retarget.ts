@@ -222,19 +222,21 @@ export function slotMoveArg(raw: unknown): SlotMovePreview {
 /**
  * HI-3592: the branches a change of Other branches work can merge into takes out while something still uses them, each
  * with what uses it and, when Work merges into stays as saved, what can move from it there (`retargetPreview`). When the
- * same change moves Work merges into, nothing is offered: a move goes to the saved one, so the removal waits for a
- * second save.
+ * same change moves Work merges into (`targetMoves`: its draft's `draftTarget`, null for the default branch), nothing is
+ * offered: a move goes to the saved one, so the removal waits for a second save.
  */
-export async function removalsOf(ws: WorkspaceService, projectPath: string, before: readonly string[], after: readonly string[], draftTarget: string | null): Promise<TargetRemoval[]> {
+export async function removalsOf(ws: WorkspaceService, projectPath: string, before: readonly string[], after: readonly string[], draftTarget: string | null, targetMoves: boolean): Promise<TargetRemoval[]> {
   const saved = (await projectTargets(ws, projectPath).catch(() => null))?.default ?? null
-  const gone = before.filter((b) => !after.includes(b) && b !== draftTarget && b !== saved)
+  // Only the default the draft keeps is never a removal (as `refuseRemovedTargets` counts, the draft's `target || null`):
+  // an old default taken out with the same save's change of Work merges into is one, its moves waiting for the second save.
+  const kept = targetMoves ? draftTarget : saved
+  const gone = before.filter((b) => !after.includes(b) && b !== kept)
   if (!gone.length) return []
   const slots = await slotUses(ws, projectPath)
   const out: TargetRemoval[] = []
   for (const branch of gone) {
-    const uses = await referencesTo(ws, projectPath, branch, () => slots.inUse(), draftTarget ?? saved)
+    const uses = await referencesTo(ws, projectPath, branch, () => slots.inUse(), kept)
     if (!uses.length) continue
-    const targetMoves = !!draftTarget && draftTarget !== saved
     out.push({ branch, uses, retarget: !targetMoves && saved ? await retargetPreview(ws, projectPath, branch, saved) : null, ...(targetMoves ? { afterTarget: true as const } : {}) })
   }
   return out

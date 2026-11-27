@@ -41,6 +41,7 @@
   "workflow.form.cantSave": "Tych opcji nie można zapisać:",
   "workflow.form.carried": "Stare worktree agentów najpierw kończą bieżącą pracę: {agents}. Potem też pracują w slotach.",
   "workflow.form.changeLine": "{option}: {from} → {to}",
+  "workflow.form.changedMeanwhileKept": "Opcje przepływu pracy zmieniły się w międzyczasie, więc nie zostały zapisane. Twoje zmiany są zachowane, nałożone na opcje w obecnej postaci: kliknij ponownie Zapisz…, aby je sprawdzić.",
   "workflow.form.changedMeanwhile": "Opcje przepływu pracy zmieniły się w międzyczasie, więc nic nie zapisano. Są pokazane w obecnym stanie.",
   "workflow.form.changesHead": "Co się zmienia:",
   "workflow.form.checkCommand": "Polecenie",
