@@ -1,8 +1,8 @@
-// The board's full-text search on a copy of a real board (#1237): CW_BOARD_BENCH_DB=<a combwork.db> copies it (with its -wal)
-// into tempDir() (the file itself is never opened), upgrades the copy, and prints what the index costs and saves: its
-// size and build time, a search through it against reading every card and matching in memory (as `GET /v1/tasks` would
-// without it) and against the window's filter of cards it already holds, and a card's edit with and without its
-// trigger. It checks, over a few hundred pieces of the board's own text, that the index finds exactly what the in-memory
+// The board's full-text search on a copy of a real board (#1237): CW_BOARD_BENCH_DB=<a 1.x combwork.db> copies it (with
+// its -wal) into tempDir() (the file itself is never opened; a 0.9 board isn't opened any more, HI-3602), opens the copy,
+// and prints what the index costs and saves: its size and build time, a search through it against reading every card
+// and matching in memory (as `GET /v1/tasks` would without it) and against the window's filter of cards it already
+// holds, and a card's edit with and without its trigger. It checks, over a few hundred pieces of the board's own text, that the index finds exactly what the in-memory
 // search finds. Skipped without it.
 // focused: opt-in (HI-3558: skipped without CW_BOARD_BENCH_DB, so the focused-test picker leaves it out)
 import { copyFileSync, existsSync, mkdirSync } from 'fs'
@@ -29,7 +29,6 @@ const opened: ReturnType<typeof createWorkspaceService>[] = []
 afterAll(async () => {
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()
-  store.boardTestHooks.upgradeAnswer = null
 })
 
 /** Words a person might search for, and some that find nothing. */
@@ -42,7 +41,6 @@ describe('the full-text search on a real board’s copy', () => {
     const file = join(ws, '.combwork', 'combwork.db')
     copyFileSync(source!, file)
     if (existsSync(`${source}-wal`)) copyFileSync(`${source}-wal`, `${file}-wal`)
-    store.boardTestHooks.upgradeAnswer = 'yes'
     const w = createWorkspaceService()
     await w.open(ws)
     opened.push(w)
@@ -67,7 +65,7 @@ describe('the full-text search on a real board’s copy', () => {
       }
     }
 
-    // The index: its size, and building it as the upgrade does (on the upgraded cards, undone).
+    // The index: its size, and building it as its schema step does (on the board's cards, undone).
     const bytes = (writer.prepare("SELECT sum(pgsize) AS b FROM dbstat WHERE name LIKE 'card_search%'").get() as { b: number }).b
     const fileBytes = (writer.prepare('SELECT page_count * page_size AS b FROM pragma_page_count, pragma_page_size').get() as { b: number }).b
     const textBytes = (writer.prepare("SELECT sum(length(title) + length(description) + length(project) + length(coalesce(agent_name, ''))) + (SELECT coalesce(sum(length(label)), 0) FROM card_labels) AS b FROM cards").get() as { b: number }).b

@@ -4,7 +4,7 @@
 // cause is fixed where stages are written (factStore's setStage clears the mark); this repairs what it left.
 
 import { basename, join } from 'path'
-import { boardRead, boardWaits, boardWrite, boardWriteOp } from '../boardStore'
+import { boardRead, boardWrite, boardWriteOp } from '../boardStore'
 import { createLogger, userText } from '../logger'
 import { HISTORY, storedText } from '../../shared/taskHistory'
 import type { WorkspaceService } from '../workspace'
@@ -33,9 +33,6 @@ export async function repairStages(ws: WorkspaceService): Promise<StageRepair> {
   const out: StageRepair = { unmarked: 0, repaired: [], failed: 0 }
   const path = ws.path
   if (!path) return out
-  // A board waiting for its upgrade to 1.0 is read-only: left alone, quietly, and repaired once it is upgraded, when the
-  // opening's steps run again (HI-1714: it warned that the board was from 0.9 at each open).
-  if (boardWaits(ws)) return out
   const life = ws.lifetime
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path
   try {

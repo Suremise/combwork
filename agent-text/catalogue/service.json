@@ -1994,6 +1994,16 @@
     "note": "An error making a project: the workspace already has a folder called {name}.",
     "audience": "both"
   },
+  "service.workspace.formatUnknown": {
+    "text": "Combwork couldn't read this workspace's board to check its version: {error}. Try opening it again.",
+    "note": "An error opening a workspace: Combwork reads the version of the workspace's task board before opening it, and couldn't ({error}: the reason, in English). Nothing in the folder was changed.",
+    "audience": "both"
+  },
+  "service.workspace.from09": {
+    "text": "This workspace is from Combwork 0.9, which this version can't open.",
+    "note": "An error opening a workspace whose task board was saved by Combwork 0.9: this version doesn't upgrade such a workspace any more. Nothing in the folder was changed.",
+    "audience": "both"
+  },
   "service.workspace.holdsOpen": {
     "text": "The workspace {workspace}, open in another window, is inside {folder}. Close it first to open {name} as a workspace.",
     "note": "An error opening a workspace: another Combwork window's workspace {workspace} is inside the folder {folder} (its name: {name}).",

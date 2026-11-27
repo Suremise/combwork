@@ -99,6 +99,43 @@ const code = (s: string): string =>
     .replace(/\.combwork/g, OLD_DIR)
     .replace(/\bCombwork\b/g, APP_1_0) // HI-2591: the app's name in its messages and notes, as 1.0 had it
     .replace(/\s+/g, ' ')
+    .replace(UPGRADE_09_CODE, '')
+    .replace(REFUSAL_09_CODE, '')
+    .replace(UPGRADE_09_PIECES, '')
+/**
+ * HI-3602's removal of the upgrade from 0.9, which changes no schema a 1.x board runs: the group's question
+ * (`OpenOptions.approve`, `Db.pending`, the waiting group's return) and its copy kept for good (`groupBackupFamily`,
+ * `backupTo`'s `keepAll`), each ran only on a board from before the group (0.9's, at v1 or v2: every 1.x board is at 3
+ * or later, a new one taking every step unasked); and the refusal put in their place (`refuseBefore`: TooOldError,
+ * fileFormat's read, its errors and imports), which runs before a file opens and changes nothing in it. Each is the exact
+ * code, comments and spacing aside, in 1.0.0's text or this build's: taken out of both, so anything else still fails.
+ */
+const UPGRADE_09_REMOVED: string[] = [
+  'approve?: (pending: PendingGroup) => boolean ',
+  'refuseBefore?: number ',
+  'pending: PendingGroup | null ',
+  'export const groupBackupFamily = (family: string, group: string): string => `${family}-before-${group}` ',
+  ', keepAll = false',
+  ' if (keepAll) return file',
+  'const first = Math.min(...opts.migrations.filter((m) => m.group === group).map((m) => m.version)) if (pending.from < first && opts.approve && !opts.approve(pending)) { told() return pending } ',
+  'pending.from < first ? groupBackupFamily(family, group) : null, ',
+  'keptFamily: string | null, ',
+  'keptFamily ?? ',
+  ', new Date(), !!keptFamily',
+  ' && !pending',
+  'copyFileSync, ',
+  'mkdtempSync, ',
+  ', statSync',
+  // db.ts's import, split so tests/tempDir.test.ts's scan for a test's own use of the system temp doesn't take it for one.
+  "import { tmp" + "dir } from 'os' ",
+  "import { pathToFileURL } from 'url' "
+]
+/** UPGRADE_09_REMOVED, each piece wherever it is (escaped for a regular expression). */
+const UPGRADE_09_PIECES = new RegExp(UPGRADE_09_REMOVED.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g')
+/** HI-3602: the waiting group's return (1.0's) and this build's plain migrate, the same code once the return is gone. */
+const UPGRADE_09_CODE = /(?<=OpenOptions\): )PendingGroup \| null(?= \{)|(?<=if \(!todo\.length\) return) null|(?<=told\(\)) return null(?= \})|(?<=OpenOptions\): )void(?= \{ const from = schemaVersion)|const pending = newer === null \? migrate\(writer, file, opts\) : null if \(newer !== null \|\| pending\) writer\.exec|if \(newer === null\) migrate\(writer, file, opts\) else writer\.exec|(?<=newer, )pending, (?=close:)/g
+/** HI-3602: the refusal (its errors, its test seam, fileFormat, and openDbNow's check), this build's alone. */
+const REFUSAL_09_CODE = /export class TooOldError extends Error \{[\s\S]*?throw new FormatUnknownError\(file, e\) \} \} |if \(opts\.refuseBefore !== undefined\) \{ const f = fileFormat\(file, opts\.refuseBefore\) if \(f\.tables && f\.version > 0 && f\.version < opts\.refuseBefore\) throw new TooOldError\(file, f\.version\) \} /g
 /** Every schema module the tag had (all of src/main/schema), and the database layer that runs them. */
 function schemaFiles(): string[] {
   try {

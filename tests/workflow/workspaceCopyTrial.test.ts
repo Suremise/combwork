@@ -1,8 +1,9 @@
-// The 1.0 upgrade's migration of agents' worktrees into slots (#1441), tried on a copy of a real 0.9 workspace. Skipped
+// The 1.0 upgrade's migration of agents' worktrees into slots (#1441), tried on a copy of a real workspace whose agents
+// still have their 0.9 worktrees (a 1.x board: a 0.9 one isn't opened any more, HI-3602). Skipped
 // unless CW_TRIAL_WS names one (never committed with a path in it). Its Combwork files are copied read-only into a
 // tempDir() (the board through SQLite's backup, workspace.json and each project.json), each project with git is a scratch
 // clone sharing the original's objects (read, never written), and each agent's worktree is made again as a worktree of
-// it at the same layout and commit. The copy's board is upgraded and adopted as the upgrade does, its sessions' folders
+// it at the same layout and commit. The copy's board is opened and adopted as an open does, its sessions' folders
 // moved to the copy's, and the migration run twice; what it did is printed as counts and names only (no card or
 // conversation text), into CW_TRIAL_REPORT (else report.txt in its temp folder). Nothing is written in the original,
 // and no real profile is used.
@@ -35,8 +36,8 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
 const under = (p: string, root: string): boolean => p.toLowerCase().startsWith(root.toLowerCase())
 const report: string[] = []
 
-describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)', () => {
-  it('copies it, upgrades the copy and migrates it, twice', { timeout: timing('test.hangRealLong') }, async () => {
+describe.skipIf(!SRC)("the slots migration on a copy of a workspace with 0.9's worktrees (#1441)", () => {
+  it('copies it, opens the copy and migrates it, twice', { timeout: timing('test.hangRealLong') }, async () => {
     const dst = join(base, basename(SRC))
     const at = (p: string): string => (under(p, SRC) ? dst + p.slice(SRC.length) : p)
     // The workspace's own files, read-only.
@@ -73,7 +74,7 @@ describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)'
     report.push(`copied: ${projects.join(', ')}; worktrees made: ${JSON.stringify(made)}`)
 
     const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../../src/main/workspace')
-    const { upgradeBoard, upgradeWaiting, boardRead, boardWrite, boardWriteOp } = await import('../../src/main/boardStore')
+    const { boardRead, boardWrite, boardWriteOp } = await import('../../src/main/boardStore')
     const { adoptWorkspace } = await import('../../src/main/workflow/adoption')
     const { migrateSlots, keptFor, startSlotMigration, stopSlotMigration } = await import('../../src/main/slotMigration')
     const { folderAgent, folderFacts } = await import('../../src/main/agentFolders')
@@ -83,7 +84,6 @@ describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)'
     try {
       await ws.open(dst)
       expect(under(ws.path!, base)).toBe(true)
-      if (upgradeWaiting(dst)) await inWorkspace(ws, () => upgradeBoard(ws))
       await adoptWorkspace(ws)
       // The sessions' folders moved to the copy's (as Repair would after a move): both spellings Windows paths have.
       await boardWrite(ws, async () =>

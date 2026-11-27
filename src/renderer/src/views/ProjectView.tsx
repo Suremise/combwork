@@ -35,7 +35,6 @@ import { ActivityTab } from './ActivityTab'
 import { SessionsTab } from './SessionsTab'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { ProjectTasksTab } from '../components/Board'
-import { useStartBlocked } from '../components/BoardUpgrade'
 import { RemovedDataBanner } from '../components/ProjectRemoval'
 
 // The tabs the strip shows, in order, then More ▾ with the others (#1043): the title bar's Project menu has them all,
@@ -324,8 +323,6 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
       : null
   const epoch = useStore((s) => (focused ? s.sessionEpoch[projectKey(project.path, focused.id)] : undefined))
   const ended = epoch !== undefined
-  // Its workspace's 1.0 upgrade waits (#1230): no session can start.
-  const startBlocked = useStartBlocked()
   // From the click until the session runs (#1177): the focused agent's, or with no agent, the one being added.
   const agentStarting = useStarting(project.path, focused?.id ?? null)
   const addingStarting = useProjectStarting(project.path)
@@ -341,10 +338,10 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
         <>
           <Icon name="debug-disconnect" />
           <span className="grow">{tr(M.sessionEnded)}</span>
-          <button className="btn act-resume solid" disabled={!!startBlocked || !!starting} aria-busy={resuming || undefined} title={startBlocked ?? (focused?.resume?.fresh ? freshTip(focused.resume.fresh, sessionLabel(focused.resume, project.name)) : undefined)} onClick={() => void actions.resumeLast(project.path)}>
+          <button className="btn act-resume solid" disabled={!!starting} aria-busy={resuming || undefined} title={focused?.resume?.fresh ? freshTip(focused.resume.fresh, sessionLabel(focused.resume, project.name)) : undefined} onClick={() => void actions.resumeLast(project.path)}>
             <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} /> {resuming ? startingLabel(starting) : tr(M.resume)}
           </button>
-          <button className="btn act-start" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
+          <button className="btn act-start" disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path)}>
             <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)}
           </button>
         </>
@@ -368,7 +365,7 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
           )}
           {noAccount && <NoConnectionBanner where="empty" />}
           <div className="btns">
-            <button className="btn act-start solid" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
+            <button className="btn act-start solid" disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path)}>
               <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)} {newKey && <kbd style={{ marginLeft: 6 }}>{formatKeybinding(newKey)}</kbd>}
             </button>
             {focused ? <ResumeButton project={project} a={focused} className={RESUME_TINT} label={tr(M.resumeLast)} /> : <AddAgentButton project={project} className="tint-amber" />}

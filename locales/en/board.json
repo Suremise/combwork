@@ -1355,10 +1355,6 @@
     "defaultMessage": "Could not change the card",
     "description": "An error toast's title: changing a card failed."
   },
-  "board.error.inUse": {
-    "defaultMessage": "Another Combwork has this workspace open: close it first.",
-    "description": "An error: the board can't be upgraded to 1.0 while another copy of Combwork (an older version, or another profile) has the workspace open. Nothing was changed."
-  },
   "board.error.move": {
     "defaultMessage": "Could not move the card",
     "description": "An error toast's title: moving a card to another column failed."
@@ -1378,14 +1374,6 @@
   "board.error.unavailable": {
     "defaultMessage": "The board couldn't be opened: {error}",
     "description": "An error: the workspace's task board database couldn't be opened or its cards couldn't be moved into it; {error} says why (from the system, often in English). Nothing was lost: the cards are still where they were."
-  },
-  "board.error.upgradeFirst": {
-    "defaultMessage": "This board is from version 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).",
-    "description": "An error: the workspace's task board hasn't been upgraded to 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board."
-  },
-  "board.error.upgradeFirstStart": {
-    "defaultMessage": "This workspace is from version 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).",
-    "description": "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window."
   },
   "board.export.command": {
     "defaultMessage": "Export Board to JSON…",
@@ -4314,50 +4302,6 @@
   "board.toolbar.startLane": {
     "defaultMessage": "Start Lane…",
     "description": "An item of the board's ⋯ menu: opens Start Lane (a builder and a reviewer agent work through cards in turn). Glossary: lane."
-  },
-  "board.upgrade.askDetail": {
-    "defaultMessage": "Close every other Combwork that has this workspace open first. Until it is upgraded, its board is read-only here and its agents can't start.",
-    "description": "Under the upgrade dialog's text: the upgrade is refused while another copy of Combwork has the workspace open; declining leaves the board readable but not changeable in this Combwork, and no agent (nor the Assistant) can start."
-  },
-  "board.upgrade.askMessage": {
-    "defaultMessage": "Combwork 1.0 needs to upgrade this workspace's data. There's no going back: version 0.9 can then no longer open it, and your agents' worktrees become slots. Back up first.",
-    "description": "The upgrade dialog's text: why (1.0 keeps the workspace's data in a new format), then what follows, for good: version 0.9 can't open the workspace any more, and the agents' own worktrees become slots (working folders Combwork lends to cards), which 0.9 can't use again, so the user should back up first."
-  },
-  "board.upgrade.askTitle": {
-    "defaultMessage": "Upgrade this workspace's board to 1.0?",
-    "description": "Title of the dialog Combwork shows on opening a workspace whose task board was saved by version 0.9: 1.0 keeps the board in a new format, and asks before converting it."
-  },
-  "board.upgrade.banner": {
-    "defaultMessage": "This workspace is from version 0.9: until it is upgraded to 1.0, its board is read-only here and its agents can't start.",
-    "description": "A banner at the top of the window while the workspace's upgrade to 1.0's format waits (the user said Not Now): cards can be read but not changed, and no agent (nor the Assistant) can start, as Combwork couldn't record its session. Also the tooltip of what is disabled meanwhile: the board's add-card buttons, dragging cards, the card dialog's changes, and New Session and Resume."
-  },
-  "board.upgrade.bannerButton": {
-    "defaultMessage": "Upgrade…",
-    "description": "A button on the banner above a read-only 0.9 board: asks to upgrade it to 1.0. The … says it asks first: keep it."
-  },
-  "board.upgrade.done": {
-    "defaultMessage": "Board upgraded to 1.0",
-    "description": "A notification after the workspace's board was converted to 1.0's format."
-  },
-  "board.upgrade.doneDetail": {
-    "defaultMessage": "Version 0.9 can no longer open this workspace.",
-    "description": "Under \"Board upgraded to 1.0\": the upgrade is one-way, so the older version 0.9 of Combwork can no longer open the workspace."
-  },
-  "board.upgrade.learnMore": {
-    "defaultMessage": "Learn more",
-    "description": "A button on the banner above a read-only 0.9 board: opens the user guide's section about upgrading to 1.0."
-  },
-  "board.upgrade.notNow": {
-    "defaultMessage": "Not Now",
-    "description": "The upgrade dialog's other button: leaves the board as it is, read-only in this Combwork, with a banner offering the upgrade."
-  },
-  "board.upgrade.upgrade": {
-    "defaultMessage": "Upgrade",
-    "description": "The upgrade dialog's button: converts the board to 1.0's format."
-  },
-  "board.upgrade.upgrading": {
-    "defaultMessage": "Upgrading…",
-    "description": "The Upgrade button while the board is converted."
   },
   "board.view.intro": {
     "defaultMessage": "Plan work as cards, start them on agents, and see where each one is on its way to Done.",

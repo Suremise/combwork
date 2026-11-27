@@ -397,8 +397,6 @@
   "service.targetChanges.setAside": "Odłóż",
   "service.targetChanges.show": "Pokaż zmiany",
   "service.targetChanges.title": "Zmiany bez commita tam, gdzie wybrana jest gałąź {target}",
-  "service.templates.v09": "Szablony w 1.0 nie przypisują agentów do worktree, więc ich miejsce zajmują szablony Combwork. Kopia {n, plural, one {szablonu} few {# szablonów} many {# szablonów} other {# szablonu}} jest przechowywana razem z kopią zapasową tablicy z 0.9.",
-  "service.templates.v09Title": "Twoje szablony agentów z 0.9 nie są używane w 1.0",
   "service.transcripts.busy": "Ta sesja jest właśnie archiwizowana lub usuwana. Spróbuj ponownie za chwilę.",
   "service.transcripts.exported": "{session} · wyeksportowano z Combwork {date}",
   "service.transcripts.imageNotKept": "Obraz nie jest zapisany w transkrypcji",
@@ -527,5 +525,7 @@
   "service.gitCommit.stopped": "{action, select, revert {Revert} other {Cherry-pick}} {commit} zatrzymał się na {count, plural, one {konflikcie w # pliku} few {konfliktach w # plikach} many {konfliktach w # plikach} other {konfliktach w # pliku}}: dokończ go lub przerwij w widoku Kontrola wersji → Zmiany.",
   "service.gitCommit.stoppedEmpty": "{action, select, revert {Revert} other {Cherry-pick}} {commit} zatrzymał się: git twierdzi, że niczego by nie zmienił. Pomiń go lub przerwij w widoku Kontrola wersji → Zmiany.",
   "service.gitCommit.timedOut": "Git nadal działał po {seconds, number} s, więc Combwork go zakończył. Zanim spróbujesz ponownie, sprawdź widok Kontrola wersji → Zmiany.",
-  "service.gitRepo.noTagCommit": "Git nie ma commita {commit} do otagowania."
+  "service.gitRepo.noTagCommit": "Git nie ma commita {commit} do otagowania.",
+  "service.workspace.formatUnknown": "Combwork nie mógł odczytać tablicy tego obszaru roboczego, aby sprawdzić jej wersję: {error}. Spróbuj otworzyć go ponownie.",
+  "service.workspace.from09": "Ten obszar roboczy pochodzi z Combwork 0.9, a ta wersja nie może go otworzyć."
 }

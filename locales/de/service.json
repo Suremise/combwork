@@ -397,8 +397,6 @@
   "service.targetChanges.setAside": "Beiseitelegen",
   "service.targetChanges.show": "Änderungen anzeigen",
   "service.targetChanges.title": "Nicht committete Änderungen, wo {target} ausgecheckt ist",
-  "service.templates.v09": "Vorlagen in 1.0 binden Agenten nicht an Worktrees, daher treten die Vorlagen von Combwork an ihre Stelle. Eine Kopie {n, plural, one {der Vorlage} other {der # Vorlagen}} liegt bei der Board-Sicherung aus 0.9.",
-  "service.templates.v09Title": "Deine Agentenvorlagen aus 0.9 werden in 1.0 nicht verwendet",
   "service.transcripts.busy": "Diese Sitzung wird gerade archiviert oder gelöscht. Versuche es gleich noch einmal.",
   "service.transcripts.exported": "{session} · aus Combwork exportiert, {date}",
   "service.transcripts.imageNotKept": "Das Bild ist nicht im Transkript gespeichert",
@@ -527,5 +525,7 @@
   "service.gitCommit.stopped": "{action, select, revert {Der Revert} other {Der Cherry-Pick}} von {commit} hat bei {count, plural, one {einem Konflikt in # Datei} other {Konflikten in # Dateien}} angehalten: Schließe ihn unter Versionsverwaltung → Änderungen ab oder brich ihn ab.",
   "service.gitCommit.stoppedEmpty": "{action, select, revert {Der Revert} other {Der Cherry-Pick}} von {commit} hat angehalten: Laut Git würde er nichts ändern. Überspringe ihn unter Versionsverwaltung → Änderungen oder brich ihn ab.",
   "service.gitCommit.timedOut": "Git lief nach {seconds, number} Sekunden noch, also hat Combwork es beendet. Sieh dir Versionsverwaltung → Änderungen an, bevor du es erneut versuchst.",
-  "service.gitRepo.noTagCommit": "Git hat keinen Commit {commit} zum Taggen."
+  "service.gitRepo.noTagCommit": "Git hat keinen Commit {commit} zum Taggen.",
+  "service.workspace.formatUnknown": "Combwork konnte das Board dieses Arbeitsbereichs nicht lesen, um seine Version zu prüfen: {error}. Versuche, ihn erneut zu öffnen.",
+  "service.workspace.from09": "Dieser Arbeitsbereich stammt aus Combwork 0.9 und kann von dieser Version nicht geöffnet werden."
 }

@@ -1,14 +1,13 @@
 // Project keys (#1219, #704; SPEC §16.12): the suggestion and its rules (2–4 letters, unique, none a prefix of another,
-// case-insensitive), the 1.0 step (an existing card keeps its number in its project, HI-1061; every old #N still resolves),
-// new cards numbered per project, a key changed (the old one an alias), a card moved to another project (its old key an
-// alias, its number there again when it comes back), a counter after a change undone part way, and references for the
-// Agent API (`HI-12`, `hi-12`, `#12`, 12). CW_KEYS_LIVE_DB=<a combwork.db> runs the step on a copy of that board.
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+// case-insensitive), new cards numbered per project, a key changed (the old one an alias), a card moved to another
+// project (its old key an alias, its number there again when it comes back), a counter after a change undone part way,
+// and references for the Agent API (`HI-12`, `hi-12`, `#12`, 12). HI-3602: a 0.9 board's step (its cards keeping their
+// numbers, HI-1061) is no longer run on one.
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { as09 } from './boardDb'
 import { cardName, cardRef, keyProblem, suggestKey, type KeyHeld } from '../src/shared/projectKeys'
 import { cardChange, limitLine, releasedLine, wakeLine } from '../src/shared/watch'
 import { inboxText } from '../src/shared/deliveries'
@@ -16,7 +15,6 @@ import { taskPrompt } from '../src/shared/tasks'
 import { taskRow, taskRowText } from '../src/shared/toolReplies'
 import { unexpectedCloseText } from '../src/shared/unexpectedClose'
 import { bound } from './keepType'
-import { timing } from './timing.cjs'
 
 const base = tempDir('cw-keys-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -25,12 +23,8 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const keys = await import('../src/main/projectKeys')
-const keysStep = await import('../src/main/schema/keysStep')
-const { openDb } = await import('../src/main/db')
 const { staleWhy } = await import('../src/main/deliveries')
 
-// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
-const HUNG_MS = timing('wait.hang')
 const user = { kind: 'user' } as const
 let n = 0
 type WS = ReturnType<typeof createWorkspaceService>
@@ -40,7 +34,6 @@ afterAll(async () => {
   store.closeAllBoards()
 })
 afterEach(() => {
-  store.boardTestHooks.upgradeAnswer = null
   store.boardTestHooks.failPut = null
 })
 
@@ -484,56 +477,5 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
     expect(src).toContain("items: { type: ['number', 'string'] }")
     expect(src.match(/number: cardArg/g)?.length).toBeGreaterThanOrEqual(3)
     expect(src).toContain('card: cardArg')
-  })
-})
-
-describe('the 1.0 step: keys for a 0.9 board', () => {
-  it('existing cards keep their numbers in their project, each counter carries on, and every old #N resolves', async () => {
-    const ws = workspace()
-    let w = await open(ws)
-    const made = await inWorkspace(w, async () => {
-      const out: number[] = []
-      for (const [title, project] of [['One', 'hike'], ['Two', 'ambrosia'], ['Three', 'hike'], ['Four', '']]) out.push((await tasks.createTask({ title, project }, user)).number)
-      return out
-    })
-    await close(w)
-    as09(store.boardFile(ws))
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    w = await open(ws)
-    const read = await inWorkspace(w, () => tasks.allTasks(w))
-    const byNumber = new Map(read.map((c) => [c.number, c.key ?? null]))
-    expect(made.map((m) => byNumber.get(m))).toEqual([`HI-${made[0]}`, `AM-${made[1]}`, `HI-${made[2]}`, null])
-    for (const m of made) expect(keys.cardOfRef(w, `#${m}`)).toBe(m)
-    expect(keys.cardOfRef(w, `HI-${made[2]}`)).toBe(made[2])
-    // Each project's counter goes on from its highest.
-    const next = await inWorkspace(w, () => tasks.createTask({ title: 'Five', project: 'hike' }, user))
-    expect(next.key).toBe(`HI-${made[2] + 1}`)
-    // Said once, quietly.
-    expect(store.keysNoticeDue(w)).toBe(true)
-    keys.sayKeysOnce(w)
-    await expect.poll(() => store.keysNoticeDue(w), { timeout: HUNG_MS }).toBe(false)
-    await close(w)
-  })
-})
-
-const live = process.env.CW_KEYS_LIVE_DB
-describe.skipIf(!live)("the keys step on a copy of a live board's combwork.db (CW_KEYS_LIVE_DB)", () => {
-  it('gives each project with cards a key, and every card that has a project its own number there: every old #N resolves', () => {
-    const copy = join(base, `live-${++n}.db`)
-    copyFileSync(live!, copy)
-    if (existsSync(`${live}-wal`)) copyFileSync(`${live}-wal`, `${copy}-wal`)
-    // The board's 1.0 group as the upgrade runs it (the cards step before the keys step), on the copy.
-    const opened2 = openDb(copy, { migrations: store.BOARD_MIGRATIONS, appVersion: '1.0.0-test', approve: () => true })
-    try {
-      const r = opened2.reader
-      const cards = r.prepare('SELECT number, project_id, project_number FROM cards').all() as { number: number; project_id: string | null; project_number: number | null }[]
-      const withProject = cards.filter((c) => c.project_id)
-      expect(withProject.every((c) => c.project_number === c.number)).toBe(true)
-      const k = keysStep.currentKeys(r)
-      console.log(`live copy: ${cards.length} cards, ${withProject.length} with a project; keys ${[...k.values()].sort().join(', ')}`)
-      for (const c of withProject) expect(keysStep.cardOfKey(r, k.get(c.project_id!)!, c.number)).toBe(c.number)
-    } finally {
-      opened2.close()
-    }
   })
 })

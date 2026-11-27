@@ -1,11 +1,12 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { createHash } from 'crypto'
-import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'original-fs'
+import { existsSync, readdirSync, readFileSync, renameSync } from 'original-fs'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { basename, join } from 'path'
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
 import { app } from 'electron'
 import { CW_DIR } from '../shared/defaults'
+import { LEGACY_HIVE_DIR } from '../shared/combworkFolderMove' // old-name: 0.9's folder, read to refuse a 0.9 board (HI-3602)
 import { msg } from '../shared/i18n'
 import type { ArchiveBatch, BoardState } from '../shared/types'
 import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
@@ -20,8 +21,8 @@ import { PROJECT_REVS_STEP } from './schema/projectRevsStep'
 import { QUEUE_REVS_STEP } from './schema/queueRevsStep'
 import { PROJECT_REVS_DROP_STEP } from './schema/projectRevsDropStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
-import { backupsOf, beginTransaction, DbInUseError, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
-import { checkpointsLetGo, checkpointWhenIdle, timedCommit } from './walCheckpoint'
+import { beginTransaction, fileFormat, isIoError, openDb, OPENABLE_WAIT_MS, untilOpenable, type Db, type Migration } from './db'
+import { checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { beginWrite, countedWrite } from './dbWrites'
 import { timedStep } from './stallWork'
 import { moveStores, STORES_STEP } from './schema/storeCodec'
@@ -30,7 +31,7 @@ import { placeKey, realPath, withFileLock } from './fsutil'
 import { trash } from './trash'
 import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
-import { assertAdmitted, assertPlaceAdmitted, isAdmitted, isRefusal } from './openingFence'
+import { assertAdmitted, assertPlaceAdmitted, isAdmitted } from './openingFence'
 import { HEARTBEAT_MS, othersPresent, profileId, removePresence, writePresence } from './presence'
 import { moveStoreRows } from './schema/sessionDeliveryTables'
 import type { WorkspaceService } from './workspace'
@@ -427,8 +428,6 @@ interface Board {
    */
   combwork: string
   db: Db
-  /** Its cards are still JSON documents, a row each (a 0.9 board waiting for its upgrade to 1.0, read-only), not 1.0's tables. */
-  legacy: boolean
   /** Statements made once. */
   version: StatementSync
   /** The writer's data_version when last looked at: another process's commit changes it (#1017's poll). */
@@ -459,13 +458,11 @@ const boards = new Map<string, Board>()
 export const boardTestHooks: {
   failPut: ((n: number) => boolean) | null
   refuseRename: ((from: string) => boolean) | null
-  /** The 1.0 upgrade's question answered before it is asked (as CW_TEST_BOARD_UPGRADE does for a test copy). */
-  upgradeAnswer: 'yes' | 'no' | null
-  /** Runs while the upgrade holds the file's exclusive lock, its steps committed. */
+  /** Runs while a group's later steps (a 1.0 board's) hold the file's exclusive lock, committed. */
   whileUpgrading: (() => void) | null
   /** Told as a workspace's open starts waiting for its board to be openable (HI-2199). */
   openableWait: ((path: string) => void) | null
-} = { failPut: null, refuseRename: null, upgradeAnswer: null, whileUpgrading: null, openableWait: null }
+} = { failPut: null, refuseRename: null, whileUpgrading: null, openableWait: null }
 const keyOf = (path: string): string => path.toLowerCase()
 
 /** What the board tells the user about the import (index.ts shows it as a notice). */
@@ -478,9 +475,6 @@ export function onBoardNotice(fn: (path: string, n: BoardNotice) => void): void 
 const M = {
   noWorkspace: msg({ id: 'board.error.noWorkspace', defaultMessage: 'No workspace is open', description: 'An error: the task board needs an open workspace, and there is none.' }),
   newer: msg({ id: 'board.error.newer', defaultMessage: 'This board was saved by a newer version of Combwork. It is shown read-only: update Combwork to change it.', description: "An error: the workspace's task board was saved by a newer Combwork, whose format this version doesn't know; cards can be read but not changed." }),
-  upgradeFirst: msg({ id: 'board.error.upgradeFirst', defaultMessage: "This board is from version 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).", description: "An error: the workspace's task board hasn't been upgraded to 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board." }),
-  upgradeFirstStart: msg({ id: 'board.error.upgradeFirstStart', defaultMessage: 'This workspace is from version 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).', description: "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window." }),
-  inUse: msg({ id: 'board.error.inUse', defaultMessage: 'Another Combwork has this workspace open: close it first.', description: "An error: the board can't be upgraded to 1.0 while another copy of Combwork (an older version, or another profile) has the workspace open. Nothing was changed." }),
   unavailable: msg({ id: 'board.error.unavailable', defaultMessage: "The board couldn't be opened: {error}", description: "An error: the workspace's task board database couldn't be opened or its cards couldn't be moved into it; {error} says why (from the system, often in English). Nothing was lost: the cards are still where they were." })
 }
 
@@ -735,7 +729,7 @@ function boardOf(path: string, transient = false): Board {
   const failed = failures.get(key)?.error
   if (failed) throw combworkError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
   try {
-    const b = openBoard(path, false)
+    const b = openBoard(path)
     b.transient = transient
     return b
   } catch (e) {
@@ -765,11 +759,11 @@ export async function untilBoardOpenable(path: string, signal: AbortSignal): Pro
 }
 
 /**
- * Opens a workspace's board, its file migrated: the 1.0 group (#1207) only when `upgrade` (the user said yes) or a test
- * copy's pre-answer, else the board opens read-only until it is upgraded. Throws as openDb does (DbInUseError: another
- * Combwork has the file open), and when another profile's presence marker is fresh, nothing changed either way.
+ * Opens a workspace's board, its file migrated (a 1.0 board takes the 1.0 group's later steps). Throws as openDb does
+ * (DbInUseError: another Combwork has the file open; TooOldError: a 0.9 board, HI-3602), and when another profile's
+ * presence marker is fresh, nothing changed either way.
  */
-function openBoard(path: string, upgrade: boolean): Board {
+function openBoard(path: string): Board {
   const key = keyOf(path)
   // The folder's `.combwork` where it really is, now: what every later write and removal for this board uses (#1402), the
   // file itself opened by its spelling (the same file at this instant; db.ts knows it by that).
@@ -781,11 +775,12 @@ function openBoard(path: string, upgrade: boolean): Board {
       migrations: BOARD_MIGRATIONS,
       appVersion: appVersion(),
       backupDir: join(path, CW_DIR, BACKUPS),
-      approve: (p) => upgrade || upgradeAnswer(p) === 'yes',
+      // HI-3602: a 0.9 board (before the 1.0 group's first step) is refused, untouched (WorkspaceService refuses its open first).
+      refuseBefore: FIRST_10,
       beforeGroup: () => {
         if (othersPresent(combwork, presenceId()).length) throw new OtherCombworkError()
       },
-      whileGroupLocked: boardTestHooks.whileUpgrading ?? holdForTest,
+      whileGroupLocked: boardTestHooks.whileUpgrading ?? undefined,
       // The WAL's first write after a checkpoint is made under the board's lock, which every writer of the file takes (HI-3289),
       // counted (HI-1368) so the workspace's close waits for the worker's answer rather than closing while it holds the lock.
       checkpointer: (file, writer) => checkpointWhenIdle(file, writer, { hold: (fn) => countedWrite(path, () => withFileLock(boardLock(path), fn)) }),
@@ -798,14 +793,11 @@ function openBoard(path: string, upgrade: boolean): Board {
       }
     })
     const w = db.writer
-    // Read-only until the user says yes in the window's question (HI-1694: the log said nothing of the wait for it).
-    if (db.pending) log.info(`the board of ${userText(path)} waits for its upgrade to 1.0 (from v${db.pending.from}): read-only until the window's question is answered`)
     const b: Board = {
       path,
       place: real.toLowerCase(),
       combwork,
       db,
-      legacy: db.reader.prepare("SELECT 1 FROM pragma_table_info('cards') WHERE name = 'doc'").get() !== undefined, // i18n-ignore: SQL
       version: w.prepare('PRAGMA data_version'), // i18n-ignore: SQL
       dataVersion: 0,
       revision: 0,
@@ -836,51 +828,16 @@ function openBoard(path: string, upgrade: boolean): Board {
   }
 }
 
-/** Whether a board's file takes writes: not saved by a newer Combwork, nor waiting for its upgrade. */
-const writable = (db: Db): boolean => db.newer === null && !db.pending
+/** Whether a board's file takes writes: not saved by a newer Combwork. */
+const writable = (db: Db): boolean => db.newer === null
 
-/** The folder of the board's copies (db.ts keeps the newest three, and the 1.0 group's copy for good). */
+/** The folder of the board's copies (db.ts keeps the newest three). */
 const BACKUPS = 'backups'
-/** The family of the board's copies; the copy before the 1.0 upgrade is `combwork-before-1.0-v<n>-<time>.db`. */
-const FAMILY = DB_FILE.replace(/\.db$/, '')
 
 /** Another profile's Combwork has the workspace open, by its presence marker (1.0's; a 0.9 build shows by SQLite's lock). */
 class OtherCombworkError extends Error {
   constructor() {
-    super('another Combwork has the workspace open (its presence marker is fresh)') // i18n-ignore: for the log; the user sees M.inUse
-  }
-}
-
-/**
- * A test copy's answer to the upgrade's question, given before it is asked (CW_TEST_BOARD_UPGRADE=yes|no, unpackaged
- * builds only; the e2e suites' boards made by 0.9), or a unit test's hook. Anything else: the user is asked.
- */
-function upgradeAnswer(p: PendingGroup): 'yes' | 'no' | null {
-  if (p.group !== UPGRADE_GROUP_ID) return null
-  if (boardTestHooks.upgradeAnswer) return boardTestHooks.upgradeAnswer
-  const env = process.env.CW_TEST_BOARD_UPGRADE
-  if (packaged() || (env !== 'yes' && env !== 'no')) return null
-  return env
-}
-
-/**
- * For the S60 suite (unpackaged builds only): CW_TEST_UPGRADE_HOLD=<ms>;<file> keeps the upgrade's exclusive lock that
- * long once its steps are committed, after writing <file>, so the suite can start a 0.9 build during the upgrade. Main's
- * thread waits meanwhile, as it would on a slow disk.
- */
-function holdForTest(): void {
-  const hold = packaged() ? undefined : process.env.CW_TEST_UPGRADE_HOLD
-  if (!hold) return
-  const [ms, file] = hold.split(';')
-  if (file) writeFileSync(file, new Date().toISOString(), 'utf8')
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.min(Number(ms) || 0, 120_000))
-}
-
-const packaged = (): boolean => {
-  try {
-    return app.isPackaged
-  } catch {
-    return false
+    super('another Combwork has the workspace open (its presence marker is fresh)') // i18n-ignore: for the log; the user sees M.unavailable
   }
 }
 
@@ -968,7 +925,7 @@ function revisionOf(ws: WorkspaceService, sql: string, project: string, also?: (
   const path = pathOf(ws)
   if (inWrite(keyOf(path))) return null
   const b = boardOf(path)
-  if (b.db.reader.isTransaction || b.legacy || b.db.pending) return null
+  if (b.db.reader.isTransaction) return null
   try {
     return readSnapshot(ws, (_b, db) => {
       const r = (db.prepare(sql).get(project) as { r: number } | undefined)?.r ?? 0
@@ -1136,7 +1093,6 @@ function boardWriteLocked<T>(ws: WorkspaceService, path: string, key: string, fn
     if (opts.alive && !opts.alive()) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
     const b = boardOf(path)
     if (b.db.newer !== null) throw combworkError(M.newer, undefined, { kind: 'conflict' })
-    if (b.db.pending) throw combworkError(M.upgradeFirst, undefined, { kind: 'conflict' })
     const state: WriteState = { key, open: true, changed: false, after: [], checks: new Map(), undone: [], lost: null }
     const db = b.db.writer
     let committed = false
@@ -1311,10 +1267,9 @@ const ADOPTION_SQL = 'SELECT number, project, col, archived, agent, pre_workflow
 type AdoptionRow = { number: number; project: string; col: string; archived: number; agent: string | null; pre_workflow: number; facts: number }
 const adoptionCardOf = (r: AdoptionRow): AdoptionCard => ({ number: r.number, project: r.project, column: r.col, archived: r.archived === 1, agent: r.agent, preWorkflow: r.pre_workflow === 1, facts: r.facts === 1 })
 
-/** The AdoptionCard of each card up to `upto` (ADOPTION_UPTO), in number order, on one snapshot ([] on a board still 0.9's, waiting for its upgrade). */
+/** The AdoptionCard of each card up to `upto` (ADOPTION_UPTO), in number order, on one snapshot. */
 export function adoptionCards(ws: WorkspaceService, upto = Number.MAX_SAFE_INTEGER): AdoptionCard[] {
-  return readSnapshot(ws, (b, db) => {
-    if (b.legacy || b.db.pending) return []
+  return readSnapshot(ws, (_b, db) => {
     return (db.prepare(`${ADOPTION_SQL} WHERE number <= ? ORDER BY number`).all(upto) as AdoptionRow[]).map(adoptionCardOf) // i18n-ignore: SQL
   })
 }
@@ -1378,7 +1333,7 @@ export function cardOwnersNow(ws: WorkspaceService, numbers: readonly number[]):
     const at = numbers.map(() => '?').join(', ')
     const out = new Map<number, { agent: string | null; lane: string | null }>()
     for (const r of db.prepare(`SELECT number, agent FROM cards WHERE number IN (${at})`).all(...numbers) as { number: number; agent: string | null }[]) out.set(r.number, { agent: r.agent, lane: null }) // i18n-ignore: SQL
-    // A 0.9 board waiting for its upgrade to 1.0 has no lane tables yet: no card has an owner lane (HI-1846).
+    // A board saved by a newer Combwork (read-only) has lane tables that may not be this build's: no owner lane (HI-1846).
     if (boardReadOnly(ws)) return out
     const rows = db
       .prepare(`SELECT x.card, l.id FROM (SELECT lane, card FROM lane_cards UNION SELECT lane, card FROM lane_pending) x JOIN lanes l ON l.id = x.lane JOIN cards c ON c.number = x.card WHERE x.card IN (${at}) AND l.state = 'active' AND l.project = c.project COLLATE NOCASE ORDER BY (c.agent IS NOT NULL AND c.agent = l.builder_id), l.started_at, l.id`) // i18n-ignore: SQL
@@ -1476,11 +1431,7 @@ function writeOp<T>(ws: WorkspaceService, op: (b: Board) => T): T {
 
 /** A card's document as saved; null when there is no such card. */
 export function cardDoc(ws: WorkspaceService, n: number): Record<string, unknown> | null {
-  return readSnapshot(ws, (b, db) => {
-    if (b.legacy) {
-      const row = db.prepare('SELECT doc FROM cards WHERE number = ?').get(n) as { doc: string } | undefined // i18n-ignore: SQL
-      return row ? (JSON.parse(row.doc) as Record<string, unknown>) : null
-    }
+  return readSnapshot(ws, (_b, db) => {
     const [r] = readCardRows(db, { numbers: [n] })
     return r ? composeCard(r) : null
   })
@@ -1488,8 +1439,8 @@ export function cardDoc(ws: WorkspaceService, n: number): Record<string, unknown
 
 /** HI-2915: the cards whose waiting mark is an Assistant request's (`waitingFor.ask`, kept in a card's extra): each number and ref. */
 export function askWaitMarks(ws: WorkspaceService): { n: number; ref: string }[] {
-  return readSnapshot(ws, (b, db) => {
-    const ask = `json_extract(${b.legacy ? 'doc' : 'extra'}, '$.waitingFor.ask')` // i18n-ignore: SQL
+  return readSnapshot(ws, (_b, db) => {
+    const ask = `json_extract(extra, '$.waitingFor.ask')` // i18n-ignore: SQL
     return db.prepare(`SELECT number AS n, ${ask} AS ref FROM cards WHERE ${ask} IS NOT NULL`).all() as { n: number; ref: string }[] // i18n-ignore: SQL
   })
 }
@@ -1499,8 +1450,8 @@ export function askWaitMarks(ws: WorkspaceService): { n: number; ref: string }[]
  * `host`: each card's number and the PR's. Names compared as GitHub does, case aside.
  */
 export function prSourceCards(ws: WorkspaceService, repo: { host: string; owner: string; repo: string }): { n: number; pr: number }[] {
-  return readSnapshot(ws, (b, db) => {
-    const src = (path: string): string => `json_extract(${b.legacy ? 'doc' : 'extra'}, '$.source.${path}')` // i18n-ignore: SQL
+  return readSnapshot(ws, (_b, db) => {
+    const src = (path: string): string => `json_extract(extra, '$.source.${path}')` // i18n-ignore: SQL
     const sql = `SELECT number AS n, ${src('number')} AS pr FROM cards WHERE archived = 0 AND ${src('kind')} = 'pr' AND lower(${src('host')}) = lower(?) AND lower(${src('owner')}) = lower(?) AND lower(${src('repo')}) = lower(?)` // i18n-ignore: SQL
     return (db.prepare(sql).all(repo.host, repo.owner, repo.repo) as { n: number; pr: unknown }[]).filter((r) => Number.isInteger(r.pr)) as { n: number; pr: number }[]
   })
@@ -1511,8 +1462,8 @@ export function prSourceCards(ws: WorkspaceService, repo: { host: string; owner:
  * whether the card is archived (an issue's import looks only at cards not archived; its close at publish at all).
  */
 export function issueSourceCards(ws: WorkspaceService, repo: { host: string; owner: string; repo: string }): { n: number; issue: number; archived: boolean }[] {
-  return readSnapshot(ws, (b, db) => {
-    const src = (path: string): string => `json_extract(${b.legacy ? 'doc' : 'extra'}, '$.source.${path}')` // i18n-ignore: SQL
+  return readSnapshot(ws, (_b, db) => {
+    const src = (path: string): string => `json_extract(extra, '$.source.${path}')` // i18n-ignore: SQL
     const sql = `SELECT number AS n, ${src('number')} AS issue, archived FROM cards WHERE ${src('kind')} = 'issue' AND lower(${src('host')}) = lower(?) AND lower(${src('owner')}) = lower(?) AND lower(${src('repo')}) = lower(?)` // i18n-ignore: SQL
     return (db.prepare(sql).all(repo.host, repo.owner, repo.repo) as { n: number; issue: unknown; archived: number }[]).filter((r) => Number.isInteger(r.issue)).map((r) => ({ n: r.n, issue: r.issue as number, archived: !!r.archived }))
   })
@@ -1525,14 +1476,13 @@ export function hasCard(ws: WorkspaceService, n: number): boolean {
 }
 
 /**
- * Cards' 1.0 stages (#1223, SPEC §16.4.3), by number: the `stage` column, else (no 1.0 rule has moved the card, or the
- * board waits for its upgrade) the stage its column stands for. A card not on the board isn't in the map.
+ * Cards' 1.0 stages (#1223, SPEC §16.4.3), by number: the `stage` column, else (no 1.0 rule has moved the card) the
+ * stage its column stands for. A card not on the board isn't in the map.
  */
 export function cardStages(ws: WorkspaceService, numbers: number[]): Map<number, StageId> {
   if (!numbers.length) return new Map()
-  return readSnapshot(ws, (b, db) => {
-    const cols = b.legacy ? "NULL AS stage, doc ->> '$.column' AS col" : 'stage, col' // i18n-ignore: SQL
-    const rows = db.prepare(`SELECT number, ${cols} FROM cards WHERE number IN (SELECT value FROM json_each(?))`).all(JSON.stringify(numbers)) as { number: number; stage: StageId | null; col: Category }[] // i18n-ignore: SQL
+  return readSnapshot(ws, (_b, db) => {
+    const rows = db.prepare(`SELECT number, stage, col FROM cards WHERE number IN (SELECT value FROM json_each(?))`).all(JSON.stringify(numbers)) as { number: number; stage: StageId | null; col: Category }[] // i18n-ignore: SQL
     return new Map(rows.map((r) => [r.number, r.stage ?? CATEGORY_STAGE[r.col] ?? 'todo']))
   })
 }
@@ -1575,22 +1525,21 @@ export const searchMatch = (words: string): string => `{title description projec
  * The board's search through its full-text index (#1237, `card_search`): the cards whose title, description, project,
  * agent's name or labels contain `words` (searchedWords: lower case), as candidates the caller confirms with cardMatches.
  * Null when the index can't answer: words under three characters (it indexes trigrams), words it can't be trusted with
- * (foldsApart), or a board without it (0.9's, waiting for its upgrade).
+ * (foldsApart).
  */
 export function searchCards(ws: WorkspaceService, words: string): Set<number> | null {
   if ([...words].length < 3 || foldsApart(words) || words.endsWith('i')) return null
-  return readSnapshot(ws, (b, db) => {
-    if (b.legacy || b.db.pending) return null
+  return readSnapshot(ws, (_b, db) => {
     return new Set((db.prepare(QUERIES['board.search'].sql).all(searchMatch(words)) as { number: number }[]).map((r) => r.number))
   })
 }
 
 /** Cards' documents, by number, as the query asks; in number order. */
 export function cardDocs(ws: WorkspaceService, q: CardQuery = {}): { number: number; doc: Record<string, unknown> }[] {
-  return readSnapshot(ws, (b, db) => docsOf(b, db, q))
+  return readSnapshot(ws, (_b, db) => docsOf(db, q))
 }
 
-function docsOf(b: Board, db: Db['reader'], q: CardQuery): { number: number; doc: Record<string, unknown> }[] {
+function docsOf(db: Db['reader'], q: CardQuery): { number: number; doc: Record<string, unknown> }[] {
   const where: string[] = []
   const args: (number | string)[] = []
   if (q.archived !== undefined) where.push(`archived = ${q.archived ? 1 : 0}`)
@@ -1606,12 +1555,10 @@ function docsOf(b: Board, db: Db['reader'], q: CardQuery): { number: number; doc
   }
   if (q.reviewers) {
     if (!q.reviewers.length) return []
-    where.push(`${b.legacy ? "doc ->> '$.review.agent'" : 'review_agent'} IN (SELECT value FROM json_each(?))`) // i18n-ignore: SQL
+    where.push(`review_agent IN (SELECT value FROM json_each(?))`) // i18n-ignore: SQL
     args.push(JSON.stringify(q.reviewers))
   }
-  if (!b.legacy) return readCardRows(db, { where: where.join(' AND ') || undefined, args }).map((r) => ({ number: r.card.number, doc: composeCard(r) }))
-  const rows = db.prepare(`SELECT number, doc FROM cards${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY number`).all(...args) as { number: number; doc: string }[] // i18n-ignore: SQL
-  return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+  return readCardRows(db, { where: where.join(' AND ') || undefined, args }).map((r) => ({ number: r.card.number, doc: composeCard(r) }))
 }
 
 /** The `cards` columns each document field is read from (the lists are child tables: readCardRows' parts). */
@@ -1656,8 +1603,7 @@ const COST_FIELDS = ['title', 'project', 'projectId', 'column', 'archived', 'hel
  */
 export function costDocs(ws: WorkspaceService, numbers: number[]): { number: number; doc: Record<string, unknown> }[] {
   if (!numbers.length) return []
-  return readSnapshot(ws, (b, db) => {
-    if (b.legacy) return docsOf(b, db, { numbers }).map(({ number, doc }) => ({ number, doc: Object.fromEntries(COST_FIELDS.map((k) => [k, doc[k] ?? null])) }))
+  return readSnapshot(ws, (_b, db) => {
     return cardFields(db, COST_FIELDS, { numbers, parts: ['holds', 'history'] }).map(({ r, fields }) => ({ number: r.card.number, doc: fields }))
   })
 }
@@ -1671,21 +1617,18 @@ const SUMMARY = ['title', 'project', 'projectId', 'agent', 'agentName', 'column'
  * card's dialog read them in full.
  */
 export function archivedSummaryDocs(ws: WorkspaceService): { number: number; doc: Record<string, unknown> }[] {
-  return readSnapshot(ws, summariesOf)
+  return readSnapshot(ws, (_b, db) => summariesOf(db))
 }
 
-function summariesOf(b: Board, db: Db['reader']): { number: number; doc: Record<string, unknown> }[] {
-  if (!b.legacy) return cardFields(db, SUMMARY, { where: 'archived = 1', parts: ['labels'] }).map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, archived: true } }))
-  const field = (k: string): string => `'${k}', doc -> '$.${k}'`
-  const rows = db.prepare(`SELECT number, json_object(${SUMMARY.map(field).join(', ')}, 'archived', json('true')) AS doc FROM cards WHERE archived = 1 ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
-  return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+function summariesOf(db: Db['reader']): { number: number; doc: Record<string, unknown> }[] {
+  return cardFields(db, SUMMARY, { where: 'archived = 1', parts: ['labels'] }).map(({ r, fields }) => ({ number: r.card.number, doc: { ...fields, archived: true } }))
 }
 
 /** What a window's board read takes from one snapshot of the board (HI-1715, cardChanges). */
 export interface CardChanges {
   /** The board's opening it was read from (Board.generation). */
   generation: number
-  /** The board's mark in that snapshot; null on a board with no revisions (a 0.9 board waiting for its upgrade). */
+  /** The board's mark in that snapshot. */
   mark: number | null
   /** Every card's number. */
   numbers: number[]
@@ -1705,7 +1648,6 @@ export interface CardChanges {
 export function cardChanges(ws: WorkspaceService, since: number | null): CardChanges {
   return readSnapshot(ws, (b, db) => {
     const numbers = (db.prepare('SELECT number FROM cards ORDER BY number').all() as { number: number }[]).map((r) => r.number) // i18n-ignore: SQL
-    if (b.legacy) return { generation: b.generation, mark: null, numbers, keys: new Map(), live: docsOf(b, db, { archived: false }), summaries: summariesOf(b, db) }
     const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
     const changed = since === null ? '' : ' AND rev >= ?' // i18n-ignore: SQL
     const args = since === null ? [] : [since]
@@ -1726,12 +1668,10 @@ const DECISION_FIELDS = ['project', 'projectId', 'column', 'agent', 'agentName',
 /**
  * The live cards at revision `since` or above (every live card when null): their numbers, and DECISION_FIELDS of those
  * with decisions, with the board's mark and its opening, from one snapshot (HI-1789). Nothing else of any card is read:
- * no comments or description, and nothing of the cards unchanged (cardChanges reads every card's number and key). Null
- * on a board with no revisions (a 0.9 board waiting for its upgrade).
+ * no comments or description, and nothing of the cards unchanged (cardChanges reads every card's number and key).
  */
 export function decisionChanges(ws: WorkspaceService, since: number | null): { generation: number; mark: number; changed: number[]; docs: { number: number; doc: Record<string, unknown> }[] } | null {
   return readSnapshot(ws, (b, db) => {
-    if (b.legacy) return null
     const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
     // By the revision's index alone (archived picked here: a condition on it, or an ORDER BY, can make SQLite take
     // another index or scan every card), then the decided ones by number.
@@ -1764,9 +1704,7 @@ export function boardGeneration(ws: WorkspaceService): number {
 export function holdDocs(ws: WorkspaceService, o: { live?: boolean } = {}): { number: number; doc: Record<string, unknown> }[] {
   // One snapshot for both reads: the history read for the cards without holds sees the cards the first read saw.
   return readSnapshot(ws, (b, db) => {
-    if (!b.legacy) return holdRows(db, o.live ? { where: 'archived = 0' } : {})
-    const rows = db.prepare(`SELECT number, json_object('project', doc -> '$.project', 'projectId', doc -> '$.projectId', 'agent', doc -> '$.agent', 'agentName', doc -> '$.agentName', 'review', doc -> '$.review', 'held', doc -> '$.held', 'history', CASE WHEN json_type(doc, '$.held') = 'array' THEN NULL ELSE doc -> '$.history' END) AS doc FROM cards${o.live ? " WHERE coalesce(json_extract(doc, '$.archived'), 0) = 0" : ''} ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
-    return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+    return holdRows(db, o.live ? { where: 'archived = 0' } : {})
   })
 }
 
@@ -1781,12 +1719,10 @@ function holdRows(db: Db['reader'], sel: { where?: string; args?: number[] }): {
 /**
  * The holds (holdDocs) of the cards at revision `since` or above (every card's when null), with the board's mark, its
  * opening (Board.generation) and every card's number, from one snapshot (HI-1748: what the usage history keeps of the
- * board, read again only for the cards a change touched, as cardChanges does for a window). Null on a board with no
- * revisions (a 0.9 board waiting for its upgrade): holdDocs reads it whole.
+ * board, read again only for the cards a change touched, as cardChanges does for a window).
  */
 export function holdChanges(ws: WorkspaceService, since: number | null): { generation: number; mark: number; numbers: number[]; docs: { number: number; doc: Record<string, unknown> }[] } | null {
   return readSnapshot(ws, (b, db) => {
-    if (b.legacy) return null
     const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
     const numbers = (db.prepare('SELECT number FROM cards ORDER BY number').all() as { number: number }[]).map((r) => r.number) // i18n-ignore: SQL
     return { generation: b.generation, mark, numbers, docs: holdRows(db, since === null ? {} : { where: 'rev >= ?', args: [since] }) }
@@ -1797,12 +1733,11 @@ export function holdChanges(ws: WorkspaceService, since: number | null): { gener
  * These cards' revisions (CARD_REVS_STEP), the board's mark and its opening, from one snapshot; a card not on the board
  * has none. A write raises a card's revision only while it is below the mark (a card at the mark keeps it), so a card
  * read at the mark may change without its revision moving: only one read below the mark is known to be the card until
- * its revision moves. Null on a board with no revisions (a 0.9 board waiting for its upgrade). What a read kept per
+ * its revision moves. What a read kept per
  * card checks itself against (HI-1780).
  */
 export function cardRevs(ws: WorkspaceService, numbers: readonly number[]): { generation: number; mark: number; revs: Map<number, number> } | null {
   return readSnapshot(ws, (b, db) => {
-    if (b.legacy) return null
     const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
     const rows = numbers.length ? (db.prepare('SELECT number, rev FROM cards WHERE number IN (SELECT value FROM json_each(?))').all(JSON.stringify(numbers)) as { number: number; rev: number }[]) : [] // i18n-ignore: SQL
     return { generation: b.generation, mark, revs: new Map(rows.map((r) => [r.number, r.rev])) }
@@ -1819,9 +1754,7 @@ export function cardPlaces(ws: WorkspaceService, live?: { column: string; known:
   const args = live ? [live.column, JSON.stringify(live.known)] : []
   return readSnapshot(ws, (b, db) => {
     // Order and archived as the 0.9 index gave them (cardRows.ts): its order a number where the document's was one in another form.
-    if (!b.legacy) return cardFields(db, ['column', 'order', 'project', 'projectId'], { where, args, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, raw: { column: fields.column, order: r.card.ord, archived: r.card.archived === 1, project: fields.project, projectId: fields.projectId } }))
-    const rows = db.prepare(`SELECT number, col, ord, archived, project, project_id FROM cards${where ? ` WHERE ${where}` : ''}`).all(...args) as { number: number; col: unknown; ord: unknown; archived: number; project: unknown; project_id: unknown }[] // i18n-ignore: SQL
-    return rows.map((r) => ({ number: r.number, raw: { column: r.col, order: r.ord, archived: r.archived === 1, project: r.project, projectId: r.project_id } }))
+    return cardFields(db, ['column', 'order', 'project', 'projectId'], { where, args, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, raw: { column: fields.column, order: r.card.ord, archived: r.card.archived === 1, project: fields.project, projectId: fields.projectId } }))
   })
 }
 
@@ -1836,22 +1769,17 @@ const HEAD_FIELDS = ['title', 'project', 'projectId', 'column', 'order', 'archiv
 export function cardHeadDocs(ws: WorkspaceService, o: { done?: boolean } = {}): { number: number; doc: Record<string, unknown> }[] {
   const where = o.done ? "col = 'done' AND archived = 0" : 'archived = 0' // i18n-ignore: SQL
   return readSnapshot(ws, (b, db) => {
-    if (!b.legacy) return cardFields(db, HEAD_FIELDS, { where, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, doc: fields }))
-    const field = (k: string): string => `'${k}', doc -> '$.${k}'`
-    const rows = db.prepare(`SELECT number, json_object(${HEAD_FIELDS.map(field).join(', ')}) AS doc FROM cards WHERE ${where} ORDER BY number`).all() as { number: number; doc: string }[] // i18n-ignore: SQL
-    return rows.map((r) => ({ number: r.number, doc: JSON.parse(r.doc) as Record<string, unknown> }))
+    return cardFields(db, HEAD_FIELDS, { where, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, doc: fields }))
   })
 }
 
 /**
  * The heads (cardHeadDocs) of the live cards at revision `since` or above (every live card's when null), with every live
  * card's number, the board's mark and its opening, from one snapshot (HI-1909: the readers of each board change, read
- * again only for the cards it touched, as holdChanges does for the usage history). Null on a board with no revisions (a
- * 0.9 board waiting for its upgrade): cardHeadDocs reads it whole.
+ * again only for the cards it touched, as holdChanges does for the usage history).
  */
 export function headChanges(ws: WorkspaceService, since: number | null): { generation: number; mark: number; live: number[]; docs: { number: number; doc: Record<string, unknown> }[] } | null {
   return readSnapshot(ws, (b, db) => {
-    if (b.legacy) return null
     const mark = (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g // i18n-ignore: SQL
     const live = (db.prepare('SELECT number FROM cards WHERE archived = 0 ORDER BY number').all() as { number: number }[]).map((r) => r.number) // i18n-ignore: SQL
     // The changed ones' numbers by the revision's index alone, then those cards by number (a condition on archived, or
@@ -1870,9 +1798,7 @@ export function headChanges(ws: WorkspaceService, since: number | null): { gener
 export function cardHeads(ws: WorkspaceService, numbers: number[]): { number: number; project: unknown; column: unknown; agent: unknown }[] {
   if (!numbers.length) return []
   return readSnapshot(ws, (b, db) => {
-    if (!b.legacy) return cardFields(db, ['project', 'column', 'agent'], { numbers, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, project: fields.project, column: fields.column, agent: fields.agent }))
-    const rows = db.prepare("SELECT number, doc ->> '$.project' AS project, doc ->> '$.column' AS col, doc ->> '$.agent' AS agent FROM cards WHERE number IN (SELECT value FROM json_each(?))").all(JSON.stringify(numbers)) as { number: number; project: unknown; col: unknown; agent: unknown }[] // i18n-ignore: SQL
-    return rows.map((r) => ({ number: r.number, project: r.project, column: r.col, agent: r.agent }))
+    return cardFields(db, ['project', 'column', 'agent'], { numbers, parts: [] }).map(({ r, fields }) => ({ number: r.card.number, project: fields.project, column: fields.column, agent: fields.agent }))
   })
 }
 
@@ -1911,24 +1837,24 @@ export function archiveComments(ws: WorkspaceService, n: number, evicted: readon
 
 /**
  * What a card's archive holds: how many comments, and whether it may have lost older ones before archiving existed
- * (it held 500 when the board took the archive's step). Nothing on a board waiting for its 1.0 upgrade.
+ * (it held 500 when the board took the archive's step).
  */
 export function commentArchiveOf(ws: WorkspaceService, n: number): { archived: number; mayHaveBeenLost: boolean } {
-  return readSnapshot(ws, (b, db) => (b.legacy || b.db.pending ? { archived: 0, mayHaveBeenLost: false } : { archived: archivedCommentCount(db, n), mayHaveBeenLost: mayHaveLostCards(db).has(n) }))
+  return readSnapshot(ws, (b, db) => ({ archived: archivedCommentCount(db, n), mayHaveBeenLost: mayHaveLostCards(db).has(n) }))
 }
 
 /** A page of a card's archived comments, oldest first, with how many it has in all. */
 export function archivedComments(ws: WorkspaceService, n: number, offset: number, limit: number): { total: number; comments: unknown[] } {
-  return readSnapshot(ws, (b, db) => (b.legacy || b.db.pending ? { total: 0, comments: [] } : { total: archivedCommentCount(db, n), comments: archivedCommentRows(db, n, offset, limit) }))
+  return readSnapshot(ws, (b, db) => ({ total: archivedCommentCount(db, n), comments: archivedCommentRows(db, n, offset, limit) }))
 }
 
 // ---------------------------------------------------------------------------
 // Project keys (#1219, #704): the queries are keysStep.ts's; these run them on the board's connections.
 // ---------------------------------------------------------------------------
 
-/** Each card's key (`HI-12`), by number: these cards, or all (none for one with no key: a workspace card, a 0.9 board). */
+/** Each card's key (`HI-12`), by number: these cards, or all (none for one with no key: a workspace card). */
 export function cardKeys(ws: WorkspaceService, numbers?: readonly number[]): Map<number, string> {
-  return readSnapshot(ws, (b, db) => (b.legacy ? new Map() : keysOfCards(db, numbers)))
+  return readSnapshot(ws, (_b, db) => keysOfCards(db, numbers))
 }
 
 /**
@@ -1936,8 +1862,7 @@ export function cardKeys(ws: WorkspaceService, numbers?: readonly number[]): Map
  * projectNow), or null when it has no key.
  */
 export function cardKeyOf(ws: WorkspaceService, n: number): { key: string; project: string; projectId: string | null } | null {
-  return readSnapshot(ws, (b, db) => {
-    if (b.legacy) return null
+  return readSnapshot(ws, (_b, db) => {
     const key = keysOfCards(db, [n]).get(n)
     const r = key ? (db.prepare('SELECT project, project_id FROM cards WHERE number = ?').get(n) as { project: string; project_id: string | null } | undefined) : undefined // i18n-ignore: SQL
     return key && r ? { key, project: r.project, projectId: r.project_id } : null
@@ -1946,17 +1871,17 @@ export function cardKeyOf(ws: WorkspaceService, n: number): { key: string; proje
 
 /** The names moved cards keep in the projects they left (`HI-1` → card), for the window (#1221). */
 export function movedNames(ws: WorkspaceService): Record<string, number> {
-  return readSnapshot(ws, (b, db) => (b.legacy ? {} : movedCardNames(db)))
+  return readSnapshot(ws, (_b, db) => movedCardNames(db))
 }
 
 /** The card a key names (`HI-12`, any case, an old key or a card's old number in another project too), or null. */
 export function cardNamed(ws: WorkspaceService, key: string, number: number): number | null {
-  return readSnapshot(ws, (b, db) => (b.legacy ? null : cardOfKey(db, key, number)))
+  return readSnapshot(ws, (_b, db) => cardOfKey(db, key, number))
 }
 
 /** Every key the projects hold: current and old (aliases), each with its project's id. */
 export function projectKeys(ws: WorkspaceService): { key: string; projectId: string; current: boolean }[] {
-  return readSnapshot(ws, (b, db) => (b.legacy ? [] : keysHeld(db)))
+  return readSnapshot(ws, (_b, db) => keysHeld(db))
 }
 
 /** Gives projects that have none their key (inside boardWrite): `pick` chooses each from the keys held so far. */
@@ -1998,8 +1923,8 @@ export function setProjectKey(ws: WorkspaceService, projectId: string, key: stri
 
 /** Whether the window still has to say that projects have keys now (once, after the upgrade gave them), and saying it. */
 export function keysNoticeDue(ws: WorkspaceService): boolean {
-  const { b, db } = readConn(ws)
-  return !b.legacy && meta(db, 'keys.notice') === 'due'
+  const { db } = readConn(ws)
+  return meta(db, 'keys.notice') === 'due'
 }
 export function keysNoticeSaid(ws: WorkspaceService): void {
   writeOp(ws, (b) => setMeta(b.db.writer, 'keys.notice', 'said'))
@@ -2106,41 +2031,53 @@ export const inBoardWrite = (workspacePath: string): boolean => inWrite(keyOf(wo
 /** The board's file (for the log, diagnostics and tests). */
 export const boardFile = (workspacePath: string): string => join(workspacePath, CW_DIR, DB_FILE)
 
-/** Whether the board is shown read-only: saved by a newer Combwork, or waiting for its upgrade to 1.0. */
+/** Whether the board is shown read-only: saved by a newer Combwork. */
 export const boardReadOnly = (ws: WorkspaceService): boolean => (ws.path ? !writable(boardOf(ws.path).db) : false)
 
 // ---------------------------------------------------------------------------
-// The 1.0 upgrade (#1207, SPEC §16.17): asked first, the file locked to this Combwork, the 0.9 copy kept (HI-3601: no way back).
+// The board's version (#1207, SPEC §16.17): a 1.0 board takes the 1.0 group's later steps as it opens; a 0.9 board,
+// from before the group, is refused (HI-3602: the upgrade from 0.9 is gone).
 // ---------------------------------------------------------------------------
 
 /** The board's state for the window: why it is read-only. */
 export function boardState(ws: WorkspaceService): BoardState {
   const b = boardOf(pathOf(ws))
-  return { readOnly: b.db.newer !== null ? 'newer' : b.db.pending ? 'upgrade' : null }
+  return { readOnly: b.db.newer !== null ? 'newer' : null }
 }
 
-/** The 1.0 group's first version: a copy of the file before it is a 0.9 board. */
+/** The 1.0 group's first version: a board with tables below it is 0.9's (HI-3602: refused, never opened for writing). */
 const FIRST_10 = Math.min(...BOARD_MIGRATIONS.filter((m) => m.group === UPGRADE_GROUP_ID).map((m) => m.version))
 
+/** Whether a board's file is a 0.9 board (HI-3602), read without making or changing anything beside it (fileFormat). */
+export function isBoardFrom09(file: string): boolean {
+  const f = fileFormat(file, FIRST_10)
+  return f.tables && f.version > 0 && f.version < FIRST_10
+}
+
 /**
- * The newest copy kept from before the board's upgrade to 1.0: of the group's family, and of a version before the group
- * (by its name). A copy made before a later step of the group is a 1.0 board's, and
- * db.ts keeps those with the ordinary copies anyway.
+ * Whether a workspace folder's board is a 0.9 board (HI-3602), wherever one can be: 0.9's own folder and file, or one a
+ * 1.x build moved (the folder move, HI-2462, and the names upgrade, HI-2587) while its upgrade waited. Read before
+ * anything of the workspace is moved or opened; throws FormatUnknownError when a board's version can't be told.
  */
-const copy09 = (path: string): { file: string; version: number; at: string } | undefined =>
-  backupsOf(join(path, CW_DIR, BACKUPS), groupBackupFamily(FAMILY, UPGRADE_GROUP_ID))
-    .filter((c) => c.version < FIRST_10)
-    .at(-1)
+export function workspaceFrom09(workspacePath: string): boolean {
+  const files = [
+    join(workspacePath, LEGACY_HIVE_DIR, 'hive.db'), // old-name: 0.9's folder and board file, read to refuse them
+    join(workspacePath, CW_DIR, 'hive.db'), // old-name: 0.9's board file in a folder 1.1 moved
+    join(workspacePath, CW_DIR, DB_FILE)
+  ]
+  return files.some((f) => isBoardFrom09(f))
+}
 
 /**
  * The workspace database's generation (#1207 round 2): a number that changes each time its file is replaced under the
- * services (the upgrade to 1.0), whose caches were read from the file before. What a service read in an older generation
- * is stale: it reads again, and a save made from it is refused (`saveStore`'s guard), so nothing written meanwhile (by a 0.9 build while the upgrade waited) is overwritten from an old snapshot.
+ * services, whose caches were read from the file before. What a service read in an older generation is stale: it reads
+ * again, and a save made from it is refused (`saveStore`'s guard). Nothing replaces the file since HI-3601 and HI-3602
+ * (the 0.9 restore and the upgrade from 0.9 are gone), so it stays 0; the guards stay until a follow-up removes them.
  */
 /** By the workspace's place (#1395: a store loaded through another spelling of its folder is the same database's). */
 const generations = new Map<string, number>()
 /**
- * The generation of a workspace's database by a path entering now: its open board's place, as `replaced` counts it
+ * The generation of a workspace's database by a path entering now: its open board's place, as `replaced` counted it
  * (HI-1797: resolving the path on each call cost a realpath on main's thread, read on every lanes refresh), else the
  * place resolved here.
  */
@@ -2156,119 +2093,6 @@ const replacedListeners = new Set<(workspacePath: string, place: string) => void
 export function onDbReplaced(fn: (workspacePath: string, place: string) => void): void {
   replacedListeners.add(fn)
 }
-function replaced(path: string): void {
-  const place = boards.get(keyOf(path))?.place ?? placeKey(path)
-  generations.set(place, dbGenerationAt(place) + 1)
-  for (const fn of replacedListeners) {
-    try {
-      fn(path, place)
-    } catch (e) {
-      log.warn('a service following the replaced workspace database', e)
-    }
-  }
-}
-
-/**
- * Whether a workspace's data waits for its upgrade to 1.0 (the user said Not Now): combwork.db then takes no writes, so
- * nothing that must be recorded may start (an agent's session, #1207 round 1). False when the board can't be opened at
- * all: that is told where it is used. Throws the refusal for a workspace no window holds (#1395).
- */
-export function upgradeWaiting(workspacePath: string): boolean {
-  try {
-    return !!boardOf(workspacePath).db.pending
-  } catch (e) {
-    // A workspace no window holds (#1395) is refused, never taken for one with nothing pending.
-    if (isRefusal(e)) throw e
-    return false
-  }
-}
-
-/**
- * Whether a workspace's board waits for its upgrade to 1.0 (HI-1694): its tables are still 0.9's and it takes no writes,
- * so background work for the workspace (the line updater, metrics, the opening's board steps) waits for it too, and runs
- * once it is upgraded. False for a workspace no window holds (its work stops on that anyway) or with no board.
- */
-export function boardWaits(ws: WorkspaceService): boolean {
-  if (!ws.path) return false
-  try {
-    return upgradeWaiting(ws.path)
-  } catch {
-    return false
-  }
-}
-
-/** Throws the user's reason when the workspace's upgrade to 1.0 waits: for what can't run without combwork.db (an agent's start). */
-export function assertUpgraded(workspacePath: string): void {
-  if (upgradeWaiting(workspacePath)) throw combworkError(M.upgradeFirstStart, undefined, { kind: 'conflict' })
-}
-
-/** The user's errors for another Combwork on the file (SQLite's lock or a fresh presence marker). */
-const inUse = (e: unknown): boolean => e instanceof DbInUseError || e instanceof OtherCombworkError
-
-const upgradedListeners = new Set<(ws: WorkspaceService) => void>()
-/**
- * Called once a workspace's board was upgraded (#1621), after its lock is let go: what a service skipped as the
- * workspace opened, its board then read-only (the merge queues, the repairs that write), it runs now, without a restart.
- * Returns the unsubscribe.
- */
-export function onBoardUpgraded(fn: (ws: WorkspaceService) => void): () => void {
-  upgradedListeners.add(fn)
-  return () => upgradedListeners.delete(fn)
-}
-
-/**
- * Upgrades the board to 1.0, the user having said yes: under the board's lock (no change of it under way), the board
- * closed and opened again with the 1.0 group approved, which db.ts runs with the file locked to this Combwork, after a copy
- * kept for good, in one transaction. Another Combwork with the workspace open: refused, nothing changed, and the board opens
- * read-only again. Replies with the kept copy's file.
- */
-export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: string | null }> {
-  const path = pathOf(ws)
-  const key = keyOf(path)
-  const started = performance.now()
-  let upgraded = false
-  // Counted as a write (HI-1368): a close command waits for it.
-  const out = await countedWrite(path, () => withFileLock(boardLock(path), async () => {
-    const pending = boardOf(path).db.pending
-    if (!pending) return { backup: null }
-    const from09 = pending.from < FIRST_10
-    // The group runs with the file locked to one connection: the checkpoints' worker lets go of it first (HI-1691, its
-    // kept connection too: HI-3414), awaited before the close, so nothing opens it again between the close and the upgrade's open.
-    await checkpointsLetGo(join(path, CW_DIR, DB_FILE))
-    // Opened for keeps: only while a window holds it (#1395), checked after that wait, nothing awaited since.
-    assertAdmitted(join(path, CW_DIR, DB_FILE))
-    closeBoard(path)
-    try {
-      openBoard(path, true)
-    } catch (e) {
-      // Opened again as it was (read-only, its upgrade waiting); a failure there is the board's to tell.
-      failures.delete(key)
-      if (inUse(e)) {
-        log.info(`the board of ${userText(path)} wasn't upgraded: another Combwork has it open`)
-        boardOf(path)
-        throw combworkError(M.inUse, undefined, { kind: 'conflict' })
-      }
-      log.error(`upgrading the board of ${userText(path)}`, e)
-      boardOf(path)
-      throw combworkError(M.unavailable, { error: e instanceof Error ? e.message : String(e) }, { kind: 'conflict' })
-    }
-    // A 0.9 board's copy is the one kept for good; a 1.0 board taking a later step of the group gets an ordinary one.
-    const kept = from09 ? copy09(path) : undefined
-    log.info(`upgraded the board of ${userText(path)} to 1.0 (from v${pending.from}) in ${Math.round(performance.now() - started)} ms; ${kept ? `the 0.9 board is kept as ${basename(kept.file)}` : 'it was a 1.0 board already'}`)
-    replaced(path)
-    upgraded = true
-    return { backup: kept?.file ?? null }
-  }))
-  emit({ type: 'tasks-changed', workspacePath: path })
-  if (upgraded) for (const fn of upgradedListeners) {
-    try {
-      fn(ws)
-    } catch (e) {
-      log.warn('a service following the upgraded board', e)
-    }
-  }
-  return out
-}
 
 /**
  * Exports the board to plain files (Export Board to JSON): a folder with `<n>.json` for each card, exactly as the cards'
@@ -2277,7 +2101,7 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
 export async function exportBoard(ws: WorkspaceService, dir: string, mask: <T>(v: T) => T = (v) => v): Promise<number> {
   // Its cards, next number and batches as one snapshot of the board.
   // Its cards' archived comments too (HI-2641), in the same snapshot: `<n>.comments-archive.json` beside a card with some.
-  const { docs, next, batches, archives } = readSnapshot(ws, (b, db) => ({ docs: cardDocs(ws), next: nextOf(db), batches: archiveBatchDocs(ws), archives: b.legacy || b.db.pending ? new Map<number, unknown[]>() : allArchivedComments(db) }))
+  const { docs, next, batches, archives } = readSnapshot(ws, (_b, db) => ({ docs: cardDocs(ws), next: nextOf(db), batches: archiveBatchDocs(ws), archives: allArchivedComments(db) }))
   await mkdir(dir, { recursive: true })
   // `mask`: each value masked before it is written (HI-1772: no server connection's key in an export).
   for (const { number, doc } of docs) await writeFile(join(dir, `${number}.json`), JSON.stringify(mask(doc), null, 2) + '\n', 'utf8')

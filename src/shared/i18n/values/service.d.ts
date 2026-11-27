@@ -477,8 +477,6 @@ interface CombworkMessageValues {
   'service.targetChanges.setAside': undefined
   'service.targetChanges.show': undefined
   'service.targetChanges.title': { target: string | number }
-  'service.templates.v09': { n: number }
-  'service.templates.v09Title': undefined
   'service.transcripts.busy': undefined
   'service.transcripts.exported': { session: string | number; date: string | number }
   'service.transcripts.imageNotKept': undefined
@@ -508,6 +506,8 @@ interface CombworkMessageValues {
   'service.workspace.closed': undefined
   'service.workspace.connectionGone': { agent: string | number }
   'service.workspace.folderExists': { name: string | number }
+  'service.workspace.formatUnknown': { error: string | number }
+  'service.workspace.from09': undefined
   'service.workspace.holdsOpen': { workspace: string | number; folder: string | number; name: string | number }
   'service.workspace.insideOpen': { folder: string | number; workspace: string | number }
   'service.workspace.nameIn': { name: string | number; projects: string | number }

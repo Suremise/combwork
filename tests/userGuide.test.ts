@@ -7,7 +7,6 @@ import { describe, expect, it } from 'vitest'
 import { docOutline, headingId } from '../src/shared/docSections'
 import { TIPS } from '../src/shared/tips'
 import { SETTINGS_CATALOG } from '../src/shared/settingsCatalog'
-import { BOARD_UPGRADE_GUIDE } from '../src/shared/userGuide'
 import { GIT_VIEW_GUIDE } from '../src/shared/gitRepo'
 import { GIT_GUIDE } from '../src/shared/gitTool'
 import { CW_FOLDER_GUIDE } from '../src/shared/combworkVcsText'
@@ -20,7 +19,7 @@ const guide = readFileSync(join(root, 'docs', 'USER_GUIDE.md'), 'utf8')
 const ids = (md: string): Set<string> => new Set(docOutline(md).filter((h) => h.fixed).map((h) => h.slug))
 
 /** The window's links that aren't tips or settings, by the constant `openGuideAt` is called with. */
-const CONSTANTS: Record<string, string> = { BOARD_UPGRADE_GUIDE, GIT_VIEW_GUIDE, GIT_GUIDE, CW_FOLDER_GUIDE, UNUSED_WORKTREES_GUIDE, MANAGED_POLICY_GUIDE }
+const CONSTANTS: Record<string, string> = { GIT_VIEW_GUIDE, GIT_GUIDE, CW_FOLDER_GUIDE, UNUSED_WORKTREES_GUIDE, MANAGED_POLICY_GUIDE }
 
 /** Every link the app makes into the guide, each with where it comes from. */
 const appLinks = (): [string, string][] => [

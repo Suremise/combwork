@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Removed
+
+- **Upgrading a 0.9 workspace to 1.0** (HI-3602). Every user is on 1.6.0 or later, so the upgrade's question, its read-only board and banner, and the copy of 0.9's agent templates it made are gone. A workspace whose board Combwork 0.9 saved now gets one plain refusal as you open it: *This workspace is from Combwork 0.9, which this version can't open.* Nothing in its folder is changed or moved. Workspaces made or upgraded by 1.0 or later open as before. The backups the upgrade kept in `.combwork/backups` stay where they are.
+
 ## 1.7.1 — 2026-11-26
 
 ### Removed

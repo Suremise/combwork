@@ -1,6 +1,6 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
-import { boardLock, boardOpen, boardWriteOp, dbGenerationAt, inBoardWrite, leaseDb, noteLanesSaved, onDbReplaced, upgradeWaiting, workspaceDb, type DbLease } from './boardStore'
+import { boardLock, boardOpen, boardWriteOp, dbGenerationAt, inBoardWrite, leaseDb, noteLanesSaved, onDbReplaced, workspaceDb, type DbLease } from './boardStore'
 import type { WorkspaceService } from './workspace'
 import { countedWrite } from './dbWrites'
 import { transaction } from './db'
@@ -17,9 +17,6 @@ const log = createLogger('stores')
  * the board's own transactions on their shared connection), that rewrites only the entries that changed and removes
  * those gone. A store's values (`imported`, metrics' `observed`, watches' `invalid`) are in `board_meta` as
  * `<store>.<key>`.
- *
- * While a workspace's upgrade to 1.0 waits (#1207), its file still has 0.9's `store_rows`: the stores read them from
- * there, and nothing is written (the file is read-only).
  */
 
 export interface TableData {
@@ -63,7 +60,7 @@ export const committedFor = (): string[] => [...new Set([...committed.values()].
 
 const hasTable = (db: ReturnType<typeof workspaceDb>['reader'], name: string): boolean => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) // i18n-ignore: SQL
 
-/** A store's entries and values as last committed: its tables, or 0.9's `store_rows` while its upgrade waits. */
+/** A store's entries and values as last committed, from its tables. */
 export function readTable(workspacePath: string, store: TableStore): TableData {
   if (tableTestHooks.failRead?.(store)) throw new Error(`SQLITE_IOERR: disk I/O error (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
   return readTableIn(workspaceDb(resolve(workspacePath)).reader, store)
@@ -72,24 +69,9 @@ export function readTable(workspacePath: string, store: TableStore): TableData {
 /** readTable on the connection given (a lease's: a look at a workspace no window holds, #1395). */
 export function readTableIn(db: ReturnType<typeof workspaceDb>['reader'], store: TableStore): TableData {
   const def = TABLE_DEFS[store]
-  if (!hasTable(db, def.main)) return readOld(db, store)
+  // A board saved by a newer Combwork may have moved a store's table: nothing read of it then.
+  if (!hasTable(db, def.main)) return { docs: [], meta: new Map() }
   return { docs: readEntries(db, store).map((e) => e.doc), meta: readMeta(db, store) }
-}
-
-/** 0.9's rows for a store (a file waiting for its upgrade to 1.0), read only. */
-function readOld(db: ReturnType<typeof workspaceDb>['reader'], store: TableStore): TableData {
-  if (!hasTable(db, 'store_rows')) return { docs: [], meta: new Map() }
-  const rows = db.prepare("SELECT doc FROM store_rows WHERE store = ? AND scope = '' ORDER BY ord, key").all(store) as { doc: string }[] // i18n-ignore: SQL
-  const meta = db.prepare("SELECT key, value FROM store_meta WHERE store = ? AND scope = ''").all(store) as { key: string; value: string }[] // i18n-ignore: SQL
-  const docs: unknown[] = []
-  for (const r of rows) {
-    try {
-      docs.push(JSON.parse(r.doc))
-    } catch {
-      // not JSON: the upgrade keeps it aside
-    }
-  }
-  return { docs, meta: new Map(meta.map((m) => [m.key, m.value])) }
 }
 
 /**
@@ -244,12 +226,10 @@ function deleteByKey(db: ReturnType<typeof workspaceDb>['writer'], store: TableS
  * the file as the store always has and gives its entries, null only when there is no file; one that can't be read now
  * throws, and nothing is marked, so the next open tries again. They go into the tables in one transaction with the mark
  * that they did (`<store>.imported`), and the file is renamed `<file>.imported-<time>`, kept as a backup. A file found
- * after that (a rename refused before, or one an older version wrote since) is renamed the same way, unread. While the
- * upgrade to 1.0 waits, nothing is moved: the store reads what the file has (`store_rows`).
+ * after that (a rename refused before, or one an older version wrote since) is renamed the same way, unread.
  */
 export async function openTable(workspacePath: string, store: TableStore, file: string, readFile: () => Promise<{ docs: unknown[]; meta?: Record<string, string> } | null>): Promise<TableData> {
   const path = resolve(workspacePath)
-  if (upgradeWaiting(path)) return readTable(path, store)
   const moved = (): boolean => hasTable(workspaceDb(path).reader, TABLE_DEFS[store].main) && readMeta(workspaceDb(path).reader, store).has('imported')
   const first = !moved()
   if (first) {

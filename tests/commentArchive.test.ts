@@ -8,7 +8,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { as09, editCard } from './boardDb'
+import { editCard } from './boardDb'
 
 const base = tempDir('cw-comment-archive-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -286,7 +286,7 @@ describe("the archive's board step", () => {
     }
   }
 
-  it('an upgraded board takes it unasked; only a card that held the cap may have lost comments, and none is counted', async () => {
+  it('a 1.x board from before the step takes it unasked; only a card that held the cap may have lost comments, and none is counted', async () => {
     const ws = newWorkspace()
     let w = await open(ws)
     const atCap = await cardWith(w, comments(KEPT))
@@ -306,20 +306,5 @@ describe("the archive's board step", () => {
     // Archiving from now on: the flag stays (what was lost before stays unknown), the count is what was archived.
     await inWorkspace(w, () => tasks.commentTask(atCap, 'more', user))
     expect(of(atCap)).toEqual({ archived: 1, mayHaveBeenLost: true })
-  })
-
-  it('a 0.9 board waiting for its upgrade takes it only with the upgrade', async () => {
-    const ws = newWorkspace()
-    let w = await open(ws)
-    const atCap = await cardWith(w, comments(KEPT))
-    await close(w)
-    as09(store.boardFile(ws))
-    w = await open(ws)
-    expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBe('upgrade')
-    expect(tables(ws)).not.toContain('card_comments_archive')
-    expect(inWorkspace(w, () => tasks.commentArchive(atCap))).toEqual({ archived: 0, mayHaveBeenLost: false })
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    expect(tables(ws)).toContain('card_comments_archive')
-    expect(inWorkspace(w, () => tasks.commentArchive(atCap))).toEqual({ archived: 0, mayHaveBeenLost: true })
   })
 })

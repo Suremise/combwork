@@ -1368,12 +1368,9 @@ export interface TaskCard {
  * A bulk archive by the user (#351): Archive All in a column, or Archive All Cards. Kept so the batch can be brought back
  * later (Undo, "Unarchive this batch"), each card where it was.
  */
-/**
- * The board's state for the window (#1207): why it is read-only (saved by a newer Combwork, or waiting for its upgrade to 1.0,
- * which the user is asked for).
- */
+/** The board's state for the window (#1207): why it is read-only (saved by a newer Combwork). */
 export interface BoardState {
-  readOnly: 'newer' | 'upgrade' | null
+  readOnly: 'newer' | null
 }
 
 export interface ArchiveBatch {
@@ -4308,15 +4305,13 @@ export interface ViewerToken {
 
 /**
  * Where a window's workspace is in opening it (HI-1694), for the steady view the window shows meanwhile: reading its
- * projects, and after the user said yes to its upgrade to 1.0, the upgrade (the 0.9 board kept as a backup), the cards'
- * and projects' adoption, and the agents' worktrees adopted as slots. Its bundled skills and modes are brought up to date
- * after the open, not in it (HI-1705).
+ * projects. Its bundled skills and modes are brought up to date after the open, not in it (HI-1705).
  */
 export interface OpenProgress {
   /** The workspace's folder, and its name as shown. */
   path: string
   name: string
-  step: 'projects' | 'upgrade' | 'adoption' | 'slots'
+  step: 'projects'
 }
 
 /** Events pushed from main to renderer. */

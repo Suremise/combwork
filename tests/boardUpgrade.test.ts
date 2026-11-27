@@ -1,43 +1,23 @@
-// The 1.0 upgrade's run (#1207, SPEC §16.17): a group of schema steps run as one (asked first, the file locked to one
-// connection, a copy kept for good, one transaction), and the board's side of it: read-only until the user says yes,
-// refused while another Combwork has the workspace open (SQLite's lock, or a fresh presence marker), and the 0.9 copy
-// kept (HI-3601: nothing puts it back).
-import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs'
-import { join } from 'path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+// The 1.0 group's steps (#1207, SPEC §16.17) as a 1.x board takes them: a group of schema steps run as one (the file
+// locked to one connection, an ordinary copy, one transaction), refused while another Combwork has the file open. And
+// a board from before the group, 0.9's, refused before anything opens it for writing (HI-3602: the upgrade from 0.9 is
+// gone), its version read without making or changing anything beside it (fileFormat), the WAL counted.
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import { createHash } from 'crypto'
+import { join, relative } from 'path'
+import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
-import { junction } from './pathAliases'
-import { as09 } from './boardDb'
 import { timing } from './timing.cjs'
-
-// The checkpoints' worker letting go of a file (HI-1691), held by a test: `gate` set, checkpointsLetGo waits for it,
-// telling `reached` as it starts to.
-const held = vi.hoisted(() => ({ gate: null as Promise<void> | null, reached: null as (() => void) | null }))
-vi.mock('../src/main/walCheckpoint', async (original) => {
-  const real = await original<typeof import('../src/main/walCheckpoint')>()
-  return {
-    ...real,
-    checkpointsLetGo: (file: string) => {
-      held.reached?.()
-      return held.gate ?? real.checkpointsLetGo(file)
-    }
-  }
-})
 
 const base = tempDir('cw-board-upgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
-const { sessions } = await import('../src/main/sessions')
-const storeRows = await import('../src/main/storeRows')
+const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
-const { keyProjects } = await import('../src/main/projectKeys')
-const { changeGroups } = await import('../src/main/assistantChanges')
-const { queueViews } = await import('../src/main/workflow/queueControls')
-const { BACKUPS_KEPT, DbInUseError, fileSchemaVersion, openDb, schemaVersion } = await import('../src/main/db')
+const { DbInUseError, FormatUnknownError, TooOldError, fileFormat, fileSchemaVersion, formatTestHooks, openDb, schemaVersion, BACKUPS_KEPT } = await import('../src/main/db')
 const { PRESENCE_DIR, STALE_MS } = await import('../src/main/presence')
 
 type Step = { version: number; name: string; group?: string; up: (d: DatabaseSync) => void }
@@ -50,23 +30,14 @@ afterAll(async () => {
   store.closeAllBoards()
 })
 afterEach(() => {
-  store.boardTestHooks.upgradeAnswer = null
   store.boardTestHooks.whileUpgrading = null
-  held.gate = null
-  held.reached = null
+  formatTestHooks.copy = undefined
 })
 
-/** Holds checkpointsLetGo (HI-1691, HI-3414): resolves once the code under test waits there; `release` lets it go on. */
-function holdRelease(): { waiting: Promise<void>; release: () => void } {
-  let release = (): void => undefined
-  held.gate = new Promise<void>((r) => (release = r))
-  const waiting = new Promise<void>((r) => (held.reached = r))
-  return { waiting, release }
-}
-
-const fileIn = (): { file: string; backups: string } => {
+const fileIn = (): { dir: string; file: string; backups: string } => {
   const dir = join(base, `db-${++n}`)
-  return { file: join(dir, 'x.db'), backups: join(dir, 'backups') }
+  mkdirSync(dir, { recursive: true })
+  return { dir, file: join(dir, 'x.db'), backups: join(dir, 'backups') }
 }
 const tables = (file: string): string[] => {
   const db = new DatabaseSync(file, { readOnly: true })
@@ -76,6 +47,22 @@ const tables = (file: string): string[] => {
     db.close()
   }
 }
+/** Every file under `dir`, by its path there, with its size and its bytes' hash: what "nothing changed" compares. */
+function snapshot(dir: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  const walk = (d: string): void => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name)
+      if (e.isDirectory()) {
+        out[`${relative(dir, p)}/`] = 'dir'
+        walk(p)
+      } else out[relative(dir, p)] = `${statSync(p).size}:${createHash('sha256').update(readFileSync(p)).digest('hex')}`
+    }
+  }
+  walk(dir)
+  return out
+}
+
 const plain: Step[] = [
   { version: 1, name: 'one', up: (d) => d.exec('CREATE TABLE a (x); INSERT INTO a VALUES (1)') },
   { version: 2, name: 'two', up: (d) => d.exec('CREATE TABLE b (y)') }
@@ -84,54 +71,57 @@ const group = (third: (d: DatabaseSync) => void = (d) => d.exec('CREATE TABLE d 
   { version: 3, name: 'three', group: '1.0', up: (d) => d.exec('CREATE TABLE c (z)') },
   { version: 4, name: 'four', group: '1.0', up: third }
 ]
+const five: Step = { version: 5, name: 'five', group: '1.0', up: (d) => d.exec('CREATE TABLE e (v)') }
+/** A file at v4 with data, as a 1.x build made it (every step, as a new file takes them). */
+function at10(): { dir: string; file: string; backups: string } {
+  const f = fileIn()
+  openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, refuseBefore: 3 }).close()
+  return f
+}
 /** A file at v2 with data, as 0.9 left it. */
-function at09(): { file: string; backups: string } {
+function at09(): { dir: string; file: string; backups: string } {
   const f = fileIn()
   openDb(f.file, { migrations: plain, appVersion: '0.9.3' }).close()
   return f
 }
+/**
+ * `make` run on a new connection that never checkpoints, the file and its WAL then copied (no `-shm`) into a folder of
+ * their own: a board whose commits since `seed` are only in its WAL, as a Combwork that ended without quitting leaves one.
+ */
+function walOnly(seed: ((file: string) => void) | null, make: (d: DatabaseSync) => void): { dir: string; file: string } {
+  const src = fileIn()
+  seed?.(src.file)
+  const d = new DatabaseSync(src.file)
+  d.exec('PRAGMA journal_mode = WAL')
+  d.exec('PRAGMA wal_autocheckpoint = 0')
+  make(d)
+  const out = fileIn()
+  copyFileSync(src.file, out.file)
+  copyFileSync(`${src.file}-wal`, `${out.file}-wal`)
+  d.close()
+  return out
+}
 
 describe('a group of steps (db.ts)', () => {
-  it('runs every pending step of the group in one transaction: a throwing step leaves the file before the group', () => {
-    const f = at09()
-    expect(() => openDb(f.file, { migrations: [...plain, ...group(() => { throw new Error('step four broke') })], appVersion: '1.0.0', backupDir: f.backups, approve: () => true })).toThrow('step four broke')
-    // Neither of the group's steps: not c, not a recorded version 3.
-    expect(tables(f.file)).toEqual(['a', 'b', 'schema_version'])
-    const raw = new DatabaseSync(f.file)
-    expect(schemaVersion(raw)).toBe(2)
-    raw.close()
-    // And the lock went back: the file opens again, and the group runs once it works.
-    const db = openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true })
+  it('runs every pending step of the group in one transaction: a throwing step leaves the file before them', () => {
+    const f = at10()
+    const six: Step = { version: 6, name: 'six', group: '1.0', up: () => { throw new Error('step six broke') } }
+    expect(() => openDb(f.file, { migrations: [...plain, ...group(), five, six], appVersion: '1.1.0', backupDir: f.backups, refuseBefore: 3 })).toThrow('step six broke')
+    expect(tables(f.file)).not.toContain('e')
+    expect(fileSchemaVersion(f.file)).toBe(4)
+    // And the lock went back: the file opens again, and the steps run once they work.
+    const db = openDb(f.file, { migrations: [...plain, ...group(), five], appVersion: '1.1.0', backupDir: f.backups, refuseBefore: 3 })
     try {
-      expect(schemaVersion(db.writer)).toBe(4)
-      expect(db.pending).toBeNull()
+      expect(schemaVersion(db.writer)).toBe(5)
       expect((db.writer.prepare('PRAGMA locking_mode').get() as { locking_mode: string }).locking_mode).toBe('normal')
     } finally {
       db.close()
     }
   })
 
-  it('asks once for the whole group; refused, the steps before it run and the file opens read-only, waiting', () => {
+  it('a new file takes every step, the group too, and gets no copy', () => {
     const f = fileIn()
-    openDb(f.file, { migrations: plain.slice(0, 1), appVersion: '0.9.0' }).close()
-    const asked: unknown[] = []
-    const db = openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: (p) => (asked.push(p), false) })
-    try {
-      expect(asked).toEqual([{ group: '1.0', from: 2, to: 4 }])
-      expect(db.pending).toEqual({ group: '1.0', from: 2, to: 4 })
-      expect(schemaVersion(db.writer)).toBe(2)
-      expect(() => db.writer.exec('INSERT INTO a VALUES (2)')).toThrow()
-      expect(db.reader.prepare('SELECT count(*) AS n FROM a').get()).toEqual({ n: 1 })
-    } finally {
-      db.close()
-    }
-    // Only the plain step's copy: no group copy for a group that didn't run.
-    expect(readdirSync(f.backups).filter((x) => x.includes('before-1.0'))).toEqual([])
-  })
-
-  it('a new file takes every step, the group too, unasked', () => {
-    const f = fileIn()
-    const db = openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => { throw new Error('asked') } })
+    const db = openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, refuseBefore: 3 })
     try {
       expect(schemaVersion(db.writer)).toBe(4)
     } finally {
@@ -140,91 +130,45 @@ describe('a group of steps (db.ts)', () => {
     expect(existsSync(f.backups)).toBe(false)
   })
 
-  it('keeps its copy of the file before the group for good: later copies never prune it', () => {
-    const f = at09()
-    openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
-    const kept = readdirSync(f.backups).filter((x) => x.startsWith('x-before-1.0-v2-'))
-    expect(kept).toHaveLength(1)
-    // It is the file at v2, whole.
-    expect(tables(join(f.backups, kept[0]))).toEqual(['a', 'b', 'schema_version'])
-    // More steps than the folder keeps copies of, each after a copy of its own.
-    let steps: Step[] = [...plain, ...group()]
-    for (let v = 5; v < 5 + BACKUPS_KEPT + 2; v++) {
-      steps = [...steps, { version: v, name: `v${v}`, up: (d) => d.exec(`CREATE TABLE t${v} (q)`) }]
-      openDb(f.file, { migrations: steps, appVersion: '1.0.0', backupDir: f.backups }).close()
-    }
+  it("a later step of the group on a file in it already: an ordinary copy of the file's three, never a 'before the group' one", () => {
+    const f = at10()
+    openDb(f.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: f.backups, refuseBefore: 3 }).close()
+    expect(fileSchemaVersion(f.file)).toBe(5)
     const after = readdirSync(f.backups)
-    expect(after.filter((x) => x.startsWith('x-v'))).toHaveLength(BACKUPS_KEPT)
-    expect(after.filter((x) => x.startsWith('x-before-1.0-'))).toEqual(kept)
-  })
-
-  it("a later step of the group on a file in it already: an ordinary copy, never another 'before the group' one (#1207 round 1)", () => {
-    const f = at09()
-    openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
-    const five: Step = { version: 5, name: 'five', group: '1.0', up: (d) => d.exec('CREATE TABLE e (v)') }
-    const asked: unknown[] = []
-    const db = openDb(f.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: f.backups, approve: (p) => (asked.push(p), true) })
-    try {
-      // Not asked again (HI-1718): it was when the file joined the group.
-      expect(asked).toEqual([])
-      expect(schemaVersion(db.writer)).toBe(5)
-    } finally {
-      db.close()
-    }
-    const after = readdirSync(f.backups)
-    expect(after.filter((x) => x.startsWith('x-before-1.0-'))).toEqual([expect.stringMatching(/^x-before-1\.0-v2-/)])
+    expect(after.filter((x) => x.includes('before-'))).toEqual([])
     expect(after.filter((x) => x.startsWith('x-v4-'))).toHaveLength(1)
   })
 
-  it('a later step of the group on a file in it already runs even where the group would be refused: the file opens writable, waiting for nothing (HI-1718)', () => {
-    const f = at09()
-    openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
-    const five: Step = { version: 5, name: 'five', group: '1.0', up: (d) => d.exec('CREATE TABLE e (v)') }
-    const db = openDb(f.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: f.backups, approve: () => false })
-    try {
-      expect(db.pending).toBeNull()
-      expect(schemaVersion(db.writer)).toBe(5)
-      db.writer.exec('INSERT INTO e VALUES (1)')
-    } finally {
-      db.close()
+  it('a copy 1.0 kept of a 0.9 board (before-1.0) is never pruned by the copies after it (HI-3602: the users\' backups stay)', () => {
+    const f = at10()
+    mkdirSync(f.backups, { recursive: true })
+    const kept = join(f.backups, 'x-before-1.0-v2-2026-01-01T00-00-00-000Z.db')
+    writeFileSync(kept, 'the 0.9 board as 1.0 kept it')
+    let steps: Step[] = [...plain, ...group()]
+    for (let v = 5; v < 5 + BACKUPS_KEPT + 2; v++) {
+      steps = [...steps, { version: v, name: `v${v}`, group: '1.0', up: (d) => d.exec(`CREATE TABLE t${v} (q)`) }]
+      openDb(f.file, { migrations: steps, appVersion: '1.0.0', backupDir: f.backups, refuseBefore: 3 }).close()
     }
-    // A file before the group is still asked, and refused waits.
-    const g = at09()
-    const before = openDb(g.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: g.backups, approve: () => false })
-    try {
-      expect(before.pending).toEqual({ group: '1.0', from: 2, to: 5 })
-    } finally {
-      before.close()
-    }
-  })
-
-  it('a file made in 1.0 (every step unasked) gets no copy kept for good when a later step of the group comes', () => {
-    const f = fileIn()
-    openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups }).close()
-    const raw = new DatabaseSync(f.file)
-    raw.exec('INSERT INTO a VALUES (2)')
-    raw.close()
-    const five: Step = { version: 5, name: 'five', group: '1.0', up: (d) => d.exec('CREATE TABLE e (v)') }
-    openDb(f.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: f.backups, approve: () => true }).close()
-    expect(readdirSync(f.backups).filter((x) => x.includes('before-1.0'))).toEqual([])
+    const after = readdirSync(f.backups)
+    expect(after.filter((x) => x.startsWith('x-v'))).toHaveLength(BACKUPS_KEPT)
+    expect(readFileSync(kept, 'utf8')).toBe('the 0.9 board as 1.0 kept it')
   })
 
   it('is refused while another connection has the file open, changing nothing; runs once it has closed', () => {
-    const f = at09()
+    const f = at10()
     const other = new DatabaseSync(f.file)
     other.prepare('SELECT count(*) FROM a').get()
     try {
-      expect(() => openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true })).toThrow(DbInUseError)
-      expect(schemaVersion(other)).toBe(2)
-      expect(existsSync(f.backups)).toBe(false)
+      expect(() => openDb(f.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: f.backups, refuseBefore: 3 })).toThrow(DbInUseError)
+      expect(schemaVersion(other)).toBe(4)
       // The other connection still writes: nothing was left locked.
       other.exec('INSERT INTO a VALUES (2)')
     } finally {
       other.close()
     }
-    const db = openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true })
+    const db = openDb(f.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: f.backups, refuseBefore: 3 })
     try {
-      expect(schemaVersion(db.writer)).toBe(4)
+      expect(schemaVersion(db.writer)).toBe(5)
       expect(db.reader.prepare('SELECT count(*) AS n FROM a').get()).toEqual({ n: 2 })
     } finally {
       db.close()
@@ -232,13 +176,12 @@ describe('a group of steps (db.ts)', () => {
   })
 
   it('holds the file for the whole run: another connection opening it meanwhile is refused', () => {
-    const f = at09()
+    const f = at10()
     let during: string | null = null
     const db = openDb(f.file, {
-      migrations: [...plain, ...group()],
-      appVersion: '1.0.0',
+      migrations: [...plain, ...group(), five],
+      appVersion: '1.0.1',
       backupDir: f.backups,
-      approve: () => true,
       whileGroupLocked: () => {
         const other = new DatabaseSync(f.file, { timeout: 100 }) // timing-ok: the refusal under test: a brief busy wait, then refused while the run holds the file
         try {
@@ -256,15 +199,81 @@ describe('a group of steps (db.ts)', () => {
   })
 
   it("a refusal before the copy (another Combwork's marker) changes nothing and lets go of the file", () => {
-    const f = at09()
-    expect(() => openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true, beforeGroup: () => { throw new Error('another Combwork') } })).toThrow('another Combwork')
-    expect(existsSync(f.backups)).toBe(false)
+    const f = at10()
+    const before = readdirSync(f.dir)
+    expect(() => openDb(f.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: f.backups, beforeGroup: () => { throw new Error('another Combwork') } })).toThrow('another Combwork')
+    expect(readdirSync(f.dir)).toEqual(before)
     const other = new DatabaseSync(f.file, { timeout: timing('db.busyMs') })
     try {
-      expect(schemaVersion(other)).toBe(2)
+      expect(schemaVersion(other)).toBe(4)
       other.exec('INSERT INTO a VALUES (3)')
     } finally {
       other.close()
+    }
+  })
+})
+
+describe('a board from before the group, 0.9\'s, is refused untouched (HI-3602)', () => {
+  it('openDb refuses it before opening it for writing: every name and byte beside it as it was', () => {
+    const f = at09()
+    mkdirSync(f.backups, { recursive: true })
+    writeFileSync(join(f.backups, 'x-before-1.0-v2-2026-01-01T00-00-00-000Z.db'), 'a backup')
+    // 0.9's version column, which a writable open renames (HI-2587).
+    const raw = new DatabaseSync(f.file)
+    raw.exec('ALTER TABLE schema_version RENAME COLUMN app_version TO hive_version') // old-name: 0.9's column, which the refusal must leave as it is
+    raw.close()
+    const was = snapshot(f.dir)
+    expect(() => openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.8.0', backupDir: f.backups, refuseBefore: 3 })).toThrow(TooOldError)
+    expect(snapshot(f.dir)).toEqual(was)
+  })
+
+  it('reads the version from the WAL where the main file may lag: a 0.9 board only in its WAL, with no -shm, is refused, nothing added', () => {
+    const f = walOnly(null, (d) => {
+      d.exec('CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, app_version TEXT NOT NULL) STRICT')
+      d.exec("INSERT INTO schema_version VALUES (1, 'one', 'x', '0.9.3'), (2, 'two', 'x', '0.9.3')")
+      d.exec('CREATE TABLE a (x); INSERT INTO a VALUES (1)')
+    })
+    const dir = join(f.file, '..')
+    expect(existsSync(`${f.file}-shm`)).toBe(false)
+    const was = snapshot(dir)
+    // The main file alone says nothing of it (its commits are in the WAL).
+    expect(fileFormat(f.file)).toEqual({ version: 2, tables: true })
+    expect(() => openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.8.0', refuseBefore: 3 })).toThrow(TooOldError)
+    expect(snapshot(dir)).toEqual(was)
+  })
+
+  it('a 1.0 board whose group steps are only in its WAL is read at its real version: not refused, opened as it is', () => {
+    const f = walOnly((file) => openDb(file, { migrations: plain, appVersion: '0.9.3' }).close(), (d) => {
+      d.exec('CREATE TABLE c (z); CREATE TABLE d (w)')
+      d.exec("INSERT INTO schema_version VALUES (3, 'three', 'x', '1.0.0'), (4, 'four', 'x', '1.0.0')")
+      d.exec('INSERT INTO a VALUES (2)')
+    })
+    expect(fileFormat(f.file)).toEqual({ version: 4, tables: true })
+    const db = openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.8.0', refuseBefore: 3 })
+    try {
+      expect(schemaVersion(db.writer)).toBe(4)
+      expect(db.reader.prepare('SELECT count(*) AS n FROM a').get()).toEqual({ n: 2 })
+    } finally {
+      db.close()
+    }
+  })
+
+  it("a WAL that can't be read, or that changes while it is copied, refuses the open: nothing opened for writing, nothing added", () => {
+    for (const how of ['fails', 'changes'] as const) {
+      const f = walOnly((file) => openDb(file, { migrations: plain, appVersion: '0.9.3' }).close(), (d) => d.exec('INSERT INTO a VALUES (2)'))
+      const dir = join(f.file, '..')
+      const was = snapshot(dir)
+      formatTestHooks.copy = (from, to) => {
+        if (how === 'fails') throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' })
+        copyFileSync(from, to)
+        // Another process's commit as it was read: the WAL grows.
+        if (from.endsWith('-wal')) writeFileSync(from, Buffer.concat([readFileSync(from), Buffer.alloc(8)]))
+      }
+      expect(() => openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.8.0', refuseBefore: 3 }), how).toThrow(FormatUnknownError)
+      formatTestHooks.copy = undefined
+      if (how === 'fails') expect(snapshot(dir), how).toEqual(was)
+      // Only the WAL this test grew changed; nothing was added beside it.
+      else expect(Object.keys(snapshot(dir)).sort(), how).toEqual(Object.keys(was).sort())
     }
   })
 })
@@ -285,446 +294,75 @@ async function close(w: WS): Promise<void> {
   await disposeWorkspaceService(w)
   store.closeBoard(path)
 }
-const combworkOf = (ws: string): string => join(ws, '.combwork')
 const upgradeSteps = store.BOARD_MIGRATIONS.filter((m) => m.group === '1.0')
+const titles = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title).sort()
 
-/** A workspace whose board 0.9 left (its file before the 1.0 group), with card #1 on it. */
-async function board09(): Promise<string> {
+/** A workspace with card #1 on its board, made by this build. */
+async function board(): Promise<string> {
   const ws = join(base, `ws-${++n}`)
   mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
   writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
   const w = await open(ws)
-  await inWorkspace(w, () => tasks.createTask({ title: 'From 0.9', project: 'p' }, user))
+  await inWorkspace(w, () => tasks.createTask({ title: 'Before', project: 'p' }, user))
   await close(w)
-  // As 0.9 left it: its cards as documents, none of the 1.0 group's steps.
-  as09(store.boardFile(ws))
   return ws
 }
 
-const titles = async (w: WS): Promise<string[]> => (await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title).sort()
+/** The board as rc.1–rc.4 left it: in the group, without the steps that came after (card attachments on). */
+function asRc(ws: string): number {
+  const later = store.BOARD_MIGRATIONS.find((m) => m.name === 'card attachments')!
+  const raw = new DatabaseSync(store.boardFile(ws))
+  const revTriggers = (raw.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE '%rev_a%'").all() as { name: string }[]).map((r) => `DROP TRIGGER ${r.name};`).join(' ')
+  raw.exec(`DROP TABLE card_attachments; DROP TABLE card_comments_archive; ${revTriggers} DROP INDEX cards_rev; DROP TABLE board_rev; ALTER TABLE cards DROP COLUMN rev; DELETE FROM schema_version WHERE version >= ${later.version}`)
+  raw.close()
+  return later.version - 1
+}
 
-describe("the board's upgrade to 1.0 (#1207)", () => {
+describe("the board's 1.0 group (#1207)", () => {
   it('has the 1.0 group, after every 0.9 step', () => {
     expect(upgradeSteps.length).toBeGreaterThan(0)
     const last09 = Math.max(...store.BOARD_MIGRATIONS.filter((m) => !m.group).map((m) => m.version))
     expect(Math.min(...upgradeSteps.map((m) => m.version))).toBeGreaterThan(last09)
   })
 
-  it('opens a 0.9 board read-only until the user says yes; then upgraded, its cards kept and the 0.9 copy kept', async () => {
-    const ws = await board09()
+  it("a board 1.0 made takes the group's later steps unasked: writable, its cards kept (HI-1718: rc.1–rc.4 boards at v22)", async () => {
+    const ws = await board()
+    const at = asRc(ws)
+    expect(fileSchemaVersion(store.boardFile(ws))).toBe(at)
     const w = await open(ws)
-    expect(inWorkspace(w, () => store.boardState(w))).toEqual({ readOnly: 'upgrade' })
-    expect(await titles(w)).toEqual(['From 0.9'])
-    await expect(inWorkspace(w, () => tasks.createTask({ title: 'Too soon', project: 'p' }, user))).rejects.toThrow(/read-only until it is upgraded/)
-    const { backup } = await inWorkspace(w, () => store.upgradeBoard(w))
-    expect(backup).toMatch(/combwork-before-1.0-v2-.*\.db$/)
-    expect(tables(backup!)).toContain('cards')
-    const state = inWorkspace(w, () => store.boardState(w))
-    expect(state.readOnly).toBeNull()
-    await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))
-    expect(await titles(w)).toEqual(['After', 'From 0.9'])
-    // Upgrading again does nothing.
-    expect(await inWorkspace(w, () => store.upgradeBoard(w))).toEqual({ backup: null })
-    await close(w)
-  })
-
-  it('is refused while another Combwork has the file open, the board still read-only; goes ahead once it has closed', async () => {
-    const ws = await board09()
-    const w = await open(ws)
-    // A 0.9 build: a connection to the file, as every open workspace holds one.
-    const other = new DatabaseSync(store.boardFile(ws))
-    other.prepare('SELECT count(*) FROM cards').get()
-    try {
-      await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('Another Combwork has this workspace open: close it first.')
-      expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBe('upgrade')
-      expect(await titles(w)).toEqual(['From 0.9'])
-      expect(existsSync(join(combworkOf(ws), 'backups')) ? readdirSync(join(combworkOf(ws), 'backups')).filter((x) => x.includes('before-1.0')) : []).toEqual([])
-    } finally {
-      other.close()
-    }
-    await inWorkspace(w, () => store.upgradeBoard(w))
     expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
+    expect(fileSchemaVersion(store.boardFile(ws))).toBe(Math.max(...store.BOARD_MIGRATIONS.map((m) => m.version)))
+    expect(tables(store.boardFile(ws))).toContain('card_attachments')
+    await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))
+    expect(await titles(w)).toEqual(['After', 'Before'])
     await close(w)
   })
 
-  it("keeps a presence marker while open; another profile's fresh one refuses the upgrade, a stale one doesn't", async () => {
-    const ws = await board09()
-    const w = await open(ws)
-    const dir = join(combworkOf(ws), PRESENCE_DIR)
-    inWorkspace(w, () => store.boardState(w))
-    const own = readdirSync(dir)
-    expect(own).toHaveLength(1)
+  it("keeps a presence marker while open; another profile's fresh one refuses the later steps, a stale one doesn't", async () => {
+    const ws = await board()
+    asRc(ws)
+    const dir = join(ws, '.combwork', PRESENCE_DIR)
+    mkdirSync(dir, { recursive: true })
     const other = join(dir, 'Combwork-Dev-12345678.json')
     // Running (this process's pid) and recent: another Combwork.
     writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Combwork-Dev', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
-    await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('close it first')
-    expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBe('upgrade')
+    const at = fileSchemaVersion(store.boardFile(ws))
+    await expect((async () => {
+      const w = await open(ws)
+      try {
+        await titles(w)
+      } finally {
+        await close(w)
+      }
+    })()).rejects.toThrow(/another Combwork has the workspace open/)
+    expect(fileSchemaVersion(store.boardFile(ws))).toBe(at)
     // Its heartbeat missed: a Combwork that stopped without removing it.
     writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Combwork-Dev', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date(Date.now() - STALE_MS - 1000).toISOString() }))
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
+    const w = await open(ws)
+    expect(await titles(w)).toEqual(['Before'])
+    expect(readdirSync(dir)).toHaveLength(2)
     await close(w)
     // Removed as the workspace closed; the other's left alone.
     expect(readdirSync(dir)).toEqual(['Combwork-Dev-12345678.json'])
-  })
-
-  it('a board an earlier 1.0 upgraded takes the group\'s later steps unasked: writable, its cards kept (HI-1718: rc.1–rc.4 boards at v22)', async () => {
-    const ws = await board09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    const first = await open(ws)
-    expect(await titles(first)).toEqual(['From 0.9'])
-    await close(first)
-    store.boardTestHooks.upgradeAnswer = null
-    // As rc.1–rc.4 left it: upgraded, without the steps that came after (card attachments, HI-1700; card revisions, HI-1715;
-    // the comment archive, HI-2641).
-    const last = Math.max(...upgradeSteps.map((m) => m.version))
-    const later = store.BOARD_MIGRATIONS.find((m) => m.name === 'card attachments')!
-    const raw = new DatabaseSync(store.boardFile(ws))
-    const revTriggers = (raw.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE '%rev_a%'").all() as { name: string }[]).map((r) => `DROP TRIGGER ${r.name};`).join(' ')
-    raw.exec(`DROP TABLE card_attachments; DROP TABLE card_comments_archive; ${revTriggers} DROP INDEX cards_rev; DROP TABLE board_rev; ALTER TABLE cards DROP COLUMN rev; DELETE FROM schema_version WHERE version >= ${later.version}`)
-    raw.close()
-    expect(fileSchemaVersion(store.boardFile(ws))).toBe(later.version - 1)
-    // No answer given: had it been asked, the board would wait read-only for the user.
-    const w = await open(ws)
-    expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
-    expect(fileSchemaVersion(store.boardFile(ws))).toBe(Math.max(last, ...store.BOARD_MIGRATIONS.map((m) => m.version)))
-    expect(tables(store.boardFile(ws))).toContain('card_attachments')
-    expect(tables(store.boardFile(ws))).toContain('board_rev')
-    await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))
-    expect(await titles(w)).toEqual(['After', 'From 0.9'])
-    await close(w)
-  })
-
-  it('a test copy can answer before it is asked', async () => {
-    const ws = await board09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    const w = await open(ws)
-    expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
-    expect(await titles(w)).toEqual(['From 0.9'])
-    await close(w)
-  })
-
-  it("the workspace closing while the upgrade waits for the checkpoints' worker: refused, the file as it was (HI-1691, HR6's round 3)", async () => {
-    // A 0.9 board, left waiting for it.
-    const ws2 = await board09()
-    const w2 = await open(ws2)
-    const hold = holdRelease()
-    const upgrading = inWorkspace(w2, () => store.upgradeBoard(w2))
-    upgrading.catch(() => undefined)
-    await hold.waiting
-    await close(w2)
-    hold.release()
-    await expect(upgrading).rejects.toThrow()
-    expect(fileSchemaVersion(store.boardFile(ws2))).toBe(2)
-  })
-
-})
-
-describe('while the upgrade waits, nothing needing combwork.db starts or writes (#1207 round 1)', () => {
-  it('an agent is refused before anything starts, saying why; it starts once upgraded', async () => {
-    const ws = await board09()
-    const w = await open(ws)
-    expect(inWorkspace(w, () => store.upgradeWaiting(ws))).toBe(true)
-    await expect(inWorkspace(w, () => sessions.start(join(ws, 'p'), { agentId: 'a1' }))).rejects.toThrow('This workspace is from version 0.9: upgrade it to 1.0 before starting agents')
-    expect(sessions.agentsIn(ws)).toBe(0)
-    // The Assistant's home is in the workspace: refused the same way.
-    await expect(inWorkspace(w, () => sessions.start(join(ws, '.combwork', 'assistant'), { agentId: 'assistant' }))).rejects.toThrow('upgrade it to 1.0 before starting agents')
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    expect(store.upgradeWaiting(ws)).toBe(false)
-    expect(() => store.assertUpgraded(ws)).not.toThrow()
-    await close(w)
-  })
-
-  it("the Assistant's changes, which the window lists as it opens, read as none while it waits (no \"no such table\"); kept once upgraded (HI-1820)", async () => {
-    const ws = await board09()
-    const w = await open(ws)
-    expect(store.boardReadOnly(w)).toBe(true)
-    expect(inWorkspace(w, () => changeGroups(w))).toEqual([])
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    expect(store.boardReadOnly(w)).toBe(false)
-    expect(inWorkspace(w, () => changeGroups(w))).toEqual([])
-    await close(w)
-  })
-
-  it("a project's queues, which the window lists as it opens, read as none while it waits (no \"no such table: workflow_queue_seen\"); listed once upgraded (HI-3310)", async () => {
-    const ws = await board09()
-    const w = await open(ws)
-    expect(store.boardReadOnly(w)).toBe(true)
-    const p = join(ws, 'p')
-    await expect(inWorkspace(w, () => queueViews(w, p))).resolves.toEqual([])
-    await expect(inWorkspace(w, () => queueViews(w, p, 'main', true))).resolves.toEqual([])
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    expect(store.boardReadOnly(w)).toBe(false)
-    await expect(inWorkspace(w, () => queueViews(w, p))).resolves.toBeInstanceOf(Array)
-    await close(w)
-  })
-
-  it("lanes' card owners, which the Lanes view reads as it opens, read as none while it waits (no \"no such table: lane_pending\"); read once upgraded (HI-1846)", async () => {
-    const ws = await board09()
-    const w = await open(ws)
-    expect(store.boardReadOnly(w)).toBe(true)
-    const numbers = (inWorkspace(w, () => store.boardRead(w, (db) => db.prepare('SELECT number FROM cards').all())) as { number: number }[]).map((r) => r.number)
-    expect(numbers.length).toBeGreaterThan(0)
-    const owners = inWorkspace(w, () => store.cardOwnersNow(w, numbers))
-    expect([...owners.values()].every((o) => o.lane === null)).toBe(true)
-    expect(owners.size).toBe(numbers.length)
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    expect(store.boardReadOnly(w)).toBe(false)
-    expect(inWorkspace(w, () => store.cardOwnersNow(w, numbers)).size).toBe(numbers.length)
-    await close(w)
-  })
-
-  it("a store's file isn't moved in meanwhile (no write): read from the database, left in place, moved in once upgraded", async () => {
-    const ws = await board09()
-    const p = join(ws, 'p')
-    const old = { version: 1, sessions: [{ id: 's1', agent: 'claude-code', name: 'From 0.9', createdAt: '2026-10-19T10:00:00.000Z', lastActiveAt: '2026-10-19T10:00:00.000Z', archived: false }] }
-    writeFileSync(join(p, '.combwork', 'sessions.json'), JSON.stringify(old))
-    const w = await open(ws)
-    const read = await inWorkspace(w, () => workspace.sessionsFile(p))
-    expect(read.sessions).toEqual([])
-    expect(existsSync(join(p, '.combwork', 'sessions.json'))).toBe(true)
-    // A store's open the same way: nothing moved, nothing marked.
-    const probe = join(ws, '.combwork', 'never-a-store.json')
-    writeFileSync(probe, '[]')
-    let put = 0
-    await storeRows.openTable(ws, 'sessions', 'probe', probe, async () => ({ rows: 1 }), { count: () => 0, put: () => ++put })
-    expect(put).toBe(0)
-    expect(existsSync(probe)).toBe(true)
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    expect((await inWorkspace(w, () => workspace.sessionsFile(p))).sessions.map((x) => x.id)).toEqual(['s1'])
-    expect(existsSync(join(p, '.combwork', 'sessions.json'))).toBe(false)
-    await close(w)
-  })
-
-  it("the opening's steps that write skip the waiting board quietly; the upgrade tells its listeners once, so they run then (#1621)", async () => {
-    const ws = await board09()
-    const w = await open(ws)
-    const told: string[] = []
-    const off = store.onBoardUpgraded((x) => told.push(x.path!))
-    try {
-      // Nothing written, nothing thrown (a warning that the board was from 0.9 was logged for each).
-      expect(await inWorkspace(w, () => tasks.stampCardProjects(w))).toBe(0)
-      expect(await inWorkspace(w, () => keyProjects(w))).toEqual([])
-      expect(await inWorkspace(w, () => tasks.archiveOldDone(w))).toEqual([])
-      expect(await inWorkspace(w, () => tasks.endReviewsWithoutSession(w, () => false))).toEqual([])
-      // Refused (another Combwork has the file open): not upgraded, nobody told.
-      const other = new DatabaseSync(store.boardFile(ws))
-      other.prepare('SELECT count(*) FROM cards').get()
-      await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('close it first')
-      other.close()
-      expect(told).toEqual([])
-      await inWorkspace(w, () => store.upgradeBoard(w))
-      expect(told).toEqual([ws])
-      // Upgrading again changes nothing, and tells nobody again.
-      await inWorkspace(w, () => store.upgradeBoard(w))
-      expect(told).toEqual([ws])
-      // The board takes writes now: the same steps run through it (the upgrade gave the project its key already).
-      expect(await inWorkspace(w, () => tasks.stampCardProjects(w))).toBe(0)
-      expect(await inWorkspace(w, () => keyProjects(w))).toEqual([])
-      expect(store.projectKeys(w).filter((k) => k.current)).toHaveLength(1)
-      expect(await inWorkspace(w, () => tasks.endReviewsWithoutSession(w, () => false))).toEqual([])
-    } finally {
-      off()
-    }
-    await close(w)
-  })
-
-  it('background work waits while the board waits for its upgrade: no "no such table" or "readonly" errors; it runs once upgraded (HI-1694)', async () => {
-    const { updateLines } = await import('../src/main/workflow/lineUpdates')
-    const { repairStages } = await import('../src/main/workflow/stageRepair')
-    const metrics = await import('../src/main/metrics')
-    const { readTable } = await import('../src/main/storeTables')
-    const ws = await board09()
-    const w = await open(ws)
-    // What Combwork logs meanwhile (to the console in an unpackaged build, as the tests are).
-    const lines: string[] = []
-    const keep = (...a: unknown[]): void => void lines.push(a.map(String).join(' '))
-    const spies = [vi.spyOn(console, 'log').mockImplementation(keep), vi.spyOn(console, 'error').mockImplementation(keep)]
-    try {
-      expect(store.boardWaits(w)).toBe(true)
-      // The line updater (a pass came with every agent's change in another window) and a metrics save, on the 0.9 board.
-      await inWorkspace(w, () => updateLines(w))
-      // The stage repair (HI-1674), which warned that the board was from 0.9 at each open (HI-1714): it leaves the board alone.
-      expect(await inWorkspace(w, () => repairStages(w))).toEqual({ unmarked: 0, repaired: [], failed: 0 })
-      metrics.recordApi(metrics.metricsHandle(w), null, { route: '/v1/tasks', method: 'GET', role: 'agent', outcome: 'ok', requestBytes: 1, responseBytes: 1, ms: 1 })
-      await metrics.metricsHandle(w)!.store.save()
-      expect(lines.filter((l) => /no such table|readonly database|Could not save the performance metrics|bringing builders|from version 0\.9|repairing the stages/i.test(l))).toEqual([])
-      expect(readTable(ws, 'metrics').docs).toEqual([])
-      await inWorkspace(w, () => store.upgradeBoard(w))
-      expect(store.boardWaits(w)).toBe(false)
-      // Upgraded: they run, and metrics observed since are saved.
-      await inWorkspace(w, () => updateLines(w))
-      await inWorkspace(w, () => repairStages(w))
-      metrics.recordApi(metrics.metricsHandle(w), null, { route: '/v1/tasks', method: 'GET', role: 'agent', outcome: 'ok', requestBytes: 1, responseBytes: 1, ms: 1 })
-      await metrics.metricsHandle(w)!.store.save()
-      expect(lines.filter((l) => /\[(WARN|ERROR)\]/.test(l))).toEqual([])
-      expect(readTable(ws, 'metrics').docs.length).toBeGreaterThan(0)
-    } finally {
-      for (const s of spies) s.mockRestore()
-    }
-    await close(w)
-  })
-
-})
-
-describe("what services read before the database was replaced is read again (#1207 round 2)", () => {
-  /** A delivery as a 0.9 build saves it, straight into the database (another process), with the host's next id. */
-  function writtenBy09(ws: string, scope: string, id: string, next: number, body: string): void {
-    const raw = new DatabaseSync(store.boardFile(ws), { timeout: timing('db.busyMs') })
-    try {
-      const rec = { id, seq: Number(id.slice(1)), agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body, state: 'queued', created: new Date().toISOString(), expires: new Date(Date.now() + 86_400_000).toISOString() }
-      raw.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET doc = excluded.doc').run('deliveries', scope, id, 0, JSON.stringify(rec))
-      raw.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value').run('deliveries', scope, 'next', String(next))
-      raw.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO NOTHING').run('deliveries', scope, 'imported', JSON.stringify({ at: new Date().toISOString(), rows: 1, file: null }))
-    } finally {
-      raw.close()
-    }
-  }
-  const bodies = (rs: { id: string; body: string }[]): string[] => rs.map((r) => `${r.id} ${r.body}`).sort()
-
-  it("deliveries loaded while the upgrade waited, and 0.9's saved meanwhile: kept, with its next id, through the first 1.0 save and a restart", async () => {
-    const delivery = await import('../src/main/deliveries')
-    delivery.setReadsInboxForTests(() => true)
-    const ws = await board09()
-    const host = join(ws, 'p')
-    const w = await open(ws)
-    try {
-      // Loaded (cached) while the upgrade waits.
-      expect(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))).toEqual([])
-      const { scope } = await inWorkspace(w, () => w.sessionScope(host))
-      writtenBy09(ws, scope, 'm1', 2, 'Written by 0.9 while the upgrade waited')
-      await inWorkspace(w, () => store.upgradeBoard(w))
-      expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 Written by 0.9 while the upgrade waited'])
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'The first in 1.0' }))
-      expect(made.id).toBe('m2')
-      const saved = await inWorkspace(w, () => delivery.savedForTests(host))
-      expect(bodies(saved.deliveries)).toEqual(['m1 Written by 0.9 while the upgrade waited', 'm2 The first in 1.0'])
-      expect(saved.next).toBe(3)
-      // A restart reads the same.
-      await delivery.forgetDeliveriesForTests()
-      expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 Written by 0.9 while the upgrade waited', 'm2 The first in 1.0'])
-    } finally {
-      await delivery.forgetDeliveriesForTests()
-      delivery.setReadsInboxForTests(null)
-      await close(w)
-    }
-  })
-
-  it('deliveries loaded through a junction to the workspace are read again too: by the place recorded, not the spelling (#1395)', async () => {
-    const delivery = await import('../src/main/deliveries')
-    delivery.setReadsInboxForTests(() => true)
-    const ws = await board09()
-    const via = junction(ws, `${ws}-via`)
-    const host = join(via, 'p')
-    const w = await open(ws)
-    try {
-      // Loaded (cached) under the junction's spelling while the upgrade waits; the window has the real one.
-      expect(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))).toEqual([])
-      const { scope } = await inWorkspace(w, () => w.sessionScope(join(ws, 'p')))
-      writtenBy09(ws, scope, 'm1', 2, 'Written by 0.9 while the upgrade waited')
-      await inWorkspace(w, () => store.upgradeBoard(w))
-      expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 Written by 0.9 while the upgrade waited'])
-    } finally {
-      await delivery.forgetDeliveriesForTests()
-      delivery.setReadsInboxForTests(null)
-      await close(w)
-      unlinkSync(via)
-    }
-  })
-
-  it('each replacement moves the generation on, and a save read in an older one is refused', async () => {
-    const ws = await board09()
-    const w = await open(ws)
-    try {
-      const before = store.dbGeneration(ws)
-      const told: string[] = []
-      store.onDbReplaced((p) => told.push(p))
-      await inWorkspace(w, () => store.upgradeBoard(w))
-      expect(store.dbGeneration(ws)).toBe(before + 1)
-      expect(told).toEqual([ws])
-      // A save planned in the generation before: its guard refuses it, nothing written.
-      const gen = before
-      let wrote = false
-      await expect(storeRows.saveTable(ws, 'sessions', 'probe', () => (wrote = true), { probe: '1' }, () => {
-        if (gen !== store.dbGeneration(ws)) throw new Error('stale')
-      })).rejects.toThrow('stale')
-      expect(wrote).toBe(false)
-      expect(storeRows.storeValue(store.workspaceDb(ws).reader, 'sessions', 'probe', 'probe')).toBeNull()
-    } finally {
-      await close(w)
-    }
-  })
-})
-
-describe('a workspace closed right after its database was replaced stays closed (#1207 round 3)', () => {
-  const markers = (ws: string): string[] => (existsSync(join(combworkOf(ws), PRESENCE_DIR)) ? readdirSync(join(combworkOf(ws), PRESENCE_DIR)) : [])
-
-  /**
-   * Replaces the database and closes the workspace with setImmediate held (only it: Node's I/O runs as usual), so what
-   * they leave queued runs when the test says, not while the close goes on; then runs it, with every deliveries read
-   * held at a gate until then, as a slow disk would hold it; then waits for every load that started, however long its
-   * reads take. What a replacement left queued for a closed workspace (round 3: a reload) has then run to its end.
-   */
-  async function replaceThenClose(w: WS, replace: () => Promise<unknown>): Promise<void> {
-    const delivery = await import('../src/main/deliveries')
-    const watches = await import('../src/main/watches')
-    let release!: () => void
-    const gate = new Promise<void>((r) => (release = r))
-    delivery.setBeforeReadForTests(() => gate)
-    vi.useFakeTimers({ toFake: ['setImmediate'] })
-    try {
-      await replace()
-      await close(w)
-      vi.runAllTimers()
-    } finally {
-      vi.useRealTimers()
-      release()
-    }
-    try {
-      await delivery.loadsForTests()
-      await watches.loadsForTests()
-      await delivery.settledForTests()
-    } finally {
-      delivery.setBeforeReadForTests(null)
-    }
-  }
-
-  it("after the upgrade, closing the workspace at once: its deliveries and watches aren't read again, its database not opened", async () => {
-    const delivery = await import('../src/main/deliveries')
-    const watches = await import('../src/main/watches')
-    delivery.setReadsInboxForTests(() => true)
-    const ws = await board09()
-    const host = join(ws, 'p')
-    const w = await open(ws)
-    try {
-      // Loaded, so the replacement has something to drop.
-      await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))
-      await inWorkspace(w, () => watches.evaluateAgentWatches(w))
-      await replaceThenClose(w, () => inWorkspace(w, () => store.upgradeBoard(w)))
-      expect(store.boardOpen(ws)).toBe(false)
-      expect(markers(ws)).toEqual([])
-    } finally {
-      await delivery.forgetDeliveriesForTests()
-      delivery.setReadsInboxForTests(null)
-      store.closeBoard(ws)
-    }
-  })
-
-  it('after the upgrade, a workspace still open reads its deliveries again on their next use', async () => {
-    const delivery = await import('../src/main/deliveries')
-    delivery.setReadsInboxForTests(() => true)
-    const ws = await board09()
-    const host = join(ws, 'p')
-    const w = await open(ws)
-    try {
-      await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))
-      await inWorkspace(w, () => store.upgradeBoard(w))
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'After the upgrade' }))
-      expect((await inWorkspace(w, () => delivery.savedForTests(host))).deliveries.map((r) => r.id)).toEqual([made.id])
-    } finally {
-      await delivery.forgetDeliveriesForTests()
-      delivery.setReadsInboxForTests(null)
-      await close(w)
-    }
   })
 })

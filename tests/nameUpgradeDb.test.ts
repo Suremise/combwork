@@ -52,12 +52,12 @@ describe("the board's names step", () => {
   it("renames the comments' old text column (a 1.0 or RC board's) and the import record's key", () => {
     const file = join(base, `board${++n}.db`)
     const before = BOARD_MIGRATIONS.filter((m) => m.version < 25)
-    const db0 = openDb(file, { migrations: before, appVersion: '1.0.0', approve: () => true })
+    const db0 = openDb(file, { migrations: before, appVersion: '1.0.0' })
     // As 1.0 and the 1.1 release candidates made it (this build's cards step makes app_text).
     db0.writer.exec(`ALTER TABLE card_comments RENAME COLUMN app_text TO ${OLD_TEXT_COL}`)
     db0.writer.prepare("INSERT INTO board_meta (key, value) VALUES ('imported', ?)").run(JSON.stringify({ at: 'then', cards: 3, [OLD_IMPORT_KEY]: '0.9.3' }))
     db0.close()
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.1.0', approve: () => true })
+    const db = openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.1.0' })
     const cols = columns(db.writer, 'card_comments')
     expect(cols).toContain('app_text')
     expect(cols).not.toContain(OLD_TEXT_COL)

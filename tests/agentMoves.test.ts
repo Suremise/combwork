@@ -8,7 +8,6 @@ import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { as09, writeCard } from './boardDb'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { timing } from './timing.cjs'
 
@@ -503,11 +502,11 @@ describe('a failed review by either route: back to Doing, its builder holding it
   })
 })
 
-describe("S40: an upgraded lane's old moves (#1268)", () => {
+describe("S40: an adopted lane's old moves (#1268)", () => {
   const at = new Date(Date.UTC(2026, 9, 1)).toISOString()
   const card09 = (number: number, column: string, agent: string | null): Record<string, unknown> => ({ number, title: `Card ${number}`, description: '', project: 'p', agent, ...(agent ? { agentName: agent === 'b1' ? 'B1' : 'R1' } : {}), column, order: number, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: at, createdBy: 'You', updatedAt: at })
 
-  it('cards in flight at the upgrade, adopted, go on by the old moves: Doing submitted, Review passed, Passed reported merged', async () => {
+  it('cards in flight from before 1.0, adopted, go on by the old moves: Doing submitted, Review passed, Passed reported merged', async () => {
     const ws = join(base, `ws-${++n}`)
     // A lane in the project folder, as the spike's S40 (the upgrade's options: review by an agent, not checked).
     const p = gitRepo(join(ws, 'p'))
@@ -515,15 +514,12 @@ describe("S40: an upgraded lane's old moves (#1268)", () => {
     commit(p, { 'src/b.txt': 'b1\n' }, 'B1 builds')
     mkdirSync(join(p, '.combwork'), { recursive: true })
     writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1 (reviewer)' }] }))
-    const w0 = await open(ws)
-    for (const c of [card09(1, 'doing', 'b1'), card09(2, 'review', 'b1'), card09(3, 'passed', 'b1')]) await writeCard(w0, c.number as number, c)
-    // As 0.9 left it, then upgraded and adopted.
-    opened.splice(opened.indexOf(w0), 1)
-    await disposeWorkspaceService(w0)
-    store.closeBoard(ws)
-    as09(store.boardFile(ws))
+    // Card files from before 0.9, imported as the board is made (HI-3602: the only cards from before 1.0 left), then adopted.
+    const files = join(ws, '.combwork', 'tasks')
+    mkdirSync(files, { recursive: true })
+    for (const c of [card09(1, 'doing', 'b1'), card09(2, 'review', 'b1'), card09(3, 'passed', 'b1')]) writeFileSync(join(files, `${c.number}.json`), JSON.stringify(c))
+    writeFileSync(join(files, 'board.json'), JSON.stringify({ version: 1, next: 4 }))
     const w = await open(ws)
-    await inWorkspace(w, () => store.upgradeBoard(w))
     const adopted = await inWorkspace(w, () => adoptNow(w))
     expect(adopted).toMatchObject({ adopted: 3, failed: 0 })
     const b1 = { kind: 'agent', name: 'B1 (p)', self: { project: 'p', agentId: 'b1' }, scope: 'p' } as const

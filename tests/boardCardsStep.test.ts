@@ -1,17 +1,13 @@
-// The 1.0 cards step (#1209): a 0.9 board's cards, JSON documents a row each, moved into #1208's tables in the 1.0
-// group's transaction, and every reader of the board giving the same bytes after as before (cards in full and in short,
-// holds, places, Export Board). A step that throws part way leaves the 0.9 file as it was; opening it again runs nothing.
-//
-// CW_BOARD_GOLDEN_DB=<a combwork.db> runs the same comparison over a copy of that board, made in tempDir() (the file itself
-// is never opened; its -wal is copied with it). Timings are tests/boardBench.test.ts's.
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
+// The 1.0 cards step (#1209): cards in #1208's tables, a row each and their child rows. A new board takes the step with
+// no cards (HI-3602: a 0.9 board's documents are no longer moved; such a board isn't opened), card files from before 0.9
+// go straight into the tables, and a change saves into them. And the board read on one snapshot.
+import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
-import { as09, removeCard, writeCard, writeCardOutside } from './boardDb'
-import { timing } from './timing.cjs'
+import { removeCard, writeCard, writeCardOutside } from './boardDb'
 
 const base = tempDir('cw-cards-step-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -19,7 +15,6 @@ const base = tempDir('cw-cards-step-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
-const { schemaVersion } = await import('../src/main/db')
 const { cardRowsTestHooks } = await import('../src/main/schema/cardRows')
 
 const user = { kind: 'user' } as const
@@ -31,7 +26,6 @@ afterAll(async () => {
   store.closeAllBoards()
 })
 afterEach(() => {
-  store.boardTestHooks.upgradeAnswer = null
   cardRowsTestHooks.afterCards = null
 })
 
@@ -56,7 +50,7 @@ function workspace(): string {
   return ws
 }
 
-/** Documents of every form a 0.9 board can hold: Combwork's own, an older version's, hand-edited ones. */
+/** Documents of every form a card can hold: Combwork's own, an older version's, hand-edited ones. */
 const ODD: Record<number, Record<string, unknown>> = {
   // Another key order, a field Combwork doesn't know, and one named like Object.prototype's.
   901: { title: 'Out of order', number: 901, column: 'todo', project: 'p', agent: null, description: '', order: 3, labels: ['x'], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '2026-01-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-01-01T00:00:00.000Z', custom: { deep: [1, 2] }, ['__proto__']: 'kept' },
@@ -68,8 +62,8 @@ const ODD: Record<number, Record<string, unknown>> = {
   904: { number: 904, title: 'Archived', description: 'd', project: 'p', agent: 'a1', agentName: 'Agent 1', column: 'done', order: 2, labels: ['1.0.0'], blocked: null, blockedBy: [], links: [], comments: [], history: [{ at: '2026-01-01T00:00:00.000Z', by: 'You', what: 'Moved to Done' }], archived: true, decisions: [{ id: 'd1', text: 'Keep it', decidedBy: 'You', recordedBy: 'You', at: '2026-01-01T00:00:00.000Z' }], held: [{ agent: 'a1', name: 'Agent 1', role: 'agent', from: '2026-01-01T00:00:00.000Z', to: '2026-01-02T00:00:00.000Z' }], createdAt: '2026-01-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-01-01T00:00:00.000Z', archivedFor: 'done', archivedBatch: 'b1' }
 }
 
-/** A 0.9 board (#1209: its cards as documents): cards made by this Combwork, the odd ones, then the file put back as 0.9 left it. */
-async function board09(): Promise<{ ws: string; numbers: number[] }> {
+/** A board with cards made by this Combwork and the odd ones. */
+async function madeBoard(): Promise<{ ws: string; numbers: number[] }> {
   const ws = workspace()
   const w = await open(ws)
   const numbers = await inWorkspace(w, async () => {
@@ -81,52 +75,13 @@ async function board09(): Promise<{ ws: string; numbers: number[] }> {
     return [a.number, b.number, ...Object.keys(ODD).map(Number)]
   })
   await close(w)
-  as09(store.boardFile(ws))
   return { ws, numbers }
-}
-
-/** Everything the board's readers give, as text: each card as the Agent API reads it, the window's board, costs' holds, places, an export. */
-async function readers(w: WS, numbers: number[], exportTo: string): Promise<Record<string, string>> {
-  return inWorkspace(w, async () => {
-    const out: Record<string, string> = {}
-    for (const k of numbers) out[`card ${k}`] = JSON.stringify(await tasks.getTask(k, w))
-    out.all = JSON.stringify(await tasks.allTasks(w))
-    out.live = JSON.stringify(await tasks.allTasks(w, { archived: false }))
-    out.some = JSON.stringify(await tasks.allTasks(w, { numbers: numbers.slice(0, 3) }))
-    out.agents = JSON.stringify(await tasks.allTasks(w, { agents: ['a1'] }))
-    out.reviewers = JSON.stringify(await tasks.allTasks(w, { reviewers: ['a2'] }))
-    out.window = JSON.stringify(await tasks.windowTasks(w))
-    out.holds = JSON.stringify(await tasks.cardHolds(w))
-    out.places = JSON.stringify(await tasks.boardPlaces(w))
-    out.heads = JSON.stringify(await tasks.liveCardHeads(w))
-    out.done = JSON.stringify(await tasks.liveCardHeads(w, { done: true }))
-    out.counts = JSON.stringify(store.archivedCounts(w))
-    await store.exportBoard(w, exportTo)
-    for (const f of readdirSync(exportTo).sort()) out[`export ${f}`] = readFileSync(join(exportTo, f), 'utf8')
-    return out
-  })
 }
 
 const columnsOf = (file: string): string[] => {
   const db = new DatabaseSync(file, { readOnly: true })
   try {
     return (db.prepare("SELECT name FROM pragma_table_info('cards')").all() as { name: string }[]).map((r) => r.name)
-  } finally {
-    db.close()
-  }
-}
-const tablesOf = (file: string): string[] => {
-  const db = new DatabaseSync(file, { readOnly: true })
-  try {
-    return (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as { name: string }[]).map((r) => r.name)
-  } finally {
-    db.close()
-  }
-}
-const versionOf = (file: string): number => {
-  const db = new DatabaseSync(file, { readOnly: true })
-  try {
-    return schemaVersion(db)
   } finally {
     db.close()
   }
@@ -139,34 +94,8 @@ describe('the cards step (#1209)', () => {
     expect(store.BOARD_MIGRATIONS.find((m) => m.name === 'project keys')!.version).toBeGreaterThan(5)
   })
 
-  it("moves a 0.9 board's cards into the tables: every reader gives the same bytes after as before", async () => {
-    const { ws, numbers } = await board09()
-    const file = store.boardFile(ws)
-    expect(columnsOf(file)).toContain('doc')
-    // Read-only before: as 0.9 left it, read from its documents.
-    store.boardTestHooks.upgradeAnswer = 'no'
-    const w = await open(ws)
-    expect(store.boardState(w).readOnly).toBe('upgrade')
-    const before = await readers(w, numbers, join(base, `export-${n}-before`))
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    expect(store.boardState(w).readOnly).toBeNull()
-    const after = await readers(w, numbers, join(base, `export-${n}-after`))
-    expect(Object.keys(after)).toEqual(Object.keys(before))
-    // Every reader the same, but for the key each card of a project has now (#1219: additive, worked out when read).
-    const withoutKeys = (s: string): string => s.replace(/"key":\s*"[A-Z]{2,4}-\d+",\s*/g, '')
-    for (const k of Object.keys(before)) expect(withoutKeys(after[k]), k).toBe(before[k])
-    // The odd cards came through as they were saved, not as clean() reads them.
-    for (const [k, doc] of Object.entries(ODD)) expect(readFileSync(join(base, `export-${n}-after`, `${k}.json`), 'utf8')).toBe(JSON.stringify(doc, null, 2) + '\n')
-    // The documents are gone: typed columns and child tables, no table left aside.
-    expect(columnsOf(file)).not.toContain('doc')
-    expect(tablesOf(file)).toEqual(expect.arrayContaining(['card_comments', 'card_decisions', 'card_history', 'card_holds', 'card_labels', 'card_links', 'cards']))
-    expect(tablesOf(file)).not.toContain('cards_09')
-    await close(w)
-  })
-
-  it('a change after the upgrade saves into the tables and reads back the same', async () => {
-    const { ws, numbers } = await board09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
+  it('a change saves into the tables and reads back the same', async () => {
+    const { ws, numbers } = await madeBoard()
     const w = await open(ws)
     const [a] = numbers
     const card = await inWorkspace(w, async () => {
@@ -194,64 +123,6 @@ describe('the cards step (#1209)', () => {
     await close(w)
   })
 
-  it('a step that throws after it leaves the 0.9 file as it was, its cards as documents', async () => {
-    const { ws } = await board09()
-    const file = store.boardFile(ws)
-    const raw = new DatabaseSync(file, { readOnly: true })
-    const docs = raw.prepare('SELECT number, doc FROM cards ORDER BY number').all()
-    raw.close()
-    const last = Math.max(...store.BOARD_MIGRATIONS.map((m) => m.version))
-    store.BOARD_MIGRATIONS.push({ version: last + 1, name: 'breaks', group: '1.0', up: () => { throw new Error('a later step broke') } })
-    try {
-      store.boardTestHooks.upgradeAnswer = 'no'
-      const w = await open(ws)
-      await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('a later step broke')
-      expect(store.boardState(w).readOnly).toBe('upgrade')
-      await close(w)
-    } finally {
-      store.BOARD_MIGRATIONS.pop()
-    }
-    expect(versionOf(file)).toBe(2)
-    expect(tablesOf(file)).not.toContain('card_comments')
-    const again = new DatabaseSync(file, { readOnly: true })
-    try {
-      expect(again.prepare('SELECT number, doc FROM cards ORDER BY number').all()).toEqual(docs)
-    } finally {
-      again.close()
-    }
-  })
-
-  it("a row that isn't a card's document stops the upgrade, naming the card, and changes nothing", async () => {
-    const { ws } = await board09()
-    const file = store.boardFile(ws)
-    const raw = new DatabaseSync(file)
-    raw.prepare('INSERT INTO cards (number, doc) VALUES (?, ?)').run(950, '[1, 2]')
-    raw.close()
-    store.boardTestHooks.upgradeAnswer = 'no'
-    const w = await open(ws)
-    await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow("card #950's saved document isn't a JSON object")
-    await close(w)
-    expect(versionOf(file)).toBe(2)
-    expect(columnsOf(file)).toContain('doc')
-  })
-
-  it('opening the upgraded board again runs nothing: the same version, no new copy, the same cards', async () => {
-    const { ws, numbers } = await board09()
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    let w = await open(ws)
-    const first = await readers(w, numbers, join(base, `export-${n}-1`))
-    await close(w)
-    const file = store.boardFile(ws)
-    const version = versionOf(file)
-    const copies = readdirSync(join(ws, '.combwork', 'backups')).sort()
-    w = await open(ws)
-    const second = await readers(w, numbers, join(base, `export-${n}-2`))
-    await close(w)
-    expect(versionOf(file)).toBe(version)
-    expect(readdirSync(join(ws, '.combwork', 'backups')).sort()).toEqual(copies)
-    expect(second).toEqual(first)
-  })
-
   it('a new workspace takes the step with no cards, and moves its card files straight into the tables', async () => {
     const ws = workspace()
     mkdirSync(join(ws, '.combwork', 'tasks'), { recursive: true })
@@ -264,30 +135,6 @@ describe('the cards step (#1209)', () => {
     await close(w)
   })
 
-  const golden = process.env.CW_BOARD_GOLDEN_DB
-  it.skipIf(!golden)("a live board's copy: every reader gives the same bytes after the upgrade", { timeout: timing('test.hangRealLong') }, async () => {
-    const ws = workspace()
-    const file = store.boardFile(ws)
-    mkdirSync(join(ws, '.combwork'), { recursive: true })
-    copyFileSync(golden!, file)
-    if (existsSync(`${golden}-wal`)) copyFileSync(`${golden}-wal`, `${file}-wal`)
-    // Every card number of the copy, read on a connection of its own.
-    const raw = new DatabaseSync(file)
-    const numbers = (raw.prepare('SELECT number FROM cards ORDER BY number').all() as { number: number }[]).map((r) => r.number)
-    raw.close()
-    store.boardTestHooks.upgradeAnswer = 'no'
-    const w = await open(ws)
-    const before = await readers(w, numbers, join(base, `golden-${n}-before`))
-    const t0 = performance.now()
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    const upgradeMs = performance.now() - t0
-    const after = await readers(w, numbers, join(base, `golden-${n}-after`))
-    const differ = Object.keys(before).filter((k) => after[k] !== before[k])
-    console.log(`golden: ${numbers.length} cards; upgraded in ${Math.round(upgradeMs)} ms; ${Object.keys(before).length} readings compared, ${differ.length} differ${differ.length ? `: ${differ.slice(0, 20).join(', ')}` : ''}`)
-    expect(differ).toEqual([])
-    expect(Object.keys(after)).toEqual(Object.keys(before))
-    await close(w)
-  })
 })
 
 // A card is its row and its child rows, read by separate statements: another process committing between them must

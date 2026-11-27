@@ -1,14 +1,13 @@
 // Templates v2 and Combwork's own (#1436, SPEC §16.10.6), on fake Claude Code with the Assistant off and Codex turned off:
-// a workspace opened with 0.9's templates (the workspace's and a project's) copies them into the 0.9 backup's folder,
-// leaves them as they were and never lists them, and says so once in the Notifications panel; importing a 0.9 file is refused, saying why; the Templates view lists
+// a workspace opened with 0.9's templates (the workspace's and a project's) leaves them as they were and never lists
+// them; importing a 0.9 file is refused, saying why; the Templates view lists
 // Combwork's six, read-only, with the preset each suggests; Team 3×3 loaded into a project from the view makes six agents
 // named from its key, builders and reviewers paired both ways, in a grid of six, none in a worktree, Codex's agents on
 // Claude Code with a note on their rows, its workflow unticked; Pair loaded from + Add ▾ → Templates with "Also apply its
 // workflow" (HI-1910: Combwork's own carry their preset's) ticked lands in Version Control → Workflow with Pair chosen and not
 // saved. Screenshots of the Combwork templates, and of
 // the load dialog's suggestion and connections (HI-2109), in both themes. Dev build (or CW_EXE), throwaway profile, workspace and
-// CLAUDE_CONFIG_DIR; a quiet test copy. (0.9's templates copied at the board's real upgrade, and the upgrade waiting:
-// tests/upgradeTemplates.test.ts, on boards made 0.9's.)
+// CLAUDE_CONFIG_DIR; a quiet test copy.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -67,19 +66,9 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
       await inv('settings:update', { appearance: { theme: 'dark' } })
     }
 
-    // --- 0.9's templates copied as the workspace opens in 1.0, into the 0.9 backup's folder, said once; the originals
-    // stay (#1436, the Assistant's scope call: copy only).
-    const originals = [path.join(ws, '.combwork', 'templates'), path.join(alpha, '.combwork', 'templates')].map((d) => Object.fromEntries(fs.readdirSync(d).map((f) => [f, fs.readFileSync(path.join(d, f), 'utf8')])))
-    const backup = path.join(ws, '.combwork', 'backups', 'templates-0.9')
+    // --- 0.9's templates in the folders are left as they are (HI-3602: nothing copies them aside any more) and never listed.
     const listed = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [])
-    const projectsDir = path.join(backup, 'projects')
-    check("0.9's templates are copied into the backup's folder (the workspace's, and alpha's by its id; no .bak)", !!(await until(async () => JSON.stringify(listed(path.join(backup, 'workspace'))) === '["old-pair.json"]' && listed(projectsDir).length === 1 && JSON.stringify(listed(path.join(projectsDir, listed(projectsDir)[0]))) === '["mine.json"]', HUNG_MS)), JSON.stringify([listed(path.join(backup, 'workspace')), listed(projectsDir)]))
-    check('…the originals left as they were, byte for byte', JSON.stringify([path.join(ws, '.combwork', 'templates'), path.join(alpha, '.combwork', 'templates')].map((d) => Object.fromEntries(fs.readdirSync(d).map((f) => [f, fs.readFileSync(path.join(d, f), 'utf8')])))) === JSON.stringify(originals))
-    await page.locator('.activitybar .activity-btn[aria-label="Notifications"]').click()
-    const notice = page.locator('.notif-panel .notif-item', { hasText: 'Your 0.9 agent templates aren’t used in 1.0' })
-    check('one quiet notice says so, in the Notifications panel', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)) && /1\.0 templates don’t pin agents to worktrees, so the Combwork templates take their place\. A copy of the 2 templates is kept with the 0\.9 board backup\./.test(await notice.innerText()), await page.locator('.notif-panel').innerText().catch(() => ''))
-    await shoot('notice', () => page.locator('.notif-panel'))
-    await page.locator('.notif-panel [aria-label="Close"]').click()
+    check("0.9's templates are left in their folders, nothing copied aside", JSON.stringify(listed(path.join(ws, '.combwork', 'templates'))).includes('old-pair.json') && JSON.stringify(listed(path.join(alpha, '.combwork', 'templates'))).includes('mine.json') && !fs.existsSync(path.join(ws, '.combwork', 'backups', 'templates-0.9')))
 
     // --- The Templates view: Combwork's six first, read-only, each suggesting a preset.
     await page.locator('.activitybar [aria-label="Templates"]').click()

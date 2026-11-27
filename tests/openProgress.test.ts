@@ -1,10 +1,10 @@
-// A window's workspace operations, one at a time (HI-1694, HR2's round 1 finding): an open, close or upgrade claims the
-// window, checked and taken at once; another is refused while it holds it, saying why; only the claim's own operation
-// moves its steps on or lets it go, so a stale one can't clear a newer one's view.
+// A window's workspace operations, one at a time (HI-1694, HR2's round 1 finding): an open or close claims the window,
+// checked and taken at once; another is refused while it holds it, saying why; only the claim's own operation lets it
+// go, so a stale one can't clear a newer one's view.
 import { describe, expect, it, vi } from 'vitest'
 import { timing } from './timing.cjs'
 
-const { AfterOpen, assertNotOpening, claimWindow, openProgress, openStep, releaseWindow, windowClaim } = await import('../src/main/openProgress')
+const { AfterOpen, assertNotOpening, claimWindow, openProgress, releaseWindow, windowClaim } = await import('../src/main/openProgress')
 type WS = Parameters<typeof claimWindow>[0]
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
 const HUNG_MS = timing('wait.hang')
@@ -32,29 +32,18 @@ describe("a window's claim (HI-1694)", () => {
     releaseWindow(ws, a)
   })
 
-  it("only the claim's own operation moves its steps or lets it go: a stale one changes nothing", () => {
+  it("only the claim's own operation lets it go: a stale one changes nothing", () => {
     const ws = service()
     const first = claimWindow(ws, 'D:\\Work\\Tools', 'projects')
     releaseWindow(ws, first)
     const second = claimWindow(ws, 'D:\\Work\\Other', 'projects')
-    // The first operation, finishing late, neither lets the second's claim go nor moves its steps.
+    // The first operation, finishing late, doesn't let the second's claim go.
     releaseWindow(ws, first)
-    openStep(ws, 'adoption', { token: first })
-    openStep(ws, 'adoption', { path: 'D:\\Work\\Tools' })
     expect(openProgress(ws)).toEqual({ path: 'D:\\Work\\Other', name: 'Other', step: 'projects' })
-    // Its own do.
-    openStep(ws, 'adoption', { path: 'D:\\Work\\Other' })
-    expect(openProgress(ws)).toEqual({ path: 'D:\\Work\\Other', name: 'Other', step: 'adoption' })
     expect(windowClaim(ws)).toBe(second)
     releaseWindow(ws, second)
     expect(openProgress(ws)).toBeNull()
     expect(windowClaim(ws)).toBeNull()
-  })
-
-  it('a step with no operation under way (a workspace opened another way) shows nothing', () => {
-    const ws = service()
-    openStep(ws, 'adoption')
-    expect(openProgress(ws)).toBeNull()
   })
 })
 

@@ -3,7 +3,7 @@ import { carryLegacyAgentFields, legacyWorktree, type LegacyAgentFields, type Na
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
-import { boardFile, boardWrite, closeBoard, inBoardWrite, untilBoardOpenable } from './boardStore'
+import { boardFile, boardWrite, closeBoard, inBoardWrite, untilBoardOpenable, workspaceFrom09 } from './boardStore'
 import { closeJournal, untilJournalOpenable } from './journal'
 import { AsyncLocalStorage } from 'async_hooks'
 import type { BrowserWindow } from 'electron'
@@ -86,6 +86,24 @@ const M = {
 
 // What a closed workspace's refused open throws (#1381: made when refused, not kept per workspace).
 setFenceReason(() => combworkError(M.closed, undefined, { kind: 'conflict' }))
+
+/**
+ * Refuses the open of a workspace whose board 0.9 saved (HI-3602: the upgrade to 1.0 is gone), plainly, or of one whose
+ * board's version can't be read without changing it: nothing of the folder is moved, opened for writing or written.
+ */
+function assertNotFrom09(path: string): void {
+  let from09: boolean
+  try {
+    from09 = workspaceFrom09(path)
+  } catch (e) {
+    log.warn(`couldn't tell the version of the board of ${userText(path)}: its open is refused`, e)
+    throw combworkError(msg({ id: 'service.workspace.formatUnknown', defaultMessage: "Combwork couldn't read this workspace's board to check its version: {error}. Try opening it again.", description: "An error opening a workspace: Combwork reads the version of the workspace's task board before opening it, and couldn't ({error}: the reason, in English). Nothing in the folder was changed." }), { error: e instanceof Error ? e.message : String(e) }, { kind: 'conflict' })
+  }
+  if (from09) {
+    log.info(`the board of ${userText(path)} is from 0.9: its open is refused, nothing changed`)
+    throw combworkError(msg({ id: 'service.workspace.from09', defaultMessage: "This workspace is from Combwork 0.9, which this version can't open.", description: "An error opening a workspace whose task board was saved by Combwork 0.9: this version doesn't upgrade such a workspace any more. Nothing in the folder was changed." }), undefined, { kind: 'conflict' })
+  }
+}
 
 /** The notice that a project's folder no longer has the version control Combwork recorded for it (SPEC §16.3.5). */
 function platformNotice(project: string, p: ProjectPlatform): { title: string; message: string } {
@@ -474,6 +492,9 @@ export class WorkspaceService {
   private async openNow(path: string): Promise<WorkspaceInfo> {
     const abs = resolve(path)
     if (!(await isDir(abs))) throw combworkError(msg({ id: 'service.workspace.notFound', defaultMessage: 'Folder not found: {folder}', description: 'An error opening a workspace: the folder {folder} is not there.' }), { folder: abs })
+    // HI-3602: a workspace whose board 0.9 saved isn't opened (its upgrade to 1.0 is gone), told before anything of it is
+    // moved, admitted, read for writing or written, and before this window lets go of the workspace it has.
+    assertNotFrom09(abs)
     // The skills and modes of the workspace this window had, still being brought up to date (HI-1705), first: its close
     // waits for them, and no other window's open should wait behind that in the admission.
     await this.itemsSynced
