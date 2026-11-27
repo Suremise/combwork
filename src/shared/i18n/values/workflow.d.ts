@@ -97,6 +97,7 @@ interface CombworkMessageValues {
   'workflow.form.loadFailed': { error: string | number }
   'workflow.form.loopsReadNote': undefined
   'workflow.form.minutesValue': { n: number }
+  'workflow.form.movedUnsaved': undefined
   'workflow.form.neverOff.fileLocks': undefined
   'workflow.form.neverOff.folderGit': undefined
   'workflow.form.neverOff.indexLock': undefined
@@ -130,6 +131,9 @@ interface CombworkMessageValues {
   'workflow.form.previewHead': { preset: string | number }
   'workflow.form.previewNow': { value: string | number }
   'workflow.form.readOnly': { agents: string | number }
+  'workflow.form.removalAfterTarget': { branch: string | number }
+  'workflow.form.removalPersist': { branch: string | number }
+  'workflow.form.removalUses': { branch: string | number; uses: string | number }
   'workflow.form.removeCheck': undefined
   'workflow.form.retargetCard': { card: string | number; title: string | number }
   'workflow.form.retargetChoice': { from: string | number; to: string | number; cards: number; slots: number }

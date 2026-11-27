@@ -416,6 +416,8 @@ interface CombworkMessageValues {
   'tips.moreAgents.title': { usual: number }
   'tips.moveAnyway.text': undefined
   'tips.moveAnyway.title': undefined
+  'tips.moveSlotOn.text': undefined
+  'tips.moveSlotOn.title': undefined
   'tips.muse.text': undefined
   'tips.muse.title': undefined
   'tips.myPrices.text': undefined

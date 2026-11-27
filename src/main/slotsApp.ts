@@ -882,7 +882,7 @@ export function stopSlots(): void {
  * A pool's slots as the window reads them (`slots:list`). A writer is held (#1506) when its run isn't live here and its
  * Combwork is this one or one known to have gone: Release Slot… is offered for it.
  */
-export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
+export async function slotViews(pool: SlotPool, target: string | null = null): Promise<SlotView[]> {
   const slots = pool.slots()
   return Promise.all(
     slots.map(async (s) => {
@@ -895,7 +895,9 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       // HI-3467: or its detach at the target failing, once that has repeated (as the user is told).
       const recorded = !l ? pool.operation(s.name) : null
       const operation = operationTold(recorded) ? recorded : null
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(goneFree ? { goneFree: true as const } : {}), ...(operation ? { operation: { what: operation.what, since: operation.since, ...(operation.what === DETACH_FAILED ? { error: operation.error ?? '', ...(s.target ? { target: s.target } : {}) } : {}) } } : {}) }
+      // HI-3592: free and left on another branch than Work merges into: its row offers to move it there.
+      const movable = !!target && !!s.target && s.target !== target && s.state === 'ready' && !l && !w && !s.op && !s.job && !recorded
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(goneFree ? { goneFree: true as const } : {}), ...(movable ? { moveOn: { from: s.target!, to: target! } } : {}), ...(operation ? { operation: { what: operation.what, since: operation.since, ...(operation.what === DETACH_FAILED ? { error: operation.error ?? '', ...(s.target ? { target: s.target } : {}) } : {}) } } : {}) }
     })
   )
 }

@@ -414,6 +414,8 @@
   "tips.moreAgents.title": "More than {usual, plural, one {# agent} other {# agents}}",
   "tips.moveAnyway.text": "Dragging a card past a rule of its project (to Done before its review, say) asks first and names the rules it skips. Move Anyway records an override on the card, with your reason: an open lock on its tile says who, which rules and why.",
   "tips.moveAnyway.title": "Move a card past its rules, with a reason",
+  "tips.moveSlotOn.text": "A slot lent when Work merges into moved on stays on the old branch. Once it is free, its row in Version Control → Worktrees has Move to… for the new branch, and Save… offers the same when you take the old branch out of Other branches work can merge into.",
+  "tips.moveSlotOn.title": "Move a free slot left on an old release",
   "tips.muse.text": "Agents can use Meta’s Muse Code. Install it with Meta’s installer, add a Muse Code account in Settings → Accounts & Connections and sign it in there. Each account keeps its own sign-in, settings and sessions, apart from your own Muse.",
   "tips.muse.title": "Run agents on Muse Code",
   "tips.myPrices.text": "Claude Code's cost is its own figure, from its price table. On other rates (a discount, another tier)? Set Session costs to My prices, and Combwork prices every session from your table instead.",

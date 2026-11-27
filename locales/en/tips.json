@@ -1659,6 +1659,14 @@
     "defaultMessage": "Move a card past its rules, with a reason",
     "description": "A tip's title (glossary: rule)."
   },
+  "tips.moveSlotOn.text": {
+    "defaultMessage": "A slot lent when Work merges into moved on stays on the old branch. Once it is free, its row in Version Control → Worktrees has Move to… for the new branch, and Save… offers the same when you take the old branch out of Other branches work can merge into.",
+    "description": "A tip (HI-3592). Work merges into, Version Control → Worktrees, Move to…, Save… and Other branches work can merge into are names in Combwork's window: keep them as Combwork shows them."
+  },
+  "tips.moveSlotOn.title": {
+    "defaultMessage": "Move a free slot left on an old release",
+    "description": "A tip's title (HI-3592): a free slot still following a release branch after Work merges into moved on."
+  },
   "tips.muse.text": {
     "defaultMessage": "Agents can use Meta’s Muse Code. Install it with Meta’s installer, add a Muse Code account in Settings → Accounts & Connections and sign it in there. Each account keeps its own sign-in, settings and sessions, apart from your own Muse.",
     "description": "A tip. Muse Code and Meta are names. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

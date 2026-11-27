@@ -10,6 +10,7 @@ import { call } from '../api'
 import { useAdvancedValue } from '../advanced'
 import { cardLabelOf, confirm, notify, openChangesOf, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { NumberField } from './NumberField'
+import { moveSlotOn, slotMoveText } from '../slotMove'
 import { Icon, Switch } from './ui'
 import { ORIGIN_TEXT } from '../workflowOrigins'
 import { OriginText } from './OriginText'
@@ -255,6 +256,12 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
                           {s.operation && s.operation.what !== DETACH_FAILED && (
                             <button className="btn subtle small" data-action="open-operation" onClick={() => openChangesOf(project.path, { folder: s.folder })}>
                               {tr(T.openOperation)}
+                            </button>
+                          )}
+                          {/* HI-3592: free and left on an older branch than Work merges into: moved on from here. */}
+                          {s.moveOn && (
+                            <button className="btn subtle small" data-action="move-slot" title={slotMoveText(s.name, s.moveOn).tip} onClick={() => void moveSlotOn(project.path, s.name, reload)}>
+                              {slotMoveText(s.name, s.moveOn).label}
                             </button>
                           )}
                           {s.goneFree && (

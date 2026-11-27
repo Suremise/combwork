@@ -1729,6 +1729,32 @@ export interface WorkflowCheck {
   retarget?: RetargetPreview
   /** HI-2807: branches newly named in Work merges into or Other branches that don't exist (a save refuses them). */
   missing?: string[]
+  /** HI-3592: branches the change takes out of Other branches work can merge into while something still uses them. */
+  removals?: TargetRemoval[]
+}
+
+/**
+ * HI-3592: a branch taken out of Other branches work can merge into while something uses it (`uses`: keys and names), and
+ * what can move from it to the saved Work merges into before the save (null: nothing offered). `afterTarget`: the same
+ * change moves Work merges into, so the moves wait for a second save, the branch kept until then.
+ */
+export interface TargetRemoval {
+  branch: string
+  uses: string[]
+  retarget: RetargetPreview | null
+  afterTarget?: true
+}
+
+/**
+ * HI-3592: a free slot's move to Work merges into from its row: `move` as it was seen (folder, recorded target, head),
+ * or `keep` with why it can't (`onTarget`: it follows Work merges into already).
+ */
+export interface SlotMovePreview {
+  slot: string
+  from: string
+  to: string
+  move?: RetargetPreview['slots']['move'][number]
+  keep?: RetargetPreview['slots']['keep'][number]['why'] | 'onTarget'
 }
 
 /**
@@ -1996,6 +2022,11 @@ export interface SlotView {
    * error line (English, never translated; '' when git said none: the target's branch isn't there).
    */
   operation?: { what: string; since: number; error?: string; target?: string }
+  /**
+   * HI-3592: free, recording another branch (`from`) than the project's Work merges into (`to`), left behind when that
+   * moved on: its row offers to move it there. Absent: lent, busy, or on it already.
+   */
+  moveOn?: { from: string; to: string }
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */

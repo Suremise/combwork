@@ -3169,6 +3169,21 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   and `to` alone make a new preview, moving nothing).
   the default (stored as none) or a branch G7b lists that exists now (`pickTarget`, `branchExists`). A lane start's
   target is checked before anything changes (an `applyNow` put back included), and again under the lanes' lock.
+- **What a retarget left behind, moved later from the window (HI-3592, design s12 after s9).** A slot lent, changed or
+  holding commits when G7 moved on stays on its old branch; nothing moves it by itself. Once it is free (ready, no lease,
+  writer, operation or job, no git operation left under way) and records another branch than G7, its row (Version
+  Control → Worktrees, and Slots and copies) has **Move to {G7}…** (`SlotView.moveOn`): `slotMovePreview` checks it as
+  the retarget's preview does (`slotsPreview`, that slot alone: clean, its head in its branch), says why it can't
+  (lent, dirty, busy, unmerged, cantCheck; `onTarget` when it follows G7 already), and asked first, `slotMoveApply`
+  moves it as `retargetApply` moves a slot (as seen, rechecked under the pool's operation): lent or changed since, it
+  stays, said so. A save taking branches out of G7b that something still uses: `workflow:check`'s `removals`
+  (`removalsOf`) names each branch with what uses it (`referencesTo`, as the refusal counts), and, while the change
+  leaves G7 as saved, a retarget preview from it to the saved G7, shown in Save… and ticked when anything can move. Those
+  move before the save, branch by branch (moving them is what lets the save pass), each item rechecked as above; what
+  moved stays moved if the save is then refused (the dialog says so first), and a notification says what moved and
+  stayed, the refusal staying in the dialog with the draft (a retry moves nothing again). A change that also moves G7
+  offers no move (`afterTarget`: a move goes to the saved G7, never a draft's): the dialog says to save G7's change
+  first, the branch kept in G7b, then take it out. The refusal itself is as before (HI-2680).
 - **A target that doesn't exist, and Start the next version (HI-2807, design s10 after s7).** A save naming a branch in
   G7 or G7b that the options before it didn't name, and that isn't a local branch now (`newlyMissing`; one git can't
   answer for isn't counted), is refused (`refuseMissingTargets`) in every save's own write: the Workflow section's

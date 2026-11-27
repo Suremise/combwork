@@ -6,7 +6,8 @@ import { offered, repoOp } from '../repoOps'
 import { confirm, notify } from '../store'
 import { cx } from '../util'
 import { REMOTE_PLACEHOLDER, upstreamCommands } from '@shared/workflow/queue'
-import { RetargetDetails, retargetSkippedText } from './WorkflowOptions'
+import { RetargetDetails } from './WorkflowOptions'
+import { retargetSkippedText } from '../retargetText'
 
 // HI-2807 (SPEC §16.6.2, §16.13.2): Start the next version, and a missing target's offer to create itself, in a
 // project's Workflow section (Version Control → Workflow).

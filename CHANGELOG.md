@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Added
+
+- **Move a free slot left on an old release from the window** (HI-3592). A slot that was lent, had changes or held commits when **Work merges into** moved on stayed on the old branch, and only the Assistant or a git command could move it. Once it's free, its row in **Version Control → Branches & remotes → Worktrees** and in **Slots and copies** now has **Move to 1.8.0…** (the branch work merges into now), checked as **Also retarget what can move** checks a slot, and checked again as it moves. Taking a branch out of **Other branches work can merge into** while something still uses it, **Save…** now names what uses it and offers to move what can, before saving.
+
 ## 1.7.1 — 2026-11-26
 
 ### Removed

@@ -368,6 +368,7 @@ export const SUITES = [
   { name: 'slotbroker' },
   { name: 'slotcards' },
   { name: 'slotguidance' },
+  { name: 'slotmoveon' },
   { name: 'slotoptions' },
   { name: 'slotpool' },
   { name: 'slotrecovery' },
