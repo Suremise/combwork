@@ -177,6 +177,11 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     await closeToasts()
 
     // --- Saved again: integration taken out, nothing left to move, and the other window's merge style kept.
+    // HI-3625: the put-back card's slot is freed after the card is deleted, later under load; until then it is lent on
+    // integration, and Save… rightly lists it as staying there.
+    const sameFolder = (a, b) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
+    const b2Slot = async () => (await slots()).find((s) => sameFolder(s.folder, b2.folder)) ?? null
+    check("…the deleted card's slot is free again", !!(await waitHung(async () => (await b2Slot())?.state === 'ready')), JSON.stringify(await slots()))
     await form.locator('[data-action="save"]').click()
     await save.waitFor({ timeout: HUNG_MS })
     check('…saved again with nothing on integration: no removal listed', (await save.locator('[data-removal]').count()) === 0, (await text(save)).slice(0, 600))
