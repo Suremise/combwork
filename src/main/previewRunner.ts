@@ -57,6 +57,12 @@ export interface RunnerDeps {
   watch: (folder: string, changed: () => void) => () => void
   /** Where its server's log goes, or null. */
   logPath: (id: string, place: PreviewPlace) => string | null
+  /**
+   * HI-3615 round 1: the preview's own teardown beyond its server (its guarded page: its proxy, its page, its
+   * connections), awaited by every stop before its server is ended and its place and ports given back. False when its end
+   * can't be proved: the place stays held, as for a server's.
+   */
+  teardown?: (id: string) => Promise<boolean>
   /** How often a start looks at the TCP table (default 250 ms). */
   pollMs?: number
   now?: () => number
@@ -360,7 +366,9 @@ export class PreviewRunner {
         server = got && !('problem' in got) ? got : null
       }
       r.server = server
-      const proved = server ? await server.stop().catch(() => false) : true
+      // Its guarded page first (a page or proxy of this generation never outlives its stop), then its server.
+      const pageGone = this.deps.teardown ? await this.deps.teardown(id).catch(() => false) : true
+      const proved = (server ? await server.stop().catch(() => false) : true) && pageGone
       if (proved) this.release(r)
       else this.hold(r)
     })()
@@ -376,10 +384,11 @@ export class PreviewRunner {
     this.changed(r)
   }
 
-  /** Tries again to end a held preview's server: true once proved (its place and ports then given back). */
+  /** Tries again to end a held preview's server and page: true once proved (its place and ports then given back). */
   private async retryHeld(r: Running): Promise<boolean> {
     if (!r.unproved) return true
-    const proved = r.server ? await r.server.stop().catch(() => false) : true
+    const pageGone = this.deps.teardown ? await this.deps.teardown(r.view.id).catch(() => false) : true
+    const proved = (r.server ? await r.server.stop().catch(() => false) : true) && pageGone
     if (!proved) return false
     r.unproved = false
     r.view.held = false

@@ -75,6 +75,10 @@ export class PreviewGuard {
   private ping: NodeJS.Timeout | null = null
   private lastPong = 0
   private closed = false
+  /** Its close, shared by every caller. */
+  private closing: Promise<boolean> | null = null
+  /** Settles when the proxy's process has exited (resolved at once when it never started). */
+  private proxyExit: Promise<void> = Promise.resolve()
   private readonly own: { ports: number[] }
   /** Every request refused, by layer (tests read them; bounded). */
   readonly refusals: { layer: Layer; url: string; why: string }[] = []
@@ -121,6 +125,7 @@ export class PreviewGuard {
     // 1. The proxy, in its own process.
     const child = utilityProcess.fork(join(__dirname, 'preview-proxy.js'), [], { serviceName: 'Combwork Preview network guard', stdio: 'ignore' }) // i18n-ignore: the process's name in Task Manager
     this.proxy = child
+    this.proxyExit = new Promise<void>((r) => child.once('exit', () => r()))
     const port = await new Promise<number>((ok, fail) => {
       const timer = setTimeout(() => fail(new Error('the network guard did not start')), READY_MS) // i18n-ignore: a reason, logged and kept on the preview's end
       child.on('message', (m: { type: string; port?: number; why?: string; event?: ProxyEvent }) => {
@@ -236,22 +241,36 @@ export class PreviewGuard {
    * tunnel opened before, included), whatever the page or the partition does. Then the page, and the partition's
    * connections closed (bounded: nothing here waits on Chromium for long). The partition is in memory and never used again.
    */
-  async close(): Promise<void> {
-    if (this.closed) return
+  close(): Promise<boolean> {
+    return (this.closing ??= this.closeOnce())
+  }
+
+  /** close's one run: true once the proxy is seen exited (asked, then ended by its handle) and the page closed. */
+  private async closeOnce(): Promise<boolean> {
     this.closed = true
     if (this.ping) clearInterval(this.ping)
     const p = this.proxy
     this.proxy = null
     const view = this.viewNow
     this.viewNow = null
-    const bounded = (work: Promise<unknown>): Promise<unknown> => Promise.race([work.catch(() => undefined), new Promise<void>((r) => setTimeout(r, PING_MS).unref?.())])
-    if (p && p.pid) {
-      const gone = new Promise<void>((r) => p.once('exit', () => r()))
-      p.postMessage({ type: 'close' })
-      await bounded(gone)
-      p.kill()
+    /** Whether the work finished within the bound. */
+    const bounded = (work: Promise<unknown>): Promise<boolean> => Promise.race([work.then(() => true, () => true), new Promise<boolean>((r) => setTimeout(() => r(false), PING_MS).unref?.())])
+    let proxyGone = true
+    if (p) {
+      try {
+        p.postMessage({ type: 'close' })
+      } catch {
+        // Gone already: its exit says so.
+      }
+      proxyGone = await bounded(this.proxyExit)
+      if (!proxyGone) {
+        p.kill()
+        proxyGone = await bounded(this.proxyExit)
+      }
     }
     if (view && !view.webContents.isDestroyed()) view.webContents.close({ waitForBeforeUnload: false })
     if (this.ses) await bounded(this.ses.closeAllConnections())
+    if (!proxyGone) log.warn("A preview's network guard couldn't be proved ended")
+    return proxyGone
   }
 }

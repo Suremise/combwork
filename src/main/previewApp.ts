@@ -23,6 +23,7 @@ import { copiesFor } from './copiesApp'
 import { combworkError } from './combworkError'
 import { emit, emitTo } from './events'
 import { PreviewGuard } from './previewGuard'
+import { PreviewShows } from './previewShown'
 import { openableUrl } from '../shared/previewPolicy'
 import { createLogger, userText } from './logger'
 import { onPlaceEnded } from './placeEnds'
@@ -89,13 +90,12 @@ function runnerNow(): PreviewRunner {
         return null
       }
     },
+    // Its guarded page, closed as part of its every end, before its place and ports are given back (round 1).
+    teardown: (id) => closeShown(id),
     log: { info: (l) => log.info(l), warn: (l, e) => log.warn(l, e) }
   })
   // Every window's Preview tab follows its previews; a stopped one's guarded page (its partition and proxy) is closed.
-  runner.onChange((v) => {
-    emit({ type: 'preview-changed', preview: v })
-    if (v.state === 'stopped') void closeShown(v.id)
-  })
+  runner.onChange((v) => emit({ type: 'preview-changed', preview: v }))
   return runner
 }
 
@@ -321,20 +321,55 @@ function closeWorkspace(path: string): Promise<void> {
   })
 }
 
-// --- The guarded page (HI-3615): one PreviewGuard per running preview (its own partition and proxy), made when a
-// window's Preview tab first shows it, closed when the preview stops (a new generation is a new preview, so a new
-// partition) or its window closes.
+// --- The guarded page (HI-3615): one PreviewGuard per running preview (its own partition and proxy), opened when a
+// window's Preview tab first shows it, and closed as part of the preview's every end (the runner's teardown, awaited
+// before its place and ports are given back: round 1). Where it shows, and whether a show is still wanted after each
+// await, is PreviewShows' (previewShown.ts).
 
-interface Shown {
-  guard: Promise<PreviewGuard>
-  /** The window it is in now (one at a time). */
-  win: BrowserWindow | null
-  /** URLs the page tried to leave for: only these are opened in the user's browser, by Combwork's bar. */
-  tried: Set<string>
-  /** Its first load done. */
-  loaded: boolean
-}
-const shown = new Map<string, Shown>()
+/** The URLs each shown preview's page tried to leave for: only these are opened in the user's browser, by Combwork's bar. */
+const triedOf = new Map<string, Set<string>>()
+
+const shows = new PreviewShows<BrowserWindow, PreviewGuard>({
+  open: (id) => {
+    const v = runner?.views().find((x) => x.id === id)
+    if (!v || v.state !== 'running') return Promise.reject(new Error('not running')) // i18n-ignore: a reason, never shown (the caller says notRunning)
+    return PreviewGuard.open({
+      placeKey: createHash('sha256').update(v.place.folder.toLowerCase()).digest('hex').slice(0, 12),
+      generation: v.place.generation,
+      ownPorts: [v.port, ...(v.hmrPort ? [v.hmrPort] : [])],
+      events: {
+        // Lost (its proxy exited or stopped answering): the preview stops, its teardown closing what is left.
+        lost: () => void runner?.stop(id, { kind: 'guardStopped' }),
+        tried: (url) => {
+          const set = triedOf.get(id) ?? new Set<string>()
+          triedOf.set(id, set)
+          if (set.size < 50) set.add(url)
+          const w = shownIn.get(id)
+          if (w && !w.isDestroyed()) emitTo(w, { type: 'preview-tried', projectPath: v.projectPath, id, url })
+        },
+        refused: (layer, url, why) => log.info(`Preview ${id}: the ${layer} refused ${userText(url)} (${why})`)
+      }
+    }).then((g) => {
+      guardIds.set(g, id)
+      return g
+    })
+  },
+  attach: (win, g) => {
+    if (g.view) win.contentView.addChildView(g.view)
+    shownIn.set(idOf(g), win)
+  },
+  detach: (win, g) => {
+    if (g.view && !win.isDestroyed()) win.contentView.removeChildView(g.view)
+    if (shownIn.get(idOf(g)) === win) shownIn.delete(idOf(g))
+  },
+  place: (win, g, bounds) => g.view?.setBounds(boundsOf(win, bounds)),
+  owned: async (id) => (await runner!.checkOwnership(id)).ok
+})
+
+/** Each guard's preview, and the window each shown preview is in (for its tried URLs' bar). */
+const guardIds = new WeakMap<PreviewGuard, string>()
+const idOf = (g: PreviewGuard): string => guardIds.get(g) ?? ''
+const shownIn = new Map<string, BrowserWindow>()
 
 /** A running preview of this project by id, or refused. */
 function runningView(projectPath: string, id: string): PreviewView {
@@ -343,14 +378,12 @@ function runningView(projectPath: string, id: string): PreviewView {
   return v
 }
 
-/** Closes a preview's guarded page (its view, partition connections and proxy). */
-async function closeShown(id: string): Promise<void> {
-  const s = shown.get(id)
-  if (!s) return
-  shown.delete(id)
-  const g = await s.guard.catch(() => null)
-  if (g?.view && s.win && !s.win.isDestroyed()) s.win.contentView.removeChildView(g.view)
-  await g?.close()
+/** A preview's guarded page closed (the runner's teardown, at its every end): true once its guard's end is proved. */
+async function closeShown(id: string): Promise<boolean> {
+  const proved = await shows.close(id)
+  triedOf.delete(id)
+  shownIn.delete(id)
+  return proved
 }
 
 /** The view's place in its window: the tab's area in the window's CSS pixels, scaled by its zoom, in whole pixels. */
@@ -362,87 +395,40 @@ function boundsOf(win: BrowserWindow, b: unknown): Rectangle {
 }
 
 /**
- * Shows a running preview's page in a window, at those bounds (the tab's area): its guard made on first use (the proxy
- * started, the partition's proxy awaited, the view made), its ports' owners checked again before its first load.
+ * Shows a running preview's page in a window, at those bounds (the tab's area): its guard opened on first use (the proxy
+ * started, the partition's proxy awaited, the view made), its ports' owners checked again before its first load. A hide,
+ * the window closing or the preview's end meanwhile makes it attach and load nothing.
  */
 export async function showPreview(win: BrowserWindow, projectPath: string, id: string, bounds: unknown): Promise<PreviewView> {
   assertOn()
   const v = runningView(projectPath, id)
-  let s = shown.get(id)
-  if (!s) {
-    const own = [v.port, ...(v.hmrPort ? [v.hmrPort] : [])]
-    const entry: Shown = { guard: Promise.resolve(null as unknown as PreviewGuard), win: null, tried: new Set(), loaded: false }
-    entry.guard = PreviewGuard.open({
-      placeKey: createHash('sha256').update(v.place.folder.toLowerCase()).digest('hex').slice(0, 12),
-      generation: v.place.generation,
-      ownPorts: own,
-      events: {
-        lost: () => {
-          void closeShown(id)
-          void runner?.stop(id, { kind: 'guardStopped' })
-        },
-        tried: (url) => {
-          if (entry.tried.size < 50) entry.tried.add(url)
-          const w = entry.win
-          if (w && !w.isDestroyed()) emitTo(w, { type: 'preview-tried', projectPath, id, url })
-        },
-        refused: (layer, url, why) => log.info(`Preview ${id}: the ${layer} refused ${userText(url)} (${why})`)
-      }
-    })
-    s = entry
-    shown.set(id, entry)
-  }
-  let g: PreviewGuard
+  let answer: Awaited<ReturnType<typeof shows.show>>
   try {
-    g = await s.guard
+    answer = await shows.show(id, win, bounds, v.url!)
   } catch (e) {
-    shown.delete(id)
     log.warn(`Preview ${id}'s network guard couldn't start`, e)
     await runner?.stop(id, { kind: 'guardStopped' })
     throw combworkError(M.guardFailed, undefined, { kind: 'invalid' })
   }
-  if (!g.view || shown.get(id) !== s) throw combworkError(M.notRunning, undefined, { kind: 'invalid' })
-  if (s.win !== win) {
-    if (s.win && !s.win.isDestroyed()) s.win.contentView.removeChildView(g.view)
-    s.win = win
-    win.contentView.addChildView(g.view)
-    win.once('closed', () => {
-      if (shown.get(id)?.win === win) void closeShown(id)
-    })
-  }
-  g.view.setBounds(boundsOf(win, bounds))
-  if (!s.loaded) {
-    const owned = await runner!.checkOwnership(id)
-    if (!owned.ok) throw combworkError(M.notRunning, undefined, { kind: 'invalid' })
-    s.loaded = true
-    await g.load(v.url!)
-  }
+  if (answer === 'notOwned') throw combworkError(M.notRunning, undefined, { kind: 'invalid' })
   return runningView(projectPath, id)
 }
 
 /** Moves a shown preview's page (the tab resized); nothing when it isn't shown in that window. */
-export async function placePreview(win: BrowserWindow, id: string, bounds: unknown): Promise<void> {
-  const s = shown.get(id)
-  if (!s || s.win !== win) return
-  const g = await s.guard.catch(() => null)
-  g?.view?.setBounds(boundsOf(win, bounds))
+export function placePreview(win: BrowserWindow, id: string, bounds: unknown): Promise<void> {
+  return shows.place(id, win, bounds)
 }
 
-/** Takes a shown preview's page out of its window (the tab hidden): it keeps running, its page kept. */
-export async function hidePreview(win: BrowserWindow, id: string): Promise<void> {
-  const s = shown.get(id)
-  if (!s || s.win !== win) return
-  const g = await s.guard.catch(() => null)
-  if (g?.view && !win.isDestroyed()) win.contentView.removeChildView(g.view)
-  s.win = null
+/** Takes a preview's page out of its window (the tab hidden), and cancels a show of it there still under way. */
+export function hidePreview(win: BrowserWindow, id: string): Promise<void> {
+  return shows.hide(id, win)
 }
 
 /** Reloads a shown preview's page (hard: bypassing the cache), its ports' owners checked again first. */
 export async function reloadPreview(projectPath: string, id: string, hard: boolean): Promise<void> {
   assertOn()
   runningView(projectPath, id)
-  const s = shown.get(id)
-  const g = s ? await s.guard.catch(() => null) : null
+  const g = shows.has(id) ? await shows.guard(id) : null
   if (!g) return
   const owned = await runner!.checkOwnership(id)
   if (!owned.ok) throw combworkError(M.notRunning, undefined, { kind: 'invalid' })
@@ -453,20 +439,18 @@ export async function reloadPreview(projectPath: string, id: string, hard: boole
 export async function previewDevTools(projectPath: string, id: string): Promise<void> {
   assertOn()
   runningView(projectPath, id)
-  const g = await shown.get(id)?.guard.catch(() => null)
+  const g = await shows.guard(id)
   g?.devTools()
 }
 
 /** Opens in the user's browser a URL the page tried to leave for: only one it did try, only http(s), on the user's click. */
 export async function openTried(id: string, url: unknown): Promise<boolean> {
   assertOn()
-  const s = shown.get(id)
   const u = typeof url === 'string' ? openableUrl(url) : null
-  if (!s || !u || !s.tried.has(u)) return false
+  if (!u || !triedOf.get(id)?.has(u)) return false
   // Test copies only: written down instead of opening the user's browser (test copies never show anything outside them).
   const testLog = !app.isPackaged ? process.env.CW_TEST_PREVIEW_OPENED : undefined
-  if (testLog) await appendFile(testLog, `${u}
-`)
+  if (testLog) await appendFile(testLog, u + '\n')
   else await shell.openExternal(u)
   return true
 }
@@ -474,11 +458,11 @@ export async function openTried(id: string, url: unknown): Promise<boolean> {
 /** Test copies only: a shown preview's guard, for its refusals and its proxy's process (ended as a crash would). */
 export async function previewTest(op: { op: 'refusals' | 'killGuard' | 'shown' | 'tried' | 'capture'; id: string; file?: string }): Promise<unknown> {
   if (app.isPackaged) throw new Error('Not allowed') // i18n-ignore: a test channel, never shown
-  const g = await shown.get(op.id)?.guard.catch(() => null)
-  if (op.op === 'shown') return { shown: !!g?.alive, viewDestroyed: !g?.view || g.view.webContents.isDestroyed() }
+  const g = shows.has(op.id) ? await shows.guard(op.id) : null
+  if (op.op === 'shown') return { shown: !!g?.alive && shownIn.has(op.id), viewDestroyed: !g?.view || g.view.webContents.isDestroyed() }
+  if (op.op === 'tried') return [...(triedOf.get(op.id) ?? [])]
   if (!g) return null
   if (op.op === 'refusals') return g.refusals
-  if (op.op === 'tried') return [...(shown.get(op.id)?.tried ?? [])]
   // The page as its view draws it (a window's own screenshot doesn't include a native view), to a test's file.
   if (op.op === 'capture') {
     const img = await g.view?.webContents.capturePage()
