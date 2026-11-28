@@ -942,6 +942,11 @@
       "list": "plain"
     }
   },
+  "api.doc.notBundled": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
   "api.doc.notFound": {
     "placeholders": {
       "path": "plain"

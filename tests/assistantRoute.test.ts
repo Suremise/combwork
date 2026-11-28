@@ -15,7 +15,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const { assistantInstructions } = await import('../src/main/modes')
 const store = await import('../src/main/boardStore')
 
-const RULE = "When Combwork's window can do what the user asks, name that route first, by its place in the window (merged branches: Version Control → Branches & remotes → Clean Up Merged Branches…); unsure of its name, say where in the window to look rather than guess. Give a shell or git command only where the window has none (say so) or when the user asks for one; then give it."
+const RULE = "When Combwork's window can do what the user asks, name that route first, by its place in the window (merged branches: Version Control → Branches & remotes → Clean Up Merged Branches…). Find any other in Combwork's user guide (cw_doc_outline \"combwork:USER_GUIDE.md\", then cw_read_section) and give it in full; never guess one: not there, say so. Give a shell or git command only where the window has none (say so) or when the user asks for one; then give it."
 
 const ws = join(base, 'ws')
 mkdirSync(join(ws, 'alpha', '.combwork'), { recursive: true })

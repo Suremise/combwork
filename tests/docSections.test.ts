@@ -228,3 +228,18 @@ describe("Combwork's tools' replies", () => {
     expect(partial.endsWith('or this whole section with full=true.')).toBe(true)
   })
 })
+
+// HI-3622: combwork:<name> is a document Combwork ships, its own copy: only the user guide, by name in any case.
+describe("Combwork's own documents (combwork:)", async () => {
+  const { readFileSync } = await import('fs')
+  const { join } = await import('path')
+  const { bundledDoc } = await import('../src/main/docSections')
+  it('combwork:USER_GUIDE.md is the user guide the app ships, its name in any case', () => {
+    const guide = readFileSync(join(__dirname, '..', 'docs', 'USER_GUIDE.md'), 'utf8').replace(/^\uFEFF/, '')
+    for (const p of ['combwork:USER_GUIDE.md', 'combwork:user_guide.md', 'combwork: USER_GUIDE.md ']) expect(bundledDoc(p), p).toEqual({ ref: 'combwork:USER_GUIDE.md', text: guide })
+    expect(findHeading(docOutline(guide), '#github-issues')).toHaveProperty('heading')
+  })
+  it('any other name is none: never a path into a folder', () => {
+    for (const p of ['combwork:SPEC.md', 'combwork:docs/USER_GUIDE.md', 'combwork:../USER_GUIDE.md', 'combwork:..\\docs\\USER_GUIDE.md', 'combwork:', 'combwork:C:\\docs\\USER_GUIDE.md', 'combwork:USER_GUIDE']) expect(bundledDoc(p), p).toBeNull()
+  })
+})

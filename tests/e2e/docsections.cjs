@@ -160,6 +160,21 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     r = await outline(agentToken, { path: 'shared:../outside.md' })
     check('a shared path outside the notes: refused', r.status === 400, JSON.stringify(r))
 
+    // --- Combwork's own guide (HI-3622): combwork:USER_GUIDE.md is the copy the build ships, for any caller, whatever
+    // project (one that doesn't exist too) or from the request names; any other combwork: name is refused, never looked
+    // for in a folder.
+    const guide = fs.readFileSync(path.join(lib.ROOT, 'docs', 'USER_GUIDE.md'), 'utf8').replace(/^﻿/, '')
+    for (const [who, token, extra] of [['the agent', agentToken, {}], ['the agent, naming another project', agentToken, { project: 'beta' }], ['the workspace token, no project', workspaceToken, {}], ['a project that does not exist', workspaceToken, { project: 'nope' }], ['from: project', agentToken, { from: 'project' }]]) {
+      r = await outline(token, { path: 'combwork:USER_GUIDE.md', ...extra })
+      check(`combwork:USER_GUIDE.md outlined (${who}): the bundled guide`, r.status === 200 && r.body.path === 'combwork:USER_GUIDE.md' && r.body.size === guide.length && r.body.headings[0].text === 'Combwork User Guide', JSON.stringify(r.body).slice(0, 300))
+    }
+    r = await section(agentToken, { path: 'combwork:user_guide.md', heading: '#github-issues' })
+    check('…a section of it by its id, the name in any case', r.status === 200 && r.body.path === 'combwork:USER_GUIDE.md' && r.body.content.includes('Close Shipped Issues…'), JSON.stringify(r.body).slice(0, 300))
+    for (const p of ['combwork:SPEC.md', 'combwork:docs/USER_GUIDE.md', 'combwork:../USER_GUIDE.md', 'combwork:..\\docs\\USER_GUIDE.md', 'combwork:', `combwork:${path.join(lib.ROOT, 'docs', 'USER_GUIDE.md')}`]) {
+      r = await outline(workspaceToken, { path: p, project: 'alpha' })
+      check(`…any other combwork: name refused (${p}): 404, nothing read`, r.status === 404 && /Combwork ships no .*combwork:USER_GUIDE\.md/.test(r.body.error) && !r.body.headings, JSON.stringify(r).slice(0, 300))
+    }
+
     // --- Through cw-mcp.js, as the agent's tools: lean text.
     const tool = (name, args) => {
       const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
@@ -184,6 +199,10 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     check('cw_read_section: an id two headings carry is an error listing both, never the first', t.isError && t.text.includes('#setup (First, line 7)') && t.text.includes('#setup-1 (Second, line 11)') && !t.text.includes('One.'), t.text)
     t = tool('cw_read_section', { path: 'shared:plans/design.md', heading: 'nothing like it' })
     check('…an unknown heading is an error naming the closest', t.isError && /Closest: /.test(t.text), t.text)
+    t = tool('cw_read_section', { path: 'combwork:USER_GUIDE.md', heading: 'github-issues' })
+    check('cw_read_section: a section of Combwork’s own guide (HI-3622)', !t.isError && t.text.startsWith('combwork:USER_GUIDE.md#github-issues (') && t.text.includes('Close Shipped Issues…'), t.text.slice(0, 300))
+    t = tool('cw_doc_outline', { path: 'combwork:SPEC.md' })
+    check('…another combwork: name is an error naming the guide', t.isError && t.text.includes('combwork:USER_GUIDE.md'), t.text)
 
     // --- Two workspaces open (#817 round 2): an agent's and the Assistant's shared notes and projects are their own
     // workspace's, whatever the request names; the workspace token reads the other's when it names it.

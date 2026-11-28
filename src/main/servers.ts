@@ -49,7 +49,7 @@ import { STOP_ASK_MS } from './mcp/agentApiCall'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
 import { agentTitle, settingChangeTexts, settingPath, settingReadOnly, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { addAgent, updateAgent } from './projectAgents'
-import { DOC_MAX, SHARED_PREFIX, readDoc } from './docSections'
+import { BUNDLED_PREFIX, DOC_MAX, SHARED_PREFIX, bundledDoc, readDoc } from './docSections'
 import { docOutline, findHeading, sectionText, type DocHeading } from '../shared/docSections'
 import { providerService } from './providerService'
 import { agentInstallInfo } from './providers/common'
@@ -2952,6 +2952,13 @@ const SECTION_MAX = 30_000
 async function docOf(query: URLSearchParams): Promise<{ ref: string; text: string }> {
   const path = query.get('path')?.trim()
   if (!path) throw new HttpError(400, apiSaid(API.doc.pathRequired))
+  // HI-3622: Combwork's own guide, the copy it ships, for any caller and whatever project the request names; any other
+  // combwork: name is refused here, never looked for in a folder.
+  if (path.toLowerCase().startsWith(BUNDLED_PREFIX)) {
+    const doc = bundledDoc(path)
+    if (!doc) throw new HttpError(404, apiSaid(API.doc.notBundled, { path }))
+    return doc
+  }
   let root: string
   let rel: string
   if (path.startsWith(SHARED_PREFIX)) {
