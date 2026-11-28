@@ -129,6 +129,8 @@ export type PreviewEnd =
   | { kind: 'noStart'; detail: string }
   /** Another preview's server in the same place couldn't be proved ended: nothing starts there until it is (HI-3614 round 2). */
   | { kind: 'placeHeld'; preview: string }
+  /** Its page's network guard (the filtering proxy) stopped or couldn't start: its page is gone, nothing more loads (HI-3615). */
+  | { kind: 'guardStopped' }
 
 export type PreviewState = 'starting' | 'running' | 'stopped'
 

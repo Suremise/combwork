@@ -142,7 +142,7 @@ import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesNow } from './workflow/rulesets'
 import { poolFor, removeGoneSlot, slotTest, slotViews } from './slotsApp'
-import { previewSuggestion, previewViews, setPreviewConfig, startPreview, stopPreview } from './previewApp'
+import { hidePreview, openTried, placePreview, previewDevTools, previewSuggestion, previewTest, previewViews, reloadPreview, setPreviewConfig, showPreview, startPreview, stopPreview } from './previewApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { githubLinkOf, githubRepoFor, openPrsOf, setGithubRemote } from './githubLink'
@@ -1091,6 +1091,13 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'preview:stop': (p, folder) => stopPreview(workspace, workspace.assertProject(p), typeof folder === 'string' ? folder : null),
     'preview:suggest': (p) => previewSuggestion(workspace.assertProject(p)),
     'preview:setConfig': (p, cfg) => setPreviewConfig(workspace, workspace.assertProject(p), cfg),
+    'preview:show': (p, id, bounds) => showPreview(win(), workspace.assertProject(p), String(id), bounds),
+    'preview:place': (id, bounds) => placePreview(win(), String(id), bounds),
+    'preview:hide': (id) => hidePreview(win(), String(id)),
+    'preview:reload': (p, id, hard) => reloadPreview(workspace.assertProject(p), String(id), hard === true),
+    'preview:devtools': (p, id) => previewDevTools(workspace.assertProject(p), String(id)),
+    'preview:openTried': (id, url) => openTried(String(id), url),
+    'preview:test': (op) => previewTest(op),
     'slots:gitFiles': async (p) => (await slotWorkspaces().files?.status(workspace.assertProject(p))) ?? null,
     // A workspace's (null) or project's GitHub hosts (HI-2779): parsed again in setGithubHosts, whoever asks.
     'github:form': (p) => githubHostsForm(workspace, p ? workspace.assertProject(p) : null, process.env),
