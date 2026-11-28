@@ -2,7 +2,7 @@
 // the file as it is in the editor, and that commit's own card and the agent that submitted it (HI-3475's rules), else
 // the commit and its author. The parsing here is pure; gitFileBlame.ts runs git, fileBlamePanel.ts adds the cards.
 
-import type { FileHistoryCard } from './fileHistory'
+import type { FileHistoryCard, FileHistoryFile, FileHistoryRow } from './fileHistory'
 
 /** The id git gives lines that no commit has yet (the editor's own edits, uncommitted changes). */
 export const UNCOMMITTED = '0'.repeat(40)
@@ -76,10 +76,10 @@ export function parseIncrementalBlame(out: string): { blocks: BlameBlock[]; comm
     else if (key === 'summary') cur.info.subject = value
     else if (key === 'previous') {
       const at = value.indexOf(' ')
-      cur.info.previous = at < 0 ? null : { commit: value.slice(0, at), path: value.slice(at + 1) }
+      cur.info.previous = at < 0 ? null : { commit: value.slice(0, at), path: unquoteGitPath(value.slice(at + 1)) }
     } else if (key === 'filename') {
       const known = commits.get(cur.hash)
-      if (!known) commits.set(cur.hash, { hash: cur.hash, author: cur.info.author ?? '', email: cur.info.email ?? '', date: cur.info.date ?? 0, subject: cur.info.subject ?? '', previous: cur.info.previous ?? null, path: value })
+      if (!known) commits.set(cur.hash, { hash: cur.hash, author: cur.info.author ?? '', email: cur.info.email ?? '', date: cur.info.date ?? 0, subject: cur.info.subject ?? '', previous: cur.info.previous ?? null, path: unquoteGitPath(value) })
       else if (!known.previous && cur.info.previous) known.previous = cur.info.previous
       raw.push({ start: cur.start, count: cur.count, hash: cur.hash })
       cur = null
@@ -94,6 +94,45 @@ export function parseIncrementalBlame(out: string): { blocks: BlameBlock[]; comm
     else blocks.push({ start: r.start, count: r.count, commit })
   }
   return { blocks, commits }
+}
+
+const ESCAPES: Record<string, number> = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, '\\': 92 }
+
+/**
+ * A path as git prints it in blame's `filename` and `previous` (HR1's round 1 finding 1): quoted in C's way when it has
+ * characters git escapes (a quote, a backslash, a control character, and with `core.quotePath` on any byte above 0x7f
+ * as octal), else as it is. The quoted form's bytes are decoded as UTF-8.
+ */
+export function unquoteGitPath(p: string): string {
+  if (p.length < 2 || !p.startsWith('"') || !p.endsWith('"')) return p
+  const s = p.slice(1, -1)
+  const bytes: number[] = []
+  const enc = new TextEncoder()
+  let i = 0
+  while (i < s.length) {
+    const slash = s.indexOf('\\', i)
+    const plainEnd = slash < 0 ? s.length : slash
+    if (plainEnd > i) bytes.push(...enc.encode(s.slice(i, plainEnd)))
+    if (slash < 0) break
+    const n = s[slash + 1] ?? ''
+    if (/[0-7]/.test(n)) {
+      const oct = /^[0-7]{1,3}/.exec(s.slice(slash + 1))![0]
+      bytes.push(parseInt(oct, 8) & 0xff)
+      i = slash + 1 + oct.length
+    } else {
+      bytes.push(ESCAPES[n] ?? n.charCodeAt(0))
+      i = slash + 2
+    }
+  }
+  return new TextDecoder().decode(new Uint8Array(bytes))
+}
+
+/** The commit's diff of the file, as History opens one: its parent at the path it had there, the commit at its own. */
+export function blamePick(c: BlameCommit): { row: FileHistoryRow; file: FileHistoryFile } {
+  const renamed = c.previous && c.previous.path !== c.path ? c.previous.path : null
+  const file: FileHistoryFile = { status: c.previous ? (renamed ? 'R' : 'M') : 'A', path: c.path, oldPath: renamed }
+  const row: FileHistoryRow = { hash: c.hash, short: c.hash.slice(0, 7), parent: c.previous?.commit ?? null, author: c.author, email: c.email, date: c.date, subject: c.subject, files: [file], card: c.card, submittedBy: c.submittedBy }
+  return { row, file }
 }
 
 /** How faded an annotation is by its age: 0 for the newest commit blamed, 1 for the oldest (none: all the same). */

@@ -78,7 +78,7 @@ export interface RepoReads {
   /** HI-3475: the merge that introduced `commit` on `head`'s first-parent line, or null when none can be said. */
   introducedBy?(root: string, head: string, commit: string, at?: number): Promise<MergeIntro | null>
   /** HI-3475: the commits in `revision` and not in `base` (a submission's own); null when they can't be read here. */
-  rangeCommits?(root: string, base: string, revision: string, at?: number): Promise<Set<string> | null>
+  rangeCommits?(root: string, base: string, revision: string, at?: number, signal?: AbortSignal): Promise<Set<string> | null>
   /**
    * HI-3476: which commit last changed each line of `rel` with `text` as its content (the editor's), and each commit's
    * card trailer; `untracked` when HEAD has no such file. Bounded by `at` as History's reads, ended by `signal`.

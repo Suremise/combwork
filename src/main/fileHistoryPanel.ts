@@ -71,7 +71,7 @@ function ownCard(wf: Workflow, project: string, c: Pick<LoggedCommit, 'hash' | '
  * The builder of the first of the card's submissions holding `commit`, or null: none holds it, or its range can't be read
  * here (its commits gone). A range read past the page's deadline `at` is refused, as the page is.
  */
-async function submitter(reads: Pick<Reads, 'rangeCommits'>, root: string, submissions: readonly Submission[], commit: string, at: number): Promise<string | null> {
+async function submitter(reads: Pick<Reads, 'rangeCommits'>, root: string, submissions: readonly Submission[], commit: string, at: number, signal?: AbortSignal): Promise<string | null> {
   for (const s of submissions) {
     if (!s.by) continue
     if (s.commits) {
@@ -79,7 +79,7 @@ async function submitter(reads: Pick<Reads, 'rangeCommits'>, root: string, submi
       continue
     }
     if (!s.base || !s.revision) continue
-    if ((await reads.rangeCommits(root, s.base, s.revision, at))?.has(commit)) return s.by
+    if ((await reads.rangeCommits(root, s.base, s.revision, at, signal))?.has(commit)) return s.by
   }
   return null
 }
@@ -121,9 +121,10 @@ export interface CommitCardOf {
 /**
  * HI-3475/HI-3476: each commit's own card (ownCard) and its "submitted by" (submitter), for History's rows and blame's
  * annotations alike, read once per card. `at` bounds the submissions' range reads; past it this is refused, never answered
- * without them. No board to read (none yet, a workspace closing): no cards.
+ * without them; `signal` stops them (their git ended), and every one after it, which then fails at once. No board to read
+ * (none yet, a workspace closing): no cards.
  */
-export async function commitCards(ws: WorkspaceService, project: string, folder: string, commits: readonly Pick<LoggedCommit, 'hash' | 'trailer' | 'subject'>[], at: number, reads: Pick<Reads, 'rangeCommits'>): Promise<Map<string, CommitCardOf>> {
+export async function commitCards(ws: WorkspaceService, project: string, folder: string, commits: readonly Pick<LoggedCommit, 'hash' | 'trailer' | 'subject'>[], at: number, reads: Pick<Reads, 'rangeCommits'>, signal?: AbortSignal): Promise<Map<string, CommitCardOf>> {
   const out = new Map<string, CommitCardOf>()
   const wf = commits.length ? await workflowOrNull(ws, project) : null
   if (!wf) return out
@@ -135,7 +136,7 @@ export async function commitCards(ws: WorkspaceService, project: string, folder:
     if (card) {
       let subs = submissions.get(card.number)
       if (!subs) submissions.set(card.number, (subs = wf.state(card.number).submissions))
-      const agent = await submitter(reads, folder, subs, c.hash, at)
+      const agent = await submitter(reads, folder, subs, c.hash, at, signal)
       if (agent) submittedBy = { agent, name: name(agent) }
     }
     out.set(c.hash, { card, submittedBy })

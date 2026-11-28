@@ -151,13 +151,14 @@ const RANGES_KEPT = 200
 
 /**
  * The commits in `base..revision` (in the revision and not its base): a submission's own. Null when git can't read the
- * range (its commits gone from this repository): it says nothing of a commit. Refused only once `at` has run out.
+ * range (its commits gone from this repository): it says nothing of a commit. Refused once `at` has run out, or once
+ * `signal` stops it (HR1's HI-3476 finding 4: its blame was stopped), its git ended.
  */
-export async function rangeCommits(root: string, base: string, revision: string, at = historyDeadline()): Promise<Set<string> | null> {
+export async function rangeCommits(root: string, base: string, revision: string, at = historyDeadline(), signal?: AbortSignal): Promise<Set<string> | null> {
   const key = `${root.toLowerCase()}\n${base}\n${revision}`
   const kept = ranges.get(key)
   if (kept) return kept
-  const r = await run(root, ['rev-list', `${base}..${revision}`, '--'], at)
+  const r = await run(root, ['rev-list', `${base}..${revision}`, '--'], at, undefined, { signal })
   if (!r.ok) return null
   const got = new Set(r.out.split(/\r?\n/).filter(Boolean))
   if (ranges.size >= RANGES_KEPT) ranges.delete(ranges.keys().next().value!)

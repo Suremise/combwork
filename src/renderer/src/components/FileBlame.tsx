@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type * as Monaco from 'monaco-editor'
-import { ageShade, type BlameCommit, type BlameResult } from '@shared/fileBlame'
-import type { FileHistoryFile, FileHistoryRow } from '@shared/fileHistory'
+import { ageShade, blamePick, type BlameResult } from '@shared/fileBlame'
 import { formatDateTime } from '@shared/dates'
 import { msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -37,14 +36,6 @@ const T = FILE_BLAME_TEXT
 const SETTLE_MS = 800
 
 let requests = 0
-
-/** The commit's diff of the file, as History opens one: its parent at the path it had there, the commit at its own. */
-export function blamePick(c: BlameCommit): HistoryPick {
-  const renamed = c.previous && c.previous.path !== c.path ? c.previous.path : null
-  const file: FileHistoryFile = { status: c.previous ? (renamed ? 'R' : 'M') : 'A', path: c.path, oldPath: renamed }
-  const row: FileHistoryRow = { hash: c.hash, short: c.hash.slice(0, 7), parent: c.previous?.commit ?? null, author: c.author, email: c.email, date: c.date, subject: c.subject, files: [file], card: c.card, submittedBy: c.submittedBy }
-  return { row, file }
-}
 
 type Shown = { for: string; result: BlameResult } | { for: string; error: string }
 
@@ -88,12 +79,15 @@ export function BlameColumn({ root, rel, text, editor, onOpenCommit }: { root: s
     return () => subs.forEach((s) => s.dispose())
   }, [editor])
 
-  const result = shown && 'result' in shown ? shown.result : null
+  // HR1's round 1 finding 3: only an answer for the text the editor has now is drawn. One for an earlier text (lines
+  // typed above, deleted) would put its commits beside the wrong lines, so until the next answer the column is empty.
+  const current = shown && shown.for === key ? shown : null
+  const result = current && 'result' in current ? current.result : null
   const bar = (): React.ReactNode => {
-    if (shown && 'error' in shown)
+    if (current && 'error' in current)
       return (
         <div className="banner warn blame-bar" data-blame-error="">
-          {tr(T.failed, { error: shown.error })}{' '}
+          {tr(T.failed, { error: current.error })}{' '}
           <button className="btn small" onClick={() => setReads((n) => n + 1)}>
             {tr(T.retry)}
           </button>
@@ -170,7 +164,7 @@ export function BlameColumn({ root, rel, text, editor, onOpenCommit }: { root: s
     }
   }
 
-  const loading = !shown || shown.for !== key
+  const loading = !current
   return (
     <>
       {bar()}

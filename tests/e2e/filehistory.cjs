@@ -154,6 +154,8 @@ const check = (name, ok, extra = '') => {
     await page.locator('.split-main .monaco').first().click({ position: { x: 90, y: 10 } })
     await page.keyboard.press('Control+Home')
     await page.keyboard.type('top line\n')
+    // Until the new text's blame comes (a moment after typing stops), the old one isn't drawn beside the moved lines.
+    check('as soon as a line is typed, the old annotations are gone', (await column.locator('.blame-block').count()) === 0 && (await column.getAttribute('aria-busy')) === 'true')
     check('a line typed is blamed as not committed', !!(await lib.until(async () => (await column.locator('.blame-block.uncommitted[data-blame-line="1"]').count()) === 1, HUNG_MS)))
     await page.keyboard.press('Control+Home')
     await page.keyboard.press('Shift+ArrowDown')

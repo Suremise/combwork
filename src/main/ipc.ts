@@ -241,6 +241,23 @@ const advancedState = (): AdvancedState => advanced.state(workspace.path ? (work
 /** The window an IPC call came from, for calls that keep something per window (the developer console's subscription). */
 const senderStore = new AsyncLocalStorage<WebContents>()
 
+/** HI-3476: the windows whose blames are stopped when they go (registered once each). */
+const blameWindows = new WeakSet<WebContents>()
+/**
+ * HI-3476: whose blame request ids an IPC call's are: its window's (its webContents' id), so two windows' ids never
+ * meet; `onGone` stops that window's blames when it is destroyed (registered once a window).
+ */
+function blameOwner(onGone?: (owner: string) => void): string {
+  const wc = senderStore.getStore()
+  if (!wc) return 'none'
+  const owner = `wc:${wc.id}`
+  if (onGone && !blameWindows.has(wc)) {
+    blameWindows.add(wc)
+    wc.once('destroyed', () => onGone(owner))
+  }
+  return owner
+}
+
 /** HI-3372: who may cancel a run started now: this window, this open of its workspace, the project (gitCancel.ts). */
 const cancelOwner = (projectPath: string): CancelOwner => cancelOwnerOf(senderStore.getStore(), currentWorkspace(), projectPath)
 
@@ -1897,8 +1914,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'files:historyDiff': async (root, left, right) => (await import('./fileHistoryPanel')).fileHistoryDiffAt(workspace, root, left, right, lineRepoReads()),
     'files:historyIntro': async (root, head, commit) => (await import('./fileHistoryPanel')).fileHistoryIntroAt(workspace, root, head, commit, lineRepoReads()),
     // HI-3476: blame by card, in the same folders as History; a later request with the same id, or blameCancel, stops it.
-    'files:blame': async (root, rel, text, large, id) => (await import('./fileBlamePanel')).fileBlameAt(workspace, root, rel, text, large, id, lineRepoReads()),
-    'files:blameCancel': async (id) => (await import('./fileBlamePanel')).fileBlameCancel(id),
+    'files:blame': async (root, rel, text, large, id) => {
+      const blame = await import('./fileBlamePanel')
+      return blame.fileBlameAt(workspace, root, rel, text, large, id, lineRepoReads(), blameOwner(blame.fileBlameOwnerGone))
+    },
+    'files:blameCancel': async (id) => (await import('./fileBlamePanel')).fileBlameCancel(blameOwner(), id),
     'git:history': async (p, ref, page) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

@@ -9,7 +9,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { timing } from './waits'
 import { commit, gitRepo, sh } from './workflow/harness'
-import { ageShade, parseIncrementalBlame, UNCOMMITTED } from '../src/shared/fileBlame'
+import { ageShade, blamePick, parseIncrementalBlame, unquoteGitPath, UNCOMMITTED } from '../src/shared/fileBlame'
 import type { Submission } from '../src/shared/workflow/facts'
 
 const board = {
@@ -54,7 +54,7 @@ const ws = {
 }
 type Ws = Parameters<typeof P.fileBlameAt>[0]
 const text = (rel: string): string => readFileSync(join(proj, rel), 'utf8')
-const blame = (rel: string, t = text(rel), large = false, id = `t${n}`) => P.fileBlameAt(ws as unknown as Ws, proj, rel, t, large, id, gitRepoReads)
+const blame = (rel: string, t = text(rel), large = false, id = `t${n}`, owner = 'w1') => P.fileBlameAt(ws as unknown as Ws, proj, rel, t, large, id, gitRepoReads, owner)
 const later = (): number => Date.now() + 60_000
 
 beforeEach(() => {
@@ -105,6 +105,17 @@ describe('parsing', () => {
     expect(got.commits.get(a)?.previous).toBeNull()
   })
 
+  it("decodes git's quoted paths: escapes, and UTF-8 bytes in octal", () => {
+    expect(unquoteGitPath('"caf\\303\\251.txt"')).toBe('café.txt')
+    expect(unquoteGitPath('"a\\"b\\\\c\\td.txt"')).toBe('a"b\\c\td.txt')
+    expect(unquoteGitPath('plain.txt')).toBe('plain.txt')
+    expect(unquoteGitPath('"')).toBe('"')
+    const out = [`${'c'.repeat(40)} 1 1 1`, 'author A', 'author-time 1', 'summary s', `previous ${'d'.repeat(40)} "caf\\303\\251.txt"`, 'filename "na\\303\\257ve.txt"'].join('\n')
+    const c = parseIncrementalBlame(out).commits.get('c'.repeat(40))!
+    expect(c.path).toBe('naïve.txt')
+    expect(c.previous).toEqual({ commit: 'd'.repeat(40), path: 'café.txt' })
+  })
+
   it('fades the older commits, the newest not at all', () => {
     expect(ageShade(10, 10, 0)).toBe(0)
     expect(ageShade(0, 10, 0)).toBe(1)
@@ -147,6 +158,21 @@ describe('git read', () => {
     mkdirSync(empty, { recursive: true })
     sh(empty, 'init', '-q')
     expect(await B.fileBlame(empty, 'f.txt', 'x\n', later())).toEqual({ kind: 'untracked' })
+  })
+
+  it('opens a non-ASCII file renamed in a commit at both its paths, from what git quotes', async () => {
+    const one = commit(proj, { 'café.txt': 'a\n' }, 'one')
+    sh(proj, 'mv', 'café.txt', 'naïve.txt')
+    const two = commit(proj, { 'naïve.txt': 'a\nb\n' }, 'two')
+    // Git as a terminal runs it (core.quotePath on): the names come quoted, in octal.
+    const out = sh(proj, '-c', 'core.quotePath=true', 'blame', '--incremental', '-M', '--', 'naïve.txt')
+    expect(out).toContain('"na\\303\\257ve.txt"')
+    const c = parseIncrementalBlame(out).commits.get(two)!
+    const { row, file } = blamePick({ ...c, card: null, submittedBy: null })
+    expect(file).toEqual({ status: 'R', path: 'naïve.txt', oldPath: 'café.txt' })
+    const H = await import('../src/main/platform/git/gitFileHistory')
+    expect(await H.fileVersions(proj, { commit: row.parent!, path: file.oldPath! }, { commit: row.hash, path: file.path })).toMatchObject({ original: 'a\n', modified: 'a\nb\n', left: 'file', right: 'file' })
+    expect(row.parent).toBe(one)
   })
 
   it("reads paths from the repository's top in a folder inside it", async () => {
@@ -198,10 +224,59 @@ describe('the panel', () => {
     await expect(first).rejects.toThrow(/changed meanwhile/)
     expect(signals[0].aborted).toBe(true)
     await vi.waitFor(() => expect(signals).toHaveLength(2), { timeout: timing('wait.hang') })
-    P.fileBlameCancel('same')
+    P.fileBlameCancel('w1', 'same')
     await expect(second).rejects.toThrow(/changed meanwhile/)
     expect(signals[1].aborted).toBe(true)
     release()
+  })
+
+  /** A git that runs until its signal stops it, for the calls `which` picks; the signals seen, in order. */
+  const blocking = (which: (args: string[]) => boolean): AbortSignal[] => {
+    const signals: AbortSignal[] = []
+    gitHook = (_cwd, args, _max, _input, opts) => {
+      if (!which(args)) return null
+      if (opts?.signal) signals.push(opts.signal)
+      return new Promise((resolve) => {
+        const done = (): void => resolve({ ok: false, out: '', buf: Buffer.alloc(0), err: 'cancelled', code: -1, cancelled: true })
+        if (opts?.signal?.aborted) done()
+        else opts?.signal?.addEventListener('abort', done, { once: true })
+      })
+    }
+    return signals
+  }
+  const isBlame = (args: string[]): boolean => args[1] === 'blame'
+
+  it("keeps each window's requests apart: the same id in another window stops nothing", async () => {
+    commit(proj, { 'f.txt': 'a\n' }, 'one')
+    const signals = blocking(isBlame)
+    const one = blame('f.txt', 'a\n', false, 'blame-1', 'w1')
+    await vi.waitFor(() => expect(signals).toHaveLength(1), { timeout: timing('wait.hang') })
+    const two = blame('f.txt', 'a\n', false, 'blame-1', 'w2')
+    await vi.waitFor(() => expect(signals).toHaveLength(2), { timeout: timing('wait.hang') })
+    expect(signals[0].aborted).toBe(false)
+    P.fileBlameCancel('w2', 'blame-1')
+    await expect(two).rejects.toThrow(/changed meanwhile/)
+    expect(signals[0].aborted).toBe(false)
+    // The first window going stops its own.
+    P.fileBlameOwnerGone('w1')
+    await expect(one).rejects.toThrow(/changed meanwhile/)
+    expect(P.fileBlamesRunning('w1') + P.fileBlamesRunning('w2')).toBe(0)
+  })
+
+  it("stops a submission's range read when its blame is cancelled, and starts no other", async () => {
+    const b0 = commit(proj, { 'f.txt': 'a\n' }, 'start')
+    const c = commit(proj, { 'f.txt': 'A\n' }, 'HI-12: change', { trailer: 'HI-12' })
+    const other = commit(proj, { 'g.txt': 'x\n' }, 'more')
+    board.submissions.set(12, [submission({ id: 1, by: 'a-2', base: c, revision: other }), submission({ id: 2, by: 'a-1', base: b0, revision: c })])
+    let ranges = 0
+    const signals = blocking((args) => args[0] === 'rev-list' && !!args[1]?.includes('..') && ++ranges > 0)
+    const going = blame('f.txt', 'A\n', false, 'r1')
+    await vi.waitFor(() => expect(signals).toHaveLength(1), { timeout: timing('wait.hang') })
+    P.fileBlameCancel('w1', 'r1')
+    await expect(going).rejects.toThrow(/changed meanwhile/)
+    expect(signals[0].aborted).toBe(true)
+    // The second submission's range was never started after the first was stopped.
+    expect(ranges).toBe(1)
   })
 
   it("is bounded by History's deadline", async () => {
