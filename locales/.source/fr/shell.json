@@ -53,6 +53,7 @@
   "shell.command.assistant.toggle": "Toggle Assistant",
   "shell.command.console.showCapture": "Show Capture in Folder",
   "shell.command.files.commitIgnore": "Commit .gitignore",
+  "shell.command.files.toggleBlame": "Toggle Blame by Card",
   "shell.command.files.toggleHistory": "Toggle File History",
   "shell.command.folderChanges.settle": "Commit or Set Aside Changes",
   "shell.command.folderChanges.show": "Show Uncommitted Changes",

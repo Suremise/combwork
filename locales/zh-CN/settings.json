@@ -463,6 +463,8 @@
   "settings.advanced.copilotFooter.title": "底栏：{mode}",
   "settings.advanced.cw.db.busySeconds.desc": "当其他程序（此工作区中的另一个 Combwork、某个脚本）持有数据库锁时，对看板、助手日志或使用历史的写入在被拒绝前等待的时间。这是等待时间的上限，而不是速度：对看板的写入在 Combwork 的主线程上等待，因此等待期间窗口不会响应。重启 Combwork 后生效。",
   "settings.advanced.cw.db.busySeconds.title": "数据库：等待其他程序的锁",
+  "settings.advanced.cw.git.blameAskLines.desc": "“文件”标签页中的按卡片追溯会读取每一行最后由哪个提交更改；文件和历史越长，git 用时越久。行数超过此值的文件会先询问。每次读取仍会在“Git：读取历史的最长时间”处停止。",
+  "settings.advanced.cw.git.blameAskLines.title": "Git：追溯前先询问的文件行数",
   "settings.advanced.cw.git.historySeconds.desc": "“文件”标签页的“历史”读取一个文件的一页提交（及其卡片）、一个提交的更改或带入某个提交的合并时可用的最长时间，超过后 Combwork 会停止 git 并说明。一页通常远不到一秒；如果仓库非常大、git 读取历史很慢，请调高此值。",
   "settings.advanced.cw.git.historySeconds.title": "Git：读取历史的最长时间",
   "settings.advanced.cw.input.hiddenSeconds.desc": "从 Combwork 首次因代理的输入框不在屏幕上而无法输入时算起，输入框可以一直不显示多久，之后 Combwork 停止尝试，并将该代理显示为等待你处理（HI-3411）：它的 CLI 在输入框位置显示的内容（例如 Combwork 无法识别的问题）正在接收按键。输入框再次显示后，等待中的内容会被输入。",

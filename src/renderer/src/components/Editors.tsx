@@ -40,7 +40,8 @@ export function CodeEditor({
   onSave,
   readOnly,
   wordWrap = true,
-  goto
+  goto,
+  onEditor
 }: {
   value: string
   language: string
@@ -49,6 +50,8 @@ export function CodeEditor({
   readOnly?: boolean
   wordWrap?: boolean
   goto?: EditorGoto
+  /** HI-3476: hears the editor once it is made, and null once it is gone (blame's column beside it). */
+  onEditor?: (editor: Monaco.editor.IStandaloneCodeEditor | null) => void
 }) {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -83,9 +86,11 @@ export function CodeEditor({
       ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => cbs.current.onSave?.())
       editor.current = ed
       setReady(true)
+      onEditor?.(ed)
     })
     return () => {
       disposed = true
+      if (editor.current) onEditor?.(null)
       // Dispose the editor before its model; the other order makes Monaco throw "Model is disposed!".
       const model = editor.current?.getModel()
       editor.current?.dispose()

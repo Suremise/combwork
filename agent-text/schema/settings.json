@@ -1187,6 +1187,12 @@
   "settings.advanced.cw.focused.pickSeconds.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.git.blameAskLines.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.blameAskLines.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.git.commitMinutes.desc": {
     "placeholders": {}
   },

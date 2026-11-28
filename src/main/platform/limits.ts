@@ -14,6 +14,8 @@ export const platformLimits = {
   queueCheckMs: (): number => 90 * 60_000,
   /** HI-3475: one read of the Files tab's History (a page with its cards, a commit's diff, its merge), git ended at it (`cw.git.historySeconds`, 60 s). */
   gitHistoryMs: (): number => 60_000,
+  /** HI-3476: blame asks first for a file with more lines than this (`cw.git.blameAskLines`, 20,000). */
+  blameAskLines: (): number => 20_000,
   /** HI-3473: how old a lock file of git's must be before Repository health calls it stale (`cw.git.staleLockSeconds`, 60 s). */
   staleLockMs: (): number => 60_000,
   /** HI-3473: the program names that count as a git that may hold a lock (`cw.git.processNames`). */

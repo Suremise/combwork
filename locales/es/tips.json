@@ -228,6 +228,8 @@
   "tips.dialectsNewModel.title": "Un archivo de dialecto para cualquier modelo",
   "tips.editTemplates.text": "Selecciona una plantilla en la vista Plantillas y elige Editar…: agrega, copia, reordena o quita sus agentes, cambia cada uno en el cuadro Configuración del agente (su Guardar también guarda la plantilla), cámbiale el nombre y elige su diseño.",
   "tips.editTemplates.title": "Edita una plantilla en su sitio",
+  "tips.fileBlame.text": "Blame por tarjeta, encima de un archivo en la pestaña Archivos, muestra junto a cada bloque de líneas la tarjeta cuyo commit lo cambió por última vez y el agente que lo envió. Haz clic en la tarjeta para abrirla, o en el resto para ver qué cambió ese commit.",
+  "tips.fileBlame.title": "¿Qué tarjeta cambió esta línea?",
   "tips.fileHistory.text": "Historial, encima de un archivo en la pestaña Archivos, lista los commits que lo cambiaron, siguiendo sus cambios de nombre: cada uno con la tarjeta que nombra su commit y el agente que lo envió. Haz clic en uno para ver qué cambió; Volver al archivo conserva tus ediciones.",
   "tips.fileHistory.title": "¿Qué tarjeta cambió este archivo?",
   "tips.fileLinks.text": "Las rutas de archivo que imprime un agente, como src/app.ts:42, son enlaces: haz Ctrl+clic en una para abrir el archivo en la pestaña Archivos en esa línea.",

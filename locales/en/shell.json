@@ -215,6 +215,10 @@
     "defaultMessage": "Commit .gitignore",
     "description": "HI-2944: a command, in the Project category. It isn't in the menus or the palette: the notification after Exclude from Git (shared, in .gitignore) runs it from its Commit It button. Keep .gitignore: a file name."
   },
+  "shell.command.files.toggleBlame": {
+    "defaultMessage": "Toggle Blame by Card",
+    "description": "HI-3476: a command (the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Files tab and shows or hides, beside the file's editor, which card and agent last changed each line."
+  },
   "shell.command.files.toggleHistory": {
     "defaultMessage": "Toggle File History",
     "description": "HI-3475: a command (the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Files tab and shows or hides its History panel (the commits that changed the file or folder selected)."

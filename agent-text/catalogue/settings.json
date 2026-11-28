@@ -1939,6 +1939,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge.",
     "audience": "both"
   },
+  "settings.advanced.cw.git.blameAskLines.desc": {
+    "text": "Blame in the Files tab reads which commit last changed each line, which takes git longer the longer the file and its history. For a file with more lines than this it asks first. Each read still stops at Git: longest a history read takes.",
+    "note": "What the advanced setting \"Git: ask before blaming a file longer than\" does (Settings → Advanced, HI-3476). Git: longest a history read takes is another setting’s name: keep it as Settings → Advanced shows it.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.git.blameAskLines.title": {
+    "text": "Git: ask before blaming a file longer than",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in lines: the Files tab's Blame (HI-3476).",
+    "audience": "both"
+  },
   "settings.advanced.cw.git.commitMinutes.desc": {
     "text": "How long Commit and Set aside of a folder's changes may run, the repository's pre-commit hook, filters and signer included, before Combwork ends git as stuck. You can cancel one from the window at any time: this is a last resort for one nobody is watching. Raise it if a hook really runs longer.",
     "note": "What the advanced setting \"Git: longest a commit or set aside takes\" does, and when to change it (Settings → Advanced, HI-3372).",

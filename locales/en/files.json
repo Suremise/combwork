@@ -195,6 +195,54 @@
     "defaultMessage": "View",
     "description": "An attachment's right-click menu: opens it in the viewer."
   },
+  "files.blame.blameAnyway": {
+    "defaultMessage": "Blame it",
+    "description": "HI-3476: the button on the long file's bar: reads the blame anyway."
+  },
+  "files.blame.commitTip": {
+    "defaultMessage": "{subject}\n{author} · {when} · {commit}\nClick to see what this commit changed in the file.",
+    "description": "HI-3476: the tooltip of an annotation in the blame column (keep the line breaks): the commit's message's first line, its author, when (a date and time) and short id."
+  },
+  "files.blame.failed": {
+    "defaultMessage": "Couldn't read who changed each line: {error}",
+    "description": "HI-3476: a bar over the editor when reading the blame failed. {error} is why."
+  },
+  "files.blame.large": {
+    "defaultMessage": "This file has {lines, number} lines: reading who changed each one may take a while.",
+    "description": "HI-3476: a bar over the editor before blaming a file longer than Settings → Advanced's limit."
+  },
+  "files.blame.loading": {
+    "defaultMessage": "Reading who changed each line…",
+    "description": "HI-3476: atop the blame column while git reads it."
+  },
+  "files.blame.openCard": {
+    "defaultMessage": "Open {card}: {title}",
+    "description": "HI-3476: the tooltip of a card in the blame column. {card} is its key (HI-12), {title} its title."
+  },
+  "files.blame.retry": {
+    "defaultMessage": "Try again",
+    "description": "HI-3476: the blame bar's button after reading it failed."
+  },
+  "files.blame.submittedByTip": {
+    "defaultMessage": "{agent} submitted this commit for review in one of {card}'s submissions. It doesn't say who wrote it: git records one author for everyone here.",
+    "description": "HI-3476: the tooltip of the agent in the blame column. {agent} is the agent's name, {card} the card's key."
+  },
+  "files.blame.toggle": {
+    "defaultMessage": "Blame by card",
+    "description": "HI-3476: the Files tab's toolbar button (and right-click menu item) that shows or hides, beside the editor, which card and agent last changed each line."
+  },
+  "files.blame.toggleTip": {
+    "defaultMessage": "Which card and agent last changed each line",
+    "description": "HI-3476: the tooltip of the Files tab's Blame by card button."
+  },
+  "files.blame.uncommitted": {
+    "defaultMessage": "Not committed yet",
+    "description": "HI-3476: the blame column beside lines no commit has: the editor's unsaved edits, or changes not committed."
+  },
+  "files.blame.untracked": {
+    "defaultMessage": "Git has no committed version of this file yet: there's nothing to blame.",
+    "description": "HI-3476: a bar over the editor when Blame by card is on for a file git doesn't track, or that isn't in the last commit (new, renamed and not committed)."
+  },
   "files.collapseAll": {
     "defaultMessage": "Collapse All",
     "description": "Files tab's toolbar: closes every open folder."

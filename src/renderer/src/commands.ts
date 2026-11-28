@@ -262,6 +262,17 @@ const COMMAND_DEFS: CommandDef[] = [
       set({ filesHistory: show })
     }
   },
+  {
+    id: 'files.toggleBlame',
+    name: msg({ id: 'shell.command.files.toggleBlame', defaultMessage: 'Toggle Blame by Card', description: "HI-3476: a command (the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Files tab and shows or hides, beside the file's editor, which card and agent last changed each line." }),
+    category: 'project',
+    when: hasProject,
+    run: () => {
+      const show = !get().filesBlame
+      if (show) tab('files')()
+      set({ filesBlame: show })
+    }
+  },
   { id: 'project.tab.images', name: msg({ id: 'shell.command.project.tab.images', defaultMessage: 'Go to Attachments', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+7', when: hasProject, run: tab('images') },
   { id: 'project.tab.changes', name: msg({ id: 'shell.command.project.tab.changes', defaultMessage: 'Go to Version Control', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Version Control tab (glossary 2.1).' }), category: 'project', keybinding: 'Alt+8', when: hasProject, run: tab('changes') },
   { id: 'project.tab.activity', name: msg({ id: 'shell.command.project.tab.activity', defaultMessage: 'Go to Activity', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Activity tab, the project's live work as a tree." }), category: 'project', keybinding: 'Alt+9', when: hasProject, run: tab('activity') },

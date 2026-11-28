@@ -5,11 +5,13 @@ import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { languageFor } from '../monacoLang'
 import { clearEditorDrafts, editorDraftList, onEditorDrafts, saveEditorDrafts } from '../editorDrafts'
-import { confirm, notify } from '../store'
+import { confirm, notify, set, useStore } from '../store'
 import { cx, formatBytes, imageUrl, timeAgo } from '../util'
 import { CodeEditor, type EditorGoto } from './Editors'
 import { PaneResizer, usePaneSize } from './Resizer'
-import { Icon, Markdown, Tooltip } from './ui'
+import { Icon, IconButton, Markdown, Tooltip } from './ui'
+import { BlameColumn, FILE_BLAME_TEXT } from './FileBlame'
+import type { HistoryPick } from './FileHistory'
 
 /** The Files area's words used by more than one editor (#803): the Files tab, its file view and DocEditor. */
 export const FILES_TEXT = {
@@ -283,7 +285,8 @@ export function FileView({
   onOpenRel,
   toolbarExtra,
   goto,
-  overlay
+  overlay,
+  blame
 }: {
   project: ProjectInfo
   rel: string
@@ -298,6 +301,11 @@ export function FileView({
    * hidden, its text, edits and undo kept: taking the overlay away shows it again.
    */
   overlay?: React.ReactNode
+  /**
+   * HI-3476: Blame by card is offered (the Files tab, in the folder it shows): its toolbar button, and the column beside
+   * the editor while the store's `filesBlame` is on; a commit clicked there opens with `onOpenCommit`.
+   */
+  blame?: { onOpenCommit: (pick: HistoryPick) => void }
 }) {
   const abs = `${project.path}\\${rel.replace(/\//g, '\\')}`
   const name = rel.split('/').pop()!
@@ -313,6 +321,8 @@ export function FileView({
     setModeState(m)
   }
   const dirty = !!content && content.kind === 'text' && text !== content.text
+  const blameShown = useStore((s) => s.filesBlame)
+  const [codeEditor, setCodeEditor] = useState<Parameters<NonNullable<Parameters<typeof CodeEditor>[0]['onEditor']>>[0]>(null)
   const textRef = useRef(text)
   textRef.current = text
   const contentRef = useRef(content)
@@ -453,6 +463,9 @@ export function FileView({
           )}
         </div>
       )}
+      {blame && content?.kind === 'text' && canEdit && (
+        <IconButton icon="list-flat" title={tr(FILE_BLAME_TEXT.toggleTip)} active={blameShown} action="file-blame" onClick={() => set({ filesBlame: !blameShown })} />
+      )}
       {toolbarExtra}
       {content?.kind === 'text' && canEdit && (
         <Tooltip content={tr(M.saveTip)}>
@@ -503,7 +516,7 @@ export function FileView({
   }
 
   const previewProps: PreviewProps = { text, root: project.path, abs, rel, onOpenRel }
-  const editor = (
+  const code = (
     <CodeEditor
       key={abs}
       value={text}
@@ -512,7 +525,17 @@ export function FileView({
       onSave={() => void save()}
       wordWrap={/\.(md|markdown|mdx|txt)$/i.test(name)}
       goto={goto}
+      onEditor={setCodeEditor}
     />
+  )
+  // HI-3476: the blame column beside the editor; the editor stays the same element, so turning it on keeps its state.
+  const editor = blame ? (
+    <div className={cx('blame-wrap', blameShown && 'on')}>
+      {blameShown && <BlameColumn root={project.path} rel={rel} text={text} editor={codeEditor} onOpenCommit={blame.onOpenCommit} />}
+      <div className="blame-editor">{code}</div>
+    </div>
+  ) : (
+    code
   )
   return (
     <>

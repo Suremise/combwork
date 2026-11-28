@@ -14,6 +14,7 @@
 import type { BranchDrops, BranchUpdatePlan, CompareLines, GitComparison, GitHistory, GitRemote, GitRepoInfo, GitRepoSummary, LeftoverInfo } from '../../shared/gitRepo'
 import type { SigningInfo } from '../../shared/gitSigning'
 import type { FileLog, FileSide, FileVersions, MergeIntro } from '../../shared/fileHistory'
+import type { BlameRead } from '../../shared/fileBlame'
 import type { GitOperationState } from '../../shared/gitOperations'
 import type { StashConflict } from '../../shared/gitStashes'
 import type { ResolvedStart, StartPoints } from '../../shared/nextVersion'
@@ -77,7 +78,12 @@ export interface RepoReads {
   /** HI-3475: the merge that introduced `commit` on `head`'s first-parent line, or null when none can be said. */
   introducedBy?(root: string, head: string, commit: string, at?: number): Promise<MergeIntro | null>
   /** HI-3475: the commits in `revision` and not in `base` (a submission's own); null when they can't be read here. */
-  rangeCommits?(root: string, base: string, revision: string, at?: number): Promise<Set<string> | null>
+  rangeCommits?(root: string, base: string, revision: string, at?: number, signal?: AbortSignal): Promise<Set<string> | null>
+  /**
+   * HI-3476: which commit last changed each line of `rel` with `text` as its content (the editor's), and each commit's
+   * card trailer; `untracked` when HEAD has no such file. Bounded by `at` as History's reads, ended by `signal`.
+   */
+  fileBlame?(root: string, rel: string, text: string, at: number, signal?: AbortSignal): Promise<BlameRead>
   /** A line's history, a page at a time, and the tags. */
   history(root: string, o: { ref?: string | null; page?: number; workTarget?: string | null }): Promise<GitHistory>
   /** What can be compared: the lines, main, the integration line and the slots with a line. */

@@ -995,6 +995,14 @@
     "defaultMessage": "Choose your external terminal",
     "description": "A tip's title (HI-3582)."
   },
+  "tips.fileBlame.text": {
+    "defaultMessage": "Blame by card, above a file in the Files tab, shows beside each run of lines the card whose commit last changed it and the agent that submitted it. Click the card to open it, or the rest to see what that commit changed.",
+    "description": "A tip (HI-3476). Names of Combwork's buttons and views: keep them as Combwork shows them."
+  },
+  "tips.fileBlame.title": {
+    "defaultMessage": "Which card changed this line?",
+    "description": "A tip's title (HI-3476)."
+  },
   "tips.fileHistory.text": {
     "defaultMessage": "History, above a file in the Files tab, lists the commits that changed it, following its renames: each with the card its commit names and the agent that submitted it. Click one to see what it changed; Back to file keeps your edits.",
     "description": "A tip (HI-3475). Names of Combwork's buttons and views: keep them as Combwork shows them."

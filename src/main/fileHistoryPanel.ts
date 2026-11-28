@@ -28,10 +28,10 @@ const T = {
   unsupported: msg({ id: 'service.fileHistory.unsupported', defaultMessage: "This folder's version control has no history to show.", description: "HI-3475: an error from the Files tab's History panel: the folder's version control can't read a file's history." })
 }
 
-type Reads = Required<Pick<RepoReads, 'fileLog' | 'fileVersions' | 'introducedBy' | 'rangeCommits'>>
+export type Reads = Required<Pick<RepoReads, 'fileLog' | 'fileVersions' | 'introducedBy' | 'rangeCommits'>>
 
 /** The reads History needs, or refused when the folder's platform has none. */
-function readsOf(reads: RepoReads): Reads {
+export function readsOf(reads: RepoReads): Reads {
   const { fileLog, fileVersions, introducedBy, rangeCommits } = reads
   if (!fileLog || !fileVersions || !introducedBy || !rangeCommits) throw combworkError(T.unsupported, undefined, { kind: 'conflict' })
   return { fileLog, fileVersions, introducedBy, rangeCommits }
@@ -71,7 +71,7 @@ function ownCard(wf: Workflow, project: string, c: Pick<LoggedCommit, 'hash' | '
  * The builder of the first of the card's submissions holding `commit`, or null: none holds it, or its range can't be read
  * here (its commits gone). A range read past the page's deadline `at` is refused, as the page is.
  */
-async function submitter(reads: Reads, root: string, submissions: readonly Submission[], commit: string, at: number): Promise<string | null> {
+async function submitter(reads: Pick<Reads, 'rangeCommits'>, root: string, submissions: readonly Submission[], commit: string, at: number, signal?: AbortSignal): Promise<string | null> {
   for (const s of submissions) {
     if (!s.by) continue
     if (s.commits) {
@@ -79,7 +79,7 @@ async function submitter(reads: Reads, root: string, submissions: readonly Submi
       continue
     }
     if (!s.base || !s.revision) continue
-    if ((await reads.rangeCommits(root, s.base, s.revision, at))?.has(commit)) return s.by
+    if ((await reads.rangeCommits(root, s.base, s.revision, at, signal))?.has(commit)) return s.by
   }
   return null
 }
@@ -91,7 +91,7 @@ async function agentNames(ws: WorkspaceService, project: string): Promise<(id: s
 }
 
 /** The folder shown (the project folder, an agent's slot or worktree) and its project, refused otherwise. */
-function rootOf(ws: WorkspaceService, root: unknown): { folder: string; project: string } {
+export function rootOf(ws: WorkspaceService, root: unknown): { folder: string; project: string } {
   if (typeof root !== 'string' || !root) throw combworkError(T.invalid, undefined, { kind: 'invalid' })
   return ws.changesRootProject(root)
 }
@@ -107,22 +107,41 @@ export async function fileHistoryAt(ws: WorkspaceService, rootRaw: unknown, rel:
   if (!historyPathOk(rel) || (rel === '' && isDir !== true) || (pinned != null && !isCommitId(pinned))) throw combworkError(T.invalid, undefined, { kind: 'invalid' })
   const at = Date.now() + platformLimits.gitHistoryMs()
   const got = await r.fileLog(folder, rel, isDir === true || rel === '', pinned ?? null, Number(page) || 1, at)
-  const wf = got.commits.length ? await workflowOrNull(ws, project) : null
-  const name = wf ? await agentNames(ws, project) : (id: string): string => id
+  const cards = await commitCards(ws, project, folder, got.commits, at, r)
+  const rows: FileHistoryRow[] = got.commits.map((c) => ({ hash: c.hash, short: c.short, parent: c.parent, author: c.author, email: c.email, date: c.date, subject: c.subject, files: c.files, ...(cards.get(c.hash) ?? { card: null, submittedBy: null }) }))
+  return { head: got.head, moved: got.moved, rows, page: got.page, more: got.more, repoPath: got.repoPath, prefix: got.prefix }
+}
+
+/** What a commit itself says of its card, and who submitted it in one of that card's submissions. */
+export interface CommitCardOf {
+  card: FileHistoryCard | null
+  submittedBy: { agent: string; name: string } | null
+}
+
+/**
+ * HI-3475/HI-3476: each commit's own card (ownCard) and its "submitted by" (submitter), for History's rows and blame's
+ * annotations alike, read once per card. `at` bounds the submissions' range reads; past it this is refused, never answered
+ * without them; `signal` stops them (their git ended), and every one after it, which then fails at once. No board to read
+ * (none yet, a workspace closing): no cards.
+ */
+export async function commitCards(ws: WorkspaceService, project: string, folder: string, commits: readonly Pick<LoggedCommit, 'hash' | 'trailer' | 'subject'>[], at: number, reads: Pick<Reads, 'rangeCommits'>, signal?: AbortSignal): Promise<Map<string, CommitCardOf>> {
+  const out = new Map<string, CommitCardOf>()
+  const wf = commits.length ? await workflowOrNull(ws, project) : null
+  if (!wf) return out
+  const name = await agentNames(ws, project)
   const submissions = new Map<number, readonly Submission[]>()
-  const rows: FileHistoryRow[] = []
-  for (const c of got.commits) {
-    const card = wf ? ownCard(wf, project, c) : null
-    let submittedBy: FileHistoryRow['submittedBy'] = null
-    if (wf && card) {
+  for (const c of commits) {
+    const card = ownCard(wf, project, c)
+    let submittedBy: CommitCardOf['submittedBy'] = null
+    if (card) {
       let subs = submissions.get(card.number)
       if (!subs) submissions.set(card.number, (subs = wf.state(card.number).submissions))
-      const agent = await submitter(r, folder, subs, c.hash, at)
+      const agent = await submitter(reads, folder, subs, c.hash, at, signal)
       if (agent) submittedBy = { agent, name: name(agent) }
     }
-    rows.push({ hash: c.hash, short: c.short, parent: c.parent, author: c.author, email: c.email, date: c.date, subject: c.subject, files: c.files, card, submittedBy })
+    out.set(c.hash, { card, submittedBy })
   }
-  return { head: got.head, moved: got.moved, rows, page: got.page, more: got.more, repoPath: got.repoPath, prefix: got.prefix }
+  return out
 }
 
 /** `files:historyDiff`: a file at two commits, each side at its own path (a side null: there is none, as a root commit's parent). */

@@ -228,6 +228,8 @@
   "tips.dialectsNewModel.title": "Um arquivo de dialeto para qualquer modelo",
   "tips.editTemplates.text": "Selecione um modelo na visualização Modelos e escolha Editar…: adicione, copie, reordene ou remova os agentes dele, altere cada um no diálogo Configurações do agente (o Salvar dele também salva o modelo), renomeie o modelo e escolha o layout.",
   "tips.editTemplates.title": "Edite um modelo ali mesmo",
+  "tips.fileBlame.text": "O Blame por cartão, acima de um arquivo na guia Arquivos, mostra ao lado de cada bloco de linhas o cartão cujo commit o mudou por último e o agente que o enviou. Clique no cartão para abri-lo, ou no resto para ver o que esse commit mudou.",
+  "tips.fileBlame.title": "Qual cartão mudou esta linha?",
   "tips.fileHistory.text": "Histórico, acima de um arquivo na guia Arquivos, lista os commits que o mudaram, seguindo suas renomeações: cada um com o cartão que seu commit indica e o agente que o enviou. Clique em um para ver o que ele mudou; Voltar ao arquivo mantém suas edições.",
   "tips.fileHistory.title": "Qual cartão mudou este arquivo?",
   "tips.fileLinks.text": "Caminhos de arquivo que um agente imprime, como src/app.ts:42, são links: use Ctrl+clique em um para abrir o arquivo na aba Arquivos, naquela linha.",
