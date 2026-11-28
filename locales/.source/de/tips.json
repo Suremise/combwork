@@ -250,6 +250,8 @@
   "tips.externalTerminal.title": "Choose your external terminal",
   "tips.fileBlame.text": "Blame by card, above a file in the Files tab, shows beside each run of lines the card whose commit last changed it and the agent that submitted it. Click the card to open it, or the rest to see what that commit changed.",
   "tips.fileBlame.title": "Which card changed this line?",
+  "tips.fileCompare.text": "Compare with…, above a file in the Files tab, shows it beside its version on the target branch, another branch, tag or commit, or (in an agent's slot) the project folder's copy, following renames. Your unsaved edits are compared too.",
+  "tips.fileCompare.title": "Compare a file with any branch",
   "tips.fileHistory.text": "History, above a file in the Files tab, lists the commits that changed it, following its renames: each with the card its commit names and the agent that submitted it. Click one to see what it changed; Back to file keeps your edits.",
   "tips.fileHistory.title": "Which card changed this file?",
   "tips.fileLinks.text": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",

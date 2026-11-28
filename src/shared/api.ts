@@ -201,6 +201,7 @@ import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, Re
 import type { CommitActionDone, CommitActionRequest, CommitDetail } from './gitCommitView'
 import type { CommitIntro, FileHistoryPage, FileSide, FileVersions } from './fileHistory'
 import type { BlameResult } from './fileBlame'
+import type { CompareChoices, CompareVersion, ProjectCopy } from './fileCompare'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1265,6 +1266,12 @@ export interface CombworkRequests {
   /** HI-3476: who last changed each line of `rel` with `text` (the editor's) as its content, with their cards; `large` blames a file over the advanced limit. `id`: the window's, so a later request or `files:blameCancel` stops it. */
   'files:blame': (root: string, rel: string, text: string, large: boolean, id: string) => BlameResult
   'files:blameCancel': (id: string) => void
+  /** HI-3478: what Compare with… offers in the folder shown: the target, branches and tags, and a slot's project folder. */
+  'files:compareChoices': (root: string) => CompareChoices
+  /** HI-3478: `rel` at a branch, tag or commit (`path`: its path there when known, as History's row), its path found across renames. */
+  'files:compareWith': (root: string, rel: string, ref: string, path: string | null) => CompareVersion
+  /** HI-3478: a slot's or worktree's file, the project folder's copy: text, missing (only when absent), a folder, or not text. */
+  'files:compareProject': (root: string, rel: string) => ProjectCopy
   /** Each action replies with what it did, in a sentence. Switching (and creating a branch to switch to) or pulling is refused while an agent works in the folder or its merge slot is held (`folderBusy`). */
   'git:switch': (projectPath: string, branch: string) => string
   /** Update from <target> (HI-1180): what it would do to a branch (its dialog), and the update, merge or rebase, saying what it did. */

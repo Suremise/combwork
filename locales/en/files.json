@@ -247,6 +247,90 @@
     "defaultMessage": "Collapse All",
     "description": "Files tab's toolbar: closes every open folder."
   },
+  "files.compare.back": {
+    "defaultMessage": "Back to file",
+    "description": "HI-3478: the button atop a comparison: shows the file's editor again, as it was left (unsaved edits kept)."
+  },
+  "files.compare.badRef": {
+    "defaultMessage": "Type a branch, tag or commit hash: not an option or a range.",
+    "description": "HI-3478: in Compare with…'s picker, what was typed can't be one (it starts with a dash, or holds spaces, .. or ~)."
+  },
+  "files.compare.binary": {
+    "defaultMessage": "Binary or too large to compare as text.",
+    "description": "HI-3478: in place of a comparison when the other version is binary or too large."
+  },
+  "files.compare.branches": {
+    "defaultMessage": "Branches",
+    "description": "HI-3478: a heading in Compare with…'s picker."
+  },
+  "files.compare.failed": {
+    "defaultMessage": "Couldn't compare: {error}",
+    "description": "HI-3478: in place of the comparison when reading the other version failed. {error} is why."
+  },
+  "files.compare.heading": {
+    "defaultMessage": "{side} ← → this file",
+    "description": "HI-3478: the heading of a comparison: the other version on the left ({side}, e.g. 'main · 1a2b3c4' or 'the project folder's copy'), the file as the editor has it on the right."
+  },
+  "files.compare.loading": {
+    "defaultMessage": "Reading…",
+    "description": "HI-3478: Compare with…'s picker, or its diff, while it reads."
+  },
+  "files.compare.notFile": {
+    "defaultMessage": "In {side} this path is a folder or submodule, not a file.",
+    "description": "HI-3478: under a comparison's heading: at the other version ({side}) the file's path is a folder or a submodule."
+  },
+  "files.compare.notThere": {
+    "defaultMessage": "This file isn't in {side} under its name or a rename git found: the left side is empty.",
+    "description": "HI-3478: under a comparison's heading: the other version ({side}) has no such file (deleted there, never there, or renamed in a way git didn't follow)."
+  },
+  "files.compare.open": {
+    "defaultMessage": "Compare with…",
+    "description": "HI-3478: the Files tab's toolbar button (and right-click menu item) that compares the file with its version on another branch, tag or commit, or the project folder's copy."
+  },
+  "files.compare.projectCopy": {
+    "defaultMessage": "The project folder's copy",
+    "description": "HI-3478: Compare with…'s choice in an agent's slot or worktree: the same file in the project folder, as it is on disk there."
+  },
+  "files.compare.projectNotText": {
+    "defaultMessage": "The project folder's copy isn't text Combwork can compare: {kind, select, binary {it's binary} tooLarge {it's too large to open} other {it isn't UTF-8}}.",
+    "description": "HI-3478: in place of a comparison with the project folder's copy when that copy is there but isn't text (binary, too large, or in another encoding). Keep the select keys."
+  },
+  "files.compare.projectSide": {
+    "defaultMessage": "the project folder's copy",
+    "description": "HI-3478: the left side's name in a comparison with the project folder's copy (used inside files.compare.heading)."
+  },
+  "files.compare.refSide": {
+    "defaultMessage": "{ref} · {commit}",
+    "description": "HI-3478: the left side's name in a comparison: what was chosen ({ref}: a branch, tag or the commit's short id) and its commit's short id."
+  },
+  "files.compare.renamed": {
+    "defaultMessage": "There it was {path}.",
+    "description": "HI-3478: under a comparison's heading: at the other version the file had another path ({path}), followed across a rename."
+  },
+  "files.compare.search": {
+    "defaultMessage": "Branch, tag or commit",
+    "description": "HI-3478: the placeholder of Compare with…'s search box: filters the list, and a name or commit hash typed and Enter compares with it."
+  },
+  "files.compare.tags": {
+    "defaultMessage": "Tags",
+    "description": "HI-3478: a heading in Compare with…'s picker."
+  },
+  "files.compare.target": {
+    "defaultMessage": "Target branch ({branch})",
+    "description": "HI-3478: Compare with…'s first choice: the branch this folder's work merges into ({branch}, its name)."
+  },
+  "files.compare.title": {
+    "defaultMessage": "Compare {name} with…",
+    "description": "HI-3478: the title of Compare with…'s picker. {name} is the file's name."
+  },
+  "files.compare.typedRef": {
+    "defaultMessage": "Compare with “{ref}”",
+    "description": "HI-3478: in Compare with…'s picker, the choice that compares with exactly what was typed ({ref}: a branch, tag or commit hash)."
+  },
+  "files.compare.unsaved": {
+    "defaultMessage": "Right: your edits (not saved)",
+    "description": "HI-3478: under a comparison's heading when the editor has unsaved edits: the right side is the editor's text, not the file on disk."
+  },
   "files.csv.firstRows": {
     "defaultMessage": "Showing the first {count, plural, one {# row} other {# rows}}. Switch to Edit to see everything.",
     "description": "Under a CSV file's table when the file has more rows than it shows. Edit is the mode button of that name."
@@ -570,6 +654,10 @@
   "files.history.close": {
     "defaultMessage": "Close History",
     "description": "HI-3475: the tooltip of the History panel's close button."
+  },
+  "files.history.compareThis": {
+    "defaultMessage": "Compare with this version",
+    "description": "HI-3478: a History row's button (a file's history): compares the file as the editor has it with its version at this commit."
   },
   "files.history.copyHash": {
     "defaultMessage": "Copy hash {commit}",

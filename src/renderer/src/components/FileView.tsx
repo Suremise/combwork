@@ -11,6 +11,7 @@ import { CodeEditor, type EditorGoto } from './Editors'
 import { PaneResizer, usePaneSize } from './Resizer'
 import { Icon, IconButton, Markdown, Tooltip } from './ui'
 import { BlameColumn, FILE_BLAME_TEXT } from './FileBlame'
+import { CompareDiff, ComparePicker, FILE_COMPARE_TEXT, type CompareSource } from './FileCompare'
 import type { HistoryPick } from './FileHistory'
 
 /** The Files area's words used by more than one editor (#803): the Files tab, its file view and DocEditor. */
@@ -285,8 +286,9 @@ export function FileView({
   onOpenRel,
   toolbarExtra,
   goto,
-  overlay,
-  blame
+  overlay: parentOverlay,
+  blame,
+  compare
 }: {
   project: ProjectInfo
   rel: string
@@ -306,6 +308,11 @@ export function FileView({
    * the editor while the store's `filesBlame` is on; a commit clicked there opens with `onOpenCommit`.
    */
   blame?: { onOpenCommit: (pick: HistoryPick) => void }
+  /**
+   * HI-3478: Compare with… is offered, in the folder `root` (its toolbar button and picker; the comparison over the
+   * editor, ahead of `overlay`). `ask`, a new nonce: open the picker (`source` null), compare with `source`, or close.
+   */
+  compare?: { root: string; ask?: { nonce: number; source: CompareSource | null | 'close' } }
 }) {
   const abs = `${project.path}\\${rel.replace(/\//g, '\\')}`
   const name = rel.split('/').pop()!
@@ -322,6 +329,17 @@ export function FileView({
   }
   const dirty = !!content && content.kind === 'text' && text !== content.text
   const blameShown = useStore((s) => s.filesBlame)
+  const [compareSource, setCompareSource] = useState<CompareSource | null>(null)
+  const [comparePicking, setComparePicking] = useState(false)
+  // A new ask from the Files tab (its right-click menu, History's row, a History diff opened over this).
+  useEffect(() => {
+    const ask = compare?.ask
+    if (!ask) return
+    if (ask.source === 'close') setCompareSource(null)
+    else if (ask.source) setCompareSource(ask.source)
+    else setComparePicking(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compare?.ask?.nonce])
   const [codeEditor, setCodeEditor] = useState<Parameters<NonNullable<Parameters<typeof CodeEditor>[0]['onEditor']>>[0]>(null)
   const textRef = useRef(text)
   textRef.current = text
@@ -463,6 +481,10 @@ export function FileView({
           )}
         </div>
       )}
+      {compare && content?.kind === 'text' && canEdit && (
+        <IconButton icon="git-compare" title={tr(FILE_COMPARE_TEXT.open)} active={!!compareSource} action="file-compare" onClick={() => setComparePicking(true)} />
+      )}
+      {comparePicking && compare && <ComparePicker root={compare.root} name={name} onClose={() => setComparePicking(false)} onPick={(s) => (setComparePicking(false), setCompareSource(s))} />}
       {blame && content?.kind === 'text' && canEdit && (
         <IconButton icon="list-flat" title={tr(FILE_BLAME_TEXT.toggleTip)} active={blameShown} action="file-blame" onClick={() => set({ filesBlame: !blameShown })} />
       )}
@@ -478,6 +500,8 @@ export function FileView({
     </div>
   )
 
+  // HI-3478: a comparison shows ahead of the Files tab's own overlay (a History diff), over the same kept editor.
+  const overlay = compare && compareSource && content?.kind === 'text' ? <CompareDiff root={compare.root} rel={rel} source={compareSource} text={text} dirty={dirty} onBack={() => setCompareSource(null)} /> : parentOverlay
   if (overlay && (!content || content.kind !== 'text' || (pv && !pv.needsText))) {
     return (
       <>

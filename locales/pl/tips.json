@@ -230,6 +230,8 @@
   "tips.editTemplates.title": "Edytuj szablon na miejscu",
   "tips.fileBlame.text": "Blame według kart, nad plikiem w zakładce Pliki, pokazuje obok każdego bloku wierszy kartę, której commit ostatnio go zmienił, i agenta, który go przesłał. Kliknij kartę, aby ją otworzyć, albo resztę, aby zobaczyć, co ten commit zmienił.",
   "tips.fileBlame.title": "Która karta zmieniła ten wiersz?",
+  "tips.fileCompare.text": "Porównaj z…, nad plikiem w zakładce Pliki, pokazuje go obok jego wersji w gałęzi docelowej, innej gałęzi, tagu lub commicie albo (w slocie agenta) kopii w folderze projektu, śledząc zmiany nazw. Twoje niezapisane edycje też są porównywane.",
+  "tips.fileCompare.title": "Porównaj plik z dowolną gałęzią",
   "tips.fileHistory.text": "Historia, nad plikiem w zakładce Pliki, wymienia commity, które go zmieniły, śledząc zmiany jego nazwy: każdy z kartą wskazaną przez commit i agentem, który go przesłał. Kliknij jeden, aby zobaczyć, co zmienił; Wróć do pliku zachowuje twoje edycje.",
   "tips.fileHistory.title": "Która karta zmieniła ten plik?",
   "tips.fileLinks.text": "Ścieżki plików wypisywane przez agenta, np. src/app.ts:42, są linkami: kliknij z Ctrl, żeby otworzyć plik w tym wierszu w zakładce Pliki.",

@@ -252,6 +252,8 @@ interface CombworkMessageValues {
   'tips.externalTerminal.title': undefined
   'tips.fileBlame.text': undefined
   'tips.fileBlame.title': undefined
+  'tips.fileCompare.text': undefined
+  'tips.fileCompare.title': undefined
   'tips.fileHistory.text': undefined
   'tips.fileHistory.title': undefined
   'tips.fileLinks.text': undefined

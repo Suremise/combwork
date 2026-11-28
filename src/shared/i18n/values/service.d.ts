@@ -62,6 +62,9 @@ interface CombworkMessageValues {
   'service.combworkVcs.rmFailed': { why: string | number }
   'service.fileBlame.invalid': undefined
   'service.fileBlame.unsupported': undefined
+  'service.fileCompare.invalid': undefined
+  'service.fileCompare.noRef': { ref: string | number }
+  'service.fileCompare.unsupported': undefined
   'service.fileHistory.cancelled': undefined
   'service.fileHistory.failed': { why: string | number }
   'service.fileHistory.invalid': undefined

@@ -42,6 +42,7 @@ export const FILE_HISTORY_TEXT = {
   cameIn: msg({ id: 'files.history.cameIn', defaultMessage: "Came in with {card}'s merge", description: "HI-3475: a History row, after Find its merge: the merge that brought the commit into the branch names the card {card} (its key). The card merged it, it didn't necessarily make it." }),
   cameInPlain: msg({ id: 'files.history.cameInPlain', defaultMessage: 'Came in with merge {commit}, which names no card', description: "HI-3475: a History row, after Find its merge: the merge that brought the commit in ({commit}, a short id) names no card." }),
   noMerge: msg({ id: 'files.history.noMerge', defaultMessage: 'No merge brought it in that Combwork can name', description: "HI-3475: a History row, after Find its merge: the commit was made on the branch itself, or how it came in isn't clear (several branches merged at once), so nothing is said." }),
+  compareThis: msg({ id: 'files.history.compareThis', defaultMessage: 'Compare with this version', description: "HI-3478: a History row's button (a file's history): compares the file as the editor has it with its version at this commit." }),
   openCommit: msg({ id: 'files.history.openCommit', defaultMessage: 'Open commit', description: "HI-3475: a History row's button: opens the Commit dialog (the commit's message, files and actions)." }),
   copyHash: msg({ id: 'files.history.copyHash', defaultMessage: 'Copy hash {commit}', description: "HI-3475: the tooltip of a History row's short commit id: copies the full hash. {commit} is the full hash." }),
   back: msg({ id: 'files.history.back', defaultMessage: 'Back to file', description: "HI-3475: the button atop a commit's diff opened from History: shows the file's editor again, as it was left (unsaved edits kept)." }),
@@ -70,6 +71,7 @@ export function FileHistoryPanel({
   picked,
   onPick,
   onOpenCommit,
+  onCompare,
   onClose
 }: {
   project: ProjectInfo
@@ -78,6 +80,8 @@ export function FileHistoryPanel({
   onPick: (p: HistoryPick) => void
   /** Null: the folder shown isn't the project folder, where the Commit dialog works. */
   onOpenCommit: ((row: FileHistoryRow, file: FileHistoryFile | null) => void) | null
+  /** HI-3478: Compare with this version (a file's history only): the row's commit at the path it had there. */
+  onCompare?: ((row: FileHistoryRow, file: FileHistoryFile) => void) | null
   onClose: () => void
 }) {
   const width = usePaneSize('fileHistory', 340)
@@ -167,6 +171,7 @@ export function FileHistoryPanel({
             onPick={(file) => onPick({ row: r, file })}
             onFindMerge={() => void findMerge(r)}
             onOpenCommit={onOpenCommit}
+            onCompare={onCompare ?? null}
           />
         ))}
         {error && <div className="banner warn">{tr(T.failed, { error })}</div>}
@@ -212,7 +217,8 @@ function HistoryRow({
   onToggle,
   onPick,
   onFindMerge,
-  onOpenCommit
+  onOpenCommit,
+  onCompare
 }: {
   row: FileHistoryRow
   isDir: boolean
@@ -223,6 +229,7 @@ function HistoryRow({
   onPick: (file: FileHistoryFile) => void
   onFindMerge: () => void
   onOpenCommit: ((row: FileHistoryRow, file: FileHistoryFile | null) => void) | null
+  onCompare: ((row: FileHistoryRow, file: FileHistoryFile) => void) | null
 }) {
   const file = isDir ? null : (row.files[0] ?? null)
   const card = row.card
@@ -273,6 +280,7 @@ function HistoryRow({
             <code>{row.short}</code>
           </button>
         </Tooltip>
+        {onCompare && file && file.status !== 'D' && <IconButton icon="git-compare" title={tr(T.compareThis)} action="history-compare" onClick={() => onCompare(row, file)} />}
         {onOpenCommit && <IconButton icon="git-commit" title={tr(T.openCommit)} onClick={() => onOpenCommit(row, file)} />}
       </div>
       {!card && (

@@ -53,6 +53,7 @@
   "shell.command.assistant.toggle": "显示/隐藏助手",
   "shell.command.console.showCapture": "在文件夹中显示捕获记录",
   "shell.command.files.commitIgnore": "提交 .gitignore",
+  "shell.command.files.compareWith": "比较文件…",
   "shell.command.files.toggleBlame": "显示或隐藏按卡片追溯",
   "shell.command.files.toggleHistory": "显示或隐藏文件历史",
   "shell.command.folderChanges.settle": "提交或搁置更改",

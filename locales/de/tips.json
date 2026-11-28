@@ -230,6 +230,8 @@
   "tips.editTemplates.title": "Eine Vorlage direkt bearbeiten",
   "tips.fileBlame.text": "Blame nach Karte, über einer Datei im Tab „Dateien“, zeigt neben jedem Zeilenblock die Karte, deren Commit ihn zuletzt geändert hat, und den Agent, der ihn eingereicht hat. Klicke auf die Karte, um sie zu öffnen, oder auf den Rest, um zu sehen, was dieser Commit geändert hat.",
   "tips.fileBlame.title": "Welche Karte hat diese Zeile geändert?",
+  "tips.fileCompare.text": "„Vergleichen mit …“ über einer Datei im Tab „Dateien“ zeigt sie neben ihrer Version im Zielbranch, einem anderen Branch, Tag oder Commit oder (im Slot eines Agents) der Kopie im Projektordner, auch über Umbenennungen hinweg. Deine ungespeicherten Änderungen werden mitverglichen.",
+  "tips.fileCompare.title": "Eine Datei mit einem beliebigen Branch vergleichen",
   "tips.fileHistory.text": "„Verlauf“ über einer Datei im Tab „Dateien“ listet die Commits, die sie geändert haben, auch über Umbenennungen hinweg: jeder mit der Karte, die sein Commit nennt, und dem Agent, der ihn eingereicht hat. Klicke auf einen, um zu sehen, was er geändert hat; „Zurück zur Datei“ behält deine Änderungen.",
   "tips.fileHistory.title": "Welche Karte hat diese Datei geändert?",
   "tips.fileLinks.text": "Dateipfade, die ein Agent ausgibt, etwa src/app.ts:42, sind Links: Strg+Klick öffnet die Datei im Tab „Dateien“ an dieser Zeile.",
