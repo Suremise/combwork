@@ -165,6 +165,8 @@ const check = (name, ok, extra = '') => {
     await page.locator('[data-file-history] .file-history-head .icon-btn').last().click()
     check('closing hides the panel', !!(await lib.until(async () => (await page.locator('[data-file-history]').count()) === 0, HUNG_MS)))
     // Saved, so quitting has no unsaved file to ask about.
+    await row('doc.txt').click()
+    await lib.until(async () => (await page.locator('.editor-toolbar .dirty-dot').count()) === 1, HUNG_MS)
     await page.locator('.split-main .monaco').first().click({ position: { x: 200, y: 10 } })
     await page.keyboard.press('Control+S')
     check('the edit saves to the file', !!(await lib.until(async () => fs.readFileSync(path.join(alpha, 'doc.txt'), 'utf8').includes('unsaved line'), HUNG_MS)))
