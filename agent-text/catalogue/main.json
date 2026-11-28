@@ -504,6 +504,31 @@
     "note": "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it).",
     "audience": "both"
   },
+  "main.preview.badConfig": {
+    "text": "A preview needs a command (one line, at most 1,000 characters) and a page path starting with /.",
+    "note": "An error: Project Settings → Preview's values weren't saved: the command is empty or too long, or the path doesn't start with a slash.",
+    "audience": "both"
+  },
+  "main.preview.noConfig": {
+    "text": "{project} has no preview command: set one in Project Settings → Preview.",
+    "note": "An error: a preview was asked for in a project that has no preview command. {project} is the project's name. Project Settings → Preview is a section: use its names as translated there.",
+    "audience": "both"
+  },
+  "main.preview.notAPlace": {
+    "text": "That folder isn't {project}'s folder, one of its slots or one of its review copies.",
+    "note": "An error: a preview was asked for in a folder that isn't one a preview runs in. {project} is the project's name. A slot is a worktree Combwork lends to a card or a lane; a review copy is a copy at the revision a reviewer reviews.",
+    "audience": "both"
+  },
+  "main.preview.notLent": {
+    "text": "{slot} isn't lent to a card or a review now, so a preview can't run in it.",
+    "note": "An error: a preview was asked for in a slot or review copy no card or review holds now. {slot} is its name (slot-b, copy-1).",
+    "audience": "both"
+  },
+  "main.preview.off": {
+    "text": "The Preview is turned off (Settings → Advanced, Preview: run projects’ dev servers).",
+    "note": "An error: something asked for the Preview while its advanced setting is off. Settings → Advanced and the setting's title are names: use them as translated there.",
+    "audience": "both"
+  },
   "main.quit.closed": {
     "text": "Combwork has closed",
     "note": "A notice after Combwork quit without asking, its sessions stopped.",

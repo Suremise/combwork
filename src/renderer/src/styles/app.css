@@ -3869,6 +3869,37 @@ p.hint {
   font-size: 12px;
   margin-top: 6px;
 }
+/* Project Settings → Preview (HI-3614): its fields labelled on the left, the hints and switch under them. */
+.preview-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 720px;
+  margin-top: 10px;
+}
+.preview-settings .field {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.preview-settings .field .input {
+  width: 100%;
+}
+.preview-settings .field-hint,
+.preview-settings .field-error {
+  margin-top: 0;
+  margin-left: 100px;
+}
+.preview-settings .preview-hmr-label {
+  white-space: nowrap;
+}
+.preview-settings .preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 100px;
+}
 .number-field {
   width: 100%;
 }

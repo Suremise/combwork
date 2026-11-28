@@ -19,6 +19,7 @@ import { config } from './config'
 import { containsPlace } from './fsutil'
 import { agentMsg, say, sayWithId, type Said } from '../shared/agentText'
 import { createLogger, userText } from './logger'
+import { placeEnded } from './placeEnds'
 import { progress } from './progressService'
 import { sessions } from './sessions'
 import { appRunner, appSettle, boardConn, holder, journalsOf, retireSealOf, sweepSealsOf } from './slotsApp'
@@ -91,7 +92,13 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
       leaseOver: (l) => (l.kind === 'review' ? (reviewOver?.(ws, projectPath, l) ?? null) : leaseOver(workspacePath, l)),
       // Review leases: with review copies on, and workflow rules enforced (off, Combwork records facts and leases nothing, #1439).
       reviewOn: () => advanced.get(COPIES_REVIEW) !== false && advanced.get<boolean>(WORKFLOW_ENFORCE) !== false,
-      quietWaitMs: () => Math.max(1, Number(advanced.get(COPIES_QUIET_WAIT)) || 10) * 60_000
+      quietWaitMs: () => Math.max(1, Number(advanced.get(COPIES_QUIET_WAIT)) || 10) * 60_000,
+      // HI-3614: a preview running in the copy under this lease stops with it (its review over).
+      returned: async (l) => {
+        // One whose server isn't proved gone keeps the copy held for its job (round 2).
+        const held = await placeEnded({ kind: 'generation', id: l.id })
+        return held.length ? { holdJob: held[0] } : undefined
+      }
     })
     // The seals of jobs settled before this Combwork started (HI-1723; the folder slots' jobs share).
     sweepSealsOf(root, { once: true })

@@ -1,0 +1,16 @@
+{
+  "preview.settings.address": "起動のたびに {first}–{last} の空きポートが {variable} に入ります。サーバーはlocalhostのそのポートで待ち受ける必要があり、ページは {url} になります。",
+  "preview.settings.badPath": "ページのパスは / で始まり、空白やバックスラッシュを含みません。",
+  "preview.settings.clear": "削除",
+  "preview.settings.command": "コマンド",
+  "preview.settings.commandPlaceholder": "npm run dev",
+  "preview.settings.failed": "プレビューを保存できませんでした",
+  "preview.settings.hmr": "ホットリロード用の2つ目のポート",
+  "preview.settings.hmrNote": "{variable} に入ります。ホットリロードのソケットを別に待ち受けるサーバー向けです。",
+  "preview.settings.noSuggestion": "package.json に提案できる dev、start、preview スクリプトはありません。",
+  "preview.settings.path": "ページ",
+  "preview.settings.save": "保存",
+  "preview.settings.saved": "プレビューを保存しました",
+  "preview.settings.suggested": "package.json の {script} スクリプトは {line} を実行します。提案するコマンド：{command}",
+  "preview.settings.useIt": "これを使う"
+}

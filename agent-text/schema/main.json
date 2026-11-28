@@ -482,6 +482,27 @@
       "connection": "plain"
     }
   },
+  "main.preview.badConfig": {
+    "placeholders": {}
+  },
+  "main.preview.noConfig": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "main.preview.notAPlace": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "main.preview.notLent": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "main.preview.off": {
+    "placeholders": {}
+  },
   "main.quit.closed": {
     "placeholders": {}
   },

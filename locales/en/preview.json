@@ -1,0 +1,58 @@
+{
+  "preview.settings.address": {
+    "defaultMessage": "Each start gets a free port from {first}–{last} in {variable}. The server must listen on it on localhost: the page is then at {url}.",
+    "description": "A line in Project Settings → Preview: where the dev server must listen. {first} and {last} are port numbers (the range), {variable} is PORT (an environment variable), {url} an address such as http://127.0.0.1:%PORT%/: keep the last two as they are."
+  },
+  "preview.settings.badPath": {
+    "defaultMessage": "A page path starts with / and has no spaces or backslashes.",
+    "description": "An error under the Page box (Project Settings → Preview): what was typed isn't a page path."
+  },
+  "preview.settings.clear": {
+    "defaultMessage": "Remove",
+    "description": "A button (Project Settings → Preview): removes the project's preview command."
+  },
+  "preview.settings.command": {
+    "defaultMessage": "Command",
+    "description": "A field's label (Project Settings → Preview): the command line that starts the project's development server."
+  },
+  "preview.settings.commandPlaceholder": {
+    "defaultMessage": "npm run dev",
+    "description": "The example in the empty Command box (Project Settings → Preview): a command line, keep it as it is."
+  },
+  "preview.settings.failed": {
+    "defaultMessage": "Couldn't save the preview",
+    "description": "An error's title: saving Project Settings → Preview's values failed."
+  },
+  "preview.settings.hmr": {
+    "defaultMessage": "A second port for hot reload",
+    "description": "A switch's label (Project Settings → Preview): the server also gets a port of its own for its hot reload socket, in CW_PREVIEW_HMR_PORT."
+  },
+  "preview.settings.hmrNote": {
+    "defaultMessage": "In {variable}, for a server whose hot reload socket listens apart.",
+    "description": "Beside the switch \"A second port for hot reload\" (Project Settings → Preview). {variable} is CW_PREVIEW_HMR_PORT, an environment variable."
+  },
+  "preview.settings.noSuggestion": {
+    "defaultMessage": "No dev, start or preview script in package.json to suggest.",
+    "description": "A line under the Command box (Project Settings → Preview): the project's package.json has none of these scripts (keep their names as they are), or there is no package.json."
+  },
+  "preview.settings.path": {
+    "defaultMessage": "Page",
+    "description": "A field's label (Project Settings → Preview): the path of the page to open on the server, such as / or /app."
+  },
+  "preview.settings.save": {
+    "defaultMessage": "Save",
+    "description": "A button (Project Settings → Preview): saves the preview's command, page and hot reload port."
+  },
+  "preview.settings.saved": {
+    "defaultMessage": "Preview saved",
+    "description": "A notification: Project Settings → Preview's values were saved."
+  },
+  "preview.settings.suggested": {
+    "defaultMessage": "package.json’s {script} script runs {line}. Suggested command: {command}",
+    "description": "A line under the Command box (Project Settings → Preview): Combwork found a script in the project's package.json. {script} is its name (dev, start, preview), {line} its command line, {command} the command Combwork suggests (npm run dev): keep them as they are."
+  },
+  "preview.settings.useIt": {
+    "defaultMessage": "Use it",
+    "description": "A button beside the suggested command (Project Settings → Preview): puts it in the Command box, unsaved until Save."
+  }
+}

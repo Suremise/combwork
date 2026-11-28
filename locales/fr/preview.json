@@ -1,0 +1,16 @@
+{
+  "preview.settings.address": "Chaque démarrage reçoit un port libre parmi {first}–{last} dans {variable}. Le serveur doit écouter dessus sur localhost : la page est alors à {url}.",
+  "preview.settings.badPath": "Un chemin de page commence par / et ne contient ni espaces ni barres obliques inverses.",
+  "preview.settings.clear": "Supprimer",
+  "preview.settings.command": "Commande",
+  "preview.settings.commandPlaceholder": "npm run dev",
+  "preview.settings.failed": "Impossible d’enregistrer l’aperçu",
+  "preview.settings.hmr": "Un second port pour le rechargement à chaud",
+  "preview.settings.hmrNote": "Dans {variable}, pour un serveur dont le socket de rechargement à chaud écoute à part.",
+  "preview.settings.noSuggestion": "Aucun script dev, start ou preview dans package.json à suggérer.",
+  "preview.settings.path": "Page",
+  "preview.settings.save": "Enregistrer",
+  "preview.settings.saved": "Aperçu enregistré",
+  "preview.settings.suggested": "Le script {script} de package.json exécute {line}. Commande suggérée : {command}",
+  "preview.settings.useIt": "L’utiliser"
+}

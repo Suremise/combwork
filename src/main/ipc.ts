@@ -142,6 +142,7 @@ import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesNow } from './workflow/rulesets'
 import { poolFor, removeGoneSlot, slotTest, slotViews } from './slotsApp'
+import { previewSuggestion, previewViews, setPreviewConfig, startPreview, stopPreview } from './previewApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { githubLinkOf, githubRepoFor, openPrsOf, setGithubRemote } from './githubLink'
@@ -1048,6 +1049,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (patch.workflow !== undefined) throw new CombworkError({ lines: ["A project's workflow options change through workflow:setOptions"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
       // Its version control switches only with its checks and its options kept per platform (#1419): workflow:setPlatform.
       if (patch.platform !== undefined) throw new CombworkError({ lines: ["A project's version control changes through workflow:setPlatform"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
+      // HI-3614: its preview is checked whole, and only while the Preview is on: preview:setConfig.
+      if (patch.preview !== undefined) throw new CombworkError({ lines: ["A project's preview changes through preview:setConfig"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
       const projectPath = workspace.assertProject(p)
       // A project has no provider pages or default provider since HI-2106/HI-2107: its agents' connections hold what they
       // set (HI-2122: nothing is made from them), and project.json keeps none.
@@ -1083,6 +1086,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'slots:move': (p, preview) => slotMoveApply(currentWorkspace(), workspace.assertProject(p), slotMoveArg(preview)),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
+    'preview:list': (p) => previewViews(workspace.assertProject(p)),
+    'preview:start': (p, folder) => startPreview(workspace, workspace.assertProject(p), typeof folder === 'string' ? folder : null),
+    'preview:stop': (p, folder) => stopPreview(workspace, workspace.assertProject(p), typeof folder === 'string' ? folder : null),
+    'preview:suggest': (p) => previewSuggestion(workspace.assertProject(p)),
+    'preview:setConfig': (p, cfg) => setPreviewConfig(workspace, workspace.assertProject(p), cfg),
     'slots:gitFiles': async (p) => (await slotWorkspaces().files?.status(workspace.assertProject(p))) ?? null,
     // A workspace's (null) or project's GitHub hosts (HI-2779): parsed again in setGithubHosts, whoever asks.
     'github:form': (p) => githubHostsForm(workspace, p ? workspace.assertProject(p) : null, process.env),

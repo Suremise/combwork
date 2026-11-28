@@ -320,6 +320,7 @@ export const EDGES = [
   { file: 'src/main/platform/releaseReadsPorts', module: 'src/main/platform/git/gitReleaseReads', class: 'registry', names: ['gitReleaseReads'], why: "the release reads port's map (HI-3148)" },
   { file: 'src/main/platform/revisionReadsPorts', module: 'src/main/platform/git/gitRevisionReads', class: 'registry', names: ['gitRevisionReads'], why: "the revision reads port's map (HI-3218)" },
   { file: 'src/main/platform/workspacePorts', module: 'src/main/platform/git/gitWorkspacePort', class: 'registry', names: ['gitWorkspacePort'], why: "the workspace port's map (R4)" },
+  { file: 'src/main/previewSource', module: 'src/main/git', class: 'impl', names: ['GitResult', 'git'], why: "HI-3614: a preview's stamp, Git's half: the place's commit and its files' tree (a temporary index's add and write-tree, on git's worker); outside a repository it reads nothing" },
   { file: 'src/main/projectAgents', module: 'src/main/branchWatch', class: 'gitUi', why: "an agent's branch card checked again" },
   { file: 'src/main/projectAgents', module: 'src/main/gitTool', class: 'gitUi', why: "Add Agent's 0.9 worktree choice says why git can't run" },
   { file: 'src/main/projectAgents', module: 'src/main/repoLock', class: 'impl', names: ['withRepoLock'], why: "a 0.9 worktree's guarded removal under the repository lock (R5 left it to the audit)" },

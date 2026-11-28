@@ -2514,10 +2514,25 @@ How its agents launch isn't here: each agent chooses a connection (see [Accounts
 | | Completion chime | On, off or inherit |
 | Agents | Agents | See [Several agents in one project](#several-agents-in-one-project). The setup script and copied files are in the project's Version Control tab, under **Slots and copies**; file locks and card loops are workflow options there (see [Workflow options](#workflow-options)) |
 | Keyboard Shortcuts | | Shortcuts for project and session commands in this project (see [Keyboard shortcuts](#keyboard-shortcuts)) |
+| Preview | Dev server | The command that runs the project's development server for the Preview, shown only while the Preview is turned on (see [Preview](#preview-dev-servers)) |
 
 **Number settings**, here and in Settings, save when you press Enter or click away. An empty box inherits the global value here; in Settings it just puts the saved value back. A number out of range, or text that isn't a number, isn't saved: the range shows under the box. Settings that can be turned off have a **Never** (or **No pause**) checkbox beside the number; untick it to get your last number back.
 
 Changes apply to new sessions.
+
+### Preview: a project's dev server <a id="preview-dev-servers"></a>
+
+Combwork can run a web project's development server for you, so you and its agents can look at the change being made. It's off by default: turn on **Settings → Advanced → Preview: run projects' dev servers**. While it's off, Project Settings has no Preview section and nothing of it runs.
+
+**Setting it up.** In **Project Settings → Preview**, type the command that starts the server. If the project's `package.json` has a `dev`, `start` or `preview` script, the first of them is suggested (run with the package manager its lockfile names, npm otherwise): **Use it** puts it in the box, and nothing is saved until you click **Save**. **Page** is the path of the page to open (`/` by default). Turn on **A second port for hot reload** for a server whose hot reload socket listens on a port of its own.
+
+**Its port.** Each time a preview starts, Combwork gives the server a free port in `PORT` (and `CW_PREVIEW_PORT`; the hot reload port in `CW_PREVIEW_HMR_PORT`), from a range of its own: 45000–45999 (a development build of Combwork uses 46000–46999). The section shows the range and the address. The server must listen on that port on localhost. The command runs in cmd, so a server that picks its own port needs it passed, such as `npm run dev -- --port %PORT%`. Ports another program listens on are skipped, and so are Combwork's own. **Settings → Advanced → Preview: first port** moves the range.
+
+**Where it runs.** A preview runs in one place: the project folder, a slot lent to a card, or a review copy during its review. Each place has at most one, each on its own port, so a builder's slot, a reviewer's copy and your project folder never clash, across all your projects and windows. A preview starts only when asked, never when Combwork starts, and stops when you stop it, when its slot's lease or its review ends, when the project is removed or its workspace closed, when the Preview is turned off, and when Combwork quits. The server's output is kept in Combwork's own logs folder (`logs\preview`).
+
+**Checked, never assumed.** Combwork waits up to a minute (**Settings → Advanced → Preview: longest a server takes to start**) for the server to listen, then checks that what listens on the port is the server it started. If another program holds the port, or the server listens on another port (it ignored `PORT`), the preview fails and says which. Once the server exits, the preview stays stopped: Combwork never shows whatever program takes the port afterwards.
+
+**Which source it is.** A preview records the commit its place was at when it started, and, when there were uncommitted changes, an id of the files themselves: the same files always give the same id. It also notes when the files change afterwards. That tells you which source the server was started from. It can't promise the page shows it: hot reload can lag or fail, and the server's own data is its own.
 
 ### Permission modes <a id="permission-modes"></a>
 

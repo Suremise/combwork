@@ -1,0 +1,16 @@
+{
+  "preview.settings.address": "每次启动都会在 {variable} 中获得 {first}–{last} 中的一个空闲端口。服务器必须在 localhost 的该端口上监听：页面届时位于 {url}。",
+  "preview.settings.badPath": "页面路径以 / 开头，且不含空格或反斜杠。",
+  "preview.settings.clear": "移除",
+  "preview.settings.command": "命令",
+  "preview.settings.commandPlaceholder": "npm run dev",
+  "preview.settings.failed": "无法保存预览",
+  "preview.settings.hmr": "用于热重载的第二个端口",
+  "preview.settings.hmrNote": "放在 {variable} 中，适用于热重载套接字单独监听的服务器。",
+  "preview.settings.noSuggestion": "package.json 中没有可建议的 dev、start 或 preview 脚本。",
+  "preview.settings.path": "页面",
+  "preview.settings.save": "保存",
+  "preview.settings.saved": "已保存预览",
+  "preview.settings.suggested": "package.json 的 {script} 脚本运行 {line}。建议的命令：{command}",
+  "preview.settings.useIt": "使用它"
+}

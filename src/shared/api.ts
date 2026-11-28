@@ -1,4 +1,5 @@
 import type { PrView } from './githubSource'
+import type { PreviewConfig, PreviewSuggestion, PreviewView } from './preview'
 import type { FeedbackTarget, PrFeedbackRead } from './prFeedback'
 import type { FeedbackExpect, LineCommentView } from './workflow/lineComments'
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
@@ -495,6 +496,16 @@ export interface CombworkRequests {
   'slots:gitFiles': (projectPath: string) => GitFilesStatus | null
   /** A project's copied files as they inherit (HI-1765: its own, its workspace's, Combwork's, the default), and where they come from. */
   'slots:copyOf': (projectPath: string) => { value: string; origin: SlotOptionOrigin }
+  /**
+   * The Preview (HI-3614, SPEC §16.21), each refused while Settings → Advanced's switch is off: a project's previews (running,
+   * and the last stopped one of each place), a place's start (`folder`: the project folder, a lent slot or a review copy;
+   * left out: the project folder) and stop, Project Settings → Preview's suggestion, and its setting (null: none).
+   */
+  'preview:list': (projectPath: string) => PreviewView[]
+  'preview:start': (projectPath: string, folder?: string | null) => PreviewView
+  'preview:stop': (projectPath: string, folder?: string | null) => boolean
+  'preview:suggest': (projectPath: string) => { suggestion: PreviewSuggestion | null; range: [number, number] }
+  'preview:setConfig': (projectPath: string, config: PreviewConfig | null) => PreviewConfig | null
   /** A workspace's (null) or a project's GitHub host settings as they resolve (HI-2779), and a change to them. */
   'github:form': (projectPath: string | null) => GithubHostsForm
   'github:set': (projectPath: string | null, change: GithubHostChange) => GithubHostsForm

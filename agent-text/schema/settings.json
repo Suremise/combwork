@@ -1433,6 +1433,24 @@
   "settings.advanced.cw.outage.waitMinutes.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.preview.enabled.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.preview.enabled.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.preview.portRange.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.preview.portRange.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.preview.startSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.preview.startSeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.processes.knownHosts.desc": {
     "placeholders": {}
   },
@@ -3533,6 +3551,12 @@
   "settings.project.metadata.title": {
     "placeholders": {}
   },
+  "settings.project.preview.desc": {
+    "placeholders": {}
+  },
+  "settings.project.preview.title": {
+    "placeholders": {}
+  },
   "settings.project.reset.desc": {
     "placeholders": {}
   },
@@ -3609,6 +3633,12 @@
     "placeholders": {}
   },
   "settings.projectSection.keys.label": {
+    "placeholders": {}
+  },
+  "settings.projectSection.preview.desc": {
+    "placeholders": {}
+  },
+  "settings.projectSection.preview.label": {
     "placeholders": {}
   },
   "settings.projectSection.sessions.desc": {

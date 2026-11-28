@@ -32,6 +32,7 @@ import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
 import { builderCountOf, DETACH_FAILED, operationTold, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
 import { onCombworkEvent } from './events'
+import { placeEnded } from './placeEnds'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
@@ -71,7 +72,7 @@ export function boardConn(ws: WorkspaceService): SlotConn {
  * Starts a command in its job on Combwork's process supervisor: the launcher is put in the job before it runs the command
  * (queueJobs.ts), and one that can't be is ended having run nothing.
  */
-function jobSpawn(job: LeaseJob): Spawn {
+export function jobSpawn(job: LeaseJob): Spawn {
   return (file, args, opts) => {
     const { child, after, before } = startLauncher({ command: file, args, verbatim: !!opts.windowsVerbatimArguments }, { cwd: opts.cwd as string | undefined, env: opts.env })
     const giveUp = (): void => {
@@ -324,10 +325,14 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
         }
       },
       removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
-      ended: (lease, slot) => {
+      ended: async (lease, slot) => {
         stopLeaseSession(projectPath, lease, slot, { ws, pool: made })
         // Where its agent works changes (#1442: an idle builder's "in slot-b" goes): the window reads it again.
         if (!ws.lifetime.aborted) ws.scheduleRefresh()
+        // HI-3614: a preview running in the slot under this lease stops with it, its server gone before the slot settles;
+        // one not proved gone keeps the slot held for its job (round 2).
+        const held = await placeEnded({ kind: 'generation', id: lease.id })
+        return held.length ? { holdJob: held[0] } : undefined
       },
       writerOver: (w) => writerOver(w),
       overCleared: (run) => writerCleared(run),
