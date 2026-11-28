@@ -126,6 +126,39 @@ interface CombworkMessageValues {
   'files.git.whyFailed': undefined
   'files.header': undefined
   'files.header.info': undefined
+  'files.history.back': undefined
+  'files.history.binary': undefined
+  'files.history.cameIn': { card: string | number }
+  'files.history.cameInPlain': { commit: string | number }
+  'files.history.cardHow': { how: string }
+  'files.history.close': undefined
+  'files.history.copyHash': { commit: string | number }
+  'files.history.diffFailed': { error: string | number }
+  'files.history.diffPaths': { from: string | number; to: string | number }
+  'files.history.diffTitle': { commit: string | number; subject: string | number }
+  'files.history.failed': { error: string | number }
+  'files.history.files': { n: number }
+  'files.history.findMerge': undefined
+  'files.history.findMergeTip': undefined
+  'files.history.loading': undefined
+  'files.history.meta': { author: string | number; when: string | number }
+  'files.history.more': undefined
+  'files.history.moved': undefined
+  'files.history.noMerge': undefined
+  'files.history.none': undefined
+  'files.history.notFile': { side: string }
+  'files.history.notThere': { side: string }
+  'files.history.openCard': { card: string | number; title: string | number }
+  'files.history.openCommit': undefined
+  'files.history.pick': undefined
+  'files.history.refresh': undefined
+  'files.history.renamed': { path: string | number }
+  'files.history.retry': undefined
+  'files.history.submittedBy': { agent: string | number }
+  'files.history.submittedByTip': { agent: string | number; card: string | number }
+  'files.history.title': undefined
+  'files.history.toggle': undefined
+  'files.history.toggleTip': undefined
   'files.image.actualSize': undefined
   'files.image.fit': undefined
   'files.insertIntoSession': undefined

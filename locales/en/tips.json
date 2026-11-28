@@ -987,6 +987,14 @@
     "defaultMessage": "Choose your external terminal",
     "description": "A tip's title (HI-3582)."
   },
+  "tips.fileHistory.text": {
+    "defaultMessage": "History, above a file in the Files tab, lists the commits that changed it, following its renames: each with the card its commit names and the agent that submitted it. Click one to see what it changed; Back to file keeps your edits.",
+    "description": "A tip (HI-3475). Names of Combwork's buttons and views: keep them as Combwork shows them."
+  },
+  "tips.fileHistory.title": {
+    "defaultMessage": "Which card changed this file?",
+    "description": "A tip's title (HI-3475)."
+  },
   "tips.fileLinks.text": {
     "defaultMessage": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

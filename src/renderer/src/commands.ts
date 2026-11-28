@@ -251,6 +251,17 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'project.tab.tasks', name: msg({ id: 'shell.command.project.tab.tasks', defaultMessage: 'Go to Tasks', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+4', when: hasProject, run: tab('tasks') },
   { id: 'project.tab.sessions', name: msg({ id: 'shell.command.project.tab.sessions', defaultMessage: 'Go to Sessions', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+5', when: hasProject, run: tab('sessions') },
   { id: 'project.tab.files', name: msg({ id: 'shell.command.project.tab.files', defaultMessage: 'Go to Files', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+6', when: hasProject, run: tab('files') },
+  {
+    id: 'files.toggleHistory',
+    name: msg({ id: 'shell.command.files.toggleHistory', defaultMessage: 'Toggle File History', description: "HI-3475: a command (the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Files tab and shows or hides its History panel (the commits that changed the file or folder selected)." }),
+    category: 'project',
+    when: hasProject,
+    run: () => {
+      const show = !get().filesHistory
+      if (show) tab('files')()
+      set({ filesHistory: show })
+    }
+  },
   { id: 'project.tab.images', name: msg({ id: 'shell.command.project.tab.images', defaultMessage: 'Go to Attachments', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+7', when: hasProject, run: tab('images') },
   { id: 'project.tab.changes', name: msg({ id: 'shell.command.project.tab.changes', defaultMessage: 'Go to Version Control', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Version Control tab (glossary 2.1).' }), category: 'project', keybinding: 'Alt+8', when: hasProject, run: tab('changes') },
   { id: 'project.tab.activity', name: msg({ id: 'shell.command.project.tab.activity', defaultMessage: 'Go to Activity', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Activity tab, the project's live work as a tree." }), category: 'project', keybinding: 'Alt+9', when: hasProject, run: tab('activity') },

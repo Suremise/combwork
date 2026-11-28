@@ -380,7 +380,7 @@ export const EDGES = [
 export const SEAMS = {
   'src/main/agentFolders': { calls: { slotWorkspaces: 2 }, why: "a Resume's claim of a slot: the pool's platform (R5)" },
   'src/main/assistantUndo': { calls: { lineRepoOps: 1 }, why: "the Assistant's branch undo: the window's repository operations, whatever the project's workflow platform (R3)" },
-  'src/main/ipc': { calls: { lineRepoReads: 20, slotWorkspaces: 1 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792), and Branches & remotes' Signing section (HI-1185), and the Files tab's Git menu's target (HI-3477); Slots and copies' submodules and LFS status, the slots' platform's (HI-1182)" },
+  'src/main/ipc': { calls: { lineRepoReads: 23, slotWorkspaces: 1 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792), and Branches & remotes' Signing section (HI-1185), and the Files tab's Git menu's target (HI-3477), and its History (HI-3475); Slots and copies' submodules and LFS status, the slots' platform's (HI-1182)" },
   'src/main/lanes': { calls: { slotWorkspaces: 1 }, why: "a lane's start reads its slot through the pool's platform (R5)" },
   'src/main/githubLink': { calls: { lineRepoReads: 1 }, why: "HI-3550: a project's GitHub link reads its remotes' URLs, the window's repository read (R2), as Branches & remotes does" },
   'src/main/fileRestorePanel': { calls: { lineRepoReads: 1 }, why: "the Files tab's Restore From → Target Branch: the project's target, the window's repository read (R2, HI-3477); its plan and change go through repoOpsIpc's opsAt" },

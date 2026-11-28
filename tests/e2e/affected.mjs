@@ -591,6 +591,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/ChangesLeftovers.tsx', 'src/shared/branchCleanup.ts'], suites: ['changesleftovers', 'gitcleanup'] },
   // HI-3473: Branches & remotes' Repository health.
   { paths: ['tests/e2e/githealth.cjs', 'src/main/platform/git/gitHealth.ts', 'src/shared/gitHealth.ts', 'src/renderer/src/components/RepoHealth.tsx', 'src/renderer/src/views/GitBranches.tsx'], suites: ['githealth'] },
+  { paths: ['tests/e2e/filehistory.cjs', 'src/main/fileHistoryPanel.ts', 'src/main/platform/git/gitFileHistory.ts', 'src/shared/fileHistory.ts', 'src/renderer/src/components/FileHistory.tsx'], suites: ['filehistory'] },
   { paths: ['tests/e2e/gitcommit.cjs', 'src/main/platform/git/gitCommitActions.ts', 'src/shared/gitCommitView.ts', 'src/renderer/src/components/CommitDialog.tsx'], suites: ['gitcommit'] },
   { paths: ['tests/e2e/gitmoves.cjs', 'src/main/platform/git/gitMoves.ts', 'src/shared/gitMoves.ts', 'src/renderer/src/components/BranchMoves.tsx'], suites: ['gitmoves'] },
   { paths: ['tests/e2e/gitstashes.cjs', 'src/main/stashPanel.ts', 'src/main/platform/git/gitStashes.ts', 'src/shared/gitStashes.ts', 'src/renderer/src/components/StashesSection.tsx', 'src/renderer/src/components/OperationPanel.tsx', 'src/main/operationPanel.ts', 'src/main/platform/git/gitOperationSteps.ts', 'src/shared/gitOperations.ts'], suites: ['gitstashes'] },

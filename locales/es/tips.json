@@ -226,6 +226,8 @@
   "tips.dialectsNewModel.title": "Un archivo de dialecto para cualquier modelo",
   "tips.editTemplates.text": "Selecciona una plantilla en la vista Plantillas y elige Editar…: agrega, copia, reordena o quita sus agentes, cambia cada uno en el cuadro Configuración del agente (su Guardar también guarda la plantilla), cámbiale el nombre y elige su diseño.",
   "tips.editTemplates.title": "Edita una plantilla en su sitio",
+  "tips.fileHistory.text": "Historial, encima de un archivo en la pestaña Archivos, lista los commits que lo cambiaron, siguiendo sus cambios de nombre: cada uno con la tarjeta que nombra su commit y el agente que lo envió. Haz clic en uno para ver qué cambió; Volver al archivo conserva tus ediciones.",
+  "tips.fileHistory.title": "¿Qué tarjeta cambió este archivo?",
   "tips.fileLinks.text": "Las rutas de archivo que imprime un agente, como src/app.ts:42, son enlaces: haz Ctrl+clic en una para abrir el archivo en la pestaña Archivos en esa línea.",
   "tips.fileLinks.title": "Ctrl+clic en una ruta en la terminal",
   "tips.fileRestore.text": "Haz clic derecho en un archivo cambiado en la pestaña Archivos: Descartar cambios… lo devuelve al commit actual, y Restaurar desde toma su versión en la rama de destino o en uno de sus commits. Ambos muestran primero el diff y guardan sus cambios en un stash.",

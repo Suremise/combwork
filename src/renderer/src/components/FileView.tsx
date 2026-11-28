@@ -282,7 +282,8 @@ export function FileView({
   changeTick,
   onOpenRel,
   toolbarExtra,
-  goto
+  goto,
+  overlay
 }: {
   project: ProjectInfo
   rel: string
@@ -292,6 +293,11 @@ export function FileView({
   toolbarExtra?: React.ReactNode
   /** A line to go to (a terminal's file link); a new nonce goes there again. */
   goto?: EditorGoto
+  /**
+   * HI-3475: shown in place of the file's body (a commit's diff from History). The editor stays as it was beneath it,
+   * hidden, its text, edits and undo kept: taking the overlay away shows it again.
+   */
+  overlay?: React.ReactNode
 }) {
   const abs = `${project.path}\\${rel.replace(/\//g, '\\')}`
   const name = rel.split('/').pop()!
@@ -459,6 +465,14 @@ export function FileView({
     </div>
   )
 
+  if (overlay && (!content || content.kind !== 'text' || (pv && !pv.needsText))) {
+    return (
+      <>
+        {header}
+        {overlay}
+      </>
+    )
+  }
   if (error && !content) {
     return (
       <>
@@ -515,7 +529,8 @@ export function FileView({
         </div>
       )}
       {error && content && <div className="banner warn"><Icon name="warning" /> {error}</div>}
-      <div className={cx('editor-host', effectiveMode === 'split' && 'split-view')}>
+      {overlay}
+      <div className={cx('editor-host', effectiveMode === 'split' && 'split-view')} hidden={!!overlay}>
         {effectiveMode === 'edit' && editor}
         {effectiveMode === 'preview' && pv && <div className="preview-pane">{pv.render(previewProps)}</div>}
         {effectiveMode === 'split' && pv && (

@@ -203,6 +203,22 @@
       "why": "plain"
     }
   },
+  "service.fileHistory.failed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.fileHistory.invalid": {
+    "placeholders": {}
+  },
+  "service.fileHistory.noCommit": {
+    "placeholders": {
+      "commit": "plain"
+    }
+  },
+  "service.fileHistory.unsupported": {
+    "placeholders": {}
+  },
   "service.files.badName": {
     "placeholders": {
       "name": "plain"

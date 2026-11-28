@@ -22,6 +22,9 @@ import { cx, formatBytes, formatKeybinding, FILES_MIME, IMAGE_EXT, imageUrl, quo
 import { CW_DIR } from '@shared/defaults'
 import { FILES_GIT_TEXT, gitMenuEntries, ignoredByText } from '../components/FilesGitMenu'
 import { CodeEditor } from '../components/Editors'
+import { CommitDialog } from '../components/CommitDialog'
+import { FILE_HISTORY_TEXT, FileHistoryPanel, HistoryDiff, type HistoryPick } from '../components/FileHistory'
+import { offered } from '../repoOps'
 import type { FileGitRuleText } from '@shared/types'
 
 const parentOf = (rel: string): string => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '')
@@ -580,6 +583,7 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
           ]
         : []),
       ...(!e.isDir && single ? [{ label: tr(M.openInDefaultApp), icon: 'link-external', onClick: () => open(e) }] : []),
+      ...(single ? [{ label: tr(FILE_HISTORY_TEXT.toggle), icon: 'history', onClick: () => set({ filesHistory: true }) }] : []),
       { label: tr(FILES_TEXT.revealInExplorer), icon: 'folder-opened', onClick: () => void call('files:reveal', project.path, e.relPath) },
       ...(project.live ? [{ label: tr(M.insertPath), icon: 'terminal', onClick: () => void insertIntoSession(project, abs) }] : []),
       { separator: true },
@@ -729,6 +733,14 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
 
   const cutSet = fileClipboard?.mode === 'cut' && fileClipboard.project === project.path ? new Set(fileClipboard.rels) : null
   const one = selEntries.length === 1 ? selEntries[0] : null
+  // HI-3475: History of the one item selected, or of the folder shown when nothing is; a commit's diff opened from it
+  // shows only while that item stays selected.
+  const historyShown = useStore((s) => s.filesHistory)
+  const historyItem = !selEntries.length ? { rel: '', isDir: true } : one ? { rel: one.relPath, isDir: one.isDir } : null
+  const [historyPick, setHistoryPick] = useState<{ rel: string; pick: HistoryPick } | null>(null)
+  const shownPick = historyShown && historyItem && historyPick?.rel === historyItem.rel ? historyPick.pick : null
+  const [commitShown, setCommitShown] = useState<{ hash: string; focus: { path: string; oldPath: string | null } | null } | null>(null)
+  const historyDiff = shownPick ? <HistoryDiff root={project.path} pick={shownPick} onBack={() => setHistoryPick(null)} /> : undefined
 
   return (
     <div className="split">
@@ -814,7 +826,8 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
           )}
         </div>
       </div>
-      <div className="split-main">
+      <div className="split-main files-main">
+        <div className="files-main-body">
         {one && !one.isDir ? (
           <FileView
             // A fresh instance per file, so no state (text, drafts, mode) leaks from one file to the next.
@@ -824,18 +837,34 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
             changeTick={dirTicks[parentOf(one.relPath)] ?? 0}
             onOpenRel={reveal}
             goto={goto?.rel === one.relPath && goto.line ? { line: goto.line, col: goto.col, nonce: goto.nonce } : undefined}
+            overlay={historyDiff}
             toolbarExtra={
               <>
+                <IconButton icon="history" title={tr(FILE_HISTORY_TEXT.toggleTip)} active={historyShown} action="file-history" onClick={() => set({ filesHistory: !historyShown })} />
                 <IconButton icon="link-external" title={tr(M.openInDefaultApp)} onClick={() => openExternally(one.relPath)} />
                 <IconButton icon="folder-opened" title={tr(FILES_TEXT.revealInExplorer)} onClick={() => void call('files:reveal', project.path, one.relPath)} />
                 {project.live && <IconButton icon="terminal" title={tr(M.insertPath)} onClick={() => void insertIntoSession(project, [absOf(project, one.relPath)])} />}
               </>
             }
           />
+        ) : historyDiff ? (
+          historyDiff
         ) : (
           <FileDetails project={project} entry={one} count={selEntries.length} git={one ? git[one.relPath] : undefined} onOpen={open} onRename={(e) => setEditing({ kind: 'rename', rel: e.relPath })} onDelete={() => void trashSelected()} />
         )}
+        </div>
+        {historyShown && (
+          <FileHistoryPanel
+            project={project}
+            item={historyItem}
+            picked={shownPick}
+            onPick={(pick) => historyItem && setHistoryPick({ rel: historyItem.rel, pick })}
+            onOpenCommit={mainCheckout && offered('git:commitDetail') ? (row, file) => setCommitShown({ hash: row.hash, focus: file ? { path: file.path, oldPath: file.oldPath } : null }) : null}
+            onClose={() => set({ filesHistory: false })}
+          />
+        )}
       </div>
+      {commitShown && <CommitDialog project={project} commit={commitShown.hash} focus={commitShown.focus} onClose={() => setCommitShown(null)} />}
       {menu.element}
       {ruleView && <IgnoreRuleViewer view={ruleView} onClose={() => setRuleView(null)} />}
     </div>

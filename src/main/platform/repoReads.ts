@@ -13,6 +13,7 @@
 
 import type { BranchDrops, BranchUpdatePlan, CompareLines, GitComparison, GitHistory, GitRemote, GitRepoInfo, GitRepoSummary, LeftoverInfo } from '../../shared/gitRepo'
 import type { SigningInfo } from '../../shared/gitSigning'
+import type { FileLog, FileSide, FileVersions, MergeIntro } from '../../shared/fileHistory'
 import type { GitOperationState } from '../../shared/gitOperations'
 import type { StashConflict } from '../../shared/gitStashes'
 import type { ResolvedStart, StartPoints } from '../../shared/nextVersion'
@@ -64,6 +65,18 @@ export interface RepoReads {
    * at most once a minute unless `force`). Optional: a platform without signing has none, and nothing is shown.
    */
   signing?(root: string, force?: boolean): Promise<SigningInfo>
+  /**
+   * HI-3475: the Files tab's History of a file (following its renames) or a folder in a working folder, a page at a
+   * time from the commit pinned on page 1 (`pinned`; null reads the folder's head and pins it). Optional, as the members
+   * below: a platform without them offers no History.
+   */
+  fileLog?(root: string, rel: string, isDir: boolean, pinned: string | null, page: number): Promise<FileLog>
+  /** HI-3475: a file at two commits, each side at its own path (null: no side); a side confirmed absent is `missing`. */
+  fileVersions?(root: string, left: FileSide | null, right: FileSide | null): Promise<FileVersions>
+  /** HI-3475: the merge that introduced `commit` on `head`'s first-parent line, or null when none can be said. */
+  introducedBy?(root: string, head: string, commit: string): Promise<MergeIntro | null>
+  /** HI-3475: the commits in `revision` and not in `base` (a submission's own). */
+  rangeCommits?(root: string, base: string, revision: string): Promise<Set<string>>
   /** A line's history, a page at a time, and the tags. */
   history(root: string, o: { ref?: string | null; page?: number; workTarget?: string | null }): Promise<GitHistory>
   /** What can be compared: the lines, main, the integration line and the slots with a line. */

@@ -53,6 +53,7 @@
   "shell.command.assistant.toggle": "アシスタントの表示を切り替え",
   "shell.command.console.showCapture": "キャプチャをフォルダーに表示",
   "shell.command.files.commitIgnore": ".gitignoreをコミット",
+  "shell.command.files.toggleHistory": "ファイルの履歴の表示を切り替える",
   "shell.command.folderChanges.settle": "変更をコミットまたは退避",
   "shell.command.folderChanges.show": "未コミットの変更を表示",
   "shell.command.git.cancelRun": "Git操作をキャンセル",

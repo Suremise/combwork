@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Added
+
+- **A file's history in the Files tab** (HI-3475). **History**, above a file or in its right-click menu, opens a panel listing the commits that changed the file, following its renames, or every commit that changed a folder. Each shows the card its commit names (click it to open the card), the agent that submitted it for review, its author and when it was made. Click one to see what it changed in the file. **Back to file** returns to the editor with your unsaved edits kept. A commit naming no card can show which card's merge brought it in. It works in the project folder and in an agent's slot or worktree.
+
 ## 1.7.1 — 2026-11-26
 
 ### Removed
