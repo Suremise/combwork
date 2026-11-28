@@ -2534,6 +2534,28 @@ Combwork can run a web project's development server for you, so you and its agen
 
 **Which source it is.** A preview records the commit its place was at when it started, and, when there were uncommitted changes, an id of the files themselves: the same files always give the same id. It also notes when the files change afterwards. That tells you which source the server was started from. It can't promise the page shows it: hot reload can lag or fail, and the server's own data is its own.
 
+### The Preview tab <a id="preview-tab"></a>
+
+With the Preview on (above), a project with a preview command has a **Preview** tab in its tab strip; without one, Preview is under More ▾ and says **Set up a preview**, with a button to Project Settings → Preview.
+
+- **Place** picks where the page comes from: the project folder, or a slot or review copy whose preview runs (agents start those).
+- **Start** runs the dev server and shows its page; **Stop** stops it; **Reload** and **Reload, bypassing the cache** load it again; **Developer Tools** opens the browser's tools for the page (yours only: no agent can open them).
+- The header's **stamp** says which source the server was started from: the place, a slot's card, and the commit (`a1b2c3d`), with `+ tree …` when there were uncommitted changes. Once the files change, it says **stale**, and **Restart** starts the server again from them. The stamp names the source, not the page: hot reload can lag or fail, and a server can keep old output.
+- A page that tries to leave its own address (a link to another site, a script, `window.open`, a refresh) stays where it is, and a bar says **The page tried to open …**. Only **Open in Browser** on that bar opens it, in your own browser.
+
+**What the page can reach.** The page is treated as untrusted: it is your project's code, its dependencies and whatever they load from the internet. It runs in a view of its own, with its own storage that's thrown away when the preview stops, and every request it makes goes through Combwork's network guard:
+
+- its own dev server's ports (and the hot reload port), and the internet over **https** and **wss**: allowed;
+- any other port on this computer (Combwork's own Agent API, other previews, other programs), names that point at this computer (`localhost`, `foo.localhost`, a name that resolves to `127.0.0.1`), your local network and other private addresses: **refused**, however the address is written or wherever a redirect leads;
+- `file:`, Combwork's own addresses, and other schemes: refused;
+- camera, microphone, location, notifications and clipboard reading: refused; downloads are cancelled; WebRTC can't open connections of its own.
+
+If the guard stops, the page is closed and the preview says **Stopped: network guard stopped**; nothing more loads until you start it again.
+
+**What it doesn't cover.** The **dev server's command** is yours, like a command you run in a terminal: it runs with your rights and can reach anything. Only the page in the Preview tab is guarded.
+
+To turn the Preview off, switch off **Settings → Advanced → Preview: run projects' dev servers**: the tab goes, and running previews stop.
+
 ### Permission modes <a id="permission-modes"></a>
 
 | Mode | Behaviour |

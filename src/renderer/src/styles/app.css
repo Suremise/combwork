@@ -3869,6 +3869,52 @@ p.hint {
   font-size: 12px;
   margin-top: 6px;
 }
+/* The Preview tab (HI-3615): its header and bar, then the area main puts the guarded page's native view at. */
+.preview-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.preview-place {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.preview-stamp {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.preview-stale {
+  font-size: 12px;
+  color: var(--warning);
+}
+.preview-tried {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.preview-status {
+  padding: 16px;
+  color: var(--fg-muted);
+}
+.preview-area {
+  flex: 1;
+  min-height: 0;
+}
+.preview-setup {
+  padding: 24px;
+  max-width: 640px;
+}
 /* Project Settings → Preview (HI-3614): its fields labelled on the left, the hints and switch under them. */
 .preview-settings {
   display: flex;

@@ -15,7 +15,7 @@
 import { app, shell, type BrowserWindow, type Rectangle } from 'electron'
 import { createHash } from 'crypto'
 import { mkdirSync, watch } from 'original-fs'
-import { readdir, readFile } from 'original-fs/promises'
+import { appendFile, readdir, readFile, writeFile } from 'original-fs/promises'
 import { basename, join } from 'path'
 import { advanced } from './advanced'
 import { processSupervisor } from './agentProcesses'
@@ -304,13 +304,11 @@ export async function previewSuggestion(projectPath: string): Promise<{ suggesti
 /** Saves a project's preview setting (null: none), checked whole. */
 export async function setPreviewConfig(ws: WorkspaceService, projectPath: string, raw: unknown): Promise<PreviewConfig | null> {
   assertOn()
-  if (raw === null) {
-    await ws.mutateProjectConfig(projectPath, () => ({ preview: undefined }))
-    return null
-  }
-  const cfg = previewConfigOf(raw)
-  if (!cfg) throw combworkError(M.badConfig, undefined, { kind: 'invalid' })
-  await ws.mutateProjectConfig(projectPath, () => ({ preview: cfg }))
+  const cfg = raw === null ? null : previewConfigOf(raw)
+  if (raw !== null && !cfg) throw combworkError(M.badConfig, undefined, { kind: 'invalid' })
+  await ws.mutateProjectConfig(projectPath, () => ({ preview: cfg ?? undefined }))
+  // Every window reads it again (the tab strip places the Preview tab by it, HI-3615), whoever set it.
+  ws.scheduleRefresh()
   return cfg
 }
 
@@ -355,10 +353,11 @@ async function closeShown(id: string): Promise<void> {
   await g?.close()
 }
 
-/** The view's place in its window: whole pixels, inside the window. */
-function boundsOf(b: unknown): Rectangle {
+/** The view's place in its window: the tab's area in the window's CSS pixels, scaled by its zoom, in whole pixels. */
+function boundsOf(win: BrowserWindow, b: unknown): Rectangle {
   const r = (b && typeof b === 'object' ? b : {}) as Record<string, unknown>
-  const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0)
+  const zoom = win.webContents.getZoomFactor() || 1
+  const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.round(v * zoom)) : 0)
   return { x: n(r.x), y: n(r.y), width: n(r.width), height: n(r.height) }
 }
 
@@ -411,7 +410,7 @@ export async function showPreview(win: BrowserWindow, projectPath: string, id: s
       if (shown.get(id)?.win === win) void closeShown(id)
     })
   }
-  g.view.setBounds(boundsOf(bounds))
+  g.view.setBounds(boundsOf(win, bounds))
   if (!s.loaded) {
     const owned = await runner!.checkOwnership(id)
     if (!owned.ok) throw combworkError(M.notRunning, undefined, { kind: 'invalid' })
@@ -426,7 +425,7 @@ export async function placePreview(win: BrowserWindow, id: string, bounds: unkno
   const s = shown.get(id)
   if (!s || s.win !== win) return
   const g = await s.guard.catch(() => null)
-  g?.view?.setBounds(boundsOf(bounds))
+  g?.view?.setBounds(boundsOf(win, bounds))
 }
 
 /** Takes a shown preview's page out of its window (the tab hidden): it keeps running, its page kept. */
@@ -464,20 +463,30 @@ export async function openTried(id: string, url: unknown): Promise<boolean> {
   const s = shown.get(id)
   const u = typeof url === 'string' ? openableUrl(url) : null
   if (!s || !u || !s.tried.has(u)) return false
-  await shell.openExternal(u)
+  // Test copies only: written down instead of opening the user's browser (test copies never show anything outside them).
+  const testLog = !app.isPackaged ? process.env.CW_TEST_PREVIEW_OPENED : undefined
+  if (testLog) await appendFile(testLog, `${u}
+`)
+  else await shell.openExternal(u)
   return true
 }
 
 /** Test copies only: a shown preview's guard, for its refusals and its proxy's process (ended as a crash would). */
-export async function previewTest(op: { op: 'refusals' | 'killGuard' | 'shown'; id: string }): Promise<unknown> {
+export async function previewTest(op: { op: 'refusals' | 'killGuard' | 'shown' | 'tried' | 'capture'; id: string; file?: string }): Promise<unknown> {
   if (app.isPackaged) throw new Error('Not allowed') // i18n-ignore: a test channel, never shown
   const g = await shown.get(op.id)?.guard.catch(() => null)
   if (op.op === 'shown') return { shown: !!g?.alive, viewDestroyed: !g?.view || g.view.webContents.isDestroyed() }
   if (!g) return null
   if (op.op === 'refusals') return g.refusals
-  const pid = g.proxyPid
-  if (pid) process.kill(pid)
-  return pid
+  if (op.op === 'tried') return [...(shown.get(op.id)?.tried ?? [])]
+  // The page as its view draws it (a window's own screenshot doesn't include a native view), to a test's file.
+  if (op.op === 'capture') {
+    const img = await g.view?.webContents.capturePage()
+    if (!img || !op.file) return false
+    await writeFile(op.file, img.toPNG())
+    return true
+  }
+  return g.crashProxyForTests()
 }
 
 let offEnds: (() => void) | null = null

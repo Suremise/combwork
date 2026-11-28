@@ -517,7 +517,7 @@ export interface CombworkRequests {
   'preview:reload': (projectPath: string, id: string, hard: boolean) => void
   'preview:devtools': (projectPath: string, id: string) => void
   'preview:openTried': (id: string, url: string) => boolean
-  'preview:test': (op: { op: 'refusals' | 'killGuard' | 'shown'; id: string }) => unknown
+  'preview:test': (op: { op: 'refusals' | 'killGuard' | 'shown' | 'tried' | 'capture'; id: string; file?: string }) => unknown
   /** A workspace's (null) or a project's GitHub host settings as they resolve (HI-2779), and a change to them. */
   'github:form': (projectPath: string | null) => GithubHostsForm
   'github:set': (projectPath: string | null, change: GithubHostChange) => GithubHostsForm

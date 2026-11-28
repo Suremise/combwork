@@ -26,6 +26,7 @@
 ### Added
 
 - **Preview: Combwork runs a web project's dev server, on a port of its own** (HI-3614). Off by default: turn on **Settings → Advanced → Preview: run projects' dev servers**, then set the command in **Project Settings → Preview**, which suggests one from your `package.json` scripts for you to confirm. Each preview runs in one place (the project folder, a slot or a review copy), only when asked, on a free port given in `PORT` from a range shared by all your projects and windows; Combwork checks the server it started is the one listening, and stops it with its slot's lease or review, its project or Combwork itself. It records the source it was started from. The Preview tab and the agents' tool come next.
+- **The Preview tab: a web project's page, in a guarded view** (HI-3615). With the Preview turned on (Settings → Advanced), a project with a preview command gets a Preview tab: Start runs its dev server and shows its page, stamped with the source it was started from (stale once the files change, with Restart), with Reload, a hard reload and Developer Tools. The page is untrusted: it reaches only its own dev server and the internet over https, through a network guard that refuses this computer's other services, your local network and private addresses however they're written, and every permission; a page that tries to leave is offered in Combwork's own bar, opened in your browser only on your click.
 
 ## 1.7.1 — 2026-11-26
 

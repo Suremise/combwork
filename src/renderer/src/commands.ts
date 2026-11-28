@@ -2,6 +2,7 @@ import { PROJECT_KEYBINDING_CATEGORIES, SESSION_LAYOUTS, projectSessionView, res
 import { PROVIDERS, adminSnippetProvider, providerDescriptor } from '@shared/providers'
 import { batchCounts, type BatchCounts } from '@shared/startAll'
 import { appTakesTerminalKey } from '@shared/terminalInput'
+import { advancedDef, advancedRow, PREVIEW_ENABLED } from '@shared/advanced'
 import type { ProjectInfo, ProviderId, SessionLayout, ToastTarget } from '@shared/types'
 import { tilePageCount } from '@shared/tiles'
 import { APP_NAME } from '@shared/appName'
@@ -125,13 +126,17 @@ const tab = (t: ProjectTab) => () => {
 // The strip's tabs (#974: Settings isn't one); from Project Settings, the next is the first and the previous the last.
 const TAB_ORDER: ProjectTab[] = STRIP_TABS.map((t) => t.id)
 
+/** HI-3615: whether the Preview is on (Settings → Advanced): its tab and command only then. */
+const previewOn = (): boolean => advancedRow(advancedDef(PREVIEW_ENABLED)!, get().advanced).value === true
+
 function cycleTab(delta: number): void {
   const p = get().selectedProject
   if (!p) return
-  const at = TAB_ORDER.indexOf(get().projectTabs[p] ?? 'session')
-  const i = at >= 0 ? at : delta > 0 ? -1 : TAB_ORDER.length
+  const order = previewOn() ? TAB_ORDER : TAB_ORDER.filter((t) => t !== 'preview')
+  const at = order.indexOf(get().projectTabs[p] ?? 'session')
+  const i = at >= 0 ? at : delta > 0 ? -1 : order.length
   showView('projects')
-  setProjectTab(p, TAB_ORDER[(i + delta + TAB_ORDER.length) % TAB_ORDER.length])
+  setProjectTab(p, order[(i + delta + order.length) % order.length])
 }
 
 /** Focus agent N (1-based) of the selected project and show it. */
@@ -259,6 +264,7 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'project.tab.skills', name: msg({ id: 'shell.command.project.tab.skills', defaultMessage: 'Go to Skills', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('skills') },
   { id: 'project.tab.templates', name: msg({ id: 'shell.command.project.tab.templates', defaultMessage: 'Go to Templates', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('templates') },
   { id: 'project.tab.mcp', name: msg({ id: 'shell.command.project.tab.mcp', defaultMessage: 'Go to MCP', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('mcp') },
+  { id: 'project.tab.preview', name: msg({ id: 'shell.command.project.tab.preview', defaultMessage: 'Go to Preview', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Preview tab (only while the Preview is turned on in Settings → Advanced)." }), category: 'project', when: () => hasProject() && previewOn(), run: tab('preview') },
   { id: 'project.tab.settings', name: msg({ id: 'shell.command.project.tab.settings', defaultMessage: 'Go to Project Settings', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+0', when: hasProject, run: tab('settings') },
   { id: 'project.storage', name: msg({ id: 'shell.command.project.storage', defaultMessage: 'Project Storage and Clean Up…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category. The … says it opens a dialog first: keep it.' }), category: 'project', when: hasProject, run: () => openProjectSettings(get().selectedProject!, 'storage') },
   { id: 'project.tab.next', name: msg({ id: 'shell.command.project.tab.next', defaultMessage: 'Next Project Tab', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Mod+Tab', when: hasProject, run: () => cycleTab(1) }, // i18n-ignore: a shortcut's keys

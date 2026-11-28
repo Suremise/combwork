@@ -297,6 +297,7 @@ export const SUITES = [
   { name: 'presetstep' },
   { name: 'preview' },
   { name: 'previewguard' },
+  { name: 'previewtab' },
   { name: 'prfinish' },
   { name: 'progress', serial: 'window focus' },
   { name: 'progressgates' },

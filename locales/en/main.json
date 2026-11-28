@@ -1171,6 +1171,10 @@
     "defaultMessage": "A preview needs a command (one line, at most 1,000 characters) and a page path starting with /.",
     "description": "An error: Project Settings → Preview's values weren't saved: the command is empty or too long, or the path doesn't start with a slash."
   },
+  "main.preview.guardFailed": {
+    "defaultMessage": "The preview's network guard couldn't start, so its page isn't shown. Start it again; Combwork's log says why.",
+    "description": "An error: the Preview's network guard (the filtering proxy every request of the previewed page goes through) didn't start, so Combwork shows no page."
+  },
   "main.preview.noConfig": {
     "defaultMessage": "{project} has no preview command: set one in Project Settings → Preview.",
     "description": "An error: a preview was asked for in a project that has no preview command. {project} is the project's name. Project Settings → Preview is a section: use its names as translated there."
@@ -1182,6 +1186,10 @@
   "main.preview.notLent": {
     "defaultMessage": "{slot} isn't lent to a card or a review now, so a preview can't run in it.",
     "description": "An error: a preview was asked for in a slot or review copy no card or review holds now. {slot} is its name (slot-b, copy-1)."
+  },
+  "main.preview.notRunning": {
+    "defaultMessage": "That preview isn't running now: start it again.",
+    "description": "An error: the Preview tab asked to show, reload or inspect a preview that has stopped meanwhile."
   },
   "main.preview.off": {
     "defaultMessage": "The Preview is turned off (Settings → Advanced, Preview: run projects’ dev servers).",

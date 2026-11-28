@@ -25,6 +25,9 @@ const READY_MS = 15_000
 /** How often its health is asked, and how long an answer may take. */
 const PING_MS = 5_000
 
+/** What refused something: a request's layer, or the partition's permission and download handlers. */
+export type Layer = 'webRequest' | 'proxy' | 'permission' | 'download'
+
 /** What a guard reports to its owner. */
 export interface GuardEvents {
   /** The guard was lost (its proxy exited or stopped answering): the view is gone. */
@@ -32,7 +35,7 @@ export interface GuardEvents {
   /** The page tried to leave its origin (a navigation, window.open): the URL, for Combwork's own bar. */
   tried: (url: string) => void
   /** A request refused, by which layer (tests and the log). */
-  refused?: (layer: 'webRequest' | 'proxy', url: string, why: string) => void
+  refused?: (layer: Layer, url: string, why: string) => void
 }
 
 export interface GuardOptions {
@@ -74,7 +77,7 @@ export class PreviewGuard {
   private closed = false
   private readonly own: { ports: number[] }
   /** Every request refused, by layer (tests read them; bounded). */
-  readonly refusals: { layer: 'webRequest' | 'proxy'; url: string; why: string }[] = []
+  readonly refusals: { layer: Layer; url: string; why: string }[] = []
 
   private constructor(private readonly o: GuardOptions) {
     this.own = { ports: [...o.ownPorts] }
@@ -100,12 +103,15 @@ export class PreviewGuard {
     return !this.closed && !!this.viewNow
   }
 
-  /** The proxy's process id (tests end it as a crash would). */
-  get proxyPid(): number | null {
-    return this.proxy?.pid ?? null
+  /** Tests: ends the proxy's process by its handle, as a crash would; its pid, or null with none. */
+  crashProxyForTests(): number | null {
+    const p = this.proxy
+    const pid = p?.pid ?? null
+    p?.kill()
+    return pid
   }
 
-  private refused(layer: 'webRequest' | 'proxy', url: string, why: string): void {
+  private refused(layer: Layer, url: string, why: string): void {
     if (this.refusals.length < 500) this.refusals.push({ layer, url, why })
     this.o.events.refused?.(layer, url, why)
   }
@@ -140,11 +146,18 @@ export class PreviewGuard {
     this.ses = ses
     await ses.setProxy({ mode: 'fixed_servers', proxyRules: `127.0.0.1:${port}`, proxyBypassRules: '<-loopback>' })
     await ses.closeAllConnections()
-    ses.setPermissionRequestHandler((_wc, _perm, cb) => cb(false))
+    ses.setPermissionRequestHandler((_wc, perm, cb) => {
+      this.refused('permission', perm, 'request')
+      cb(false)
+    })
     ses.setPermissionCheckHandler(() => false)
     ses.setDevicePermissionHandler(() => false)
-    ses.setDisplayMediaRequestHandler((_req, cb) => cb({}))
+    ses.setDisplayMediaRequestHandler((_req, cb) => {
+      this.refused('permission', 'display-capture', 'request')
+      cb({})
+    })
     ses.on('will-download', (e, item) => {
+      this.refused('download', item.getURL(), 'cancelled')
       e.preventDefault()
       item.cancel()
     })
@@ -197,7 +210,7 @@ export class PreviewGuard {
     const wc = this.viewNow?.webContents
     if (!wc || !sameOrigin(url, this.own.ports[0])) return Promise.resolve()
     if (hard) wc.session.clearCache().catch(() => undefined)
-    return wc.loadURL(url, hard ? { extraHeaders: 'pragma: no-cache\ncache-control: no-cache\n' } : {}).catch(() => undefined)
+    return wc.loadURL(url, hard ? { extraHeaders: 'pragma: no-cache\ncache-control: no-cache\n' } : {}).catch(() => undefined) // i18n-ignore: HTTP headers
   }
 
   reload(hard: boolean): void {

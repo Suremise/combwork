@@ -97,6 +97,7 @@
   "shell.command.project.tab.next": "Następna zakładka projektu",
   "shell.command.project.tab.overview": "Przejdź do zakładki Przegląd",
   "shell.command.project.tab.performance": "Przejdź do zakładki Wydajność",
+  "shell.command.project.tab.preview": "Przejdź do Podglądu",
   "shell.command.project.tab.previous": "Poprzednia zakładka projektu",
   "shell.command.project.tab.session": "Przejdź do zakładki Sesja",
   "shell.command.project.tab.sessions": "Przejdź do zakładki Sesje",

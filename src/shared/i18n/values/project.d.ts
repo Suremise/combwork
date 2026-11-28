@@ -396,6 +396,7 @@ interface CombworkMessageValues {
   'project.tab.memory': undefined
   'project.tab.overview': undefined
   'project.tab.performance': undefined
+  'project.tab.preview': undefined
   'project.tab.session': undefined
   'project.tab.sessions': undefined
   'project.tab.settings': undefined

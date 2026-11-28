@@ -97,6 +97,7 @@
   "shell.command.project.tab.next": "Próxima aba do projeto",
   "shell.command.project.tab.overview": "Ir para Visão geral",
   "shell.command.project.tab.performance": "Ir para Desempenho",
+  "shell.command.project.tab.preview": "Ir para Pré-visualização",
   "shell.command.project.tab.previous": "Aba anterior do projeto",
   "shell.command.project.tab.session": "Ir para Sessão",
   "shell.command.project.tab.sessions": "Ir para Sessões",

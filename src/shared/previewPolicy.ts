@@ -71,7 +71,7 @@ function v6Groups(ip: string): number[] | null {
   const part = (x: string): number[] => (x ? x.split(':').map((h) => parseInt(h, 16)) : [])
   const head = part(halves[0])
   const tail = halves.length === 2 ? part(halves[1]) : []
-  const groups = halves.length === 2 ? [...head, ...new Array(Math.max(0, 8 - head.length - tail.length)).fill(0), ...tail] : head
+  const groups = halves.length === 2 ? [...head, ...Array.from({ length: Math.max(0, 8 - head.length - tail.length) }, () => 0), ...tail] : head
   return groups.length === 8 && groups.every((g) => Number.isInteger(g) && g >= 0 && g <= 0xffff) ? groups : null
 }
 

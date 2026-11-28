@@ -15,12 +15,12 @@
 // - the proxy killed: the preview is stopped ("network guard stopped") and its page gone.
 // QUIC is off (Combwork's --disable-quic; a fixed proxy rules it out too). The proxy's own rules (pinning, rebinding,
 // CONNECT to a private address) are tests/previewGuard.test.ts's. Dev build, throwaway profile; no agent.
+// Dev build only (#1578): its resolver, address map, fixture certificate and proxy-alone mode are test copies' seams.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 const http = require('http')
 const https = require('https')
-const net = require('net')
 const dgram = require('dgram')
 const crypto = require('crypto')
 const { execFileSync } = require('child_process')

@@ -97,6 +97,7 @@
   "shell.command.project.tab.next": "Pestaña del proyecto siguiente",
   "shell.command.project.tab.overview": "Ir a Resumen",
   "shell.command.project.tab.performance": "Ir a Rendimiento",
+  "shell.command.project.tab.preview": "Ir a Vista previa",
   "shell.command.project.tab.previous": "Pestaña del proyecto anterior",
   "shell.command.project.tab.session": "Ir a Sesión",
   "shell.command.project.tab.sessions": "Ir a Sesiones",
