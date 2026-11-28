@@ -66,8 +66,8 @@
     "note": "HI-2229: the Assistant has no project of its own (\"Default: this project.\" left it calling with none), so it gets arg.project."
   },
   "tool.arg.source": {
-    "text": "The project's GitHub issue or pull request it is about: #12 or its address (null clears it). Only before it starts, in Todo or On Hold; read from GitHub, never written to.",
-    "note": "HI-3584: the Assistant’s source on cw_create_task and cw_update_task: links the card, as the card dialog’s GitHub source does, so Close Shipped Issues… finds it."
+    "text": "The project's GitHub issue or PR it's about: #12 or its URL (null clears). Only in Todo or On Hold; GitHub is only read.",
+    "note": "HI-3584: the Assistant’s source on cw_create_task and cw_update_task: links the card, as the card dialog’s GitHub source does, so Close Shipped Issues… finds it. HI-3624: shortened to a parameter’s 120 characters (toolLimits.cjs)."
   },
   "tool.arg.target": {
     "text": "Merges into: one of the project's Other branches work can merge into, or \"\" for its Work merges into."
