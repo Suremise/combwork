@@ -1,9 +1,7 @@
 // Agents' workflow roles (#1430, SPEC §16.10.6): an agent's own role, else the guess from its note or name (HR1 and
 // HI-R2 read as reviewers, as do notes and names saying review; anything else as a builder), either-role agents both
-// building and reviewing, and the readers that use it: the preset step's suggestion, the upgrade's reviewer option
-// (adoption) and the short project listing. Nothing is written for an agent whose role is a guess.
-import { execFileSync } from 'child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+// building and reviewing, and the readers that use it: the preset step's suggestion and the short project listing. Nothing is written for an agent whose role is a guess.
+import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -15,7 +13,6 @@ mkdirSync(join(base, 'profile'), { recursive: true })
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const store = await import('../src/main/boardStore')
-const { adoptNow } = await import('../src/main/workflow/adoption')
 const { cleanWorkflowRole } = await import('../src/main/projectAgents')
 const { agentWorkflowRole, buildsWork, reviewsWork, takesCards, isWorkflowRole, workflowPairs: pairsOf, WORKFLOW_ROLES } = await import('../src/shared/workflow/roles')
 const { suggestPreset } = await import('../src/shared/workflow/presetStep')
@@ -88,34 +85,6 @@ describe('its readers (#1430)', () => {
   it("the short project listing gives each agent's role", () => {
     const row = { name: 'p', workspace: 'w', active: true, branch: 'main', agents: [{ name: 'HB1', provider: 'claude-code', workflowRole: 'builder', status: 'stopped', branch: null, backgroundTasks: 0 }] }
     expect(projectRowText(row, false)).toBe('p (on, main): HB1 [claude-code, builder] stopped')
-  })
-
-  const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()
-  let n = 0
-  /** A workspace from before 1.0 (no platform recorded, no board yet) whose project `p` has these agents; adopted. */
-  async function upgraded(agents: { id: string; name: string; role?: string }[]): Promise<Record<string, any>> {
-    const ws = join(base, `ws-${++n}`)
-    const repo = join(ws, 'p')
-    mkdirSync(join(repo, '.combwork'), { recursive: true })
-    mkdirSync(join(ws, '.combwork'), { recursive: true })
-    git(repo, 'init', '-q', '-b', 'main')
-    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
-    const w = createWorkspaceService()
-    await w.open(ws)
-    opened.push(w)
-    expect(await adoptNow(w)).toMatchObject({ configured: 1, failed: 0 })
-    return JSON.parse(readFileSync(join(repo, '.combwork', 'project.json'), 'utf8'))
-  }
-
-  it('the upgrade reads HR-named agents as reviewers (a reviewer agent reviews), and writes no role on any agent', async () => {
-    const cfg = await upgraded([{ id: 'b1', name: 'HB1' }, { id: 'r1', name: 'HR1' }])
-    expect(cfg.workflow).toMatchObject({ options: { review: 'agent' } })
-    expect(cfg.agents.map((a: Record<string, unknown>) => a.workflowRole)).toEqual([undefined, undefined])
-  })
-
-  it('with builders only, the upgrade asks no reviewer agent', async () => {
-    const cfg = await upgraded([{ id: 'b1', name: 'HB1' }, { id: 'b2', name: 'HB2' }])
-    expect(cfg.workflow.options.review).not.toBe('agent')
   })
 })
 

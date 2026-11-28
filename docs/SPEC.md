@@ -102,7 +102,7 @@ Primary platform is Windows 11. Code avoids Windows-only assumptions where cheap
     combwork.db               # the task board (§6.6): SQLite, one row a card (#1017), and lanes, card watches and every session host's deliveries (#1018) and session records (#1061, below); with combwork.db-wal and combwork.db-shm
     usage.db              # the usage history (§9, #1106): what each session used, a row per day, model and card; written by the usage worker only; with usage.db-wal and usage.db-shm
     tasks/                # 0.9 to 1.0 left a stub here for older versions (board.json, a README; #1017): none is written since 1.1, and the names upgrade sets aside any card in it and removes it (HI-2594)
-    tasks.imported-<time>/ # the cards' files as they were, kept when they moved into combwork.db; to the Recycle Bin 14 days after (#1111)
+    tasks.imported-<time>/ # the cards' files as they were, kept when they moved into combwork.db (an import gone since HI-3619); to the Recycle Bin 14 days after (#1111)
     .gitignore            # keeps combwork.db, usage.db and the board's backups out of git (written once, if there is none; the usage history's lines added to one an older version wrote before them)
     lanes.json.imported-<time>  # lanes.json, watches.json as they were, kept when they moved into combwork.db (#1018); a project's deliveries.json likewise in its .combwork. Each such backup (`<name>.imported-<time>`: these, metrics.json's, the board's folder, a session host's sessions.json) goes to the Recycle Bin (`trash()`) 14 days after the move, by the time in its name, when the workspace opens (`sweepLeftovers`, #1111): only those names in their own store's folder, a file or a real folder, never a link
     assistant/            # the Assistant's home (§6.5); its own .gitignore keeps it out of git
@@ -2027,8 +2027,8 @@ Everything is visible in the Version Control tab itself, not only through the As
   Project, a folder found when the workspace is read, its project.json made then as opening makes it, one the
   Assistant or the Agent API adds) and one switched to a
   platform it never had (#1419: nothing in `kept`), even with its other platform answered. A project from before 1.0
-  (no platform recorded) never asks, also before its upgrade has run: the upgrade writes its options (it gets the
-  one-time presets notice, §16.17).
+  with the options its upgrade wrote doesn't ask; one with no platform recorded and no options (its upgrade's adoption
+  never ran: gone since HI-3619, §16.17) asks as any other does.
 - **The answer is the platform's:** `chosen` (any save from the Workflow section, the step's Choose included) or
   `notNow` (for the platform the step showed: one switched meanwhile isn't answered for it), written with
   `setPresetAsked` (`projectWorkflow.ts`) under the project's lock; it goes into `kept` with the
@@ -2042,7 +2042,7 @@ Everything is visible in the Version Control tab itself, not only through the As
   now** writes `notNow` and no options, so they stay inherited (the workspace's and Combwork's defaults, else all off), and
   the header says "no preset chosen". Nothing is applied before Choose.
 - **Where:** New Project opens the new project's Version Control tab at the step; a project found when the workspace
-  is read, or added by the Assistant or the Agent API, gets a notice in the presets notice's look ("<project> was
+  is read, or added by the Assistant or the Agent API, gets a notice (a banner: "<project> was
   added: how do you work?", **Choose…** to the step, **Not Now** answers `notNow`); after a switch to a platform with no
   answer, the tab shows the step. All of it works with the Assistant off.
 
@@ -3247,7 +3247,7 @@ the row scrolls with the selected section in view. **None's page:** Workflow (no
 ruleset has Combwork merge), with its controls and the links to it, until that state is clear. The section list is a pure
 function of the platform and that state. Workflow hosts P4's form (§16.6.6's Built note) unchanged until #1418;
 Project Settings → Workflow kept one row, **Open Version Control**, until HI-1766 removed the section; the hidden
-`project.workflow.*` rows stay for `cw_update_setting` (their path: Version Control → Workflow → the option). The presets notice's **Choose…** opens the first project's tab at Workflow.
+`project.workflow.*` rows stay for `cw_update_setting` (their path: Version Control → Workflow → the option).
 
 **Tabs (HI-3549):** the Workflow form is tabbed, its groups (§16.6.1, §16.6.2) placed on them by `FORM_TABS`
 (`shared/workflow/options.ts`): layout only, no option's meaning, value or default changing. Git: **Overview** (the
@@ -3355,7 +3355,7 @@ afterwards makes it **Custom** (the header says which preset it started from). T
 
 None's presets fill every option: Solo = N1 No one, N2 —, N3 none, N4 the whole folder except `.combwork`, `node_modules` and `.venv`, N5 default names, N6 On, N7 as set; Pair = N1 A reviewer agent, N2 On, N3 the quick checks, the rest as Solo; Team = N1 A reviewer agent, then you, N2 On, N3 quick checks + tests, the rest as Solo. (N7 is shown, not set: its owner is Settings → Agents.)
 
-**G19's default since HI-1997**: the branch's own in every preset and All off (`BASE`), since card titles name people and details a public history shouldn't keep. A project keeps Combwork's only by a proven choice: its `workflow.commitMessageChosen` mark (`writeWorkflow` sets it when a write changes G19 to Combwork's, and it stays while G19 is Combwork's) or its merge-choice record saying Combwork's (HI-1697; limited evidence, as the record isn't written for every save), which, where the project only inherited Combwork's, the step writes into its own Git options (marked), those in force or those it keeps while on None, before any default it inherits from is dropped. A one-time step (`commitMessageStep.ts`) switches every other stored Combwork's: a project's own Git options, in force and kept, at the workspace's open (each with its `stepsDone` in the same locked write, then the workspace's own defaults with workspace.json's `stepsDone`, then the board's mark `workflow.commitMessageDefault`), and Combwork's own defaults at startup (with `settings.stepsDone`, the save confirmed). A stored 'branch' is never touched. An ambiguous saved Combwork's is the old default and switches; the hive project, with nothing proving its choice, switches too and is set back to Combwork's in Version Control → Workflow once the build is installed (option ii), a choice made after the switch and so kept. The upgrade's merge question (HI-1697) starts on the branch's own, with Combwork's marked as how it merged until now.
+**G19's default since HI-1997**: the branch's own in every preset and All off (`BASE`), since card titles name people and details a public history shouldn't keep. A project keeps Combwork's only by a proven choice: its `workflow.commitMessageChosen` mark (`writeWorkflow` sets it when a write changes G19 to Combwork's, and it stays while G19 is Combwork's) or its merge-choice record saying Combwork's (HI-1697; limited evidence, as the record isn't written for every save), which, where the project only inherited Combwork's, the step writes into its own Git options (marked), those in force or those it keeps while on None, before any default it inherits from is dropped. A one-time step (`commitMessageStep.ts`) switched every other stored Combwork's: a project's own Git options, in force and kept, at the workspace's open (each with its `stepsDone` in the same locked write, then the workspace's own defaults with workspace.json's `stepsDone`, then the board's mark `workflow.commitMessageDefault`), and Combwork's own defaults at startup (with `settings.stepsDone`, the save confirmed); every 1.6 workspace has run it, and it is gone since HI-3619 (the `commitMessageChosen` mark is still written, and read by nothing now). A stored 'branch' was never touched. An ambiguous saved Combwork's is the old default and switches; the hive project, with nothing proving its choice, switches too and is set back to Combwork's in Version Control → Workflow once the build is installed (option ii), a choice made after the switch and so kept. The upgrade's merge question (HI-1697) starts on the branch's own, with Combwork's marked as how it merged until now.
 
 The Version Control tab documents each preset's choices and why (P6, from this table) [#1122].
 
@@ -3521,8 +3521,9 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
   - **Presets at their full values (§16.6.3):** Pair, Team and Pair (the agent merges) set G15 On and G17 One per lane;
     every preset is offered (`PRESETS` has no `needs`); Team keeps #1361's focused-tests note (#1367). The presets' whys
     have G15's and G17's lines (`OPTION_WHY`); G11's is as before. The settings tool has `project.workflow.slotsUpToDate`.
-  - **Saved options from before P7** (`src/main/workflow/slotsUpToDateStep.ts`): a pre-P7 build stored G15 only as its
-    forced Off. A one-time step after the upgrade's adoption (a `board_meta` mark,
+  - **Saved options from before P7** (`slotsUpToDateStep.ts`, gone since HI-3619: only dev and test workspaces had such
+    values, and no release had P5 or P6): a pre-P7 build stored G15 only as its forced Off. A one-time step after the
+    upgrade's adoption (a `board_meta` mark,
     `workflow.slotsUpToDateFromBeforeP7`, set once every project is done, and the project's own record, the step's
     name in project.json's `stepsDone`, written in the same locked write as its change through `writeWorkflow`; both
     checked under the project's lock first, so a second Combwork running the step meanwhile, or a run again after one that
@@ -3582,7 +3583,7 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
     a later phase's).
   - Each row shows its origin (the preset, the project, the workspace, Combwork's settings, or the platform's all-off). An
     option the project sets has **Inherit**: project.json keeps only the options the project sets (`workflow.options`
-    is partial), and the runtime, the recorder's start and the adoption resolve them over the other levels.
+    is partial), and the runtime and the recorder's start resolve them over the other levels.
   - **Save…** runs `workflow:setOptions`, never `project:updateConfig` (which refuses `workflow`). It is checked under
     the project's lock: an option that can't be read, a contradiction, or a value the project sets that this version
     doesn't offer yet (strict, slots kept up to date; Combwork merges and merge checks until P5) refuses the whole save, with each
@@ -7446,7 +7447,7 @@ repeating them (#533) [note §8].
 agents lose `worktree` and are lent the slot they were in. Tested on a copy of the maintainer's workspace.
 
 **Built [#1441]: adopt in place, rename later with Repair's steps; one-way.** A step of the upgrade,
-run at each opening of a 1.0 board (`slotMigration.ts`; every 1.0 board has the adoption's mark, so a 0.9 project added
+run at each opening of a 1.0 board (`slotMigration.ts`; every 1.0 board has the 1.0 upgrade's mark, `adoption_upto`, so a 0.9 project added
 to a workspace made by 1.0 is migrated too), per agent (board_meta `slot_migration` records each project's agents
 migrated), safe to repeat and to run in two copies of Combwork at once (each agent's adoption, with its record, is one board write,
 decided again in it):
@@ -8853,8 +8854,11 @@ an invented history:
 | Review | `Adopted` and an **adopted submission**: a `Submitted` fact marked `source: observed, adopted: true` at the line's head, with endpoints and keys computed then | its reviewer reviews that revision as usual. If the head isn't what the builder meant, the review says so. |
 | Passed | `Adopted` with `passedBefore1_0: true` (what the column said), **no `Verdict`**: a pass can't be tied to a revision history doesn't prove | under the upgrade's options (G5 Not checked, below) nothing needs a verdict: the builder reports its merge or the user moves it. A later stricter ruleset applies only from the next card [#1112 down]. |
 
-The adoption (#1218, `workflow/adoption.ts`) runs in the background once the migration has committed, and again at each
-start until it has handled every card once (board_meta `adoption`). It handles only the cards from before 1.0: the
+**Gone since HI-3619**, with the import of card files from before 0.9 (the only cards it could still find): every 1.6
+workspace has run it. The board keeps what it wrote (`Adopted` facts, adopted submissions, cards marked before 1.0,
+board_meta `adoption` and `adoption_upto`), and the workflow still reads them; nothing writes them now. What it did:
+the adoption (#1218, `workflow/adoption.ts`) ran in the background once the migration had committed, and again at each
+start until it had handled every card once (board_meta `adoption`). It handled only the cards from before 1.0: the
 upgrade's transaction records the highest card number (board_meta `adoption_upto`; 0 on a board made by 1.0, which so
 adopts nothing), so a card made since is never marked. Archived cards, workspace cards and the cards of a project no
 longer in the workspace are **before 1.0** whatever their column. A card's folder is its agent's worktree (target: the
@@ -8868,19 +8872,19 @@ and to run in two copies of Combwork at once, and a project's options are writte
 the board: each adopted card is already at the stage its column stands for. A project's agents count as reviewer agents
 when a role or name says *review*.
 
-**Options at the upgrade** [#1122 c: "options matching how they work today, so nothing changes overnight"]:
+**Options at the upgrade** [#1122 c: "options matching how they work today, so nothing changes overnight"], written by
+the adoption (gone since HI-3619: a project.json from before 1.0 that never got them asks "How do you work?" now,
+§16.3.5, its options written only when the user chooses):
 - Git projects get Git with G5 **Not checked**, G11 as their agents work (slots if any agent has a worktree, else the
   project folder), every check off, and **G1 = A reviewer agent if the project has reviewer agents or a lane**, else No
   review. None projects get None, with N1 the same way. (Everything off would hide the Review and Approved stages that
   running lanes are in, HB3's finding 1.)
 - **A stage stays visible while any card is in it,** even if the options no longer produce it; the card finishes under
   its own ruleset.
-- A one-time notice offers the presets. This reads the clean cut-over as "everyone moves to the layer at once, no warn
-  mode", with options starting where the project is (OP-22). **Built [#1278]:** a banner after the upgrade names the
-  projects with no preset chosen; **Choose…** opens the first one's Project Settings → Workflow, **Not Now** dismisses
-  it. Either answer is recorded in `board_meta` (`workflow.presetsNotice`), so it shows once per workspace, and never on
-  a board made by 1.0 (no card from before it: `adoption_upto` 0).
-- **[#1423]** Only projects from before 1.0 get the upgrade's options: those whose project.json records no platform
+- A one-time notice offered the presets (OP-22). **Built [#1278], gone since HI-3619:** a banner after the upgrade named
+  the projects with no preset chosen; **Choose…** opened the first one's Workflow section, **Not Now** dismissed it.
+  Either answer was recorded in `board_meta` (`workflow.presetsNotice`), so it showed once per workspace.
+- **[#1423]** Only projects from before 1.0 got the upgrade's options: those whose project.json records no platform
   (Combwork records it as it makes a project.json, which no version before 1.0 did), whatever the board (an upgraded board
   with no cards included). A project made by 1.0 gets none, and asks "How do you work?" (§16.3.5) instead.
 - **[HI-1697] The merge style and commit message are asked, never set silently.** A Git project given the upgrade's
@@ -8907,7 +8911,10 @@ when a role or name says *review*.
   chosen, a project's saves are ordinary ones and the record never takes them back (it is written to the file only
   while pending). The queue then lifts its pause, closes any question still open, and merges the card as chosen.
   Answered in words, the queue asks again. A project marked with no card in the queue is never interrupted. Projects
-  upgraded before HI-1697 have no mark.
+  upgraded before HI-1697 have no mark, and none is marked since HI-3619 (the adoption marked them): a project still
+  marked keeps its question until it is answered. The test copies' crash at the choice's seams
+  (`CW_TEST_MERGE_CHOICE_CRASH`) is gone (HI-3619): the e2e suite that set it went with HI-3602, and the unit tests drive
+  the seams (`saveSeams`).
 
 **Agents' old moves, for one transition** [HB3's finding 7]: from P4 until P8 rewrites the skills, an agent's
 `cw_update_task` column move is translated into the matching intent instead of refused: `review` → submit, `passed`

@@ -5,11 +5,10 @@
 // each gets an Override naming the options changed, carrying the new ruleset, which the card works under from then on.
 // Also the one-time notice offering the presets after the upgrade (§16.17, OP-22).
 
-import { app } from 'electron'
 import { existsSync } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { join } from 'path'
-import { ADOPTION_UPTO, boardState, boardValue, boardWrite, cardKeys, setBoardValue } from '../boardStore'
+import { boardWrite, cardKeys } from '../boardStore'
 import { cardLabel } from '../../shared/projectKeys'
 import { MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry } from '../../shared/workflow/facts'
 import { refusal } from '../../shared/workflow/refusals'
@@ -41,7 +40,6 @@ import { refuseRemovedTargets, removalsOf, retargetPreview, slotUses } from './r
 import { newlyMissing, projectTargets, refuseMissingTargets } from './targets'
 import { workflowWrite } from './writes'
 import { withFolderRepoLocks } from '../platform/repoPorts'
-import { exitBy } from '../exitLog'
 import { LEGACY_CONSUMED, legacyPreferences } from '../../shared/workflow/preferences'
 import { checkOffer } from './releaseOffer'
 import { changeGuards, refuseGuardsAtSave } from './guardsSave'
@@ -49,9 +47,6 @@ import { previewable, type GuardPreview, type MergeGuard } from '../../shared/wo
 import { previewMergeGuard, schedulePreview } from './mergeGuardsRun'
 
 const log = createLogger('workflow')
-
-/** board_meta's record that the presets notice was answered (§16.17): shown once per workspace. */
-export const PRESETS_NOTICE_KEY = 'workflow.presetsNotice'
 
 /** The stages a card in flight is in: started, not yet Done (or parked). */
 const IN_FLIGHT = new Set(['active', 'review', 'approved', 'merging', 'prOpen'])
@@ -567,11 +562,6 @@ async function settleLocked(ws: WorkspaceService, project: { path: string; name:
  */
 export const saveSeams: { beforeBoard?: () => Promise<void>; recorded?: () => Promise<void>; beforeFile?: () => Promise<void> } = {}
 
-// A test copy (an unpackaged build) crashes at one of them when CW_TEST_MERGE_CHOICE_CRASH names it (HI-1697's crash
-// boundaries): Combwork gone part way, as a crash leaves it.
-const crashAt = app?.isPackaged ? undefined : process.env.CW_TEST_MERGE_CHOICE_CRASH
-if (crashAt === 'recorded' || crashAt === 'beforeFile') saveSeams[crashAt] = () => (exitBy('app.exit', `a test crash at the merge choice's ${crashAt}`, () => app.exit(1)), new Promise<void>(() => undefined))
-
 /** What a save makes of the project's options: its workflow, the options it changes, whether it chooses (HI-1697). */
 function planOptions(ws: WorkspaceService, project: { path: string; name: string; platform: PlatformId }, cfg: ProjectConfig, change: WorkflowChange, answering: boolean): { workflow: ProjectWorkflow; changed: (keyof WorkflowOptions)[]; chosen: boolean } {
   // Its version control switched since the form was read (#1419): these options are the other platform's, refused.
@@ -669,25 +659,4 @@ async function applyToInFlight(ws: WorkspaceService, project: { path: string; na
       }
     })
   })
-}
-
-/**
- * The one-time presets notice (§16.17, OP-22): after the upgrade from 0.9, the projects that kept today's way of working
- * (options the upgrade wrote, no preset chosen), until the user answers it once. Never on a board made by 1.0 (no card
- * from before it), nor while the upgrade waits.
- */
-export async function presetsNotice(ws: WorkspaceService): Promise<{ path: string; name: string }[] | null> {
-  if (!ws.path || boardState(ws).readOnly !== null) return null
-  if (boardValue(ws, PRESETS_NOTICE_KEY) !== null || !(Number(boardValue(ws, ADOPTION_UPTO) ?? 0) > 0)) return null
-  const out: { path: string; name: string }[] = []
-  for (const p of ws.info()?.projects ?? []) {
-    const cfg = await ws.projectConfig(p.path).catch(() => null)
-    if (cfg?.workflow && cfg.workflow.preset === null) out.push({ path: p.path, name: p.name })
-  }
-  return out.length ? out : null
-}
-
-/** The presets notice was answered (Choose… or Not now): never shown again in this workspace. */
-export async function presetsNoticeSaid(ws: WorkspaceService): Promise<void> {
-  await boardWrite(ws, async () => setBoardValue(ws, PRESETS_NOTICE_KEY, new Date().toISOString()))
 }

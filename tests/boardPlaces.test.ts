@@ -36,11 +36,10 @@ const base = tempDir('cw-board-places-')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
-const { boardFile } = await import('../src/main/boardStore')
+const { boardChanged, boardFile, boardWrite, putCard } = await import('../src/main/boardStore')
 
 const user = { kind: 'user' } as const
 const wsPath = join(base, 'ws')
-const tasksDir = join(wsPath, '.combwork', 'tasks')
 const BOARD = 200
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
@@ -56,11 +55,13 @@ async function readsOf(fn: () => Promise<unknown>): Promise<number> {
 beforeAll(async () => {
   mkdirSync(join(wsPath, 'p', '.combwork'), { recursive: true })
   writeFileSync(join(wsPath, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
-  // A board of 200 cards' files from before 0.9: moved into the database as the board is first used.
-  mkdirSync(tasksDir, { recursive: true })
-  for (let n = 1; n <= BOARD; n++) writeFileSync(join(tasksDir, `${n}.json`), JSON.stringify(card(n, { column: (['todo', 'review', 'passed', 'done'] as const)[n % 4], archived: n % 5 === 0 })))
   w = createWorkspaceService()
   await w.open(wsPath)
+  // A board of 200 cards, saved as they are.
+  await boardWrite(w, async () => {
+    for (let n = 1; n <= BOARD; n++) putCard(w, n, card(n, { column: (['todo', 'review', 'passed', 'done'] as const)[n % 4], archived: n % 5 === 0 }))
+    boardChanged(w)
+  })
 })
 afterAll(async () => disposeWorkspaceService(w))
 

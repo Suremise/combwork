@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { goneProject, isProjectId, orphanNames, projectNow, savedProjectName, settleProjectIds } from '../src/shared/projectIds'
 import { moveFolder } from './moveFolder'
 import { tempDir } from './tempDir'
-import { readCardIn, writeCardOutside } from './boardDb'
+import { readCardIn, writeCard, writeCardOutside } from './boardDb'
 import { storeDocs } from './storeDocs'
 import { bound } from './keepType'
 import { timing } from './timing.cjs'
@@ -127,17 +127,15 @@ describe('a workspace', () => {
     // Renamed from old-site while Combwork was closed, before projects had ids (as acme-website → website): its agent
     // Claude was removed since, but its sessions are still the project's.
     project(wsPath, 'site', {}, [{ agentId: 'a-claude' }])
-    // A card saved before ids, by a project of the workspace: it gets the id when the workspace opens.
-    mkdirSync(join(wsPath, '.combwork', 'tasks'), { recursive: true })
-    const old = (n: number, name: string, agent: string | null, archived = false): void =>
-      writeFileSync(join(wsPath, '.combwork', 'tasks', `${n}.json`), JSON.stringify({ number: n, title: `Old ${n}`, description: '', project: name, agent, ...(agent ? { agentName: 'Claude' } : {}), column: 'done', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z' }))
-    old(1, 'beta', null)
-    old(2, 'old-site', 'a-claude', true)
-    old(3, 'old-site', null, true)
-    old(4, 'old-site', 'a-claude')
-    writeFileSync(join(wsPath, '.combwork', 'tasks', 'board.json'), JSON.stringify({ version: 1, next: 5 }))
     w = createWorkspaceService()
     await w.open(wsPath)
+    // A card saved before ids, by a project of the workspace: it gets the id when the workspace opens.
+    const old = (n: number, name: string, agent: string | null, archived = false): Promise<void> =>
+      writeCard(w, n, { number: n, title: `Old ${n}`, description: '', project: name, agent, ...(agent ? { agentName: 'Claude' } : {}), column: 'done', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z' })
+    await old(1, 'beta', null)
+    await old(2, 'old-site', 'a-claude', true)
+    await old(3, 'old-site', null, true)
+    await old(4, 'old-site', 'a-claude')
   })
   afterAll(async () => disposeWorkspaceService(w))
 
@@ -249,9 +247,8 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
   const wsPath = join(base, 'ws2')
   let w: ReturnType<typeof createWorkspaceService>
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
-  const tasksDir = join(wsPath, '.combwork', 'tasks')
-  const legacy = (n: number, name: string, extra: Record<string, unknown> = {}): void =>
-    writeFileSync(join(tasksDir, `${n}.json`), JSON.stringify({ number: n, title: `Legacy ${n}`, description: '', project: name, agent: null, column: 'todo', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z', ...extra }))
+  const legacyDoc = (n: number, name: string, extra: Record<string, unknown> = {}): Record<string, unknown> => ({ number: n, title: `Legacy ${n}`, description: '', project: name, agent: null, column: 'todo', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z', ...extra })
+  const legacy = (n: number, name: string, extra: Record<string, unknown> = {}): Promise<void> => writeCard(w, n, legacyDoc(n, name, extra))
   const alphaAgent = { kind: 'agent', name: 'X (alpha)', scope: 'alpha', self: { project: 'alpha', agentId: 'x1' } } as const
 
   beforeAll(async () => {
@@ -261,27 +258,22 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
     // Each test that renames a folder has its own (#579), so one that fails leaves the next ones theirs.
     project(wsPath, 'kappa')
     project(wsPath, 'rho')
-    mkdirSync(tasksDir, { recursive: true })
-    legacy(1, 'alpha', { custom: { kept: true } })
-    legacy(2, 'beta')
-    // Saved before ids under a project renamed since (site was old-site), with a field this Combwork doesn't know.
-    legacy(3, 'old-site', { agent: 'a-old', agentName: 'Old', custom: 'mine' })
-    writeFileSync(join(tasksDir, 'board.json'), JSON.stringify({ version: 1, next: 4 }))
     // A lane saved before ids, and one under old-site.
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     const lane = (id: string, name: string, builder: string) => ({ id, project: name, name: null, builder: { id: builder, name: builder }, reviewer: null, cards: [1], rounds: 5, waitMinutes: 120, state: 'active', startedBy: 'x', startedAt: '2026-10-09T10:00:00.000Z', updatedAt: '2026-10-09T10:00:00.000Z', endedAt: null, mergeCommit: null })
     writeFileSync(join(wsPath, '.combwork', 'lanes.json'), JSON.stringify({ version: 1, lanes: [lane('lane-a', 'alpha', 'a1'), lane('lane-o', 'old-site', 'a-old')] }))
     w = createWorkspaceService()
     await w.open(wsPath)
+    await legacy(1, 'alpha', { custom: { kept: true } })
+    await legacy(2, 'beta')
+    // Saved before ids under a project renamed since (site was old-site), with a field this Combwork doesn't know.
+    await legacy(3, 'old-site', { agent: 'a-old', agentName: 'Old', custom: 'mine' })
   })
   afterAll(async () => disposeWorkspaceService(w))
 
-  it('stamping gives each card its id once, every field kept; the files as they were are kept in the import backup (#1017)', async () => {
+  it('stamping gives each card its id once, every field kept', async () => {
     expect(await tasks.stampCardProjects(w)).toBe(2)
-    // The cards' files as they were before the move, kept as they were.
-    const kept = readdirSync(join(wsPath, '.combwork')).find((f) => f.startsWith('tasks.imported-'))!
-    const before1 = JSON.parse(readFileSync(join(wsPath, '.combwork', kept, '1.json'), 'utf8'))
-    expect(before1).toMatchObject({ project: 'alpha', custom: { kept: true } })
-    expect(readCard(wsPath, 1)).toEqual({ ...before1, projectId: projectJson(join(wsPath, 'alpha')).id })
+    expect(readCard(wsPath, 1)).toEqual({ ...legacyDoc(1, 'alpha', { custom: { kept: true } }), projectId: projectJson(join(wsPath, 'alpha')).id })
     expect(readCard(wsPath, 2).projectId).toBe(projectJson(join(wsPath, 'beta')).id)
     // Saved under a name no project has, it is Repair's: not stamped.
     expect(readCard(wsPath, 3).projectId).toBeUndefined()

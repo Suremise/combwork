@@ -467,10 +467,6 @@ export interface CombworkRequests {
    * asked again for it. Ignored if the project uses another platform now, or was answered meanwhile.
    */
   'workflow:presetNotNow': (projectPath: string, platform: PlatformId) => void
-  /** The projects the one-time presets notice offers presets to (§16.17), or null when it isn't due. */
-  'workflow:presetsNotice': () => { path: string; name: string }[] | null
-  /** The presets notice was answered (Choose… or Not now): it isn't shown again in this workspace. */
-  'workflow:presetsNoticeSaid': () => void
   /** A level's workflow defaults for a platform as the editor shows them (#1422: Combwork's, or the open workspace's). */
   'workflow:levelForm': (level: WorkflowLevel, platform: PlatformId) => WorkflowForm
   /** What saving a level's defaults would do: its problems, what changes, and the projects inheriting it (#1422). */

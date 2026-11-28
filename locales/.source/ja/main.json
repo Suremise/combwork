@@ -39,8 +39,6 @@
   "main.assistantQuestion.stop.state": "{status, select, working {working} waiting {waiting for the user} signin {waiting for the user to sign in to its CLI again (its sign-in expired)} starting {starting} background {waiting on background tasks it started} watching {waiting for cards to change (a card watch: its card loop pauses until it is resumed)} ready {idle} finished {idle (finished its task)} error {in error} stopped {stopped} other {{status}}}",
   "main.assistantQuestion.stop.title": "Stop {agent} in {project}?",
   "main.assistantQuestion.stop.yes": "Stop",
-  "main.board.damagedBody": "{files} stayed out of the board. They are kept in {folder}.",
-  "main.board.damagedTitle": "{n, plural, one {# card file couldn't be read} other {# card files couldn't be read}}",
   "main.board.foundBody": "They are kept, unchanged, in {folder}. Nothing on the board was changed for them: Review… adds each to the board or discards it.",
   "main.board.foundTitle": "{n, plural, one {# card made by an older Combwork was found: review it} other {# cards made by an older Combwork were found: review them}}",
   "main.board.review": "Review…",

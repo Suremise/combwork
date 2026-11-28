@@ -9,7 +9,6 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { Contradiction, WorkflowOptions } from '../src/shared/workflow/options'
-import type { PlatformId } from '../src/shared/platform/descriptors'
 import { bound } from './keepType'
 import { timing } from './timing.cjs'
 
@@ -27,8 +26,6 @@ const levels = await import('../src/main/workflow/levels')
 const { workflowFor } = await import('../src/main/workflow/service')
 const { checkOptions } = await import('../src/main/workflow/rulesets')
 const { allOff, contradictions, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, preset, PRESETS, previewRows, setOption } = await import('../src/shared/workflow/options')
-const { settledSlotsUpToDate, settleSlotsUpToDate, SLOTS_UP_TO_DATE_STEP } = await import('../src/main/workflow/slotsUpToDateStep')
-const { boardValue } = await import('../src/main/boardStore')
 const { slotOptionsOf } = await import('../src/main/slots')
 const { OPTION_TEXT, OPTION_WHY, optionTitle, PRESET_SUMMARY } = await import('../src/shared/workflow/optionTexts')
 const { englishText } = await import('../src/shared/advanced')
@@ -37,11 +34,9 @@ const { setLanguage } = await import('../src/shared/i18n')
 const projectKeys = await import('../src/main/projectKeys')
 const { agentActor, MERGE_CHOICE_GATE } = await import('../src/shared/workflow/facts')
 const { compile } = await import('../src/shared/workflow/compile')
-const { COMMIT_MESSAGE_STEP, settleCommitMessageDefault, settleGlobalCommitMessage, settledCommitMessage, settledDefaults } = await import('../src/main/workflow/commitMessageStep')
 const { writeWorkflow } = await import('../src/shared/workflow/projectWorkflow')
 const { resolveOptions } = await import('../src/main/workflow/rulesets')
 const { FactStore } = await import('../src/main/workflow/factStore')
-const { MERGE_CHOICE_KEY } = await import('../src/shared/workflow/facts')
 /** A Git project's own options as a pre-1.0 build's preset left them: Pair whole, G19 Combwork's. */
 
 /** The bound for a hung run: a start's facts are recorded within it. */
@@ -893,24 +888,6 @@ describe('a change of the target says what keeps its own (HI-2674)', () => {
   })
 })
 
-describe('the one-time presets notice (#1278, §16.17)', () => {
-  it('is due after an upgrade from 0.9 for projects with no preset, once; never on a board made by 1.0', async () => {
-    const { w, repo } = await workspace({ project: allOff('git') })
-    // A board made by 1.0: no card from before it.
-    expect(await form.presetsNotice(w)).toBeNull()
-    await store.boardWrite(w, async () => store.setBoardValue(w, store.ADOPTION_UPTO, '12'))
-    expect(await form.presetsNotice(w)).toEqual([{ path: repo, name: 'p' }])
-    await form.presetsNoticeSaid(w)
-    expect(await form.presetsNotice(w)).toBeNull()
-  })
-
-  it('leaves out a project whose preset was chosen', async () => {
-    const { w } = await workspace({ project: preset('git', 'solo'), preset: 'solo' })
-    await store.boardWrite(w, async () => store.setBoardValue(w, store.ADOPTION_UPTO, '3'))
-    expect(await form.presetsNotice(w)).toBeNull()
-  })
-})
-
 describe("workflow defaults at Combwork's and the workspace's level (#1422)", () => {
   const read = (file: string): Record<string, unknown> => JSON.parse(readFileSync(file, 'utf8'))
 
@@ -1147,134 +1124,6 @@ describe('G15 and G17 in the form (#1445)', () => {
   })
 })
 
-describe("G15 saved before P7: the one-time step (#1445)", () => {
-  // The step's check, as a save makes it (no defaults at the levels here).
-  const problemsOf = (platform: PlatformId, o: Partial<WorkflowOptions>): string[] => checkOptions(platform, { project: o }).problems.map((p) => (p.kind === 'contradiction' ? p.id : p.kind))
-  const { platform: _gp, ...pairWhole } = preset('git', 'pair')
-  const { platform: _gt, ...teamWhole } = preset('git', 'team')
-
-  it("a preset's project takes its preset's value, one with none drops it; kept options too; G1b untouched", () => {
-    const pair = settledSlotsUpToDate({ platform: 'git', preset: 'pair', options: { ...pairWhole, slotsUpToDate: false, reviewers: 2 } }, problemsOf)
-    expect(pair?.options).toMatchObject({ slotsUpToDate: true, reviewers: 2 })
-    const team = settledSlotsUpToDate({ platform: 'git', preset: 'team', options: { ...teamWhole, slotsUpToDate: false } }, problemsOf)
-    expect(team?.options).toMatchObject({ slotsUpToDate: true })
-    // Solo's own value is Off already: nothing to change.
-    expect(settledSlotsUpToDate({ platform: 'git', preset: 'solo', options: { slotsUpToDate: false } }, problemsOf)).toBeNull()
-    const custom = settledSlotsUpToDate({ platform: 'git', preset: null, options: { slotsUpToDate: false, review: 'agent', noSelfReview: true } }, problemsOf)
-    expect(custom?.options).toEqual({ review: 'agent', noSelfReview: true })
-    expect(settledSlotsUpToDate({ platform: 'git', preset: null, options: { review: 'none' } }, problemsOf)).toBeNull()
-    // Another platform's kept options (#1419), and every other field kept (#1417's writeWorkflow).
-    const kept = settledSlotsUpToDate({ platform: 'none', preset: 'solo', options: {}, presetAsked: 'chosen', kept: { git: { preset: 'pair', options: { ...pairWhole, slotsUpToDate: false }, presetAsked: 'chosen' } } }, problemsOf)
-    expect(kept).toMatchObject({ platform: 'none', presetAsked: 'chosen', kept: { git: { preset: 'pair', options: { slotsUpToDate: true }, presetAsked: 'chosen' } } })
-  })
-
-  it('never adds a problem (HR5): a Pair or Team customised to the project folder, and kept options so, stay as they are', () => {
-    for (const [id, whole] of [['pair', pairWhole], ['team', teamWhole]] as const) {
-      const shared = { ...whole, folder: 'project' as const, finish: 'committed' as const, target: '', slotsUpToDate: false }
-      expect(problemsOf('git', shared), id).toEqual([])
-      expect(settledSlotsUpToDate({ platform: 'git', preset: id, options: shared }, problemsOf), id).toBeNull()
-      // A stored On there (never a P6 build's, but a hand edit) goes Off rather than leave a contradiction it didn't add.
-      expect(settledSlotsUpToDate({ platform: 'none', preset: 'solo', options: {}, kept: { git: { preset: id, options: shared } } }, problemsOf), `${id} kept`).toBeNull()
-    }
-    // One whose folder isn't stored resolves the project folder (all-off's): left Off, never On.
-    expect(settledSlotsUpToDate({ platform: 'git', preset: 'pair', options: { slotsUpToDate: false } }, problemsOf)).toBeNull()
-    // With no preset, a drop that would inherit a contradiction keeps the stored Off.
-    const inherits = (platform: PlatformId, o: Partial<WorkflowOptions>): string[] => checkOptions(platform, { workspace: { git: { slotsUpToDate: true, folder: 'slots' } }, project: o }).problems.map((p) => (p.kind === 'contradiction' ? p.id : p.kind))
-    expect(settledSlotsUpToDate({ platform: 'git', preset: null, options: { folder: 'project', slotsUpToDate: false } }, inherits)).toBeNull()
-    expect(settledSlotsUpToDate({ platform: 'git', preset: null, options: { folder: 'slots', slotsUpToDate: false } }, inherits)?.options).toEqual({ folder: 'slots' })
-  })
-
-  it('runs once over the workspace (run twice), a value stored after it is kept, and a Pair project reads as Pair, not Custom', async () => {
-    const { w, repo } = await workspace({})
-    // As a pre-P7 build saved Pair: the preset whole, G15 Off.
-    const { platform: _p, ...pairOptions } = (await form.workflowForm(w, repo)).presets.find((x) => x.id === 'pair')!.options
-    await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow, platform: 'git', preset: 'pair', options: { ...pairOptions, slotsUpToDate: false, reviewers: 1 } } }))
-    expect(await settleSlotsUpToDate(w)).toBe(1)
-    expect(boardValue(w, SLOTS_UP_TO_DATE_STEP)).not.toBeNull()
-    const after = (await w.projectConfig(repo)).workflow!
-    expect(after.options).toMatchObject({ slotsUpToDate: true, reviewers: 1 })
-    const f = await form.workflowForm(w, repo)
-    expect(f.preset).toBe('pair')
-    const pairNow = f.presets.find((p) => p.id === 'pair')!.options
-    expect(FORM_OPTIONS.git.filter((k) => JSON.stringify(f.options[k]) !== JSON.stringify(pairNow[k]))).toEqual([])
-    // The user turns it off afterwards: their choice, kept by a second run.
-    await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, slotsUpToDate: false } } }))
-    expect(await settleSlotsUpToDate(w)).toBe(0)
-    expect((await w.projectConfig(repo)).workflow!.options.slotsUpToDate).toBe(false)
-  })
-
-  it("a run that read no mark before another finished never overwrites the user's choice made since (HR5: two Combworks)", async () => {
-    const { w, repo } = await workspace({})
-    const { platform: _p, ...pairOptions } = (await form.workflowForm(w, repo)).presets.find((x) => x.id === 'pair')!.options
-    await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow, platform: 'git', preset: 'pair', options: { ...pairOptions, slotsUpToDate: false } } }))
-    // A is held after its admission (no mark yet), before the project.
-    let release!: () => void
-    let reached!: () => void
-    const atProject = new Promise<void>((r) => (reached = r))
-    const gate = new Promise<void>((r) => (release = r))
-    const a = settleSlotsUpToDate(w, { beforeProject: async () => (reached(), gate) })
-    await atProject
-    // B runs whole meanwhile, and the user then saves G15 Off.
-    expect(await settleSlotsUpToDate(w)).toBe(1)
-    await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, slotsUpToDate: false } } }))
-    release()
-    expect(await a).toBe(0)
-    expect((await w.projectConfig(repo)).workflow!.options.slotsUpToDate).toBe(false)
-  })
-
-  it("the project's record is in the same write as its change (HR5's round 2): a run held or stopped just after it never lets another rewrite the user's choice", async () => {
-    for (const how of ['held', 'stopped'] as const) {
-      const { w, repo } = await workspace({})
-      const { platform: _p, ...pairOptions } = (await form.workflowForm(w, repo)).presets.find((x) => x.id === 'pair')!.options
-      await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow, platform: 'git', preset: 'pair', options: { ...pairOptions, slotsUpToDate: false } } }))
-      let release!: () => void
-      let reached!: () => void
-      const written = new Promise<void>((r) => (reached = r))
-      const gate = new Promise<void>((r) => (release = r))
-      // A has written the project and goes no further: held there, or failing (a crash before anything else is recorded).
-      const a = settleSlotsUpToDate(w, { afterProject: async () => { reached(); if (how === 'stopped') throw new Error('stopped'); await gate } })
-      await written
-      // The file holds the change and its record together, as one write did.
-      const onDisk = JSON.parse(readFileSync(join(repo, '.combwork', 'project.json'), 'utf8'))
-      expect([onDisk.workflow.options.slotsUpToDate, onDisk.stepsDone], how).toEqual([true, [SLOTS_UP_TO_DATE_STEP]])
-      expect(boardValue(w, SLOTS_UP_TO_DATE_STEP), how).toBeNull()
-      // The user saves G15 Off, and another run (a second Combwork, or the next open) goes over the workspace.
-      await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, slotsUpToDate: false } } }))
-      expect(await settleSlotsUpToDate(w), how).toBe(0)
-      release()
-      await a
-      expect((await w.projectConfig(repo)).workflow!.options.slotsUpToDate, how).toBe(false)
-      expect((await w.projectConfig(repo)).stepsDone, how).toEqual([SLOTS_UP_TO_DATE_STEP])
-      // Once a run has gone over every project, the step's mark: a project made later is never looked at.
-      expect(boardValue(w, SLOTS_UP_TO_DATE_STEP), how).not.toBeNull()
-    }
-  })
-
-  it('a run that failed part way leaves the projects it settled alone when it runs again', async () => {
-    const { w, repo, ws } = await workspace({})
-    const second = join(ws, 'q')
-    mkdirSync(join(second, '.combwork'), { recursive: true })
-    await w.refresh()
-    const { platform: _p, ...pairOptions } = (await form.workflowForm(w, repo)).presets.find((x) => x.id === 'pair')!.options
-    for (const folder of [repo, second]) await w.mutateProjectConfig(folder, (c) => ({ workflow: { ...c.workflow, platform: 'git', preset: 'pair', options: { ...pairOptions, slotsUpToDate: false } } }))
-    // The first run fails at its second project: the first is settled and marked, the step isn't.
-    let calls = 0
-    const firstDone = await settleSlotsUpToDate(w, { beforeProject: () => { if (++calls === 2) throw new Error('interrupted') } })
-    expect(firstDone).toBe(1)
-    expect(boardValue(w, SLOTS_UP_TO_DATE_STEP)).toBeNull()
-    const stored = async (f: string) => (await w.projectConfig(f)).workflow!.options.slotsUpToDate
-    const [r1, r2] = [await stored(repo), await stored(second)]
-    const done = r1 ? repo : second
-    const notYet = r1 ? second : repo
-    expect([r1, r2].filter(Boolean)).toHaveLength(1)
-    // The user turns the settled one Off; the next run settles the other and leaves it so.
-    await w.mutateProjectConfig(done, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, slotsUpToDate: false } } }))
-    expect(await settleSlotsUpToDate(w)).toBe(1)
-    expect(await stored(done)).toBe(false)
-    expect(await stored(notYet)).toBe(true)
-    expect(boardValue(w, SLOTS_UP_TO_DATE_STEP)).not.toBeNull()
-  })
-})
 describe("G19's default, the branch's own message (HI-1997)", () => {
   const filled = (): Partial<WorkflowOptions> => {
     const { platform: _p, ...o } = preset('git', 'pair')
@@ -1297,139 +1146,6 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     expect(writeWorkflow(wf({ commitMessage: 'combwork' }, true), { platform: 'git', preset: null, options: { commitMessage: 'combwork', strict: true } }).commitMessageChosen).toBe(true)
     expect(writeWorkflow(wf({ commitMessage: 'combwork' }, true), { platform: 'git', preset: null, options: { commitMessage: 'branch' } }).commitMessageChosen).toBeUndefined()
     expect(writeWorkflow(wf({ commitMessage: 'combwork' }, true), { platform: 'git', preset: null, options: {} }).commitMessageChosen).toBeUndefined()
-  })
-
-  it("the step's choices: an ambiguous Combwork's switched (in force and kept), a proven one and the branch's own kept", () => {
-    const wf = { platform: 'git' as const, preset: 'pair' as const, options: filled() }
-    expect(settledCommitMessage(wf, false)?.options).not.toHaveProperty('commitMessage')
-    expect(settledCommitMessage(wf, true)).toBeNull()
-    expect(settledCommitMessage({ ...wf, commitMessageChosen: true }, false)).toBeNull()
-    expect(settledCommitMessage({ ...wf, options: { commitMessage: 'branch' } }, false)).toBeNull()
-    const kept = settledCommitMessage({ platform: 'none', preset: null, options: {}, kept: { git: { preset: 'pair', options: filled() } } }, false)
-    expect(kept?.kept?.git?.options).not.toHaveProperty('commitMessage')
-    expect(settledDefaults({ git: { commitMessage: 'combwork', review: 'agent' }, none: { review: 'agent' } })).toEqual({ git: { review: 'agent' }, none: { review: 'agent' } })
-    expect(settledDefaults({ git: { commitMessage: 'branch' } })).toBeNull()
-  })
-
-  it("a workspace's projects and own defaults switched once, each recorded with its change, then the board's mark; a choice made since is kept", async () => {
-    const { w, repo, ws } = await workspace({ project: filled(), preset: 'pair', workspace: { git: { commitMessage: 'combwork', review: 'agent' } } })
-    expect(await settleCommitMessageDefault(w)).toBe(1)
-    const cfg = await w.projectConfig(repo)
-    expect(cfg.workflow!.options).not.toHaveProperty('commitMessage')
-    expect(cfg.stepsDone).toContain(COMMIT_MESSAGE_STEP)
-    const wsFile = JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8'))
-    expect(wsFile.workflow.git).toEqual({ review: 'agent' })
-    expect(wsFile.stepsDone).toContain(COMMIT_MESSAGE_STEP)
-    expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
-    expect((await form.workflowForm(w, repo)).options.commitMessage).toBe('branch')
-    // Combwork's chosen afterwards: kept by a second run.
-    await w.mutateProjectConfig(repo, (c) => ({ workflow: writeWorkflow(c.workflow, { platform: 'git', preset: c.workflow!.preset, options: { ...c.workflow!.options, commitMessage: 'combwork' } }) }))
-    expect(await settleCommitMessageDefault(w)).toBe(0)
-    expect((await w.projectConfig(repo)).workflow!.options.commitMessage).toBe('combwork')
-  })
-
-  it("Combwork's proven by the mark or by the board's merge choice (HI-1697) is kept", async () => {
-    const marked = await workspace({ project: { commitMessage: 'combwork' }, preset: null })
-    await marked.w.mutateProjectConfig(marked.repo, (c) => ({ workflow: { ...c.workflow!, commitMessageChosen: true } }))
-    expect(await settleCommitMessageDefault(marked.w)).toBe(0)
-    expect((await marked.w.projectConfig(marked.repo)).workflow!.options.commitMessage).toBe('combwork')
-    const answered = await workspace({ project: filled(), preset: 'pair' })
-    const name = basename(answered.repo)
-    await store.boardWrite(answered.w, async () => FactStore.forBoard(answered.w, { project: name, key: name }).setMeta(MERGE_CHOICE_KEY, JSON.stringify({ style: 'merge', commitMessage: 'combwork', at: 'x', pending: false })))
-    expect(await settleCommitMessageDefault(answered.w)).toBe(0)
-    expect((await answered.w.projectConfig(answered.repo)).workflow!.options.commitMessage).toBe('combwork')
-  })
-
-  it("answered Combwork's while inheriting it from the workspace: written into its own options before the workspace's goes, through a failed save and its retry (HR3's note on s26)", async () => {
-    const { commitMessage: _m, ...inheriting } = filled()
-    const { w, repo, ws } = await workspace({ project: inheriting, preset: 'pair', workspace: { git: { commitMessage: 'combwork' } } })
-    const name = basename(repo)
-    await store.boardWrite(w, async () => FactStore.forBoard(w, { project: name, key: name }).setMeta(MERGE_CHOICE_KEY, JSON.stringify({ style: 'merge', commitMessage: 'combwork', at: 'x', pending: false })))
-    const save = vi.spyOn(w, 'saveWorkspaceConfigWith').mockRejectedValueOnce(new Error('disk full'))
-    try {
-      await settleCommitMessageDefault(w)
-      // The project's own Combwork's is written first; the workspace's stays, as the save failed, and nothing is marked.
-      expect((await w.projectConfig(repo)).workflow).toMatchObject({ commitMessageChosen: true, options: { commitMessage: 'combwork' } })
-      expect(JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8')).workflow.git.commitMessage).toBe('combwork')
-      expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
-    } finally {
-      save.mockRestore()
-    }
-    await settleCommitMessageDefault(w)
-    expect(JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8')).workflow.git).not.toHaveProperty('commitMessage')
-    expect((await form.workflowForm(w, repo)).options.commitMessage).toBe('combwork')
-    expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
-  })
-
-  it("answered Combwork's inherited in the Git options a None project keeps: written there too, so switching back to Git is still Combwork's (HR3's round 1)", async () => {
-    const { setKept } = await import('../src/shared/workflow/projectWorkflow')
-    const { commitMessage: _m, ...inheriting } = filled()
-    const { w, repo, ws } = await workspace({ project: inheriting, preset: 'pair', workspace: { git: { commitMessage: 'combwork' } } })
-    // On None now, its Git options kept (#1419), inheriting Combwork's from the workspace.
-    await w.mutateProjectConfig(repo, (c) => ({ workflow: setKept(c.workflow!, 'none') }))
-    expect((await w.projectConfig(repo)).workflow).toMatchObject({ platform: 'none', kept: { git: { preset: 'pair' } } })
-    const name = basename(repo)
-    await store.boardWrite(w, async () => FactStore.forBoard(w, { project: name, key: name }).setMeta(MERGE_CHOICE_KEY, JSON.stringify({ style: 'merge', commitMessage: 'combwork', at: 'x', pending: false })))
-    const save = vi.spyOn(w, 'saveWorkspaceConfigWith').mockRejectedValueOnce(new Error('disk full'))
-    try {
-      await settleCommitMessageDefault(w)
-      expect((await w.projectConfig(repo)).workflow).toMatchObject({ commitMessageChosen: true, kept: { git: { options: { commitMessage: 'combwork' } } } })
-      expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
-    } finally {
-      save.mockRestore()
-    }
-    await settleCommitMessageDefault(w)
-    const wsFile = JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8'))
-    expect(wsFile.workflow.git).not.toHaveProperty('commitMessage')
-    expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
-    // Back on Git: its own Combwork's, over the workspace's defaults as they are now.
-    const back = setKept((await w.projectConfig(repo)).workflow!, 'git')
-    expect(back.commitMessageChosen).toBe(true)
-    expect(resolveOptions('git', { workspace: wsFile.workflow, project: back.options }).options.commitMessage).toBe('combwork')
-  })
-
-  it("a failed write leaves no board mark; the next run finishes, never undoing a project already settled (HR3's gap 3)", async () => {
-    const { w, repo, ws } = await workspace({ project: filled(), preset: 'pair', workspace: { git: { commitMessage: 'combwork' } } })
-    const save = vi.spyOn(w, 'saveWorkspaceConfigWith').mockRejectedValueOnce(new Error('disk full'))
-    try {
-      expect(await settleCommitMessageDefault(w)).toBe(1)
-      expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
-      expect((await w.projectConfig(repo)).stepsDone).toContain(COMMIT_MESSAGE_STEP)
-      expect(JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8')).workflow.git.commitMessage).toBe('combwork')
-      // Combwork's chosen on the project before the retry: the project's record keeps the retry off it.
-      await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, commitMessage: 'combwork' } } }))
-    } finally {
-      save.mockRestore()
-    }
-    expect(await settleCommitMessageDefault(w)).toBe(0)
-    expect((await w.projectConfig(repo)).workflow!.options.commitMessage).toBe('combwork')
-    expect(JSON.parse(readFileSync(join(ws, '.combwork', 'workspace.json'), 'utf8')).workflow.git).not.toHaveProperty('commitMessage')
-    expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
-  })
-
-  it("Combwork's own defaults: switched with their record only once the save reaches the disk", async () => {
-    const was = { workflow: config.settings.workflow, stepsDone: config.settings.stepsDone }
-    const save = vi.spyOn(config, 'saveNow').mockResolvedValueOnce(false)
-    try {
-      config.settings.workflow = { git: { commitMessage: 'combwork', review: 'agent' } }
-      config.settings.stepsDone = undefined
-      await settleGlobalCommitMessage()
-      expect(save).toHaveBeenCalledTimes(1)
-      // As read again from disk at the next start, the save having failed: the step runs again.
-      config.settings.workflow = { git: { commitMessage: 'combwork', review: 'agent' } }
-      config.settings.stepsDone = undefined
-      await settleGlobalCommitMessage()
-      expect(config.settings.workflow).toEqual({ git: { review: 'agent' } })
-      expect(config.settings.stepsDone).toContain(COMMIT_MESSAGE_STEP)
-      // Done: Combwork's chosen since is kept.
-      config.settings.workflow = { git: { commitMessage: 'combwork' } }
-      await settleGlobalCommitMessage()
-      expect(config.settings.workflow).toEqual({ git: { commitMessage: 'combwork' } })
-    } finally {
-      save.mockRestore()
-      config.settings.workflow = was.workflow
-      config.settings.stepsDone = was.stepsDone
-    }
   })
 })
 

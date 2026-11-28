@@ -1299,18 +1299,6 @@
     "defaultMessage": "Team",
     "description": "A workflow preset (glossary 2.1): several builders and reviewers, stricter checks."
   },
-  "workflow.presetsNotice.choose": {
-    "defaultMessage": "Choose…",
-    "description": "A button of the one-time presets notice: opens the first project’s Version Control tab at Workflow."
-  },
-  "workflow.presetsNotice.notNow": {
-    "defaultMessage": "Not Now",
-    "description": "A button of the one-time presets notice: dismisses it for good."
-  },
-  "workflow.presetsNotice.text": {
-    "defaultMessage": "{n, plural, one {{projects} works} other {{projects} work}} as before this version. A preset sets up a workflow in one click: who reviews the work, which checks pass first and who merges.",
-    "description": "The one-time notice after the upgrade to 1.0 (glossary 2.1: preset, workflow). {projects} is a list of project names; {n} how many."
-  },
   "workflow.refused.approval.given.change": {
     "defaultMessage": "This rule is set in Version Control → Your OK before merging.",
     "description": "Where the rule that waits for the user's OK is changed."

@@ -41,8 +41,6 @@ interface CombworkMessageValues {
   'main.assistantQuestion.stop.state': { status: string }
   'main.assistantQuestion.stop.title': { agent: string | number; project: string | number }
   'main.assistantQuestion.stop.yes': undefined
-  'main.board.damagedBody': { files: string | number; folder: string | number }
-  'main.board.damagedTitle': { n: number }
   'main.board.foundBody': { folder: string | number }
   'main.board.foundTitle': { n: number }
   'main.board.review': undefined

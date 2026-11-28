@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import type { NameJournal } from '../src/main/projectNames'
 import { moveFolder as move } from './moveFolder'
 import { tempDir } from './tempDir'
-import { readCardIn } from './boardDb'
+import { readCardIn, writeCard } from './boardDb'
 import { closeAllBoards } from '../src/main/boardStore'
 import { timing } from './timing.cjs'
 
@@ -411,9 +411,8 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
     project(ws, 'website', { lastPath: join(ws, 'website'), agents: [{ id: 'site-builder', name: 'Builder', provider: 'claude-code' }] })
     project(ws, 'acme')
     oldHandover(ws, '2026-10-01-acme-website-old.md', 'acme-website')
-    mkdirSync(join(ws, '.combwork', 'tasks'), { recursive: true })
-    writeFileSync(join(ws, '.combwork', 'tasks', '1.json'), JSON.stringify({ number: 1, title: 'Old card', project: 'acme-website', agent: 'site-builder', column: 'done', archived: true, history: [], comments: [] }))
     const w = await open(ws)
+    await writeCard(w, 1, { number: 1, title: 'Old card', project: 'acme-website', agent: 'site-builder', column: 'done', archived: true, history: [], comments: [] })
     await until(w, () => existsSync(join(ws, '.combwork', 'project-names.json')))
     const owners = join(ws, '.combwork', 'handover-owners.json')
     const real = fsutil.writeKeptJson

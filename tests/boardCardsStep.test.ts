@@ -1,6 +1,6 @@
 // The 1.0 cards step (#1209): cards in #1208's tables, a row each and their child rows. A new board takes the step with
-// no cards (HI-3602: a 0.9 board's documents are no longer moved; such a board isn't opened), card files from before 0.9
-// go straight into the tables, and a change saves into them. And the board read on one snapshot.
+// no cards (HI-3602: a 0.9 board's documents are no longer moved; such a board isn't opened; HI-3619: nor are card files
+// from before 0.9 imported), and a change saves into them. And the board read on one snapshot.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
@@ -123,12 +123,11 @@ describe('the cards step (#1209)', () => {
     await close(w)
   })
 
-  it('a new workspace takes the step with no cards, and moves its card files straight into the tables', async () => {
+  it('a new workspace takes the step with no cards, and a card saved into it goes straight into the tables', async () => {
     const ws = workspace()
-    mkdirSync(join(ws, '.combwork', 'tasks'), { recursive: true })
-    writeFileSync(join(ws, '.combwork', 'tasks', '7.json'), JSON.stringify(ODD[901]).replace('"number":901', '"number":7'))
-    writeFileSync(join(ws, '.combwork', 'tasks', 'board.json'), JSON.stringify({ version: 1, next: 8 }))
     const w = await open(ws)
+    expect(await inWorkspace(w, () => tasks.allTasks(w))).toEqual([])
+    await writeCard(w, 7, JSON.parse(JSON.stringify(ODD[901]).replace('"number":901', '"number":7')))
     const doc = await inWorkspace(w, () => store.cardDoc(w, 7))
     expect(JSON.stringify(doc)).toBe(JSON.stringify(ODD[901]).replace('"number":901', '"number":7'))
     expect(columnsOf(store.boardFile(ws))).not.toContain('doc')

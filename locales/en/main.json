@@ -159,14 +159,6 @@
     "defaultMessage": "Stop",
     "description": "The button that answers yes to \"Stop <agent> in <project>?\" (the Assistant asks before stopping a busy agent)."
   },
-  "main.board.damagedBody": {
-    "defaultMessage": "{files} stayed out of the board. They are kept in {folder}.",
-    "description": "The notice about card files Combwork couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept."
-  },
-  "main.board.damagedTitle": {
-    "defaultMessage": "{n, plural, one {# card file couldn't be read} other {# card files couldn't be read}}",
-    "description": "A notice as Combwork moved the board's cards into its database: some card files weren't valid. {n} is how many."
-  },
   "main.board.foundBody": {
     "defaultMessage": "They are kept, unchanged, in {folder}. Nothing on the board was changed for them: Review… adds each to the board or discards it.",
     "description": "The notice about cards an older Combwork saved: {folder} is the folder where they are kept."
