@@ -21,7 +21,8 @@ const net = require('net')
 const path = require('path')
 const q = require('./queueFixture.cjs')
 
-const PORT = Number(lib.port(47939))
+// Above the e2e lanes' ports (lanes.mjs: 47939–48128), below Windows' dynamic range.
+const PORT = Number(lib.port(48300))
 const fx = q.queueProject('preview')
 const beta = path.join(fx.ws, 'beta')
 const HUNG_MS = lib.timing('hang.step')
