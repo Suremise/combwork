@@ -17317,3 +17317,36 @@ button.progress-lane-retry {
 .blame-who:hover {
   text-decoration: underline;
 }
+
+/* HI-3478: Compare with…'s picker: what to compare the file with. */
+.compare-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 360px;
+}
+.compare-choices {
+  max-height: 50vh;
+  overflow: auto;
+}
+.compare-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+.compare-choice:hover,
+.compare-choice:focus {
+  background: var(--accent-soft);
+}
+.compare-choice .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compare-heading {
+  padding: 6px 6px 2px;
+}

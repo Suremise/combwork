@@ -15,6 +15,7 @@ import type { BranchDrops, BranchUpdatePlan, CompareLines, GitComparison, GitHis
 import type { SigningInfo } from '../../shared/gitSigning'
 import type { FileLog, FileSide, FileVersions, MergeIntro } from '../../shared/fileHistory'
 import type { BlameRead } from '../../shared/fileBlame'
+import type { CompareVersion } from '../../shared/fileCompare'
 import type { GitOperationState } from '../../shared/gitOperations'
 import type { StashConflict } from '../../shared/gitStashes'
 import type { ResolvedStart, StartPoints } from '../../shared/nextVersion'
@@ -84,6 +85,10 @@ export interface RepoReads {
    * card trailer; `untracked` when HEAD has no such file. Bounded by `at` as History's reads, ended by `signal`.
    */
   fileBlame?(root: string, rel: string, text: string, at: number, signal?: AbortSignal): Promise<BlameRead>
+  /** HI-3478: Compare with…'s branches and tags, the most recently changed first. Bounded by `at` as History's reads. */
+  compareRefs?(root: string, at: number): Promise<{ branches: { name: string; commit: string }[]; tags: { name: string; commit: string }[] }>
+  /** HI-3478: `rel` at a branch, tag or commit, its path there found across renames (`given`: a path already known). */
+  fileAtRef?(root: string, rel: string, ref: string, given: string | null, at: number): Promise<CompareVersion>
   /** A line's history, a page at a time, and the tags. */
   history(root: string, o: { ref?: string | null; page?: number; workTarget?: string | null }): Promise<GitHistory>
   /** What can be compared: the lines, main, the integration line and the slots with a line. */

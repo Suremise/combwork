@@ -1003,6 +1003,14 @@
     "defaultMessage": "Which card changed this line?",
     "description": "A tip's title (HI-3476)."
   },
+  "tips.fileCompare.text": {
+    "defaultMessage": "Compare with…, above a file in the Files tab, shows it beside its version on the target branch, another branch, tag or commit, or (in an agent's slot) the project folder's copy, following renames. Your unsaved edits are compared too.",
+    "description": "A tip (HI-3478). Names of Combwork's buttons and views: keep them as Combwork shows them."
+  },
+  "tips.fileCompare.title": {
+    "defaultMessage": "Compare a file with any branch",
+    "description": "A tip's title (HI-3478)."
+  },
   "tips.fileHistory.text": {
     "defaultMessage": "History, above a file in the Files tab, lists the commits that changed it, following its renames: each with the card its commit names and the agent that submitted it. Click one to see what it changed; Back to file keeps your edits.",
     "description": "A tip (HI-3475). Names of Combwork's buttons and views: keep them as Combwork shows them."

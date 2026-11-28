@@ -6,8 +6,10 @@
 // says it came in with the card's merge; a folder's History lists its commits; switching file shows that file's history.
 // HI-3476's Blame by card: the column names the card on its commit's lines, the unsaved and newly typed lines as not
 // committed, the side commit by its hash; an entry opens its commit's diff (Back keeps the edit), the card opens it.
-// Screenshots of the panel, a diff and the blame column in both themes. Git's global config the suite's own. Dev build, throwaway profile
-// and workspace.
+// HI-3478's Compare with…: a branch from before the rename compares at the old path, beside the editor's unsaved text;
+// an option-like name is refused, a hash typed compares with that commit, History's row with its commit; a file not
+// in the version says so. Screenshots of the panel, a diff, the blame column and a comparison in both themes. Git's
+// global config the suite's own. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
 const fs = require('fs')
@@ -41,6 +43,8 @@ const check = (name, ok, extra = '') => {
   write('notes/a.md', '# A\n')
   g('add', '-A')
   g('commit', '-qm', 'start')
+  // HI-3478: a branch from before the rename, to compare with.
+  g('branch', 'before')
   const claude = lib.fakeClaude(userData, claudeHome, [alpha])
   const env = { ...claude, CW_API_PORT: lib.port(47608), GIT_CONFIG_GLOBAL: globalConfig }
 
@@ -185,6 +189,32 @@ const check = (name, ok, extra = '') => {
     await page.locator('[data-action="file-blame"]').click()
     check('Blame by card turns off', !!(await lib.until(async () => (await column.count()) === 0, HUNG_MS)))
 
+    // HI-3478: Compare with… a branch from before the rename: the file at its old path there, beside the editor's text.
+    await page.locator('[data-action="file-compare"]').click()
+    const picker = page.locator('[data-compare-picker]')
+    check('Compare with… lists the branches', await shown(picker.locator('[data-compare-choice="branch:before"]')))
+    await picker.locator('[data-compare-choice="branch:before"]').click()
+    const compared = page.locator('[data-compare-diff]')
+    check('…and compares with the one chosen', await shown(compared.locator('.monaco')))
+    check('…found at its old path there', /There it was old\.txt/.test(await text(compared)), await text(compared))
+    check('…the right side the unsaved edits, said so', (await compared.locator('[data-compare-unsaved]').count()) === 1)
+    await shoot(page.locator('.split-main'), 'compare')
+    await compared.locator('[data-action="compare-back"]').click()
+    check('Back to file keeps the edit', !!(await lib.until(async () => (await compared.count()) === 0 && (await editorText()).includes('unsaved line'), HUNG_MS)))
+    // A name typed: only a branch, tag or hash; a hash compares with that commit.
+    await page.locator('[data-action="file-compare"]').click()
+    await picker.locator('input').fill('--output=x')
+    check('an option-like name is refused in the picker', /not an option or a range/.test(await text(picker)) && (await picker.locator('[data-compare-choice^="typed:"]').count()) === 0)
+    await picker.locator('input').fill(renamed)
+    await picker.locator('input').press('Enter')
+    check('a commit hash typed compares with it', !!(await lib.until(async () => (await page.locator(`[data-compare-diff="${renamed}"] .monaco`).count()) === 1, HUNG_MS)))
+    await page.locator('[data-action="compare-back"]').click()
+    // From History: the row's commit at the path it had there.
+    await panel.locator(`[data-history-row="${renamed}"] [data-action="history-compare"]`).click()
+    check("History's Compare with this version compares with that commit", !!(await lib.until(async () => (await page.locator(`[data-compare-diff="${renamed}"] .monaco`).count()) === 1, HUNG_MS)))
+    await page.locator('[data-action="compare-back"]').click()
+    await lib.until(async () => (await page.locator('[data-compare-diff]').count()) === 0, HUNG_MS)
+
     // Another item selected: its history, never the last one's.
     await row('notes').click()
     const folder = page.locator('[data-file-history="notes"]')
@@ -196,6 +226,16 @@ const check = (name, ok, extra = '') => {
     await row('doc.txt').click()
     check('back on the file, its history again and its editor (the diff left with the folder)', !!(await lib.until(async () => (await panel.locator('[data-history-row]').count()) === 3 && (await page.locator('[data-history-diff]').count()) === 0, HUNG_MS)))
     check('…its edit still unsaved', (await editorText()).includes('unsaved line'))
+    // A file the version doesn't have: said, the left side empty.
+    await row('notes/b.md').click()
+    // A Markdown file opens in its preview: its toolbar's Compare with… is there all the same.
+    await shown(page.locator('.editor-toolbar .path', { hasText: 'b.md' }))
+    await page.locator('[data-action="file-compare"]').click()
+    await page.locator('[data-compare-picker] [data-compare-choice="branch:before"]').click()
+    check("a file not in the version says it isn't there", !!(await lib.until(async () => (await page.locator('[data-compare-missing]').count()) === 1, HUNG_MS)))
+    await page.locator('[data-action="compare-back"]').click()
+    await row('doc.txt').click()
+    await lib.until(async () => (await editorText()).includes('unsaved line'), HUNG_MS)
 
     // A later page whose pinned commit is gone (amended, then pruned): refused, the list kept as it was until Refresh.
     for (let i = 0; i <= 50; i++) {

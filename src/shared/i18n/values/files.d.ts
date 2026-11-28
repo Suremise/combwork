@@ -63,6 +63,26 @@ interface CombworkMessageValues {
   'files.blame.uncommitted': undefined
   'files.blame.untracked': undefined
   'files.collapseAll': undefined
+  'files.compare.back': undefined
+  'files.compare.badRef': undefined
+  'files.compare.binary': undefined
+  'files.compare.branches': undefined
+  'files.compare.failed': { error: string | number }
+  'files.compare.heading': { side: string | number }
+  'files.compare.loading': undefined
+  'files.compare.notFile': { side: string | number }
+  'files.compare.notThere': { side: string | number }
+  'files.compare.open': undefined
+  'files.compare.projectCopy': undefined
+  'files.compare.projectSide': undefined
+  'files.compare.refSide': { ref: string | number; commit: string | number }
+  'files.compare.renamed': { path: string | number }
+  'files.compare.search': undefined
+  'files.compare.tags': undefined
+  'files.compare.target': { branch: string | number }
+  'files.compare.title': { name: string | number }
+  'files.compare.typedRef': { ref: string | number }
+  'files.compare.unsaved': undefined
   'files.csv.firstRows': { count: number }
   'files.delete': undefined
   'files.details.extFile': { ext: string | number }
@@ -144,6 +164,7 @@ interface CombworkMessageValues {
   'files.history.cameInPlain': { commit: string | number }
   'files.history.cardHow': { how: string }
   'files.history.close': undefined
+  'files.history.compareThis': undefined
   'files.history.copyHash': { commit: string | number }
   'files.history.diffFailed': { error: string | number }
   'files.history.diffPaths': { from: string | number; to: string | number }

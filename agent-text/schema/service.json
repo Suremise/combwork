@@ -209,6 +209,17 @@
   "service.fileBlame.unsupported": {
     "placeholders": {}
   },
+  "service.fileCompare.invalid": {
+    "placeholders": {}
+  },
+  "service.fileCompare.noRef": {
+    "placeholders": {
+      "ref": "plain"
+    }
+  },
+  "service.fileCompare.unsupported": {
+    "placeholders": {}
+  },
   "service.fileHistory.cancelled": {
     "placeholders": {}
   },

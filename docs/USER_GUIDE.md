@@ -2312,6 +2312,20 @@ It blames the file as it is in the editor: lines you've typed or changed and not
 
 It works in the project folder and in an agent's slot or worktree. A file git has no committed version of has nothing to blame. For a file longer than 20,000 lines it asks first (**Settings → Advanced → Git: ask before blaming a file longer than**). Each read stops after a minute, like History's (**Git: longest a history read takes**).
 
+### Comparing a file <a id="compare-a-file"></a>
+
+**Compare with…** (the button above a file's editor, the file's right-click menu, or **Compare File With…** in the command palette) shows the file beside another version of it, in place of the editor. Choose:
+
+- **Target branch**: the branch this folder's work merges into. In an agent's slot, that's its card's target.
+- **The project folder's copy**, in an agent's slot or worktree: the same file in the project folder, as it is on disk there.
+- **A branch or tag** from the list, newest first. Or type a name, or a commit's hash, and press **Enter**.
+
+From **History**, a commit's **Compare with this version** compares the file with it at that commit.
+
+The other version is on the left. On the right is the file as it is in the editor, so your unsaved edits are compared too, and a note says so. If the file was renamed since the two versions parted, on either side, it's found at its old name, and the note says what it was called there. A file that isn't in that version, under its name or a rename git found, shows an empty left side and says so. **Back to file** returns to the editor as you left it.
+
+It works in the project folder and in an agent's slot or worktree. Each read stops after a minute (**Settings → Advanced → Git: longest a history read takes**).
+
 ### Viewing and editing files <a id="viewing-and-editing-files"></a>
 
 Select a file and it opens on the right, ready to edit, with syntax highlighting for code, SQL, XML, JSON, YAML and many more. **Ctrl+S** (or **Save**) saves it. Some file types also get a nicer view, and the buttons above the file switch between them:

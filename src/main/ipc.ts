@@ -1919,6 +1919,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return blame.fileBlameAt(workspace, root, rel, text, large, id, lineRepoReads(), blameOwner(blame.fileBlameOwnerGone))
     },
     'files:blameCancel': async (id) => (await import('./fileBlamePanel')).fileBlameCancel(blameOwner(), id),
+    // HI-3478: Compare with…, in the same folders as History.
+    'files:compareChoices': async (root) => (await import('./fileComparePanel')).compareChoicesAt(workspace, root, lineRepoReads()),
+    'files:compareWith': async (root, rel, ref, path) => (await import('./fileComparePanel')).compareWithAt(workspace, root, rel, ref, path, lineRepoReads()),
     'git:history': async (p, ref, page) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

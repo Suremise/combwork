@@ -25,6 +25,7 @@ import { CodeEditor } from '../components/Editors'
 import { CommitDialog } from '../components/CommitDialog'
 import { FILE_HISTORY_TEXT, FileHistoryPanel, HistoryDiff, type HistoryPick } from '../components/FileHistory'
 import { FILE_BLAME_TEXT } from '../components/FileBlame'
+import { FILE_COMPARE_TEXT, type CompareSource } from '../components/FileCompare'
 import { offered } from '../repoOps'
 import type { FileGitRuleText } from '@shared/types'
 
@@ -586,6 +587,7 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
       ...(!e.isDir && single ? [{ label: tr(M.openInDefaultApp), icon: 'link-external', onClick: () => open(e) }] : []),
       ...(single ? [{ label: tr(FILE_HISTORY_TEXT.toggle), icon: 'history', onClick: () => set({ filesHistory: true }) }] : []),
       ...(!e.isDir && single ? [{ label: tr(FILE_BLAME_TEXT.toggle), icon: 'list-flat', onClick: () => set({ filesBlame: true }) }] : []),
+      ...(!e.isDir && single ? [{ label: tr(FILE_COMPARE_TEXT.open), icon: 'git-compare', onClick: () => askCompare(e.relPath, null) }] : []),
       { label: tr(FILES_TEXT.revealInExplorer), icon: 'folder-opened', onClick: () => void call('files:reveal', project.path, e.relPath) },
       ...(project.live ? [{ label: tr(M.insertPath), icon: 'terminal', onClick: () => void insertIntoSession(project, abs) }] : []),
       { separator: true },
@@ -739,7 +741,24 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
   // (or from HI-3476's blame column) shows only while that item stays selected.
   const historyShown = useStore((s) => s.filesHistory)
   const historyItem = !selEntries.length ? { rel: '', isDir: true } : one ? { rel: one.relPath, isDir: one.isDir } : null
-  const [historyPick, setHistoryPick] = useState<{ rel: string; pick: HistoryPick } | null>(null)
+  const [historyPickState, setHistoryPickState] = useState<{ rel: string; pick: HistoryPick } | null>(null)
+  // HI-3478: Compare with… asked of the viewer (its picker, History's row, or closed when a History diff opens over it).
+  const [compareAsk, setCompareAsk] = useState<{ rel: string; nonce: number; source: CompareSource | null | 'close' } | null>(null)
+  const askCompare = (rel: string, source: CompareSource | null | 'close'): void => setCompareAsk((a) => ({ rel, nonce: (a?.nonce ?? 0) + 1, source }))
+  const historyPick = historyPickState
+  // Compare File With… (the command): the picker for the file shown.
+  const compareCommand = useStore((s) => s.filesCompareAsk)
+  const firstCompareCommand = useRef(compareCommand)
+  useEffect(() => {
+    if (compareCommand === firstCompareCommand.current) return
+    firstCompareCommand.current = compareCommand
+    if (one && !one.isDir) askCompare(one.relPath, null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compareCommand])
+  const setHistoryPick = (p: { rel: string; pick: HistoryPick } | null): void => {
+    if (p) askCompare(p.rel, 'close')
+    setHistoryPickState(p)
+  }
   const shownPick = historyItem && historyPick?.rel === historyItem.rel ? historyPick.pick : null
   const [commitShown, setCommitShown] = useState<{ hash: string; focus: { path: string; oldPath: string | null } | null } | null>(null)
   const historyDiff = shownPick ? <HistoryDiff root={project.path} pick={shownPick} onBack={() => setHistoryPick(null)} /> : undefined
@@ -841,6 +860,7 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
             goto={goto?.rel === one.relPath && goto.line ? { line: goto.line, col: goto.col, nonce: goto.nonce } : undefined}
             overlay={historyDiff}
             blame={{ onOpenCommit: (pick) => setHistoryPick({ rel: one.relPath, pick }) }}
+            compare={{ root: project.path, ...(compareAsk?.rel === one.relPath ? { ask: compareAsk } : {}) }}
             toolbarExtra={
               <>
                 <IconButton icon="history" title={tr(FILE_HISTORY_TEXT.toggleTip)} active={historyShown} action="file-history" onClick={() => set({ filesHistory: !historyShown })} />
@@ -862,6 +882,7 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
             item={historyItem}
             picked={shownPick}
             onPick={(pick) => historyItem && setHistoryPick({ rel: historyItem.rel, pick })}
+            onCompare={historyItem && !historyItem.isDir ? (row, file) => (setHistoryPick(null), askCompare(historyItem.rel, { kind: 'ref', ref: row.hash, path: file.path })) : null}
             onOpenCommit={mainCheckout && offered('git:commitDetail') ? (row, file) => setCommitShown({ hash: row.hash, focus: file ? { path: file.path, oldPath: file.oldPath } : null }) : null}
             onClose={() => set({ filesHistory: false })}
           />

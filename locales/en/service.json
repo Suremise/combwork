@@ -243,6 +243,18 @@
     "defaultMessage": "This folder's version control can't say who changed each line.",
     "description": "HI-3476: an error from the Files tab's Blame: the folder's version control has no blame."
   },
+  "service.fileCompare.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was read.",
+    "description": "HI-3478: an error from the Files tab's Compare with…: the request was malformed (not reached from the window), or the name typed can't be a branch, tag or commit (it starts with a dash, or holds spaces or range characters)."
+  },
+  "service.fileCompare.noRef": {
+    "defaultMessage": "{ref} isn't a branch, tag or commit here.",
+    "description": "HI-3478: an error from the Files tab's Compare with…: what the user typed or chose ({ref}) doesn't name a commit in the repository."
+  },
+  "service.fileCompare.unsupported": {
+    "defaultMessage": "This folder's version control can't compare a file with another version.",
+    "description": "HI-3478: an error from the Files tab's Compare with…: the folder's version control has no such read."
+  },
   "service.fileHistory.cancelled": {
     "defaultMessage": "Stopped: the file or its text changed meanwhile.",
     "description": "HI-3476: why a blame of a file in the Files tab stopped: the file shown, or its text in the editor, changed, so its answer was no longer wanted (the window drops it; rarely seen)."

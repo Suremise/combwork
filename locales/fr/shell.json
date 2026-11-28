@@ -53,6 +53,7 @@
   "shell.command.assistant.toggle": "Afficher ou masquer l’Assistant",
   "shell.command.console.showCapture": "Afficher la capture dans le dossier",
   "shell.command.files.commitIgnore": "Commiter .gitignore",
+  "shell.command.files.compareWith": "Comparer le fichier avec…",
   "shell.command.files.toggleBlame": "Afficher ou masquer Blame par carte",
   "shell.command.files.toggleHistory": "Afficher ou masquer l’historique du fichier",
   "shell.command.folderChanges.settle": "Commiter ou mettre de côté les modifications",

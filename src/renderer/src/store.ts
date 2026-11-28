@@ -285,6 +285,8 @@ interface State {
   filesHistory: boolean
   /** HI-3476: the Files tab's Blame by card column is shown beside the editor (its toolbar button, Toggle Blame by Card). */
   filesBlame: boolean
+  /** HI-3478: Compare File With… asked (a new number each time): the Files tab opens the picker for the file it shows. */
+  filesCompareAsk: number
   /** A file whose diff to show in a project's Changes (the Files tab's Show changes, HI-2743): the project folder's. */
   changesJump: { project: string; file: string; nonce: number } | null
   /** Resizable pane sizes, saved with the window layout. */
@@ -623,6 +625,7 @@ export const useStore = create<State>(() => ({
   filesJump: null,
   filesHistory: false,
   filesBlame: false,
+  filesCompareAsk: 0,
   changesJump: null,
   panes: {},
   skillsProvider: {},
