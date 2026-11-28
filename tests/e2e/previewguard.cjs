@@ -29,6 +29,11 @@ const q = require('./queueFixture.cjs')
 // Above the e2e lanes' ports (lanes.mjs: 47939–48128), below Windows' dynamic range.
 const PORT = Number(lib.port(48301))
 const HUNG_MS = lib.timing('hang.step')
+/**
+ * This copy's own preview ports (cw.preview.portRange): test copies all run as dev builds, so each takes a range from its
+ * Agent API port, apart from other suites' running beside it.
+ */
+const PREVIEW_BASE = 50000 + ((PORT * 37) % 13000)
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -183,6 +188,7 @@ async function phase(name, proxyOnly) {
     const { page, inv } = h
     page.on('pageerror', (e) => check(`${tag}no page errors`, false, e.message))
     await inv('advanced:set', 'cw.preview.enabled', true)
+    await inv('advanced:set', 'cw.preview.portRange', PREVIEW_BASE)
     await inv('preview:setConfig', fx.alpha, { command: `node "${server}"`, path: `/?s=${otherPort}&a=${PORT}&u=${udpPort}` })
     const v = await inv('preview:start', fx.alpha)
     check(`${tag}the fixture's preview runs`, v.state === 'running', JSON.stringify(v.end))

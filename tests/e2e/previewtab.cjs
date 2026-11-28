@@ -20,6 +20,11 @@ const q = require('./queueFixture.cjs')
 // Above the e2e lanes' ports (lanes.mjs: 47939–48128), below Windows' dynamic range.
 const PORT = Number(lib.port(48302))
 const HUNG_MS = lib.timing('hang.step')
+/**
+ * This copy's own preview ports (cw.preview.portRange): test copies all run as dev builds, so each takes a range from its
+ * Agent API port, apart from other suites' running beside it.
+ */
+const PREVIEW_BASE = 50000 + ((PORT * 37) % 13000)
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -98,6 +103,7 @@ function devServer(file) {
 
     // --- On, no command: in More ▾, "Set up a preview".
     await inv('advanced:set', 'cw.preview.enabled', true)
+    await inv('advanced:set', 'cw.preview.portRange', PREVIEW_BASE)
     check('on with no command: Preview is in More ▾, not the strip', !!(await until(async () => (await stripTab.count()) === 0 && /Preview/.test(await moreItems()), HUNG_MS)))
     await command('project.tab.preview')
     const setup = page.locator('[data-preview="setup"]')

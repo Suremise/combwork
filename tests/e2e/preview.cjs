@@ -3,7 +3,7 @@
 // will) and Project Settings → Preview:
 // 4. Off (the default): every preview: call is refused, and Project Settings has no Preview section. Turned on, it has
 //    one, suggesting package.json's dev script for the user to take (nothing saved until Save, screenshot).
-// 1. Cross-project: alpha and beta started at the same time get different ports from 46000–46999, each answering.
+// 1. Cross-project: alpha and beta started at the same time get different ports from its range, each answering.
 // 2. Collision and the wrong server: a stranger on the next port makes it pick another; a stranger on every port of the
 //    range fails the start naming the range; a server ignoring PORT fails naming the port it listens on; a server that
 //    exits, then a stranger taking its port, leaves it Stopped (its address gone), and a new start gets another port.
@@ -11,7 +11,8 @@
 //    change), the revert the commit alone again; a preview in a slot under its lease stops when the lease ends, and the
 //    slot's next lease gets a new one.
 // 4. Turned off again: the running preview is stopped (its server gone, its port free), and the section goes.
-// Dev build, throwaway profile and workspace (no agent is started). Ports: the dev build's range, a stranger's at random
+// Dev build, throwaway profile and workspace (no agent is started). Ports: its settings page shows the dev build's default
+// range (46000–46999); then a range of this copy's own (PREVIEW_BASE: test copies all run as dev builds), a stranger's at random
 // in it as the test finds them free; the all-taken case moves the range to 52000–52999 for its step.
 // Dev build only (#1578): its slot is lent and released through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
@@ -26,6 +27,11 @@ const PORT = Number(lib.port(48300))
 const fx = q.queueProject('preview')
 const beta = path.join(fx.ws, 'beta')
 const HUNG_MS = lib.timing('hang.step')
+/**
+ * This copy's own preview ports (cw.preview.portRange): test copies all run as dev builds, so each takes a range from its
+ * Agent API port, apart from other suites' running beside it.
+ */
+const PREVIEW_BASE = 50000 + ((PORT * 37) % 13000)
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -129,12 +135,13 @@ const free = (port) =>
     check('Save saves the command', !!(await until(async () => (await saved())?.command === cmd('port'), HUNG_MS)), JSON.stringify(await saved()))
     check('a page path not from the root is refused', /page path/.test(await refusal(inv('preview:setConfig', fx.alpha, { command: cmd('port'), path: 'app' }))))
     await inv('preview:setConfig', beta, { command: cmd('port') })
+    await inv('advanced:set', 'cw.preview.portRange', PREVIEW_BASE)
     await command('project.tab.session')
 
     // --- 1. Cross-project: two projects at the same time, different ports, each its own server.
     const [a, b] = await Promise.all([inv('preview:start', fx.alpha), inv('preview:start', beta)])
     check('alpha and beta both run', a.state === 'running' && b.state === 'running', JSON.stringify([a.end, b.end]))
-    check('…on different ports from the dev build’s range', a.port !== b.port && [a.port, b.port].every((p) => p >= 46000 && p <= 46999), JSON.stringify([a.port, b.port]))
+    check('…on different ports from its range', a.port !== b.port && [a.port, b.port].every((p) => p >= PREVIEW_BASE && p <= PREVIEW_BASE + 999), JSON.stringify([a.port, b.port]))
     check('…each answering with its own PORT and CW_PREVIEW_PORT', (await fetchText(a.url)) === `preview ${a.port} ${a.port}` && (await fetchText(b.url)) === `preview ${b.port} ${b.port}`)
     check("…each in its project's list only", (await list()).every((v) => v.projectPath.toLowerCase() === fx.alpha.toLowerCase()) && (await list(beta)).length === 1)
     check('a second start of a running place gives the same preview', (await inv('preview:start', fx.alpha)).id === a.id)
@@ -150,7 +157,7 @@ const free = (port) =>
     await closeAll(strangers)
 
     // --- 2. A server ignoring PORT: fails, naming the port it listens on.
-    let own = 46500
+    let own = PREVIEW_BASE + 500
     while (!(await free(own))) own++
     await inv('preview:setConfig', fx.alpha, { command: cmd('fixed', own) })
     const d = await inv('preview:start', fx.alpha)
@@ -185,7 +192,7 @@ const free = (port) =>
     const g = await inv('preview:start', fx.alpha)
     check('a stranger on every port fails the start, naming the range', g.state === 'stopped' && g.end?.kind === 'noFreePort' && g.end.first === 52000 && g.end.last === 52999, JSON.stringify(g.end))
     await closeAll(strangers)
-    await inv('advanced:set', 'cw.preview.portRange', 45000)
+    await inv('advanced:set', 'cw.preview.portRange', PREVIEW_BASE)
 
     // --- 3. Identity: the source at start; an edit a content id; the revert the commit alone.
     const head = lib.git(fx.alpha, ['rev-parse', 'HEAD']).trim()
