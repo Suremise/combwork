@@ -16,9 +16,8 @@ import { wakeEventsOf, type LaneEvent } from '../shared/laneEvents'
 import { assistantHomeIn } from './combworkFolder'
 import { config } from './config'
 import { onCombworkEvent } from './events'
-import { placeKey, readCapped, renameRetrying } from './fsutil'
+import { readCapped, renameRetrying } from './fsutil'
 import { openTable, saveTable } from './storeTables'
-import { dbGenerationAt, onDbReplaced } from './boardStore'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { listLanes } from './lanes'
@@ -214,10 +213,6 @@ interface Store {
   queue: Promise<unknown>
   /** Watches being typed now, by id: cancelled stops the typing (checked before each piece and before Enter). */
   delivering: Map<string, { cancelled: boolean }>
-  /** The workspace database's generation it was read from (#1207 round 2): from an older one, it is closed (`alive`). */
-  gen: number
-  /** Its workspace's place as its load entered (#1456): what its generation is judged and its replacement matched by. */
-  place: string
   /**
    * What each agent's wakes told it (#224): each card of a delivered watch as its line was made from it (for a line about
    * the limit, as the watch began: nothing new was told), the latest wake's for a card in several. The agent's next watch
@@ -373,9 +368,7 @@ const mayWatch = (ws: WorkspaceService, path: string, _projectPath: string, targ
 const shownTo = (scope: string | null, agent: WatchedAgent, now: AgentNow): AgentNow => (scope === null || same(scope, basename(resolve(agent.projectPath))) ? now : { ...now, reply: null })
 
 /** Whether a store's workspace is still the one open in its window. */
-// Read from a database since replaced (#1207 round 2: the upgrade to 1.0, a restore), it is closed too: never saved over the
-// file as it is now, and read again.
-const alive = (store: Store): boolean => !store.life.aborted && !!store.ws.path && same(store.ws.path, store.path) && store.gen === dbGenerationAt(store.place)
+const alive = (store: Store): boolean => !store.life.aborted && !!store.ws.path && same(store.ws.path, store.path)
 const checkAlive = (store: Store): void => {
   if (!alive(store)) throw closedError()
 }
@@ -401,11 +394,7 @@ function load(ws: WorkspaceService): Promise<Store> {
   if (had && had.ws === ws && alive(had)) return Promise.resolve(had)
   const going = loading.get(k)
   if (going) return going
-  // Read from the database as it is now: replaced meanwhile (the upgrade to 1.0, a restore), the read is closed too.
-  // Its place resolved once, as it enters (#1456): its generation is judged by it from then on.
-  const place = placeKey(path)
-  const gen = dbGenerationAt(place)
-  const open = (): boolean => !life.aborted && !!ws.path && same(ws.path, path) && gen === dbGenerationAt(place)
+  const open = (): boolean => !life.aborted && !!ws.path && same(ws.path, path)
   const p = (async () => {
     const read = await readSaved(path, open)
     await testHooks.afterLoad?.()
@@ -460,7 +449,7 @@ function load(ws: WorkspaceService): Promise<Store> {
       }
     }
     // What was migrated is saved at the next tick.
-    const store: Store = { ws, path, life, list, invalid, dirty: migrated || stamped || gone.size > 0, queue: Promise.resolve(), delivering: new Map(), woke: new Map(), wokeAgents: new Map(), wokeLanes: new Map(), wokeReplies: new Map(), gen, place }
+    const store: Store = { ws, path, life, list, invalid, dirty: migrated || stamped || gone.size > 0, queue: Promise.resolve(), delivering: new Map(), woke: new Map(), wokeAgents: new Map(), wokeLanes: new Map(), wokeReplies: new Map() }
     // Read back too big for every watch to end (a hand edit, an older build): room is made, nothing is lost.
     if (budget(store, list) > MAX_FILE_BYTES) {
       const over: WatchRecord[] = []
@@ -3330,19 +3319,6 @@ export async function loadsForTests(): Promise<void> {
 export function forgetWatches(ws: WorkspaceService): void {
   if (ws.path && stores.get(ws.path.toLowerCase())?.ws === ws) stores.delete(ws.path.toLowerCase())
 }
-
-// The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its watches, read from the file
-// before, go from memory (closed by their generation: a change begun on them is refused). They are read again from it
-// by their next use (the replacement's tasks-changed checks them, for a workspace still open), never by this: a
-// workspace closed meanwhile isn't opened again (#1207 round 3). Under every spelling of the workspace, by the place each
-// store recorded as its load entered (#1456).
-onDbReplaced((workspacePath, place) => {
-  for (const [k, store] of [...stores]) {
-    if (k !== workspacePath.toLowerCase() && store.place !== place) continue
-    stores.delete(k)
-    for (const d of store.delivering.values()) d.cancelled = true
-  }
-})
 
 /**
  * The marks of cards now as `scope` sees them (a card outside it reads as gone), for a bounded wait, from the folder that

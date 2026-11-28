@@ -2,7 +2,7 @@ import { existsSync } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { resolve } from 'path'
 import type { SessionsFile } from './workspace'
-import { onDbReplaced, withLeasedDb, workspaceDb } from './boardStore'
+import { withLeasedDb, workspaceDb } from './boardStore'
 import { placeKey, readKeptJson, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup, openTable, storeValue, withStoreLock, writeStore } from './storeRows'
@@ -122,13 +122,6 @@ async function readOldFile(file: string): Promise<SessionsFile | null> {
  */
 const opened = new Map<string, string>()
 const openedKey = (p: SessionsPlace): string => `${p.workspace.toLowerCase()}\0${p.scope}`
-// The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its hosts are looked at again (a
-// sessions.json whose move waited, or one a restore brought back the need for), under every spelling of the workspace,
-// by the place each recorded. The records keep no copy in memory.
-onDbReplaced((workspacePath, place) => {
-  const prefix = `${workspacePath.toLowerCase()}\0`
-  for (const [k, at] of [...opened]) if (k.startsWith(prefix) || at === place) opened.delete(k)
-})
 /** For tests: the workspaces (as spelt, lower-cased) whose hosts were moved in this run. */
 export const sessionsOpenedFor = (): string[] => [...new Set([...opened.keys()].map((k) => k.slice(0, k.indexOf('\0'))))]
 

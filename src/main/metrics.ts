@@ -6,7 +6,6 @@ import { placeKey } from './fsutil'
 import { createLogger, userText } from './logger'
 import { keepAsBackup } from './storeBackup'
 import { readTable, saveTable } from './storeTables'
-import { dbGeneration, onDbReplaced } from './boardStore'
 import { englishText } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
@@ -446,11 +445,8 @@ class Store {
   private importing = false
   /** What is saved couldn't be read (the database unavailable): nothing is saved over it. */
   private unreadable = false
-  /** The workspace database's generation it was read from (#1207 round 2): a save from an older one is refused. */
-  private gen = 0
   constructor(readonly file: string) {
     this.workspace = resolve(file, '..', '..', '..')
-    this.gen = dbGeneration(this.workspace)
     this.load()
     const now = clock.now()
     if (this.roll(now)) this.changed()
@@ -687,17 +683,13 @@ class Store {
       // A row a bucket, by its span and start: one leaving the front moves no other (#1019, #1212).
       const rows = this.buckets
       const importing = this.importing
-      const gen = this.gen
-      const replaced = (): void => {
-        if (gen !== dbGeneration(this.workspace)) throw new Error("the workspace's database was replaced since these metrics were read: not saved over it") // i18n-ignore: logged
-      }
       await saveTable(this.workspace, 'metrics', rows, {
         observed: JSON.stringify(this.observed),
         evictedThrough: this.evictedThrough ? String(this.evictedThrough) : null,
         renamesApplied: this.renamesApplied ? String(this.renamesApplied) : null,
         // The first save after metrics.json was read moves it in: marked in the same transaction, then the file kept.
         ...(importing ? { imported: JSON.stringify({ at: new Date(now).toISOString(), rows: rows.length, file: this.file }) } : {})
-      }, replaced)
+      })
       if (importing) {
         this.importing = false
         if (existsSync(this.file)) keepAsBackup(this.file)
@@ -705,26 +697,6 @@ class Store {
     } catch (e) {
       log.warn('Could not save the performance metrics', e)
     }
-  }
-
-  /**
-   * The workspace's database was replaced (#1207 round 2: the upgrade to 1.0, a restore): what is in memory, read from
-   * the file before (saves failed while the upgrade waited), goes for what the file has now; observing starts again.
-   */
-  reread(): void {
-    if (this.timer) clearTimeout(this.timer)
-    this.timer = null
-    this.gen = dbGeneration(this.workspace)
-    this.buckets = []
-    this.observed = []
-    this.evictedThrough = 0
-    this.renamesApplied = 0
-    this.importing = false
-    this.unreadable = false
-    this.dirty = false
-    this.sealed = true
-    this.load()
-    this.touch(clock.now())
   }
 
   /** Everything goes, observation too: from now on is all a report covers. */
@@ -816,12 +788,6 @@ const live = new Set<Store>()
  */
 const byFile = new Map<string, { store: Store; lifetime: AbortSignal; place: string }>()
 const fileKey = (file: string): string => (process.platform === 'win32' ? resolve(file).toLowerCase() : resolve(file))
-// The workspace's database replaced (the upgrade to 1.0, a restore): its store reads what the file has now.
-// Under every spelling of the workspace, by the place each store's handle recorded as it entered (#1456).
-onDbReplaced((workspacePath, place) => {
-  const key = fileKey(join(workspacePath, CW_DIR, 'metrics', 'metrics.json'))
-  for (const store of new Set([...byFile].filter(([k, o]) => k === key || o.place === place).map(([, o]) => o.store))) store.reread()
-})
 /** Saves started by a workspace closing, still going (quitting waits for them). */
 const closing = new Set<Promise<void>>()
 

@@ -315,13 +315,9 @@
     "text": "Combwork couldn't read {card} now.",
     "note": "Why a message tied to a card's round (#652) isn't made: the card can't be read now (its workspace closed). card: the card (HI-12)."
   },
-  "inbox.save.dbReplaced": {
-    "text": "the workspace's database was replaced since these deliveries were read",
-    "note": "Why the deliveries couldn't be saved, in inbox.save.failed: an upgrade or a restore replaced the database."
-  },
   "inbox.save.failed": {
     "text": "Combwork couldn't save the deliveries ({error}): nothing changed.",
-    "note": "Why a change to deliveries (a message, a read, an ack, a cancel) failed. error: why the save failed (inbox.save.tooMany, .dbReplaced, or a system error)."
+    "note": "Why a change to deliveries (a message, a read, an ack, a cancel) failed. error: why the save failed (inbox.save.tooMany, or a system error)."
   },
   "inbox.save.tooMany": {
     "text": "too many deliveries to keep in this project",
