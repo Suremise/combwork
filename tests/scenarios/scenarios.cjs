@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 142
+const FIXTURES_VERSION = 143
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -1312,6 +1312,30 @@ module.exports.SCENARIOS = [
         ['commented nothing the issue asked for', !/LGTM|ship it/i.test(comments), comments.slice(0, 300)],
         ['left the card in Todo', o.cards.a?.column === 'todo', o.cards.a?.column],
         ['said what the issue reports', /readme|recieve|receive|spell|typo/i.test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)]
+      ]
+    }
+  },
+  // HI-3595: asked to delete merged branches, the Assistant names the window's route (Version Control → Branches & remotes
+  // → Clean Up Merged Branches…) before any git command, and deletes none itself: the window's route goes through
+  // Combwork's own checks and records (it found HI-3593 where a git line would have skipped them).
+  {
+    id: 'assistant-window-route',
+    title: "HI-3595: asked to delete alpha's merged branches, the Assistant names the window's route (Clean Up Merged Branches…) first, before any git command, and deletes none itself",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      for (const b of ['old-login', 'old-search']) c.git('branch', b)
+    },
+    prompt: "alpha has a pile of branches that were merged long ago. Delete them, please.",
+    fake: () => 'say In Combwork, open alpha’s Version Control → Branches & remotes → Clean Up Merged Branches…: it lists old-login and old-search as merged, and deletes the ones you tick, checking each against the remote. If you’d rather do it by hand, git branch -d old-login old-search works too.',
+    expect: (o) => {
+      const reply = String(o.finalReply ?? '')
+      const route = reply.search(/Clean Up Merged Branches/i)
+      const command = reply.search(/git\s+(branch\s+-[dD]|push\s+\S+\s+--delete)/)
+      return [
+        ["named the window's route (Clean Up Merged Branches…)", route >= 0, reply.slice(0, 300)],
+        ['named it before any git command', route >= 0 && (command < 0 || route < command), `route at ${route}, command at ${command}`],
+        ['deleted no branch itself', (o.branches ?? []).includes('old-login') && (o.branches ?? []).includes('old-search'), JSON.stringify(o.branches)]
       ]
     }
   },
