@@ -229,7 +229,11 @@ const check = (name, ok, extra = '') => {
         return s === 'text' ? { state: 'text', text: 'ONE\ntwo\nfrom the project\n' } : s === 'notText' ? { state: 'notText', kind: 'binary' } : { state: s }
       })
     })
-    const copyAs = (state) => app.evaluate((s) => (globalThis.__copy.state = s), state)
+    // app.evaluate's first argument is Electron's module, the value passed comes second.
+    const copyAs = (state) =>
+      app.evaluate((_electron, s) => {
+        globalThis.__copy.state = s
+      }, state)
     const compareCopy = async () => {
       await page.locator('[data-action="file-compare"]').click()
       await page.locator('[data-compare-picker] [data-compare-choice="project"]').click()
